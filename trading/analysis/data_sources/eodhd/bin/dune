@@ -1,0 +1,6 @@
+(executable
+ (public_name eodhd)
+ (name main)
+ (libraries eodhd core async async_ssl)
+ (preprocess
+  (pps ppx_let)))

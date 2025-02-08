@@ -1,4 +1,0 @@
-(executable
- (public_name data_sources)
- (name main)
- (libraries data_sources))
