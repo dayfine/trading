@@ -1,14 +1,15 @@
 open Core
 open Async
-open Eodhd
 
-let fetch_url url =
-  let uri = Uri.of_string url in
-  Http_client.get_body ~uri >>= fun body ->
+let fetch_data symbol =
+  let uri =
+    Eodhd.Http_client.Params.make ~symbol |> Eodhd.Http_client.Params.to_uri
+  in
+  Eodhd.Http_client.get_body ~token:"123" ~uri >>= fun body ->
   print_endline ("Received body\n" ^ body);
   return ()
 
-let main () = fetch_url "https://www.google.com/"
+let main () = fetch_data "GOOG"
 
 let () =
   Command.async ~summary:"Minimal Async example" (Command.Param.return main)

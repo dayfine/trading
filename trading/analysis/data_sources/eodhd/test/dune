@@ -1,2 +1,6 @@
-(test
- (name test_eodhd))
+(library
+ (name http_client_test)
+ (libraries base eodhd)
+ (inline_tests)
+ (preprocess
+  (pps ppx_expect)))
