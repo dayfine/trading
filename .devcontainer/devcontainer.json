@@ -1,5 +1,5 @@
 {
-    "image": "docker.io/ocaml/opam:ubuntu-22.04-ocaml-5.3",
-    "postCreateCommand": "sudo apt update && sudo apt install pkg-config libssl-dev -y && sudo apt-get install vim && opam install . --deps-only --with-test && opam update && opam install ocaml-lsp-server odoc ocamlformat utop dune --yes --unlock-base"
+   "build": { "dockerfile": "Dockerfile" },
+   "postStartCommand": "git config --unset commit.gpgsign"
   }
   
