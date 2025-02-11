@@ -2,4 +2,5 @@
  (name eodhd)
  (preprocess
   (pps ppx_let))
- (libraries base cohttp-async))
+ (libraries base calendar cohttp-async)
+ (modules_without_implementation http_params))

@@ -1,10 +1,7 @@
 open Async
+open CalendarLib
 
-module Params : sig
-  type t
+val to_uri : ?testonly_today:Date.t option -> Http_params.t -> Uri.t
 
-  val make : symbol:string -> t
-  val to_uri : t -> Uri.t
-end
-
-val get_body : token:string -> uri:Uri.t -> string Deferred.t
+val get_historical_price :
+  token:string -> params:Http_params.t -> (string, string) Result.t Deferred.t

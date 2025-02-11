@@ -5,6 +5,7 @@ depends: [
   "ocaml"
   "async_ssl"
   "base"
+  "calendar"
   "cohttp-async"
   "odoc" {with-doc}
 ]
