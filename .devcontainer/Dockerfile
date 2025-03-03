@@ -6,5 +6,4 @@ opam update && \
 opam install ocaml-lsp-server odoc ocamlformat utop dune --yes --unlock-base && \
 # Install the project dependencies
 # For async_ssl
-sudo apt-get install libffi-dev && \
-opam install trading/analysis/data_sources/eodhd/
+sudo apt-get install libffi-dev
