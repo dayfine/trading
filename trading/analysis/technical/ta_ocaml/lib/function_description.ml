@@ -10,10 +10,19 @@ module Functions (F : Ctypes.FOREIGN) = struct
 
   let ta_initialize = foreign "TA_Initialize" (void @-> returning int)
   let ta_shutdown = foreign "TA_Shutdown" (void @-> returning int)
-  let ta_sma = foreign "TA_SMA"
-    (int @-> int @-> ptr double @-> int @-> ptr double @-> ptr int @-> ptr int @-> returning int)
-  let ta_ema = foreign "TA_EMA"
-    (int @-> int @-> ptr double @-> int @-> ptr double @-> ptr int @-> ptr int @-> returning int)
-  let ta_rsi = foreign "TA_RSI"
-    (int @-> int @-> ptr double @-> int @-> ptr double @-> ptr int @-> ptr int @-> returning int)
+
+  let ta_sma =
+    foreign "TA_SMA"
+      (int @-> int @-> ptr double @-> int @-> ptr int @-> ptr int @-> ptr double
+     @-> returning int)
+
+  let ta_ema =
+    foreign "TA_EMA"
+      (int @-> int @-> ptr double @-> int @-> ptr int @-> ptr int @-> ptr double
+     @-> returning int)
+
+  let ta_rsi =
+    foreign "TA_RSI"
+      (int @-> int @-> ptr double @-> int @-> ptr int @-> ptr int @-> ptr double
+     @-> returning int)
 end

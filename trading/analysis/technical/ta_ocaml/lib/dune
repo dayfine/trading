@@ -2,14 +2,17 @@
  (name ta_ocaml)
  (public_name ta_ocaml)
  (libraries ctypes ctypes.foreign)
- (c_library_flags (-L/lib -lta-lib -Wl,-rpath,/lib))
+ (c_library_flags
+  (-L/lib -lta-lib -Wl,-rpath,/lib))
  (ctypes
   (external_library_name ta-lib)
   (build_flags_resolver
    (vendored
     (c_flags (-I/usr/include))
-    (c_library_flags (-L/lib -lta-lib -Wl,-rpath,/lib))))
-  (headers (include "ta-lib/ta_defs.h" "ta-lib/ta_libc.h"))
+    (c_library_flags
+     (-L/lib -lta-lib -Wl,-rpath,/lib))))
+  (headers
+   (include "ta-lib/ta_defs.h" "ta-lib/ta_libc.h"))
   (type_description
    (instance Types)
    (functor Type_description))
