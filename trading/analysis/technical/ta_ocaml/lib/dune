@@ -1,0 +1,22 @@
+(library
+ (name ta_ocaml)
+ (public_name ta_ocaml)
+ (libraries ctypes ctypes.foreign)
+ (ctypes
+  (external_library_name ta-lib)
+  (build_flags_resolver
+   (vendored
+    (c_flags (-I/usr/include))
+    (c_library_flags
+     (-L/lib -lta-lib -Wl,-rpath,/lib))))
+  (headers
+   (include "ta-lib/ta_defs.h" "ta-lib/ta_libc.h"))
+  (type_description
+   (instance Types)
+   (functor Type_description))
+  (function_description
+   (concurrency sequential)
+   (instance Functions)
+   (functor Function_description))
+  (generated_types Types_generated)
+  (generated_entry_point C)))
