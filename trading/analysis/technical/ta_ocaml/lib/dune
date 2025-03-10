@@ -2,8 +2,6 @@
  (name ta_ocaml)
  (public_name ta_ocaml)
  (libraries ctypes ctypes.foreign)
- (c_library_flags
-  (-L/lib -lta-lib -Wl,-rpath,/lib))
  (ctypes
   (external_library_name ta-lib)
   (build_flags_resolver
