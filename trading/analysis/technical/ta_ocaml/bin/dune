@@ -1,0 +1,4 @@
+(executable
+ (public_name ta_ocaml)
+ (name main)
+ (libraries ta_ocaml))

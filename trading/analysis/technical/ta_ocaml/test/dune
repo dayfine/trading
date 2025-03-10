@@ -1,0 +1,6 @@
+(library
+ (name test_ta_ocaml)
+ (libraries ta_ocaml)
+ (inline_tests)
+ (preprocess
+  (pps ppx_expect)))
