@@ -7,4 +7,5 @@
 (package
  (name data_sources)
  (depends ocaml)
+ (allow_empty)
  (tags ()))
