@@ -1,0 +1,4 @@
+(library
+ (name weekly_indicators)
+ (public_name weekly_indicators)
+ (libraries ta_ocaml unix))
