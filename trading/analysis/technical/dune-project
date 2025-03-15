@@ -1,7 +1,0 @@
-(lang dune 3.0)
-(name technical)
-
-(package
- (name technical)
- (allow_empty)
- (synopsis "Technical analysis tools"))

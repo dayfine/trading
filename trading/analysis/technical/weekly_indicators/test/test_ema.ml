@@ -1,40 +1,34 @@
 open OUnit2
+open Weekly_indicators.Types
+open Weekly_indicators.Date
 open Weekly_indicators.Ema
 
-let test_parse_date _ =
-  let date = parse_date "2024-03-12" in
-  assert_equal 2024 date.year;
-  assert_equal 3 date.month;
-  assert_equal 12 date.day
+let create_test_data date close =
+  { date;
+    open_price = close;  (* using close price for all fields for simplicity *)
+    high = close;
+    low = close;
+    close;
+    adjusted_close = close;
+    volume = 1000 }
 
-let test_is_same_week _ =
-  let d1 = { year = 2024; month = 3; day = 12 } in
-  let d2 = { year = 2024; month = 3; day = 15 } in
-  let d3 = { year = 2024; month = 3; day = 18 } in
-  assert_bool "Should be same week" (is_same_week d1 d2);
-  assert_bool "Should not be same week" (not (is_same_week d1 d3))
-
-let test_daily_to_weekly _ =
-  let data = [
-    ({ year = 2024; month = 3; day = 12 }, 139.62);
-    ({ year = 2024; month = 3; day = 13 }, 140.77);
-    ({ year = 2024; month = 3; day = 14 }, 144.34);
-    ({ year = 2024; month = 3; day = 15 }, 142.17);
-    ({ year = 2024; month = 3; day = 18 }, 148.48);
-  ] in
-  let weekly = daily_to_weekly data in
-  assert_equal 2 (List.length weekly);
-  match weekly with
-  | [(_d1, p1); (_d2, p2)] ->
-      assert_equal 142.17 p1;
-      assert_equal 148.48 p2
-  | _ -> assert_failure "Unexpected weekly data structure"
+let test_calculate_30_week_ema _ =
+  (* Create 35 weeks of test data *)
+  let base_date = create ~year:2024 ~month:1 ~day:1 in
+  let data = List.init 35 (fun i ->
+    let date = add_days base_date (i * 7) in
+    create_test_data date (float_of_int (100 + i))
+  ) in
+  let ema_result = calculate_30_week_ema data in
+  assert_equal 5 (List.length ema_result);  (* should have 5 EMA values (35-30) *)
+  match List.rev ema_result with
+  | (last_date, last_ema) :: _ ->
+      assert_bool "Last EMA should be > 100.0" (last_ema > 100.0);
+      assert_equal 2024 (year last_date);
+      assert_equal 8 (month last_date);  (* Should be around August *)
+  | [] -> assert_failure "No EMA results"
 
 let suite =
-  "Weekly EMA tests" >::: [
-    "test_parse_date" >:: test_parse_date;
-    "test_is_same_week" >:: test_is_same_week;
-    "test_daily_to_weekly" >:: test_daily_to_weekly;
+  "EMA tests" >::: [
+    "test_calculate_30_week_ema" >:: test_calculate_30_week_ema;
   ]
-
-let () = run_test_tt_main suite
