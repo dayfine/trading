@@ -1,0 +1,5 @@
+(executable
+ (name compute_ema)
+ (public_name compute_ema)
+ (package weekly_indicators)
+ (libraries weekly_indicators ta_ocaml))
