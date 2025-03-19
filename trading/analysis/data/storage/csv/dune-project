@@ -1,14 +1,13 @@
-(lang dune 3.14)
+(lang dune 3.17)
 
 (name csv_storage)
 (version 0.1.0)
 
+(generate_opam_files true)
+
 (package
  (name csv_storage)
- (synopsis "CSV storage module for trading data")
- (description "A module for reading and writing trading data in CSV format")
  (depends
-  (ocaml (>= 4.14.0))
-  (dune (>= 3.14.0))
+  ocaml ISO8601
   (ounit2 :with-test)
-  (ppx_deriving (>= 5.2.1))))
+  ppx_deriving))

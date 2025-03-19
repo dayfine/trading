@@ -1,6 +1,6 @@
 open OUnit2
-open Trading.Csv_storage.Types
-open Trading.Csv_storage.Parser
+open Csv_storage.Types
+open Csv_storage.Parser
 
 let test_parse_line _ =
   let line = "2024-03-15,143.41,144.34,141.13,142.17,141.4998,41025900" in
@@ -24,8 +24,7 @@ let test_parse_line_invalid_format _ =
       assert_failure
         (Printf.sprintf "Expected Error but got Ok: %s" (show_price_data data))
   | Error msg ->
-      assert_equal
-        (Invalid_csv_format "Expected 7 columns, line: invalid,data")
+      assert_equal (Invalid_csv_format "Expected 7 columns, line: invalid,data")
         msg
 
 let test_parse_line_invalid_date _ =
@@ -34,10 +33,7 @@ let test_parse_line_invalid_date _ =
   | Ok data ->
       assert_failure
         (Printf.sprintf "Expected Error but got Ok: %s" (show_price_data data))
-  | Error msg ->
-      assert_equal
-        (Invalid_date line)
-        msg
+  | Error msg -> assert_equal (Invalid_date line) msg
 
 let test_parse_line_invalid_number _ =
   let line = "2024-03-15,not_a_number,144.34,141.13,142.17,141.4998,41025900" in
@@ -45,10 +41,7 @@ let test_parse_line_invalid_number _ =
   | Ok data ->
       assert_failure
         (Printf.sprintf "Expected Error but got Ok: %s" (show_price_data data))
-  | Error msg ->
-      assert_equal
-        (Invalid_number line)
-        msg
+  | Error msg -> assert_equal (Invalid_number line) msg
 
 let test_parse_line_invalid_volume _ =
   let line = "2024-03-15,143.41,144.34,141.13,142.17,141.4998,not_a_number" in
@@ -56,24 +49,24 @@ let test_parse_line_invalid_volume _ =
   | Ok data ->
       assert_failure
         (Printf.sprintf "Expected Error but got Ok: %s" (show_price_data data))
-  | Error msg ->
-      assert_equal
-        (Invalid_volume line)
-        msg
+  | Error msg -> assert_equal (Invalid_volume line) msg
 
 let test_to_string _ =
-  let data = {
-    date = Unix.localtime (Unix.time ());
-    open_ = 143.41;
-    high = 144.34;
-    low = 141.13;
-    close = 142.17;
-    adjusted_close = 141.4998;
-    volume = 41025900;
-  } in
+  let data =
+    {
+      date = Unix.localtime (Unix.time ());
+      open_ = 143.41;
+      high = 144.34;
+      low = 141.13;
+      close = 142.17;
+      adjusted_close = 141.4998;
+      volume = 41025900;
+    }
+  in
   let str = to_string data in
   match parse_line str with
-  | Error msg -> assert_failure ("Failed to parse generated string: " ^ show_error msg)
+  | Error msg ->
+      assert_failure ("Failed to parse generated string: " ^ show_error msg)
   | Ok parsed ->
       assert_equal data.open_ parsed.open_;
       assert_equal data.high parsed.high;
@@ -83,11 +76,14 @@ let test_to_string _ =
       assert_equal data.volume parsed.volume
 
 let suite =
-  "CSV Parser tests" >::: [
-    "test_parse_line" >:: test_parse_line;
-    "test_parse_line_invalid_format" >:: test_parse_line_invalid_format;
-    "test_parse_line_invalid_date" >:: test_parse_line_invalid_date;
-    "test_parse_line_invalid_number" >:: test_parse_line_invalid_number;
-    "test_parse_line_invalid_volume" >:: test_parse_line_invalid_volume;
-    "test_to_string" >:: test_to_string;
-  ]
+  "CSV Parser tests"
+  >::: [
+         "test_parse_line" >:: test_parse_line;
+         "test_parse_line_invalid_format" >:: test_parse_line_invalid_format;
+         "test_parse_line_invalid_date" >:: test_parse_line_invalid_date;
+         "test_parse_line_invalid_number" >:: test_parse_line_invalid_number;
+         "test_parse_line_invalid_volume" >:: test_parse_line_invalid_volume;
+         "test_to_string" >:: test_to_string;
+       ]
+
+let () = run_test_tt_main suite

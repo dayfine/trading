@@ -8,7 +8,8 @@ type price_data = {
   close : float;
   adjusted_close : float;
   volume : int;
-} [@@deriving show]
+}
+[@@deriving show]
 
 type error =
   | Invalid_csv_format of string
