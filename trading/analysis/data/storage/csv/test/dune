@@ -1,0 +1,4 @@
+(test
+ (name test_csv_parser)
+ (libraries ounit2 csv_storage)
+ (preprocess (pps ppx_deriving.show)))
