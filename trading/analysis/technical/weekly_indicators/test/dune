@@ -1,5 +1,0 @@
-(tests
- (names run_tests)
- (modules run_tests test_date test_csv_parser test_ema)
- (libraries weekly_indicators ounit2 ppx_deriving)
- (preprocess (pps ppx_deriving.show)))
