@@ -4,7 +4,7 @@ version: "0.1.0"
 depends: [
   "dune" {>= "3.17"}
   "ocaml"
-  "ISO8601"
+  "core"
   "ounit2" {with-test}
   "ppx_deriving"
   "odoc" {with-doc}

@@ -1,13 +1,12 @@
 (lang dune 3.17)
 
-(name csv_storage)
+(name types)
 (version 0.1.0)
 
 (generate_opam_files true)
 
 (package
- (name csv_storage)
+ (name types)
  (depends
   ocaml core
-  (ounit2 :with-test)
   ppx_deriving))

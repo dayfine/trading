@@ -1,7 +1,2 @@
-open Types
-
-val parse_line : string -> result
+val parse_line : string -> (Types.Daily_price.t, string) Result.t
 (** Parse a single line of CSV data into a price_data record *)
-
-val to_string : price_data -> string
-(** Convert a price_data record back to a CSV string *)

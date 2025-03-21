@@ -1,7 +1,7 @@
 (library
  (name csv_storage)
  (public_name csv_storage)
- (modules types parser)
- (libraries unix ppx_deriving.runtime ISO8601)
+ (modules parser)
+ (libraries unix ppx_deriving.runtime types core)
  (preprocess
   (pps ppx_deriving.show)))
