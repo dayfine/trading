@@ -1,6 +1,5 @@
 (library
  (name weekly_indicators)
- (public_name weekly_indicators)
- (modules types date csv_parser ema)
- (libraries ta_ocaml unix ppx_deriving.runtime)
- (preprocess (pps ppx_deriving.show)))
+ (libraries core types csv_storage ta_ocaml)
+ (preprocess
+  (pps ppx_deriving.show)))
