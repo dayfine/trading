@@ -1,0 +1,7 @@
+(library
+ (name types)
+ (public_name types)
+ (modules daily_price)
+ (libraries core ppx_deriving.runtime)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

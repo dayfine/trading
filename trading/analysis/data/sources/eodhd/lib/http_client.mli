@@ -1,5 +1,5 @@
 open Async
-open CalendarLib
+open Core
 
 val to_uri : ?testonly_today:Date.t option -> Http_params.t -> Uri.t
 

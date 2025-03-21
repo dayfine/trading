@@ -1,14 +1,10 @@
 open Async
-open CalendarLib
+open Core
 
 (* https://eodhd.com/financial-apis/api-for-historical-data-and-volumes *)
 let api_host = "eodhd.com"
 let query_base = [ ("fmt", [ "csv" ]); ("period", [ "d" ]); ("order", [ "a" ]) ]
-
-let as_str (date : Date.t) =
-  Printf.sprintf "%04d-%02d-%02d" (Date.year date)
-    (Date.int_of_month @@ Date.month date)
-    (Date.days_in_month date)
+let as_str (date : Date.t) = Date.to_string date
 
 let to_uri ?(testonly_today = None) (params : Http_params.t) =
   let uri =
@@ -21,7 +17,9 @@ let to_uri ?(testonly_today = None) (params : Http_params.t) =
     | None -> uri
     | Some start_date -> Uri.add_query_param' uri ("from", start_date |> as_str)
   in
-  let today = Option.value testonly_today ~default:(Date.today ()) in
+  let today =
+    Option.value testonly_today ~default:(Date.today ~zone:Time_float.Zone.utc)
+  in
   Uri.add_query_param' uri'
     ("to", Option.value params.end_date ~default:today |> as_str)
 
