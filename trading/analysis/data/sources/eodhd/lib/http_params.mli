@@ -1,4 +1,4 @@
-open CalendarLib
+open Core
 
 (* params for calling the EODHD API *)
 type t = {

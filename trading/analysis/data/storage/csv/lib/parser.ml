@@ -1,9 +1,7 @@
 open Core
 
 let parse_date str =
-  try
-    Scanf.sscanf str "%d-%d-%d" (fun year month day ->
-        Date.create_exn ~y:year ~m:(Month.of_int_exn month) ~d:day)
+  try Date.of_string str
   with _ ->
     raise (Invalid_argument "Invalid date format, expected YYYY-MM-DD")
 
