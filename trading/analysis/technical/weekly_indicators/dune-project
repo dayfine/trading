@@ -6,5 +6,7 @@
 
 (package
  (name weekly_indicators)
- (depends ocaml)
- (allow_empty))
+ (depends
+  ocaml
+  ppx_let
+  core_unix))
