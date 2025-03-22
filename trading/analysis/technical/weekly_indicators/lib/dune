@@ -1,0 +1,5 @@
+(library
+ (name weekly_indicators)
+ (libraries core types csv_storage ta_ocaml)
+ (preprocess
+  (pps ppx_deriving.show)))

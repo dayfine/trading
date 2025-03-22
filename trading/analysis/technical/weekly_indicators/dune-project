@@ -1,0 +1,10 @@
+(lang dune 3.17)
+
+(name weekly_indicators)
+
+(generate_opam_files true)
+
+(package
+ (name weekly_indicators)
+ (depends ocaml)
+ (allow_empty))
