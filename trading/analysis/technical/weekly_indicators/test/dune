@@ -1,6 +1,0 @@
-(tests
- (names test_time_period_conversion)
- (modules test_time_period_conversion)
- (libraries weekly_indicators ounit2 ppx_deriving)
- (preprocess
-  (pps ppx_deriving.show)))
