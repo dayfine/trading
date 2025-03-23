@@ -1,0 +1,6 @@
+(tests
+ (names test_conversion)
+ (modules test_conversion)
+ (libraries time_period ounit2 ppx_deriving)
+ (preprocess
+  (pps ppx_deriving.show)))

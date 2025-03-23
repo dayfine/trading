@@ -1,0 +1,9 @@
+(lang dune 3.17)
+
+(name time_period)
+
+(generate_opam_files true)
+
+(package
+ (name time_period)
+ (depends ocaml core types))

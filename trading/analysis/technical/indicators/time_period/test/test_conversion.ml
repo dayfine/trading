@@ -1,7 +1,7 @@
 open OUnit2
 open Core
 open Types.Daily_price
-open Weekly_indicators.Time_period_conversion
+open Time_period.Conversion
 
 let default_volume = 1000
 
