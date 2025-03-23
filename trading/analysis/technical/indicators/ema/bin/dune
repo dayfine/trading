@@ -1,0 +1,5 @@
+(executable
+ (name compute_ema)
+ (libraries ema ta_ocaml core core_unix.command_unix)
+ (preprocess
+  (pps ppx_let)))

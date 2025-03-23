@@ -1,0 +1,12 @@
+(lang dune 3.17)
+
+(name indicators)
+
+(generate_opam_files true)
+
+(package
+ (name indicators)
+ (depends
+  ocaml
+  ppx_let
+  core_unix))
