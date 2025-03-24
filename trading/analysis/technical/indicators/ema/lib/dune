@@ -1,0 +1,5 @@
+(library
+ (name ema)
+ (libraries core ta_ocaml indicator_types)
+ (preprocess
+  (pps ppx_deriving.eq)))
