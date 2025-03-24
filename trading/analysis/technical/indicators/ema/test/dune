@@ -1,0 +1,6 @@
+(tests
+ (names test_ema)
+ (modules test_ema)
+ (libraries ema ounit2 indicator_types)
+ (preprocess
+  (pps ppx_deriving.eq)))
