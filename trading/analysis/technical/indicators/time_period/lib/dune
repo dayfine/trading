@@ -1,6 +1,5 @@
 (library
  (name time_period)
- (package time_period)
  (libraries core types)
  (preprocess
   (pps ppx_deriving.show)))
