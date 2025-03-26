@@ -6,7 +6,7 @@ let parse_date str =
     raise (Invalid_argument "Invalid date format, expected YYYY-MM-DD")
 
 let parse_line line =
-  let parts = String.split_on_chars ~on:[ ';' ] line in
+  let parts = String.split_on_chars ~on:[ ',' ] line in
   match parts with
   | [
    date_str; open_str; high_str; low_str; close_str; adj_close_str; volume_str;
@@ -35,3 +35,23 @@ let parse_line line =
       | Invalid_argument msg -> Error msg
       | Failure _ -> Error ("Invalid number in line: " ^ line))
   | _ -> Error ("Expected 7 columns, line: " ^ line)
+
+let read_file filename =
+  try
+    let lines = In_channel.read_lines filename in
+    let rec parse_lines acc = function
+      | [] -> Ok (List.rev acc)
+      | line :: rest -> (
+          match parse_line line with
+          | Ok price -> parse_lines (price :: acc) rest
+          | Error msg -> Error msg)
+    in
+    match lines with
+    | [] -> Ok []
+    | header :: data_lines ->
+        (* Try to parse header but ignore any errors *)
+        let _ = parse_line header in
+        parse_lines [] data_lines
+  with
+  | Sys_error msg -> Error ("Failed to read file: " ^ msg)
+  | e -> Error ("Unexpected error: " ^ Exn.to_string e)
