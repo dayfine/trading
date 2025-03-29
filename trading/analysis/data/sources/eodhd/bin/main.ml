@@ -13,21 +13,22 @@ let fetch_data ~(token : string) ~(symbol : string) =
 let handle_response ~symbol ~output_file response =
   match response with
   | Ok body -> (
-      print_endline ("Received data for " ^ symbol);
+      Async.Log.Global.info "Received data for %s" symbol;
       match output_file with
       | Some filename ->
           save_to_csv ~filename ~data:body;
-          print_endline ("Saved data to " ^ filename);
+          Async.Log.Global.info "Saved data to %s" filename;
           return ()
       | None ->
-          print_endline body;
+          Async.Log.Global.info "Data:\n%s" body;
           return ())
   | Error error ->
-      print_endline ("Error: " ^ error);
+      Async.Log.Global.error "Error: %s" error;
       return ()
 
 let main symbol output_file () =
-  let token = read_file_as_string "secrets" |> String.rstrip in
+  let secrets_path = "trading/analysis/data/sources/eodhd/secrets" in
+  let token = read_file_as_string secrets_path |> String.rstrip in
   fetch_data ~token ~symbol >>= handle_response ~symbol ~output_file
 
 let command =
