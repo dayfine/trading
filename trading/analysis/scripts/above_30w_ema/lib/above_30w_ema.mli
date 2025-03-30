@@ -1,11 +1,11 @@
 open Async
 
 type stock_data = {
-  symbol: string;
-  name: string;
-  sector: string;
-  price: float;
-  ema: float;
+  symbol : string;
+  name : string;
+  sector : string;
+  price : float;
+  ema : float;
 }
 
 val above_30w_ema : token:string -> unit -> stock_data list Deferred.t

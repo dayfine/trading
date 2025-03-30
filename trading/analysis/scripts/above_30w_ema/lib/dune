@@ -8,6 +8,7 @@
   uri
   indicators.ema
   indicators.types
-  eodhd)
+  eodhd
+  progress)
  (preprocess
   (pps ppx_jane)))
