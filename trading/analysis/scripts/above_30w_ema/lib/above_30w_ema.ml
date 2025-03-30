@@ -55,37 +55,17 @@ let calculate_metrics (symbol, name, sector) historical_data =
 
 let above_30w_ema ~token () =
   let symbols = read_sp500_symbols () in
-  let total = List.length symbols in
-
   (* Create a throttle to limit concurrent requests *)
   let throttle =
     Throttle.create ~max_concurrent_jobs:20 ~continue_on_error:false
   in
-
-  let bar ~total =
-    let open Progress.Line in
-    list
-      [
-        const "Processing symbols";
-        spinner ();
-        bar total;
-        eta total;
-        count_to total;
-      ]
-  in
-
-  Progress.with_reporter (bar ~total) (fun report ->
-      symbols
-      |> Deferred.List.map ~how:`Parallel ~f:(fun (sym, name, sector) ->
-             Throttle.enqueue throttle (fun () ->
-                 get_historical_prices ~token sym
-                 >>| calculate_metrics (sym, name, sector)
-                 >>| fun result ->
-                 report 1;
-                 result))
-      >>| List.filter_opt
-      >>| List.filter ~f:(fun stock -> Float.(stock.price > stock.ema))
-      >>| List.sort ~compare:(fun a b -> String.compare a.symbol b.symbol))
+  Deferred.List.map symbols ~how:`Parallel ~f:(fun (sym, name, sector) ->
+      Throttle.enqueue throttle (fun () ->
+          get_historical_prices ~token sym
+          >>| calculate_metrics (sym, name, sector)))
+  >>| List.filter_opt
+  >>| List.filter ~f:(fun stock -> Float.(stock.price > stock.ema))
+  >>| List.sort ~compare:(fun a b -> String.compare a.symbol b.symbol)
 
 let print_results results =
   printf "\nStocks Above 30-Week EMA:\n";
