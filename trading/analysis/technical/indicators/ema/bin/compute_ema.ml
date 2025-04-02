@@ -6,7 +6,7 @@ open Time_period.Conversion
 
 let daily_prices_to_indicator_values prices =
   List.map prices ~f:(fun p ->
-      { date = p.Types.Daily_price.date; value = p.close_price })
+      { date = p.Types.Daily_price.date; value = p.adjusted_close })
 
 let main input_file period weekly () =
   Ta_ocaml.Ta.initialize ();
