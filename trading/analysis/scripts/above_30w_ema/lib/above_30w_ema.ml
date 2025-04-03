@@ -38,7 +38,7 @@ let parse_price_data data =
   (* Skip header *)
   List.map ~f:(fun line ->
       match Csv_storage.Parser.parse_line line with
-      | Ok price -> { date = price.date; value = price.close_price }
+      | Ok price -> { date = price.date; value = price.adjusted_close }
       | Error msg -> failwith msg)
 
 let calculate_metrics (symbol, name, sector) historical_data =
