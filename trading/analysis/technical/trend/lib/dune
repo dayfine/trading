@@ -1,0 +1,5 @@
+(library
+ (name trend_lib)
+ (public_name trend.lib)
+ (libraries owl owl-plplot)
+ (modules segmentation regression_test))

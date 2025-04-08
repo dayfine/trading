@@ -1,0 +1,13 @@
+(lang dune 3.17)
+
+(name trend)
+
+(generate_opam_files true)
+
+(package
+ (name trend)
+ (allow_empty)
+ (depends
+  ocaml
+  owl
+  owl-plplot))
