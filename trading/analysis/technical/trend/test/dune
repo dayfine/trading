@@ -4,4 +4,4 @@
 
 (test
  (name segmentation_test)
- (libraries trend.lib ounit2 owl))
+ (libraries core trend.lib ounit2 owl))

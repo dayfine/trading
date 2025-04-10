@@ -54,9 +54,9 @@ let () =
   in
 
   (* Print segment information *)
-  Printf.printf "Identified %d segments:\n\n" (Array.length segments);
+  Printf.printf "Identified %d segments:\n\n" (List.length segments);
 
-  Array.iteri
+  List.iteri
     (fun i segment ->
       Printf.printf "Segment %d (indices %d-%d):\n" (i + 1) segment.start_idx
         segment.end_idx;

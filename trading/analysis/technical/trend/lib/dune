@@ -2,4 +2,6 @@
  (name trend_lib)
  (public_name trend.lib)
  (libraries owl owl-plplot)
- (modules segmentation regression_test))
+ (modules segmentation regression_test)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

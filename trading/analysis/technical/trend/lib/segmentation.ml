@@ -12,6 +12,7 @@ type segment = {
   r_squared : float;  (** R-squared value indicating fit quality *)
   channel_width : float;  (** Standard deviation of residuals (channel width) *)
 }
+[@@deriving show, eq]
 (** Type representing a trend segment *)
 
 (* Enhanced segmentation algorithm using Owl's built-in functions *)
@@ -25,7 +26,7 @@ let segment_by_trends ?(min_segment_length = 3) ?(preferred_segment_length = 10)
 
   (* Not enough data for segmentation *)
   if n < min_segment_length * 2 then
-    [|
+    [
       {
         start_idx = 0;
         end_idx = n - 1;
@@ -33,7 +34,7 @@ let segment_by_trends ?(min_segment_length = 3) ?(preferred_segment_length = 10)
         r_squared = 0.;
         channel_width = 0.;
       };
-    |]
+    ]
   else
     (* Create x coordinates *)
     let x = Arr.of_array (Array.init n float_of_int) [| n |] in
@@ -215,9 +216,8 @@ let segment_by_trends ?(min_segment_length = 3) ?(preferred_segment_length = 10)
             :: segments
     in
 
-    (* Start segmentation and convert to array *)
     let segments = find_segments [] (max_segments - 1) 0 (n - 1) in
-    Array.of_list (List.rev segments)
+    List.rev segments
 
 (* Function to visualize segmentation results with Owl *)
 let visualize_segmentation data segments =
@@ -240,7 +240,7 @@ let visualize_segmentation data segments =
   Plot.(plot ~h ~spec:[ RGB (100, 100, 100); Marker "*"; MarkerSize 1.0 ] x y);
 
   (* Plot each segment with trend line and channel *)
-  Array.iter
+  List.iter
     (fun segment ->
       (* Extract segment data *)
       let segment_length = segment.end_idx - segment.start_idx + 1 in

@@ -6,6 +6,7 @@ type segment = {
   r_squared : float;  (** R-squared value indicating fit quality *)
   channel_width : float;  (** Standard deviation of residuals (channel width) *)
 }
+[@@deriving show, eq]
 (** Type representing a trend segment *)
 
 val segment_by_trends :
@@ -19,8 +20,8 @@ val segment_by_trends :
   ?max_channel_width:float ->
   ?width_penalty_factor:float ->
   float array ->
-  segment array
+  segment list
 (** Enhanced segmentation algorithm using Owl's built-in functions *)
 
-val visualize_segmentation : float array -> segment array -> unit
+val visualize_segmentation : float array -> segment list -> unit
 (** Function to visualize segmentation results with Owl *)
