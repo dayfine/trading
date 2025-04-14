@@ -47,11 +47,18 @@ let () =
     |]
   in
 
+  let params = { default_params
+  with
+    min_segment_length = 4;
+    preferred_segment_length = 8;
+    length_flexibility = 0.3;
+    min_r_squared = 0.8;
+    min_slope = 0.0;
+  } in
+
+
   (* Segment the data *)
-  let segments =
-    segment_by_trends ~min_segment_length:4 ~preferred_segment_length:8
-      ~preferred_channel_width:0.3 ~max_channel_width:1.0 data
-  in
+  let segments = segment_by_trends ~params data in
 
   (* Print segment information *)
   Printf.printf "Identified %d segments:\n\n" (List.length segments);
