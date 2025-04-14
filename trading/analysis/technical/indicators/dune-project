@@ -6,6 +6,7 @@
 
 (package
  (name indicators)
+ (allow_empty)
  (depends
   ocaml
   ppx_let

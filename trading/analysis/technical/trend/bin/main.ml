@@ -1,4 +1,4 @@
-open Trend_lib.Segmentation
+open Trend.Segmentation
 
 let () =
   (* Sample data with multiple trend changes *)
@@ -47,15 +47,16 @@ let () =
     |]
   in
 
-  let params = { default_params
-  with
-    min_segment_length = 4;
-    preferred_segment_length = 8;
-    length_flexibility = 0.3;
-    min_r_squared = 0.8;
-    min_slope = 0.0;
-  } in
-
+  let params =
+    {
+      default_params with
+      min_segment_length = 4;
+      preferred_segment_length = 8;
+      length_flexibility = 0.3;
+      min_r_squared = 0.8;
+      min_slope = 0.0;
+    }
+  in
 
   (* Segment the data *)
   let segments = segment_by_trends ~params data in

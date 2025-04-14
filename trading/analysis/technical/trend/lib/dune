@@ -1,7 +1,7 @@
 (library
- (name trend_lib)
- (public_name trend.lib)
+ (name trend)
+ (public_name trend)
  (libraries owl owl-plplot)
- (modules segmentation regression_test)
+ (modules regression segmentation)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
