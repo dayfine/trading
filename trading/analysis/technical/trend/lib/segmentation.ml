@@ -1,5 +1,4 @@
-open Owl_plplot
-module Stats = Owl.Stats
+open Owl.Stats
 module Arr = Owl.Dense.Ndarray.S
 module Mat = Owl.Dense.Matrix.D
 module Linalg = Owl.Linalg.S
@@ -23,6 +22,8 @@ type segment = {
   trend : string;  (** Trend direction: "increasing", "decreasing", "flat", or "unknown" *)
   r_squared : float;  (** R-squared value indicating fit quality *)
   channel_width : float;  (** Standard deviation of residuals (channel width) *)
+  slope : float;  (** Slope of the regression line *)
+  intercept : float;  (** Y-intercept of the regression line *)
 } [@@deriving show, eq]
 
 let default_params = {
@@ -77,16 +78,9 @@ module Regression = struct
     in
 
     (* Calculate residual standard deviation *)
-    let residual_std = Stats.std (Arr.to_array residuals) in
+    let residual_std = std (Arr.to_array residuals) in
 
     { intercept = a; slope = b; r_squared; residual_std }
-
-  (** Predicts the y-value for a given x using the regression line.
-      @param intercept Y-intercept of the regression line
-      @param slope Slope of the regression line
-      @param x Input x-value
-      @return Predicted y-value *)
-  let predict ~intercept ~slope x = intercept +. (slope *. x)
 end
 
 (* Internal module for calculating various penalties used in the segmentation
@@ -178,6 +172,8 @@ module SegmentAnalysis = struct
       trend;
       r_squared = stats.Regression.r_squared;
       channel_width = stats.Regression.residual_std;
+      slope = stats.Regression.slope;
+      intercept = stats.Regression.intercept;
     }
 
   (** Creates a segment marked as unknown, used when there's insufficient data
@@ -192,6 +188,8 @@ module SegmentAnalysis = struct
       trend = "unknown";
       r_squared = 0.;
       channel_width = 0.;
+      slope = 0.;
+      intercept = 0.;
     }
 
   (** Determines whether a segment should be split based on its quality metrics.
@@ -371,74 +369,3 @@ let segment_by_trends ?(params = default_params) data_array =
         ~x_data
         ~data_array
         ~params
-
-(* Function to visualize segmentation results with Owl *)
-let visualize_segmentation data segments =
-  (* Set environment variable for non-interactive display *)
-  Unix.putenv "QT_QPA_PLATFORM" "offscreen";
-
-  let h = Plot.create ~n:1 ~m:1 "segmentation.png" in
-  Plot.set_output h "segmentation.png";
-  Plot.set_background_color h 255 255 255;  (* white background *)
-  Plot.set_pen_size h 2.;  (* thicker lines *)
-
-  (* Plot original data *)
-  let n = Array.length data in
-  (* Use Mat (float64) instead of Arr (float32) because owl-plplot requires float64 matrices for plotting *)
-  let x = Mat.of_array (Array.init n float_of_int) 1 n in
-  let y = Mat.of_array data 1 n in
-  Plot.(plot ~h ~spec:[ RGB (100, 100, 100); Marker "*"; MarkerSize 1.0 ] x y);
-
-  (* Plot each segment with trend line and channel *)
-  List.iter
-    (fun segment ->
-      (* Extract segment data *)
-      let segment_length = segment.end_idx - segment.start_idx + 1 in
-      let x_segment =
-        Array.init segment_length (fun i ->
-            float_of_int (i + segment.start_idx))
-      in
-      let y_segment = Array.sub data segment.start_idx segment_length in
-
-      (* Calculate trend line *)
-      let stats = Regression.calculate_stats x_segment y_segment in
-
-      (* Create trend line *)
-      let trend_y = Array.map (fun x -> Regression.predict ~intercept:stats.intercept ~slope:stats.slope x) x_segment in
-
-      (* Plot segment trend line *)
-      let r, g, b =
-        match segment.trend with
-        | "increasing" -> (0, 200, 0) (* green *)
-        | "decreasing" -> (200, 0, 0) (* red *)
-        | _ -> (100, 100, 100) (* gray *)
-      in
-
-      (* Plot trend line *)
-      let x_mat = Mat.of_array x_segment 1 segment_length in
-      let y_mat = Mat.of_array trend_y 1 segment_length in
-      Plot.(plot ~h ~spec:[ RGB (r, g, b); LineStyle 1 ] x_mat y_mat);
-
-      (* Plot channel boundaries *)
-      let upper_y = Array.map (fun y -> y +. segment.channel_width) trend_y in
-      let lower_y = Array.map (fun y -> y -. segment.channel_width) trend_y in
-      let y_upper = Mat.of_array upper_y 1 segment_length in
-      let y_lower = Mat.of_array lower_y 1 segment_length in
-      Plot.(plot ~h ~spec:[ RGB (r, g, b); LineStyle 2 ] x_mat y_upper);
-      Plot.(plot ~h ~spec:[ RGB (r, g, b); LineStyle 2 ] x_mat y_lower);
-
-      (* Add R² value as text *)
-      let mid_x = float_of_int (segment.start_idx + segment.end_idx) /. 2.0 in
-      let mid_y = Regression.predict ~intercept:stats.intercept ~slope:stats.slope mid_x in
-      Plot.(
-        text ~h
-          ~spec:[ RGB (r, g, b) ]
-          mid_x mid_y
-          (Printf.sprintf "R²=%.2f" segment.r_squared)))
-    segments;
-
-  (* Set plot properties *)
-  Plot.set_title h "Trend Segmentation";
-  Plot.set_xlabel h "Time";
-  Plot.set_ylabel h "Value";
-  Plot.output h

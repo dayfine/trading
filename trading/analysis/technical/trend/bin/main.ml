@@ -1,4 +1,5 @@
 open Trend.Segmentation
+open Trend.Visualization
 
 let () =
   (* Sample data with multiple trend changes *)
@@ -61,21 +62,7 @@ let () =
   (* Segment the data *)
   let segments = segment_by_trends ~params data in
 
-  (* Print segment information *)
-  Printf.printf "Identified %d segments:\n\n" (List.length segments);
-
-  List.iteri
-    (fun i segment ->
-      Printf.printf "Segment %d (indices %d-%d):\n" (i + 1) segment.start_idx
-        segment.end_idx;
-      Printf.printf "  - Trend: %s\n" segment.trend;
-      Printf.printf "  - Quality (R²): %.4f\n" segment.r_squared;
-      Printf.printf "  - Channel width (std dev): %.4f\n" segment.channel_width;
-      Printf.printf "  - Length: %d data points\n\n"
-        (segment.end_idx - segment.start_idx + 1))
-    segments;
-
   (* Generate visualization *)
-  visualize_segmentation data segments;
+  create_plot data segments;
 
   Printf.printf "Visualization saved to segmentation.png\n"

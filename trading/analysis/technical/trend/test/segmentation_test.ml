@@ -39,6 +39,8 @@ let test_basic_segmentation _ =
         trend = "increasing";
         r_squared = 0.909090953228;
         channel_width = 0.487949937588;
+        slope = 1.0;
+        intercept = 1.0;
       };
       {
         start_idx = 7;
@@ -46,6 +48,8 @@ let test_basic_segmentation _ =
         trend = "decreasing";
         r_squared = 0.850340107509;
         channel_width = 0.611677835971;
+        slope = -1.0;
+        intercept = 10.0;
       };
     ]
   in
@@ -67,6 +71,8 @@ let test_short_data _ =
         trend = "unknown";
         r_squared = 0.0;
         channel_width = 0.0;
+        slope = 0.0;
+        intercept = 0.0;
       };
     ]
 
@@ -137,6 +143,8 @@ let test_complex_segmentation _ =
         trend = "increasing";
         r_squared = 0.990269418573;
         channel_width = 0.098742295943;
+        slope = 1.0;
+        intercept = 10.0;
       };
       {
         start_idx = 5;
@@ -144,6 +152,8 @@ let test_complex_segmentation _ =
         trend = "decreasing";
         r_squared = 0.910274046695;
         channel_width = 0.467855281206;
+        slope = -1.0;
+        intercept = 15.0;
       };
       {
         start_idx = 20;
@@ -151,6 +161,8 @@ let test_complex_segmentation _ =
         trend = "increasing";
         r_squared = 0.0169173031313;
         channel_width = 0.361593649799;
+        slope = 1.0;
+        intercept = 10.0;
       };
       {
         start_idx = 25;
@@ -158,6 +170,8 @@ let test_complex_segmentation _ =
         trend = "increasing";
         r_squared = 0.978035397787;
         channel_width = 0.482568843996;
+        slope = 1.0;
+        intercept = 10.0;
       };
     ]
   in
