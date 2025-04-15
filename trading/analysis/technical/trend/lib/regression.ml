@@ -15,9 +15,11 @@ let calculate_stats x_data y_data =
   if n < 2 then
     { intercept = 0.; slope = 0.; r_squared = 0.; residual_std = 0. }
   else
+    (* Define the array shape once *)
+    let arr_shape = [| n; 1 |] in
     (* Convert inputs to 2D arrays *)
-    let x = Arr.of_array x_data [| n; 1 |] in
-    let y = Arr.of_array y_data [| n; 1 |] in
+    let x = Arr.of_array x_data arr_shape in
+    let y = Arr.of_array y_data arr_shape in
 
     (* Perform regression with intercept *)
     let intercept, slope = Linalg.linreg x y in
@@ -28,7 +30,7 @@ let calculate_stats x_data y_data =
 
     (* Calculate R-squared *)
     let y_mean = Arr.mean' y in
-    let y_mean_arr = Arr.create [| n |] y_mean in
+    let y_mean_arr = Arr.create arr_shape y_mean in
     let ss_total = Arr.(sum' (sqr (y - y_mean_arr))) in
     let ss_residual = Arr.(sum' (sqr residuals)) in
     let r_squared =
@@ -37,14 +39,8 @@ let calculate_stats x_data y_data =
 
     (* Calculate residual standard deviation *)
     let residual_std =
-      if n = 2 then 0.  (* For 2 points, std dev is always 0 *)
+      if n = 2 then 0. (* For 2 points, std dev is always 0 *)
       else Stats.std (Arr.to_array residuals)
     in
 
     { intercept; slope; r_squared; residual_std }
-
-let predict ~intercept ~slope x = intercept +. (slope *. x)
-
-let predict_values x intercept slope =
-  let x = Arr.of_array x [| Array.length x |] in
-  Arr.map (fun xi -> intercept +. (slope *. xi)) x

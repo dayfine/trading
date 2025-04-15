@@ -60,10 +60,8 @@ type segment = {
   channel_width : float;
       (** Standard deviation of residuals from the trend line. Measures the
           volatility or "width" of the price channel around the trend. *)
-  slope : float;
-      (** Slope of the regression line *)
-  intercept : float;
-      (** Y-intercept of the regression line *)
+  slope : float;  (** Slope of the regression line *)
+  intercept : float;  (** Y-intercept of the regression line *)
 }
 [@@deriving show, eq]
 (** Represents a single trend segment in the time series. Each segment contains
@@ -79,4 +77,3 @@ val segment_by_trends :
     @param data Array of float values representing the time series to segment.
     @return
       List of segments, ordered from earliest to latest in the time series. *)
-

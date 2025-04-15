@@ -30,20 +30,12 @@ let test_perfect_line _ =
   assert_equal ~msg:"R-squared should be 1.0" ~cmp:float_equal 1.0
     stats.r_squared
 
-let test_predict _ =
-  let x = [| 1.; 2.; 3.; 4.; 5. |] in
-  let y = [| 2.; 4.; 6.; 8.; 10. |] in
-  let stats = calculate_stats x y in
-  let predicted = predict ~intercept:stats.intercept ~slope:stats.slope 3.0 in
-  assert_equal ~msg:"Prediction should be 6.0" ~cmp:float_equal 6.0 predicted
-
 let suite =
   "regression"
   >::: [
          "test_linear_regression" >:: test_linear_regression;
          "test_r_squared" >:: test_r_squared;
          "test_perfect_line" >:: test_perfect_line;
-         "test_predict" >:: test_predict;
        ]
 
 let () = run_test_tt_main suite

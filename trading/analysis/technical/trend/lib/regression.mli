@@ -16,17 +16,3 @@ val calculate_stats : float array -> float array -> regression_stats
     @param x_data Array of x-coordinates
     @param y_data Array of y-coordinates
     @return regression_stats containing the calculated metrics *)
-
-val predict : intercept:float -> slope:float -> float -> float
-(** Predicts the y-value for a given x using the regression line.
-    @param intercept Y-intercept of the regression line
-    @param slope Slope of the regression line
-    @param x Input x-value
-    @return Predicted y-value *)
-
-val predict_values : float array -> float -> float -> Owl.Dense.Ndarray.S.arr
-(** Predicts multiple y-values for given x-values using the regression line.
-    @param x Array of x-values
-    @param intercept Y-intercept of the regression line
-    @param slope Slope of the regression line
-    @return Array of predicted y-values *)
