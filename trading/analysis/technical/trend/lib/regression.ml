@@ -8,13 +8,16 @@ type regression_stats = {
   r_squared : float;  (** Coefficient of determination *)
   residual_std : float;  (** Standard deviation of residuals *)
 }
+[@@deriving show, eq]
 
-let calculate_stats x_data y_data =
+let calculate_stats y_data =
   (* Check for minimum points *)
-  let n = Array.length x_data in
+  let n = Array.length y_data in
   if n < 2 then
     { intercept = 0.; slope = 0.; r_squared = 0.; residual_std = 0. }
   else
+    (* Create x_data as indices *)
+    let x_data = Array.init n float_of_int in
     (* Define the array shape once *)
     let arr_shape = [| n; 1 |] in
     (* Convert inputs to 2D arrays *)

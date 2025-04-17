@@ -33,6 +33,14 @@ type segmentation_params = {
       (** Factor used to penalize segments that deviate from
           preferred_channel_width. Higher values make the algorithm more strict
           about channel width. *)
+  r_squared_tolerance : float;
+      (** Additional tolerance for R-squared threshold when determining if a
+          segment should be split. This allows for slightly lower R-squared
+          values before forcing a split. *)
+  max_width_penalty : float;
+      (** Maximum allowed width penalty before a segment is split. This controls
+          how much deviation from the preferred channel width is tolerated
+          before forcing a split. *)
 }
 [@@deriving show, eq]
 (** Parameters that control the behavior of the segmentation algorithm. These
@@ -47,12 +55,7 @@ val default_params : segmentation_params
 type segment = {
   start_idx : int;  (** Starting index of the segment in the input array *)
   end_idx : int;  (** Ending index of the segment in the input array *)
-  trend : string;
-      (** Trend direction:
-          - "increasing": positive slope above min_slope
-          - "decreasing": negative slope below -min_slope
-          - "flat": slope between -min_slope and min_slope
-          - "unknown": insufficient data or poor fit *)
+  trend : Trend_type.t;  (** Trend direction *)
   r_squared : float;
       (** R-squared value indicating how well the linear regression fits the
           data. Values range from 0 to 1, with higher values indicating better

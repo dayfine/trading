@@ -14,14 +14,17 @@ type segmentation_params = {
   preferred_channel_width : float;
   max_channel_width : float;
   width_penalty_factor : float;
+  r_squared_tolerance : float;
+      (** Additional tolerance for R-squared threshold *)
+  max_width_penalty : float;
+      (** Maximum allowed width penalty before splitting *)
 }
 [@@deriving show, eq]
 
 type segment = {
   start_idx : int;  (** Starting index of the segment *)
   end_idx : int;  (** Ending index of the segment *)
-  trend : string;
-      (** Trend direction: "increasing", "decreasing", "flat", or "unknown" *)
+  trend : Trend_type.t;  (** Trend direction *)
   r_squared : float;  (** R-squared value indicating fit quality *)
   channel_width : float;  (** Standard deviation of residuals (channel width) *)
   slope : float;  (** Slope of the regression line *)
@@ -33,13 +36,15 @@ let default_params =
   {
     min_segment_length = 3;
     preferred_segment_length = 10;
-    length_flexibility = 0.5;
-    min_r_squared = 0.6;
+    length_flexibility = 1.;
+    min_r_squared = 0.9;
     min_slope = 0.01;
     max_segments = 10;
     preferred_channel_width = 0.5;
     max_channel_width = 2.0;
     width_penalty_factor = 0.5;
+    r_squared_tolerance = 0.1;
+    max_width_penalty = 0.3;
   }
 
 (* Internal module for calculating various penalties used in the segmentation
@@ -108,12 +113,12 @@ module SegmentAnalysis = struct
   (** Determines the trend direction based on the slope value.
       @param min_slope Minimum slope magnitude to consider a trend
       @param slope Calculated slope of the segment
-      @return Trend direction as a string *)
+      @return Trend direction *)
   let determine_trend ~min_slope slope =
     match (abs_float slope < min_slope, slope > 0.0) with
-    | true, _ -> "flat"
-    | false, true -> "increasing"
-    | false, false -> "decreasing"
+    | true, _ -> Trend_type.Flat
+    | false, true -> Trend_type.Increasing
+    | false, false -> Trend_type.Decreasing
 
   (** Creates a segment object with calculated statistics.
       @param start_idx Starting index of the segment
@@ -142,7 +147,7 @@ module SegmentAnalysis = struct
     {
       start_idx;
       end_idx;
-      trend = "unknown";
+      trend = Trend_type.Unknown;
       r_squared = 0.;
       channel_width = 0.;
       slope = 0.;
@@ -155,7 +160,8 @@ module SegmentAnalysis = struct
       @param params Segmentation parameters
       @return true if the segment should be split *)
   let should_split ~r_squared ~width_penalty params =
-    r_squared < params.min_r_squared +. 0.1 || width_penalty >= 0.3
+    r_squared < params.min_r_squared +. params.r_squared_tolerance
+    || width_penalty >= params.max_width_penalty
 
   (** Calculates a bonus score when a split point represents a significant trend
       change.
@@ -164,37 +170,35 @@ module SegmentAnalysis = struct
       @param right_slope Slope of the right segment
       @return Bonus value (0.0 or 0.2) *)
   let calculate_trend_change_bonus ~min_slope left_slope right_slope =
+    let open Trend_type in
     let get_trend slope =
       match (slope > min_slope, slope < -.min_slope) with
-      | true, _ -> 1
-      | _, true -> -1
-      | _, _ -> 0
+      | true, _ -> Increasing
+      | _, true -> Decreasing
+      | _, _ -> Flat
     in
     let left_trend = get_trend left_slope in
     let right_trend = get_trend right_slope in
-    match (left_trend <> 0, right_trend <> 0, left_trend <> right_trend) with
-    | true, true, true -> 0.2
-    | _, _, _ -> 0.0
+    match (left_trend, right_trend) with
+    | Increasing, Decreasing | Decreasing, Increasing -> 0.4
+    | Flat, _ | _, Flat -> 0.2
+    | _ -> 0.0
 end
 
 (* Helper function to create a segment from data *)
-let create_segment_from_data ~start_idx ~end_idx ~x_data ~data_array ~params =
-  let segment_x = Array.sub x_data start_idx (end_idx - start_idx + 1) in
+let create_segment_from_data ~start_idx ~end_idx ~data_array ~params =
   let segment_y = Array.sub data_array start_idx (end_idx - start_idx + 1) in
-  let stats = Reg.calculate_stats segment_x segment_y in
+  let stats = Reg.calculate_stats segment_y in
   SegmentAnalysis.create_segment ~start_idx ~end_idx ~min_slope:params.min_slope
     stats
 
 (* Helper function to evaluate a potential split point *)
-let evaluate_split_point ~start_idx ~end_idx ~split_idx ~x_data ~data_array
-    ~params =
-  let left_x = Array.sub x_data start_idx (split_idx - start_idx + 1) in
+let evaluate_split_point ~start_idx ~end_idx ~split_idx ~data_array ~params =
   let left_y = Array.sub data_array start_idx (split_idx - start_idx + 1) in
-  let right_x = Array.sub x_data (split_idx + 1) (end_idx - split_idx) in
   let right_y = Array.sub data_array (split_idx + 1) (end_idx - split_idx) in
 
-  let left_stats = Reg.calculate_stats left_x left_y in
-  let right_stats = Reg.calculate_stats right_x right_y in
+  let left_stats = Reg.calculate_stats left_y in
+  let right_stats = Reg.calculate_stats right_y in
 
   let total_len = end_idx - start_idx + 1 in
   let left_len = split_idx - start_idx + 1 in
@@ -229,7 +233,7 @@ let evaluate_split_point ~start_idx ~end_idx ~split_idx ~x_data ~data_array
   (score, left_stats, right_stats)
 
 (* Helper function to find the best split point *)
-let find_best_split ~start_idx ~end_idx ~x_data ~data_array ~params =
+let find_best_split ~start_idx ~end_idx ~data_array ~params =
   let best_split = ref None in
   let best_score = ref (-1.0) in
 
@@ -239,8 +243,7 @@ let find_best_split ~start_idx ~end_idx ~x_data ~data_array ~params =
     to end_idx - params.min_segment_length
   do
     let score, _, _ =
-      evaluate_split_point ~start_idx ~end_idx ~split_idx ~x_data ~data_array
-        ~params
+      evaluate_split_point ~start_idx ~end_idx ~split_idx ~data_array ~params
     in
     if score > !best_score then (
       best_score := score;
@@ -249,10 +252,9 @@ let find_best_split ~start_idx ~end_idx ~x_data ~data_array ~params =
   !best_split
 
 (* Helper function to check if a segment needs to be split *)
-let needs_split ~start_idx ~end_idx ~x_data ~data_array ~params =
-  let segment_x = Array.sub x_data start_idx (end_idx - start_idx + 1) in
+let needs_split ~start_idx ~end_idx ~data_array ~params =
   let segment_y = Array.sub data_array start_idx (end_idx - start_idx + 1) in
-  let stats = Reg.calculate_stats segment_x segment_y in
+  let stats = Reg.calculate_stats segment_y in
 
   let width_penalty =
     Penalties.calculate_width_penalty
@@ -268,52 +270,49 @@ let needs_split ~start_idx ~end_idx ~x_data ~data_array ~params =
   (should_split, stats)
 
 (* Helper function to process a single segment *)
-let rec process_segment ~segments ~remaining_splits ~start_idx ~end_idx ~x_data
+let rec process_segment ~segments ~remaining_splits ~start_idx ~end_idx
     ~data_array ~params =
   (* Check if segment is too small *)
   let segment_length = end_idx - start_idx + 1 in
-  if segment_length < params.min_segment_length * 2 then
-    create_segment_from_data ~start_idx ~end_idx ~x_data ~data_array ~params
-    :: segments
+  if segment_length < params.min_segment_length then
+    create_segment_from_data ~start_idx ~end_idx ~data_array ~params :: segments
   else
     let should_split, stats =
-      needs_split ~start_idx ~end_idx ~x_data ~data_array ~params
+      needs_split ~start_idx ~end_idx ~data_array ~params
     in
     let segment =
       SegmentAnalysis.create_segment ~start_idx ~end_idx
         ~min_slope:params.min_slope stats
     in
     match
-      ( should_split,
-        find_best_split ~start_idx ~end_idx ~x_data ~data_array ~params )
+      (should_split, find_best_split ~start_idx ~end_idx ~data_array ~params)
     with
     | false, _ -> segment :: segments
     | true, None -> segment :: segments
     | true, Some split_idx ->
         process_split_segments ~segments ~remaining_splits ~start_idx ~end_idx
-          ~split_idx ~x_data ~data_array ~params
+          ~split_idx ~data_array ~params
 
 (* Helper function to process split segments *)
 and process_split_segments ~segments ~remaining_splits ~start_idx ~end_idx
-    ~split_idx ~x_data ~data_array ~params =
+    ~split_idx ~data_array ~params =
   (* Process right segment first *)
   let right_segments =
     process_segment ~segments ~remaining_splits:(remaining_splits - 1)
-      ~start_idx:(split_idx + 1) ~end_idx ~x_data ~data_array ~params
+      ~start_idx:(split_idx + 1) ~end_idx ~data_array ~params
   in
   (* Then process left segment *)
   process_segment ~segments:right_segments
     ~remaining_splits:(remaining_splits - 1) ~start_idx ~end_idx:split_idx
-    ~x_data ~data_array ~params
+    ~data_array ~params
 
 (* Main segmentation algorithm *)
 let segment_by_trends ?(params = default_params) data_array =
   let n = Array.length data_array in
-  let x_data = Array.init n float_of_int in
 
-  match n < params.min_segment_length * 2 with
+  match n < params.min_segment_length with
   | true ->
       [ SegmentAnalysis.create_unknown_segment ~start_idx:0 ~end_idx:(n - 1) ]
   | false ->
       process_segment ~segments:[] ~remaining_splits:params.max_segments
-        ~start_idx:0 ~end_idx:(n - 1) ~x_data ~data_array ~params
+        ~start_idx:0 ~end_idx:(n - 1) ~data_array ~params

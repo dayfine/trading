@@ -2,6 +2,6 @@
  (name trend)
  (public_name trend)
  (libraries owl owl-plplot)
- (modules regression segmentation visualization)
+ (modules regression segmentation visualization trend_type)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

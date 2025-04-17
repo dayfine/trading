@@ -55,7 +55,7 @@ let () =
       preferred_segment_length = 8;
       length_flexibility = 0.3;
       min_r_squared = 0.8;
-      min_slope = 0.0;
+      min_slope = 0.04;
     }
   in
 

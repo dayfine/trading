@@ -5,9 +5,10 @@ module Linalg = Owl.Linalg.S
 
 (* Helper function to get color based on trend *)
 let get_trend_color = function
-  | "increasing" -> Plot.(RGB (0, 200, 0)) (* green *)
-  | "decreasing" -> Plot.(RGB (200, 0, 0)) (* red *)
-  | _ -> Plot.(RGB (100, 100, 100))
+  | Trend_type.Increasing -> Plot.(RGB (0, 200, 0)) (* green *)
+  | Trend_type.Decreasing -> Plot.(RGB (200, 0, 0)) (* red *)
+  | Trend_type.Flat -> Plot.(RGB (0, 0, 200)) (* blue *)
+  | Trend_type.Unknown -> Plot.(RGB (100, 100, 100))
 (* gray *)
 
 (* Main visualization function *)
