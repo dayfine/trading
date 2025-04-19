@@ -46,10 +46,9 @@ let create_plot data segments =
       in
       let trend_y =
         Array.init segment_length (fun i ->
-            let x = float_of_int (i + segment.start_idx) in
             let slope = segment.Segmentation.slope in
             let intercept = segment.Segmentation.intercept in
-            intercept +. (slope *. x))
+            intercept +. (slope *. float_of_int i))
       in
       let color = get_trend_color segment.trend in
 
