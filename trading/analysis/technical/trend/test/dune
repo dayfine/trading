@@ -1,0 +1,7 @@
+(test
+ (name regression_test)
+ (libraries trend ounit2 owl))
+
+(test
+ (name segmentation_test)
+ (libraries core trend ounit2 owl))

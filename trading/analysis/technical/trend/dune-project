@@ -1,13 +1,13 @@
 (lang dune 3.17)
 
-(name indicators)
+(name trend)
 
 (generate_opam_files true)
 
 (package
- (name indicators)
+ (name trend)
  (allow_empty)
  (depends
   ocaml
-  ppx_let
-  core_unix))
+  owl
+  owl-plplot))
