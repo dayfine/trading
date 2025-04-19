@@ -1,0 +1,5 @@
+(test
+ (name status_test)
+ (libraries
+  alcotest
+  status))
