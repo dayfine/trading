@@ -24,8 +24,6 @@ type t = {
 }
 [@@deriving show, eq]
 
-let create code message = { code; message }
-
 let code_to_string = function
   | Ok -> "OK"
   | Cancelled -> "CANCELLED"

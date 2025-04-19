@@ -29,9 +29,6 @@ type t = {
 }
 [@@deriving show, eq]
 
-(** [create code message] creates a new status with the given code and message *)
-val create : code -> string -> t
-
 (** [to_string status] converts a status to a human-readable string *)
 val to_string : t -> string
 
