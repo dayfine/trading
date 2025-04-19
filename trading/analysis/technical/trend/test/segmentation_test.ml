@@ -84,8 +84,8 @@ let test_basic_segmentation _ =
     ~cmp:(List.equal segment_equal) segments expected
 
 let test_data_too_short _ =
-  (* Test with data too short for segmentation *)
-  let data = [| 1.0; 2.0; 3.0 |] in
+  (* Data too short for segmentation when default min_segment_length=3 *)
+  let data = [| 1.0; 2.0; |] in
   let segments = segment_by_trends ~params:default_params data in
 
   assert_equal
@@ -94,7 +94,7 @@ let test_data_too_short _ =
     [
       {
         start_idx = 0;
-        end_idx = 2;
+        end_idx = 1;
         trend = Unknown;
         r_squared = 0.0;
         channel_width = 0.0;
@@ -105,9 +105,8 @@ let test_data_too_short _ =
 
 let test_short_data _ =
   let data = [| 1.0; 2.0; 3.0 |] in
-  (* Test with min_length=3 should detect increasing trend *)
-  let params = { default_params with min_segment_length = 2 } in
-  let segments = segment_by_trends ~params data in
+  (* default_params with min_length=3 should detect increasing trend *)
+  let segments = segment_by_trends ~params:default_params data in
 
   assert_equal
     ~printer:(fun l -> List.map ~f:show_segment l |> String.concat ~sep:"; ")
@@ -201,7 +200,7 @@ let test_complex_segmentation _ =
         r_squared = 0.910274046695;
         channel_width = 0.467855281206;
         slope = -0.333214259148;
-        intercept = 15.3652377764;
+        intercept = 13.6991664807;
       };
       {
         start_idx = 20;
@@ -210,7 +209,7 @@ let test_complex_segmentation _ =
         r_squared = 0.0169173031313;
         channel_width = 0.361593649799;
         slope = 0.0300001144409;
-        intercept = 8.69999809265;
+        intercept = 9.30000038147;
       };
       {
         start_idx = 25;
@@ -219,7 +218,7 @@ let test_complex_segmentation _ =
         r_squared = 0.978035397787;
         channel_width = 0.482568843996;
         slope = 0.970908945257;
-        intercept = -15.599995353;
+        intercept = 8.67272827842;
       };
     ]
   in

@@ -64,7 +64,9 @@ type segment = {
       (** Standard deviation of residuals from the trend line. Measures the
           volatility or "width" of the price channel around the trend. *)
   slope : float;  (** Slope of the regression line *)
-  intercept : float;  (** Y-intercept of the regression line *)
+  intercept : float;
+      (** Y-intercept of the regression line for **this** segment, which
+          should be close to the first data point of the segment *)
 }
 [@@deriving show, eq]
 (** Represents a single trend segment in the time series. Each segment contains
