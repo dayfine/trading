@@ -1,0 +1,5 @@
+(library
+ (name status)
+ (public_name status)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
