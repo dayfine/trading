@@ -18,7 +18,8 @@ let init_plot () =
 
   let h = Plot.create ~n:1 ~m:1 "segmentation.png" in
   Plot.set_output h "segmentation.png";
-  Plot.set_background_color h 255 255 255; (* white background *)
+  Plot.set_background_color h 255 255 255;
+  (* white background *)
   Plot.set_pen_size h 2.;
   Plot.set_title h "Trend Segmentation";
   Plot.set_xlabel h "Time";

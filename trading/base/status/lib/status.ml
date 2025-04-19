@@ -18,11 +18,7 @@ type code =
   | Unknown
 [@@deriving show, eq]
 
-type t = {
-  code : code;
-  message : string;
-}
-[@@deriving show, eq]
+type t = { code : code; message : string } [@@deriving show, eq]
 
 let code_to_string = function
   | Ok -> "OK"
@@ -47,5 +43,4 @@ let to_string { code; message } =
   Printf.sprintf "%s: %s" (code_to_string code) message
 
 let is_ok { code; _ } = code = Ok
-
 let is_error status = not (is_ok status)

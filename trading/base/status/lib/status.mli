@@ -1,5 +1,5 @@
-(** Standard status codes and types for the trading system.
-    Based on Abseil's status codes: https://abseil.io/docs/cpp/guides/status-codes *)
+(** Standard status codes and types for the trading system. Based on Abseil's
+    status codes: https://abseil.io/docs/cpp/guides/status-codes *)
 
 (** Status codes that can occur during operations *)
 type code =
@@ -22,18 +22,14 @@ type code =
   | Unknown
 [@@deriving show, eq]
 
+type t = { code : code; message : string } [@@deriving show, eq]
 (** A status consists of a code and a descriptive message *)
-type t = {
-  code : code;
-  message : string;
-}
-[@@deriving show, eq]
 
-(** [to_string status] converts a status to a human-readable string *)
 val to_string : t -> string
+(** [to_string status] converts a status to a human-readable string *)
 
-(** [is_ok status] returns true if the status code is Ok *)
 val is_ok : t -> bool
+(** [is_ok status] returns true if the status code is Ok *)
 
-(** [is_error status] returns true if the status code is not Ok *)
 val is_error : t -> bool
+(** [is_error status] returns true if the status code is not Ok *)
