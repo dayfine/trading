@@ -85,7 +85,7 @@ let test_basic_segmentation _ =
 
 let test_data_too_short _ =
   (* Data too short for segmentation when default min_segment_length=3 *)
-  let data = [| 1.0; 2.0; |] in
+  let data = [| 1.0; 2.0 |] in
   let segments = segment_by_trends ~params:default_params data in
 
   assert_equal
