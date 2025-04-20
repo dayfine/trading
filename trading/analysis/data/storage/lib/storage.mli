@@ -1,4 +1,4 @@
-open Status
+open Core
 
 (** Module type for storing and managing historical daily price data. This
     interface provides the core operations needed to manage historical price
@@ -22,7 +22,7 @@ module type HistoricalDailyPriceStorage = sig
       - [Resource_exhausted] if storage quota is exceeded
       - [Internal] for other initialization failures *)
 
-  val save : t -> override:bool -> Price.t list -> (unit, Status.t) result
+  val save : t -> override:bool -> Types.Daily_price.t list -> (unit, Status.t) result
   (** [save t ~override prices] saves the set of [prices] to storage. If
       [override] is true, existing data will be overwritten.
 
@@ -45,7 +45,7 @@ module type HistoricalDailyPriceStorage = sig
     ?start_date:Date.t ->
     ?end_date:Date.t ->
     unit ->
-    (Price.t list, Status.t) result
+    (Types.Daily_price.t list, Status.t) result
   (** [get_prices t ?start_date ?end_date] returns prices from storage. If
       [start_date] is provided, only prices on or after that date are returned.
       If [end_date] is provided, only prices on or before that date are
