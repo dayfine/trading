@@ -1,6 +1,6 @@
 open OUnit2
 open Core
-open Csv_storage
+open Csv
 
 let test_parse_line_valid _ =
   let result =

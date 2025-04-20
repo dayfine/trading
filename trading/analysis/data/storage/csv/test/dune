@@ -1,3 +1,7 @@
 (test
- (name test_storage)
+ (name test_csv_storage)
+ (libraries ounit2 csv storage))
+
+(test
+ (name test_csv_parser)
  (libraries ounit2 csv))
