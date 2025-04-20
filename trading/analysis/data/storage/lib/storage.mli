@@ -22,7 +22,8 @@ module type HistoricalDailyPriceStorage = sig
       - [Resource_exhausted] if storage quota is exceeded
       - [Internal] for other initialization failures *)
 
-  val save : t -> override:bool -> Types.Daily_price.t list -> (unit, Status.t) result
+  val save :
+    t -> override:bool -> Types.Daily_price.t list -> (unit, Status.t) result
   (** [save t ~override prices] saves the set of [prices] to storage. If
       [override] is true, existing data will be overwritten.
 
