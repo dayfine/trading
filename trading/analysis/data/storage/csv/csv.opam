@@ -7,6 +7,7 @@ depends: [
   "core"
   "ounit2" {with-test}
   "ppx_deriving"
+  "ppx_let"
   "odoc" {with-doc}
 ]
 build: [

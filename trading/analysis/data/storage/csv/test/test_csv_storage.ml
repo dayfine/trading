@@ -8,7 +8,7 @@ let ok_or_failwith_status = function
   | Error status -> failwith status.message
 
 let test_save_and_read _ =
-  let storage = create "TEST" |> ok_or_failwith_status in
+  let storage = create "TEST1" |> ok_or_failwith_status in
   let prices =
     [
       {
@@ -41,7 +41,7 @@ let test_save_and_read _ =
     prices read_prices
 
 let test_date_filter _ =
-  let storage = create "TEST" |> ok_or_failwith_status in
+  let storage = create "TEST2" |> ok_or_failwith_status in
   let prices =
     [
       {
@@ -84,7 +84,7 @@ let test_date_filter _ =
     (List.nth_exn filtered_prices 0)
 
 let test_validation_error _ =
-  let storage = create "TEST" |> ok_or_failwith_status in
+  let storage = create "TEST3" |> ok_or_failwith_status in
   let prices =
     [
       {

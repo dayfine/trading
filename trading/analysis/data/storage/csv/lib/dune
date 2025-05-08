@@ -4,4 +4,4 @@
  (modules csv_storage parser)
  (libraries unix ppx_deriving.runtime types core storage core_unix.sys_unix)
  (preprocess
-  (pps ppx_deriving.show)))
+  (pps ppx_deriving.show ppx_let)))
