@@ -41,13 +41,13 @@ module type HistoricalDailyPriceStorage = sig
       - [Data_loss] if data corruption is detected
       - [Internal] for other save failures *)
 
-  val get_prices :
+  val get:
     t ->
     ?start_date:Date.t ->
     ?end_date:Date.t ->
     unit ->
     (Types.Daily_price.t list, Status.t) result
-  (** [get_prices t ?start_date ?end_date] returns prices from storage. If
+  (** [get t ?start_date ?end_date] returns prices from storage. If
       [start_date] is provided, only prices on or after that date are returned.
       If [end_date] is provided, only prices on or before that date are
       returned.

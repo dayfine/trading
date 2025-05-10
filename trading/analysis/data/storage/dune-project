@@ -8,4 +8,6 @@
 (package
  (name storage)
  (depends
-  ocaml))
+  ocaml
+  fpath
+  (bos :with-test)))

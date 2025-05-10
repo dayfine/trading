@@ -40,9 +40,11 @@ let write_price oc price =
        ]);
   Out_channel.newline oc
 
-let create symbol =
-  let path = Filename.concat "data" (symbol ^ ".csv") in
-  Ok { path }
+let default_data_dir = Fpath.v "data"
+
+let create ?(data_dir = default_data_dir) symbol =
+  let path = Fpath.(data_dir / symbol |> add_ext "csv") in
+  Ok { path = Fpath.to_string path }
 
 let save t ~override prices =
   let open Result.Let_syntax in
@@ -63,7 +65,7 @@ let save t ~override prices =
            Status.permission_denied_error
              (sprintf "Failed to write file: %s" (Exn.to_string e)))
 
-let get_prices t ?start_date ?end_date () =
+let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
   let%bind prices =
     Parser.read_file t.path

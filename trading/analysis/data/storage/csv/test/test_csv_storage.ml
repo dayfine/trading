@@ -1,14 +1,20 @@
 open OUnit2
+open Bos
 open Core
 open Csv.Csv_storage
 open Status
 
 let ok_or_failwith_status = function
-  | Result.Ok x -> x
+  | Stdlib.Result.Ok x -> x
   | Error status -> failwith status.message
 
+let ok_or_failwith_os_error = function
+  | Stdlib.Result.Ok x -> x
+  | Error (`Msg msg) -> failwith msg
+
 let test_save_and_read _ =
-  let storage = create "TEST1" |> ok_or_failwith_status in
+  let temp_dir = OS.Dir.tmp "test_%s" |> ok_or_failwith_os_error in
+  let storage = create ~data_dir:temp_dir "GOOG" |> ok_or_failwith_status in
   let prices =
     [
       {
@@ -34,14 +40,15 @@ let test_save_and_read _ =
   (* Save prices *)
   save storage ~override:true prices |> ok_or_failwith_status;
   (* Read back and verify *)
-  let read_prices = get_prices storage () |> ok_or_failwith_status in
+  let read_prices = get storage () |> ok_or_failwith_status in
   assert_equal
     ~printer:(fun ps ->
       String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
     prices read_prices
 
 let test_date_filter _ =
-  let storage = create "TEST2" |> ok_or_failwith_status in
+  let temp_dir = OS.Dir.tmp "test_%s" |> ok_or_failwith_os_error in
+  let storage = create ~data_dir:temp_dir "GOOG" |> ok_or_failwith_status in
   let prices =
     [
       {
@@ -77,14 +84,15 @@ let test_date_filter _ =
   let start_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20 in
   let end_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20 in
   let filtered_prices =
-    get_prices storage ~start_date ~end_date () |> ok_or_failwith_status
+    get storage ~start_date ~end_date () |> ok_or_failwith_status
   in
   assert_equal ~printer:Int.to_string 1 (List.length filtered_prices);
   assert_equal ~printer:Types.Daily_price.show (List.nth_exn prices 1)
     (List.nth_exn filtered_prices 0)
 
 let test_validation_error _ =
-  let storage = create "TEST3" |> ok_or_failwith_status in
+  let temp_dir = OS.Dir.tmp "test_%s" |> ok_or_failwith_os_error in
+  let storage = create ~data_dir:temp_dir "GOOG" |> ok_or_failwith_status in
   let prices =
     [
       {
