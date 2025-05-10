@@ -1,5 +1,6 @@
 (library
  (name indicator_types)
+ (public_name indicators.types)
  (libraries core)
  (preprocess
   (pps ppx_deriving.eq)))
