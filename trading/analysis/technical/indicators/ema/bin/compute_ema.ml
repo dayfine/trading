@@ -1,6 +1,6 @@
 open Core
 open Ema
-open Csv_storage.Parser
+open Csv.Parser
 open Indicator_types
 open Time_period.Conversion
 

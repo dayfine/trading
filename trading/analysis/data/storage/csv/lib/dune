@@ -1,7 +1,14 @@
 (library
- (name csv_storage)
- (public_name csv_storage)
- (modules parser)
- (libraries unix ppx_deriving.runtime types core)
+ (name csv)
+ (public_name csv)
+ (modules csv_storage parser)
+ (libraries
+   core
+   core_unix.sys_unix
+   fpath
+   ppx_deriving.runtime
+   storage
+   types
+   unix)
  (preprocess
-  (pps ppx_deriving.show)))
+  (pps ppx_deriving.show ppx_let)))

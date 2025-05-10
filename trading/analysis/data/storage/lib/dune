@@ -1,0 +1,5 @@
+(library
+ (name storage)
+ (public_name storage)
+ (modules_without_implementation storage)
+ (libraries core status types))

@@ -1,5 +1,5 @@
 (executable
  (name compute_ema)
- (libraries ema ta_ocaml core core_unix.command_unix csv_storage time_period)
+ (libraries ema ta_ocaml core core_unix.command_unix csv time_period)
  (preprocess
   (pps ppx_let)))

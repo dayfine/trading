@@ -1,7 +1,9 @@
 (test
+ (name test_csv_storage)
+ (libraries ounit2 csv storage bos))
+
+(test
  (name test_csv_parser)
- (libraries ounit2 csv_storage)
- (preprocess
-  (pps ppx_deriving.show))
+ (libraries ounit2 csv)
  (deps
   (file ./data/test_data.csv)))

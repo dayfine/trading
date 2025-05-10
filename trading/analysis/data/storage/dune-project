@@ -1,0 +1,13 @@
+(lang dune 3.17)
+
+(name storage)
+(version 0.1.0)
+
+(generate_opam_files true)
+
+(package
+ (name storage)
+ (depends
+  ocaml
+  fpath
+  (bos :with-test)))

@@ -33,3 +33,13 @@ val is_ok : t -> bool
 
 val is_error : t -> bool
 (** [is_error status] returns true if the status code is not Ok *)
+
+(** Error creation functions *)
+val invalid_argument_error : string -> t
+(** [invalid_argument_error message] creates a status with Invalid_argument code *)
+
+val not_found_error : string -> t
+(** [not_found_error message] creates a status with NotFound code *)
+
+val permission_denied_error : string -> t
+(** [permission_denied_error message] creates a status with Permission_denied code *)
