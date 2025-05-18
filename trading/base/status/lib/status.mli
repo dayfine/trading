@@ -36,10 +36,12 @@ val is_error : t -> bool
 
 (** Error creation functions *)
 val invalid_argument_error : string -> t
-(** [invalid_argument_error message] creates a status with Invalid_argument code *)
+(** [invalid_argument_error message] creates a status with Invalid_argument code
+*)
 
 val not_found_error : string -> t
 (** [not_found_error message] creates a status with NotFound code *)
 
 val permission_denied_error : string -> t
-(** [permission_denied_error message] creates a status with Permission_denied code *)
+(** [permission_denied_error message] creates a status with Permission_denied
+    code *)

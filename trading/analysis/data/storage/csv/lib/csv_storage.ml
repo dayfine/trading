@@ -51,7 +51,8 @@ let save t ~override prices =
   let%bind () = validate_prices prices in
   let exists = Sys_unix.file_exists t.path in
   if phys_equal exists `Yes && not override then
-    Error (Status.invalid_argument_error "File already exists and override is false")
+    Error
+      (Status.invalid_argument_error "File already exists and override is false")
   else
     let oc = Out_channel.create t.path in
     Exn.protect
@@ -74,7 +75,9 @@ let get t ?start_date ?end_date () =
   in
   match (start_date, end_date) with
   | Some start, Some end_ when Date.compare start end_ > 0 ->
-      Error (Status.invalid_argument_error "start_date must be before or equal to end_date")
+      Error
+        (Status.invalid_argument_error
+           "start_date must be before or equal to end_date")
   | _ ->
       let filtered_prices =
         List.filter prices ~f:(fun price ->

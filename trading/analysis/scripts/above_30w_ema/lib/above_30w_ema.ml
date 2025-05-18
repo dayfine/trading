@@ -25,7 +25,7 @@ let parse_price_data data =
   |>
   (* Skip header *)
   List.map ~f:(fun line ->
-      match Csv_storage.Parser.parse_line line with
+      match Csv.Parser.parse_line line with
       | Ok price -> { date = price.date; value = price.adjusted_close }
       | Error msg -> failwith msg)
 
