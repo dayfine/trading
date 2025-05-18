@@ -39,6 +39,9 @@ val invalid_argument_error : string -> t
 (** [invalid_argument_error message] creates a status with Invalid_argument code
 *)
 
+val internal_error : string -> t
+(** [internal_error message] creates a status with Internal code *)
+
 val not_found_error : string -> t
 (** [not_found_error message] creates a status with NotFound code *)
 
