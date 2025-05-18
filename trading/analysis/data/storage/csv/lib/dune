@@ -3,12 +3,12 @@
  (public_name csv)
  (modules csv_storage parser)
  (libraries
-   core
-   core_unix.sys_unix
-   fpath
-   ppx_deriving.runtime
-   storage
-   types
-   unix)
+  core
+  core_unix.sys_unix
+  fpath
+  ppx_deriving.runtime
+  storage
+  types
+  unix)
  (preprocess
   (pps ppx_deriving.show ppx_let)))
