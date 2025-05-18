@@ -2,12 +2,13 @@
 opam-version: "2.0"
 depends: [
   "dune" {>= "3.17"}
-  "ocaml"
-  "async_ssl"
-  "base"
   "core"
-  "cohttp-async"
-  "yojson"
+  "async"
+  "csv"
+  "uri"
+  "ema"
+  "indicator_types"
+  "eodhd"
   "odoc" {with-doc}
 ]
 build: [

@@ -1,6 +1,7 @@
 (library
  (name eodhd)
+ (public_name eodhd)
  (preprocess
   (pps ppx_let))
- (libraries base core cohttp-async)
+ (libraries base core cohttp-async yojson)
  (modules http_params http_client))

@@ -1,0 +1,5 @@
+(executable
+ (name main)
+ (libraries core core_unix async above_30w_ema)
+ (preprocess
+  (pps ppx_jane)))

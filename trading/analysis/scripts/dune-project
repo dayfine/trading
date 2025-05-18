@@ -1,0 +1,17 @@
+(lang dune 3.17)
+
+(name scripts)
+
+(generate_opam_files true)
+
+(package
+ (name scripts)
+ (allow_empty)
+ (depends
+  core
+  async
+  csv
+  uri
+  ema
+  indicator_types
+  eodhd))
