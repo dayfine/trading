@@ -6,5 +6,5 @@
 
 (package
  (name eodhd)
- (depends ocaml async_ssl base core cohttp-async)
+ (depends ocaml async_ssl base core cohttp-async yojson)
  (tags ()))
