@@ -69,9 +69,7 @@ let save t ~override prices =
 let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
   let%bind prices =
-    Parser.read_file t.path
-    |> Result.map_error ~f:(fun msg ->
-           Status.not_found_error (sprintf "Failed to read file: %s" msg))
+    In_channel.read_lines t.path |> Parser.parse_lines |> Result.all
   in
   match (start_date, end_date) with
   | Some start, Some end_ when Date.compare start end_ > 0 ->

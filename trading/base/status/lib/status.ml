@@ -47,6 +47,7 @@ let is_error status = not (is_ok status)
 
 (** Error creation functions *)
 let invalid_argument_error message = { code = Invalid_argument; message }
+
 let internal_error message = { code = Internal; message }
 let not_found_error message = { code = NotFound; message }
 let permission_denied_error message = { code = Permission_denied; message }

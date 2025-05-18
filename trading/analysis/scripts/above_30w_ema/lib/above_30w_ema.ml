@@ -19,22 +19,20 @@ let get_historical_prices ~token symbol =
   | Ok data -> Some (symbol, data)
   | Error _ -> None
 
-let parse_price_data data =
+let parse_price_data data : (indicator_value list, Status.t) Result.t =
+  let open Result in
   let lines = String.split_lines data in
-  List.tl_exn lines
-  |>
-  (* Skip header *)
-  List.map ~f:(fun line ->
-      match Csv.Parser.parse_line line with
-      | Ok price -> { date = price.date; value = price.adjusted_close }
-      | Error msg -> failwith msg)
+  Csv.Parser.parse_lines lines
+  >>= List.map ~f:(fun (price : Types.Daily_price.t) ->
+          { date = price.date; value = price.adjusted_close })
 
 let calculate_metrics symbol historical_data =
   match historical_data with
   | None -> None
   | Some (_sym, data) -> (
       try
-        let prices = parse_price_data data in
+        let open Result in
+        parse_price_data data >>= fun prices ->
         let ema_values = calculate_ema prices 30 in
         let current_price = (List.last_exn prices).value in
         let current_ema = (List.last_exn ema_values).value in

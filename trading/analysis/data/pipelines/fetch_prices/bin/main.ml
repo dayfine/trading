@@ -23,10 +23,9 @@ let random_sample ~n symbols =
 let print_results results =
   let successes, failures =
     List.partition_map results ~f:(fun (symbol, res) ->
-      match res with
-      | Ok () -> Either.First symbol
-      | Error err -> Either.Second (symbol, Status.to_string err)
-    )
+        match res with
+        | Ok () -> Either.First symbol
+        | Error err -> Either.Second (symbol, Status.to_string err))
   in
   printf "\nSuccessfully saved prices for %d symbols:\n" (List.length successes);
   List.iter successes ~f:(fun symbol -> printf "✓ %s\n" symbol);

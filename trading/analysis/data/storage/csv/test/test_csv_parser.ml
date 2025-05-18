@@ -1,10 +1,14 @@
 open OUnit2
 open Core
 open Csv
+open Status
+
+let parse_line line =
+  Parser.parse_lines [""; line] |> List.hd_exn |> Result.map_error ~f:(fun status -> status.message)
 
 let test_parse_line_valid _ =
   let result =
-    Parser.parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,1000"
+    parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,1000"
     |> Result.ok |> Option.value_exn
   in
   assert_equal ~printer:Types.Daily_price.show result
@@ -20,14 +24,14 @@ let test_parse_line_valid _ =
 
 let test_parse_line_invalid_date _ =
   let result =
-    Parser.parse_line "invalid,100.0,105.0,98.0,103.0,103.0,1000"
+    parse_line "invalid,100.0,105.0,98.0,103.0,103.0,1000"
     |> Result.error
   in
   assert_equal result (Option.some "Invalid date format, expected YYYY-MM-DD")
 
 let test_parse_line_invalid_number _ =
   let result =
-    Parser.parse_line "2024-03-19,invalid,105.0,98.0,103.0,103.0,1000"
+    parse_line "2024-03-19,invalid,105.0,98.0,103.0,103.0,1000"
     |> Result.error
   in
   assert_equal result
@@ -36,7 +40,7 @@ let test_parse_line_invalid_number _ =
 
 let test_parse_line_invalid_volume _ =
   let result =
-    Parser.parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,invalid"
+    parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,invalid"
     |> Result.error
   in
   assert_equal result
@@ -44,13 +48,26 @@ let test_parse_line_invalid_volume _ =
        "Invalid number in line: 2024-03-19,100.0,105.0,98.0,103.0,103.0,invalid")
 
 let test_parse_line_invalid_format _ =
-  let result = Parser.parse_line "not,enough,columns" |> Result.error in
+  let result = parse_line "not,enough,columns" |> Result.error in
   assert_equal result
     (Option.some "Expected 7 columns, line: not,enough,columns")
 
+let test_parse_lines_with_empty_list _ =
+  let result = Parser.parse_lines [] in
+  assert_equal result []
+
+let test_parse_lines_with_empty_lines _ =
+  let result = Parser.parse_lines [ ""; "" ] in
+  assert_equal result [Error (Status.invalid_argument_error "Expected 7 columns, line: ")]
+
+let test_parse_lines_with_invalid_line _ =
+  let result = Parser.parse_lines [ ""; "not,enough,columns" ] in
+  assert_equal result [Error (Status.invalid_argument_error "Expected 7 columns, line: not,enough,columns")]
+
 let test_read_test_data_file _ =
   let prices =
-    Parser.read_file "./data/test_data.csv" |> Result.ok |> Option.value_exn
+    In_channel.read_lines "./data/test_data.csv"
+    |> Parser.parse_lines |> Result.all |> Result.ok |> Option.value_exn
   in
   assert_equal (List.length prices) 250;
   let first_price = List.hd_exn prices in
@@ -84,6 +101,11 @@ let suite =
          "test_parse_line_invalid_number" >:: test_parse_line_invalid_number;
          "test_parse_line_invalid_volume" >:: test_parse_line_invalid_volume;
          "test_parse_line_invalid_format" >:: test_parse_line_invalid_format;
+         "test_parse_lines_with_empty_list" >:: test_parse_lines_with_empty_list;
+         "test_parse_lines_with_empty_lines"
+         >:: test_parse_lines_with_empty_lines;
+         "test_parse_lines_with_invalid_line"
+         >:: test_parse_lines_with_invalid_line;
          "test_read_test_data_file" >:: test_read_test_data_file;
        ]
 
