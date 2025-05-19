@@ -19,25 +19,23 @@ let get_historical_prices ~token symbol =
   | Ok data -> Some (symbol, data)
   | Error _ -> None
 
-let parse_price_data data : (indicator_value list, Status.t) Result.t =
+let parse_price_data data : indicator_value list Option.t =
   let open Result in
-  let lines = String.split_lines data in
-  Csv.Parser.parse_lines lines
-  >>= List.map ~f:(fun (price : Types.Daily_price.t) ->
+  data |> String.split_lines |> Csv.Parser.parse_lines
+  >>| List.map ~f:(fun (price : Types.Daily_price.t) ->
           { date = price.date; value = price.adjusted_close })
+  |> Stdlib.Result.to_option
 
 let calculate_metrics symbol historical_data =
   match historical_data with
   | None -> None
-  | Some (_sym, data) -> (
-      try
-        let open Result in
-        parse_price_data data >>= fun prices ->
-        let ema_values = calculate_ema prices 30 in
-        let current_price = (List.last_exn prices).value in
-        let current_ema = (List.last_exn ema_values).value in
-        Some { symbol; price = current_price; ema = current_ema }
-      with _ -> None)
+  | Some (_sym, data) ->
+      let open Option in
+      parse_price_data data >>= fun prices ->
+      let ema_values = calculate_ema prices 30 in
+      let current_price = (List.last_exn prices).value in
+      let current_ema = (List.last_exn ema_values).value in
+      Some { symbol; price = current_price; ema = current_ema }
 
 let above_30w_ema ~token ~symbols () =
   (* Create a throttle to limit concurrent requests *)

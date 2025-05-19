@@ -68,9 +68,7 @@ let save t ~override prices =
 
 let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
-  let%bind prices =
-    In_channel.read_lines t.path |> Parser.parse_lines |> Result.all
-  in
+  let%bind prices = In_channel.read_lines t.path |> Parser.parse_lines in
   match (start_date, end_date) with
   | Some start, Some end_ when Date.compare start end_ > 0 ->
       Error

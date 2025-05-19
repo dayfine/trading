@@ -37,8 +37,8 @@ let parse_line (line : string) : (Types.Daily_price.t, string) Result.t =
   | _ -> Error ("Expected 7 columns, line: " ^ line)
 
 let parse_lines (lines : string list) :
-    (Types.Daily_price.t, Status.t) Result.t list =
-  if List.is_empty lines then []
+    (Types.Daily_price.t list, Status.t) Result.t =
+  if List.is_empty lines then Error (Status.invalid_argument_error "Empty file")
   else
     (* Skip header *)
     List.tl_exn lines
@@ -46,3 +46,4 @@ let parse_lines (lines : string list) :
            match parse_line line with
            | Ok price -> Ok price
            | Error msg -> Error (Status.invalid_argument_error msg))
+    |> Result.all

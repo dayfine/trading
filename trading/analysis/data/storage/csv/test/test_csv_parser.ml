@@ -4,12 +4,13 @@ open Csv
 open Status
 
 let parse_line line =
-  Parser.parse_lines [""; line] |> List.hd_exn |> Result.map_error ~f:(fun status -> status.message)
+  Parser.parse_lines [ ""; line ]
+  |> Result.map_error ~f:(fun status -> status.message)
 
 let test_parse_line_valid _ =
   let result =
     parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,1000"
-    |> Result.ok |> Option.value_exn
+    |> Result.ok |> Option.value_exn |> List.hd_exn
   in
   assert_equal ~printer:Types.Daily_price.show result
     {
@@ -24,15 +25,13 @@ let test_parse_line_valid _ =
 
 let test_parse_line_invalid_date _ =
   let result =
-    parse_line "invalid,100.0,105.0,98.0,103.0,103.0,1000"
-    |> Result.error
+    parse_line "invalid,100.0,105.0,98.0,103.0,103.0,1000" |> Result.error
   in
   assert_equal result (Option.some "Invalid date format, expected YYYY-MM-DD")
 
 let test_parse_line_invalid_number _ =
   let result =
-    parse_line "2024-03-19,invalid,105.0,98.0,103.0,103.0,1000"
-    |> Result.error
+    parse_line "2024-03-19,invalid,105.0,98.0,103.0,103.0,1000" |> Result.error
   in
   assert_equal result
     (Option.some
@@ -40,8 +39,7 @@ let test_parse_line_invalid_number _ =
 
 let test_parse_line_invalid_volume _ =
   let result =
-    parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,invalid"
-    |> Result.error
+    parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,invalid" |> Result.error
   in
   assert_equal result
     (Option.some
@@ -54,20 +52,24 @@ let test_parse_line_invalid_format _ =
 
 let test_parse_lines_with_empty_list _ =
   let result = Parser.parse_lines [] in
-  assert_equal result []
+  assert_equal result (Error (Status.invalid_argument_error "Empty file"))
 
 let test_parse_lines_with_empty_lines _ =
   let result = Parser.parse_lines [ ""; "" ] in
-  assert_equal result [Error (Status.invalid_argument_error "Expected 7 columns, line: ")]
+  assert_equal result
+    (Error (Status.invalid_argument_error "Expected 7 columns, line: "))
 
 let test_parse_lines_with_invalid_line _ =
   let result = Parser.parse_lines [ ""; "not,enough,columns" ] in
-  assert_equal result [Error (Status.invalid_argument_error "Expected 7 columns, line: not,enough,columns")]
+  assert_equal result
+    (Error
+       (Status.invalid_argument_error
+          "Expected 7 columns, line: not,enough,columns"))
 
 let test_read_test_data_file _ =
   let prices =
     In_channel.read_lines "./data/test_data.csv"
-    |> Parser.parse_lines |> Result.all |> Result.ok |> Option.value_exn
+    |> Parser.parse_lines |> Result.ok |> Option.value_exn
   in
   assert_equal (List.length prices) 250;
   let first_price = List.hd_exn prices in

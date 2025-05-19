@@ -13,7 +13,7 @@ let main input_file period weekly () =
   Exn.protect
     ~f:(fun () ->
       let lines = In_channel.read_lines input_file in
-      let data = Result.all (parse_lines lines) in
+      let data = parse_lines lines in
       match data with
       | Ok data ->
           let indicator_values =
