@@ -40,7 +40,7 @@ let write_price oc price =
        ]);
   Out_channel.newline oc
 
-let default_data_dir = Fpath.v "data"
+let default_data_dir = Fpath.v (Sys_unix.getcwd () ^ "/data")
 
 let create ?(data_dir = default_data_dir) symbol =
   let path = Fpath.(data_dir / symbol |> add_ext "csv") in
@@ -54,7 +54,7 @@ let save t ~override prices =
     Error
       (Status.invalid_argument_error "File already exists and override is false")
   else
-    let oc = Out_channel.create t.path in
+    let oc = Stdlib.open_out t.path in
     Exn.protect
       ~f:(fun () ->
         Out_channel.output_string oc
