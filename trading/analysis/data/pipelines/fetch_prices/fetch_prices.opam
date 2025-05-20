@@ -1,0 +1,25 @@
+opam-version: "2.0"
+name: "fetch_prices"
+version: "0.1.0"
+synopsis: "Fetch and save historical stock prices"
+description: "A tool to fetch historical stock prices from EODHD API and save them to CSV files"
+maintainer: "difa"
+authors: ["difa"]
+license: "MIT"
+homepage: ""
+bug-reports: ""
+depends: [
+  "dune" {>= "3.0"}
+  "core" {>= "v0.15"}
+  "async" {>= "v0.15"}
+  "async_unix" {>= "v0.15"}
+  "eodhd"
+  "csv_storage"
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+dev-repo: "git+file:///workspaces/trading-1"
+url {
+  src: ""
+}

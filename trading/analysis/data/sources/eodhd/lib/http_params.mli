@@ -3,8 +3,8 @@ open Core
 (* params for calling the EODHD API *)
 type t = {
   symbol : string;
-  (* If specified, omitted from the API call *)
+  (* If not specified, omitted from the API call *)
   start_date : Date.t option;
-  (* If specified, defaults to today *)
+  (* If not specified, defaults to today *)
   end_date : Date.t option;
 }

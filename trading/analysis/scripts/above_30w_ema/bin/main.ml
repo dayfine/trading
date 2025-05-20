@@ -26,7 +26,9 @@ let main ~num_symbols () =
   | Ok all_symbols ->
       let symbols = random_sample ~n:num_symbols all_symbols in
       above_30w_ema ~token ~symbols () >>| print_results >>= fun () -> return ()
-  | Error msg -> failwith msg
+  | Error status ->
+      printf "Error fetching symbols: %s\n" (Status.to_string status);
+      return ()
 
 let command =
   Command.async ~summary:"Find stocks trading above their 30-week EMA"

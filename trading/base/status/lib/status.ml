@@ -1,3 +1,5 @@
+open Core
+
 type code =
   | Ok
   | Cancelled
@@ -20,33 +22,34 @@ type code =
 
 type t = { code : code; message : string } [@@deriving show, eq]
 
-let code_to_string = function
-  | Ok -> "OK"
-  | Cancelled -> "CANCELLED"
-  | Invalid_argument -> "INVALID_ARGUMENT"
-  | Deadline_exceeded -> "DEADLINE_EXCEEDED"
-  | NotFound -> "NOT_FOUND"
-  | Already_exists -> "ALREADY_EXISTS"
-  | Permission_denied -> "PERMISSION_DENIED"
-  | Unauthenticated -> "UNAUTHENTICATED"
-  | Resource_exhausted -> "RESOURCE_EXHAUSTED"
-  | Failed_precondition -> "FAILED_PRECONDITION"
-  | Aborted -> "ABORTED"
-  | Unavailable -> "UNAVAILABLE"
-  | Out_of_range -> "OUT_OF_RANGE"
-  | Unimplemented -> "UNIMPLEMENTED"
-  | Internal -> "INTERNAL"
-  | Data_loss -> "DATA_LOSS"
-  | Unknown -> "UNKNOWN"
-
 let to_string { code; message } =
-  Printf.sprintf "%s: %s" (code_to_string code) message
+  match code with
+  | Ok -> "OK"
+  | _ -> sprintf "%s: %s" (show_code code) message
 
-let is_ok { code; _ } = code = Ok
+let is_ok { code; _ } = equal_code code Ok
 let is_error status = not (is_ok status)
 
 (** Error creation functions *)
 let invalid_argument_error message = { code = Invalid_argument; message }
 
+let internal_error message = { code = Internal; message }
 let not_found_error message = { code = NotFound; message }
 let permission_denied_error message = { code = Permission_denied; message }
+
+let combine statuses =
+  let errors = List.filter ~f:is_error statuses in
+  match errors with
+  | [] -> { code = Ok; message = "" }
+  | first_error :: rest ->
+      let combined_message =
+        match rest with
+        | [] -> first_error.message
+        | _ ->
+            let error_messages =
+              first_error.message
+              :: List.map rest ~f:(fun s -> s.message)
+            in
+            String.concat ~sep:"; " error_messages
+      in
+      { code = first_error.code; message = combined_message }

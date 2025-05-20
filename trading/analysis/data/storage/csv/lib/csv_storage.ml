@@ -40,7 +40,7 @@ let write_price oc price =
        ]);
   Out_channel.newline oc
 
-let default_data_dir = Fpath.v "data"
+let default_data_dir = Fpath.v (Sys_unix.getcwd () ^ "/data")
 
 let create ?(data_dir = default_data_dir) symbol =
   let path = Fpath.(data_dir / symbol |> add_ext "csv") in
@@ -54,7 +54,7 @@ let save t ~override prices =
     Error
       (Status.invalid_argument_error "File already exists and override is false")
   else
-    let oc = Out_channel.create t.path in
+    let oc = Stdlib.open_out t.path in
     Exn.protect
       ~f:(fun () ->
         Out_channel.output_string oc
@@ -68,11 +68,7 @@ let save t ~override prices =
 
 let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
-  let%bind prices =
-    Parser.read_file t.path
-    |> Result.map_error ~f:(fun msg ->
-           Status.not_found_error (sprintf "Failed to read file: %s" msg))
-  in
+  let%bind prices = In_channel.read_lines t.path |> Parser.parse_lines in
   match (start_date, end_date) with
   | Some start, Some end_ when Date.compare start end_ > 0 ->
       Error

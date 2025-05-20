@@ -1,11 +1,11 @@
 open Core
 
-let parse_date str =
+let parse_date (str : string) : Date.t =
   try Date.of_string str
   with _ ->
     raise (Invalid_argument "Invalid date format, expected YYYY-MM-DD")
 
-let parse_line line =
+let parse_line (line : string) : (Types.Daily_price.t, string) Result.t =
   let parts = String.split_on_chars ~on:[ ',' ] line in
   match parts with
   | [
@@ -36,22 +36,14 @@ let parse_line line =
       | Failure _ -> Error ("Invalid number in line: " ^ line))
   | _ -> Error ("Expected 7 columns, line: " ^ line)
 
-let read_file filename =
-  try
-    let lines = In_channel.read_lines filename in
-    let rec parse_lines acc = function
-      | [] -> Ok (List.rev acc)
-      | line :: rest -> (
-          match parse_line line with
-          | Ok price -> parse_lines (price :: acc) rest
-          | Error msg -> Error msg)
-    in
-    match lines with
-    | [] -> Ok []
-    | header :: data_lines ->
-        (* Try to parse header but ignore any errors *)
-        let _ = parse_line header in
-        parse_lines [] data_lines
-  with
-  | Sys_error msg -> Error ("Failed to read file: " ^ msg)
-  | e -> Error ("Unexpected error: " ^ Exn.to_string e)
+let parse_lines (lines : string list) :
+    (Types.Daily_price.t list, Status.t) Result.t =
+  if List.is_empty lines then Error (Status.invalid_argument_error "Empty file")
+  else
+    (* Skip header *)
+    List.tl_exn lines
+    |> List.map ~f:(fun line ->
+           match parse_line line with
+           | Ok price -> Ok price
+           | Error msg -> Error (Status.invalid_argument_error msg))
+    |> Result.all

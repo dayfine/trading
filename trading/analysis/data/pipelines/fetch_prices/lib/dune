@@ -1,0 +1,6 @@
+(library
+ (name fetch_prices)
+ (public_name pipelines.fetch_prices)
+ (libraries core async eodhd csv status)
+ (preprocess
+  (pps ppx_jane)))

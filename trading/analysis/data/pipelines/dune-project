@@ -1,0 +1,14 @@
+(lang dune 3.17)
+
+(name pipelines)
+
+(generate_opam_files true)
+
+(package
+ (name pipelines)
+ (allow_empty)
+ (depends
+  core
+  async
+  csv
+  eodhd))

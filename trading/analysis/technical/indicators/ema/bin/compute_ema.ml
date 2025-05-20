@@ -12,7 +12,9 @@ let main input_file period weekly () =
   Ta_ocaml.Ta.initialize ();
   Exn.protect
     ~f:(fun () ->
-      match read_file input_file with
+      let lines = In_channel.read_lines input_file in
+      let data = parse_lines lines in
+      match data with
       | Ok data ->
           let indicator_values =
             if weekly then
@@ -26,8 +28,8 @@ let main input_file period weekly () =
                 (Month.to_int (Date.month v.date))
                 (Date.day v.date) v.value);
           exit 0
-      | Error msg ->
-          Printf.eprintf "Error reading file: %s\n" msg;
+      | Error status ->
+          Printf.eprintf "Error reading file: %s\n" (Status.to_string status);
           exit 1)
     ~finally:(fun () -> Ta_ocaml.Ta.shutdown ())
 
