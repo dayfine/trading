@@ -25,7 +25,7 @@ let print_results results =
     List.partition_map results ~f:(fun (symbol, res) ->
         match res with
         | Ok () -> Either.First symbol
-        | Error err -> Either.Second (symbol, Status.to_string err))
+        | Error status -> Either.Second (symbol, Status.to_string status))
   in
   printf "\nSuccessfully saved prices for %d symbols:\n" (List.length successes);
   List.iter successes ~f:(fun symbol -> printf "✓ %s\n" symbol);
@@ -40,8 +40,8 @@ let main ~num_symbols () =
       return ()
   | Ok token -> (
       get_symbols ~token >>= function
-      | Error msg ->
-          printf "Error: %s\n" msg;
+      | Error status ->
+          printf "Error fetching symbols: %s\n" (Status.to_string status);
           return ()
       | Ok symbols ->
           let selected_symbols = random_sample ~n:num_symbols symbols in

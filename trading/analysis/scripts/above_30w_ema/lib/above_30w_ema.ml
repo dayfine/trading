@@ -17,7 +17,9 @@ let get_historical_prices ~token symbol =
   in
   Eodhd.Http_client.get_historical_price ~token ~params >>| function
   | Ok data -> Some (symbol, data)
-  | Error _ -> None
+  | Error status ->
+      printf "Error fetching data for %s: %s\n" symbol (Status.to_string status);
+      None
 
 let parse_price_data data : indicator_value list Option.t =
   let open Result in

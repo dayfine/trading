@@ -12,7 +12,7 @@ val historical_price_uri :
 *)
 
 val get_historical_price :
-  token:string -> params:Http_params.t -> (string, string) Result.t Deferred.t
+  token:string -> params:Http_params.t -> (string, Status.t) Result.t Deferred.t
 
-val get_symbols : token:string -> (string list, string) Result.t Deferred.t
+val get_symbols : token:string -> (string list, Status.t) Result.t Deferred.t
 (** Fetch list of US stock symbols from EODHD API *)

@@ -12,7 +12,7 @@ let get_and_parse uri parse_body =
   | status ->
       let status_str = Cohttp.Code.string_of_status status in
       Cohttp_async.Body.to_string body >>| fun body_str ->
-      Error (Printf.sprintf "Error: %s\n%s" status_str body_str)
+      Error (Status.internal_error (Printf.sprintf "Error: %s\n%s" status_str body_str))
 
 let make_symbols_uri token =
   Uri.make ~scheme:"https" ~host:api_host ~path:"/api/exchange-symbol-list/US"
@@ -23,9 +23,9 @@ let extract_symbol_from_json = function
   | `Assoc fields -> (
       match List.find fields ~f:(fun (k, _) -> String.equal k "Code") with
       | Some (_, `String code) -> Ok code
-      | Some (_, _) -> Error "Code field is not a string"
-      | None -> Error "Code field not found")
-  | _ -> Error "Invalid symbol format"
+      | Some (_, _) -> Error (Status.invalid_argument_error "Code field is not a string")
+      | None -> Error (Status.not_found_error "Code field not found"))
+  | _ -> Error (Status.invalid_argument_error "Invalid symbol format")
 
 let parse_symbols_response body_str =
   match Yojson.Safe.from_string body_str with
@@ -39,10 +39,10 @@ let parse_symbols_response body_str =
           (List.filter_map results ~f:(function
             | Ok s -> Some s
             | Error _ -> None))
-      else Error (String.concat ~sep:", " errors)
-  | _ -> Error "Invalid response format"
+      else Error (Status.combine errors)
+  | _ -> Error (Status.invalid_argument_error "Invalid response format")
 
-let get_symbols ~token : (string list, string) Result.t Deferred.t =
+let get_symbols ~token : (string list, Status.t) Result.t Deferred.t =
   let uri = make_symbols_uri token in
   get_and_parse uri parse_symbols_response
 
@@ -65,7 +65,7 @@ let historical_price_uri ?(testonly_today = None) (params : Http_params.t) =
     ("to", Option.value params.end_date ~default:today |> as_str)
 
 let get_historical_price ~(token : string) ~(params : Http_params.t) :
-    (string, string) Result.t Deferred.t =
+    (string, Status.t) Result.t Deferred.t =
   let uri = historical_price_uri params in
   let uri' = Uri.add_query_param' uri ("api_token", token) in
   get_and_parse uri' (fun body_str -> Ok body_str)

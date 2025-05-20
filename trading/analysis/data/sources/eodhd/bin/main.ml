@@ -22,8 +22,8 @@ let handle_response ~symbol ~output_file response =
       | None ->
           Async.Log.Global.info "Data:\n%s" body;
           return ())
-  | Error error ->
-      Async.Log.Global.error "Error: %s" error;
+  | Error status ->
+      Async.Log.Global.error "Error: %s" (Status.to_string status);
       return ()
 
 let main symbol output_file () =
