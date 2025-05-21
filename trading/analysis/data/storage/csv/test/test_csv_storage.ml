@@ -27,12 +27,6 @@ let teardown_test_dir () =
   | `Yes -> ok_or_failwith_os_error (OS.Dir.delete ~recurse:true test_dir)
   | _ -> ()
 
-let test_create_directory_structure _ =
-  let symbol = "GOOG" in
-  let _storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
-  let expected_path = Fpath.(test_dir / "G" / "O" / symbol / "data.csv") in
-  assert_equal `Yes (Sys_unix.file_exists (Fpath.to_string expected_path))
-
 let test_save_and_get_prices _ =
   let symbol = "AAPL" in
   let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
@@ -59,19 +53,41 @@ let test_save_and_get_prices _ =
     ]
   in
   ok_or_failwith_status (save storage ~override:true prices);
+  let expected_path = Fpath.(test_dir / "A" / "L" / "AAPL" / "data.csv") in
+  assert_equal `Yes (Sys_unix.file_exists (Fpath.to_string expected_path));
   let retrieved_prices = get storage () |> ok_or_failwith_status in
-  assert_equal (List.length prices) (List.length retrieved_prices);
-  List.iter2_exn prices retrieved_prices ~f:(fun expected actual ->
-      assert_equal expected.date actual.date;
-      assert_equal expected.open_price actual.open_price;
-      assert_equal expected.high_price actual.high_price;
-      assert_equal expected.low_price actual.low_price;
-      assert_equal expected.close_price actual.close_price;
-      assert_equal expected.adjusted_close actual.adjusted_close;
-      assert_equal expected.volume actual.volume)
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    prices retrieved_prices
+
+let test_single_char_symbol _ =
+  let symbol = "X" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  let prices =
+    [
+      {
+        Types.Daily_price.date = Date.of_string "2024-01-01";
+        open_price = 50.0;
+        high_price = 55.0;
+        low_price = 48.0;
+        close_price = 52.0;
+        adjusted_close = 52.0;
+        volume = 500000;
+      };
+    ]
+  in
+  ok_or_failwith_status (save storage ~override:true prices);
+  let expected_path = Fpath.(test_dir / "X" / "X" / "X" / "data.csv") in
+  assert_equal `Yes (Sys_unix.file_exists (Fpath.to_string expected_path));
+  let retrieved_prices = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    prices retrieved_prices
 
 let test_invalid_symbol _ =
-  let symbol = "A" in
+  let symbol = "" in
   (* Too short for our directory structure *)
   match create ~data_dir:test_dir symbol with
   | Ok _ -> assert_failure "Should have failed with invalid symbol"
@@ -156,8 +172,8 @@ let test_validation_error _ =
 let suite =
   "CSV Storage tests"
   >::: [
-         "test_create_directory_structure" >:: test_create_directory_structure;
          "test_save_and_get_prices" >:: test_save_and_get_prices;
+         "test_single_char_symbol" >:: test_single_char_symbol;
          "test_invalid_symbol" >:: test_invalid_symbol;
          "test_date_filter" >:: test_date_filter;
          "test_validation_error" >:: test_validation_error;
