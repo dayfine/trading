@@ -12,7 +12,9 @@ let get_and_parse uri parse_body =
   | status ->
       let status_str = Cohttp.Code.string_of_status status in
       Cohttp_async.Body.to_string body >>| fun body_str ->
-      Error (Status.internal_error (Printf.sprintf "Error: %s\n%s" status_str body_str))
+      Error
+        (Status.internal_error
+           (Printf.sprintf "Error: %s\n%s" status_str body_str))
 
 let make_symbols_uri token =
   Uri.make ~scheme:"https" ~host:api_host ~path:"/api/exchange-symbol-list/US"
@@ -23,7 +25,8 @@ let extract_symbol_from_json = function
   | `Assoc fields -> (
       match List.find fields ~f:(fun (k, _) -> String.equal k "Code") with
       | Some (_, `String code) -> Ok code
-      | Some (_, _) -> Error (Status.invalid_argument_error "Code field is not a string")
+      | Some (_, _) ->
+          Error (Status.invalid_argument_error "Code field is not a string")
       | None -> Error (Status.not_found_error "Code field not found"))
   | _ -> Error (Status.invalid_argument_error "Invalid symbol format")
 

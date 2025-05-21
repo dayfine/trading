@@ -11,7 +11,8 @@ let get_historical_prices ~token symbol : (string, Status.t) Result.t Deferred.t
   get_historical_price ~token ~params
   |> Deferred.Result.map_error ~f:(fun status ->
          Status.internal_error
-           (sprintf "Failed to fetch prices for %s: %s" symbol (Status.to_string status)))
+           (sprintf "Failed to fetch prices for %s: %s" symbol
+              (Status.to_string status)))
 
 let parse_price_data data : (Types.Daily_price.t list, Status.t) Result.t =
   let lines = String.split_lines data in
