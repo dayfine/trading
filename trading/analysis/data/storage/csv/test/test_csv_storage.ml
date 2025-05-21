@@ -17,8 +17,8 @@ let test_dir = Fpath.v "test_data"
 let setup_test_dir () =
   let dir_str = Fpath.to_string test_dir in
   (match Sys_unix.file_exists dir_str with
-   | `Yes -> ok_or_failwith_os_error (OS.Dir.delete ~recurse:true test_dir)
-   | _ -> ());
+  | `Yes -> ok_or_failwith_os_error (OS.Dir.delete ~recurse:true test_dir)
+  | _ -> ());
   ignore (ok_or_failwith_os_error (OS.Dir.create test_dir))
 
 let teardown_test_dir () =
@@ -30,9 +30,7 @@ let teardown_test_dir () =
 let test_create_directory_structure _ =
   let symbol = "GOOG" in
   let _storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
-  let expected_path =
-    Fpath.(test_dir / "G" / "O" / symbol / "data.csv")
-  in
+  let expected_path = Fpath.(test_dir / "G" / "O" / symbol / "data.csv") in
   assert_equal `Yes (Sys_unix.file_exists (Fpath.to_string expected_path))
 
 let test_save_and_get_prices _ =
