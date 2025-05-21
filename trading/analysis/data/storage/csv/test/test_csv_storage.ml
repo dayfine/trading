@@ -86,6 +86,11 @@ let test_single_char_symbol _ =
       String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
     prices retrieved_prices
 
+let test_create_twice _ =
+  let symbol = "MSFT" in
+  ignore (create ~data_dir:test_dir symbol |> ok_or_failwith_status);
+  ignore (create ~data_dir:test_dir symbol |> ok_or_failwith_status)
+
 let test_invalid_symbol _ =
   let symbol = "" in
   (* Too short for our directory structure *)
@@ -174,6 +179,7 @@ let suite =
   >::: [
          "test_save_and_get_prices" >:: test_save_and_get_prices;
          "test_single_char_symbol" >:: test_single_char_symbol;
+         "test_create_twice" >:: test_create_twice;
          "test_invalid_symbol" >:: test_invalid_symbol;
          "test_date_filter" >:: test_date_filter;
          "test_validation_error" >:: test_validation_error;

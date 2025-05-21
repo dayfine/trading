@@ -54,9 +54,13 @@ let create_symbol_dirs data_dir symbol =
       Fpath.(
         data_dir / String.make 1 first_char / String.make 1 last_char / symbol)
     in
-    match OS.Dir.create ~path:true dir_path with
-    | Ok _ -> Ok dir_path
-    | Error (`Msg msg) -> Error (Status.invalid_argument_error msg)
+    match OS.Dir.exists dir_path with
+    | Ok true -> Ok dir_path
+    | Ok false -> (
+        match OS.Dir.create ~path:true dir_path with
+        | Ok _ -> Ok dir_path
+        | Error (`Msg msg) -> Error (Status.internal_error msg))
+    | Error (`Msg msg) -> Error (Status.internal_error msg)
 
 let create ?(data_dir = default_data_dir) symbol =
   let%bind symbol_dir = create_symbol_dirs data_dir symbol in
