@@ -8,7 +8,9 @@
 (package
  (name csv)
  (depends
-  ocaml core
+  bos
+  core
+  ocaml
   (ounit2 :with-test)
   ppx_deriving
   ppx_let))

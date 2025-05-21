@@ -1,4 +1,6 @@
 open Core
+open Result.Let_syntax
+open Bos
 
 let validate_prices prices =
   let rec check_sorted_and_unique prev = function
@@ -42,8 +44,20 @@ let write_price oc price =
 
 let default_data_dir = Fpath.v (Sys_unix.getcwd () ^ "/data")
 
+let create_symbol_dirs data_dir symbol =
+  let first_char = String.get symbol 0 in
+  let second_char = String.get symbol 1 in
+  let dir_path =
+    Fpath.(
+      data_dir / String.make 1 first_char / String.make 1 second_char / symbol)
+  in
+  match OS.Dir.create ~path:true dir_path with
+  | Ok _ -> Ok dir_path
+  | Error (`Msg msg) -> Error (Status.invalid_argument_error msg)
+
 let create ?(data_dir = default_data_dir) symbol =
-  let path = Fpath.(data_dir / symbol |> add_ext "csv") in
+  let%bind symbol_dir = create_symbol_dirs data_dir symbol in
+  let path = Fpath.(symbol_dir / "data.csv") in
   Ok { path = Fpath.to_string path }
 
 let save t ~override prices =
