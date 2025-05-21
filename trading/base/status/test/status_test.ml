@@ -11,7 +11,8 @@ let test_create () =
 
 let test_to_string () =
   let status = { code = Invalid_argument; message = "test message" } in
-  check string "to_string" "Status.Invalid_argument: test message" (to_string status)
+  check string "to_string" "Status.Invalid_argument: test message"
+    (to_string status)
 
 let test_is_ok () =
   let ok_status = { code = Ok; message = "success" } in
