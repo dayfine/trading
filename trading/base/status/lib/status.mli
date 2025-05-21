@@ -53,6 +53,5 @@ val combine : t list -> t
 (** [combine statuses] combines a list of statuses into a single status.
     - If all statuses are Ok, returns Ok
     - If any status is an error, returns a combined error status with:
-      - The first error code from the list
-      - A message that combines all error messages
-*)
+    - The first error code from the list
+    - A message that combines all error messages *)
