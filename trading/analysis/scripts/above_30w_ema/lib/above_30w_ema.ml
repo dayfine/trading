@@ -11,11 +11,10 @@ let get_historical_prices ~token symbol =
     {
       Eodhd.Http_params.symbol;
       start_date = Some (Date.add_days (Date.today ~zone) (-365));
-      (* 1 year of data *)
       end_date = Some (Date.today ~zone);
     }
   in
-  Eodhd.Http_client.get_historical_price ~token ~params >>| function
+  Eodhd.Http_client.get_historical_price ~token ~params () >>| function
   | Ok data -> Some (symbol, data)
   | Error status ->
       printf "Error fetching data for %s: %s\n" symbol (Status.show status);

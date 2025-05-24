@@ -1,6 +1,7 @@
 open Async
 open Core
-open Types
+
+type fetch_fn = Uri.t -> (string, Status.t) Result.t Deferred.t
 
 (* https://eodhd.com/financial-apis/api-for-historical-data-and-volumes *)
 let api_host = "eodhd.com"
@@ -69,9 +70,8 @@ let historical_price_uri ?(testonly_today = None)
   Uri.add_query_param' uri'
     ("to", Option.value params.end_date ~default:today |> as_str)
 
-let get_historical_price ~(token : string)
-    ~(params : Http_params.historical_price_params) :
-    (string, Status.t) Result.t Deferred.t =
+let get_historical_price ~token ~params
+    ?(fetch = fun uri -> get_and_parse uri (fun body_str -> Ok body_str)) () =
   let uri = historical_price_uri params in
-  let uri' = Uri.add_query_param' uri ("api_token", token) in
-  get_and_parse uri' (fun body_str -> Ok body_str)
+  let uri = Uri.add_query_param' uri ("api_token", token) in
+  fetch uri >>| function Ok body_str -> Ok body_str | Error err -> Error err
