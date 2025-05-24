@@ -4,10 +4,9 @@ open Core
 type fetch_fn = Uri.t -> (string, Status.t) Result.t Deferred.t
 
 (* https://eodhd.com/financial-apis/api-for-historical-data-and-volumes *)
-let api_host = "eodhd.com"
-let as_str (date : Date.t) = Date.to_string date
+let _api_host = "eodhd.com"
 
-let get_and_parse uri parse_body =
+let _get_and_parse uri parse_body =
   Cohttp_async.Client.get uri >>= fun (resp, body) ->
   match Cohttp.Response.status resp with
   | `OK -> Cohttp_async.Body.to_string body >>| parse_body
@@ -18,12 +17,29 @@ let get_and_parse uri parse_body =
         (Status.internal_error
            (Printf.sprintf "Error: %s\n%s" status_str body_str))
 
-let make_symbols_uri token =
-  Uri.make ~scheme:"https" ~host:api_host ~path:"/api/exchange-symbol-list/US"
+let _historical_price_uri (params : Http_params.historical_price_params) =
+  let uri =
+    Uri.make ~scheme:"https" ~host:_api_host
+      ~path:("/api/eod/" ^ params.symbol)
+      ~query:[ ("fmt", [ "csv" ]); ("period", [ "d" ]); ("order", [ "a" ]) ]
+      ()
+  in
+  let uri' =
+    match params.start_date with
+    | None -> uri
+    | Some start_date ->
+        Uri.add_query_param' uri ("from", start_date |> Date.to_string)
+  in
+  let today = Date.today ~zone:Time_float.Zone.utc in
+  Uri.add_query_param' uri'
+    ("to", Option.value params.end_date ~default:today |> Date.to_string)
+
+let _make_symbols_uri token =
+  Uri.make ~scheme:"https" ~host:_api_host ~path:"/api/exchange-symbol-list/US"
     ~query:[ ("api_token", [ token ]); ("fmt", [ "json" ]) ]
     ()
 
-let extract_symbol_from_json = function
+let _extract_symbol_from_json = function
   | `Assoc fields -> (
       match List.find fields ~f:(fun (k, _) -> String.equal k "Code") with
       | Some (_, `String code) -> Ok code
@@ -32,10 +48,10 @@ let extract_symbol_from_json = function
       | None -> Error (Status.not_found_error "Code field not found"))
   | _ -> Error (Status.invalid_argument_error "Invalid symbol format")
 
-let parse_symbols_response body_str =
+let _parse_symbols_response body_str =
   match Yojson.Safe.from_string body_str with
   | `List symbols ->
-      let results = List.map symbols ~f:extract_symbol_from_json in
+      let results = List.map symbols ~f:_extract_symbol_from_json in
       let errors =
         List.filter_map results ~f:(function Error e -> Some e | Ok _ -> None)
       in
@@ -48,30 +64,11 @@ let parse_symbols_response body_str =
   | _ -> Error (Status.invalid_argument_error "Invalid response format")
 
 let get_symbols ~token : (string list, Status.t) Result.t Deferred.t =
-  let uri = make_symbols_uri token in
-  get_and_parse uri parse_symbols_response
-
-let historical_price_uri ?(testonly_today = None)
-    (params : Http_params.historical_price_params) =
-  let uri =
-    Uri.make ~scheme:"https" ~host:api_host
-      ~path:("/api/eod/" ^ params.symbol)
-      ~query:[ ("fmt", [ "csv" ]); ("period", [ "d" ]); ("order", [ "a" ]) ]
-      ()
-  in
-  let uri' =
-    match params.start_date with
-    | None -> uri
-    | Some start_date -> Uri.add_query_param' uri ("from", start_date |> as_str)
-  in
-  let today =
-    Option.value testonly_today ~default:(Date.today ~zone:Time_float.Zone.utc)
-  in
-  Uri.add_query_param' uri'
-    ("to", Option.value params.end_date ~default:today |> as_str)
+  let uri = _make_symbols_uri token in
+  _get_and_parse uri _parse_symbols_response
 
 let get_historical_price ~token ~params
-    ?(fetch = fun uri -> get_and_parse uri (fun body_str -> Ok body_str)) () =
-  let uri = historical_price_uri params in
+    ?(fetch = fun uri -> _get_and_parse uri (fun body_str -> Ok body_str)) () =
+  let uri = _historical_price_uri params in
   let uri = Uri.add_query_param' uri ("api_token", token) in
   fetch uri >>| function Ok body_str -> Ok body_str | Error err -> Error err
