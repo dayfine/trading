@@ -67,7 +67,7 @@ let create ?(data_dir = default_data_dir) symbol =
   let path = Fpath.(symbol_dir / "data.csv") in
   Ok { path = Fpath.to_string path }
 
-let save t ~override prices =
+let save t ?(override = false) prices =
   let open Result.Let_syntax in
   let%bind () = validate_prices prices in
   let exists = Sys_unix.file_exists t.path in

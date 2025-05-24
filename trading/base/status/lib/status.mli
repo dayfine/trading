@@ -25,9 +25,6 @@ type code =
 type t = { code : code; message : string } [@@deriving show, eq]
 (** A status consists of a code and a descriptive message *)
 
-val to_string : t -> string
-(** [to_string status] converts a status to a human-readable string *)
-
 val is_ok : t -> bool
 (** [is_ok status] returns true if the status code is Ok *)
 
