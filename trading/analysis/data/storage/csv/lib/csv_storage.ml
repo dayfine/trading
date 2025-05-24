@@ -84,41 +84,63 @@ let _append_prices_to_file path prices =
          Status.internal_error
            (sprintf "Failed to write file: %s" (Exn.to_string e)))
 
+let _price_map_of_list prices =
+  List.fold prices ~init:Date.Map.empty ~f:(fun acc p ->
+      Map.set acc ~key:p.Types.Daily_price.date ~data:p)
+
 let _merge_prices ~override_old_price old_prices new_prices =
-  let old_map =
-    List.fold old_prices ~init:Date.Map.empty ~f:(fun acc p ->
-        Map.set acc ~key:p.Types.Daily_price.date ~data:p)
-  in
-  let%bind merged =
-    List.fold new_prices ~init:(Ok []) ~f:(fun acc p ->
+  let price_map = _price_map_of_list old_prices in
+  let%bind updated_map =
+    List.fold new_prices ~init:(Ok price_map) ~f:(fun acc p ->
         match acc with
         | Error _ as e -> e
-        | Ok prices -> (
-            match Map.find old_map p.Types.Daily_price.date with
+        | Ok map -> (
+            match Map.find map p.Types.Daily_price.date with
             | Some old_price when not (Poly.equal old_price p) ->
-                if override_old_price then Ok (p :: prices)
+                if override_old_price then
+                  Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)
                 else
                   Error
                     (Status.invalid_argument_error
                        "Cannot save data with overlapping dates and different \
                         values")
-            | Some _ -> Ok prices (* Skip if identical *)
-            | None -> Ok (p :: prices)))
+            | Some _ -> Ok map (* Skip if identical *)
+            | None -> Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)))
     (* Add if new date *)
-  in
-  let old_only =
-    List.filter old_prices ~f:(fun p ->
-        not
-          (Map.mem
-             (List.fold merged ~init:Date.Map.empty ~f:(fun acc p ->
-                  Map.set acc ~key:p.Types.Daily_price.date ~data:p))
-             p.Types.Daily_price.date))
   in
   Ok
     (List.sort
        ~compare:(fun a b ->
          Date.compare a.Types.Daily_price.date b.Types.Daily_price.date)
-       (old_only @ merged))
+       (Map.data updated_map))
+
+(* Compare date ranges of two sorted price lists.
+   Returns:
+   - `Before` if new prices are before old prices
+   - `After` if new prices are after old prices
+   - `Overlapping` if there is any overlap
+   - `Empty` if either list is empty *)
+type date_range = Before | After | Overlapping | Empty
+
+let _compare_date_ranges old_prices new_prices =
+  match (old_prices, new_prices) with
+  | [], _ | _, [] -> Empty
+  | old_prices, new_prices ->
+      let old_first = List.hd_exn old_prices in
+      let old_last = List.last_exn old_prices in
+      let new_first = List.hd_exn new_prices in
+      let new_last = List.last_exn new_prices in
+      if
+        Date.compare new_last.Types.Daily_price.date
+          old_first.Types.Daily_price.date
+        < 0
+      then Before
+      else if
+        Date.compare old_last.Types.Daily_price.date
+          new_first.Types.Daily_price.date
+        < 0
+      then After
+      else Overlapping
 
 let _handle_existing_and_new_prices path ~override existing_prices new_prices =
   if override || List.is_empty existing_prices then
@@ -127,28 +149,17 @@ let _handle_existing_and_new_prices path ~override existing_prices new_prices =
     in
     _write_prices_to_file path merged
   else
-    let old_first = List.hd_exn existing_prices in
-    let old_last = List.last_exn existing_prices in
-    let new_first = List.hd_exn new_prices in
-    let new_last = List.last_exn new_prices in
-    if
-      Date.compare old_last.Types.Daily_price.date
-        new_first.Types.Daily_price.date
-      < 0
-    then _append_prices_to_file path new_prices
-    else if
-      Date.compare new_last.Types.Daily_price.date
-        old_first.Types.Daily_price.date
-      < 0
-    then
-      Error
-        (Status.invalid_argument_error
-           "Cannot save data with dates before existing data")
-    else
-      let%bind merged =
-        _merge_prices ~override_old_price:false existing_prices new_prices
-      in
-      _write_prices_to_file path merged
+    match _compare_date_ranges existing_prices new_prices with
+    | Empty | After -> _append_prices_to_file path new_prices
+    | Before ->
+        Error
+          (Status.invalid_argument_error
+             "Cannot save data with dates before existing data")
+    | Overlapping ->
+        let%bind merged =
+          _merge_prices ~override_old_price:false existing_prices new_prices
+        in
+        _write_prices_to_file path merged
 
 type t = { path : string }
 
