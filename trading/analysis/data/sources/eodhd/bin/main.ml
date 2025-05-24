@@ -6,9 +6,11 @@ let read_file_as_string filename =
 
 let save_to_csv ~filename ~data = Out_channel.write_all filename ~data
 
-let fetch_data ~(token : string) ~(symbol : string) =
-  Eodhd.Http_client.get_historical_price ~token
-    ~params:{ symbol; start_date = None; end_date = None }
+let fetch_data ~token ~symbol =
+  let params =
+    { Eodhd.Http_params.symbol; start_date = None; end_date = None }
+  in
+  Eodhd.Http_client.get_historical_price ~token ~params ()
 
 let handle_response ~symbol ~output_file response =
   match response with

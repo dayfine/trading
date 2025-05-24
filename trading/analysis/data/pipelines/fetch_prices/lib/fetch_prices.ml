@@ -1,6 +1,5 @@
 open Core
 open Async
-open Eodhd.Http_client
 open Csv
 
 let get_historical_prices ~token symbol : (string, Status.t) Result.t Deferred.t
@@ -8,11 +7,7 @@ let get_historical_prices ~token symbol : (string, Status.t) Result.t Deferred.t
   let params =
     { Eodhd.Http_params.symbol; start_date = None; end_date = None }
   in
-  get_historical_price ~token ~params
-  |> Deferred.Result.map_error ~f:(fun status ->
-         Status.internal_error
-           (sprintf "Failed to fetch prices for %s: %s" symbol
-              (Status.show status)))
+  Eodhd.Http_client.get_historical_price ~token ~params ()
 
 let parse_price_data data : (Types.Daily_price.t list, Status.t) Result.t =
   let lines = String.split_lines data in

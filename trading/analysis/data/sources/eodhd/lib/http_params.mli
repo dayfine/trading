@@ -1,7 +1,7 @@
 open Core
 
 (* params for calling the EODHD API *)
-type t = {
+type historical_price_params = {
   symbol : string;
   (* If not specified, omitted from the API call *)
   start_date : Date.t option;
