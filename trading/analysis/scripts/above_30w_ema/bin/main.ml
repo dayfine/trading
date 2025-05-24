@@ -27,7 +27,7 @@ let main ~num_symbols () =
       let symbols = random_sample ~n:num_symbols all_symbols in
       above_30w_ema ~token ~symbols () >>| print_results >>= fun () -> return ()
   | Error status ->
-      printf "Error fetching symbols: %s\n" (Status.to_string status);
+      printf "Error fetching symbols: %s\n" (Status.show status);
       return ()
 
 let command =

@@ -22,9 +22,6 @@ type code =
 
 type t = { code : code; message : string } [@@deriving show, eq]
 
-let to_string { code; message } =
-  match code with Ok -> "OK" | _ -> sprintf "%s: %s" (show_code code) message
-
 let is_ok { code; _ } = equal_code code Ok
 let is_error status = not (is_ok status)
 

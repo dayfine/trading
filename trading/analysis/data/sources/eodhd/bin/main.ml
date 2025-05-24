@@ -23,7 +23,7 @@ let handle_response ~symbol ~output_file response =
           Async.Log.Global.info "Data:\n%s" body;
           return ())
   | Error status ->
-      Async.Log.Global.error "Error: %s" (Status.to_string status);
+      Async.Log.Global.error "Error: %s" (Status.show status);
       return ()
 
 let main symbol output_file () =

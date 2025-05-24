@@ -27,32 +27,50 @@ let teardown_test_dir () =
   | `Yes -> ok_or_failwith_os_error (OS.Dir.delete ~recurse:true test_dir)
   | _ -> ()
 
+let prices =
+  [
+    {
+      Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:19;
+      open_price = 100.0;
+      high_price = 105.0;
+      low_price = 98.0;
+      close_price = 103.0;
+      adjusted_close = 103.0;
+      volume = 1000;
+    };
+    {
+      Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
+      open_price = 103.0;
+      high_price = 108.0;
+      low_price = 102.0;
+      close_price = 107.0;
+      adjusted_close = 107.0;
+      volume = 1200;
+    };
+    {
+      Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21;
+      open_price = 107.0;
+      high_price = 112.0;
+      low_price = 106.0;
+      close_price = 111.0;
+      adjusted_close = 111.0;
+      volume = 1400;
+    };
+    {
+      Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:22;
+      open_price = 111.0;
+      high_price = 115.0;
+      low_price = 110.0;
+      close_price = 114.0;
+      adjusted_close = 114.0;
+      volume = 1600;
+    };
+  ]
+
 let test_save_and_get_prices _ =
   let symbol = "AAPL" in
   let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
-  let prices =
-    [
-      {
-        Types.Daily_price.date = Date.of_string "2024-01-01";
-        open_price = 100.0;
-        high_price = 105.0;
-        low_price = 95.0;
-        close_price = 102.0;
-        adjusted_close = 102.0;
-        volume = 1000000;
-      };
-      {
-        Types.Daily_price.date = Date.of_string "2024-01-02";
-        open_price = 102.0;
-        high_price = 107.0;
-        low_price = 101.0;
-        close_price = 106.0;
-        adjusted_close = 106.0;
-        volume = 1200000;
-      };
-    ]
-  in
-  ok_or_failwith_status (save storage ~override:true prices);
+  ok_or_failwith_status (save storage prices);
   let expected_path = Fpath.(test_dir / "A" / "L" / "AAPL" / "data.csv") in
   assert_equal `Yes (Sys_unix.file_exists (Fpath.to_string expected_path));
   let retrieved_prices = get storage () |> ok_or_failwith_status in
@@ -64,20 +82,7 @@ let test_save_and_get_prices _ =
 let test_single_char_symbol _ =
   let symbol = "X" in
   let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
-  let prices =
-    [
-      {
-        Types.Daily_price.date = Date.of_string "2024-01-01";
-        open_price = 50.0;
-        high_price = 55.0;
-        low_price = 48.0;
-        close_price = 52.0;
-        adjusted_close = 52.0;
-        volume = 500000;
-      };
-    ]
-  in
-  ok_or_failwith_status (save storage ~override:true prices);
+  ok_or_failwith_status (save storage prices);
   let expected_path = Fpath.(test_dir / "X" / "X" / "X" / "data.csv") in
   assert_equal `Yes (Sys_unix.file_exists (Fpath.to_string expected_path));
   let retrieved_prices = get storage () |> ok_or_failwith_status in
@@ -98,40 +103,19 @@ let test_invalid_symbol _ =
   | Ok _ -> assert_failure "Should have failed with invalid symbol"
   | Error _ -> ()
 
+let test_fail_to_write_if_data_is_not_sorted _ =
+  let storage = create ~data_dir:test_dir "GOOG" |> ok_or_failwith_status in
+  match save storage (List.rev prices) with
+  | Ok _ -> assert_failure "Expected validation error"
+  | Error status ->
+      assert_equal ~printer:Status.show status
+        (Status.invalid_argument_error
+           "Prices must be sorted by date in ascending order and contain no \
+            duplicates")
+
 let test_date_filter _ =
   let storage = create ~data_dir:test_dir "GOOG" |> ok_or_failwith_status in
-  let prices =
-    [
-      {
-        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:19;
-        open_price = 100.0;
-        high_price = 105.0;
-        low_price = 98.0;
-        close_price = 103.0;
-        adjusted_close = 103.0;
-        volume = 1000;
-      };
-      {
-        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
-        open_price = 103.0;
-        high_price = 108.0;
-        low_price = 102.0;
-        close_price = 107.0;
-        adjusted_close = 107.0;
-        volume = 1200;
-      };
-      {
-        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21;
-        open_price = 107.0;
-        high_price = 112.0;
-        low_price = 106.0;
-        close_price = 111.0;
-        adjusted_close = 111.0;
-        volume = 1400;
-      };
-    ]
-  in
-  ignore (save storage ~override:true prices |> ok_or_failwith_status);
+  ok_or_failwith_status (save storage prices);
   let start_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20 in
   let end_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20 in
   let filtered_prices =
@@ -141,38 +125,123 @@ let test_date_filter _ =
   assert_equal ~printer:Types.Daily_price.show (List.nth_exn prices 1)
     (List.nth_exn filtered_prices 0)
 
-let test_validation_error _ =
-  let storage = create ~data_dir:test_dir "GOOG" |> ok_or_failwith_status in
-  let prices =
+let test_multiple_writes_non_overlapping _ =
+  let storage = create ~data_dir:test_dir "META" |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  let all_prices = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    prices all_prices
+
+let test_idempotent_writes _ =
+  let storage = create ~data_dir:test_dir "NFLX" |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  ok_or_failwith_status (save storage prices);
+  ok_or_failwith_status (save storage prices);
+  let retrieved_prices = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    prices retrieved_prices
+
+let test_reject_overlapping_contradictory_data _ =
+  let storage = create ~data_dir:test_dir "TSLA" |> ok_or_failwith_status in
+  let prices1 = List.take prices 2 in
+  let prices2 =
     [
       {
         Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
-        open_price = 103.0;
-        high_price = 108.0;
-        low_price = 102.0;
-        close_price = 107.0;
-        adjusted_close = 107.0;
-        volume = 1200;
+        open_price = 110.0;
+        (* Different price for same date *)
+        high_price = 115.0;
+        low_price = 108.0;
+        close_price = 112.0;
+        adjusted_close = 112.0;
+        volume = 1500;
       };
       {
-        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:19;
-        open_price = 100.0;
-        high_price = 105.0;
-        low_price = 98.0;
-        close_price = 103.0;
-        adjusted_close = 103.0;
-        volume = 1000;
+        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21;
+        open_price = 112.0;
+        high_price = 118.0;
+        low_price = 111.0;
+        close_price = 116.0;
+        adjusted_close = 116.0;
+        volume = 1800;
       };
     ]
   in
-  match save storage ~override:true prices with
-  | Ok _ -> assert_failure "Expected validation error"
+  (* Write first batch *)
+  ok_or_failwith_status (save storage prices1);
+  (* Try to write second batch with overlapping date *)
+  match save storage prices2 with
+  | Ok _ ->
+      assert_failure
+        "Expected validation error for overlapping dates with different data"
   | Error status ->
-      assert_equal ~printer:Status.show_code Status.Invalid_argument status.code;
-      assert_equal ~printer:String.to_string
-        "Prices must be sorted by date in ascending order and contain no \
-         duplicates"
-        status.message
+      assert_equal ~printer:Status.show status
+        (Status.invalid_argument_error
+           "Cannot save data with overlapping dates and different values")
+
+let test_allow_overlapping_with_override _ =
+  let storage = create ~data_dir:test_dir "AMZN" |> ok_or_failwith_status in
+  let prices1 = List.take prices 2 in
+  let prices2 =
+    [
+      {
+        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
+        open_price = 110.0;
+        high_price = 115.0;
+        low_price = 108.0;
+        close_price = 112.0;
+        adjusted_close = 112.0;
+        volume = 1500;
+      };
+      {
+        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21;
+        open_price = 112.0;
+        high_price = 118.0;
+        low_price = 111.0;
+        close_price = 116.0;
+        adjusted_close = 116.0;
+        volume = 1800;
+      };
+    ]
+  in
+  (* Write first batch *)
+  ok_or_failwith_status (save storage prices1);
+  (* Write second batch with override *)
+  ok_or_failwith_status (save storage ~override:true prices2);
+  (* Verify final state has the second batch's data for overlapping date *)
+  let all_prices = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    (* 03/19 price from first batch, all other prices from second batch *)
+    (List.take prices1 1 @ prices2)
+    all_prices
+
+let test_empty_list_after_write_with_override _ =
+  let symbol = "EMPTY" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage ~override:true prices);
+  ok_or_failwith_status (save storage ~override:true []);
+  let saved_prices = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    prices saved_prices
+
+let test_empty_list_after_write_without_override _ =
+  let symbol = "EMPTY2" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage ~override:false prices);
+  ok_or_failwith_status (save storage ~override:false []);
+  let saved_prices = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    prices saved_prices
 
 let suite =
   "CSV Storage tests"
@@ -181,8 +250,20 @@ let suite =
          "test_single_char_symbol" >:: test_single_char_symbol;
          "test_create_twice" >:: test_create_twice;
          "test_invalid_symbol" >:: test_invalid_symbol;
+         "test_fail_to_write_if_data_is_not_sorted"
+         >:: test_fail_to_write_if_data_is_not_sorted;
          "test_date_filter" >:: test_date_filter;
-         "test_validation_error" >:: test_validation_error;
+         "test_multiple_writes_non_overlapping"
+         >:: test_multiple_writes_non_overlapping;
+         "test_idempotent_writes" >:: test_idempotent_writes;
+         "test_reject_overlapping_contradictory_data"
+         >:: test_reject_overlapping_contradictory_data;
+         "test_allow_overlapping_with_override"
+         >:: test_allow_overlapping_with_override;
+         "test_empty_list_after_write_with_override"
+         >:: test_empty_list_after_write_with_override;
+         "test_empty_list_after_write_without_override"
+         >:: test_empty_list_after_write_without_override;
        ]
 
 let () =

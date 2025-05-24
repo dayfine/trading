@@ -11,7 +11,7 @@ val create : ?data_dir:Fpath.t -> string -> (t, Status.t) Result.t
     If no data directory is provided, a default value is used. *)
 
 val save :
-  t -> override:bool -> Types.Daily_price.t list -> (unit, Status.t) Result.t
+  t -> ?override:bool -> Types.Daily_price.t list -> (unit, Status.t) Result.t
 (** Save prices to CSV file *)
 
 val get :

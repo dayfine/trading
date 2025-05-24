@@ -29,7 +29,7 @@ let main input_file period weekly () =
                 (Date.day v.date) v.value);
           exit 0
       | Error status ->
-          Printf.eprintf "Error reading file: %s\n" (Status.to_string status);
+          Printf.eprintf "Error reading file: %s\n" (Status.show status);
           exit 1)
     ~finally:(fun () -> Ta_ocaml.Ta.shutdown ())
 

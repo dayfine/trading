@@ -9,11 +9,6 @@ let test_create () =
     "{ Status.code = Status.Invalid_argument; message = \"test message\" }"
     (show status)
 
-let test_to_string () =
-  let status = { code = Invalid_argument; message = "test message" } in
-  check string "to_string" "Status.Invalid_argument: test message"
-    (to_string status)
-
 let test_is_ok () =
   let ok_status = { code = Ok; message = "success" } in
   let error_status = { code = Invalid_argument; message = "error" } in
@@ -39,7 +34,6 @@ let () =
   run "Status"
     [
       ("create", [ test_case "create" `Quick test_create ]);
-      ("to_string", [ test_case "to_string" `Quick test_to_string ]);
       ("is_ok", [ test_case "is_ok" `Quick test_is_ok ]);
       ("is_error", [ test_case "is_error" `Quick test_is_error ]);
       ("code_show", [ test_case "code_show" `Quick test_code_show ]);
