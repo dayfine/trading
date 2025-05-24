@@ -24,9 +24,11 @@ module type HistoricalDailyPriceStorage = sig
 
   val save :
     t -> ?override:bool -> Types.Daily_price.t list -> (unit, Status.t) result
-  (** [save t ~override prices] saves the set of [prices] to storage.
-      If [override] is true, new data replaces any overlapping dates, but non-overlapping old data is preserved.
-      If [override] is false (default), only non-overlapping or idempotent data is allowed; overlapping contradictory data is rejected.
+  (** [save t ~override prices] saves the set of [prices] to storage. If
+      [override] is true, new data replaces any overlapping dates, but
+      non-overlapping old data is preserved. If [override] is false (default),
+      only non-overlapping or idempotent data is allowed; overlapping
+      contradictory data is rejected.
 
       Preconditions:
       - [t] must be a valid storage instance

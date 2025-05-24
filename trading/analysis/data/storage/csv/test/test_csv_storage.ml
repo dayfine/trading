@@ -380,7 +380,7 @@ let test_allow_overlapping_with_override _ =
     ~printer:(fun ps ->
       String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
     (* 03/19 price from first batch, all other prices from second batch *)
-    ([List.hd_exn prices1] @ prices2)
+    ([ List.hd_exn prices1 ] @ prices2)
     all_prices
 
 let suite =
