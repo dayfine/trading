@@ -1,5 +1,6 @@
 open Async
 open Core
+open Types
 
 (* https://eodhd.com/financial-apis/api-for-historical-data-and-volumes *)
 let api_host = "eodhd.com"
@@ -49,7 +50,8 @@ let get_symbols ~token : (string list, Status.t) Result.t Deferred.t =
   let uri = make_symbols_uri token in
   get_and_parse uri parse_symbols_response
 
-let historical_price_uri ?(testonly_today = None) (params : Http_params.t) =
+let historical_price_uri ?(testonly_today = None)
+    (params : Http_params.historical_price_params) =
   let uri =
     Uri.make ~scheme:"https" ~host:api_host
       ~path:("/api/eod/" ^ params.symbol)
@@ -67,7 +69,8 @@ let historical_price_uri ?(testonly_today = None) (params : Http_params.t) =
   Uri.add_query_param' uri'
     ("to", Option.value params.end_date ~default:today |> as_str)
 
-let get_historical_price ~(token : string) ~(params : Http_params.t) :
+let get_historical_price ~(token : string)
+    ~(params : Http_params.historical_price_params) :
     (string, Status.t) Result.t Deferred.t =
   let uri = historical_price_uri params in
   let uri' = Uri.add_query_param' uri ("api_token", token) in
