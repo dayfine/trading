@@ -67,26 +67,6 @@ let create ?(data_dir = default_data_dir) symbol =
   let path = Fpath.(symbol_dir / "data.csv") in
   Ok { path = Fpath.to_string path }
 
-let save t ?(override = false) prices =
-  let open Result.Let_syntax in
-  let%bind () = validate_prices prices in
-  let exists = Sys_unix.file_exists t.path in
-  if phys_equal exists `Yes && not override then
-    Error
-      (Status.invalid_argument_error "File already exists and override is false")
-  else
-    let oc = Stdlib.open_out t.path in
-    Exn.protect
-      ~f:(fun () ->
-        Out_channel.output_string oc
-          "date,open,high,low,close,adjusted_close,volume\n";
-        List.iter ~f:(write_price oc) prices;
-        Ok ())
-      ~finally:(fun () -> Out_channel.close oc)
-    |> Result.map_error ~f:(fun e ->
-           Status.permission_denied_error
-             (sprintf "Failed to write file: %s" (Exn.to_string e)))
-
 let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
   let%bind prices = In_channel.read_lines t.path |> Parser.parse_lines in
@@ -112,3 +92,90 @@ let get t ?start_date ?end_date () =
             after_start && before_end)
       in
       Ok filtered_prices
+
+let save t ?(override = false) prices =
+  let open Result.Let_syntax in
+  let%bind () = validate_prices prices in
+  let exists = Sys_unix.file_exists t.path in
+  if phys_equal exists `Yes then
+    if override then (
+      let%bind existing_prices = get t () in
+      (* Merge: new data replaces overlapping dates, old non-overlapping data is preserved *)
+      let new_map =
+        List.fold prices ~init:Date.Map.empty ~f:(fun acc p ->
+            Map.set acc ~key:p.Types.Daily_price.date ~data:p)
+      in
+      let merged =
+        (* Add all old prices whose date is not in new_map *)
+        let old_only =
+          List.filter existing_prices ~f:(fun p ->
+              not (Map.mem new_map p.Types.Daily_price.date))
+        in
+        List.sort ~compare:(fun a b -> Date.compare a.Types.Daily_price.date b.Types.Daily_price.date)
+          (old_only @ prices)
+      in
+      let oc = Stdlib.open_out t.path in
+      Exn.protect
+        ~f:(fun () ->
+          Out_channel.output_string oc
+            "date,open,high,low,close,adjusted_close,volume\n";
+          List.iter ~f:(write_price oc) merged;
+          Ok ())
+        ~finally:(fun () -> Out_channel.close oc)
+      |> Result.map_error ~f:(fun e ->
+             Status.permission_denied_error
+               (sprintf "Failed to write file: %s" (Exn.to_string e)))
+    ) else (
+      let%bind existing_prices = get t () in
+      (* Check for overlap with different data *)
+      let existing_map =
+        List.fold existing_prices ~init:Date.Map.empty ~f:(fun acc p ->
+            Map.set acc ~key:p.Types.Daily_price.date ~data:p)
+      in
+      let new_map =
+        List.fold prices ~init:Date.Map.empty ~f:(fun acc p ->
+            Map.set acc ~key:p.Types.Daily_price.date ~data:p)
+      in
+      let overlap =
+        Map.fold new_map ~init:[] ~f:(fun ~key:date ~data:np acc ->
+            match Map.find existing_map date with
+            | Some ep when not (Poly.equal ep np) -> date :: acc
+            | _ -> acc)
+      in
+      if List.length overlap > 0 then
+        Error
+          (Status.invalid_argument_error
+             "Cannot save data with overlapping dates and different values")
+      else (
+        (* Allow if idempotent or non-overlapping *)
+        let oc = Stdlib.open_out_gen [Open_append] 0o666 t.path in
+        Exn.protect
+          ~f:(fun () ->
+            (* Only write new prices that are not already present *)
+            let existing_dates =
+              List.map existing_prices ~f:(fun p -> p.Types.Daily_price.date)
+              |> Date.Set.of_list
+            in
+            let new_only =
+              List.filter prices ~f:(fun p ->
+                  not (Set.mem existing_dates p.Types.Daily_price.date))
+            in
+            List.iter ~f:(write_price oc) new_only;
+            Ok ())
+          ~finally:(fun () -> Out_channel.close oc)
+        |> Result.map_error ~f:(fun e ->
+               Status.permission_denied_error
+                 (sprintf "Failed to write file: %s" (Exn.to_string e))))
+    )
+  else
+    let oc = Stdlib.open_out t.path in
+    Exn.protect
+      ~f:(fun () ->
+        Out_channel.output_string oc
+          "date,open,high,low,close,adjusted_close,volume\n";
+        List.iter ~f:(write_price oc) prices;
+        Ok ())
+      ~finally:(fun () -> Out_channel.close oc)
+    |> Result.map_error ~f:(fun e ->
+           Status.permission_denied_error
+             (sprintf "Failed to write file: %s" (Exn.to_string e)))

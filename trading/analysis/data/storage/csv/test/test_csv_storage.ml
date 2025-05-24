@@ -163,7 +163,7 @@ let test_date_filter _ =
       };
     ]
   in
-  ignore (save storage prices |> ok_or_failwith_status);
+  ok_or_failwith_status (save storage prices);
   let start_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20 in
   let end_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20 in
   let filtered_prices =
@@ -373,13 +373,14 @@ let test_allow_overlapping_with_override _ =
   (* Write first batch *)
   ok_or_failwith_status (save storage prices1);
   (* Write second batch with override *)
-  ok_or_failwith_status (save storage prices2);
+  ok_or_failwith_status (save storage ~override:true prices2);
   (* Verify final state has the second batch's data for overlapping date *)
   let all_prices = get storage () |> ok_or_failwith_status in
   assert_equal
     ~printer:(fun ps ->
       String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
-    (List.tl_exn prices1 @ prices2)
+    (* 03/19 price from first batch, all other prices from second batch *)
+    ([List.hd_exn prices1] @ prices2)
     all_prices
 
 let suite =
