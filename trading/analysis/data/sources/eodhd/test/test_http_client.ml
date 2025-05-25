@@ -45,7 +45,7 @@ let test_get_historical_price _ =
     let test_data = In_channel.read_all "./data/get_historical_price.json" in
     Deferred.return (Ok test_data)
   in
-  let params : Eodhd.Http_params.historical_price_params =
+  let params : Eodhd.Http_client.historical_price_params =
     {
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
@@ -68,7 +68,7 @@ let test_get_historical_price_error _ =
   let mock_fetch _uri =
     Deferred.return (Error (Status.internal_error "API rate limit exceeded"))
   in
-  let params : Eodhd.Http_params.historical_price_params =
+  let params : Eodhd.Http_client.historical_price_params =
     {
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
@@ -88,7 +88,7 @@ let test_get_historical_price_error _ =
 
 let test_get_historical_price_malformed_data _ =
   let mock_fetch _uri = Deferred.return (Ok "This is not valid JSON data") in
-  let params : Eodhd.Http_params.historical_price_params =
+  let params : Eodhd.Http_client.historical_price_params =
     {
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
@@ -119,7 +119,7 @@ let test_get_historical_price_no_dates _ =
     let test_data = In_channel.read_all "./data/get_historical_price.json" in
     Deferred.return (Ok test_data)
   in
-  let params : Eodhd.Http_params.historical_price_params =
+  let params : Eodhd.Http_client.historical_price_params =
     { symbol = "AAPL"; start_date = None; end_date = None }
   in
   let result =
@@ -147,7 +147,7 @@ let test_get_historical_price_only_start_date _ =
     let test_data = In_channel.read_all "./data/get_historical_price.json" in
     Deferred.return (Ok test_data)
   in
-  let params : Eodhd.Http_params.historical_price_params =
+  let params : Eodhd.Http_client.historical_price_params =
     {
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
@@ -176,7 +176,7 @@ let test_get_historical_price_only_end_date _ =
     let test_data = In_channel.read_all "./data/get_historical_price.json" in
     Deferred.return (Ok test_data)
   in
-  let params : Eodhd.Http_params.historical_price_params =
+  let params : Eodhd.Http_client.historical_price_params =
     {
       symbol = "AAPL";
       start_date = None;
@@ -202,7 +202,7 @@ let test_get_historical_price_invalid_date_range _ =
          (Status.invalid_argument_error
             "start_date must be before or equal to end_date"))
   in
-  let params : Eodhd.Http_params.historical_price_params =
+  let params : Eodhd.Http_client.historical_price_params =
     {
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:31);

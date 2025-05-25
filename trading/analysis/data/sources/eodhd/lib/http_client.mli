@@ -6,9 +6,17 @@ type fetch_fn = Uri.t -> (string, Status.t) Result.t Deferred.t
     returns either [Ok body] with the response body as a string, or
     [Error status] if the request fails. *)
 
+type historical_price_params = {
+  symbol : string;
+  (* If not specified, omitted from the API call *)
+  start_date : Date.t option;
+  (* If not specified, defaults to today *)
+  end_date : Date.t option;
+}
+
 val get_historical_price :
   token:string ->
-  params:Http_params.historical_price_params ->
+  params:historical_price_params ->
   ?fetch:fetch_fn ->
   unit ->
   (Types.Daily_price.t list, Status.t) Result.t Deferred.t

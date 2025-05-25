@@ -7,9 +7,9 @@ type stock_data = { symbol : string; price : float; ema : float }
 
 let get_historical_prices ~token symbol =
   let zone = Time_float.Zone.utc in
-  let params =
+  let params : Eodhd.Http_client.historical_price_params =
     {
-      Eodhd.Http_params.symbol;
+      symbol;
       start_date = Some (Date.add_days (Date.today ~zone) (-365));
       end_date = Some (Date.today ~zone);
     }

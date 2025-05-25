@@ -5,8 +5,8 @@ let read_file_as_string filename =
   In_channel.with_file filename ~f:In_channel.input_all
 
 let fetch_data ~token ~symbol =
-  let params =
-    { Eodhd.Http_params.symbol; start_date = None; end_date = None }
+  let params : Eodhd.Http_client.historical_price_params =
+    { symbol; start_date = None; end_date = None }
   in
   Eodhd.Http_client.get_historical_price ~token ~params ()
 
