@@ -11,11 +11,11 @@ val get_historical_price :
   params:Http_params.historical_price_params ->
   ?fetch:fetch_fn ->
   unit ->
-  (string, Status.t) Result.t Deferred.t
+  (Types.Daily_price.t list, Status.t) Result.t Deferred.t
 
 val get_symbols :
   token:string ->
   ?fetch:fetch_fn ->
   unit ->
-  (string list, Status.t) result Deferred.t
+  (string list, Status.t) Result.t Deferred.t
 (** Get a list of symbols for a given exchange *)

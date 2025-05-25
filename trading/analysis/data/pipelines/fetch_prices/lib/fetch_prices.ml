@@ -2,23 +2,19 @@ open Core
 open Async
 open Csv
 
-let get_historical_prices ~token symbol : (string, Status.t) Result.t Deferred.t
-    =
+let get_historical_prices ~token symbol :
+    (Types.Daily_price.t list, Status.t) Result.t Deferred.t =
   let params =
     { Eodhd.Http_params.symbol; start_date = None; end_date = None }
   in
   Eodhd.Http_client.get_historical_price ~token ~params ()
 
-let parse_price_data data : (Types.Daily_price.t list, Status.t) Result.t =
-  let lines = String.split_lines data in
-  Parser.parse_lines lines
-
-let save_prices symbol (data : string) : (unit, Status.t) Result.t =
+let save_prices symbol (data : Types.Daily_price.t list) :
+    (unit, Status.t) Result.t =
   (* Do not let the Deferred's >>= to be shadowed here *)
   let open Result in
-  parse_price_data data >>= fun prices ->
   Csv_storage.create symbol >>= fun storage ->
-  Csv_storage.save storage ~override:true prices
+  Csv_storage.save storage ~override:true data
 
 let fetch_and_save_prices ~token ~symbols () :
     (string * (unit, Status.t) Result.t) list Deferred.t =
@@ -32,6 +28,6 @@ let fetch_and_save_prices ~token ~symbols () :
           Deferred.return
             ( symbol,
               match data with
-              | Ok (data : string) -> save_prices symbol data
+              | Ok data -> save_prices symbol data
               | Error status -> Error status )))
   >>| List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)

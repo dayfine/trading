@@ -2,19 +2,48 @@ open Core
 open Async
 open OUnit2
 open Eodhd.Http_client
-open Csv.Parser
+
+(* data from /trading/analysis/data/sources/eodhd/test/data/get_historical_price.json *)
+let expected_prices =
+  [
+    {
+      Types.Daily_price.date = Date.of_string "2015-11-12";
+      open_price = 621.84;
+      high_price = 624.59;
+      low_price = 612.96;
+      close_price = 614.68;
+      volume = 29640000;
+      adjusted_close = 12.2936;
+    };
+    {
+      Types.Daily_price.date = Date.of_string "2015-11-13";
+      open_price = 613.6;
+      high_price = 616.25;
+      low_price = 592.06;
+      close_price = 592.89;
+      volume = 60785000;
+      adjusted_close = 11.8578;
+    };
+    {
+      Types.Daily_price.date = Date.of_string "2015-11-16";
+      open_price = 591.23;
+      high_price = 593.85;
+      low_price = 583.07;
+      close_price = 588.74;
+      volume = 41905000;
+      adjusted_close = 11.7748;
+    };
+  ]
 
 let test_get_historical_price _ =
   let mock_fetch uri =
     let actual_uri_str = Uri.to_string uri in
     let expected_uri_str =
-      "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=2024-01-31&from=2024-01-01&fmt=csv&period=d&order=a"
+      "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=2024-01-31&from=2024-01-01&fmt=json&period=d&order=a"
     in
     assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
-    Deferred.return
-      (Ok
-         {|Date,Open,High,Low,Close,Adjusted Close,Volume
-2024-01-01,100.0,101.0,99.0,100.5,100.5,1000|})
+    let test_data = In_channel.read_all "./data/get_historical_price.json" in
+    Deferred.return (Ok test_data)
   in
   let params : Eodhd.Http_params.historical_price_params =
     {
@@ -28,27 +57,12 @@ let test_get_historical_price _ =
         get_historical_price ~fetch:mock_fetch ~token:"test_token" ~params ())
   in
   match result with
-  | Ok csv_str -> (
-      let lines = String.split_lines csv_str in
-      match parse_lines lines with
-      | Ok prices ->
-          assert_equal ~printer:Int.to_string 1 (List.length prices);
-          let expected_price =
-            {
-              Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:1;
-              open_price = 100.0;
-              high_price = 101.0;
-              low_price = 99.0;
-              close_price = 100.5;
-              volume = 1000;
-              adjusted_close = 100.5;
-            }
-          in
-          let actual_price = List.hd_exn prices in
+  | Ok prices ->
+      assert_equal ~printer:Int.to_string 3 (List.length prices);
+      List.iter2_exn prices expected_prices ~f:(fun actual expected ->
           assert_bool "Prices should be equal"
-            (Types.Daily_price.equal expected_price actual_price)
-      | Error err -> assert_failure (Status.show err))
-  | Error _ -> assert_failure "Expected Ok result"
+            (Types.Daily_price.equal actual expected))
+  | Error err -> assert_failure (Status.show err)
 
 let test_get_historical_price_error _ =
   let mock_fetch _uri =
@@ -73,10 +87,7 @@ let test_get_historical_price_error _ =
         status
 
 let test_get_historical_price_malformed_data _ =
-  let mock_fetch _uri =
-    Deferred.return (Ok {|Invalid,CSV,Format
-No,Proper,Headers|})
-  in
+  let mock_fetch _uri = Deferred.return (Ok "This is not valid JSON data") in
   let params : Eodhd.Http_params.historical_price_params =
     {
       symbol = "AAPL";
@@ -89,15 +100,11 @@ No,Proper,Headers|})
         get_historical_price ~fetch:mock_fetch ~token:"test_token" ~params ())
   in
   match result with
-  | Ok csv_str -> (
-      let lines = String.split_lines csv_str in
-      match parse_lines lines with
-      | Ok _ -> assert_failure "Expected parse_lines to fail on malformed data"
-      | Error err ->
-          let msg = Status.show err in
-          assert_bool "Error message should mention columns"
-            (String.is_substring msg ~substring:"columns"))
-  | Error _ -> assert_failure "Expected Ok result with malformed data"
+  | Ok _ -> assert_failure "Expected Error result"
+  | Error status ->
+      let msg = Status.show status in
+      assert_bool "Error message should mention invalid JSON"
+        (String.is_substring msg ~substring:"Invalid JSON")
 
 let test_get_historical_price_no_dates _ =
   let mock_fetch uri =
@@ -105,14 +112,12 @@ let test_get_historical_price_no_dates _ =
     let today = Date.today ~zone:Time_float.Zone.utc in
     let expected_uri_str =
       Printf.sprintf
-        "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=%s&fmt=csv&period=d&order=a"
+        "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=%s&fmt=json&period=d&order=a"
         (Date.to_string today)
     in
     assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
-    Deferred.return
-      (Ok
-         {|Date,Open,High,Low,Close,Adjusted Close,Volume
-2024-01-01,100.0,101.0,99.0,100.5,100.5,1000|})
+    let test_data = In_channel.read_all "./data/get_historical_price.json" in
+    Deferred.return (Ok test_data)
   in
   let params : Eodhd.Http_params.historical_price_params =
     { symbol = "AAPL"; start_date = None; end_date = None }
@@ -122,27 +127,12 @@ let test_get_historical_price_no_dates _ =
         get_historical_price ~fetch:mock_fetch ~token:"test_token" ~params ())
   in
   match result with
-  | Ok csv_str -> (
-      let lines = String.split_lines csv_str in
-      match parse_lines lines with
-      | Ok prices ->
-          assert_equal ~printer:Int.to_string 1 (List.length prices);
-          let expected_price =
-            {
-              Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:1;
-              open_price = 100.0;
-              high_price = 101.0;
-              low_price = 99.0;
-              close_price = 100.5;
-              volume = 1000;
-              adjusted_close = 100.5;
-            }
-          in
-          let actual_price = List.hd_exn prices in
+  | Ok prices ->
+      assert_equal ~printer:Int.to_string 3 (List.length prices);
+      List.iter2_exn prices expected_prices ~f:(fun actual expected ->
           assert_bool "Prices should be equal"
-            (Types.Daily_price.equal expected_price actual_price)
-      | Error err -> assert_failure (Status.show err))
-  | Error _ -> assert_failure "Expected Ok result"
+            (Types.Daily_price.equal actual expected))
+  | Error err -> assert_failure (Status.show err)
 
 let test_get_historical_price_only_start_date _ =
   let mock_fetch uri =
@@ -150,14 +140,12 @@ let test_get_historical_price_only_start_date _ =
     let today = Date.today ~zone:Time_float.Zone.utc in
     let expected_uri_str =
       Printf.sprintf
-        "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=%s&from=2024-01-01&fmt=csv&period=d&order=a"
+        "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=%s&from=2024-01-01&fmt=json&period=d&order=a"
         (Date.to_string today)
     in
     assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
-    Deferred.return
-      (Ok
-         {|Date,Open,High,Low,Close,Adjusted Close,Volume
-2024-01-01,100.0,101.0,99.0,100.5,100.5,1000|})
+    let test_data = In_channel.read_all "./data/get_historical_price.json" in
+    Deferred.return (Ok test_data)
   in
   let params : Eodhd.Http_params.historical_price_params =
     {
@@ -171,39 +159,22 @@ let test_get_historical_price_only_start_date _ =
         get_historical_price ~fetch:mock_fetch ~token:"test_token" ~params ())
   in
   match result with
-  | Ok csv_str -> (
-      let lines = String.split_lines csv_str in
-      match parse_lines lines with
-      | Ok prices ->
-          assert_equal ~printer:Int.to_string 1 (List.length prices);
-          let expected_price =
-            {
-              Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:1;
-              open_price = 100.0;
-              high_price = 101.0;
-              low_price = 99.0;
-              close_price = 100.5;
-              volume = 1000;
-              adjusted_close = 100.5;
-            }
-          in
-          let actual_price = List.hd_exn prices in
+  | Ok prices ->
+      assert_equal ~printer:Int.to_string 3 (List.length prices);
+      List.iter2_exn prices expected_prices ~f:(fun actual expected ->
           assert_bool "Prices should be equal"
-            (Types.Daily_price.equal expected_price actual_price)
-      | Error err -> assert_failure (Status.show err))
-  | Error _ -> assert_failure "Expected Ok result"
+            (Types.Daily_price.equal actual expected))
+  | Error err -> assert_failure (Status.show err)
 
 let test_get_historical_price_only_end_date _ =
   let mock_fetch uri =
     let actual_uri_str = Uri.to_string uri in
     let expected_uri_str =
-      "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=2024-01-31&fmt=csv&period=d&order=a"
+      "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=2024-01-31&fmt=json&period=d&order=a"
     in
     assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
-    Deferred.return
-      (Ok
-         {|Date,Open,High,Low,Close,Adjusted Close,Volume
-2024-01-01,100.0,101.0,99.0,100.5,100.5,1000|})
+    let test_data = In_channel.read_all "./data/get_historical_price.json" in
+    Deferred.return (Ok test_data)
   in
   let params : Eodhd.Http_params.historical_price_params =
     {
@@ -217,27 +188,12 @@ let test_get_historical_price_only_end_date _ =
         get_historical_price ~fetch:mock_fetch ~token:"test_token" ~params ())
   in
   match result with
-  | Ok csv_str -> (
-      let lines = String.split_lines csv_str in
-      match parse_lines lines with
-      | Ok prices ->
-          assert_equal ~printer:Int.to_string 1 (List.length prices);
-          let expected_price =
-            {
-              Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:1;
-              open_price = 100.0;
-              high_price = 101.0;
-              low_price = 99.0;
-              close_price = 100.5;
-              volume = 1000;
-              adjusted_close = 100.5;
-            }
-          in
-          let actual_price = List.hd_exn prices in
+  | Ok prices ->
+      assert_equal ~printer:Int.to_string 3 (List.length prices);
+      List.iter2_exn prices expected_prices ~f:(fun actual expected ->
           assert_bool "Prices should be equal"
-            (Types.Daily_price.equal expected_price actual_price)
-      | Error err -> assert_failure (Status.show err))
-  | Error _ -> assert_failure "Expected Ok result"
+            (Types.Daily_price.equal actual expected))
+  | Error err -> assert_failure (Status.show err)
 
 let test_get_historical_price_invalid_date_range _ =
   let mock_fetch _uri =
@@ -307,9 +263,7 @@ let test_get_symbols_error _ =
         status
 
 let test_get_symbols_malformed_data _ =
-  let mock_fetch _uri =
-    Deferred.return (Ok "This is not valid JSON data")
-  in
+  let mock_fetch _uri = Deferred.return (Ok "This is not valid JSON data") in
   let result =
     Async.Thread_safe.block_on_async_exn (fun () ->
         get_symbols ~fetch:mock_fetch ~token:"test_token" ())
