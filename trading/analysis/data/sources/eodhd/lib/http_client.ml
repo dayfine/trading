@@ -6,10 +6,10 @@ type fetch_fn = Uri.t -> (string, Status.t) Result.t Deferred.t
 (* https://eodhd.com/financial-apis/api-for-historical-data-and-volumes *)
 let _api_host = "eodhd.com"
 
-let _get_and_parse uri parse_body =
+let _fetch_body uri : (string, Status.t) Result.t Deferred.t =
   Cohttp_async.Client.get uri >>= fun (resp, body) ->
   match Cohttp.Response.status resp with
-  | `OK -> Cohttp_async.Body.to_string body >>| parse_body
+  | `OK -> Cohttp_async.Body.to_string body >>| fun body_str -> Ok body_str
   | status ->
       let status_str = Cohttp.Code.string_of_status status in
       Cohttp_async.Body.to_string body >>| fun body_str ->
@@ -49,26 +49,30 @@ let _extract_symbol_from_json = function
   | _ -> Error (Status.invalid_argument_error "Invalid symbol format")
 
 let _parse_symbols_response body_str =
-  match Yojson.Safe.from_string body_str with
-  | `List symbols ->
-      let results = List.map symbols ~f:_extract_symbol_from_json in
-      let errors =
-        List.filter_map results ~f:(function Error e -> Some e | Ok _ -> None)
-      in
-      if List.is_empty errors then
-        Ok
-          (List.filter_map results ~f:(function
-            | Ok s -> Some s
-            | Error _ -> None))
-      else Error (Status.combine errors)
-  | _ -> Error (Status.invalid_argument_error "Invalid response format")
+  try
+    match Yojson.Safe.from_string body_str with
+    | `List symbols ->
+        let results = List.map symbols ~f:_extract_symbol_from_json in
+        let errors =
+          List.filter_map results ~f:(function Error e -> Some e | Ok _ -> None)
+        in
+        if List.is_empty errors then
+          Ok
+            (List.filter_map results ~f:(function
+              | Ok s -> Some s
+              | Error _ -> None))
+        else Error (Status.combine errors)
+    | _ -> Error (Status.invalid_argument_error "Invalid response format")
+  with Yojson.Json_error msg ->
+    Error (Status.invalid_argument_error (Printf.sprintf "Invalid JSON: %s" msg))
 
-let get_symbols ~token : (string list, Status.t) Result.t Deferred.t =
+let get_symbols ~token ?(fetch = _fetch_body) () :
+    (string list, Status.t) Result.t Deferred.t =
   let uri = _make_symbols_uri token in
-  _get_and_parse uri _parse_symbols_response
+  fetch uri >>| Result.bind ~f:_parse_symbols_response
 
-let get_historical_price ~token ~params
-    ?(fetch = fun uri -> _get_and_parse uri (fun body_str -> Ok body_str)) () =
+let get_historical_price ~token ~params ?(fetch = _fetch_body) () :
+    (string, Status.t) Result.t Deferred.t =
   let uri = _historical_price_uri params in
   let uri = Uri.add_query_param' uri ("api_token", token) in
-  fetch uri >>| function Ok body_str -> Ok body_str | Error err -> Error err
+  fetch uri

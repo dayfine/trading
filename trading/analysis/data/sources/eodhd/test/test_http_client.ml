@@ -265,6 +265,62 @@ let test_get_historical_price_invalid_date_range _ =
            "start_date must be before or equal to end_date")
         status
 
+let test_get_symbols _ =
+  let mock_fetch uri =
+    let actual_uri_str = Uri.to_string uri in
+    let expected_uri_str =
+      "https://eodhd.com/api/exchange-symbol-list/US?api_token=test_token&fmt=json"
+    in
+    assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
+    let test_data =
+      In_channel.read_all "./data/get_symbol_list_response.json"
+    in
+    Deferred.return (Ok test_data)
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_symbols ~fetch:mock_fetch ~token:"test_token" ())
+  in
+  match result with
+  | Ok symbols ->
+      let expected_symbols =
+        [ "0P000070L2"; "0P0000A2WI"; "ZZHGY"; "ZZZ"; "ZZZOF" ]
+      in
+      assert_equal
+        ~printer:(fun xs -> String.concat ~sep:"," xs)
+        expected_symbols symbols
+  | Error err -> assert_failure (Status.show err)
+
+let test_get_symbols_error _ =
+  let mock_fetch _uri =
+    Deferred.return (Error (Status.internal_error "API rate limit exceeded"))
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_symbols ~fetch:mock_fetch ~token:"test_token" ())
+  in
+  match result with
+  | Ok _ -> assert_failure "Expected Error result"
+  | Error status ->
+      assert_equal ~printer:Status.show
+        (Status.internal_error "API rate limit exceeded")
+        status
+
+let test_get_symbols_malformed_data _ =
+  let mock_fetch _uri =
+    Deferred.return (Ok "This is not valid JSON data")
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_symbols ~fetch:mock_fetch ~token:"test_token" ())
+  in
+  match result with
+  | Ok _ -> assert_failure "Expected Error result"
+  | Error status ->
+      let msg = Status.show status in
+      assert_bool "Error message should mention invalid JSON"
+        (String.is_substring msg ~substring:"Invalid JSON")
+
 let suite =
   "http_client_test"
   >::: [
@@ -279,6 +335,9 @@ let suite =
          >:: test_get_historical_price_only_end_date;
          "get_historical_price_invalid_date_range"
          >:: test_get_historical_price_invalid_date_range;
+         "get_symbols" >:: test_get_symbols;
+         "get_symbols_error" >:: test_get_symbols_error;
+         "get_symbols_malformed_data" >:: test_get_symbols_malformed_data;
        ]
 
 let () = run_test_tt_main suite
