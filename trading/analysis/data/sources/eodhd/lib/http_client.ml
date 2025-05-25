@@ -87,10 +87,14 @@ let _parse_json_price = function
       let find name =
         match List.Assoc.find ~equal:String.equal fields name with
         | Some v -> Ok v
-        | None -> Error (Status.not_found_error (Printf.sprintf "Field %s not found" name))
+        | None ->
+            Error
+              (Status.not_found_error
+                 (Printf.sprintf "Field %s not found" name))
       in
       let open Result.Let_syntax in
-      let%bind date = find "date" >>= _string_of_yojson >>= fun s ->
+      let%bind date =
+        find "date" >>= _string_of_yojson >>= fun s ->
         try Ok (Date.of_string s)
         with _ -> Error (Status.invalid_argument_error ("Invalid date: " ^ s))
       in
@@ -100,7 +104,16 @@ let _parse_json_price = function
       let%bind close_price = find "close" >>= _float_of_yojson in
       let%bind volume = find "volume" >>= _int_of_yojson in
       let%bind adjusted_close = find "adjusted_close" >>= _float_of_yojson in
-      Ok { Types.Daily_price.date; open_price; high_price; low_price; close_price; volume; adjusted_close }
+      Ok
+        {
+          Types.Daily_price.date;
+          open_price;
+          high_price;
+          low_price;
+          close_price;
+          volume;
+          adjusted_close;
+        }
   | _ -> Error (Status.invalid_argument_error "Invalid price format")
 
 let _parse_json_prices body_str =
@@ -111,7 +124,8 @@ let _parse_json_prices body_str =
         Result.all results
     | _ -> Error (Status.invalid_argument_error "Invalid response format")
   with Yojson.Json_error msg ->
-    Error (Status.invalid_argument_error (Printf.sprintf "Invalid JSON: %s" msg))
+    Error
+      (Status.invalid_argument_error (Printf.sprintf "Invalid JSON: %s" msg))
 
 let get_historical_price ~token ~params ?(fetch = _fetch_body) () :
     (Types.Daily_price.t list, Status.t) Result.t Deferred.t =
