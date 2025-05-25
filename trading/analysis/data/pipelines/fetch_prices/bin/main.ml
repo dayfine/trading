@@ -39,7 +39,7 @@ let main ~num_symbols () =
       printf "Error: %s\n" msg;
       return ()
   | Ok token -> (
-      get_symbols ~token >>= function
+      get_symbols ~token () >>= function
       | Error status ->
           printf "Error fetching symbols: %s\n" (Status.show status);
           return ()

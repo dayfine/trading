@@ -1,6 +1,7 @@
-(library
- (name http_client_test)
- (libraries base eodhd)
- (inline_tests)
+(test
+ (name test_http_client)
+ (libraries eodhd core async async_unix ounit2 csv)
  (preprocess
-  (pps ppx_expect)))
+  (pps ppx_jane))
+ (deps
+  (glob_files ./data/*.json)))

@@ -1,0 +1,47 @@
+[
+  {
+    "Code": "0P000070L2",
+    "Name": "RBC $U.S. Money Market Fund A",
+    "Country": "USA",
+    "Exchange": "OTC",
+    "Currency": "USD",
+    "Type": "FUND",
+    "Isin": null
+  },
+  {
+    "Code": "0P0000A2WI",
+    "Name": "Fidelity American High Yield Sr B",
+    "Country": "USA",
+    "Exchange": "US",
+    "Currency": "USD",
+    "Type": "FUND",
+    "Isin": null
+  },
+  {
+    "Code": "ZZHGY",
+    "Name": "ZhongAn Online P & C Insurance Co. Ltd",
+    "Country": "USA",
+    "Exchange": "PINK",
+    "Currency": "USD",
+    "Type": "Common Stock",
+    "Isin": null
+  },
+  {
+    "Code": "ZZZ",
+    "Name": "Cyber Hornet S&P 500 and Bitcoin 75/25 Strategy ETF",
+    "Country": "USA",
+    "Exchange": "NASDAQ",
+    "Currency": "USD",
+    "Type": "ETF",
+    "Isin": "US45407J4094"
+  },
+  {
+    "Code": "ZZZOF",
+    "Name": "Zinc One Resources Inc",
+    "Country": "USA",
+    "Exchange": "PINK",
+    "Currency": "USD",
+    "Type": "Common Stock",
+    "Isin": null
+  }
+]

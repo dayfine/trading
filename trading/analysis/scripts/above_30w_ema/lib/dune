@@ -1,5 +1,5 @@
 (library
  (name above_30w_ema)
- (libraries core async csv uri indicators.ema indicators.types eodhd)
+ (libraries core async indicators.ema indicators.types eodhd)
  (preprocess
   (pps ppx_jane)))

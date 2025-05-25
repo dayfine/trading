@@ -1,18 +1,29 @@
 open Async
 open Core
 
-val historical_price_uri :
-  ?testonly_today:Date.t option -> Http_params.t -> Uri.t
-(** [historical_price_uri ?testonly_today params] Construct the URI for fetching
-    historical price data for a given symbol and date range from the EODHD API.
-    @param testonly_today
-      Optional override for the 'today' date (used for testing)
-    @param params The parameters specifying the symbol and date range
-    @return The constructed [Uri.t] for the EODHD historical price API request
-*)
+type fetch_fn = Uri.t -> (string, Status.t) Result.t Deferred.t
+(** [fetch_fn uri] fetches the HTTP response body for the given [uri]. It
+    returns either [Ok body] with the response body as a string, or
+    [Error status] if the request fails. *)
+
+type historical_price_params = {
+  symbol : string;
+  (* If not specified, omitted from the API call *)
+  start_date : Date.t option;
+  (* If not specified, defaults to today *)
+  end_date : Date.t option;
+}
 
 val get_historical_price :
-  token:string -> params:Http_params.t -> (string, Status.t) Result.t Deferred.t
+  token:string ->
+  params:historical_price_params ->
+  ?fetch:fetch_fn ->
+  unit ->
+  (Types.Daily_price.t list, Status.t) Result.t Deferred.t
 
-val get_symbols : token:string -> (string list, Status.t) Result.t Deferred.t
-(** Fetch list of US stock symbols from EODHD API *)
+val get_symbols :
+  token:string ->
+  ?fetch:fetch_fn ->
+  unit ->
+  (string list, Status.t) Result.t Deferred.t
+(** Get a list of symbols for a given exchange *)
