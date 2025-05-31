@@ -7,7 +7,7 @@ module type HistoricalDailyPriceStorage = sig
   type t
   (** The abstract type representing a storage instance for a specific symbol *)
 
-  val create : string -> (t, Status.t) result
+  val create : string -> t Status.status_or
   (** [create symbol] creates a new storage instance for the given [symbol]. The
       storage will be initialized with default settings and empty data.
 
@@ -23,8 +23,8 @@ module type HistoricalDailyPriceStorage = sig
       - [Internal] for other initialization failures *)
 
   val save :
-    t -> ?override:bool -> Types.Daily_price.t list -> (unit, Status.t) result
-  (** [save t ~override prices] saves the set of [prices] to storage. If
+    t -> ?override:bool -> Types.Daily_price.t list -> unit Status.status_or
+  (** [save t ?override prices] saves the given [prices] to storage. If
       [override] is true, new data replaces any overlapping dates, but
       non-overlapping old data is preserved. If [override] is false (default),
       only non-overlapping or idempotent data is allowed; overlapping
@@ -49,7 +49,7 @@ module type HistoricalDailyPriceStorage = sig
     ?start_date:Date.t ->
     ?end_date:Date.t ->
     unit ->
-    (Types.Daily_price.t list, Status.t) result
+    Types.Daily_price.t list Status.status_or
   (** [get t ?start_date ?end_date] returns prices from storage. If [start_date]
       is provided, only prices on or after that date are returned. If [end_date]
       is provided, only prices on or before that date are returned.

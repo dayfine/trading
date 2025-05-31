@@ -44,7 +44,7 @@ let _default_data_dir = Fpath.v (Sys_unix.getcwd () ^ "/data")
 
 let _create_symbol_dirs data_dir symbol =
   if String.is_empty symbol then
-    Error (Status.invalid_argument_error "Symbol cannot be empty")
+    Status.error_invalid_argument "Symbol cannot be empty"
   else
     let first_char = String.get symbol 0 in
     let last_char = String.get symbol (String.length symbol - 1) in
@@ -57,8 +57,8 @@ let _create_symbol_dirs data_dir symbol =
     | Ok false -> (
         match OS.Dir.create ~path:true dir_path with
         | Ok _ -> Ok dir_path
-        | Error (`Msg msg) -> Error (Status.internal_error msg))
-    | Error (`Msg msg) -> Error (Status.internal_error msg)
+        | Error (`Msg msg) -> Status.error_internal msg)
+    | Error (`Msg msg) -> Status.error_internal msg
 
 let _write_prices_to_file path prices =
   let oc = Stdlib.open_out path in
@@ -100,10 +100,9 @@ let _merge_prices ~override_old_price old_prices new_prices =
                 if override_old_price then
                   Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)
                 else
-                  Error
-                    (Status.invalid_argument_error
-                       "Cannot save data with overlapping dates and different \
-                        values")
+                  Status.error_invalid_argument
+                    "Cannot save data with overlapping dates and different \
+                     values"
             | Some _ -> Ok map (* Skip if identical *)
             | None -> Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)))
     (* Add if new date *)
@@ -152,9 +151,8 @@ let _handle_existing_and_new_prices path ~override existing_prices new_prices =
     match _compare_date_ranges existing_prices new_prices with
     | Empty | After -> _append_prices_to_file path new_prices
     | Before ->
-        Error
-          (Status.invalid_argument_error
-             "Cannot save data with dates before existing data")
+        Status.error_invalid_argument
+          "Cannot save data with dates before existing data"
     | Overlapping ->
         let%bind merged =
           _merge_prices ~override_old_price:false existing_prices new_prices
@@ -173,9 +171,8 @@ let get t ?start_date ?end_date () =
   let%bind prices = In_channel.read_lines t.path |> Parser.parse_lines in
   match (start_date, end_date) with
   | Some start, Some end_ when Date.compare start end_ > 0 ->
-      Error
-        (Status.invalid_argument_error
-           "start_date must be before or equal to end_date")
+      Status.error_invalid_argument
+        "start_date must be before or equal to end_date"
   | _ ->
       let filtered_prices =
         List.filter prices ~f:(fun price ->
