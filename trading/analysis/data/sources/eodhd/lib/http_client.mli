@@ -27,3 +27,12 @@ val get_symbols :
   unit ->
   (string list, Status.t) Result.t Deferred.t
 (** Get a list of symbols for a given exchange *)
+
+val get_bulk_last_day :
+  token:string ->
+  exchange:string ->
+  ?fetch:fetch_fn ->
+  unit ->
+  ((string * Types.Daily_price.t) list, Status.t) Result.t Deferred.t
+(** Get the last day's prices for all symbols in a given exchange. Returns a
+    list of tuples containing the symbol and its daily price data. *)

@@ -1,0 +1,35 @@
+[
+  {
+    "code": "AAAZX",
+    "exchange_short_name": "US",
+    "date": "2025-05-30",
+    "open": 12.3,
+    "high": 12.3,
+    "low": 12.3,
+    "close": 12.3,
+    "adjusted_close": 12.3,
+    "volume": 0
+  },
+  {
+    "code": "AABB",
+    "exchange_short_name": "US",
+    "date": "2025-05-30",
+    "open": 0.029,
+    "high": 0.0304,
+    "low": 0.0281,
+    "close": 0.0304,
+    "adjusted_close": 0.0304,
+    "volume": 5158473
+  },
+  {
+    "code": "AABCX",
+    "exchange_short_name": "US",
+    "date": "2025-05-30",
+    "open": 15.51,
+    "high": 15.51,
+    "low": 15.51,
+    "close": 15.51,
+    "adjusted_close": 15.51,
+    "volume": 0
+  }
+]
