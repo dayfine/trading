@@ -17,11 +17,8 @@ type t = {
 [@@deriving sexp, show]
 (** Metadata for a stock's historical data *)
 
-val of_csv : csv_path:string -> symbol:string -> n:int -> t
-(** Generate metadata from a CSV file
-    @param csv_path Path to the CSV file
-    @param symbol Stock symbol
-    @param n Number of last prices to consider for average calculation *)
+val generate_metadata : csv_path:string -> symbol:string -> n:int -> t
+val validate_metadata : t -> csv_path:string -> bool
 
 val save : t -> csv_path:string -> unit
 (** Save metadata to a file next to the CSV
@@ -31,8 +28,3 @@ val save : t -> csv_path:string -> unit
 val load : csv_path:string -> t option
 (** Load metadata from file if it exists
     @param csv_path Path to the corresponding CSV file *)
-
-val verify : t -> csv_path:string -> bool
-(** Verify that the metadata matches the CSV file
-    @param t Metadata to verify
-    @param csv_path Path to the CSV file to verify against *)
