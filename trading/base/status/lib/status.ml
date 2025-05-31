@@ -22,6 +22,9 @@ type code =
 
 type t = { code : code; message : string } [@@deriving show, eq]
 
+type 'a status_or = ('a, t) Result.t
+(** A type alias for Result.t with Status.t as the error type *)
+
 let is_ok { code; _ } = equal_code code Ok
 let is_error status = not (is_ok status)
 
@@ -47,3 +50,8 @@ let combine statuses =
             String.concat ~sep:"; " error_messages
       in
       { code = first_error.code; message = combined_message }
+
+let error_invalid_argument msg = Error (invalid_argument_error msg)
+let error_internal msg = Error (internal_error msg)
+let error_not_found msg = Error (not_found_error msg)
+let error_permission_denied msg = Error (permission_denied_error msg)

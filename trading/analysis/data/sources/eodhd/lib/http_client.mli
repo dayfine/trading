@@ -1,7 +1,7 @@
 open Async
 open Core
 
-type fetch_fn = Uri.t -> (string, Status.t) Result.t Deferred.t
+type fetch_fn = Uri.t -> string Status.status_or Deferred.t
 (** [fetch_fn uri] fetches the HTTP response body for the given [uri]. It
     returns either [Ok body] with the response body as a string, or
     [Error status] if the request fails. *)
@@ -19,13 +19,13 @@ val get_historical_price :
   params:historical_price_params ->
   ?fetch:fetch_fn ->
   unit ->
-  (Types.Daily_price.t list, Status.t) Result.t Deferred.t
+  Types.Daily_price.t list Status.status_or Deferred.t
 
 val get_symbols :
   token:string ->
   ?fetch:fetch_fn ->
   unit ->
-  (string list, Status.t) Result.t Deferred.t
+  string list Status.status_or Deferred.t
 (** Get a list of symbols for a given exchange *)
 
 val get_bulk_last_day :
@@ -33,6 +33,6 @@ val get_bulk_last_day :
   exchange:string ->
   ?fetch:fetch_fn ->
   unit ->
-  ((string * Types.Daily_price.t) list, Status.t) Result.t Deferred.t
+  (string * Types.Daily_price.t) list Status.status_or Deferred.t
 (** Get the last day's prices for all symbols in a given exchange. Returns a
     list of tuples containing the symbol and its daily price data. *)
