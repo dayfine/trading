@@ -275,6 +275,66 @@ let test_get_symbols_malformed_data _ =
       assert_bool "Error message should mention invalid JSON"
         (String.is_substring msg ~substring:"Invalid JSON")
 
+let test_get_bulk_last_day _ =
+  let mock_fetch uri =
+    let actual_uri_str = Uri.to_string uri in
+    let expected_uri_str =
+      "https://eodhd.com/api/eod-bulk-last-day/US?api_token=test_token&fmt=json"
+    in
+    assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
+    let test_data = In_channel.read_all "./data/eod_bulk_last_day.json" in
+    Deferred.return (Ok test_data)
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_bulk_last_day ~fetch:mock_fetch ~token:"test_token" ~exchange:"US"
+          ())
+  in
+  match result with
+  | Ok prices ->
+      let expected_prices =
+        [
+          ( "AAAZX",
+            {
+              Types.Daily_price.date = Date.of_string "2025-05-30";
+              open_price = 12.3;
+              high_price = 12.3;
+              low_price = 12.3;
+              close_price = 12.3;
+              volume = 0;
+              adjusted_close = 12.3;
+            } );
+          ( "AABB",
+            {
+              Types.Daily_price.date = Date.of_string "2025-05-30";
+              open_price = 0.029;
+              high_price = 0.0304;
+              low_price = 0.0281;
+              close_price = 0.0304;
+              volume = 5158473;
+              adjusted_close = 0.0304;
+            } );
+          ( "AABCX",
+            {
+              Types.Daily_price.date = Date.of_string "2025-05-30";
+              open_price = 15.51;
+              high_price = 15.51;
+              low_price = 15.51;
+              close_price = 15.51;
+              volume = 0;
+              adjusted_close = 15.51;
+            } );
+        ]
+      in
+      assert_equal ~printer:Int.to_string 3 (List.length prices);
+      List.iter2_exn prices expected_prices
+        ~f:(fun
+            (actual_symbol, actual_price) (expected_symbol, expected_price) ->
+          assert_equal ~printer:Fn.id actual_symbol expected_symbol;
+          assert_bool "Prices should be equal"
+            (Types.Daily_price.equal actual_price expected_price))
+  | Error err -> assert_failure (Status.show err)
+
 let suite =
   "http_client_test"
   >::: [
@@ -292,6 +352,7 @@ let suite =
          "get_symbols" >:: test_get_symbols;
          "get_symbols_error" >:: test_get_symbols_error;
          "get_symbols_malformed_data" >:: test_get_symbols_malformed_data;
+         "get_bulk_last_day" >:: test_get_bulk_last_day;
        ]
 
 let () = run_test_tt_main suite
