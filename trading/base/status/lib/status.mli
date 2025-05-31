@@ -1,3 +1,5 @@
+open Core
+
 (** Standard status codes and types for the trading system. Based on Abseil's
     status codes: https://abseil.io/docs/cpp/guides/status-codes *)
 
