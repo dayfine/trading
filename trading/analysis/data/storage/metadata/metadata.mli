@@ -17,8 +17,7 @@ type t = {
 [@@deriving sexp, show]
 (** Metadata for a stock's historical data *)
 
-val generate_metadata : csv_path:string -> symbol:string -> n:int -> t
-val validate_metadata : t -> csv_path:string -> bool
+val generate_metadata : csv_path:string -> symbol:string -> ?n:int -> unit -> t
 
 val save : t -> csv_path:string -> unit
 (** Save metadata to a file next to the CSV
