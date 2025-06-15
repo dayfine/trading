@@ -1,18 +1,28 @@
 open Core
 open Async
 
+(* Extract the symbol from the path, which is the last component of the path *)
 let extract_symbol_from_path path =
   match String.split ~on:'/' path |> List.rev with
   | _filename :: symbol :: _ -> symbol
   | _ -> failwith "Path does not contain enough components to extract symbol"
 
-let process_file csv_path =
+(* Save the metadata to a file next to the CSV file *)
+let metadata_path_for_csv csv_path =
+  Fpath.v (String.chop_suffix_exn csv_path ~suffix:".csv" ^ ".metadata.sexp")
+
+let save t ~csv_path =
+  File_sexp.Sexp.save (module Metadata.T_sexp) t ~path:(metadata_path_for_csv csv_path)
+
+let process_file csv_path : (string, string * string) Result.t Deferred.t =
   let symbol = extract_symbol_from_path csv_path in
-  try
-    let metadata = Metadata.generate_metadata ~csv_path ~symbol () in
-    Metadata.save metadata ~csv_path;
-    Deferred.return (Ok symbol)
-  with exn -> Deferred.return (Error (symbol, Exn.to_string exn))
+  let lines = In_channel.read_lines csv_path in
+  match Csv.Parser.parse_lines lines with
+  | Error status -> Deferred.return (Error (symbol, status.message))
+  | Ok prices ->
+      let metadata = Metadata.generate_metadata ~price_data:prices ~symbol () in
+      save metadata ~csv_path;
+      Deferred.return (Ok symbol)
 
 let print_result = function
   | Ok symbol -> printf "Successfully generated metadata for %s\n" symbol

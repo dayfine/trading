@@ -1,0 +1,14 @@
+(lang dune 3.17)
+
+(name file)
+(version 0.1.0)
+
+(generate_opam_files true)
+
+(package
+ (name file)
+ (depends
+  ocaml
+  bos
+  sexplib
+  sexp_pretty))

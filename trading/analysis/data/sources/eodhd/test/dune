@@ -1,7 +1,5 @@
 (test
  (name test_http_client)
  (libraries eodhd core async async_unix ounit2 csv)
- (preprocess
-  (pps ppx_jane))
  (deps
   (glob_files ./data/*.json)))
