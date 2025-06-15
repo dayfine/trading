@@ -1,5 +1,5 @@
 (library
  (name storage)
- (public_name storage)
+ (public_name storage.interface)
  (modules_without_implementation storage)
  (libraries core status types))

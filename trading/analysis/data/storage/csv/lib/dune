@@ -8,7 +8,7 @@
   core_unix.sys_unix
   fpath
   ppx_deriving.runtime
-  storage
+  storage.interface
   types
   unix)
  (preprocess
