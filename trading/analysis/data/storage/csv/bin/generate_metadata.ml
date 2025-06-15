@@ -8,11 +8,12 @@ let extract_symbol_from_path path =
 
 let process_file csv_path =
   let symbol = extract_symbol_from_path csv_path in
-  try
-    let metadata = Metadata.generate_metadata ~csv_path ~symbol () in
-    Metadata.save metadata ~csv_path;
-    Deferred.return (Ok symbol)
-  with exn -> Deferred.return (Error (symbol, Exn.to_string exn))
+  let lines = In_channel.read_lines csv_path in
+  let open Result.Let_syntax in
+  let%bind prices = Csv.Parser.parse_lines lines in
+  let metadata = Metadata.generate_metadata ~price_data:prices ~symbol () in
+  Metadata.save metadata ~csv_path;
+  Deferred.return (Ok symbol)
 
 let print_result = function
   | Ok symbol -> printf "Successfully generated metadata for %s\n" symbol

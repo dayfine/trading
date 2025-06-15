@@ -3,4 +3,4 @@
  (public_name storage.metadata)
  (libraries core csv sexp_pretty types)
  (preprocess
-  (pps ppx_jane ppx_sexp_conv ppx_deriving.show)))
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
