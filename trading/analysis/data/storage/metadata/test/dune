@@ -1,5 +1,3 @@
 (test
  (name metadata_test)
- (libraries core metadata types ounit2)
- (preprocess
-  (pps ppx_jane)))
+ (libraries core metadata ounit2 types))

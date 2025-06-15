@@ -1,0 +1,4 @@
+(library
+ (name file_sexp)
+ (public_name file.sexp)
+ (libraries base bos sexplib sexp_pretty))

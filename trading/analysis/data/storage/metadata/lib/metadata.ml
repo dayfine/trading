@@ -56,25 +56,10 @@ let generate_metadata ~price_data ~symbol ?(n = 20) () =
     last_n_prices_avg_above_500 = Float.(avg_price > 500.0);
   }
 
-let save t ~csv_path =
-  let open Bos in
-  let metadata_path =
-    Fpath.v (String.chop_suffix_exn csv_path ~suffix:".csv" ^ ".metadata.sexp")
-  in
-  let data = Sexp_pretty.sexp_to_string (sexp_of_t t) in
-  match OS.File.write metadata_path data with
-  | Ok () -> ()
-  | Error (`Msg msg) -> failwith msg
+(* Create a module that exposes the type and functions *)
+module T_sexp = struct
+  type nonrec t = t
 
-let load ~csv_path =
-  let open Bos in
-  let metadata_path =
-    Fpath.v (String.chop_suffix_exn csv_path ~suffix:".csv" ^ ".metadata.sexp")
-  in
-  match OS.File.exists metadata_path with
-  | Ok true -> (
-      match OS.File.read metadata_path with
-      | Ok contents -> Some (Sexp.of_string contents |> t_of_sexp)
-      | Error (`Msg msg) -> failwith msg)
-  | Ok false -> None
-  | Error (`Msg msg) -> failwith msg
+  let sexp_of_t = sexp_of_t
+  let t_of_sexp = t_of_sexp
+end
