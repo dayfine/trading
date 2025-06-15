@@ -1,5 +1,12 @@
 (executable
  (name generate_metadata)
- (libraries async core core_unix.command_unix csv file.sexp storage.metadata)
+ (libraries
+  async
+  core
+  core_unix.command_unix
+  csv
+  csv.registry
+  file.sexp
+  storage.metadata)
  (preprocess
   (pps ppx_let)))
