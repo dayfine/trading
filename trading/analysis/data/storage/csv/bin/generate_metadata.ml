@@ -1,5 +1,6 @@
 open Core
 open Async
+open Registry
 
 (* Extract the symbol from the path, which is the last component of the path *)
 let extract_symbol_from_path path =
@@ -12,7 +13,10 @@ let metadata_path_for_csv csv_path =
   Fpath.v (String.chop_suffix_exn csv_path ~suffix:".csv" ^ ".metadata.sexp")
 
 let save t ~csv_path =
-  File_sexp.Sexp.save (module Metadata.T_sexp) t ~path:(metadata_path_for_csv csv_path)
+  File_sexp.Sexp.save
+    (module Metadata.T_sexp)
+    t
+    ~path:(metadata_path_for_csv csv_path)
 
 let process_file csv_path : (string, string * string) Result.t Deferred.t =
   let symbol = extract_symbol_from_path csv_path in
@@ -33,17 +37,6 @@ let print_results results =
   printf "\nProcessing %d files:\n" (List.length results);
   List.iter results ~f:print_result
 
-let list_csv_files_in_dir dir =
-  match
-    Bos.OS.Dir.fold_contents ~elements:`Files
-      (fun p acc ->
-        let path = Fpath.to_string p in
-        if String.is_suffix ~suffix:".csv" path then path :: acc else acc)
-      [] (Fpath.v dir)
-  with
-  | Ok files -> files
-  | Error (`Msg msg) -> failwith msg
-
 let main ~csv_path ~dir () =
   match (csv_path, dir) with
   | Some csv_path, None ->
@@ -52,10 +45,12 @@ let main ~csv_path ~dir () =
       return ()
   | None, Some dir ->
       printf "Processing directory: %s\n" dir;
-      let csv_files = list_csv_files_in_dir dir in
-      printf "Found %d CSV files to process\n" (List.length csv_files);
+      let registry = create ~csv_dir:dir in
+      let entries = list registry in
+      printf "Found %d CSV files to process\n" (List.length entries);
       let%bind results =
-        Deferred.List.map ~how:`Parallel csv_files ~f:process_file
+        Deferred.List.map ~how:`Parallel entries ~f:(fun { csv_path; _ } ->
+            process_file (Fpath.to_string csv_path))
       in
       printf "Finished processing all files\n";
       print_results results;

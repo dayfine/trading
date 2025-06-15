@@ -1,0 +1,5 @@
+(executable
+ (name list_entries)
+ (libraries core registry core_unix.command_unix)
+ (preprocess
+  (pps ppx_jane)))
