@@ -16,18 +16,20 @@ let process_file csv_path =
 
 let print_result = function
   | Ok symbol -> printf "Successfully generated metadata for %s\n" symbol
-  | Error (symbol, msg) -> printf "Failed to generate metadata for %s: %s\n" symbol msg
+  | Error (symbol, msg) ->
+      printf "Failed to generate metadata for %s: %s\n" symbol msg
 
 let print_results results =
   printf "\nProcessing %d files:\n" (List.length results);
   List.iter results ~f:print_result
 
 let list_csv_files_in_dir dir =
-  match Bos.OS.Dir.fold_contents ~elements:`Files
-    (fun p acc ->
-      let path = Fpath.to_string p in
-      if String.is_suffix ~suffix:".csv" path then path :: acc else acc)
-    [] (Fpath.v dir)
+  match
+    Bos.OS.Dir.fold_contents ~elements:`Files
+      (fun p acc ->
+        let path = Fpath.to_string p in
+        if String.is_suffix ~suffix:".csv" path then path :: acc else acc)
+      [] (Fpath.v dir)
   with
   | Ok files -> files
   | Error (`Msg msg) -> failwith msg

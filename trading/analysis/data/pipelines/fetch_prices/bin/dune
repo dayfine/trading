@@ -1,6 +1,5 @@
 (executable
  (name main)
- (public_name fetch_prices)
  (libraries core async async_unix fetch_prices)
  (preprocess
   (pps ppx_jane)))

@@ -1,6 +1,6 @@
 (test
  (name test_csv_storage)
- (libraries ounit2 csv storage bos))
+ (libraries ounit2 csv storage.interface bos))
 
 (test
  (name test_csv_parser)

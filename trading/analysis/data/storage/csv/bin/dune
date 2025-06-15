@@ -1,0 +1,5 @@
+(executable
+ (name generate_metadata)
+ (libraries async core core_unix.command_unix storage.metadata)
+ (preprocess
+  (pps ppx_let)))
