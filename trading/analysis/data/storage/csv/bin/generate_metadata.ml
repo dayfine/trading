@@ -23,10 +23,11 @@ let process_file csv_path : (string, string * string) Result.t Deferred.t =
   let lines = In_channel.read_lines csv_path in
   match Csv.Parser.parse_lines lines with
   | Error status -> Deferred.return (Error (symbol, status.message))
-  | Ok prices ->
+  | Ok prices -> (
       let metadata = Metadata.generate_metadata ~price_data:prices ~symbol () in
-      save metadata ~csv_path;
-      Deferred.return (Ok symbol)
+      match save metadata ~csv_path with
+      | Ok () -> Deferred.return (Ok symbol)
+      | Error status -> Deferred.return (Error (symbol, status.message)))
 
 let print_result = function
   | Ok symbol -> printf "Successfully generated metadata for %s\n" symbol

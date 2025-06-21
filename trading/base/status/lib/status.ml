@@ -21,9 +21,8 @@ type code =
 [@@deriving show, eq]
 
 type t = { code : code; message : string } [@@deriving show, eq]
-
 type 'a status_or = ('a, t) Result.t
-(** A type alias for Result.t with Status.t as the error type *)
+type status = unit status_or
 
 let is_ok { code; _ } = equal_code code Ok
 let is_error status = not (is_ok status)
@@ -51,6 +50,7 @@ let combine statuses =
       in
       { code = first_error.code; message = combined_message }
 
+let ok () = Result.Ok ()
 let error_invalid_argument msg = Error (invalid_argument_error msg)
 let error_internal msg = Error (internal_error msg)
 let error_not_found msg = Error (not_found_error msg)
