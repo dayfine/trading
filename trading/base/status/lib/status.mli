@@ -31,11 +31,18 @@ type 'a status_or = ('a, t) Result.t
 (** A type alias for [Result.t] with [Status.t] as the error type. Use this for
     functions that return a result with a status error. *)
 
+type status = unit status_or
+(** A type alias for a unit result with a status error. Use this for functions
+    that that returns no data that might fail. *)
+
 val is_ok : t -> bool
 (** [is_ok status] returns true if the status code is Ok *)
 
 val is_error : t -> bool
 (** [is_error status] returns true if the status code is not Ok *)
+
+val ok : unit -> status
+(** [ok] creates a status with Ok code *)
 
 (** Error creation functions *)
 val invalid_argument_error : string -> t
