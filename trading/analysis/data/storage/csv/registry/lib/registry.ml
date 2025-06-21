@@ -34,5 +34,5 @@ let get t ~symbol =
   | Some entry -> Some entry
   | None -> None
 
-let list t =
+let list_all t =
   Hashtbl.to_alist t.hash_table |> List.map ~f:(fun (_, entry) -> entry)

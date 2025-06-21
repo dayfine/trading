@@ -46,8 +46,8 @@ let main ~csv_path ~dir () =
       return ()
   | None, Some dir ->
       printf "Processing directory: %s\n" dir;
-      let registry = create ~csv_dir:dir in
-      let entries = list registry in
+      let registry = Registry.create ~csv_dir:dir in
+      let entries = Registry.list_all registry in
       printf "Found %d CSV files to process\n" (List.length entries);
       let%bind results =
         Deferred.List.map ~how:`Parallel entries ~f:(fun { csv_path; _ } ->

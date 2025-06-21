@@ -7,5 +7,5 @@ val create : csv_dir:string -> t
 val get : t -> symbol:string -> entry option
 (** Get an entry by symbol *)
 
-val list : t -> entry list
+val list_all : t -> entry list
 (** List all entries in the registry *)
