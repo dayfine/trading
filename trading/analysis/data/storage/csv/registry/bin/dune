@@ -1,5 +1,10 @@
 (executable
  (name list_entries)
- (libraries core registry core_unix.command_unix)
+ (libraries
+   core
+   core_unix.command_unix
+   file.sexp
+   storage.metadata
+   registry)
  (preprocess
   (pps ppx_jane)))
