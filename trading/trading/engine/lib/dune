@@ -1,0 +1,6 @@
+(library
+ (name engine)
+ (public_name engine)
+ (libraries core ppx_deriving.runtime base)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

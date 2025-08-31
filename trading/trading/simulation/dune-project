@@ -1,0 +1,16 @@
+(lang dune 3.17)
+
+(name simulation)
+(version 0.1.0)
+
+(generate_opam_files true)
+
+(package
+ (name simulation)
+ (depends
+  ocaml core
+  ppx_deriving
+  base
+  engine
+  orders
+  portfolio))

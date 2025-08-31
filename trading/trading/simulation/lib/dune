@@ -1,0 +1,6 @@
+(library
+ (name simulation)
+ (public_name simulation)
+ (libraries core ppx_deriving.runtime base engine orders portfolio)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

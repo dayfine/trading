@@ -1,0 +1,13 @@
+(lang dune 3.17)
+
+(name orders)
+(version 0.1.0)
+
+(generate_opam_files true)
+
+(package
+ (name orders)
+ (depends
+  ocaml core
+  ppx_deriving
+  base))
