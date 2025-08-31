@@ -1,0 +1,6 @@
+(library
+ (name trading_base)
+ (public_name trading.base)
+ (libraries)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
