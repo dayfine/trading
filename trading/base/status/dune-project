@@ -9,5 +9,5 @@
  (name status)
  (depends
   ocaml
-  alcotest
+  ounit2
   ppx_deriving))

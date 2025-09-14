@@ -4,7 +4,7 @@ version: "0.1.0"
 depends: [
   "dune" {>= "3.17"}
   "ocaml"
-  "alcotest"
+  "ounit2"
   "ppx_deriving"
   "odoc" {with-doc}
 ]
