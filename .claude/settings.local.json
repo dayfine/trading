@@ -7,6 +7,8 @@
       "Bash(mkdir:*)",
       "Bash(git commit:*)",
       "Edit",
+      "WebSearch",
+      "WebFetch(domain:api.github.com)",
       "WebFetch(domain:github.com)"
     ],
     "deny": [],

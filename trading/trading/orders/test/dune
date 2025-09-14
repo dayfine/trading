@@ -1,0 +1,7 @@
+(test
+ (name test_types)
+ (libraries ounit2 trading.orders trading.base))
+
+(test
+ (name test_factory)
+ (libraries ounit2 trading.orders trading.base))

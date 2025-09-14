@@ -29,7 +29,7 @@ let test_normal_prices _ =
     create_test_price_data ~start_date ~end_date ~prices ~volumes
   in
   let metadata = generate_metadata ~price_data ~symbol:"TEST" () in
-  let expected =
+  assert_equal ~printer:Metadata.show metadata
     {
       symbol = "TEST";
       last_verified = Date.today ~zone:Time_float.Zone.utc;
@@ -40,8 +40,6 @@ let test_normal_prices _ =
       last_n_prices_avg_below_10 = false;
       last_n_prices_avg_above_500 = false;
     }
-  in
-  assert_equal ~printer:Metadata.show metadata expected
 
 let test_low_prices _ =
   let start_date = Date.of_string "2024-01-01" in
