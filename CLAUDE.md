@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Environment
 
 - Development environment runs in Docker
-- All commands must be executed inside Docker container: `docker exec <container-name> bash -c "cd /workspaces/trading-1/trading && eval \$(opam env) && <command>"`
+- All commands must be executed inside Docker container:
+  `docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval \$(opam env) && <command>'`
 - OCaml codebase built with Dune build system
 - Uses Core library extensively for standard data structures and utilities
 
@@ -105,6 +106,7 @@ lines), plan it out beforehand and make multiple commits, each no more than
 
 ### Debugging Tips
 
-- For compilation errors with published packages, inspect opam/build to check exported symbols
+- For compilation errors with published packages, inspect opam/build to check
+  exported symbols
 - Use WebSearch to identify similar issues and solutions
 - Check dune-package files for actual module structure when modules seem missing

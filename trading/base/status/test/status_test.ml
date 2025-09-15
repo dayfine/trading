@@ -27,8 +27,7 @@ let test_code_show _ =
   let ok_status = { code = Ok; message = "ok" } in
   let invalid_status = { code = Invalid_argument; message = "invalid" } in
   assert_equal "Status.Ok" (Status.show_code ok_status.code);
-  assert_equal "Status.Invalid_argument"
-    (Status.show_code invalid_status.code)
+  assert_equal "Status.Invalid_argument" (Status.show_code invalid_status.code)
 
 let suite =
   "Status"
