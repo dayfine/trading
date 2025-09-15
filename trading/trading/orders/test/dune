@@ -1,7 +1,11 @@
 (test
- (name test_types)
+ (name test_create_order)
  (libraries ounit2 trading.orders trading.base))
 
 (test
- (name test_create_order)
+ (name test_manager)
+ (libraries ounit2 trading.orders trading.base))
+
+(test
+ (name test_types)
  (libraries ounit2 trading.orders trading.base))
