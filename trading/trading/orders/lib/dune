@@ -4,5 +4,4 @@
  (libraries trading.base unix core core_unix.time_ns_unix status)
  (modules types factory)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq))
-)
+  (pps ppx_deriving.show ppx_deriving.eq)))
