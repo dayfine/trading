@@ -2,6 +2,6 @@
  (name trading_orders)
  (public_name trading.orders)
  (libraries trading.base unix core core_unix.time_ns_unix status)
- (modules types factory)
+ (modules types create_order)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

@@ -3,7 +3,7 @@ open OUnit2
 open Trading_base.Types
 open Status
 open Trading_orders.Types
-open Trading_orders.Factory
+open Trading_orders.Create_order
 
 let test_create_limit_order _ =
   let params =
