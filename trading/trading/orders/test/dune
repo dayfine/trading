@@ -3,5 +3,5 @@
  (libraries ounit2 trading.orders trading.base))
 
 (test
- (name test_factory)
+ (name test_create_order)
  (libraries ounit2 trading.orders trading.base))
