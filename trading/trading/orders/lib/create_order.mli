@@ -1,4 +1,4 @@
-(** Order factory for creating orders from structured data *)
+(** Module for creating orders from structured data *)
 
 open Trading_base.Types
 open Status
