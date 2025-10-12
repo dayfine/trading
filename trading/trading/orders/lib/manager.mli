@@ -10,20 +10,18 @@ type order_manager
 val create : unit -> order_manager
 (** Create a new order manager instance *)
 
-val submit_order : order_manager -> order -> status
-(** Submit a single order to the manager *)
-
 val submit_orders : order_manager -> order list -> status list
-(** Submit multiple orders at once. Returns list of results for each order *)
-
-val cancel_order : order_manager -> order_id -> status
-(** Cancel a single order by ID *)
+(** Submit orders to the manager. Returns list of results for each order - same
+    length and order as input. Common errors: Already_exists (order ID already
+    exists) *)
 
 val cancel_orders : order_manager -> order_id list -> status list
-(** Cancel multiple orders by ID. Returns list of results for each order *)
+(** Cancel orders by ID. Returns list of results for each order - same length
+    and order as input. Common errors: NotFound (order doesn't exist),
+    Invalid_argument (order not active) *)
 
 val get_order : order_manager -> order_id -> order status_or
-(** Retrieve an order by ID *)
+(** Retrieve an order by ID. Common errors: NotFound (order doesn't exist) *)
 
 (** List orders with optional filters *)
 type order_filter =
@@ -35,6 +33,3 @@ type order_filter =
 
 val list_orders : ?filter:order_filter -> order_manager -> order list
 (** List all orders, optionally filtered *)
-
-val cancel_all : order_manager -> unit
-(** Cancel all active orders *)

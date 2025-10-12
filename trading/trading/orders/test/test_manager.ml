@@ -1,14 +1,45 @@
+open Core
 open OUnit2
 open Trading_base.Types
 open Trading_orders.Types
-open Trading_orders.Factory
+open Trading_orders.Create_order
 open Trading_orders.Manager
+
+(* Helper functions *)
+let compare_orders_by_id a b = String.compare a.id b.id
+let sort_orders_by_id orders = List.sort orders ~compare:compare_orders_by_id
+
+let assert_ok_and_unpack result ~msg =
+  match result with
+  | Ok value -> value
+  | Error err -> assert_failure (msg ^ ": " ^ Status.show err)
+
+let assert_error_and_unpack result ~msg =
+  match result with
+  | Ok _ -> assert_failure (msg ^ ": Expected error but got Ok")
+  | Error err -> err
+
+let assert_single_ok results ~msg =
+  match results with
+  | [ Ok _ ] -> ()
+  | [ Error err ] -> assert_failure (msg ^ ": " ^ Status.show err)
+  | _ -> assert_failure (msg ^ ": Expected single result")
+
+let assert_single_error results ~msg =
+  match results with
+  | [ Ok _ ] -> assert_failure (msg ^ ": Expected error but got Ok")
+  | [ Error err ] -> err
+  | _ -> assert_failure (msg ^ ": Expected single result")
 
 (* Helper to create orders with the new API *)
 let make_order ~symbol ~side ~order_type ~quantity ~time_in_force =
-  match create_order { symbol; side; order_type; quantity; time_in_force } with
-  | Result.Ok order -> order
-  | Result.Error _ -> failwith "Expected successful order creation"
+  let test_time = Time_ns_unix.of_string "2024-01-01 12:00:00Z" in
+  match
+    create_order ~now_time:test_time
+      { symbol; side; order_type; quantity; time_in_force }
+  with
+  | Ok order -> order
+  | Error err -> failwith (Status.show err)
 
 let test_create_manager _ =
   let manager = create () in
@@ -21,12 +52,12 @@ let test_submit_order _ =
     make_order ~symbol:"AAPL" ~side:Buy ~order_type:Market ~quantity:100.0
       ~time_in_force:GTC
   in
-  let result = submit_order manager order in
-  assert_equal true (match result with Result.Ok _ -> true | Error _ -> false);
+  let results = submit_orders manager [ order ] in
+  assert_single_ok results ~msg:"Failed to submit order";
   let orders = list_orders manager in
   assert_equal 1 (List.length orders);
-  let retrieved_order = List.hd orders in
-  assert_equal order.id retrieved_order.id
+  let retrieved_order = List.hd_exn orders in
+  assert_equal order retrieved_order
 
 let test_duplicate_order _ =
   let manager = create () in
@@ -35,12 +66,39 @@ let test_duplicate_order _ =
       ~quantity:50.0 ~time_in_force:Day
   in
 
-  let first_result = submit_order manager order in
-  assert_equal true
-    (match first_result with Result.Ok _ -> true | Error _ -> false);
-  let duplicate_result = submit_order manager order in
-  assert_equal true
-    (match duplicate_result with Result.Ok _ -> false | Error _ -> true)
+  let first_results = submit_orders manager [ order ] in
+  assert_single_ok first_results ~msg:"Failed to submit first order";
+  let duplicate_results = submit_orders manager [ order ] in
+  let status =
+    assert_single_error duplicate_results
+      ~msg:"Expected duplicate order to be rejected"
+  in
+  assert_equal Status.Invalid_argument status.code
+    ~msg:"Expected Status.Invalid_argument error code for duplicate order ID"
+
+let test_duplicate_order_batch _ =
+  let manager = create () in
+  let order =
+    make_order ~symbol:"TSLA" ~side:Buy ~order_type:(Limit 200.0) ~quantity:25.0
+      ~time_in_force:GTC
+  in
+
+  let results = submit_orders manager [ order; order ] in
+  match results with
+  | [ Ok _; Error status ] ->
+      (* Expected: first succeeds, second fails due to duplicate ID *)
+      assert_equal Status.Invalid_argument status.code
+        ~msg:
+          "Expected Status.Invalid_argument error code for duplicate order ID";
+      let orders = list_orders manager in
+      assert_equal 1 (List.length orders);
+      (* Only one order should be stored *)
+      let stored_order = List.hd_exn orders in
+      assert_equal order stored_order
+  | [ Ok _; Ok _ ] ->
+      assert_failure "Expected second order to be rejected due to duplicate ID"
+  | [ Error _; Error _ ] -> assert_failure "Expected first order to succeed"
+  | _ -> assert_failure "Expected exactly two results"
 
 let test_get_order _ =
   let manager = create () in
@@ -48,18 +106,23 @@ let test_get_order _ =
     make_order ~symbol:"GOOGL" ~side:Buy ~order_type:Market ~quantity:10.0
       ~time_in_force:IOC
   in
-  let _ = submit_order manager order in
-  let result = get_order manager order.id in
-  match result with
-  | Result.Ok retrieved_order ->
-      assert_equal order.id retrieved_order.id;
-      assert_equal order.symbol retrieved_order.symbol
-  | Error _ -> assert_failure "Expected Ok result"
+  let _ = submit_orders manager [ order ] in
+  let retrieved_order =
+    assert_ok_and_unpack
+      (get_order manager order.id)
+      ~msg:"Failed to retrieve order"
+  in
+  assert_equal order retrieved_order
 
 let test_get_nonexistent_order _ =
   let manager = create () in
-  let result = get_order manager "nonexistent_id" in
-  assert_equal true (match result with Result.Ok _ -> false | Error _ -> true)
+  let status =
+    assert_error_and_unpack
+      (get_order manager "nonexistent_id")
+      ~msg:"Expected error for nonexistent order"
+  in
+  assert_equal Status.NotFound status.code
+    ~msg:"Expected Status.NotFound error code for nonexistent order"
 
 let test_cancel_order _ =
   let manager = create () in
@@ -68,17 +131,18 @@ let test_cancel_order _ =
       ~time_in_force:GTC
   in
 
-  let _ = submit_order manager order in
-  let cancel_result = cancel_order manager order.id in
-  assert_equal true
-    (match cancel_result with Result.Ok _ -> true | Error _ -> false);
-
-  let result = get_order manager order.id in
-  match result with
-  | Result.Ok cancelled_order ->
-      assert_equal Cancelled cancelled_order.status;
-      assert_equal false (is_active cancelled_order)
-  | Error _ -> assert_failure "Expected Ok result"
+  let _ = submit_orders manager [ order ] in
+  let cancel_results = cancel_orders manager [ order.id ] in
+  match cancel_results with
+  | [ Ok _ ] -> (
+      let result = get_order manager order.id in
+      match result with
+      | Ok cancelled_order ->
+          assert_equal Cancelled cancelled_order.status;
+          assert_equal false (is_active cancelled_order)
+      | Error err -> assert_failure (Status.show err))
+  | [ Error err ] -> assert_failure (Status.show err)
+  | _ -> assert_failure "Expected single result"
 
 let test_cancel_already_cancelled_order _ =
   let manager = create () in
@@ -87,10 +151,16 @@ let test_cancel_already_cancelled_order _ =
       ~quantity:15.0 ~time_in_force:FOK
   in
 
-  let _ = submit_order manager order in
-  let _ = cancel_order manager order.id in
-  let result = cancel_order manager order.id in
-  assert_equal true (match result with Result.Ok _ -> false | Error _ -> true)
+  let _ = submit_orders manager [ order ] in
+  let _ = cancel_orders manager [ order.id ] in
+  let results = cancel_orders manager [ order.id ] in
+  match results with
+  | [ Ok _ ] ->
+      assert_failure "Expected error when cancelling already cancelled order"
+  | [ Error status ] ->
+      assert_equal Status.Invalid_argument status.code
+        ~msg:"Expected Status.Invalid_argument error code for inactive order"
+  | _ -> assert_failure "Expected single result"
 
 let test_list_active_orders _ =
   let manager = create () in
@@ -103,14 +173,13 @@ let test_list_active_orders _ =
       ~time_in_force:GTC
   in
 
-  let _ = submit_order manager order1 in
-  let _ = submit_order manager order2 in
-  let _ = cancel_order manager order1.id in
+  let _ = submit_orders manager [ order1; order2 ] in
+  let _ = cancel_orders manager [ order1.id ] in
 
   let active_orders = list_orders ~filter:ActiveOnly manager in
   assert_equal 1 (List.length active_orders);
-  let active_order = List.hd active_orders in
-  assert_equal order2.id active_order.id
+  let active_order = List.hd_exn active_orders in
+  assert_equal order2 active_order
 
 let test_list_orders_by_symbol _ =
   let manager = create () in
@@ -127,15 +196,21 @@ let test_list_orders_by_symbol _ =
       ~quantity:15.0 ~time_in_force:IOC
   in
 
-  let _ = submit_order manager order1 in
-  let _ = submit_order manager order2 in
-  let _ = submit_order manager order3 in
+  let _ = submit_orders manager [ order1; order2; order3 ] in
 
   let aapl_orders = list_orders ~filter:(BySymbol "AAPL") manager in
   let msft_orders = list_orders ~filter:(BySymbol "MSFT") manager in
 
-  assert_equal 2 (List.length aapl_orders);
-  assert_equal 1 (List.length msft_orders)
+  (* Sort both lists by order ID for deterministic comparison *)
+  let aapl_orders_sorted = sort_orders_by_id aapl_orders in
+  let expected_aapl_orders = sort_orders_by_id [ order1; order3 ] in
+  assert_equal expected_aapl_orders aapl_orders_sorted
+    ~msg:"AAPL orders should contain order1 and order3";
+
+  let msft_orders_sorted = sort_orders_by_id msft_orders in
+  let expected_msft_orders = sort_orders_by_id [ order2 ] in
+  assert_equal expected_msft_orders msft_orders_sorted
+    ~msg:"MSFT orders should contain order2"
 
 let test_batch_operations _ =
   let manager = create () in
@@ -150,21 +225,15 @@ let test_batch_operations _ =
 
   let results = submit_orders manager [ order1; order2 ] in
   assert_equal 2 (List.length results);
-  assert_equal true
-    (match List.nth results 0 with Result.Ok _ -> true | Error _ -> false);
-  assert_equal true
-    (match List.nth results 1 with Result.Ok _ -> true | Error _ -> false);
+  List.iter results ~f:(function
+    | Ok _ -> ()
+    | Error err -> assert_failure (Status.show err));
 
   let cancel_results = cancel_orders manager [ order1.id; order2.id ] in
   assert_equal 2 (List.length cancel_results);
-  assert_equal true
-    (match List.nth cancel_results 0 with
-    | Result.Ok _ -> true
-    | Error _ -> false);
-  assert_equal true
-    (match List.nth cancel_results 1 with
-    | Result.Ok _ -> true
-    | Error _ -> false)
+  List.iter cancel_results ~f:(function
+    | Ok _ -> ()
+    | Error err -> assert_failure (Status.show err))
 
 let test_cancel_all _ =
   let manager = create () in
@@ -177,10 +246,11 @@ let test_cancel_all _ =
       ~quantity:20.0 ~time_in_force:GTC
   in
 
-  let _ = submit_order manager order1 in
-  let _ = submit_order manager order2 in
+  let _ = submit_orders manager [ order1; order2 ] in
 
-  cancel_all manager;
+  let active_orders = list_orders ~filter:ActiveOnly manager in
+  let active_ids = List.map active_orders ~f:(fun order -> order.id) in
+  let _ = cancel_orders manager active_ids in
   assert_equal 0 (List.length (list_orders ~filter:ActiveOnly manager))
 
 let test_filtering _ =
@@ -198,20 +268,49 @@ let test_filtering _ =
       ~quantity:15.0 ~time_in_force:IOC
   in
 
-  let _ = submit_order manager order1 in
-  let _ = submit_order manager order2 in
-  let _ = submit_order manager order3 in
-  let _ = cancel_order manager order1.id in
+  let _ = submit_orders manager [ order1; order2; order3 ] in
+  let _ = cancel_orders manager [ order1.id ] in
+
+  (* Get the updated orders from the manager for comparison *)
+  let updated_order1 =
+    assert_ok_and_unpack (get_order manager order1.id) ~msg:"order1 not found"
+  in
+  let updated_order2 =
+    assert_ok_and_unpack (get_order manager order2.id) ~msg:"order2 not found"
+  in
+  let updated_order3 =
+    assert_ok_and_unpack (get_order manager order3.id) ~msg:"order3 not found"
+  in
 
   let by_symbol = list_orders ~filter:(BySymbol "AAPL") manager in
   let by_side = list_orders ~filter:(BySide Buy) manager in
   let by_status = list_orders ~filter:(ByStatus Cancelled) manager in
   let active_only = list_orders ~filter:ActiveOnly manager in
 
-  assert_equal 2 (List.length by_symbol);
-  assert_equal 1 (List.length by_side);
-  assert_equal 1 (List.length by_status);
-  assert_equal 2 (List.length active_only)
+  (* Sort both lists by order ID for deterministic comparison *)
+  let by_symbol_sorted = sort_orders_by_id by_symbol in
+  let expected_by_symbol =
+    sort_orders_by_id [ updated_order1; updated_order3 ]
+  in
+  assert_equal expected_by_symbol by_symbol_sorted
+    ~msg:"BySymbol AAPL should contain order1 and order3";
+
+  let by_side_sorted = sort_orders_by_id by_side in
+  let expected_by_side = sort_orders_by_id [ updated_order1 ] in
+  assert_equal expected_by_side by_side_sorted
+    ~msg:"BySide Buy should contain order1";
+
+  let by_status_sorted = sort_orders_by_id by_status in
+  let expected_by_status = sort_orders_by_id [ updated_order1 ] in
+  assert_equal expected_by_status by_status_sorted
+    ~msg:"ByStatus Cancelled should contain order1";
+
+  let active_only_sorted = sort_orders_by_id active_only in
+  let expected_active_only =
+    sort_orders_by_id [ updated_order2; updated_order3 ]
+  in
+  assert_equal expected_active_only active_only_sorted
+    ~msg:"ActiveOnly should contain order2 and order3"
 
 let suite =
   "Order Manager"
@@ -219,6 +318,7 @@ let suite =
          "create_manager" >:: test_create_manager;
          "submit_order" >:: test_submit_order;
          "duplicate_order" >:: test_duplicate_order;
+         "duplicate_order_batch" >:: test_duplicate_order_batch;
          "get_order" >:: test_get_order;
          "get_nonexistent_order" >:: test_get_nonexistent_order;
          "cancel_order" >:: test_cancel_order;
