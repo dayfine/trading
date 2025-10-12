@@ -1,6 +1,6 @@
 open Trading_base.Types
 
-type cash = float [@@deriving show, eq]
+type cash_value = float [@@deriving show, eq]
 
 type portfolio_position = {
   symbol : symbol;

@@ -12,13 +12,13 @@ val unrealized_pnl : portfolio_position -> price -> float
 val portfolio_value :
   Trading_base.Types.symbol list ->
   portfolio_position list ->
-  cash ->
+  cash_value ->
   (symbol * price) list ->
   float
 (** Calculate total portfolio value given current market prices. Includes cash +
     sum of all position market values *)
 
-(* val realized_pnl_from_trades : trade list -> float *)
+val realized_pnl_from_trades : trade list -> float
 (** Calculate realized P&L from trade history *)
 
 val position_cost_basis : portfolio_position -> float

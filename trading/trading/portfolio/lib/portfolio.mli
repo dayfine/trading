@@ -7,7 +7,7 @@ open Types
 type t
 (** Opaque portfolio type. Internal state is managed to maintain consistency. *)
 
-val create : initial_cash:cash -> t
+val create : initial_cash:cash_value -> t
 (** Create a new portfolio with initial cash balance *)
 
 val apply_trades : t -> trade list -> t status_or
@@ -16,10 +16,10 @@ val apply_trades : t -> trade list -> t status_or
     Order matters: [Buy 100 AAPL; Sell 50 AAPL] vs [Sell 50 AAPL; Buy 100 AAPL]
 *)
 
-val get_cash : t -> cash
+val get_cash : t -> cash_value
 (** Get current cash balance *)
 
-val get_initial_cash : t -> cash
+val get_initial_cash : t -> cash_value
 (** Get initial cash balance *)
 
 val get_trade_history : t -> trade list

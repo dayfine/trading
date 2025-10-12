@@ -2,8 +2,8 @@
 
 open Trading_base.Types
 
-type cash = float [@@deriving show, eq]
-(** Cash balance in the portfolio *)
+type cash_value = float [@@deriving show, eq]
+(** Cash balance in the portfolio, denominated in US dollars *)
 
 type portfolio_position = {
   symbol : symbol;

@@ -3,10 +3,10 @@ open Status
 open Types
 
 type t = {
-  initial_cash : cash;
+  initial_cash : cash_value;
   trade_history : Trading_base.Types.trade list;
   (* Computed state - maintained for performance *)
-  current_cash : cash;
+  current_cash : cash_value;
   positions : (Trading_base.Types.symbol, portfolio_position) Hashtbl.t;
 }
 

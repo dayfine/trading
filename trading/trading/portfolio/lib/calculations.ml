@@ -8,7 +8,7 @@ let unrealized_pnl position market_price =
   let cost_basis = position.quantity *. position.avg_cost in
   current_value -. cost_basis
 
-let portfolio_value _symbols positions cash market_prices =
+let portfolio_value _symbols positions cash_value market_prices =
   let price_map = Map.of_alist_exn (module String) market_prices in
   let positions_value =
     List.fold positions ~init:0.0 ~f:(fun acc position ->
@@ -17,15 +17,12 @@ let portfolio_value _symbols positions cash market_prices =
         | None -> acc +. (position.quantity *. position.avg_cost)
         (* Fallback to cost basis *))
   in
-  cash +. positions_value
+  cash_value +. positions_value
 
 let position_cost_basis position = position.quantity *. position.avg_cost
 
-(* Commented out until we figure out trade type imports
 let realized_pnl_from_trades trades =
-  List.fold trades ~init:0.0 ~f:(fun acc trade ->
-    match trade.side with
-    | Sell -> acc +. (trade.quantity *. trade.price -. trade.commission)
-    | Buy -> acc -. (trade.quantity *. trade.price +. trade.commission)
-  )
-*)
+  List.fold trades ~init:0.0 ~f:(fun acc (trade : Trading_base.Types.trade) ->
+      match trade.side with
+      | Sell -> acc +. ((trade.quantity *. trade.price) -. trade.commission)
+      | Buy -> acc -. ((trade.quantity *. trade.price) +. trade.commission))

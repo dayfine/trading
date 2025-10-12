@@ -1,3 +1,7 @@
 (test
  (name test_portfolio)
  (libraries ounit2 trading.portfolio trading.orders trading.base))
+
+(test
+ (name test_calculations)
+ (libraries ounit2 trading.portfolio trading.base))
