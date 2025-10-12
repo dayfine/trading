@@ -23,3 +23,16 @@ type order_type =
 type position = { symbol : symbol; quantity : quantity; price : price }
 [@@deriving show, eq]
 (** Position represents a holding in an security *)
+
+type trade_id = string
+
+type trade = {
+  id : trade_id;
+  order_id : string;
+  symbol : symbol;
+  side : side;
+  quantity : quantity;
+  price : price;
+  commission : float;
+  timestamp : Time_ns_unix.t;
+}
