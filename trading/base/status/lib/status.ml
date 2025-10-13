@@ -51,13 +51,12 @@ let combine statuses =
       { code = first_error.code; message = combined_message }
 
 let combine_status_list status_list =
-  let statuses =
-    List.map status_list ~f:(function
-      | Result.Ok () -> { code = Ok; message = "" }
-      | Result.Error status -> status)
-  in
-  let combined_status = combine statuses in
-  if is_ok combined_status then Result.Ok () else Result.Error combined_status
+  List.fold_right status_list ~init:(Result.Ok ()) ~f:(fun status acc ->
+    match (status, acc) with
+    | (Result.Ok (), Result.Ok ()) -> Result.Ok ()
+    | (Result.Error s, Result.Ok ()) -> Result.Error s
+    | (Result.Ok (), Result.Error s) -> Result.Error s
+    | (Result.Error s1, Result.Error s2) -> Result.Error (combine [s1; s2]))
 
 let ok () = Result.Ok ()
 let error_invalid_argument msg = Error (invalid_argument_error msg)
