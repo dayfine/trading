@@ -66,6 +66,11 @@ val combine : t list -> t
     - The first error code from the list
     - A message that combines all error messages *)
 
+val combine_status_list : unit status_or list -> unit status_or
+(** [combine_status_list status_list] combines a list of status results.
+    - If all are Ok, returns Ok ()
+    - If any are Error, returns the combined error status *)
+
 val error_invalid_argument : string -> 'a status_or
 (** [error_invalid_argument msg] returns [Error (invalid_argument_error msg)].
     Use for invalid argument errors in result-returning functions. *)

@@ -50,6 +50,15 @@ let combine statuses =
       in
       { code = first_error.code; message = combined_message }
 
+let combine_status_list status_list =
+  let statuses =
+    List.map status_list ~f:(function
+      | Result.Ok () -> { code = Ok; message = "" }
+      | Result.Error status -> status)
+  in
+  let combined_status = combine statuses in
+  if is_ok combined_status then Result.Ok () else Result.Error combined_status
+
 let ok () = Result.Ok ()
 let error_invalid_argument msg = Error (invalid_argument_error msg)
 let error_internal msg = Error (internal_error msg)
