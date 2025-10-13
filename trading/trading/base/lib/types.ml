@@ -24,7 +24,7 @@ type position = { symbol : symbol; quantity : quantity; price : price }
 [@@deriving show, eq]
 (** Position represents a holding in an security *)
 
-type trade_id = string
+type trade_id = string [@@deriving show, eq]
 
 type trade = {
   id : trade_id;
@@ -36,3 +36,4 @@ type trade = {
   commission : float;
   timestamp : Time_ns_unix.t;
 }
+[@@deriving show, eq]

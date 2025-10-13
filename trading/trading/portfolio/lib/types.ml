@@ -8,3 +8,6 @@ type portfolio_position = {
   avg_cost : price;
 }
 [@@deriving show, eq]
+
+type trade_with_pnl = { trade : Trading_base.Types.trade; realized_pnl : float }
+[@@deriving show, eq]

@@ -4,7 +4,7 @@ open Types
 
 type t = {
   initial_cash : cash_value;
-  trade_history : Trading_base.Types.trade list;
+  trade_history : trade_with_pnl list;
   (* Computed state - maintained for performance *)
   current_cash : cash_value;
   positions : (Trading_base.Types.symbol, portfolio_position) Hashtbl.t;
@@ -21,9 +21,55 @@ let create ~initial_cash =
 let get_cash portfolio = portfolio.current_cash
 let get_initial_cash portfolio = portfolio.initial_cash
 let get_trade_history portfolio = portfolio.trade_history
+
+let get_total_realized_pnl portfolio =
+  List.fold portfolio.trade_history ~init:0.0 ~f:(fun acc { realized_pnl; _ } ->
+      acc +. realized_pnl)
+
 let get_position portfolio symbol = Hashtbl.find portfolio.positions symbol
 
-let update_position_with_trade positions (trade : Trading_base.Types.trade) :
+(* Helper functions for position updates *)
+let _calculate_average_cost existing trade_quantity trade_price new_quantity =
+  let same_direction = Float.(existing.quantity *. new_quantity > 0.0) in
+  let adding_to_position = Float.(existing.quantity *. trade_quantity > 0.0) in
+
+  if same_direction && adding_to_position then
+    (* Adding to existing position in same direction - weighted average *)
+    ((existing.avg_cost *. existing.quantity) +. (trade_price *. trade_quantity))
+    /. new_quantity
+  else if not same_direction then
+    (* Direction changed - use new trade price as basis *)
+    trade_price
+  else
+    (* Reducing position in same direction - keep existing average cost *)
+    existing.avg_cost
+
+let _update_existing_position positions symbol existing trade_quantity
+    trade_price =
+  let new_quantity = existing.quantity +. trade_quantity in
+  if Float.(new_quantity = 0.0) then (
+    (* Position closed *)
+    Hashtbl.remove positions symbol;
+    Result.Ok ())
+  else
+    (* Update existing position with new average cost *)
+    let new_avg_cost =
+      _calculate_average_cost existing trade_quantity trade_price new_quantity
+    in
+    let updated_position =
+      { existing with quantity = new_quantity; avg_cost = new_avg_cost }
+    in
+    Hashtbl.set positions ~key:symbol ~data:updated_position;
+    Result.Ok ()
+
+let _create_new_position positions symbol trade_quantity trade_price =
+  let position =
+    { symbol; quantity = trade_quantity; avg_cost = trade_price }
+  in
+  Hashtbl.set positions ~key:symbol ~data:position;
+  Result.Ok ()
+
+let _update_position_with_trade positions (trade : Trading_base.Types.trade) :
     unit status_or =
   let symbol = trade.symbol in
   let trade_quantity =
@@ -31,53 +77,40 @@ let update_position_with_trade positions (trade : Trading_base.Types.trade) :
   in
 
   match Hashtbl.find positions symbol with
-  | None when Float.(trade_quantity > 0.0) ->
-      (* New long position *)
-      let position =
-        { symbol; quantity = trade_quantity; avg_cost = trade.price }
-      in
-      Hashtbl.set positions ~key:symbol ~data:position;
-      Ok ()
-  | None ->
-      (* Trying to sell without position *)
-      error_invalid_argument
-        ("Cannot sell " ^ symbol ^ " without existing position")
+  | None -> _create_new_position positions symbol trade_quantity trade.price
   | Some existing ->
-      let new_quantity = existing.quantity +. trade_quantity in
-      if Float.(new_quantity < 0.0) then
-        error_invalid_argument
-          ("Insufficient position in " ^ symbol ^ " to sell "
-          ^ Float.to_string trade.quantity)
-      else if Float.(new_quantity = 0.0) then (
-        (* Position closed *)
-        Hashtbl.remove positions symbol;
-        Ok ())
-      else
-        (* Update existing position with new average cost *)
-        let new_avg_cost =
-          if Float.(trade_quantity > 0.0) then
-            (* Adding to position *)
-            ((existing.avg_cost *. existing.quantity)
-            +. (trade.price *. trade_quantity))
-            /. new_quantity
-          else
-            (* Reducing position - keep existing average cost *)
-            existing.avg_cost
-        in
-        let updated_position =
-          { existing with quantity = new_quantity; avg_cost = new_avg_cost }
-        in
-        Hashtbl.set positions ~key:symbol ~data:updated_position;
-        Ok ()
+      _update_existing_position positions symbol existing trade_quantity
+        trade.price
 
-let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
-    t status_or =
-  let cash_change =
-    match trade.side with
-    | Buy -> -.((trade.quantity *. trade.price) +. trade.commission)
-    | Sell -> (trade.quantity *. trade.price) -. trade.commission
+(* Helper functions for trade application *)
+let _calculate_cash_change (trade : Trading_base.Types.trade) =
+  match trade.side with
+  | Buy -> -.((trade.quantity *. trade.price) +. trade.commission)
+  | Sell -> (trade.quantity *. trade.price) -. trade.commission
+
+let _calculate_realized_pnl (trade : Trading_base.Types.trade) existing_position
+    =
+  let trade_qty =
+    match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
   in
 
+  (* Only realize P&L when closing or reducing position *)
+  if Float.(existing_position.quantity *. trade_qty < 0.0) then
+    (* Closing position (opposite direction trade) *)
+    let close_qty =
+      Float.min (Float.abs existing_position.quantity) (Float.abs trade_qty)
+    in
+    let pnl_before_commission =
+      match trade.side with
+      | Sell -> close_qty *. (trade.price -. existing_position.avg_cost)
+      | Buy -> close_qty *. (existing_position.avg_cost -. trade.price)
+    in
+    pnl_before_commission -. trade.commission
+  else
+    (* Opening or adding to position - no realized P&L *)
+    0.0
+
+let _check_sufficient_cash portfolio cash_change =
   let new_cash = portfolio.current_cash +. cash_change in
   if Float.(new_cash < 0.0) then
     error_invalid_argument
@@ -85,72 +118,92 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
       ^ Float.to_string (-.cash_change)
       ^ ", Available: "
       ^ Float.to_string portfolio.current_cash)
-  else
-    let new_positions = Hashtbl.copy portfolio.positions in
-    match
-      update_position_with_trade new_positions
-        (trade : Trading_base.Types.trade)
-    with
-    | Ok () ->
-        Ok
-          {
-            portfolio with
-            current_cash = new_cash;
-            positions = new_positions;
-            trade_history = portfolio.trade_history @ [ trade ];
-          }
-    | Error _ as err -> err
+  else Result.Ok new_cash
+
+let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
+    t status_or =
+  let cash_change = _calculate_cash_change trade in
+  match _check_sufficient_cash portfolio cash_change with
+  | Result.Error _ as err -> err
+  | Result.Ok new_cash -> (
+      let new_positions = Hashtbl.copy portfolio.positions in
+      let realized_pnl =
+        match Hashtbl.find portfolio.positions trade.symbol with
+        | None -> 0.0 (* New position - no realized P&L *)
+        | Some existing_position ->
+            _calculate_realized_pnl trade existing_position
+      in
+
+      match _update_position_with_trade new_positions trade with
+      | Result.Ok () ->
+          let trade_with_pnl = { trade; realized_pnl } in
+          Result.Ok
+            {
+              portfolio with
+              current_cash = new_cash;
+              positions = new_positions;
+              trade_history = portfolio.trade_history @ [ trade_with_pnl ];
+            }
+      | Result.Error _ as err -> err)
 
 let apply_trades portfolio trades =
-  List.fold trades ~init:(Result.Ok portfolio) ~f:(fun acc trade ->
-      match acc with
-      | Ok p -> apply_single_trade p trade
-      | Error _ as err -> err)
+  List.fold_result trades ~init:portfolio ~f:apply_single_trade
 
 let list_positions portfolio =
   Hashtbl.fold portfolio.positions ~init:[]
     ~f:(fun ~key:_symbol ~data:position acc -> position :: acc)
 
 (* Reconstruct portfolio from scratch for validation *)
-let reconstruct_from_history initial_cash trades =
+let reconstruct_from_history initial_cash trade_history =
+  let trades = List.map trade_history ~f:(fun { trade; _ } -> trade) in
   let empty_portfolio = create ~initial_cash in
   apply_trades empty_portfolio trades
+
+(* Helper functions for combinational validation *)
+let _validate_cash_balance portfolio reconstructed =
+  if Float.equal portfolio.current_cash reconstructed.current_cash then ok ()
+  else
+    error_invalid_argument
+      (Printf.sprintf "Cash balance mismatch: expected %.2f, found %.2f"
+         reconstructed.current_cash portfolio.current_cash)
+
+let _positions_to_sorted_list positions =
+  Hashtbl.to_alist positions
+  |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
+
+let _validate_positions portfolio reconstructed =
+  let position_pair_equal (s1, p1) (s2, p2) =
+    String.equal s1 s2 && equal_portfolio_position p1 p2
+  in
+  let current_positions = _positions_to_sorted_list portfolio.positions in
+  let reconstructed_positions =
+    _positions_to_sorted_list reconstructed.positions
+  in
+
+  if List.equal position_pair_equal current_positions reconstructed_positions
+  then ok ()
+  else
+    let format_positions positions =
+      List.map positions ~f:(fun (symbol, pos) ->
+          Printf.sprintf "%s: %s" symbol (show_portfolio_position pos))
+      |> String.concat ~sep:"; "
+    in
+    error_invalid_argument
+      (Printf.sprintf "Positions mismatch:\nExpected: [%s]\nFound: [%s]"
+         (format_positions reconstructed_positions)
+         (format_positions current_positions))
 
 let validate portfolio =
   match
     reconstruct_from_history portfolio.initial_cash portfolio.trade_history
   with
-  | Error _ as err -> err
-  | Ok reconstructed ->
-      let cash_matches =
-        Float.equal portfolio.current_cash reconstructed.current_cash
+  | Result.Error _ as err -> err
+  | Result.Ok reconstructed ->
+      (* Run all validations and collect errors *)
+      let validations =
+        [
+          _validate_cash_balance portfolio reconstructed;
+          _validate_positions portfolio reconstructed;
+        ]
       in
-
-      let positions_match =
-        let current_symbols =
-          Hashtbl.keys portfolio.positions |> Set.of_list (module String)
-        in
-        let reconstructed_symbols =
-          Hashtbl.keys reconstructed.positions |> Set.of_list (module String)
-        in
-
-        if not (Set.equal current_symbols reconstructed_symbols) then false
-        else
-          Set.for_all current_symbols ~f:(fun symbol ->
-              match
-                ( Hashtbl.find portfolio.positions symbol,
-                  Hashtbl.find reconstructed.positions symbol )
-              with
-              | Some curr, Some recon ->
-                  Float.equal curr.quantity recon.quantity
-                  && Float.equal curr.avg_cost recon.avg_cost
-              | _ -> false)
-      in
-
-      if cash_matches && positions_match then Ok ()
-      else
-        error_invalid_argument
-          ("Portfolio validation failed: cash_matches="
-          ^ Bool.to_string cash_matches
-          ^ ", positions_match="
-          ^ Bool.to_string positions_match)
+      combine_status_list validations

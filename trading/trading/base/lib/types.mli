@@ -20,7 +20,7 @@ type order_type =
   | StopLimit of price * price
 [@@deriving show, eq]
 
-type trade_id = string
+type trade_id = string [@@deriving show, eq]
 
 type trade = {
   id : trade_id;
@@ -32,3 +32,4 @@ type trade = {
   commission : float;
   timestamp : Time_ns_unix.t;
 }
+[@@deriving show, eq]

@@ -63,8 +63,12 @@ let test_portfolio_value_with_market_prices _ =
   let market_prices = [ ("AAPL", 160.0); ("MSFT", 210.0) ] in
   (* AAPL: 100 * 160 = 16000, MSFT: 50 * 210 = 10500, Cash: 5000 *)
   let expected = 16000.0 +. 10500.0 +. 5000.0 in
-  let actual = portfolio_value [] positions cash_value market_prices in
-  assert_float_equal expected actual ~msg:"Portfolio value with market prices"
+  match portfolio_value positions cash_value market_prices with
+  | Result.Ok actual ->
+      assert_float_equal expected actual
+        ~msg:"Portfolio value with market prices"
+  | Result.Error err ->
+      assert_failure ("Portfolio value should succeed: " ^ Status.show err)
 
 let test_portfolio_value_missing_prices _ =
   let positions =
@@ -76,55 +80,77 @@ let test_portfolio_value_missing_prices _ =
   let cash_value = 5000.0 in
   let market_prices = [ ("AAPL", 160.0) ] in
   (* Missing MSFT price *)
-  (* AAPL: 100 * 160 = 16000, MSFT: 50 * 200 = 10000 (fallback), Cash: 5000 *)
-  let expected = 16000.0 +. 10000.0 +. 5000.0 in
-  let actual = portfolio_value [] positions cash_value market_prices in
-  assert_float_equal expected actual ~msg:"Portfolio value with missing prices"
+  (* This should now return an error because MSFT price is missing *)
+  match portfolio_value positions cash_value market_prices with
+  | Result.Ok _ -> assert_failure "Expected error for missing MSFT price"
+  | Result.Error status ->
+      assert_equal Status.Invalid_argument status.code;
+      assert_bool "Error message contains MSFT"
+        (String.is_substring status.message ~substring:"MSFT")
 
 let test_realized_pnl_from_trades _ =
-  let trades =
+  (* Create trade_with_pnl records with cash flow P&L for backward compatibility *)
+  let trade_history =
     [
-      (* Buy 100 shares at $150 each with $5 commission *)
-      make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
-        ~quantity:100.0 ~price:150.0 ~commission:5.0 ();
-      (* Sell 50 shares at $160 each with $3 commission *)
-      make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Sell
-        ~quantity:50.0 ~price:160.0 ~commission:3.0 ();
-      (* Sell remaining 50 shares at $155 each with $2 commission *)
-      make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell
-        ~quantity:50.0 ~price:155.0 ~commission:2.0 ();
+      {
+        trade =
+          make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+            ~quantity:100.0 ~price:150.0 ~commission:5.0 ();
+        realized_pnl = -15005.0;
+        (* Cash flow: -(100*150 + 5) *)
+      };
+      {
+        trade =
+          make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Sell
+            ~quantity:50.0 ~price:160.0 ~commission:3.0 ();
+        realized_pnl = 7997.0;
+        (* Cash flow: +(50*160 - 3) *)
+      };
+      {
+        trade =
+          make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell
+            ~quantity:50.0 ~price:155.0 ~commission:2.0 ();
+        realized_pnl = 7748.0;
+        (* Cash flow: +(50*155 - 2) *)
+      };
     ]
   in
 
-  (* Realized P&L calculation:
-     Buy:  -(100*150 + 5) = -15005
-     Sell: +(50*160 - 3) = +7997
-     Sell: +(50*155 - 2) = +7748
-     Total: -15005 + 7997 + 7748 = 740 *)
+  (* Total: -15005 + 7997 + 7748 = 740 *)
   let expected_pnl = 740.0 in
-  let actual_pnl = realized_pnl_from_trades trades in
+  let actual_pnl = realized_pnl_from_trades trade_history in
   assert_float_equal expected_pnl actual_pnl ~msg:"Realized P&L calculation"
 
 let test_realized_pnl_no_trades _ =
-  let trades = [] in
+  let trade_history = [] in
   let expected_pnl = 0.0 in
-  let actual_pnl = realized_pnl_from_trades trades in
+  let actual_pnl = realized_pnl_from_trades trade_history in
   assert_float_equal expected_pnl actual_pnl
     ~msg:"No trades should give zero P&L"
 
 let test_realized_pnl_only_buys _ =
-  let trades =
+  let trade_history =
     [
-      make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
-        ~quantity:100.0 ~price:150.0 ~commission:5.0 ();
-      make_trade ~id:"t2" ~order_id:"o2" ~symbol:"MSFT" ~side:Buy ~quantity:50.0
-        ~price:200.0 ~commission:3.0 ();
+      {
+        trade =
+          make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+            ~quantity:100.0 ~price:150.0 ~commission:5.0 ();
+        realized_pnl = -15005.0;
+        (* Cash flow: -(100*150 + 5) *)
+      };
+      {
+        trade =
+          make_trade ~id:"t2" ~order_id:"o2" ~symbol:"MSFT" ~side:Buy
+            ~quantity:50.0 ~price:200.0 ~commission:3.0 ();
+        realized_pnl = -10003.0;
+        (* Cash flow: -(50*200 + 3) *)
+      };
     ]
   in
 
-  (* Only buys: -(100*150 + 5) - (50*200 + 3) = -15005 - 10003 = -25008 *)
+  (* Total: -15005 + -10003 = -25008 *)
   let expected_pnl = -25008.0 in
-  let actual_pnl = realized_pnl_from_trades trades in
+  let actual_pnl = realized_pnl_from_trades trade_history in
   assert_float_equal expected_pnl actual_pnl ~msg:"Only buy trades"
 
 let suite =

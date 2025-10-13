@@ -22,8 +22,11 @@ val get_cash : t -> cash_value
 val get_initial_cash : t -> cash_value
 (** Get initial cash balance *)
 
-val get_trade_history : t -> trade list
-(** Get complete trade history in chronological order *)
+val get_trade_history : t -> trade_with_pnl list
+(** Get complete trade history with realized P&L in chronological order *)
+
+val get_total_realized_pnl : t -> float
+(** Get total realized P&L from all trades *)
 
 val get_position : t -> symbol -> portfolio_position option
 (** Get position for a specific symbol *)

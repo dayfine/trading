@@ -66,7 +66,7 @@ val combine : t list -> t
     - The first error code from the list
     - A message that combines all error messages *)
 
-val combine_status_list : unit status_or list -> unit status_or
+val combine_status_list : status list -> status
 (** [combine_status_list status_list] combines a list of status results.
     - If all are Ok, returns Ok ()
     - If any are Error, returns the combined error status *)
