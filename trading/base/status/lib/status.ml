@@ -52,11 +52,11 @@ let combine statuses =
 
 let combine_status_list status_list =
   List.fold_right status_list ~init:(Result.Ok ()) ~f:(fun status acc ->
-    match (status, acc) with
-    | (Result.Ok (), Result.Ok ()) -> Result.Ok ()
-    | (Result.Error s, Result.Ok ()) -> Result.Error s
-    | (Result.Ok (), Result.Error s) -> Result.Error s
-    | (Result.Error s1, Result.Error s2) -> Result.Error (combine [s1; s2]))
+      match (status, acc) with
+      | Result.Ok (), Result.Ok () -> Result.Ok ()
+      | Result.Error s, Result.Ok () -> Result.Error s
+      | Result.Ok (), Result.Error s -> Result.Error s
+      | Result.Error s1, Result.Error s2 -> Result.Error (combine [ s1; s2 ]))
 
 let ok () = Result.Ok ()
 let error_invalid_argument msg = Error (invalid_argument_error msg)

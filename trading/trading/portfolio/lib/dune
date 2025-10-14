@@ -1,0 +1,7 @@
+(library
+ (public_name trading.portfolio)
+ (name trading_portfolio)
+ (libraries core trading.base core_unix.time_ns_unix status)
+ (modules types portfolio calculations)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
