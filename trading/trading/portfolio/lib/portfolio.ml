@@ -23,29 +23,39 @@ let get_initial_cash portfolio = portfolio.initial_cash
 let get_trade_history portfolio = portfolio.trade_history
 
 let get_total_realized_pnl portfolio =
-  List.fold portfolio.trade_history ~init:0.0 ~f:(fun acc { realized_pnl; _ } ->
-      acc +. realized_pnl)
+  Calculations.realized_pnl_from_trades portfolio.trade_history
 
 let get_position portfolio symbol = Hashtbl.find portfolio.positions symbol
 
 (* Helper functions for position updates *)
-let _calculate_average_cost existing trade_quantity trade_price new_quantity =
+
+(* Calculate effective cost per share including commission for opening/adding trades *)
+let _calculate_cost_basis_with_commission (trade : Trading_base.Types.trade) =
+  let open Trading_base.Types in
+  let commission_per_share = trade.commission /. trade.quantity in
+  match trade.side with
+  | Buy -> trade.price +. commission_per_share
+  | Sell -> trade.price -. commission_per_share
+
+let _calculate_average_cost existing trade_quantity effective_cost new_quantity
+    =
   let same_direction = Float.(existing.quantity *. new_quantity > 0.0) in
   let adding_to_position = Float.(existing.quantity *. trade_quantity > 0.0) in
 
   if same_direction && adding_to_position then
     (* Adding to existing position in same direction - weighted average *)
-    ((existing.avg_cost *. existing.quantity) +. (trade_price *. trade_quantity))
+    ((existing.avg_cost *. existing.quantity)
+    +. (effective_cost *. trade_quantity))
     /. new_quantity
   else if not same_direction then
-    (* Direction changed - use new trade price as basis *)
-    trade_price
+    (* Direction changed - use new effective cost as basis *)
+    effective_cost
   else
     (* Reducing position in same direction - keep existing average cost *)
     existing.avg_cost
 
 let _update_existing_position positions symbol existing trade_quantity
-    trade_price =
+    effective_cost =
   let new_quantity = existing.quantity +. trade_quantity in
   if Float.(new_quantity = 0.0) then (
     (* Position closed *)
@@ -54,7 +64,8 @@ let _update_existing_position positions symbol existing trade_quantity
   else
     (* Update existing position with new average cost *)
     let new_avg_cost =
-      _calculate_average_cost existing trade_quantity trade_price new_quantity
+      _calculate_average_cost existing trade_quantity effective_cost
+        new_quantity
     in
     let updated_position =
       { existing with quantity = new_quantity; avg_cost = new_avg_cost }
@@ -62,9 +73,9 @@ let _update_existing_position positions symbol existing trade_quantity
     Hashtbl.set positions ~key:symbol ~data:updated_position;
     Result.Ok ()
 
-let _create_new_position positions symbol trade_quantity trade_price =
+let _create_new_position positions symbol trade_quantity effective_cost =
   let position =
-    { symbol; quantity = trade_quantity; avg_cost = trade_price }
+    { symbol; quantity = trade_quantity; avg_cost = effective_cost }
   in
   Hashtbl.set positions ~key:symbol ~data:position;
   Result.Ok ()
@@ -75,12 +86,13 @@ let _update_position_with_trade positions (trade : Trading_base.Types.trade) :
   let trade_quantity =
     match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
   in
+  let effective_cost = _calculate_cost_basis_with_commission trade in
 
   match Hashtbl.find positions symbol with
-  | None -> _create_new_position positions symbol trade_quantity trade.price
+  | None -> _create_new_position positions symbol trade_quantity effective_cost
   | Some existing ->
       _update_existing_position positions symbol existing trade_quantity
-        trade.price
+        effective_cost
 
 (* Helper functions for trade application *)
 let _calculate_cash_change (trade : Trading_base.Types.trade) =

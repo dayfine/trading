@@ -34,7 +34,7 @@ val get_position : t -> symbol -> portfolio_position option
 val list_positions : t -> portfolio_position list
 (** List all positions in the portfolio *)
 
-val validate : t -> unit status_or
+val validate : t -> status
 (** Validate internal consistency. Should always succeed for properly
     constructed portfolios. Reconstructs portfolio from initial_cash and
     trade_history, compares with stored state. *)

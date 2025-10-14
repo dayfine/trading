@@ -5,8 +5,9 @@ open Trading_portfolio.Types
 open Trading_portfolio.Portfolio
 
 (* Helper functions *)
-let assert_float_equal expected actual ~msg =
-  assert_equal expected actual ~cmp:Float.equal ~msg
+let assert_float_equal ?(epsilon = 1e-9) expected actual ~msg =
+  let cmp a b = Float.(abs (a - b) < epsilon) in
+  assert_equal expected actual ~cmp ~msg
 
 let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
     () =
@@ -54,7 +55,7 @@ let test_apply_buy_trade _ =
       | Some position ->
           assert_float_equal 100.0 position.quantity ~msg:"Position quantity";
           assert_float_equal 150.0 position.avg_cost
-            ~msg:"Position average cost"
+            ~msg:"Position average cost (no commission)"
       | None -> assert_failure "Position should exist after buy trade")
   | Error err -> assert_failure ("Buy trade failed: " ^ Status.show err)
 
@@ -220,10 +221,10 @@ let test_short_selling _ =
 let test_short_cover _ =
   let portfolio = create ~initial_cash:10000.0 in
 
-  (* Short sell 100 shares at $150 *)
+  (* Short sell 100 shares at $150 with $5 commission *)
   let short_trade =
     make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell ~quantity:100.0
-      ~price:150.0 ()
+      ~price:150.0 ~commission:5.0 ()
   in
   let portfolio =
     match apply_trades portfolio [ short_trade ] with
@@ -231,26 +232,40 @@ let test_short_cover _ =
     | Error _ -> assert_failure "Short sell should succeed"
   in
 
-  (* Buy to cover 50 shares at $140 *)
+  (* Verify short position cost basis includes commission *)
+  (match get_position portfolio "AAPL" with
+  | Some position ->
+      (* Cost basis for short: $150 - $5/100 = $149.95 *)
+      assert_float_equal 149.95 position.avg_cost
+        ~msg:"Short cost basis should include commission ($150 - $5/100)"
+  | None -> assert_failure "Short position should exist");
+
+  (* Buy to cover 50 shares at $140 with $3 commission *)
   let cover_trade =
     make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:50.0
-      ~price:140.0 ()
+      ~price:140.0 ~commission:3.0 ()
   in
 
   match apply_trades portfolio [ cover_trade ] with
   | Ok updated_portfolio -> (
-      (* Cash: 10000 + 15000 - 7000 = 18000 *)
-      assert_float_equal 18000.0
+      (* Cash: 10000 + (15000 - 5) - (7000 + 3) = 10000 + 14995 - 7003 = 17992 *)
+      assert_float_equal 17992.0
         (get_cash updated_portfolio)
-        ~msg:"Cash after partial cover";
+        ~msg:"Cash after partial cover (with commissions)";
+
+      (* Verify realized P&L: covering 50 shares
+         P&L = 50 * ($149.95 - $140) - $3 = 50 * $9.95 - $3 = $497.50 - $3 = $494.50 *)
+      let history = get_trade_history updated_portfolio in
+      let cover_pnl = (List.nth_exn history 1).realized_pnl in
+      assert_float_equal 494.5 cover_pnl ~msg:"Cover P&L should be $494.50";
 
       (* Position should be -50 shares *)
       match get_position updated_portfolio "AAPL" with
       | Some position ->
           assert_float_equal (-50.0) position.quantity
             ~msg:"Remaining short position";
-          assert_float_equal 150.0 position.avg_cost
-            ~msg:"Avg cost unchanged on cover"
+          assert_float_equal 149.95 position.avg_cost
+            ~msg:"Avg cost should remain $149.95 on partial cover"
       | None -> assert_failure "Remaining short position should exist")
   | Error err -> assert_failure ("Cover trade failed: " ^ Status.show err)
 
@@ -291,6 +306,27 @@ let test_short_to_long _ =
       | None -> assert_failure "Long position should exist after flip")
   | Error err -> assert_failure ("Short to long failed: " ^ Status.show err)
 
+let test_commission_in_cost_basis _ =
+  let portfolio = create ~initial_cash:20000.0 in
+
+  (* Buy 100 shares at $100 with $10 commission *)
+  let buy_trade =
+    make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
+      ~price:100.0 ~commission:10.0 ()
+  in
+
+  match apply_trades portfolio [ buy_trade ] with
+  | Ok updated_portfolio -> (
+      (* Cost basis should be $100.10 per share ($100 + $10/100) *)
+      match get_position updated_portfolio "AAPL" with
+      | Some position ->
+          assert_float_equal 100.0 position.quantity ~msg:"Position quantity";
+          assert_float_equal 100.10 position.avg_cost
+            ~msg:
+              "Cost basis should include commission ($100 + $10/100 = $100.10)"
+      | None -> assert_failure "Position should exist after buy trade")
+  | Error err -> assert_failure ("Commission test failed: " ^ Status.show err)
+
 let test_realized_pnl_calculation _ =
   let portfolio = create ~initial_cash:20000.0 in
   let trades =
@@ -310,10 +346,10 @@ let test_realized_pnl_calculation _ =
   match apply_trades portfolio trades with
   | Ok updated_portfolio ->
       (* Verify individual trade P&L:
-         Buy 100 @ $150: P&L = 0 (opening position)
-         Sell 50 @ $160: P&L = 50 * ($160 - $150) - $3 = $497
-         Sell 50 @ $155: P&L = 50 * ($155 - $150) - $2 = $248
-         Total: $0 + $497 + $248 = $745 *)
+         Buy 100 @ $150 + $5 commission: cost basis = $150.05/share, P&L = 0 (opening position)
+         Sell 50 @ $160 - $3 commission: P&L = 50 * ($160 - $150.05) - $3 = $494.50
+         Sell 50 @ $155 - $2 commission: P&L = 50 * ($155 - $150.05) - $2 = $245.50
+         Total: $0 + $494.50 + $245.50 = $740 *)
       let trade_history = get_trade_history updated_portfolio in
       assert_equal 3 (List.length trade_history) ~msg:"Should have 3 trades";
 
@@ -323,14 +359,17 @@ let test_realized_pnl_calculation _ =
 
       assert_float_equal 0.0 trade1.realized_pnl
         ~msg:"Buy trade should have no realized P&L";
-      assert_float_equal 497.0 trade2.realized_pnl
-        ~msg:"First sell should realize $497";
-      assert_float_equal 248.0 trade3.realized_pnl
-        ~msg:"Second sell should realize $248";
+      assert_float_equal 494.5 trade2.realized_pnl
+        ~msg:
+          "First sell P&L should be $494.50 (commission included in cost basis)";
+      assert_float_equal 245.5 trade3.realized_pnl
+        ~msg:
+          "Second sell P&L should be $245.50 (commission included in cost \
+           basis)";
 
-      assert_float_equal 745.0
-        (get_total_realized_pnl updated_portfolio)
-        ~msg:"Total realized P&L should be $745";
+      let total_pnl = get_total_realized_pnl updated_portfolio in
+      assert_float_equal 740.0 total_pnl
+        ~msg:"Total realized P&L should be $740 (buy commission reduces P&L)";
 
       (* Position should be closed *)
       assert_equal None
@@ -352,6 +391,7 @@ let suite =
          "short_selling" >:: test_short_selling;
          "short_cover" >:: test_short_cover;
          "short_to_long" >:: test_short_to_long;
+         "commission_in_cost_basis" >:: test_commission_in_cost_basis;
          "realized_pnl_calculation" >:: test_realized_pnl_calculation;
        ]
 
