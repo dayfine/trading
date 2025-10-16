@@ -4,20 +4,11 @@ open Trading_base.Types
 open Trading_orders.Types
 open Trading_orders.Create_order
 open Trading_orders.Manager
+open Matchers
 
 (* Helper functions *)
 let compare_orders_by_id a b = String.compare a.id b.id
 let sort_orders_by_id orders = List.sort orders ~compare:compare_orders_by_id
-
-let assert_ok_and_unpack result ~msg =
-  match result with
-  | Ok value -> value
-  | Error err -> assert_failure (msg ^ ": " ^ Status.show err)
-
-let assert_error_and_unpack result ~msg =
-  match result with
-  | Ok _ -> assert_failure (msg ^ ": Expected error but got Ok")
-  | Error err -> err
 
 let assert_single_ok results ~msg =
   match results with
@@ -108,21 +99,14 @@ let test_get_order _ =
   in
   let _ = submit_orders manager [ order ] in
   let retrieved_order =
-    assert_ok_and_unpack
-      (get_order manager order.id)
-      ~msg:"Failed to retrieve order"
+    assert_ok ~msg:"Failed to retrieve order" (get_order manager order.id)
   in
   assert_equal order retrieved_order
 
 let test_get_nonexistent_order _ =
   let manager = create () in
-  let status =
-    assert_error_and_unpack
-      (get_order manager "nonexistent_id")
-      ~msg:"Expected error for nonexistent order"
-  in
-  assert_equal Status.NotFound status.code
-    ~msg:"Expected Status.NotFound error code for nonexistent order"
+  assert_error ~msg:"Expected error for nonexistent order"
+    (get_order manager "nonexistent_id")
 
 let test_cancel_order _ =
   let manager = create () in
@@ -273,13 +257,13 @@ let test_filtering _ =
 
   (* Get the updated orders from the manager for comparison *)
   let updated_order1 =
-    assert_ok_and_unpack (get_order manager order1.id) ~msg:"order1 not found"
+    assert_ok ~msg:"order1 not found" (get_order manager order1.id)
   in
   let updated_order2 =
-    assert_ok_and_unpack (get_order manager order2.id) ~msg:"order2 not found"
+    assert_ok ~msg:"order2 not found" (get_order manager order2.id)
   in
   let updated_order3 =
-    assert_ok_and_unpack (get_order manager order3.id) ~msg:"order3 not found"
+    assert_ok ~msg:"order3 not found" (get_order manager order3.id)
   in
 
   let by_symbol = list_orders ~filter:(BySymbol "AAPL") manager in

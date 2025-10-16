@@ -4,4 +4,4 @@
 
 (test
  (name test_calculations)
- (libraries ounit2 trading.portfolio trading.base))
+ (libraries ounit2 trading.portfolio trading.base matchers))
