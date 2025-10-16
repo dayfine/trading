@@ -1,0 +1,17 @@
+(lang dune 3.0)
+
+(name matchers)
+
+(generate_opam_files true)
+
+(package
+ (name matchers)
+ (synopsis "Testing utilities for Result types with OUnit2")
+ (description
+  "Provides helper functions to reduce boilerplate when testing Result types in OCaml with OUnit2. Includes assert_ok_with, assert_error, and assert_ok for cleaner test assertions.")
+ (depends
+  (ocaml
+   (>= 5.2.0))
+  core
+  ounit2
+  status))
