@@ -1,0 +1,39 @@
+(** Testing utilities for asserting on Result types.
+
+    This module provides helper functions to reduce boilerplate in tests while
+    maintaining clarity. These helpers work with OUnit2 test framework and
+    Status.status_or types. *)
+
+val assert_ok_with : msg:string -> 'a Status.status_or -> f:('a -> unit) -> unit
+(** [assert_ok_with ~msg result ~f] asserts that [result] is [Ok value] and
+    executes [f value] for further assertions. If [result] is [Error], fails
+    with [msg] and the error details.
+
+    Example:
+    {[
+      assert_ok_with ~msg:"Operation failed" (some_operation ())
+        ~f:(fun value ->
+          assert_equal expected_value value ~msg:"Value mismatch")
+    ]} *)
+
+val assert_error : msg:string -> 'a Status.status_or -> unit
+(** [assert_error ~msg result] asserts that [result] is [Error]. If [result] is
+    [Ok], fails with [msg].
+
+    Example:
+    {[
+      assert_error ~msg:"Should fail with invalid input"
+        (validate_input invalid_data)
+    ]} *)
+
+val assert_ok : msg:string -> 'a Status.status_or -> 'a
+(** [assert_ok ~msg result] asserts that [result] is [Ok value] and returns
+    [value]. If [result] is [Error], fails with [msg] and the error details.
+    This is useful for test setup where you need the unwrapped value.
+
+    Example:
+    {[
+      let portfolio =
+        assert_ok ~msg:"Failed to create portfolio"
+          (create_portfolio ~cash:10000.0)
+    ]} *)

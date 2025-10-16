@@ -1,4 +1,5 @@
 open Core
+open Result.Let_syntax
 open Status
 open Types
 
@@ -135,28 +136,22 @@ let _check_sufficient_cash portfolio cash_change =
 let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
     t status_or =
   let cash_change = _calculate_cash_change trade in
-  match _check_sufficient_cash portfolio cash_change with
-  | Result.Error _ as err -> err
-  | Result.Ok new_cash -> (
-      let new_positions = Hashtbl.copy portfolio.positions in
-      let realized_pnl =
-        match Hashtbl.find portfolio.positions trade.symbol with
-        | None -> 0.0 (* New position - no realized P&L *)
-        | Some existing_position ->
-            _calculate_realized_pnl trade existing_position
-      in
-
-      match _update_position_with_trade new_positions trade with
-      | Result.Ok () ->
-          let trade_with_pnl = { trade; realized_pnl } in
-          Result.Ok
-            {
-              portfolio with
-              current_cash = new_cash;
-              positions = new_positions;
-              trade_history = portfolio.trade_history @ [ trade_with_pnl ];
-            }
-      | Result.Error _ as err -> err)
+  let%bind new_cash = _check_sufficient_cash portfolio cash_change in
+  let new_positions = Hashtbl.copy portfolio.positions in
+  let realized_pnl =
+    match Hashtbl.find portfolio.positions trade.symbol with
+    | None -> 0.0 (* New position - no realized P&L *)
+    | Some existing_position -> _calculate_realized_pnl trade existing_position
+  in
+  let%bind () = _update_position_with_trade new_positions trade in
+  let trade_with_pnl = { trade; realized_pnl } in
+  return
+    {
+      portfolio with
+      current_cash = new_cash;
+      positions = new_positions;
+      trade_history = portfolio.trade_history @ [ trade_with_pnl ];
+    }
 
 let apply_trades portfolio trades =
   List.fold_result trades ~init:portfolio ~f:apply_single_trade
@@ -206,16 +201,14 @@ let _validate_positions portfolio reconstructed =
          (format_positions current_positions))
 
 let validate portfolio =
-  match
+  let%bind reconstructed =
     reconstruct_from_history portfolio.initial_cash portfolio.trade_history
-  with
-  | Result.Error _ as err -> err
-  | Result.Ok reconstructed ->
-      (* Run all validations and collect errors *)
-      let validations =
-        [
-          _validate_cash_balance portfolio reconstructed;
-          _validate_positions portfolio reconstructed;
-        ]
-      in
-      combine_status_list validations
+  in
+  (* Run all validations and collect errors *)
+  let validations =
+    [
+      _validate_cash_balance portfolio reconstructed;
+      _validate_positions portfolio reconstructed;
+    ]
+  in
+  combine_status_list validations

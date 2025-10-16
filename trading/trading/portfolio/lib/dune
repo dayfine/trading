@@ -4,4 +4,4 @@
  (libraries core trading.base core_unix.time_ns_unix status)
  (modules types portfolio calculations)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq)))
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

@@ -3,6 +3,7 @@ open OUnit2
 open Trading_base.Types
 open Trading_portfolio.Types
 open Trading_portfolio.Portfolio
+open Matchers
 
 (* Helper functions *)
 let assert_float_equal ?(epsilon = 1e-9) expected actual ~msg =
@@ -22,6 +23,10 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
     timestamp = Time_ns_unix.now ();
   }
 
+(* Domain-specific helper using matchers library *)
+let apply_trades_exn portfolio trades ~error_msg =
+  assert_ok ~msg:error_msg (apply_trades portfolio trades)
+
 let test_create_portfolio _ =
   let portfolio = create ~initial_cash:10000.0 in
   assert_float_equal 10000.0 (get_cash portfolio) ~msg:"Initial cash";
@@ -38,8 +43,8 @@ let test_apply_buy_trade _ =
       ~price:150.0 ()
   in
 
-  match apply_trades portfolio [ buy_trade ] with
-  | Ok updated_portfolio -> (
+  assert_ok_with ~msg:"Buy trade failed" (apply_trades portfolio [ buy_trade ])
+    ~f:(fun updated_portfolio ->
       (* Cash should be reduced by 100 * 150 = 15000 *)
       assert_float_equal 5000.0
         (get_cash updated_portfolio)
@@ -57,7 +62,6 @@ let test_apply_buy_trade _ =
           assert_float_equal 150.0 position.avg_cost
             ~msg:"Position average cost (no commission)"
       | None -> assert_failure "Position should exist after buy trade")
-  | Error err -> assert_failure ("Buy trade failed: " ^ Status.show err)
 
 let test_apply_sell_trade _ =
   let portfolio = create ~initial_cash:20000.0 in
@@ -68,9 +72,7 @@ let test_apply_sell_trade _ =
       ~price:150.0 ()
   in
   let portfolio =
-    match apply_trades portfolio [ buy_trade ] with
-    | Ok p -> p
-    | Error _ -> assert_failure "Buy should succeed"
+    apply_trades_exn portfolio [ buy_trade ] ~error_msg:"Buy should succeed"
   in
 
   (* Then sell some shares at a higher price *)
@@ -79,8 +81,8 @@ let test_apply_sell_trade _ =
       ~price:160.0 ()
   in
 
-  match apply_trades portfolio [ sell_trade ] with
-  | Ok updated_portfolio -> (
+  assert_ok_with ~msg:"Sell trade failed"
+    (apply_trades portfolio [ sell_trade ]) ~f:(fun updated_portfolio ->
       (* Cash: 20000 - 15000 + 8000 = 13000 *)
       assert_float_equal 13000.0
         (get_cash updated_portfolio)
@@ -92,7 +94,6 @@ let test_apply_sell_trade _ =
           assert_float_equal 50.0 position.quantity
             ~msg:"Reduced position quantity"
       | None -> assert_failure "Position should still exist after partial sell")
-  | Error err -> assert_failure ("Sell trade failed: " ^ Status.show err)
 
 let test_insufficient_cash _ =
   let portfolio = create ~initial_cash:1000.0 in
@@ -101,9 +102,8 @@ let test_insufficient_cash _ =
       ~price:150.0 ()
   in
 
-  match apply_trades portfolio [ expensive_trade ] with
-  | Ok _ -> assert_failure "Should fail due to insufficient cash"
-  | Error _err -> () (* Expected behavior *)
+  assert_error ~msg:"Should fail due to insufficient cash"
+    (apply_trades portfolio [ expensive_trade ])
 
 let test_short_selling_allowed _ =
   let portfolio = create ~initial_cash:10000.0 in
@@ -112,16 +112,14 @@ let test_short_selling_allowed _ =
       ~price:150.0 ()
   in
 
-  match apply_trades portfolio [ sell_trade ] with
-  | Ok updated_portfolio -> (
+  assert_ok_with ~msg:"Short selling should be allowed"
+    (apply_trades portfolio [ sell_trade ]) ~f:(fun updated_portfolio ->
       (* Short selling should be allowed and create negative position *)
       match get_position updated_portfolio "AAPL" with
       | Some position ->
           assert_float_equal (-100.0) position.quantity
             ~msg:"Short position created"
       | None -> assert_failure "Short position should exist")
-  | Error err ->
-      assert_failure ("Short selling should be allowed: " ^ Status.show err)
 
 let test_position_close _ =
   let portfolio = create ~initial_cash:20000.0 in
@@ -132,9 +130,7 @@ let test_position_close _ =
       ~price:150.0 ()
   in
   let portfolio =
-    match apply_trades portfolio [ buy_trade ] with
-    | Ok p -> p
-    | Error _ -> assert_failure "Buy should succeed"
+    apply_trades_exn portfolio [ buy_trade ] ~error_msg:"Buy should succeed"
   in
 
   (* Sell all shares *)
@@ -143,16 +139,15 @@ let test_position_close _ =
       ~price:160.0 ()
   in
 
-  match apply_trades portfolio [ sell_trade ] with
-  | Ok updated_portfolio ->
+  assert_ok_with ~msg:"Close position failed"
+    (apply_trades portfolio [ sell_trade ]) ~f:(fun updated_portfolio ->
       (* Position should be closed (removed) *)
       assert_equal None
         (get_position updated_portfolio "AAPL")
         ~msg:"Position should be closed";
       assert_equal []
         (list_positions updated_portfolio)
-        ~msg:"No positions remaining"
-  | Error err -> assert_failure ("Close position failed: " ^ Status.show err)
+        ~msg:"No positions remaining")
 
 let test_validation _ =
   let portfolio = create ~initial_cash:20000.0 in
@@ -161,12 +156,10 @@ let test_validation _ =
       ~price:150.0 ()
   in
 
-  match apply_trades portfolio [ trade ] with
-  | Ok updated_portfolio -> (
-      match validate updated_portfolio with
-      | Ok () -> () (* Expected - portfolio should be consistent *)
-      | Error err -> assert_failure ("Validation failed: " ^ Status.show err))
-  | Error err -> assert_failure ("Trade application failed: " ^ Status.show err)
+  assert_ok_with ~msg:"Trade application failed"
+    (apply_trades portfolio [ trade ]) ~f:(fun updated_portfolio ->
+      assert_ok_with ~msg:"Validation failed" (validate updated_portfolio)
+        ~f:(fun () -> () (* Expected - portfolio should be consistent *)))
 
 let test_multiple_trades_batch _ =
   let portfolio = create ~initial_cash:30000.0 in
@@ -179,8 +172,8 @@ let test_multiple_trades_batch _ =
     ]
   in
 
-  match apply_trades portfolio trades with
-  | Ok updated_portfolio ->
+  assert_ok_with ~msg:"Batch trades failed" (apply_trades portfolio trades)
+    ~f:(fun updated_portfolio ->
       assert_equal 2
         (List.length (list_positions updated_portfolio))
         ~msg:"Two positions created";
@@ -190,8 +183,7 @@ let test_multiple_trades_batch _ =
       (* Cash: 30000 - (100*150) - (50*200) = 30000 - 15000 - 10000 = 5000 *)
       assert_float_equal 5000.0
         (get_cash updated_portfolio)
-        ~msg:"Cash after both trades"
-  | Error err -> assert_failure ("Batch trades failed: " ^ Status.show err)
+        ~msg:"Cash after both trades")
 
 let test_short_selling _ =
   let portfolio = create ~initial_cash:10000.0 in

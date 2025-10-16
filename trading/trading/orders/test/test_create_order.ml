@@ -4,6 +4,7 @@ open Trading_base.Types
 open Status
 open Trading_orders.Types
 open Trading_orders.Create_order
+open Matchers
 
 let test_create_limit_order _ =
   let params =
@@ -16,9 +17,8 @@ let test_create_limit_order _ =
     }
   in
   let test_time = Time_ns_unix.of_string "2024-01-01 12:00:00Z" in
-  let result = create_order ~now_time:test_time params in
-  match result with
-  | Ok order ->
+  assert_ok_with ~msg:"Failed to create limit order"
+    (create_order ~now_time:test_time params) ~f:(fun order ->
       assert_equal
         {
           id = order.id;
@@ -33,8 +33,7 @@ let test_create_limit_order _ =
           created_at = test_time;
           updated_at = test_time;
         }
-        order
-  | Error err -> assert_failure (Status.show err)
+        order)
 
 let test_stop_orders _ =
   let stop_buy_params =
@@ -139,10 +138,8 @@ let test_negative_quantiy_is_invalid _ =
       time_in_force = GTC;
     }
   in
-  let result = create_order invalid_params in
-  match result with
-  | Error status -> assert_equal status.code Invalid_argument
-  | Ok _ -> assert_failure "Expected validation to fail"
+  assert_error ~msg:"Expected validation to fail for negative quantity"
+    (create_order invalid_params)
 
 let test_zero_quantiy_is_invalid _ =
   let invalid_params =
