@@ -5,11 +5,11 @@ open Trading_portfolio.Types
 open Trading_portfolio.Portfolio
 open Matchers
 
-(* Helper functions *)
-let assert_float_equal ?(epsilon = 1e-9) expected actual ~msg =
-  let cmp a b = Float.(abs (a - b) < epsilon) in
-  assert_equal expected actual ~cmp ~msg
+(* Domain-specific helper using matchers library *)
+let apply_trades_exn portfolio trades ~error_msg =
+  assert_ok ~msg:error_msg (apply_trades portfolio trades)
 
+(* Test data builders - simple record constructors *)
 let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
     () =
   {
@@ -22,10 +22,6 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
     commission;
     timestamp = Time_ns_unix.now ();
   }
-
-(* Domain-specific helper using matchers library *)
-let apply_trades_exn portfolio trades ~error_msg =
-  assert_ok ~msg:error_msg (apply_trades portfolio trades)
 
 let test_create_portfolio _ =
   let portfolio = create ~initial_cash:10000.0 in

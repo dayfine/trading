@@ -5,10 +5,7 @@ open Trading_portfolio.Types
 open Trading_portfolio.Calculations
 open Matchers
 
-(* Helper functions *)
-let assert_float_equal expected actual ~msg =
-  assert_equal expected actual ~cmp:Float.equal ~msg
-
+(* Test data builders - simple record constructors *)
 let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
     () =
   {

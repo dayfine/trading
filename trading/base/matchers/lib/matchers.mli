@@ -37,3 +37,13 @@ val assert_ok : msg:string -> 'a Status.status_or -> 'a
         assert_ok ~msg:"Failed to create portfolio"
           (create_portfolio ~cash:10000.0)
     ]} *)
+
+val assert_float_equal : ?epsilon:float -> float -> float -> msg:string -> unit
+(** [assert_float_equal ?epsilon expected actual ~msg] asserts that [expected]
+    and [actual] are equal within the given epsilon tolerance (default: 1e-9).
+    Uses OUnit2's assert_equal with a custom float comparator.
+
+    Example:
+    {[
+      assert_float_equal 10.5 (calculate_total ()) ~msg:"Total should be 10.5"
+    ]} *)
