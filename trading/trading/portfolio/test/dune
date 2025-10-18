@@ -1,18 +1,7 @@
 (test
  (name test_portfolio)
- (libraries
-  ounit2
-  trading.portfolio
-  trading.orders
-  trading.base
-  matchers
-  portfolio_test_helpers))
+ (libraries ounit2 trading.portfolio trading.orders trading.base matchers))
 
 (test
  (name test_calculations)
- (libraries
-  ounit2
-  trading.portfolio
-  trading.base
-  matchers
-  portfolio_test_helpers))
+ (libraries ounit2 trading.portfolio trading.base matchers))

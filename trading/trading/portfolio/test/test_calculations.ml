@@ -4,7 +4,22 @@ open Trading_base.Types
 open Trading_portfolio.Types
 open Trading_portfolio.Calculations
 open Matchers
-open Portfolio_test_helpers
+
+(* Test data builders - simple record constructors *)
+let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
+    () =
+  {
+    id;
+    order_id;
+    symbol;
+    side;
+    quantity;
+    price;
+    commission;
+    timestamp = Time_ns_unix.now ();
+  }
+
+let make_position ~symbol ~quantity ~avg_cost = { symbol; quantity; avg_cost }
 
 let test_market_value _ =
   let position = make_position ~symbol:"AAPL" ~quantity:100.0 ~avg_cost:150.0 in

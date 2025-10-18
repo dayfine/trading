@@ -80,8 +80,6 @@ let create_order ?(now_time = Time_ns_unix.now ()) params =
       _validate_order_type params;
     ]
   in
-
-  (* Combine all validations - returns first error or Ok () *)
   match combine_status_list validations with
   | Ok () ->
       Result.Ok

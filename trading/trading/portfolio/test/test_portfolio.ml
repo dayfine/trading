@@ -4,11 +4,24 @@ open Trading_base.Types
 open Trading_portfolio.Types
 open Trading_portfolio.Portfolio
 open Matchers
-open Portfolio_test_helpers
 
 (* Domain-specific helper using matchers library *)
 let apply_trades_exn portfolio trades ~error_msg =
   assert_ok ~msg:error_msg (apply_trades portfolio trades)
+
+(* Test data builders - simple record constructors *)
+let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
+    () =
+  {
+    id;
+    order_id;
+    symbol;
+    side;
+    quantity;
+    price;
+    commission;
+    timestamp = Time_ns_unix.now ();
+  }
 
 let test_create_portfolio _ =
   let portfolio = create ~initial_cash:10000.0 in
