@@ -4,25 +4,7 @@ open Trading_base.Types
 open Trading_portfolio.Types
 open Trading_portfolio.Calculations
 open Matchers
-
-(* Helper functions *)
-let assert_float_equal expected actual ~msg =
-  assert_equal expected actual ~cmp:Float.equal ~msg
-
-let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
-    () =
-  {
-    id;
-    order_id;
-    symbol;
-    side;
-    quantity;
-    price;
-    commission;
-    timestamp = Time_ns_unix.now ();
-  }
-
-let make_position ~symbol ~quantity ~avg_cost = { symbol; quantity; avg_cost }
+open Portfolio_test_helpers
 
 let test_market_value _ =
   let position = make_position ~symbol:"AAPL" ~quantity:100.0 ~avg_cost:150.0 in

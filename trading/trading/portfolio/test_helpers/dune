@@ -1,0 +1,3 @@
+(library
+ (name portfolio_test_helpers)
+ (libraries core ounit2 trading.base trading.portfolio))

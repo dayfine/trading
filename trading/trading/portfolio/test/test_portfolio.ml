@@ -4,24 +4,7 @@ open Trading_base.Types
 open Trading_portfolio.Types
 open Trading_portfolio.Portfolio
 open Matchers
-
-(* Helper functions *)
-let assert_float_equal ?(epsilon = 1e-9) expected actual ~msg =
-  let cmp a b = Float.(abs (a - b) < epsilon) in
-  assert_equal expected actual ~cmp ~msg
-
-let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
-    () =
-  {
-    id;
-    order_id;
-    symbol;
-    side;
-    quantity;
-    price;
-    commission;
-    timestamp = Time_ns_unix.now ();
-  }
+open Portfolio_test_helpers
 
 (* Domain-specific helper using matchers library *)
 let apply_trades_exn portfolio trades ~error_msg =
