@@ -41,15 +41,14 @@ let test_fifo_basic_buy_sell _ =
   in
 
   (* Verify position has 2 lots *)
-  match get_position portfolio "AAPL" with
-  | Some position ->
+  assert_some_with ~msg:"Position should exist"
+    (get_position portfolio "AAPL") ~f:(fun position ->
       assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
       assert_float_equal 200.0 (position_quantity position) ~msg:"Total quantity";
 
       (* Average cost should be (100*100 + 100*110) / 200 = 105 *)
       assert_float_equal 105.0 (avg_cost_of_position position)
-        ~msg:"Average cost"
-  | None -> assert_failure "Position should exist"
+        ~msg:"Average cost")
 
 let test_fifo_sell_matches_oldest _ =
   (* Create portfolio with FIFO accounting *)
@@ -70,15 +69,14 @@ let test_fifo_sell_matches_oldest _ =
   in
 
   (* Should have 1 lot remaining (the second buy at $110) *)
-  match get_position portfolio "AAPL" with
-  | Some position ->
+  assert_some_with ~msg:"Position should still exist"
+    (get_position portfolio "AAPL") ~f:(fun position ->
       assert_equal 1 (List.length position.lots) ~msg:"Should have 1 lot left";
       assert_float_equal 100.0 (position_quantity position) ~msg:"Remaining quantity";
 
       (* Remaining lot should have cost basis of $110 per share *)
       assert_float_equal 110.0 (avg_cost_of_position position)
-        ~msg:"Remaining lot cost basis"
-  | None -> assert_failure "Position should still exist"
+        ~msg:"Remaining lot cost basis")
 
 let test_fifo_partial_lot_consumption _ =
   (* Create portfolio with FIFO accounting *)
@@ -99,16 +97,15 @@ let test_fifo_partial_lot_consumption _ =
   in
 
   (* Should have 2 lots: 50 shares at $100, 100 shares at $110 *)
-  match get_position portfolio "AAPL" with
-  | Some position ->
+  assert_some_with ~msg:"Position should still exist"
+    (get_position portfolio "AAPL") ~f:(fun position ->
       assert_equal 2 (List.length position.lots)
         ~msg:"Should have 2 lots (partial + full)";
       assert_float_equal 150.0 (position_quantity position) ~msg:"Remaining quantity";
 
       (* Average cost: (50*100 + 100*110) / 150 = 106.67 *)
       assert_float_equal 106.666666666667 (avg_cost_of_position position)
-        ~msg:"Average cost after partial sale"
-  | None -> assert_failure "Position should still exist"
+        ~msg:"Average cost after partial sale")
 
 let test_fifo_vs_average_cost _ =
   (* Test that FIFO and AverageCost produce different results *)
@@ -159,7 +156,19 @@ let test_fifo_vs_average_cost _ =
 
       (* AverageCost remaining cost should be $105 (average of both) *)
       assert_float_equal 105.0 (avg_cost_of_position avg)
-        ~msg:"AverageCost remaining cost"
+        ~msg:"AverageCost remaining cost";
+
+      (* Both should have same realized P&L since P&L is calculated using avg cost *)
+      (* At time of sell, both methods see avg cost of $105, so P&L = 100*(120-105) = $1500 *)
+      let fifo_pnl = get_total_realized_pnl portfolio_fifo in
+      let avg_pnl = get_total_realized_pnl portfolio_avg in
+      assert_float_equal 1500.0 fifo_pnl ~msg:"FIFO realized P&L";
+      assert_float_equal 1500.0 avg_pnl ~msg:"AverageCost realized P&L";
+
+      (* The key difference is in the REMAINING position cost basis *)
+      (* FIFO keeps the $110 lot, AverageCost keeps avg of $105 *)
+      let cost_diff = Float.abs (avg_cost_of_position fifo -. avg_cost_of_position avg) in
+      assert_bool "Cost basis should differ" Float.(cost_diff > 0.01)
   | _ -> assert_failure "Both positions should exist"
 
 let test_fifo_multiple_partial_sells _ =
@@ -183,15 +192,14 @@ let test_fifo_multiple_partial_sells _ =
   in
 
   (* Should have 2 lots: 50 shares at $110, 100 shares at $120 *)
-  match get_position portfolio "AAPL" with
-  | Some position ->
+  assert_some_with ~msg:"Position should still exist"
+    (get_position portfolio "AAPL") ~f:(fun position ->
       assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
       assert_float_equal 150.0 (position_quantity position) ~msg:"Remaining quantity";
 
       (* Average cost: (50*110 + 100*120) / 150 = 116.67 *)
       assert_float_equal 116.666666666667 (avg_cost_of_position position)
-        ~msg:"Average cost after selling 150"
-  | None -> assert_failure "Position should still exist"
+        ~msg:"Average cost after selling 150")
 
 let suite =
   "FIFO Accounting"

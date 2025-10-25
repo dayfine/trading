@@ -53,12 +53,11 @@ let test_apply_buy_trade _ =
         ~msg:"Trade in history";
 
       (* Position should be created *)
-      match get_position updated_portfolio "AAPL" with
-      | Some position ->
+      assert_some_with ~msg:"Position should exist after buy trade"
+        (get_position updated_portfolio "AAPL") ~f:(fun position ->
           assert_float_equal 100.0 (position_quantity position) ~msg:"Position quantity";
           assert_float_equal 150.0 (avg_cost_of_position position)
-            ~msg:"Position average cost (no commission)"
-      | None -> assert_failure "Position should exist after buy trade")
+            ~msg:"Position average cost (no commission)"))
 
 let test_apply_sell_trade _ =
   let portfolio = create ~initial_cash:20000.0 () in
@@ -79,11 +78,10 @@ let test_apply_sell_trade _ =
   assert_float_equal 13000.0 (get_cash portfolio) ~msg:"Cash updated after sell";
 
   (* Position should be reduced *)
-  match get_position portfolio "AAPL" with
-  | Some position ->
+  assert_some_with ~msg:"Position should still exist after partial sell"
+    (get_position portfolio "AAPL") ~f:(fun position ->
       assert_float_equal 50.0 (position_quantity position)
-        ~msg:"Reduced position quantity"
-  | None -> assert_failure "Position should still exist after partial sell"
+        ~msg:"Reduced position quantity")
 
 let test_insufficient_cash _ =
   let portfolio = create ~initial_cash:1000.0 () in
@@ -105,11 +103,10 @@ let test_short_selling_allowed _ =
   assert_ok_with ~msg:"Short selling should be allowed"
     (apply_trades portfolio [ sell_trade ]) ~f:(fun updated_portfolio ->
       (* Short selling should be allowed and create negative position *)
-      match get_position updated_portfolio "AAPL" with
-      | Some position ->
+      assert_some_with ~msg:"Short position should exist"
+        (get_position updated_portfolio "AAPL") ~f:(fun position ->
           assert_float_equal (-100.0) (position_quantity position)
-            ~msg:"Short position created"
-      | None -> assert_failure "Short position should exist")
+            ~msg:"Short position created"))
 
 let test_position_close _ =
   let portfolio = create ~initial_cash:20000.0 () in
@@ -127,7 +124,7 @@ let test_position_close _ =
   in
 
   (* Position should be closed (removed) *)
-  assert_equal None (get_position portfolio "AAPL") ~msg:"Position should be closed";
+  assert_none ~msg:"Position should be closed" (get_position portfolio "AAPL");
   assert_equal [] (list_positions portfolio) ~msg:"No positions remaining"
 
 let test_validation _ =
@@ -183,12 +180,11 @@ let test_short_selling _ =
         ~msg:"Cash increased after short sell";
 
       (* Position should be negative *)
-      match get_position updated_portfolio "AAPL" with
-      | Some position ->
+      assert_some_with ~msg:"Short position should exist"
+        (get_position updated_portfolio "AAPL") ~f:(fun position ->
           assert_float_equal (-100.0) (position_quantity position)
             ~msg:"Short position quantity";
-          assert_float_equal 150.0 (avg_cost_of_position position) ~msg:"Short position cost"
-      | None -> assert_failure "Short position should exist")
+          assert_float_equal 150.0 (avg_cost_of_position position) ~msg:"Short position cost"))
   | Error err -> assert_failure ("Short sell failed: " ^ Status.show err)
 
 let test_short_cover _ =
@@ -217,13 +213,12 @@ let test_short_cover _ =
   assert_float_equal 494.5 cover_pnl ~msg:"Cover P&L should be $494.50";
 
   (* Position should be -50 shares *)
-  match get_position portfolio "AAPL" with
-  | Some position ->
+  assert_some_with ~msg:"Remaining short position should exist"
+    (get_position portfolio "AAPL") ~f:(fun position ->
       assert_float_equal (-50.0) (position_quantity position)
         ~msg:"Remaining short position";
       assert_float_equal 149.95 (avg_cost_of_position position)
-        ~msg:"Avg cost should remain $149.95 on partial cover"
-  | None -> assert_failure "Remaining short position should exist"
+        ~msg:"Avg cost should remain $149.95 on partial cover")
 
 let test_short_to_long _ =
   let portfolio = create ~initial_cash:10000.0 () in
@@ -244,13 +239,12 @@ let test_short_to_long _ =
   assert_float_equal 3500.0 (get_cash portfolio) ~msg:"Cash after going long";
 
   (* Position should be +50 shares at new cost basis *)
-  match get_position portfolio "AAPL" with
-  | Some position ->
+  assert_some_with ~msg:"Long position should exist after flip"
+    (get_position portfolio "AAPL") ~f:(fun position ->
       assert_float_equal 50.0 (position_quantity position)
         ~msg:"Long position after flip";
       assert_float_equal 140.0 (avg_cost_of_position position)
-        ~msg:"New avg cost after direction change"
-  | None -> assert_failure "Long position should exist after flip"
+        ~msg:"New avg cost after direction change")
 
 let test_commission_in_cost_basis _ =
   let portfolio = create ~initial_cash:20000.0 () in
@@ -261,17 +255,14 @@ let test_commission_in_cost_basis _ =
       ~price:100.0 ~commission:10.0 ()
   in
 
-  match apply_trades portfolio [ buy_trade ] with
-  | Ok updated_portfolio -> (
+  assert_ok_with ~msg:"Commission test failed"
+    (apply_trades portfolio [ buy_trade ]) ~f:(fun updated_portfolio ->
       (* Cost basis should be $100.10 per share ($100 + $10/100) *)
-      match get_position updated_portfolio "AAPL" with
-      | Some position ->
+      assert_some_with ~msg:"Position should exist after buy trade"
+        (get_position updated_portfolio "AAPL") ~f:(fun position ->
           assert_float_equal 100.0 (position_quantity position) ~msg:"Position quantity";
           assert_float_equal 100.10 (avg_cost_of_position position)
-            ~msg:
-              "Cost basis should include commission ($100 + $10/100 = $100.10)"
-      | None -> assert_failure "Position should exist after buy trade")
-  | Error err -> assert_failure ("Commission test failed: " ^ Status.show err)
+            ~msg:"Cost basis should include commission ($100 + $10/100 = $100.10)"))
 
 let test_complete_offset_and_reversal _ =
   let portfolio = create ~initial_cash:50000.0 () in
@@ -288,8 +279,8 @@ let test_complete_offset_and_reversal _ =
       ~error_msg:"Complete offset should succeed"
   in
   (* Position should be completely closed *)
-  assert_equal None (get_position portfolio "AAPL")
-    ~msg:"Position should be closed after complete offset";
+  assert_none ~msg:"Position should be closed after complete offset"
+    (get_position portfolio "AAPL");
 
   (* Test 2: Long position reversed to short *)
   let portfolio =
@@ -303,13 +294,12 @@ let test_complete_offset_and_reversal _ =
       ~error_msg:"Long to short reversal should succeed"
   in
   (* Position should now be short 100 shares *)
-  (match get_position portfolio "MSFT" with
-  | Some position ->
+  assert_some_with ~msg:"Position should exist after reversal"
+    (get_position portfolio "MSFT") ~f:(fun position ->
       assert_float_equal (-100.0) (position_quantity position)
         ~msg:"Position should be short 100 after reversal";
       assert_float_equal 210.0 (avg_cost_of_position position)
-        ~msg:"Short position cost basis"
-  | None -> assert_failure "Position should exist after reversal");
+        ~msg:"Short position cost basis");
 
   (* Test 3: Short position reversed to long *)
   let portfolio =
@@ -323,13 +313,12 @@ let test_complete_offset_and_reversal _ =
       ~error_msg:"Short to long reversal should succeed"
   in
   (* Position should now be long 40 shares *)
-  match get_position portfolio "TSLA" with
-  | Some position ->
+  assert_some_with ~msg:"Position should exist after short to long reversal"
+    (get_position portfolio "TSLA") ~f:(fun position ->
       assert_float_equal 40.0 (position_quantity position)
         ~msg:"Position should be long 40 after reversal";
       assert_float_equal 290.0 (avg_cost_of_position position)
-        ~msg:"Long position cost basis after reversal"
-  | None -> assert_failure "Position should exist after short to long reversal"
+        ~msg:"Long position cost basis after reversal")
 
 let test_realized_pnl_calculation _ =
   let portfolio = create ~initial_cash:20000.0 () in
@@ -376,9 +365,8 @@ let test_realized_pnl_calculation _ =
         ~msg:"Total realized P&L should be $740 (buy commission reduces P&L)";
 
       (* Position should be closed *)
-      assert_equal None
+      assert_none ~msg:"Position should be closed after selling all shares"
         (get_position updated_portfolio "AAPL")
-        ~msg:"Position should be closed after selling all shares"
   | Error err -> assert_failure ("Realized P&L test failed: " ^ Status.show err)
 
 let suite =
