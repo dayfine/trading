@@ -2,11 +2,20 @@ open Core
 open Status
 open Types
 
+(* Helper to compute average cost from lots *)
+let avg_cost_of_position (position : portfolio_position) : float =
+  if Float.(abs position.quantity < 1e-9) then 0.0
+  else
+    let total_cost_basis =
+      List.fold position.lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.cost_basis)
+    in
+    total_cost_basis /. Float.abs position.quantity
+
 let market_value position market_price = position.quantity *. market_price
 
 let unrealized_pnl position market_price =
   let current_value = market_value position market_price in
-  let cost_basis = position.quantity *. position.avg_cost in
+  let cost_basis = position.quantity *. avg_cost_of_position position in
   current_value -. cost_basis
 
 let portfolio_value positions cash_value market_prices =
@@ -30,7 +39,8 @@ let portfolio_value positions cash_value market_prices =
     in
     Result.Ok (cash_value +. positions_value)
 
-let position_cost_basis position = position.quantity *. position.avg_cost
+let position_cost_basis position =
+  position.quantity *. avg_cost_of_position position
 
 let realized_pnl_from_trades trade_history =
   List.fold trade_history ~init:0.0 ~f:(fun acc { realized_pnl; _ } ->

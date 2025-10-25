@@ -7,8 +7,10 @@ open Types
 type t
 (** Opaque portfolio type. Internal state is managed to maintain consistency. *)
 
-val create : initial_cash:cash_value -> t
-(** Create a new portfolio with initial cash balance *)
+val create :
+  ?accounting_method:accounting_method -> initial_cash:cash_value -> unit -> t
+(** Create a new portfolio with initial cash balance and optional accounting
+    method (default: AverageCost) *)
 
 val apply_trades : t -> trade list -> t status_or
 (** Apply trades sequentially. Trades are processed in order. Returns Error if

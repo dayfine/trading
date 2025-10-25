@@ -3,6 +3,7 @@ open OUnit2
 open Trading_base.Types
 open Trading_portfolio.Types
 open Trading_portfolio.Portfolio
+open Trading_portfolio.Calculations
 open Matchers
 
 (* Domain-specific helper using matchers library *)
@@ -24,7 +25,7 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
   }
 
 let test_create_portfolio _ =
-  let portfolio = create ~initial_cash:10000.0 in
+  let portfolio = create ~initial_cash:10000.0 () in
   assert_float_equal 10000.0 (get_cash portfolio) ~msg:"Initial cash";
   assert_float_equal 10000.0
     (get_initial_cash portfolio)
@@ -33,7 +34,7 @@ let test_create_portfolio _ =
   assert_equal [] (list_positions portfolio) ~msg:"No positions initially"
 
 let test_apply_buy_trade _ =
-  let portfolio = create ~initial_cash:20000.0 in
+  let portfolio = create ~initial_cash:20000.0 () in
   let buy_trade =
     make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
       ~price:150.0 ()
@@ -55,12 +56,12 @@ let test_apply_buy_trade _ =
       match get_position updated_portfolio "AAPL" with
       | Some position ->
           assert_float_equal 100.0 position.quantity ~msg:"Position quantity";
-          assert_float_equal 150.0 position.avg_cost
+          assert_float_equal 150.0 (avg_cost_of_position position)
             ~msg:"Position average cost (no commission)"
       | None -> assert_failure "Position should exist after buy trade")
 
 let test_apply_sell_trade _ =
-  let portfolio = create ~initial_cash:20000.0 in
+  let portfolio = create ~initial_cash:20000.0 () in
 
   (* First buy some shares *)
   let buy_trade =
@@ -92,7 +93,7 @@ let test_apply_sell_trade _ =
       | None -> assert_failure "Position should still exist after partial sell")
 
 let test_insufficient_cash _ =
-  let portfolio = create ~initial_cash:1000.0 in
+  let portfolio = create ~initial_cash:1000.0 () in
   let expensive_trade =
     make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
       ~price:150.0 ()
@@ -102,7 +103,7 @@ let test_insufficient_cash _ =
     (apply_trades portfolio [ expensive_trade ])
 
 let test_short_selling_allowed _ =
-  let portfolio = create ~initial_cash:10000.0 in
+  let portfolio = create ~initial_cash:10000.0 () in
   let sell_trade =
     make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell ~quantity:100.0
       ~price:150.0 ()
@@ -118,7 +119,7 @@ let test_short_selling_allowed _ =
       | None -> assert_failure "Short position should exist")
 
 let test_position_close _ =
-  let portfolio = create ~initial_cash:20000.0 in
+  let portfolio = create ~initial_cash:20000.0 () in
 
   (* Buy shares *)
   let buy_trade =
@@ -146,7 +147,7 @@ let test_position_close _ =
         ~msg:"No positions remaining")
 
 let test_validation _ =
-  let portfolio = create ~initial_cash:20000.0 in
+  let portfolio = create ~initial_cash:20000.0 () in
   let trade =
     make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
       ~price:150.0 ()
@@ -158,7 +159,7 @@ let test_validation _ =
         ~f:(fun () -> () (* Expected - portfolio should be consistent *)))
 
 let test_multiple_trades_batch _ =
-  let portfolio = create ~initial_cash:30000.0 in
+  let portfolio = create ~initial_cash:30000.0 () in
   let trades =
     [
       make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
@@ -182,7 +183,7 @@ let test_multiple_trades_batch _ =
         ~msg:"Cash after both trades")
 
 let test_short_selling _ =
-  let portfolio = create ~initial_cash:10000.0 in
+  let portfolio = create ~initial_cash:10000.0 () in
 
   (* Short sell 100 shares at $150 *)
   let short_trade =
@@ -202,12 +203,12 @@ let test_short_selling _ =
       | Some position ->
           assert_float_equal (-100.0) position.quantity
             ~msg:"Short position quantity";
-          assert_float_equal 150.0 position.avg_cost ~msg:"Short position cost"
+          assert_float_equal 150.0 (avg_cost_of_position position) ~msg:"Short position cost"
       | None -> assert_failure "Short position should exist")
   | Error err -> assert_failure ("Short sell failed: " ^ Status.show err)
 
 let test_short_cover _ =
-  let portfolio = create ~initial_cash:10000.0 in
+  let portfolio = create ~initial_cash:10000.0 () in
 
   (* Short sell 100 shares at $150 with $5 commission *)
   let short_trade =
@@ -224,7 +225,7 @@ let test_short_cover _ =
   (match get_position portfolio "AAPL" with
   | Some position ->
       (* Cost basis for short: $150 - $5/100 = $149.95 *)
-      assert_float_equal 149.95 position.avg_cost
+      assert_float_equal 149.95 (avg_cost_of_position position)
         ~msg:"Short cost basis should include commission ($150 - $5/100)"
   | None -> assert_failure "Short position should exist");
 
@@ -252,13 +253,13 @@ let test_short_cover _ =
       | Some position ->
           assert_float_equal (-50.0) position.quantity
             ~msg:"Remaining short position";
-          assert_float_equal 149.95 position.avg_cost
+          assert_float_equal 149.95 (avg_cost_of_position position)
             ~msg:"Avg cost should remain $149.95 on partial cover"
       | None -> assert_failure "Remaining short position should exist")
   | Error err -> assert_failure ("Cover trade failed: " ^ Status.show err)
 
 let test_short_to_long _ =
-  let portfolio = create ~initial_cash:10000.0 in
+  let portfolio = create ~initial_cash:10000.0 () in
 
   (* Short sell 50 shares at $150 *)
   let short_trade =
@@ -289,13 +290,13 @@ let test_short_to_long _ =
       | Some position ->
           assert_float_equal 50.0 position.quantity
             ~msg:"Long position after flip";
-          assert_float_equal 140.0 position.avg_cost
+          assert_float_equal 140.0 (avg_cost_of_position position)
             ~msg:"New avg cost after direction change"
       | None -> assert_failure "Long position should exist after flip")
   | Error err -> assert_failure ("Short to long failed: " ^ Status.show err)
 
 let test_commission_in_cost_basis _ =
-  let portfolio = create ~initial_cash:20000.0 in
+  let portfolio = create ~initial_cash:20000.0 () in
 
   (* Buy 100 shares at $100 with $10 commission *)
   let buy_trade =
@@ -309,14 +310,14 @@ let test_commission_in_cost_basis _ =
       match get_position updated_portfolio "AAPL" with
       | Some position ->
           assert_float_equal 100.0 position.quantity ~msg:"Position quantity";
-          assert_float_equal 100.10 position.avg_cost
+          assert_float_equal 100.10 (avg_cost_of_position position)
             ~msg:
               "Cost basis should include commission ($100 + $10/100 = $100.10)"
       | None -> assert_failure "Position should exist after buy trade")
   | Error err -> assert_failure ("Commission test failed: " ^ Status.show err)
 
 let test_realized_pnl_calculation _ =
-  let portfolio = create ~initial_cash:20000.0 in
+  let portfolio = create ~initial_cash:20000.0 () in
   let trades =
     [
       (* Buy 100 shares at $150 each with $5 commission *)

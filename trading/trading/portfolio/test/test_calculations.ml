@@ -19,7 +19,18 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
     timestamp = Time_ns_unix.now ();
   }
 
-let make_position ~symbol ~quantity ~avg_cost = { symbol; quantity; avg_cost }
+let make_position ~symbol ~quantity ~avg_cost =
+  (* For testing: create a single lot representing the position (AverageCost behavior) *)
+  let total_cost_basis = Float.abs quantity *. avg_cost in
+  let lot =
+    {
+      lot_id = "test";
+      quantity;
+      cost_basis = total_cost_basis;
+      acquisition_date = Date.today ~zone:Time_float.Zone.utc;
+    }
+  in
+  { symbol; quantity; lots = [ lot ]; accounting_method = AverageCost }
 
 let test_market_value _ =
   let position = make_position ~symbol:"AAPL" ~quantity:100.0 ~avg_cost:150.0 in
