@@ -59,130 +59,169 @@ let _calculate_average_cost (existing : portfolio_position) (trade_quantity : fl
     (* Reducing position in same direction - keep existing average cost *)
     existing_avg_cost
 
+(* FIFO lot matching helpers *)
+let _sort_lots_by_date (lots : position_lot list) : position_lot list =
+  List.sort lots ~compare:(fun lot1 lot2 ->
+      Core.Date.compare lot1.acquisition_date lot2.acquisition_date)
+
+let _is_same_direction (qty1 : float) (qty2 : float) : bool =
+  Float.(qty1 *. qty2 > 0.0)
+
+let _is_quantity_negligible (qty : float) : bool = Float.(abs qty < 1e-9)
+
+let _partially_consume_lot (lot : position_lot) (consume_qty : float) : position_lot =
+  (* consume_qty and lot.quantity have opposite signs *)
+  let remaining_qty = lot.quantity +. consume_qty in
+  let lot_qty_abs = Float.abs lot.quantity in
+  let remaining_cost =
+    (lot.cost_basis /. lot_qty_abs) *. (Float.abs remaining_qty)
+  in
+  { lot with quantity = remaining_qty; cost_basis = remaining_cost }
+
+let rec _match_single_lot
+    (remaining_qty : float)
+    (lot : position_lot)
+    (rest : position_lot list)
+    : (position_lot list * position_lot list) =
+  if _is_same_direction lot.quantity remaining_qty then
+    (* Lot in same direction - keep it, continue matching *)
+    let (remaining_lots, matched) = _match_lots_rec remaining_qty rest in
+    (lot :: remaining_lots, matched)
+  else
+    (* Lot in opposite direction - consume it *)
+    let lot_qty_abs = Float.abs lot.quantity in
+    let remaining_qty_abs = Float.abs remaining_qty in
+    if Float.(lot_qty_abs <= remaining_qty_abs) then
+      (* Fully consume this lot *)
+      let new_remaining_qty = remaining_qty +. lot.quantity in
+      let (remaining_lots, matched) = _match_lots_rec new_remaining_qty rest in
+      (remaining_lots, lot :: matched)
+    else
+      (* Partially consume this lot *)
+      let updated_lot = _partially_consume_lot lot remaining_qty in
+      (updated_lot :: rest, [ lot ])
+
+and _match_lots_rec
+    (remaining_qty : float)
+    (lots : position_lot list)
+    : (position_lot list * position_lot list) =
+  if _is_quantity_negligible remaining_qty then
+    (lots, [])
+  else
+    match lots with
+    | [] -> ([], [])
+    | lot :: rest -> _match_single_lot remaining_qty lot rest
+
 (* FIFO lot matching: consume oldest lots first when closing position *)
 let _match_fifo_lots (existing_lots : position_lot list) (trade_quantity : float)
     : (position_lot list * position_lot list) =
-  (* Sort lots by acquisition_date (oldest first) *)
-  let sorted_lots =
-    List.sort existing_lots ~compare:(fun (lot1 : position_lot) (lot2 : position_lot) ->
-        Core.Date.compare lot1.acquisition_date lot2.acquisition_date)
-  in
+  let sorted_lots = _sort_lots_by_date existing_lots in
+  _match_lots_rec trade_quantity sorted_lots
 
-  (* Match lots *)
-  let rec match_lots (remaining_qty : float) (lots_to_match : position_lot list)
-      : (position_lot list * position_lot list) =
-    if Float.(abs remaining_qty < 1e-9) then
-      (* All matched - return all remaining lots *)
-      (lots_to_match, [])
-    else
-      match lots_to_match with
-      | [] -> ([], [])  (* No more lots to match *)
-      | lot :: rest ->
-          let same_direction = Float.(lot.quantity *. remaining_qty > 0.0) in
-          if same_direction then
-            (* Lot is in same direction as trade - keep it *)
-            let (remaining_lots, matched) = match_lots remaining_qty rest in
-            (lot :: remaining_lots, matched)
-          else
-            (* Lot is in opposite direction - match against it *)
-            let lot_qty_abs = Float.abs lot.quantity in
-            if Float.(lot_qty_abs <= abs remaining_qty) then
-              (* Fully consume this lot *)
-              let new_remaining_qty =
-                remaining_qty +. lot.quantity  (* Add because opposite signs *)
-              in
-              let (remaining_lots, matched) = match_lots new_remaining_qty rest in
-              (remaining_lots, lot :: matched)
-            else
-              (* Partially consume this lot *)
-              (* remaining_qty and lot.quantity have opposite signs *)
-              let remaining_lot_qty = lot.quantity +. remaining_qty in
-              let remaining_lot_cost =
-                (lot.cost_basis /. lot_qty_abs) *. (Float.abs remaining_lot_qty)
-              in
-              let updated_lot = { lot with quantity = remaining_lot_qty; cost_basis = remaining_lot_cost } in
-              (updated_lot :: rest, [ lot ])  (* Return original lot as matched for P&L calculation *)
-  in
-  match_lots trade_quantity sorted_lots
+(* Helper: Create a new lot from trade details *)
+let _make_lot trade_id trade_quantity effective_cost trade_timestamp : position_lot =
+  {
+    lot_id = trade_id;
+    quantity = trade_quantity;
+    cost_basis = Float.abs trade_quantity *. effective_cost;
+    acquisition_date = Time_ns_unix.to_date trade_timestamp ~zone:Time_float.Zone.utc;
+  }
+
+(* Helper: Set position in hashtable *)
+let _set_position positions symbol position : unit status_or =
+  Hashtbl.set positions ~key:symbol ~data:position;
+  ok ()
+
+(* Helper: Remove position from hashtable *)
+let _remove_position positions symbol : unit status_or =
+  Hashtbl.remove positions symbol;
+  ok ()
 
 let _create_new_position positions symbol trade_quantity effective_cost trade_id
-    trade_timestamp accounting_method =
-  let total_cost_basis = Float.abs trade_quantity *. effective_cost in
-  let lot =
-    {
-      lot_id = trade_id;
-      quantity = trade_quantity;
-      cost_basis = total_cost_basis;
-      acquisition_date = Time_ns_unix.to_date trade_timestamp ~zone:Time_float.Zone.utc;
-    }
-  in
+    trade_timestamp accounting_method : unit status_or =
+  let lot = _make_lot trade_id trade_quantity effective_cost trade_timestamp in
   let position =
     { symbol; quantity = trade_quantity; lots = [ lot ]; accounting_method }
   in
-  Hashtbl.set positions ~key:symbol ~data:position;
-  Result.Ok ()
+  _set_position positions symbol position
 
-let _update_existing_position_fifo positions symbol (existing : portfolio_position)
-    trade_quantity effective_cost trade_id trade_timestamp : unit status_or =
-  let adding_to_position = Float.(existing.quantity *. trade_quantity > 0.0) in
-
-  if adding_to_position then
-    (* Adding to position - create new lot *)
-    let new_lot =
-      {
-        lot_id = trade_id;
-        quantity = trade_quantity;
-        cost_basis = Float.abs trade_quantity *. effective_cost;
-        acquisition_date = Time_ns_unix.to_date trade_timestamp ~zone:Time_float.Zone.utc;
-      }
-    in
-    let new_quantity = existing.quantity +. trade_quantity in
-    let updated_position =
-      {
-        existing with
-        quantity = new_quantity;
-        lots = existing.lots @ [ new_lot ];
-      }
-    in
-    Hashtbl.set positions ~key:symbol ~data:updated_position;
-    Result.Ok ()
-  else
-    (* Closing/reducing position - match against oldest lots *)
-    let (remaining_lots, _matched_lots) = _match_fifo_lots existing.lots trade_quantity in
-    let new_quantity = existing.quantity +. trade_quantity in
-
-    if Float.(abs new_quantity < 1e-9) then (
-      (* Position fully closed *)
-      Hashtbl.remove positions symbol;
-      Result.Ok ())
-    else if List.is_empty remaining_lots then (
-      (* Direction changed - create new position *)
-      _create_new_position positions symbol new_quantity effective_cost trade_id
-        trade_timestamp existing.accounting_method)
-    else (
-      (* Position reduced - update with remaining lots *)
-      let updated_position =
-        {
-          existing with
-          quantity = new_quantity;
-          lots = remaining_lots;
-        }
-      in
-      Hashtbl.set positions ~key:symbol ~data:updated_position;
-      Result.Ok ())
-
-let _update_existing_position_average_cost positions symbol (existing : portfolio_position)
-    trade_quantity effective_cost trade_id trade_timestamp : unit status_or =
+let _add_lot_to_position
+    positions
+    symbol
+    (existing : portfolio_position)
+    trade_quantity
+    effective_cost
+    trade_id
+    trade_timestamp
+    : unit status_or =
+  let new_lot = _make_lot trade_id trade_quantity effective_cost trade_timestamp in
   let new_quantity = existing.quantity +. trade_quantity in
-  if Float.(abs new_quantity < 1e-9) then (
-    (* Position closed *)
-    Hashtbl.remove positions symbol;
-    Result.Ok ())
+  let updated_position =
+    {
+      existing with
+      quantity = new_quantity;
+      lots = existing.lots @ [ new_lot ];
+    }
+  in
+  _set_position positions symbol updated_position
+
+let _close_or_reduce_fifo_position
+    positions
+    symbol
+    (existing : portfolio_position)
+    trade_quantity
+    effective_cost
+    trade_id
+    trade_timestamp
+    : unit status_or =
+  let (remaining_lots, _matched_lots) = _match_fifo_lots existing.lots trade_quantity in
+  let new_quantity = existing.quantity +. trade_quantity in
+
+  if _is_quantity_negligible new_quantity then
+    _remove_position positions symbol
+  else if List.is_empty remaining_lots then
+    (* Direction changed - create new position *)
+    _create_new_position positions symbol new_quantity effective_cost trade_id
+      trade_timestamp existing.accounting_method
   else
-    (* Calculate new average cost and use _create_new_position to rebuild *)
+    (* Position reduced - update with remaining lots *)
+    let updated_position =
+      { existing with quantity = new_quantity; lots = remaining_lots }
+    in
+    _set_position positions symbol updated_position
+
+let _update_existing_position_fifo
+    positions
+    symbol
+    (existing : portfolio_position)
+    trade_quantity
+    effective_cost
+    trade_id
+    trade_timestamp
+    : unit status_or =
+  let adding_to_position = _is_same_direction existing.quantity trade_quantity in
+  if adding_to_position then
+    _add_lot_to_position positions symbol existing trade_quantity effective_cost
+      trade_id trade_timestamp
+  else
+    _close_or_reduce_fifo_position positions symbol existing trade_quantity
+      effective_cost trade_id trade_timestamp
+
+let _update_existing_position_average_cost
+    positions
+    symbol
+    (existing : portfolio_position)
+    trade_quantity
+    effective_cost
+    trade_id
+    trade_timestamp
+    : unit status_or =
+  let new_quantity = existing.quantity +. trade_quantity in
+  if _is_quantity_negligible new_quantity then
+    _remove_position positions symbol
+  else
     let new_avg_cost =
-      _calculate_average_cost existing trade_quantity effective_cost
-        new_quantity
+      _calculate_average_cost existing trade_quantity effective_cost new_quantity
     in
     _create_new_position positions symbol new_quantity new_avg_cost trade_id
       trade_timestamp existing.accounting_method
@@ -219,28 +258,37 @@ let _calculate_cash_change (trade : Trading_base.Types.trade) =
   | Buy -> -.((trade.quantity *. trade.price) +. trade.commission)
   | Sell -> (trade.quantity *. trade.price) -. trade.commission
 
-let _calculate_realized_pnl (trade : Trading_base.Types.trade) existing_position
-    =
+let _is_closing_trade position_qty trade_qty : bool =
+  not (_is_same_direction position_qty trade_qty)
+
+let _calculate_closing_pnl
+    (trade : Trading_base.Types.trade)
+    (existing_position : portfolio_position)
+    : float =
+  let close_qty =
+    Float.min
+      (Float.abs existing_position.quantity)
+      (Float.abs trade.quantity)
+  in
+  let existing_avg_cost = Calculations.avg_cost_of_position existing_position in
+  let pnl_before_commission =
+    match trade.side with
+    | Sell -> close_qty *. (trade.price -. existing_avg_cost)
+    | Buy -> close_qty *. (existing_avg_cost -. trade.price)
+  in
+  pnl_before_commission -. trade.commission
+
+let _calculate_realized_pnl
+    (trade : Trading_base.Types.trade)
+    (existing_position : portfolio_position)
+    : float =
   let trade_qty =
     match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
   in
-
-  (* Only realize P&L when closing or reducing position *)
-  if Float.(existing_position.quantity *. trade_qty < 0.0) then
-    (* Closing position (opposite direction trade) *)
-    let close_qty =
-      Float.min (Float.abs existing_position.quantity) (Float.abs trade_qty)
-    in
-    let existing_avg_cost = Calculations.avg_cost_of_position existing_position in
-    let pnl_before_commission =
-      match trade.side with
-      | Sell -> close_qty *. (trade.price -. existing_avg_cost)
-      | Buy -> close_qty *. (existing_avg_cost -. trade.price)
-    in
-    pnl_before_commission -. trade.commission
+  if _is_closing_trade existing_position.quantity trade_qty then
+    _calculate_closing_pnl trade existing_position
   else
-    (* Opening or adding to position - no realized P&L *)
-    0.0
+    0.0 (* Opening or adding to position *)
 
 let _check_sufficient_cash portfolio cash_change =
   let new_cash = portfolio.current_cash +. cash_change in
