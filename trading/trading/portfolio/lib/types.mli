@@ -8,10 +8,11 @@ type cash_value = float [@@deriving show, eq]
 type lot_id = string [@@deriving show, eq]
 (** Unique identifier for a position lot *)
 
-type accounting_method = AverageCost
+type accounting_method = AverageCost | FIFO
 [@@deriving show, eq]
 (** Method for calculating cost basis and matching lots.
-    Currently only AverageCost is supported. FIFO will be added in a future commit. *)
+    - AverageCost: Combines all lots into a single lot with weighted average cost
+    - FIFO: Keeps lots separate and matches oldest lots first when closing positions *)
 
 type position_lot = {
   lot_id : lot_id;

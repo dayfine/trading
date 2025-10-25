@@ -4,7 +4,7 @@ type cash_value = float [@@deriving show, eq]
 
 type lot_id = string [@@deriving show, eq]
 
-type accounting_method = AverageCost [@@deriving show, eq]
+type accounting_method = AverageCost | FIFO [@@deriving show, eq]
 
 type position_lot = {
   lot_id : lot_id;

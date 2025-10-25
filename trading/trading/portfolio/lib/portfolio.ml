@@ -41,8 +41,8 @@ let _calculate_cost_basis_with_commission (trade : Trading_base.Types.trade) =
   | Buy -> trade.price +. commission_per_share
   | Sell -> trade.price -. commission_per_share
 
-let _calculate_average_cost existing trade_quantity effective_cost new_quantity
-    =
+let _calculate_average_cost (existing : portfolio_position) (trade_quantity : float)
+    (effective_cost : float) (new_quantity : float) : float =
   let same_direction = Float.(existing.quantity *. new_quantity > 0.0) in
   let adding_to_position = Float.(existing.quantity *. trade_quantity > 0.0) in
   let existing_avg_cost = Calculations.avg_cost_of_position existing in
@@ -59,9 +59,54 @@ let _calculate_average_cost existing trade_quantity effective_cost new_quantity
     (* Reducing position in same direction - keep existing average cost *)
     existing_avg_cost
 
+(* FIFO lot matching: consume oldest lots first when closing position *)
+let _match_fifo_lots (existing_lots : position_lot list) (trade_quantity : float)
+    : (position_lot list * position_lot list) =
+  (* Sort lots by acquisition_date (oldest first) *)
+  let sorted_lots =
+    List.sort existing_lots ~compare:(fun (lot1 : position_lot) (lot2 : position_lot) ->
+        Core.Date.compare lot1.acquisition_date lot2.acquisition_date)
+  in
+
+  (* Match lots *)
+  let rec match_lots (remaining_qty : float) (lots_to_match : position_lot list)
+      : (position_lot list * position_lot list) =
+    if Float.(abs remaining_qty < 1e-9) then
+      (* All matched - return all remaining lots *)
+      (lots_to_match, [])
+    else
+      match lots_to_match with
+      | [] -> ([], [])  (* No more lots to match *)
+      | lot :: rest ->
+          let same_direction = Float.(lot.quantity *. remaining_qty > 0.0) in
+          if same_direction then
+            (* Lot is in same direction as trade - keep it *)
+            let (remaining_lots, matched) = match_lots remaining_qty rest in
+            (lot :: remaining_lots, matched)
+          else
+            (* Lot is in opposite direction - match against it *)
+            let lot_qty_abs = Float.abs lot.quantity in
+            if Float.(lot_qty_abs <= abs remaining_qty) then
+              (* Fully consume this lot *)
+              let new_remaining_qty =
+                remaining_qty +. lot.quantity  (* Add because opposite signs *)
+              in
+              let (remaining_lots, matched) = match_lots new_remaining_qty rest in
+              (remaining_lots, lot :: matched)
+            else
+              (* Partially consume this lot *)
+              (* remaining_qty and lot.quantity have opposite signs *)
+              let remaining_lot_qty = lot.quantity +. remaining_qty in
+              let remaining_lot_cost =
+                (lot.cost_basis /. lot_qty_abs) *. (Float.abs remaining_lot_qty)
+              in
+              let updated_lot = { lot with quantity = remaining_lot_qty; cost_basis = remaining_lot_cost } in
+              (updated_lot :: rest, [ lot ])  (* Return original lot as matched for P&L calculation *)
+  in
+  match_lots trade_quantity sorted_lots
+
 let _create_new_position positions symbol trade_quantity effective_cost trade_id
     trade_timestamp accounting_method =
-  (* Create a single lot representing the entire position (AverageCost behavior) *)
   let total_cost_basis = Float.abs trade_quantity *. effective_cost in
   let lot =
     {
@@ -77,10 +122,59 @@ let _create_new_position positions symbol trade_quantity effective_cost trade_id
   Hashtbl.set positions ~key:symbol ~data:position;
   Result.Ok ()
 
-let _update_existing_position positions symbol existing trade_quantity
-    effective_cost trade_id trade_timestamp =
+let _update_existing_position_fifo positions symbol (existing : portfolio_position)
+    trade_quantity effective_cost trade_id trade_timestamp : unit status_or =
+  let adding_to_position = Float.(existing.quantity *. trade_quantity > 0.0) in
+
+  if adding_to_position then
+    (* Adding to position - create new lot *)
+    let new_lot =
+      {
+        lot_id = trade_id;
+        quantity = trade_quantity;
+        cost_basis = Float.abs trade_quantity *. effective_cost;
+        acquisition_date = Time_ns_unix.to_date trade_timestamp ~zone:Time_float.Zone.utc;
+      }
+    in
+    let new_quantity = existing.quantity +. trade_quantity in
+    let updated_position =
+      {
+        existing with
+        quantity = new_quantity;
+        lots = existing.lots @ [ new_lot ];
+      }
+    in
+    Hashtbl.set positions ~key:symbol ~data:updated_position;
+    Result.Ok ()
+  else
+    (* Closing/reducing position - match against oldest lots *)
+    let (remaining_lots, _matched_lots) = _match_fifo_lots existing.lots trade_quantity in
+    let new_quantity = existing.quantity +. trade_quantity in
+
+    if Float.(abs new_quantity < 1e-9) then (
+      (* Position fully closed *)
+      Hashtbl.remove positions symbol;
+      Result.Ok ())
+    else if List.is_empty remaining_lots then (
+      (* Direction changed - create new position *)
+      _create_new_position positions symbol new_quantity effective_cost trade_id
+        trade_timestamp existing.accounting_method)
+    else (
+      (* Position reduced - update with remaining lots *)
+      let updated_position =
+        {
+          existing with
+          quantity = new_quantity;
+          lots = remaining_lots;
+        }
+      in
+      Hashtbl.set positions ~key:symbol ~data:updated_position;
+      Result.Ok ())
+
+let _update_existing_position_average_cost positions symbol (existing : portfolio_position)
+    trade_quantity effective_cost trade_id trade_timestamp : unit status_or =
   let new_quantity = existing.quantity +. trade_quantity in
-  if Float.(new_quantity = 0.0) then (
+  if Float.(abs new_quantity < 1e-9) then (
     (* Position closed *)
     Hashtbl.remove positions symbol;
     Result.Ok ())
@@ -92,6 +186,16 @@ let _update_existing_position positions symbol existing trade_quantity
     in
     _create_new_position positions symbol new_quantity new_avg_cost trade_id
       trade_timestamp existing.accounting_method
+
+let _update_existing_position positions symbol (existing : portfolio_position)
+    trade_quantity effective_cost trade_id trade_timestamp : unit status_or =
+  match existing.accounting_method with
+  | AverageCost ->
+      _update_existing_position_average_cost positions symbol existing
+        trade_quantity effective_cost trade_id trade_timestamp
+  | FIFO ->
+      _update_existing_position_fifo positions symbol existing trade_quantity
+        effective_cost trade_id trade_timestamp
 
 let _update_position_with_trade positions accounting_method
     (trade : Trading_base.Types.trade) : unit status_or =
