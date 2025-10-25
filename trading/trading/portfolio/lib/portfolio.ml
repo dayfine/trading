@@ -9,14 +9,17 @@ type t = {
   (* Computed state - maintained for performance *)
   current_cash : cash_value;
   positions : (Trading_base.Types.symbol, portfolio_position) Hashtbl.t;
+  accounting_method : accounting_method;
+      (* Default accounting method for new positions *)
 }
 
-let create ~initial_cash =
+let create ?(accounting_method = AverageCost) ~initial_cash () =
   {
     initial_cash;
     trade_history = [];
     current_cash = initial_cash;
     positions = Hashtbl.create (module String);
+    accounting_method;
   }
 
 let get_cash portfolio = portfolio.current_cash
@@ -42,10 +45,11 @@ let _calculate_average_cost existing trade_quantity effective_cost new_quantity
     =
   let same_direction = Float.(existing.quantity *. new_quantity > 0.0) in
   let adding_to_position = Float.(existing.quantity *. trade_quantity > 0.0) in
+  let existing_avg_cost = Calculations.avg_cost_of_position existing in
 
   if same_direction && adding_to_position then
     (* Adding to existing position in same direction - weighted average *)
-    ((existing.avg_cost *. existing.quantity)
+    ((existing_avg_cost *. existing.quantity)
     +. (effective_cost *. trade_quantity))
     /. new_quantity
   else if not same_direction then
@@ -53,36 +57,44 @@ let _calculate_average_cost existing trade_quantity effective_cost new_quantity
     effective_cost
   else
     (* Reducing position in same direction - keep existing average cost *)
-    existing.avg_cost
+    existing_avg_cost
+
+let _create_new_position positions symbol trade_quantity effective_cost trade_id
+    trade_timestamp accounting_method =
+  (* Create a single lot representing the entire position (AverageCost behavior) *)
+  let total_cost_basis = Float.abs trade_quantity *. effective_cost in
+  let lot =
+    {
+      lot_id = trade_id;
+      quantity = trade_quantity;
+      cost_basis = total_cost_basis;
+      acquisition_date = Time_ns_unix.to_date trade_timestamp ~zone:Time_float.Zone.utc;
+    }
+  in
+  let position =
+    { symbol; quantity = trade_quantity; lots = [ lot ]; accounting_method }
+  in
+  Hashtbl.set positions ~key:symbol ~data:position;
+  Result.Ok ()
 
 let _update_existing_position positions symbol existing trade_quantity
-    effective_cost =
+    effective_cost trade_id trade_timestamp =
   let new_quantity = existing.quantity +. trade_quantity in
   if Float.(new_quantity = 0.0) then (
     (* Position closed *)
     Hashtbl.remove positions symbol;
     Result.Ok ())
   else
-    (* Update existing position with new average cost *)
+    (* Calculate new average cost and use _create_new_position to rebuild *)
     let new_avg_cost =
       _calculate_average_cost existing trade_quantity effective_cost
         new_quantity
     in
-    let updated_position =
-      { existing with quantity = new_quantity; avg_cost = new_avg_cost }
-    in
-    Hashtbl.set positions ~key:symbol ~data:updated_position;
-    Result.Ok ()
+    _create_new_position positions symbol new_quantity new_avg_cost trade_id
+      trade_timestamp existing.accounting_method
 
-let _create_new_position positions symbol trade_quantity effective_cost =
-  let position =
-    { symbol; quantity = trade_quantity; avg_cost = effective_cost }
-  in
-  Hashtbl.set positions ~key:symbol ~data:position;
-  Result.Ok ()
-
-let _update_position_with_trade positions (trade : Trading_base.Types.trade) :
-    unit status_or =
+let _update_position_with_trade positions accounting_method
+    (trade : Trading_base.Types.trade) : unit status_or =
   let symbol = trade.symbol in
   let trade_quantity =
     match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
@@ -90,10 +102,12 @@ let _update_position_with_trade positions (trade : Trading_base.Types.trade) :
   let effective_cost = _calculate_cost_basis_with_commission trade in
 
   match Hashtbl.find positions symbol with
-  | None -> _create_new_position positions symbol trade_quantity effective_cost
+  | None ->
+      _create_new_position positions symbol trade_quantity effective_cost
+        trade.id trade.timestamp accounting_method
   | Some existing ->
       _update_existing_position positions symbol existing trade_quantity
-        effective_cost
+        effective_cost trade.id trade.timestamp
 
 (* Helper functions for trade application *)
 let _calculate_cash_change (trade : Trading_base.Types.trade) =
@@ -113,10 +127,11 @@ let _calculate_realized_pnl (trade : Trading_base.Types.trade) existing_position
     let close_qty =
       Float.min (Float.abs existing_position.quantity) (Float.abs trade_qty)
     in
+    let existing_avg_cost = Calculations.avg_cost_of_position existing_position in
     let pnl_before_commission =
       match trade.side with
-      | Sell -> close_qty *. (trade.price -. existing_position.avg_cost)
-      | Buy -> close_qty *. (existing_position.avg_cost -. trade.price)
+      | Sell -> close_qty *. (trade.price -. existing_avg_cost)
+      | Buy -> close_qty *. (existing_avg_cost -. trade.price)
     in
     pnl_before_commission -. trade.commission
   else
@@ -143,7 +158,9 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
     | None -> 0.0 (* New position - no realized P&L *)
     | Some existing_position -> _calculate_realized_pnl trade existing_position
   in
-  let%bind () = _update_position_with_trade new_positions trade in
+  let%bind () =
+    _update_position_with_trade new_positions portfolio.accounting_method trade
+  in
   let trade_with_pnl = { trade; realized_pnl } in
   return
     {
@@ -161,9 +178,9 @@ let list_positions portfolio =
     ~f:(fun ~key:_symbol ~data:position acc -> position :: acc)
 
 (* Reconstruct portfolio from scratch for validation *)
-let reconstruct_from_history initial_cash trade_history =
+let reconstruct_from_history initial_cash accounting_method trade_history =
   let trades = List.map trade_history ~f:(fun { trade; _ } -> trade) in
-  let empty_portfolio = create ~initial_cash in
+  let empty_portfolio = create ~accounting_method ~initial_cash () in
   apply_trades empty_portfolio trades
 
 (* Helper functions for combinational validation *)
@@ -202,7 +219,8 @@ let _validate_positions portfolio reconstructed =
 
 let validate portfolio =
   let%bind reconstructed =
-    reconstruct_from_history portfolio.initial_cash portfolio.trade_history
+    reconstruct_from_history portfolio.initial_cash portfolio.accounting_method
+      portfolio.trade_history
   in
   (* Run all validations and collect errors *)
   let validations =
