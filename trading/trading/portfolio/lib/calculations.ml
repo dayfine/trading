@@ -12,7 +12,8 @@ let avg_cost_of_position (position : portfolio_position) : float =
   if Float.(abs qty < 1e-9) then 0.0
   else
     let total_cost_basis =
-      List.fold position.lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.cost_basis)
+      List.fold position.lots ~init:0.0 ~f:(fun acc lot ->
+          acc +. lot.cost_basis)
     in
     total_cost_basis /. Float.abs qty
 
@@ -21,7 +22,9 @@ let market_value position market_price =
 
 let unrealized_pnl position market_price =
   let current_value = market_value position market_price in
-  let cost_basis = position_quantity position *. avg_cost_of_position position in
+  let cost_basis =
+    position_quantity position *. avg_cost_of_position position
+  in
   current_value -. cost_basis
 
 let portfolio_value positions cash_value market_prices =

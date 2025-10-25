@@ -50,8 +50,8 @@ val assert_float_equal : ?epsilon:float -> float -> float -> msg:string -> unit
 
 val assert_some_with : msg:string -> 'a option -> f:('a -> unit) -> unit
 (** [assert_some_with ~msg option ~f] asserts that [option] is [Some value] and
-    executes [f value] for further assertions. If [option] is [None], fails
-    with [msg].
+    executes [f value] for further assertions. If [option] is [None], fails with
+    [msg].
 
     Example:
     {[
