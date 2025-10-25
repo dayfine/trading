@@ -3,6 +3,9 @@
 open Trading_base.Types
 open Types
 
+val position_quantity : portfolio_position -> float
+(** Compute total quantity from all lots in position *)
+
 val avg_cost_of_position : portfolio_position -> float
 (** Compute average cost per share from position lots. Returns 0.0 if quantity is ~0. *)
 

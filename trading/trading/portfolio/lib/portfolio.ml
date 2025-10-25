@@ -43,13 +43,14 @@ let _calculate_cost_basis_with_commission (trade : Trading_base.Types.trade) =
 
 let _calculate_average_cost (existing : portfolio_position) (trade_quantity : float)
     (effective_cost : float) (new_quantity : float) : float =
-  let same_direction = Float.(existing.quantity *. new_quantity > 0.0) in
-  let adding_to_position = Float.(existing.quantity *. trade_quantity > 0.0) in
+  let existing_qty = Calculations.position_quantity existing in
+  let same_direction = Float.(existing_qty *. new_quantity > 0.0) in
+  let adding_to_position = Float.(existing_qty *. trade_quantity > 0.0) in
   let existing_avg_cost = Calculations.avg_cost_of_position existing in
 
   if same_direction && adding_to_position then
     (* Adding to existing position in same direction - weighted average *)
-    ((existing_avg_cost *. existing.quantity)
+    ((existing_avg_cost *. existing_qty)
     +. (effective_cost *. trade_quantity))
     /. new_quantity
   else if not same_direction then
@@ -128,21 +129,19 @@ let _make_lot trade_id trade_quantity effective_cost trade_timestamp : position_
   }
 
 (* Helper: Set position in hashtable *)
-let _set_position positions symbol position : unit status_or =
+let _set_position positions symbol position : status =
   Hashtbl.set positions ~key:symbol ~data:position;
   ok ()
 
 (* Helper: Remove position from hashtable *)
-let _remove_position positions symbol : unit status_or =
+let _remove_position positions symbol : status =
   Hashtbl.remove positions symbol;
   ok ()
 
 let _create_new_position positions symbol trade_quantity effective_cost trade_id
-    trade_timestamp accounting_method : unit status_or =
+    trade_timestamp accounting_method : status =
   let lot = _make_lot trade_id trade_quantity effective_cost trade_timestamp in
-  let position =
-    { symbol; quantity = trade_quantity; lots = [ lot ]; accounting_method }
-  in
+  let position = { symbol; lots = [ lot ]; accounting_method } in
   _set_position positions symbol position
 
 let _add_lot_to_position
@@ -153,16 +152,9 @@ let _add_lot_to_position
     effective_cost
     trade_id
     trade_timestamp
-    : unit status_or =
+    : status =
   let new_lot = _make_lot trade_id trade_quantity effective_cost trade_timestamp in
-  let new_quantity = existing.quantity +. trade_quantity in
-  let updated_position =
-    {
-      existing with
-      quantity = new_quantity;
-      lots = existing.lots @ [ new_lot ];
-    }
-  in
+  let updated_position = { existing with lots = existing.lots @ [ new_lot ] } in
   _set_position positions symbol updated_position
 
 let _close_or_reduce_fifo_position
@@ -173,9 +165,11 @@ let _close_or_reduce_fifo_position
     effective_cost
     trade_id
     trade_timestamp
-    : unit status_or =
+    : status =
   let (remaining_lots, _matched_lots) = _match_fifo_lots existing.lots trade_quantity in
-  let new_quantity = existing.quantity +. trade_quantity in
+  let new_quantity =
+    List.fold remaining_lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.quantity)
+  in
 
   if _is_quantity_negligible new_quantity then
     _remove_position positions symbol
@@ -185,9 +179,7 @@ let _close_or_reduce_fifo_position
       trade_timestamp existing.accounting_method
   else
     (* Position reduced - update with remaining lots *)
-    let updated_position =
-      { existing with quantity = new_quantity; lots = remaining_lots }
-    in
+    let updated_position = { existing with lots = remaining_lots } in
     _set_position positions symbol updated_position
 
 let _update_existing_position_fifo
@@ -198,8 +190,9 @@ let _update_existing_position_fifo
     effective_cost
     trade_id
     trade_timestamp
-    : unit status_or =
-  let adding_to_position = _is_same_direction existing.quantity trade_quantity in
+    : status =
+  let existing_qty = Calculations.position_quantity existing in
+  let adding_to_position = _is_same_direction existing_qty trade_quantity in
   if adding_to_position then
     _add_lot_to_position positions symbol existing trade_quantity effective_cost
       trade_id trade_timestamp
@@ -215,8 +208,9 @@ let _update_existing_position_average_cost
     effective_cost
     trade_id
     trade_timestamp
-    : unit status_or =
-  let new_quantity = existing.quantity +. trade_quantity in
+    : status =
+  let existing_qty = Calculations.position_quantity existing in
+  let new_quantity = existing_qty +. trade_quantity in
   if _is_quantity_negligible new_quantity then
     _remove_position positions symbol
   else
@@ -227,7 +221,7 @@ let _update_existing_position_average_cost
       trade_timestamp existing.accounting_method
 
 let _update_existing_position positions symbol (existing : portfolio_position)
-    trade_quantity effective_cost trade_id trade_timestamp : unit status_or =
+    trade_quantity effective_cost trade_id trade_timestamp : status =
   match existing.accounting_method with
   | AverageCost ->
       _update_existing_position_average_cost positions symbol existing
@@ -237,7 +231,7 @@ let _update_existing_position positions symbol (existing : portfolio_position)
         effective_cost trade_id trade_timestamp
 
 let _update_position_with_trade positions accounting_method
-    (trade : Trading_base.Types.trade) : unit status_or =
+    (trade : Trading_base.Types.trade) : status =
   let symbol = trade.symbol in
   let trade_quantity =
     match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
@@ -265,11 +259,8 @@ let _calculate_closing_pnl
     (trade : Trading_base.Types.trade)
     (existing_position : portfolio_position)
     : float =
-  let close_qty =
-    Float.min
-      (Float.abs existing_position.quantity)
-      (Float.abs trade.quantity)
-  in
+  let existing_qty = Calculations.position_quantity existing_position in
+  let close_qty = Float.min (Float.abs existing_qty) (Float.abs trade.quantity) in
   let existing_avg_cost = Calculations.avg_cost_of_position existing_position in
   let pnl_before_commission =
     match trade.side with
@@ -285,7 +276,8 @@ let _calculate_realized_pnl
   let trade_qty =
     match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
   in
-  if _is_closing_trade existing_position.quantity trade_qty then
+  let existing_qty = Calculations.position_quantity existing_position in
+  if _is_closing_trade existing_qty trade_qty then
     _calculate_closing_pnl trade existing_position
   else
     0.0 (* Opening or adding to position *)

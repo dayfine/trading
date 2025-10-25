@@ -28,12 +28,11 @@ type position_lot = {
 
 type portfolio_position = {
   symbol : symbol;
-  quantity : quantity;  (** Total quantity across all lots *)
   lots : position_lot list;  (** Individual lots making up this position *)
   accounting_method : accounting_method;  (** Method used for this position *)
 }
 [@@deriving show, eq]
-(** Position with lot-based cost basis tracking. The quantity field is the sum
+(** Position with lot-based cost basis tracking. Quantity is computed as the sum
     of all lot quantities. Average cost can be computed on demand from lots.
     The accounting_method determines how lots are combined or matched.
     Market value and P&L are computed separately. *)

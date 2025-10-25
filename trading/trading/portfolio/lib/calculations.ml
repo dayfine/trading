@@ -2,20 +2,26 @@ open Core
 open Status
 open Types
 
+(* Compute total quantity from all lots *)
+let position_quantity (position : portfolio_position) : float =
+  List.fold position.lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.quantity)
+
 (* Helper to compute average cost from lots *)
 let avg_cost_of_position (position : portfolio_position) : float =
-  if Float.(abs position.quantity < 1e-9) then 0.0
+  let qty = position_quantity position in
+  if Float.(abs qty < 1e-9) then 0.0
   else
     let total_cost_basis =
       List.fold position.lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.cost_basis)
     in
-    total_cost_basis /. Float.abs position.quantity
+    total_cost_basis /. Float.abs qty
 
-let market_value position market_price = position.quantity *. market_price
+let market_value position market_price =
+  position_quantity position *. market_price
 
 let unrealized_pnl position market_price =
   let current_value = market_value position market_price in
-  let cost_basis = position.quantity *. avg_cost_of_position position in
+  let cost_basis = position_quantity position *. avg_cost_of_position position in
   current_value -. cost_basis
 
 let portfolio_value positions cash_value market_prices =
@@ -40,7 +46,7 @@ let portfolio_value positions cash_value market_prices =
     Result.Ok (cash_value +. positions_value)
 
 let position_cost_basis position =
-  position.quantity *. avg_cost_of_position position
+  position_quantity position *. avg_cost_of_position position
 
 let realized_pnl_from_trades trade_history =
   List.fold trade_history ~init:0.0 ~f:(fun acc { realized_pnl; _ } ->

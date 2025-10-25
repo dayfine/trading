@@ -16,7 +16,6 @@ type position_lot = {
 
 type portfolio_position = {
   symbol : symbol;
-  quantity : quantity;  (* Total quantity across all lots *)
   lots : position_lot list;  (* Individual lots *)
   accounting_method : accounting_method;
 }

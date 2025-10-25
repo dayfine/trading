@@ -28,29 +28,23 @@ let test_fifo_basic_buy_sell _ =
   (* Create portfolio with FIFO accounting *)
   let portfolio = create ~accounting_method:FIFO ~initial_cash:30000.0 () in
 
-  (* Buy 100 shares at $100 *)
-  let buy1 =
-    make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:100.0 ()
-  in
+  (* Buy 100 shares at $100, then buy another 100 shares at $110 *)
   let portfolio =
-    apply_trades_exn portfolio [ buy1 ] ~error_msg:"First buy should succeed"
-  in
-
-  (* Buy another 100 shares at $110 *)
-  let buy2 =
-    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:110.0 ()
-  in
-  let portfolio =
-    apply_trades_exn portfolio [ buy2 ] ~error_msg:"Second buy should succeed"
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:100.0 ();
+        make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:110.0 ();
+      ]
+      ~error_msg:"Buys should succeed"
   in
 
   (* Verify position has 2 lots *)
   match get_position portfolio "AAPL" with
   | Some position ->
       assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
-      assert_float_equal 200.0 position.quantity ~msg:"Total quantity";
+      assert_float_equal 200.0 (position_quantity position) ~msg:"Total quantity";
 
       (* Average cost should be (100*100 + 100*110) / 200 = 105 *)
       assert_float_equal 105.0 (avg_cost_of_position position)
@@ -61,24 +55,17 @@ let test_fifo_sell_matches_oldest _ =
   (* Create portfolio with FIFO accounting *)
   let portfolio = create ~accounting_method:FIFO ~initial_cash:50000.0 () in
 
-  (* Buy 100 shares at $100 on day 1 *)
-  let buy1 =
-    make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:100.0 ()
-  in
-  (* Buy 100 shares at $110 on day 2 *)
-  let buy2 =
-    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:110.0 ()
-  in
-  (* Sell 100 shares at $120 - should match against first lot (cost $100) *)
-  let sell1 =
-    make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell
-      ~quantity:100.0 ~price:120.0 ()
-  in
-
+  (* Buy at $100, buy at $110, sell at $120 - should match against first lot *)
   let portfolio =
-    apply_trades_exn portfolio [ buy1; buy2; sell1 ]
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:100.0 ();
+        make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:110.0 ();
+        make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell
+          ~quantity:100.0 ~price:120.0 ();
+      ]
       ~error_msg:"Trades should succeed"
   in
 
@@ -86,7 +73,7 @@ let test_fifo_sell_matches_oldest _ =
   match get_position portfolio "AAPL" with
   | Some position ->
       assert_equal 1 (List.length position.lots) ~msg:"Should have 1 lot left";
-      assert_float_equal 100.0 position.quantity ~msg:"Remaining quantity";
+      assert_float_equal 100.0 (position_quantity position) ~msg:"Remaining quantity";
 
       (* Remaining lot should have cost basis of $110 per share *)
       assert_float_equal 110.0 (avg_cost_of_position position)
@@ -97,24 +84,17 @@ let test_fifo_partial_lot_consumption _ =
   (* Create portfolio with FIFO accounting *)
   let portfolio = create ~accounting_method:FIFO ~initial_cash:30000.0 () in
 
-  (* Buy 100 shares at $100 *)
-  let buy1 =
-    make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:100.0 ()
-  in
-  (* Buy 100 shares at $110 *)
-  let buy2 =
-    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:110.0 ()
-  in
-  (* Sell 50 shares - should partially consume first lot *)
-  let sell1 =
-    make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell ~quantity:50.0
-      ~price:120.0 ()
-  in
-
+  (* Buy at $100, buy at $110, sell 50 shares - should partially consume first lot *)
   let portfolio =
-    apply_trades_exn portfolio [ buy1; buy2; sell1 ]
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:100.0 ();
+        make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:110.0 ();
+        make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell
+          ~quantity:50.0 ~price:120.0 ();
+      ]
       ~error_msg:"Trades should succeed"
   in
 
@@ -123,7 +103,7 @@ let test_fifo_partial_lot_consumption _ =
   | Some position ->
       assert_equal 2 (List.length position.lots)
         ~msg:"Should have 2 lots (partial + full)";
-      assert_float_equal 150.0 position.quantity ~msg:"Remaining quantity";
+      assert_float_equal 150.0 (position_quantity position) ~msg:"Remaining quantity";
 
       (* Average cost: (50*100 + 100*110) / 150 = 106.67 *)
       assert_float_equal 106.666666666667 (avg_cost_of_position position)
@@ -165,7 +145,9 @@ let test_fifo_vs_average_cost _ =
   match (pos_fifo, pos_avg) with
   | Some fifo, Some avg ->
       (* Both should have same quantity *)
-      assert_float_equal fifo.quantity avg.quantity ~msg:"Same quantity";
+      let fifo_qty = position_quantity fifo in
+      let avg_qty = position_quantity avg in
+      assert_float_equal fifo_qty avg_qty ~msg:"Same quantity";
 
       (* FIFO should have 1 lot, AverageCost should have 1 lot *)
       assert_equal 1 (List.length fifo.lots) ~msg:"FIFO lots count";
@@ -184,28 +166,19 @@ let test_fifo_multiple_partial_sells _ =
   (* Create portfolio with FIFO accounting *)
   let portfolio = create ~accounting_method:FIFO ~initial_cash:50000.0 () in
 
-  (* Buy 3 lots *)
-  let buy1 =
-    make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:100.0 ()
-  in
-  let buy2 =
-    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:110.0 ()
-  in
-  let buy3 =
-    make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
-      ~price:120.0 ()
-  in
-
-  (* Sell 150 shares - should consume first lot fully and half of second lot *)
-  let sell1 =
-    make_trade ~id:"t4" ~order_id:"o4" ~symbol:"AAPL" ~side:Sell
-      ~quantity:150.0 ~price:130.0 ()
-  in
-
+  (* Buy 3 lots, sell 150 - should consume first lot fully and half of second lot *)
   let portfolio =
-    apply_trades_exn portfolio [ buy1; buy2; buy3; sell1 ]
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:100.0 ();
+        make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:110.0 ();
+        make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:120.0 ();
+        make_trade ~id:"t4" ~order_id:"o4" ~symbol:"AAPL" ~side:Sell
+          ~quantity:150.0 ~price:130.0 ();
+      ]
       ~error_msg:"Trades should succeed"
   in
 
@@ -213,7 +186,7 @@ let test_fifo_multiple_partial_sells _ =
   match get_position portfolio "AAPL" with
   | Some position ->
       assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
-      assert_float_equal 150.0 position.quantity ~msg:"Remaining quantity";
+      assert_float_equal 150.0 (position_quantity position) ~msg:"Remaining quantity";
 
       (* Average cost: (50*110 + 100*120) / 150 = 116.67 *)
       assert_float_equal 116.666666666667 (avg_cost_of_position position)
