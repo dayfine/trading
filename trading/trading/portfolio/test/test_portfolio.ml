@@ -300,38 +300,45 @@ let test_realized_pnl_calculation _ accounting_method =
     ]
   in
 
-  match apply_trades portfolio trades with
-  | Ok updated_portfolio ->
-      (* Verify individual trade P&L:
-         Buy 100 @ $150 + $5 commission: cost basis = $150.05/share, P&L = 0 (opening position)
-         Sell 50 @ $160 - $3 commission: P&L = 50 * ($160 - $150.05) - $3 = $494.50
-         Sell 50 @ $155 - $2 commission: P&L = 50 * ($155 - $150.05) - $2 = $245.50
-         Total: $0 + $494.50 + $245.50 = $740 *)
-      let trade_history = get_trade_history updated_portfolio in
-      assert_equal 3 (List.length trade_history) ~msg:"Should have 3 trades";
+  let updated_portfolio =
+    assert_ok ~msg:"Realized P&L test failed" (apply_trades portfolio trades)
+  in
 
-      let trade1 = List.nth_exn trade_history 0 in
-      let trade2 = List.nth_exn trade_history 1 in
-      let trade3 = List.nth_exn trade_history 2 in
+  let trade_history = get_trade_history updated_portfolio in
+  assert_equal 3 (List.length trade_history) ~msg:"Should have 3 trades";
 
-      assert_float_equal 0.0 trade1.realized_pnl
-        ~msg:"Buy trade should have no realized P&L";
+  let trade1 = List.nth_exn trade_history 0 in
+  let trade2 = List.nth_exn trade_history 1 in
+  let trade3 = List.nth_exn trade_history 2 in
+
+  assert_float_equal 0.0 trade1.realized_pnl
+    ~msg:"Buy trade should have no realized P&L";
+
+  (* Different P&L expectations based on accounting method *)
+  (match accounting_method with
+  | AverageCost ->
+      (* AverageCost: Both sells use same avg cost of $150.05/share
+         Sell 50 @ $160 - $3: P&L = 50 * ($160 - $150.05) - $3 = $494.50
+         Sell 50 @ $155 - $2: P&L = 50 * ($155 - $150.05) - $2 = $245.50 *)
       assert_float_equal 494.5 trade2.realized_pnl
-        ~msg:
-          "First sell P&L should be $494.50 (commission included in cost basis)";
+        ~msg:"AverageCost: First sell P&L";
       assert_float_equal 245.5 trade3.realized_pnl
-        ~msg:
-          "Second sell P&L should be $245.50 (commission included in cost \
-           basis)";
+        ~msg:"AverageCost: Second sell P&L"
+  | FIFO ->
+      (* FIFO: Sells consume lots in order (all from same lot in this case)
+         Same as AverageCost since there's only one lot
+         Sell 50 @ $160 - $3: P&L = 50 * ($160 - $150.05) - $3 = $494.50
+         Sell 50 @ $155 - $2: P&L = 50 * ($155 - $150.05) - $2 = $245.50 *)
+      assert_float_equal 494.5 trade2.realized_pnl ~msg:"FIFO: First sell P&L";
+      assert_float_equal 245.5 trade3.realized_pnl ~msg:"FIFO: Second sell P&L");
 
-      let total_pnl = get_total_realized_pnl updated_portfolio in
-      assert_float_equal 740.0 total_pnl
-        ~msg:"Total realized P&L should be $740 (buy commission reduces P&L)";
+  let total_pnl = get_total_realized_pnl updated_portfolio in
+  assert_float_equal 740.0 total_pnl
+    ~msg:"Total realized P&L should be $740 (buy commission reduces P&L)";
 
-      (* Position should be closed *)
-      assert_none ~msg:"Position should be closed after selling all shares"
-        (get_position updated_portfolio "AAPL")
-  | Error err -> assert_failure ("Realized P&L test failed: " ^ Status.show err)
+  (* Position should be closed *)
+  assert_none ~msg:"Position should be closed after selling all shares"
+    (get_position updated_portfolio "AAPL")
 
 (* ========================================================================== *)
 (* Accounting-method specific tests - parameterized expectations             *)
@@ -556,12 +563,15 @@ let test_fifo_vs_average_cost _ =
       assert_float_equal 105.0 (avg_cost_of_position avg)
         ~msg:"AverageCost remaining cost";
 
-      (* Both should have same realized P&L since P&L is calculated using avg cost *)
-      (* At time of sell, both methods see avg cost of $105, so P&L = 100*(120-105) = $1500 *)
+      (* FIFO and AverageCost have different realized P&L *)
+      (* FIFO: Sells lot bought @ $100, so P&L = 100*(120-100) = $2000 *)
+      (* AverageCost: Avg cost = $105, so P&L = 100*(120-105) = $1500 *)
       let fifo_pnl = get_total_realized_pnl portfolio_fifo in
       let avg_pnl = get_total_realized_pnl portfolio_avg in
-      assert_float_equal 1500.0 fifo_pnl ~msg:"FIFO realized P&L";
-      assert_float_equal 1500.0 avg_pnl ~msg:"AverageCost realized P&L";
+      assert_float_equal 2000.0 fifo_pnl
+        ~msg:"FIFO realized P&L (sold oldest lot @ $100)";
+      assert_float_equal 1500.0 avg_pnl
+        ~msg:"AverageCost realized P&L (avg cost $105)";
 
       (* The key difference is in the REMAINING position cost basis *)
       (* FIFO keeps the $110 lot, AverageCost keeps avg of $105 *)
