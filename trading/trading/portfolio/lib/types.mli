@@ -8,10 +8,12 @@ type cash_value = float [@@deriving show, eq]
 type lot_id = string [@@deriving show, eq]
 (** Unique identifier for a position lot *)
 
-type accounting_method = AverageCost
-[@@deriving show, eq]
 (** Method for calculating cost basis and matching lots.
-    Currently only AverageCost is supported. FIFO will be added in a future commit. *)
+    - AverageCost: Combines all lots into a single lot with weighted average
+      cost
+    - FIFO: Keeps lots separate and matches oldest lots first when closing
+      positions *)
+type accounting_method = AverageCost | FIFO [@@deriving show, eq]
 
 type position_lot = {
   lot_id : lot_id;
@@ -27,15 +29,18 @@ type position_lot = {
 
 type portfolio_position = {
   symbol : symbol;
-  quantity : quantity;  (** Total quantity across all lots *)
-  lots : position_lot list;  (** Individual lots making up this position *)
+  lots : position_lot list;
+      (** Individual lots making up this position. Invariant: Always sorted by
+          acquisition_date in ascending order (oldest first). This ordering is
+          maintained by the portfolio module to enable efficient FIFO matching.
+      *)
   accounting_method : accounting_method;  (** Method used for this position *)
 }
 [@@deriving show, eq]
-(** Position with lot-based cost basis tracking. The quantity field is the sum
-    of all lot quantities. Average cost can be computed on demand from lots.
-    The accounting_method determines how lots are combined or matched.
-    Market value and P&L are computed separately. *)
+(** Position with lot-based cost basis tracking. Quantity is computed as the sum
+    of all lot quantities. Average cost can be computed on demand from lots. The
+    accounting_method determines how lots are combined or matched. Market value
+    and P&L are computed separately. *)
 
 type trade_with_pnl = { trade : Trading_base.Types.trade; realized_pnl : float }
 [@@deriving show, eq]

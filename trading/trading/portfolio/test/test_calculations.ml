@@ -30,7 +30,7 @@ let make_position ~symbol ~quantity ~avg_cost =
       acquisition_date = Date.today ~zone:Time_float.Zone.utc;
     }
   in
-  { symbol; quantity; lots = [ lot ]; accounting_method = AverageCost }
+  { symbol; lots = [ lot ]; accounting_method = AverageCost }
 
 let test_market_value _ =
   let position = make_position ~symbol:"AAPL" ~quantity:100.0 ~avg_cost:150.0 in

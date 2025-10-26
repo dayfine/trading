@@ -16,4 +16,14 @@ let assert_ok ~msg result =
 
 let assert_float_equal ?(epsilon = 1e-9) expected actual ~msg =
   let cmp a b = Float.(abs (a - b) < epsilon) in
-  assert_equal expected actual ~cmp ~msg
+  let printer = Float.to_string in
+  assert_equal expected actual ~cmp ~printer ~msg
+
+let assert_some_with ~msg option ~f =
+  match option with Some value -> f value | None -> assert_failure msg
+
+let assert_some ~msg option =
+  match option with Some value -> value | None -> assert_failure msg
+
+let assert_none ~msg option =
+  match option with Some _ -> assert_failure msg | None -> () (* Expected *)
