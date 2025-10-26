@@ -40,7 +40,7 @@ let _is_quantity_negligible (qty : float) : bool =
 
 let _is_same_direction (qty1 : float) (qty2 : float) : bool =
   if _is_quantity_negligible qty1 || _is_quantity_negligible qty2 then false
-  else Float.(qty1 *. qty2 > 0.0)
+  else Bool.equal Float.O.(qty1 >= 0.0) Float.O.(qty2 >= 0.0)
 
 let _sort_lots_by_date (lots : position_lot list) : position_lot list =
   List.sort lots ~compare:(fun lot1 lot2 ->
@@ -250,10 +250,12 @@ let _calculate_pnl_from_matched_lots (matched_lots : position_lot list)
   let total_cost_basis =
     List.fold matched_lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.cost_basis)
   in
-  let total_qty =
-    List.fold matched_lots ~init:0.0 ~f:(fun acc lot ->
-        acc +. Float.abs lot.quantity)
+  (* Matched lots all have the same sign (opposite to trade direction),
+     so we can sum quantities directly and take abs once. *)
+  let total_qty_signed =
+    List.fold matched_lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.quantity)
   in
+  let total_qty = Float.abs total_qty_signed in
   if Float.(total_qty < negligible_quantity_epsilon) then 0.0
   else
     let matched_avg_cost = total_cost_basis /. total_qty in
@@ -280,11 +282,8 @@ let _calculate_average_cost_pnl (trade : Trading_base.Types.trade)
   pnl_before_commission -. trade.commission
 
 (* Calculate P&L for FIFO method *)
-let _calculate_fifo_pnl (trade : Trading_base.Types.trade)
+let _calculate_fifo_pnl (trade : Trading_base.Types.trade) (trade_qty : float)
     (existing_position : portfolio_position) : float =
-  let trade_qty =
-    match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
-  in
   let _remaining_lots, matched_lots =
     _match_fifo_lots existing_position.lots trade_qty
   in
@@ -299,7 +298,7 @@ let _calculate_realized_pnl (trade : Trading_base.Types.trade)
   if _is_closing_trade existing_qty trade_qty then
     match existing_position.accounting_method with
     | AverageCost -> _calculate_average_cost_pnl trade existing_position
-    | FIFO -> _calculate_fifo_pnl trade existing_position
+    | FIFO -> _calculate_fifo_pnl trade trade_qty existing_position
   else 0.0 (* Opening or adding to position *)
 
 let _check_sufficient_cash portfolio cash_change =
@@ -348,6 +347,26 @@ let reconstruct_from_history initial_cash accounting_method trade_history =
   apply_trades empty_portfolio trades
 
 (* Helper functions for combinational validation *)
+let _validate_lots_sorted (position : portfolio_position) : status =
+  let rec check_sorted = function
+    | [] | [ _ ] -> true
+    | lot1 :: (lot2 :: _ as rest) ->
+        Core.Date.(lot1.acquisition_date <= lot2.acquisition_date)
+        && check_sorted rest
+  in
+  if check_sorted position.lots then ok ()
+  else
+    error_invalid_argument
+      (Printf.sprintf "Lots not sorted by acquisition date for symbol %s"
+         position.symbol)
+
+let _validate_all_positions_lots_sorted positions : status =
+  let position_validations =
+    Hashtbl.to_alist positions
+    |> List.map ~f:(fun (_symbol, position) -> _validate_lots_sorted position)
+  in
+  combine_status_list position_validations
+
 let _validate_cash_balance portfolio reconstructed =
   if Float.equal portfolio.current_cash reconstructed.current_cash then ok ()
   else
@@ -389,6 +408,7 @@ let validate portfolio =
   (* Run all validations and collect errors *)
   let validations =
     [
+      _validate_all_positions_lots_sorted portfolio.positions;
       _validate_cash_balance portfolio reconstructed;
       _validate_positions portfolio reconstructed;
     ]

@@ -29,7 +29,11 @@ type position_lot = {
 
 type portfolio_position = {
   symbol : symbol;
-  lots : position_lot list;  (** Individual lots making up this position *)
+  lots : position_lot list;
+      (** Individual lots making up this position. Invariant: Always sorted by
+          acquisition_date in ascending order (oldest first). This ordering is
+          maintained by the portfolio module to enable efficient FIFO matching.
+      *)
   accounting_method : accounting_method;  (** Method used for this position *)
 }
 [@@deriving show, eq]
