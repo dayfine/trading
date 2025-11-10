@@ -296,6 +296,97 @@ let test_filtering _ =
   assert_equal expected_active_only active_only_sorted
     ~msg:"ActiveOnly should contain order2 and order3"
 
+(* update_order tests *)
+let test_update_order_success _ =
+  let manager = create () in
+  let order =
+    make_order ~symbol:"AAPL" ~side:Buy ~order_type:Market ~quantity:100.0
+      ~time_in_force:GTC
+  in
+  let _ = submit_orders manager [ order ] in
+
+  (* Update the order to Filled status *)
+  let filled_order = update_status order Filled in
+  let result = update_order manager filled_order in
+  assert_ok ~msg:"Update should succeed" result;
+
+  (* Verify the order was updated *)
+  let retrieved_order =
+    assert_ok ~msg:"Failed to retrieve updated order"
+      (get_order manager order.id)
+  in
+  assert_equal Filled retrieved_order.status
+    ~msg:"Order status should be Filled"
+
+let test_update_nonexistent_order _ =
+  let manager = create () in
+  let order =
+    make_order ~symbol:"AAPL" ~side:Buy ~order_type:Market ~quantity:100.0
+      ~time_in_force:GTC
+  in
+
+  (* Try to update without submitting *)
+  let result = update_order manager order in
+  match result with
+  | Ok _ -> assert_failure "Expected error for nonexistent order"
+  | Error status ->
+      assert_equal Status.NotFound status.code
+        ~msg:"Expected NotFound error code"
+
+let test_update_order_preserves_changes _ =
+  let manager = create () in
+  let order =
+    make_order ~symbol:"AAPL" ~side:Buy ~order_type:Market ~quantity:100.0
+      ~time_in_force:GTC
+  in
+  let _ = submit_orders manager [ order ] in
+
+  (* Update to partially filled *)
+  let partially_filled_order =
+    {
+      order with
+      status = PartiallyFilled 50.0;
+      filled_quantity = 50.0;
+      avg_fill_price = Some 150.0;
+    }
+  in
+  let _ = update_order manager partially_filled_order in
+
+  (* Retrieve and verify all fields updated *)
+  let retrieved_order =
+    assert_ok ~msg:"Failed to retrieve updated order"
+      (get_order manager order.id)
+  in
+  assert_equal (PartiallyFilled 50.0) retrieved_order.status
+    ~msg:"Status should be PartiallyFilled";
+  assert_float_equal 50.0 retrieved_order.filled_quantity
+    ~msg:"Filled quantity should be 50.0";
+  assert_equal (Some 150.0) retrieved_order.avg_fill_price
+    ~msg:"Average fill price should be Some 150.0"
+
+let test_update_order_timestamp _ =
+  let manager = create () in
+  let order =
+    make_order ~symbol:"AAPL" ~side:Buy ~order_type:Market ~quantity:100.0
+      ~time_in_force:GTC
+  in
+  let _ = submit_orders manager [ order ] in
+
+  (* Update using update_status which should update timestamp *)
+  let filled_order = update_status order Filled in
+  assert_bool "Updated timestamp should differ from original"
+    (not (Time_ns_unix.equal order.updated_at filled_order.updated_at));
+
+  let _ = update_order manager filled_order in
+
+  (* Verify timestamp was preserved *)
+  let retrieved_order =
+    assert_ok ~msg:"Failed to retrieve updated order"
+      (get_order manager order.id)
+  in
+  assert_bool "Retrieved order should have updated timestamp"
+    (Time_ns_unix.equal filled_order.updated_at retrieved_order.updated_at)
+
 let suite =
   "Order Manager"
   >::: [
@@ -312,6 +403,11 @@ let suite =
          "batch_operations" >:: test_batch_operations;
          "cancel_all" >:: test_cancel_all;
          "filtering" >:: test_filtering;
+         "update_order_success" >:: test_update_order_success;
+         "update_nonexistent_order" >:: test_update_nonexistent_order;
+         "update_order_preserves_changes"
+         >:: test_update_order_preserves_changes;
+         "update_order_timestamp" >:: test_update_order_timestamp;
        ]
 
 let () = run_test_tt_main suite

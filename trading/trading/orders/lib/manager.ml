@@ -57,3 +57,10 @@ let list_orders ?filter manager =
         (fun _ order acc ->
           if matches_filter order f then order :: acc else acc)
         manager.orders []
+
+let update_order manager order =
+  match Hashtbl.find_opt manager.orders order.id with
+  | None -> error_not_found ("Order with ID " ^ order.id ^ " not found")
+  | Some _ ->
+      Hashtbl.replace manager.orders order.id order;
+      Result.Ok ()
