@@ -1,7 +1,7 @@
 (library
  (public_name trading.engine)
  (name trading_engine)
- (libraries trading.base trading.orders status)
- (modules types engine)
+ (libraries core trading.base core_unix.time_ns_unix status)
+ (modules types)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
