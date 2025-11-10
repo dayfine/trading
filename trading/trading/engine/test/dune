@@ -1,0 +1,14 @@
+(test
+ (name test_types)
+ (libraries ounit2 trading.engine trading.base matchers))
+
+(test
+ (name test_engine)
+ (libraries
+  ounit2
+  core
+  trading.engine
+  trading.base
+  trading.orders
+  matchers
+  core_unix.time_ns_unix))

@@ -33,3 +33,13 @@ type order_filter =
 
 val list_orders : ?filter:order_filter -> order_manager -> order list
 (** List all orders, optionally filtered *)
+
+val update_order : order_manager -> order -> status
+(** Update an existing order in the manager. Replaces the order with the same
+    ID. Returns error if order ID doesn't exist.
+
+    Typically called by execution engine to update:
+    - status (Pending → Filled)
+    - filled_quantity
+    - avg_fill_price
+    - updated_at timestamp (already handled by Types.update_status) *)
