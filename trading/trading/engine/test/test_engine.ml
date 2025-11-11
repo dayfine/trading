@@ -14,6 +14,8 @@ let test_timestamp = Time_ns_unix.of_string "2024-01-15 10:30:00Z"
 let make_config ?(per_share = 0.01) ?(minimum = 1.0) () =
   { commission = { per_share; minimum } }
 
+let make_quote symbol ~bid ~ask ~last = { symbol; bid; ask; last }
+
 let make_order_params ~symbol ~side ~order_type ~quantity ?(time_in_force = Day)
     () =
   { symbol; side; order_type; quantity; time_in_force }
@@ -49,47 +51,75 @@ let test_get_market_data_returns_data_after_update _ =
   let config = make_config () in
   let engine = create config in
   (* Update market data *)
-  update_market engine "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5)
-    ~last:(Some 150.25);
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
   (* Get market data *)
   let data = get_market_data engine "AAPL" in
   match data with
   | None -> assert_failure "Should return market data after update"
-  | Some (bid, ask, last) ->
-      assert_equal (Some 150.0) bid ~msg:"Bid should be 150.0";
-      assert_equal (Some 150.5) ask ~msg:"Ask should be 150.5";
-      assert_equal (Some 150.25) last ~msg:"Last should be 150.25"
+  | Some quote ->
+      assert_equal (Some 150.0) quote.bid ~msg:"Bid should be 150.0";
+      assert_equal (Some 150.5) quote.ask ~msg:"Ask should be 150.5";
+      assert_equal (Some 150.25) quote.last ~msg:"Last should be 150.25"
 
 let test_update_market_with_partial_data _ =
   let config = make_config () in
   let engine = create config in
   (* Update with only last price *)
-  update_market engine "AAPL" ~bid:None ~ask:None ~last:(Some 150.0);
+  let quote = make_quote "AAPL" ~bid:None ~ask:None ~last:(Some 150.0) in
+  update_market engine [ quote ];
   let data = get_market_data engine "AAPL" in
   match data with
   | None -> assert_failure "Should return market data"
-  | Some (bid, ask, last) ->
-      assert_equal None bid ~msg:"Bid should be None";
-      assert_equal None ask ~msg:"Ask should be None";
-      assert_equal (Some 150.0) last ~msg:"Last should be 150.0"
+  | Some quote ->
+      assert_equal None quote.bid ~msg:"Bid should be None";
+      assert_equal None quote.ask ~msg:"Ask should be None";
+      assert_equal (Some 150.0) quote.last ~msg:"Last should be 150.0"
 
 let test_update_market_overwrites_previous_data _ =
   let config = make_config () in
   let engine = create config in
   (* First update *)
-  update_market engine "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5)
-    ~last:(Some 150.25);
+  let quote1 =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote1 ];
   (* Second update *)
-  update_market engine "AAPL" ~bid:(Some 155.0) ~ask:(Some 155.5)
-    ~last:(Some 155.25);
+  let quote2 =
+    make_quote "AAPL" ~bid:(Some 155.0) ~ask:(Some 155.5) ~last:(Some 155.25)
+  in
+  update_market engine [ quote2 ];
   (* Get market data - should have second update *)
   let data = get_market_data engine "AAPL" in
   match data with
   | None -> assert_failure "Should return market data"
-  | Some (bid, ask, last) ->
-      assert_equal (Some 155.0) bid ~msg:"Bid should be 155.0";
-      assert_equal (Some 155.5) ask ~msg:"Ask should be 155.5";
-      assert_equal (Some 155.25) last ~msg:"Last should be 155.25"
+  | Some quote ->
+      assert_equal (Some 155.0) quote.bid ~msg:"Bid should be 155.0";
+      assert_equal (Some 155.5) quote.ask ~msg:"Ask should be 155.5";
+      assert_equal (Some 155.25) quote.last ~msg:"Last should be 155.25"
+
+let test_update_market_batch _ =
+  let config = make_config () in
+  let engine = create config in
+  (* Batch update multiple symbols *)
+  let quotes =
+    [
+      make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25);
+      make_quote "GOOGL" ~bid:(Some 2800.0) ~ask:(Some 2805.0)
+        ~last:(Some 2802.5);
+      make_quote "MSFT" ~bid:(Some 380.0) ~ask:(Some 380.5) ~last:(Some 380.25);
+    ]
+  in
+  update_market engine quotes;
+  (* Verify all symbols updated *)
+  let aapl = get_market_data engine "AAPL" in
+  let googl = get_market_data engine "GOOGL" in
+  let msft = get_market_data engine "MSFT" in
+  assert_bool "AAPL should have data" (Option.is_some aapl);
+  assert_bool "GOOGL should have data" (Option.is_some googl);
+  assert_bool "MSFT should have data" (Option.is_some msft)
 
 (* process_orders tests *)
 let test_process_orders_empty_manager _ =
@@ -116,8 +146,10 @@ let test_process_orders_with_market_order _ =
   in
   let () = submit_single_order order_mgr order in
   (* Update market data with price *)
-  update_market engine "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5)
-    ~last:(Some 150.25);
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
   (* Process orders *)
   let result = process_orders engine order_mgr in
   assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
@@ -146,8 +178,10 @@ let test_process_orders_calculates_commission _ =
   in
   let () = submit_single_order order_mgr order in
   (* Update market data *)
-  update_market engine "AAPL" ~bid:(Some 100.0) ~ask:(Some 100.5)
-    ~last:(Some 100.25);
+  let quote =
+    make_quote "AAPL" ~bid:(Some 100.0) ~ask:(Some 100.5) ~last:(Some 100.25)
+  in
+  update_market engine [ quote ];
   let result = process_orders engine order_mgr in
   (* For 50 shares at $0.01 per share:
      - Calculated = 50 * 0.01 = 0.50
@@ -177,8 +211,10 @@ let test_process_orders_updates_order_status _ =
   let orders_before = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
   assert_equal 1 (List.length orders_before) ~msg:"Should have 1 pending order";
   (* Update market data *)
-  update_market engine "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5)
-    ~last:(Some 150.25);
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
   (* Process orders *)
   let _result = process_orders engine order_mgr in
   (* Verify order status updated:
@@ -218,13 +254,16 @@ let test_process_orders_with_multiple_orders _ =
       in
       submit_single_order order_mgr order)
     [ params1; params2; params3 ];
-  (* Update market data for all symbols *)
-  update_market engine "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5)
-    ~last:(Some 150.25);
-  update_market engine "GOOGL" ~bid:(Some 2800.0) ~ask:(Some 2805.0)
-    ~last:(Some 2802.5);
-  update_market engine "MSFT" ~bid:(Some 380.0) ~ask:(Some 380.5)
-    ~last:(Some 380.25);
+  (* Update market data for all symbols in batch *)
+  let quotes =
+    [
+      make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25);
+      make_quote "GOOGL" ~bid:(Some 2800.0) ~ask:(Some 2805.0)
+        ~last:(Some 2802.5);
+      make_quote "MSFT" ~bid:(Some 380.0) ~ask:(Some 380.5) ~last:(Some 380.25);
+    ]
+  in
+  update_market engine quotes;
   (* Process all orders *)
   let result = process_orders engine order_mgr in
   assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
@@ -251,6 +290,7 @@ let suite =
          >:: test_update_market_with_partial_data;
          "test_update_market_overwrites_previous_data"
          >:: test_update_market_overwrites_previous_data;
+         "test_update_market_batch" >:: test_update_market_batch;
          "test_process_orders_empty_manager"
          >:: test_process_orders_empty_manager;
          "test_process_orders_with_market_order"

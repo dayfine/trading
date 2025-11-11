@@ -2,6 +2,15 @@
 
 open Trading_base.Types
 
+type price_quote = {
+  symbol : symbol;
+  bid : price option;
+  ask : price option;
+  last : price option;
+}
+[@@deriving show, eq]
+(** Price quote for a symbol with bid/ask/last prices *)
+
 (** Fill status indicates whether an order execution was successful.
     - Filled: Order completely executed with trades generated
     - PartiallyFilled: Only part of order executed (not used in Phase 1-6)
