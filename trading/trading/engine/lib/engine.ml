@@ -1,16 +1,10 @@
-[@@@warning "-69"]
-(* Suppress unused field warning for market_data.timestamp:
-   This field is semantically important for future enhancements
-   (e.g., checking data freshness), even though not currently read. *)
-
 open Core
 open Trading_base.Types
 open Trading_orders.Manager
 open Trading_orders.Types
 open Types
 
-(* Internal market data with timestamp for freshness tracking *)
-type market_data = { quote : price_quote; timestamp : Time_ns_unix.t }
+type market_data = { quote : price_quote }
 
 type t = {
   config : engine_config;
@@ -20,9 +14,8 @@ type t = {
 let create config = { config; market_state = Hashtbl.create (module String) }
 
 let update_market engine quotes =
-  let now = Time_ns_unix.now () in
   List.iter quotes ~f:(fun quote ->
-      let data = { quote; timestamp = now } in
+      let data = { quote } in
       Hashtbl.set engine.market_state ~key:quote.symbol ~data)
 
 let _calculate_commission config quantity =
@@ -55,12 +48,13 @@ let _create_execution_report order_id trade =
   { order_id; status = Filled; trades = [ trade ] }
 
 let _process_market_order engine order_mgr order =
-  match _execute_market_order engine order with
-  | None -> None
-  | Some trade ->
-      let updated_order = { order with status = Filled } in
-      let _ = update_order order_mgr updated_order in
-      Some (_create_execution_report order.id trade)
+  _execute_market_order engine order
+  |> Option.map ~f:(fun trade ->
+         let updated_order =
+           ({ order with status = Filled } : Trading_orders.Types.order)
+         in
+         let _ = update_order order_mgr updated_order in
+         _create_execution_report order.id trade)
 
 let process_orders engine order_mgr =
   let pending = list_orders order_mgr ~filter:ActiveOnly in
