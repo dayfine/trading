@@ -1,11 +1,12 @@
-[@@@warning "-33-69"]
-(* -33: unused open, -69: unused field *)
+[@@@warning "-69"]
+(* Suppress unused field warnings for market_data.symbol and market_data.timestamp:
+   These fields are semantically important for debugging and future enhancements
+   (e.g., checking data freshness), even though not currently read. *)
 
 open Core
 open Trading_base.Types
 open Trading_orders.Manager
 open Trading_orders.Types
-open Status
 open Types
 
 (* Internal market data type - not exposed in public API *)
