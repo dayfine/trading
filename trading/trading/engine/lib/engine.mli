@@ -1,6 +1,5 @@
 (** Trading engine - simulated broker for order execution *)
 
-open Trading_base.Types
 open Trading_orders.Manager
 open Status
 open Types
@@ -42,10 +41,6 @@ val update_market : t -> price_quote list -> unit
       in
       Engine.update_market engine quotes
     ]} *)
-
-val get_market_data : t -> symbol -> price_quote option
-(** Query current market data for a symbol. Returns None if no market data has
-    been set for the symbol. *)
 
 val process_orders : t -> order_manager -> execution_report list status_or
 (** Process pending orders from the order manager.

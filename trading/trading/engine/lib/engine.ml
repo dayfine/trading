@@ -25,10 +25,6 @@ let update_market engine quotes =
       let data = { quote; timestamp = now } in
       Hashtbl.set engine.market_state ~key:quote.symbol ~data)
 
-let get_market_data engine symbol =
-  Hashtbl.find engine.market_state symbol
-  |> Option.map ~f:(fun data -> data.quote)
-
 let _calculate_commission config quantity =
   Float.max (quantity *. config.commission.per_share) config.commission.minimum
 

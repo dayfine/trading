@@ -29,7 +29,6 @@ type fill_status = Filled | PartiallyFilled | Unfilled
 (* Functions *)
 val create : engine_config -> t
 val update_market : t -> price_quote list -> unit  (* Batch update prices *)
-val get_market_data : t -> symbol -> price_quote option
 val process_orders : t -> order_manager -> execution_report list status_or
 ```
 
@@ -60,16 +59,16 @@ match Engine.process_orders engine order_mgr with
 - Commission calculation: `max(quantity * per_share, minimum)`
 - Batch market data updates via `price_quote` list
 - Order status updates to Filled
-- 12 engine tests + 12 type tests passing
+- 10 engine tests + 12 type tests passing
 
 ### Phase 4 Next
 - Limit order execution (buy when ask ≤ limit, sell when bid ≥ limit)
 
 ## Test Coverage
 
-**24 tests total** (all passing):
+**22 tests total** (all passing):
 - 12 type tests (fill_status, execution_report, commission_config, price_quote)
-- 12 engine tests (creation, market data, market orders, batch updates)
+- 10 engine tests (creation, market data behavior, execution, commission)
 
 ## Module Structure
 

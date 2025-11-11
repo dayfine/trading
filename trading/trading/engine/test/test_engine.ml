@@ -40,86 +40,100 @@ let test_create_engine_with_custom_commission _ =
   (* Just verify creation succeeds - engine type is opaque *)
   assert_bool "Engine with custom commission created successfully" true
 
-(* get_market_data tests *)
-let test_get_market_data_returns_none_when_no_data _ =
+(* update_market tests - verified through execution behavior *)
+let test_orders_skip_when_no_market_data _ =
   let config = make_config () in
   let engine = create config in
-  let data = get_market_data engine "AAPL" in
-  assert_equal None data ~msg:"Should return None when no market data set"
+  let order_mgr = OrderManager.create () in
+  (* Submit order but don't update market data *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Process should return empty - no market data available *)
+  let result = process_orders engine order_mgr in
+  assert_ok_with ~msg:"Should succeed but return no reports" result
+    ~f:(fun reports ->
+      assert_equal 0 (List.length reports)
+        ~msg:"Should not execute without market data");
+  (* Order should still be pending *)
+  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
+  assert_equal 1 (List.length pending) ~msg:"Order should remain pending"
 
-let test_get_market_data_returns_data_after_update _ =
+let test_update_market_enables_execution _ =
   let config = make_config () in
   let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* First process - no market data *)
+  let result1 = process_orders engine order_mgr in
+  assert_ok_with ~msg:"First process" result1 ~f:(fun reports ->
+      assert_equal 0 (List.length reports) ~msg:"No execution without data");
   (* Update market data *)
   let quote =
     make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
   in
   update_market engine [ quote ];
-  (* Get market data *)
-  let data = get_market_data engine "AAPL" in
-  match data with
-  | None -> assert_failure "Should return market data after update"
-  | Some quote ->
-      assert_equal (Some 150.0) quote.bid ~msg:"Bid should be 150.0";
-      assert_equal (Some 150.5) quote.ask ~msg:"Ask should be 150.5";
-      assert_equal (Some 150.25) quote.last ~msg:"Last should be 150.25"
+  (* Second process - should execute now *)
+  let result2 = process_orders engine order_mgr in
+  assert_ok_with ~msg:"Second process" result2 ~f:(fun reports ->
+      assert_equal 1 (List.length reports) ~msg:"Should execute with data";
+      let report = List.hd_exn reports in
+      let trade = List.hd_exn report.trades in
+      assert_float_equal 150.25 trade.price ~msg:"Should use last price")
 
-let test_update_market_with_partial_data _ =
+let test_update_market_overwrites_prices _ =
   let config = make_config () in
   let engine = create config in
-  (* Update with only last price *)
-  let quote = make_quote "AAPL" ~bid:None ~ask:None ~last:(Some 150.0) in
-  update_market engine [ quote ];
-  let data = get_market_data engine "AAPL" in
-  match data with
-  | None -> assert_failure "Should return market data"
-  | Some quote ->
-      assert_equal None quote.bid ~msg:"Bid should be None";
-      assert_equal None quote.ask ~msg:"Ask should be None";
-      assert_equal (Some 150.0) quote.last ~msg:"Last should be 150.0"
-
-let test_update_market_overwrites_previous_data _ =
-  let config = make_config () in
-  let engine = create config in
-  (* First update *)
+  let order_mgr = OrderManager.create () in
+  (* Update with first price *)
   let quote1 =
     make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
   in
   update_market engine [ quote1 ];
-  (* Second update *)
+  (* Submit order *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order1 =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order1;
+  (* Execute at first price *)
+  let _ = process_orders engine order_mgr in
+  (* Update with new price *)
   let quote2 =
     make_quote "AAPL" ~bid:(Some 155.0) ~ask:(Some 155.5) ~last:(Some 155.25)
   in
   update_market engine [ quote2 ];
-  (* Get market data - should have second update *)
-  let data = get_market_data engine "AAPL" in
-  match data with
-  | None -> assert_failure "Should return market data"
-  | Some quote ->
-      assert_equal (Some 155.0) quote.bid ~msg:"Bid should be 155.0";
-      assert_equal (Some 155.5) quote.ask ~msg:"Ask should be 155.5";
-      assert_equal (Some 155.25) quote.last ~msg:"Last should be 155.25"
-
-let test_update_market_batch _ =
-  let config = make_config () in
-  let engine = create config in
-  (* Batch update multiple symbols *)
-  let quotes =
-    [
-      make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25);
-      make_quote "GOOGL" ~bid:(Some 2800.0) ~ask:(Some 2805.0)
-        ~last:(Some 2802.5);
-      make_quote "MSFT" ~bid:(Some 380.0) ~ask:(Some 380.5) ~last:(Some 380.25);
-    ]
+  (* Submit new order *)
+  let order2 =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
   in
-  update_market engine quotes;
-  (* Verify all symbols updated *)
-  let aapl = get_market_data engine "AAPL" in
-  let googl = get_market_data engine "GOOGL" in
-  let msft = get_market_data engine "MSFT" in
-  assert_bool "AAPL should have data" (Option.is_some aapl);
-  assert_bool "GOOGL should have data" (Option.is_some googl);
-  assert_bool "MSFT should have data" (Option.is_some msft)
+  submit_single_order order_mgr order2;
+  (* Execute at new price *)
+  let result = process_orders engine order_mgr in
+  assert_ok_with ~msg:"Should execute at new price" result ~f:(fun reports ->
+      assert_equal 1 (List.length reports) ~msg:"Should have 1 report";
+      let report = List.hd_exn reports in
+      let trade = List.hd_exn report.trades in
+      assert_float_equal 155.25 trade.price ~msg:"Should use new last price")
 
 (* process_orders tests *)
 let test_process_orders_empty_manager _ =
@@ -282,15 +296,12 @@ let suite =
          "test_create_engine" >:: test_create_engine;
          "test_create_engine_with_custom_commission"
          >:: test_create_engine_with_custom_commission;
-         "test_get_market_data_returns_none_when_no_data"
-         >:: test_get_market_data_returns_none_when_no_data;
-         "test_get_market_data_returns_data_after_update"
-         >:: test_get_market_data_returns_data_after_update;
-         "test_update_market_with_partial_data"
-         >:: test_update_market_with_partial_data;
-         "test_update_market_overwrites_previous_data"
-         >:: test_update_market_overwrites_previous_data;
-         "test_update_market_batch" >:: test_update_market_batch;
+         "test_orders_skip_when_no_market_data"
+         >:: test_orders_skip_when_no_market_data;
+         "test_update_market_enables_execution"
+         >:: test_update_market_enables_execution;
+         "test_update_market_overwrites_prices"
+         >:: test_update_market_overwrites_prices;
          "test_process_orders_empty_manager"
          >:: test_process_orders_empty_manager;
          "test_process_orders_with_market_order"
