@@ -18,10 +18,26 @@ val create : engine_config -> t
       let engine = Engine.create config
     ]} *)
 
+val update_market :
+  t ->
+  symbol ->
+  bid:price option ->
+  ask:price option ->
+  last:price option ->
+  unit
+(** Update market data for a symbol. This is typically called by the simulation
+    to feed current market prices to the engine.
+
+    Example:
+    {[
+      Engine.update_market engine "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5)
+        ~last:(Some 150.25)
+    ]} *)
+
 val get_market_data :
   t -> symbol -> (price option * price option * price option) option
 (** Query current market data for a symbol. Returns (bid, ask, last) tuple.
-    Returns None until market data management is implemented (Phase 6+). *)
+    Returns None if no market data has been set for the symbol. *)
 
 val process_orders : t -> order_manager -> execution_report list status_or
 (** Process pending orders from the order manager.

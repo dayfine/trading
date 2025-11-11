@@ -1,6 +1,6 @@
 # Trading Engine Module
 
-**Status**: Phase 1 Complete - Stub implementation with tests ✅
+**Status**: Phase 3 Complete - Market Order Execution ✅
 **Branch**: `feature/engine-with-order-manager`
 
 ## Overview
@@ -54,7 +54,7 @@ let trades = List.concat_map reports ~f:(fun r -> r.trades) in
 let portfolio' = Portfolio.apply_trades portfolio trades
 ```
 
-## Current Implementation (Phase 1)
+## Current Implementation (Phase 3)
 
 ### Module Structure
 
@@ -110,7 +110,7 @@ type engine_config = {
 
 ### Engine API (engine.mli)
 
-**Current stub interface**:
+**Implemented interface**:
 
 ```ocaml
 type t  (* Opaque engine type *)
@@ -118,42 +118,57 @@ type t  (* Opaque engine type *)
 val create : engine_config -> t
 (** Create engine with commission configuration *)
 
+val update_market : t -> symbol -> bid:price option -> ask:price option -> last:price option -> unit
+(** Update market data for a symbol - called by simulation to feed prices *)
+
 val get_market_data : t -> symbol -> (price option * price option * price option) option
-(** Returns None until Phase 6+ - market data management deferred *)
+(** Query current market data for a symbol. Returns (bid, ask, last) tuple. *)
 
 val process_orders : t -> order_manager -> execution_report list status_or
 (** Process pending orders from OrderManager.
-    Currently returns [] with TODOs for Phase 3-5 implementation. *)
+    Executes market orders at last price with commission. *)
 ```
 
 ### Engine Implementation (engine.ml)
 
-**Current stub**:
+**Current implementation**:
 ```ocaml
-type t = { config : engine_config }
+type market_data = {
+  symbol : symbol;
+  bid : price option;
+  ask : price option;
+  last : price option;
+  timestamp : Time_ns_unix.t;
+}
 
-let create config = { config }
+type t = {
+  config : engine_config;
+  market_state : (symbol, market_data) Hashtbl.t;
+}
 
-let get_market_data _engine _symbol = None
+let create config = { config; market_state = Hashtbl.create (module String) }
 
-let process_orders _engine _order_mgr =
-  (* TODO: Phase 3 - Implement market order execution
-     TODO: Phase 4 - Implement limit order execution
-     TODO: Phase 5 - Implement stop order execution
+let update_market engine symbol ~bid ~ask ~last =
+  let data = { symbol; bid; ask; last; timestamp = Time_ns_unix.now () } in
+  Hashtbl.set engine.market_state ~key:symbol ~data
 
-     Algorithm:
-     1. Get pending orders from order_mgr using list_orders ~filter:ActiveOnly
-     2. For each order, match on order.order_type:
-        - Market: execute immediately at last price
-        - Limit: check if price condition met, execute at limit price
-        - Stop: check if triggered, execute as market order
-        - StopLimit: not implemented yet
-     3. For executed orders:
-        - Generate trade with commission
-        - Update order status in order_mgr
-        - Create execution_report
-     4. Return list of execution_reports *)
-  Result.Ok []
+let get_market_data engine symbol =
+  match Hashtbl.find engine.market_state symbol with
+  | Some data -> Some (data.bid, data.ask, data.last)
+  | None -> None
+
+let process_orders engine order_mgr =
+  (* 1. Get pending orders *)
+  let pending = list_orders order_mgr ~filter:ActiveOnly in
+  (* 2. Process each order *)
+  let reports =
+    List.filter_map pending ~f:(fun order ->
+        match order.order_type with
+        | Market -> (* Execute at last price with commission *)
+            ...
+        | _ -> None (* TODO: Phase 4-5 - Limit/Stop orders *))
+  in
+  Result.Ok reports
 ```
 
 ## Test Coverage
@@ -168,31 +183,20 @@ All passing:
 - `commission_config` construction and equality
 - `engine_config` construction and equality
 
-### Engine Tests (test_engine.ml) - 8 tests ✅
+### Engine Tests (test_engine.ml) - 11 tests ✅
 
-**Currently passing with stub implementation**:
+**All tests passing with real implementation**:
 1. ✅ `test_create_engine` - Basic engine creation
 2. ✅ `test_create_engine_with_custom_commission` - Custom commission config
-3. ✅ `test_get_market_data_returns_none` - Verifies stub returns None
-4. ✅ `test_process_orders_empty_manager` - Empty order manager case
-
-**With TODO comments for Phase 3 implementation**:
-5. ✅ `test_process_orders_with_market_order` - Execute market order at price
-   - TODO: Verify execution_report returned
-   - TODO: Verify trade generated with correct price/commission
-   - TODO: Verify order updated to Filled in OrderManager
-
-6. ✅ `test_process_orders_calculates_commission` - Commission = max(qty * per_share, minimum)
-   - TODO: For 50 shares at $0.01/share: commission should be max(0.50, 1.0) = 1.0
-
-7. ✅ `test_process_orders_updates_order_status` - Order status changes
-   - TODO: Verify order.status updated to Filled
-   - TODO: Verify list_orders ~filter:ActiveOnly no longer returns filled order
-
-8. ✅ `test_process_orders_with_multiple_orders` - Process 3 orders
-   - TODO: Verify 3 execution_reports returned
-
-Each test includes detailed TODO comments describing expected behavior.
+3. ✅ `test_get_market_data_returns_none_when_no_data` - Returns None when no data
+4. ✅ `test_get_market_data_returns_data_after_update` - Returns data after update_market
+5. ✅ `test_update_market_with_partial_data` - Handles partial market data (only last price)
+6. ✅ `test_update_market_overwrites_previous_data` - Updates overwrite previous data
+7. ✅ `test_process_orders_empty_manager` - Empty order manager case
+8. ✅ `test_process_orders_with_market_order` - Execute market order at last price
+9. ✅ `test_process_orders_calculates_commission` - Commission = max(qty * per_share, minimum)
+10. ✅ `test_process_orders_updates_order_status` - Order status updated to Filled
+11. ✅ `test_process_orders_with_multiple_orders` - Process 3 orders correctly
 
 ## Dependencies
 
@@ -229,93 +233,52 @@ Each test includes detailed TODO comments describing expected behavior.
 - Successfully rebased onto main (5f061c5)
 - All tests passing (67 total across project)
 
-## Next Steps - Phase 3: Market Order Execution
+### ✅ Phase 3: Market Order Execution
+- Added internal `market_data` type with hashtable storage
+- Implemented `update_market` to feed prices to engine
+- Implemented `get_market_data` to query current prices
+- Implemented `process_orders` for market order execution:
+  - Executes at last price
+  - Calculates commission: max(quantity * per_share, minimum)
+  - Updates order status to Filled
+  - Generates execution_report with trade
+- Added 3 new tests for market data management
+- Updated 4 existing tests with real assertions
+- All 11 engine tests passing (total 23 with type tests)
+- All 135 project tests passing
+
+## Next Steps - Phase 4: Limit Order Execution
 
 ### Goal
-Implement market order execution with internal market state management.
+Implement limit order execution based on bid/ask prices.
 
 ### What Needs to be Added
 
-1. **Add back internal market_data type** (in `engine.ml`, not public):
+1. **Implement limit order logic in `_execute_limit_order`**:
+   - Buy limit: execute when ask <= limit price
+   - Sell limit: execute when bid >= limit price
+   - Execute at limit price (not market price)
+   - Return None if condition not met
+
+2. **Update `process_orders`** to handle Limit orders:
 ```ocaml
-type market_data = {
-  symbol : symbol;
-  bid : price option;
-  ask : price option;
-  last : price option;
-  timestamp : Time_ns_unix.t;
-}
+| Limit limit_price -> (
+    match _execute_limit_order engine order limit_price with
+    | None -> None (* Price condition not met *)
+    | Some trade -> (* Create execution_report *)
+        ...)
 ```
 
-2. **Update engine type** to include market_state:
-```ocaml
-type t = {
-  config : engine_config;
-  market_state : (symbol, market_data) Hashtbl.t;
-}
-```
+### Success Criteria for Phase 4
 
-3. **Implement update_market** (add to `engine.mli`):
-```ocaml
-val update_market :
-  t ->
-  symbol ->
-  bid:price option ->
-  ask:price option ->
-  last:price option ->
-  unit
-(** Update market data for a symbol. Called by simulation to feed prices. *)
-```
+- [ ] Buy limit orders execute when ask <= limit price
+- [ ] Sell limit orders execute when bid >= limit price
+- [ ] Execution price is the limit price
+- [ ] Orders remain Pending when condition not met
+- [ ] 5+ new tests for limit order execution
+- [ ] All existing tests continue passing
 
-4. **Implement process_orders** for Market orders:
-```ocaml
-let process_orders engine order_mgr =
-  (* 1. Get pending orders *)
-  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
-
-  (* 2. Process each order *)
-  let reports = List.filter_map pending ~f:(fun order ->
-    match order.order_type with
-    | Market ->
-        (* Get market data for symbol *)
-        (* Execute at last price *)
-        (* Calculate commission = max(qty * per_share, minimum) *)
-        (* Generate trade *)
-        (* Update order status to Filled in order_mgr *)
-        (* Return execution_report with trade *)
-    | _ -> None  (* Limit/Stop not implemented yet *)
-  ) in
-  Result.Ok reports
-```
-
-### Tests to Update
-
-Update the 5 TODO tests in `test_engine.ml` to verify:
-- Market orders execute at last price
-- Commission calculated correctly
-- Order status updated to Filled
-- Trades generated with correct fields
-- Multiple orders process correctly
-
-### Success Criteria for Phase 3
-
-- [ ] `update_market` feeds prices to engine
-- [ ] `get_market_data` returns actual data
-- [ ] Market orders execute at last price
-- [ ] Commission: `max(quantity * per_share, minimum)`
-- [ ] Order status updated to Filled in OrderManager
-- [ ] Trade generated with: id, order_id, symbol, side, quantity, price, commission, timestamp
-- [ ] execution_report contains trade
-- [ ] Multiple market orders process correctly
-- [ ] All 8 engine tests pass with real implementation (no TODOs)
-- [ ] 20+ total engine tests
-
-## Future Phases (Post-Phase 3)
-
-### Phase 4: Limit Order Execution
-- Check bid/ask prices against limit price
-- Execute only when price condition is met
-- Return Unfilled status when condition not met
+## Future Phases (Post-Phase 4)
 
 ### Phase 5: Stop Order Execution
 - Monitor last price for stop trigger
