@@ -307,39 +307,30 @@ let test_process_orders_with_multiple_orders _ =
   in
   update_market engine quotes;
   (* Process all orders *)
-  let result = process_orders engine order_mgr in
-  assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
-      assert_equal 3 (List.length reports) ~msg:"Should return 3 reports";
-      (* Sort reports by order_id to ensure consistent order for elements_are *)
-      let sorted_reports =
-        List.sort reports ~compare:(fun r1 r2 ->
-            String.compare r1.order_id r2.order_id)
-      in
-      (* Use elements_are to check specific properties for each report in order *)
-      let order1, order2, order3 =
-        (List.nth_exn orders 0, List.nth_exn orders 1, List.nth_exn orders 2)
-      in
-      let sorted_order_ids =
-        List.sort [ order1.id; order2.id; order3.id ] ~compare:String.compare
-      in
-      elements_are sorted_reports
-        [
-          (fun r ->
-            assert_equal
-              (List.nth_exn sorted_order_ids 0)
-              r.order_id ~msg:"First order ID";
-            assert_equal Filled r.status ~msg:"Should be Filled");
-          (fun r ->
-            assert_equal
-              (List.nth_exn sorted_order_ids 1)
-              r.order_id ~msg:"Second order ID";
-            assert_equal Filled r.status ~msg:"Should be Filled");
-          (fun r ->
-            assert_equal
-              (List.nth_exn sorted_order_ids 2)
-              r.order_id ~msg:"Third order ID";
-            assert_equal Filled r.status ~msg:"Should be Filled");
-        ])
+  let order1, order2, order3 =
+    (List.nth_exn orders 0, List.nth_exn orders 1, List.nth_exn orders 2)
+  in
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (unordered_elements_are
+          [
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order1.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order2.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order3.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+          ]))
 
 (* Test suite *)
 let suite =

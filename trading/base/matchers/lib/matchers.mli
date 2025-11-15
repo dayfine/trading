@@ -184,5 +184,25 @@ val one : 'a matcher -> 'a list matcher
 
     Example:
     {[
-      asserts_that reports (one (field (fun r -> r.order_id) (equal_to id)))
+      assert_that reports (one (field (fun r -> r.order_id) (equal_to id)))
+    ]} *)
+
+val unordered_elements_are : 'a matcher list -> 'a list matcher
+(** [unordered_elements_are matchers] creates a matcher that checks:
+    - All matchers match at least one element
+    - All elements match at least one matcher
+    - The list and matchers have the same length
+
+    This enables matching elements in any order, useful for cases where order
+    doesn't matter.
+
+    Example:
+    {[
+      assert_that reports
+        (unordered_elements_are
+           [
+             field (fun r -> r.order_id) (equal_to "order1");
+             field (fun r -> r.order_id) (equal_to "order2");
+             field (fun r -> r.order_id) (equal_to "order3");
+           ])
     ]} *)
