@@ -20,6 +20,15 @@ let make_order_params ~symbol ~side ~order_type ~quantity ?(time_in_force = Day)
     () =
   { symbol; side; order_type; quantity; time_in_force }
 
+(* Domain-specific matchers *)
+let trade_like (expected : trade) (actual : trade) =
+  (* Compare entire trade record, ignoring dynamic fields (id, timestamp) *)
+  let normalized_actual =
+    { actual with id = expected.id; timestamp = expected.timestamp }
+  in
+  assert_equal ~cmp:equal_trade expected normalized_actual
+    ~msg:"Trade should match expected values"
+
 (* Helper to submit a single order and check success *)
 let submit_single_order order_mgr order =
   match OrderManager.submit_orders order_mgr [ order ] with
@@ -79,21 +88,20 @@ let test_update_market_enables_execution _ =
   in
   submit_single_order order_mgr order;
   (* First process - no market data *)
-  let result1 = process_orders engine order_mgr in
-  assert_ok_with ~msg:"First process" result1 ~f:(fun reports ->
-      assert_equal 0 (List.length reports) ~msg:"No execution without data");
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
   (* Update market data *)
   let quote =
     make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
   in
   update_market engine [ quote ];
   (* Second process - should execute now *)
-  let result2 = process_orders engine order_mgr in
-  assert_ok_with ~msg:"Second process" result2 ~f:(fun reports ->
-      assert_equal 1 (List.length reports) ~msg:"Should execute with data";
-      let report = List.hd_exn reports in
-      let trade = List.hd_exn report.trades in
-      assert_float_equal 150.25 trade.price ~msg:"Should use last price")
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 150.25))))))
 
 let test_update_market_overwrites_prices _ =
   let config = make_config () in
@@ -128,22 +136,20 @@ let test_update_market_overwrites_prices _ =
   in
   submit_single_order order_mgr order2;
   (* Execute at new price *)
-  let result = process_orders engine order_mgr in
-  assert_ok_with ~msg:"Should execute at new price" result ~f:(fun reports ->
-      assert_equal 1 (List.length reports) ~msg:"Should have 1 report";
-      let report = List.hd_exn reports in
-      let trade = List.hd_exn report.trades in
-      assert_float_equal 155.25 trade.price ~msg:"Should use new last price")
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 155.25))))))
 
 (* process_orders tests *)
 let test_process_orders_empty_manager _ =
   let config = make_config () in
   let engine = create config in
   let order_mgr = OrderManager.create () in
-  let result = process_orders engine order_mgr in
-  assert_ok_with ~msg:"Should succeed with empty manager" result
-    ~f:(fun reports ->
-      assert_equal 0 (List.length reports) ~msg:"Should return no reports")
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []))
 
 let test_process_orders_with_market_order _ =
   let config = make_config () in
@@ -165,18 +171,29 @@ let test_process_orders_with_market_order _ =
   in
   update_market engine [ quote ];
   (* Process orders *)
-  let result = process_orders engine order_mgr in
-  assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
-      assert_equal 1 (List.length reports) ~msg:"Should return 1 report";
-      let report = List.hd_exn reports in
-      assert_equal order.id report.order_id ~msg:"Should match order ID";
-      assert_equal Filled report.status ~msg:"Should be Filled";
-      assert_equal 1 (List.length report.trades) ~msg:"Should have 1 trade";
-      let trade = List.hd_exn report.trades in
-      assert_float_equal 100.0 trade.quantity ~msg:"Quantity should be 100.0";
-      assert_float_equal 150.25 trade.price ~msg:"Price should be last price";
-      assert_float_equal 1.0 trade.commission
-        ~msg:"Commission should be max(100*0.01, 1.0) = 1.0")
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Buy;
+                         quantity = 100.0;
+                         price = 150.25;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
 
 let test_process_orders_calculates_commission _ =
   let config = make_config ~per_share:0.01 ~minimum:1.0 () in
@@ -196,17 +213,28 @@ let test_process_orders_calculates_commission _ =
     make_quote "AAPL" ~bid:(Some 100.0) ~ask:(Some 100.5) ~last:(Some 100.25)
   in
   update_market engine [ quote ];
-  let result = process_orders engine order_mgr in
   (* For 50 shares at $0.01 per share:
      - Calculated = 50 * 0.01 = 0.50
      - Minimum = 1.0
      - Actual commission should be max(0.50, 1.0) = 1.0 *)
-  assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
-      assert_equal 1 (List.length reports) ~msg:"Should return 1 report";
-      let report = List.hd_exn reports in
-      let trade = List.hd_exn report.trades in
-      assert_float_equal 1.0 trade.commission
-        ~msg:"Commission should be max(0.50, 1.0) = 1.0")
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one
+                (trade_like
+                   {
+                     id = "";
+                     order_id = order.id;
+                     symbol = "AAPL";
+                     side = Buy;
+                     quantity = 50.0;
+                     price = 100.25;
+                     commission = 1.0;
+                     timestamp = Time_ns_unix.epoch;
+                   })))))
 
 let test_process_orders_updates_order_status _ =
   let config = make_config () in
@@ -260,14 +288,14 @@ let test_process_orders_with_multiple_orders _ =
     make_order_params ~symbol:"MSFT" ~side:Buy ~order_type:Market ~quantity:75.0
       ()
   in
-  List.iter
-    ~f:(fun params ->
-      let order =
+  let orders =
+    List.map
+      ~f:(fun params ->
         assert_ok ~msg:"Failed to create order"
-          (create_order ~now_time:test_timestamp params)
-      in
-      submit_single_order order_mgr order)
-    [ params1; params2; params3 ];
+          (create_order ~now_time:test_timestamp params))
+      [ params1; params2; params3 ]
+  in
+  List.iter ~f:(submit_single_order order_mgr) orders;
   (* Update market data for all symbols in batch *)
   let quotes =
     [
@@ -282,12 +310,36 @@ let test_process_orders_with_multiple_orders _ =
   let result = process_orders engine order_mgr in
   assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
       assert_equal 3 (List.length reports) ~msg:"Should return 3 reports";
-      (* Verify all orders have expected structure *)
-      List.iter reports ~f:(fun report ->
-          assert_equal Filled report.status ~msg:"All should be Filled";
-          assert_equal 1
-            (List.length report.trades)
-            ~msg:"Each should have 1 trade"))
+      (* Sort reports by order_id to ensure consistent order for elements_are *)
+      let sorted_reports =
+        List.sort reports ~compare:(fun r1 r2 ->
+            String.compare r1.order_id r2.order_id)
+      in
+      (* Use elements_are to check specific properties for each report in order *)
+      let order1, order2, order3 =
+        (List.nth_exn orders 0, List.nth_exn orders 1, List.nth_exn orders 2)
+      in
+      let sorted_order_ids =
+        List.sort [ order1.id; order2.id; order3.id ] ~compare:String.compare
+      in
+      elements_are sorted_reports
+        [
+          (fun r ->
+            assert_equal
+              (List.nth_exn sorted_order_ids 0)
+              r.order_id ~msg:"First order ID";
+            assert_equal Filled r.status ~msg:"Should be Filled");
+          (fun r ->
+            assert_equal
+              (List.nth_exn sorted_order_ids 1)
+              r.order_id ~msg:"Second order ID";
+            assert_equal Filled r.status ~msg:"Should be Filled");
+          (fun r ->
+            assert_equal
+              (List.nth_exn sorted_order_ids 2)
+              r.order_id ~msg:"Third order ID";
+            assert_equal Filled r.status ~msg:"Should be Filled");
+        ])
 
 (* Test suite *)
 let suite =

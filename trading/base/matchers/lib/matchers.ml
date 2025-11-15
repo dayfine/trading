@@ -27,3 +27,37 @@ let assert_some ~msg option =
 
 let assert_none ~msg option =
   match option with Some _ -> assert_failure msg | None -> () (* Expected *)
+
+let elements_are list callbacks =
+  if List.length list <> List.length callbacks then
+    assert_failure
+      (Printf.sprintf "List length (%d) does not match callbacks length (%d)"
+         (List.length list) (List.length callbacks))
+  else List.iter2_exn list callbacks ~f:(fun elem callback -> callback elem)
+
+let all_of checks value = List.iter checks ~f:(fun check -> check value)
+let field accessor matcher value = matcher (accessor value)
+
+let equal_to ?(cmp = Poly.equal) ?(msg = "Values should be equal") expected
+    actual =
+  assert_equal expected actual ~cmp ~msg
+
+(* Fluent Matcher API *)
+type 'a matcher = 'a -> unit
+
+let assert_that value matcher = matcher value
+
+let is_ok_and_holds matcher result =
+  match result with
+  | Ok value -> matcher value
+  | Error err -> assert_failure ("Expected Ok but got Error: " ^ Status.show err)
+
+let each matcher list = List.iter list ~f:matcher
+
+let one matcher list =
+  match list with
+  | [ single ] -> matcher single
+  | _ ->
+      assert_failure
+        (Printf.sprintf "Expected exactly one element, got %d"
+           (List.length list))
