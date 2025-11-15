@@ -65,14 +65,10 @@ let test_orders_skip_when_no_market_data _ =
   in
   submit_single_order order_mgr order;
   (* Process should return empty - no market data available *)
-  let result = process_orders engine order_mgr in
-  assert_ok_with ~msg:"Should succeed but return no reports" result
-    ~f:(fun reports ->
-      assert_equal 0 (List.length reports)
-        ~msg:"Should not execute without market data");
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
   (* Order should still be pending *)
   let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
-  assert_equal 1 (List.length pending) ~msg:"Order should remain pending"
+  assert_that pending (size_is 1)
 
 let test_update_market_enables_execution _ =
   let config = make_config () in
@@ -251,7 +247,7 @@ let test_process_orders_updates_order_status _ =
   let () = submit_single_order order_mgr order in
   (* Verify order is initially Pending *)
   let orders_before = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
-  assert_equal 1 (List.length orders_before) ~msg:"Should have 1 pending order";
+  assert_that orders_before (size_is 1);
   (* Update market data *)
   let quote =
     make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
@@ -263,13 +259,13 @@ let test_process_orders_updates_order_status _ =
      - OrderManager.list_orders with ActiveOnly filter should return empty list
      - OrderManager.list_orders without filter should return 1 order with Filled status *)
   let orders_after = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
-  assert_equal 0 (List.length orders_after)
-    ~msg:"Should have 0 pending orders after execution";
+  assert_that orders_after (equal_to []);
   let all_orders = OrderManager.list_orders order_mgr in
-  assert_equal 1 (List.length all_orders) ~msg:"Should have 1 total order";
-  let filled_order = List.hd_exn all_orders in
-  assert_equal Trading_orders.Types.Filled filled_order.status
-    ~msg:"Order should be Filled"
+  assert_that all_orders
+    (one
+       (field
+          (fun (o : Trading_orders.Types.order) -> o.status)
+          (equal_to Trading_orders.Types.Filled)))
 
 let test_process_orders_with_multiple_orders _ =
   let config = make_config () in

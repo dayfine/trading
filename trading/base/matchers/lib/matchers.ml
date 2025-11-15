@@ -124,3 +124,9 @@ let unordered_elements_are matchers list =
         else msgs
       in
       assert_failure (String.concat ~sep:"\nand " (List.rev msgs))
+
+let size_is expected_size list =
+  let actual_size = List.length list in
+  if actual_size <> expected_size then
+    assert_failure
+      (Printf.sprintf "Expected size %d but got %d" expected_size actual_size)

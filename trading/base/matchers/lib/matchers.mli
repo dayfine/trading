@@ -206,3 +206,12 @@ val unordered_elements_are : 'a matcher list -> 'a list matcher
              field (fun r -> r.order_id) (equal_to "order3");
            ])
     ]} *)
+
+val size_is : int -> 'a list matcher
+(** [size_is n] creates a matcher that checks a list has exactly n elements.
+
+    Example:
+    {[
+      assert_that pending_orders (size_is 3)
+      assert_that completed_orders (size_is 0)  (* equivalent to equal_to [] *)
+    ]} *)
