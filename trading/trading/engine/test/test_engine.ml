@@ -14,9 +14,20 @@ let test_timestamp = Time_ns_unix.of_string "2024-01-15 10:30:00Z"
 let make_config ?(per_share = 0.01) ?(minimum = 1.0) () =
   { commission = { per_share; minimum } }
 
+let make_quote symbol ~bid ~ask ~last = { symbol; bid; ask; last }
+
 let make_order_params ~symbol ~side ~order_type ~quantity ?(time_in_force = Day)
     () =
   { symbol; side; order_type; quantity; time_in_force }
+
+(* Domain-specific matchers *)
+let trade_like (expected : trade) (actual : trade) =
+  (* Compare entire trade record, ignoring dynamic fields (id, timestamp) *)
+  let normalized_actual =
+    { actual with id = expected.id; timestamp = expected.timestamp }
+  in
+  assert_equal ~cmp:equal_trade expected normalized_actual
+    ~msg:"Trade should match expected values"
 
 (* Helper to submit a single order and check success *)
 let submit_single_order order_mgr order =
@@ -38,22 +49,103 @@ let test_create_engine_with_custom_commission _ =
   (* Just verify creation succeeds - engine type is opaque *)
   assert_bool "Engine with custom commission created successfully" true
 
-(* get_market_data tests *)
-let test_get_market_data_returns_none _ =
+(* update_market tests - verified through execution behavior *)
+let test_orders_skip_when_no_market_data _ =
   let config = make_config () in
   let engine = create config in
-  let data = get_market_data engine "AAPL" in
-  assert_equal None data ~msg:"Should return None until Phase 6"
+  let order_mgr = OrderManager.create () in
+  (* Submit order but don't update market data *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Process should return empty - no market data available *)
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
+  (* Order should still be pending *)
+  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
+  assert_that pending (size_is 1)
+
+let test_update_market_enables_execution _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* First process - no market data *)
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
+  (* Update market data *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
+  (* Second process - should execute now *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 150.25))))))
+
+let test_update_market_overwrites_prices _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Update with first price *)
+  let quote1 =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote1 ];
+  (* Submit order *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order1 =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order1;
+  (* Execute at first price *)
+  let _ = process_orders engine order_mgr in
+  (* Update with new price *)
+  let quote2 =
+    make_quote "AAPL" ~bid:(Some 155.0) ~ask:(Some 155.5) ~last:(Some 155.25)
+  in
+  update_market engine [ quote2 ];
+  (* Submit new order *)
+  let order2 =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order2;
+  (* Execute at new price *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 155.25))))))
 
 (* process_orders tests *)
 let test_process_orders_empty_manager _ =
   let config = make_config () in
   let engine = create config in
   let order_mgr = OrderManager.create () in
-  let result = process_orders engine order_mgr in
-  assert_ok_with ~msg:"Should succeed with empty manager" result
-    ~f:(fun reports ->
-      assert_equal 0 (List.length reports) ~msg:"Should return no reports")
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []))
 
 let test_process_orders_with_market_order _ =
   let config = make_config () in
@@ -69,21 +161,35 @@ let test_process_orders_with_market_order _ =
       (create_order ~now_time:test_timestamp params)
   in
   let () = submit_single_order order_mgr order in
+  (* Update market data with price *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
   (* Process orders *)
-  let result = process_orders engine order_mgr in
-  (* TODO: Phase 3 - Implement market order execution
-     Expected behavior:
-     - Should return 1 execution_report
-     - report.order_id should be "order_1"
-     - report.status should be Filled
-     - report.trades should have 1 trade with:
-       - quantity = 100.0
-       - price = execution price (TBD how to pass this in)
-       - commission = max(100.0 * 0.01, 1.0) = 1.0
-     - Order in order_mgr should be updated to Filled status *)
-  assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
-      assert_equal 0 (List.length reports)
-        ~msg:"TODO: Should return 1 report after Phase 3 implementation")
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Buy;
+                         quantity = 100.0;
+                         price = 150.25;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
 
 let test_process_orders_calculates_commission _ =
   let config = make_config ~per_share:0.01 ~minimum:1.0 () in
@@ -98,15 +204,33 @@ let test_process_orders_calculates_commission _ =
       (create_order ~now_time:test_timestamp params)
   in
   let () = submit_single_order order_mgr order in
-  let result = process_orders engine order_mgr in
-  (* TODO: Phase 3 - Verify commission calculation
-     For 50 shares at $0.01 per share:
+  (* Update market data *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 100.0) ~ask:(Some 100.5) ~last:(Some 100.25)
+  in
+  update_market engine [ quote ];
+  (* For 50 shares at $0.01 per share:
      - Calculated = 50 * 0.01 = 0.50
      - Minimum = 1.0
      - Actual commission should be max(0.50, 1.0) = 1.0 *)
-  assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
-      assert_equal 0 (List.length reports)
-        ~msg:"TODO: Verify commission in trade after Phase 3")
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one
+                (trade_like
+                   {
+                     id = "";
+                     order_id = order.id;
+                     symbol = "AAPL";
+                     side = Buy;
+                     quantity = 50.0;
+                     price = 100.25;
+                     commission = 1.0;
+                     timestamp = Time_ns_unix.epoch;
+                   })))))
 
 let test_process_orders_updates_order_status _ =
   let config = make_config () in
@@ -123,17 +247,25 @@ let test_process_orders_updates_order_status _ =
   let () = submit_single_order order_mgr order in
   (* Verify order is initially Pending *)
   let orders_before = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
-  assert_equal 1 (List.length orders_before) ~msg:"Should have 1 pending order";
+  assert_that orders_before (size_is 1);
+  (* Update market data *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
   (* Process orders *)
   let _result = process_orders engine order_mgr in
-  (* TODO: Phase 3 - Verify order status updated
-     After execution:
-     - Order with ID "order_1" should be updated to Filled status
+  (* Verify order status updated:
      - OrderManager.list_orders with ActiveOnly filter should return empty list
-     - OrderManager.list_orders with AllOrders filter should return 1 order with Filled status *)
+     - OrderManager.list_orders without filter should return 1 order with Filled status *)
   let orders_after = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
-  assert_equal 1 (List.length orders_after)
-    ~msg:"TODO: Should have 0 pending orders after Phase 3"
+  assert_that orders_after (equal_to []);
+  let all_orders = OrderManager.list_orders order_mgr in
+  assert_that all_orders
+    (one
+       (field
+          (fun (o : Trading_orders.Types.order) -> o.status)
+          (equal_to Trading_orders.Types.Filled)))
 
 let test_process_orders_with_multiple_orders _ =
   let config = make_config () in
@@ -152,21 +284,49 @@ let test_process_orders_with_multiple_orders _ =
     make_order_params ~symbol:"MSFT" ~side:Buy ~order_type:Market ~quantity:75.0
       ()
   in
-  List.iter
-    ~f:(fun params ->
-      let order =
+  let orders =
+    List.map
+      ~f:(fun params ->
         assert_ok ~msg:"Failed to create order"
-          (create_order ~now_time:test_timestamp params)
-      in
-      submit_single_order order_mgr order)
-    [ params1; params2; params3 ];
+          (create_order ~now_time:test_timestamp params))
+      [ params1; params2; params3 ]
+  in
+  List.iter ~f:(submit_single_order order_mgr) orders;
+  (* Update market data for all symbols in batch *)
+  let quotes =
+    [
+      make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25);
+      make_quote "GOOGL" ~bid:(Some 2800.0) ~ask:(Some 2805.0)
+        ~last:(Some 2802.5);
+      make_quote "MSFT" ~bid:(Some 380.0) ~ask:(Some 380.5) ~last:(Some 380.25);
+    ]
+  in
+  update_market engine quotes;
   (* Process all orders *)
-  let result = process_orders engine order_mgr in
-  (* TODO: Phase 3 - Handle multiple orders
-     Should return 3 execution_reports, one for each order *)
-  assert_ok_with ~msg:"Should process orders" result ~f:(fun reports ->
-      assert_equal 0 (List.length reports)
-        ~msg:"TODO: Should return 3 reports after Phase 3")
+  let order1, order2, order3 =
+    (List.nth_exn orders 0, List.nth_exn orders 1, List.nth_exn orders 2)
+  in
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (unordered_elements_are
+          [
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order1.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order2.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order3.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+          ]))
 
 (* Test suite *)
 let suite =
@@ -175,8 +335,12 @@ let suite =
          "test_create_engine" >:: test_create_engine;
          "test_create_engine_with_custom_commission"
          >:: test_create_engine_with_custom_commission;
-         "test_get_market_data_returns_none"
-         >:: test_get_market_data_returns_none;
+         "test_orders_skip_when_no_market_data"
+         >:: test_orders_skip_when_no_market_data;
+         "test_update_market_enables_execution"
+         >:: test_update_market_enables_execution;
+         "test_update_market_overwrites_prices"
+         >:: test_update_market_overwrites_prices;
          "test_process_orders_empty_manager"
          >:: test_process_orders_empty_manager;
          "test_process_orders_with_market_order"

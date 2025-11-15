@@ -1,6 +1,5 @@
 (** Trading engine - simulated broker for order execution *)
 
-open Trading_base.Types
 open Trading_orders.Manager
 open Status
 open Types
@@ -18,10 +17,30 @@ val create : engine_config -> t
       let engine = Engine.create config
     ]} *)
 
-val get_market_data :
-  t -> symbol -> (price option * price option * price option) option
-(** Query current market data for a symbol. Returns (bid, ask, last) tuple.
-    Returns None until market data management is implemented (Phase 6+). *)
+val update_market : t -> price_quote list -> unit
+(** Update market data for one or more symbols. Called by simulation to feed
+    current market prices to the engine.
+
+    Example:
+    {[
+      let quotes =
+        [
+          {
+            symbol = "AAPL";
+            bid = Some 150.0;
+            ask = Some 150.5;
+            last = Some 150.25;
+          };
+          {
+            symbol = "GOOGL";
+            bid = Some 2800.0;
+            ask = Some 2805.0;
+            last = Some 2802.5;
+          };
+        ]
+      in
+      Engine.update_market engine quotes
+    ]} *)
 
 val process_orders : t -> order_manager -> execution_report list status_or
 (** Process pending orders from the order manager.

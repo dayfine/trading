@@ -1,35 +1,67 @@
-[@@@warning "-33-69"]
-(* Suppress unused open/field warnings for stub implementation *)
-
+open Core
 open Trading_base.Types
 open Trading_orders.Manager
-open Status
+open Trading_orders.Types
 open Types
 
-(* Engine state *)
-type t = { config : engine_config }
+type market_data = { quote : price_quote }
 
-let create config = { config }
+type t = {
+  config : engine_config;
+  market_state : (symbol, market_data) Hashtbl.t;
+}
 
-let get_market_data _engine _symbol =
-  (* TODO: Phase 6 - Add market data management for limit/stop orders *)
-  None
+let create config = { config; market_state = Hashtbl.create (module String) }
 
-let process_orders _engine _order_mgr =
-  (* TODO: Phase 3 - Implement market order execution
-     TODO: Phase 4 - Implement limit order execution
-     TODO: Phase 5 - Implement stop order execution
+let update_market engine quotes =
+  List.iter quotes ~f:(fun quote ->
+      let data = { quote } in
+      Hashtbl.set engine.market_state ~key:quote.symbol ~data)
 
-     Algorithm:
-     1. Get pending orders from order_mgr using list_orders ~filter:ActiveOnly
-     2. For each order, match on order.order_type:
-        - Market: execute immediately at last price
-        - Limit: check if price condition met, execute at limit price
-        - Stop: check if triggered, execute as market order
-        - StopLimit: not implemented yet
-     3. For executed orders:
-        - Generate trade with commission
-        - Update order status in order_mgr
-        - Create execution_report
-     4. Return list of execution_reports *)
-  Result.Ok []
+let _calculate_commission config quantity =
+  Float.max (quantity *. config.commission.per_share) config.commission.minimum
+
+let _generate_trade_id order_id = "trade_" ^ order_id
+
+let _create_trade order_id symbol side quantity price commission =
+  {
+    id = _generate_trade_id order_id;
+    order_id;
+    symbol;
+    side;
+    quantity;
+    price;
+    commission;
+    timestamp = Time_ns_unix.now ();
+  }
+
+(* Execute market order - returns Some trade if successful, None otherwise *)
+let _execute_market_order engine (ord : Trading_orders.Types.order) =
+  let open Option.Let_syntax in
+  let%bind mkt_data = Hashtbl.find engine.market_state ord.symbol in
+  let%bind last_price = mkt_data.quote.last in
+  let commission = _calculate_commission engine.config ord.quantity in
+  return
+    (_create_trade ord.id ord.symbol ord.side ord.quantity last_price commission)
+
+let _create_execution_report order_id trade =
+  { order_id; status = Filled; trades = [ trade ] }
+
+let _process_market_order engine order_mgr order =
+  _execute_market_order engine order
+  |> Option.map ~f:(fun trade ->
+         let updated_order =
+           ({ order with status = Filled } : Trading_orders.Types.order)
+         in
+         let _ = update_order order_mgr updated_order in
+         _create_execution_report order.id trade)
+
+let process_orders engine order_mgr =
+  let pending = list_orders order_mgr ~filter:ActiveOnly in
+  let reports =
+    List.filter_map pending ~f:(fun order ->
+        match order.order_type with
+        | Market -> _process_market_order engine order_mgr order
+        | _ -> None (* TODO: Phase 4-5 - Limit/Stop orders *))
+  in
+  Result.Ok reports

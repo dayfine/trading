@@ -1,5 +1,13 @@
 open Trading_base.Types
 
+type price_quote = {
+  symbol : symbol;
+  bid : price option;
+  ask : price option;
+  last : price option;
+}
+[@@deriving show, eq]
+
 type fill_status = Filled | PartiallyFilled | Unfilled [@@deriving show, eq]
 
 type execution_report = {
