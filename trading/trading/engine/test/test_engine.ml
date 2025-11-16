@@ -328,6 +328,233 @@ let test_process_orders_with_multiple_orders _ =
               ];
           ]))
 
+(* Limit order tests *)
+let test_buy_limit_executes_when_ask_at_limit _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy limit order at $150.50 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Limit 150.50)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with ask = 150.50 (exactly at limit) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.50) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
+  (* Should execute at ask price *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Buy;
+                         quantity = 100.0;
+                         price = 150.50;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_buy_limit_executes_when_ask_below_limit _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy limit order at $151.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Limit 151.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with ask = 150.50 (below limit) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.50) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
+  (* Should execute at ask price (150.50, better than limit) *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Buy;
+                         quantity = 100.0;
+                         price = 150.50;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_buy_limit_does_not_execute_when_ask_above_limit _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy limit order at $150.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Limit 150.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with ask = 150.50 (above limit) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.50) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
+  (* Should not execute *)
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
+  (* Order should still be pending *)
+  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
+  assert_that pending (size_is 1)
+
+let test_sell_limit_executes_when_bid_at_limit _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell limit order at $150.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Limit 150.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with bid = 150.00 (exactly at limit) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.00) ~ask:(Some 150.50) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
+  (* Should execute at bid price *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Sell;
+                         quantity = 100.0;
+                         price = 150.00;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_sell_limit_executes_when_bid_above_limit _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell limit order at $150.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Limit 150.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with bid = 150.50 (above limit, better price) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.50) ~ask:(Some 151.00) ~last:(Some 150.75)
+  in
+  update_market engine [ quote ];
+  (* Should execute at bid price (150.50, better than limit) *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Sell;
+                         quantity = 100.0;
+                         price = 150.50;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_sell_limit_does_not_execute_when_bid_below_limit _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell limit order at $150.50 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Limit 150.50)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with bid = 150.00 (below limit) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.00) ~ask:(Some 150.50) ~last:(Some 150.25)
+  in
+  update_market engine [ quote ];
+  (* Should not execute *)
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
+  (* Order should still be pending *)
+  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
+  assert_that pending (size_is 1)
+
 (* Test suite *)
 let suite =
   "Engine Tests"
@@ -351,6 +578,18 @@ let suite =
          >:: test_process_orders_updates_order_status;
          "test_process_orders_with_multiple_orders"
          >:: test_process_orders_with_multiple_orders;
+         "test_buy_limit_executes_when_ask_at_limit"
+         >:: test_buy_limit_executes_when_ask_at_limit;
+         "test_buy_limit_executes_when_ask_below_limit"
+         >:: test_buy_limit_executes_when_ask_below_limit;
+         "test_buy_limit_does_not_execute_when_ask_above_limit"
+         >:: test_buy_limit_does_not_execute_when_ask_above_limit;
+         "test_sell_limit_executes_when_bid_at_limit"
+         >:: test_sell_limit_executes_when_bid_at_limit;
+         "test_sell_limit_executes_when_bid_above_limit"
+         >:: test_sell_limit_executes_when_bid_above_limit;
+         "test_sell_limit_does_not_execute_when_bid_below_limit"
+         >:: test_sell_limit_does_not_execute_when_bid_below_limit;
        ]
 
 let () = run_test_tt_main suite
