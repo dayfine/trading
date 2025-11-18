@@ -89,6 +89,32 @@ let _process_limit_order engine order_mgr order limit_price =
   _process_order_with_execution order_mgr order (fun () ->
       _execute_limit_order engine order limit_price)
 
+(* Execute stop order - returns Some trade if triggered, None otherwise *)
+let _execute_stop_order engine (ord : Trading_orders.Types.order) stop_price =
+  let open Option.Let_syntax in
+  let%bind mkt_data = Hashtbl.find engine.market_state ord.symbol in
+  let%bind last_price = mkt_data.quote.last in
+  (* Check if stop is triggered based on side *)
+  let triggered =
+    match ord.side with
+    | Buy ->
+        (* Buy stop: triggered when last >= stop_price (breakout/upward) *)
+        Float.(last_price >= stop_price)
+    | Sell ->
+        (* Sell stop: triggered when last <= stop_price (stop-loss/downward) *)
+        Float.(last_price <= stop_price)
+  in
+  if triggered then
+    let commission = _calculate_commission engine.config ord.quantity in
+    return
+      (_create_trade ord.id ord.symbol ord.side ord.quantity last_price
+         commission)
+  else None
+
+let _process_stop_order engine order_mgr order stop_price =
+  _process_order_with_execution order_mgr order (fun () ->
+      _execute_stop_order engine order stop_price)
+
 let process_orders engine order_mgr =
   let pending = list_orders order_mgr ~filter:ActiveOnly in
   let reports =
@@ -97,6 +123,8 @@ let process_orders engine order_mgr =
         | Market -> _process_market_order engine order_mgr order
         | Limit limit_price ->
             _process_limit_order engine order_mgr order limit_price
-        | _ -> None (* TODO: Phase 5 - Stop orders *))
+        | Stop stop_price ->
+            _process_stop_order engine order_mgr order stop_price
+        | _ -> None (* TODO: Phase 6 - StopLimit orders *))
   in
   Result.Ok reports
