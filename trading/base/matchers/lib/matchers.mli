@@ -213,5 +213,8 @@ val size_is : int -> 'a list matcher
     Example:
     {[
       assert_that pending_orders (size_is 3)
-      assert_that completed_orders (size_is 0)  (* equivalent to equal_to [] *)
+    ]}
+    {[
+      assert_that completed_orders (size_is 0)
+      (* equivalent to equal_to [] *)
     ]} *)

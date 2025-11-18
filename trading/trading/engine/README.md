@@ -1,6 +1,6 @@
 # Trading Engine
 
-**Status**: Phase 3 Complete - Market Order Execution ✅
+**Status**: Phase 4 Complete - Limit Order Execution ✅
 
 ## Overview
 
@@ -54,21 +54,31 @@ match Engine.process_orders engine order_mgr with
 
 ## Implementation Status
 
+### Phase 4 Complete ✅
+- Limit order execution:
+  - Buy limit: Execute when ask ≤ limit_price at ask price
+  - Sell limit: Execute when bid ≥ limit_price at bid price
+  - Orders remain pending when price conditions not met
+- 16 engine tests + 12 type tests passing
+
 ### Phase 3 Complete ✅
 - Market order execution at last price
 - Commission calculation: `max(quantity * per_share, minimum)`
 - Batch market data updates via `price_quote` list
 - Order status updates to Filled
-- 10 engine tests + 12 type tests passing
 
-### Phase 4 Next
-- Limit order execution (buy when ask ≤ limit, sell when bid ≥ limit)
+### Phase 5 Next
+- Stop order execution (buy when last ≥ stop, sell when last ≤ stop)
 
 ## Test Coverage
 
-**22 tests total** (all passing):
+**28 tests total** (all passing):
 - 12 type tests (fill_status, execution_report, commission_config, price_quote)
-- 10 engine tests (creation, market data behavior, execution, commission)
+- 16 engine tests:
+  - Engine creation and configuration (2 tests)
+  - Market data management (3 tests)
+  - Market order execution (5 tests)
+  - Limit order execution (6 tests)
 
 ## Module Structure
 
