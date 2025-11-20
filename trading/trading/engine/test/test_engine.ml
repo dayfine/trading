@@ -555,6 +555,258 @@ let test_sell_limit_does_not_execute_when_bid_below_limit _ =
   let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
   assert_that pending (size_is 1)
 
+(* Stop order tests *)
+let test_buy_stop_executes_when_last_at_stop _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy stop order at $151.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Stop 151.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with last = 151.00 (exactly at stop) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.50) ~ask:(Some 151.50) ~last:(Some 151.00)
+  in
+  update_market engine [ quote ];
+  (* Should execute at last price *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Buy;
+                         quantity = 100.0;
+                         price = 151.00;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_buy_stop_executes_when_last_above_stop _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy stop order at $150.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Stop 150.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with last = 151.00 (above stop - breakout!) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.50) ~ask:(Some 151.50) ~last:(Some 151.00)
+  in
+  update_market engine [ quote ];
+  (* Should execute at last price (151.00) *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Buy;
+                         quantity = 100.0;
+                         price = 151.00;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_buy_stop_does_not_execute_when_last_below_stop _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy stop order at $151.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Stop 151.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with last = 150.50 (below stop) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.00) ~ask:(Some 151.00) ~last:(Some 150.50)
+  in
+  update_market engine [ quote ];
+  (* Should not execute *)
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
+  (* Order should still be pending *)
+  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
+  assert_that pending (size_is 1)
+
+let test_sell_stop_executes_when_last_at_stop _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell stop order at $149.00 (stop loss) *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Stop 149.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with last = 149.00 (exactly at stop) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 148.50) ~ask:(Some 149.50) ~last:(Some 149.00)
+  in
+  update_market engine [ quote ];
+  (* Should execute at last price *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Sell;
+                         quantity = 100.0;
+                         price = 149.00;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_sell_stop_executes_when_last_below_stop _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell stop order at $150.00 (stop loss) *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Stop 150.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with last = 148.00 (below stop - triggered!) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 147.50) ~ask:(Some 148.50) ~last:(Some 148.00)
+  in
+  update_market engine [ quote ];
+  (* Should execute at last price (148.00) *)
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Sell;
+                         quantity = 100.0;
+                         price = 148.00;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_sell_stop_does_not_execute_when_last_above_stop _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell stop order at $149.00 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Stop 149.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market with last = 150.00 (above stop) *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 149.50) ~ask:(Some 150.50) ~last:(Some 150.00)
+  in
+  update_market engine [ quote ];
+  (* Should not execute *)
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
+  (* Order should still be pending *)
+  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
+  assert_that pending (size_is 1)
+
+let test_stop_order_requires_last_price _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy stop order *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Stop 150.00)
+      ~quantity:100.0 ()
+  in
+  let order =
+    assert_ok ~msg:"Failed to create order"
+      (create_order ~now_time:test_timestamp params)
+  in
+  submit_single_order order_mgr order;
+  (* Update market WITHOUT last price *)
+  let quote =
+    make_quote "AAPL" ~bid:(Some 150.00) ~ask:(Some 150.50) ~last:None
+  in
+  update_market engine [ quote ];
+  (* Should not execute - no last price available *)
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
+  (* Order should still be pending *)
+  let pending = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
+  assert_that pending (size_is 1)
+
 (* Test suite *)
 let suite =
   "Engine Tests"
@@ -590,6 +842,20 @@ let suite =
          >:: test_sell_limit_executes_when_bid_above_limit;
          "test_sell_limit_does_not_execute_when_bid_below_limit"
          >:: test_sell_limit_does_not_execute_when_bid_below_limit;
+         "test_buy_stop_executes_when_last_at_stop"
+         >:: test_buy_stop_executes_when_last_at_stop;
+         "test_buy_stop_executes_when_last_above_stop"
+         >:: test_buy_stop_executes_when_last_above_stop;
+         "test_buy_stop_does_not_execute_when_last_below_stop"
+         >:: test_buy_stop_does_not_execute_when_last_below_stop;
+         "test_sell_stop_executes_when_last_at_stop"
+         >:: test_sell_stop_executes_when_last_at_stop;
+         "test_sell_stop_executes_when_last_below_stop"
+         >:: test_sell_stop_executes_when_last_below_stop;
+         "test_sell_stop_does_not_execute_when_last_above_stop"
+         >:: test_sell_stop_does_not_execute_when_last_above_stop;
+         "test_stop_order_requires_last_price"
+         >:: test_stop_order_requires_last_price;
        ]
 
 let () = run_test_tt_main suite
