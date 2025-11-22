@@ -670,6 +670,26 @@ let suite =
          >:: test_sell_stop_does_not_execute_when_last_above_stop;
          "test_stop_order_requires_last_price"
          >:: test_stop_order_requires_last_price;
+         "test_buy_stop_limit_executes_when_both_conditions_met"
+         >:: test_buy_stop_limit_executes_when_both_conditions_met;
+         "test_buy_stop_limit_executes_when_ask_at_limit"
+         >:: test_buy_stop_limit_executes_when_ask_at_limit;
+         "test_buy_stop_limit_does_not_execute_when_stop_not_triggered"
+         >:: test_buy_stop_limit_does_not_execute_when_stop_not_triggered;
+         "test_buy_stop_limit_does_not_execute_when_ask_above_limit"
+         >:: test_buy_stop_limit_does_not_execute_when_ask_above_limit;
+         "test_sell_stop_limit_executes_when_both_conditions_met"
+         >:: test_sell_stop_limit_executes_when_both_conditions_met;
+         "test_sell_stop_limit_executes_when_bid_at_limit"
+         >:: test_sell_stop_limit_executes_when_bid_at_limit;
+         "test_sell_stop_limit_does_not_execute_when_stop_not_triggered"
+         >:: test_sell_stop_limit_does_not_execute_when_stop_not_triggered;
+         "test_sell_stop_limit_does_not_execute_when_bid_below_limit"
+         >:: test_sell_stop_limit_does_not_execute_when_bid_below_limit;
+         "test_stop_limit_requires_last_price"
+         >:: test_stop_limit_requires_last_price;
+         "test_stop_limit_requires_bid_ask_price"
+         >:: test_stop_limit_requires_bid_ask_price;
        ]
 
 let () = run_test_tt_main suite
