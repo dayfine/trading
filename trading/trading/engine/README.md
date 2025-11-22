@@ -1,6 +1,6 @@
 # Trading Engine
 
-**Status**: Phase 4 Complete - Limit Order Execution ✅
+**Status**: Phase 6 Complete - All Order Types Implemented ✅
 
 ## Overview
 
@@ -11,6 +11,18 @@ Simulated broker that executes orders from OrderManager:
 - Updates order status in OrderManager
 
 **Data Flow**: `OrderManager → Engine.process_orders → execution_reports → Portfolio.apply_trades`
+
+## Order Types Supported
+
+| Order Type | Trigger Condition | Execution Price |
+|------------|-------------------|-----------------|
+| Market | Always (when last price available) | Last price |
+| Limit (Buy) | ask ≤ limit_price | Ask price |
+| Limit (Sell) | bid ≥ limit_price | Bid price |
+| Stop (Buy) | last ≥ stop_price | Last price |
+| Stop (Sell) | last ≤ stop_price | Last price |
+| StopLimit (Buy) | last ≥ stop_price AND ask ≤ limit_price | Ask price |
+| StopLimit (Sell) | last ≤ stop_price AND bid ≥ limit_price | Bid price |
 
 ## API
 
@@ -54,12 +66,22 @@ match Engine.process_orders engine order_mgr with
 
 ## Implementation Status
 
+### Phase 6 Complete ✅
+- StopLimit order execution (stateless approach):
+  - Buy StopLimit: Triggers when last ≥ stop_price, executes when ask ≤ limit_price
+  - Sell StopLimit: Triggers when last ≤ stop_price, executes when bid ≥ limit_price
+  - Reuses limit order execution after stop trigger check
+
+### Phase 5 Complete ✅
+- Stop order execution:
+  - Buy stop: Execute when last ≥ stop_price (breakout)
+  - Sell stop: Execute when last ≤ stop_price (stop-loss)
+
 ### Phase 4 Complete ✅
 - Limit order execution:
   - Buy limit: Execute when ask ≤ limit_price at ask price
   - Sell limit: Execute when bid ≥ limit_price at bid price
   - Orders remain pending when price conditions not met
-- 16 engine tests + 12 type tests passing
 
 ### Phase 3 Complete ✅
 - Market order execution at last price
@@ -67,18 +89,17 @@ match Engine.process_orders engine order_mgr with
 - Batch market data updates via `price_quote` list
 - Order status updates to Filled
 
-### Phase 5 Next
-- Stop order execution (buy when last ≥ stop, sell when last ≤ stop)
-
 ## Test Coverage
 
-**28 tests total** (all passing):
+**45 tests total** (all passing):
 - 12 type tests (fill_status, execution_report, commission_config, price_quote)
-- 16 engine tests:
+- 33 engine tests:
   - Engine creation and configuration (2 tests)
   - Market data management (3 tests)
   - Market order execution (5 tests)
   - Limit order execution (6 tests)
+  - Stop order execution (7 tests)
+  - StopLimit order execution (10 tests)
 
 ## Module Structure
 
