@@ -2,6 +2,6 @@
  (public_name trading.simulation)
  (name trading_simulation)
  (libraries trading.base trading.portfolio trading.engine types core)
- (modules sim_types simulator)
+ (modules simulator)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

@@ -2,37 +2,58 @@
 
 open Core
 
+(** {1 Input Types} *)
+
+type symbol_prices = { symbol : string; prices : Types.Daily_price.t list }
+[@@deriving show, eq]
+
+type config = {
+  start_date : Date.t;
+  end_date : Date.t;
+  initial_cash : float;
+  symbols : string list;
+  commission : Trading_engine.Types.commission_config;
+}
+[@@deriving show, eq]
+
+type dependencies = { prices : symbol_prices list } [@@warning "-69"]
+
+(** {1 Simulator Types} *)
+
 type step_result = {
   date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
   trades : Trading_base.Types.trade list;
 }
 
-type run_result = {
-  steps : step_result list;
-  final_portfolio : Trading_portfolio.Portfolio.t;
-}
+type step_outcome =
+  | Stepped of t * step_result
+  | Completed of Trading_portfolio.Portfolio.t
 
-type t = {
-  config : Sim_types.simulation_config;
-  prices : Sim_types.symbol_prices list; [@warning "-69"]
+and t = {
+  config : config;
+  deps : dependencies; [@warning "-69"]
   current_date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
 }
 
-let create ~config ~prices =
+(** {1 Creation} *)
+
+let create ~config ~deps =
   let portfolio =
-    Trading_portfolio.Portfolio.create
-      ~initial_cash:config.Sim_types.initial_cash ()
+    Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
   in
-  Ok { config; prices; current_date = config.Sim_types.start_date; portfolio }
+  { config; deps; current_date = config.start_date; portfolio }
+
+(** {1 Inspection} *)
 
 let current_date t = t.current_date
 let is_complete t = Date.( >= ) t.current_date t.config.end_date
 
+(** {1 Running} *)
+
 let step t =
-  if is_complete t then
-    Error (Status.invalid_argument_error "Simulation already complete")
+  if is_complete t then Ok (Completed t.portfolio)
   else
     (* Stub: just advance the date, no actual trading *)
     let next_date = Date.add_days t.current_date 1 in
@@ -40,15 +61,13 @@ let step t =
       { date = t.current_date; portfolio = t.portfolio; trades = [] }
     in
     let t' = { t with current_date = next_date } in
-    Ok (t', step_result)
+    Ok (Stepped (t', step_result))
 
 let run t =
   let rec loop t acc =
-    if is_complete t then
-      Ok { steps = List.rev acc; final_portfolio = t.portfolio }
-    else
-      match step t with
-      | Error e -> Error e
-      | Ok (t', step_result) -> loop t' (step_result :: acc)
+    match step t with
+    | Error e -> Error e
+    | Ok (Completed portfolio) -> Ok (List.rev acc, portfolio)
+    | Ok (Stepped (t', step_result)) -> loop t' (step_result :: acc)
   in
   loop t []

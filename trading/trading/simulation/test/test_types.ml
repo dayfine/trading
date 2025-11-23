@@ -1,6 +1,6 @@
 open OUnit2
 open Core
-open Trading_simulation.Sim_types
+open Trading_simulation.Simulator
 
 (** Helper to create a daily price *)
 let make_daily_price ~date ~open_price ~high ~low ~close ~volume =
@@ -50,10 +50,10 @@ let test_symbol_prices_show _ =
   assert_bool "Show should contain symbol"
     (String.is_substring str ~substring:"AAPL")
 
-(* ==================== simulation_config tests ==================== *)
+(* ==================== config tests ==================== *)
 
-let test_simulation_config_construction _ =
-  let config =
+let test_config_construction _ =
+  let cfg =
     {
       start_date = date_of_string "2024-01-01";
       end_date = date_of_string "2024-12-31";
@@ -62,12 +62,12 @@ let test_simulation_config_construction _ =
       commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
     }
   in
-  assert_equal (date_of_string "2024-01-01") config.start_date;
-  assert_equal (date_of_string "2024-12-31") config.end_date;
-  assert_equal 100000.0 config.initial_cash;
-  assert_equal [ "AAPL"; "GOOGL" ] config.symbols
+  assert_equal (date_of_string "2024-01-01") cfg.start_date;
+  assert_equal (date_of_string "2024-12-31") cfg.end_date;
+  assert_equal 100000.0 cfg.initial_cash;
+  assert_equal [ "AAPL"; "GOOGL" ] cfg.symbols
 
-let test_simulation_config_equality _ =
+let test_config_equality _ =
   let make_config () =
     {
       start_date = date_of_string "2024-01-01";
@@ -80,12 +80,12 @@ let test_simulation_config_equality _ =
   let cfg1 = make_config () in
   let cfg2 = make_config () in
   let cfg3 = { (make_config ()) with initial_cash = 50000.0 } in
-  assert_bool "Same configs should be equal" (equal_simulation_config cfg1 cfg2);
+  assert_bool "Same configs should be equal" (equal_config cfg1 cfg2);
   assert_bool "Different initial_cash should not be equal"
-    (not (equal_simulation_config cfg1 cfg3))
+    (not (equal_config cfg1 cfg3))
 
-let test_simulation_config_show _ =
-  let config =
+let test_config_show _ =
+  let cfg =
     {
       start_date = date_of_string "2024-01-01";
       end_date = date_of_string "2024-12-31";
@@ -94,7 +94,7 @@ let test_simulation_config_show _ =
       commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
     }
   in
-  let str = show_simulation_config config in
+  let str = show_config cfg in
   assert_bool "Show should contain initial_cash"
     (String.is_substring str ~substring:"100000")
 
@@ -107,11 +107,10 @@ let suite =
          "symbol_prices construction" >:: test_symbol_prices_construction;
          "symbol_prices equality" >:: test_symbol_prices_equality;
          "symbol_prices show" >:: test_symbol_prices_show;
-         (* simulation_config *)
-         "simulation_config construction"
-         >:: test_simulation_config_construction;
-         "simulation_config equality" >:: test_simulation_config_equality;
-         "simulation_config show" >:: test_simulation_config_show;
+         (* config *)
+         "config construction" >:: test_config_construction;
+         "config equality" >:: test_config_equality;
+         "config show" >:: test_config_show;
        ]
 
 let () = run_test_tt_main suite

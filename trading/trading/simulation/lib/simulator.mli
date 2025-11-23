@@ -2,7 +2,29 @@
 
 open Core
 
-(** {1 Types} *)
+(** {1 Input Types} *)
+
+type symbol_prices = {
+  symbol : string;
+  prices : Types.Daily_price.t list;  (** sorted by date, ascending *)
+}
+[@@deriving show, eq]
+(** Historical price data for a single symbol *)
+
+type config = {
+  start_date : Date.t;
+  end_date : Date.t;
+  initial_cash : float;
+  symbols : string list;
+  commission : Trading_engine.Types.commission_config;
+}
+[@@deriving show, eq]
+(** Configuration for running a simulation *)
+
+type dependencies = { prices : symbol_prices list }
+(** External dependencies injected into the simulator *)
+
+(** {1 Simulator Types} *)
 
 type t
 (** Abstract simulator type *)
@@ -14,30 +36,26 @@ type step_result = {
 }
 (** Result of a single simulation step *)
 
-type run_result = {
-  steps : step_result list;
-  final_portfolio : Trading_portfolio.Portfolio.t;
-}
-(** Result of a full simulation run *)
+type step_outcome =
+  | Stepped of t * step_result
+  | Completed of Trading_portfolio.Portfolio.t
+      (** Outcome of calling step - either advanced or simulation complete *)
 
 (** {1 Creation} *)
 
-val create :
-  config:Sim_types.simulation_config ->
-  prices:Sim_types.symbol_prices list ->
-  (t, Status.t) result
-(** Create a simulator from config and historical prices. Returns error if
-    config is invalid or prices are insufficient. *)
+val create : config:config -> deps:dependencies -> t
+(** Create a simulator from config and dependencies *)
 
 (** {1 Running} *)
 
-val step : t -> (t * step_result, Status.t) result
-(** Advance simulation by one day. Returns error if simulation is complete or an
-    execution error occurs. *)
+val step : t -> (step_outcome, Status.t) result
+(** Advance simulation by one day. Returns [Completed] when simulation reaches
+    end date, or [Stepped] with updated simulator and step result. *)
 
-val run : t -> (run_result, Status.t) result
-(** Run the full simulation from start to end date. Returns error if any step
-    fails. *)
+val run :
+  t -> (step_result list * Trading_portfolio.Portfolio.t, Status.t) result
+(** Run the full simulation from start to end date. Returns list of step results
+    and final portfolio. *)
 
 (** {1 Inspection} *)
 
