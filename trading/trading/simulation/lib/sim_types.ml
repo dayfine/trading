@@ -18,13 +18,3 @@ type simulation_config = {
 }
 [@@deriving show, eq]
 (** Configuration for running a simulation *)
-
-type simulation_state = {
-  current_date : Date.t;
-  portfolio : Trading_portfolio.Portfolio.t;
-  order_manager : Trading_orders.Manager.order_manager;
-  engine : Trading_engine.Engine.t;
-  price_history : symbol_prices list;
-      (** accumulated price history for strategy lookback *)
-}
-(** Current state of a running simulation *)
