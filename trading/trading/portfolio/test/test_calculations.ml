@@ -37,7 +37,7 @@ let test_market_value _ =
   let market_price = 160.0 in
   let expected = 100.0 *. 160.0 in
   let actual = market_value position market_price in
-  assert_float_equal expected actual ~msg:"Market value calculation"
+  assert_that actual (float_equal expected)
 
 let test_unrealized_pnl_profit _ =
   let position = make_position ~symbol:"AAPL" ~quantity:100.0 ~avg_cost:150.0 in
@@ -45,7 +45,7 @@ let test_unrealized_pnl_profit _ =
   (* Current value: 100 * 160 = 16000, Cost basis: 100 * 150 = 15000 *)
   let expected_pnl = 1000.0 in
   let actual_pnl = unrealized_pnl position market_price in
-  assert_float_equal expected_pnl actual_pnl ~msg:"Unrealized profit"
+  assert_that actual_pnl (float_equal expected_pnl)
 
 let test_unrealized_pnl_loss _ =
   let position = make_position ~symbol:"AAPL" ~quantity:100.0 ~avg_cost:150.0 in
@@ -53,13 +53,13 @@ let test_unrealized_pnl_loss _ =
   (* Current value: 100 * 140 = 14000, Cost basis: 100 * 150 = 15000 *)
   let expected_pnl = -1000.0 in
   let actual_pnl = unrealized_pnl position market_price in
-  assert_float_equal expected_pnl actual_pnl ~msg:"Unrealized loss"
+  assert_that actual_pnl (float_equal expected_pnl)
 
 let test_position_cost_basis _ =
   let position = make_position ~symbol:"AAPL" ~quantity:50.0 ~avg_cost:175.0 in
   let expected = 50.0 *. 175.0 in
   let actual = position_cost_basis position in
-  assert_float_equal expected actual ~msg:"Position cost basis"
+  assert_that actual (float_equal expected)
 
 let test_portfolio_value_with_market_prices _ =
   let positions =
@@ -72,10 +72,9 @@ let test_portfolio_value_with_market_prices _ =
   let market_prices = [ ("AAPL", 160.0); ("MSFT", 210.0) ] in
   (* AAPL: 100 * 160 = 16000, MSFT: 50 * 210 = 10500, Cash: 5000 *)
   let expected = 16000.0 +. 10500.0 +. 5000.0 in
-  assert_ok_with ~msg:"Portfolio value should succeed"
-    (portfolio_value positions cash_value market_prices) ~f:(fun actual ->
-      assert_float_equal expected actual
-        ~msg:"Portfolio value with market prices")
+  assert_that
+    (portfolio_value positions cash_value market_prices)
+    (is_ok_and_holds (float_equal expected))
 
 let test_portfolio_value_missing_prices _ =
   let positions =
@@ -88,8 +87,7 @@ let test_portfolio_value_missing_prices _ =
   let market_prices = [ ("AAPL", 160.0) ] in
   (* Missing MSFT price *)
   (* This should now return an error because MSFT price is missing *)
-  assert_error ~msg:"Expected error for missing MSFT price"
-    (portfolio_value positions cash_value market_prices)
+  assert_that (portfolio_value positions cash_value market_prices) is_error
 
 let test_realized_pnl_from_trades _ =
   (* Create trade_with_pnl records with cash flow P&L for backward compatibility *)
@@ -122,14 +120,13 @@ let test_realized_pnl_from_trades _ =
   (* Total: -15005 + 7997 + 7748 = 740 *)
   let expected_pnl = 740.0 in
   let actual_pnl = realized_pnl_from_trades trade_history in
-  assert_float_equal expected_pnl actual_pnl ~msg:"Realized P&L calculation"
+  assert_that actual_pnl (float_equal expected_pnl)
 
 let test_realized_pnl_no_trades _ =
   let trade_history = [] in
   let expected_pnl = 0.0 in
   let actual_pnl = realized_pnl_from_trades trade_history in
-  assert_float_equal expected_pnl actual_pnl
-    ~msg:"No trades should give zero P&L"
+  assert_that actual_pnl (float_equal expected_pnl)
 
 let test_realized_pnl_only_buys _ =
   let trade_history =
@@ -154,7 +151,7 @@ let test_realized_pnl_only_buys _ =
   (* Total: -15005 + -10003 = -25008 *)
   let expected_pnl = -25008.0 in
   let actual_pnl = realized_pnl_from_trades trade_history in
-  assert_float_equal expected_pnl actual_pnl ~msg:"Only buy trades"
+  assert_that actual_pnl (float_equal expected_pnl)
 
 let suite =
   "Calculations"

@@ -44,8 +44,9 @@ let setup_order_test ~order_type ~side ?(symbol = "AAPL") ?(quantity = 100.0)
   let order_mgr = OrderManager.create () in
   let params = make_order_params ~symbol ~side ~order_type ~quantity () in
   let order =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   submit_single_order order_mgr order;
   update_market engine [ quote ];
@@ -107,8 +108,9 @@ let test_orders_skip_when_no_market_data _ =
       ~quantity:100.0 ()
   in
   let order =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   submit_single_order order_mgr order;
   (* Process should return empty - no market data available *)
@@ -126,8 +128,9 @@ let test_update_market_enables_execution _ =
       ~quantity:100.0 ()
   in
   let order =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   submit_single_order order_mgr order;
   (* First process - no market data *)
@@ -161,8 +164,9 @@ let test_update_market_overwrites_prices _ =
       ~quantity:100.0 ()
   in
   let order1 =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   submit_single_order order_mgr order1;
   (* Execute at first price *)
@@ -174,8 +178,9 @@ let test_update_market_overwrites_prices _ =
   update_market engine [ quote2 ];
   (* Submit new order *)
   let order2 =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   submit_single_order order_mgr order2;
   (* Execute at new price *)
@@ -204,8 +209,9 @@ let test_process_orders_with_market_order _ =
       ~quantity:100.0 ()
   in
   let order =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   let () = submit_single_order order_mgr order in
   (* Update market data with price *)
@@ -247,8 +253,9 @@ let test_process_orders_calculates_commission _ =
       ()
   in
   let order =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   let () = submit_single_order order_mgr order in
   (* Update market data *)
@@ -288,8 +295,9 @@ let test_process_orders_updates_order_status _ =
       ~quantity:100.0 ()
   in
   let order =
-    assert_ok ~msg:"Failed to create order"
-      (create_order ~now_time:test_timestamp params)
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   let () = submit_single_order order_mgr order in
   (* Verify order is initially Pending *)
@@ -334,8 +342,9 @@ let test_process_orders_with_multiple_orders _ =
   let orders =
     List.map
       ~f:(fun params ->
-        assert_ok ~msg:"Failed to create order"
-          (create_order ~now_time:test_timestamp params))
+        match create_order ~now_time:test_timestamp params with
+        | Ok order -> order
+        | Error err -> failwith ("Failed to create order: " ^ Status.show err))
       [ params1; params2; params3 ]
   in
   List.iter ~f:(submit_single_order order_mgr) orders;

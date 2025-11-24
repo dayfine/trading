@@ -119,10 +119,10 @@ let process portfolio trade =
 ```ocaml
 open Matchers
 
-(* Assert on Result types *)
-assert_ok_with ~msg:"Operation should succeed" result
-  ~f:(fun value ->
-    assert_float_equal expected value ~msg:"Value should match")
+(* Assert on Result types with fluent matchers *)
+assert_that result
+  (is_ok_and_holds (fun value ->
+       assert_float_equal expected value ~msg:"Value should match"))
 
 (* Assert errors *)
 assert_error ~msg:"Should fail with invalid input" result

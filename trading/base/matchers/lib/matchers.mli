@@ -1,126 +1,50 @@
-(** Testing utilities for asserting on Result types.
+(** Testing utilities with a fluent matcher API.
 
-    This module provides helper functions to reduce boilerplate in tests while
-    maintaining clarity. These helpers work with OUnit2 test framework and
-    Status.status_or types. *)
+    This module provides composable matchers for writing expressive test
+    assertions. Matchers work with OUnit2 test framework and Status.status_or
+    types. *)
 
-val assert_ok_with : msg:string -> 'a Status.status_or -> f:('a -> unit) -> unit
-(** [assert_ok_with ~msg result ~f] asserts that [result] is [Ok value] and
-    executes [f value] for further assertions. If [result] is [Error], fails
-    with [msg] and the error details.
+(** {1 Core Matcher Types} *)
+
+type 'a matcher = 'a -> unit
+(** A matcher is a function that takes a value and performs assertions on it.
+    Matchers can be composed and combined to create complex assertions. *)
+
+val assert_that : 'a -> 'a matcher -> unit
+(** [assert_that value matcher] applies the matcher to the value. This is the
+    entry point for fluent assertions.
 
     Example:
     {[
-      assert_ok_with ~msg:"Operation failed" (some_operation ())
-        ~f:(fun value ->
-          assert_equal expected_value value ~msg:"Value mismatch")
+      assert_that actual_price (float_equal 150.25)
+    ]}
+    {[
+      assert_that result (is_ok_and_holds (equal_to expected_value))
     ]} *)
 
-val assert_error : msg:string -> 'a Status.status_or -> unit
-(** [assert_error ~msg result] asserts that [result] is [Error]. If [result] is
-    [Ok], fails with [msg].
+(** {1 Basic Matchers} *)
+
+val equal_to : ?cmp:('a -> 'a -> bool) -> ?msg:string -> 'a -> 'a -> unit
+(** [equal_to ?cmp ?msg expected actual] asserts that [actual] equals
+    [expected]. Optionally takes a custom comparison function and message.
 
     Example:
     {[
-      assert_error ~msg:"Should fail with invalid input"
-        (validate_input invalid_data)
-    ]} *)
-
-val assert_ok : msg:string -> 'a Status.status_or -> 'a
-(** [assert_ok ~msg result] asserts that [result] is [Ok value] and returns
-    [value]. If [result] is [Error], fails with [msg] and the error details.
-    This is useful for test setup where you need the unwrapped value.
-
-    Example:
+      assert_that result (is_ok_and_holds (equal_to expected))
+    ]}
     {[
-      let portfolio =
-        assert_ok ~msg:"Failed to create portfolio"
-          (create_portfolio ~cash:10000.0)
-    ]} *)
-
-val assert_float_equal : ?epsilon:float -> float -> float -> msg:string -> unit
-(** [assert_float_equal ?epsilon expected actual ~msg] asserts that [expected]
-    and [actual] are equal within the given epsilon tolerance (default: 1e-9).
-    Uses OUnit2's assert_equal with a custom float comparator.
-
-    Example:
-    {[
-      assert_float_equal 10.5 (calculate_total ()) ~msg:"Total should be 10.5"
-    ]} *)
-
-val assert_some_with : msg:string -> 'a option -> f:('a -> unit) -> unit
-(** [assert_some_with ~msg option ~f] asserts that [option] is [Some value] and
-    executes [f value] for further assertions. If [option] is [None], fails with
-    [msg].
-
-    Example:
-    {[
-      assert_some_with ~msg:"Position should exist"
-        (get_position portfolio "AAPL") ~f:(fun position ->
-          assert_float_equal 100.0 position.quantity ~msg:"Quantity mismatch")
-    ]} *)
-
-val assert_some : msg:string -> 'a option -> 'a
-(** [assert_some ~msg option] asserts that [option] is [Some value] and returns
-    [value]. If [option] is [None], fails with [msg]. This is useful for test
-    setup where you need the unwrapped value.
-
-    Example:
-    {[
-      let position =
-        assert_some ~msg:"Position should exist after buy"
-          (get_position portfolio "AAPL")
-    ]} *)
-
-val assert_none : msg:string -> 'a option -> unit
-(** [assert_none ~msg option] asserts that [option] is [None]. If [option] is
-    [Some], fails with [msg].
-
-    Example:
-    {[
-      assert_none ~msg:"Position should be closed"
-        (get_position portfolio "AAPL")
-    ]} *)
-
-val elements_are : 'a list -> ('a -> unit) list -> unit
-(** [elements_are list callbacks] applies each callback function to the
-    corresponding element in [list]. The list and callbacks must have the same
-    length, otherwise the assertion fails. This is useful for checking specific
-    properties of each element in order.
-
-    Example:
-    {[
-      elements_are reports
-        [
-          (fun r -> assert_equal "order1" r.order_id);
-          (fun r -> assert_equal "order2" r.order_id);
-          (fun r -> assert_equal "order3" r.order_id);
-        ]
-    ]} *)
-
-val all_of : ('a -> unit) list -> 'a -> unit
-(** [all_of checks] returns a function that applies all check functions to a
-    given value. This is useful for combining multiple assertions into a single
-    callback, reducing nesting when used with elements_are.
-
-    Example:
-    {[
-      elements_are reports
-        [
-          all_of
-            [
-              (fun r -> assert_equal order.id r.order_id);
-              (fun r -> assert_equal Filled r.status);
-            ];
-        ]
+      field (fun r -> r.order_id) (equal_to "order123")
     ]} *)
 
 val field : ('a -> 'b) -> ('b -> unit) -> 'a -> unit
-(** [field accessor matcher] creates a check that extracts a field using
+(** [field accessor matcher] creates a matcher that extracts a field using
     [accessor] and applies [matcher] to it. This enables a declarative style for
     field assertions.
 
     Example:
+    {[
+      assert_that order (field (fun o -> o.status) (equal_to Filled))
+    ]}
     {[
       elements_are reports
         [
@@ -132,49 +56,132 @@ val field : ('a -> 'b) -> ('b -> unit) -> 'a -> unit
         ]
     ]} *)
 
-val equal_to : ?cmp:('a -> 'a -> bool) -> ?msg:string -> 'a -> 'a -> unit
-(** [equal_to ?cmp ?msg expected actual] asserts that [actual] equals
-    [expected]. Optionally takes a custom comparison function and message.
+val all_of : ('a -> unit) list -> 'a -> unit
+(** [all_of matchers] returns a matcher that applies all matchers to a given
+    value. This is useful for combining multiple assertions.
 
     Example:
     {[
-      field (fun r -> r.order_id) (equal_to "order123")
+      assert_that order
+        (all_of
+           [
+             (fun o -> assert_equal "order1" o.order_id);
+             (fun o -> assert_equal Filled o.status);
+           ])
+    ]}
+    {[
+      elements_are reports
+        [
+          all_of
+            [
+              field (fun r -> r.order_id) (equal_to order.id);
+              field (fun r -> r.status) (equal_to Filled);
+            ];
+        ]
     ]} *)
 
-(** {1 Fluent Matcher API}
+(** {1 Result Matchers}
 
-    These functions provide a composable, declarative API for assertions.
-    Matchers are values that can be combined and passed around. *)
+    Matchers for [Result.t] and [Status.status_or] types *)
 
-type 'a matcher = 'a -> unit
-(** A matcher is a function that takes a value and performs assertions on it *)
-
-val assert_that : 'a -> 'a matcher -> unit
-(** [assert_that value matcher] applies the matcher to the value. This is the
-    entry point for fluent assertions.
+val is_ok : 'a Status.status_or matcher
+(** [is_ok] creates a matcher that asserts a Result is Ok. Does not check the Ok
+    value - use [is_ok_and_holds] if you need to assert on the value.
 
     Example:
     {[
-      assert_that reports
-        (is_ok_and_holds (elements_are (all_of [ (* matchers *) ])))
+      assert_that (validate_input valid_data) is_ok
     ]} *)
 
 val is_ok_and_holds : 'a matcher -> 'a Status.status_or matcher
-(** [is_ok_and_holds matcher] creates a matcher for Result types that asserts
-    the value is Ok and applies the inner matcher to the unwrapped value.
+(** [is_ok_and_holds matcher] creates a matcher that asserts a Result is Ok and
+    applies the inner matcher to the unwrapped value.
 
     Example:
     {[
-      asserts_that result (is_ok_and_holds (equal_to expected_value))
+      assert_that result (is_ok_and_holds (equal_to expected_value))
+    ]}
+    {[
+      assert_that result (is_ok_and_holds (float_equal 150.25))
     ]} *)
 
-val each : 'a matcher -> 'a list matcher
-(** [each matcher] creates a matcher that applies the given matcher to each
-    element in a list.
+val is_error : 'a Status.status_or matcher
+(** [is_error] creates a matcher that asserts a Result is Error. Does not check
+    the error details - use [is_error_with] if you need to check the status
+    code.
 
     Example:
     {[
-      asserts_that reports
+      assert_that (validate_input invalid_data) is_error
+    ]} *)
+
+val is_error_with : Status.code -> 'a Status.status_or matcher
+(** [is_error_with code] creates a matcher that asserts a Result is Error with
+    the specified status code.
+
+    Example:
+    {[
+      assert_that (get_order manager "nonexistent") (is_error_with NotFound)
+    ]}
+    {[
+      assert_that (create_order invalid_params) (is_error_with Invalid_argument)
+    ]} *)
+
+(** {1 Option Matchers}
+
+    Matchers for [Option.t] types *)
+
+val is_some_and : 'a matcher -> 'a option matcher
+(** [is_some_and matcher] creates a matcher that asserts an Option is Some and
+    applies the inner matcher to the unwrapped value.
+
+    Example:
+    {[
+      assert_that
+        (get_position portfolio "AAPL")
+        (is_some_and (field position_quantity (float_equal 100.0)))
+    ]}
+    {[
+      assert_that (Map.find cache key) (is_some_and (equal_to expected))
+    ]} *)
+
+val is_none : 'a option matcher
+(** [is_none] creates a matcher that asserts an Option is None.
+
+    Example:
+    {[
+      assert_that (get_position portfolio "AAPL") is_none
+    ]}
+    {[
+      assert_that (Map.find cache "nonexistent") is_none
+    ]} *)
+
+(** {1 Numeric Matchers} *)
+
+val float_equal : ?epsilon:float -> float -> float matcher
+(** [float_equal ?epsilon expected] creates a matcher that checks a float value
+    equals [expected] within the given epsilon tolerance (default: 1e-9).
+
+    Example:
+    {[
+      assert_that actual_price (float_equal 150.25)
+    ]}
+    {[
+      assert_that computed_value (float_equal ~epsilon:0.01 expected)
+    ]} *)
+
+(** {1 List Matchers} *)
+
+val each : 'a matcher -> 'a list matcher
+(** [each matcher] creates a matcher that applies the matcher to each element in
+    a list. All elements must match.
+
+    Example:
+    {[
+      assert_that orders (each (field (fun o -> o.status) (equal_to Filled)))
+    ]}
+    {[
+      assert_that reports
         (each (all_of [ field (fun r -> r.status) (equal_to Filled) ]))
     ]} *)
 
@@ -184,7 +191,40 @@ val one : 'a matcher -> 'a list matcher
 
     Example:
     {[
-      assert_that reports (one (field (fun r -> r.order_id) (equal_to id)))
+      assert_that pending_orders (one (field (fun o -> o.id) (equal_to id)))
+    ]}
+    {[
+      assert_that results (one (equal_to expected))
+    ]} *)
+
+val elements_are : 'a list -> ('a -> unit) list -> unit
+(** [elements_are list matchers] applies each matcher to the corresponding
+    element in [list]. The list and matchers must have the same length. This is
+    useful for checking specific properties of each element in order.
+
+    Example:
+    {[
+      elements_are reports
+        [
+          (fun r -> assert_equal "order1" r.order_id);
+          (fun r -> assert_equal "order2" r.order_id);
+          (fun r -> assert_equal "order3" r.order_id);
+        ]
+    ]}
+    {[
+      elements_are orders
+        [
+          all_of
+            [
+              field (fun o -> o.id) (equal_to "order1");
+              field (fun o -> o.status) (equal_to Pending);
+            ];
+          all_of
+            [
+              field (fun o -> o.id) (equal_to "order2");
+              field (fun o -> o.status) (equal_to Filled);
+            ];
+        ]
     ]} *)
 
 val unordered_elements_are : 'a matcher list -> 'a list matcher
@@ -204,6 +244,14 @@ val unordered_elements_are : 'a matcher list -> 'a list matcher
              field (fun r -> r.order_id) (equal_to "order1");
              field (fun r -> r.order_id) (equal_to "order2");
              field (fun r -> r.order_id) (equal_to "order3");
+           ])
+    ]}
+    {[
+      assert_that positions
+        (unordered_elements_are
+           [
+             field (fun p -> p.symbol) (equal_to "AAPL");
+             field (fun p -> p.symbol) (equal_to "MSFT");
            ])
     ]} *)
 
