@@ -15,7 +15,6 @@ type config = {
   start_date : Date.t;
   end_date : Date.t;
   initial_cash : float;
-  symbols : string list;
   commission : Trading_engine.Types.commission_config;
 }
 [@@deriving show, eq]

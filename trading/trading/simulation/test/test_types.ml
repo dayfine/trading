@@ -58,14 +58,12 @@ let test_config_construction _ =
       start_date = date_of_string "2024-01-01";
       end_date = date_of_string "2024-12-31";
       initial_cash = 100000.0;
-      symbols = [ "AAPL"; "GOOGL" ];
       commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
     }
   in
   assert_equal (date_of_string "2024-01-01") cfg.start_date;
   assert_equal (date_of_string "2024-12-31") cfg.end_date;
-  assert_equal 100000.0 cfg.initial_cash;
-  assert_equal [ "AAPL"; "GOOGL" ] cfg.symbols
+  assert_equal 100000.0 cfg.initial_cash
 
 let test_config_equality _ =
   let make_config () =
@@ -73,7 +71,6 @@ let test_config_equality _ =
       start_date = date_of_string "2024-01-01";
       end_date = date_of_string "2024-12-31";
       initial_cash = 100000.0;
-      symbols = [ "AAPL" ];
       commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
     }
   in
@@ -90,7 +87,6 @@ let test_config_show _ =
       start_date = date_of_string "2024-01-01";
       end_date = date_of_string "2024-12-31";
       initial_cash = 100000.0;
-      symbols = [ "AAPL" ];
       commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
     }
   in

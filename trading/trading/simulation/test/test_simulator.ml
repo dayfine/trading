@@ -22,7 +22,6 @@ let sample_config =
     start_date = date_of_string "2024-01-02";
     end_date = date_of_string "2024-01-05";
     initial_cash = 10000.0;
-    symbols = [ "AAPL" ];
     commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
   }
 
