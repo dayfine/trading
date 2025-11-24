@@ -139,8 +139,7 @@ let test_negative_quantiy_is_invalid _ =
       time_in_force = GTC;
     }
   in
-  assert_error ~msg:"Expected validation to fail for negative quantity"
-    (create_order invalid_params)
+  assert_that (create_order invalid_params) is_error
 
 let test_zero_quantiy_is_invalid _ =
   let invalid_params =

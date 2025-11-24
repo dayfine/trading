@@ -89,8 +89,8 @@ let test_execution_report_with_multiple_trades _ =
 (* commission_config tests *)
 let test_commission_config_construction _ =
   let config = { per_share = 0.01; minimum = 1.0 } in
-  assert_float_equal 0.01 config.per_share ~msg:"Per share commission";
-  assert_float_equal 1.0 config.minimum ~msg:"Minimum commission"
+  assert_that config.per_share (float_equal 0.01);
+  assert_that config.minimum (float_equal 1.0)
 
 let test_commission_config_equality _ =
   let config1 = { per_share = 0.01; minimum = 1.0 } in
@@ -107,10 +107,8 @@ let test_commission_config_show _ =
 let test_engine_config_construction _ =
   let commission_config = { per_share = 0.01; minimum = 1.0 } in
   let config = { commission = commission_config } in
-  assert_float_equal 0.01 config.commission.per_share
-    ~msg:"Engine config commission per share";
-  assert_float_equal 1.0 config.commission.minimum
-    ~msg:"Engine config commission minimum"
+  assert_that config.commission.per_share (float_equal 0.01);
+  assert_that config.commission.minimum (float_equal 1.0)
 
 let test_engine_config_equality _ =
   let commission_config = { per_share = 0.01; minimum = 1.0 } in

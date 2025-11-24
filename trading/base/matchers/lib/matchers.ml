@@ -1,51 +1,81 @@
 open Core
 open OUnit2
 
-let assert_error ~msg result =
-  match result with Ok _ -> assert_failure msg | Error _ -> () (* Expected *)
+(* ========================================================================== *)
+(* Core Matcher Types                                                        *)
+(* ========================================================================== *)
 
-let assert_ok ~msg result =
-  match result with
-  | Ok value -> value
-  | Error err -> assert_failure (msg ^ ": " ^ Status.show err)
+type 'a matcher = 'a -> unit
 
-let assert_float_equal ?(epsilon = 1e-9) expected actual ~msg =
-  let cmp a b = Float.(abs (a - b) < epsilon) in
-  let printer = Float.to_string in
-  assert_equal expected actual ~cmp ~printer ~msg
+let assert_that value matcher = matcher value
 
-let assert_some_with ~msg option ~f =
-  match option with Some value -> f value | None -> assert_failure msg
-
-let assert_some ~msg option =
-  match option with Some value -> value | None -> assert_failure msg
-
-let assert_none ~msg option =
-  match option with Some _ -> assert_failure msg | None -> () (* Expected *)
-
-let elements_are list callbacks =
-  if List.length list <> List.length callbacks then
-    assert_failure
-      (Printf.sprintf "List length (%d) does not match callbacks length (%d)"
-         (List.length list) (List.length callbacks))
-  else List.iter2_exn list callbacks ~f:(fun elem callback -> callback elem)
-
-let all_of checks value = List.iter checks ~f:(fun check -> check value)
-let field accessor matcher value = matcher (accessor value)
+(* ========================================================================== *)
+(* Basic Matchers                                                            *)
+(* ========================================================================== *)
 
 let equal_to ?(cmp = Poly.equal) ?(msg = "Values should be equal") expected
     actual =
   assert_equal expected actual ~cmp ~msg
 
-(* Fluent Matcher API *)
-type 'a matcher = 'a -> unit
+let field accessor matcher value = matcher (accessor value)
+let all_of checks value = List.iter checks ~f:(fun check -> check value)
 
-let assert_that value matcher = matcher value
+(* ========================================================================== *)
+(* Result Matchers                                                           *)
+(* ========================================================================== *)
+
+let is_ok result =
+  match result with
+  | Ok _ -> () (* Expected *)
+  | Error err -> assert_failure ("Expected Ok but got Error: " ^ Status.show err)
 
 let is_ok_and_holds matcher result =
   match result with
   | Ok value -> matcher value
   | Error err -> assert_failure ("Expected Ok but got Error: " ^ Status.show err)
+
+let is_error result =
+  match result with
+  | Ok _ -> assert_failure "Expected Error but got Ok"
+  | Error _ -> () (* Expected *)
+
+let is_error_with expected_code result =
+  match result with
+  | Ok _ -> assert_failure "Expected Error but got Ok"
+  | Error { Status.code; _ } ->
+      if not (Status.equal_code code expected_code) then
+        assert_failure
+          (Printf.sprintf "Expected error code %s but got %s"
+             (Status.show_code expected_code)
+             (Status.show_code code))
+
+(* ========================================================================== *)
+(* Option Matchers                                                           *)
+(* ========================================================================== *)
+
+let is_some_and matcher option =
+  match option with
+  | Some value -> matcher value
+  | None -> assert_failure "Expected Some but got None"
+
+let is_none option =
+  match option with
+  | Some _ -> assert_failure "Expected None but got Some"
+  | None -> () (* Expected *)
+
+(* ========================================================================== *)
+(* Numeric Matchers                                                          *)
+(* ========================================================================== *)
+
+let float_equal ?(epsilon = 1e-9) expected actual =
+  if Float.(abs (expected - actual) >= epsilon) then
+    assert_failure
+      (Printf.sprintf "Expected float %f but got %f (epsilon: %g)" expected
+         actual epsilon)
+
+(* ========================================================================== *)
+(* List Matchers                                                             *)
+(* ========================================================================== *)
 
 let each matcher list = List.iter list ~f:matcher
 
@@ -56,6 +86,13 @@ let one matcher list =
       assert_failure
         (Printf.sprintf "Expected exactly one element, got %d"
            (List.length list))
+
+let elements_are list callbacks =
+  if List.length list <> List.length callbacks then
+    assert_failure
+      (Printf.sprintf "List length (%d) does not match callbacks length (%d)"
+         (List.length list) (List.length callbacks))
+  else List.iter2_exn list callbacks ~f:(fun elem callback -> callback elem)
 
 let unordered_elements_are matchers list =
   (* Check length first *)

@@ -8,7 +8,9 @@ open Matchers
 
 (* Domain-specific helper using matchers library *)
 let apply_trades_exn portfolio trades ~error_msg =
-  assert_ok ~msg:error_msg (apply_trades portfolio trades)
+  match apply_trades portfolio trades with
+  | Ok value -> value
+  | Error err -> OUnit2.assert_failure (error_msg ^ ": " ^ Status.show err)
 
 (* Test data builders - simple record constructors *)
 let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
@@ -30,10 +32,8 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
 
 let test_create_portfolio _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
-  assert_float_equal 10000.0 (get_cash portfolio) ~msg:"Initial cash";
-  assert_float_equal 10000.0
-    (get_initial_cash portfolio)
-    ~msg:"Initial cash preserved";
+  assert_that (get_cash portfolio) (float_equal 10000.0);
+  assert_that (get_initial_cash portfolio) (float_equal 10000.0);
   assert_equal [] (get_trade_history portfolio) ~msg:"Empty trade history";
   assert_equal [] (list_positions portfolio) ~msg:"No positions initially"
 
@@ -48,9 +48,7 @@ let test_apply_buy_trade _ accounting_method =
     (apply_trades portfolio [ buy_trade ])
     (is_ok_and_holds (fun updated_portfolio ->
          (* Cash should be reduced by 100 * 150 = 15000 *)
-         assert_float_equal 5000.0
-           (get_cash updated_portfolio)
-           ~msg:"Cash reduced after buy";
+         assert_that (get_cash updated_portfolio) (float_equal 5000.0);
 
          (* Trade should be in history *)
          assert_equal 1
@@ -58,14 +56,11 @@ let test_apply_buy_trade _ accounting_method =
            ~msg:"Trade in history";
 
          (* Position should be created *)
-         assert_some_with ~msg:"Position should exist after buy trade"
-           (get_position updated_portfolio "AAPL") ~f:(fun position ->
-             assert_float_equal 100.0
-               (position_quantity position)
-               ~msg:"Position quantity";
-             assert_float_equal 150.0
-               (avg_cost_of_position position)
-               ~msg:"Position average cost (no commission)")))
+         assert_that
+           (get_position updated_portfolio "AAPL")
+           (is_some_and (fun position ->
+                assert_that (position_quantity position) (float_equal 100.0);
+                assert_that (avg_cost_of_position position) (float_equal 150.0)))))
 
 let test_apply_sell_trade _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -83,14 +78,13 @@ let test_apply_sell_trade _ accounting_method =
   in
 
   (* Cash: 20000 - 15000 + 8000 = 13000 *)
-  assert_float_equal 13000.0 (get_cash portfolio) ~msg:"Cash updated after sell";
+  assert_that (get_cash portfolio) (float_equal 13000.0);
 
   (* Position should be reduced *)
-  assert_some_with ~msg:"Position should still exist after partial sell"
-    (get_position portfolio "AAPL") ~f:(fun position ->
-      assert_float_equal 50.0
-        (position_quantity position)
-        ~msg:"Reduced position quantity")
+  assert_that
+    (get_position portfolio "AAPL")
+    (is_some_and (fun position ->
+         assert_that (position_quantity position) (float_equal 50.0)))
 
 let test_insufficient_cash _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:1000.0 () in
@@ -99,8 +93,7 @@ let test_insufficient_cash _ accounting_method =
       ~price:150.0 ()
   in
 
-  assert_error ~msg:"Should fail due to insufficient cash"
-    (apply_trades portfolio [ expensive_trade ])
+  assert_that (apply_trades portfolio [ expensive_trade ]) is_error
 
 let test_short_selling_allowed _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
@@ -113,11 +106,10 @@ let test_short_selling_allowed _ accounting_method =
     (apply_trades portfolio [ sell_trade ])
     (is_ok_and_holds (fun updated_portfolio ->
          (* Short selling should be allowed and create negative position *)
-         assert_some_with ~msg:"Short position should exist"
-           (get_position updated_portfolio "AAPL") ~f:(fun position ->
-             assert_float_equal (-100.0)
-               (position_quantity position)
-               ~msg:"Short position created")))
+         assert_that
+           (get_position updated_portfolio "AAPL")
+           (is_some_and (fun position ->
+                assert_that (position_quantity position) (float_equal (-100.0))))))
 
 let test_position_close _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -135,7 +127,7 @@ let test_position_close _ accounting_method =
   in
 
   (* Position should be closed (removed) *)
-  assert_none ~msg:"Position should be closed" (get_position portfolio "AAPL");
+  assert_that (get_position portfolio "AAPL") is_none;
   assert_equal [] (list_positions portfolio) ~msg:"No positions remaining"
 
 let test_validation _ accounting_method =
@@ -173,9 +165,7 @@ let test_multiple_trades_batch _ accounting_method =
            (List.length (get_trade_history updated_portfolio))
            ~msg:"Two trades in history";
          (* Cash: 30000 - (100*150) - (50*200) = 30000 - 15000 - 10000 = 5000 *)
-         assert_float_equal 5000.0
-           (get_cash updated_portfolio)
-           ~msg:"Cash after both trades"))
+         assert_that (get_cash updated_portfolio) (float_equal 5000.0)))
 
 let test_short_selling _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
@@ -189,19 +179,14 @@ let test_short_selling _ accounting_method =
   match apply_trades portfolio [ short_trade ] with
   | Ok updated_portfolio ->
       (* Cash should increase by 100 * 150 = 15000 *)
-      assert_float_equal 25000.0
-        (get_cash updated_portfolio)
-        ~msg:"Cash increased after short sell";
+      assert_that (get_cash updated_portfolio) (float_equal 25000.0);
 
       (* Position should be negative *)
-      assert_some_with ~msg:"Short position should exist"
-        (get_position updated_portfolio "AAPL") ~f:(fun position ->
-          assert_float_equal (-100.0)
-            (position_quantity position)
-            ~msg:"Short position quantity";
-          assert_float_equal 150.0
-            (avg_cost_of_position position)
-            ~msg:"Short position cost")
+      assert_that
+        (get_position updated_portfolio "AAPL")
+        (is_some_and (fun position ->
+             assert_that (position_quantity position) (float_equal (-100.0));
+             assert_that (avg_cost_of_position position) (float_equal 150.0)))
   | Error err -> assert_failure ("Short sell failed: " ^ Status.show err)
 
 let test_short_cover _ accounting_method =
@@ -220,24 +205,20 @@ let test_short_cover _ accounting_method =
   in
 
   (* Cash: 10000 + (15000 - 5) - (7000 + 3) = 10000 + 14995 - 7003 = 17992 *)
-  assert_float_equal 17992.0 (get_cash portfolio)
-    ~msg:"Cash after partial cover (with commissions)";
+  assert_that (get_cash portfolio) (float_equal 17992.0);
 
   (* Verify realized P&L: covering 50 shares
      P&L = 50 * ($149.95 - $140) - $3 = 50 * $9.95 - $3 = $497.50 - $3 = $494.50 *)
   let history = get_trade_history portfolio in
   let cover_pnl = (List.nth_exn history 1).realized_pnl in
-  assert_float_equal 494.5 cover_pnl ~msg:"Cover P&L should be $494.50";
+  assert_that cover_pnl (float_equal 494.5);
 
   (* Position should be -50 shares *)
-  assert_some_with ~msg:"Remaining short position should exist"
-    (get_position portfolio "AAPL") ~f:(fun position ->
-      assert_float_equal (-50.0)
-        (position_quantity position)
-        ~msg:"Remaining short position";
-      assert_float_equal 149.95
-        (avg_cost_of_position position)
-        ~msg:"Avg cost should remain $149.95 on partial cover")
+  assert_that
+    (get_position portfolio "AAPL")
+    (is_some_and (fun position ->
+         assert_that (position_quantity position) (float_equal (-50.0));
+         assert_that (avg_cost_of_position position) (float_equal 149.95)))
 
 let test_short_to_long _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
@@ -255,17 +236,14 @@ let test_short_to_long _ accounting_method =
   in
 
   (* Cash: 10000 + 7500 - 14000 = 3500 *)
-  assert_float_equal 3500.0 (get_cash portfolio) ~msg:"Cash after going long";
+  assert_that (get_cash portfolio) (float_equal 3500.0);
 
   (* Position should be +50 shares at new cost basis *)
-  assert_some_with ~msg:"Long position should exist after flip"
-    (get_position portfolio "AAPL") ~f:(fun position ->
-      assert_float_equal 50.0
-        (position_quantity position)
-        ~msg:"Long position after flip";
-      assert_float_equal 140.0
-        (avg_cost_of_position position)
-        ~msg:"New avg cost after direction change")
+  assert_that
+    (get_position portfolio "AAPL")
+    (is_some_and (fun position ->
+         assert_that (position_quantity position) (float_equal 50.0);
+         assert_that (avg_cost_of_position position) (float_equal 140.0)))
 
 let test_commission_in_cost_basis _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -280,16 +258,11 @@ let test_commission_in_cost_basis _ accounting_method =
     (apply_trades portfolio [ buy_trade ])
     (is_ok_and_holds (fun updated_portfolio ->
          (* Cost basis should be $100.10 per share ($100 + $10/100) *)
-         assert_some_with ~msg:"Position should exist after buy trade"
-           (get_position updated_portfolio "AAPL") ~f:(fun position ->
-             assert_float_equal 100.0
-               (position_quantity position)
-               ~msg:"Position quantity";
-             assert_float_equal 100.10
-               (avg_cost_of_position position)
-               ~msg:
-                 "Cost basis should include commission ($100 + $10/100 = \
-                  $100.10)")))
+         assert_that
+           (get_position updated_portfolio "AAPL")
+           (is_some_and (fun position ->
+                assert_that (position_quantity position) (float_equal 100.0);
+                assert_that (avg_cost_of_position position) (float_equal 100.10)))))
 
 let test_realized_pnl_calculation _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -308,7 +281,10 @@ let test_realized_pnl_calculation _ accounting_method =
   in
 
   let updated_portfolio =
-    assert_ok ~msg:"Realized P&L test failed" (apply_trades portfolio trades)
+    match apply_trades portfolio trades with
+    | Ok value -> value
+    | Error err ->
+        OUnit2.assert_failure ("Realized P&L test failed: " ^ Status.show err)
   in
 
   let trade_history = get_trade_history updated_portfolio in
@@ -318,8 +294,7 @@ let test_realized_pnl_calculation _ accounting_method =
   let trade2 = List.nth_exn trade_history 1 in
   let trade3 = List.nth_exn trade_history 2 in
 
-  assert_float_equal 0.0 trade1.realized_pnl
-    ~msg:"Buy trade should have no realized P&L";
+  assert_that trade1.realized_pnl (float_equal 0.0);
 
   (* Different P&L expectations based on accounting method *)
   (match accounting_method with
@@ -327,25 +302,21 @@ let test_realized_pnl_calculation _ accounting_method =
       (* AverageCost: Both sells use same avg cost of $150.05/share
          Sell 50 @ $160 - $3: P&L = 50 * ($160 - $150.05) - $3 = $494.50
          Sell 50 @ $155 - $2: P&L = 50 * ($155 - $150.05) - $2 = $245.50 *)
-      assert_float_equal 494.5 trade2.realized_pnl
-        ~msg:"AverageCost: First sell P&L";
-      assert_float_equal 245.5 trade3.realized_pnl
-        ~msg:"AverageCost: Second sell P&L"
+      assert_that trade2.realized_pnl (float_equal 494.5);
+      assert_that trade3.realized_pnl (float_equal 245.5)
   | FIFO ->
       (* FIFO: Sells consume lots in order (all from same lot in this case)
          Same as AverageCost since there's only one lot
          Sell 50 @ $160 - $3: P&L = 50 * ($160 - $150.05) - $3 = $494.50
          Sell 50 @ $155 - $2: P&L = 50 * ($155 - $150.05) - $2 = $245.50 *)
-      assert_float_equal 494.5 trade2.realized_pnl ~msg:"FIFO: First sell P&L";
-      assert_float_equal 245.5 trade3.realized_pnl ~msg:"FIFO: Second sell P&L");
+      assert_that trade2.realized_pnl (float_equal 494.5);
+      assert_that trade3.realized_pnl (float_equal 245.5));
 
   let total_pnl = get_total_realized_pnl updated_portfolio in
-  assert_float_equal 740.0 total_pnl
-    ~msg:"Total realized P&L should be $740 (buy commission reduces P&L)";
+  assert_that total_pnl (float_equal 740.0);
 
   (* Position should be closed *)
-  assert_none ~msg:"Position should be closed after selling all shares"
-    (get_position updated_portfolio "AAPL")
+  assert_that (get_position updated_portfolio "AAPL") is_none
 
 (* ========================================================================== *)
 (* Accounting-method specific tests - parameterized expectations             *)
@@ -366,8 +337,7 @@ let test_complete_offset_and_reversal _ accounting_method =
       ~error_msg:"Complete offset should succeed"
   in
   (* Position should be completely closed *)
-  assert_none ~msg:"Position should be closed after complete offset"
-    (get_position portfolio "AAPL");
+  assert_that (get_position portfolio "AAPL") is_none;
 
   (* Test 2: Long position reversed to short *)
   let portfolio =
@@ -381,19 +351,16 @@ let test_complete_offset_and_reversal _ accounting_method =
       ~error_msg:"Long to short reversal should succeed"
   in
   (* Position should now be short 100 shares *)
-  assert_some_with ~msg:"Position should exist after reversal"
-    (get_position portfolio "MSFT") ~f:(fun position ->
-      assert_float_equal (-100.0)
-        (position_quantity position)
-        ~msg:"Position should be short 100 after reversal";
-      assert_float_equal 210.0
-        (avg_cost_of_position position)
-        ~msg:"Short position cost basis";
-      (* FIFO: Only 1 lot, AverageCost: Only 1 lot *)
-      let expected_lot_count = 1 in
-      assert_equal expected_lot_count
-        (List.length position.lots)
-        ~msg:"Should have 1 lot");
+  assert_that
+    (get_position portfolio "MSFT")
+    (is_some_and (fun position ->
+         assert_that (position_quantity position) (float_equal (-100.0));
+         assert_that (avg_cost_of_position position) (float_equal 210.0);
+         (* FIFO: Only 1 lot, AverageCost: Only 1 lot *)
+         let expected_lot_count = 1 in
+         assert_equal expected_lot_count
+           (List.length position.lots)
+           ~msg:"Should have 1 lot"));
 
   (* Test 3: Short position reversed to long *)
   let portfolio =
@@ -407,19 +374,16 @@ let test_complete_offset_and_reversal _ accounting_method =
       ~error_msg:"Short to long reversal should succeed"
   in
   (* Position should now be long 40 shares *)
-  assert_some_with ~msg:"Position should exist after short to long reversal"
-    (get_position portfolio "TSLA") ~f:(fun position ->
-      assert_float_equal 40.0
-        (position_quantity position)
-        ~msg:"Position should be long 40 after reversal";
-      assert_float_equal 290.0
-        (avg_cost_of_position position)
-        ~msg:"Long position cost basis after reversal";
-      (* FIFO: Only 1 lot, AverageCost: Only 1 lot *)
-      let expected_lot_count = 1 in
-      assert_equal expected_lot_count
-        (List.length position.lots)
-        ~msg:"Should have 1 lot")
+  assert_that
+    (get_position portfolio "TSLA")
+    (is_some_and (fun position ->
+         assert_that (position_quantity position) (float_equal 40.0);
+         assert_that (avg_cost_of_position position) (float_equal 290.0);
+         (* FIFO: Only 1 lot, AverageCost: Only 1 lot *)
+         let expected_lot_count = 1 in
+         assert_equal expected_lot_count
+           (List.length position.lots)
+           ~msg:"Should have 1 lot"))
 
 (* ========================================================================== *)
 (* FIFO-specific tests - only run for FIFO accounting                        *)
@@ -442,17 +406,14 @@ let test_fifo_basic_buy_sell _ =
   in
 
   (* Verify position has 2 lots *)
-  assert_some_with ~msg:"Position should exist" (get_position portfolio "AAPL")
-    ~f:(fun position ->
-      assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
-      assert_float_equal 200.0
-        (position_quantity position)
-        ~msg:"Total quantity";
+  assert_that
+    (get_position portfolio "AAPL")
+    (is_some_and (fun position ->
+         assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
+         assert_that (position_quantity position) (float_equal 200.0);
 
-      (* Average cost should be (100*100 + 100*110) / 200 = 105 *)
-      assert_float_equal 105.0
-        (avg_cost_of_position position)
-        ~msg:"Average cost")
+         (* Average cost should be (100*100 + 100*110) / 200 = 105 *)
+         assert_that (avg_cost_of_position position) (float_equal 105.0)))
 
 let test_fifo_sell_matches_oldest _ =
   (* Create portfolio with FIFO accounting *)
@@ -473,17 +434,16 @@ let test_fifo_sell_matches_oldest _ =
   in
 
   (* Should have 1 lot remaining (the second buy at $110) *)
-  assert_some_with ~msg:"Position should still exist"
-    (get_position portfolio "AAPL") ~f:(fun position ->
-      assert_equal 1 (List.length position.lots) ~msg:"Should have 1 lot left";
-      assert_float_equal 100.0
-        (position_quantity position)
-        ~msg:"Remaining quantity";
+  assert_that
+    (get_position portfolio "AAPL")
+    (is_some_and (fun position ->
+         assert_equal 1
+           (List.length position.lots)
+           ~msg:"Should have 1 lot left";
+         assert_that (position_quantity position) (float_equal 100.0);
 
-      (* Remaining lot should have cost basis of $110 per share *)
-      assert_float_equal 110.0
-        (avg_cost_of_position position)
-        ~msg:"Remaining lot cost basis")
+         (* Remaining lot should have cost basis of $110 per share *)
+         assert_that (avg_cost_of_position position) (float_equal 110.0)))
 
 let test_fifo_partial_lot_consumption _ =
   (* Create portfolio with FIFO accounting *)
@@ -504,19 +464,18 @@ let test_fifo_partial_lot_consumption _ =
   in
 
   (* Should have 2 lots: 50 shares at $100, 100 shares at $110 *)
-  assert_some_with ~msg:"Position should still exist"
-    (get_position portfolio "AAPL") ~f:(fun position ->
-      assert_equal 2
-        (List.length position.lots)
-        ~msg:"Should have 2 lots (partial + full)";
-      assert_float_equal 150.0
-        (position_quantity position)
-        ~msg:"Remaining quantity";
+  assert_that
+    (get_position portfolio "AAPL")
+    (is_some_and (fun position ->
+         assert_equal 2
+           (List.length position.lots)
+           ~msg:"Should have 2 lots (partial + full)";
+         assert_that (position_quantity position) (float_equal 150.0);
 
-      (* Average cost: (50*100 + 100*110) / 150 = 106.67 *)
-      assert_float_equal 106.666666666667
-        (avg_cost_of_position position)
-        ~msg:"Average cost after partial sale")
+         (* Average cost: (50*100 + 100*110) / 150 = 106.67 *)
+         assert_that
+           (avg_cost_of_position position)
+           (float_equal 106.666666666667)))
 
 let test_fifo_vs_average_cost _ =
   (* Test that FIFO and AverageCost produce different results *)
@@ -555,30 +514,25 @@ let test_fifo_vs_average_cost _ =
       (* Both should have same quantity *)
       let fifo_qty = position_quantity fifo in
       let avg_qty = position_quantity avg in
-      assert_float_equal fifo_qty avg_qty ~msg:"Same quantity";
+      assert_that fifo_qty (float_equal avg_qty);
 
       (* FIFO should have 1 lot, AverageCost should have 1 lot *)
       assert_equal 1 (List.length fifo.lots) ~msg:"FIFO lots count";
       assert_equal 1 (List.length avg.lots) ~msg:"AverageCost lots count";
 
       (* FIFO remaining cost should be $110 (second lot) *)
-      assert_float_equal 110.0
-        (avg_cost_of_position fifo)
-        ~msg:"FIFO remaining cost";
+      assert_that (avg_cost_of_position fifo) (float_equal 110.0);
 
       (* AverageCost remaining cost should be $105 (average of both) *)
-      assert_float_equal 105.0 (avg_cost_of_position avg)
-        ~msg:"AverageCost remaining cost";
+      assert_that (avg_cost_of_position avg) (float_equal 105.0);
 
       (* FIFO and AverageCost have different realized P&L *)
       (* FIFO: Sells lot bought @ $100, so P&L = 100*(120-100) = $2000 *)
       (* AverageCost: Avg cost = $105, so P&L = 100*(120-105) = $1500 *)
       let fifo_pnl = get_total_realized_pnl portfolio_fifo in
       let avg_pnl = get_total_realized_pnl portfolio_avg in
-      assert_float_equal 2000.0 fifo_pnl
-        ~msg:"FIFO realized P&L (sold oldest lot @ $100)";
-      assert_float_equal 1500.0 avg_pnl
-        ~msg:"AverageCost realized P&L (avg cost $105)";
+      assert_that fifo_pnl (float_equal 2000.0);
+      assert_that avg_pnl (float_equal 1500.0);
 
       (* The key difference is in the REMAINING position cost basis *)
       (* FIFO keeps the $110 lot, AverageCost keeps avg of $105 *)
@@ -609,17 +563,16 @@ let test_fifo_multiple_partial_sells _ =
   in
 
   (* Should have 2 lots: 50 shares at $110, 100 shares at $120 *)
-  assert_some_with ~msg:"Position should still exist"
-    (get_position portfolio "AAPL") ~f:(fun position ->
-      assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
-      assert_float_equal 150.0
-        (position_quantity position)
-        ~msg:"Remaining quantity";
+  assert_that
+    (get_position portfolio "AAPL")
+    (is_some_and (fun position ->
+         assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
+         assert_that (position_quantity position) (float_equal 150.0);
 
-      (* Average cost: (50*110 + 100*120) / 150 = 116.67 *)
-      assert_float_equal 116.666666666667
-        (avg_cost_of_position position)
-        ~msg:"Average cost after selling 150")
+         (* Average cost: (50*110 + 100*120) / 150 = 116.67 *)
+         assert_that
+           (avg_cost_of_position position)
+           (float_equal 116.666666666667)))
 
 (* ========================================================================== *)
 (* Test suite organization                                                   *)

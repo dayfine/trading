@@ -8,7 +8,7 @@
  (name matchers)
  (synopsis "Testing utilities for Result types with OUnit2")
  (description
-  "Provides helper functions to reduce boilerplate when testing Result types in OCaml with OUnit2. Includes assert_ok_with, assert_error, and assert_ok for cleaner test assertions.")
+  "Provides a fluent matcher API for testing Result and Option types in OCaml with OUnit2. Includes matchers like is_ok_and_holds, is_error, is_some_and, and combinators for cleaner test assertions.")
  (depends
   (ocaml
    (>= 5.2.0))

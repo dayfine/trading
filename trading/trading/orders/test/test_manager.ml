@@ -98,15 +98,13 @@ let test_get_order _ =
       ~time_in_force:IOC
   in
   let _ = submit_orders manager [ order ] in
-  let retrieved_order =
-    assert_ok ~msg:"Failed to retrieve order" (get_order manager order.id)
-  in
-  assert_equal order retrieved_order
+  assert_that
+    (get_order manager order.id)
+    (is_ok_and_holds (fun retrieved_order -> assert_equal order retrieved_order))
 
 let test_get_nonexistent_order _ =
   let manager = create () in
-  assert_error ~msg:"Expected error for nonexistent order"
-    (get_order manager "nonexistent_id")
+  assert_that (get_order manager "nonexistent_id") is_error
 
 let test_cancel_order _ =
   let manager = create () in
@@ -257,13 +255,19 @@ let test_filtering _ =
 
   (* Get the updated orders from the manager for comparison *)
   let updated_order1 =
-    assert_ok ~msg:"order1 not found" (get_order manager order1.id)
+    match get_order manager order1.id with
+    | Ok order -> order
+    | Error err -> failwith ("order1 not found: " ^ Status.show err)
   in
   let updated_order2 =
-    assert_ok ~msg:"order2 not found" (get_order manager order2.id)
+    match get_order manager order2.id with
+    | Ok order -> order
+    | Error err -> failwith ("order2 not found: " ^ Status.show err)
   in
   let updated_order3 =
-    assert_ok ~msg:"order3 not found" (get_order manager order3.id)
+    match get_order manager order3.id with
+    | Ok order -> order
+    | Error err -> failwith ("order3 not found: " ^ Status.show err)
   in
 
   let by_symbol = list_orders ~filter:(BySymbol "AAPL") manager in
@@ -308,15 +312,14 @@ let test_update_order_success _ =
   (* Update the order to Filled status *)
   let filled_order = update_status order Filled in
   let result = update_order manager filled_order in
-  assert_ok ~msg:"Update should succeed" result;
+  assert_that result is_ok;
 
   (* Verify the order was updated *)
-  let retrieved_order =
-    assert_ok ~msg:"Failed to retrieve updated order"
-      (get_order manager order.id)
-  in
-  assert_equal Filled retrieved_order.status
-    ~msg:"Order status should be Filled"
+  assert_that
+    (get_order manager order.id)
+    (is_ok_and_holds (fun retrieved_order ->
+         assert_equal Filled retrieved_order.status
+           ~msg:"Order status should be Filled"))
 
 let test_update_nonexistent_order _ =
   let manager = create () in
@@ -353,16 +356,14 @@ let test_update_order_preserves_changes _ =
   let _ = update_order manager partially_filled_order in
 
   (* Retrieve and verify all fields updated *)
-  let retrieved_order =
-    assert_ok ~msg:"Failed to retrieve updated order"
-      (get_order manager order.id)
-  in
-  assert_equal (PartiallyFilled 50.0) retrieved_order.status
-    ~msg:"Status should be PartiallyFilled";
-  assert_float_equal 50.0 retrieved_order.filled_quantity
-    ~msg:"Filled quantity should be 50.0";
-  assert_equal (Some 150.0) retrieved_order.avg_fill_price
-    ~msg:"Average fill price should be Some 150.0"
+  assert_that
+    (get_order manager order.id)
+    (is_ok_and_holds (fun retrieved_order ->
+         assert_equal (PartiallyFilled 50.0) retrieved_order.status
+           ~msg:"Status should be PartiallyFilled";
+         assert_that retrieved_order.filled_quantity (float_equal 50.0);
+         assert_equal (Some 150.0) retrieved_order.avg_fill_price
+           ~msg:"Average fill price should be Some 150.0"))
 
 let test_update_order_timestamp _ =
   let manager = create () in
@@ -380,12 +381,12 @@ let test_update_order_timestamp _ =
   let _ = update_order manager filled_order in
 
   (* Verify timestamp was preserved *)
-  let retrieved_order =
-    assert_ok ~msg:"Failed to retrieve updated order"
-      (get_order manager order.id)
-  in
-  assert_bool "Retrieved order should have updated timestamp"
-    (Time_ns_unix.equal filled_order.updated_at retrieved_order.updated_at)
+  assert_that
+    (get_order manager order.id)
+    (is_ok_and_holds (fun retrieved_order ->
+         assert_bool "Retrieved order should have updated timestamp"
+           (Time_ns_unix.equal filled_order.updated_at
+              retrieved_order.updated_at)))
 
 let suite =
   "Order Manager"
