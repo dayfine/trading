@@ -19,6 +19,7 @@ type dependencies = { prices : symbol_prices list } [@@warning "-69"]
 
 (** {1 Simulator Types} *)
 
+(* TODO: Add [@@deriving show, eq] once Portfolio.t has deriving *)
 type step_result = {
   date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
