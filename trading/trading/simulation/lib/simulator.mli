@@ -30,9 +30,10 @@ type t
 (** Abstract simulator type *)
 
 type step_result = {
-  date : Date.t;
-  portfolio : Trading_portfolio.Portfolio.t;
+  date : Date.t;  (** The date this step executed on *)
+  portfolio : Trading_portfolio.Portfolio.t;  (** Portfolio state after step *)
   trades : Trading_base.Types.trade list;
+      (** Trades executed during this step (empty if no orders filled) *)
 }
 (** Result of a single simulation step *)
 
@@ -56,11 +57,3 @@ val run :
   t -> (step_result list * Trading_portfolio.Portfolio.t, Status.t) result
 (** Run the full simulation from start to end date. Returns list of step results
     and final portfolio. *)
-
-(** {1 Inspection} *)
-
-val current_date : t -> Date.t
-(** Get the current simulation date *)
-
-val is_complete : t -> bool
-(** Check if simulation has reached end date *)

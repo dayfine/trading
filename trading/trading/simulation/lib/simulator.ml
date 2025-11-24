@@ -45,15 +45,12 @@ let create ~config ~deps =
   in
   { config; deps; current_date = config.start_date; portfolio }
 
-(** {1 Inspection} *)
-
-let current_date t = t.current_date
-let is_complete t = Date.( >= ) t.current_date t.config.end_date
-
 (** {1 Running} *)
 
+let _is_complete t = Date.( >= ) t.current_date t.config.end_date
+
 let step t =
-  if is_complete t then Ok (Completed t.portfolio)
+  if _is_complete t then Ok (Completed t.portfolio)
   else
     (* Stub: just advance the date, no actual trading *)
     let next_date = Date.add_days t.current_date 1 in

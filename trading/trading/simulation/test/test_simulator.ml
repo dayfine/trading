@@ -51,24 +51,37 @@ let sample_deps = { prices = sample_prices }
 
 (* ==================== create tests ==================== *)
 
-let test_create_succeeds _ =
+let test_create_returns_simulator _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
-  assert_equal (date_of_string "2024-01-02") (current_date sim);
-  assert_bool "Should not be complete" (not (is_complete sim))
+  (* Verify by stepping - first step should return Stepped with start date *)
+  match step sim with
+  | Ok (Stepped (_, result)) ->
+      assert_equal (date_of_string "2024-01-02") result.date
+  | Ok (Completed _) -> assert_failure "Expected Stepped on first step"
+  | Error _ -> assert_failure "Expected step to succeed"
 
 let test_create_with_empty_prices _ =
   let sim = create ~config:sample_config ~deps:{ prices = [] } in
-  assert_equal (date_of_string "2024-01-02") (current_date sim)
+  (* Should still work - empty prices is valid for stub *)
+  match step sim with
+  | Ok (Stepped (_, result)) ->
+      assert_equal (date_of_string "2024-01-02") result.date
+  | Ok (Completed _) -> assert_failure "Expected Stepped"
+  | Error _ -> assert_failure "Expected step to succeed"
 
 (* ==================== step tests ==================== *)
 
 let test_step_advances_date _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
   match step sim with
-  | Ok (Stepped (sim', step_result)) ->
+  | Ok (Stepped (sim', step_result)) -> (
       assert_equal (date_of_string "2024-01-02") step_result.date;
-      assert_equal (date_of_string "2024-01-03") (current_date sim');
-      assert_equal [] step_result.trades
+      assert_equal [] step_result.trades;
+      (* Second step should be on next date *)
+      match step sim' with
+      | Ok (Stepped (_, result2)) ->
+          assert_equal (date_of_string "2024-01-03") result2.date
+      | _ -> assert_failure "Expected second step to succeed")
   | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
   | Error _ -> assert_failure "Expected step to succeed"
 
@@ -93,7 +106,16 @@ let test_run_completes_simulation _ =
   match run sim with
   | Ok (steps, _portfolio) ->
       (* start=Jan 2, end=Jan 5 -> steps for Jan 2, 3, 4 = 3 steps *)
-      assert_equal 3 (List.length steps)
+      assert_equal 3 (List.length steps);
+      (* Verify dates are in order *)
+      let dates = List.map steps ~f:(fun s -> s.date) in
+      assert_equal
+        [
+          date_of_string "2024-01-02";
+          date_of_string "2024-01-03";
+          date_of_string "2024-01-04";
+        ]
+        dates
   | Error e ->
       assert_failure (Printf.sprintf "Expected run to succeed: %s" e.message)
 
@@ -110,30 +132,13 @@ let test_run_on_already_complete _ =
   | Ok (steps, _portfolio) -> assert_equal 0 (List.length steps)
   | Error _ -> assert_failure "Expected run to succeed with empty steps"
 
-(* ==================== is_complete tests ==================== *)
-
-let test_is_complete_false_initially _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
-  assert_bool "Should not be complete initially" (not (is_complete sim))
-
-let test_is_complete_true_at_end _ =
-  let config =
-    {
-      sample_config with
-      start_date = date_of_string "2024-01-02";
-      end_date = date_of_string "2024-01-02";
-    }
-  in
-  let sim = create ~config ~deps:sample_deps in
-  assert_bool "Should be complete when start >= end" (is_complete sim)
-
 (* ==================== Test Suite ==================== *)
 
 let suite =
   "Simulator Tests"
   >::: [
          (* create *)
-         "create succeeds" >:: test_create_succeeds;
+         "create returns simulator" >:: test_create_returns_simulator;
          "create with empty prices" >:: test_create_with_empty_prices;
          (* step *)
          "step advances date" >:: test_step_advances_date;
@@ -142,9 +147,6 @@ let suite =
          (* run *)
          "run completes simulation" >:: test_run_completes_simulation;
          "run on already complete" >:: test_run_on_already_complete;
-         (* is_complete *)
-         "is_complete false initially" >:: test_is_complete_false_initially;
-         "is_complete true at end" >:: test_is_complete_true_at_end;
        ]
 
 let () = run_test_tt_main suite
