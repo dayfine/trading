@@ -48,11 +48,11 @@ val create : config:config -> deps:dependencies -> t
 
 (** {1 Running} *)
 
-val step : t -> (step_outcome, Status.t) result
+val step : t -> step_outcome Status.status_or
 (** Advance simulation by one day. Returns [Completed] when simulation reaches
     end date, or [Stepped] with updated simulator and step result. *)
 
 val run :
-  t -> (step_result list * Trading_portfolio.Portfolio.t, Status.t) result
+  t -> (step_result list * Trading_portfolio.Portfolio.t) Status.status_or
 (** Run the full simulation from start to end date. Returns list of step results
     and final portfolio. *)

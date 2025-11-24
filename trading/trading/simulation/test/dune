@@ -1,7 +1,10 @@
 (test
- (name test_types)
- (libraries ounit2 core trading.simulation trading.base types matchers))
-
-(test
  (name test_simulator)
- (libraries ounit2 core trading.simulation trading.base trading.engine types))
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.base
+  trading.engine
+  types
+  matchers))

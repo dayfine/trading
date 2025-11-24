@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Trading_simulation.Simulator
+open Matchers
 
 let date_of_string s = Date.of_string s
 
@@ -52,37 +53,33 @@ let sample_deps = { prices = sample_prices }
 
 let test_create_returns_simulator _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
-  (* Verify by stepping - first step should return Stepped with start date *)
-  match step sim with
-  | Ok (Stepped (_, result)) ->
-      assert_equal (date_of_string "2024-01-02") result.date
-  | Ok (Completed _) -> assert_failure "Expected Stepped on first step"
-  | Error _ -> assert_failure "Expected step to succeed"
+  assert_ok_with ~msg:"First step should succeed" (step sim) ~f:(function
+    | Stepped (_, result) ->
+        assert_equal (date_of_string "2024-01-02") result.date
+    | Completed _ -> assert_failure "Expected Stepped on first step")
 
 let test_create_with_empty_prices _ =
   let sim = create ~config:sample_config ~deps:{ prices = [] } in
-  (* Should still work - empty prices is valid for stub *)
-  match step sim with
-  | Ok (Stepped (_, result)) ->
-      assert_equal (date_of_string "2024-01-02") result.date
-  | Ok (Completed _) -> assert_failure "Expected Stepped"
-  | Error _ -> assert_failure "Expected step to succeed"
+  assert_ok_with ~msg:"Step with empty prices should succeed" (step sim)
+    ~f:(function
+    | Stepped (_, result) ->
+        assert_equal (date_of_string "2024-01-02") result.date
+    | Completed _ -> assert_failure "Expected Stepped")
 
 (* ==================== step tests ==================== *)
 
 let test_step_advances_date _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
-  match step sim with
-  | Ok (Stepped (sim', step_result)) -> (
-      assert_equal (date_of_string "2024-01-02") step_result.date;
-      assert_equal [] step_result.trades;
-      (* Second step should be on next date *)
-      match step sim' with
-      | Ok (Stepped (_, result2)) ->
-          assert_equal (date_of_string "2024-01-03") result2.date
-      | _ -> assert_failure "Expected second step to succeed")
-  | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
-  | Error _ -> assert_failure "Expected step to succeed"
+  assert_ok_with ~msg:"First step should succeed" (step sim) ~f:(function
+    | Stepped (sim', step_result) ->
+        assert_equal (date_of_string "2024-01-02") step_result.date;
+        assert_equal [] step_result.trades;
+        assert_ok_with ~msg:"Second step should succeed" (step sim')
+          ~f:(function
+          | Stepped (_, result2) ->
+              assert_equal (date_of_string "2024-01-03") result2.date
+          | Completed _ -> assert_failure "Expected Stepped on second step")
+    | Completed _ -> assert_failure "Expected Stepped, got Completed")
 
 let test_step_returns_completed_when_done _ =
   let config =
@@ -93,30 +90,25 @@ let test_step_returns_completed_when_done _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
-  match step sim with
-  | Ok (Completed _portfolio) -> () (* expected *)
-  | Ok (Stepped _) -> assert_failure "Expected Completed, got Stepped"
-  | Error _ -> assert_failure "Expected step to succeed with Completed"
+  assert_ok_with ~msg:"Step should return Completed" (step sim) ~f:(function
+    | Completed _portfolio -> ()
+    | Stepped _ -> assert_failure "Expected Completed, got Stepped")
 
 (* ==================== run tests ==================== *)
 
 let test_run_completes_simulation _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
-  match run sim with
-  | Ok (steps, _portfolio) ->
-      (* start=Jan 2, end=Jan 5 -> steps for Jan 2, 3, 4 = 3 steps *)
-      assert_equal 3 (List.length steps);
-      (* Verify dates are in order *)
+  assert_ok_with ~msg:"Run should succeed" (run sim)
+    ~f:(fun (steps, _portfolio) ->
+      assert_equal ~msg:"Should have 3 steps" 3 (List.length steps);
       let dates = List.map steps ~f:(fun s -> s.date) in
-      assert_equal
+      assert_equal ~msg:"Dates should be in order"
         [
           date_of_string "2024-01-02";
           date_of_string "2024-01-03";
           date_of_string "2024-01-04";
         ]
-        dates
-  | Error e ->
-      assert_failure (Printf.sprintf "Expected run to succeed: %s" e.message)
+        dates)
 
 let test_run_on_already_complete _ =
   let config =
@@ -127,23 +119,20 @@ let test_run_on_already_complete _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
-  match run sim with
-  | Ok (steps, _portfolio) -> assert_equal 0 (List.length steps)
-  | Error _ -> assert_failure "Expected run to succeed with empty steps"
+  assert_ok_with ~msg:"Run on complete should succeed" (run sim)
+    ~f:(fun (steps, _portfolio) ->
+      assert_equal ~msg:"Should have 0 steps" 0 (List.length steps))
 
 (* ==================== Test Suite ==================== *)
 
 let suite =
   "Simulator Tests"
   >::: [
-         (* create *)
          "create returns simulator" >:: test_create_returns_simulator;
          "create with empty prices" >:: test_create_with_empty_prices;
-         (* step *)
          "step advances date" >:: test_step_advances_date;
          "step returns Completed when done"
          >:: test_step_returns_completed_when_done;
-         (* run *)
          "run completes simulation" >:: test_run_completes_simulation;
          "run on already complete" >:: test_run_on_already_complete;
        ]
