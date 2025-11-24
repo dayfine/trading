@@ -1,0 +1,10 @@
+(test
+ (name test_simulator)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.base
+  trading.engine
+  types
+  matchers))
