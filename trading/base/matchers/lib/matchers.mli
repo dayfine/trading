@@ -4,18 +4,6 @@
     maintaining clarity. These helpers work with OUnit2 test framework and
     Status.status_or types. *)
 
-val assert_ok_with : msg:string -> 'a Status.status_or -> f:('a -> unit) -> unit
-(** [assert_ok_with ~msg result ~f] asserts that [result] is [Ok value] and
-    executes [f value] for further assertions. If [result] is [Error], fails
-    with [msg] and the error details.
-
-    Example:
-    {[
-      assert_ok_with ~msg:"Operation failed" (some_operation ())
-        ~f:(fun value ->
-          assert_equal expected_value value ~msg:"Value mismatch")
-    ]} *)
-
 val assert_error : msg:string -> 'a Status.status_or -> unit
 (** [assert_error ~msg result] asserts that [result] is [Error]. If [result] is
     [Ok], fails with [msg].

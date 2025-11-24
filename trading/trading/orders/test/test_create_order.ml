@@ -17,23 +17,24 @@ let test_create_limit_order _ =
     }
   in
   let test_time = Time_ns_unix.of_string "2024-01-01 12:00:00Z" in
-  assert_ok_with ~msg:"Failed to create limit order"
-    (create_order ~now_time:test_time params) ~f:(fun order ->
-      assert_equal
-        {
-          id = order.id;
-          symbol = "MSFT";
-          side = Sell;
-          order_type = Limit 150.0;
-          quantity = 50.0;
-          time_in_force = Day;
-          status = Pending;
-          filled_quantity = 0.0;
-          avg_fill_price = None;
-          created_at = test_time;
-          updated_at = test_time;
-        }
-        order)
+  assert_that
+    (create_order ~now_time:test_time params)
+    (is_ok_and_holds (fun order ->
+         assert_equal
+           {
+             id = order.id;
+             symbol = "MSFT";
+             side = Sell;
+             order_type = Limit 150.0;
+             quantity = 50.0;
+             time_in_force = Day;
+             status = Pending;
+             filled_quantity = 0.0;
+             avg_fill_price = None;
+             created_at = test_time;
+             updated_at = test_time;
+           }
+           order))
 
 let test_stop_orders _ =
   let stop_buy_params =

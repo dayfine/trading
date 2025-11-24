@@ -72,10 +72,11 @@ let test_portfolio_value_with_market_prices _ =
   let market_prices = [ ("AAPL", 160.0); ("MSFT", 210.0) ] in
   (* AAPL: 100 * 160 = 16000, MSFT: 50 * 210 = 10500, Cash: 5000 *)
   let expected = 16000.0 +. 10500.0 +. 5000.0 in
-  assert_ok_with ~msg:"Portfolio value should succeed"
-    (portfolio_value positions cash_value market_prices) ~f:(fun actual ->
-      assert_float_equal expected actual
-        ~msg:"Portfolio value with market prices")
+  assert_that
+    (portfolio_value positions cash_value market_prices)
+    (is_ok_and_holds (fun actual ->
+         assert_float_equal expected actual
+           ~msg:"Portfolio value with market prices"))
 
 let test_portfolio_value_missing_prices _ =
   let positions =

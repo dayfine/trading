@@ -44,27 +44,28 @@ let test_apply_buy_trade _ accounting_method =
       ~price:150.0 ()
   in
 
-  assert_ok_with ~msg:"Buy trade failed" (apply_trades portfolio [ buy_trade ])
-    ~f:(fun updated_portfolio ->
-      (* Cash should be reduced by 100 * 150 = 15000 *)
-      assert_float_equal 5000.0
-        (get_cash updated_portfolio)
-        ~msg:"Cash reduced after buy";
+  assert_that
+    (apply_trades portfolio [ buy_trade ])
+    (is_ok_and_holds (fun updated_portfolio ->
+         (* Cash should be reduced by 100 * 150 = 15000 *)
+         assert_float_equal 5000.0
+           (get_cash updated_portfolio)
+           ~msg:"Cash reduced after buy";
 
-      (* Trade should be in history *)
-      assert_equal 1
-        (List.length (get_trade_history updated_portfolio))
-        ~msg:"Trade in history";
+         (* Trade should be in history *)
+         assert_equal 1
+           (List.length (get_trade_history updated_portfolio))
+           ~msg:"Trade in history";
 
-      (* Position should be created *)
-      assert_some_with ~msg:"Position should exist after buy trade"
-        (get_position updated_portfolio "AAPL") ~f:(fun position ->
-          assert_float_equal 100.0
-            (position_quantity position)
-            ~msg:"Position quantity";
-          assert_float_equal 150.0
-            (avg_cost_of_position position)
-            ~msg:"Position average cost (no commission)"))
+         (* Position should be created *)
+         assert_some_with ~msg:"Position should exist after buy trade"
+           (get_position updated_portfolio "AAPL") ~f:(fun position ->
+             assert_float_equal 100.0
+               (position_quantity position)
+               ~msg:"Position quantity";
+             assert_float_equal 150.0
+               (avg_cost_of_position position)
+               ~msg:"Position average cost (no commission)")))
 
 let test_apply_sell_trade _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -108,14 +109,15 @@ let test_short_selling_allowed _ accounting_method =
       ~price:150.0 ()
   in
 
-  assert_ok_with ~msg:"Short selling should be allowed"
-    (apply_trades portfolio [ sell_trade ]) ~f:(fun updated_portfolio ->
-      (* Short selling should be allowed and create negative position *)
-      assert_some_with ~msg:"Short position should exist"
-        (get_position updated_portfolio "AAPL") ~f:(fun position ->
-          assert_float_equal (-100.0)
-            (position_quantity position)
-            ~msg:"Short position created"))
+  assert_that
+    (apply_trades portfolio [ sell_trade ])
+    (is_ok_and_holds (fun updated_portfolio ->
+         (* Short selling should be allowed and create negative position *)
+         assert_some_with ~msg:"Short position should exist"
+           (get_position updated_portfolio "AAPL") ~f:(fun position ->
+             assert_float_equal (-100.0)
+               (position_quantity position)
+               ~msg:"Short position created")))
 
 let test_position_close _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -143,10 +145,12 @@ let test_validation _ accounting_method =
       ~price:150.0 ()
   in
 
-  assert_ok_with ~msg:"Trade application failed"
-    (apply_trades portfolio [ trade ]) ~f:(fun updated_portfolio ->
-      assert_ok_with ~msg:"Validation failed" (validate updated_portfolio)
-        ~f:(fun () -> () (* Expected - portfolio should be consistent *)))
+  assert_that
+    (apply_trades portfolio [ trade ])
+    (is_ok_and_holds (fun updated_portfolio ->
+         assert_that
+           (validate updated_portfolio)
+           (is_ok_and_holds (fun () -> ()))))
 
 let test_multiple_trades_batch _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:30000.0 () in
@@ -159,18 +163,19 @@ let test_multiple_trades_batch _ accounting_method =
     ]
   in
 
-  assert_ok_with ~msg:"Batch trades failed" (apply_trades portfolio trades)
-    ~f:(fun updated_portfolio ->
-      assert_equal 2
-        (List.length (list_positions updated_portfolio))
-        ~msg:"Two positions created";
-      assert_equal 2
-        (List.length (get_trade_history updated_portfolio))
-        ~msg:"Two trades in history";
-      (* Cash: 30000 - (100*150) - (50*200) = 30000 - 15000 - 10000 = 5000 *)
-      assert_float_equal 5000.0
-        (get_cash updated_portfolio)
-        ~msg:"Cash after both trades")
+  assert_that
+    (apply_trades portfolio trades)
+    (is_ok_and_holds (fun updated_portfolio ->
+         assert_equal 2
+           (List.length (list_positions updated_portfolio))
+           ~msg:"Two positions created";
+         assert_equal 2
+           (List.length (get_trade_history updated_portfolio))
+           ~msg:"Two trades in history";
+         (* Cash: 30000 - (100*150) - (50*200) = 30000 - 15000 - 10000 = 5000 *)
+         assert_float_equal 5000.0
+           (get_cash updated_portfolio)
+           ~msg:"Cash after both trades"))
 
 let test_short_selling _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
@@ -271,18 +276,20 @@ let test_commission_in_cost_basis _ accounting_method =
       ~price:100.0 ~commission:10.0 ()
   in
 
-  assert_ok_with ~msg:"Commission test failed"
-    (apply_trades portfolio [ buy_trade ]) ~f:(fun updated_portfolio ->
-      (* Cost basis should be $100.10 per share ($100 + $10/100) *)
-      assert_some_with ~msg:"Position should exist after buy trade"
-        (get_position updated_portfolio "AAPL") ~f:(fun position ->
-          assert_float_equal 100.0
-            (position_quantity position)
-            ~msg:"Position quantity";
-          assert_float_equal 100.10
-            (avg_cost_of_position position)
-            ~msg:
-              "Cost basis should include commission ($100 + $10/100 = $100.10)"))
+  assert_that
+    (apply_trades portfolio [ buy_trade ])
+    (is_ok_and_holds (fun updated_portfolio ->
+         (* Cost basis should be $100.10 per share ($100 + $10/100) *)
+         assert_some_with ~msg:"Position should exist after buy trade"
+           (get_position updated_portfolio "AAPL") ~f:(fun position ->
+             assert_float_equal 100.0
+               (position_quantity position)
+               ~msg:"Position quantity";
+             assert_float_equal 100.10
+               (avg_cost_of_position position)
+               ~msg:
+                 "Cost basis should include commission ($100 + $10/100 = \
+                  $100.10)")))
 
 let test_realized_pnl_calculation _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
