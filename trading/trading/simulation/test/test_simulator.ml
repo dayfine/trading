@@ -5,7 +5,6 @@ open Matchers
 
 let date_of_string s = Date.of_string s
 
-(** Helper to create a daily price *)
 let make_daily_price ~date ~open_price ~high ~low ~close ~volume =
   Types.Daily_price.
     {
@@ -49,37 +48,44 @@ let sample_prices =
 
 let sample_deps = { prices = sample_prices }
 
+(* Custom matchers for step_outcome *)
+let is_stepped f = function
+  | Stepped (sim', result) -> f (sim', result)
+  | Completed _ -> assert_failure "Expected Stepped, got Completed"
+
+let is_completed f = function
+  | Completed portfolio -> f portfolio
+  | Stepped _ -> assert_failure "Expected Completed, got Stepped"
+
 (* ==================== create tests ==================== *)
 
 let test_create_returns_simulator _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
-  assert_ok_with ~msg:"First step should succeed" (step sim) ~f:(function
-    | Stepped (_, result) ->
-        assert_equal (date_of_string "2024-01-02") result.date
-    | Completed _ -> assert_failure "Expected Stepped on first step")
+  assert_that (step sim)
+    (is_ok_and_holds
+       (is_stepped (fun (_, result) ->
+            assert_equal (date_of_string "2024-01-02") result.date)))
 
 let test_create_with_empty_prices _ =
   let sim = create ~config:sample_config ~deps:{ prices = [] } in
-  assert_ok_with ~msg:"Step with empty prices should succeed" (step sim)
-    ~f:(function
-    | Stepped (_, result) ->
-        assert_equal (date_of_string "2024-01-02") result.date
-    | Completed _ -> assert_failure "Expected Stepped")
+  assert_that (step sim)
+    (is_ok_and_holds
+       (is_stepped (fun (_, result) ->
+            assert_equal (date_of_string "2024-01-02") result.date)))
 
 (* ==================== step tests ==================== *)
 
 let test_step_advances_date _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
-  assert_ok_with ~msg:"First step should succeed" (step sim) ~f:(function
-    | Stepped (sim', step_result) ->
-        assert_equal (date_of_string "2024-01-02") step_result.date;
-        assert_equal [] step_result.trades;
-        assert_ok_with ~msg:"Second step should succeed" (step sim')
-          ~f:(function
-          | Stepped (_, result2) ->
-              assert_equal (date_of_string "2024-01-03") result2.date
-          | Completed _ -> assert_failure "Expected Stepped on second step")
-    | Completed _ -> assert_failure "Expected Stepped, got Completed")
+  assert_that (step sim)
+    (is_ok_and_holds
+       (is_stepped (fun (sim', step_result) ->
+            assert_equal (date_of_string "2024-01-02") step_result.date;
+            assert_equal [] step_result.trades;
+            assert_that (step sim')
+              (is_ok_and_holds
+                 (is_stepped (fun (_, result2) ->
+                      assert_equal (date_of_string "2024-01-03") result2.date))))))
 
 let test_step_returns_completed_when_done _ =
   let config =
@@ -90,25 +96,23 @@ let test_step_returns_completed_when_done _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
-  assert_ok_with ~msg:"Step should return Completed" (step sim) ~f:(function
-    | Completed _portfolio -> ()
-    | Stepped _ -> assert_failure "Expected Completed, got Stepped")
+  assert_that (step sim) (is_ok_and_holds (is_completed (fun _ -> ())))
 
 (* ==================== run tests ==================== *)
 
 let test_run_completes_simulation _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
-  assert_ok_with ~msg:"Run should succeed" (run sim)
-    ~f:(fun (steps, _portfolio) ->
-      assert_equal ~msg:"Should have 3 steps" 3 (List.length steps);
-      let dates = List.map steps ~f:(fun s -> s.date) in
-      assert_equal ~msg:"Dates should be in order"
-        [
-          date_of_string "2024-01-02";
-          date_of_string "2024-01-03";
-          date_of_string "2024-01-04";
-        ]
-        dates)
+  assert_that (run sim)
+    (is_ok_and_holds (fun (steps, _portfolio) ->
+         assert_that steps (size_is 3);
+         let dates = List.map steps ~f:(fun s -> s.date) in
+         assert_equal
+           [
+             date_of_string "2024-01-02";
+             date_of_string "2024-01-03";
+             date_of_string "2024-01-04";
+           ]
+           dates))
 
 let test_run_on_already_complete _ =
   let config =
@@ -119,9 +123,8 @@ let test_run_on_already_complete _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
-  assert_ok_with ~msg:"Run on complete should succeed" (run sim)
-    ~f:(fun (steps, _portfolio) ->
-      assert_equal ~msg:"Should have 0 steps" 0 (List.length steps))
+  assert_that (run sim)
+    (is_ok_and_holds (fun (steps, _) -> assert_that steps (size_is 0)))
 
 (* ==================== Test Suite ==================== *)
 
