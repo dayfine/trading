@@ -143,6 +143,99 @@ let position = Hashtbl.find portfolio.positions "AAPL" in
 assert_that position (is_some_and (fun pos -> ...))
 ```
 
+**Matcher Composition Patterns:**
+
+The matchers library supports declarative, composable assertions. Follow these patterns for consistency:
+
+1. **Use type annotations instead of explicit comparison functions:**
+   ```ocaml
+   (* GOOD: Type annotation enables structural equality *)
+   assert_that result
+     (is_some_and (equal_to ({ price = 100.0; quantity = 10 } : order)))
+
+   (* AVOID: Unnecessary explicit comparison parameter *)
+   assert_that result
+     (is_some_and (equal_to ~cmp:equal_order { price = 100.0; quantity = 10 }))
+   ```
+
+2. **Inline expected values instead of intermediate variables:**
+   ```ocaml
+   (* GOOD: Clear and concise *)
+   assert_that result
+     (is_some_and (equal_to ({ price = 100.0; fraction = 0.5 } : fill_result)))
+
+   (* AVOID: Unnecessary variable binding *)
+   let expected = { price = 100.0; fraction = 0.5 } in
+   assert_that result (is_some_and (equal_to expected))
+   ```
+
+3. **Use `elements_are` for comprehensive list validation:**
+   ```ocaml
+   (* GOOD: Validates entire list structure with position-specific assertions *)
+   assert_that path
+     (elements_are [
+       equal_to ({ time = 0.0; price = 100.0 } : path_point);
+       equal_to ({ time = 0.5; price = 105.0 } : path_point);
+       equal_to ({ time = 1.0; price = 110.0 } : path_point);
+     ])
+
+   (* AVOID: Manual element-by-element checking *)
+   match path with
+   | [p1; p2; p3] ->
+       assert_that p1 (equal_to { time = 0.0; price = 100.0 });
+       assert_that p2 (equal_to { time = 0.5; price = 105.0 });
+       assert_that p3 (equal_to { time = 1.0; price = 110.0 })
+   | _ -> assert_failure "Expected 3 elements"
+   ```
+
+4. **Use `field` matcher to extract and assert on record fields:**
+   ```ocaml
+   (* GOOD: Extract specific field and apply matcher *)
+   assert_that result
+     (is_some_and (field (fun fill -> fill.price) (float_equal 95.0)))
+
+   (* GOOD: Can chain with other matchers *)
+   assert_that portfolio
+     (field (fun p -> p.current_cash) (float_equal 10000.0))
+
+   (* AVOID: Pattern matching for simple field access *)
+   match result with
+   | Some fill -> assert_that fill.price (float_equal 95.0)
+   | None -> assert_failure "Expected Some"
+   ```
+
+5. **Use `is_some_and` for Option unwrapping:**
+   ```ocaml
+   (* GOOD: Declarative Option handling *)
+   assert_that result is_some_and (equal_to expected_value)
+   assert_that result is_none
+
+   (* AVOID: Manual pattern matching *)
+   match result with
+   | Some value -> assert_that value (equal_to expected_value)
+   | None -> assert_failure "Expected Some"
+   ```
+
+6. **Compose matchers for complex assertions:**
+   ```ocaml
+   (* Combining multiple matchers *)
+   assert_that order_result
+     (is_ok_and_holds (fun order ->
+       assert_that order (field (fun o -> o.status) (equal_to Filled))))
+
+   (* Nested composition for deep structures *)
+   assert_that portfolio
+     (field (fun p -> Hashtbl.find p.positions "AAPL")
+            (is_some_and (field (fun pos -> pos.quantity) (float_equal 100.0))))
+   ```
+
+**Key Principles:**
+- Prefer declarative matchers over imperative pattern matching
+- Use type annotations to enable structural equality
+- Inline values for clarity and conciseness
+- Compose matchers for complex assertions
+- Let the matcher library handle common patterns (Option, Result, list validation)
+
 **Test Data Builders:**
 - Keep simple record constructors inline in test files
 - Don't create unnecessary helper modules for trivial builders

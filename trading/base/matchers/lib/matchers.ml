@@ -87,12 +87,12 @@ let one matcher list =
         (Printf.sprintf "Expected exactly one element, got %d"
            (List.length list))
 
-let elements_are list callbacks =
-  if List.length list <> List.length callbacks then
+let elements_are matchers list =
+  if List.length list <> List.length matchers then
     assert_failure
-      (Printf.sprintf "List length (%d) does not match callbacks length (%d)"
-         (List.length list) (List.length callbacks))
-  else List.iter2_exn list callbacks ~f:(fun elem callback -> callback elem)
+      (Printf.sprintf "List length (%d) does not match matchers length (%d)"
+         (List.length list) (List.length matchers))
+  else List.iter2_exn list matchers ~f:(fun elem matcher -> matcher elem)
 
 let unordered_elements_are matchers list =
   (* Check length first *)
