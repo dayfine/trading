@@ -54,18 +54,6 @@ let gap_down_day =
       adjusted_close = 85.0;
     }
 
-let gap_trend_day =
-  Types.Daily_price.
-    {
-      date = date_of_string "2024-01-06";
-      open_price = 120.0;
-      high_price = 130.0;
-      low_price = 120.0;
-      close_price = 125.0;
-      volume = 750000;
-      adjusted_close = 125.0;
-    }
-
 (* ==================== generate_path tests ==================== *)
 
 let test_upward_day_path _ =
@@ -299,6 +287,51 @@ let test_stop_sell_gap_prefers_observed_price _ =
        (field (fun fill -> fill.price) (float_equal gap_down_day.open_price)))
 
 (* ==================== would_fill tests - StopLimit orders ==================== *)
+let test_stop_limit_buy_gap_prefers_observed_price _ =
+  (* Stop-limit shares the stop but allows paying up to 130, so fills immediately
+     at the observed open. *)
+  let path = generate_path gap_up_day in
+  let result =
+    would_fill ~path
+      ~order_type:(Trading_base.Types.StopLimit (110.0, 130.0))
+      ~side:Trading_base.Types.Buy
+  in
+  assert_that result
+    (is_some_and
+       (field (fun fill -> fill.price) (float_equal gap_up_day.open_price)))
+
+let test_stop_limit_buy_gap_limit_not_reached _ =
+  (* Stop triggers, but limit 117 never trades (low is 118). *)
+  let path = generate_path gap_up_day in
+  let result =
+    would_fill ~path
+      ~order_type:(Trading_base.Types.StopLimit (110.0, 117.0))
+      ~side:Trading_base.Types.Buy
+  in
+  assert_that result is_none
+
+let test_stop_limit_sell_gap_prefers_observed_price _ =
+  (* Stop-limit shares the stop but accepts prices down to 85, so fills
+     immediately at the observed open. *)
+  let path = generate_path gap_down_day in
+  let result =
+    would_fill ~path
+      ~order_type:(Trading_base.Types.StopLimit (95.0, 85.0))
+      ~side:Trading_base.Types.Sell
+  in
+  assert_that result
+    (is_some_and
+       (field (fun fill -> fill.price) (float_equal gap_down_day.open_price)))
+
+let test_stop_limit_sell_gap_limit_not_reached _ =
+  (* Stop triggers, but limit 96 never trades (high is 95). *)
+  let path = generate_path gap_down_day in
+  let result =
+    would_fill ~path
+      ~order_type:(Trading_base.Types.StopLimit (100.0, 96.0))
+      ~side:Trading_base.Types.Sell
+  in
+  assert_that result is_none
 
 let test_stop_limit_buy_both_conditions_met _ =
   (* Stop 105 triggers breakout continuation; limit 107 caps fill price *)
@@ -317,16 +350,6 @@ let test_stop_limit_buy_stop_not_triggered _ =
   let result =
     would_fill ~path
       ~order_type:(Trading_base.Types.StopLimit (115.0, 116.0))
-      ~side:Trading_base.Types.Buy
-  in
-  assert_that result is_none
-
-let test_stop_limit_buy_limit_not_reached _ =
-  (* Gap opens above stop; limit 119 never trades because price stays >= 120 *)
-  let path = generate_path gap_trend_day in
-  let result =
-    would_fill ~path
-      ~order_type:(Trading_base.Types.StopLimit (118.0, 119.0))
       ~side:Trading_base.Types.Buy
   in
   assert_that result is_none
@@ -378,12 +401,18 @@ let suite =
          "stop sell gap fills at observed price"
          >:: test_stop_sell_gap_prefers_observed_price;
          (* StopLimit order tests *)
+         "stop-limit buy gap fills at observed price"
+         >:: test_stop_limit_buy_gap_prefers_observed_price;
+         "stop-limit buy gap limit not reached"
+         >:: test_stop_limit_buy_gap_limit_not_reached;
+         "stop-limit sell gap fills at observed price"
+         >:: test_stop_limit_sell_gap_prefers_observed_price;
+         "stop-limit sell gap limit not reached"
+         >:: test_stop_limit_sell_gap_limit_not_reached;
          "stop limit buy both conditions met"
          >:: test_stop_limit_buy_both_conditions_met;
          "stop limit buy stop not triggered"
          >:: test_stop_limit_buy_stop_not_triggered;
-         "stop limit buy limit not reached"
-         >:: test_stop_limit_buy_limit_not_reached;
          "stop limit sell both conditions met"
          >:: test_stop_limit_sell_both_conditions_met;
        ]

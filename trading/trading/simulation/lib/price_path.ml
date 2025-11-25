@@ -84,10 +84,7 @@ let rec _search_order_fill_with_path ~(crosses : float -> float -> bool)
   | (curr_point : path_point) :: tail ->
       if crosses prev_point.price curr_point.price then
         Some
-          ( {
-              price = cross_price;
-              fraction_of_day = curr_point.fraction_of_day;
-            },
+          ( { price = cross_price; fraction_of_day = curr_point.fraction_of_day },
             curr_point :: tail )
       else if meets curr_point.price then
         Some
@@ -100,8 +97,8 @@ let rec _search_order_fill_with_path ~(crosses : float -> float -> bool)
         _search_order_fill_with_path ~crosses ~meets ~cross_price
           ~prev_point:curr_point tail
 
-let _search_order_fill ~(crosses : float -> float -> bool) ~(meets : float -> bool)
-    ~cross_price ~(prev_point : path_point) remaining =
+let _search_order_fill ~(crosses : float -> float -> bool)
+    ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) remaining =
   match
     _search_order_fill_with_path ~crosses ~meets ~cross_price ~prev_point
       remaining
