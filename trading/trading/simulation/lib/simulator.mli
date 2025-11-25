@@ -47,6 +47,14 @@ type step_outcome =
 val create : config:config -> deps:dependencies -> t
 (** Create a simulator from config and dependencies *)
 
+(** {1 Order Management} *)
+
+val submit_orders :
+  t -> Trading_orders.Types.order list -> t * Status.status list
+(** Submit orders to the simulator for execution. Returns updated simulator and
+    list of submission results (Ok or Error status for each order). Orders will
+    be processed during subsequent step() calls. *)
+
 (** {1 Running} *)
 
 val step : t -> step_outcome Status.status_or
