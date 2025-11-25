@@ -26,11 +26,9 @@ let test_path_starts_at_open _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  match List.hd path with
-  | Some first_point ->
-      assert_that first_point.fraction_of_day (float_equal 0.0);
-      assert_that first_point.price (float_equal 100.0)
-  | None -> assert_failure "Path should not be empty"
+  let expected_first : path_point = { fraction_of_day = 0.0; price = 100.0 } in
+  assert_that (List.hd path)
+    (is_some_and (equal_to ~cmp:equal_path_point expected_first))
 
 let test_path_ends_at_close _ =
   let daily =
@@ -39,11 +37,9 @@ let test_path_ends_at_close _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  match List.last path with
-  | Some last_point ->
-      assert_that last_point.fraction_of_day (float_equal 1.0);
-      assert_that last_point.price (float_equal 105.0)
-  | None -> assert_failure "Path should not be empty"
+  let expected_last : path_point = { fraction_of_day = 1.0; price = 105.0 } in
+  assert_that (List.last path)
+    (is_some_and (equal_to ~cmp:equal_path_point expected_last))
 
 let test_path_touches_high _ =
   let daily =
@@ -52,10 +48,11 @@ let test_path_touches_high _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  let has_high =
-    List.exists path ~f:(fun point -> Float.(point.price = 110.0))
+  let high_point : path_point option =
+    List.find path ~f:(fun point -> Float.(point.price = 110.0))
   in
-  assert_bool "Path should touch high price" has_high
+  assert_that high_point
+    (is_some_and (field (fun (p : path_point) -> p.price) (float_equal 110.0)))
 
 let test_path_touches_low _ =
   let daily =
@@ -64,8 +61,11 @@ let test_path_touches_low _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  let has_low = List.exists path ~f:(fun point -> Float.(point.price = 95.0)) in
-  assert_bool "Path should touch low price" has_low
+  let low_point : path_point option =
+    List.find path ~f:(fun point -> Float.(point.price = 95.0))
+  in
+  assert_that low_point
+    (is_some_and (field (fun (p : path_point) -> p.price) (float_equal 95.0)))
 
 let test_upward_day_visits_high_before_low _ =
   (* When close > open, path should go O → H → L → C *)
@@ -81,10 +81,9 @@ let test_upward_day_visits_high_before_low _ =
   let low_idx =
     List.findi path ~f:(fun _ point -> Float.(point.price = 95.0))
   in
-  match (high_idx, low_idx) with
-  | Some (h_idx, _), Some (l_idx, _) ->
-      assert_bool "High should come before low on upward day" (h_idx < l_idx)
-  | _ -> assert_failure "Path should contain both high and low"
+  let h_idx = Option.map high_idx ~f:fst |> Option.value_exn in
+  let l_idx = Option.map low_idx ~f:fst |> Option.value_exn in
+  OUnit2.assert_bool "High should come before low on upward day" (h_idx < l_idx)
 
 let test_downward_day_visits_low_before_high _ =
   (* When close < open, path should go O → L → H → C *)
@@ -100,10 +99,10 @@ let test_downward_day_visits_low_before_high _ =
   let low_idx =
     List.findi path ~f:(fun _ point -> Float.(point.price = 90.0))
   in
-  match (high_idx, low_idx) with
-  | Some (h_idx, _), Some (l_idx, _) ->
-      assert_bool "Low should come before high on downward day" (l_idx < h_idx)
-  | _ -> assert_failure "Path should contain both high and low"
+  let h_idx = Option.map high_idx ~f:fst |> Option.value_exn in
+  let l_idx = Option.map low_idx ~f:fst |> Option.value_exn in
+  OUnit2.assert_bool "Low should come before high on downward day"
+    (l_idx < h_idx)
 
 let test_path_fractions_are_increasing _ =
   let daily =
@@ -121,7 +120,7 @@ let test_path_fractions_are_increasing _ =
         | Some prev_frac -> Float.(prev_frac <= frac)
         | None -> false)
   in
-  assert_bool "Path fractions should be in increasing order" is_sorted
+  OUnit2.assert_bool "Path fractions should be in increasing order" is_sorted
 
 (* ==================== would_fill tests - Market orders ==================== *)
 
@@ -136,10 +135,9 @@ let test_market_order_fills_at_open _ =
     would_fill ~path ~order_type:Trading_base.Types.Market
       ~side:Trading_base.Types.Buy
   in
+  let expected_fill : fill_result = { price = 100.0; fraction_of_day = 0.0 } in
   assert_that result
-    (is_some_and (fun fill ->
-         assert_that fill.price (float_equal 100.0);
-         assert_that fill.fraction_of_day (float_equal 0.0)))
+    (is_some_and (equal_to ~cmp:equal_fill_result expected_fill))
 
 (* ==================== would_fill tests - Limit orders ==================== *)
 
@@ -156,7 +154,7 @@ let test_limit_buy_fills_when_price_drops_to_limit _ =
       ~side:Trading_base.Types.Buy
   in
   assert_that result
-    (is_some_and (fun fill -> assert_that fill.price (float_equal 95.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 95.0)))
 
 let test_limit_buy_does_not_fill_above_limit _ =
   let daily =
@@ -185,7 +183,7 @@ let test_limit_sell_fills_when_price_rises_to_limit _ =
       ~side:Trading_base.Types.Sell
   in
   assert_that result
-    (is_some_and (fun fill -> assert_that fill.price (float_equal 110.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 110.0)))
 
 let test_limit_sell_does_not_fill_below_limit _ =
   let daily =
@@ -216,7 +214,7 @@ let test_stop_buy_fills_when_price_rises_to_stop _ =
       ~side:Trading_base.Types.Buy
   in
   assert_that result
-    (is_some_and (fun fill -> assert_that fill.price (float_equal 110.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 110.0)))
 
 let test_stop_buy_does_not_fill_below_stop _ =
   let daily =
@@ -245,7 +243,7 @@ let test_stop_sell_fills_when_price_drops_to_stop _ =
       ~side:Trading_base.Types.Sell
   in
   assert_that result
-    (is_some_and (fun fill -> assert_that fill.price (float_equal 95.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 95.0)))
 
 let test_stop_sell_does_not_fill_above_stop _ =
   let daily =
@@ -277,7 +275,7 @@ let test_stop_limit_buy_fills_when_both_conditions_met _ =
       ~side:Trading_base.Types.Buy
   in
   assert_that result
-    (is_some_and (fun fill -> assert_that fill.price (float_equal 95.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 95.0)))
 
 let test_stop_limit_buy_does_not_fill_when_stop_not_triggered _ =
   let daily =
@@ -323,7 +321,7 @@ let test_stop_limit_sell_fills_when_both_conditions_met _ =
       ~side:Trading_base.Types.Sell
   in
   assert_that result
-    (is_some_and (fun fill -> assert_that fill.price (float_equal 110.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 110.0)))
 
 (* ==================== Test Suite ==================== *)
 

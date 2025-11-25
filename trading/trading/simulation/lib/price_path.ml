@@ -15,6 +15,8 @@ type fill_result = { price : float; fraction_of_day : float }
 
 (** {1 Path Generation} *)
 
+(** TODO: make a brownian bridge path:
+    https://en.wikipedia.org/wiki/Brownian_bridge. *)
 let generate_path (daily : Types.Daily_price.t) : intraday_path =
   (* Determine order of H and L based on whether we moved up or down from open *)
   let open_to_close = daily.close_price -. daily.open_price in
@@ -46,50 +48,36 @@ let _would_fill_market (path : intraday_path) : fill_result option =
 let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
     fill_result option =
   (* Find first point where limit price is reached *)
+  let price_reached =
+    match side with
+    | Trading_base.Types.Buy -> fun price -> Float.(price <= limit_price)
+    | Trading_base.Types.Sell -> fun price -> Float.(price >= limit_price)
+  in
+  List.find_map path ~f:(fun point ->
+      if price_reached point.price then
+        Some { price = limit_price; fraction_of_day = point.fraction_of_day }
+      else None)
+
+let _stop_trigger_predicate ~side ~stop_price =
   match side with
-  | Trading_base.Types.Buy ->
-      (* Buy limit: execute when price <= limit_price *)
-      List.find_map path ~f:(fun point ->
-          if Float.(point.price <= limit_price) then
-            Some
-              { price = limit_price; fraction_of_day = point.fraction_of_day }
-          else None)
-  | Trading_base.Types.Sell ->
-      (* Sell limit: execute when price >= limit_price *)
-      List.find_map path ~f:(fun point ->
-          if Float.(point.price >= limit_price) then
-            Some
-              { price = limit_price; fraction_of_day = point.fraction_of_day }
-          else None)
+  | Trading_base.Types.Buy -> fun price -> Float.(price >= stop_price)
+  | Trading_base.Types.Sell -> fun price -> Float.(price <= stop_price)
 
 let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
     fill_result option =
   (* Find first point where stop is triggered *)
-  match side with
-  | Trading_base.Types.Buy ->
-      (* Stop buy: trigger when price >= stop_price, fill at stop or higher *)
-      List.find_map path ~f:(fun point ->
-          if Float.(point.price >= stop_price) then
-            Some
-              { price = point.price; fraction_of_day = point.fraction_of_day }
-          else None)
-  | Trading_base.Types.Sell ->
-      (* Stop sell: trigger when price <= stop_price, fill at stop or lower *)
-      List.find_map path ~f:(fun point ->
-          if Float.(point.price <= stop_price) then
-            Some
-              { price = point.price; fraction_of_day = point.fraction_of_day }
-          else None)
+  let stop_triggered = _stop_trigger_predicate ~side ~stop_price in
+  List.find_map path ~f:(fun point ->
+      if stop_triggered point.price then
+        Some { price = point.price; fraction_of_day = point.fraction_of_day }
+      else None)
 
 let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
     ~limit_price : fill_result option =
   (* Two-stage: first stop triggers, then limit must be reached *)
+  let stop_reached = _stop_trigger_predicate ~side ~stop_price in
   let stop_triggered =
-    match side with
-    | Trading_base.Types.Buy ->
-        List.exists path ~f:(fun point -> Float.(point.price >= stop_price))
-    | Trading_base.Types.Sell ->
-        List.exists path ~f:(fun point -> Float.(point.price <= stop_price))
+    List.exists path ~f:(fun point -> stop_reached point.price)
   in
   if stop_triggered then
     (* After stop triggers, check if limit price is reached *)
