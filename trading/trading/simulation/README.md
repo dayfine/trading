@@ -3,22 +3,35 @@
 ## Overview
 Backtesting and simulation framework for testing trading strategies using historical data and simulated market conditions.
 
+**Implementation approach**: Daily-granularity backtesting with OHLC-based intraday execution modeling.
+- Strategy runs once per day after market close
+- Orders execute next day against synthetic intraday price paths
+- Leverages existing `analysis/data` module for historical prices
+
 ## Current Status
-🚧 **SCAFFOLDED** - Only directory structure exists
+✅ **Phase 1 (Core Types): COMPLETE** - Basic simulation infrastructure implemented
 
-## TODO
+### Completed (Phase 1)
+- ✅ Core types in `lib/simulator.mli`:
+  - `symbol_prices` - Historical price data per symbol using `Types.Daily_price.t`
+  - `config` - Simulation configuration (start/end dates, initial cash, commission)
+  - `step_result` - Result of a single simulation step (date, portfolio, trades)
+  - `step_outcome` - Stepped vs Completed state variants
+- ✅ Simulator interface in `lib/simulator.ml`:
+  - `create` - Initialize simulator from config and dependencies
+  - `step` - Advance simulation by one day (currently stub implementation)
+  - `run` - Execute full simulation from start to end date
+- ✅ Test suite in `test/test_simulator.ml`:
+  - 6 tests covering creation, stepping, and running simulations
+  - All tests passing ✓
+- ✅ Build configuration complete and working
 
-### Core Types (`lib/types.mli` & `lib/types.ml`)
-- [ ] Define `simulation_config` type:
-  - Start/end dates for simulation period
-  - Initial portfolio value and cash
-  - Commission and fee structure
-  - Market data source configuration
-- [ ] Define `simulation_state` type:
-  - Current simulation timestamp
-  - Active orders, portfolio state
-  - Performance metrics accumulator
-  - Market data context
+### In Progress
+🚧 **Phase 2: OHLC Price Path Simulator** - Not started
+
+### Next Steps
+
+#### Core Types (Additional work)
 - [ ] Define `strategy_signal` type:
   - Buy/sell signals with quantities
   - Entry/exit conditions
@@ -29,87 +42,62 @@ Backtesting and simulation framework for testing trading strategies using histor
   - Risk metrics (Sharpe ratio, max drawdown)
   - Execution quality metrics
 
-### Strategy Framework (`lib/strategy.mli` & `lib/strategy.ml`)
-- [ ] **Strategy Interface**:
-  - `strategy` abstract type for trading algorithms
-  - `generate_signals` - Produce trading signals from market data
-  - `risk_check` - Validate signals against risk constraints
-  - `update_state` - Maintain strategy-specific state
-- [ ] **Built-in Strategies**:
-  - `buy_and_hold_strategy` - Simple baseline strategy
-  - `moving_average_strategy` - Technical indicator based
-  - `mean_reversion_strategy` - Statistical arbitrage
-- [ ] **Strategy Utilities**:
-  - `create_custom_strategy` - Strategy builder interface
-  - `combine_strategies` - Portfolio of strategies
-  - Signal aggregation and conflict resolution
+### Phase 2: OHLC Price Path Simulator (`lib/price_path.mli` & `lib/price_path.ml`)
+- [ ] Generate synthetic intraday price paths from daily OHLC bars
+- [ ] Determine realistic order execution prices and times
+- [ ] Support for market, limit, stop, and stop-limit orders
+- [ ] Path generation strategies (deterministic and randomized)
+- [ ] Comprehensive tests for path generation and order fills
 
-### Simulation Engine (`lib/simulator.mli` & `lib/simulator.ml`)
-- [ ] **Simulation Core**:
-  - `create_simulation` - Initialize simulation environment
-  - `run_simulation` - Execute full backtest
-  - `step_simulation` - Single time step execution
-  - `get_simulation_state` - Current state inspection
-- [ ] **Time Management**:
-  - `advance_time` - Move simulation clock forward
-  - `handle_market_hours` - Trading session management
-  - `process_time_based_events` - Expiry, dividends, etc.
-- [ ] **Event Processing**:
-  - `process_strategy_signals` - Convert signals to orders
-  - `execute_orders` - Use trading engine for execution
-  - `update_portfolio` - Apply execution results
-  - `collect_metrics` - Performance tracking
+### Phase 3: Daily Simulation Loop (enhance `lib/simulator.ml`)
+- [ ] Implement actual trading logic in `step` function (currently stub)
+- [ ] Generate intraday paths from OHLC data
+- [ ] Execute pending orders against price paths
+- [ ] Apply trades to portfolio
+- [ ] Integration with Engine, Portfolio, and OrderManager modules
+- [ ] Tests for order execution and multi-day simulations
 
-### Historical Data Integration (`lib/data.mli` & `lib/data.ml`)
-- [ ] **Data Loading**:
-  - `load_historical_prices` - Import price data
-  - `validate_data_quality` - Check for gaps, errors
-  - `preprocess_data` - Clean and normalize data
-- [ ] **Data Access**:
-  - `get_prices_at_time` - Historical price lookup
-  - `get_price_range` - Time series data extraction
-  - `interpolate_missing_data` - Handle data gaps
-- [ ] **Data Sources**:
-  - CSV file import
-  - Integration with existing analysis/data modules
-  - Mock data generation for testing
+### Phase 4: Strategy Interface (`lib/strategy.mli` & `lib/strategy.ml`)
+- [ ] Define `STRATEGY` module signature
+- [ ] `on_market_close` - Strategy runs after market close each day
+- [ ] `order_intent` type with reasoning
+- [ ] Strategy state management
+- [ ] Validation that orders are priced (Limit/Stop/StopLimit, no Market)
 
-### Performance Analytics (`lib/analytics.mli` & `lib/analytics.ml`)
-- [ ] **Return Calculations**:
-  - `calculate_returns` - Portfolio returns over time
-  - `calculate_benchmark_returns` - Compare to benchmark
-  - `calculate_risk_adjusted_returns` - Sharpe, Sortino ratios
-- [ ] **Risk Metrics**:
-  - `calculate_volatility` - Portfolio volatility
-  - `calculate_max_drawdown` - Maximum loss from peak
-  - `calculate_var` - Value at Risk estimation
-- [ ] **Trade Analytics**:
-  - `analyze_trade_quality` - Win rate, profit factor
-  - `calculate_execution_costs` - Slippage and commissions
-  - `generate_trade_report` - Detailed trade breakdown
+### Phase 5: Built-in Strategies
+- [ ] `BuyAndHold` - Simple baseline strategy
+- [ ] `SimpleMovingAverage` - Technical indicator crossover
+- [ ] `MeanReversion` - Statistical arbitrage
+- [ ] Strategy parameter configuration
+- [ ] Tests for each strategy's signal generation
 
-### Testing (`test/test_*.ml`)
-- [ ] **Strategy Tests**:
-  - Built-in strategy correctness
-  - Custom strategy framework
-  - Signal generation accuracy
-- [ ] **Simulation Engine Tests**:
-  - Time advancement logic
-  - Event processing correctness
-  - State management integrity
-- [ ] **Integration Tests**:
-  - End-to-end backtesting workflow
-  - Historical data integration
-  - Performance analytics accuracy
-- [ ] **Performance Tests**:
-  - Large dataset simulation speed
-  - Memory usage optimization
-  - Concurrent simulation support
+### Phase 6: Strategy Integration
+- [ ] `create_with_strategy` - Automated backtesting
+- [ ] Convert order intents to orders
+- [ ] Full daily loop: execute orders → call strategy → prepare next day
+- [ ] Multi-symbol backtest support
+- [ ] Integration tests
 
-### Build Configuration
-- [ ] `lib/dune` - Library configuration
-- [ ] `test/dune` - Test configuration
-- [ ] `bin/dune` - CLI tools for running simulations
+### Phase 7: Performance Metrics (`lib/metrics.mli` & `lib/metrics.ml`)
+- [ ] Return calculations (total, annualized)
+- [ ] Risk metrics (volatility, Sharpe ratio, max drawdown)
+- [ ] Trade statistics (win rate, profit factor)
+- [ ] Equity curve generation
+- [ ] Tests for metric calculations
+
+### Phase 8: Simulation Results & Reporting
+- [ ] `simulation_result` type aggregating all outputs
+- [ ] `run_backtest` - Complete backtest with full results
+- [ ] Timing and performance tracking
+- [ ] Result pretty-printing and export
+- [ ] End-to-end tests
+
+### Phase 9: CLI Tool & Data Integration
+- [ ] `bin/simulate.ml` - Command-line interface
+- [ ] Integration with `analysis/data/storage` for loading historical data
+- [ ] Argument parsing for symbols, strategies, date ranges
+- [ ] Output formatting (text, JSON)
+- [ ] CLI integration tests
 
 ## Dependencies
 - `trading.base` - Core types
