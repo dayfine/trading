@@ -26,7 +26,7 @@ The codebase is organized into two main areas:
 
 - **Base Types** (`trading/base/lib/types.mli`): Fundamental trading types (symbol, price, quantity, side, order_type, position)
 - **Orders** (`trading/orders/`): Order management system with factory patterns, validation, and lifecycle management
-- **Portfolio** (`trading/portfolio/`): Portfolio tracking and management
+- **Portfolio** (`trading/portfolio/`): Portfolio tracking and management with exposed value type (fields directly accessible via `portfolio.current_cash`, `portfolio.positions`, etc.)
 - **Simulation** (`trading/simulation/`): Trading simulation engine
 - **Engine** (`trading/engine/`): Core trading engine (currently scaffolded)
 
@@ -122,17 +122,25 @@ open Matchers
 (* Assert on Result types with fluent matchers *)
 assert_that result
   (is_ok_and_holds (fun value ->
-       assert_float_equal expected value ~msg:"Value should match"))
+       assert_that value (float_equal expected)))
 
 (* Assert errors *)
-assert_error ~msg:"Should fail with invalid input" result
+assert_that result is_error
 
 (* Extract values from Ok results in test setup *)
-let portfolio = assert_ok ~msg:"Failed to create" (create_portfolio ~cash:10000.0)
+let portfolio =
+  match create_portfolio ~cash:10000.0 with
+  | Ok p -> p
+  | Error err -> failwith ("Failed to create: " ^ Status.show err)
 
 (* Float comparisons with epsilon tolerance *)
-assert_float_equal 10.5 actual ~msg:"Total should be 10.5"
-assert_float_equal ~epsilon:1e-6 expected actual ~msg:"Custom tolerance"
+assert_that actual (float_equal 10.5)
+assert_that actual (float_equal ~epsilon:1e-6 expected)
+
+(* Accessing portfolio fields directly *)
+assert_that portfolio.current_cash (float_equal 10000.0)
+let position = Hashtbl.find portfolio.positions "AAPL" in
+assert_that position (is_some_and (fun pos -> ...))
 ```
 
 **Test Data Builders:**
@@ -150,7 +158,9 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0) 
 
 ```ocaml
 let apply_trades_exn portfolio trades ~error_msg =
-  assert_ok ~msg:error_msg (apply_trades portfolio trades)
+  match apply_trades portfolio trades with
+  | Ok value -> value
+  | Error err -> OUnit2.assert_failure (error_msg ^ ": " ^ Status.show err)
 ```
 
 **General Principles:**

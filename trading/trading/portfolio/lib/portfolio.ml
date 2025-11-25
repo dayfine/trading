@@ -22,15 +22,6 @@ let create ?(accounting_method = AverageCost) ~initial_cash () =
     accounting_method;
   }
 
-let get_cash portfolio = portfolio.current_cash
-let get_initial_cash portfolio = portfolio.initial_cash
-let get_trade_history portfolio = portfolio.trade_history
-
-let get_total_realized_pnl portfolio =
-  Calculations.realized_pnl_from_trades portfolio.trade_history
-
-let get_position portfolio symbol = Hashtbl.find portfolio.positions symbol
-
 (* Constants *)
 let negligible_quantity_epsilon = 1e-9
 
@@ -335,10 +326,6 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
 
 let apply_trades portfolio trades =
   List.fold_result trades ~init:portfolio ~f:apply_single_trade
-
-let list_positions portfolio =
-  Hashtbl.fold portfolio.positions ~init:[]
-    ~f:(fun ~key:_symbol ~data:position acc -> position :: acc)
 
 (* Reconstruct portfolio from scratch for validation *)
 let reconstruct_from_history initial_cash accounting_method trade_history =

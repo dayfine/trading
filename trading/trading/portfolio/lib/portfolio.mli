@@ -1,42 +1,43 @@
-(** Portfolio management with opaque type ensuring consistency *)
+(** Portfolio management with immutable value type *)
 
 open Trading_base.Types
 open Status
 open Types
 
-type t
-(** Opaque portfolio type. Internal state is managed to maintain consistency. *)
+type t = {
+  initial_cash : cash_value;
+  trade_history : trade_with_pnl list;
+  current_cash : cash_value;
+  positions : (symbol, portfolio_position) Core.Hashtbl.t;
+  accounting_method : accounting_method;
+}
+(** Portfolio type. All fields are accessible for pattern matching and direct
+    access. The portfolio is functionally immutable - [apply_trades] returns a
+    new portfolio rather than modifying the existing one.
+
+    Fields:
+    - [initial_cash]: Starting cash balance
+    - [trade_history]: Complete history of trades with realized P&L
+    - [current_cash]: Current cash balance (derived from initial_cash and
+      trades)
+    - [positions]: Current positions indexed by symbol (copied on updates)
+    - [accounting_method]: Cost basis accounting method (AverageCost or FIFO) *)
 
 val create :
   ?accounting_method:accounting_method -> initial_cash:cash_value -> unit -> t
 (** Create a new portfolio with initial cash balance and optional accounting
-    method (default: AverageCost) *)
+    method (default: AverageCost). This is the only safe way to construct a
+    valid portfolio. *)
 
 val apply_trades : t -> trade list -> t status_or
-(** Apply trades sequentially. Trades are processed in order. Returns Error if
-    any trade would create invalid state (e.g., insufficient position to sell).
+(** Apply trades sequentially, returning a new portfolio. Trades are processed
+    in order. Returns Error if any trade would create invalid state (e.g.,
+    insufficient position to sell, insufficient cash).
+
     Order matters: [Buy 100 AAPL; Sell 50 AAPL] vs [Sell 50 AAPL; Buy 100 AAPL]
 *)
 
-val get_cash : t -> cash_value
-(** Get current cash balance *)
-
-val get_initial_cash : t -> cash_value
-(** Get initial cash balance *)
-
-val get_trade_history : t -> trade_with_pnl list
-(** Get complete trade history with realized P&L in chronological order *)
-
-val get_total_realized_pnl : t -> float
-(** Get total realized P&L from all trades *)
-
-val get_position : t -> symbol -> portfolio_position option
-(** Get position for a specific symbol *)
-
-val list_positions : t -> portfolio_position list
-(** List all positions in the portfolio *)
-
 val validate : t -> status
-(** Validate internal consistency. Should always succeed for properly
-    constructed portfolios. Reconstructs portfolio from initial_cash and
-    trade_history, compares with stored state. *)
+(** Validate internal consistency by reconstructing portfolio from initial_cash
+    and trade_history, then comparing with stored state. Should always succeed
+    for portfolios created via [create] and modified via [apply_trades]. *)
