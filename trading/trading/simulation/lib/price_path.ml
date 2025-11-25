@@ -72,6 +72,12 @@ let _crosses_limit ~side ~limit_price ~prev_price ~curr_price =
   | Trading_base.Types.Sell ->
       Float.(prev_price < limit_price && curr_price >= limit_price)
 
+(* Search forward through the path to find the first bar where [crosses] or
+   [meets] succeeds. When a crossing occurs, the fill price snaps to
+   [cross_price] (e.g. a limit/stop threshold); otherwise the observed price is
+   preserved. The helper returns both the fill information and the tail of the
+   path starting at the bar that satisfied the predicate, which allows callers
+   like stop-limits to resume processing from that point. *)
 let rec _search_order_fill_with_path ~(crosses : float -> float -> bool)
     ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
   | [] -> None
@@ -136,6 +142,11 @@ let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
   | Trading_base.Types.Sell ->
       Float.(prev_price > stop_price && curr_price <= stop_price)
 
+(* Locate the first point where the stop condition is satisfied and return both
+   the stop fill (respecting the hybrid gap/cross logic) and the remainder of
+   the path starting at that bar. This enables building higher-order orders such
+   as stop-limits that first trigger the stop and then continue scanning forward
+   for a limit fill. *)
 let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
     (fill_result * intraday_path) option =
   match path with
