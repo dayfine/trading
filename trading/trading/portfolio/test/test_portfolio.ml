@@ -32,10 +32,16 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
 
 let test_create_portfolio _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
-  assert_that (get_cash portfolio) (float_equal 10000.0);
-  assert_that (get_initial_cash portfolio) (float_equal 10000.0);
-  assert_equal [] (get_trade_history portfolio) ~msg:"Empty trade history";
-  assert_equal [] (list_positions portfolio) ~msg:"No positions initially"
+  let expected =
+    {
+      initial_cash = 10000.0;
+      current_cash = 10000.0;
+      trade_history = [];
+      positions = [];
+      accounting_method;
+    }
+  in
+  assert_equal expected portfolio ~msg:"Portfolio should match expected state"
 
 let test_apply_buy_trade _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -48,11 +54,11 @@ let test_apply_buy_trade _ accounting_method =
     (apply_trades portfolio [ buy_trade ])
     (is_ok_and_holds (fun updated_portfolio ->
          (* Cash should be reduced by 100 * 150 = 15000 *)
-         assert_that (get_cash updated_portfolio) (float_equal 5000.0);
+         assert_that updated_portfolio.current_cash (float_equal 5000.0);
 
          (* Trade should be in history *)
          assert_equal 1
-           (List.length (get_trade_history updated_portfolio))
+           (List.length updated_portfolio.trade_history)
            ~msg:"Trade in history";
 
          (* Position should be created *)
@@ -78,7 +84,7 @@ let test_apply_sell_trade _ accounting_method =
   in
 
   (* Cash: 20000 - 15000 + 8000 = 13000 *)
-  assert_that (get_cash portfolio) (float_equal 13000.0);
+  assert_that portfolio.current_cash (float_equal 13000.0);
 
   (* Position should be reduced *)
   assert_that
@@ -128,7 +134,7 @@ let test_position_close _ accounting_method =
 
   (* Position should be closed (removed) *)
   assert_that (get_position portfolio "AAPL") is_none;
-  assert_equal [] (list_positions portfolio) ~msg:"No positions remaining"
+  assert_equal [] portfolio.positions ~msg:"No positions remaining"
 
 let test_validation _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
@@ -159,13 +165,13 @@ let test_multiple_trades_batch _ accounting_method =
     (apply_trades portfolio trades)
     (is_ok_and_holds (fun updated_portfolio ->
          assert_equal 2
-           (List.length (list_positions updated_portfolio))
+           (List.length updated_portfolio.positions)
            ~msg:"Two positions created";
          assert_equal 2
-           (List.length (get_trade_history updated_portfolio))
+           (List.length updated_portfolio.trade_history)
            ~msg:"Two trades in history";
          (* Cash: 30000 - (100*150) - (50*200) = 30000 - 15000 - 10000 = 5000 *)
-         assert_that (get_cash updated_portfolio) (float_equal 5000.0)))
+         assert_that updated_portfolio.current_cash (float_equal 5000.0)))
 
 let test_short_selling _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
@@ -179,7 +185,7 @@ let test_short_selling _ accounting_method =
   match apply_trades portfolio [ short_trade ] with
   | Ok updated_portfolio ->
       (* Cash should increase by 100 * 150 = 15000 *)
-      assert_that (get_cash updated_portfolio) (float_equal 25000.0);
+      assert_that updated_portfolio.current_cash (float_equal 25000.0);
 
       (* Position should be negative *)
       assert_that
@@ -205,11 +211,11 @@ let test_short_cover _ accounting_method =
   in
 
   (* Cash: 10000 + (15000 - 5) - (7000 + 3) = 10000 + 14995 - 7003 = 17992 *)
-  assert_that (get_cash portfolio) (float_equal 17992.0);
+  assert_that portfolio.current_cash (float_equal 17992.0);
 
   (* Verify realized P&L: covering 50 shares
      P&L = 50 * ($149.95 - $140) - $3 = 50 * $9.95 - $3 = $497.50 - $3 = $494.50 *)
-  let history = get_trade_history portfolio in
+  let history = portfolio.trade_history in
   let cover_pnl = (List.nth_exn history 1).realized_pnl in
   assert_that cover_pnl (float_equal 494.5);
 
@@ -236,7 +242,7 @@ let test_short_to_long _ accounting_method =
   in
 
   (* Cash: 10000 + 7500 - 14000 = 3500 *)
-  assert_that (get_cash portfolio) (float_equal 3500.0);
+  assert_that portfolio.current_cash (float_equal 3500.0);
 
   (* Position should be +50 shares at new cost basis *)
   assert_that
@@ -287,7 +293,7 @@ let test_realized_pnl_calculation _ accounting_method =
         OUnit2.assert_failure ("Realized P&L test failed: " ^ Status.show err)
   in
 
-  let trade_history = get_trade_history updated_portfolio in
+  let trade_history = updated_portfolio.trade_history in
   assert_equal 3 (List.length trade_history) ~msg:"Should have 3 trades";
 
   let trade1 = List.nth_exn trade_history 0 in
@@ -312,7 +318,7 @@ let test_realized_pnl_calculation _ accounting_method =
       assert_that trade2.realized_pnl (float_equal 494.5);
       assert_that trade3.realized_pnl (float_equal 245.5));
 
-  let total_pnl = get_total_realized_pnl updated_portfolio in
+  let total_pnl = realized_pnl_from_trades updated_portfolio.trade_history in
   assert_that total_pnl (float_equal 740.0);
 
   (* Position should be closed *)
@@ -529,8 +535,8 @@ let test_fifo_vs_average_cost _ =
       (* FIFO and AverageCost have different realized P&L *)
       (* FIFO: Sells lot bought @ $100, so P&L = 100*(120-100) = $2000 *)
       (* AverageCost: Avg cost = $105, so P&L = 100*(120-105) = $1500 *)
-      let fifo_pnl = get_total_realized_pnl portfolio_fifo in
-      let avg_pnl = get_total_realized_pnl portfolio_avg in
+      let fifo_pnl = realized_pnl_from_trades portfolio_fifo.trade_history in
+      let avg_pnl = realized_pnl_from_trades portfolio_avg.trade_history in
       assert_that fifo_pnl (float_equal 2000.0);
       assert_that avg_pnl (float_equal 1500.0);
 
