@@ -32,10 +32,16 @@ let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)
 
 let test_create_portfolio _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:10000.0 () in
-  assert_that portfolio.current_cash (float_equal 10000.0);
-  assert_that portfolio.initial_cash (float_equal 10000.0);
-  assert_equal [] portfolio.trade_history ~msg:"Empty trade history";
-  assert_equal [] portfolio.positions ~msg:"No positions initially"
+  let expected =
+    {
+      initial_cash = 10000.0;
+      current_cash = 10000.0;
+      trade_history = [];
+      positions = [];
+      accounting_method;
+    }
+  in
+  assert_equal expected portfolio ~msg:"Portfolio should match expected state"
 
 let test_apply_buy_trade _ accounting_method =
   let portfolio = create ~accounting_method ~initial_cash:20000.0 () in
