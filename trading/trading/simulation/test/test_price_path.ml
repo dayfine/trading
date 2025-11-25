@@ -26,9 +26,11 @@ let test_path_starts_at_open _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  let expected_first : path_point = { fraction_of_day = 0.0; price = 100.0 } in
-  assert_that (List.hd path)
-    (is_some_and (equal_to ~cmp:equal_path_point expected_first))
+  match path with
+  | first :: _ ->
+      assert_that first
+        (equal_to ({ fraction_of_day = 0.0; price = 100.0 } : path_point))
+  | [] -> OUnit2.assert_failure "Path should not be empty"
 
 let test_path_ends_at_close _ =
   let daily =
@@ -37,9 +39,9 @@ let test_path_ends_at_close _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  let expected_last : path_point = { fraction_of_day = 1.0; price = 105.0 } in
-  assert_that (List.last path)
-    (is_some_and (equal_to ~cmp:equal_path_point expected_last))
+  let last = List.last_exn path in
+  assert_that last
+    (equal_to ({ fraction_of_day = 1.0; price = 105.0 } : path_point))
 
 let test_path_touches_high _ =
   let daily =
@@ -135,9 +137,9 @@ let test_market_order_fills_at_open _ =
     would_fill ~path ~order_type:Trading_base.Types.Market
       ~side:Trading_base.Types.Buy
   in
-  let expected_fill : fill_result = { price = 100.0; fraction_of_day = 0.0 } in
   assert_that result
-    (is_some_and (equal_to ~cmp:equal_fill_result expected_fill))
+    (is_some_and
+       (equal_to ({ price = 100.0; fraction_of_day = 0.0 } : fill_result)))
 
 (* ==================== would_fill tests - Limit orders ==================== *)
 
