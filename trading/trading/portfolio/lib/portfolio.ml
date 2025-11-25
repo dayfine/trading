@@ -23,8 +23,11 @@ let create ?(accounting_method = AverageCost) ~initial_cash () =
     accounting_method;
   }
 
+let _find_position_in_list positions symbol =
+  List.find positions ~f:(fun p -> String.equal p.symbol symbol)
+
 let get_position portfolio symbol =
-  List.find portfolio.positions ~f:(fun p -> String.equal p.symbol symbol)
+  _find_position_in_list portfolio.positions symbol
 
 (* Constants *)
 let negligible_quantity_epsilon = 1e-9
@@ -230,7 +233,7 @@ let _update_position_with_trade positions accounting_method
   in
   let effective_cost = _calculate_cost_basis_with_commission trade in
 
-  match List.find positions ~f:(fun p -> String.equal p.symbol symbol) with
+  match _find_position_in_list positions symbol with
   | None ->
       _create_new_position positions symbol trade_quantity effective_cost
         trade.id trade.timestamp accounting_method
