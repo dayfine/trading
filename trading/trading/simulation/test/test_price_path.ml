@@ -26,48 +26,13 @@ let test_path_starts_at_open _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  match path with
-  | first :: _ ->
-      assert_that first
-        (equal_to ({ fraction_of_day = 0.0; price = 100.0 } : path_point))
-  | [] -> OUnit2.assert_failure "Path should not be empty"
-
-let test_path_ends_at_close _ =
-  let daily =
-    make_daily_price
-      ~date:(date_of_string "2024-01-02")
-      ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
-  in
-  let path = generate_path daily in
-  let last = List.last_exn path in
-  assert_that last
-    (equal_to ({ fraction_of_day = 1.0; price = 105.0 } : path_point))
-
-let test_path_touches_high _ =
-  let daily =
-    make_daily_price
-      ~date:(date_of_string "2024-01-02")
-      ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
-  in
-  let path = generate_path daily in
-  let high_point : path_point option =
-    List.find path ~f:(fun point -> Float.(point.price = 110.0))
-  in
-  assert_that high_point
-    (is_some_and (field (fun (p : path_point) -> p.price) (float_equal 110.0)))
-
-let test_path_touches_low _ =
-  let daily =
-    make_daily_price
-      ~date:(date_of_string "2024-01-02")
-      ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
-  in
-  let path = generate_path daily in
-  let low_point : path_point option =
-    List.find path ~f:(fun point -> Float.(point.price = 95.0))
-  in
-  assert_that low_point
-    (is_some_and (field (fun (p : path_point) -> p.price) (float_equal 95.0)))
+  elements_are path
+    [
+      equal_to ({ fraction_of_day = 0.0; price = 100.0 } : path_point);
+      equal_to ({ fraction_of_day = 0.33; price = 110.0 } : path_point);
+      equal_to ({ fraction_of_day = 0.66; price = 95.0 } : path_point);
+      equal_to ({ fraction_of_day = 1.0; price = 105.0 } : path_point);
+    ]
 
 let test_upward_day_visits_high_before_low _ =
   (* When close > open, path should go O → H → L → C *)
@@ -331,10 +296,7 @@ let suite =
   "Price_path Tests"
   >::: [
          (* Path generation tests *)
-         "path starts at open" >:: test_path_starts_at_open;
-         "path ends at close" >:: test_path_ends_at_close;
-         "path touches high" >:: test_path_touches_high;
-         "path touches low" >:: test_path_touches_low;
+         "path structure is correct" >:: test_path_starts_at_open;
          "upward day visits high before low"
          >:: test_upward_day_visits_high_before_low;
          "downward day visits low before high"
