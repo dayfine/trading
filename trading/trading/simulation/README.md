@@ -9,9 +9,11 @@ Backtesting and simulation framework for testing trading strategies using histor
 - Leverages existing `analysis/data` module for historical prices
 
 ## Current Status
-✅ **Phase 1 (Core Types): COMPLETE** - Basic simulation infrastructure implemented
+✅ **Phase 1 & 2: COMPLETE** - Core infrastructure and OHLC price path simulation implemented
 
-### Completed (Phase 1)
+### Completed
+
+**Phase 1: Core Types**
 - ✅ Core types in `lib/simulator.mli`:
   - `symbol_prices` - Historical price data per symbol using `Types.Daily_price.t`
   - `config` - Simulation configuration (start/end dates, initial cash, commission)
@@ -24,10 +26,26 @@ Backtesting and simulation framework for testing trading strategies using histor
 - ✅ Test suite in `test/test_simulator.ml`:
   - 6 tests covering creation, stepping, and running simulations
   - All tests passing ✓
-- ✅ Build configuration complete and working
+
+**Phase 2: OHLC Price Path Simulator**
+- ✅ Price path types in `lib/price_path.mli`:
+  - `path_point` - Single point on intraday path (fraction_of_day, price)
+  - `intraday_path` - Complete path from open to close
+  - `fill_result` - Order fill price and timing
+- ✅ Path generation in `lib/price_path.ml`:
+  - `generate_path` - Synthetic intraday paths from OHLC bars
+  - Deterministic path generation (O→H→L→C or O→L→H→C based on direction)
+  - Path touches all OHLC points in realistic order
+- ✅ Order execution logic:
+  - `would_fill` - Determine if/when orders execute against price path
+  - Support for Market, Limit, Stop, and StopLimit orders
+  - Correct fill detection for all order types
+- ✅ Comprehensive test suite in `test/test_price_path.ml`:
+  - 14 tests covering path generation and order fills
+  - All 20 simulation tests passing ✓
 
 ### In Progress
-🚧 **Phase 2: OHLC Price Path Simulator** - Not started
+🚧 **Phase 3: Daily Simulation Loop** - Not started
 
 ### Next Steps
 

@@ -8,3 +8,7 @@
   trading.engine
   types
   matchers))
+
+(test
+ (name test_price_path)
+ (libraries ounit2 core trading.simulation trading.base types matchers))
