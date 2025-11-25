@@ -55,7 +55,7 @@ let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
   in
   List.find_map path ~f:(fun point ->
       if price_reached point.price then
-        Some { price = limit_price; fraction_of_day = point.fraction_of_day }
+        Some { price = point.price; fraction_of_day = point.fraction_of_day }
       else None)
 
 let _stop_trigger_predicate ~side ~stop_price =
