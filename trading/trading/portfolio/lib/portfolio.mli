@@ -23,6 +23,15 @@ type t = {
     - [positions]: Current positions indexed by symbol (copied on updates)
     - [accounting_method]: Cost basis accounting method (AverageCost or FIFO) *)
 
+val pp : Format.formatter -> t -> unit
+(** Pretty-printer for portfolio *)
+
+val equal : t -> t -> bool
+(** Equality comparison for portfolios *)
+
+val show : t -> string
+(** String representation of portfolio *)
+
 val create :
   ?accounting_method:accounting_method -> initial_cash:cash_value -> unit -> t
 (** Create a new portfolio with initial cash balance and optional accounting

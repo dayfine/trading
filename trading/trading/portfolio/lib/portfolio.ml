@@ -13,6 +13,47 @@ type t = {
       (* Default accounting method for new positions *)
 }
 
+(* Pretty-printing and equality for portfolio *)
+let pp fmt portfolio =
+  let positions_list =
+    Hashtbl.to_alist portfolio.positions
+    |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
+  in
+  Format.fprintf fmt
+    "{ initial_cash = %.2f; trade_history = [%d trades]; current_cash = %.2f; \
+     positions = [%a]; accounting_method = %s }"
+    portfolio.initial_cash
+    (List.length portfolio.trade_history)
+    portfolio.current_cash
+    (fun fmt positions ->
+      List.iter positions ~f:(fun (symbol, pos) ->
+          Format.fprintf fmt "%s: %s; " symbol (show_portfolio_position pos)))
+    positions_list
+    (show_accounting_method portfolio.accounting_method)
+
+let show portfolio = Format.asprintf "%a" pp portfolio
+
+let equal p1 p2 =
+  let positions_equal () =
+    let pos1 =
+      Hashtbl.to_alist p1.positions
+      |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
+    in
+    let pos2 =
+      Hashtbl.to_alist p2.positions
+      |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
+    in
+    List.equal
+      (fun (s1, pos1) (s2, pos2) ->
+        String.equal s1 s2 && equal_portfolio_position pos1 pos2)
+      pos1 pos2
+  in
+  Float.equal p1.initial_cash p2.initial_cash
+  && Float.equal p1.current_cash p2.current_cash
+  && List.equal equal_trade_with_pnl p1.trade_history p2.trade_history
+  && equal_accounting_method p1.accounting_method p2.accounting_method
+  && positions_equal ()
+
 let create ?(accounting_method = AverageCost) ~initial_cash () =
   {
     initial_cash;
