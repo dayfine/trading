@@ -47,7 +47,9 @@ let _would_fill_market (path : intraday_path) : fill_result option =
 
 let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
     fill_result option =
-  (* Find first point where limit price is reached *)
+  (* Find first point where limit price is reached.
+     For backtesting with discrete OHLC data, we conservatively assume
+     the order fills at the limit price (not at a better market price). *)
   let price_reached =
     match side with
     | Trading_base.Types.Buy -> fun price -> Float.(price <= limit_price)
@@ -55,7 +57,7 @@ let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
   in
   List.find_map path ~f:(fun point ->
       if price_reached point.price then
-        Some { price = point.price; fraction_of_day = point.fraction_of_day }
+        Some { price = limit_price; fraction_of_day = point.fraction_of_day }
       else None)
 
 let _stop_trigger_predicate ~side ~stop_price =
