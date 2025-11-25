@@ -8,7 +8,7 @@ type t = {
   initial_cash : cash_value;
   trade_history : trade_with_pnl list;
   current_cash : cash_value;
-  positions : (symbol * portfolio_position) list;
+  positions : portfolio_position list;
   accounting_method : accounting_method;
 }
 [@@deriving show, eq]
@@ -21,8 +21,7 @@ type t = {
     - [trade_history]: Complete history of trades with realized P&L
     - [current_cash]: Current cash balance (derived from initial_cash and
       trades)
-    - [positions]: Current positions as sorted association list
-      [(symbol, position)]
+    - [positions]: Current positions as sorted list (by symbol)
     - [accounting_method]: Cost basis accounting method (AverageCost or FIFO) *)
 
 val create :

@@ -8,7 +8,7 @@ type t = {
   trade_history : trade_with_pnl list;
   (* Computed state - maintained for performance *)
   current_cash : cash_value;
-  positions : (Trading_base.Types.symbol * portfolio_position) list;
+  positions : portfolio_position list;
   accounting_method : accounting_method;
       (* Default accounting method for new positions *)
 }
@@ -132,106 +132,108 @@ let _make_lot trade_id trade_quantity effective_cost trade_timestamp :
       Time_ns_unix.to_date trade_timestamp ~zone:Time_float.Zone.utc;
   }
 
-let _set_position positions symbol position :
-    (Trading_base.Types.symbol * portfolio_position) list =
-  List.Assoc.add positions ~equal:String.equal symbol position
-  |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
+let _set_position positions position : portfolio_position list =
+  (* Remove existing position with same symbol and add new one, keeping sorted *)
+  List.filter positions ~f:(fun p ->
+      not (String.equal p.symbol position.symbol))
+  |> fun ps ->
+  position :: ps
+  |> List.sort ~compare:(fun p1 p2 -> String.compare p1.symbol p2.symbol)
 
-let _remove_position positions symbol :
-    (Trading_base.Types.symbol * portfolio_position) list =
-  List.Assoc.remove positions ~equal:String.equal symbol
-  |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
+let _remove_position positions symbol : portfolio_position list =
+  List.filter positions ~f:(fun p -> not (String.equal p.symbol symbol))
+  |> List.sort ~compare:(fun p1 p2 -> String.compare p1.symbol p2.symbol)
 
 let _create_new_position positions symbol trade_quantity effective_cost trade_id
-    trade_timestamp accounting_method :
-    (Trading_base.Types.symbol * portfolio_position) list =
+    trade_timestamp accounting_method : portfolio_position list =
   let lot = _make_lot trade_id trade_quantity effective_cost trade_timestamp in
   let position = { symbol; lots = [ lot ]; accounting_method } in
-  _set_position positions symbol position
+  _set_position positions position
 
-let _add_lot_to_position positions symbol (existing : portfolio_position)
+let _add_lot_to_position positions (existing : portfolio_position)
     trade_quantity effective_cost trade_id trade_timestamp :
-    (Trading_base.Types.symbol * portfolio_position) list =
+    portfolio_position list =
   let new_lot =
     _make_lot trade_id trade_quantity effective_cost trade_timestamp
   in
   (* Maintain lots in sorted order by acquisition date (invariant) *)
   let updated_lots = _sort_lots_by_date (existing.lots @ [ new_lot ]) in
   let updated_position = { existing with lots = updated_lots } in
-  _set_position positions symbol updated_position
+  _set_position positions updated_position
 
-let _close_or_reduce_fifo_position positions symbol
-    (existing : portfolio_position) trade_quantity effective_cost trade_id
-    trade_timestamp : (Trading_base.Types.symbol * portfolio_position) list =
+let _close_or_reduce_fifo_position positions (existing : portfolio_position)
+    trade_quantity effective_cost trade_id trade_timestamp :
+    portfolio_position list =
   let remaining_lots, _matched_lots =
     _match_fifo_lots existing.lots trade_quantity
   in
   let existing_qty = Calculations.position_quantity existing in
   let new_quantity = existing_qty +. trade_quantity in
 
-  if _is_quantity_negligible new_quantity then _remove_position positions symbol
+  if _is_quantity_negligible new_quantity then
+    _remove_position positions existing.symbol
   else if List.is_empty remaining_lots then
     (* Direction changed - create new position with new_quantity *)
-    _create_new_position positions symbol new_quantity effective_cost trade_id
-      trade_timestamp existing.accounting_method
+    _create_new_position positions existing.symbol new_quantity effective_cost
+      trade_id trade_timestamp existing.accounting_method
   else
     (* Position reduced - update with remaining lots *)
     let updated_position = { existing with lots = remaining_lots } in
-    _set_position positions symbol updated_position
+    _set_position positions updated_position
 
-let _update_existing_position_fifo positions symbol
-    (existing : portfolio_position) trade_quantity effective_cost trade_id
-    trade_timestamp : (Trading_base.Types.symbol * portfolio_position) list =
+let _update_existing_position_fifo positions (existing : portfolio_position)
+    trade_quantity effective_cost trade_id trade_timestamp :
+    portfolio_position list =
   let existing_qty = Calculations.position_quantity existing in
   let adding_to_position = _is_same_direction existing_qty trade_quantity in
   if adding_to_position then
-    _add_lot_to_position positions symbol existing trade_quantity effective_cost
+    _add_lot_to_position positions existing trade_quantity effective_cost
       trade_id trade_timestamp
   else
-    _close_or_reduce_fifo_position positions symbol existing trade_quantity
+    _close_or_reduce_fifo_position positions existing trade_quantity
       effective_cost trade_id trade_timestamp
 
-let _update_existing_position_average_cost positions symbol
+let _update_existing_position_average_cost positions
     (existing : portfolio_position) trade_quantity effective_cost trade_id
-    trade_timestamp : (Trading_base.Types.symbol * portfolio_position) list =
+    trade_timestamp : portfolio_position list =
   let existing_qty = Calculations.position_quantity existing in
   let new_quantity = existing_qty +. trade_quantity in
-  if _is_quantity_negligible new_quantity then _remove_position positions symbol
+  if _is_quantity_negligible new_quantity then
+    _remove_position positions existing.symbol
   else
     let new_avg_cost =
       _calculate_average_cost existing trade_quantity effective_cost
         new_quantity
     in
-    _create_new_position positions symbol new_quantity new_avg_cost trade_id
-      trade_timestamp existing.accounting_method
+    _create_new_position positions existing.symbol new_quantity new_avg_cost
+      trade_id trade_timestamp existing.accounting_method
 
-let _update_existing_position positions symbol (existing : portfolio_position)
+let _update_existing_position positions (existing : portfolio_position)
     trade_quantity effective_cost trade_id trade_timestamp :
-    (Trading_base.Types.symbol * portfolio_position) list =
+    portfolio_position list =
   match existing.accounting_method with
   | AverageCost ->
-      _update_existing_position_average_cost positions symbol existing
-        trade_quantity effective_cost trade_id trade_timestamp
+      _update_existing_position_average_cost positions existing trade_quantity
+        effective_cost trade_id trade_timestamp
   | FIFO ->
-      _update_existing_position_fifo positions symbol existing trade_quantity
+      _update_existing_position_fifo positions existing trade_quantity
         effective_cost trade_id trade_timestamp
 
 let _update_position_with_trade positions accounting_method
-    (trade : Trading_base.Types.trade) :
-    (Trading_base.Types.symbol * portfolio_position) list =
+    (trade : Trading_base.Types.trade) : portfolio_position list =
   let symbol = trade.symbol in
   let trade_quantity =
     match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
   in
   let effective_cost = _calculate_cost_basis_with_commission trade in
 
-  match List.Assoc.find positions ~equal:String.equal symbol with
+  match List.find positions ~f:(fun p -> String.equal p.symbol symbol) with
   | None ->
       _create_new_position positions symbol trade_quantity effective_cost
         trade.id trade.timestamp accounting_method
   | Some existing ->
-      _update_existing_position positions symbol existing trade_quantity
-        effective_cost trade.id trade.timestamp
+      _update_existing_position positions existing trade_quantity effective_cost
+        trade.id trade.timestamp
 
 (* Helper functions for trade application *)
 let _calculate_cash_change (trade : Trading_base.Types.trade) =
@@ -315,7 +317,8 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
   let%bind new_cash = _check_sufficient_cash portfolio cash_change in
   let realized_pnl =
     match
-      List.Assoc.find portfolio.positions ~equal:String.equal trade.symbol
+      List.find portfolio.positions ~f:(fun p ->
+          String.equal p.symbol trade.symbol)
     with
     | None -> 0.0 (* New position - no realized P&L *)
     | Some existing_position -> _calculate_realized_pnl trade existing_position
@@ -357,10 +360,7 @@ let _validate_lots_sorted (position : portfolio_position) : status =
          position.symbol)
 
 let _validate_all_positions_lots_sorted positions : status =
-  let position_validations =
-    List.map positions ~f:(fun (_symbol, position) ->
-        _validate_lots_sorted position)
-  in
+  let position_validations = List.map positions ~f:_validate_lots_sorted in
   combine_status_list position_validations
 
 let _validate_cash_balance portfolio reconstructed =
@@ -371,16 +371,15 @@ let _validate_cash_balance portfolio reconstructed =
          reconstructed.current_cash portfolio.current_cash)
 
 let _validate_positions portfolio reconstructed =
-  let position_pair_equal (s1, p1) (s2, p2) =
-    String.equal s1 s2 && equal_portfolio_position p1 p2
-  in
   (* Positions are already sorted lists *)
-  if List.equal position_pair_equal portfolio.positions reconstructed.positions
+  if
+    List.equal equal_portfolio_position portfolio.positions
+      reconstructed.positions
   then ok ()
   else
     let format_positions positions =
-      List.map positions ~f:(fun (symbol, pos) ->
-          Printf.sprintf "%s: %s" symbol (show_portfolio_position pos))
+      List.map positions ~f:(fun pos ->
+          Printf.sprintf "%s: %s" pos.symbol (show_portfolio_position pos))
       |> String.concat ~sep:"; "
     in
     error_invalid_argument
