@@ -60,31 +60,58 @@ let _would_fill_market (path : intraday_path) : fill_result option =
   | Some point -> Some { price = point.price; fraction_of_day = 0.0 }
   | None -> None
 
+let _meets_limit ~side ~limit_price price =
+  match side with
+  | Trading_base.Types.Buy -> Float.(price <= limit_price)
+  | Trading_base.Types.Sell -> Float.(price >= limit_price)
+
+let _crosses_limit ~side ~limit_price ~prev_price ~curr_price =
+  match side with
+  | Trading_base.Types.Buy ->
+      Float.(prev_price > limit_price && curr_price <= limit_price)
+  | Trading_base.Types.Sell ->
+      Float.(prev_price < limit_price && curr_price >= limit_price)
+
+let rec _search_order_fill ~(crosses : float -> float -> bool)
+    ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
+  | [] -> None
+  | (curr_point : path_point) :: tail ->
+      if crosses prev_point.price curr_point.price then
+        Some
+          {
+            price = cross_price;
+            fraction_of_day = curr_point.fraction_of_day;
+          }
+      else if meets curr_point.price then
+        Some
+          {
+            price = curr_point.price;
+            fraction_of_day = curr_point.fraction_of_day;
+          }
+      else
+        _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point
+          tail
+
 let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
     fill_result option =
-  (* Find first point where limit price is reached.
-
-     IMPORTANT: For backtesting with discrete OHLC data, we conservatively
-     assume the order fills at the limit price (not at a better market price).
-
-     Example: Limit sell at $105, price moves 100→110
-     - In reality: Order fills as price crosses $105, actual fill unknown
-     - Our assumption: Fill at $105 (the limit)
-     - Why: Conservative, guaranteed, standard backtesting practice
-
-     TODO: With continuous price paths (random walk), we could model:
-     - Actual fill price based on order book dynamics
-     - Small price improvements (fill at $105.10 instead of $105.00)
-     - Slippage in fast-moving markets *)
-  let price_reached =
-    match side with
-    | Trading_base.Types.Buy -> fun price -> Float.(price <= limit_price)
-    | Trading_base.Types.Sell -> fun price -> Float.(price >= limit_price)
-  in
-  List.find_map path ~f:(fun point ->
-      if price_reached point.price then
-        Some { price = limit_price; fraction_of_day = point.fraction_of_day }
-      else None)
+  (* Hybrid approach mirroring stop orders:
+     - If the limit price is crossed inside a bar, record the fill at the limit
+       level (conservative assumption).
+     - If the market is already beyond the limit at the start of the bar,
+       assume we receive the observed price (captures favorable fills & slippage
+       when using discrete OHLC points). *)
+  match path with
+  | [] -> None
+  | (first : path_point) :: rest ->
+      let meets = _meets_limit ~side ~limit_price in
+      if meets first.price then
+        Some { price = first.price; fraction_of_day = first.fraction_of_day }
+      else
+        let crosses prev curr =
+          _crosses_limit ~side ~limit_price ~prev_price:prev ~curr_price:curr
+        in
+        _search_order_fill ~crosses ~meets ~cross_price:limit_price
+          ~prev_point:first rest
 
 let _meets_stop ~side ~stop_price price =
   match side with
@@ -98,24 +125,6 @@ let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
   | Trading_base.Types.Sell ->
       Float.(prev_price > stop_price && curr_price <= stop_price)
 
-let rec _search_stop_fill ~side ~stop_price ~(prev_point : path_point) =
-  function
-  | [] -> None
-  | (curr_point : path_point) :: tail ->
-      if
-        _crosses_stop ~side ~stop_price ~prev_price:prev_point.price
-          ~curr_price:curr_point.price
-      then
-        Some
-          { price = stop_price; fraction_of_day = curr_point.fraction_of_day }
-      else if _meets_stop ~side ~stop_price curr_point.price then
-        Some
-          {
-            price = curr_point.price;
-            fraction_of_day = curr_point.fraction_of_day;
-          }
-      else _search_stop_fill ~side ~stop_price ~prev_point:curr_point tail
-
 let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
     fill_result option =
   (* Hybrid approach: if the stop is crossed within a bar, fill at the stop
@@ -124,9 +133,15 @@ let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
   match path with
   | [] -> None
   | (first : path_point) :: rest ->
-      if _meets_stop ~side ~stop_price first.price then
+      let meets = _meets_stop ~side ~stop_price in
+      if meets first.price then
         Some { price = first.price; fraction_of_day = first.fraction_of_day }
-      else _search_stop_fill ~side ~stop_price ~prev_point:first rest
+      else
+        let crosses prev curr =
+          _crosses_stop ~side ~stop_price ~prev_price:prev ~curr_price:curr
+        in
+        _search_order_fill ~crosses ~meets ~cross_price:stop_price
+          ~prev_point:first rest
 
 let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
     ~limit_price : fill_result option =

@@ -139,17 +139,29 @@ let test_limit_buy_between_low_and_close _ =
       ~side:Trading_base.Types.Buy
   in
   assert_that result
-    (is_some_and (field (fun fill -> fill.price) (float_equal 101.0)))
+    (is_some_and
+       (field (fun fill -> fill.price) (float_equal upward_day.open_price)))
+
+let test_limit_buy_crosses_inside_bar _ =
+  (* Price drops past limit inside the H→L move; fill at limit *)
+  let path = generate_path upward_day in
+  let result =
+    would_fill ~path ~order_type:(Trading_base.Types.Limit 97.0)
+      ~side:Trading_base.Types.Buy
+  in
+  assert_that result
+    (is_some_and (field (fun fill -> fill.price) (float_equal 97.0)))
 
 let test_limit_buy_above_high _ =
-  (* Limit buy above high fills at limit price (conservative assumption) *)
+  (* Limit buy above high is effectively a market order; use observed price *)
   let path = generate_path upward_day in
   let result =
     would_fill ~path ~order_type:(Trading_base.Types.Limit 115.0)
       ~side:Trading_base.Types.Buy
   in
   assert_that result
-    (is_some_and (field (fun fill -> fill.price) (float_equal 115.0)))
+    (is_some_and
+       (field (fun fill -> fill.price) (float_equal upward_day.open_price)))
 
 let test_limit_sell_at_high _ =
   let path = generate_path upward_day in
@@ -181,14 +193,15 @@ let test_limit_sell_between_open_and_high _ =
     (is_some_and (field (fun fill -> fill.price) (float_equal 103.0)))
 
 let test_limit_sell_below_low _ =
-  (* Limit sell below low fills at limit price (conservative assumption) *)
+  (* Limit sell far below the market fills immediately at the observed price *)
   let path = generate_path upward_day in
   let result =
     would_fill ~path ~order_type:(Trading_base.Types.Limit 90.0)
       ~side:Trading_base.Types.Sell
   in
   assert_that result
-    (is_some_and (field (fun fill -> fill.price) (float_equal 90.0)))
+    (is_some_and
+       (field (fun fill -> fill.price) (float_equal upward_day.open_price)))
 
 (* ==================== would_fill tests - Stop orders ==================== *)
 
@@ -203,7 +216,8 @@ let test_stop_buy_at_high _ =
        (field (fun fill -> fill.price) (float_equal upward_day.high_price)))
 
 let test_stop_buy_between_open_and_high _ =
-  (* Stop buy at 105 triggers when price reaches high at 110 *)
+  (* Stop buy at 105 is triggered during the move toward the high, and fills at
+     the stop price rather than the eventual high. *)
   let path = generate_path upward_day in
   let result =
     would_fill ~path ~order_type:(Trading_base.Types.Stop 105.0)
@@ -231,7 +245,8 @@ let test_stop_sell_at_low _ =
     (is_some_and (field (fun fill -> fill.price) (float_equal 95.0)))
 
 let test_stop_sell_between_low_and_open _ =
-  (* Stop sell at 98 triggers when price reaches low at 95 *)
+  (* Stop sell at 98 triggers on the path toward the low and fills at the stop
+     level. *)
   let path = generate_path upward_day in
   let result =
     would_fill ~path ~order_type:(Trading_base.Types.Stop 98.0)
@@ -330,6 +345,7 @@ let suite =
          "limit buy below low" >:: test_limit_buy_below_low;
          "limit buy between low and close"
          >:: test_limit_buy_between_low_and_close;
+         "limit buy crosses inside bar" >:: test_limit_buy_crosses_inside_bar;
          "limit buy above high" >:: test_limit_buy_above_high;
          "limit sell at high" >:: test_limit_sell_at_high;
          "limit sell above high" >:: test_limit_sell_above_high;
