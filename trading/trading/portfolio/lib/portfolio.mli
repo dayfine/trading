@@ -8,9 +8,10 @@ type t = {
   initial_cash : cash_value;
   trade_history : trade_with_pnl list;
   current_cash : cash_value;
-  positions : (symbol, portfolio_position) Core.Hashtbl.t;
+  positions : (symbol * portfolio_position) list;
   accounting_method : accounting_method;
 }
+[@@deriving show, eq]
 (** Portfolio type. All fields are accessible for pattern matching and direct
     access. The portfolio is functionally immutable - [apply_trades] returns a
     new portfolio rather than modifying the existing one.
@@ -20,17 +21,9 @@ type t = {
     - [trade_history]: Complete history of trades with realized P&L
     - [current_cash]: Current cash balance (derived from initial_cash and
       trades)
-    - [positions]: Current positions indexed by symbol (copied on updates)
+    - [positions]: Current positions as sorted association list
+      [(symbol, position)]
     - [accounting_method]: Cost basis accounting method (AverageCost or FIFO) *)
-
-val pp : Format.formatter -> t -> unit
-(** Pretty-printer for portfolio *)
-
-val equal : t -> t -> bool
-(** Equality comparison for portfolios *)
-
-val show : t -> string
-(** String representation of portfolio *)
 
 val create :
   ?accounting_method:accounting_method -> initial_cash:cash_value -> unit -> t

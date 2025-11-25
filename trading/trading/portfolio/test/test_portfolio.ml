@@ -35,10 +35,7 @@ let test_create_portfolio _ accounting_method =
   assert_that portfolio.current_cash (float_equal 10000.0);
   assert_that portfolio.initial_cash (float_equal 10000.0);
   assert_equal [] portfolio.trade_history ~msg:"Empty trade history";
-  let positions : (string, portfolio_position) Core.Hashtbl.t =
-    portfolio.positions
-  in
-  let positions_list = Core.Hashtbl.to_alist positions |> List.map ~f:snd in
+  let positions_list = List.map portfolio.positions ~f:snd in
   assert_equal [] positions_list ~msg:"No positions initially"
 
 let test_apply_buy_trade _ accounting_method =
@@ -61,7 +58,8 @@ let test_apply_buy_trade _ accounting_method =
 
          (* Position should be created *)
          assert_that
-           (Hashtbl.find updated_portfolio.positions "AAPL")
+           (List.Assoc.find updated_portfolio.positions ~equal:String.equal
+              "AAPL")
            (is_some_and (fun position ->
                 assert_that (position_quantity position) (float_equal 100.0);
                 assert_that (avg_cost_of_position position) (float_equal 150.0)))))
@@ -86,7 +84,7 @@ let test_apply_sell_trade _ accounting_method =
 
   (* Position should be reduced *)
   assert_that
-    (Hashtbl.find portfolio.positions "AAPL")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal 50.0)))
 
@@ -111,7 +109,8 @@ let test_short_selling_allowed _ accounting_method =
     (is_ok_and_holds (fun updated_portfolio ->
          (* Short selling should be allowed and create negative position *)
          assert_that
-           (Hashtbl.find updated_portfolio.positions "AAPL")
+           (List.Assoc.find updated_portfolio.positions ~equal:String.equal
+              "AAPL")
            (is_some_and (fun position ->
                 assert_that (position_quantity position) (float_equal (-100.0))))))
 
@@ -131,9 +130,10 @@ let test_position_close _ accounting_method =
   in
 
   (* Position should be closed (removed) *)
-  assert_that (Hashtbl.find portfolio.positions "AAPL") is_none;
-  let positions = portfolio.positions in
-  let positions_list = Hashtbl.to_alist positions |> List.map ~f:snd in
+  assert_that
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
+    is_none;
+  let positions_list = List.map portfolio.positions ~f:snd in
   assert_equal [] positions_list ~msg:"No positions remaining"
 
 let test_validation _ accounting_method =
@@ -164,8 +164,7 @@ let test_multiple_trades_batch _ accounting_method =
   assert_that
     (apply_trades portfolio trades)
     (is_ok_and_holds (fun updated_portfolio ->
-         let positions = updated_portfolio.positions in
-         let positions_list = Hashtbl.to_alist positions |> List.map ~f:snd in
+         let positions_list = List.map updated_portfolio.positions ~f:snd in
          assert_equal 2
            (List.length positions_list)
            ~msg:"Two positions created";
@@ -191,7 +190,7 @@ let test_short_selling _ accounting_method =
 
       (* Position should be negative *)
       assert_that
-        (Hashtbl.find updated_portfolio.positions "AAPL")
+        (List.Assoc.find updated_portfolio.positions ~equal:String.equal "AAPL")
         (is_some_and (fun position ->
              assert_that (position_quantity position) (float_equal (-100.0));
              assert_that (avg_cost_of_position position) (float_equal 150.0)))
@@ -223,7 +222,7 @@ let test_short_cover _ accounting_method =
 
   (* Position should be -50 shares *)
   assert_that
-    (Hashtbl.find portfolio.positions "AAPL")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal (-50.0));
          assert_that (avg_cost_of_position position) (float_equal 149.95)))
@@ -248,7 +247,7 @@ let test_short_to_long _ accounting_method =
 
   (* Position should be +50 shares at new cost basis *)
   assert_that
-    (Hashtbl.find portfolio.positions "AAPL")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal 50.0);
          assert_that (avg_cost_of_position position) (float_equal 140.0)))
@@ -267,7 +266,8 @@ let test_commission_in_cost_basis _ accounting_method =
     (is_ok_and_holds (fun updated_portfolio ->
          (* Cost basis should be $100.10 per share ($100 + $10/100) *)
          assert_that
-           (Hashtbl.find updated_portfolio.positions "AAPL")
+           (List.Assoc.find updated_portfolio.positions ~equal:String.equal
+              "AAPL")
            (is_some_and (fun position ->
                 assert_that (position_quantity position) (float_equal 100.0);
                 assert_that (avg_cost_of_position position) (float_equal 100.10)))))
@@ -324,7 +324,9 @@ let test_realized_pnl_calculation _ accounting_method =
   assert_that total_pnl (float_equal 740.0);
 
   (* Position should be closed *)
-  assert_that (Hashtbl.find updated_portfolio.positions "AAPL") is_none
+  assert_that
+    (List.Assoc.find updated_portfolio.positions ~equal:String.equal "AAPL")
+    is_none
 
 (* ========================================================================== *)
 (* Accounting-method specific tests - parameterized expectations             *)
@@ -345,7 +347,9 @@ let test_complete_offset_and_reversal _ accounting_method =
       ~error_msg:"Complete offset should succeed"
   in
   (* Position should be completely closed *)
-  assert_that (Hashtbl.find portfolio.positions "AAPL") is_none;
+  assert_that
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
+    is_none;
 
   (* Test 2: Long position reversed to short *)
   let portfolio =
@@ -360,7 +364,7 @@ let test_complete_offset_and_reversal _ accounting_method =
   in
   (* Position should now be short 100 shares *)
   assert_that
-    (Hashtbl.find portfolio.positions "MSFT")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "MSFT")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal (-100.0));
          assert_that (avg_cost_of_position position) (float_equal 210.0);
@@ -383,7 +387,7 @@ let test_complete_offset_and_reversal _ accounting_method =
   in
   (* Position should now be long 40 shares *)
   assert_that
-    (Hashtbl.find portfolio.positions "TSLA")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "TSLA")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal 40.0);
          assert_that (avg_cost_of_position position) (float_equal 290.0);
@@ -415,7 +419,7 @@ let test_fifo_basic_buy_sell _ =
 
   (* Verify position has 2 lots *)
   assert_that
-    (Hashtbl.find portfolio.positions "AAPL")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
     (is_some_and (fun position ->
          assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
          assert_that (position_quantity position) (float_equal 200.0);
@@ -443,7 +447,7 @@ let test_fifo_sell_matches_oldest _ =
 
   (* Should have 1 lot remaining (the second buy at $110) *)
   assert_that
-    (Hashtbl.find portfolio.positions "AAPL")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
     (is_some_and (fun position ->
          assert_equal 1
            (List.length position.lots)
@@ -473,7 +477,7 @@ let test_fifo_partial_lot_consumption _ =
 
   (* Should have 2 lots: 50 shares at $100, 100 shares at $110 *)
   assert_that
-    (Hashtbl.find portfolio.positions "AAPL")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
     (is_some_and (fun position ->
          assert_equal 2
            (List.length position.lots)
@@ -514,8 +518,12 @@ let test_fifo_vs_average_cost _ =
   in
 
   (* Get positions *)
-  let pos_fifo = Hashtbl.find portfolio_fifo.positions "AAPL" in
-  let pos_avg = Hashtbl.find portfolio_avg.positions "AAPL" in
+  let pos_fifo =
+    List.Assoc.find portfolio_fifo.positions ~equal:String.equal "AAPL"
+  in
+  let pos_avg =
+    List.Assoc.find portfolio_avg.positions ~equal:String.equal "AAPL"
+  in
 
   match (pos_fifo, pos_avg) with
   | Some fifo, Some avg ->
@@ -572,7 +580,7 @@ let test_fifo_multiple_partial_sells _ =
 
   (* Should have 2 lots: 50 shares at $110, 100 shares at $120 *)
   assert_that
-    (Hashtbl.find portfolio.positions "AAPL")
+    (List.Assoc.find portfolio.positions ~equal:String.equal "AAPL")
     (is_some_and (fun position ->
          assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
          assert_that (position_quantity position) (float_equal 150.0);

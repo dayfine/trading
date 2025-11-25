@@ -8,58 +8,18 @@ type t = {
   trade_history : trade_with_pnl list;
   (* Computed state - maintained for performance *)
   current_cash : cash_value;
-  positions : (Trading_base.Types.symbol, portfolio_position) Hashtbl.t;
+  positions : (Trading_base.Types.symbol * portfolio_position) list;
   accounting_method : accounting_method;
       (* Default accounting method for new positions *)
 }
-
-(* Pretty-printing and equality for portfolio *)
-let pp fmt portfolio =
-  let positions_list =
-    Hashtbl.to_alist portfolio.positions
-    |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
-  in
-  Format.fprintf fmt
-    "{ initial_cash = %.2f; trade_history = [%d trades]; current_cash = %.2f; \
-     positions = [%a]; accounting_method = %s }"
-    portfolio.initial_cash
-    (List.length portfolio.trade_history)
-    portfolio.current_cash
-    (fun fmt positions ->
-      List.iter positions ~f:(fun (symbol, pos) ->
-          Format.fprintf fmt "%s: %s; " symbol (show_portfolio_position pos)))
-    positions_list
-    (show_accounting_method portfolio.accounting_method)
-
-let show portfolio = Format.asprintf "%a" pp portfolio
-
-let equal p1 p2 =
-  let positions_equal () =
-    let pos1 =
-      Hashtbl.to_alist p1.positions
-      |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
-    in
-    let pos2 =
-      Hashtbl.to_alist p2.positions
-      |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
-    in
-    List.equal
-      (fun (s1, pos1) (s2, pos2) ->
-        String.equal s1 s2 && equal_portfolio_position pos1 pos2)
-      pos1 pos2
-  in
-  Float.equal p1.initial_cash p2.initial_cash
-  && Float.equal p1.current_cash p2.current_cash
-  && List.equal equal_trade_with_pnl p1.trade_history p2.trade_history
-  && equal_accounting_method p1.accounting_method p2.accounting_method
-  && positions_equal ()
+[@@deriving show, eq]
 
 let create ?(accounting_method = AverageCost) ~initial_cash () =
   {
     initial_cash;
     trade_history = [];
     current_cash = initial_cash;
-    positions = Hashtbl.create (module String);
+    positions = [];
     accounting_method;
   }
 
@@ -172,22 +132,26 @@ let _make_lot trade_id trade_quantity effective_cost trade_timestamp :
       Time_ns_unix.to_date trade_timestamp ~zone:Time_float.Zone.utc;
   }
 
-let _set_position positions symbol position : status =
-  Hashtbl.set positions ~key:symbol ~data:position;
-  ok ()
+let _set_position positions symbol position :
+    (Trading_base.Types.symbol * portfolio_position) list =
+  List.Assoc.add positions ~equal:String.equal symbol position
+  |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
 
-let _remove_position positions symbol : status =
-  Hashtbl.remove positions symbol;
-  ok ()
+let _remove_position positions symbol :
+    (Trading_base.Types.symbol * portfolio_position) list =
+  List.Assoc.remove positions ~equal:String.equal symbol
+  |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
 
 let _create_new_position positions symbol trade_quantity effective_cost trade_id
-    trade_timestamp accounting_method : status =
+    trade_timestamp accounting_method :
+    (Trading_base.Types.symbol * portfolio_position) list =
   let lot = _make_lot trade_id trade_quantity effective_cost trade_timestamp in
   let position = { symbol; lots = [ lot ]; accounting_method } in
   _set_position positions symbol position
 
 let _add_lot_to_position positions symbol (existing : portfolio_position)
-    trade_quantity effective_cost trade_id trade_timestamp : status =
+    trade_quantity effective_cost trade_id trade_timestamp :
+    (Trading_base.Types.symbol * portfolio_position) list =
   let new_lot =
     _make_lot trade_id trade_quantity effective_cost trade_timestamp
   in
@@ -198,7 +162,7 @@ let _add_lot_to_position positions symbol (existing : portfolio_position)
 
 let _close_or_reduce_fifo_position positions symbol
     (existing : portfolio_position) trade_quantity effective_cost trade_id
-    trade_timestamp : status =
+    trade_timestamp : (Trading_base.Types.symbol * portfolio_position) list =
   let remaining_lots, _matched_lots =
     _match_fifo_lots existing.lots trade_quantity
   in
@@ -217,7 +181,7 @@ let _close_or_reduce_fifo_position positions symbol
 
 let _update_existing_position_fifo positions symbol
     (existing : portfolio_position) trade_quantity effective_cost trade_id
-    trade_timestamp : status =
+    trade_timestamp : (Trading_base.Types.symbol * portfolio_position) list =
   let existing_qty = Calculations.position_quantity existing in
   let adding_to_position = _is_same_direction existing_qty trade_quantity in
   if adding_to_position then
@@ -229,7 +193,7 @@ let _update_existing_position_fifo positions symbol
 
 let _update_existing_position_average_cost positions symbol
     (existing : portfolio_position) trade_quantity effective_cost trade_id
-    trade_timestamp : status =
+    trade_timestamp : (Trading_base.Types.symbol * portfolio_position) list =
   let existing_qty = Calculations.position_quantity existing in
   let new_quantity = existing_qty +. trade_quantity in
   if _is_quantity_negligible new_quantity then _remove_position positions symbol
@@ -242,7 +206,8 @@ let _update_existing_position_average_cost positions symbol
       trade_timestamp existing.accounting_method
 
 let _update_existing_position positions symbol (existing : portfolio_position)
-    trade_quantity effective_cost trade_id trade_timestamp : status =
+    trade_quantity effective_cost trade_id trade_timestamp :
+    (Trading_base.Types.symbol * portfolio_position) list =
   match existing.accounting_method with
   | AverageCost ->
       _update_existing_position_average_cost positions symbol existing
@@ -252,14 +217,15 @@ let _update_existing_position positions symbol (existing : portfolio_position)
         effective_cost trade_id trade_timestamp
 
 let _update_position_with_trade positions accounting_method
-    (trade : Trading_base.Types.trade) : status =
+    (trade : Trading_base.Types.trade) :
+    (Trading_base.Types.symbol * portfolio_position) list =
   let symbol = trade.symbol in
   let trade_quantity =
     match trade.side with Buy -> trade.quantity | Sell -> -.trade.quantity
   in
   let effective_cost = _calculate_cost_basis_with_commission trade in
 
-  match Hashtbl.find positions symbol with
+  match List.Assoc.find positions ~equal:String.equal symbol with
   | None ->
       _create_new_position positions symbol trade_quantity effective_cost
         trade.id trade.timestamp accounting_method
@@ -347,14 +313,16 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
     t status_or =
   let cash_change = _calculate_cash_change trade in
   let%bind new_cash = _check_sufficient_cash portfolio cash_change in
-  let new_positions = Hashtbl.copy portfolio.positions in
   let realized_pnl =
-    match Hashtbl.find portfolio.positions trade.symbol with
+    match
+      List.Assoc.find portfolio.positions ~equal:String.equal trade.symbol
+    with
     | None -> 0.0 (* New position - no realized P&L *)
     | Some existing_position -> _calculate_realized_pnl trade existing_position
   in
-  let%bind () =
-    _update_position_with_trade new_positions portfolio.accounting_method trade
+  let new_positions =
+    _update_position_with_trade portfolio.positions portfolio.accounting_method
+      trade
   in
   let trade_with_pnl = { trade; realized_pnl } in
   return
@@ -390,8 +358,8 @@ let _validate_lots_sorted (position : portfolio_position) : status =
 
 let _validate_all_positions_lots_sorted positions : status =
   let position_validations =
-    Hashtbl.to_alist positions
-    |> List.map ~f:(fun (_symbol, position) -> _validate_lots_sorted position)
+    List.map positions ~f:(fun (_symbol, position) ->
+        _validate_lots_sorted position)
   in
   combine_status_list position_validations
 
@@ -402,20 +370,12 @@ let _validate_cash_balance portfolio reconstructed =
       (Printf.sprintf "Cash balance mismatch: expected %.2f, found %.2f"
          reconstructed.current_cash portfolio.current_cash)
 
-let _positions_to_sorted_list positions =
-  Hashtbl.to_alist positions
-  |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
-
 let _validate_positions portfolio reconstructed =
   let position_pair_equal (s1, p1) (s2, p2) =
     String.equal s1 s2 && equal_portfolio_position p1 p2
   in
-  let current_positions = _positions_to_sorted_list portfolio.positions in
-  let reconstructed_positions =
-    _positions_to_sorted_list reconstructed.positions
-  in
-
-  if List.equal position_pair_equal current_positions reconstructed_positions
+  (* Positions are already sorted lists *)
+  if List.equal position_pair_equal portfolio.positions reconstructed.positions
   then ok ()
   else
     let format_positions positions =
@@ -425,8 +385,8 @@ let _validate_positions portfolio reconstructed =
     in
     error_invalid_argument
       (Printf.sprintf "Positions mismatch:\nExpected: [%s]\nFound: [%s]"
-         (format_positions reconstructed_positions)
-         (format_positions current_positions))
+         (format_positions reconstructed.positions)
+         (format_positions portfolio.positions))
 
 let validate portfolio =
   let%bind reconstructed =
