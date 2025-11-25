@@ -54,6 +54,18 @@ let gap_down_day =
       adjusted_close = 85.0;
     }
 
+let gap_trend_day =
+  Types.Daily_price.
+    {
+      date = date_of_string "2024-01-06";
+      open_price = 120.0;
+      high_price = 130.0;
+      low_price = 120.0;
+      close_price = 125.0;
+      volume = 750000;
+      adjusted_close = 125.0;
+    }
+
 (* ==================== generate_path tests ==================== *)
 
 let test_upward_day_path _ =
@@ -289,46 +301,46 @@ let test_stop_sell_gap_prefers_observed_price _ =
 (* ==================== would_fill tests - StopLimit orders ==================== *)
 
 let test_stop_limit_buy_both_conditions_met _ =
-  (* Stop at 105.0 triggers, limit at 95.0 fills *)
+  (* Stop 105 triggers breakout continuation; limit 107 caps fill price *)
   let path = generate_path upward_day in
   let result =
     would_fill ~path
-      ~order_type:(Trading_base.Types.StopLimit (105.0, 95.0))
+      ~order_type:(Trading_base.Types.StopLimit (105.0, 107.0))
       ~side:Trading_base.Types.Buy
   in
   assert_that result
-    (is_some_and (field (fun fill -> fill.price) (float_equal 95.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 105.0)))
 
 let test_stop_limit_buy_stop_not_triggered _ =
   (* Stop at 115.0 never triggers (high is 110.0) *)
   let path = generate_path upward_day in
   let result =
     would_fill ~path
-      ~order_type:(Trading_base.Types.StopLimit (115.0, 95.0))
+      ~order_type:(Trading_base.Types.StopLimit (115.0, 116.0))
       ~side:Trading_base.Types.Buy
   in
   assert_that result is_none
 
 let test_stop_limit_buy_limit_not_reached _ =
-  (* Stop at 105.0 triggers, but limit at 92.0 not reached (low is 95.0) *)
-  let path = generate_path upward_day in
+  (* Gap opens above stop; limit 119 never trades because price stays >= 120 *)
+  let path = generate_path gap_trend_day in
   let result =
     would_fill ~path
-      ~order_type:(Trading_base.Types.StopLimit (105.0, 92.0))
+      ~order_type:(Trading_base.Types.StopLimit (118.0, 119.0))
       ~side:Trading_base.Types.Buy
   in
   assert_that result is_none
 
 let test_stop_limit_sell_both_conditions_met _ =
-  (* Stop at 98.0 triggers, limit at 110.0 fills *)
+  (* Stop 98 triggers breakdown; limit 96 protects fill price *)
   let path = generate_path upward_day in
   let result =
     would_fill ~path
-      ~order_type:(Trading_base.Types.StopLimit (98.0, 110.0))
+      ~order_type:(Trading_base.Types.StopLimit (98.0, 96.0))
       ~side:Trading_base.Types.Sell
   in
   assert_that result
-    (is_some_and (field (fun fill -> fill.price) (float_equal 110.0)))
+    (is_some_and (field (fun fill -> fill.price) (float_equal 98.0)))
 
 (* ==================== Test Suite ==================== *)
 

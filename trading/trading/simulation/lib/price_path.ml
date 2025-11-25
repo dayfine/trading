@@ -72,25 +72,36 @@ let _crosses_limit ~side ~limit_price ~prev_price ~curr_price =
   | Trading_base.Types.Sell ->
       Float.(prev_price < limit_price && curr_price >= limit_price)
 
-let rec _search_order_fill ~(crosses : float -> float -> bool)
+let rec _search_order_fill_with_path ~(crosses : float -> float -> bool)
     ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
   | [] -> None
   | (curr_point : path_point) :: tail ->
       if crosses prev_point.price curr_point.price then
         Some
-          {
-            price = cross_price;
-            fraction_of_day = curr_point.fraction_of_day;
-          }
+          ( {
+              price = cross_price;
+              fraction_of_day = curr_point.fraction_of_day;
+            },
+            curr_point :: tail )
       else if meets curr_point.price then
         Some
-          {
-            price = curr_point.price;
-            fraction_of_day = curr_point.fraction_of_day;
-          }
+          ( {
+              price = curr_point.price;
+              fraction_of_day = curr_point.fraction_of_day;
+            },
+            curr_point :: tail )
       else
-        _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point
-          tail
+        _search_order_fill_with_path ~crosses ~meets ~cross_price
+          ~prev_point:curr_point tail
+
+let _search_order_fill ~(crosses : float -> float -> bool) ~(meets : float -> bool)
+    ~cross_price ~(prev_point : path_point) remaining =
+  match
+    _search_order_fill_with_path ~crosses ~meets ~cross_price ~prev_point
+      remaining
+  with
+  | Some (fill, _) -> Some fill
+  | None -> None
 
 let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
     fill_result option =
@@ -125,31 +136,45 @@ let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
   | Trading_base.Types.Sell ->
       Float.(prev_price > stop_price && curr_price <= stop_price)
 
-let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
-    fill_result option =
-  (* Hybrid approach: if the stop is crossed within a bar, fill at the stop
-     price; if the market gaps beyond the stop, fill at the observed price to
-     reflect slippage. *)
+let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
+    (fill_result * intraday_path) option =
   match path with
   | [] -> None
   | (first : path_point) :: rest ->
       let meets = _meets_stop ~side ~stop_price in
       if meets first.price then
-        Some { price = first.price; fraction_of_day = first.fraction_of_day }
+        let fill =
+          { price = first.price; fraction_of_day = first.fraction_of_day }
+        in
+        Some (fill, path)
       else
         let crosses prev curr =
           _crosses_stop ~side ~stop_price ~prev_price:prev ~curr_price:curr
         in
-        _search_order_fill ~crosses ~meets ~cross_price:stop_price
+        _search_order_fill_with_path ~crosses ~meets ~cross_price:stop_price
           ~prev_point:first rest
+
+let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
+    fill_result option =
+  (* Hybrid approach: if the stop is crossed within a bar, fill at the stop
+     price; if the market gaps beyond the stop, fill at the observed price to
+     reflect slippage. *)
+  match _stop_activation_path ~path ~side ~stop_price with
+  | Some (fill, _) -> Some fill
+  | None -> None
 
 let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
     ~limit_price : fill_result option =
   (* Two-stage: first stop triggers, then limit must be reached *)
-  if _would_fill_stop ~path ~side ~stop_price |> Option.is_some then
-    (* After stop triggers, check if limit price is reached *)
-    _would_fill_limit ~path ~side ~limit_price
-  else None
+  match _stop_activation_path ~path ~side ~stop_price with
+  | None -> None
+  | Some (stop_fill, activation_path) ->
+      let meets_limit = _meets_limit ~side ~limit_price in
+      if meets_limit stop_fill.price then Some stop_fill
+      else
+        (* Limit not satisfied immediately; wait for the limit price after stop
+           activation. *)
+        _would_fill_limit ~path:activation_path ~side ~limit_price
 
 (** {1 Order Execution} *)
 
