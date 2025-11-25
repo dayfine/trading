@@ -26,13 +26,13 @@ let test_path_starts_at_open _ =
       ~open_price:100.0 ~high:110.0 ~low:95.0 ~close:105.0 ~volume:1000000
   in
   let path = generate_path daily in
-  elements_are path
+  assert_that path (elements_are
     [
-      equal_to ({ fraction_of_day = 0.0; price = 100.0 } : path_point);
-      equal_to ({ fraction_of_day = 0.33; price = 110.0 } : path_point);
-      equal_to ({ fraction_of_day = 0.66; price = 95.0 } : path_point);
+      equal_to ({ fraction_of_day = 0.0; price = 100.0 }  : path_point);
+      equal_to ({ fraction_of_day = 0.33; price = 110.0 } : path_point );
+      equal_to ({ fraction_of_day = 0.66; price = 95.0 } : path_point );
       equal_to ({ fraction_of_day = 1.0; price = 105.0 } : path_point);
-    ]
+    ])
 
 let test_upward_day_visits_high_before_low _ =
   (* When close > open, path should go O → H → L → C *)

@@ -197,34 +197,37 @@ val one : 'a matcher -> 'a list matcher
       assert_that results (one (equal_to expected))
     ]} *)
 
-val elements_are : 'a list -> ('a -> unit) list -> unit
-(** [elements_are list matchers] applies each matcher to the corresponding
-    element in [list]. The list and matchers must have the same length. This is
-    useful for checking specific properties of each element in order.
+val elements_are : 'a matcher list -> 'a list matcher
+(** [elements_are matchers] creates a matcher that applies each matcher to the
+    corresponding element in the list. The list and matchers must have the same
+    length. This is useful for checking specific properties of each element in
+    order.
 
     Example:
     {[
-      elements_are reports
-        [
-          (fun r -> assert_equal "order1" r.order_id);
-          (fun r -> assert_equal "order2" r.order_id);
-          (fun r -> assert_equal "order3" r.order_id);
-        ]
+      assert_that reports
+        (elements_are
+           [
+             (fun r -> assert_equal "order1" r.order_id);
+             (fun r -> assert_equal "order2" r.order_id);
+             (fun r -> assert_equal "order3" r.order_id);
+           ])
     ]}
     {[
-      elements_are orders
-        [
-          all_of
-            [
-              field (fun o -> o.id) (equal_to "order1");
-              field (fun o -> o.status) (equal_to Pending);
-            ];
-          all_of
-            [
-              field (fun o -> o.id) (equal_to "order2");
-              field (fun o -> o.status) (equal_to Filled);
-            ];
-        ]
+      assert_that orders
+        (elements_are
+           [
+             all_of
+               [
+                 field (fun o -> o.id) (equal_to "order1");
+                 field (fun o -> o.status) (equal_to Pending);
+               ];
+             all_of
+               [
+                 field (fun o -> o.id) (equal_to "order2");
+                 field (fun o -> o.status) (equal_to Filled);
+               ];
+           ])
     ]} *)
 
 val unordered_elements_are : 'a matcher list -> 'a list matcher
