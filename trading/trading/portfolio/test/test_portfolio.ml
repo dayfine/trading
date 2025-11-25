@@ -63,8 +63,7 @@ let test_apply_buy_trade _ accounting_method =
 
          (* Position should be created *)
          assert_that
-           (List.find updated_portfolio.positions ~f:(fun p ->
-                String.equal p.symbol "AAPL"))
+           (get_position updated_portfolio "AAPL")
            (is_some_and (fun position ->
                 assert_that (position_quantity position) (float_equal 100.0);
                 assert_that (avg_cost_of_position position) (float_equal 150.0)))))
@@ -89,7 +88,7 @@ let test_apply_sell_trade _ accounting_method =
 
   (* Position should be reduced *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
+    (get_position portfolio "AAPL")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal 50.0)))
 
@@ -114,8 +113,7 @@ let test_short_selling_allowed _ accounting_method =
     (is_ok_and_holds (fun updated_portfolio ->
          (* Short selling should be allowed and create negative position *)
          assert_that
-           (List.find updated_portfolio.positions ~f:(fun p ->
-                String.equal p.symbol "AAPL"))
+           (get_position updated_portfolio "AAPL")
            (is_some_and (fun position ->
                 assert_that (position_quantity position) (float_equal (-100.0))))))
 
@@ -135,9 +133,7 @@ let test_position_close _ accounting_method =
   in
 
   (* Position should be closed (removed) *)
-  assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
-    is_none;
+  assert_that (get_position portfolio "AAPL") is_none;
   assert_equal [] portfolio.positions ~msg:"No positions remaining"
 
 let test_validation _ accounting_method =
@@ -193,8 +189,7 @@ let test_short_selling _ accounting_method =
 
       (* Position should be negative *)
       assert_that
-        (List.find updated_portfolio.positions ~f:(fun p ->
-             String.equal p.symbol "AAPL"))
+        (get_position updated_portfolio "AAPL")
         (is_some_and (fun position ->
              assert_that (position_quantity position) (float_equal (-100.0));
              assert_that (avg_cost_of_position position) (float_equal 150.0)))
@@ -226,7 +221,7 @@ let test_short_cover _ accounting_method =
 
   (* Position should be -50 shares *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
+    (get_position portfolio "AAPL")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal (-50.0));
          assert_that (avg_cost_of_position position) (float_equal 149.95)))
@@ -251,7 +246,7 @@ let test_short_to_long _ accounting_method =
 
   (* Position should be +50 shares at new cost basis *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
+    (get_position portfolio "AAPL")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal 50.0);
          assert_that (avg_cost_of_position position) (float_equal 140.0)))
@@ -270,8 +265,7 @@ let test_commission_in_cost_basis _ accounting_method =
     (is_ok_and_holds (fun updated_portfolio ->
          (* Cost basis should be $100.10 per share ($100 + $10/100) *)
          assert_that
-           (List.find updated_portfolio.positions ~f:(fun p ->
-                String.equal p.symbol "AAPL"))
+           (get_position updated_portfolio "AAPL")
            (is_some_and (fun position ->
                 assert_that (position_quantity position) (float_equal 100.0);
                 assert_that (avg_cost_of_position position) (float_equal 100.10)))))
@@ -328,10 +322,7 @@ let test_realized_pnl_calculation _ accounting_method =
   assert_that total_pnl (float_equal 740.0);
 
   (* Position should be closed *)
-  assert_that
-    (List.find updated_portfolio.positions ~f:(fun p ->
-         String.equal p.symbol "AAPL"))
-    is_none
+  assert_that (get_position updated_portfolio "AAPL") is_none
 
 (* ========================================================================== *)
 (* Accounting-method specific tests - parameterized expectations             *)
@@ -352,9 +343,7 @@ let test_complete_offset_and_reversal _ accounting_method =
       ~error_msg:"Complete offset should succeed"
   in
   (* Position should be completely closed *)
-  assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
-    is_none;
+  assert_that (get_position portfolio "AAPL") is_none;
 
   (* Test 2: Long position reversed to short *)
   let portfolio =
@@ -369,7 +358,7 @@ let test_complete_offset_and_reversal _ accounting_method =
   in
   (* Position should now be short 100 shares *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "MSFT"))
+    (get_position portfolio "MSFT")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal (-100.0));
          assert_that (avg_cost_of_position position) (float_equal 210.0);
@@ -392,7 +381,7 @@ let test_complete_offset_and_reversal _ accounting_method =
   in
   (* Position should now be long 40 shares *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "TSLA"))
+    (get_position portfolio "TSLA")
     (is_some_and (fun position ->
          assert_that (position_quantity position) (float_equal 40.0);
          assert_that (avg_cost_of_position position) (float_equal 290.0);
@@ -424,7 +413,7 @@ let test_fifo_basic_buy_sell _ =
 
   (* Verify position has 2 lots *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
+    (get_position portfolio "AAPL")
     (is_some_and (fun position ->
          assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
          assert_that (position_quantity position) (float_equal 200.0);
@@ -452,7 +441,7 @@ let test_fifo_sell_matches_oldest _ =
 
   (* Should have 1 lot remaining (the second buy at $110) *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
+    (get_position portfolio "AAPL")
     (is_some_and (fun position ->
          assert_equal 1
            (List.length position.lots)
@@ -482,7 +471,7 @@ let test_fifo_partial_lot_consumption _ =
 
   (* Should have 2 lots: 50 shares at $100, 100 shares at $110 *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
+    (get_position portfolio "AAPL")
     (is_some_and (fun position ->
          assert_equal 2
            (List.length position.lots)
@@ -523,13 +512,8 @@ let test_fifo_vs_average_cost _ =
   in
 
   (* Get positions *)
-  let pos_fifo =
-    List.find portfolio_fifo.positions ~f:(fun p ->
-        String.equal p.symbol "AAPL")
-  in
-  let pos_avg =
-    List.find portfolio_avg.positions ~f:(fun p -> String.equal p.symbol "AAPL")
-  in
+  let pos_fifo = get_position portfolio_fifo "AAPL" in
+  let pos_avg = get_position portfolio_avg "AAPL" in
 
   match (pos_fifo, pos_avg) with
   | Some fifo, Some avg ->
@@ -586,7 +570,7 @@ let test_fifo_multiple_partial_sells _ =
 
   (* Should have 2 lots: 50 shares at $110, 100 shares at $120 *)
   assert_that
-    (List.find portfolio.positions ~f:(fun p -> String.equal p.symbol "AAPL"))
+    (get_position portfolio "AAPL")
     (is_some_and (fun position ->
          assert_equal 2 (List.length position.lots) ~msg:"Should have 2 lots";
          assert_that (position_quantity position) (float_equal 150.0);

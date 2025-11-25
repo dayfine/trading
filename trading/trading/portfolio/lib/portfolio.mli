@@ -30,6 +30,10 @@ val create :
     method (default: AverageCost). This is the only safe way to construct a
     valid portfolio. *)
 
+val get_position : t -> symbol -> portfolio_position option
+(** Find a position by symbol. Returns None if no position exists for the
+    symbol. *)
+
 val apply_trades : t -> trade list -> t status_or
 (** Apply trades sequentially, returning a new portfolio. Trades are processed
     in order. Returns Error if any trade would create invalid state (e.g.,

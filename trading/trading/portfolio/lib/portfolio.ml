@@ -23,6 +23,9 @@ let create ?(accounting_method = AverageCost) ~initial_cash () =
     accounting_method;
   }
 
+let get_position portfolio symbol =
+  List.find portfolio.positions ~f:(fun p -> String.equal p.symbol symbol)
+
 (* Constants *)
 let negligible_quantity_epsilon = 1e-9
 
@@ -316,10 +319,7 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
   let cash_change = _calculate_cash_change trade in
   let%bind new_cash = _check_sufficient_cash portfolio cash_change in
   let realized_pnl =
-    match
-      List.find portfolio.positions ~f:(fun p ->
-          String.equal p.symbol trade.symbol)
-    with
+    match get_position portfolio trade.symbol with
     | None -> 0.0 (* New position - no realized P&L *)
     | Some existing_position -> _calculate_realized_pnl trade existing_position
   in
