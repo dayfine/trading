@@ -48,6 +48,10 @@ let sample_prices =
 
 let sample_deps = { prices = sample_prices }
 
+(* Helper to create expected step_result for comparison *)
+let make_expected_step_result ~date ~portfolio ~trades =
+  { date; portfolio; trades }
+
 (* Custom matchers for step_outcome *)
 let is_stepped f = function
   | Stepped (sim', result) -> f (sim', result)
@@ -61,31 +65,57 @@ let is_completed f = function
 
 let test_create_returns_simulator _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
+  let expected_result =
+    make_expected_step_result
+      ~date:(date_of_string "2024-01-02")
+      ~portfolio:expected_portfolio ~trades:[]
+  in
   assert_that (step sim)
     (is_ok_and_holds
-       (is_stepped (fun (_, result) ->
-            assert_equal (date_of_string "2024-01-02") result.date)))
+       (is_stepped (fun (_, result) -> assert_equal expected_result result)))
 
 let test_create_with_empty_prices _ =
   let sim = create ~config:sample_config ~deps:{ prices = [] } in
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
+  let expected_result =
+    make_expected_step_result
+      ~date:(date_of_string "2024-01-02")
+      ~portfolio:expected_portfolio ~trades:[]
+  in
   assert_that (step sim)
     (is_ok_and_holds
-       (is_stepped (fun (_, result) ->
-            assert_equal (date_of_string "2024-01-02") result.date)))
+       (is_stepped (fun (_, result) -> assert_equal expected_result result)))
 
 (* ==================== step tests ==================== *)
 
 let test_step_advances_date _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
+  let expected_result1 =
+    make_expected_step_result
+      ~date:(date_of_string "2024-01-02")
+      ~portfolio:expected_portfolio ~trades:[]
+  in
+  let expected_result2 =
+    make_expected_step_result
+      ~date:(date_of_string "2024-01-03")
+      ~portfolio:expected_portfolio ~trades:[]
+  in
   assert_that (step sim)
     (is_ok_and_holds
-       (is_stepped (fun (sim', step_result) ->
-            assert_equal (date_of_string "2024-01-02") step_result.date;
-            assert_equal [] step_result.trades;
+       (is_stepped (fun (sim', result1) ->
+            assert_equal expected_result1 result1;
             assert_that (step sim')
               (is_ok_and_holds
                  (is_stepped (fun (_, result2) ->
-                      assert_equal (date_of_string "2024-01-03") result2.date))))))
+                      assert_equal expected_result2 result2))))))
 
 let test_step_returns_completed_when_done _ =
   let config =
@@ -96,23 +126,38 @@ let test_step_returns_completed_when_done _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
-  assert_that (step sim) (is_ok_and_holds (is_completed (fun _ -> ())))
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
+  assert_that (step sim)
+    (is_ok_and_holds
+       (is_completed (fun portfolio ->
+            assert_equal expected_portfolio portfolio)))
 
 (* ==================== run tests ==================== *)
 
 let test_run_completes_simulation _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
+  let expected_steps =
+    [
+      make_expected_step_result
+        ~date:(date_of_string "2024-01-02")
+        ~portfolio:expected_portfolio ~trades:[];
+      make_expected_step_result
+        ~date:(date_of_string "2024-01-03")
+        ~portfolio:expected_portfolio ~trades:[];
+      make_expected_step_result
+        ~date:(date_of_string "2024-01-04")
+        ~portfolio:expected_portfolio ~trades:[];
+    ]
+  in
   assert_that (run sim)
-    (is_ok_and_holds (fun (steps, _portfolio) ->
-         assert_that steps (size_is 3);
-         let dates = List.map steps ~f:(fun s -> s.date) in
-         assert_equal
-           [
-             date_of_string "2024-01-02";
-             date_of_string "2024-01-03";
-             date_of_string "2024-01-04";
-           ]
-           dates))
+    (is_ok_and_holds (fun (steps, final_portfolio) ->
+         assert_equal expected_steps steps;
+         assert_equal expected_portfolio final_portfolio))
 
 let test_run_on_already_complete _ =
   let config =
@@ -123,8 +168,13 @@ let test_run_on_already_complete _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
   assert_that (run sim)
-    (is_ok_and_holds (fun (steps, _) -> assert_that steps (size_is 0)))
+    (is_ok_and_holds (fun (steps, final_portfolio) ->
+         assert_that steps (size_is 0);
+         assert_equal expected_portfolio final_portfolio))
 
 (* ==================== Test Suite ==================== *)
 
