@@ -126,7 +126,13 @@ let test_step_returns_completed_when_done _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
-  assert_that (step sim) (is_ok_and_holds (is_completed (fun _ -> ())))
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
+  assert_that (step sim)
+    (is_ok_and_holds
+       (is_completed (fun portfolio ->
+            assert_equal expected_portfolio portfolio)))
 
 (* ==================== run tests ==================== *)
 
@@ -162,8 +168,13 @@ let test_run_on_already_complete _ =
     }
   in
   let sim = create ~config ~deps:sample_deps in
+  let expected_portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+  in
   assert_that (run sim)
-    (is_ok_and_holds (fun (steps, _) -> assert_that steps (size_is 0)))
+    (is_ok_and_holds (fun (steps, final_portfolio) ->
+         assert_that steps (size_is 0);
+         assert_equal expected_portfolio final_portfolio))
 
 (* ==================== Test Suite ==================== *)
 
