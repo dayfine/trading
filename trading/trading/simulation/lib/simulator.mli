@@ -21,8 +21,8 @@ type dependencies = {
           HistoricalDailyPriceStorage *)
   order_manager : Trading_orders.Manager.order_manager;
       (** Order manager for tracking order lifecycle *)
-  commission : Trading_engine.Types.commission_config;
-      (** Commission configuration for trade cost calculation *)
+  engine : Trading_engine.Engine.t;
+      (** Trading engine for order execution and trade creation *)
 }
 (** External dependencies injected into the simulator *)
 

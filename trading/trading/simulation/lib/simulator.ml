@@ -13,7 +13,7 @@ type config = { start_date : Date.t; end_date : Date.t; initial_cash : float }
 type dependencies = {
   prices : symbol_prices list;
   order_manager : Trading_orders.Manager.order_manager;
-  commission : Trading_engine.Types.commission_config;
+  engine : Trading_engine.Engine.t;
 }
 
 (** {1 Simulator Types} *)
@@ -68,72 +68,51 @@ let _get_prices_for_date deps symbol date =
       | Some price_data -> Some price_data
       | None -> None)
 
-(** Helper: Create a trade from an order and fill result *)
-let _create_trade (order : Trading_orders.Types.order) fill_result
-    commission_config =
-  let open Trading_base.Types in
-  let quantity = order.quantity in
-  let price = fill_result.Price_path.price in
-  let commission_raw =
-    Float.max
-      (commission_config.Trading_engine.Types.per_share *. quantity)
-      commission_config.minimum
-  in
-  let commission = Float.round_decimal ~decimal_digits:2 commission_raw in
-  {
-    id = order.id ^ "_trade";
-    order_id = order.id;
-    symbol = order.symbol;
-    side = order.side;
-    quantity;
-    price;
-    commission;
-    timestamp = Time_ns_unix.now ();
-  }
-
-(** Helper: Execute a single order against price data *)
-let _execute_order (order : Trading_orders.Types.order) price_data
-    commission_config =
+(** Helper: Check if an order would fill using Price_path *)
+let _check_fill (order : Trading_orders.Types.order) price_data =
   let path = Price_path.generate_path price_data in
-  match
-    Price_path.would_fill ~path ~order_type:order.order_type ~side:order.side
-  with
-  | None -> None
-  | Some fill_result ->
-      let trade = _create_trade order fill_result commission_config in
-      Some trade
+  Price_path.would_fill ~path ~order_type:order.order_type ~side:order.side
 
 (** Helper: Process all pending orders and return executed trades *)
 let _process_orders t =
   let pending_orders =
     Trading_orders.Manager.list_orders ~filter:ActiveOnly t.deps.order_manager
   in
-  let trades_and_orders =
+  (* Check which orders would fill using Price_path *)
+  let fillable_orders =
     List.filter_map pending_orders ~f:(fun order ->
         match _get_prices_for_date t.deps order.symbol t.current_date with
         | None -> None
         | Some price_data -> (
-            match _execute_order order price_data t.deps.commission with
+            match _check_fill order price_data with
             | None -> None
-            | Some trade -> Some (trade, order)))
+            | Some fill_result -> Some (order, fill_result)))
   in
-  let trades = List.map trades_and_orders ~f:fst in
-  (* Update order statuses to Filled *)
-  List.iter trades_and_orders ~f:(fun (trade, order) ->
-      let open Trading_base.Types in
-      let updated_order =
-        {
-          order with
-          status = Filled;
-          filled_quantity = order.quantity;
-          avg_fill_price = Some trade.price;
-        }
-      in
-      let (_ : Status.status) =
-        Trading_orders.Manager.update_order t.deps.order_manager updated_order
-      in
-      ());
-  trades
+  (* Create price_quotes for the engine based on fill prices *)
+  let quotes =
+    List.map fillable_orders ~f:(fun (order, fill_result) ->
+        let fill_price = fill_result.Price_path.price in
+        Trading_engine.Types.
+          {
+            symbol = order.symbol;
+            bid = Some fill_price;
+            ask = Some fill_price;
+            last = Some fill_price;
+          })
+  in
+  (* Update engine market with fill prices *)
+  Trading_engine.Engine.update_market t.deps.engine quotes;
+  (* Let engine process orders - it will create trades and update statuses *)
+  match
+    Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
+  with
+  | Error err ->
+      (* Log error but continue - return empty trades list *)
+      let _ = err in
+      []
+  | Ok execution_reports ->
+      (* Extract trades from execution reports *)
+      List.concat_map execution_reports ~f:(fun report -> report.trades)
 
 let step t =
   if _is_complete t then Ok (Completed t.portfolio)

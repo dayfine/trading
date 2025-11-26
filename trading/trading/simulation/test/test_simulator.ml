@@ -24,7 +24,8 @@ let sample_config =
     initial_cash = 10000.0;
   }
 
-let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
+let sample_engine_config =
+  { Trading_engine.Types.commission = { per_share = 0.01; minimum = 1.0 } }
 
 let sample_prices =
   [
@@ -49,7 +50,8 @@ let sample_prices =
 
 let make_deps () =
   let order_manager = Trading_orders.Manager.create () in
-  { prices = sample_prices; order_manager; commission = sample_commission }
+  let engine = Trading_engine.Engine.create sample_engine_config in
+  { prices = sample_prices; order_manager; engine }
 
 let sample_deps = make_deps ()
 
@@ -87,7 +89,7 @@ let test_create_with_empty_prices _ =
     {
       prices = [];
       order_manager = Trading_orders.Manager.create ();
-      commission = sample_commission;
+      engine = Trading_engine.Engine.create sample_engine_config;
     }
   in
   let sim = create ~config:sample_config ~deps in
