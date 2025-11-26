@@ -22,8 +22,9 @@ let sample_config =
     start_date = date_of_string "2024-01-02";
     end_date = date_of_string "2024-01-05";
     initial_cash = 10000.0;
-    commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
   }
+
+let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
 let sample_prices =
   [
@@ -46,7 +47,11 @@ let sample_prices =
     };
   ]
 
-let sample_deps = { prices = sample_prices }
+let make_deps () =
+  let order_manager = Trading_orders.Manager.create () in
+  { prices = sample_prices; order_manager; commission = sample_commission }
+
+let sample_deps = make_deps ()
 
 (* Helper to create expected step_result for comparison *)
 let make_expected_step_result ~date ~portfolio ~trades =
@@ -78,7 +83,14 @@ let test_create_returns_simulator _ =
        (is_stepped (fun (_, result) -> assert_equal expected_result result)))
 
 let test_create_with_empty_prices _ =
-  let sim = create ~config:sample_config ~deps:{ prices = [] } in
+  let deps =
+    {
+      prices = [];
+      order_manager = Trading_orders.Manager.create ();
+      commission = sample_commission;
+    }
+  in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -125,7 +137,8 @@ let test_step_returns_completed_when_done _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps:sample_deps in
+  let deps = make_deps () in
+  let sim = create ~config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -167,7 +180,8 @@ let test_run_on_already_complete _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps:sample_deps in
+  let deps = make_deps () in
+  let sim = create ~config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -195,7 +209,8 @@ let make_order ~id ~symbol ~side ~order_type ~quantity () =
     }
 
 let test_submit_market_order_executes_next_step _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps = make_deps () in
+  let sim = create ~config:sample_config ~deps in
   let open Trading_base.Types in
   (* Submit a market buy order *)
   let order =
@@ -227,7 +242,8 @@ let test_submit_market_order_executes_next_step _ =
             assert_that portfolio.current_cash (float_equal expected_cash))))
 
 let test_submit_limit_buy_order_executes_when_price_met _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps = make_deps () in
+  let sim = create ~config:sample_config ~deps in
   let open Trading_base.Types in
   (* Submit a limit buy order at 152.0 *)
   let order =
@@ -247,7 +263,8 @@ let test_submit_limit_buy_order_executes_when_price_met _ =
             assert_that trade.price (float_equal 150.0))))
 
 let test_limit_order_does_not_execute_when_price_not_met _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps = make_deps () in
+  let sim = create ~config:sample_config ~deps in
   let open Trading_base.Types in
   (* Submit a limit buy order at 148.0 - below the low (149.0) *)
   let order =
@@ -269,7 +286,8 @@ let test_limit_order_does_not_execute_when_price_not_met _ =
             assert_that portfolio.current_cash (float_equal 10000.0))))
 
 let test_run_with_order_execution _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps = make_deps () in
+  let sim = create ~config:sample_config ~deps in
   let open Trading_base.Types in
   (* Submit multiple orders *)
   let order1 =

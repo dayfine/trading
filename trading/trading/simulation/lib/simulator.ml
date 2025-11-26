@@ -7,15 +7,14 @@ open Core
 type symbol_prices = { symbol : string; prices : Types.Daily_price.t list }
 [@@deriving show, eq]
 
-type config = {
-  start_date : Date.t;
-  end_date : Date.t;
-  initial_cash : float;
-  commission : Trading_engine.Types.commission_config;
-}
+type config = { start_date : Date.t; end_date : Date.t; initial_cash : float }
 [@@deriving show, eq]
 
-type dependencies = { prices : symbol_prices list } [@@warning "-69"]
+type dependencies = {
+  prices : symbol_prices list;
+  order_manager : Trading_orders.Manager.order_manager;
+  commission : Trading_engine.Types.commission_config;
+}
 
 (** {1 Simulator Types} *)
 
@@ -35,7 +34,6 @@ and t = {
   deps : dependencies;
   current_date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
-  order_manager : Trading_orders.Manager.order_manager;
 }
 
 (** {1 Creation} *)
@@ -44,13 +42,14 @@ let create ~config ~deps =
   let portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
   in
-  let order_manager = Trading_orders.Manager.create () in
-  { config; deps; current_date = config.start_date; portfolio; order_manager }
+  { config; deps; current_date = config.start_date; portfolio }
 
 (** {1 Order Management} *)
 
 let submit_orders t orders =
-  let statuses = Trading_orders.Manager.submit_orders t.order_manager orders in
+  let statuses =
+    Trading_orders.Manager.submit_orders t.deps.order_manager orders
+  in
   (t, statuses)
 
 (** {1 Running} *)
@@ -107,14 +106,14 @@ let _execute_order (order : Trading_orders.Types.order) price_data
 (** Helper: Process all pending orders and return executed trades *)
 let _process_orders t =
   let pending_orders =
-    Trading_orders.Manager.list_orders ~filter:ActiveOnly t.order_manager
+    Trading_orders.Manager.list_orders ~filter:ActiveOnly t.deps.order_manager
   in
   let trades_and_orders =
     List.filter_map pending_orders ~f:(fun order ->
         match _get_prices_for_date t.deps order.symbol t.current_date with
         | None -> None
         | Some price_data -> (
-            match _execute_order order price_data t.config.commission with
+            match _execute_order order price_data t.deps.commission with
             | None -> None
             | Some trade -> Some (trade, order)))
   in
@@ -131,7 +130,7 @@ let _process_orders t =
         }
       in
       let (_ : Status.status) =
-        Trading_orders.Manager.update_order t.order_manager updated_order
+        Trading_orders.Manager.update_order t.deps.order_manager updated_order
       in
       ());
   trades

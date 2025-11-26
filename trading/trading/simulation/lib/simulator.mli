@@ -11,16 +11,19 @@ type symbol_prices = {
 [@@deriving show, eq]
 (** Historical price data for a single symbol *)
 
-type config = {
-  start_date : Date.t;
-  end_date : Date.t;
-  initial_cash : float;
-  commission : Trading_engine.Types.commission_config;
-}
+type config = { start_date : Date.t; end_date : Date.t; initial_cash : float }
 [@@deriving show, eq]
 (** Configuration for running a simulation *)
 
-type dependencies = { prices : symbol_prices list }
+type dependencies = {
+  prices : symbol_prices list;
+      (** Historical price data - eventually should use
+          HistoricalDailyPriceStorage *)
+  order_manager : Trading_orders.Manager.order_manager;
+      (** Order manager for tracking order lifecycle *)
+  commission : Trading_engine.Types.commission_config;
+      (** Commission configuration for trade cost calculation *)
+}
 (** External dependencies injected into the simulator *)
 
 (** {1 Simulator Types} *)
