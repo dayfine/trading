@@ -226,22 +226,32 @@ let test_submit_market_order_executes_next_step _ =
   assert_that (step sim')
     (is_ok_and_holds
        (is_stepped (fun (_, result) ->
-            (* Should have 1 trade *)
-            assert_that result.trades (size_is 1);
-            let trade = List.hd_exn result.trades in
-            assert_that trade.symbol (equal_to "AAPL");
-            assert_that trade.side (equal_to Buy);
-            assert_that trade.quantity (float_equal 10.0);
-            (* Market orders execute at open price *)
-            assert_that trade.price (float_equal 150.0);
-            (* Commission: max(0.01 * 10, 1.0) = 1.0 *)
-            assert_that trade.commission (float_equal 1.0);
-            (* Portfolio should be updated *)
-            let expected_cash = 10000.0 -. (150.0 *. 10.0) -. 1.0 in
-            let (portfolio : Trading_portfolio.Portfolio.t) =
-              result.portfolio
-            in
-            assert_that portfolio.current_cash (float_equal expected_cash))))
+            assert_that result
+              (all_of
+                 [
+                   (* Trades assertion *)
+                   field
+                     (fun r -> r.trades)
+                     (elements_are
+                        [
+                          all_of
+                            [
+                              field (fun t -> t.symbol) (equal_to "AAPL");
+                              field (fun t -> t.side) (equal_to Buy);
+                              field (fun t -> t.quantity) (float_equal 10.0);
+                              (* Market orders execute at open price *)
+                              field (fun t -> t.price) (float_equal 150.0);
+                              (* Commission: max(0.01 * 10, 1.0) = 1.0 *)
+                              field (fun t -> t.commission) (float_equal 1.0);
+                            ];
+                        ]);
+                   (* Portfolio assertion *)
+                   field
+                     (fun r ->
+                       let (p : Trading_portfolio.Portfolio.t) = r.portfolio in
+                       p.current_cash)
+                     (float_equal (10000.0 -. (150.0 *. 10.0) -. 1.0));
+                 ]))))
 
 let test_submit_limit_buy_order_executes_when_price_met _ =
   let deps = make_deps () in
