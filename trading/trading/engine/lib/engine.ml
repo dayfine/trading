@@ -6,12 +6,31 @@ open Types
 
 type market_data = { quote : price_quote }
 
+type stop_order_state = {
+  order_id : string; [@warning "-69"]
+  stop_price : float; [@warning "-69"]
+  triggered : bool;
+  triggered_at : float option; [@warning "-69"]
+      (** time_fraction when triggered *)
+}
+(** Stop order state tracking for backtesting. When a stop order is triggered
+    during mini-bar processing, we record:
+    - Which bar triggered it (time_fraction)
+    - That it has been converted to market/limit order *)
+
 type t = {
   config : engine_config;
   market_state : (symbol, market_data) Hashtbl.t;
+  stop_states : (string, stop_order_state) Hashtbl.t;
+      (** Track stop order trigger states (order_id -> state) *)
 }
 
-let create config = { config; market_state = Hashtbl.create (module String) }
+let create config =
+  {
+    config;
+    market_state = Hashtbl.create (module String);
+    stop_states = Hashtbl.create (module String);
+  }
 
 let update_market engine quotes =
   List.iter quotes ~f:(fun quote ->
@@ -147,5 +166,147 @@ let process_orders engine order_mgr =
         | StopLimit (stop_price, limit_price) ->
             _process_stop_limit_order engine order_mgr order stop_price
               limit_price)
+  in
+  Result.Ok reports
+
+(** {1 Mini-Bar Processing for Backtesting} *)
+
+(* Check if a stop order should trigger based on mini-bar price and side *)
+let _should_stop_trigger side stop_price close_price =
+  match side with
+  | Buy -> Float.(close_price >= stop_price)
+  | Sell -> Float.(close_price <= stop_price)
+
+(* Check if limit order would fill in a mini-bar.
+   Returns Some fill_price if it fills, None otherwise. *)
+let _check_limit_fill side limit_price (bar : mini_bar) =
+  match side with
+  | Buy ->
+      (* Buy limit: can fill if price drops to or below limit *)
+      if Float.(bar.open_price <= limit_price) then
+        (* Already at or below limit at open *)
+        Some bar.open_price
+      else if Float.(bar.close_price <= limit_price) then
+        (* Crossed down through limit during bar *)
+        Some limit_price
+      else None
+  | Sell ->
+      (* Sell limit: can fill if price rises to or above limit *)
+      if Float.(bar.open_price >= limit_price) then
+        (* Already at or above limit at open *)
+        Some bar.open_price
+      else if Float.(bar.close_price >= limit_price) then
+        (* Crossed up through limit during bar *)
+        Some limit_price
+      else None
+
+(* Process a single mini-bar for a specific order *)
+let _process_order_mini_bar engine order_mgr (ord : order) (bar : mini_bar) =
+  let commission = _calculate_commission engine.config ord.quantity in
+  match ord.order_type with
+  | Market ->
+      (* Market orders execute at bar close price *)
+      let trade =
+        _create_trade ord.id ord.symbol ord.side ord.quantity bar.close_price
+          commission
+      in
+      let updated_order = { ord with status = Filled } in
+      let _ = update_order order_mgr updated_order in
+      Some (_create_execution_report ord.id trade)
+  | Limit limit_price -> (
+      (* Limit orders execute if price crosses limit *)
+      match _check_limit_fill ord.side limit_price bar with
+      | Some fill_price ->
+          let trade =
+            _create_trade ord.id ord.symbol ord.side ord.quantity fill_price
+              commission
+          in
+          let updated_order = { ord with status = Filled } in
+          let _ = update_order order_mgr updated_order in
+          Some (_create_execution_report ord.id trade)
+      | None -> None)
+  | Stop stop_price ->
+      (* Check if stop triggers, if so execute as market at close *)
+      if _should_stop_trigger ord.side stop_price bar.close_price then (
+        (* Record trigger in stop_states *)
+        let stop_state =
+          {
+            order_id = ord.id;
+            stop_price;
+            triggered = true;
+            triggered_at = Some bar.time_fraction;
+          }
+        in
+        Hashtbl.set engine.stop_states ~key:ord.id ~data:stop_state;
+        (* Execute as market order at close *)
+        let trade =
+          _create_trade ord.id ord.symbol ord.side ord.quantity bar.close_price
+            commission
+        in
+        let updated_order = { ord with status = Filled } in
+        let _ = update_order order_mgr updated_order in
+        Some (_create_execution_report ord.id trade))
+      else None
+  | StopLimit (stop_price, limit_price) ->
+      (* Check if already triggered *)
+      let already_triggered =
+        match Hashtbl.find engine.stop_states ord.id with
+        | Some state -> state.triggered
+        | None -> false
+      in
+      if already_triggered then
+        (* Already triggered, process as limit order *)
+        match _check_limit_fill ord.side limit_price bar with
+        | Some fill_price ->
+            let trade =
+              _create_trade ord.id ord.symbol ord.side ord.quantity fill_price
+                commission
+            in
+            let updated_order = { ord with status = Filled } in
+            let _ = update_order order_mgr updated_order in
+            Some (_create_execution_report ord.id trade)
+        | None -> None
+      else if _should_stop_trigger ord.side stop_price bar.close_price then (
+        (* Stop triggers now at bar close *)
+        let stop_state =
+          {
+            order_id = ord.id;
+            stop_price;
+            triggered = true;
+            triggered_at = Some bar.time_fraction;
+          }
+        in
+        Hashtbl.set engine.stop_states ~key:ord.id ~data:stop_state;
+        (* Check if the trigger price itself meets limit condition *)
+        let trigger_meets_limit =
+          match ord.side with
+          | Buy -> Float.(bar.close_price <= limit_price)
+          | Sell -> Float.(bar.close_price >= limit_price)
+        in
+        if trigger_meets_limit then
+          (* Fill immediately at trigger price *)
+          let trade =
+            _create_trade ord.id ord.symbol ord.side ord.quantity
+              bar.close_price commission
+          in
+          let updated_order = { ord with status = Filled } in
+          let _ = update_order order_mgr updated_order in
+          Some (_create_execution_report ord.id trade)
+        else
+          (* Stop triggered but limit not met yet, wait for next bar *)
+          None)
+      else None
+
+let process_mini_bars engine symbol order_mgr mini_bars =
+  (* Process each mini-bar sequentially, checking active orders at each step *)
+  let reports =
+    List.concat_map mini_bars ~f:(fun bar ->
+        (* Get currently active orders for the symbol before processing this bar *)
+        let pending = list_orders order_mgr ~filter:ActiveOnly in
+        let symbol_orders =
+          List.filter pending ~f:(fun ord -> String.equal ord.symbol symbol)
+        in
+        List.filter_map symbol_orders ~f:(fun ord ->
+            _process_order_mini_bar engine order_mgr ord bar))
   in
   Result.Ok reports

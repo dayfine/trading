@@ -630,6 +630,262 @@ let test_stop_limit_requires_bid_ask_price _ =
   in
   assert_order_not_executed engine order_mgr
 
+(* Mini-bar processing tests *)
+let make_mini_bar ~time_fraction ~open_price ~close_price =
+  { time_fraction; open_price; close_price }
+
+let test_process_mini_bars_market_order _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit market order *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Process mini-bars: market order should execute at first bar's close *)
+  let mini_bars =
+    [
+      make_mini_bar ~time_fraction:0.0 ~open_price:100.0 ~close_price:100.0;
+      make_mini_bar ~time_fraction:0.25 ~open_price:100.0 ~close_price:105.0;
+    ]
+  in
+  assert_that
+    (process_mini_bars engine "AAPL" order_mgr mini_bars)
+    (is_ok_and_holds
+       (one
+          (all_of
+             [
+               field (fun r -> r.order_id) (equal_to order.id);
+               field (fun r -> r.status) (equal_to Filled);
+               field
+                 (fun (r : execution_report) -> r.trades)
+                 (one
+                    (trade_like
+                       {
+                         id = "";
+                         order_id = order.id;
+                         symbol = "AAPL";
+                         side = Buy;
+                         quantity = 100.0;
+                         price = 100.0;
+                         commission = 1.0;
+                         timestamp = Time_ns_unix.epoch;
+                       }));
+             ])))
+
+let test_process_mini_bars_buy_limit_crosses_down _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy limit at 100.0 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Limit 100.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Mini-bars: price crosses down through limit *)
+  let mini_bars =
+    [
+      make_mini_bar ~time_fraction:0.0 ~open_price:105.0 ~close_price:105.0;
+      make_mini_bar ~time_fraction:0.25 ~open_price:105.0 ~close_price:95.0;
+    ]
+  in
+  assert_that
+    (process_mini_bars engine "AAPL" order_mgr mini_bars)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 100.0))))))
+
+let test_process_mini_bars_sell_limit_crosses_up _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell limit at 110.0 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Limit 110.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Mini-bars: price crosses up through limit *)
+  let mini_bars =
+    [
+      make_mini_bar ~time_fraction:0.0 ~open_price:105.0 ~close_price:105.0;
+      make_mini_bar ~time_fraction:0.25 ~open_price:105.0 ~close_price:115.0;
+    ]
+  in
+  assert_that
+    (process_mini_bars engine "AAPL" order_mgr mini_bars)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 110.0))))))
+
+let test_process_mini_bars_buy_stop_triggers _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy stop at 105.0 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Stop 105.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Mini-bars: price rises to trigger stop *)
+  let mini_bars =
+    [
+      make_mini_bar ~time_fraction:0.0 ~open_price:100.0 ~close_price:100.0;
+      make_mini_bar ~time_fraction:0.25 ~open_price:100.0 ~close_price:105.0;
+    ]
+  in
+  assert_that
+    (process_mini_bars engine "AAPL" order_mgr mini_bars)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 105.0))))))
+
+let test_process_mini_bars_sell_stop_triggers _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell stop at 95.0 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Stop 95.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Mini-bars: price drops to trigger stop *)
+  let mini_bars =
+    [
+      make_mini_bar ~time_fraction:0.0 ~open_price:100.0 ~close_price:100.0;
+      make_mini_bar ~time_fraction:0.25 ~open_price:100.0 ~close_price:95.0;
+    ]
+  in
+  assert_that
+    (process_mini_bars engine "AAPL" order_mgr mini_bars)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 95.0))))))
+
+let test_process_mini_bars_stop_limit_triggers_and_fills _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit buy stop-limit: stop at 105.0, limit at 110.0 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy
+      ~order_type:(StopLimit (105.0, 110.0))
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Mini-bars: stop triggers at 105.0, fills immediately since 105.0 <= 110.0 *)
+  let mini_bars =
+    [
+      make_mini_bar ~time_fraction:0.0 ~open_price:100.0 ~close_price:100.0;
+      make_mini_bar ~time_fraction:0.25 ~open_price:100.0 ~close_price:105.0;
+    ]
+  in
+  assert_that
+    (process_mini_bars engine "AAPL" order_mgr mini_bars)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 105.0))))))
+
+let test_process_mini_bars_stop_limit_waits_for_limit _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit sell stop-limit: stop at 100.0, limit at 98.0 *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell
+      ~order_type:(StopLimit (100.0, 98.0))
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Mini-bars: stop triggers at 95.0 (below limit), then limit fills at 99.0 *)
+  let mini_bars =
+    [
+      make_mini_bar ~time_fraction:0.0 ~open_price:105.0 ~close_price:105.0;
+      make_mini_bar ~time_fraction:0.25 ~open_price:105.0 ~close_price:95.0;
+      make_mini_bar ~time_fraction:0.5 ~open_price:95.0 ~close_price:99.0;
+    ]
+  in
+  assert_that
+    (process_mini_bars engine "AAPL" order_mgr mini_bars)
+    (is_ok_and_holds
+       (one
+          (field
+             (fun (r : execution_report) -> r.trades)
+             (one (field (fun (t : trade) -> t.price) (equal_to 98.0))))))
+
+let test_process_mini_bars_no_fill_for_different_symbol _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit order for AAPL *)
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Process mini-bars for GOOGL (different symbol) *)
+  let mini_bars =
+    [ make_mini_bar ~time_fraction:0.0 ~open_price:100.0 ~close_price:100.0 ]
+  in
+  assert_that
+    (process_mini_bars engine "GOOGL" order_mgr mini_bars)
+    (is_ok_and_holds (equal_to []))
+
 (* Test suite *)
 let suite =
   "Engine Tests"
@@ -699,6 +955,23 @@ let suite =
          >:: test_stop_limit_requires_last_price;
          "test_stop_limit_requires_bid_ask_price"
          >:: test_stop_limit_requires_bid_ask_price;
+         (* Mini-bar processing tests *)
+         "test_process_mini_bars_market_order"
+         >:: test_process_mini_bars_market_order;
+         "test_process_mini_bars_buy_limit_crosses_down"
+         >:: test_process_mini_bars_buy_limit_crosses_down;
+         "test_process_mini_bars_sell_limit_crosses_up"
+         >:: test_process_mini_bars_sell_limit_crosses_up;
+         "test_process_mini_bars_buy_stop_triggers"
+         >:: test_process_mini_bars_buy_stop_triggers;
+         "test_process_mini_bars_sell_stop_triggers"
+         >:: test_process_mini_bars_sell_stop_triggers;
+         "test_process_mini_bars_stop_limit_triggers_and_fills"
+         >:: test_process_mini_bars_stop_limit_triggers_and_fills;
+         "test_process_mini_bars_stop_limit_waits_for_limit"
+         >:: test_process_mini_bars_stop_limit_waits_for_limit;
+         "test_process_mini_bars_no_fill_for_different_symbol"
+         >:: test_process_mini_bars_no_fill_for_different_symbol;
        ]
 
 let () = run_test_tt_main suite

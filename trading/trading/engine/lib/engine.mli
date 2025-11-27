@@ -1,5 +1,6 @@
 (** Trading engine - simulated broker for order execution *)
 
+open Trading_base.Types
 open Trading_orders.Manager
 open Status
 open Types
@@ -55,6 +56,37 @@ val process_orders : t -> order_manager -> execution_report list status_or
     Example:
     {[
       let reports = Engine.process_orders engine order_mgr in
+      match reports with
+      | Ok reports ->
+          let trades = List.concat_map reports ~f:(fun r -> r.trades) in
+          Portfolio.apply_trades portfolio trades
+      | Error err -> (* handle error *)
+    ]} *)
+
+val process_mini_bars :
+  t ->
+  symbol ->
+  order_manager ->
+  mini_bar list ->
+  execution_report list status_or
+(** Process a sequence of mini-bars for backtesting order execution.
+
+    For the given symbol, processes mini-bars sequentially: 1. Check stop
+    orders: if stop condition met, trigger and convert to market/limit 2.
+    Execute market orders at mini-bar close price 3. Execute limit orders if
+    price crosses limit threshold 4. Generate trades for filled orders 5. Update
+    order statuses in manager
+
+    Stop order state is maintained across mini-bars within a single call.
+
+    Returns list of execution reports for orders that executed.
+
+    Example:
+    {[
+      let mini_bars = Price_path.generate_mini_bars daily_price in
+      let reports =
+        Engine.process_mini_bars engine "AAPL" order_mgr mini_bars
+      in
       match reports with
       | Ok reports ->
           let trades = List.concat_map reports ~f:(fun r -> r.trades) in

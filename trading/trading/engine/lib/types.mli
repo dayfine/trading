@@ -41,3 +41,16 @@ type engine_config = {
 }
 [@@deriving show, eq]
 (** Engine configuration controlling execution behavior and costs *)
+
+(** {1 Mini-Bar Model for Backtesting} *)
+
+type mini_bar = {
+  time_fraction : float;
+      (** Time within trading day: 0.0 = market open, 1.0 = market close *)
+  open_price : float;  (** Price at start of this segment *)
+  close_price : float;  (** Price at end of this segment *)
+}
+[@@deriving show, eq]
+(** A mini-bar represents a point-to-point price movement within a trading day.
+    Used during backtesting to simulate intraday price action from daily OHLC
+    data. *)
