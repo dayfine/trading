@@ -52,6 +52,71 @@ let generate_path (daily : Types.Daily_price.t) : intraday_path =
       { fraction_of_day = 1.0; price = daily.close_price };
     ]
 
+let generate_mini_bars (daily : Types.Daily_price.t) :
+    Trading_engine.Types.mini_bar list =
+  (* Generate point-to-point mini-bars from OHLC *)
+  let open_to_close = daily.close_price -. daily.open_price in
+  if Float.(open_to_close >= 0.0) then
+    (* Upward day: O → H → L → C *)
+    Trading_engine.Types.
+      [
+        {
+          time_fraction = 0.0;
+          open_price = daily.open_price;
+          close_price = daily.open_price;
+        };
+        {
+          time_fraction = 0.25;
+          open_price = daily.open_price;
+          close_price = daily.high_price;
+        };
+        {
+          time_fraction = 0.5;
+          open_price = daily.high_price;
+          close_price = daily.low_price;
+        };
+        {
+          time_fraction = 0.75;
+          open_price = daily.low_price;
+          close_price = daily.close_price;
+        };
+        {
+          time_fraction = 1.0;
+          open_price = daily.close_price;
+          close_price = daily.close_price;
+        };
+      ]
+  else
+    (* Downward day: O → L → H → C *)
+    Trading_engine.Types.
+      [
+        {
+          time_fraction = 0.0;
+          open_price = daily.open_price;
+          close_price = daily.open_price;
+        };
+        {
+          time_fraction = 0.25;
+          open_price = daily.open_price;
+          close_price = daily.low_price;
+        };
+        {
+          time_fraction = 0.5;
+          open_price = daily.low_price;
+          close_price = daily.high_price;
+        };
+        {
+          time_fraction = 0.75;
+          open_price = daily.high_price;
+          close_price = daily.close_price;
+        };
+        {
+          time_fraction = 1.0;
+          open_price = daily.close_price;
+          close_price = daily.close_price;
+        };
+      ]
+
 (** {1 Order Execution Helpers} *)
 
 let _would_fill_market (path : intraday_path) : fill_result option =

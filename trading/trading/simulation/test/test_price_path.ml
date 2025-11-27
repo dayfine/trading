@@ -2,6 +2,9 @@ open OUnit2
 open Core
 open Trading_simulation.Price_path
 open Matchers
+module EngineTypes = Trading_engine.Types
+
+[@@@ocaml.warning "-3"] (* Suppress deprecation warnings during migration *)
 
 let date_of_string s = Date.of_string s
 
@@ -365,6 +368,93 @@ let test_stop_limit_sell_both_conditions_met _ =
   assert_that result
     (is_some_and (field (fun fill -> fill.price) (float_equal 98.0)))
 
+(* ==================== mini-bar generation tests ==================== *)
+
+let flat_day =
+  Types.Daily_price.
+    {
+      date = date_of_string "2024-01-05";
+      open_price = 100.0;
+      high_price = 102.0;
+      low_price = 98.0;
+      close_price = 100.0;
+      volume = 500000;
+      adjusted_close = 100.0;
+    }
+
+let test_generate_mini_bars_upward _ =
+  let mini_bars = generate_mini_bars upward_day in
+  (* Should have 5 mini-bars: Open, O→H, H→L, L→C, Close *)
+  assert_that mini_bars (size_is 5);
+  (* Check the sequence touches all OHLC points *)
+  assert_that mini_bars
+    (elements_are
+       [
+         equal_to
+           ({ time_fraction = 0.0; open_price = 100.0; close_price = 100.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.25; open_price = 100.0; close_price = 110.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.5; open_price = 110.0; close_price = 95.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.75; open_price = 95.0; close_price = 105.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 1.0; open_price = 105.0; close_price = 105.0 }
+             : EngineTypes.mini_bar);
+       ])
+
+let test_generate_mini_bars_downward _ =
+  let mini_bars = generate_mini_bars downward_day in
+  (* Should follow O→L→H→C path *)
+  assert_that mini_bars (size_is 5);
+  assert_that mini_bars
+    (elements_are
+       [
+         equal_to
+           ({ time_fraction = 0.0; open_price = 100.0; close_price = 100.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.25; open_price = 100.0; close_price = 90.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.5; open_price = 90.0; close_price = 105.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.75; open_price = 105.0; close_price = 92.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 1.0; open_price = 92.0; close_price = 92.0 }
+             : EngineTypes.mini_bar);
+       ])
+
+let test_generate_mini_bars_flat _ =
+  let mini_bars = generate_mini_bars flat_day in
+  (* Flat day (close = open) should follow O→H→L→C *)
+  assert_that mini_bars (size_is 5);
+  assert_that mini_bars
+    (elements_are
+       [
+         equal_to
+           ({ time_fraction = 0.0; open_price = 100.0; close_price = 100.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.25; open_price = 100.0; close_price = 102.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.5; open_price = 102.0; close_price = 98.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 0.75; open_price = 98.0; close_price = 100.0 }
+             : EngineTypes.mini_bar);
+         equal_to
+           ({ time_fraction = 1.0; open_price = 100.0; close_price = 100.0 }
+             : EngineTypes.mini_bar);
+       ])
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -415,6 +505,10 @@ let suite =
          >:: test_stop_limit_buy_stop_not_triggered;
          "stop limit sell both conditions met"
          >:: test_stop_limit_sell_both_conditions_met;
+         (* Mini-bar generation tests *)
+         "generate mini-bars upward day" >:: test_generate_mini_bars_upward;
+         "generate mini-bars downward day" >:: test_generate_mini_bars_downward;
+         "generate mini-bars flat day" >:: test_generate_mini_bars_flat;
        ]
 
 let () = run_test_tt_main suite

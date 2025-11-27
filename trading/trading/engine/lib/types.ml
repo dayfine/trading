@@ -21,3 +21,10 @@ type commission_config = { per_share : float; minimum : float }
 [@@deriving show, eq]
 
 type engine_config = { commission : commission_config } [@@deriving show, eq]
+
+type mini_bar = {
+  time_fraction : float;
+  open_price : float;
+  close_price : float;
+}
+[@@deriving show, eq]
