@@ -1,3 +1,16 @@
+(** DEPRECATED: This module has been moved to trading_engine.Engine
+
+    The price path generation and order fill logic now resides in the engine
+    module (trading/engine/lib/engine.ml), where it belongs conceptually.
+    The engine is responsible for determining if/when orders execute based
+    on market conditions.
+
+    This file is kept temporarily for reference but should not be used.
+    The simulation library should use the engine's process_orders method
+    instead of this standalone path logic.
+
+    TODO: Remove this file and its tests once confirmed no dependencies exist *)
+
 (** OHLC Price Path Simulator - generates synthetic intraday price paths from
     daily OHLC bars *)
 

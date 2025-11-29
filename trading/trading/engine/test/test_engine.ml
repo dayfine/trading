@@ -14,7 +14,38 @@ let test_timestamp = Time_ns_unix.of_string "2024-01-15 10:30:00Z"
 let make_config ?(per_share = 0.01) ?(minimum = 1.0) () =
   { commission = { per_share; minimum } }
 
-let make_quote symbol ~bid ~ask ~last = { symbol; bid; ask; last }
+let make_bar symbol ~open_price ~high_price ~low_price ~close_price =
+  { symbol; open_price; high_price; low_price; close_price }
+
+(* TODO: Temporary compatibility function - replace with proper OHLC bars
+   This approximates old bid/ask/last behavior using OHLC path:
+   - Market orders: fill at open (was: last)
+   - Buy limits: check if path reaches ask, fill there (was: fill at ask if ask <= limit)
+   - Sell limits: check if path reaches bid (was: fill at bid if bid >= limit)
+   - Stops: check if path triggers (was: check last price)
+
+   NOTE: 17 tests currently fail because path-based execution produces different
+   fill prices than tick-based execution. These tests need to be updated to:
+   1. Use realistic OHLC bars instead of synthetic bid/ask/last
+   2. Expect path-based fill prices (which account for crossing vs gapping)
+   3. Test path-specific scenarios (e.g., limit crossed mid-bar vs gap beyond)
+
+   Tests passing: market orders, basic scenarios
+   Tests failing: limit/stop edge cases with specific fill prices *)
+let make_quote symbol ~bid ~ask ~last =
+  let bid = Option.value bid ~default:100.0 in
+  let ask = Option.value ask ~default:100.5 in
+  let last = Option.value last ~default:100.25 in
+  (* Create a bar where:
+     - open = last (so market orders fill at old "last" price)
+     - high = max of all prices
+     - low = min of all prices
+     - close = last *)
+  let all_prices = [ bid; ask; last ] in
+  let high = List.fold all_prices ~init:Float.neg_infinity ~f:Float.max in
+  let low = List.fold all_prices ~init:Float.infinity ~f:Float.min in
+  make_bar symbol ~open_price:last ~high_price:high ~low_price:low
+    ~close_price:last
 
 let make_order_params ~symbol ~side ~order_type ~quantity ?(time_in_force = Day)
     () =
@@ -136,11 +167,12 @@ let test_update_market_enables_execution _ =
   (* First process - no market data *)
   assert_that (process_orders engine order_mgr) (is_ok_and_holds (equal_to []));
   (* Update market data *)
-  let quote =
-    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  let bar =
+    make_bar "AAPL" ~open_price:150.25 ~high_price:151.0 ~low_price:150.0
+      ~close_price:150.5
   in
-  update_market engine [ quote ];
-  (* Second process - should execute now *)
+  update_market engine [ bar ];
+  (* Second process - should execute now at open price *)
   assert_that
     (process_orders engine order_mgr)
     (is_ok_and_holds

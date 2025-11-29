@@ -4,24 +4,166 @@ open Trading_orders.Manager
 open Trading_orders.Types
 open Types
 
-type market_data = { quote : price_quote }
-
 type t = {
   config : engine_config;
-  market_state : (symbol, market_data) Hashtbl.t;
+  market_state : (symbol, intraday_path) Hashtbl.t;
 }
 
 let create config = { config; market_state = Hashtbl.create (module String) }
 
-let update_market engine quotes =
-  List.iter quotes ~f:(fun quote ->
-      let data = { quote } in
-      Hashtbl.set engine.market_state ~key:quote.symbol ~data)
+(** Generate intraday price path from OHLC bar.
+
+    Simple implementation: visits OHLC points in order based on whether day
+    was up or down.
+
+    - Upward day (close >= open): O → H → L → C at times 0.0, 0.33, 0.66, 1.0
+    - Downward day (close < open): O → L → H → C at times 0.0, 0.33, 0.66, 1.0
+
+    TODO: Implement more realistic path models:
+    - Brownian bridge between OHLC points
+    - Configurable granularity (e.g., minute bars instead of 4 points)
+    - Volume-weighted price paths
+    - Support for intraday bars (hourly, minute) not just daily *)
+let _generate_path (bar : price_bar) : intraday_path =
+  let open_to_close = bar.close_price -. bar.open_price in
+  if Float.(open_to_close >= 0.0) then
+    (* Upward day: O → H → L → C *)
+    [
+      { fraction_of_day = 0.0; price = bar.open_price };
+      { fraction_of_day = 0.33; price = bar.high_price };
+      { fraction_of_day = 0.66; price = bar.low_price };
+      { fraction_of_day = 1.0; price = bar.close_price };
+    ]
+  else
+    (* Downward day: O → L → H → C *)
+    [
+      { fraction_of_day = 0.0; price = bar.open_price };
+      { fraction_of_day = 0.33; price = bar.low_price };
+      { fraction_of_day = 0.66; price = bar.high_price };
+      { fraction_of_day = 1.0; price = bar.close_price };
+    ]
+
+let update_market engine bars =
+  List.iter bars ~f:(fun bar ->
+      let path = _generate_path bar in
+      Hashtbl.set engine.market_state ~key:bar.symbol ~data:path)
 
 let _calculate_commission config quantity =
   Float.max (quantity *. config.commission.per_share) config.commission.minimum
 
 let _generate_trade_id order_id = "trade_" ^ order_id
+
+(** {1 Path-based Fill Checking}
+
+    The following functions check if orders would fill on a given intraday path.
+    They implement the same hybrid logic as in simulation/price_path.ml:
+    - If price crosses threshold within a bar, fill at threshold (conservative)
+    - If price gaps beyond threshold, fill at observed price (captures slippage)
+
+    TODO: Add more sophisticated fill models (partial fills, realistic slippage) *)
+
+let _would_fill_market (path : intraday_path) : fill_result option =
+  (* Market orders always fill at open *)
+  match List.hd path with
+  | Some point -> Some { price = point.price; fraction_of_day = 0.0 }
+  | None -> None
+
+let _meets_limit ~side ~limit_price price =
+  match side with
+  | Buy -> Float.(price <= limit_price)
+  | Sell -> Float.(price >= limit_price)
+
+let _crosses_limit ~side ~limit_price ~prev_price ~curr_price =
+  match side with
+  | Buy -> Float.(prev_price > limit_price && curr_price <= limit_price)
+  | Sell -> Float.(prev_price < limit_price && curr_price >= limit_price)
+
+let rec _search_order_fill ~(crosses : float -> float -> bool)
+    ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
+  | [] -> None
+  | (curr_point : path_point) :: tail ->
+      if crosses prev_point.price curr_point.price then
+        Some { price = cross_price; fraction_of_day = curr_point.fraction_of_day }
+      else if meets curr_point.price then
+        Some
+          { price = curr_point.price; fraction_of_day = curr_point.fraction_of_day }
+      else _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point tail
+
+let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
+    fill_result option =
+  match path with
+  | [] -> None
+  | (first : path_point) :: rest ->
+      let meets = _meets_limit ~side ~limit_price in
+      if meets first.price then
+        Some { price = first.price; fraction_of_day = first.fraction_of_day }
+      else
+        let crosses prev curr =
+          _crosses_limit ~side ~limit_price ~prev_price:prev ~curr_price:curr
+        in
+        _search_order_fill ~crosses ~meets ~cross_price:limit_price
+          ~prev_point:first rest
+
+let _meets_stop ~side ~stop_price price =
+  match side with
+  | Buy -> Float.(price >= stop_price)
+  | Sell -> Float.(price <= stop_price)
+
+let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
+  match side with
+  | Buy -> Float.(prev_price < stop_price && curr_price >= stop_price)
+  | Sell -> Float.(prev_price > stop_price && curr_price <= stop_price)
+
+let rec _search_stop_with_path ~(crosses : float -> float -> bool)
+    ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
+  | [] -> None
+  | ((curr_point : path_point) :: _tail) as remaining ->
+      if crosses prev_point.price curr_point.price then
+        Some
+          ( { price = cross_price; fraction_of_day = curr_point.fraction_of_day },
+            remaining )
+      else if meets curr_point.price then
+        Some
+          ( { price = curr_point.price; fraction_of_day = curr_point.fraction_of_day },
+            remaining )
+      else
+        _search_stop_with_path ~crosses ~meets ~cross_price ~prev_point:curr_point
+          _tail
+
+let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
+    (fill_result * intraday_path) option =
+  match path with
+  | [] -> None
+  | (first : path_point) :: _rest ->
+      let meets = _meets_stop ~side ~stop_price in
+      if meets first.price then
+        let fill = { price = first.price; fraction_of_day = first.fraction_of_day } in
+        Some (fill, path)
+      else
+        let crosses prev curr =
+          _crosses_stop ~side ~stop_price ~prev_price:prev ~curr_price:curr
+        in
+        _search_stop_with_path ~crosses ~meets ~cross_price:stop_price
+          ~prev_point:first _rest
+
+let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
+    fill_result option =
+  match _stop_activation_path ~path ~side ~stop_price with
+  | Some (fill, _) -> Some fill
+  | None -> None
+
+let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price ~limit_price
+    : fill_result option =
+  (* Two-stage: first stop triggers, then limit must be reached *)
+  match _stop_activation_path ~path ~side ~stop_price with
+  | None -> None
+  | Some (stop_fill, activation_path) ->
+      let meets_limit = _meets_limit ~side ~limit_price in
+      if meets_limit stop_fill.price then Some stop_fill
+      else
+        (* Limit not satisfied immediately; wait for the limit price after stop
+           activation. *)
+        _would_fill_limit ~path:activation_path ~side ~limit_price
 
 let _create_trade order_id symbol side quantity price commission =
   {
@@ -38,35 +180,20 @@ let _create_trade order_id symbol side quantity price commission =
 (* Execute market order - returns Some trade if successful, None otherwise *)
 let _execute_market_order engine (ord : Trading_orders.Types.order) =
   let open Option.Let_syntax in
-  let%bind mkt_data = Hashtbl.find engine.market_state ord.symbol in
-  let%bind last_price = mkt_data.quote.last in
+  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind fill = _would_fill_market path in
   let commission = _calculate_commission engine.config ord.quantity in
   return
-    (_create_trade ord.id ord.symbol ord.side ord.quantity last_price commission)
+    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
 
 (* Execute limit order - returns Some trade if successful, None otherwise *)
 let _execute_limit_order engine (ord : Trading_orders.Types.order) limit_price =
   let open Option.Let_syntax in
-  let%bind mkt_data = Hashtbl.find engine.market_state ord.symbol in
-  match ord.side with
-  | Buy ->
-      (* Buy limit: execute when ask <= limit_price, at ask price *)
-      let%bind ask_price = mkt_data.quote.ask in
-      if Float.(ask_price <= limit_price) then
-        let commission = _calculate_commission engine.config ord.quantity in
-        return
-          (_create_trade ord.id ord.symbol ord.side ord.quantity ask_price
-             commission)
-      else None
-  | Sell ->
-      (* Sell limit: execute when bid >= limit_price, at bid price *)
-      let%bind bid_price = mkt_data.quote.bid in
-      if Float.(bid_price >= limit_price) then
-        let commission = _calculate_commission engine.config ord.quantity in
-        return
-          (_create_trade ord.id ord.symbol ord.side ord.quantity bid_price
-             commission)
-      else None
+  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind fill = _would_fill_limit ~path ~side:ord.side ~limit_price in
+  let commission = _calculate_commission engine.config ord.quantity in
+  return
+    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
 
 let _create_execution_report order_id trade =
   { order_id; status = Filled; trades = [ trade ] }
@@ -92,24 +219,11 @@ let _process_limit_order engine order_mgr order limit_price =
 (* Execute stop order - returns Some trade if triggered, None otherwise *)
 let _execute_stop_order engine (ord : Trading_orders.Types.order) stop_price =
   let open Option.Let_syntax in
-  let%bind mkt_data = Hashtbl.find engine.market_state ord.symbol in
-  let%bind last_price = mkt_data.quote.last in
-  (* Check if stop is triggered based on side *)
-  let triggered =
-    match ord.side with
-    | Buy ->
-        (* Buy stop: triggered when last >= stop_price (breakout/upward) *)
-        Float.(last_price >= stop_price)
-    | Sell ->
-        (* Sell stop: triggered when last <= stop_price (stop-loss/downward) *)
-        Float.(last_price <= stop_price)
-  in
-  if triggered then
-    let commission = _calculate_commission engine.config ord.quantity in
-    return
-      (_create_trade ord.id ord.symbol ord.side ord.quantity last_price
-         commission)
-  else None
+  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind fill = _would_fill_stop ~path ~side:ord.side ~stop_price in
+  let commission = _calculate_commission engine.config ord.quantity in
+  return
+    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
 
 let _process_stop_order engine order_mgr order stop_price =
   _process_order_with_execution order_mgr order (fun () ->
@@ -121,14 +235,13 @@ let _process_stop_order engine order_mgr order stop_price =
 let _execute_stop_limit_order engine (ord : Trading_orders.Types.order)
     stop_price limit_price =
   let open Option.Let_syntax in
-  let%bind mkt_data = Hashtbl.find engine.market_state ord.symbol in
-  let%bind last_price = mkt_data.quote.last in
-  let triggered =
-    match ord.side with
-    | Buy -> Float.(last_price >= stop_price)
-    | Sell -> Float.(last_price <= stop_price)
+  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind fill =
+    _would_fill_stop_limit ~path ~side:ord.side ~stop_price ~limit_price
   in
-  if triggered then _execute_limit_order engine ord limit_price else None
+  let commission = _calculate_commission engine.config ord.quantity in
+  return
+    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
 
 let _process_stop_limit_order engine order_mgr order stop_price limit_price =
   _process_order_with_execution order_mgr order (fun () ->
