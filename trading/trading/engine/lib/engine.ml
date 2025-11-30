@@ -56,9 +56,12 @@ let _generate_trade_id order_id = "trade_" ^ order_id
 (** {1 Path-based Fill Checking}
 
     The following functions check if orders would fill on a given intraday path.
-    They implement the same hybrid logic as in simulation/price_path.ml:
+    These implement hybrid fill logic:
     - If price crosses threshold within a bar, fill at threshold (conservative)
     - If price gaps beyond threshold, fill at observed price (captures slippage)
+
+    This logic was previously in simulation/price_path.ml but has been moved here
+    as it's fundamentally the engine's responsibility to determine order execution.
 
     TODO: Add more sophisticated fill models (partial fills, realistic slippage) *)
 

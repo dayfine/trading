@@ -712,7 +712,11 @@ let test_stop_limit_requires_bid_ask_price _ =
   (* Path goes up, crosses stop at 150.00, which meets limit, fills at 150.00 *)
   assert_order_executed engine order_mgr order ~price:150.00
 
-(* ==================== Additional tests from price_path ==================== *)
+(* ==================== Path execution edge case tests ==================== *)
+(* These tests cover important edge cases for path-based order execution:
+   - Crossing inside bars (fills at limit/stop price when crossed)
+   - Gap scenarios (fills at observed price when price gaps beyond trigger)
+   - Exact OHLC point fills (fills when limit/stop exactly at high/low) *)
 
 (* Limit order crossing tests *)
 let test_limit_buy_crosses_inside_bar _ =
@@ -934,7 +938,7 @@ let suite =
          >:: test_stop_limit_requires_last_price;
          "test_stop_limit_requires_bid_ask_price"
          >:: test_stop_limit_requires_bid_ask_price;
-         (* Additional tests from price_path *)
+         (* Path execution edge case tests *)
          "test_limit_buy_crosses_inside_bar"
          >:: test_limit_buy_crosses_inside_bar;
          "test_limit_sell_crosses_inside_bar"
