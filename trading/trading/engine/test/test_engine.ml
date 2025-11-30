@@ -712,6 +712,159 @@ let test_stop_limit_requires_bid_ask_price _ =
   (* Path goes up, crosses stop at 150.00, which meets limit, fills at 150.00 *)
   assert_order_executed engine order_mgr order ~price:150.00
 
+(* ==================== Additional tests from price_path ==================== *)
+
+(* Limit order crossing tests *)
+let test_limit_buy_crosses_inside_bar _ =
+  (* Price drops past limit inside a bar move; should fill at limit price *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Limit 97.0) ~side:Buy ~quote:bar ()
+  in
+  (* Path: 100→110→95→105. Going from 110 to 95 crosses 97.0, fills at 97.0 *)
+  assert_order_executed engine order_mgr order ~price:97.0
+
+let test_limit_sell_crosses_inside_bar _ =
+  (* Price rises past limit inside a bar move; should fill at limit price *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Limit 103.0) ~side:Sell ~quote:bar ()
+  in
+  (* Path: 100→110→95→105. Going from 100 to 110 crosses 103.0, fills at 103.0 *)
+  assert_order_executed engine order_mgr order ~price:103.0
+
+(* Gap scenario tests *)
+let test_buy_stop_gap_up_fills_at_open _ =
+  (* Gap up: open beyond stop price, should fill at observed open *)
+  let bar =
+    make_bar "AAPL" ~open_price:120.0 ~high_price:130.0 ~low_price:118.0
+      ~close_price:125.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Stop 110.0) ~side:Buy ~quote:bar ()
+  in
+  (* Open at 120.0 already above stop at 110.0, fills at open *)
+  assert_order_executed engine order_mgr order ~price:120.0
+
+let test_sell_stop_gap_down_fills_at_open _ =
+  (* Gap down: open beyond stop price, should fill at observed open *)
+  let bar =
+    make_bar "AAPL" ~open_price:90.0 ~high_price:95.0 ~low_price:80.0
+      ~close_price:85.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Stop 95.0) ~side:Sell ~quote:bar ()
+  in
+  (* Open at 90.0 already below stop at 95.0, fills at open *)
+  assert_order_executed engine order_mgr order ~price:90.0
+
+let test_buy_stop_limit_gap_up_fills_at_open _ =
+  (* Gap up with stop-limit: stop triggers, limit allows open price *)
+  let bar =
+    make_bar "AAPL" ~open_price:120.0 ~high_price:130.0 ~low_price:118.0
+      ~close_price:125.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test
+      ~order_type:(StopLimit (110.0, 130.0))
+      ~side:Buy ~quote:bar ()
+  in
+  (* Stop triggers at open 120.0, which meets limit <= 130.0, fills at 120.0 *)
+  assert_order_executed engine order_mgr order ~price:120.0
+
+let test_buy_stop_limit_gap_up_limit_not_reached _ =
+  (* Gap up with stop-limit: stop triggers but limit not met *)
+  let bar =
+    make_bar "AAPL" ~open_price:120.0 ~high_price:130.0 ~low_price:118.0
+      ~close_price:125.0
+  in
+  let engine, order_mgr, _ =
+    setup_order_test
+      ~order_type:(StopLimit (110.0, 117.0))
+      ~side:Buy ~quote:bar ()
+  in
+  (* Stop triggers at 120.0, but 120.0 > limit 117.0. Low is 118.0, still > 117.0 *)
+  assert_order_not_executed engine order_mgr
+
+let test_sell_stop_limit_gap_down_fills_at_open _ =
+  (* Gap down with stop-limit: stop triggers, limit allows open price *)
+  let bar =
+    make_bar "AAPL" ~open_price:90.0 ~high_price:95.0 ~low_price:80.0
+      ~close_price:85.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test
+      ~order_type:(StopLimit (95.0, 85.0))
+      ~side:Sell ~quote:bar ()
+  in
+  (* Stop triggers at open 90.0, which meets limit >= 85.0, fills at 90.0 *)
+  assert_order_executed engine order_mgr order ~price:90.0
+
+let test_sell_stop_limit_gap_down_limit_not_reached _ =
+  (* Gap down with stop-limit: stop triggers but limit not met *)
+  let bar =
+    make_bar "AAPL" ~open_price:90.0 ~high_price:95.0 ~low_price:80.0
+      ~close_price:85.0
+  in
+  let engine, order_mgr, _ =
+    setup_order_test
+      ~order_type:(StopLimit (100.0, 96.0))
+      ~side:Sell ~quote:bar ()
+  in
+  (* Stop triggers at 90.0, but 90.0 < limit 96.0. High is 95.0, still < 96.0 *)
+  assert_order_not_executed engine order_mgr
+
+(* OHLC-specific tests *)
+let test_limit_buy_at_exact_low _ =
+  (* Limit exactly at low should fill at low *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Limit 95.0) ~side:Buy ~quote:bar ()
+  in
+  assert_order_executed engine order_mgr order ~price:95.0
+
+let test_limit_sell_at_exact_high _ =
+  (* Limit exactly at high should fill at high *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Limit 110.0) ~side:Sell ~quote:bar ()
+  in
+  assert_order_executed engine order_mgr order ~price:110.0
+
+let test_stop_buy_at_exact_high _ =
+  (* Stop buy exactly at high should fill at high *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Stop 110.0) ~side:Buy ~quote:bar ()
+  in
+  assert_order_executed engine order_mgr order ~price:110.0
+
+let test_stop_sell_at_exact_low _ =
+  (* Stop sell exactly at low should fill at low *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:(Stop 95.0) ~side:Sell ~quote:bar ()
+  in
+  assert_order_executed engine order_mgr order ~price:95.0
+
 (* Test suite *)
 let suite =
   "Engine Tests"
@@ -781,6 +934,27 @@ let suite =
          >:: test_stop_limit_requires_last_price;
          "test_stop_limit_requires_bid_ask_price"
          >:: test_stop_limit_requires_bid_ask_price;
+         (* Additional tests from price_path *)
+         "test_limit_buy_crosses_inside_bar"
+         >:: test_limit_buy_crosses_inside_bar;
+         "test_limit_sell_crosses_inside_bar"
+         >:: test_limit_sell_crosses_inside_bar;
+         "test_buy_stop_gap_up_fills_at_open"
+         >:: test_buy_stop_gap_up_fills_at_open;
+         "test_sell_stop_gap_down_fills_at_open"
+         >:: test_sell_stop_gap_down_fills_at_open;
+         "test_buy_stop_limit_gap_up_fills_at_open"
+         >:: test_buy_stop_limit_gap_up_fills_at_open;
+         "test_buy_stop_limit_gap_up_limit_not_reached"
+         >:: test_buy_stop_limit_gap_up_limit_not_reached;
+         "test_sell_stop_limit_gap_down_fills_at_open"
+         >:: test_sell_stop_limit_gap_down_fills_at_open;
+         "test_sell_stop_limit_gap_down_limit_not_reached"
+         >:: test_sell_stop_limit_gap_down_limit_not_reached;
+         "test_limit_buy_at_exact_low" >:: test_limit_buy_at_exact_low;
+         "test_limit_sell_at_exact_high" >:: test_limit_sell_at_exact_high;
+         "test_stop_buy_at_exact_high" >:: test_stop_buy_at_exact_high;
+         "test_stop_sell_at_exact_low" >:: test_stop_sell_at_exact_low;
        ]
 
 let () = run_test_tt_main suite
