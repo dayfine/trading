@@ -11,16 +11,19 @@ type symbol_prices = {
 [@@deriving show, eq]
 (** Historical price data for a single symbol *)
 
-type config = {
-  start_date : Date.t;
-  end_date : Date.t;
-  initial_cash : float;
-  commission : Trading_engine.Types.commission_config;
-}
+type config = { start_date : Date.t; end_date : Date.t; initial_cash : float }
 [@@deriving show, eq]
 (** Configuration for running a simulation *)
 
-type dependencies = { prices : symbol_prices list }
+type dependencies = {
+  prices : symbol_prices list;
+      (** Historical price data - eventually should use
+          HistoricalDailyPriceStorage *)
+  order_manager : Trading_orders.Manager.order_manager;
+      (** Order manager for tracking order lifecycle *)
+  engine : Trading_engine.Engine.t;
+      (** Trading engine for order execution and trade creation *)
+}
 (** External dependencies injected into the simulator *)
 
 (** {1 Simulator Types} *)
@@ -46,6 +49,14 @@ type step_outcome =
 
 val create : config:config -> deps:dependencies -> t
 (** Create a simulator from config and dependencies *)
+
+(** {1 Order Management} *)
+
+val submit_orders :
+  t -> Trading_orders.Types.order list -> t * Status.status list
+(** Submit orders to the simulator for execution. Returns updated simulator and
+    list of submission results (Ok or Error status for each order). Orders will
+    be processed during subsequent step() calls. *)
 
 (** {1 Running} *)
 
