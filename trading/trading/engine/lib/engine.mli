@@ -17,29 +17,35 @@ val create : engine_config -> t
       let engine = Engine.create config
     ]} *)
 
-val update_market : t -> price_quote list -> unit
+val update_market : t -> price_bar list -> unit
 (** Update market data for one or more symbols. Called by simulation to feed
-    current market prices to the engine.
+    OHLC bars to the engine.
+
+    The engine generates intraday price paths from these bars to determine
+    order execution. Each bar represents price action over a time period
+    (typically daily).
 
     Example:
     {[
-      let quotes =
+      let bars =
         [
           {
             symbol = "AAPL";
-            bid = Some 150.0;
-            ask = Some 150.5;
-            last = Some 150.25;
+            open_price = 150.0;
+            high_price = 152.0;
+            low_price = 149.5;
+            close_price = 151.0;
           };
           {
             symbol = "GOOGL";
-            bid = Some 2800.0;
-            ask = Some 2805.0;
-            last = Some 2802.5;
+            open_price = 2800.0;
+            high_price = 2850.0;
+            low_price = 2790.0;
+            close_price = 2820.0;
           };
         ]
       in
-      Engine.update_market engine quotes
+      Engine.update_market engine bars
     ]} *)
 
 val process_orders : t -> order_manager -> execution_report list status_or

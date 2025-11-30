@@ -2,14 +2,50 @@
 
 open Trading_base.Types
 
-type price_quote = {
+(** OHLC price bar for a symbol.
+
+    The bar represents price action over a time period (e.g., daily, hourly).
+    The engine simulates execution by generating intraday paths through the OHLC
+    points to determine if/when orders would fill.
+
+    TODO: Add configurable bar granularity (daily, hourly, minute)
+    TODO: Add volume data for more realistic execution modeling *)
+type price_bar = {
   symbol : symbol;
-  bid : price option;
-  ask : price option;
-  last : price option;
+  open_price : price;
+  high_price : price;
+  low_price : price;
+  close_price : price;
 }
 [@@deriving show, eq]
-(** Price quote for a symbol with bid/ask/last prices *)
+(** Price bar for a symbol with OHLC data *)
+
+(** {1 Intraday Price Path Types} *)
+
+(** A point along the intraday price path.
+
+    fraction_of_day ranges from 0.0 (market open) to 1.0 (market close).
+    For example, 0.5 represents mid-day.
+
+    TODO: Replace fraction_of_day with actual timestamps for more flexibility *)
+type path_point = { fraction_of_day : float; price : price }
+[@@deriving show, eq]
+
+(** An intraday price path is a sequence of points showing how price evolved
+    during the trading period.
+
+    The engine generates this path from OHLC bars to simulate realistic
+    order execution. The path ensures we visit all OHLC points in a plausible
+    order.
+
+    TODO: Implement more sophisticated path models (Brownian bridge, etc.) *)
+type intraday_path = path_point list [@@deriving show, eq]
+
+(** Result of checking if an order would fill on a given path.
+
+    Contains the fill price and when during the day the fill would occur. *)
+type fill_result = { price : price; fraction_of_day : float }
+[@@deriving show, eq]
 
 (** Fill status indicates whether an order execution was successful.
     - Filled: Order completely executed with trades generated
