@@ -11,41 +11,9 @@ type t = {
 
 let create config = { config; market_state = Hashtbl.create (module String) }
 
-(** Generate intraday price path from OHLC bar.
-
-    Simple implementation: visits OHLC points in order based on whether day
-    was up or down.
-
-    - Upward day (close >= open): O → H → L → C at times 0.0, 0.33, 0.66, 1.0
-    - Downward day (close < open): O → L → H → C at times 0.0, 0.33, 0.66, 1.0
-
-    TODO: Implement more realistic path models:
-    - Brownian bridge between OHLC points
-    - Configurable granularity (e.g., minute bars instead of 4 points)
-    - Volume-weighted price paths
-    - Support for intraday bars (hourly, minute) not just daily *)
-let _generate_path (bar : price_bar) : intraday_path =
-  let open_to_close = bar.close_price -. bar.open_price in
-  if Float.(open_to_close >= 0.0) then
-    (* Upward day: O → H → L → C *)
-    [
-      { fraction_of_day = 0.0; price = bar.open_price };
-      { fraction_of_day = 0.33; price = bar.high_price };
-      { fraction_of_day = 0.66; price = bar.low_price };
-      { fraction_of_day = 1.0; price = bar.close_price };
-    ]
-  else
-    (* Downward day: O → L → H → C *)
-    [
-      { fraction_of_day = 0.0; price = bar.open_price };
-      { fraction_of_day = 0.33; price = bar.low_price };
-      { fraction_of_day = 0.66; price = bar.high_price };
-      { fraction_of_day = 1.0; price = bar.close_price };
-    ]
-
 let update_market engine bars =
   List.iter bars ~f:(fun bar ->
-      let path = _generate_path bar in
+      let path = Price_path.generate_path bar in
       Hashtbl.set engine.market_state ~key:bar.symbol ~data:path)
 
 let _calculate_commission config quantity =
