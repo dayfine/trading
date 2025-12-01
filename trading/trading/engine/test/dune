@@ -12,3 +12,7 @@
   trading.orders
   matchers
   core_unix.time_ns_unix))
+
+(test
+ (name test_price_path)
+ (libraries ounit2 core trading.engine trading.base matchers))
