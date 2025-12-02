@@ -8,11 +8,11 @@ type distribution_profile = UShaped | JShaped | ReverseJ | Uniform
 
 type path_config = {
   profile : distribution_profile;
-  points_per_segment : int;
+  total_points : int;
   seed : int option;
 }
 
-let default_config = { profile = UShaped; points_per_segment = 130; seed = None }
+let default_config = { profile = UShaped; total_points = 390; seed = None }
 
 (** {1 Volatility Inference} *)
 
@@ -200,6 +200,7 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
   (* Step 3: Infer volatility *)
   let volatility_scale = _infer_volatility_scale bar in
   (* Step 4: Generate path segments between waypoints *)
+  let total_resolution = Types.default_bar_resolution in
   let rec generate_segments prices times acc =
     match (prices, times) with
     | p1 :: p2 :: rest_prices, t1 :: t2 :: rest_times ->
@@ -209,10 +210,15 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
             ({ bar_index = t1; price = p1 } : path_point) :: acc
           else acc
         in
+        (* Calculate points for this segment proportionally *)
+        let segment_length = t2 - t1 in
+        let points_for_segment =
+          (config.total_points * segment_length) / total_resolution
+        in
         (* Generate bridge segment *)
         let segment =
           _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
-            ~start_index:t1 ~end_index:t2 ~n_points:config.points_per_segment
+            ~start_index:t1 ~end_index:t2 ~n_points:points_for_segment
             ~volatility_scale ~low_bound:bar.low_price
             ~high_bound:bar.high_price
         in

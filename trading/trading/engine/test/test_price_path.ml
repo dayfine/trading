@@ -235,18 +235,16 @@ let test_custom_config_affects_granularity _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config =
-    { profile = Uniform; points_per_segment = 10; seed = Some 42 }
-  in
+  let config = { profile = Uniform; total_points = 30; seed = Some 42 } in
   let path = generate_path ~config bar in
-  (* With 10 points per segment and 3 segments, should have ~30+ points *)
+  (* With 30 total points, should have ~30-35 points including waypoints *)
   let path_length = List.length path in
   assert_bool
-    (Printf.sprintf "Path should have > 20 points (got %d)" path_length)
-    (path_length > 20);
+    (Printf.sprintf "Path should have > 25 points (got %d)" path_length)
+    (path_length > 25);
   assert_bool
-    (Printf.sprintf "Path should have < 50 points (got %d)" path_length)
-    (path_length < 50)
+    (Printf.sprintf "Path should have < 40 points (got %d)" path_length)
+    (path_length < 40)
 
 (** {1 Deterministic Tests with Fixed Seeds} *)
 
@@ -256,9 +254,7 @@ let test_deterministic_path_with_seed _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config =
-    { profile = Uniform; points_per_segment = 5; seed = Some 12345 }
-  in
+  let config = { profile = Uniform; total_points = 20; seed = Some 12345 } in
   let path1 = generate_path ~config bar in
   let path2 = generate_path ~config bar in
   (* Paths should be identical *)
@@ -269,12 +265,8 @@ let test_different_seeds_produce_different_paths _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config1 =
-    { profile = Uniform; points_per_segment = 5; seed = Some 111 }
-  in
-  let config2 =
-    { profile = Uniform; points_per_segment = 5; seed = Some 222 }
-  in
+  let config1 = { profile = Uniform; total_points = 20; seed = Some 111 } in
+  let config2 = { profile = Uniform; total_points = 20; seed = Some 222 } in
   let path1 : intraday_path = generate_path ~config:config1 bar in
   let path2 : intraday_path = generate_path ~config:config2 bar in
   (* Paths should be different (at least one point differs) *)
@@ -293,17 +285,21 @@ let test_distribution_profiles_with_seeds _ =
       ~close_price:105.0
   in
   let config_uniform =
-    { profile = Uniform; points_per_segment = 5; seed = Some 42 }
+    { profile = Uniform; total_points = 20; seed = Some 42 }
   in
   let config_jshaped =
-    { profile = JShaped; points_per_segment = 5; seed = Some 42 }
+    { profile = JShaped; total_points = 20; seed = Some 42 }
   in
   let path_uniform = generate_path ~config:config_uniform bar in
   let path_jshaped = generate_path ~config:config_jshaped bar in
-  (* Both should have same length *)
-  assert_equal (List.length path_uniform) (List.length path_jshaped);
-  (* But timing might differ (JShaped is deterministic early timing) *)
-  (* Just verify both are valid *)
+  (* Both should have similar length (within reasonable range) *)
+  let len_diff =
+    Int.abs (List.length path_uniform - List.length path_jshaped)
+  in
+  assert_bool
+    (Printf.sprintf "Path lengths should be similar (diff: %d)" len_diff)
+    (len_diff < 5);
+  (* Both should be valid *)
   assert_bool "Uniform path should be monotonic" (is_monotonic path_uniform);
   assert_bool "JShaped path should be monotonic" (is_monotonic path_jshaped)
 
