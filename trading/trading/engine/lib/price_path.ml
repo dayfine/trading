@@ -95,33 +95,29 @@ let _sample_time_from_density (random_state : Random.State.t)
 (** Generate waypoint times for O, H, L, C based on distribution profile.
 
     Returns [t_open; t_high_or_low; t_low_or_high; t_close]
-    where times are in [0, 1] representing fraction of day. *)
+    where times are bar indices [0, resolution-1]. *)
 let _generate_waypoint_times (random_state : Random.State.t)
-    (profile : distribution_profile) (_high_first : bool) : float list =
+    (profile : distribution_profile) (_high_first : bool) : int list =
+  let resolution = Types.default_bar_resolution in
   match profile with
   | UShaped | Uniform ->
-      (* High and low can occur anywhere in middle 60% of day *)
-      let middle_start = 0.2 in
-      let middle_end = 0.8 in
-      let t1 =
-        middle_start
-        +. Random.State.float random_state (middle_end -. middle_start)
-      in
-      let t2 =
-        middle_start
-        +. Random.State.float random_state (middle_end -. middle_start)
-      in
+      (* High and low can occur anywhere in middle 60% of bar *)
+      let middle_start = resolution / 5 in
+      (* 20% *)
+      let middle_end = (resolution * 4) / 5 in
+      (* 80% *)
+      let range = middle_end - middle_start in
+      let t1 = middle_start + Random.State.int random_state range in
+      let t2 = middle_start + Random.State.int random_state range in
       (* Sort to ensure monotonic time *)
-      let t_first, t_second =
-        if Float.(t1 < t2) then (t1, t2) else (t2, t1)
-      in
-      [ 0.0; t_first; t_second; 1.0 ]
+      let t_first, t_second = if t1 < t2 then (t1, t2) else (t2, t1) in
+      [ 0; t_first; t_second; resolution - 1 ]
   | JShaped ->
       (* High/Low occur early *)
-      [ 0.0; 0.25; 0.35; 1.0 ]
+      [ 0; resolution / 4; (resolution * 7) / 20; resolution - 1 ]
   | ReverseJ ->
       (* High/Low occur late *)
-      [ 0.0; 0.65; 0.75; 1.0 ]
+      [ 0; (resolution * 13) / 20; (resolution * 3) / 4; resolution - 1 ]
 
 (** {1 Brownian Bridge Segment Generation} *)
 
@@ -140,21 +136,26 @@ let _sample_gaussian (random_state : Random.State.t) : float =
 
     @param start_price Starting price
     @param end_price Ending price (must reach exactly)
-    @param start_time Starting fraction of day
-    @param end_time Ending fraction of day
+    @param start_index Starting bar index (0 to resolution-1)
+    @param end_index Ending bar index (0 to resolution-1)
     @param n_points Number of intermediate points to generate
     @param volatility_scale Scaling factor for noise amplitude
     @param low_bound Lower price bound (from bar)
     @param high_bound Upper price bound (from bar)
     @return List of path_points from start to end *)
-let _generate_bridge_segment ~random_state ~start_price ~end_price ~start_time
-    ~end_time ~n_points ~volatility_scale ~low_bound ~high_bound : path_point list
+let _generate_bridge_segment ~random_state ~start_price ~end_price ~start_index
+    ~end_index ~n_points ~volatility_scale ~low_bound ~high_bound : path_point list
     =
   if n_points <= 0 then []
   else
-    let dt = (end_time -. start_time) /. Float.of_int (n_points + 1) in
-    let noise_scale = volatility_scale *. Float.sqrt dt in
-    let rec generate_points i current_price current_time acc =
+    let time_span = end_index - start_index in
+    let index_step = Float.of_int time_span /. Float.of_int (n_points + 1) in
+    (* For noise scaling, use time step as fraction of full resolution *)
+    let dt = Float.of_int time_span /. Float.of_int Types.default_bar_resolution in
+    let noise_scale =
+      volatility_scale *. Float.sqrt (dt /. Float.of_int (n_points + 1))
+    in
+    let rec generate_points i current_price current_index_float acc =
       if i > n_points then List.rev acc
       else
         (* Brownian bridge: adjust drift to ensure we reach endpoint *)
@@ -167,13 +168,14 @@ let _generate_bridge_segment ~random_state ~start_price ~end_price ~start_time
         let new_price = current_price +. needed_drift +. noise in
         (* Clamp to bar bounds *)
         let clamped_price = Float.max low_bound (Float.min high_bound new_price) in
-        let new_time = current_time +. dt in
-        let point : path_point =
-          { fraction_of_day = new_time; price = clamped_price }
+        let new_index_float = current_index_float +. index_step in
+        let bar_index =
+          start_index + Float.to_int (Float.round new_index_float)
         in
-        generate_points (i + 1) clamped_price new_time (point :: acc)
+        let point : path_point = { bar_index; price = clamped_price } in
+        generate_points (i + 1) clamped_price new_index_float (point :: acc)
     in
-    generate_points 1 start_price start_time []
+    generate_points 1 start_price 0.0 []
 
 (** {1 Main Path Generation} *)
 
@@ -204,18 +206,18 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
         (* Create opening point if this is first segment *)
         let acc' =
           if List.is_empty acc then
-            ({ fraction_of_day = t1; price = p1 } : path_point) :: acc
+            ({ bar_index = t1; price = p1 } : path_point) :: acc
           else acc
         in
         (* Generate bridge segment *)
         let segment =
           _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
-            ~start_time:t1 ~end_time:t2 ~n_points:config.points_per_segment
+            ~start_index:t1 ~end_index:t2 ~n_points:config.points_per_segment
             ~volatility_scale ~low_bound:bar.low_price
             ~high_bound:bar.high_price
         in
         (* Add ending waypoint *)
-        let waypoint : path_point = { fraction_of_day = t2; price = p2 } in
+        let waypoint : path_point = { bar_index = t2; price = p2 } in
         let acc'' = waypoint :: (List.rev segment @ acc') in
         generate_segments (p2 :: rest_prices) (t2 :: rest_times) acc''
     | _, _ -> List.rev acc

@@ -22,30 +22,32 @@ type price_bar = {
 
 (** {1 Intraday Price Path Types} *)
 
+(** Default resolution for intraday paths (390 sub-bars).
+
+    For daily OHLC bars, this corresponds to 1-minute bars (6.5hr × 60min = 390).
+    For hourly bars, each sub-bar would represent ~9 seconds.
+    The abstraction allows the same path generation logic to work across timeframes. *)
+val default_bar_resolution : int
+
 (** A point along the intraday price path.
 
-    fraction_of_day ranges from 0.0 (market open) to 1.0 (market close).
-    For example, 0.5 represents mid-day.
-
-    TODO: Replace fraction_of_day with actual timestamps for more flexibility *)
-type path_point = { fraction_of_day : float; price : price }
-[@@deriving show, eq]
+    bar_index ranges from 0 (bar open) to 389 (bar close) by default.
+    For daily bars, each index represents a 1-minute sub-bar.
+    For hourly bars, each index represents a ~9-second sub-bar. *)
+type path_point = { bar_index : int; price : price } [@@deriving show, eq]
 
 (** An intraday price path is a sequence of points showing how price evolved
-    during the trading period.
+    during the bar period.
 
     The engine generates this path from OHLC bars to simulate realistic
     order execution. The path ensures we visit all OHLC points in a plausible
-    order.
-
-    TODO: Implement more sophisticated path models (Brownian bridge, etc.) *)
+    order. Default paths contain ~390 points. *)
 type intraday_path = path_point list [@@deriving show, eq]
 
 (** Result of checking if an order would fill on a given path.
 
-    Contains the fill price and when during the day the fill would occur. *)
-type fill_result = { price : price; fraction_of_day : float }
-[@@deriving show, eq]
+    Contains the fill price and the bar_index when the fill would occur. *)
+type fill_result = { price : price; bar_index : int } [@@deriving show, eq]
 
 (** Fill status indicates whether an order execution was successful.
     - Filled: Order completely executed with trades generated

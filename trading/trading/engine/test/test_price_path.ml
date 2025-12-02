@@ -24,12 +24,12 @@ let visits_all_ohlc (path : intraday_path) (bar : price_bar) ~epsilon : bool =
   visits bar.open_price && visits bar.high_price && visits bar.low_price
   && visits bar.close_price
 
-(** Check that path times are monotonically increasing *)
+(** Check that path indices are monotonically increasing *)
 let is_monotonic (path : intraday_path) : bool =
   let rec check = function
     | [] | [ _ ] -> true
     | (p1 : path_point) :: (p2 : path_point) :: rest ->
-        Float.(p1.fraction_of_day <= p2.fraction_of_day) && check (p2 :: rest)
+        p1.bar_index <= p2.bar_index && check (p2 :: rest)
   in
   check path
 
@@ -151,8 +151,10 @@ let test_generate_path_starts_at_open_ends_at_close _ =
     let path = generate_path bar in
     match (List.hd path, List.last path) with
     | Some first, Some last ->
-        assert_that first.fraction_of_day (float_equal 0.0);
-        assert_that last.fraction_of_day (float_equal 1.0);
+        assert_equal 0 first.bar_index;
+        assert_equal
+          (Trading_engine.Types.default_bar_resolution - 1)
+          last.bar_index;
         (* Open and close should be exact *)
         assert_that first.price (float_equal bar.open_price);
         assert_that last.price (float_equal bar.close_price)
