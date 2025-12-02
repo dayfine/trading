@@ -233,7 +233,9 @@ let test_custom_config_affects_granularity _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config = { profile = Uniform; points_per_segment = 10 } in
+  let config =
+    { profile = Uniform; points_per_segment = 10; seed = Some 42 }
+  in
   let path = generate_path ~config bar in
   (* With 10 points per segment and 3 segments, should have ~30+ points *)
   let path_length = List.length path in
@@ -243,6 +245,78 @@ let test_custom_config_affects_granularity _ =
   assert_bool
     (Printf.sprintf "Path should have < 50 points (got %d)" path_length)
     (path_length < 50)
+
+(** {1 Deterministic Tests with Fixed Seeds} *)
+
+let test_deterministic_path_with_seed _ =
+  (* Same seed should produce identical paths *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let config =
+    { profile = Uniform; points_per_segment = 5; seed = Some 12345 }
+  in
+  let path1 = generate_path ~config bar in
+  let path2 = generate_path ~config bar in
+  (* Paths should be identical *)
+  assert_equal path1 path2
+
+let test_different_seeds_produce_different_paths _ =
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let config1 =
+    { profile = Uniform; points_per_segment = 5; seed = Some 111 }
+  in
+  let config2 =
+    { profile = Uniform; points_per_segment = 5; seed = Some 222 }
+  in
+  let path1 : intraday_path = generate_path ~config:config1 bar in
+  let path2 : intraday_path = generate_path ~config:config2 bar in
+  (* Paths should be different (at least one point differs) *)
+  let paths_differ =
+    not
+      (List.equal
+         (fun (p1 : path_point) (p2 : path_point) -> Float.(p1.price = p2.price))
+         path1 path2)
+  in
+  assert_bool "Different seeds should produce different paths" paths_differ
+
+let test_distribution_profiles_with_seeds _ =
+  (* Test that different profiles produce different timing with same seed *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let config_uniform =
+    { profile = Uniform; points_per_segment = 5; seed = Some 42 }
+  in
+  let config_jshaped =
+    { profile = JShaped; points_per_segment = 5; seed = Some 42 }
+  in
+  let path_uniform = generate_path ~config:config_uniform bar in
+  let path_jshaped = generate_path ~config:config_jshaped bar in
+  (* Both should have same length *)
+  assert_equal (List.length path_uniform) (List.length path_jshaped);
+  (* But timing might differ (JShaped is deterministic early timing) *)
+  (* Just verify both are valid *)
+  assert_bool "Uniform path should be monotonic" (is_monotonic path_uniform);
+  assert_bool "JShaped path should be monotonic" (is_monotonic path_jshaped)
+
+let test_default_config_produces_390_points _ =
+  (* Default config should produce ~390 points total *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let path = generate_path bar in
+  let path_length = List.length path in
+  (* 130 points/segment * 3 segments + 4 waypoints ≈ 390-394 *)
+  assert_bool
+    (Printf.sprintf "Default should produce ~390 points (got %d)" path_length)
+    (path_length > 380 && path_length < 400)
 
 (** {1 Test Suite} *)
 
@@ -276,6 +350,14 @@ let suite =
          (* Configuration tests *)
          "custom config affects granularity"
          >:: test_custom_config_affects_granularity;
+         (* Deterministic tests *)
+         "deterministic path with seed" >:: test_deterministic_path_with_seed;
+         "different seeds produce different paths"
+         >:: test_different_seeds_produce_different_paths;
+         "distribution profiles with seeds"
+         >:: test_distribution_profiles_with_seeds;
+         "default config produces ~390 points"
+         >:: test_default_config_produces_390_points;
        ]
 
 let () = run_test_tt_main suite

@@ -6,9 +6,13 @@ open Types
 
 type distribution_profile = UShaped | JShaped | ReverseJ | Uniform
 
-type path_config = { profile : distribution_profile; points_per_segment : int }
+type path_config = {
+  profile : distribution_profile;
+  points_per_segment : int;
+  seed : int option;
+}
 
-let default_config = { profile = UShaped; points_per_segment = 100 }
+let default_config = { profile = UShaped; points_per_segment = 130; seed = None }
 
 (** {1 Volatility Inference} *)
 
@@ -38,7 +42,7 @@ let _infer_volatility_scale (bar : price_bar) : float =
     But higher volatility increases randomness.
 
     Returns true if high should come before low. *)
-let _decide_high_first (bar : price_bar) : bool =
+let _decide_high_first (random_state : Random.State.t) (bar : price_bar) : bool =
   let direction = bar.close_price -. bar.open_price in
   let volatility_scale = _infer_volatility_scale bar in
   (* Base probability: 0.5 (random) *)
@@ -50,7 +54,7 @@ let _decide_high_first (bar : price_bar) : bool =
   in
   let prob_high_first = 0.5 +. direction_bias in
   let prob_clamped = Float.max 0.2 (Float.min 0.8 prob_high_first) in
-  Float.(Random.float 1.0 < prob_clamped)
+  Float.(Random.State.float random_state 1.0 < prob_clamped)
 
 (** {1 Distribution Profiles and Time Sampling} *)
 
@@ -77,12 +81,13 @@ let _find_max_density (profile : distribution_profile) : float =
   | Uniform -> 1.0
 
 (** Sample a single time point from density function using rejection sampling *)
-let _sample_time_from_density (profile : distribution_profile) : float =
+let _sample_time_from_density (random_state : Random.State.t)
+    (profile : distribution_profile) : float =
   let density = _density_function profile in
   let max_density = _find_max_density profile in
   let rec sample () =
-    let t = Random.float 1.0 in
-    let acceptance = Random.float max_density in
+    let t = Random.State.float random_state 1.0 in
+    let acceptance = Random.State.float random_state max_density in
     if Float.(acceptance < density t) then t else sample ()
   in
   sample ()
@@ -91,18 +96,20 @@ let _sample_time_from_density (profile : distribution_profile) : float =
 
     Returns [t_open; t_high_or_low; t_low_or_high; t_close]
     where times are in [0, 1] representing fraction of day. *)
-let _generate_waypoint_times (profile : distribution_profile) (_high_first : bool)
-    : float list =
+let _generate_waypoint_times (random_state : Random.State.t)
+    (profile : distribution_profile) (_high_first : bool) : float list =
   match profile with
   | UShaped | Uniform ->
       (* High and low can occur anywhere in middle 60% of day *)
       let middle_start = 0.2 in
       let middle_end = 0.8 in
       let t1 =
-        middle_start +. (Random.float (middle_end -. middle_start))
+        middle_start
+        +. Random.State.float random_state (middle_end -. middle_start)
       in
       let t2 =
-        middle_start +. (Random.float (middle_end -. middle_start))
+        middle_start
+        +. Random.State.float random_state (middle_end -. middle_start)
       in
       (* Sort to ensure monotonic time *)
       let t_first, t_second =
@@ -121,9 +128,9 @@ let _generate_waypoint_times (profile : distribution_profile) (_high_first : boo
 (** Generate a single sample from standard normal distribution.
 
     Uses Box-Muller transform. *)
-let _sample_gaussian () : float =
-  let u1 = Random.float 1.0 in
-  let u2 = Random.float 1.0 in
+let _sample_gaussian (random_state : Random.State.t) : float =
+  let u1 = Random.State.float random_state 1.0 in
+  let u2 = Random.State.float random_state 1.0 in
   Float.sqrt (-2.0 *. Float.log u1) *. Float.cos (2.0 *. Float.pi *. u2)
 
 (** Generate price segment between two waypoints using Brownian bridge.
@@ -140,8 +147,9 @@ let _sample_gaussian () : float =
     @param low_bound Lower price bound (from bar)
     @param high_bound Upper price bound (from bar)
     @return List of path_points from start to end *)
-let _generate_bridge_segment ~start_price ~end_price ~start_time ~end_time
-    ~n_points ~volatility_scale ~low_bound ~high_bound : path_point list =
+let _generate_bridge_segment ~random_state ~start_price ~end_price ~start_time
+    ~end_time ~n_points ~volatility_scale ~low_bound ~high_bound : path_point list
+    =
   if n_points <= 0 then []
   else
     let dt = (end_time -. start_time) /. Float.of_int (n_points + 1) in
@@ -155,7 +163,7 @@ let _generate_bridge_segment ~start_price ~end_price ~start_time ~end_time
           (end_price -. current_price) /. Float.of_int remaining_steps
         in
         (* Add Gaussian noise scaled by volatility *)
-        let noise = _sample_gaussian () *. noise_scale in
+        let noise = _sample_gaussian random_state *. noise_scale in
         let new_price = current_price +. needed_drift +. noise in
         (* Clamp to bar bounds *)
         let clamped_price = Float.max low_bound (Float.min high_bound new_price) in
@@ -170,15 +178,23 @@ let _generate_bridge_segment ~start_price ~end_price ~start_time ~end_time
 (** {1 Main Path Generation} *)
 
 let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
+  (* Initialize random state based on seed *)
+  let random_state =
+    match config.seed with
+    | Some seed -> Random.State.make [| seed |]
+    | None -> Random.State.make_self_init ()
+  in
   (* Step 1: Decide path order *)
-  let high_first = _decide_high_first bar in
+  let high_first = _decide_high_first random_state bar in
   let waypoint_prices =
     if high_first then
       [ bar.open_price; bar.high_price; bar.low_price; bar.close_price ]
     else [ bar.open_price; bar.low_price; bar.high_price; bar.close_price ]
   in
   (* Step 2: Generate waypoint times *)
-  let waypoint_times = _generate_waypoint_times config.profile high_first in
+  let waypoint_times =
+    _generate_waypoint_times random_state config.profile high_first
+  in
   (* Step 3: Infer volatility *)
   let volatility_scale = _infer_volatility_scale bar in
   (* Step 4: Generate path segments between waypoints *)
@@ -193,9 +209,10 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
         in
         (* Generate bridge segment *)
         let segment =
-          _generate_bridge_segment ~start_price:p1 ~end_price:p2 ~start_time:t1
-            ~end_time:t2 ~n_points:config.points_per_segment ~volatility_scale
-            ~low_bound:bar.low_price ~high_bound:bar.high_price
+          _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
+            ~start_time:t1 ~end_time:t2 ~n_points:config.points_per_segment
+            ~volatility_scale ~low_bound:bar.low_price
+            ~high_bound:bar.high_price
         in
         (* Add ending waypoint *)
         let waypoint : path_point = { fraction_of_day = t2; price = p2 } in
