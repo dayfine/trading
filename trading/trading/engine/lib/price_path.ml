@@ -169,10 +169,7 @@ let _generate_bridge_segment ~random_state ~start_price ~end_price ~start_index
         (* Clamp to bar bounds *)
         let clamped_price = Float.max low_bound (Float.min high_bound new_price) in
         let new_index_float = current_index_float +. index_step in
-        let bar_index =
-          start_index + Float.to_int (Float.round new_index_float)
-        in
-        let point : path_point = { bar_index; price = clamped_price } in
+        let point : path_point = { price = clamped_price } in
         generate_points (i + 1) clamped_price new_index_float (point :: acc)
     in
     generate_points 1 start_price 0.0 []
@@ -206,8 +203,7 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
     | p1 :: p2 :: rest_prices, t1 :: t2 :: rest_times ->
         (* Create opening point if this is first segment *)
         let acc' =
-          if List.is_empty acc then
-            ({ bar_index = t1; price = p1 } : path_point) :: acc
+          if List.is_empty acc then ({ price = p1 } : path_point) :: acc
           else acc
         in
         (* Calculate points for this segment proportionally *)
@@ -223,7 +219,7 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
             ~high_bound:bar.high_price
         in
         (* Add ending waypoint *)
-        let waypoint : path_point = { bar_index = t2; price = p2 } in
+        let waypoint : path_point = { price = p2 } in
         let acc'' = waypoint :: (List.rev segment @ acc') in
         generate_segments (p2 :: rest_prices) (t2 :: rest_times) acc''
     | _, _ -> List.rev acc
@@ -232,7 +228,7 @@ let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
 
 (** {1 Early Exit Optimization} *)
 
-let rec can_fill (bar : price_bar) (side : side) (order_type : order_type) : bool =
+let rec might_fill (bar : price_bar) (side : side) (order_type : order_type) : bool =
   match order_type with
   | Market -> true (* Market orders always fill *)
   | Limit limit_price -> (
@@ -253,5 +249,5 @@ let rec can_fill (bar : price_bar) (side : side) (order_type : order_type) : boo
           Float.(bar.low_price <= stop_price))
   | StopLimit (stop_price, limit_price) ->
       (* Stop must trigger AND limit must be reachable *)
-      can_fill bar side (Stop stop_price)
-      && can_fill bar side (Limit limit_price)
+      might_fill bar side (Stop stop_price)
+      && might_fill bar side (Limit limit_price)

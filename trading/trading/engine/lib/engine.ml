@@ -36,7 +36,7 @@ let _generate_trade_id order_id = "trade_" ^ order_id
 let _would_fill_market (path : intraday_path) : fill_result option =
   (* Market orders always fill at open *)
   match List.hd path with
-  | Some point -> Some { price = point.price; bar_index = point.bar_index }
+  | Some point -> Some { price = point.price }
   | None -> None
 
 let _meets_limit ~side ~limit_price price =
@@ -54,9 +54,9 @@ let rec _search_order_fill ~(crosses : float -> float -> bool)
   | [] -> None
   | (curr_point : path_point) :: tail ->
       if crosses prev_point.price curr_point.price then
-        Some { price = cross_price; bar_index = curr_point.bar_index }
+        Some { price = cross_price }
       else if meets curr_point.price then
-        Some { price = curr_point.price; bar_index = curr_point.bar_index }
+        Some { price = curr_point.price }
       else _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point tail
 
 let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
@@ -65,8 +65,7 @@ let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
   | [] -> None
   | (first : path_point) :: rest ->
       let meets = _meets_limit ~side ~limit_price in
-      if meets first.price then
-        Some { price = first.price; bar_index = first.bar_index }
+      if meets first.price then Some { price = first.price }
       else
         let crosses prev curr =
           _crosses_limit ~side ~limit_price ~prev_price:prev ~curr_price:curr
@@ -89,12 +88,9 @@ let rec _search_stop_with_path ~(crosses : float -> float -> bool)
   | [] -> None
   | ((curr_point : path_point) :: _tail) as remaining ->
       if crosses prev_point.price curr_point.price then
-        Some
-          ( { price = cross_price; bar_index = curr_point.bar_index }, remaining )
+        Some ({ price = cross_price }, remaining)
       else if meets curr_point.price then
-        Some
-          ( { price = curr_point.price; bar_index = curr_point.bar_index },
-            remaining )
+        Some ({ price = curr_point.price }, remaining)
       else
         _search_stop_with_path ~crosses ~meets ~cross_price ~prev_point:curr_point
           _tail
@@ -106,7 +102,7 @@ let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
   | (first : path_point) :: _rest ->
       let meets = _meets_stop ~side ~stop_price in
       if meets first.price then
-        let fill = { price = first.price; bar_index = first.bar_index } in
+        let fill = { price = first.price } in
         Some (fill, path)
       else
         let crosses prev curr =
