@@ -31,10 +31,8 @@ val default_bar_resolution : int
 
 (** A point along the intraday price path.
 
-    bar_index ranges from 0 (bar open) to 389 (bar close) by default.
-    For daily bars, each index represents a 1-minute sub-bar.
-    For hourly bars, each index represents a ~9-second sub-bar. *)
-type path_point = { bar_index : int; price : price } [@@deriving show, eq]
+    The path is an ordered sequence, so timing is implicit from list position. *)
+type path_point = { price : price } [@@deriving show, eq]
 
 (** An intraday price path is a sequence of points showing how price evolved
     during the bar period.
@@ -46,8 +44,8 @@ type intraday_path = path_point list [@@deriving show, eq]
 
 (** Result of checking if an order would fill on a given path.
 
-    Contains the fill price and the bar_index when the fill would occur. *)
-type fill_result = { price : price; bar_index : int } [@@deriving show, eq]
+    Contains the fill price. *)
+type fill_result = { price : price } [@@deriving show, eq]
 
 (** Fill status indicates whether an order execution was successful.
     - Filled: Order completely executed with trades generated

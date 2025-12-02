@@ -54,8 +54,7 @@ val default_config : path_config
     2. Place waypoints (O, H, L, C) at non-uniform times based on distribution profile
     3. Interpolate between waypoints using Brownian bridge with auto-inferred volatility
 
-    Default configuration generates ~390 points (roughly 1-minute bars for 6.5hr day):
-    - 130 points per segment × 3 segments + 4 waypoints ≈ 394 points
+    Default configuration generates ~390 points (roughly 1-minute bars for 6.5hr day).
 
     Parameters are auto-inferred from the bar:
     - Volatility: derived from (high-low)/(open-close) ratio
@@ -80,4 +79,4 @@ val generate_path : ?config:path_config -> price_bar -> intraday_path
     @param side Order side (Buy or Sell)
     @param order_type The order type with price parameters
     @return true if order could possibly fill, false if impossible *)
-val can_fill : price_bar -> side -> order_type -> bool
+val might_fill : price_bar -> side -> order_type -> bool
