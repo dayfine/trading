@@ -30,13 +30,15 @@ type distribution_profile =
 
     If not specified, reasonable defaults are used:
     - profile: UShaped (realistic for most equity markets)
-    - points_per_segment: 100 (roughly 1-minute bars for 6.5hr day) *)
+    - points_per_segment: 130 (390 total points = 1-minute bars for 6.5hr day)
+    - seed: None (non-deterministic random path generation) *)
 type path_config = {
   profile : distribution_profile;
   points_per_segment : int;
+  seed : int option;  (** Optional random seed for deterministic testing *)
 }
 
-(** Default path configuration with reasonable parameters *)
+(** Default path configuration: UShaped profile, 130 points/segment, no seed *)
 val default_config : path_config
 
 (** Generate realistic intraday price path from OHLC bar.
@@ -48,13 +50,16 @@ val default_config : path_config
     2. Place waypoints (O, H, L, C) at non-uniform times based on distribution profile
     3. Interpolate between waypoints using Brownian bridge with auto-inferred volatility
 
+    Default configuration generates ~390 points (roughly 1-minute bars for 6.5hr day):
+    - 130 points per segment × 3 segments + 4 waypoints ≈ 394 points
+
     Parameters are auto-inferred from the bar:
     - Volatility: derived from (high-low)/(open-close) ratio
     - Path order probability: based on direction and volatility
 
     @param config Optional configuration (uses default_config if not provided)
     @param bar The OHLC bar to generate path from
-    @return Intraday path with realistic microstructure *)
+    @return Intraday path with realistic microstructure (typically ~390 points) *)
 val generate_path : ?config:path_config -> price_bar -> intraday_path
 
 (** Check if an order could possibly fill given OHLC bounds.
