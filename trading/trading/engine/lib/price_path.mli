@@ -30,15 +30,19 @@ type distribution_profile =
 
     If not specified, reasonable defaults are used:
     - profile: UShaped (realistic for most equity markets)
-    - points_per_segment: 130 (390 total points = 1-minute bars for 6.5hr day)
-    - seed: None (non-deterministic random path generation) *)
+    - total_points: 390 (distributed proportionally across segments)
+    - seed: None (non-deterministic random path generation)
+
+    Points are distributed proportionally based on segment length to ensure
+    uniform density regardless of waypoint timing. For example, a segment
+    spanning 25% of the bar receives 25% of total_points. *)
 type path_config = {
   profile : distribution_profile;
-  points_per_segment : int;
+  total_points : int;  (** Total points to generate across entire path *)
   seed : int option;  (** Optional random seed for deterministic testing *)
 }
 
-(** Default path configuration: UShaped profile, 130 points/segment, no seed *)
+(** Default path configuration: UShaped profile, 390 total points, no seed *)
 val default_config : path_config
 
 (** Generate realistic intraday price path from OHLC bar.
