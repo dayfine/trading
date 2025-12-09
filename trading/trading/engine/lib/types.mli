@@ -8,8 +8,8 @@ open Trading_base.Types
     The engine simulates execution by generating intraday paths through the OHLC
     points to determine if/when orders would fill.
 
-    TODO: Add configurable bar granularity (daily, hourly, minute)
-    TODO: Add volume data for more realistic execution modeling *)
+    TODO: Add configurable bar granularity (daily, hourly, minute) TODO: Add
+    volume data for more realistic execution modeling *)
 type price_bar = {
   symbol : symbol;
   open_price : price;
@@ -22,30 +22,26 @@ type price_bar = {
 
 (** {1 Intraday Price Path Types} *)
 
-(** Default resolution for intraday paths (390 sub-bars).
-
-    For daily OHLC bars, this corresponds to 1-minute bars (6.5hr × 60min = 390).
-    For hourly bars, each sub-bar would represent ~9 seconds.
-    The abstraction allows the same path generation logic to work across timeframes. *)
-val default_bar_resolution : int
-
+type path_point = { price : price } [@@deriving show, eq]
 (** A point along the intraday price path.
 
-    The path is an ordered sequence, so timing is implicit from list position. *)
-type path_point = { price : price } [@@deriving show, eq]
+    The path is an ordered sequence, so timing is implicit from list position.
+*)
 
+type intraday_path = path_point list [@@deriving show, eq]
 (** An intraday price path is a sequence of points showing how price evolved
     during the bar period.
 
-    The engine generates this path from OHLC bars to simulate realistic
-    order execution. The path ensures we visit all OHLC points in a plausible
-    order. Default paths contain ~390 points. *)
-type intraday_path = path_point list [@@deriving show, eq]
+    The engine generates this path from OHLC bars to simulate realistic order
+    execution. The path ensures we visit all OHLC points in a plausible order.
+    Path resolution (number of points) is configurable via
+    path_config.total_points (default: 390, representing 1-minute bars for a
+    6.5hr trading day). *)
 
+type fill_result = { price : price } [@@deriving show, eq]
 (** Result of checking if an order would fill on a given path.
 
     Contains the fill price. *)
-type fill_result = { price : price } [@@deriving show, eq]
 
 (** Fill status indicates whether an order execution was successful.
     - Filled: Order completely executed with trades generated

@@ -28,10 +28,12 @@ let _generate_trade_id order_id = "trade_" ^ order_id
     - If price crosses threshold within a bar, fill at threshold (conservative)
     - If price gaps beyond threshold, fill at observed price (captures slippage)
 
-    This logic was previously in simulation/price_path.ml but has been moved here
-    as it's fundamentally the engine's responsibility to determine order execution.
+    This logic was previously in simulation/price_path.ml but has been moved
+    here as it's fundamentally the engine's responsibility to determine order
+    execution.
 
-    TODO: Add more sophisticated fill models (partial fills, realistic slippage) *)
+    TODO: Add more sophisticated fill models (partial fills, realistic slippage)
+*)
 
 let _would_fill_market (path : intraday_path) : fill_result option =
   (* Market orders always fill at open *)
@@ -55,9 +57,10 @@ let rec _search_order_fill ~(crosses : float -> float -> bool)
   | (curr_point : path_point) :: tail ->
       if crosses prev_point.price curr_point.price then
         Some { price = cross_price }
-      else if meets curr_point.price then
-        Some { price = curr_point.price }
-      else _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point tail
+      else if meets curr_point.price then Some { price = curr_point.price }
+      else
+        _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point
+          tail
 
 let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
     fill_result option =
@@ -86,14 +89,14 @@ let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
 let rec _search_stop_with_path ~(crosses : float -> float -> bool)
     ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
   | [] -> None
-  | ((curr_point : path_point) :: _tail) as remaining ->
+  | (curr_point : path_point) :: _tail as remaining ->
       if crosses prev_point.price curr_point.price then
         Some ({ price = cross_price }, remaining)
       else if meets curr_point.price then
         Some ({ price = curr_point.price }, remaining)
       else
-        _search_stop_with_path ~crosses ~meets ~cross_price ~prev_point:curr_point
-          _tail
+        _search_stop_with_path ~crosses ~meets ~cross_price
+          ~prev_point:curr_point _tail
 
 let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
     (fill_result * intraday_path) option =
@@ -117,8 +120,8 @@ let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
   | Some (fill, _) -> Some fill
   | None -> None
 
-let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price ~limit_price
-    : fill_result option =
+let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
+    ~limit_price : fill_result option =
   (* Two-stage: first stop triggers, then limit must be reached *)
   match _stop_activation_path ~path ~side ~stop_price with
   | None -> None

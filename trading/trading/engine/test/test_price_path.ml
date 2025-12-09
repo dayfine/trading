@@ -189,7 +189,14 @@ let test_custom_config_affects_granularity _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config = { profile = Uniform; total_points = 30; seed = Some 42 } in
+  let config =
+    {
+      profile = Uniform;
+      total_points = 30;
+      seed = Some 42;
+      degrees_of_freedom = 4.0;
+    }
+  in
   let path = generate_path ~config bar in
   (* With 30 total points, should have ~30-35 points including waypoints *)
   let path_length = List.length path in
@@ -204,23 +211,31 @@ let test_deterministic_path_with_seed _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config = { profile = Uniform; total_points = 10; seed = Some 12345 } in
+  let config =
+    {
+      profile = Uniform;
+      total_points = 10;
+      seed = Some 12345;
+      degrees_of_freedom = 4.0;
+    }
+  in
   let path = generate_path ~config bar in
-  (* Expected path values for seed=12345, total_points=10 *)
+  (* Expected path values for seed=12345, total_points=10, df=4.0 with Student's t
+     After removing default_bar_resolution indirection *)
   let expected : intraday_path =
     [
       { price = 100.0 };
-      { price = 103.07065926835966 };
-      { price = 106.49045733663644 };
-      { price = 109.92582812988262 };
+      { price = 100.86187228911206 };
+      { price = 102.40592847455183 };
+      { price = 103.76781747465134 };
+      { price = 106.35315965230939 };
+      { price = 108.0731149431833 };
+      { price = 109.94664616190269 };
       { price = 110.0 };
-      { price = 102.68688098626671 };
       { price = 95.0 };
       { price = 95.0 };
-      { price = 97.385557464163853 };
-      { price = 99.869145568232142 };
-      { price = 102.28393317864106 };
-      { price = 105.09877807080935 };
+      { price = 100.10734547267361 };
+      { price = 104.09730483755989 };
       { price = 105.0 };
     ]
   in
@@ -231,15 +246,30 @@ let test_different_seeds_produce_different_paths _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config1 = { profile = Uniform; total_points = 20; seed = Some 111 } in
-  let config2 = { profile = Uniform; total_points = 20; seed = Some 222 } in
+  let config1 =
+    {
+      profile = Uniform;
+      total_points = 20;
+      seed = Some 111;
+      degrees_of_freedom = 4.0;
+    }
+  in
+  let config2 =
+    {
+      profile = Uniform;
+      total_points = 20;
+      seed = Some 222;
+      degrees_of_freedom = 4.0;
+    }
+  in
   let path1 : intraday_path = generate_path ~config:config1 bar in
   let path2 : intraday_path = generate_path ~config:config2 bar in
   (* Paths should be different (at least one point differs) *)
   let paths_differ =
     not
       (List.equal
-         (fun (p1 : path_point) (p2 : path_point) -> Float.(p1.price = p2.price))
+         (fun (p1 : path_point) (p2 : path_point) ->
+           Float.(p1.price = p2.price))
          path1 path2)
   in
   assert_that paths_differ (equal_to true)
@@ -251,10 +281,20 @@ let test_distribution_profiles_with_seeds _ =
       ~close_price:105.0
   in
   let config_uniform =
-    { profile = Uniform; total_points = 20; seed = Some 42 }
+    {
+      profile = Uniform;
+      total_points = 20;
+      seed = Some 42;
+      degrees_of_freedom = 4.0;
+    }
   in
   let config_jshaped =
-    { profile = JShaped; total_points = 20; seed = Some 42 }
+    {
+      profile = JShaped;
+      total_points = 20;
+      seed = Some 42;
+      degrees_of_freedom = 4.0;
+    }
   in
   let path_uniform = generate_path ~config:config_uniform bar in
   let path_jshaped = generate_path ~config:config_jshaped bar in
@@ -275,6 +315,63 @@ let test_default_config_produces_390_points _ =
   (* 130 points/segment * 3 segments + 4 waypoints ≈ 390-394 *)
   assert_that (path_length > 380 && path_length < 400) (equal_to true)
 
+(** {1 Edge Case Tests for Small total_points} *)
+
+let test_total_points_4_returns_waypoints_only _ =
+  (* With total_points <= 4, should return exactly 4 waypoints (O,H,L,C or O,L,H,C) *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  let config =
+    {
+      profile = Uniform;
+      total_points = 4;
+      seed = Some 42;
+      degrees_of_freedom = 4.0;
+    }
+  in
+  let path = generate_path ~config bar in
+  (* Should have exactly 4 points *)
+  assert_that (List.length path) (equal_to 4);
+  (* First should be open, last should be close *)
+  match (List.hd path, List.last path) with
+  | Some first, Some last ->
+      assert_that first.price (float_equal bar.open_price);
+      assert_that last.price (float_equal bar.close_price)
+  | _ -> assert_failure "Path should have at least 2 points"
+
+let test_total_points_small_values _ =
+  (* Test that small values (5, 6) work correctly *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+      ~close_price:105.0
+  in
+  (* Test total_points = 5 *)
+  let config5 =
+    {
+      profile = Uniform;
+      total_points = 5;
+      seed = Some 42;
+      degrees_of_freedom = 4.0;
+    }
+  in
+  let path5 = generate_path ~config:config5 bar in
+  assert_that (List.length path5 >= 4) (equal_to true);
+  assert_that (List.length path5 <= 10) (equal_to true);
+  (* Test total_points = 6 *)
+  let config6 =
+    {
+      profile = Uniform;
+      total_points = 6;
+      seed = Some 42;
+      degrees_of_freedom = 4.0;
+    }
+  in
+  let path6 = generate_path ~config:config6 bar in
+  assert_that (List.length path6 >= 4) (equal_to true);
+  assert_that (List.length path6 <= 10) (equal_to true)
+
 (** {1 Test Suite} *)
 
 let suite =
@@ -294,8 +391,7 @@ let suite =
          >:: test_might_fill_stop_limit_requires_both;
          (* Path generation tests *)
          "generate_path: stays in bounds" >:: test_generate_path_stays_in_bounds;
-         "generate_path: visits all OHLC"
-         >:: test_generate_path_visits_all_ohlc;
+         "generate_path: visits all OHLC" >:: test_generate_path_visits_all_ohlc;
          "generate_path: starts at open, ends at close"
          >:: test_generate_path_starts_at_open_ends_at_close;
          "generate_path: has many points" >:: test_generate_path_has_many_points;
@@ -314,6 +410,10 @@ let suite =
          >:: test_distribution_profiles_with_seeds;
          "default config produces ~390 points"
          >:: test_default_config_produces_390_points;
+         (* Edge case tests *)
+         "total_points = 4 returns waypoints only"
+         >:: test_total_points_4_returns_waypoints_only;
+         "small total_points values (5, 6)" >:: test_total_points_small_values;
        ]
 
 let () = run_test_tt_main suite
