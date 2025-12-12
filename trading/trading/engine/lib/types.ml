@@ -9,14 +9,9 @@ type price_bar = {
 }
 [@@deriving show, eq]
 
-type path_point = { fraction_of_day : float; price : price }
-[@@deriving show, eq]
-
+type path_point = { price : price } [@@deriving show, eq]
 type intraday_path = path_point list [@@deriving show, eq]
-
-type fill_result = { price : price; fraction_of_day : float }
-[@@deriving show, eq]
-
+type fill_result = { price : price } [@@deriving show, eq]
 type fill_status = Filled | PartiallyFilled | Unfilled [@@deriving show, eq]
 
 type execution_report = {

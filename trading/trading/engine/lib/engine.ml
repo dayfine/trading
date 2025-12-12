@@ -11,41 +11,9 @@ type t = {
 
 let create config = { config; market_state = Hashtbl.create (module String) }
 
-(** Generate intraday price path from OHLC bar.
-
-    Simple implementation: visits OHLC points in order based on whether day
-    was up or down.
-
-    - Upward day (close >= open): O → H → L → C at times 0.0, 0.33, 0.66, 1.0
-    - Downward day (close < open): O → L → H → C at times 0.0, 0.33, 0.66, 1.0
-
-    TODO: Implement more realistic path models:
-    - Brownian bridge between OHLC points
-    - Configurable granularity (e.g., minute bars instead of 4 points)
-    - Volume-weighted price paths
-    - Support for intraday bars (hourly, minute) not just daily *)
-let _generate_path (bar : price_bar) : intraday_path =
-  let open_to_close = bar.close_price -. bar.open_price in
-  if Float.(open_to_close >= 0.0) then
-    (* Upward day: O → H → L → C *)
-    [
-      { fraction_of_day = 0.0; price = bar.open_price };
-      { fraction_of_day = 0.33; price = bar.high_price };
-      { fraction_of_day = 0.66; price = bar.low_price };
-      { fraction_of_day = 1.0; price = bar.close_price };
-    ]
-  else
-    (* Downward day: O → L → H → C *)
-    [
-      { fraction_of_day = 0.0; price = bar.open_price };
-      { fraction_of_day = 0.33; price = bar.low_price };
-      { fraction_of_day = 0.66; price = bar.high_price };
-      { fraction_of_day = 1.0; price = bar.close_price };
-    ]
-
 let update_market engine bars =
   List.iter bars ~f:(fun bar ->
-      let path = _generate_path bar in
+      let path = Price_path.generate_path bar in
       Hashtbl.set engine.market_state ~key:bar.symbol ~data:path)
 
 let _calculate_commission config quantity =
@@ -60,15 +28,17 @@ let _generate_trade_id order_id = "trade_" ^ order_id
     - If price crosses threshold within a bar, fill at threshold (conservative)
     - If price gaps beyond threshold, fill at observed price (captures slippage)
 
-    This logic was previously in simulation/price_path.ml but has been moved here
-    as it's fundamentally the engine's responsibility to determine order execution.
+    This logic was previously in simulation/price_path.ml but has been moved
+    here as it's fundamentally the engine's responsibility to determine order
+    execution.
 
-    TODO: Add more sophisticated fill models (partial fills, realistic slippage) *)
+    TODO: Add more sophisticated fill models (partial fills, realistic slippage)
+*)
 
 let _would_fill_market (path : intraday_path) : fill_result option =
   (* Market orders always fill at open *)
   match List.hd path with
-  | Some point -> Some { price = point.price; fraction_of_day = 0.0 }
+  | Some point -> Some { price = point.price }
   | None -> None
 
 let _meets_limit ~side ~limit_price price =
@@ -86,11 +56,11 @@ let rec _search_order_fill ~(crosses : float -> float -> bool)
   | [] -> None
   | (curr_point : path_point) :: tail ->
       if crosses prev_point.price curr_point.price then
-        Some { price = cross_price; fraction_of_day = curr_point.fraction_of_day }
-      else if meets curr_point.price then
-        Some
-          { price = curr_point.price; fraction_of_day = curr_point.fraction_of_day }
-      else _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point tail
+        Some { price = cross_price }
+      else if meets curr_point.price then Some { price = curr_point.price }
+      else
+        _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point
+          tail
 
 let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
     fill_result option =
@@ -98,8 +68,7 @@ let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
   | [] -> None
   | (first : path_point) :: rest ->
       let meets = _meets_limit ~side ~limit_price in
-      if meets first.price then
-        Some { price = first.price; fraction_of_day = first.fraction_of_day }
+      if meets first.price then Some { price = first.price }
       else
         let crosses prev curr =
           _crosses_limit ~side ~limit_price ~prev_price:prev ~curr_price:curr
@@ -120,18 +89,14 @@ let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
 let rec _search_stop_with_path ~(crosses : float -> float -> bool)
     ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
   | [] -> None
-  | ((curr_point : path_point) :: _tail) as remaining ->
+  | (curr_point : path_point) :: _tail as remaining ->
       if crosses prev_point.price curr_point.price then
-        Some
-          ( { price = cross_price; fraction_of_day = curr_point.fraction_of_day },
-            remaining )
+        Some ({ price = cross_price }, remaining)
       else if meets curr_point.price then
-        Some
-          ( { price = curr_point.price; fraction_of_day = curr_point.fraction_of_day },
-            remaining )
+        Some ({ price = curr_point.price }, remaining)
       else
-        _search_stop_with_path ~crosses ~meets ~cross_price ~prev_point:curr_point
-          _tail
+        _search_stop_with_path ~crosses ~meets ~cross_price
+          ~prev_point:curr_point _tail
 
 let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
     (fill_result * intraday_path) option =
@@ -140,7 +105,7 @@ let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
   | (first : path_point) :: _rest ->
       let meets = _meets_stop ~side ~stop_price in
       if meets first.price then
-        let fill = { price = first.price; fraction_of_day = first.fraction_of_day } in
+        let fill = { price = first.price } in
         Some (fill, path)
       else
         let crosses prev curr =
@@ -155,8 +120,8 @@ let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
   | Some (fill, _) -> Some fill
   | None -> None
 
-let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price ~limit_price
-    : fill_result option =
+let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
+    ~limit_price : fill_result option =
   (* Two-stage: first stop triggers, then limit must be reached *)
   match _stop_activation_path ~path ~side ~stop_price with
   | None -> None

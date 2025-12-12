@@ -8,8 +8,8 @@ open Trading_base.Types
     The engine simulates execution by generating intraday paths through the OHLC
     points to determine if/when orders would fill.
 
-    TODO: Add configurable bar granularity (daily, hourly, minute)
-    TODO: Add volume data for more realistic execution modeling *)
+    TODO: Add configurable bar granularity (daily, hourly, minute) TODO: Add
+    volume data for more realistic execution modeling *)
 type price_bar = {
   symbol : symbol;
   open_price : price;
@@ -22,30 +22,26 @@ type price_bar = {
 
 (** {1 Intraday Price Path Types} *)
 
+type path_point = { price : price } [@@deriving show, eq]
 (** A point along the intraday price path.
 
-    fraction_of_day ranges from 0.0 (market open) to 1.0 (market close).
-    For example, 0.5 represents mid-day.
+    The path is an ordered sequence, so timing is implicit from list position.
+*)
 
-    TODO: Replace fraction_of_day with actual timestamps for more flexibility *)
-type path_point = { fraction_of_day : float; price : price }
-[@@deriving show, eq]
-
-(** An intraday price path is a sequence of points showing how price evolved
-    during the trading period.
-
-    The engine generates this path from OHLC bars to simulate realistic
-    order execution. The path ensures we visit all OHLC points in a plausible
-    order.
-
-    TODO: Implement more sophisticated path models (Brownian bridge, etc.) *)
 type intraday_path = path_point list [@@deriving show, eq]
+(** An intraday price path is a sequence of points showing how price evolved
+    during the bar period.
 
+    The engine generates this path from OHLC bars to simulate realistic order
+    execution. The path ensures we visit all OHLC points in a plausible order.
+    Path resolution (number of points) is configurable via
+    path_config.total_points (default: 390, representing 1-minute bars for a
+    6.5hr trading day). *)
+
+type fill_result = { price : price } [@@deriving show, eq]
 (** Result of checking if an order would fill on a given path.
 
-    Contains the fill price and when during the day the fill would occur. *)
-type fill_result = { price : price; fraction_of_day : float }
-[@@deriving show, eq]
+    Contains the fill price. *)
 
 (** Fill status indicates whether an order execution was successful.
     - Filled: Order completely executed with trades generated
