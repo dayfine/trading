@@ -25,7 +25,13 @@ type distribution_profile = UShaped | JShaped | ReverseJ | Uniform
 
 type path_config = {
   profile : distribution_profile;
-  total_points : int;  (** Total points to generate across entire path *)
+  total_points : int;
+      (** Target number of points to generate across entire path.
+
+          NOTE: The actual path length may differ from this value:
+          - If total_points <= 4: Returns exactly 4 waypoints (O, H, L, C)
+          - If total_points > 4: Returns approximately total_points ± a few
+            points due to segment rounding and waypoint inclusion *)
   seed : int option;  (** Optional random seed for deterministic testing *)
   degrees_of_freedom : float;
       (** Degrees of freedom for Student's t noise distribution. Lower values
@@ -36,13 +42,13 @@ type path_config = {
 
     If not specified, reasonable defaults are used:
     - profile: UShaped (realistic for most equity markets)
-    - total_points: 390 (distributed proportionally across segments)
+    - total_points: 390 (target resolution, actual may vary slightly)
     - seed: None (non-deterministic random path generation)
     - degrees_of_freedom: 4.0 (Student's t with moderately heavy tails)
 
     Points are distributed proportionally based on segment length to ensure
     uniform density regardless of waypoint timing. For example, a segment
-    spanning 25% of the bar receives 25% of total_points. *)
+    spanning 25% of the bar receives ~25% of total_points. *)
 
 val default_config : path_config
 (** Default path configuration: UShaped profile, 390 total points, no seed,
@@ -57,9 +63,12 @@ val generate_path : ?config:path_config -> price_bar -> intraday_path
       L, C) at non-uniform times based on distribution profile 3. Interpolate
       between waypoints using Brownian bridge with Student's t noise
 
-    Default configuration generates ~390 points (roughly 1-minute bars for 6.5hr
-    day). Noise uses Student's t-distribution (df=4.0) for realistic fat tails
-    in price moves.
+    Default configuration targets ~390 points (roughly 1-minute bars for 6.5hr
+    day), though actual length may vary by a few points. Noise uses Student's
+    t-distribution (df=4.0) for realistic fat tails in price moves.
+
+    Special case: If config.total_points <= 4, returns exactly 4 waypoints
+    without interpolation.
 
     Parameters are auto-inferred from the bar:
     - Volatility: derived from bar shape and magnitude
@@ -67,8 +76,10 @@ val generate_path : ?config:path_config -> price_bar -> intraday_path
 
     @param config Optional configuration (uses default_config if not provided)
     @param bar The OHLC bar to generate path from
-    @return Intraday path with realistic microstructure (typically ~390 points)
-*)
+    @return
+      Intraday path with realistic microstructure. Length approximately matches
+      config.total_points (default ~390), except when total_points <= 4 which
+      returns exactly 4 waypoints. *)
 
 val might_fill : price_bar -> side -> order_type -> bool
 (** Check if an order could possibly fill given OHLC bounds.

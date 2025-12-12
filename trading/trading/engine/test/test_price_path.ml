@@ -22,6 +22,31 @@ let visits_all_ohlc (path : intraday_path) (bar : price_bar) : bool =
   visits bar.open_price && visits bar.high_price && visits bar.low_price
   && visits bar.close_price
 
+(** Run a test function multiple times (for randomized tests) *)
+let run_n_times n f =
+  for _ = 1 to n do
+    f ()
+  done
+
+(** Check all basic properties that every generated path should satisfy *)
+let check_basic_properties ~bar ?(expected_length_min = 4)
+    ?(expected_length_max = Int.max_value) path =
+  (* All prices stay within OHLC bounds *)
+  assert_that (all_in_bounds path bar) (equal_to true);
+  (* Path visits all OHLC prices *)
+  assert_that (visits_all_ohlc path bar) (equal_to true);
+  (* First point is open, last point is close *)
+  (match (List.hd path, List.last path) with
+  | Some first, Some last ->
+      assert_that first.price (float_equal bar.open_price);
+      assert_that last.price (float_equal bar.close_price)
+  | _ -> assert_failure "Path should have at least 2 points");
+  (* Path length is in expected range *)
+  let path_length = List.length path in
+  assert_that
+    (path_length >= expected_length_min && path_length <= expected_length_max)
+    (equal_to true)
+
 (** {1 might_fill Tests} *)
 
 let test_might_fill_market_always _ =
@@ -88,52 +113,17 @@ let test_might_fill_stop_limit_requires_both _ =
 
 (** {1 Path Generation Tests} *)
 
-let test_generate_path_stays_in_bounds _ =
+let test_generate_path_basic_properties _ =
+  (* Merged test: checks all basic properties (bounds, OHLC visits, endpoints, length) *)
   let bar =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
   (* Run multiple times due to randomness *)
-  for _ = 1 to 10 do
-    let path = generate_path bar in
-    assert_that (all_in_bounds path bar) (equal_to true)
-  done
-
-let test_generate_path_visits_all_ohlc _ =
-  let bar =
-    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
-      ~close_price:105.0
-  in
-  (* Run multiple times due to randomness *)
-  for _ = 1 to 10 do
-    let path = generate_path bar in
-    assert_that (visits_all_ohlc path bar) (equal_to true)
-  done
-
-let test_generate_path_starts_at_open_ends_at_close _ =
-  let bar =
-    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
-      ~close_price:105.0
-  in
-  for _ = 1 to 10 do
-    let path = generate_path bar in
-    match (List.hd path, List.last path) with
-    | Some first, Some last ->
-        (* Open and close should be exact *)
-        assert_that first.price (float_equal bar.open_price);
-        assert_that last.price (float_equal bar.close_price)
-    | _ -> assert_failure "Path should have at least 2 points"
-  done
-
-let test_generate_path_has_many_points _ =
-  let bar =
-    make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
-      ~close_price:105.0
-  in
-  let path = generate_path bar in
-  (* With 100 points per segment and 3 segments, should have ~300+ points *)
-  let path_length = List.length path in
-  assert_that (path_length > 200) (equal_to true)
+  run_n_times 10 (fun () ->
+      let path = generate_path bar in
+      check_basic_properties ~bar ~expected_length_min:380
+        ~expected_length_max:400 path)
 
 let test_generate_path_narrow_range _ =
   (* Test with very narrow range (almost doji) *)
@@ -141,10 +131,10 @@ let test_generate_path_narrow_range _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:100.5 ~low_price:99.5
       ~close_price:100.0
   in
-  for _ = 1 to 10 do
-    let path = generate_path bar in
-    assert_that (all_in_bounds path bar) (equal_to true)
-  done
+  run_n_times 10 (fun () ->
+      let path = generate_path bar in
+      check_basic_properties ~bar ~expected_length_min:380
+        ~expected_length_max:400 path)
 
 let test_generate_path_wide_range _ =
   (* Test with wide range (high volatility) *)
@@ -152,11 +142,10 @@ let test_generate_path_wide_range _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:130.0 ~low_price:70.0
       ~close_price:110.0
   in
-  for _ = 1 to 10 do
-    let path = generate_path bar in
-    assert_that (all_in_bounds path bar) (equal_to true);
-    assert_that (visits_all_ohlc path bar) (equal_to true)
-  done
+  run_n_times 10 (fun () ->
+      let path = generate_path bar in
+      check_basic_properties ~bar ~expected_length_min:380
+        ~expected_length_max:400 path)
 
 let test_generate_path_upward_bar _ =
   (* Upward bar: close > open *)
@@ -164,11 +153,10 @@ let test_generate_path_upward_bar _ =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:98.0
       ~close_price:108.0
   in
-  for _ = 1 to 10 do
-    let path = generate_path bar in
-    assert_that (all_in_bounds path bar) (equal_to true);
-    assert_that (visits_all_ohlc path bar) (equal_to true)
-  done
+  run_n_times 10 (fun () ->
+      let path = generate_path bar in
+      check_basic_properties ~bar ~expected_length_min:380
+        ~expected_length_max:400 path)
 
 let test_generate_path_downward_bar _ =
   (* Downward bar: close < open *)
@@ -176,11 +164,10 @@ let test_generate_path_downward_bar _ =
     make_bar "AAPL" ~open_price:108.0 ~high_price:110.0 ~low_price:98.0
       ~close_price:100.0
   in
-  for _ = 1 to 10 do
-    let path = generate_path bar in
-    assert_that (all_in_bounds path bar) (equal_to true);
-    assert_that (visits_all_ohlc path bar) (equal_to true)
-  done
+  run_n_times 10 (fun () ->
+      let path = generate_path bar in
+      check_basic_properties ~bar ~expected_length_min:380
+        ~expected_length_max:400 path)
 
 (** {1 Configuration Tests} *)
 
@@ -199,9 +186,8 @@ let test_custom_config_affects_granularity _ =
   in
   let path = generate_path ~config bar in
   (* With 30 total points, should have ~30-35 points including waypoints *)
-  let path_length = List.length path in
-  assert_that (path_length > 25) (equal_to true);
-  assert_that (path_length < 40) (equal_to true)
+  check_basic_properties ~bar ~expected_length_min:25 ~expected_length_max:40
+    path
 
 (** {1 Deterministic Tests with Fixed Seeds} *)
 
@@ -239,70 +225,76 @@ let test_deterministic_path_with_seed _ =
       { price = 105.0 };
     ]
   in
-  assert_equal path expected
+  assert_equal path expected;
+  (* Also check basic properties *)
+  check_basic_properties ~bar ~expected_length_min:13 ~expected_length_max:13
+    path
 
 let test_different_seeds_produce_different_paths _ =
+  (* Different seed should produce different path from seed=12345 *)
   let bar =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config1 =
+  let config =
     {
       profile = Uniform;
-      total_points = 20;
-      seed = Some 111;
+      total_points = 10;
+      seed = Some 99999;
       degrees_of_freedom = 4.0;
     }
   in
-  let config2 =
-    {
-      profile = Uniform;
-      total_points = 20;
-      seed = Some 222;
-      degrees_of_freedom = 4.0;
-    }
+  let path = generate_path ~config bar in
+  (* This is the expected path from seed=12345 (from test above) *)
+  let path_from_seed_12345 : intraday_path =
+    [
+      { price = 100.0 };
+      { price = 100.86187228911206 };
+      { price = 102.40592847455183 };
+      { price = 103.76781747465134 };
+      { price = 106.35315965230939 };
+      { price = 108.0731149431833 };
+      { price = 109.94664616190269 };
+      { price = 110.0 };
+      { price = 95.0 };
+      { price = 95.0 };
+      { price = 100.10734547267361 };
+      { price = 104.09730483755989 };
+      { price = 105.0 };
+    ]
   in
-  let path1 : intraday_path = generate_path ~config:config1 bar in
-  let path2 : intraday_path = generate_path ~config:config2 bar in
   (* Paths should be different (at least one point differs) *)
   let paths_differ =
     not
       (List.equal
          (fun (p1 : path_point) (p2 : path_point) ->
            Float.(p1.price = p2.price))
-         path1 path2)
+         path path_from_seed_12345)
   in
-  assert_that paths_differ (equal_to true)
+  assert_that paths_differ (equal_to true);
+  (* Also check basic properties *)
+  check_basic_properties ~bar ~expected_length_min:13 ~expected_length_max:13
+    path
 
 let test_distribution_profiles_with_seeds _ =
-  (* Test that different profiles produce different timing with same seed *)
+  (* Test that different profiles all produce valid paths *)
   let bar =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
   in
-  let config_uniform =
-    {
-      profile = Uniform;
-      total_points = 20;
-      seed = Some 42;
-      degrees_of_freedom = 4.0;
-    }
+  let test_profile profile =
+    let config =
+      { profile; total_points = 20; seed = Some 42; degrees_of_freedom = 4.0 }
+    in
+    let path = generate_path ~config bar in
+    check_basic_properties ~bar ~expected_length_min:15 ~expected_length_max:25
+      path
   in
-  let config_jshaped =
-    {
-      profile = JShaped;
-      total_points = 20;
-      seed = Some 42;
-      degrees_of_freedom = 4.0;
-    }
-  in
-  let path_uniform = generate_path ~config:config_uniform bar in
-  let path_jshaped = generate_path ~config:config_jshaped bar in
-  (* Both should have similar length (within reasonable range) *)
-  let len_diff =
-    Int.abs (List.length path_uniform - List.length path_jshaped)
-  in
-  assert_that (len_diff < 5) (equal_to true)
+  (* Test all distribution profiles *)
+  test_profile Uniform;
+  test_profile UShaped;
+  test_profile JShaped;
+  test_profile ReverseJ
 
 let test_default_config_produces_390_points _ =
   (* Default config should produce ~390 points total *)
@@ -311,9 +303,9 @@ let test_default_config_produces_390_points _ =
       ~close_price:105.0
   in
   let path = generate_path bar in
-  let path_length = List.length path in
-  (* 130 points/segment * 3 segments + 4 waypoints ≈ 390-394 *)
-  assert_that (path_length > 380 && path_length < 400) (equal_to true)
+  (* With default config (total_points = 390), should produce ~390 points *)
+  check_basic_properties ~bar ~expected_length_min:380 ~expected_length_max:400
+    path
 
 (** {1 Edge Case Tests for Small total_points} *)
 
@@ -332,17 +324,18 @@ let test_total_points_4_returns_waypoints_only _ =
     }
   in
   let path = generate_path ~config bar in
-  (* Should have exactly 4 points *)
-  assert_that (List.length path) (equal_to 4);
-  (* First should be open, last should be close *)
-  match (List.hd path, List.last path) with
-  | Some first, Some last ->
-      assert_that first.price (float_equal bar.open_price);
-      assert_that last.price (float_equal bar.close_price)
-  | _ -> assert_failure "Path should have at least 2 points"
+  (* With seed=42, produces O→H→L→C ordering *)
+  let expected : intraday_path =
+    [
+      { price = 100.0 }; { price = 110.0 }; { price = 95.0 }; { price = 105.0 };
+    ]
+  in
+  assert_equal path expected;
+  (* Also check basic properties *)
+  check_basic_properties ~bar ~expected_length_min:4 ~expected_length_max:4 path
 
 let test_total_points_small_values _ =
-  (* Test that small values (5, 6) work correctly *)
+  (* Test that small values (5, 6) work correctly with exact expectations *)
   let bar =
     make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
       ~close_price:105.0
@@ -357,8 +350,21 @@ let test_total_points_small_values _ =
     }
   in
   let path5 = generate_path ~config:config5 bar in
-  assert_that (List.length path5 >= 4) (equal_to true);
-  assert_that (List.length path5 <= 10) (equal_to true);
+  let expected5 : intraday_path =
+    [
+      { price = 100.0 };
+      { price = 106.61732993746411 };
+      { price = 109.91210066439501 };
+      { price = 110.0 };
+      { price = 95.0 };
+      { price = 95.0 };
+      { price = 104.9266536207159 };
+      { price = 105.0 };
+    ]
+  in
+  assert_equal path5 expected5;
+  check_basic_properties ~bar ~expected_length_min:8 ~expected_length_max:8
+    path5;
   (* Test total_points = 6 *)
   let config6 =
     {
@@ -369,8 +375,22 @@ let test_total_points_small_values _ =
     }
   in
   let path6 = generate_path ~config:config6 bar in
-  assert_that (List.length path6 >= 4) (equal_to true);
-  assert_that (List.length path6 <= 10) (equal_to true)
+  let expected6 : intraday_path =
+    [
+      { price = 100.0 };
+      { price = 106.47641348279585 };
+      { price = 109.91975925183237 };
+      { price = 110.0 };
+      { price = 95.0 };
+      { price = 95.0 };
+      { price = 99.922686127778562 };
+      { price = 105.17759472119232 };
+      { price = 105.0 };
+    ]
+  in
+  assert_equal path6 expected6;
+  check_basic_properties ~bar ~expected_length_min:9 ~expected_length_max:9
+    path6
 
 (** {1 Test Suite} *)
 
@@ -390,11 +410,8 @@ let suite =
          "might_fill: stop-limit requires both"
          >:: test_might_fill_stop_limit_requires_both;
          (* Path generation tests *)
-         "generate_path: stays in bounds" >:: test_generate_path_stays_in_bounds;
-         "generate_path: visits all OHLC" >:: test_generate_path_visits_all_ohlc;
-         "generate_path: starts at open, ends at close"
-         >:: test_generate_path_starts_at_open_ends_at_close;
-         "generate_path: has many points" >:: test_generate_path_has_many_points;
+         "generate_path: basic properties"
+         >:: test_generate_path_basic_properties;
          "generate_path: narrow range" >:: test_generate_path_narrow_range;
          "generate_path: wide range" >:: test_generate_path_wide_range;
          "generate_path: upward bar" >:: test_generate_path_upward_bar;

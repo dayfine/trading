@@ -244,8 +244,9 @@ let _ensure_unique_waypoints (resolution : int) (t1 : int) (t2 : int) :
 
 (** Generate waypoint indices for O, H, L, C based on distribution profile.
 
-    Places high/low waypoints at different points in time based on activity pattern.
-    All non-uniform profiles use rejection sampling from their density functions:
+    Places high/low waypoints at different points in time based on activity
+    pattern. All non-uniform profiles use rejection sampling from their density
+    functions:
     - UShaped: Sampled from U-shaped density (more likely at open/close, less
       mid-day)
     - JShaped: Sampled from exponential decay (more likely early, less likely
@@ -255,8 +256,8 @@ let _ensure_unique_waypoints (resolution : int) (t1 : int) (t2 : int) :
     - Uniform: Random placement in middle 60% (skip early/late extremes for
       robustness)
 
-    Returns [idx_open; idx_first_extreme; idx_second_extreme; idx_close]
-    as bar indices in [0, resolution-1].
+    Returns [idx_open; idx_first_extreme; idx_second_extreme; idx_close] as bar
+    indices in [0, resolution-1].
 
     Note: The order of high vs low is determined separately by
     _decide_high_first. *)
