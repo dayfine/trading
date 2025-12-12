@@ -11,8 +11,8 @@ module OrderManager = Trading_orders.Manager
 (* Test helpers *)
 let test_timestamp = Time_ns_unix.of_string "2024-01-15 10:30:00Z"
 
-let make_config ?(per_share = 0.01) ?(minimum = 1.0) () =
-  { commission = { per_share; minimum } }
+let make_config ?(per_share = 0.01) ?(minimum = 1.0) ?(slippage_bps = 0.0) () =
+  { commission = { per_share; minimum }; slippage_bps }
 
 let make_bar symbol ~open_price ~high_price ~low_price ~close_price =
   { symbol; open_price; high_price; low_price; close_price }
@@ -869,6 +869,119 @@ let test_stop_sell_at_exact_low _ =
   in
   assert_order_executed engine order_mgr order ~price:95.0
 
+(* Slippage tests *)
+let test_buy_limit_slippage _ =
+  (* Buy limit with 10 bps slippage crossing threshold *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:102.0 ~low_price:98.0
+      ~close_price:101.0
+  in
+  let config = make_config ~slippage_bps:10.0 () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Limit 99.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  update_market engine [ bar ];
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      assert_that report.status (equal_to Filled);
+      let trade = List.hd_exn report.trades in
+      (* With 10 bps slippage, buy at 99.0 becomes 99.0 * 1.001 = 99.099 *)
+      assert_that trade.price (float_equal ~epsilon:0.001 99.099)
+  | _ -> assert_failure "Expected one filled report"
+
+let test_sell_limit_slippage _ =
+  (* Sell limit with 10 bps slippage crossing threshold *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:102.0 ~low_price:98.0
+      ~close_price:101.0
+  in
+  let config = make_config ~slippage_bps:10.0 () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:(Limit 101.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  update_market engine [ bar ];
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      assert_that report.status (equal_to Filled);
+      let trade = List.hd_exn report.trades in
+      (* With 10 bps slippage, sell at 101.0 becomes 101.0 * 0.999 = 100.899 *)
+      assert_that trade.price (float_equal ~epsilon:0.001 100.899)
+  | _ -> assert_failure "Expected one filled report"
+
+let test_no_slippage_when_zero _ =
+  (* Verify no slippage when slippage_bps = 0.0 *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:102.0 ~low_price:98.0
+      ~close_price:101.0
+  in
+  let config = make_config ~slippage_bps:0.0 () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Limit 99.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  update_market engine [ bar ];
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      assert_that report.status (equal_to Filled);
+      let trade = List.hd_exn report.trades in
+      (* With 0 bps slippage, fills at exact limit price *)
+      assert_that trade.price (float_equal 99.0)
+  | _ -> assert_failure "Expected one filled report"
+
+let test_stop_order_slippage _ =
+  (* Stop order with 5 bps slippage *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:105.0 ~low_price:98.0
+      ~close_price:103.0
+  in
+  let config = make_config ~slippage_bps:5.0 () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Stop 103.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  update_market engine [ bar ];
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      assert_that report.status (equal_to Filled);
+      let trade = List.hd_exn report.trades in
+      (* With 5 bps slippage, buy stop at 103.0 becomes 103.0 * 1.0005 = 103.0515 *)
+      assert_that trade.price (float_equal ~epsilon:0.001 103.0515)
+  | _ -> assert_failure "Expected one filled report"
+
 (* Test suite *)
 let suite =
   "Engine Tests"
@@ -959,6 +1072,11 @@ let suite =
          "test_limit_sell_at_exact_high" >:: test_limit_sell_at_exact_high;
          "test_stop_buy_at_exact_high" >:: test_stop_buy_at_exact_high;
          "test_stop_sell_at_exact_low" >:: test_stop_sell_at_exact_low;
+         (* Slippage tests *)
+         "test_buy_limit_slippage" >:: test_buy_limit_slippage;
+         "test_sell_limit_slippage" >:: test_sell_limit_slippage;
+         "test_no_slippage_when_zero" >:: test_no_slippage_when_zero;
+         "test_stop_order_slippage" >:: test_stop_order_slippage;
        ]
 
 let () = run_test_tt_main suite

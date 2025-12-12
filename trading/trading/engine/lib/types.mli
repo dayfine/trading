@@ -70,6 +70,10 @@ type commission_config = {
 
 type engine_config = {
   commission : commission_config;  (** How to calculate trade commissions *)
+  slippage_bps : float;
+      (** Slippage in basis points (1 bps = 0.01%). Applied when orders cross
+          price thresholds. For example, 5.0 bps = 0.05% price impact. Set to
+          0.0 for no slippage (fills at exact threshold prices). *)
 }
 [@@deriving show, eq]
 (** Engine configuration controlling execution behavior and costs *)

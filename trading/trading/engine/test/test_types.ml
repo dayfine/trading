@@ -106,20 +106,21 @@ let test_commission_config_show _ =
 (* engine_config tests *)
 let test_engine_config_construction _ =
   let commission_config = { per_share = 0.01; minimum = 1.0 } in
-  let config = { commission = commission_config } in
+  let config = { commission = commission_config; slippage_bps = 5.0 } in
   assert_that config.commission.per_share (float_equal 0.01);
-  assert_that config.commission.minimum (float_equal 1.0)
+  assert_that config.commission.minimum (float_equal 1.0);
+  assert_that config.slippage_bps (float_equal 5.0)
 
 let test_engine_config_equality _ =
   let commission_config = { per_share = 0.01; minimum = 1.0 } in
-  let config1 = { commission = commission_config } in
-  let config2 = { commission = commission_config } in
+  let config1 = { commission = commission_config; slippage_bps = 5.0 } in
+  let config2 = { commission = commission_config; slippage_bps = 5.0 } in
   assert_bool "Identical engine configs should be equal"
     (equal_engine_config config1 config2)
 
 let test_engine_config_show _ =
   let commission_config = { per_share = 0.01; minimum = 1.0 } in
-  let config = { commission = commission_config } in
+  let config = { commission = commission_config; slippage_bps = 5.0 } in
   let config_str = show_engine_config config in
   assert_bool "Show function works" (String.length config_str > 0)
 

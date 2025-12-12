@@ -19,6 +19,15 @@ let update_market engine bars =
 let _calculate_commission config quantity =
   Float.max (quantity *. config.commission.per_share) config.commission.minimum
 
+let _apply_slippage config side base_price =
+  (* Slippage makes execution worse for the trader:
+     - Buy orders: pay more (positive slippage)
+     - Sell orders: receive less (negative slippage) *)
+  let slippage_multiplier = config.slippage_bps /. 10000.0 in
+  match side with
+  | Buy -> base_price *. (1.0 +. slippage_multiplier)
+  | Sell -> base_price *. (1.0 -. slippage_multiplier)
+
 let _generate_trade_id order_id = "trade_" ^ order_id
 
 (** {1 Path-based Fill Checking}
@@ -52,17 +61,21 @@ let _crosses_limit ~side ~limit_price ~prev_price ~curr_price =
   | Sell -> Float.(prev_price < limit_price && curr_price >= limit_price)
 
 let rec _search_order_fill ~(crosses : float -> float -> bool)
-    ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
+    ~(meets : float -> bool) ~cross_price ~slipped_cross_price
+    ~(prev_point : path_point) = function
   | [] -> None
   | (curr_point : path_point) :: tail ->
       if crosses prev_point.price curr_point.price then
-        Some { price = cross_price }
-      else if meets curr_point.price then Some { price = curr_point.price }
+        (* When crossing threshold, apply slippage *)
+        Some { price = slipped_cross_price }
+      else if meets curr_point.price then
+        (* When meeting threshold exactly, no additional slippage *)
+        Some { price = curr_point.price }
       else
-        _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point
-          tail
+        _search_order_fill ~crosses ~meets ~cross_price ~slipped_cross_price
+          ~prev_point:curr_point tail
 
-let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
+let _would_fill_limit ~(path : intraday_path) ~side ~limit_price ~config :
     fill_result option =
   match path with
   | [] -> None
@@ -73,8 +86,9 @@ let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
         let crosses prev curr =
           _crosses_limit ~side ~limit_price ~prev_price:prev ~curr_price:curr
         in
+        let slipped_cross_price = _apply_slippage config side limit_price in
         _search_order_fill ~crosses ~meets ~cross_price:limit_price
-          ~prev_point:first rest
+          ~slipped_cross_price ~prev_point:first rest
 
 let _meets_stop ~side ~stop_price price =
   match side with
@@ -87,18 +101,21 @@ let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
   | Sell -> Float.(prev_price > stop_price && curr_price <= stop_price)
 
 let rec _search_stop_with_path ~(crosses : float -> float -> bool)
-    ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
+    ~(meets : float -> bool) ~cross_price ~slipped_cross_price
+    ~(prev_point : path_point) = function
   | [] -> None
   | (curr_point : path_point) :: _tail as remaining ->
       if crosses prev_point.price curr_point.price then
-        Some ({ price = cross_price }, remaining)
+        (* When crossing stop threshold, apply slippage *)
+        Some ({ price = slipped_cross_price }, remaining)
       else if meets curr_point.price then
+        (* When meeting stop threshold exactly, no additional slippage *)
         Some ({ price = curr_point.price }, remaining)
       else
-        _search_stop_with_path ~crosses ~meets ~cross_price
+        _search_stop_with_path ~crosses ~meets ~cross_price ~slipped_cross_price
           ~prev_point:curr_point _tail
 
-let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
+let _stop_activation_path ~(path : intraday_path) ~side ~stop_price ~config :
     (fill_result * intraday_path) option =
   match path with
   | [] -> None
@@ -111,19 +128,20 @@ let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
         let crosses prev curr =
           _crosses_stop ~side ~stop_price ~prev_price:prev ~curr_price:curr
         in
+        let slipped_cross_price = _apply_slippage config side stop_price in
         _search_stop_with_path ~crosses ~meets ~cross_price:stop_price
-          ~prev_point:first _rest
+          ~slipped_cross_price ~prev_point:first _rest
 
-let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
+let _would_fill_stop ~(path : intraday_path) ~side ~stop_price ~config :
     fill_result option =
-  match _stop_activation_path ~path ~side ~stop_price with
+  match _stop_activation_path ~path ~side ~stop_price ~config with
   | Some (fill, _) -> Some fill
   | None -> None
 
 let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
-    ~limit_price : fill_result option =
+    ~limit_price ~config : fill_result option =
   (* Two-stage: first stop triggers, then limit must be reached *)
-  match _stop_activation_path ~path ~side ~stop_price with
+  match _stop_activation_path ~path ~side ~stop_price ~config with
   | None -> None
   | Some (stop_fill, activation_path) ->
       let meets_limit = _meets_limit ~side ~limit_price in
@@ -131,7 +149,7 @@ let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
       else
         (* Limit not satisfied immediately; wait for the limit price after stop
            activation. *)
-        _would_fill_limit ~path:activation_path ~side ~limit_price
+        _would_fill_limit ~path:activation_path ~side ~limit_price ~config
 
 let _create_trade order_id symbol side quantity price commission =
   {
@@ -158,7 +176,9 @@ let _execute_market_order engine (ord : Trading_orders.Types.order) =
 let _execute_limit_order engine (ord : Trading_orders.Types.order) limit_price =
   let open Option.Let_syntax in
   let%bind path = Hashtbl.find engine.market_state ord.symbol in
-  let%bind fill = _would_fill_limit ~path ~side:ord.side ~limit_price in
+  let%bind fill =
+    _would_fill_limit ~path ~side:ord.side ~limit_price ~config:engine.config
+  in
   let commission = _calculate_commission engine.config ord.quantity in
   return
     (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
@@ -188,7 +208,9 @@ let _process_limit_order engine order_mgr order limit_price =
 let _execute_stop_order engine (ord : Trading_orders.Types.order) stop_price =
   let open Option.Let_syntax in
   let%bind path = Hashtbl.find engine.market_state ord.symbol in
-  let%bind fill = _would_fill_stop ~path ~side:ord.side ~stop_price in
+  let%bind fill =
+    _would_fill_stop ~path ~side:ord.side ~stop_price ~config:engine.config
+  in
   let commission = _calculate_commission engine.config ord.quantity in
   return
     (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
@@ -206,6 +228,7 @@ let _execute_stop_limit_order engine (ord : Trading_orders.Types.order)
   let%bind path = Hashtbl.find engine.market_state ord.symbol in
   let%bind fill =
     _would_fill_stop_limit ~path ~side:ord.side ~stop_price ~limit_price
+      ~config:engine.config
   in
   let commission = _calculate_commission engine.config ord.quantity in
   return

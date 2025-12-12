@@ -24,4 +24,5 @@ type execution_report = {
 type commission_config = { per_share : float; minimum : float }
 [@@deriving show, eq]
 
-type engine_config = { commission : commission_config } [@@deriving show, eq]
+type engine_config = { commission : commission_config; slippage_bps : float }
+[@@deriving show, eq]
