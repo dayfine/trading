@@ -68,12 +68,10 @@ type commission_config = {
 (** Commission configuration for calculating trading costs. Commissions are
     calculated as: max(per_share * quantity, minimum) *)
 
-type engine_config = {
-  commission : commission_config;  (** How to calculate trade commissions *)
-  slippage_bps : float;
-      (** Slippage in basis points (1 bps = 0.01%). Applied when orders cross
-          price thresholds. For example, 5.0 bps = 0.05% price impact. Set to
-          0.0 for no slippage (fills at exact threshold prices). *)
-}
-[@@deriving show, eq]
-(** Engine configuration controlling execution behavior and costs *)
+type engine_config = { commission : commission_config } [@@deriving show, eq]
+(** Engine configuration controlling execution behavior and costs.
+
+    Note: Slippage is naturally modeled by the granularity of the intraday price
+    path (~390 points per day). Stop and market orders fill at the current path
+    point price when triggered, giving realistic slippage based on path
+    resolution. *)
