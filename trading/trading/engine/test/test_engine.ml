@@ -103,6 +103,20 @@ let assert_order_executed engine order_mgr order ~price =
                        }));
              ])))
 
+(* Assert order executed with price in range (for natural slippage) *)
+let assert_order_executed_in_range engine order_mgr order ~min_price ~max_price
+    =
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      assert_that report.order_id (equal_to order.id);
+      assert_that report.status (equal_to Filled);
+      let trade = List.hd_exn report.trades in
+      assert_bool
+        (Printf.sprintf "Price %.2f should be in range [%.2f, %.2f]" trade.price
+           min_price max_price)
+        Float.(trade.price >= min_price && trade.price <= max_price)
+  | _ -> assert_failure "Expected one filled report"
+
 (* Engine creation tests *)
 let test_create_engine _ =
   let config = make_config () in
@@ -574,8 +588,10 @@ let test_buy_stop_limit_executes_when_both_conditions_met _ =
       ~order_type:(StopLimit (151.00, 152.00))
       ~side:Buy ~quote:bar ()
   in
-  (* Path goes up, crosses stop at 151.00, which meets limit <= 152.00, so fills at 151.00 *)
-  assert_order_executed engine order_mgr order ~price:151.00
+  (* Stop triggers when crossing 151.00, fills at current point (natural slippage)
+     Price should be >= stop (151.00) and <= limit (152.00) *)
+  assert_order_executed_in_range engine order_mgr order ~min_price:151.00
+    ~max_price:152.00
 
 let test_buy_stop_limit_executes_when_ask_at_limit _ =
   (* Bar crosses stop at 150.00, which exactly meets limit of 150.00 *)
@@ -636,8 +652,10 @@ let test_sell_stop_limit_executes_when_both_conditions_met _ =
       ~order_type:(StopLimit (150.00, 149.00))
       ~side:Sell ~quote:bar ()
   in
-  (* Path goes down, crosses stop at 150.00, which meets limit >= 149.00, fills at 150.00 *)
-  assert_order_executed engine order_mgr order ~price:150.00
+  (* Stop triggers when crossing 150.00, fills at current point (natural slippage)
+     Price should be <= stop (150.00) and >= limit (149.00) *)
+  assert_order_executed_in_range engine order_mgr order ~min_price:149.00
+    ~max_price:150.00
 
 let test_sell_stop_limit_executes_when_bid_at_limit _ =
   (* Bar crosses stop at 150.00, which exactly meets limit of 150.00 *)
@@ -709,7 +727,7 @@ let test_stop_limit_requires_bid_ask_price _ =
       ~order_type:(StopLimit (150.00, 150.00))
       ~side:Buy ~quote:bar ()
   in
-  (* Path goes up, crosses stop at 150.00, which meets limit, fills at 150.00 *)
+  (* Stop==limit case: fills at limit price (150.00) when trigger price exceeds it *)
   assert_order_executed engine order_mgr order ~price:150.00
 
 (* ==================== Path execution edge case tests ==================== *)
