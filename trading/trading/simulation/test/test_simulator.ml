@@ -228,10 +228,11 @@ let test_stop_order_executes_on_later_day _ =
           (* Trade executed on day 2 *)
           assert_that result2.trades (size_is 1);
           let trade = List.hd_exn result2.trades in
-          (* Stop triggers at or above 156.0 *)
+          (* Stop triggers at 156.0, fills between stop and day high (158.0) *)
           assert_bool
-            (Printf.sprintf "Price %.2f should be >= 156.0" trade.price)
-            Float.(trade.price >= 156.0))
+            (Printf.sprintf "Price %.2f should be in range [156.0, 158.0]"
+               trade.price)
+            Float.(trade.price >= 156.0 && trade.price <= 158.0))
 
 let test_order_fails_due_to_insufficient_cash _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
