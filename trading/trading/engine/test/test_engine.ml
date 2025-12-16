@@ -18,24 +18,6 @@ let make_config ?(per_share = 0.01) ?(minimum = 1.0) () =
 let make_bar symbol ~open_price ~high_price ~low_price ~close_price =
   { symbol; open_price; high_price; low_price; close_price }
 
-(* Compatibility function for legacy tests - can be removed once all tests use make_bar
-   This converts bid/ask/last quotes into OHLC bars for backward compatibility.
-   New tests should use make_bar directly with realistic OHLC data. *)
-let make_quote symbol ~bid ~ask ~last =
-  let bid = Option.value bid ~default:100.0 in
-  let ask = Option.value ask ~default:100.5 in
-  let last = Option.value last ~default:100.25 in
-  (* Create a bar where:
-     - open = last (so market orders fill at old "last" price)
-     - high = max of all prices
-     - low = min of all prices
-     - close = last *)
-  let all_prices = [ bid; ask; last ] in
-  let high = List.fold all_prices ~init:Float.neg_infinity ~f:Float.max in
-  let low = List.fold all_prices ~init:Float.infinity ~f:Float.min in
-  make_bar symbol ~open_price:last ~high_price:high ~low_price:low
-    ~close_price:last
-
 let make_order_params ~symbol ~side ~order_type ~quantity ?(time_in_force = Day)
     () =
   { symbol; side; order_type; quantity; time_in_force }
@@ -189,10 +171,11 @@ let test_update_market_overwrites_prices _ =
   let engine = create config in
   let order_mgr = OrderManager.create () in
   (* Update with first price *)
-  let quote1 =
-    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  let bar1 =
+    make_bar "AAPL" ~open_price:150.25 ~high_price:150.5 ~low_price:150.0
+      ~close_price:150.25
   in
-  update_market engine [ quote1 ];
+  update_market engine [ bar1 ];
   (* Submit order *)
   let params =
     make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
@@ -207,10 +190,11 @@ let test_update_market_overwrites_prices _ =
   (* Execute at first price *)
   let _ = process_orders engine order_mgr in
   (* Update with new price *)
-  let quote2 =
-    make_quote "AAPL" ~bid:(Some 155.0) ~ask:(Some 155.5) ~last:(Some 155.25)
+  let bar2 =
+    make_bar "AAPL" ~open_price:155.25 ~high_price:155.5 ~low_price:155.0
+      ~close_price:155.25
   in
-  update_market engine [ quote2 ];
+  update_market engine [ bar2 ];
   (* Submit new order *)
   let order2 =
     match create_order ~now_time:test_timestamp params with
@@ -250,10 +234,11 @@ let test_process_orders_with_market_order _ =
   in
   let () = submit_single_order order_mgr order in
   (* Update market data with price *)
-  let quote =
-    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  let bar =
+    make_bar "AAPL" ~open_price:150.25 ~high_price:150.5 ~low_price:150.0
+      ~close_price:150.25
   in
-  update_market engine [ quote ];
+  update_market engine [ bar ];
   (* Process orders *)
   assert_that
     (process_orders engine order_mgr)
@@ -294,10 +279,11 @@ let test_process_orders_calculates_commission _ =
   in
   let () = submit_single_order order_mgr order in
   (* Update market data *)
-  let quote =
-    make_quote "AAPL" ~bid:(Some 100.0) ~ask:(Some 100.5) ~last:(Some 100.25)
+  let bar =
+    make_bar "AAPL" ~open_price:100.25 ~high_price:100.5 ~low_price:100.0
+      ~close_price:100.25
   in
-  update_market engine [ quote ];
+  update_market engine [ bar ];
   (* For 50 shares at $0.01 per share:
      - Calculated = 50 * 0.01 = 0.50
      - Minimum = 1.0
@@ -339,10 +325,11 @@ let test_process_orders_updates_order_status _ =
   let orders_before = OrderManager.list_orders order_mgr ~filter:ActiveOnly in
   assert_that orders_before (size_is 1);
   (* Update market data *)
-  let quote =
-    make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25)
+  let bar =
+    make_bar "AAPL" ~open_price:150.25 ~high_price:150.5 ~low_price:150.0
+      ~close_price:150.25
   in
-  update_market engine [ quote ];
+  update_market engine [ bar ];
   (* Process orders *)
   let _result = process_orders engine order_mgr in
   (* Verify order status updated:
@@ -384,16 +371,76 @@ let test_process_orders_with_multiple_orders _ =
   in
   List.iter ~f:(submit_single_order order_mgr) orders;
   (* Update market data for all symbols in batch *)
-  let quotes =
+  let bars =
     [
-      make_quote "AAPL" ~bid:(Some 150.0) ~ask:(Some 150.5) ~last:(Some 150.25);
-      make_quote "GOOGL" ~bid:(Some 2800.0) ~ask:(Some 2805.0)
-        ~last:(Some 2802.5);
-      make_quote "MSFT" ~bid:(Some 380.0) ~ask:(Some 380.5) ~last:(Some 380.25);
+      make_bar "AAPL" ~open_price:150.25 ~high_price:150.5 ~low_price:150.0
+        ~close_price:150.25;
+      make_bar "GOOGL" ~open_price:2802.5 ~high_price:2805.0 ~low_price:2800.0
+        ~close_price:2802.5;
+      make_bar "MSFT" ~open_price:380.25 ~high_price:380.5 ~low_price:380.0
+        ~close_price:380.25;
     ]
   in
-  update_market engine quotes;
+  update_market engine bars;
   (* Process all orders *)
+  let order1, order2, order3 =
+    (List.nth_exn orders 0, List.nth_exn orders 1, List.nth_exn orders 2)
+  in
+  assert_that
+    (process_orders engine order_mgr)
+    (is_ok_and_holds
+       (unordered_elements_are
+          [
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order1.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order2.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+            all_of
+              [
+                field (fun r -> r.order_id) (equal_to order3.id);
+                field (fun r -> r.status) (equal_to Filled);
+              ];
+          ]))
+
+let test_process_orders_with_multiple_orders_same_symbol _ =
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  (* Submit 3 market orders for the same symbol (AAPL) *)
+  let params1 =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let params2 =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:Market
+      ~quantity:50.0 ()
+  in
+  let params3 =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market ~quantity:75.0
+      ()
+  in
+  let orders =
+    List.map
+      ~f:(fun params ->
+        match create_order ~now_time:test_timestamp params with
+        | Ok order -> order
+        | Error err -> failwith ("Failed to create order: " ^ Status.show err))
+      [ params1; params2; params3 ]
+  in
+  List.iter ~f:(submit_single_order order_mgr) orders;
+  (* Update market data for AAPL *)
+  let bar =
+    make_bar "AAPL" ~open_price:150.25 ~high_price:150.5 ~low_price:150.0
+      ~close_price:150.25
+  in
+  update_market engine [ bar ];
+  (* Process all orders - should execute all 3 *)
   let order1, order2, order3 =
     (List.nth_exn orders 0, List.nth_exn orders 1, List.nth_exn orders 2)
   in
@@ -948,6 +995,8 @@ let suite =
          >:: test_process_orders_updates_order_status;
          "test_process_orders_with_multiple_orders"
          >:: test_process_orders_with_multiple_orders;
+         "test_process_orders_with_multiple_orders_same_symbol"
+         >:: test_process_orders_with_multiple_orders_same_symbol;
          "test_buy_limit_executes_when_ask_at_limit"
          >:: test_buy_limit_executes_when_ask_at_limit;
          "test_buy_limit_executes_when_ask_below_limit"
