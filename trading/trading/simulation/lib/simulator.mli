@@ -49,6 +49,10 @@ val create : config:config -> deps:dependencies -> t
 
 (** {1 Running} *)
 
+val submit_orders : t -> Trading_orders.Types.order list -> Status.status list
+(** Submit orders to the simulator. Orders will be processed in the next step.
+*)
+
 val step : t -> step_outcome Status.status_or
 (** Advance simulation by one day. Returns [Completed] when simulation reaches
     end date, or [Stepped] with updated simulator and step result. *)
