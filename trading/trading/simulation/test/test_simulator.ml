@@ -131,6 +131,164 @@ let test_step_executes_market_order _ =
         (is_some_and (fun (pos : Trading_portfolio.Types.portfolio_position) ->
              assert_that pos.symbol (equal_to "AAPL")))
 
+let test_limit_order_executes_on_later_day _ =
+  let sim = create ~config:sample_config ~deps:sample_deps in
+  (* First, buy shares with a market order *)
+  let buy_order_params =
+    Trading_orders.Create_order.
+      {
+        symbol = "AAPL";
+        side = Trading_base.Types.Buy;
+        quantity = 10.0;
+        order_type = Trading_base.Types.Market;
+        time_in_force = Trading_orders.Types.GTC;
+      }
+  in
+  let buy_order =
+    match Trading_orders.Create_order.create_order buy_order_params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create buy order: " ^ Status.show err)
+  in
+  submit_orders sim [ buy_order ] |> ignore;
+  (* Execute the buy on day 1 *)
+  let sim_after_buy =
+    match step sim with
+    | Error err -> failwith ("Buy step failed: " ^ Status.show err)
+    | Ok (Completed _) -> failwith "Unexpected completion after buy"
+    | Ok (Stepped (s, _)) -> s
+  in
+  (* Now place a sell limit order at 156.0
+     Day 2 (2024-01-03): high=158.0 - should execute at 156.0 *)
+  let sell_order_params =
+    Trading_orders.Create_order.
+      {
+        symbol = "AAPL";
+        side = Trading_base.Types.Sell;
+        quantity = 10.0;
+        order_type = Trading_base.Types.Limit 156.0;
+        time_in_force = Trading_orders.Types.GTC;
+      }
+  in
+  let sell_order =
+    match Trading_orders.Create_order.create_order sell_order_params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create sell order: " ^ Status.show err)
+  in
+  submit_orders sim_after_buy [ sell_order ] |> ignore;
+  (* Step on day 2 - sell order should execute *)
+  match step sim_after_buy with
+  | Error err -> failwith ("Sell step failed: " ^ Status.show err)
+  | Ok (Completed _) -> assert_failure "Expected Stepped on day 2"
+  | Ok (Stepped (_, result)) ->
+      (* Trade executed *)
+      assert_that result.trades (size_is 1);
+      let trade = List.hd_exn result.trades in
+      assert_that trade.price (float_equal 156.0);
+      (* Cash: started with 10000, bought 10@150 (-1501), sold 10@156 (+1559) *)
+      let expected_cash =
+        10000.0 -. (10.0 *. 150.0) -. 1.0 +. (10.0 *. 156.0) -. 1.0
+      in
+      assert_that result.portfolio.current_cash (float_equal expected_cash)
+
+let test_stop_order_executes_on_later_day _ =
+  let sim = create ~config:sample_config ~deps:sample_deps in
+  (* Place a buy stop order at 156.0
+     Day 1 (2024-01-02): high=155.0 - won't trigger (price never reaches 156.0)
+     Day 2 (2024-01-03): open=154.0, high=158.0 - should trigger and execute *)
+  let order_params =
+    Trading_orders.Create_order.
+      {
+        symbol = "AAPL";
+        side = Trading_base.Types.Buy;
+        quantity = 10.0;
+        order_type = Trading_base.Types.Stop 156.0;
+        time_in_force = Trading_orders.Types.GTC;
+      }
+  in
+  let order =
+    match Trading_orders.Create_order.create_order order_params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_orders sim [ order ] |> ignore;
+  (* Step 1 - order should remain pending *)
+  match step sim with
+  | Error err -> failwith ("Step 1 failed: " ^ Status.show err)
+  | Ok (Completed _) -> assert_failure "Expected Stepped on day 1"
+  | Ok (Stepped (sim', result1)) -> (
+      (* No trades on day 1 *)
+      assert_that result1.trades (size_is 0);
+      (* Cash unchanged *)
+      assert_that result1.portfolio.current_cash (float_equal 10000.0);
+      (* Step 2 - order should execute *)
+      match step sim' with
+      | Error err -> failwith ("Step 2 failed: " ^ Status.show err)
+      | Ok (Completed _) -> assert_failure "Expected Stepped on day 2"
+      | Ok (Stepped (_, result2)) ->
+          (* Trade executed on day 2 *)
+          assert_that result2.trades (size_is 1);
+          let trade = List.hd_exn result2.trades in
+          (* Stop triggers at or above 156.0 *)
+          assert_bool
+            (Printf.sprintf "Price %.2f should be >= 156.0" trade.price)
+            Float.(trade.price >= 156.0))
+
+let test_order_fails_due_to_insufficient_cash _ =
+  let sim = create ~config:sample_config ~deps:sample_deps in
+  (* Place two market orders:
+     1. Buy 60 shares at ~150.0 = 9000 + 1.0 commission = 9001
+     2. Buy 10 shares at ~150.0 = 1500 + 1.0 commission = 1501
+     Total needed: 10502, but we only have 10000
+     First order should execute, second should fail *)
+  let order1_params =
+    Trading_orders.Create_order.
+      {
+        symbol = "AAPL";
+        side = Trading_base.Types.Buy;
+        quantity = 60.0;
+        order_type = Trading_base.Types.Market;
+        time_in_force = Trading_orders.Types.GTC;
+      }
+  in
+  let order2_params =
+    Trading_orders.Create_order.
+      {
+        symbol = "AAPL";
+        side = Trading_base.Types.Buy;
+        quantity = 10.0;
+        order_type = Trading_base.Types.Market;
+        time_in_force = Trading_orders.Types.GTC;
+      }
+  in
+  let order1 =
+    match Trading_orders.Create_order.create_order order1_params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create order1: " ^ Status.show err)
+  in
+  let order2 =
+    match Trading_orders.Create_order.create_order order2_params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create order2: " ^ Status.show err)
+  in
+  submit_orders sim [ order1; order2 ] |> ignore;
+  (* Step - first order should execute, second should fail *)
+  match step sim with
+  | Error err ->
+      (* Portfolio.apply_trades should return error for insufficient cash *)
+      let err_msg = Status.show err in
+      assert_bool
+        (Printf.sprintf "Error should mention insufficient cash: %s" err_msg)
+        (String.is_substring err_msg ~substring:"cash")
+  | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
+  | Ok (Stepped (_, result)) ->
+      (* Only one trade should have executed *)
+      assert_that result.trades (size_is 1);
+      let trade = List.hd_exn result.trades in
+      assert_that trade.quantity (float_equal 60.0);
+      (* Cash should reflect only the first trade *)
+      let expected_cash = 10000.0 -. (60.0 *. 150.0) -. 1.0 in
+      assert_that result.portfolio.current_cash (float_equal expected_cash)
+
 let test_step_advances_date _ =
   let sim = create ~config:sample_config ~deps:sample_deps in
   let expected_portfolio =
@@ -222,6 +380,12 @@ let suite =
          "create returns simulator" >:: test_create_returns_simulator;
          "create with empty prices" >:: test_create_with_empty_prices;
          "step executes market order" >:: test_step_executes_market_order;
+         "limit order executes on later day"
+         >:: test_limit_order_executes_on_later_day;
+         "stop order executes on later day"
+         >:: test_stop_order_executes_on_later_day;
+         "order fails due to insufficient cash"
+         >:: test_order_fails_due_to_insufficient_cash;
          "step advances date" >:: test_step_advances_date;
          "step returns Completed when done"
          >:: test_step_returns_completed_when_done;
