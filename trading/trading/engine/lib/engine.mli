@@ -17,13 +17,22 @@ val create : engine_config -> t
       let engine = Engine.create config
     ]} *)
 
-val update_market : t -> price_bar list -> unit
+val update_market :
+  ?path_config:Price_path.path_config -> t -> price_bar list -> unit
 (** Update market data for one or more symbols. Called by simulation to feed
     OHLC bars to the engine.
 
     The engine generates intraday price paths from these bars to determine order
     execution. Each bar represents price action over a time period (typically
     daily).
+
+    @param path_config
+      Optional configuration for path generation. Defaults to
+      Price_path.default_config. Use a fixed seed for deterministic testing:
+      {[
+        let path_config = { Price_path.default_config with seed = Some 42 } in
+        Engine.update_market ~path_config engine bars
+      ]}
 
     Example:
     {[

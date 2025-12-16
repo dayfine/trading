@@ -5,6 +5,7 @@ open Trading_orders.Types
 open Trading_orders.Create_order
 open Trading_engine.Engine
 open Trading_engine.Types
+open Trading_engine.Price_path
 open Matchers
 module OrderManager = Trading_orders.Manager
 
@@ -102,6 +103,20 @@ let assert_order_executed engine order_mgr order ~price =
                          timestamp = Time_ns_unix.epoch;
                        }));
              ])))
+
+(* Assert order executed with price in range (for natural slippage) *)
+let assert_order_executed_in_range engine order_mgr order ~min_price ~max_price
+    =
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      assert_that report.order_id (equal_to order.id);
+      assert_that report.status (equal_to Filled);
+      let trade = List.hd_exn report.trades in
+      assert_bool
+        (Printf.sprintf "Price %.2f should be in range [%.2f, %.2f]" trade.price
+           min_price max_price)
+        Float.(trade.price >= min_price && trade.price <= max_price)
+  | _ -> assert_failure "Expected one filled report"
 
 (* Engine creation tests *)
 let test_create_engine _ =
@@ -574,8 +589,10 @@ let test_buy_stop_limit_executes_when_both_conditions_met _ =
       ~order_type:(StopLimit (151.00, 152.00))
       ~side:Buy ~quote:bar ()
   in
-  (* Path goes up, crosses stop at 151.00, which meets limit <= 152.00, so fills at 151.00 *)
-  assert_order_executed engine order_mgr order ~price:151.00
+  (* Stop triggers when crossing 151.00, fills at current point (natural slippage)
+     Price should be >= stop (151.00) and <= limit (152.00) *)
+  assert_order_executed_in_range engine order_mgr order ~min_price:151.00
+    ~max_price:152.00
 
 let test_buy_stop_limit_executes_when_ask_at_limit _ =
   (* Bar crosses stop at 150.00, which exactly meets limit of 150.00 *)
@@ -636,8 +653,10 @@ let test_sell_stop_limit_executes_when_both_conditions_met _ =
       ~order_type:(StopLimit (150.00, 149.00))
       ~side:Sell ~quote:bar ()
   in
-  (* Path goes down, crosses stop at 150.00, which meets limit >= 149.00, fills at 150.00 *)
-  assert_order_executed engine order_mgr order ~price:150.00
+  (* Stop triggers when crossing 150.00, fills at current point (natural slippage)
+     Price should be <= stop (150.00) and >= limit (149.00) *)
+  assert_order_executed_in_range engine order_mgr order ~min_price:149.00
+    ~max_price:150.00
 
 let test_sell_stop_limit_executes_when_bid_at_limit _ =
   (* Bar crosses stop at 150.00, which exactly meets limit of 150.00 *)
@@ -709,7 +728,7 @@ let test_stop_limit_requires_bid_ask_price _ =
       ~order_type:(StopLimit (150.00, 150.00))
       ~side:Buy ~quote:bar ()
   in
-  (* Path goes up, crosses stop at 150.00, which meets limit, fills at 150.00 *)
+  (* Stop==limit case: fills at limit price (150.00) when trigger price exceeds it *)
   assert_order_executed engine order_mgr order ~price:150.00
 
 (* ==================== Path execution edge case tests ==================== *)
@@ -869,6 +888,43 @@ let test_stop_sell_at_exact_low _ =
   in
   assert_order_executed engine order_mgr order ~price:95.0
 
+(* Deterministic slippage test with fixed seed *)
+let test_stop_order_deterministic_slippage _ =
+  (* Use fixed seed for deterministic path generation to assert exact slippage *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:105.0 ~low_price:98.0
+      ~close_price:103.0
+  in
+  let config = make_config () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:(Stop 103.0)
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok order -> order
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  (* Use seed 42 for deterministic path - path will cross stop at specific price *)
+  let path_config = { default_config with seed = Some 42 } in
+  update_market ~path_config engine [ bar ];
+  (* With seed 42, the path crosses 103.0 and fills at a specific point.
+     This exact price is determined by the seeded random path generation. *)
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      assert_that report.status (equal_to Filled);
+      let trade = List.hd_exn report.trades in
+      (* Exact price with seed 42: 103.143016
+         This validates that:
+         1. Natural slippage is deterministic with fixed seeds
+         2. Stop order fills at current path point (103.143016) not stop price (103.0)
+         3. Slippage = 103.143016 - 103.0 = 0.143016 (~14 cents or ~0.14%) *)
+      assert_that trade.price (float_equal ~epsilon:0.000001 103.143016)
+  | _ -> assert_failure "Expected one filled report"
+
 (* Test suite *)
 let suite =
   "Engine Tests"
@@ -959,6 +1015,8 @@ let suite =
          "test_limit_sell_at_exact_high" >:: test_limit_sell_at_exact_high;
          "test_stop_buy_at_exact_high" >:: test_stop_buy_at_exact_high;
          "test_stop_sell_at_exact_low" >:: test_stop_sell_at_exact_low;
+         "test_stop_order_deterministic_slippage"
+         >:: test_stop_order_deterministic_slippage;
        ]
 
 let () = run_test_tt_main suite
