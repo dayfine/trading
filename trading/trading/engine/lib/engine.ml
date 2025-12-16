@@ -11,9 +11,9 @@ type t = {
 
 let create config = { config; market_state = Hashtbl.create (module String) }
 
-let update_market engine bars =
+let update_market ?(path_config = Price_path.default_config) engine bars =
   List.iter bars ~f:(fun bar ->
-      let path = Price_path.generate_path bar in
+      let path = Price_path.generate_path ~config:path_config bar in
       Hashtbl.set engine.market_state ~key:bar.symbol ~data:path)
 
 let _calculate_commission config quantity =
