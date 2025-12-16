@@ -9,7 +9,7 @@ Backtesting and simulation framework for testing trading strategies using histor
 - Leverages existing `analysis/data` module for historical prices
 
 ## Current Status
-✅ **Phase 1 & 2: COMPLETE** - Core infrastructure and OHLC price path simulation implemented
+✅ **Phase 1, 2 & 3: COMPLETE** - Core infrastructure, OHLC price path simulation, and daily simulation loop implemented
 
 ### Completed
 
@@ -44,8 +44,25 @@ Backtesting and simulation framework for testing trading strategies using histor
   - 14 tests covering path generation and order fills
   - All 20 simulation tests passing ✓
 
+**Phase 3: Daily Simulation Loop**
+- ✅ Full trading logic in `lib/simulator.ml`:
+  - `step` function implementation with actual order execution
+  - Engine and OrderManager integration in simulator state
+  - OHLC data conversion from Daily_price to price_bar
+  - Multi-day order persistence (GTC orders)
+  - Portfolio updates via trade application
+- ✅ Order submission API:
+  - `submit_orders` function for placing orders with simulator
+  - Orders processed on next step with current market data
+- ✅ Comprehensive test suite in `test/test_simulator.ml`:
+  - Market order execution with portfolio updates
+  - Limit orders executing on later days when price reached
+  - Stop orders triggering across multiple days
+  - Insufficient cash validation and error handling
+  - All 10 simulation tests passing ✓
+
 ### In Progress
-🚧 **Phase 3: Daily Simulation Loop** - Not started
+🚧 **Phase 4: Strategy Interface** - Not started
 
 ### Next Steps
 
@@ -68,12 +85,12 @@ Backtesting and simulation framework for testing trading strategies using histor
 - [ ] Comprehensive tests for path generation and order fills
 
 ### Phase 3: Daily Simulation Loop (enhance `lib/simulator.ml`)
-- [ ] Implement actual trading logic in `step` function (currently stub)
-- [ ] Generate intraday paths from OHLC data
-- [ ] Execute pending orders against price paths
-- [ ] Apply trades to portfolio
-- [ ] Integration with Engine, Portfolio, and OrderManager modules
-- [ ] Tests for order execution and multi-day simulations
+- [x] Implement actual trading logic in `step` function (currently stub)
+- [x] Generate intraday paths from OHLC data
+- [x] Execute pending orders against price paths
+- [x] Apply trades to portfolio
+- [x] Integration with Engine, Portfolio, and OrderManager modules
+- [x] Tests for order execution and multi-day simulations
 
 ### Phase 4: Strategy Interface (`lib/strategy.mli` & `lib/strategy.ml`)
 - [ ] Define `STRATEGY` module signature
