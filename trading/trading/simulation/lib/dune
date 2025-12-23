@@ -1,7 +1,7 @@
 (library
  (public_name trading.simulation)
  (name trading_simulation)
- (libraries trading.base trading.portfolio trading.engine types core)
- (modules simulator intent market_data)
+ (libraries trading.base trading.portfolio trading.engine trading.orders types core)
+ (modules simulator intent market_data strategy)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
