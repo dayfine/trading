@@ -8,3 +8,11 @@
   trading.engine
   types
   matchers))
+
+(test
+ (name test_intent)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.base))
