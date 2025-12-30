@@ -141,110 +141,77 @@ type exit_reason =
   | PortfolioRebalancing
 [@@deriving show, eq]
 
-type entering_state = {
-  id : string;
-  symbol : string;
-  target_quantity : float;
-  entry_price : float;  (** Limit price for entry order *)
-  filled_quantity : float;
-  created_date : Date.t;
-  reasoning : entry_reasoning;
-}
-[@@deriving show, eq]
-(** State: Attempting to open a position *)
-
-type holding_state = {
-  id : string;
-  symbol : string;
-  quantity : float;
-  entry_price : float;  (** Average entry price *)
-  entry_date : Date.t;
-  entry_reasoning : entry_reasoning;
-  risk_params : risk_params;
-}
-[@@deriving show, eq]
-(** State: Position is open, monitoring for exit *)
-
-type exiting_state = {
-  id : string;
-  symbol : string;
-  holding_state : holding_state;
-  exit_reason : exit_reason;
-  target_quantity : float;  (** Amount to exit *)
-  exit_price : float;  (** Price for exit order *)
-  filled_quantity : float;
-  started_date : Date.t;
-}
-[@@deriving show, eq]
-(** State: Attempting to close position *)
-
-type closed_state = {
-  id : string;
-  symbol : string;
-  quantity : float;
-  entry_price : float;
-  exit_price : float;
-  gross_pnl : float;
-  entry_date : Date.t;
-  exit_date : Date.t;
-  days_held : int;
-  entry_reasoning : entry_reasoning;
-  close_reason : exit_reason;
-}
-[@@deriving show, eq]
-(** State: Position fully closed *)
-
-(** Position state - exactly one of four states *)
+(** Position state variants - only state-specific data *)
 type position_state =
-  | Entering of entering_state
-  | Holding of holding_state
-  | Exiting of exiting_state
-  | Closed of closed_state
+  | Entering of {
+      target_quantity : float;
+      entry_price : float;  (** Limit price for entry order *)
+      filled_quantity : float;
+      created_date : Date.t;
+    }  (** State: Attempting to open a position *)
+  | Holding of {
+      quantity : float;
+      entry_price : float;  (** Average entry price *)
+      entry_date : Date.t;
+      risk_params : risk_params;
+    }  (** State: Position is open, monitoring for exit *)
+  | Exiting of {
+      quantity : float;  (** Position quantity being exited *)
+      entry_price : float;  (** Original entry price *)
+      entry_date : Date.t;  (** Original entry date *)
+      target_quantity : float;  (** Amount to exit *)
+      exit_price : float;  (** Price for exit order *)
+      filled_quantity : float;  (** Amount exited so far *)
+      started_date : Date.t;  (** When exit started *)
+    }  (** State: Attempting to close position *)
+  | Closed of {
+      quantity : float;  (** Final position quantity *)
+      entry_price : float;  (** Average entry price *)
+      exit_price : float;  (** Average exit price *)
+      gross_pnl : float;  (** Profit/loss before commissions *)
+      entry_date : Date.t;  (** Entry date *)
+      exit_date : Date.t;  (** Exit date *)
+      days_held : int;  (** Days between entry and exit *)
+    }  (** State: Position fully closed *)
 [@@deriving show, eq]
 
-type t = { state : position_state; last_updated : Date.t } [@@deriving show, eq]
-(** Position with state and metadata *)
+type t = {
+  id : string;  (** Unique position identifier *)
+  symbol : string;  (** Trading symbol *)
+  entry_reasoning : entry_reasoning;  (** Why we entered (set once) *)
+  exit_reason : exit_reason option;  (** Why we're exiting (set when exiting) *)
+  state : position_state;  (** Current position state *)
+  last_updated : Date.t;  (** Last state change date *)
+}
+[@@deriving show, eq]
+(** Position with normalized data - common fields at top level, state-specific
+    data in variants *)
 
 (** {1 Transitions} *)
 
-(** Transition events that change position state *)
-type transition =
-  | EntryFill of {
-      position_id : string;
-      filled_quantity : float;
-      fill_price : float;
-      fill_date : Date.t;
-    }  (** Entry order filled (partial or complete) *)
-  | EntryComplete of {
-      position_id : string;
-      risk_params : risk_params;
-      completion_date : Date.t;
-    }  (** Entry fully filled, transition to holding *)
-  | CancelEntry of {
-      position_id : string;
-      reason : string;
-      cancel_date : Date.t;
-    }  (** Cancel entry before any fills *)
-  | TriggerExit of {
-      position_id : string;
-      exit_reason : exit_reason;
-      exit_price : float;
-      trigger_date : Date.t;
-    }  (** Exit condition triggered *)
-  | UpdateRiskParams of {
-      position_id : string;
-      new_risk_params : risk_params;
-      update_date : Date.t;
-    }  (** Update stop loss / take profit levels *)
-  | ExitFill of {
-      position_id : string;
-      filled_quantity : float;
-      fill_price : float;
-      fill_date : Date.t;
-    }  (** Exit order filled (partial or complete) *)
-  | ExitComplete of { position_id : string; completion_date : Date.t }
-      (** Exit fully filled, position closed *)
+(** Transition-specific data - only what's unique to each transition *)
+type transition_kind =
+  | EntryFill of { filled_quantity : float; fill_price : float }
+      (** Entry order filled (partial or complete) *)
+  | EntryComplete of { risk_params : risk_params }
+      (** Entry fully filled, transition to holding *)
+  | CancelEntry of { reason : string }  (** Cancel entry before any fills *)
+  | TriggerExit of { exit_reason : exit_reason; exit_price : float }
+      (** Exit condition triggered *)
+  | UpdateRiskParams of { new_risk_params : risk_params }
+      (** Update stop loss / take profit levels *)
+  | ExitFill of { filled_quantity : float; fill_price : float }
+      (** Exit order filled (partial or complete) *)
+  | ExitComplete  (** Exit fully filled, position closed *)
 [@@deriving show, eq]
+
+type transition = {
+  position_id : string;  (** Position this transition applies to *)
+  date : Date.t;  (** When this transition occurred *)
+  kind : transition_kind;  (** Transition-specific data *)
+}
+[@@deriving show, eq]
+(** Transition event with common fields normalized *)
 
 (** {1 Position Operations} *)
 

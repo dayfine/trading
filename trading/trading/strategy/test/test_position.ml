@@ -16,22 +16,33 @@ let make_entering ?(id = "pos-1") ?(symbol = "AAPL") ?(target = 100.0)
   in
   match pos.state with
   | Entering entering ->
-      { pos with state = Entering { entering with filled_quantity = filled } }
+      {
+        pos with
+        state =
+          Entering
+            {
+              target_quantity = entering.target_quantity;
+              entry_price = entering.entry_price;
+              filled_quantity = filled;
+              created_date = entering.created_date;
+            };
+      }
   | _ -> failwith "Expected Entering state"
 
 let make_holding ?(id = "pos-1") ?(symbol = "AAPL") ?(quantity = 100.0)
     ?(entry_price = 150.0) () =
   {
+    id;
+    symbol;
+    entry_reasoning =
+      TechnicalSignal { indicator = "EMA"; description = "Test" };
+    exit_reason = None;
     state =
       Holding
         {
-          id;
-          symbol;
           quantity;
           entry_price;
           entry_date = date_of_string "2024-01-02";
-          entry_reasoning =
-            TechnicalSignal { indicator = "EMA"; description = "Test" };
           risk_params =
             {
               stop_loss_price = Some 142.5;
@@ -65,13 +76,11 @@ let test_create_entering _ =
 let test_entry_fill_partial _ =
   let pos = make_entering ~filled:0.0 () in
   let transition =
-    EntryFill
-      {
-        position_id = "pos-1";
-        filled_quantity = 50.0;
-        fill_price = 150.0;
-        fill_date = date_of_string "2024-01-02";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -84,13 +93,11 @@ let test_entry_fill_partial _ =
 let test_entry_fill_multiple _ =
   let pos = make_entering ~filled:50.0 () in
   let transition =
-    EntryFill
-      {
-        position_id = "pos-1";
-        filled_quantity = 30.0;
-        fill_price = 150.0;
-        fill_date = date_of_string "2024-01-02";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind = EntryFill { filled_quantity = 30.0; fill_price = 150.0 };
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -103,30 +110,31 @@ let test_entry_fill_multiple _ =
 let test_entry_fill_exceeds_target _ =
   let pos = make_entering ~target:100.0 ~filled:90.0 () in
   let transition =
-    EntryFill
-      {
-        position_id = "pos-1";
-        filled_quantity = 20.0;
-        fill_price = 150.0;
-        fill_date = date_of_string "2024-01-02";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind = EntryFill { filled_quantity = 20.0; fill_price = 150.0 };
+    }
   in
   assert_that (apply_transition pos transition) is_error
 
 let test_entry_complete _ =
   let pos = make_entering ~filled:100.0 () in
   let transition =
-    EntryComplete
-      {
-        position_id = "pos-1";
-        risk_params =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind =
+        EntryComplete
           {
-            stop_loss_price = Some 142.5;
-            take_profit_price = Some 165.0;
-            max_hold_days = Some 30;
+            risk_params =
+              {
+                stop_loss_price = Some 142.5;
+                take_profit_price = Some 165.0;
+                max_hold_days = Some 30;
+              };
           };
-        completion_date = date_of_string "2024-01-02";
-      }
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -142,29 +150,31 @@ let test_entry_complete _ =
 let test_entry_complete_no_fills _ =
   let pos = make_entering ~filled:0.0 () in
   let transition =
-    EntryComplete
-      {
-        position_id = "pos-1";
-        risk_params =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind =
+        EntryComplete
           {
-            stop_loss_price = None;
-            take_profit_price = None;
-            max_hold_days = None;
+            risk_params =
+              {
+                stop_loss_price = None;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
           };
-        completion_date = date_of_string "2024-01-02";
-      }
+    }
   in
   assert_that (apply_transition pos transition) is_error
 
 let test_cancel_entry_no_fills _ =
   let pos = make_entering ~filled:0.0 () in
   let transition =
-    CancelEntry
-      {
-        position_id = "pos-1";
-        reason = "Signal invalidated";
-        cancel_date = date_of_string "2024-01-02";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind = CancelEntry { reason = "Signal invalidated" };
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -177,12 +187,11 @@ let test_cancel_entry_no_fills _ =
 let test_cancel_entry_with_fills _ =
   let pos = make_entering ~filled:50.0 () in
   let transition =
-    CancelEntry
-      {
-        position_id = "pos-1";
-        reason = "Signal invalidated";
-        cancel_date = date_of_string "2024-01-02";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind = CancelEntry { reason = "Signal invalidated" };
+    }
   in
   assert_that (apply_transition pos transition) is_error
 
@@ -191,19 +200,22 @@ let test_cancel_entry_with_fills _ =
 let test_trigger_exit _ =
   let pos = make_holding () in
   let transition =
-    TriggerExit
-      {
-        position_id = "pos-1";
-        exit_reason =
-          TakeProfit
-            {
-              target_price = 165.0;
-              actual_price = 165.5;
-              profit_percent = 10.3;
-            };
-        exit_price = 165.0;
-        trigger_date = date_of_string "2024-01-10";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-10";
+      kind =
+        TriggerExit
+          {
+            exit_reason =
+              TakeProfit
+                {
+                  target_price = 165.0;
+                  actual_price = 165.5;
+                  profit_percent = 10.3;
+                };
+            exit_price = 165.0;
+          };
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -211,8 +223,8 @@ let test_trigger_exit _ =
       | Exiting exiting -> (
           assert_that exiting.exit_price (float_equal 165.0);
           assert_that exiting.target_quantity (float_equal 100.0);
-          match exiting.exit_reason with
-          | TakeProfit { profit_percent; _ } ->
+          match pos'.exit_reason with
+          | Some (TakeProfit { profit_percent; _ }) ->
               assert_that profit_percent (float_equal 10.3)
           | _ -> assert_failure "Expected TakeProfit reason")
       | _ -> assert_failure "Expected Exiting state")
@@ -228,12 +240,11 @@ let test_update_risk_params _ =
     }
   in
   let transition =
-    UpdateRiskParams
-      {
-        position_id = "pos-1";
-        new_risk_params = new_params;
-        update_date = date_of_string "2024-01-05";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-05";
+      kind = UpdateRiskParams { new_risk_params = new_params };
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -247,38 +258,26 @@ let test_update_risk_params _ =
 (* ==================== Exit Transitions ==================== *)
 
 let test_exit_fill _ =
-  let holding_state =
+  let pos =
     {
       id = "pos-1";
       symbol = "AAPL";
-      quantity = 100.0;
-      entry_price = 150.0;
-      entry_date = date_of_string "2024-01-02";
       entry_reasoning =
         TechnicalSignal { indicator = "EMA"; description = "Test" };
-      risk_params =
-        {
-          stop_loss_price = Some 142.5;
-          take_profit_price = Some 165.0;
-          max_hold_days = Some 30;
-        };
-    }
-  in
-  let pos =
-    {
+      exit_reason =
+        Some
+          (TakeProfit
+             {
+               target_price = 165.0;
+               actual_price = 165.5;
+               profit_percent = 10.3;
+             });
       state =
         Exiting
           {
-            id = "pos-1";
-            symbol = "AAPL";
-            holding_state;
-            exit_reason =
-              TakeProfit
-                {
-                  target_price = 165.0;
-                  actual_price = 165.5;
-                  profit_percent = 10.3;
-                };
+            quantity = 100.0;
+            entry_price = 150.0;
+            entry_date = date_of_string "2024-01-02";
             target_quantity = 100.0;
             exit_price = 165.0;
             filled_quantity = 0.0;
@@ -288,13 +287,11 @@ let test_exit_fill _ =
     }
   in
   let transition =
-    ExitFill
-      {
-        position_id = "pos-1";
-        filled_quantity = 100.0;
-        fill_price = 165.5;
-        fill_date = date_of_string "2024-01-10";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-10";
+      kind = ExitFill { filled_quantity = 100.0; fill_price = 165.5 };
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -305,38 +302,26 @@ let test_exit_fill _ =
   | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
 
 let test_exit_complete _ =
-  let holding_state =
+  let pos =
     {
       id = "pos-1";
       symbol = "AAPL";
-      quantity = 100.0;
-      entry_price = 150.0;
-      entry_date = date_of_string "2024-01-02";
       entry_reasoning =
         TechnicalSignal { indicator = "EMA"; description = "Test" };
-      risk_params =
-        {
-          stop_loss_price = Some 142.5;
-          take_profit_price = Some 165.0;
-          max_hold_days = Some 30;
-        };
-    }
-  in
-  let pos =
-    {
+      exit_reason =
+        Some
+          (TakeProfit
+             {
+               target_price = 165.0;
+               actual_price = 165.5;
+               profit_percent = 10.3;
+             });
       state =
         Exiting
           {
-            id = "pos-1";
-            symbol = "AAPL";
-            holding_state;
-            exit_reason =
-              TakeProfit
-                {
-                  target_price = 165.0;
-                  actual_price = 165.5;
-                  profit_percent = 10.3;
-                };
+            quantity = 100.0;
+            entry_price = 150.0;
+            entry_date = date_of_string "2024-01-02";
             target_quantity = 100.0;
             exit_price = 165.5;
             filled_quantity = 100.0;
@@ -346,8 +331,11 @@ let test_exit_complete _ =
     }
   in
   let transition =
-    ExitComplete
-      { position_id = "pos-1"; completion_date = date_of_string "2024-01-10" }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-10";
+      kind = ExitComplete;
+    }
   in
   match apply_transition pos transition with
   | Ok pos' -> (
@@ -366,11 +354,21 @@ let test_exit_complete _ =
 let test_invalid_transition_from_closed _ =
   let pos =
     {
+      id = "pos-1";
+      symbol = "AAPL";
+      entry_reasoning =
+        TechnicalSignal { indicator = "EMA"; description = "Test" };
+      exit_reason =
+        Some
+          (TakeProfit
+             {
+               target_price = 165.0;
+               actual_price = 165.0;
+               profit_percent = 10.0;
+             });
       state =
         Closed
           {
-            id = "pos-1";
-            symbol = "AAPL";
             quantity = 100.0;
             entry_price = 150.0;
             exit_price = 165.0;
@@ -378,53 +376,38 @@ let test_invalid_transition_from_closed _ =
             entry_date = date_of_string "2024-01-02";
             exit_date = date_of_string "2024-01-10";
             days_held = 8;
-            entry_reasoning =
-              TechnicalSignal { indicator = "EMA"; description = "Test" };
-            close_reason =
-              TakeProfit
-                {
-                  target_price = 165.0;
-                  actual_price = 165.0;
-                  profit_percent = 10.0;
-                };
           };
       last_updated = date_of_string "2024-01-10";
     }
   in
   let transition =
-    EntryFill
-      {
-        position_id = "pos-1";
-        filled_quantity = 50.0;
-        fill_price = 150.0;
-        fill_date = date_of_string "2024-01-11";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-11";
+      kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
+    }
   in
   assert_that (apply_transition pos transition) is_error
 
 let test_wrong_position_id _ =
   let pos = make_entering () in
   let transition =
-    EntryFill
-      {
-        position_id = "wrong-id";
-        filled_quantity = 50.0;
-        fill_price = 150.0;
-        fill_date = date_of_string "2024-01-02";
-      }
+    {
+      position_id = "wrong-id";
+      date = date_of_string "2024-01-02";
+      kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
+    }
   in
   assert_that (apply_transition pos transition) is_error
 
 let test_invalid_state_transition _ =
   let pos = make_holding () in
   let transition =
-    EntryFill
-      {
-        position_id = "pos-1";
-        filled_quantity = 50.0;
-        fill_price = 150.0;
-        fill_date = date_of_string "2024-01-05";
-      }
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-05";
+      kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
+    }
   in
   assert_that (apply_transition pos transition) is_error
 

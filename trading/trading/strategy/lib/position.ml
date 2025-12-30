@@ -35,118 +35,76 @@ type exit_reason =
   | PortfolioRebalancing
 [@@deriving show, eq]
 
-type entering_state = {
-  id : string;
-  symbol : string;
-  target_quantity : float;
-  entry_price : float;
-  filled_quantity : float;
-  created_date : Date.t;
-  reasoning : entry_reasoning;
-}
-[@@deriving show, eq]
-
-type holding_state = {
-  id : string;
-  symbol : string;
-  quantity : float;
-  entry_price : float;
-  entry_date : Date.t;
-  entry_reasoning : entry_reasoning;
-  risk_params : risk_params;
-}
-[@@deriving show, eq]
-
-type exiting_state = {
-  id : string;
-  symbol : string;
-  holding_state : holding_state;
-  exit_reason : exit_reason;
-  target_quantity : float;
-  exit_price : float;
-  filled_quantity : float;
-  started_date : Date.t;
-}
-[@@deriving show, eq]
-
-type closed_state = {
-  id : string;
-  symbol : string;
-  quantity : float;
-  entry_price : float;
-  exit_price : float;
-  gross_pnl : float;
-  entry_date : Date.t;
-  exit_date : Date.t;
-  days_held : int;
-  entry_reasoning : entry_reasoning;
-  close_reason : exit_reason;
-}
-[@@deriving show, eq]
-
 type position_state =
-  | Entering of entering_state
-  | Holding of holding_state
-  | Exiting of exiting_state
-  | Closed of closed_state
+  | Entering of {
+      target_quantity : float;
+      entry_price : float;
+      filled_quantity : float;
+      created_date : Date.t;
+    }
+  | Holding of {
+      quantity : float;
+      entry_price : float;
+      entry_date : Date.t;
+      risk_params : risk_params;
+    }
+  | Exiting of {
+      quantity : float;
+      entry_price : float;
+      entry_date : Date.t;
+      target_quantity : float;
+      exit_price : float;
+      filled_quantity : float;
+      started_date : Date.t;
+    }
+  | Closed of {
+      quantity : float;
+      entry_price : float;
+      exit_price : float;
+      gross_pnl : float;
+      entry_date : Date.t;
+      exit_date : Date.t;
+      days_held : int;
+    }
 [@@deriving show, eq]
 
-type t = { state : position_state; last_updated : Date.t } [@@deriving show, eq]
+type t = {
+  id : string;
+  symbol : string;
+  entry_reasoning : entry_reasoning;
+  exit_reason : exit_reason option;
+  state : position_state;
+  last_updated : Date.t;
+}
+[@@deriving show, eq]
 
 (** {1 Transitions} *)
 
-type transition =
-  | EntryFill of {
-      position_id : string;
-      filled_quantity : float;
-      fill_price : float;
-      fill_date : Date.t;
-    }
-  | EntryComplete of {
-      position_id : string;
-      risk_params : risk_params;
-      completion_date : Date.t;
-    }
-  | CancelEntry of {
-      position_id : string;
-      reason : string;
-      cancel_date : Date.t;
-    }
-  | TriggerExit of {
-      position_id : string;
-      exit_reason : exit_reason;
-      exit_price : float;
-      trigger_date : Date.t;
-    }
-  | UpdateRiskParams of {
-      position_id : string;
-      new_risk_params : risk_params;
-      update_date : Date.t;
-    }
-  | ExitFill of {
-      position_id : string;
-      filled_quantity : float;
-      fill_price : float;
-      fill_date : Date.t;
-    }
-  | ExitComplete of { position_id : string; completion_date : Date.t }
+type transition_kind =
+  | EntryFill of { filled_quantity : float; fill_price : float }
+  | EntryComplete of { risk_params : risk_params }
+  | CancelEntry of { reason : string }
+  | TriggerExit of { exit_reason : exit_reason; exit_price : float }
+  | UpdateRiskParams of { new_risk_params : risk_params }
+  | ExitFill of { filled_quantity : float; fill_price : float }
+  | ExitComplete
+[@@deriving show, eq]
+
+type transition = {
+  position_id : string;
+  date : Date.t;
+  kind : transition_kind;
+}
 [@@deriving show, eq]
 
 (** {1 Helper Functions} *)
 
-let _get_position_id = function
-  | Entering s -> s.id
-  | Holding s -> s.id
-  | Exiting s -> s.id
-  | Closed s -> s.id
-
-let _validate_position_id state transition_id =
-  let state_id = _get_position_id state in
-  if String.equal state_id transition_id then Ok ()
+let _validate_position_id position_id transition_id =
+  if String.equal position_id transition_id then Ok ()
   else
     Error
       (Status.invalid_argument_error
-         (Printf.sprintf "Position ID mismatch: expected %s, got %s" state_id
+         (Printf.sprintf "Position ID mismatch: expected %s, got %s" position_id
             transition_id))
 
 let _validate_positive name value =
@@ -169,29 +127,18 @@ let _validate_quantity_bounds filled target =
 let create_entering ~id ~symbol ~target_quantity ~entry_price ~created_date
     ~reasoning =
   {
+    id;
+    symbol;
+    entry_reasoning = reasoning;
+    exit_reason = None;
     state =
       Entering
-        {
-          id;
-          symbol;
-          target_quantity;
-          entry_price;
-          filled_quantity = 0.0;
-          created_date;
-          reasoning;
-        };
+        { target_quantity; entry_price; filled_quantity = 0.0; created_date };
     last_updated = created_date;
   }
 
-let get_id t = _get_position_id t.state
-
-let get_symbol t =
-  match t.state with
-  | Entering s -> s.symbol
-  | Holding s -> s.symbol
-  | Exiting s -> s.symbol
-  | Closed s -> s.symbol
-
+let get_id t = t.id
+let get_symbol t = t.symbol
 let get_state t = t.state
 let is_closed t = match t.state with Closed _ -> true | _ -> false
 
@@ -199,129 +146,186 @@ let is_closed t = match t.state with Closed _ -> true | _ -> false
 
 let apply_transition t transition =
   let open Result.Let_syntax in
-  match (t.state, transition) with
+  let%bind () = _validate_position_id t.id transition.position_id in
+  match (t.state, transition.kind) with
   (* Entering state transitions *)
-  | ( Entering entering,
-      EntryFill { position_id; filled_quantity; fill_price; fill_date } ) ->
-      let%bind () = _validate_position_id t.state position_id in
+  | ( Entering
+        {
+          target_quantity;
+          entry_price;
+          filled_quantity = curr_filled;
+          created_date;
+        },
+      EntryFill { filled_quantity; fill_price } ) ->
       let%bind () = _validate_positive "fill_price" fill_price in
       let%bind () = _validate_positive "filled_quantity" filled_quantity in
-      let new_filled = entering.filled_quantity +. filled_quantity in
-      let%bind () =
-        _validate_quantity_bounds new_filled entering.target_quantity
-      in
-      let new_entering = { entering with filled_quantity = new_filled } in
-      Ok { state = Entering new_entering; last_updated = fill_date }
-  | ( Entering entering,
-      EntryComplete { position_id; risk_params; completion_date } ) ->
-      let%bind () = _validate_position_id t.state position_id in
-      if Float.(entering.filled_quantity <= 0.0) then
+      let new_filled = curr_filled +. filled_quantity in
+      let%bind () = _validate_quantity_bounds new_filled target_quantity in
+      Ok
+        {
+          t with
+          state =
+            Entering
+              {
+                target_quantity;
+                entry_price;
+                filled_quantity = new_filled;
+                created_date;
+              };
+          last_updated = transition.date;
+        }
+  | ( Entering
+        { target_quantity = _; entry_price; filled_quantity; created_date = _ },
+      EntryComplete { risk_params } ) ->
+      if Float.(filled_quantity <= 0.0) then
         Error
           (Status.invalid_argument_error "Cannot complete entry with no fills")
       else
-        let holding =
+        Ok
           {
-            id = entering.id;
-            symbol = entering.symbol;
-            quantity = entering.filled_quantity;
-            entry_price = entering.entry_price;
-            entry_date = completion_date;
-            entry_reasoning = entering.reasoning;
-            risk_params;
+            t with
+            state =
+              Holding
+                {
+                  quantity = filled_quantity;
+                  entry_price;
+                  entry_date = transition.date;
+                  risk_params;
+                };
+            last_updated = transition.date;
           }
-        in
-        Ok { state = Holding holding; last_updated = completion_date }
-  | Entering entering, CancelEntry { position_id; reason = _; cancel_date } ->
-      let%bind () = _validate_position_id t.state position_id in
-      if Float.(entering.filled_quantity > 0.0) then
+  | ( Entering
+        { target_quantity = _; entry_price; filled_quantity; created_date },
+      CancelEntry { reason = _ } ) ->
+      if Float.(filled_quantity > 0.0) then
         Error
           (Status.invalid_argument_error
              "Cannot cancel entry after fills occurred")
       else
-        let closed =
+        Ok
           {
-            id = entering.id;
-            symbol = entering.symbol;
-            quantity = 0.0;
-            entry_price = entering.entry_price;
-            exit_price = entering.entry_price;
-            gross_pnl = 0.0;
-            entry_date = entering.created_date;
-            exit_date = cancel_date;
-            days_held = Date.diff cancel_date entering.created_date;
-            entry_reasoning = entering.reasoning;
-            close_reason = PortfolioRebalancing;
+            t with
+            state =
+              Closed
+                {
+                  quantity = 0.0;
+                  entry_price;
+                  exit_price = entry_price;
+                  gross_pnl = 0.0;
+                  entry_date = created_date;
+                  exit_date = transition.date;
+                  days_held = Date.diff transition.date created_date;
+                };
+            exit_reason = Some PortfolioRebalancing;
+            last_updated = transition.date;
           }
-        in
-        Ok { state = Closed closed; last_updated = cancel_date }
   (* Holding state transitions *)
-  | ( Holding holding,
-      TriggerExit { position_id; exit_reason; exit_price; trigger_date } ) ->
-      let%bind () = _validate_position_id t.state position_id in
+  | ( Holding { quantity; entry_price; entry_date; risk_params = _ },
+      TriggerExit { exit_reason; exit_price } ) ->
       let%bind () = _validate_positive "exit_price" exit_price in
-      let exiting =
+      Ok
         {
-          id = holding.id;
-          symbol = holding.symbol;
-          holding_state = holding;
-          exit_reason;
-          target_quantity = holding.quantity;
-          exit_price;
-          filled_quantity = 0.0;
-          started_date = trigger_date;
+          t with
+          state =
+            Exiting
+              {
+                quantity;
+                entry_price;
+                entry_date;
+                target_quantity = quantity;
+                exit_price;
+                filled_quantity = 0.0;
+                started_date = transition.date;
+              };
+          exit_reason = Some exit_reason;
+          last_updated = transition.date;
         }
-      in
-      Ok { state = Exiting exiting; last_updated = trigger_date }
-  | ( Holding holding,
-      UpdateRiskParams { position_id; new_risk_params; update_date } ) ->
-      let%bind () = _validate_position_id t.state position_id in
-      let updated_holding = { holding with risk_params = new_risk_params } in
-      Ok { state = Holding updated_holding; last_updated = update_date }
+  | ( Holding { quantity; entry_price; entry_date; risk_params = _ },
+      UpdateRiskParams { new_risk_params } ) ->
+      Ok
+        {
+          t with
+          state =
+            Holding
+              {
+                quantity;
+                entry_price;
+                entry_date;
+                risk_params = new_risk_params;
+              };
+          last_updated = transition.date;
+        }
   (* Exiting state transitions *)
-  | ( Exiting exiting,
-      ExitFill { position_id; filled_quantity; fill_price; fill_date } ) ->
-      let%bind () = _validate_position_id t.state position_id in
+  | ( Exiting
+        {
+          quantity;
+          entry_price;
+          entry_date;
+          target_quantity;
+          exit_price;
+          filled_quantity = curr_filled;
+          started_date;
+        },
+      ExitFill { filled_quantity; fill_price } ) ->
       let%bind () = _validate_positive "fill_price" fill_price in
       let%bind () = _validate_positive "filled_quantity" filled_quantity in
-      let new_filled = exiting.filled_quantity +. filled_quantity in
-      let%bind () =
-        _validate_quantity_bounds new_filled exiting.target_quantity
-      in
-      let new_exiting = { exiting with filled_quantity = new_filled } in
-      Ok { state = Exiting new_exiting; last_updated = fill_date }
-  | Exiting exiting, ExitComplete { position_id; completion_date } ->
-      let%bind () = _validate_position_id t.state position_id in
-      if Float.(exiting.filled_quantity <= 0.0) then
+      let new_filled = curr_filled +. filled_quantity in
+      let%bind () = _validate_quantity_bounds new_filled target_quantity in
+      Ok
+        {
+          t with
+          state =
+            Exiting
+              {
+                quantity;
+                entry_price;
+                entry_date;
+                target_quantity;
+                exit_price;
+                filled_quantity = new_filled;
+                started_date;
+              };
+          last_updated = transition.date;
+        }
+  | ( Exiting
+        {
+          quantity = _;
+          entry_price;
+          entry_date;
+          target_quantity = _;
+          exit_price;
+          filled_quantity;
+          started_date = _;
+        },
+      ExitComplete ) ->
+      if Float.(filled_quantity <= 0.0) then
         Error
           (Status.invalid_argument_error "Cannot complete exit with no fills")
       else
-        let holding = exiting.holding_state in
-        let gross_pnl =
-          (exiting.exit_price -. holding.entry_price) *. exiting.filled_quantity
-        in
-        let closed =
+        let gross_pnl = (exit_price -. entry_price) *. filled_quantity in
+        Ok
           {
-            id = exiting.id;
-            symbol = exiting.symbol;
-            quantity = exiting.filled_quantity;
-            entry_price = holding.entry_price;
-            exit_price = exiting.exit_price;
-            gross_pnl;
-            entry_date = holding.entry_date;
-            exit_date = completion_date;
-            days_held = Date.diff completion_date holding.entry_date;
-            entry_reasoning = holding.entry_reasoning;
-            close_reason = exiting.exit_reason;
+            t with
+            state =
+              Closed
+                {
+                  quantity = filled_quantity;
+                  entry_price;
+                  exit_price;
+                  gross_pnl;
+                  entry_date;
+                  exit_date = transition.date;
+                  days_held = Date.diff transition.date entry_date;
+                };
+            last_updated = transition.date;
           }
-        in
-        Ok { state = Closed closed; last_updated = completion_date }
   (* Invalid transitions *)
   | Closed _, _ ->
       Error
         (Status.invalid_argument_error
            "Cannot apply transitions to closed position")
-  | _, transition ->
+  | _, kind ->
       Error
         (Status.invalid_argument_error
            (Printf.sprintf "Invalid transition %s for current state"
-              (show_transition transition)))
+              (show_transition_kind kind)))
