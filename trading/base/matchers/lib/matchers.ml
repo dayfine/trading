@@ -49,11 +49,13 @@ let is_error_with ?msg expected_code result =
              (Status.show_code expected_code)
              (Status.show_code code));
       match msg with
-      | Some predicate ->
+      | Some substring ->
           let msg_str = Status.show status in
-          if not (predicate msg_str) then
+          if not (String.is_substring msg_str ~substring) then
             assert_failure
-              (Printf.sprintf "Error message predicate failed for: %s" msg_str)
+              (Printf.sprintf
+                 "Expected error message to contain '%s' but got: %s" substring
+                 msg_str)
       | None -> ())
 
 (* ========================================================================== *)
