@@ -177,25 +177,15 @@ let apply_transition t transition =
   in
   match (t.state, transition.kind) with
   (* Entering state transitions *)
-  | ( Entering
-        {
-          target_quantity;
-          entry_price;
-          filled_quantity = curr_filled;
-          created_date;
-        },
-      EntryFill { filled_quantity; fill_price = _ } ) ->
-      let new_filled = curr_filled +. filled_quantity in
+  | Entering entry_state, EntryFill { filled_quantity; fill_price = _ } ->
       Ok
         {
           t with
           state =
             Entering
               {
-                target_quantity;
-                entry_price;
-                filled_quantity = new_filled;
-                created_date;
+                entry_state with
+                filled_quantity = entry_state.filled_quantity +. filled_quantity;
               };
           last_updated = transition.date;
         }
@@ -264,47 +254,23 @@ let apply_transition t transition =
           exit_reason = Some exit_reason;
           last_updated = transition.date;
         }
-  | ( Holding { quantity; entry_price; entry_date; risk_params = _ },
-      UpdateRiskParams { new_risk_params } ) ->
+  | Holding holding_state, UpdateRiskParams { new_risk_params } ->
       Ok
         {
           t with
-          state =
-            Holding
-              {
-                quantity;
-                entry_price;
-                entry_date;
-                risk_params = new_risk_params;
-              };
+          state = Holding { holding_state with risk_params = new_risk_params };
           last_updated = transition.date;
         }
   (* Exiting state transitions *)
-  | ( Exiting
-        {
-          quantity;
-          entry_price;
-          entry_date;
-          target_quantity;
-          exit_price;
-          filled_quantity = curr_filled;
-          started_date;
-        },
-      ExitFill { filled_quantity; fill_price = _ } ) ->
-      let new_filled = curr_filled +. filled_quantity in
+  | Exiting exit_state, ExitFill { filled_quantity; fill_price = _ } ->
       Ok
         {
           t with
           state =
             Exiting
               {
-                quantity;
-                entry_price;
-                entry_date;
-                target_quantity;
-                exit_price;
-                filled_quantity = new_filled;
-                started_date;
+                exit_state with
+                filled_quantity = exit_state.filled_quantity +. filled_quantity;
               };
           last_updated = transition.date;
         }
