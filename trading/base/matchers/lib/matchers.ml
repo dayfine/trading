@@ -39,15 +39,24 @@ let is_error result =
   | Ok _ -> assert_failure "Expected Error but got Ok"
   | Error _ -> () (* Expected *)
 
-let is_error_with expected_code result =
+let is_error_with ?msg expected_code result =
   match result with
   | Ok _ -> assert_failure "Expected Error but got Ok"
-  | Error { Status.code; _ } ->
+  | Error ({ Status.code; _ } as status) -> (
       if not (Status.equal_code code expected_code) then
         assert_failure
           (Printf.sprintf "Expected error code %s but got %s"
              (Status.show_code expected_code)
-             (Status.show_code code))
+             (Status.show_code code));
+      match msg with
+      | Some substring ->
+          let msg_str = Status.show status in
+          if not (String.is_substring msg_str ~substring) then
+            assert_failure
+              (Printf.sprintf
+                 "Expected error message to contain '%s' but got: %s" substring
+                 msg_str)
+      | None -> ())
 
 (* ========================================================================== *)
 (* Option Matchers                                                           *)

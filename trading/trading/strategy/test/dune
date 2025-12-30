@@ -1,0 +1,4 @@
+(test
+ (name test_position)
+ (modules test_position)
+ (libraries ounit2 core trading.strategy trading.base matchers))
