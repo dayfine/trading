@@ -122,6 +122,33 @@ let _validate_quantity_bounds filled target =
          (Printf.sprintf "Filled quantity (%.2f) exceeds target (%.2f)" filled
             target))
 
+let _validate_transition t transition =
+  match (t.state, transition.kind) with
+  | ( Entering { target_quantity; filled_quantity = curr_filled; _ },
+      EntryFill { filled_quantity; fill_price } ) ->
+      let new_filled = curr_filled +. filled_quantity in
+      [
+        _validate_positive "fill_price" fill_price;
+        _validate_positive "filled_quantity" filled_quantity;
+        _validate_quantity_bounds new_filled target_quantity;
+      ]
+  | Entering _, EntryComplete _ -> []
+  | Entering _, CancelEntry _ -> []
+  | Holding _, TriggerExit { exit_price; _ } ->
+      [ _validate_positive "exit_price" exit_price ]
+  | Holding _, UpdateRiskParams _ -> []
+  | ( Exiting { target_quantity; filled_quantity = curr_filled; _ },
+      ExitFill { filled_quantity; fill_price } ) ->
+      let new_filled = curr_filled +. filled_quantity in
+      [
+        _validate_positive "fill_price" fill_price;
+        _validate_positive "filled_quantity" filled_quantity;
+        _validate_quantity_bounds new_filled target_quantity;
+      ]
+  | Exiting _, ExitComplete -> []
+  | Closed _, _ -> []
+  | _ -> []
+
 (** {1 Position Operations} *)
 
 let create_entering ~id ~symbol ~target_quantity ~entry_price ~created_date
@@ -145,6 +172,9 @@ let is_closed t = match t.state with Closed _ -> true | _ -> false
 let apply_transition t transition =
   let open Result.Let_syntax in
   let%bind () = _validate_position_id t.id transition.position_id in
+  let%bind () =
+    Status.combine_status_list (_validate_transition t transition)
+  in
   match (t.state, transition.kind) with
   (* Entering state transitions *)
   | ( Entering
@@ -154,16 +184,8 @@ let apply_transition t transition =
           filled_quantity = curr_filled;
           created_date;
         },
-      EntryFill { filled_quantity; fill_price } ) ->
+      EntryFill { filled_quantity; fill_price = _ } ) ->
       let new_filled = curr_filled +. filled_quantity in
-      let validations =
-        [
-          _validate_positive "fill_price" fill_price;
-          _validate_positive "filled_quantity" filled_quantity;
-          _validate_quantity_bounds new_filled target_quantity;
-        ]
-      in
-      let%bind () = Status.combine_status_list validations in
       Ok
         {
           t with
@@ -225,7 +247,6 @@ let apply_transition t transition =
   (* Holding state transitions *)
   | ( Holding { quantity; entry_price; entry_date; risk_params = _ },
       TriggerExit { exit_reason; exit_price } ) ->
-      let%bind () = _validate_positive "exit_price" exit_price in
       Ok
         {
           t with
@@ -269,16 +290,8 @@ let apply_transition t transition =
           filled_quantity = curr_filled;
           started_date;
         },
-      ExitFill { filled_quantity; fill_price } ) ->
+      ExitFill { filled_quantity; fill_price = _ } ) ->
       let new_filled = curr_filled +. filled_quantity in
-      let validations =
-        [
-          _validate_positive "fill_price" fill_price;
-          _validate_positive "filled_quantity" filled_quantity;
-          _validate_quantity_bounds new_filled target_quantity;
-        ]
-      in
-      let%bind () = Status.combine_status_list validations in
       Ok
         {
           t with
