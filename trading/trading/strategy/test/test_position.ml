@@ -8,26 +8,22 @@ let date_of_string s = Date.of_string s
 (* Test helpers *)
 
 let make_entering ?(id = "pos-1") ?(symbol = "AAPL") ?(target = 100.0)
-    ?(entry_price = 150.0) ?(filled = 0.0) () =
-  let pos =
-    create_entering ~id ~symbol ~target_quantity:target ~entry_price
-      ~created_date:(date_of_string "2024-01-01")
-      ~reasoning:(TechnicalSignal { indicator = "EMA"; description = "Test" })
+    ?(entry_price = 150.0) () =
+  create_entering ~id ~symbol ~target_quantity:target ~entry_price
+    ~created_date:(date_of_string "2024-01-01")
+    ~reasoning:(TechnicalSignal { indicator = "EMA"; description = "Test" })
+
+let apply_entry_fill pos ~filled_quantity =
+  let transition =
+    {
+      position_id = pos.id;
+      date = date_of_string "2024-01-01";
+      kind = EntryFill { filled_quantity; fill_price = 150.0 };
+    }
   in
-  match pos.state with
-  | Entering entering ->
-      {
-        pos with
-        state =
-          Entering
-            {
-              target_quantity = entering.target_quantity;
-              entry_price = entering.entry_price;
-              filled_quantity = filled;
-              created_date = entering.created_date;
-            };
-      }
-  | _ -> failwith "Expected Entering state"
+  match apply_transition pos transition with
+  | Ok pos' -> pos'
+  | Error err -> failwith ("Failed to apply fill: " ^ Status.show err)
 
 let make_holding ?(id = "pos-1") ?(symbol = "AAPL") ?(quantity = 100.0)
     ?(entry_price = 150.0) () =
@@ -74,7 +70,7 @@ let test_create_entering _ =
 (* ==================== Entry Transitions ==================== *)
 
 let test_entry_fill_partial _ =
-  let pos = make_entering ~filled:0.0 () in
+  let pos = make_entering () in
   let transition =
     {
       position_id = "pos-1";
@@ -91,7 +87,8 @@ let test_entry_fill_partial _ =
   | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
 
 let test_entry_fill_multiple _ =
-  let pos = make_entering ~filled:50.0 () in
+  let pos = make_entering () in
+  let pos = apply_entry_fill pos ~filled_quantity:50.0 in
   let transition =
     {
       position_id = "pos-1";
@@ -108,7 +105,8 @@ let test_entry_fill_multiple _ =
   | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
 
 let test_entry_fill_exceeds_target _ =
-  let pos = make_entering ~target:100.0 ~filled:90.0 () in
+  let pos = make_entering ~target:100.0 () in
+  let pos = apply_entry_fill pos ~filled_quantity:90.0 in
   let transition =
     {
       position_id = "pos-1";
@@ -119,7 +117,8 @@ let test_entry_fill_exceeds_target _ =
   assert_that (apply_transition pos transition) is_error
 
 let test_entry_fill_multiple_validation_errors _ =
-  let pos = make_entering ~target:100.0 ~filled:90.0 () in
+  let pos = make_entering ~target:100.0 () in
+  let pos = apply_entry_fill pos ~filled_quantity:90.0 in
   let transition =
     {
       position_id = "pos-1";
@@ -138,7 +137,8 @@ let test_entry_fill_multiple_validation_errors _ =
            ~substring:"Filled quantity (110.00) exceeds target (100.00)")
 
 let test_entry_complete _ =
-  let pos = make_entering ~filled:100.0 () in
+  let pos = make_entering () in
+  let pos = apply_entry_fill pos ~filled_quantity:100.0 in
   let transition =
     {
       position_id = "pos-1";
@@ -167,7 +167,7 @@ let test_entry_complete _ =
   | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
 
 let test_entry_complete_no_fills _ =
-  let pos = make_entering ~filled:0.0 () in
+  let pos = make_entering () in
   let transition =
     {
       position_id = "pos-1";
@@ -187,7 +187,7 @@ let test_entry_complete_no_fills _ =
   assert_that (apply_transition pos transition) is_error
 
 let test_cancel_entry_no_fills _ =
-  let pos = make_entering ~filled:0.0 () in
+  let pos = make_entering () in
   let transition =
     {
       position_id = "pos-1";
@@ -204,7 +204,8 @@ let test_cancel_entry_no_fills _ =
   | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
 
 let test_cancel_entry_with_fills _ =
-  let pos = make_entering ~filled:50.0 () in
+  let pos = make_entering () in
+  let pos = apply_entry_fill pos ~filled_quantity:50.0 in
   let transition =
     {
       position_id = "pos-1";
