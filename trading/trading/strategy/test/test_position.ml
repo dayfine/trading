@@ -133,23 +133,12 @@ let test_entry_fill_multiple_validation_errors _ =
       kind = EntryFill { filled_quantity = 20.0; fill_price = -10.0 };
     }
   in
-  match apply_transition pos transition with
-  | Ok _ -> assert_failure "Expected validation errors"
-  | Error err ->
-      let err_msg = Status.show err in
-      assert_that err_msg
-        (all_of
-           [
-             (fun msg ->
-               assert_bool "Should report negative fill_price error"
-                 (String.is_substring msg
-                    ~substring:"fill_price must be positive"));
-             (fun msg ->
-               assert_bool "Should report quantity bounds error"
-                 (String.is_substring msg
-                    ~substring:
-                      "Filled quantity (110.00) exceeds target (100.00)"));
-           ])
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument ~msg:(fun msg ->
+         String.is_substring msg ~substring:"fill_price must be positive"
+         && String.is_substring msg
+              ~substring:"Filled quantity (110.00) exceeds target (100.00)"))
 
 let test_entry_complete _ =
   let pos = make_entering () in

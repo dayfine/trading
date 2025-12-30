@@ -115,9 +115,11 @@ val is_error : 'a Status.status_or matcher
       assert_that (validate_input invalid_data) is_error
     ]} *)
 
-val is_error_with : Status.code -> 'a Status.status_or matcher
-(** [is_error_with code] creates a matcher that asserts a Result is Error with
-    the specified status code.
+val is_error_with :
+  ?msg:(string -> bool) -> Status.code -> 'a Status.status_or matcher
+(** [is_error_with ?msg code] creates a matcher that asserts a Result is Error
+    with the specified status code. Optionally takes a message predicate to
+    check the error message content.
 
     Example:
     {[
@@ -125,6 +127,11 @@ val is_error_with : Status.code -> 'a Status.status_or matcher
     ]}
     {[
       assert_that (create_order invalid_params) (is_error_with Invalid_argument)
+    ]}
+    {[
+      assert_that result
+        (is_error_with Invalid_argument
+           ~msg:(fun msg -> String.is_substring msg ~substring:"must be positive"))
     ]} *)
 
 (** {1 Option Matchers}
