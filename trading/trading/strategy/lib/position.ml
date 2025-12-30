@@ -61,7 +61,7 @@ type position_state =
       quantity : float;
       entry_price : float;
       exit_price : float;
-      gross_pnl : float;
+      gross_pnl : float option;
       entry_date : Date.t;
       exit_date : Date.t;
       days_held : int;
@@ -226,7 +226,7 @@ let apply_transition t transition =
                 quantity = 0.0;
                 entry_price = entry_state.entry_price;
                 exit_price = entry_state.entry_price;
-                gross_pnl = 0.0;
+                gross_pnl = None;
                 entry_date = entry_state.created_date;
                 exit_date = transition.date;
                 days_held = Date.diff transition.date entry_state.created_date;
@@ -275,10 +275,6 @@ let apply_transition t transition =
           last_updated = transition.date;
         }
   | Exiting exit_state, ExitComplete ->
-      let gross_pnl =
-        (exit_state.exit_price -. exit_state.entry_price)
-        *. exit_state.filled_quantity
-      in
       Ok
         {
           t with
@@ -288,7 +284,7 @@ let apply_transition t transition =
                 quantity = exit_state.filled_quantity;
                 entry_price = exit_state.entry_price;
                 exit_price = exit_state.exit_price;
-                gross_pnl;
+                gross_pnl = None;
                 entry_date = exit_state.entry_date;
                 exit_date = transition.date;
                 days_held = Date.diff transition.date exit_state.entry_date;

@@ -364,7 +364,7 @@ let test_exit_complete _ =
           assert_that closed.quantity (float_equal 100.0);
           assert_that closed.entry_price (float_equal 150.0);
           assert_that closed.exit_price (float_equal 165.5);
-          assert_that closed.gross_pnl (float_equal 1550.0)
+          assert_that closed.gross_pnl is_none
       | _ -> assert_failure "Expected Closed state")
   | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
 
@@ -391,7 +391,7 @@ let test_invalid_transition_from_closed _ =
             quantity = 100.0;
             entry_price = 150.0;
             exit_price = 165.0;
-            gross_pnl = 1500.0;
+            gross_pnl = None;
             entry_date = date_of_string "2024-01-02";
             exit_date = date_of_string "2024-01-10";
             days_held = 8;

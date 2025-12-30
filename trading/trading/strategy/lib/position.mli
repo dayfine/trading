@@ -168,7 +168,7 @@ type position_state =
       quantity : float;  (** Final position quantity *)
       entry_price : float;  (** Average entry price *)
       exit_price : float;  (** Average exit price *)
-      gross_pnl : float;  (** Profit/loss before commissions *)
+      gross_pnl : float option;  (** Populated by engine from portfolio *)
       entry_date : Date.t;  (** Entry date *)
       exit_date : Date.t;  (** Exit date *)
       days_held : int;  (** Days between entry and exit *)
