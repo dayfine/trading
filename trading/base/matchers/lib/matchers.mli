@@ -130,8 +130,8 @@ val is_error_with :
     ]}
     {[
       assert_that result
-        (is_error_with Invalid_argument
-           ~msg:(fun msg -> String.is_substring msg ~substring:"must be positive"))
+        (is_error_with Invalid_argument ~msg:(fun msg ->
+             String.is_substring msg ~substring:"must be positive"))
     ]} *)
 
 (** {1 Option Matchers}
