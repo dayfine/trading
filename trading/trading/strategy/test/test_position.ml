@@ -121,7 +121,7 @@ let test_entry_fill_exceeds_target _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_error_with Status.Invalid_argument)
+    (is_error_with Status.Invalid_argument ~msg:"exceeds target")
 
 let test_entry_fill_multiple_validation_errors _ =
   let pos = make_entering ~target:100.0 () in
@@ -133,16 +133,11 @@ let test_entry_fill_multiple_validation_errors _ =
       kind = EntryFill { filled_quantity = 20.0; fill_price = -10.0 };
     }
   in
-  match apply_transition pos transition with
-  | Ok _ -> assert_failure "Expected validation errors"
-  | Error err ->
-      let err_msg = Status.show err in
-      assert_that (Result.Error err)
-        (is_error_with Status.Invalid_argument
-           ~msg:"fill_price must be positive");
-      assert_bool "Should report quantity bounds error"
-        (String.is_substring err_msg
-           ~substring:"Filled quantity (110.00) exceeds target (100.00)")
+  let result = apply_transition pos transition in
+  assert_that result
+    (is_error_with Status.Invalid_argument ~msg:"fill_price must be positive");
+  assert_that result
+    (is_error_with Status.Invalid_argument ~msg:"exceeds target")
 
 let test_entry_complete _ =
   let pos = make_entering () in
@@ -166,13 +161,21 @@ let test_entry_complete _ =
   assert_that
     (apply_transition pos transition)
     (is_ok_and_holds (fun pos' ->
-         match get_state pos' with
-         | Holding holding ->
-             assert_that holding.quantity (float_equal 100.0);
-             assert_that holding.entry_price (float_equal 150.0);
-             assert_that holding.risk_params.stop_loss_price
-               (is_some_and (float_equal 142.5))
-         | _ -> assert_failure "Expected Holding state"))
+         assert_that (get_state pos')
+           (equal_to
+              (Holding
+                 {
+                   quantity = 100.0;
+                   entry_price = 150.0;
+                   entry_date = date_of_string "2024-01-02";
+                   risk_params =
+                     {
+                       stop_loss_price = Some 142.5;
+                       take_profit_price = Some 165.0;
+                       max_hold_days = Some 30;
+                     };
+                 }
+                : position_state))))
 
 let test_entry_complete_no_fills _ =
   let pos = make_entering () in
@@ -194,7 +197,7 @@ let test_entry_complete_no_fills _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_error_with Status.Invalid_argument)
+    (is_error_with Status.Invalid_argument ~msg:"no fills")
 
 let test_cancel_entry_no_fills _ =
   let pos = make_entering () in
@@ -225,7 +228,7 @@ let test_cancel_entry_with_fills _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_error_with Status.Invalid_argument)
+    (is_error_with Status.Invalid_argument ~msg:"after fills occurred")
 
 (* ==================== Holding Transitions ==================== *)
 
@@ -252,15 +255,29 @@ let test_trigger_exit _ =
   assert_that
     (apply_transition pos transition)
     (is_ok_and_holds (fun pos' ->
-         match get_state pos' with
-         | Exiting exiting -> (
-             assert_that exiting.exit_price (float_equal 165.0);
-             assert_that exiting.target_quantity (float_equal 100.0);
-             match pos'.exit_reason with
-             | Some (TakeProfit { profit_percent; _ }) ->
-                 assert_that profit_percent (float_equal 10.3)
-             | _ -> assert_failure "Expected TakeProfit reason")
-         | _ -> assert_failure "Expected Exiting state"))
+         assert_that (get_state pos')
+           (equal_to
+              (Exiting
+                 {
+                   quantity = 100.0;
+                   entry_price = 150.0;
+                   entry_date = date_of_string "2024-01-02";
+                   target_quantity = 100.0;
+                   exit_price = 165.0;
+                   filled_quantity = 0.0;
+                   started_date = date_of_string "2024-01-10";
+                 }
+                : position_state));
+         assert_that pos'.exit_reason
+           (is_some_and
+              (equal_to
+                 (TakeProfit
+                    {
+                      target_price = 165.0;
+                      actual_price = 165.5;
+                      profit_percent = 10.3;
+                    }
+                   : exit_reason)))))
 
 let test_update_risk_params _ =
   let pos = make_holding () in
@@ -281,11 +298,16 @@ let test_update_risk_params _ =
   assert_that
     (apply_transition pos transition)
     (is_ok_and_holds (fun pos' ->
-         match get_state pos' with
-         | Holding holding ->
-             assert_that holding.risk_params.stop_loss_price
-               (is_some_and (float_equal 145.0))
-         | _ -> assert_failure "Expected Holding state"))
+         assert_that (get_state pos')
+           (equal_to
+              (Holding
+                 {
+                   quantity = 100.0;
+                   entry_price = 150.0;
+                   entry_date = date_of_string "2024-01-02";
+                   risk_params = new_params;
+                 }
+                : position_state))))
 
 (* ==================== Exit Transitions ==================== *)
 
@@ -328,10 +350,19 @@ let test_exit_fill _ =
   assert_that
     (apply_transition pos transition)
     (is_ok_and_holds (fun pos' ->
-         match get_state pos' with
-         | Exiting exiting ->
-             assert_that exiting.filled_quantity (float_equal 100.0)
-         | _ -> assert_failure "Expected Exiting state"))
+         assert_that (get_state pos')
+           (equal_to
+              (Exiting
+                 {
+                   quantity = 100.0;
+                   entry_price = 150.0;
+                   entry_date = date_of_string "2024-01-02";
+                   target_quantity = 100.0;
+                   exit_price = 165.0;
+                   filled_quantity = 100.0;
+                   started_date = date_of_string "2024-01-10";
+                 }
+                : position_state))))
 
 let test_exit_complete _ =
   let pos =
@@ -373,13 +404,19 @@ let test_exit_complete _ =
     (apply_transition pos transition)
     (is_ok_and_holds (fun pos' ->
          assert_that (is_closed pos') (equal_to true);
-         match get_state pos' with
-         | Closed closed ->
-             assert_that closed.quantity (float_equal 100.0);
-             assert_that closed.entry_price (float_equal 150.0);
-             assert_that closed.exit_price (float_equal 165.5);
-             assert_that closed.gross_pnl is_none
-         | _ -> assert_failure "Expected Closed state"))
+         assert_that (get_state pos')
+           (equal_to
+              (Closed
+                 {
+                   quantity = 100.0;
+                   entry_price = 150.0;
+                   exit_price = 165.5;
+                   gross_pnl = None;
+                   entry_date = date_of_string "2024-01-02";
+                   exit_date = date_of_string "2024-01-10";
+                   days_held = 8;
+                 }
+                : position_state))))
 
 (* ==================== Invalid Transitions ==================== *)
 
@@ -390,14 +427,7 @@ let test_invalid_transition_from_closed _ =
       symbol = "AAPL";
       entry_reasoning =
         TechnicalSignal { indicator = "EMA"; description = "Test" };
-      exit_reason =
-        Some
-          (TakeProfit
-             {
-               target_price = 165.0;
-               actual_price = 165.0;
-               profit_percent = 10.0;
-             });
+      exit_reason = None;
       state =
         Closed
           {
@@ -421,7 +451,7 @@ let test_invalid_transition_from_closed _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_error_with Status.Invalid_argument)
+    (is_error_with Status.Invalid_argument ~msg:"closed position")
 
 let test_wrong_position_id _ =
   let pos = make_entering () in
@@ -434,7 +464,7 @@ let test_wrong_position_id _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_error_with Status.Invalid_argument)
+    (is_error_with Status.Invalid_argument ~msg:"ID mismatch")
 
 let test_invalid_state_transition _ =
   let pos = make_holding () in
@@ -447,7 +477,7 @@ let test_invalid_state_transition _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_error_with Status.Invalid_argument)
+    (is_error_with Status.Invalid_argument ~msg:"Invalid transition")
 
 (* ==================== Test Suite ==================== *)
 
