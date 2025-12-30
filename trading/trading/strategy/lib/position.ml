@@ -122,6 +122,16 @@ let _validate_quantity_bounds filled target =
          (Printf.sprintf "Filled quantity (%.2f) exceeds target (%.2f)" filled
             target))
 
+let _validate_has_fills filled =
+  if Float.(filled > 0.0) then Ok ()
+  else Error (Status.invalid_argument_error "Cannot complete with no fills")
+
+let _validate_no_fills filled =
+  if Float.(filled = 0.0) then Ok ()
+  else
+    Error
+      (Status.invalid_argument_error "Cannot cancel entry after fills occurred")
+
 let _validate_transition t transition =
   match (t.state, transition.kind) with
   | ( Entering { target_quantity; filled_quantity = curr_filled; _ },
@@ -132,8 +142,10 @@ let _validate_transition t transition =
         _validate_positive "filled_quantity" filled_quantity;
         _validate_quantity_bounds new_filled target_quantity;
       ]
-  | Entering _, EntryComplete _ -> []
-  | Entering _, CancelEntry _ -> []
+  | Entering { filled_quantity; _ }, EntryComplete _ ->
+      [ _validate_has_fills filled_quantity ]
+  | Entering { filled_quantity; _ }, CancelEntry _ ->
+      [ _validate_no_fills filled_quantity ]
   | Holding _, TriggerExit { exit_price; _ } ->
       [ _validate_positive "exit_price" exit_price ]
   | Holding _, UpdateRiskParams _ -> []
@@ -145,7 +157,8 @@ let _validate_transition t transition =
         _validate_positive "filled_quantity" filled_quantity;
         _validate_quantity_bounds new_filled target_quantity;
       ]
-  | Exiting _, ExitComplete -> []
+  | Exiting { filled_quantity; _ }, ExitComplete ->
+      [ _validate_has_fills filled_quantity ]
   | Closed _, _ -> []
   | _ -> []
 
@@ -189,51 +202,38 @@ let apply_transition t transition =
               };
           last_updated = transition.date;
         }
-  | ( Entering
-        { target_quantity = _; entry_price; filled_quantity; created_date = _ },
-      EntryComplete { risk_params } ) ->
-      if Float.(filled_quantity <= 0.0) then
-        Error
-          (Status.invalid_argument_error "Cannot complete entry with no fills")
-      else
-        Ok
-          {
-            t with
-            state =
-              Holding
-                {
-                  quantity = filled_quantity;
-                  entry_price;
-                  entry_date = transition.date;
-                  risk_params;
-                };
-            last_updated = transition.date;
-          }
-  | ( Entering
-        { target_quantity = _; entry_price; filled_quantity; created_date },
-      CancelEntry { reason = _ } ) ->
-      if Float.(filled_quantity > 0.0) then
-        Error
-          (Status.invalid_argument_error
-             "Cannot cancel entry after fills occurred")
-      else
-        Ok
-          {
-            t with
-            state =
-              Closed
-                {
-                  quantity = 0.0;
-                  entry_price;
-                  exit_price = entry_price;
-                  gross_pnl = 0.0;
-                  entry_date = created_date;
-                  exit_date = transition.date;
-                  days_held = Date.diff transition.date created_date;
-                };
-            exit_reason = Some PortfolioRebalancing;
-            last_updated = transition.date;
-          }
+  | Entering entry_state, EntryComplete { risk_params } ->
+      Ok
+        {
+          t with
+          state =
+            Holding
+              {
+                quantity = entry_state.filled_quantity;
+                entry_price = entry_state.entry_price;
+                entry_date = transition.date;
+                risk_params;
+              };
+          last_updated = transition.date;
+        }
+  | Entering entry_state, CancelEntry { reason = _ } ->
+      Ok
+        {
+          t with
+          state =
+            Closed
+              {
+                quantity = 0.0;
+                entry_price = entry_state.entry_price;
+                exit_price = entry_state.entry_price;
+                gross_pnl = 0.0;
+                entry_date = entry_state.created_date;
+                exit_date = transition.date;
+                days_held = Date.diff transition.date entry_state.created_date;
+              };
+          exit_reason = Some PortfolioRebalancing;
+          last_updated = transition.date;
+        }
   (* Holding state transitions *)
   | ( Holding { quantity; entry_price; entry_date; risk_params = _ },
       TriggerExit { exit_reason; exit_price } ) ->
@@ -274,38 +274,27 @@ let apply_transition t transition =
               };
           last_updated = transition.date;
         }
-  | ( Exiting
+  | Exiting exit_state, ExitComplete ->
+      let gross_pnl =
+        (exit_state.exit_price -. exit_state.entry_price)
+        *. exit_state.filled_quantity
+      in
+      Ok
         {
-          quantity = _;
-          entry_price;
-          entry_date;
-          target_quantity = _;
-          exit_price;
-          filled_quantity;
-          started_date = _;
-        },
-      ExitComplete ) ->
-      if Float.(filled_quantity <= 0.0) then
-        Error
-          (Status.invalid_argument_error "Cannot complete exit with no fills")
-      else
-        let gross_pnl = (exit_price -. entry_price) *. filled_quantity in
-        Ok
-          {
-            t with
-            state =
-              Closed
-                {
-                  quantity = filled_quantity;
-                  entry_price;
-                  exit_price;
-                  gross_pnl;
-                  entry_date;
-                  exit_date = transition.date;
-                  days_held = Date.diff transition.date entry_date;
-                };
-            last_updated = transition.date;
-          }
+          t with
+          state =
+            Closed
+              {
+                quantity = exit_state.filled_quantity;
+                entry_price = exit_state.entry_price;
+                exit_price = exit_state.exit_price;
+                gross_pnl;
+                entry_date = exit_state.entry_date;
+                exit_date = transition.date;
+                days_held = Date.diff transition.date exit_state.entry_date;
+              };
+          last_updated = transition.date;
+        }
   (* Invalid transitions *)
   | Closed _, _ ->
       Error
