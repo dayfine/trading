@@ -62,8 +62,8 @@ let test_create_entering _ =
       ~created_date:(date_of_string "2024-01-01")
       ~reasoning:(TechnicalSignal { indicator = "EMA"; description = "Test" })
   in
-  assert_equal "pos-1" (get_id pos);
-  assert_equal "AAPL" (get_symbol pos);
+  assert_equal "pos-1" pos.id;
+  assert_equal "AAPL" pos.symbol;
   assert_equal false (is_closed pos);
   match get_state pos with
   | Entering entering ->

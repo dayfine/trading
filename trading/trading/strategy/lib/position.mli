@@ -234,12 +234,6 @@ val apply_transition : t -> transition -> t Status.status_or
     - Data is inconsistent
     - Business rules violated *)
 
-val get_id : t -> string
-(** Get position ID *)
-
-val get_symbol : t -> string
-(** Get position symbol *)
-
 val get_state : t -> position_state
 (** Get current state *)
 

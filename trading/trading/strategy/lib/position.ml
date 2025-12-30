@@ -137,8 +137,6 @@ let create_entering ~id ~symbol ~target_quantity ~entry_price ~created_date
     last_updated = created_date;
   }
 
-let get_id t = t.id
-let get_symbol t = t.symbol
 let get_state t = t.state
 let is_closed t = match t.state with Closed _ -> true | _ -> false
 
