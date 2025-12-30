@@ -58,14 +58,19 @@ let test_create_entering _ =
       ~created_date:(date_of_string "2024-01-01")
       ~reasoning:(TechnicalSignal { indicator = "EMA"; description = "Test" })
   in
-  assert_equal "pos-1" pos.id;
-  assert_equal "AAPL" pos.symbol;
-  assert_equal false (is_closed pos);
-  match get_state pos with
-  | Entering entering ->
-      assert_that entering.target_quantity (float_equal 100.0);
-      assert_that entering.filled_quantity (float_equal 0.0)
-  | _ -> assert_failure "Expected Entering state"
+  assert_that pos.id (equal_to "pos-1");
+  assert_that pos.symbol (equal_to "AAPL");
+  assert_that (is_closed pos) (equal_to false);
+  assert_that (get_state pos)
+    (equal_to
+       (Entering
+          {
+            target_quantity = 100.0;
+            entry_price = 150.0;
+            filled_quantity = 0.0;
+            created_date = date_of_string "2024-01-01";
+          }
+         : position_state))
 
 (* ==================== Entry Transitions ==================== *)
 
@@ -78,13 +83,13 @@ let test_entry_fill_partial _ =
       kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      match get_state pos' with
-      | Entering entering ->
-          assert_that entering.filled_quantity (float_equal 50.0)
-      | _ -> assert_failure "Expected Entering state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         match get_state pos' with
+         | Entering entering ->
+             assert_that entering.filled_quantity (float_equal 50.0)
+         | _ -> assert_failure "Expected Entering state"))
 
 let test_entry_fill_multiple _ =
   let pos = make_entering () in
@@ -96,13 +101,13 @@ let test_entry_fill_multiple _ =
       kind = EntryFill { filled_quantity = 30.0; fill_price = 150.0 };
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      match get_state pos' with
-      | Entering entering ->
-          assert_that entering.filled_quantity (float_equal 80.0)
-      | _ -> assert_failure "Expected Entering state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         match get_state pos' with
+         | Entering entering ->
+             assert_that entering.filled_quantity (float_equal 80.0)
+         | _ -> assert_failure "Expected Entering state"))
 
 let test_entry_fill_exceeds_target _ =
   let pos = make_entering ~target:100.0 () in
@@ -114,7 +119,9 @@ let test_entry_fill_exceeds_target _ =
       kind = EntryFill { filled_quantity = 20.0; fill_price = 150.0 };
     }
   in
-  assert_that (apply_transition pos transition) is_error
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument)
 
 let test_entry_fill_multiple_validation_errors _ =
   let pos = make_entering ~target:100.0 () in
@@ -130,11 +137,19 @@ let test_entry_fill_multiple_validation_errors _ =
   | Ok _ -> assert_failure "Expected validation errors"
   | Error err ->
       let err_msg = Status.show err in
-      assert_bool "Should report negative fill_price error"
-        (String.is_substring err_msg ~substring:"fill_price must be positive");
-      assert_bool "Should report quantity bounds error"
-        (String.is_substring err_msg
-           ~substring:"Filled quantity (110.00) exceeds target (100.00)")
+      assert_that err_msg
+        (all_of
+           [
+             (fun msg ->
+               assert_bool "Should report negative fill_price error"
+                 (String.is_substring msg
+                    ~substring:"fill_price must be positive"));
+             (fun msg ->
+               assert_bool "Should report quantity bounds error"
+                 (String.is_substring msg
+                    ~substring:
+                      "Filled quantity (110.00) exceeds target (100.00)"));
+           ])
 
 let test_entry_complete _ =
   let pos = make_entering () in
@@ -155,16 +170,16 @@ let test_entry_complete _ =
           };
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      match get_state pos' with
-      | Holding holding ->
-          assert_that holding.quantity (float_equal 100.0);
-          assert_that holding.entry_price (float_equal 150.0);
-          assert_that holding.risk_params.stop_loss_price
-            (is_some_and (float_equal 142.5))
-      | _ -> assert_failure "Expected Holding state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         match get_state pos' with
+         | Holding holding ->
+             assert_that holding.quantity (float_equal 100.0);
+             assert_that holding.entry_price (float_equal 150.0);
+             assert_that holding.risk_params.stop_loss_price
+               (is_some_and (float_equal 142.5))
+         | _ -> assert_failure "Expected Holding state"))
 
 let test_entry_complete_no_fills _ =
   let pos = make_entering () in
@@ -184,7 +199,9 @@ let test_entry_complete_no_fills _ =
           };
     }
   in
-  assert_that (apply_transition pos transition) is_error
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument)
 
 let test_cancel_entry_no_fills _ =
   let pos = make_entering () in
@@ -195,13 +212,13 @@ let test_cancel_entry_no_fills _ =
       kind = CancelEntry { reason = "Signal invalidated" };
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      assert_that (is_closed pos') (equal_to true);
-      match get_state pos' with
-      | Closed closed -> assert_that closed.quantity (float_equal 0.0)
-      | _ -> assert_failure "Expected Closed state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         assert_that (is_closed pos') (equal_to true);
+         match get_state pos' with
+         | Closed closed -> assert_that closed.quantity (float_equal 0.0)
+         | _ -> assert_failure "Expected Closed state"))
 
 let test_cancel_entry_with_fills _ =
   let pos = make_entering () in
@@ -213,7 +230,9 @@ let test_cancel_entry_with_fills _ =
       kind = CancelEntry { reason = "Signal invalidated" };
     }
   in
-  assert_that (apply_transition pos transition) is_error
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument)
 
 (* ==================== Holding Transitions ==================== *)
 
@@ -237,18 +256,18 @@ let test_trigger_exit _ =
           };
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      match get_state pos' with
-      | Exiting exiting -> (
-          assert_that exiting.exit_price (float_equal 165.0);
-          assert_that exiting.target_quantity (float_equal 100.0);
-          match pos'.exit_reason with
-          | Some (TakeProfit { profit_percent; _ }) ->
-              assert_that profit_percent (float_equal 10.3)
-          | _ -> assert_failure "Expected TakeProfit reason")
-      | _ -> assert_failure "Expected Exiting state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         match get_state pos' with
+         | Exiting exiting -> (
+             assert_that exiting.exit_price (float_equal 165.0);
+             assert_that exiting.target_quantity (float_equal 100.0);
+             match pos'.exit_reason with
+             | Some (TakeProfit { profit_percent; _ }) ->
+                 assert_that profit_percent (float_equal 10.3)
+             | _ -> assert_failure "Expected TakeProfit reason")
+         | _ -> assert_failure "Expected Exiting state"))
 
 let test_update_risk_params _ =
   let pos = make_holding () in
@@ -266,14 +285,14 @@ let test_update_risk_params _ =
       kind = UpdateRiskParams { new_risk_params = new_params };
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      match get_state pos' with
-      | Holding holding ->
-          assert_that holding.risk_params.stop_loss_price
-            (is_some_and (float_equal 145.0))
-      | _ -> assert_failure "Expected Holding state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         match get_state pos' with
+         | Holding holding ->
+             assert_that holding.risk_params.stop_loss_price
+               (is_some_and (float_equal 145.0))
+         | _ -> assert_failure "Expected Holding state"))
 
 (* ==================== Exit Transitions ==================== *)
 
@@ -313,13 +332,13 @@ let test_exit_fill _ =
       kind = ExitFill { filled_quantity = 100.0; fill_price = 165.5 };
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      match get_state pos' with
-      | Exiting exiting ->
-          assert_that exiting.filled_quantity (float_equal 100.0)
-      | _ -> assert_failure "Expected Exiting state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         match get_state pos' with
+         | Exiting exiting ->
+             assert_that exiting.filled_quantity (float_equal 100.0)
+         | _ -> assert_failure "Expected Exiting state"))
 
 let test_exit_complete _ =
   let pos =
@@ -357,17 +376,17 @@ let test_exit_complete _ =
       kind = ExitComplete;
     }
   in
-  match apply_transition pos transition with
-  | Ok pos' -> (
-      assert_that (is_closed pos') (equal_to true);
-      match get_state pos' with
-      | Closed closed ->
-          assert_that closed.quantity (float_equal 100.0);
-          assert_that closed.entry_price (float_equal 150.0);
-          assert_that closed.exit_price (float_equal 165.5);
-          assert_that closed.gross_pnl is_none
-      | _ -> assert_failure "Expected Closed state")
-  | Error err -> assert_failure ("Transition failed: " ^ Status.show err)
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds (fun pos' ->
+         assert_that (is_closed pos') (equal_to true);
+         match get_state pos' with
+         | Closed closed ->
+             assert_that closed.quantity (float_equal 100.0);
+             assert_that closed.entry_price (float_equal 150.0);
+             assert_that closed.exit_price (float_equal 165.5);
+             assert_that closed.gross_pnl is_none
+         | _ -> assert_failure "Expected Closed state"))
 
 (* ==================== Invalid Transitions ==================== *)
 
@@ -407,7 +426,9 @@ let test_invalid_transition_from_closed _ =
       kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
     }
   in
-  assert_that (apply_transition pos transition) is_error
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument)
 
 let test_wrong_position_id _ =
   let pos = make_entering () in
@@ -418,7 +439,9 @@ let test_wrong_position_id _ =
       kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
     }
   in
-  assert_that (apply_transition pos transition) is_error
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument)
 
 let test_invalid_state_transition _ =
   let pos = make_holding () in
@@ -429,7 +452,9 @@ let test_invalid_state_transition _ =
       kind = EntryFill { filled_quantity = 50.0; fill_price = 150.0 };
     }
   in
-  assert_that (apply_transition pos transition) is_error
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument)
 
 (* ==================== Test Suite ==================== *)
 
