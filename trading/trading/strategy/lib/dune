@@ -1,0 +1,7 @@
+(library
+ (public_name trading.strategy)
+ (name trading_strategy)
+ (libraries core trading.base status)
+ (modules position)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
