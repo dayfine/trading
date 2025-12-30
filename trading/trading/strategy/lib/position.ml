@@ -155,10 +155,15 @@ let apply_transition t transition =
           created_date;
         },
       EntryFill { filled_quantity; fill_price } ) ->
-      let%bind () = _validate_positive "fill_price" fill_price in
-      let%bind () = _validate_positive "filled_quantity" filled_quantity in
       let new_filled = curr_filled +. filled_quantity in
-      let%bind () = _validate_quantity_bounds new_filled target_quantity in
+      let validations =
+        [
+          _validate_positive "fill_price" fill_price;
+          _validate_positive "filled_quantity" filled_quantity;
+          _validate_quantity_bounds new_filled target_quantity;
+        ]
+      in
+      let%bind () = Status.combine_status_list validations in
       Ok
         {
           t with
@@ -265,10 +270,15 @@ let apply_transition t transition =
           started_date;
         },
       ExitFill { filled_quantity; fill_price } ) ->
-      let%bind () = _validate_positive "fill_price" fill_price in
-      let%bind () = _validate_positive "filled_quantity" filled_quantity in
       let new_filled = curr_filled +. filled_quantity in
-      let%bind () = _validate_quantity_bounds new_filled target_quantity in
+      let validations =
+        [
+          _validate_positive "fill_price" fill_price;
+          _validate_positive "filled_quantity" filled_quantity;
+          _validate_quantity_bounds new_filled target_quantity;
+        ]
+      in
+      let%bind () = Status.combine_status_list validations in
       Ok
         {
           t with

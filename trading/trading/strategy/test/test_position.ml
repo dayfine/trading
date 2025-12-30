@@ -118,6 +118,25 @@ let test_entry_fill_exceeds_target _ =
   in
   assert_that (apply_transition pos transition) is_error
 
+let test_entry_fill_multiple_validation_errors _ =
+  let pos = make_entering ~target:100.0 ~filled:90.0 () in
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-02";
+      kind = EntryFill { filled_quantity = 20.0; fill_price = -10.0 };
+    }
+  in
+  match apply_transition pos transition with
+  | Ok _ -> assert_failure "Expected validation errors"
+  | Error err ->
+      let err_msg = Status.show err in
+      assert_bool "Should report negative fill_price error"
+        (String.is_substring err_msg ~substring:"fill_price must be positive");
+      assert_bool "Should report quantity bounds error"
+        (String.is_substring err_msg
+           ~substring:"Filled quantity (110.00) exceeds target (100.00)")
+
 let test_entry_complete _ =
   let pos = make_entering ~filled:100.0 () in
   let transition =
@@ -420,6 +439,8 @@ let suite =
          "entry fill partial" >:: test_entry_fill_partial;
          "entry fill multiple" >:: test_entry_fill_multiple;
          "entry fill exceeds target" >:: test_entry_fill_exceeds_target;
+         "entry fill multiple validation errors"
+         >:: test_entry_fill_multiple_validation_errors;
          "entry complete" >:: test_entry_complete;
          "entry complete no fills" >:: test_entry_complete_no_fills;
          "cancel entry no fills" >:: test_cancel_entry_no_fills;
