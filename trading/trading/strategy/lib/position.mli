@@ -182,6 +182,13 @@ type t = {
   exit_reason : exit_reason option;  (** Why we're exiting (set when exiting) *)
   state : position_state;  (** Current position state *)
   last_updated : Date.t;  (** Last state change date *)
+  portfolio_lot_ids : string list;
+      (** Portfolio lot IDs associated with this position.
+
+          Links this strategy position to the corresponding lots in the
+          portfolio for tracking quantity and cost basis. Initially empty when
+          position is created. Populated when entry fills execute and portfolio
+          lots are created. *)
 }
 [@@deriving show, eq]
 (** Position with normalized data - common fields at top level, state-specific

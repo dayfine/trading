@@ -75,6 +75,7 @@ type t = {
   exit_reason : exit_reason option;
   state : position_state;
   last_updated : Date.t;
+  portfolio_lot_ids : string list;
 }
 [@@deriving show, eq]
 
@@ -175,6 +176,7 @@ let create_entering ~id ~symbol ~target_quantity ~entry_price ~created_date
       Entering
         { target_quantity; entry_price; filled_quantity = 0.0; created_date };
     last_updated = created_date;
+    portfolio_lot_ids = [];
   }
 
 let get_state t = t.state
