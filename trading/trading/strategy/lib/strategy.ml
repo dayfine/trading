@@ -16,7 +16,9 @@ type t = {
     existential quantification. **)
 
 (** Execute strategy *)
-let use_strategy ~get_price ~get_indicator ~portfolio strategy =
+let use_strategy ~(get_price : get_price_fn) ~(get_indicator : get_indicator_fn)
+    ~(portfolio : Trading_portfolio.Portfolio.t) (strategy : t) :
+    (output * t) Status.status_or =
   let (module S) = strategy.strategy_module in
   let open Result.Let_syntax in
   let%bind output, new_state =
@@ -33,7 +35,8 @@ type config =
 [@@deriving show]
 
 (** Create strategy from config *)
-let create_strategy = function
+let create_strategy (cfg : config) : t =
+  match cfg with
   | EmaConfig cfg ->
       let strategy_module, initial_state = Ema_strategy.make cfg in
       let (module S) = strategy_module in
@@ -44,4 +47,4 @@ let create_strategy = function
       { strategy_module; state_ref = ref initial_state; name = S.name }
 
 (** Get strategy name *)
-let get_name strategy = strategy.name
+let get_name (strategy : t) : string = strategy.name

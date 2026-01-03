@@ -14,15 +14,18 @@ type config = {
 let name = "EmaCrossover"
 let _position_counter = ref 0
 
-let _generate_position_id symbol =
+let _generate_position_id (symbol : string) : string =
   _position_counter := !_position_counter + 1;
   Printf.sprintf "%s-pos-%d" symbol !_position_counter
 
 (* Check for entry signal: price above EMA *)
-let _has_entry_signal ~price ~ema = Float.(price > ema)
+let _has_entry_signal ~(price : float) ~(ema : float) : bool =
+  Float.(price > ema)
 
 (* Execute entry: create position in Entering state *)
-let _execute_entry ~symbol ~config ~price ~ema:_ =
+let _execute_entry ~(symbol : string) ~(config : config)
+    ~(price : Types.Daily_price.t) ~ema:_ :
+    (Position.transition list * Position.t) Status.status_or =
   let open Result.Let_syntax in
   let position_id = _generate_position_id symbol in
   let entry_price = price.Types.Daily_price.close_price in
@@ -41,7 +44,9 @@ let _execute_entry ~symbol ~config ~price ~ema:_ =
   return ([], position)
 
 (* Check if exit condition is met and return (should_exit, exit_reason) *)
-let _check_exit_signal ~current_price ~ema ~risk_params ~entry_price =
+let _check_exit_signal ~(current_price : float) ~(ema : float)
+    ~(risk_params : Position.risk_params) ~(entry_price : float) :
+    bool * Position.exit_reason =
   let open Position in
   (* Check stop loss first *)
   if
@@ -75,7 +80,9 @@ let _check_exit_signal ~current_price ~ema ~risk_params ~entry_price =
   else (false, PortfolioRebalancing)
 
 (* Execute exit: produce TriggerExit transition only *)
-let _execute_exit ~position ~quantity:_ ~price ~exit_reason =
+let _execute_exit ~(position : Position.t) ~quantity:_
+    ~(price : Types.Daily_price.t) ~(exit_reason : Position.exit_reason) :
+    (Position.transition list * Position.t) Status.status_or =
   (* Only produce TriggerExit - engine will produce ExitFill and ExitComplete *)
   Result.return
     ( [
@@ -90,7 +97,10 @@ let _execute_exit ~position ~quantity:_ ~price ~exit_reason =
       position )
 
 (* Process one symbol - returns (transitions, updated_positions) *)
-let _process_symbol ~get_price ~get_indicator ~config ~positions symbol =
+let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
+    ~(get_indicator : Strategy_interface.get_indicator_fn) ~(config : config)
+    ~(positions : Position.t String.Map.t) (symbol : string) :
+    (Position.transition list * Position.t String.Map.t) Status.status_or =
   let open Result.Let_syntax in
   let price_opt = get_price symbol in
   let ema_opt = get_indicator symbol "EMA" config.ema_period in
@@ -128,7 +138,8 @@ let _process_symbol ~get_price ~get_indicator ~config ~positions symbol =
   (* All other cases: no action *)
   | _ -> return ([], positions)
 
-let make config =
+let make (config : config) :
+    (module Strategy_interface.STRATEGY) * Strategy_interface.state =
   let module M = struct
     let on_market_close ~get_price ~get_indicator ~portfolio:_
         ~(state : Strategy_interface.state) =
