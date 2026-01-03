@@ -110,4 +110,4 @@ let get_ema_series t symbol period ?lookback_days () =
 let get_indicator t symbol indicator_name period =
   match indicator_name with
   | "EMA" -> get_ema t symbol period
-  | _ -> None  (* Only EMA supported for now *)
+  | _ -> None (* Only EMA supported for now *)

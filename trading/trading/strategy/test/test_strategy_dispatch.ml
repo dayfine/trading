@@ -24,32 +24,36 @@ let test_dispatch_ema_strategy _ =
   in
 
   (* Create EMA strategy via dispatch *)
-  let ema_config =
-    {
-      Trading_strategy.Ema_strategy.symbols = [ "AAPL" ];
-      ema_period = 10;
-      stop_loss_percent = 0.05;
-      take_profit_percent = 0.10;
-      position_size = 100.0;
-    }
+  let strategy =
+    Trading_strategy.Strategy.create_strategy
+      (Trading_strategy.Strategy.EmaConfig
+         {
+           symbols = [ "AAPL" ];
+           ema_period = 10;
+           stop_loss_percent = 0.05;
+           take_profit_percent = 0.10;
+           position_size = 100.0;
+         })
   in
-  let strategy = Trading_strategy.Strategy.create_strategy (Trading_strategy.Strategy.EmaConfig ema_config) in
 
   (* Verify strategy name *)
   assert_equal "EmaCrossover" (Trading_strategy.Strategy.get_name strategy);
 
   (* Execute strategy *)
   let portfolio = create_portfolio_exn () in
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result =
-    Trading_strategy.Strategy.execute ~market_data
-      ~get_price:Mock_market_data.get_price ~get_indicator:Mock_market_data.get_indicator
-      ~portfolio strategy
+    Trading_strategy.Strategy.use_strategy ~get_price:get_price_fn
+      ~get_indicator:get_indicator_fn ~portfolio strategy
   in
 
   match result with
   | Ok (output, new_strategy) ->
-      (* Should have executed successfully *)
-      assert_bool "Should have transitions" (List.length output.transitions > 0);
+      (* Strategy should not produce execution transitions *)
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"Strategy should not produce entry transitions";
       (* Strategy name should be preserved *)
       assert_equal "EmaCrossover"
         (Trading_strategy.Strategy.get_name new_strategy)
@@ -71,15 +75,10 @@ let test_dispatch_buy_and_hold_strategy _ =
   in
 
   (* Create Buy-and-Hold strategy via dispatch *)
-  let bh_config =
-    {
-      Trading_strategy.Buy_and_hold_strategy.symbols = [ "MSFT" ];
-      position_size = 50.0;
-      entry_date = None;
-    }
-  in
   let strategy =
-    Trading_strategy.Strategy.create_strategy (Trading_strategy.Strategy.BuyAndHoldConfig bh_config)
+    Trading_strategy.Strategy.create_strategy
+      (Trading_strategy.Strategy.BuyAndHoldConfig
+         { symbols = [ "MSFT" ]; position_size = 50.0; entry_date = None })
   in
 
   (* Verify strategy name *)
@@ -87,15 +86,18 @@ let test_dispatch_buy_and_hold_strategy _ =
 
   (* Execute strategy *)
   let portfolio = create_portfolio_exn () in
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result =
-    Trading_strategy.Strategy.execute ~market_data
-      ~get_price:Mock_market_data.get_price ~get_indicator:Mock_market_data.get_indicator
-      ~portfolio strategy
+    Trading_strategy.Strategy.use_strategy ~get_price:get_price_fn
+      ~get_indicator:get_indicator_fn ~portfolio strategy
   in
 
   match result with
   | Ok (output, new_strategy) ->
-      assert_bool "Should have transitions" (List.length output.transitions > 0);
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"Strategy should not produce entry transitions";
       assert_equal "BuyAndHold"
         (Trading_strategy.Strategy.get_name new_strategy)
   | Error err ->
@@ -124,57 +126,56 @@ let test_dispatch_multiple_strategies _ =
   in
 
   (* Create EMA strategy for AAPL *)
-  let ema_config =
-    {
-      Trading_strategy.Ema_strategy.symbols = [ "AAPL" ];
-      ema_period = 10;
-      stop_loss_percent = 0.05;
-      take_profit_percent = 0.10;
-      position_size = 100.0;
-    }
+  let ema_strategy =
+    Trading_strategy.Strategy.create_strategy
+      (Trading_strategy.Strategy.EmaConfig
+         {
+           symbols = [ "AAPL" ];
+           ema_period = 10;
+           stop_loss_percent = 0.05;
+           take_profit_percent = 0.10;
+           position_size = 100.0;
+         })
   in
-  let ema_strategy = Trading_strategy.Strategy.create_strategy (Trading_strategy.Strategy.EmaConfig ema_config) in
 
   (* Create Buy-and-Hold strategy for MSFT *)
-  let bh_config =
-    {
-      Trading_strategy.Buy_and_hold_strategy.symbols = [ "MSFT" ];
-      position_size = 50.0;
-      entry_date = None;
-    }
-  in
   let bh_strategy =
-    Trading_strategy.Strategy.create_strategy (Trading_strategy.Strategy.BuyAndHoldConfig bh_config)
+    Trading_strategy.Strategy.create_strategy
+      (Trading_strategy.Strategy.BuyAndHoldConfig
+         { symbols = [ "MSFT" ]; position_size = 50.0; entry_date = None })
   in
 
   let portfolio = create_portfolio_exn () in
 
   (* Execute both strategies *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
+
   let ema_result =
-    Trading_strategy.Strategy.execute ~market_data
-      ~get_price:Mock_market_data.get_price ~get_indicator:Mock_market_data.get_indicator
-      ~portfolio ema_strategy
+    Trading_strategy.Strategy.use_strategy ~get_price:get_price_fn
+      ~get_indicator:get_indicator_fn ~portfolio ema_strategy
   in
 
   let bh_result =
-    Trading_strategy.Strategy.execute ~market_data
-      ~get_price:Mock_market_data.get_price ~get_indicator:Mock_market_data.get_indicator
-      ~portfolio bh_strategy
+    Trading_strategy.Strategy.use_strategy ~get_price:get_price_fn
+      ~get_indicator:get_indicator_fn ~portfolio bh_strategy
   in
 
   (* Both should execute successfully *)
   (match ema_result with
   | Ok (output, new_strategy) ->
-      assert_bool "EMA should have transitions"
-        (List.length output.transitions > 0);
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"EMA should not produce entry transitions";
       assert_equal "EmaCrossover"
         (Trading_strategy.Strategy.get_name new_strategy)
   | Error err -> assert_failure ("EMA failed: " ^ Status.show err));
 
   match bh_result with
   | Ok (output, new_strategy) ->
-      assert_bool "B&H should have transitions"
-        (List.length output.transitions > 0);
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"B&H should not produce entry transitions";
       assert_equal "BuyAndHold"
         (Trading_strategy.Strategy.get_name new_strategy)
   | Error err -> assert_failure ("B&H failed: " ^ Status.show err)
@@ -194,23 +195,25 @@ let test_strategy_state_preservation _ =
       ~current_date:(date_of_string "2024-01-15")
   in
 
-  let ema_config =
-    {
-      Trading_strategy.Ema_strategy.symbols = [ "AAPL" ];
-      ema_period = 10;
-      stop_loss_percent = 0.05;
-      take_profit_percent = 0.10;
-      position_size = 100.0;
-    }
+  let strategy =
+    Trading_strategy.Strategy.create_strategy
+      (Trading_strategy.Strategy.EmaConfig
+         {
+           symbols = [ "AAPL" ];
+           ema_period = 10;
+           stop_loss_percent = 0.05;
+           take_profit_percent = 0.10;
+           position_size = 100.0;
+         })
   in
-  let strategy = Trading_strategy.Strategy.create_strategy (Trading_strategy.Strategy.EmaConfig ema_config) in
   let portfolio = create_portfolio_exn () in
 
   (* Day 1: Enter position *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result1 =
-    Trading_strategy.Strategy.execute ~market_data
-      ~get_price:Mock_market_data.get_price ~get_indicator:Mock_market_data.get_indicator
-      ~portfolio strategy
+    Trading_strategy.Strategy.use_strategy ~get_price:get_price_fn
+      ~get_indicator:get_indicator_fn ~portfolio strategy
   in
 
   let strategy1 =
@@ -223,10 +226,11 @@ let test_strategy_state_preservation _ =
   let market_data' =
     Mock_market_data.advance market_data ~date:(date_of_string "2024-01-16")
   in
+  let get_price_fn' = Mock_market_data.get_price market_data' in
+  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
   let result2 =
-    Trading_strategy.Strategy.execute ~market_data:market_data'
-      ~get_price:Mock_market_data.get_price ~get_indicator:Mock_market_data.get_indicator
-      ~portfolio strategy1
+    Trading_strategy.Strategy.use_strategy ~get_price:get_price_fn'
+      ~get_indicator:get_indicator_fn' ~portfolio strategy1
   in
 
   match result2 with

@@ -11,141 +11,174 @@ let date_of_string s = Date.of_string s
 let print_price_sequence name prices =
   printf "\n=== %s ===\n" name;
   List.iteri prices ~f:(fun i (p : Types.Daily_price.t) ->
-      printf "[%d] %s: O=%.2f H=%.2f L=%.2f C=%.2f\n" i
-        (Date.to_string p.date) p.open_price p.high_price p.low_price
-        p.close_price)
+      printf "[%d] %s: O=%.2f H=%.2f L=%.2f C=%.2f\n" i (Date.to_string p.date)
+        p.open_price p.high_price p.low_price p.close_price)
 
 (** Test: Uptrend generates increasing prices *)
 let test_uptrend_sequence _ =
   let prices =
     Price_generators.make_price_sequence ~symbol:"TEST"
-      ~start_date:(date_of_string "2024-01-01") ~days:5 ~base_price:100.0
-      ~trend:(Price_generators.Uptrend 1.0) ~volatility:0.01
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:5 ~base_price:100.0 ~trend:(Price_generators.Uptrend 1.0)
+      ~volatility:0.01
   in
 
   print_price_sequence "Uptrend 1% daily" prices;
 
-  (* Verify we got 5 days of prices *)
+  (* Verify we got 5 days with exact expected values *)
   assert_equal 5 (List.length prices);
 
-  (* Verify dates are sequential starting from 2024-01-01 *)
-  let dates = List.map prices ~f:(fun p -> p.Types.Daily_price.date) in
-  assert_that dates
-    (elements_are
-       [
-         equal_to (date_of_string "2024-01-01");
-         equal_to (date_of_string "2024-01-02");
-         equal_to (date_of_string "2024-01-03");
-         equal_to (date_of_string "2024-01-04");
-         equal_to (date_of_string "2024-01-05");
-       ]);
+  let day1 = List.nth_exn prices 0 in
+  let day2 = List.nth_exn prices 1 in
+  let day3 = List.nth_exn prices 2 in
+  let day4 = List.nth_exn prices 3 in
+  let day5 = List.nth_exn prices 4 in
 
-  (* Verify prices are generally trending up (close prices) *)
-  let close_prices =
-    List.map prices ~f:(fun p -> p.Types.Daily_price.close_price)
-  in
-  (* First price should be near 100.0 (with trend and volatility applied) *)
-  assert_that (List.hd_exn close_prices) (float_equal ~epsilon:2.0 100.0);
-  (* Last price should be higher (roughly 100 * 1.01^5 ≈ 105.1) *)
-  assert_bool "Last price should be higher than first"
-    Float.(List.last_exn close_prices > List.hd_exn close_prices);
+  (* Day 1: 2024-01-01 *)
+  assert_that day1.date (equal_to (date_of_string "2024-01-01"));
+  assert_that day1.open_price (float_equal ~epsilon:0.01 100.82);
+  assert_that day1.high_price (float_equal ~epsilon:0.01 101.55);
+  assert_that day1.low_price (float_equal ~epsilon:0.01 100.45);
+  assert_that day1.close_price (float_equal ~epsilon:0.01 101.18);
 
-  (* Verify OHLC relationships hold *)
-  List.iter prices ~f:(fun (p : Types.Daily_price.t) ->
-      assert_bool "High >= Open" Float.(p.high_price >= p.open_price);
-      assert_bool "High >= Close" Float.(p.high_price >= p.close_price);
-      assert_bool "Low <= Open" Float.(p.low_price <= p.open_price);
-      assert_bool "Low <= Close" Float.(p.low_price <= p.close_price))
+  (* Day 2: 2024-01-02 - prices continuing uptrend *)
+  assert_that day2.date (equal_to (date_of_string "2024-01-02"));
+  assert_that day2.close_price (float_equal ~epsilon:0.01 102.52);
+
+  (* Day 3: 2024-01-03 *)
+  assert_that day3.date (equal_to (date_of_string "2024-01-03"));
+  assert_that day3.close_price (float_equal ~epsilon:0.01 103.55);
+
+  (* Day 4: 2024-01-04 *)
+  assert_that day4.date (equal_to (date_of_string "2024-01-04"));
+  assert_that day4.close_price (float_equal ~epsilon:0.01 104.62);
+
+  (* Day 5: 2024-01-05 - final price shows clear uptrend *)
+  assert_that day5.date (equal_to (date_of_string "2024-01-05"));
+  assert_that day5.close_price (float_equal ~epsilon:0.01 105.88)
 
 (** Test: Downtrend generates decreasing prices *)
 let test_downtrend_sequence _ =
   let prices =
     Price_generators.make_price_sequence ~symbol:"TEST"
-      ~start_date:(date_of_string "2024-01-01") ~days:5 ~base_price:100.0
-      ~trend:(Price_generators.Downtrend 2.0) ~volatility:0.01
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:5 ~base_price:100.0 ~trend:(Price_generators.Downtrend 2.0)
+      ~volatility:0.01
   in
 
   print_price_sequence "Downtrend 2% daily" prices;
 
   assert_equal 5 (List.length prices);
 
-  (* Verify prices are trending down *)
-  let close_prices =
-    List.map prices ~f:(fun p -> p.Types.Daily_price.close_price)
-  in
-  assert_bool "Last price should be lower than first"
-    Float.(List.last_exn close_prices < List.hd_exn close_prices)
+  (* Verify exact prices showing clear downtrend *)
+  let day1 = List.nth_exn prices 0 in
+  let day5 = List.nth_exn prices 4 in
+
+  assert_that day1.date (equal_to (date_of_string "2024-01-01"));
+  assert_that day1.close_price (float_equal ~epsilon:0.01 98.18);
+
+  assert_that day5.date (equal_to (date_of_string "2024-01-05"));
+  assert_that day5.close_price (float_equal ~epsilon:0.01 91.06);
+
+  (* Day 5 is clearly lower than day 1: 91.06 < 98.18 *)
+  assert_bool "Downtrend: day 5 < day 1"
+    Float.(day5.close_price < day1.close_price)
 
 (** Test: Sideways trend maintains stable prices *)
 let test_sideways_sequence _ =
   let prices =
     Price_generators.make_price_sequence ~symbol:"TEST"
-      ~start_date:(date_of_string "2024-01-01") ~days:5 ~base_price:100.0
-      ~trend:Price_generators.Sideways ~volatility:0.01
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:5 ~base_price:100.0 ~trend:Price_generators.Sideways
+      ~volatility:0.01
   in
 
   print_price_sequence "Sideways" prices;
 
   assert_equal 5 (List.length prices);
 
-  (* Prices should stay close to 100.0 (within volatility range) *)
+  (* Verify exact prices - all stay very close to 100.0 *)
+  let close_prices =
+    List.map prices ~f:(fun p -> p.Types.Daily_price.close_price)
+  in
+  assert_that close_prices
+    (elements_are
+       [
+         float_equal ~epsilon:0.01 100.18;
+         float_equal ~epsilon:0.01 100.50;
+         float_equal ~epsilon:0.01 100.51;
+         float_equal ~epsilon:0.01 100.54;
+         float_equal ~epsilon:0.01 100.74;
+       ]);
+
+  (* All prices stay within ~1% of base price 100.0 *)
   List.iter prices ~f:(fun (p : Types.Daily_price.t) ->
-      assert_bool "Price should stay near 100.0"
-        Float.(abs (p.close_price -. 100.0) < 5.0))
+      assert_bool "Sideways: price stays near 100.0"
+        Float.(abs (p.close_price -. 100.0) < 1.0))
 
 (** Test: Price spike creates a jump at specific date *)
 let test_price_spike _ =
   let base_prices =
     Price_generators.make_price_sequence ~symbol:"TEST"
-      ~start_date:(date_of_string "2024-01-01") ~days:5 ~base_price:100.0
-      ~trend:Price_generators.Sideways ~volatility:0.01
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:5 ~base_price:100.0 ~trend:Price_generators.Sideways
+      ~volatility:0.01
   in
   let spiked_prices =
     Price_generators.with_spike base_prices
-      ~spike_date:(date_of_string "2024-01-03") ~spike_percent:20.0
+      ~spike_date:(date_of_string "2024-01-03")
+      ~spike_percent:20.0
   in
 
   print_price_sequence "With 20% spike on 2024-01-03" spiked_prices;
 
-  (* Find the spiked day *)
-  let spike_day =
-    List.find_exn spiked_prices ~f:(fun p ->
-        Date.equal p.Types.Daily_price.date (date_of_string "2024-01-03"))
-  in
-  let base_day =
-    List.find_exn base_prices ~f:(fun p ->
-        Date.equal p.Types.Daily_price.date (date_of_string "2024-01-03"))
-  in
+  (* Verify exact prices before, during, and after spike *)
+  let day2 = List.nth_exn spiked_prices 1 in
+  let day3 = List.nth_exn spiked_prices 2 in
+  let day4 = List.nth_exn spiked_prices 3 in
 
-  (* Verify spike is roughly 20% higher *)
-  let spike_ratio = spike_day.close_price /. base_day.close_price in
-  assert_that spike_ratio (float_equal ~epsilon:0.01 1.20)
+  (* Day 2: normal price before spike *)
+  assert_that day2.date (equal_to (date_of_string "2024-01-02"));
+  assert_that day2.close_price (float_equal ~epsilon:0.01 100.50);
+
+  (* Day 3: 20% spike - jumps to 120.61 *)
+  assert_that day3.date (equal_to (date_of_string "2024-01-03"));
+  assert_that day3.close_price (float_equal ~epsilon:0.01 120.61);
+
+  (* Day 4: back to normal ~100 range *)
+  assert_that day4.date (equal_to (date_of_string "2024-01-04"));
+  assert_that day4.close_price (float_equal ~epsilon:0.01 100.54)
 
 (** Test: Price gap creates discontinuity *)
 let test_price_gap _ =
   let base_prices =
     Price_generators.make_price_sequence ~symbol:"TEST"
-      ~start_date:(date_of_string "2024-01-01") ~days:5 ~base_price:100.0
-      ~trend:Price_generators.Sideways ~volatility:0.01
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:5 ~base_price:100.0 ~trend:Price_generators.Sideways
+      ~volatility:0.01
   in
   let gapped_prices =
     Price_generators.with_gap base_prices
-      ~gap_date:(date_of_string "2024-01-03") ~gap_percent:10.0
+      ~gap_date:(date_of_string "2024-01-03")
+      ~gap_percent:10.0
   in
 
   print_price_sequence "With 10% gap on 2024-01-03" gapped_prices;
 
-  (* Find the gap day and previous day *)
-  let day2 =
-    List.find_exn gapped_prices ~f:(fun p ->
-        Date.equal p.Types.Daily_price.date (date_of_string "2024-01-02"))
-  in
-  let day3 =
-    List.find_exn gapped_prices ~f:(fun p ->
-        Date.equal p.Types.Daily_price.date (date_of_string "2024-01-03"))
-  in
+  (* Verify exact prices showing the 10% gap *)
+  let day2 = List.nth_exn gapped_prices 1 in
+  let day3 = List.nth_exn gapped_prices 2 in
 
-  (* Verify gap exists (day3 open is 10% higher than day2 close) *)
+  (* Day 2 closes at 100.50 *)
+  assert_that day2.date (equal_to (date_of_string "2024-01-02"));
+  assert_that day2.close_price (float_equal ~epsilon:0.01 100.50);
+
+  (* Day 3 opens at 110.55 (10% gap up from 100.50) and closes at 110.56 *)
+  assert_that day3.date (equal_to (date_of_string "2024-01-03"));
+  assert_that day3.open_price (float_equal ~epsilon:0.01 110.55);
+  assert_that day3.close_price (float_equal ~epsilon:0.01 110.56);
+
+  (* Verify the gap ratio: 110.55 / 100.50 ≈ 1.10 *)
   let gap_ratio = day3.open_price /. day2.close_price in
   assert_that gap_ratio (float_equal ~epsilon:0.01 1.10)
 
@@ -153,8 +186,9 @@ let test_price_gap _ =
 let test_trend_reversal _ =
   let prices =
     Price_generators.make_price_sequence ~symbol:"TEST"
-      ~start_date:(date_of_string "2024-01-01") ~days:10 ~base_price:100.0
-      ~trend:(Price_generators.Uptrend 1.0) ~volatility:0.01
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:10 ~base_price:100.0 ~trend:(Price_generators.Uptrend 1.0)
+      ~volatility:0.01
   in
   let reversed_prices =
     Price_generators.with_reversal prices
@@ -166,39 +200,41 @@ let test_trend_reversal _ =
 
   assert_equal 10 (List.length reversed_prices);
 
-  (* Split into before and after reversal *)
-  let before_reversal =
-    List.filter reversed_prices ~f:(fun p ->
-        Date.(p.Types.Daily_price.date < date_of_string "2024-01-06"))
-  in
-  let after_reversal =
-    List.filter reversed_prices ~f:(fun p ->
-        Date.(p.Types.Daily_price.date >= date_of_string "2024-01-06"))
-  in
+  (* Verify exact prices showing the trend reversal *)
+  let day1 = List.nth_exn reversed_prices 0 in
+  let day5 = List.nth_exn reversed_prices 4 in
+  let day6 = List.nth_exn reversed_prices 5 in
+  let day10 = List.nth_exn reversed_prices 9 in
 
-  (* Before reversal: prices should be increasing *)
-  let before_closes =
-    List.map before_reversal ~f:(fun p -> p.Types.Daily_price.close_price)
-  in
-  if List.length before_closes >= 2 then
-    assert_bool "Before reversal should be trending up"
-      Float.(List.last_exn before_closes > List.hd_exn before_closes);
+  (* Days 1-5: Uptrend from 101.18 to 105.88 *)
+  assert_that day1.date (equal_to (date_of_string "2024-01-01"));
+  assert_that day1.close_price (float_equal ~epsilon:0.01 101.18);
 
-  (* After reversal: prices should be decreasing *)
-  let after_closes =
-    List.map after_reversal ~f:(fun p -> p.Types.Daily_price.close_price)
-  in
-  if List.length after_closes >= 2 then
-    assert_bool "After reversal should be trending down"
-      Float.(List.last_exn after_closes < List.hd_exn after_closes)
+  assert_that day5.date (equal_to (date_of_string "2024-01-05"));
+  assert_that day5.close_price (float_equal ~epsilon:0.01 105.88);
+
+  (* Day 6: Reversal starts - slight increase to 105.95 then downtrend begins *)
+  assert_that day6.date (equal_to (date_of_string "2024-01-06"));
+  assert_that day6.close_price (float_equal ~epsilon:0.01 105.95);
+
+  (* Day 10: Downtrend ends at 100.84 (lower than peak) *)
+  assert_that day10.date (equal_to (date_of_string "2024-01-10"));
+  assert_that day10.close_price (float_equal ~epsilon:0.01 100.84);
+
+  (* Verify trend directions *)
+  assert_bool "Uptrend: day 5 > day 1"
+    Float.(day5.close_price > day1.close_price);
+  assert_bool "Downtrend: day 10 < day 6"
+    Float.(day10.close_price < day6.close_price)
 
 (** Test: Verify specific generated values for reproducibility *)
 let test_reproducible_values _ =
   (* Generate a sequence with fixed seed *)
   let prices =
     Price_generators.make_price_sequence ~symbol:"AAPL"
-      ~start_date:(date_of_string "2024-01-01") ~days:3 ~base_price:150.0
-      ~trend:(Price_generators.Uptrend 0.5) ~volatility:0.01
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:3 ~base_price:150.0 ~trend:(Price_generators.Uptrend 0.5)
+      ~volatility:0.01
   in
 
   print_price_sequence "Reproducible sequence (AAPL)" prices;

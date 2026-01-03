@@ -20,6 +20,52 @@ let make_config ?(symbols = [ "AAPL" ]) ?(ema_period = 10) ?(stop_loss = 0.05)
 let create_portfolio_exn () =
   Trading_portfolio.Portfolio.create ~initial_cash:100000.0 ()
 
+(** Helper to create strategy module and initial state from config *)
+let make_strategy config = Trading_strategy.Ema_strategy.make config
+
+(** Helper to manually apply engine transitions to move position from Entering
+    to Holding *)
+let apply_entry_fill_and_complete position ~date ~entry_price ~stop_loss_pct
+    ~take_profit_pct =
+  (* Apply EntryFill *)
+  let position =
+    match
+      Trading_strategy.Position.apply_transition position
+        {
+          position_id = position.Trading_strategy.Position.id;
+          date;
+          kind = EntryFill { filled_quantity = 100.0; fill_price = entry_price };
+        }
+    with
+    | Ok p -> p
+    | Error err -> failwith ("Failed to apply EntryFill: " ^ Status.show err)
+  in
+  (* Apply EntryComplete to reach Holding *)
+  let position =
+    match
+      Trading_strategy.Position.apply_transition position
+        {
+          position_id = position.Trading_strategy.Position.id;
+          date;
+          kind =
+            EntryComplete
+              {
+                risk_params =
+                  {
+                    stop_loss_price =
+                      Some (entry_price *. (1.0 -. stop_loss_pct));
+                    take_profit_price =
+                      Some (entry_price *. (1.0 +. take_profit_pct));
+                    max_hold_days = None;
+                  };
+              };
+        }
+    with
+    | Ok p -> p
+    | Error err -> failwith ("Failed to apply EntryComplete: " ^ Status.show err)
+  in
+  position
+
 (** Test: Entry signal when price crosses above EMA *)
 let test_entry_signal _ =
   (* Create uptrend price data *)
@@ -37,36 +83,33 @@ let test_entry_signal _ =
   in
 
   let config = make_config () in
-  let state = Trading_strategy.Ema_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Execute strategy on market close *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
 
   match result with
   | Ok (output, new_state) -> (
-      (* Should have created position transitions *)
-      assert_bool "Should have transitions" (List.length output.transitions > 0);
-      (* Should have EntryFill and EntryComplete transitions *)
-      assert_equal 2 (List.length output.transitions);
-      (* Should have created buy order *)
-      (* Should have active position in Holding state *)
+      (* Strategy should not produce execution transitions *)
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"Strategy should not produce entry transitions";
+      (* Should have created position in Entering state *)
       match Map.find new_state.positions "AAPL" with
       | Some position -> (
           match Trading_strategy.Position.get_state position with
-          | Holding holding -> (
-              assert_that holding.quantity (float_equal 100.0);
-              (* Verify stop loss is set and is below entry price *)
-              match holding.risk_params.stop_loss_price with
-              | Some stop_loss ->
-                  assert_bool "Stop loss should be below entry price"
-                    Float.(stop_loss < holding.entry_price)
-              | None -> assert_failure "Expected stop loss to be set")
-          | _ -> assert_failure "Expected Holding state")
+          | Entering entering ->
+              assert_that entering.target_quantity (float_equal 100.0);
+              (* Entry price should be set *)
+              assert_bool "Entry price should be positive"
+                Float.(entering.entry_price > 0.0)
+          | _ -> assert_failure "Expected Entering state")
       | None -> assert_failure "Expected active position")
   | Error err -> assert_failure ("Strategy failed: " ^ Status.show err)
 
@@ -93,19 +136,44 @@ let test_take_profit _ =
   in
 
   let config = make_config () in
-  let state = Trading_strategy.Ema_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Day 1: Enter position *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result1 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
   let state1 =
     match result1 with
-    | Ok (_, s) -> s
+    | Ok (output, s) ->
+        (* Should have created position in Entering state *)
+        assert_equal 0
+          (List.length output.transitions)
+          ~msg:"Entry should not produce transitions";
+        s
     | Error err -> failwith ("Day 1 failed: " ^ Status.show err)
+  in
+
+  (* Manually apply engine transitions to move position to Holding state *)
+  let state1_with_holding =
+    match Map.find state1.positions "AAPL" with
+    | Some position ->
+        let entry_price =
+          match Trading_strategy.Position.get_state position with
+          | Entering e -> e.entry_price
+          | _ -> failwith "Expected Entering state"
+        in
+        let position =
+          apply_entry_fill_and_complete position
+            ~date:(date_of_string "2024-01-15")
+            ~entry_price ~stop_loss_pct:0.05 ~take_profit_pct:0.10
+        in
+        ({ positions = Map.set state1.positions ~key:"AAPL" ~data:position }
+          : Trading_strategy.Strategy_interface.state)
+    | None -> failwith "Expected position to exist"
   in
 
   (* Advance to spike day *)
@@ -114,29 +182,36 @@ let test_take_profit _ =
   in
 
   (* Day 2: Should trigger take profit *)
+  let get_price_fn' = Mock_market_data.get_price market_data' in
+  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
   let result2 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data:market_data'
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state:state1
+    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
+      ~portfolio ~state:state1_with_holding
   in
 
   match result2 with
   | Ok (output, new_state) -> (
-      (* Should have exit transitions *)
-      assert_bool "Should have exit transitions"
-        (List.length output.transitions > 0);
-      (* Should have TriggerExit, ExitFill, ExitComplete *)
-      assert_equal 3 (List.length output.transitions);
-      (* Should have sell order *)
-      (* Position should be closed *)
+      (* Should have TriggerExit transition only *)
+      assert_equal 1
+        (List.length output.transitions)
+        ~msg:"Should produce TriggerExit only";
+      (* Verify it's a TriggerExit *)
+      (match List.hd output.transitions with
+      | Some trans -> (
+          match trans.kind with
+          | TriggerExit { exit_reason; _ } -> (
+              match exit_reason with
+              | TakeProfit _ -> () (* Expected *)
+              | _ -> assert_failure "Expected TakeProfit exit reason")
+          | _ -> assert_failure "Expected TriggerExit transition")
+      | None -> assert_failure "Expected at least one transition");
+      (* Position should still be in Holding state (not moved to Exiting) *)
       match Map.find new_state.positions "AAPL" with
       | Some position -> (
           match Trading_strategy.Position.get_state position with
-          | Closed closed ->
-              (* Should have positive realized P&L *)
-              assert_bool "Should have profit" Float.(closed.gross_pnl > 0.0)
-          | _ -> assert_failure "Expected Closed state")
-      | None -> assert_failure "Expected closed position")
+          | Holding _ -> () (* Expected - strategy doesn't move state *)
+          | _ -> assert_failure "Expected position to remain in Holding state")
+      | None -> assert_failure "Expected position to exist")
   | Error err -> assert_failure ("Take profit failed: " ^ Status.show err)
 
 (** Test: Stop loss when price falls *)
@@ -162,19 +237,43 @@ let test_stop_loss _ =
   in
 
   let config = make_config () in
-  let state = Trading_strategy.Ema_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Day 1: Enter position *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result1 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
   let state1 =
     match result1 with
-    | Ok (_, s) -> s
+    | Ok (output, s) ->
+        assert_equal 0
+          (List.length output.transitions)
+          ~msg:"Entry should not produce transitions";
+        s
     | Error err -> failwith ("Day 1 failed: " ^ Status.show err)
+  in
+
+  (* Manually apply engine transitions to move position to Holding state *)
+  let state1_with_holding =
+    match Map.find state1.positions "AAPL" with
+    | Some position ->
+        let entry_price =
+          match Trading_strategy.Position.get_state position with
+          | Entering e -> e.entry_price
+          | _ -> failwith "Expected Entering state"
+        in
+        let position =
+          apply_entry_fill_and_complete position
+            ~date:(date_of_string "2024-01-15")
+            ~entry_price ~stop_loss_pct:0.05 ~take_profit_pct:0.10
+        in
+        ({ positions = Map.set state1.positions ~key:"AAPL" ~data:position }
+          : Trading_strategy.Strategy_interface.state)
+    | None -> failwith "Expected position to exist"
   in
 
   (* Advance to drop day *)
@@ -183,25 +282,36 @@ let test_stop_loss _ =
   in
 
   (* Day 2: Should trigger stop loss *)
+  let get_price_fn' = Mock_market_data.get_price market_data' in
+  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
   let result2 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data:market_data'
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state:state1
+    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
+      ~portfolio ~state:state1_with_holding
   in
 
   match result2 with
   | Ok (output, new_state) -> (
-      (* Should have exit transitions *)
-      assert_equal 3 (List.length output.transitions);
-      (* Position should be closed with loss *)
+      (* Should have TriggerExit transition only *)
+      assert_equal 1
+        (List.length output.transitions)
+        ~msg:"Should produce TriggerExit only";
+      (* Verify it's a TriggerExit with StopLoss reason *)
+      (match List.hd output.transitions with
+      | Some trans -> (
+          match trans.kind with
+          | TriggerExit { exit_reason; _ } -> (
+              match exit_reason with
+              | StopLoss _ -> () (* Expected *)
+              | _ -> assert_failure "Expected StopLoss exit reason")
+          | _ -> assert_failure "Expected TriggerExit transition")
+      | None -> assert_failure "Expected at least one transition");
+      (* Position should still be in Holding state *)
       match Map.find new_state.positions "AAPL" with
       | Some position -> (
           match Trading_strategy.Position.get_state position with
-          | Closed closed ->
-              (* Should have negative realized P&L *)
-              assert_bool "Should have loss" Float.(closed.gross_pnl < 0.0)
-          | _ -> assert_failure "Expected Closed state")
-      | None -> assert_failure "Expected closed position")
+          | Holding _ -> () (* Expected *)
+          | _ -> assert_failure "Expected position to remain in Holding state")
+      | None -> assert_failure "Expected position to exist")
   | Error err -> assert_failure ("Stop loss failed: " ^ Status.show err)
 
 (** Test: Signal reversal when price crosses below EMA *)
@@ -228,19 +338,43 @@ let test_signal_reversal _ =
   in
 
   let config = make_config () in
-  let state = Trading_strategy.Ema_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Day 1: Enter position *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result1 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
   let state1 =
     match result1 with
-    | Ok (_, s) -> s
+    | Ok (output, s) ->
+        assert_equal 0
+          (List.length output.transitions)
+          ~msg:"Entry should not produce transitions";
+        s
     | Error err -> failwith ("Day 1 failed: " ^ Status.show err)
+  in
+
+  (* Manually apply engine transitions to move position to Holding state *)
+  let state1_with_holding =
+    match Map.find state1.positions "AAPL" with
+    | Some position ->
+        let entry_price =
+          match Trading_strategy.Position.get_state position with
+          | Entering e -> e.entry_price
+          | _ -> failwith "Expected Entering state"
+        in
+        let position =
+          apply_entry_fill_and_complete position
+            ~date:(date_of_string "2024-01-15")
+            ~entry_price ~stop_loss_pct:0.05 ~take_profit_pct:0.10
+        in
+        ({ positions = Map.set state1.positions ~key:"AAPL" ~data:position }
+          : Trading_strategy.Strategy_interface.state)
+    | None -> failwith "Expected position to exist"
   in
 
   (* Advance to reversal day *)
@@ -249,23 +383,43 @@ let test_signal_reversal _ =
   in
 
   (* Day 2: Should detect signal reversal *)
+  let get_price_fn' = Mock_market_data.get_price market_data' in
+  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
   let result2 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data:market_data'
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state:state1
+    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
+      ~portfolio ~state:state1_with_holding
   in
 
   match result2 with
   | Ok (output, new_state) -> (
-      (* Should have exit transitions *)
-      assert_equal 3 (List.length output.transitions);
-      (* Position should be closed *)
+      (* Should have TriggerExit transition only *)
+      assert_equal 1
+        (List.length output.transitions)
+        ~msg:"Should produce TriggerExit only";
+      (* Verify it's a TriggerExit - exit reason could be StopLoss or SignalReversal *)
+      (match List.hd output.transitions with
+      | Some trans -> (
+          match trans.kind with
+          | TriggerExit { exit_reason; _ } -> (
+              match exit_reason with
+              | SignalReversal _ -> () (* Expected *)
+              | StopLoss _ ->
+                  () (* Also acceptable - stop loss may trigger first *)
+              | _ ->
+                  assert_failure
+                    (Printf.sprintf
+                       "Expected SignalReversal or StopLoss, got: %s"
+                       (Trading_strategy.Position.show_exit_reason exit_reason))
+              )
+          | _ -> assert_failure "Expected TriggerExit transition")
+      | None -> assert_failure "Expected at least one transition");
+      (* Position should still be in Holding state *)
       match Map.find new_state.positions "AAPL" with
       | Some position -> (
           match Trading_strategy.Position.get_state position with
-          | Closed _ -> ()
-          | _ -> assert_failure "Expected Closed state")
-      | None -> assert_failure "Expected closed position")
+          | Holding _ -> () (* Expected *)
+          | _ -> assert_failure "Expected position to remain in Holding state")
+      | None -> assert_failure "Expected position to exist")
   | Error err -> assert_failure ("Signal reversal failed: " ^ Status.show err)
 
 (** Test: No action when holding position with no exit signal *)
@@ -285,19 +439,43 @@ let test_hold_position _ =
   in
 
   let config = make_config () in
-  let state = Trading_strategy.Ema_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Day 1: Enter position *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result1 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
   let state1 =
     match result1 with
-    | Ok (_, s) -> s
+    | Ok (output, s) ->
+        assert_equal 0
+          (List.length output.transitions)
+          ~msg:"Entry should not produce transitions";
+        s
     | Error err -> failwith ("Day 1 failed: " ^ Status.show err)
+  in
+
+  (* Manually apply engine transitions to move position to Holding state *)
+  let state1_with_holding =
+    match Map.find state1.positions "AAPL" with
+    | Some position ->
+        let entry_price =
+          match Trading_strategy.Position.get_state position with
+          | Entering e -> e.entry_price
+          | _ -> failwith "Expected Entering state"
+        in
+        let position =
+          apply_entry_fill_and_complete position
+            ~date:(date_of_string "2024-01-15")
+            ~entry_price ~stop_loss_pct:0.05 ~take_profit_pct:0.10
+        in
+        ({ positions = Map.set state1.positions ~key:"AAPL" ~data:position }
+          : Trading_strategy.Strategy_interface.state)
+    | None -> failwith "Expected position to exist"
   in
 
   (* Advance one day *)
@@ -306,17 +484,19 @@ let test_hold_position _ =
   in
 
   (* Day 2: Should hold position *)
+  let get_price_fn' = Mock_market_data.get_price market_data' in
+  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
   let result2 =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data:market_data'
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state:state1
+    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
+      ~portfolio ~state:state1_with_holding
   in
 
   match result2 with
   | Ok (output, new_state) -> (
       (* Should have no transitions *)
-      assert_equal 0 (List.length output.transitions);
-      (* Should have no orders *)
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"No exit signal, so no transitions";
       (* Position should still be in Holding state *)
       match Map.find new_state.positions "AAPL" with
       | Some position -> (
@@ -343,14 +523,15 @@ let test_no_entry_below_ema _ =
   in
 
   let config = make_config () in
-  let state = Trading_strategy.Ema_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Execute strategy - should not enter *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result =
-    Trading_strategy.Ema_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
 
   match result with

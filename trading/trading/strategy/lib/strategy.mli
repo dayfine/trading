@@ -1,137 +1,53 @@
-(** Strategy abstraction and polymorphic dispatch
+(** Strategy factory and execution
 
-    This module provides a unified interface for all trading strategies, enabling
-    polymorphic strategy execution through value-based dispatch.
-
-    {1 Design Philosophy}
-
-    Strategies are self-contained decision-making units that:
-    - Observe market data and portfolio state
-    - Make trading decisions (entry/exit signals)
-    - Generate position transitions and trading orders
-    - Maintain their own internal state
-
-    The strategy abstraction separates {i what} a strategy does (trading logic)
-    from {i how} it's executed (dispatch mechanism), allowing different strategy
-    implementations to be used interchangeably.
-
-    {1 Key Concepts}
-
-    {b Strategy State}: Each strategy maintains its own state (positions, indicators,
-    counters, etc.). The state is immutable - [on_market_close] returns a new state.
-
-    {b Position Transitions}: Strategies generate [Position.transition] events that
-    describe desired position lifecycle changes (e.g., EntryFill, TriggerExit). These
-    transitions are applied to positions to update their state.
-
-    {b Trading Orders}: Strategies also generate trading orders (buy/sell) that represent
-    the actual market instructions needed to execute the strategy's decisions.
-
-    {b Value-Based Dispatch}: The [t] type is a GADT variant that packages different
-    strategy types together, enabling polymorphic execution while preserving type safety.
+    This module provides factory functions for creating strategies and
+    polymorphic execution without pattern matching.
 
     {1 Usage Example}
 
     {[
-      (* Create different strategies *)
-      let ema_config = { symbol = "AAPL"; ema_period = 20; ... } in
-      let bh_config = { symbol = "MSFT"; position_size = 100.0; ... } in
-
+      (* Create strategies using factory *)
       let strategies = [
-        Strategy.create_ema ~config:ema_config;
-        Strategy.create_buy_and_hold ~config:bh_config;
+        Strategy.create_strategy (Strategy.EmaConfig {
+          symbols = ["AAPL"]; ema_period = 20; ...
+        });
+        Strategy.create_strategy (Strategy.BuyAndHoldConfig {
+          symbols = ["MSFT"]; position_size = 100.0; ...
+        });
       ] in
 
-      (* Execute all strategies uniformly *)
+      (* Execute uniformly - no pattern matching needed *)
+      (* Partially apply market_data to accessor functions *)
+      let get_price_fn = get_price market_data in
+      let get_indicator_fn = get_indicator market_data in
       let results = List.map strategies ~f:(fun strategy ->
-        Strategy.execute ~market_data ~get_price ~get_ema ~portfolio strategy
+        Strategy.use_strategy ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+          ~portfolio strategy
       ) in
     ]} *)
 
+include module type of Strategy_interface
+(** Re-export interface types for convenience *)
 
-(** Common output type for all strategies *)
-type output = {
-  transitions : Position.transition list;
-      (** Position state transitions to apply.
+type t
+(** Packed strategy type
 
-          These transitions describe the intended changes to position states
-          (e.g., EntryFill, ExitComplete). The simulation engine or live trading
-          system will apply these transitions to update position states.
+    Encapsulates any strategy implementation with its config and state. The
+    internal representation is abstract - strategies are executed through
+    {!use_strategy} without pattern matching. *)
 
-          Example: [EntryFill { position_id = "AAPL-1"; filled_quantity = 100.0; ... }]
-          tells the system that 100 shares were filled for position AAPL-1.
+(** Strategy configuration - aggregates all strategy types
 
-          Note: Trading orders are generated separately from transitions using
-          {!Order_generator.from_transitions}. This separates strategy decisions
-          (what to do) from execution details (how to do it). *) }
-[@@deriving show, eq]
-
-(** Abstract strategy module signature *)
-module type STRATEGY = sig
-  type config [@@deriving show, eq]
-  (** Strategy-specific configuration *)
-
-  type state
-  (** Strategy-specific state *)
-
-  val init : config:config -> state
-  (** Initialize strategy with configuration *)
-
-  val on_market_close :
-    market_data:'a ->
-    get_price:('a -> string -> Types.Daily_price.t option) ->
-    get_indicator:('a -> string -> string -> int -> float option) ->
-    portfolio:Trading_portfolio.Portfolio.t ->
-    state:state ->
-    (output * state) Status.status_or
-  (** Execute strategy logic after market close
-
-      Called once per trading day after the market closes to make trading decisions.
-
-      {b Important}: The returned state reflects the strategy's view AFTER the proposed
-      transitions have been applied. For example, if the strategy decides to enter a
-      position, the returned state will have [active_position = Some position] where
-      the position is already in the Holding state (after EntryFill + EntryComplete
-      transitions).
-
-      This means:
-      - Input [state]: Current state before this day's decisions
-      - Output [state]: Expected state after transitions are applied
-      - Output [transitions]: The transitions needed to achieve the new state
-      - Output [orders]: The market orders to execute those transitions
-
-      The caller (simulation engine or live trading system) is responsible for:
-      1. Applying the transitions to update position states
-      2. Submitting orders to the market/broker
-      3. Feeding the new state back into the next [on_market_close] call
-
-      @param market_data Generic market data source
-      @param get_price Function to retrieve price for a symbol
-      @param get_indicator Function to retrieve indicator value (symbol, indicator_name, period)
-          Example: [get_indicator market_data "AAPL" "EMA" 20] returns 20-period EMA
-      @param portfolio Current portfolio state (positions, cash, etc.)
-      @param state Current strategy state (before today's decisions)
-      @return (output, new_state) where:
-          - output contains transitions and orders to execute
-          - new_state is the expected state after transitions are applied *)
-
-  val name : string
-  (** Strategy name for identification *)
-end
-
-(** Packed strategy type for value-based dispatch *)
-type t =
-  | EmaStrategy of { config : Ema_strategy.config; state : Ema_strategy.state }
-  | BuyAndHoldStrategy of {
-      config : Buy_and_hold_strategy.config;
-      state : Buy_and_hold_strategy.state;
-    }
-
-(** Strategy configuration - aggregates all strategy types *)
+    Each variant corresponds to a concrete strategy implementation. The specific
+    config types are defined in the respective strategy modules. *)
 type config =
   | EmaConfig of Ema_strategy.config
   | BuyAndHoldConfig of Buy_and_hold_strategy.config
 [@@deriving show]
+(** Strategy configuration - wraps concrete strategy configs
+
+    Instead of duplicating config structure, this type directly references the
+    config types from individual strategy modules. *)
 
 val create_strategy : config -> t
 (** Create a strategy from configuration
@@ -140,18 +56,38 @@ val create_strategy : config -> t
 
     Example:
     {[
-      let ema_cfg = { symbol = "AAPL"; ema_period = 20; ... } in
+      let ema_cfg : Ema_strategy.config =
+        {
+          symbols = [ "AAPL" ];
+          ema_period = 20;
+          stop_loss_percent = 0.05;
+          take_profit_percent = 0.10;
+          position_size = 100.0;
+        }
+      in
       let strategy = create_strategy (EmaConfig ema_cfg)
     ]} *)
 
-val execute :
-  market_data:'a ->
-  get_price:('a -> string -> Types.Daily_price.t option) ->
-  get_indicator:('a -> string -> string -> int -> float option) ->
+val use_strategy :
+  get_price:get_price_fn ->
+  get_indicator:get_indicator_fn ->
   portfolio:Trading_portfolio.Portfolio.t ->
   t ->
   (output * t) Status.status_or
-(** Execute a strategy's on_market_close logic *)
+(** Execute a strategy's logic without pattern matching
+
+    This function dispatches to the appropriate strategy implementation
+    transparently, without requiring the caller to know which specific strategy
+    is being executed.
+
+    The accessor functions should already have market_data partially applied.
+    Example:
+    {[
+      let get_price_fn = get_price market_data in
+      let get_indicator_fn = get_indicator market_data in
+      use_strategy ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+        ~portfolio strategy
+    ]} *)
 
 val get_name : t -> string
 (** Get strategy name *)

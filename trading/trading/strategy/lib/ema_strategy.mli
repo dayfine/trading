@@ -1,4 +1,7 @@
-(** EMA crossover strategy *)
+(** EMA crossover strategy
+
+    This module implements the {!Strategy_interface.STRATEGY} interface with
+    EMA-based entry/exit logic. *)
 
 type config = {
   symbols : string list;  (** Symbols to trade *)
@@ -10,27 +13,12 @@ type config = {
 [@@deriving show, eq]
 (** Strategy configuration *)
 
-type state = {
-  config : config;
-  positions : Position.t Core.String.Map.t;
-      (** Active positions indexed by symbol (max one per symbol) *)
-}
-(** Strategy state *)
-
-type output = { transitions : Position.transition list }
-(** Strategy output - same structure as Strategy.output *)
-
-val init : config:config -> state
-(** Initialize strategy *)
-
-val on_market_close :
-  market_data:'a ->
-  get_price:('a -> string -> Types.Daily_price.t option) ->
-  get_ema:('a -> string -> int -> float option) ->
-  portfolio:Trading_portfolio.Portfolio.t ->
-  state:state ->
-  (output * state) Status.status_or
-(** Execute strategy logic after market close *)
-
 val name : string
 (** Strategy name *)
+
+val make :
+  config -> (module Strategy_interface.STRATEGY) * Strategy_interface.state
+(** Create a strategy instance that implements the STRATEGY interface
+
+    Returns both the strategy module (with config captured) and the initial
+    state. This encapsulates state initialization within the strategy module. *)

@@ -9,6 +9,9 @@ let date_of_string s = Date.of_string s
 let create_portfolio_exn () =
   Trading_portfolio.Portfolio.create ~initial_cash:100000.0 ()
 
+(** Helper to create strategy module and initial state from config *)
+let make_strategy config = Trading_strategy.Buy_and_hold_strategy.make config
+
 (** Test: Buy and hold enters position immediately when no entry date specified
 *)
 let test_enter_immediately _ =
@@ -33,26 +36,31 @@ let test_enter_immediately _ =
       entry_date = None;
     }
   in
-  let state = Trading_strategy.Buy_and_hold_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Execute strategy - should enter immediately *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result =
-    Trading_strategy.Buy_and_hold_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
 
   match result with
-  | Ok (output, new_state) ->
-      (* Should have created position transitions *)
-      assert_equal 2 (List.length output.transitions);
-      (* EntryFill + EntryComplete *)
-      (* Should have active position *)
-      assert_bool "Should have active position"
-        (Option.is_some (Map.find new_state.positions "AAPL"));
-      assert_bool "Entry should be executed"
-        (Option.value ~default:false (Map.find new_state.entries_executed "AAPL"))
+  | Ok (output, new_state) -> (
+      (* Strategy should not produce execution transitions *)
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"Strategy should not produce entry transitions";
+      (* Should have created position in Entering state *)
+      match Map.find new_state.positions "AAPL" with
+      | Some position -> (
+          match Trading_strategy.Position.get_state position with
+          | Entering entering ->
+              assert_that entering.target_quantity (float_equal 100.0)
+          | _ -> assert_failure "Expected Entering state")
+      | None -> assert_failure "Expected position to exist")
   | Error err -> assert_failure ("Strategy failed: " ^ Status.show err)
 
 (** Test: Buy and hold waits for specific entry date *)
@@ -77,42 +85,47 @@ let test_wait_for_entry_date _ =
       entry_date = Some (date_of_string "2024-01-05");
     }
   in
-  let state = Trading_strategy.Buy_and_hold_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Day 1: Before entry date - should not enter *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result1 =
-    Trading_strategy.Buy_and_hold_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
 
   (match result1 with
   | Ok (output, new_state) ->
       assert_equal 0 (List.length output.transitions);
       assert_bool "Should not have position"
-        (Option.is_none (Map.find new_state.positions "AAPL"));
-      assert_bool "Entry should not be executed"
-        (not (Option.value ~default:false (Map.find new_state.entries_executed "AAPL")))
+        (Option.is_none (Map.find new_state.positions "AAPL"))
   | Error err -> assert_failure ("Day 1 failed: " ^ Status.show err));
 
   (* Day 2: On entry date - should enter *)
   let market_data' =
     Mock_market_data.advance market_data ~date:(date_of_string "2024-01-05")
   in
+  let get_price_fn' = Mock_market_data.get_price market_data' in
+  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
   let result2 =
-    Trading_strategy.Buy_and_hold_strategy.on_market_close
-      ~market_data:market_data' ~get_price:Mock_market_data.get_price
-      ~get_ema:Mock_market_data.get_ema ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
+      ~portfolio ~state:initial_state
   in
 
   match result2 with
-  | Ok (output, new_state) ->
-      assert_equal 2 (List.length output.transitions);
-      assert_bool "Should have position"
-        (Option.is_some (Map.find new_state.positions "AAPL"));
-      assert_bool "Entry should be executed"
-        (Option.value ~default:false (Map.find new_state.entries_executed "AAPL"))
+  | Ok (output, new_state) -> (
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"Should not produce transitions";
+      (* Should have position in Entering state *)
+      match Map.find new_state.positions "AAPL" with
+      | Some position -> (
+          match Trading_strategy.Position.get_state position with
+          | Entering _ -> ()
+          | _ -> assert_failure "Expected Entering state")
+      | None -> assert_failure "Should have position")
   | Error err -> assert_failure ("Day 2 failed: " ^ Status.show err)
 
 (** Test: Buy and hold never exits - holds indefinitely *)
@@ -137,119 +150,71 @@ let test_holds_indefinitely _ =
       entry_date = None;
     }
   in
-  let state = Trading_strategy.Buy_and_hold_strategy.init ~config in
+  let (module S), initial_state = make_strategy config in
   let portfolio = create_portfolio_exn () in
 
   (* Day 1: Enter position *)
+  let get_price_fn = Mock_market_data.get_price market_data in
+  let get_indicator_fn = Mock_market_data.get_indicator market_data in
   let result1 =
-    Trading_strategy.Buy_and_hold_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
+    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+      ~portfolio ~state:initial_state
   in
   let state1 =
     match result1 with
-    | Ok (_, s) -> s
+    | Ok (output, s) ->
+        assert_equal 0
+          (List.length output.transitions)
+          ~msg:"Entry should not produce transitions";
+        assert_bool "Should have position"
+          (Option.is_some (Map.find s.positions "AAPL"));
+        s
     | Error err -> failwith ("Day 1 failed: " ^ Status.show err)
   in
 
-  (* Day 2: After entry - should hold (no exit) *)
+  (* Day 2: After entry - should never produce exit transitions *)
   let market_data' =
     Mock_market_data.advance market_data ~date:(date_of_string "2024-01-10")
   in
+  let get_price_fn' = Mock_market_data.get_price market_data' in
+  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
   let result2 =
-    Trading_strategy.Buy_and_hold_strategy.on_market_close
-      ~market_data:market_data' ~get_price:Mock_market_data.get_price
-      ~get_ema:Mock_market_data.get_ema ~portfolio ~state:state1
+    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
+      ~portfolio ~state:state1
   in
 
-  (match result2 with
-  | Ok (output, new_state) -> (
-      (* Should have no new transitions or orders *)
-      assert_equal 0 (List.length output.transitions);
-      (* Position should still be active *)
-      assert_bool "Should still have position"
-        (Option.is_some (Map.find new_state.positions "AAPL"));
-      (* Verify position is in Holding state *)
-      match Map.find new_state.positions "AAPL" with
-      | Some pos -> (
-          match Trading_strategy.Position.get_state pos with
-          | Holding h ->
-              (* Verify no exit criteria *)
-              assert_bool "Should have no stop loss"
-                (Option.is_none h.risk_params.stop_loss_price);
-              assert_bool "Should have no take profit"
-                (Option.is_none h.risk_params.take_profit_price);
-              assert_bool "Should have no max hold days"
-                (Option.is_none h.risk_params.max_hold_days)
-          | _ -> assert_failure "Expected Holding state")
-      | None -> assert_failure "Expected active position")
-  | Error err -> assert_failure ("Day 2 failed: " ^ Status.show err));
+  let state2 =
+    match result2 with
+    | Ok (output, s) ->
+        (* Buy-and-hold never exits - should have no transitions *)
+        assert_equal 0
+          (List.length output.transitions)
+          ~msg:"Buy-and-hold should never produce exit transitions";
+        assert_bool "Should still have position"
+          (Option.is_some (Map.find s.positions "AAPL"));
+        s
+    | Error err -> failwith ("Day 2 failed: " ^ Status.show err)
+  in
 
-  (* Day 3: Much later - still holding *)
+  (* Day 3: Much later - still no exit transitions *)
   let market_data'' =
     Mock_market_data.advance market_data ~date:(date_of_string "2024-01-25")
   in
-  let state2 =
-    match result2 with
-    | Ok (_, s) -> s
-    | Error err -> failwith ("Can't get state2: " ^ Status.show err)
-  in
+  let get_price_fn'' = Mock_market_data.get_price market_data'' in
+  let get_indicator_fn'' = Mock_market_data.get_indicator market_data'' in
   let result3 =
-    Trading_strategy.Buy_and_hold_strategy.on_market_close
-      ~market_data:market_data'' ~get_price:Mock_market_data.get_price
-      ~get_ema:Mock_market_data.get_ema ~portfolio ~state:state2
+    S.on_market_close ~get_price:get_price_fn''
+      ~get_indicator:get_indicator_fn'' ~portfolio ~state:state2
   in
 
   match result3 with
   | Ok (output, new_state) ->
-      assert_equal 0 (List.length output.transitions);
+      assert_equal 0
+        (List.length output.transitions)
+        ~msg:"Buy-and-hold should never produce exit transitions";
       assert_bool "Should still have position"
         (Option.is_some (Map.find new_state.positions "AAPL"))
   | Error err -> assert_failure ("Day 3 failed: " ^ Status.show err)
-
-(** Test: Position has no risk parameters (no exit criteria) *)
-let test_no_risk_parameters _ =
-  let prices =
-    Price_generators.make_price_sequence ~symbol:"AAPL"
-      ~start_date:(date_of_string "2024-01-01")
-      ~days:5 ~base_price:100.0 ~trend:Price_generators.Sideways
-      ~volatility:0.01
-  in
-  let market_data =
-    Mock_market_data.create
-      ~data:[ ("AAPL", prices) ]
-      ~ema_periods:[]
-      ~current_date:(date_of_string "2024-01-01")
-  in
-
-  let config =
-    {
-      Trading_strategy.Buy_and_hold_strategy.symbols = [ "AAPL" ];
-      position_size = 50.0;
-      entry_date = None;
-    }
-  in
-  let state = Trading_strategy.Buy_and_hold_strategy.init ~config in
-  let portfolio = create_portfolio_exn () in
-
-  let result =
-    Trading_strategy.Buy_and_hold_strategy.on_market_close ~market_data
-      ~get_price:Mock_market_data.get_price ~get_ema:Mock_market_data.get_ema
-      ~portfolio ~state
-  in
-
-  match result with
-  | Ok (_, new_state) -> (
-      match Map.find new_state.positions "AAPL" with
-      | Some pos -> (
-          match Trading_strategy.Position.get_state pos with
-          | Holding h ->
-              assert_that h.risk_params.stop_loss_price is_none;
-              assert_that h.risk_params.take_profit_price is_none;
-              assert_that h.risk_params.max_hold_days is_none
-          | _ -> assert_failure "Expected Holding state")
-      | None -> assert_failure "Expected position")
-  | Error err -> assert_failure ("Failed: " ^ Status.show err)
 
 let suite =
   "Buy and Hold Strategy Tests"
@@ -257,7 +222,6 @@ let suite =
          "enter immediately" >:: test_enter_immediately;
          "wait for entry date" >:: test_wait_for_entry_date;
          "holds indefinitely" >:: test_holds_indefinitely;
-         "no risk parameters" >:: test_no_risk_parameters;
        ]
 
 let () = run_test_tt_main suite
