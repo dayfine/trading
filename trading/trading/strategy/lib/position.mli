@@ -198,6 +198,13 @@ type t = {
 
 (** Transition-specific data - only what's unique to each transition *)
 type transition_kind =
+  | CreateEntering of {
+      symbol : string;
+      target_quantity : float;
+      entry_price : float;
+      reasoning : entry_reasoning;
+    }
+      (** Strategy wants to create a new position in Entering state *)
   | EntryFill of { filled_quantity : float; fill_price : float }
       (** Entry order filled (partial or complete) *)
   | EntryComplete of { risk_params : risk_params }

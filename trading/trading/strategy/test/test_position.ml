@@ -483,6 +483,167 @@ let test_invalid_state_transition _ =
     (apply_transition pos transition)
     (is_error_with Status.Invalid_argument ~msg:"Invalid transition")
 
+(* ==================== CreateEntering Transition Tests ==================== *)
+
+(** Test: CreateEntering transition contains all required data *)
+let test_create_entering_transition_structure _ =
+  let transition =
+    {
+      position_id = "AAPL-1";
+      date = date_of_string "2024-01-01";
+      kind =
+        CreateEntering
+          {
+            symbol = "AAPL";
+            target_quantity = 100.0;
+            entry_price = 150.0;
+            reasoning =
+              TechnicalSignal
+                { indicator = "EMA"; description = "Price crossed above EMA" };
+          };
+    }
+  in
+
+  (* Verify transition structure *)
+  assert_equal "AAPL-1" transition.position_id;
+  assert_equal (date_of_string "2024-01-01") transition.date;
+
+  match transition.kind with
+  | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
+      assert_equal "AAPL" symbol;
+      assert_that target_quantity (float_equal 100.0);
+      assert_that entry_price (float_equal 150.0);
+      (match reasoning with
+      | TechnicalSignal { indicator; description = _ } ->
+          assert_equal "EMA" indicator
+      | _ -> assert_failure "Expected TechnicalSignal reasoning")
+  | _ -> assert_failure "Expected CreateEntering transition"
+
+(** Test: CreateEntering can be used to create a position *)
+let test_create_entering_creates_position _ =
+  let transition =
+    {
+      position_id = "AAPL-1";
+      date = date_of_string "2024-01-01";
+      kind =
+        CreateEntering
+          {
+            symbol = "AAPL";
+            target_quantity = 100.0;
+            entry_price = 150.0;
+            reasoning = ManualDecision { description = "Buy and hold" };
+          };
+    }
+  in
+
+  (* Extract parameters from CreateEntering transition *)
+  match transition.kind with
+  | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
+      (* Create position using the transition data *)
+      let position =
+        create_entering ~id:transition.position_id ~symbol ~target_quantity
+          ~entry_price ~created_date:transition.date ~reasoning
+      in
+
+      (* Verify position was created correctly *)
+      assert_equal "AAPL-1" position.id;
+      assert_equal "AAPL" position.symbol;
+      (match position.state with
+      | Entering { target_quantity = tq; entry_price = ep; filled_quantity; _ }
+        ->
+          assert_that tq (float_equal 100.0);
+          assert_that ep (float_equal 150.0);
+          assert_that filled_quantity (float_equal 0.0)
+      | _ -> assert_failure "Expected position in Entering state")
+  | _ -> assert_failure "Expected CreateEntering transition"
+
+(** Test: Multiple CreateEntering transitions for different symbols *)
+let test_multiple_create_entering_transitions _ =
+  let transitions =
+    [
+      {
+        position_id = "AAPL-1";
+        date = date_of_string "2024-01-01";
+        kind =
+          CreateEntering
+            {
+              symbol = "AAPL";
+              target_quantity = 100.0;
+              entry_price = 150.0;
+              reasoning =
+                TechnicalSignal { indicator = "EMA"; description = "Uptrend" };
+            };
+      };
+      {
+        position_id = "MSFT-1";
+        date = date_of_string "2024-01-01";
+        kind =
+          CreateEntering
+            {
+              symbol = "MSFT";
+              target_quantity = 50.0;
+              entry_price = 300.0;
+              reasoning = Rebalancing;
+            };
+      };
+    ]
+  in
+
+  (* Verify we have 2 transitions *)
+  assert_equal 2 (List.length transitions);
+
+  (* Create positions from transitions *)
+  let positions =
+    List.filter_map transitions ~f:(fun t ->
+        match t.kind with
+        | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
+            Some
+              (create_entering ~id:t.position_id ~symbol ~target_quantity
+                 ~entry_price ~created_date:t.date ~reasoning)
+        | _ -> None)
+  in
+
+  (* Verify 2 positions were created *)
+  assert_equal 2 (List.length positions);
+
+  (* Verify first position *)
+  let aapl_pos = List.nth_exn positions 0 in
+  assert_equal "AAPL" aapl_pos.symbol;
+
+  (* Verify second position *)
+  let msft_pos = List.nth_exn positions 1 in
+  assert_equal "MSFT" msft_pos.symbol
+
+(** Test: CreateEntering with different reasoning types *)
+let test_create_entering_with_various_reasoning _ =
+  let test_reasoning reasoning =
+    let transition =
+      {
+        position_id = "test-1";
+        date = date_of_string "2024-01-01";
+        kind =
+          CreateEntering
+            {
+              symbol = "TEST";
+              target_quantity = 100.0;
+              entry_price = 100.0;
+              reasoning;
+            };
+      }
+    in
+
+    match transition.kind with
+    | CreateEntering { reasoning = r; _ } -> assert_equal reasoning r
+    | _ -> assert_failure "Expected CreateEntering"
+  in
+
+  (* Test all reasoning types *)
+  test_reasoning
+    (TechnicalSignal { indicator = "RSI"; description = "Oversold" });
+  test_reasoning (PricePattern "Cup and Handle");
+  test_reasoning Rebalancing;
+  test_reasoning (ManualDecision { description = "Strong fundamentals" })
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -506,6 +667,14 @@ let suite =
          >:: test_invalid_transition_from_closed;
          "wrong position id" >:: test_wrong_position_id;
          "invalid state transition" >:: test_invalid_state_transition;
+         "create entering transition structure"
+         >:: test_create_entering_transition_structure;
+         "create entering creates position"
+         >:: test_create_entering_creates_position;
+         "multiple create entering transitions"
+         >:: test_multiple_create_entering_transitions;
+         "create entering with various reasoning"
+         >:: test_create_entering_with_various_reasoning;
        ]
 
 let () = run_test_tt_main suite

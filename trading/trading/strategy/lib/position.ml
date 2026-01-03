@@ -82,6 +82,12 @@ type t = {
 (** {1 Transitions} *)
 
 type transition_kind =
+  | CreateEntering of {
+      symbol : string;
+      target_quantity : float;
+      entry_price : float;
+      reasoning : entry_reasoning;
+    }
   | EntryFill of { filled_quantity : float; fill_price : float }
   | EntryComplete of { risk_params : risk_params }
   | CancelEntry of { reason : string }
