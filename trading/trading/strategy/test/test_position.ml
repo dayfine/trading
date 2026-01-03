@@ -47,6 +47,7 @@ let make_holding ?(id = "pos-1") ?(symbol = "AAPL") ?(quantity = 100.0)
             };
         };
     last_updated = date_of_string "2024-01-02";
+    portfolio_lot_ids = [];
   }
 
 (* ==================== Creation Tests ==================== *)
@@ -338,6 +339,7 @@ let test_exit_fill _ =
             started_date = date_of_string "2024-01-10";
           };
       last_updated = date_of_string "2024-01-10";
+      portfolio_lot_ids = [];
     }
   in
   let transition =
@@ -391,6 +393,7 @@ let test_exit_complete _ =
             started_date = date_of_string "2024-01-10";
           };
       last_updated = date_of_string "2024-01-10";
+      portfolio_lot_ids = [];
     }
   in
   let transition =
@@ -440,6 +443,7 @@ let test_invalid_transition_from_closed _ =
             days_held = 8;
           };
       last_updated = date_of_string "2024-01-10";
+      portfolio_lot_ids = [];
     }
   in
   let transition =
