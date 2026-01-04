@@ -107,9 +107,10 @@ let test_ema_computation _ =
   (match ema_10 with Some _ -> () | None -> assert_failure "Expected EMA 10");
   let ema_20 = Mock_market_data.get_ema market_data "AAPL" 20 in
   (match ema_20 with Some _ -> () | None -> assert_failure "Expected EMA 20");
-  (* EMA series should have values *)
+  (* EMA series should have values starting from period-1 *)
+  (* For 30 days with period 10: 30 - (10 - 1) = 21 values *)
   let ema_series = Mock_market_data.get_ema_series market_data "AAPL" 10 () in
-  assert_equal 30 (List.length ema_series)
+  assert_equal 21 (List.length ema_series)
 
 let test_price_spike _ =
   let base_prices =

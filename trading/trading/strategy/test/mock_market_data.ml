@@ -9,27 +9,19 @@ type t = {
 }
 (** Price data with indicators *)
 
-(** Compute EMA from price data *)
+(** Convert price data to indicator values *)
+let prices_to_indicator_values (prices : Types.Daily_price.t list) :
+    Indicator_types.indicator_value list =
+  List.map prices ~f:(fun p ->
+      { Indicator_types.date = p.date; value = p.close_price })
+
+(** Compute EMA from price data using real EMA implementation *)
 let compute_ema prices period =
   if List.is_empty prices || period <= 0 then []
   else
-    let multiplier = 2.0 /. Float.of_int (period + 1) in
-    let rec compute acc remaining =
-      match remaining with
-      | [] -> List.rev acc
-      | price :: rest -> (
-          match acc with
-          | [] ->
-              (* First EMA = close price *)
-              compute [ (price.Types.Daily_price.date, price.close_price) ] rest
-          | (_, prev_ema) :: _ ->
-              (* EMA = (close - prev_ema) * multiplier + prev_ema *)
-              let new_ema =
-                ((price.close_price -. prev_ema) *. multiplier) +. prev_ema
-              in
-              compute ((price.date, new_ema) :: acc) rest)
-    in
-    compute [] prices
+    let indicator_values = prices_to_indicator_values prices in
+    let ema_results = Ema.calculate_ema indicator_values period in
+    List.map ema_results ~f:(fun iv -> (iv.date, iv.value))
 
 (** Create mock market data from price lists *)
 let create ~data ~ema_periods ~current_date =
