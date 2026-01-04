@@ -9,9 +9,24 @@ let date_of_string s = Date.of_string s
 
 let make_entering ?(id = "pos-1") ?(symbol = "AAPL") ?(target = 100.0)
     ?(entry_price = 150.0) () =
-  create_entering ~id ~symbol ~target_quantity:target ~entry_price
-    ~created_date:(date_of_string "2024-01-01")
-    ~reasoning:(TechnicalSignal { indicator = "EMA"; description = "Test" })
+  let transition =
+    {
+      position_id = id;
+      date = date_of_string "2024-01-01";
+      kind =
+        CreateEntering
+          {
+            symbol;
+            target_quantity = target;
+            entry_price;
+            reasoning =
+              TechnicalSignal { indicator = "EMA"; description = "Test" };
+          };
+    }
+  in
+  match create_entering transition with
+  | Ok pos -> pos
+  | Error err -> failwith ("Failed to create entering: " ^ Status.show err)
 
 let apply_entry_fill pos ~filled_quantity =
   let transition =
@@ -53,25 +68,44 @@ let make_holding ?(id = "pos-1") ?(symbol = "AAPL") ?(quantity = 100.0)
 (* ==================== Creation Tests ==================== *)
 
 let test_create_entering _ =
-  let pos =
-    create_entering ~id:"pos-1" ~symbol:"AAPL" ~target_quantity:100.0
-      ~entry_price:150.0
-      ~created_date:(date_of_string "2024-01-01")
-      ~reasoning:(TechnicalSignal { indicator = "EMA"; description = "Test" })
-  in
-  assert_that pos.id (equal_to "pos-1");
-  assert_that pos.symbol (equal_to "AAPL");
-  assert_that (is_closed pos) (equal_to false);
-  assert_that (get_state pos)
-    (equal_to
-       (Entering
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-01";
+      kind =
+        CreateEntering
           {
+            symbol = "AAPL";
             target_quantity = 100.0;
             entry_price = 150.0;
-            filled_quantity = 0.0;
-            created_date = date_of_string "2024-01-01";
-          }
-         : position_state))
+            reasoning =
+              TechnicalSignal { indicator = "EMA"; description = "Test" };
+          };
+    }
+  in
+  assert_that
+    (create_entering transition)
+    (is_ok_and_holds (fun pos ->
+         assert_that pos
+           (equal_to
+              ({
+                 id = "pos-1";
+                 symbol = "AAPL";
+                 entry_reasoning =
+                   TechnicalSignal { indicator = "EMA"; description = "Test" };
+                 exit_reason = None;
+                 state =
+                   Entering
+                     {
+                       target_quantity = 100.0;
+                       entry_price = 150.0;
+                       filled_quantity = 0.0;
+                       created_date = date_of_string "2024-01-01";
+                     };
+                 last_updated = date_of_string "2024-01-01";
+                 portfolio_lot_ids = [];
+               }
+                : t))))
 
 (* ==================== Entry Transitions ==================== *)
 
@@ -503,21 +537,26 @@ let test_create_entering_transition_structure _ =
           };
     }
   in
-
-  (* Verify transition structure *)
-  assert_equal "AAPL-1" transition.position_id;
-  assert_equal (date_of_string "2024-01-01") transition.date;
-
-  match transition.kind with
-  | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
-      assert_equal "AAPL" symbol;
-      assert_that target_quantity (float_equal 100.0);
-      assert_that entry_price (float_equal 150.0);
-      (match reasoning with
-      | TechnicalSignal { indicator; description = _ } ->
-          assert_equal "EMA" indicator
-      | _ -> assert_failure "Expected TechnicalSignal reasoning")
-  | _ -> assert_failure "Expected CreateEntering transition"
+  assert_that transition
+    (equal_to
+       ({
+          position_id = "AAPL-1";
+          date = date_of_string "2024-01-01";
+          kind =
+            CreateEntering
+              {
+                symbol = "AAPL";
+                target_quantity = 100.0;
+                entry_price = 150.0;
+                reasoning =
+                  TechnicalSignal
+                    {
+                      indicator = "EMA";
+                      description = "Price crossed above EMA";
+                    };
+              };
+        }
+         : transition))
 
 (** Test: CreateEntering can be used to create a position *)
 let test_create_entering_creates_position _ =
@@ -535,27 +574,29 @@ let test_create_entering_creates_position _ =
           };
     }
   in
-
-  (* Extract parameters from CreateEntering transition *)
-  match transition.kind with
-  | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
-      (* Create position using the transition data *)
-      let position =
-        create_entering ~id:transition.position_id ~symbol ~target_quantity
-          ~entry_price ~created_date:transition.date ~reasoning
-      in
-
-      (* Verify position was created correctly *)
-      assert_equal "AAPL-1" position.id;
-      assert_equal "AAPL" position.symbol;
-      (match position.state with
-      | Entering { target_quantity = tq; entry_price = ep; filled_quantity; _ }
-        ->
-          assert_that tq (float_equal 100.0);
-          assert_that ep (float_equal 150.0);
-          assert_that filled_quantity (float_equal 0.0)
-      | _ -> assert_failure "Expected position in Entering state")
-  | _ -> assert_failure "Expected CreateEntering transition"
+  assert_that
+    (create_entering transition)
+    (is_ok_and_holds (fun pos ->
+         assert_that pos
+           (equal_to
+              ({
+                 id = "AAPL-1";
+                 symbol = "AAPL";
+                 entry_reasoning =
+                   ManualDecision { description = "Buy and hold" };
+                 exit_reason = None;
+                 state =
+                   Entering
+                     {
+                       target_quantity = 100.0;
+                       entry_price = 150.0;
+                       filled_quantity = 0.0;
+                       created_date = date_of_string "2024-01-01";
+                     };
+                 last_updated = date_of_string "2024-01-01";
+                 portfolio_lot_ids = [];
+               }
+                : t))))
 
 (** Test: Multiple CreateEntering transitions for different symbols *)
 let test_multiple_create_entering_transitions _ =
@@ -589,34 +630,58 @@ let test_multiple_create_entering_transitions _ =
     ]
   in
 
-  (* Verify we have 2 transitions *)
-  assert_equal 2 (List.length transitions);
-
   (* Create positions from transitions *)
   let positions =
     List.filter_map transitions ~f:(fun t ->
-        match t.kind with
-        | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
-            Some
-              (create_entering ~id:t.position_id ~symbol ~target_quantity
-                 ~entry_price ~created_date:t.date ~reasoning)
-        | _ -> None)
+        match create_entering t with Ok pos -> Some pos | Error _ -> None)
   in
 
-  (* Verify 2 positions were created *)
-  assert_equal 2 (List.length positions);
-
-  (* Verify first position *)
-  let aapl_pos = List.nth_exn positions 0 in
-  assert_equal "AAPL" aapl_pos.symbol;
-
-  (* Verify second position *)
-  let msft_pos = List.nth_exn positions 1 in
-  assert_equal "MSFT" msft_pos.symbol
+  (* Verify both positions created successfully *)
+  assert_that positions
+    (elements_are
+       [
+         equal_to
+           ({
+              id = "AAPL-1";
+              symbol = "AAPL";
+              entry_reasoning =
+                TechnicalSignal { indicator = "EMA"; description = "Uptrend" };
+              exit_reason = None;
+              state =
+                Entering
+                  {
+                    target_quantity = 100.0;
+                    entry_price = 150.0;
+                    filled_quantity = 0.0;
+                    created_date = date_of_string "2024-01-01";
+                  };
+              last_updated = date_of_string "2024-01-01";
+              portfolio_lot_ids = [];
+            }
+             : t);
+         equal_to
+           ({
+              id = "MSFT-1";
+              symbol = "MSFT";
+              entry_reasoning = Rebalancing;
+              exit_reason = None;
+              state =
+                Entering
+                  {
+                    target_quantity = 50.0;
+                    entry_price = 300.0;
+                    filled_quantity = 0.0;
+                    created_date = date_of_string "2024-01-01";
+                  };
+              last_updated = date_of_string "2024-01-01";
+              portfolio_lot_ids = [];
+            }
+             : t);
+       ])
 
 (** Test: CreateEntering with different reasoning types *)
 let test_create_entering_with_various_reasoning _ =
-  let test_reasoning reasoning =
+  let test_reasoning reasoning expected_pos =
     let transition =
       {
         position_id = "test-1";
@@ -631,18 +696,139 @@ let test_create_entering_with_various_reasoning _ =
             };
       }
     in
-
-    match transition.kind with
-    | CreateEntering { reasoning = r; _ } -> assert_equal reasoning r
-    | _ -> assert_failure "Expected CreateEntering"
+    assert_that
+      (create_entering transition)
+      (is_ok_and_holds (fun pos ->
+           assert_that pos (equal_to (expected_pos : t))))
   in
 
   (* Test all reasoning types *)
   test_reasoning
-    (TechnicalSignal { indicator = "RSI"; description = "Oversold" });
-  test_reasoning (PricePattern "Cup and Handle");
-  test_reasoning Rebalancing;
-  test_reasoning (ManualDecision { description = "Strong fundamentals" })
+    (TechnicalSignal { indicator = "RSI"; description = "Oversold" })
+    {
+      id = "test-1";
+      symbol = "TEST";
+      entry_reasoning =
+        TechnicalSignal { indicator = "RSI"; description = "Oversold" };
+      exit_reason = None;
+      state =
+        Entering
+          {
+            target_quantity = 100.0;
+            entry_price = 100.0;
+            filled_quantity = 0.0;
+            created_date = date_of_string "2024-01-01";
+          };
+      last_updated = date_of_string "2024-01-01";
+      portfolio_lot_ids = [];
+    };
+  test_reasoning (PricePattern "Cup and Handle")
+    {
+      id = "test-1";
+      symbol = "TEST";
+      entry_reasoning = PricePattern "Cup and Handle";
+      exit_reason = None;
+      state =
+        Entering
+          {
+            target_quantity = 100.0;
+            entry_price = 100.0;
+            filled_quantity = 0.0;
+            created_date = date_of_string "2024-01-01";
+          };
+      last_updated = date_of_string "2024-01-01";
+      portfolio_lot_ids = [];
+    };
+  test_reasoning Rebalancing
+    {
+      id = "test-1";
+      symbol = "TEST";
+      entry_reasoning = Rebalancing;
+      exit_reason = None;
+      state =
+        Entering
+          {
+            target_quantity = 100.0;
+            entry_price = 100.0;
+            filled_quantity = 0.0;
+            created_date = date_of_string "2024-01-01";
+          };
+      last_updated = date_of_string "2024-01-01";
+      portfolio_lot_ids = [];
+    };
+  test_reasoning
+    (ManualDecision { description = "Strong fundamentals" })
+    {
+      id = "test-1";
+      symbol = "TEST";
+      entry_reasoning = ManualDecision { description = "Strong fundamentals" };
+      exit_reason = None;
+      state =
+        Entering
+          {
+            target_quantity = 100.0;
+            entry_price = 100.0;
+            filled_quantity = 0.0;
+            created_date = date_of_string "2024-01-01";
+          };
+      last_updated = date_of_string "2024-01-01";
+      portfolio_lot_ids = [];
+    }
+
+(** Test: CreateEntering validation - negative quantity *)
+let test_create_entering_negative_quantity _ =
+  let transition =
+    {
+      position_id = "test-1";
+      date = date_of_string "2024-01-01";
+      kind =
+        CreateEntering
+          {
+            symbol = "TEST";
+            target_quantity = -100.0;
+            entry_price = 100.0;
+            reasoning = Rebalancing;
+          };
+    }
+  in
+  assert_that
+    (create_entering transition)
+    (is_error_with Status.Invalid_argument
+       ~msg:"target_quantity must be positive")
+
+(** Test: CreateEntering validation - negative price *)
+let test_create_entering_negative_price _ =
+  let transition =
+    {
+      position_id = "test-1";
+      date = date_of_string "2024-01-01";
+      kind =
+        CreateEntering
+          {
+            symbol = "TEST";
+            target_quantity = 100.0;
+            entry_price = -100.0;
+            reasoning = Rebalancing;
+          };
+    }
+  in
+  assert_that
+    (create_entering transition)
+    (is_error_with Status.Invalid_argument ~msg:"entry_price must be positive")
+
+(** Test: CreateEntering with wrong transition kind *)
+let test_create_entering_wrong_transition_kind _ =
+  let transition =
+    {
+      position_id = "test-1";
+      date = date_of_string "2024-01-01";
+      kind = EntryFill { filled_quantity = 100.0; fill_price = 100.0 };
+    }
+  in
+  assert_that
+    (create_entering transition)
+    (is_error_with Status.Invalid_argument
+       ~msg:"Expected CreateEntering transition")
 
 (* ==================== Test Suite ==================== *)
 
@@ -675,6 +861,12 @@ let suite =
          >:: test_multiple_create_entering_transitions;
          "create entering with various reasoning"
          >:: test_create_entering_with_various_reasoning;
+         "create entering negative quantity"
+         >:: test_create_entering_negative_quantity;
+         "create entering negative price"
+         >:: test_create_entering_negative_price;
+         "create entering wrong transition kind"
+         >:: test_create_entering_wrong_transition_kind;
        ]
 
 let () = run_test_tt_main suite

@@ -38,11 +38,11 @@ type output = {
   transitions : Position.transition list;
       (** Position state transitions to apply.
 
-          These transitions describe all desired position state changes including
-          creating new positions (CreateEntering), updating existing positions
-          (TriggerExit, UpdateRiskParams), and handling fills (EntryFill, ExitFill).
-          The simulation engine or live trading system will apply these transitions
-          to update position states. *)
+          These transitions describe all desired position state changes
+          including creating new positions (CreateEntering), updating existing
+          positions (TriggerExit, UpdateRiskParams), and handling fills
+          (EntryFill, ExitFill). The simulation engine or live trading system
+          will apply these transitions to update position states. *)
 }
 [@@deriving show, eq]
 (** Common output type for all strategies *)
@@ -75,8 +75,8 @@ module type STRATEGY = sig
         Function to retrieve indicator value for a symbol (market data already
         captured)
       @param positions
-        Current positions map (symbol -> position). Caller owns and manages
-        this state.
+        Current positions map (symbol -> position). Caller owns and manages this
+        state.
       @return output containing transitions to execute *)
 
   val name : string
