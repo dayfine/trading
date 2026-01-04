@@ -24,47 +24,45 @@ let _should_enter (config : config) (price : Types.Daily_price.t) : bool =
 
 (* Execute entry: create CreateEntering transition *)
 let _execute_entry ~(symbol : string) ~(config : config)
-    ~(price : Types.Daily_price.t) : Position.transition list =
+    ~(price : Types.Daily_price.t) : Position.transition =
   let position_id = _generate_position_id symbol in
   let entry_price = price.Types.Daily_price.close_price in
   let date = price.Types.Daily_price.date in
 
   (* Produce CreateEntering transition - engine will create and fill position *)
-  [
-    {
-      Position.position_id;
-      date;
-      kind =
-        CreateEntering
-          {
-            symbol;
-            target_quantity = config.position_size;
-            entry_price;
-            reasoning =
-              ManualDecision { description = "Buy and hold - initial entry" };
-          };
-    };
-  ]
+  {
+    Position.position_id;
+    date;
+    kind =
+      CreateEntering
+        {
+          symbol;
+          target_quantity = config.position_size;
+          entry_price;
+          reasoning =
+            ManualDecision { description = "Buy and hold - initial entry" };
+        };
+  }
 
-(* Process one symbol - returns transitions only *)
+(* Process one symbol - returns optional transition *)
 let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
     ~(config : config) ~(positions : Position.t String.Map.t) (symbol : string)
-    : Position.transition list =
+    : Position.transition option =
   (* Early exit if position already exists (entry already executed) *)
-  if Map.mem positions symbol then []
+  if Map.mem positions symbol then None
   else
     (* Check if we should enter *)
     match get_price symbol with
     | Some price when _should_enter config price ->
-        _execute_entry ~symbol ~config ~price
-    | _ -> []
+        Some (_execute_entry ~symbol ~config ~price)
+    | _ -> None
 
 let make (config : config) : (module Strategy_interface.STRATEGY) =
   let module M = struct
     let on_market_close ~get_price ~get_indicator:_ ~positions =
       (* Process all symbols and collect transitions *)
       let all_transitions =
-        List.concat_map config.symbols ~f:(fun symbol ->
+        List.filter_map config.symbols ~f:(fun symbol ->
             _process_symbol ~get_price ~config ~positions symbol)
       in
 

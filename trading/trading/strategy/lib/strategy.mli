@@ -32,9 +32,10 @@ include module type of Strategy_interface
 type t
 (** Packed strategy type
 
-    Encapsulates any strategy implementation. Strategies are stateless - positions
-    are managed by the caller. The internal representation is abstract - strategies
-    are executed through {!use_strategy} without pattern matching. *)
+    Encapsulates any strategy implementation. Strategies are stateless -
+    positions are managed by the caller. The internal representation is abstract
+    \- strategies are executed through {!use_strategy} without pattern matching.
+*)
 
 (** Strategy configuration - aggregates all strategy types
 
