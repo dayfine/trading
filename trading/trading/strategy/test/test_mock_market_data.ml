@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Test_helpers
+open Matchers
 
 let date_of_string s = Date.of_string s
 
@@ -20,9 +21,12 @@ let test_create_and_query _ =
     (date_of_string "2024-01-05")
     (Mock_market_data.current_date market_data);
   let price_opt = Mock_market_data.get_price market_data "AAPL" in
-  match price_opt with
-  | Some _ -> ()
-  | None -> assert_failure "Expected Some price"
+  (* Check actual price - should be day 5 with deterministic value *)
+  assert_that price_opt
+    (is_some_and
+       (field
+          (fun (p : Types.Daily_price.t) -> p.close_price)
+          (float_equal ~epsilon:0.5 154.0)))
 
 let test_advance_date _ =
   let prices =
@@ -56,14 +60,42 @@ let test_price_history _ =
       ~current_date:(date_of_string "2024-01-10")
   in
   let history = Mock_market_data.get_price_history market_data "AAPL" () in
-  (* Should have all generated prices up to current date *)
-  assert_bool "Should have prices" (List.length history > 0);
-  assert_bool "Should not exceed total" (List.length history <= 10);
-  (* Test lookback *)
+  (* Should have all 10 days with deterministic values *)
+  assert_that history (size_is 10);
+  let close_prices =
+    List.map history ~f:(fun (p : Types.Daily_price.t) -> p.close_price)
+  in
+  (* Verify deterministic values - Sideways trend with base 150.0 should stay near 150 *)
+  (* These values are from fixed Random seed 42, scaled from base=100 pattern *)
+  assert_that close_prices
+    (elements_are
+       [
+         float_equal ~epsilon:1.0 150.27;
+         float_equal ~epsilon:1.0 150.75;
+         float_equal ~epsilon:1.0 150.765;
+         float_equal ~epsilon:1.0 150.81;
+         float_equal ~epsilon:1.0 151.11;
+         float_equal ~epsilon:1.0 150.975;
+         float_equal ~epsilon:1.0 150.99;
+         float_equal ~epsilon:1.0 151.395;
+         float_equal ~epsilon:1.0 151.185;
+         float_equal ~epsilon:1.0 151.215;
+       ]);
+  (* Test lookback - should only get last 3 days *)
   let recent =
     Mock_market_data.get_price_history market_data "AAPL" ~lookback_days:3 ()
   in
-  assert_bool "Lookback should limit results" (List.length recent <= 3)
+  assert_that recent (size_is 3);
+  let recent_close_prices =
+    List.map recent ~f:(fun (p : Types.Daily_price.t) -> p.close_price)
+  in
+  assert_that recent_close_prices
+    (elements_are
+       [
+         float_equal ~epsilon:1.0 151.395;
+         float_equal ~epsilon:1.0 151.185;
+         float_equal ~epsilon:1.0 151.215;
+       ])
 
 let test_no_lookahead _ =
   let prices =
@@ -79,16 +111,14 @@ let test_no_lookahead _ =
   in
   (* Should only get prices up to current date *)
   let history = Mock_market_data.get_price_history market_data "AAPL" () in
-  assert_equal 5 (List.length history);
+  assert_that history (size_is 5);
   (* Future date should return None *)
   let future_price =
     Mock_market_data.get_price
       (Mock_market_data.advance market_data ~date:(date_of_string "2024-01-20"))
       "AAPL"
   in
-  match future_price with
-  | None -> ()
-  | Some _ -> assert_failure "Expected None for future date"
+  assert_that future_price is_none
 
 let test_ema_computation _ =
   let prices =
@@ -104,13 +134,15 @@ let test_ema_computation _ =
   in
   (* EMA should be computed *)
   let ema_10 = Mock_market_data.get_ema market_data "AAPL" 10 in
-  (match ema_10 with Some _ -> () | None -> assert_failure "Expected EMA 10");
+  assert_that ema_10
+    (is_some_and (fun ema -> assert_bool "EMA 10 should be positive" (ema > 0.0)));
   let ema_20 = Mock_market_data.get_ema market_data "AAPL" 20 in
-  (match ema_20 with Some _ -> () | None -> assert_failure "Expected EMA 20");
+  assert_that ema_20
+    (is_some_and (fun ema -> assert_bool "EMA 20 should be positive" (ema > 0.0)));
   (* EMA series should have values starting from period-1 *)
   (* For 30 days with period 10: 30 - (10 - 1) = 21 values *)
   let ema_series = Mock_market_data.get_ema_series market_data "AAPL" 10 () in
-  assert_equal 21 (List.length ema_series)
+  assert_that ema_series (size_is 21)
 
 let test_price_spike _ =
   let base_prices =
