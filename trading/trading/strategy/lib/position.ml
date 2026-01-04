@@ -172,9 +172,9 @@ let _validate_transition t transition =
 (** {1 Position Operations} *)
 
 let create_entering ?(id = None) ?(date = None) transition =
-  let open Result.Let_syntax in
   match transition.kind with
   | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
+      let open Result.Let_syntax in
       let%bind () = _validate_positive "target_quantity" target_quantity in
       let%bind () = _validate_positive "entry_price" entry_price in
       let position_id =
