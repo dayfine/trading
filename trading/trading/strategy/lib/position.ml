@@ -172,39 +172,38 @@ let _validate_transition t transition =
 (** {1 Position Operations} *)
 
 let create_entering ?(id = None) ?(date = None) transition =
-  match transition.kind with
-  | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
-      let open Result.Let_syntax in
-      let%bind () = _validate_positive "target_quantity" target_quantity in
-      let%bind () = _validate_positive "entry_price" entry_price in
-      let position_id =
-        match id with Some id -> id | None -> transition.position_id
-      in
-      let created_date =
-        match date with Some d -> d | None -> transition.date
-      in
-      Ok
-        {
-          id = position_id;
-          symbol;
-          entry_reasoning = reasoning;
-          exit_reason = None;
-          state =
-            Entering
-              {
-                target_quantity;
-                entry_price;
-                filled_quantity = 0.0;
-                created_date;
-              };
-          last_updated = created_date;
-          portfolio_lot_ids = [];
-        }
-  | kind ->
-      Error
-        (Status.invalid_argument_error
-           (Printf.sprintf "Expected CreateEntering transition, got %s"
-              (show_transition_kind kind)))
+  let open Result.Let_syntax in
+  (* Check transition kind first and extract fields *)
+  let%bind symbol, target_quantity, entry_price, reasoning =
+    match transition.kind with
+    | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
+        Ok (symbol, target_quantity, entry_price, reasoning)
+    | kind ->
+        Error
+          (Status.invalid_argument_error
+             (Printf.sprintf "Expected CreateEntering transition, got %s"
+                (show_transition_kind kind)))
+  in
+  (* Validate extracted values *)
+  let%bind () = _validate_positive "target_quantity" target_quantity in
+  let%bind () = _validate_positive "entry_price" entry_price in
+  (* Build position *)
+  let position_id =
+    match id with Some id -> id | None -> transition.position_id
+  in
+  let created_date = match date with Some d -> d | None -> transition.date in
+  Ok
+    {
+      id = position_id;
+      symbol;
+      entry_reasoning = reasoning;
+      exit_reason = None;
+      state =
+        Entering
+          { target_quantity; entry_price; filled_quantity = 0.0; created_date };
+      last_updated = created_date;
+      portfolio_lot_ids = [];
+    }
 
 let get_state t = t.state
 let is_closed t = match t.state with Closed _ -> true | _ -> false
