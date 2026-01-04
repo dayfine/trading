@@ -519,45 +519,6 @@ let test_invalid_state_transition _ =
 
 (* ==================== CreateEntering Transition Tests ==================== *)
 
-(** Test: CreateEntering transition contains all required data *)
-let test_create_entering_transition_structure _ =
-  let transition =
-    {
-      position_id = "AAPL-1";
-      date = date_of_string "2024-01-01";
-      kind =
-        CreateEntering
-          {
-            symbol = "AAPL";
-            target_quantity = 100.0;
-            entry_price = 150.0;
-            reasoning =
-              TechnicalSignal
-                { indicator = "EMA"; description = "Price crossed above EMA" };
-          };
-    }
-  in
-  assert_that transition
-    (equal_to
-       ({
-          position_id = "AAPL-1";
-          date = date_of_string "2024-01-01";
-          kind =
-            CreateEntering
-              {
-                symbol = "AAPL";
-                target_quantity = 100.0;
-                entry_price = 150.0;
-                reasoning =
-                  TechnicalSignal
-                    {
-                      indicator = "EMA";
-                      description = "Price crossed above EMA";
-                    };
-              };
-        }
-         : transition))
-
 (** Test: CreateEntering can be used to create a position *)
 let test_create_entering_creates_position _ =
   let transition =
@@ -597,87 +558,6 @@ let test_create_entering_creates_position _ =
                  portfolio_lot_ids = [];
                }
                 : t))))
-
-(** Test: Multiple CreateEntering transitions for different symbols *)
-let test_multiple_create_entering_transitions _ =
-  let transitions =
-    [
-      {
-        position_id = "AAPL-1";
-        date = date_of_string "2024-01-01";
-        kind =
-          CreateEntering
-            {
-              symbol = "AAPL";
-              target_quantity = 100.0;
-              entry_price = 150.0;
-              reasoning =
-                TechnicalSignal { indicator = "EMA"; description = "Uptrend" };
-            };
-      };
-      {
-        position_id = "MSFT-1";
-        date = date_of_string "2024-01-01";
-        kind =
-          CreateEntering
-            {
-              symbol = "MSFT";
-              target_quantity = 50.0;
-              entry_price = 300.0;
-              reasoning = Rebalancing;
-            };
-      };
-    ]
-  in
-
-  (* Create positions from transitions *)
-  let positions =
-    List.filter_map transitions ~f:(fun t ->
-        match create_entering t with Ok pos -> Some pos | Error _ -> None)
-  in
-
-  (* Verify both positions created successfully *)
-  assert_that positions
-    (elements_are
-       [
-         equal_to
-           ({
-              id = "AAPL-1";
-              symbol = "AAPL";
-              entry_reasoning =
-                TechnicalSignal { indicator = "EMA"; description = "Uptrend" };
-              exit_reason = None;
-              state =
-                Entering
-                  {
-                    target_quantity = 100.0;
-                    entry_price = 150.0;
-                    filled_quantity = 0.0;
-                    created_date = date_of_string "2024-01-01";
-                  };
-              last_updated = date_of_string "2024-01-01";
-              portfolio_lot_ids = [];
-            }
-             : t);
-         equal_to
-           ({
-              id = "MSFT-1";
-              symbol = "MSFT";
-              entry_reasoning = Rebalancing;
-              exit_reason = None;
-              state =
-                Entering
-                  {
-                    target_quantity = 50.0;
-                    entry_price = 300.0;
-                    filled_quantity = 0.0;
-                    created_date = date_of_string "2024-01-01";
-                  };
-              last_updated = date_of_string "2024-01-01";
-              portfolio_lot_ids = [];
-            }
-             : t);
-       ])
 
 (** Test: CreateEntering with different reasoning types *)
 let test_create_entering_with_various_reasoning _ =
@@ -853,12 +733,8 @@ let suite =
          >:: test_invalid_transition_from_closed;
          "wrong position id" >:: test_wrong_position_id;
          "invalid state transition" >:: test_invalid_state_transition;
-         "create entering transition structure"
-         >:: test_create_entering_transition_structure;
          "create entering creates position"
          >:: test_create_entering_creates_position;
-         "multiple create entering transitions"
-         >:: test_multiple_create_entering_transitions;
          "create entering with various reasoning"
          >:: test_create_entering_with_various_reasoning;
          "create entering negative quantity"
