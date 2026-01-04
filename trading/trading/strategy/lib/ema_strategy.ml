@@ -22,26 +22,30 @@ let _generate_position_id (symbol : string) : string =
 let _has_entry_signal ~(price : float) ~(ema : float) : bool =
   Float.(price > ema)
 
-(* Execute entry: create position in Entering state *)
+(* Execute entry: create CreateEntering transition *)
 let _execute_entry ~(symbol : string) ~(config : config)
-    ~(price : Types.Daily_price.t) ~ema:_ :
-    (Position.transition list * Position.t) Status.status_or =
-  let open Result.Let_syntax in
+    ~(price : Types.Daily_price.t) ~ema:_ : Position.transition list =
   let position_id = _generate_position_id symbol in
   let entry_price = price.Types.Daily_price.close_price in
   let date = price.Types.Daily_price.date in
 
-  (* Create initial Entering position - engine will fill it *)
-  let position =
-    Position.create_entering ~id:position_id ~symbol
-      ~target_quantity:config.position_size ~entry_price ~created_date:date
-      ~reasoning:
-        (Position.TechnicalSignal
-           { indicator = "EMA"; description = "Price crossed above EMA" })
-  in
-
-  (* No transitions - engine will produce EntryFill and EntryComplete *)
-  return ([], position)
+  (* Produce CreateEntering transition - engine will create and fill position *)
+  [
+    {
+      Position.position_id;
+      date;
+      kind =
+        CreateEntering
+          {
+            symbol;
+            target_quantity = config.position_size;
+            entry_price;
+            reasoning =
+              TechnicalSignal
+                { indicator = "EMA"; description = "Price crossed above EMA" };
+          };
+    };
+  ]
 
 (* Check if exit condition is met and return (should_exit, exit_reason) *)
 let _check_exit_signal ~(current_price : float) ~(ema : float)
@@ -82,26 +86,23 @@ let _check_exit_signal ~(current_price : float) ~(ema : float)
 (* Execute exit: produce TriggerExit transition only *)
 let _execute_exit ~(position : Position.t) ~quantity:_
     ~(price : Types.Daily_price.t) ~(exit_reason : Position.exit_reason) :
-    (Position.transition list * Position.t) Status.status_or =
+    Position.transition list =
   (* Only produce TriggerExit - engine will produce ExitFill and ExitComplete *)
-  Result.return
-    ( [
-        {
-          Position.position_id = position.Position.id;
-          date = price.Types.Daily_price.date;
-          kind =
-            TriggerExit
-              { exit_reason; exit_price = price.Types.Daily_price.close_price };
-        };
-      ],
-      position )
+  [
+    {
+      Position.position_id = position.Position.id;
+      date = price.Types.Daily_price.date;
+      kind =
+        TriggerExit
+          { exit_reason; exit_price = price.Types.Daily_price.close_price };
+    };
+  ]
 
-(* Process one symbol - returns (transitions, updated_positions) *)
+(* Process one symbol - returns transitions only *)
 let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
     ~(get_indicator : Strategy_interface.get_indicator_fn) ~(config : config)
     ~(positions : Position.t String.Map.t) (symbol : string) :
-    (Position.transition list * Position.t String.Map.t) Status.status_or =
-  let open Result.Let_syntax in
+    Position.transition list =
   let price_opt = get_price symbol in
   let ema_opt = get_indicator symbol "EMA" config.ema_period in
   let active_position = Map.find positions symbol in
@@ -110,11 +111,7 @@ let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
   (* Entry: no position and entry signal *)
   | Some price, Some ema, None
     when _has_entry_signal ~price:price.Types.Daily_price.close_price ~ema ->
-      let%bind transitions, position =
-        _execute_entry ~symbol ~config ~price ~ema
-      in
-      let updated_positions = Map.set positions ~key:symbol ~data:position in
-      return (transitions, updated_positions)
+      _execute_entry ~symbol ~config ~price ~ema
   (* Exit check: has position in Holding state *)
   | Some price, Some ema, Some position -> (
       match Position.get_state position with
@@ -125,45 +122,25 @@ let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
               ~risk_params:holding.risk_params ~entry_price:holding.entry_price
           in
           if should_exit then
-            let%bind transitions, final_position =
-              _execute_exit ~position ~quantity:holding.quantity ~price
-                ~exit_reason
-            in
-            let updated_positions =
-              Map.set positions ~key:symbol ~data:final_position
-            in
-            return (transitions, updated_positions)
-          else return ([], positions)
-      | _ -> return ([], positions))
+            _execute_exit ~position ~quantity:holding.quantity ~price
+              ~exit_reason
+          else []
+      | _ -> [])
   (* All other cases: no action *)
-  | _ -> return ([], positions)
+  | _ -> []
 
-let make (config : config) :
-    (module Strategy_interface.STRATEGY) * Strategy_interface.state =
+let make (config : config) : (module Strategy_interface.STRATEGY) =
   let module M = struct
-    let on_market_close ~get_price ~get_indicator ~portfolio:_
-        ~(state : Strategy_interface.state) =
-      let open Result.Let_syntax in
-      (* Use passed state parameter (functional) *)
-      let%bind all_transitions, final_positions =
-        List.fold_result config.symbols ~init:([], state.positions)
-          ~f:(fun (acc_transitions, positions) symbol ->
-            let%bind symbol_transitions, updated_positions =
-              _process_symbol ~get_price ~get_indicator ~config ~positions
-                symbol
-            in
-            return (acc_transitions @ symbol_transitions, updated_positions))
+    let on_market_close ~get_price ~get_indicator ~positions =
+      (* Process all symbols and collect transitions *)
+      let all_transitions =
+        List.concat_map config.symbols ~f:(fun symbol ->
+            _process_symbol ~get_price ~get_indicator ~config ~positions symbol)
       in
 
       let output = { Strategy_interface.transitions = all_transitions } in
-      let new_state : Strategy_interface.state =
-        { positions = final_positions }
-      in
-      return (output, new_state)
+      Result.return output
 
     let name = name
   end in
-  let initial_state : Strategy_interface.state =
-    { positions = String.Map.empty }
-  in
-  ((module M : Strategy_interface.STRATEGY), initial_state)
+  (module M : Strategy_interface.STRATEGY)

@@ -7,26 +7,17 @@ include Strategy_interface
 
 type t = {
   strategy_module : (module STRATEGY);
-  state_ref : state ref;
   name : string;
 }
-(** Packed strategy type - wraps a first-class STRATEGY module with state
+(** Packed strategy type - wraps a first-class STRATEGY module
 
-    All strategies now share the same state type (positions map), so no need for
-    existential quantification. **)
+    Strategies are stateless - positions are managed by the caller. **)
 
 (** Execute strategy *)
 let use_strategy ~(get_price : get_price_fn) ~(get_indicator : get_indicator_fn)
-    ~(portfolio : Trading_portfolio.Portfolio.t) (strategy : t) :
-    (output * t) Status.status_or =
+    ~(positions : Position.t String.Map.t) (strategy : t) : output Status.status_or =
   let (module S) = strategy.strategy_module in
-  let open Result.Let_syntax in
-  let%bind output, new_state =
-    S.on_market_close ~get_price ~get_indicator ~portfolio
-      ~state:!(strategy.state_ref)
-  in
-  strategy.state_ref := new_state;
-  return (output, strategy)
+  S.on_market_close ~get_price ~get_indicator ~positions
 
 (** Strategy configuration - wraps concrete strategy configs *)
 type config =
@@ -38,13 +29,13 @@ type config =
 let create_strategy (cfg : config) : t =
   match cfg with
   | EmaConfig cfg ->
-      let strategy_module, initial_state = Ema_strategy.make cfg in
+      let strategy_module = Ema_strategy.make cfg in
       let (module S) = strategy_module in
-      { strategy_module; state_ref = ref initial_state; name = S.name }
+      { strategy_module; name = S.name }
   | BuyAndHoldConfig cfg ->
-      let strategy_module, initial_state = Buy_and_hold_strategy.make cfg in
+      let strategy_module = Buy_and_hold_strategy.make cfg in
       let (module S) = strategy_module in
-      { strategy_module; state_ref = ref initial_state; name = S.name }
+      { strategy_module; name = S.name }
 
 (** Get strategy name *)
 let get_name (strategy : t) : string = strategy.name

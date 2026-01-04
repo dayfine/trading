@@ -22,70 +22,55 @@ let _should_enter (config : config) (price : Types.Daily_price.t) : bool =
   | Some target_date -> Date.equal price.date target_date
   | None -> true
 
-(* Execute entry: create position in Entering state *)
+(* Execute entry: create CreateEntering transition *)
 let _execute_entry ~(symbol : string) ~(config : config)
-    ~(price : Types.Daily_price.t) :
-    (Position.transition list * Position.t) Status.status_or =
-  let open Result.Let_syntax in
+    ~(price : Types.Daily_price.t) : Position.transition list =
   let position_id = _generate_position_id symbol in
   let entry_price = price.Types.Daily_price.close_price in
   let date = price.Types.Daily_price.date in
 
-  (* Create initial Entering position - engine will fill it *)
-  let position =
-    Position.create_entering ~id:position_id ~symbol
-      ~target_quantity:config.position_size ~entry_price ~created_date:date
-      ~reasoning:
-        (Position.ManualDecision
-           { description = "Buy and hold - initial entry" })
-  in
+  (* Produce CreateEntering transition - engine will create and fill position *)
+  [
+    {
+      Position.position_id;
+      date;
+      kind =
+        CreateEntering
+          {
+            symbol;
+            target_quantity = config.position_size;
+            entry_price;
+            reasoning =
+              ManualDecision { description = "Buy and hold - initial entry" };
+          };
+    };
+  ]
 
-  (* No transitions - engine will produce EntryFill and EntryComplete *)
-  return ([], position)
-
-(* Process one symbol - returns (transitions, updated_positions) *)
+(* Process one symbol - returns transitions only *)
 let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
     ~(config : config) ~(positions : Position.t String.Map.t) (symbol : string)
-    : (Position.transition list * Position.t String.Map.t) Status.status_or =
-  let open Result.Let_syntax in
+    : Position.transition list =
   (* Early exit if position already exists (entry already executed) *)
-  if Map.mem positions symbol then return ([], positions)
+  if Map.mem positions symbol then []
   else
     (* Check if we should enter *)
     match get_price symbol with
     | Some price when _should_enter config price ->
-        let%bind transitions, position =
-          _execute_entry ~symbol ~config ~price
-        in
-        let updated_positions = Map.set positions ~key:symbol ~data:position in
-        return (transitions, updated_positions)
-    | _ -> return ([], positions)
+        _execute_entry ~symbol ~config ~price
+    | _ -> []
 
-let make (config : config) :
-    (module Strategy_interface.STRATEGY) * Strategy_interface.state =
+let make (config : config) : (module Strategy_interface.STRATEGY) =
   let module M = struct
-    let on_market_close ~get_price ~get_indicator:_ ~portfolio:_
-        ~(state : Strategy_interface.state) =
-      let open Result.Let_syntax in
-      (* Use passed state parameter (functional) *)
-      let%bind all_transitions, final_positions =
-        List.fold_result config.symbols ~init:([], state.positions)
-          ~f:(fun (acc_transitions, positions) symbol ->
-            let%bind symbol_transitions, updated_positions =
-              _process_symbol ~get_price ~config ~positions symbol
-            in
-            return (acc_transitions @ symbol_transitions, updated_positions))
+    let on_market_close ~get_price ~get_indicator:_ ~positions =
+      (* Process all symbols and collect transitions *)
+      let all_transitions =
+        List.concat_map config.symbols ~f:(fun symbol ->
+            _process_symbol ~get_price ~config ~positions symbol)
       in
 
       let output = { Strategy_interface.transitions = all_transitions } in
-      let new_state : Strategy_interface.state =
-        { positions = final_positions }
-      in
-      return (output, new_state)
+      Result.return output
 
     let name = name
   end in
-  let initial_state : Strategy_interface.state =
-    { positions = String.Map.empty }
-  in
-  ((module M : Strategy_interface.STRATEGY), initial_state)
+  (module M : Strategy_interface.STRATEGY)

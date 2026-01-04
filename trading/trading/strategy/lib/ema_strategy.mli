@@ -16,9 +16,7 @@ type config = {
 val name : string
 (** Strategy name *)
 
-val make :
-  config -> (module Strategy_interface.STRATEGY) * Strategy_interface.state
+val make : config -> (module Strategy_interface.STRATEGY)
 (** Create a strategy instance that implements the STRATEGY interface
 
-    Returns both the strategy module (with config captured) and the initial
-    state. This encapsulates state initialization within the strategy module. *)
+    Returns the strategy module with config captured in its closure. *)

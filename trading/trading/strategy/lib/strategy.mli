@@ -32,9 +32,9 @@ include module type of Strategy_interface
 type t
 (** Packed strategy type
 
-    Encapsulates any strategy implementation with its config and state. The
-    internal representation is abstract - strategies are executed through
-    {!use_strategy} without pattern matching. *)
+    Encapsulates any strategy implementation. Strategies are stateless - positions
+    are managed by the caller. The internal representation is abstract - strategies
+    are executed through {!use_strategy} without pattern matching. *)
 
 (** Strategy configuration - aggregates all strategy types
 
@@ -71,9 +71,9 @@ val create_strategy : config -> t
 val use_strategy :
   get_price:get_price_fn ->
   get_indicator:get_indicator_fn ->
-  portfolio:Trading_portfolio.Portfolio.t ->
+  positions:Position.t Core.String.Map.t ->
   t ->
-  (output * t) Status.status_or
+  output Status.status_or
 (** Execute a strategy's logic without pattern matching
 
     This function dispatches to the appropriate strategy implementation
@@ -86,7 +86,7 @@ val use_strategy :
       let get_price_fn = get_price market_data in
       let get_indicator_fn = get_indicator market_data in
       use_strategy ~get_price:get_price_fn ~get_indicator:get_indicator_fn
-        ~portfolio strategy
+        ~positions strategy
     ]} *)
 
 val get_name : t -> string
