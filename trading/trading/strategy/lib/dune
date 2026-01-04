@@ -2,6 +2,11 @@
  (public_name trading.strategy)
  (name trading_strategy)
  (libraries trading.base trading.portfolio trading.orders types core status)
- (modules position strategy_interface)
+ (modules
+  position
+  strategy_interface
+  ema_strategy
+  buy_and_hold_strategy
+  strategy)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
