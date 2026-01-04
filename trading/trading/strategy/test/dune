@@ -2,3 +2,8 @@
  (name test_position)
  (modules test_position)
  (libraries ounit2 core trading.strategy trading.base matchers))
+
+(test
+ (name test_strategy_lifecycle)
+ (modules test_strategy_lifecycle)
+ (libraries ounit2 core trading.strategy trading.base))
