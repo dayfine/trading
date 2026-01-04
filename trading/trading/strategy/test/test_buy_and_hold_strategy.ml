@@ -1,227 +1,305 @@
+(** Buy and Hold Strategy Tests - using stateless API with engine pattern *)
+
 open OUnit2
 open Core
-open Matchers
-open Test_helpers
+open Trading_strategy
 
 let date_of_string s = Date.of_string s
 
-(** Helper to create portfolio *)
-let create_portfolio_exn () =
-  Trading_portfolio.Portfolio.create ~initial_cash:100000.0 ()
+(** Helper to unwrap Result *)
+let unwrap_result result msg =
+  match result with
+  | Ok value -> value
+  | Error err -> failwith (Printf.sprintf "%s: %s" msg (Status.show err))
 
-(** Helper to create strategy module and initial state from config *)
-let make_strategy config = Trading_strategy.Buy_and_hold_strategy.make config
+(** Apply a transition to positions map *)
+let apply_transition positions transition =
+  match transition.Position.kind with
+  | CreateEntering _ -> (
+      match Position.create_entering transition with
+      | Ok position ->
+          Map.set positions ~key:position.Position.symbol ~data:position
+      | Error err ->
+          failwith
+            (Printf.sprintf "CreateEntering failed: %s" (Status.show err)))
+  | _ -> (
+      let position_opt =
+        Map.to_alist positions
+        |> List.find_map ~f:(fun (_symbol, pos) ->
+               if String.equal pos.Position.id transition.position_id then
+                 Some pos
+               else None)
+      in
+      match position_opt with
+      | Some position -> (
+          match Position.apply_transition position transition with
+          | Ok updated_position ->
+              Map.set positions ~key:position.symbol ~data:updated_position
+          | Error err ->
+              failwith
+                (Printf.sprintf "Transition failed: %s" (Status.show err)))
+      | None ->
+          failwith
+            (Printf.sprintf "Position not found: %s" transition.position_id))
 
-(** Test: Buy and hold enters position immediately when no entry date specified
-*)
+let apply_transitions positions transitions =
+  List.fold transitions ~init:positions ~f:apply_transition
+
+(** ENGINE: Fill and complete entry *)
+let engine_fill_and_complete_entry positions date =
+  Map.fold positions ~init:[] ~f:(fun ~key:_ ~data:position acc ->
+      match Position.get_state position with
+      | Entering entering ->
+          let entry_price = entering.entry_price in
+          let fill =
+            {
+              Position.position_id = position.id;
+              date;
+              kind =
+                EntryFill
+                  {
+                    filled_quantity = entering.target_quantity;
+                    fill_price = entry_price;
+                  };
+            }
+          in
+          let complete =
+            {
+              Position.position_id = position.id;
+              date;
+              kind =
+                EntryComplete
+                  {
+                    risk_params =
+                      {
+                        stop_loss_price = None;
+                        take_profit_price = None;
+                        max_hold_days = None;
+                      };
+                  };
+            }
+          in
+          fill :: complete :: acc
+      | _ -> acc)
+
+(** Test: Buy and hold enters on first day *)
 let test_enter_immediately _ =
-  (* Create uptrend price data *)
+  let positions = ref String.Map.empty in
+
   let prices =
-    Price_generators.make_price_sequence ~symbol:"AAPL"
+    Test_helpers.Price_generators.make_price_sequence ~symbol:"AAPL"
       ~start_date:(date_of_string "2024-01-01")
-      ~days:10 ~base_price:150.0 ~trend:(Price_generators.Uptrend 0.5)
-      ~volatility:0.01
+      ~days:10 ~base_price:100.0 ~trend:(Uptrend 0.5) ~volatility:0.01
   in
   let market_data =
-    Mock_market_data.create
+    Test_helpers.Mock_market_data.create
       ~data:[ ("AAPL", prices) ]
       ~ema_periods:[]
-      ~current_date:(date_of_string "2024-01-05")
+      ~current_date:(date_of_string "2024-01-01")
   in
 
   let config =
     {
-      Trading_strategy.Buy_and_hold_strategy.symbols = [ "AAPL" ];
+      Buy_and_hold_strategy.symbols = [ "AAPL" ];
       position_size = 100.0;
       entry_date = None;
     }
   in
-  let (module S), initial_state = make_strategy config in
-  let portfolio = create_portfolio_exn () in
+  let (module S) = Buy_and_hold_strategy.make config in
 
-  (* Execute strategy - should enter immediately *)
-  let get_price_fn = Mock_market_data.get_price market_data in
-  let get_indicator_fn = Mock_market_data.get_indicator market_data in
-  let result =
-    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
-      ~portfolio ~state:initial_state
+  let get_price = Test_helpers.Mock_market_data.get_price market_data in
+  let output =
+    unwrap_result
+      (S.on_market_close ~get_price
+         ~get_indicator:(fun _ _ _ -> None)
+         ~positions:!positions)
+      "Strategy execution"
   in
 
-  match result with
-  | Ok (output, new_state) -> (
-      (* Strategy should not produce execution transitions *)
-      assert_equal 0
-        (List.length output.transitions)
-        ~msg:"Strategy should not produce entry transitions";
-      (* Should have created position in Entering state *)
-      match Map.find new_state.positions "AAPL" with
-      | Some position -> (
-          match Trading_strategy.Position.get_state position with
-          | Entering entering ->
-              assert_that entering.target_quantity (float_equal 100.0)
-          | _ -> assert_failure "Expected Entering state")
-      | None -> assert_failure "Expected position to exist")
-  | Error err -> assert_failure ("Strategy failed: " ^ Status.show err)
+  (* Should produce CreateEntering *)
+  assert_equal 1 (List.length output.transitions);
+  positions := apply_transitions !positions output.transitions;
 
-(** Test: Buy and hold waits for specific entry date *)
-let test_wait_for_entry_date _ =
+  (* Verify Entering state *)
+  let pos = Map.find_exn !positions "AAPL" in
+  match Position.get_state pos with
+  | Entering e -> assert_bool "Quantity" Float.(e.target_quantity = 100.0)
+  | _ -> assert_failure "Expected Entering state"
+
+(** Test: Buy and hold enters on specific date *)
+let test_enter_on_specific_date _ =
+  let positions = ref String.Map.empty in
+
   let prices =
-    Price_generators.make_price_sequence ~symbol:"AAPL"
+    Test_helpers.Price_generators.make_price_sequence ~symbol:"AAPL"
       ~start_date:(date_of_string "2024-01-01")
-      ~days:10 ~base_price:150.0 ~trend:Price_generators.Sideways
-      ~volatility:0.01
+      ~days:10 ~base_price:100.0 ~trend:(Uptrend 0.5) ~volatility:0.01
   in
   let market_data =
-    Mock_market_data.create
+    Test_helpers.Mock_market_data.create
       ~data:[ ("AAPL", prices) ]
       ~ema_periods:[]
-      ~current_date:(date_of_string "2024-01-03")
+      ~current_date:(date_of_string "2024-01-01")
   in
 
   let config =
     {
-      Trading_strategy.Buy_and_hold_strategy.symbols = [ "AAPL" ];
+      Buy_and_hold_strategy.symbols = [ "AAPL" ];
       position_size = 100.0;
       entry_date = Some (date_of_string "2024-01-05");
     }
   in
-  let (module S), initial_state = make_strategy config in
-  let portfolio = create_portfolio_exn () in
+  let (module S) = Buy_and_hold_strategy.make config in
 
-  (* Day 1: Before entry date - should not enter *)
-  let get_price_fn = Mock_market_data.get_price market_data in
-  let get_indicator_fn = Mock_market_data.get_indicator market_data in
-  let result1 =
-    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
-      ~portfolio ~state:initial_state
+  (* Day 1: Should not enter *)
+  let get_price = Test_helpers.Mock_market_data.get_price market_data in
+  let output =
+    unwrap_result
+      (S.on_market_close ~get_price
+         ~get_indicator:(fun _ _ _ -> None)
+         ~positions:!positions)
+      "Day 1"
   in
+  assert_equal 0 (List.length output.transitions);
 
-  (match result1 with
-  | Ok (output, new_state) ->
-      assert_equal 0 (List.length output.transitions);
-      assert_bool "Should not have position"
-        (Option.is_none (Map.find new_state.positions "AAPL"))
-  | Error err -> assert_failure ("Day 1 failed: " ^ Status.show err));
-
-  (* Day 2: On entry date - should enter *)
+  (* Day 5: Should enter *)
   let market_data' =
-    Mock_market_data.advance market_data ~date:(date_of_string "2024-01-05")
+    Test_helpers.Mock_market_data.advance market_data
+      ~date:(date_of_string "2024-01-05")
   in
-  let get_price_fn' = Mock_market_data.get_price market_data' in
-  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
-  let result2 =
-    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
-      ~portfolio ~state:initial_state
+  let get_price' = Test_helpers.Mock_market_data.get_price market_data' in
+  let output =
+    unwrap_result
+      (S.on_market_close ~get_price:get_price'
+         ~get_indicator:(fun _ _ _ -> None)
+         ~positions:!positions)
+      "Day 5"
   in
+  assert_equal 1 (List.length output.transitions);
+  positions := apply_transitions !positions output.transitions;
 
-  match result2 with
-  | Ok (output, new_state) -> (
-      assert_equal 0
-        (List.length output.transitions)
-        ~msg:"Should not produce transitions";
-      (* Should have position in Entering state *)
-      match Map.find new_state.positions "AAPL" with
-      | Some position -> (
-          match Trading_strategy.Position.get_state position with
-          | Entering _ -> ()
-          | _ -> assert_failure "Expected Entering state")
-      | None -> assert_failure "Should have position")
-  | Error err -> assert_failure ("Day 2 failed: " ^ Status.show err)
+  let pos = Map.find_exn !positions "AAPL" in
+  match Position.get_state pos with
+  | Entering _ -> ()
+  | _ -> assert_failure "Expected Entering state"
 
-(** Test: Buy and hold never exits - holds indefinitely *)
+(** Test: Holds position indefinitely *)
 let test_holds_indefinitely _ =
+  let positions = ref String.Map.empty in
+
   let prices =
-    Price_generators.make_price_sequence ~symbol:"AAPL"
+    Test_helpers.Price_generators.make_price_sequence ~symbol:"AAPL"
       ~start_date:(date_of_string "2024-01-01")
-      ~days:30 ~base_price:150.0 ~trend:(Price_generators.Uptrend 1.0)
-      ~volatility:0.02
+      ~days:30 ~base_price:100.0 ~trend:(Uptrend 0.5) ~volatility:0.01
   in
   let market_data =
-    Mock_market_data.create
+    Test_helpers.Mock_market_data.create
       ~data:[ ("AAPL", prices) ]
       ~ema_periods:[]
-      ~current_date:(date_of_string "2024-01-05")
+      ~current_date:(date_of_string "2024-01-01")
   in
 
   let config =
     {
-      Trading_strategy.Buy_and_hold_strategy.symbols = [ "AAPL" ];
+      Buy_and_hold_strategy.symbols = [ "AAPL" ];
       position_size = 100.0;
       entry_date = None;
     }
   in
-  let (module S), initial_state = make_strategy config in
-  let portfolio = create_portfolio_exn () in
+  let (module S) = Buy_and_hold_strategy.make config in
 
-  (* Day 1: Enter position *)
-  let get_price_fn = Mock_market_data.get_price market_data in
-  let get_indicator_fn = Mock_market_data.get_indicator market_data in
-  let result1 =
-    S.on_market_close ~get_price:get_price_fn ~get_indicator:get_indicator_fn
-      ~portfolio ~state:initial_state
+  (* Day 1: Enter *)
+  let get_price = Test_helpers.Mock_market_data.get_price market_data in
+  let output =
+    unwrap_result
+      (S.on_market_close ~get_price
+         ~get_indicator:(fun _ _ _ -> None)
+         ~positions:!positions)
+      "Day 1"
   in
-  let state1 =
-    match result1 with
-    | Ok (output, s) ->
-        assert_equal 0
-          (List.length output.transitions)
-          ~msg:"Entry should not produce transitions";
-        assert_bool "Should have position"
-          (Option.is_some (Map.find s.positions "AAPL"));
-        s
-    | Error err -> failwith ("Day 1 failed: " ^ Status.show err)
+  positions := apply_transitions !positions output.transitions;
+
+  (* Engine fills and completes *)
+  let engine_transitions =
+    engine_fill_and_complete_entry !positions (date_of_string "2024-01-01")
+  in
+  positions := apply_transitions !positions engine_transitions;
+
+  (* Day 10, 20, 30: Should hold, no exit *)
+  List.iter [ "2024-01-10"; "2024-01-20"; "2024-01-30" ] ~f:(fun date_str ->
+      let market_data' =
+        Test_helpers.Mock_market_data.advance market_data
+          ~date:(date_of_string date_str)
+      in
+      let get_price' = Test_helpers.Mock_market_data.get_price market_data' in
+      let output =
+        unwrap_result
+          (S.on_market_close ~get_price:get_price'
+             ~get_indicator:(fun _ _ _ -> None)
+             ~positions:!positions)
+          date_str
+      in
+      (* Should produce no transitions *)
+      assert_equal 0 (List.length output.transitions))
+
+(** Test: No entry if already holding *)
+let test_no_double_entry _ =
+  let positions = ref String.Map.empty in
+
+  let prices =
+    Test_helpers.Price_generators.make_price_sequence ~symbol:"AAPL"
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:10 ~base_price:100.0 ~trend:(Uptrend 0.5) ~volatility:0.01
+  in
+  let market_data =
+    Test_helpers.Mock_market_data.create
+      ~data:[ ("AAPL", prices) ]
+      ~ema_periods:[]
+      ~current_date:(date_of_string "2024-01-01")
   in
 
-  (* Day 2: After entry - should never produce exit transitions *)
+  let config =
+    {
+      Buy_and_hold_strategy.symbols = [ "AAPL" ];
+      position_size = 100.0;
+      entry_date = None;
+    }
+  in
+  let (module S) = Buy_and_hold_strategy.make config in
+
+  (* Day 1: Enter *)
+  let get_price = Test_helpers.Mock_market_data.get_price market_data in
+  let output =
+    unwrap_result
+      (S.on_market_close ~get_price
+         ~get_indicator:(fun _ _ _ -> None)
+         ~positions:!positions)
+      "Day 1"
+  in
+  positions := apply_transitions !positions output.transitions;
+
+  (* Day 2: Should not enter again *)
   let market_data' =
-    Mock_market_data.advance market_data ~date:(date_of_string "2024-01-10")
+    Test_helpers.Mock_market_data.advance market_data
+      ~date:(date_of_string "2024-01-02")
   in
-  let get_price_fn' = Mock_market_data.get_price market_data' in
-  let get_indicator_fn' = Mock_market_data.get_indicator market_data' in
-  let result2 =
-    S.on_market_close ~get_price:get_price_fn' ~get_indicator:get_indicator_fn'
-      ~portfolio ~state:state1
+  let get_price' = Test_helpers.Mock_market_data.get_price market_data' in
+  let output =
+    unwrap_result
+      (S.on_market_close ~get_price:get_price'
+         ~get_indicator:(fun _ _ _ -> None)
+         ~positions:!positions)
+      "Day 2"
   in
-
-  let state2 =
-    match result2 with
-    | Ok (output, s) ->
-        (* Buy-and-hold never exits - should have no transitions *)
-        assert_equal 0
-          (List.length output.transitions)
-          ~msg:"Buy-and-hold should never produce exit transitions";
-        assert_bool "Should still have position"
-          (Option.is_some (Map.find s.positions "AAPL"));
-        s
-    | Error err -> failwith ("Day 2 failed: " ^ Status.show err)
-  in
-
-  (* Day 3: Much later - still no exit transitions *)
-  let market_data'' =
-    Mock_market_data.advance market_data ~date:(date_of_string "2024-01-25")
-  in
-  let get_price_fn'' = Mock_market_data.get_price market_data'' in
-  let get_indicator_fn'' = Mock_market_data.get_indicator market_data'' in
-  let result3 =
-    S.on_market_close ~get_price:get_price_fn''
-      ~get_indicator:get_indicator_fn'' ~portfolio ~state:state2
-  in
-
-  match result3 with
-  | Ok (output, new_state) ->
-      assert_equal 0
-        (List.length output.transitions)
-        ~msg:"Buy-and-hold should never produce exit transitions";
-      assert_bool "Should still have position"
-        (Option.is_some (Map.find new_state.positions "AAPL"))
-  | Error err -> assert_failure ("Day 3 failed: " ^ Status.show err)
+  assert_equal 0 (List.length output.transitions)
 
 let suite =
   "Buy and Hold Strategy Tests"
   >::: [
          "enter immediately" >:: test_enter_immediately;
-         "wait for entry date" >:: test_wait_for_entry_date;
+         "enter on specific date" >:: test_enter_on_specific_date;
          "holds indefinitely" >:: test_holds_indefinitely;
+         "no double entry" >:: test_no_double_entry;
        ]
 
 let () = run_test_tt_main suite

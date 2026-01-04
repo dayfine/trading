@@ -25,57 +25,12 @@
  (modules test_price_generators)
  (libraries ounit2 core test_helpers types matchers))
 
-; Commented out - these tests use the old stateful strategy API
-; and need to be updated for the new stateless API
-;
-; (test
-;  (name test_ema_strategy)
-;  (modules test_ema_strategy)
-;  (libraries
-;   ounit2
-;   core
-;   trading.strategy
-;   trading.portfolio
-;   trading.base
-;   test_helpers
-;   types
-;   matchers))
-;
-; (test
-;  (name test_multiple_strategies)
-;  (modules test_multiple_strategies)
-;  (libraries
-;   ounit2
-;   core
-;   trading.strategy
-;   trading.portfolio
-;   trading.base
-;   test_helpers
-;   types
-;   matchers))
-;
-; (test
-;  (name test_buy_and_hold_strategy)
-;  (modules test_buy_and_hold_strategy)
-;  (libraries
-;   ounit2
-;   core
-;   trading.strategy
-;   trading.portfolio
-;   trading.base
-;   test_helpers
-;   types
-;   matchers))
-;
-; (test
-;  (name test_strategy_dispatch)
-;  (modules test_strategy_dispatch)
-;  (libraries
-;   ounit2
-;   core
-;   trading.strategy
-;   trading.portfolio
-;   trading.base
-;   test_helpers
-;   types
-;   matchers))
+(test
+ (name test_ema_strategy)
+ (modules test_ema_strategy)
+ (libraries ounit2 core trading.strategy trading.base test_helpers types))
+
+(test
+ (name test_buy_and_hold_strategy)
+ (modules test_buy_and_hold_strategy)
+ (libraries ounit2 core trading.strategy trading.base test_helpers types))
