@@ -57,21 +57,27 @@ let get_price t symbol =
       List.find prices ~f:(fun (p : Types.Daily_price.t) ->
           Date.equal p.date t.current_date)
 
+(** Generic helper to filter time series data up to current date with optional
+    lookback *)
+let filter_time_series ~current_date ~get_date ?lookback_days data =
+  let up_to_current =
+    List.filter data ~f:(fun item -> Date.(get_date item <= current_date))
+  in
+  match lookback_days with
+  | None -> up_to_current
+  | Some days ->
+      let start_date = Date.add_days current_date (-(days - 1)) in
+      List.filter up_to_current ~f:(fun item ->
+          Date.(get_date item >= start_date))
+
 (** Get price history up to current date *)
 let get_price_history t symbol ?lookback_days () =
   match Hashtbl.find t.symbol_data symbol with
   | None -> []
-  | Some prices -> (
-      let up_to_current =
-        List.filter prices ~f:(fun (p : Types.Daily_price.t) ->
-            Date.(p.date <= t.current_date))
-      in
-      match lookback_days with
-      | None -> up_to_current
-      | Some days ->
-          let start_date = Date.add_days t.current_date (-(days - 1)) in
-          List.filter up_to_current ~f:(fun (p : Types.Daily_price.t) ->
-              Date.(p.date >= start_date)))
+  | Some prices ->
+      filter_time_series ~current_date:t.current_date
+        ~get_date:(fun (p : Types.Daily_price.t) -> p.date)
+        ?lookback_days prices
 
 (** Get EMA value at current date *)
 let get_ema t symbol period =
@@ -85,18 +91,9 @@ let get_ema t symbol period =
 let get_ema_series t symbol period ?lookback_days () =
   match Hashtbl.find t.ema_cache (symbol, period) with
   | None -> []
-  | Some ema_series -> (
-      let up_to_current =
-        List.filter ema_series ~f:(fun (date, _) ->
-            Date.(date <= t.current_date))
-      in
-      match lookback_days with
-      | None -> List.map up_to_current ~f:(fun (date, value) -> (date, value))
-      | Some days ->
-          let start_date = Date.add_days t.current_date (-(days - 1)) in
-          List.filter up_to_current ~f:(fun (date, _) ->
-              Date.(date >= start_date))
-          |> List.map ~f:(fun (date, value) -> (date, value)))
+  | Some ema_series ->
+      filter_time_series ~current_date:t.current_date ~get_date:fst
+        ?lookback_days ema_series
 
 (** Get indicator value at current date (generic interface) *)
 let get_indicator t symbol indicator_name period =
