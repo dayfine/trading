@@ -58,43 +58,55 @@
     {1 Usage Example}
 
     {[
-      (* Create position in Entering state *)
-      let pos =
-        Position.create_entering ~id:"AAPL-1" ~symbol:"AAPL"
-          ~target_quantity:100.0 ~entry_price:150.0
-          ~created_date:(Date.today ())
-          ~reasoning:
-            (TechnicalSignal { indicator = "EMA"; description = "..." })
+      (* Create position in Entering state from transition *)
+      let transition =
+        {
+          position_id = "AAPL-1";
+          date = Date.today ();
+          kind =
+            CreateEntering
+              {
+                symbol = "AAPL";
+                target_quantity = 100.0;
+                entry_price = 150.0;
+                reasoning =
+                  TechnicalSignal { indicator = "EMA"; description = "..." };
+              };
+        }
       in
+      let pos = Position.create_entering transition |> Status.ok_exn in
 
       (* Apply fill transition *)
+      let fill_transition =
+        {
+          position_id = "AAPL-1";
+          date = Date.today ();
+          kind = EntryFill { filled_quantity = 100.0; fill_price = 150.25 };
+        }
+      in
       let pos =
-        Position.apply_transition pos
-          (EntryFill
-             {
-               position_id = "AAPL-1";
-               filled_quantity = 100.0;
-               fill_price = 150.25;
-               fill_date = Date.today ();
-             })
-        |> Status.ok_exn
+        Position.apply_transition pos fill_transition |> Status.ok_exn
       in
 
       (* Complete entry, move to Holding *)
+      let complete_transition =
+        {
+          position_id = "AAPL-1";
+          date = Date.today ();
+          kind =
+            EntryComplete
+              {
+                risk_params =
+                  {
+                    stop_loss_price = Some 142.50;
+                    take_profit_price = Some 165.00;
+                    max_hold_days = None;
+                  };
+              };
+        }
+      in
       let pos =
-        Position.apply_transition pos
-          (EntryComplete
-             {
-               position_id = "AAPL-1";
-               risk_params =
-                 {
-                   stop_loss_price = Some 142.50;
-                   take_profit_price = Some 165.00;
-                   max_hold_days = None;
-                 };
-               completion_date = Date.today ();
-             })
-        |> Status.ok_exn
+        Position.apply_transition pos complete_transition |> Status.ok_exn
       in
 
       (* Position now in Holding state *)
@@ -198,6 +210,12 @@ type t = {
 
 (** Transition-specific data - only what's unique to each transition *)
 type transition_kind =
+  | CreateEntering of {
+      symbol : string;
+      target_quantity : float;
+      entry_price : float;
+      reasoning : entry_reasoning;
+    }  (** Strategy wants to create a new position in Entering state *)
   | EntryFill of { filled_quantity : float; fill_price : float }
       (** Entry order filled (partial or complete) *)
   | EntryComplete of { risk_params : risk_params }
@@ -223,14 +241,20 @@ type transition = {
 (** {1 Position Operations} *)
 
 val create_entering :
-  id:string ->
-  symbol:string ->
-  target_quantity:float ->
-  entry_price:float ->
-  created_date:Date.t ->
-  reasoning:entry_reasoning ->
-  t
-(** Create a new position in Entering state *)
+  ?id:string option -> ?date:Date.t option -> transition -> t Status.status_or
+(** Create a new position in Entering state from a CreateEntering transition.
+
+    The transition must have kind CreateEntering, otherwise returns an error.
+
+    Validates:
+    - target_quantity must be positive
+    - entry_price must be positive
+
+    @param id Override the position ID (defaults to transition.position_id)
+    @param date Override the created date (defaults to transition.date)
+    @param transition The CreateEntering transition
+
+    @return Ok position or Error if validation fails or wrong transition type *)
 
 val apply_transition : t -> transition -> t Status.status_or
 (** Apply a transition to a position.

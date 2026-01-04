@@ -38,9 +38,11 @@ type output = {
   transitions : Position.transition list;
       (** Position state transitions to apply.
 
-          These transitions describe the intended changes to position states
-          (e.g., EntryFill, ExitComplete). The simulation engine or live trading
-          system will apply these transitions to update position states. *)
+          These transitions describe all desired position state changes
+          including creating new positions (CreateEntering), updating existing
+          positions (TriggerExit, UpdateRiskParams), and handling fills
+          (EntryFill, ExitFill). The simulation engine or live trading system
+          will apply these transitions to update position states. *)
 }
 [@@deriving show, eq]
 (** Common output type for all strategies *)
@@ -49,34 +51,33 @@ type output = {
 
 (** Abstract strategy module signature
 
-    All trading strategies must implement this interface. The interface is
-    parameterized by a strategy-specific state type. *)
+    All trading strategies must implement this interface. Strategies are pure
+    functions that analyze market data and current positions to produce
+    transitions. *)
 module type STRATEGY = sig
-  type state
-  (** Strategy-specific state *)
-
   val on_market_close :
     get_price:get_price_fn ->
     get_indicator:get_indicator_fn ->
-    portfolio:Trading_portfolio.Portfolio.t ->
-    state:state ->
-    (output * state) Status.status_or
+    positions:Position.t Core.String.Map.t ->
+    output Status.status_or
   (** Execute strategy logic after market close
 
       Called once per trading day after the market closes to make trading
       decisions. Market data is already captured in the accessor functions.
+
+      Strategies are pure functions: given market data and current positions,
+      they produce transitions. The caller (engine/tests) is responsible for
+      tracking positions and applying transitions.
 
       @param get_price
         Function to retrieve price for a symbol (market data already captured)
       @param get_indicator
         Function to retrieve indicator value for a symbol (market data already
         captured)
-      @param portfolio Current portfolio state (positions, cash, etc.)
-      @param state Current strategy state (before today's decisions)
-      @return
-        (output, new_state) where:
-        - output contains transitions to execute
-        - new_state is the expected state after transitions are applied *)
+      @param positions
+        Current positions map (symbol -> position). Caller owns and manages this
+        state.
+      @return output containing transitions to execute *)
 
   val name : string
   (** Strategy name for identification *)
