@@ -8,3 +8,12 @@
   trading.engine
   types
   matchers))
+
+(test
+ (name test_market_data_adapter)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  types
+  matchers))
