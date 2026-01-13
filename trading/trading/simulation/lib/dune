@@ -10,6 +10,6 @@
   csv
   fpath
   core)
- (modules simulator time_series storage_backend)
+ (modules simulator time_series price_cache)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

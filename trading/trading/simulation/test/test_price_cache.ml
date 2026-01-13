@@ -1,9 +1,9 @@
 open OUnit2
 open Core
-open Trading_simulation.Storage_backend
+open Trading_simulation.Price_cache
 open Matchers
 
-let test_data_dir = Fpath.v "test_data/storage_backend"
+let test_data_dir = Fpath.v "test_data/price_cache"
 
 let ok_or_fail_status = function
   | Ok x -> x
@@ -198,7 +198,7 @@ let test_nonexistent_symbol _ =
   teardown_test_data ()
 
 let suite =
-  "Storage backend tests"
+  "Price cache tests"
   >::: [
          "test_create_backend" >:: test_create_backend;
          "test_lazy_loading" >:: test_lazy_loading;

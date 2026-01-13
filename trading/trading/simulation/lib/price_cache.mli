@@ -1,18 +1,21 @@
-(** Storage backend for lazy-loading historical price data from CSV files.
+(** Multi-symbol price cache with lazy loading from CSV files.
 
-    This module provides efficient access to historical price data by:
+    This module provides efficient access to historical price data for multiple
+    symbols by:
     - Lazy loading: Only loads symbols when first accessed
     - Caching: Keeps loaded data in memory for subsequent queries
     - Date filtering: Returns only prices within requested date ranges
+
+    Uses Csv.Csv_storage internally for actual file I/O.
 *)
 
 open Core
 
 type t
-(** Storage backend instance *)
+(** Price cache instance *)
 
 val create : data_dir:Fpath.t -> t
-(** Create a new storage backend pointing to a data directory.
+(** Create a new price cache pointing to a data directory.
 
     The data directory should contain CSV files for historical prices.
     Symbols are loaded lazily on first access. *)

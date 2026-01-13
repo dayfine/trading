@@ -1,4 +1,4 @@
-(** Storage backend implementation *)
+(** Multi-symbol price cache implementation *)
 
 open Core
 
