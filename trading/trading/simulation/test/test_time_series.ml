@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Trading_simulation.Time_series
+open Matchers
 
 let default_volume = 1000
 
@@ -18,9 +19,9 @@ let make_test_price ~date ~price =
 
 (* Cadence type tests *)
 let test_cadence_equality _ =
-  assert_equal ~printer:show_cadence Daily Daily;
-  assert_equal ~printer:show_cadence Weekly Weekly;
-  assert_equal ~printer:show_cadence Monthly Monthly;
+  assert_that Daily (equal_to (Daily : cadence));
+  assert_that Weekly (equal_to (Weekly : cadence));
+  assert_that Monthly (equal_to (Monthly : cadence));
   assert_bool "Daily <> Weekly" (not (equal_cadence Daily Weekly))
 
 (* is_period_end tests *)
@@ -62,9 +63,43 @@ let test_convert_cadence_daily _ =
     ]
   in
   let result = convert_cadence prices ~cadence:Daily ~as_of_date:None in
-  assert_equal ~printer:Int.to_string 3 (List.length result);
-  assert_equal ~printer:Types.Daily_price.show (List.hd_exn prices)
-    (List.hd_exn result)
+  assert_that result
+    (elements_are
+       [
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:11;
+              open_price = 1.0;
+              high_price = 1.0;
+              low_price = 1.0;
+              close_price = 1.0;
+              volume = default_volume;
+              adjusted_close = 1.0;
+            }
+             : Types.Daily_price.t);
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:12;
+              open_price = 2.0;
+              high_price = 2.0;
+              low_price = 2.0;
+              close_price = 2.0;
+              volume = default_volume;
+              adjusted_close = 2.0;
+            }
+             : Types.Daily_price.t);
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:13;
+              open_price = 3.0;
+              high_price = 3.0;
+              low_price = 3.0;
+              close_price = 3.0;
+              volume = default_volume;
+              adjusted_close = 3.0;
+            }
+             : Types.Daily_price.t);
+       ])
 
 let test_convert_cadence_weekly_complete _ =
   let prices =
@@ -77,10 +112,22 @@ let test_convert_cadence_weekly_complete _ =
     ]
   in
   let result = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
-  assert_equal ~printer:Int.to_string 1 (List.length result);
-  assert_equal ~printer:Date.to_string (Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-    (List.hd_exn result).date;
-  assert_equal ~printer:Float.to_string 5.0 (List.hd_exn result).close_price
+  (* Conversion returns last entry of the week, not aggregated OHLCV *)
+  assert_that result
+    (elements_are
+       [
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+              open_price = 5.0;
+              high_price = 5.0;
+              low_price = 5.0;
+              close_price = 5.0;
+              volume = default_volume;
+              adjusted_close = 5.0;
+            }
+             : Types.Daily_price.t);
+       ])
 
 let test_convert_cadence_weekly_incomplete_excluded _ =
   let prices =
@@ -93,7 +140,7 @@ let test_convert_cadence_weekly_incomplete_excluded _ =
   in
   (* as_of_date=None means exclude incomplete weeks *)
   let result = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
-  assert_equal ~printer:Int.to_string 0 (List.length result)
+  assert_that result (elements_are [])
 
 let test_convert_cadence_weekly_incomplete_provisional _ =
   let prices =
@@ -109,10 +156,22 @@ let test_convert_cadence_weekly_incomplete_provisional _ =
     convert_cadence prices ~cadence:Weekly
       ~as_of_date:(Some (Date.create_exn ~y:2024 ~m:Month.Mar ~d:13))
   in
-  assert_equal ~printer:Int.to_string 1 (List.length result);
-  assert_equal ~printer:Date.to_string (Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
-    (List.hd_exn result).date;
-  assert_equal ~printer:Float.to_string 3.0 (List.hd_exn result).close_price
+  (* Conversion returns last entry of the week *)
+  assert_that result
+    (elements_are
+       [
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:13;
+              open_price = 3.0;
+              high_price = 3.0;
+              low_price = 3.0;
+              close_price = 3.0;
+              volume = default_volume;
+              adjusted_close = 3.0;
+            }
+             : Types.Daily_price.t);
+       ])
 
 let test_convert_cadence_weekly_mixed _ =
   let prices =
@@ -129,16 +188,53 @@ let test_convert_cadence_weekly_mixed _ =
   in
   (* Exclude incomplete: only week 1 *)
   let finalized = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
-  assert_equal ~printer:Int.to_string 1 (List.length finalized);
-  assert_equal ~printer:Float.to_string 5.0 (List.hd_exn finalized).close_price;
+  (* Conversion returns last entry of each week *)
+  assert_that finalized
+    (elements_are
+       [
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+              open_price = 5.0;
+              high_price = 5.0;
+              low_price = 5.0;
+              close_price = 5.0;
+              volume = default_volume;
+              adjusted_close = 5.0;
+            }
+             : Types.Daily_price.t);
+       ]);
   (* Include provisional: both weeks *)
   let provisional =
     convert_cadence prices ~cadence:Weekly
       ~as_of_date:(Some (Date.create_exn ~y:2024 ~m:Month.Mar ~d:20))
   in
-  assert_equal ~printer:Int.to_string 2 (List.length provisional);
-  assert_equal ~printer:Float.to_string 8.0
-    (List.nth_exn provisional 1).close_price
+  assert_that provisional
+    (elements_are
+       [
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+              open_price = 5.0;
+              high_price = 5.0;
+              low_price = 5.0;
+              close_price = 5.0;
+              volume = default_volume;
+              adjusted_close = 5.0;
+            }
+             : Types.Daily_price.t);
+         equal_to
+           ({
+              date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
+              open_price = 8.0;
+              high_price = 8.0;
+              low_price = 8.0;
+              close_price = 8.0;
+              volume = default_volume;
+              adjusted_close = 8.0;
+            }
+             : Types.Daily_price.t);
+       ])
 
 let test_convert_cadence_monthly_todo _ =
   (* Monthly conversion not yet implemented *)
@@ -149,7 +245,7 @@ let test_convert_cadence_monthly_todo _ =
   in
   let result = convert_cadence prices ~cadence:Monthly ~as_of_date:None in
   (* Currently returns empty - this is a TODO *)
-  assert_equal ~printer:Int.to_string 0 (List.length result)
+  assert_that result (elements_are [])
 
 let suite =
   "Time series tests"

@@ -11,4 +11,4 @@
 
 (test
  (name test_time_series)
- (libraries ounit2 core trading.simulation types))
+ (libraries ounit2 core trading.simulation types matchers))
