@@ -34,7 +34,7 @@ let _process_data_point ~weekdays_only ~prev_date ~curr_week data =
         (data :: curr_week, Some data.date)
       else ([ data ], Some data.date)
 
-let daily_to_weekly ?(weekdays_only = false) data =
+let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data =
   (* Recursively process data points, maintaining:
      - acc: list of completed weekly entries (last entry of each week)
      - curr_week: entries in the current week being processed
@@ -46,7 +46,10 @@ let daily_to_weekly ?(weekdays_only = false) data =
         match curr_week with
         | [] -> List.rev acc (* No remaining week *)
         | data :: _ ->
-            List.rev (data :: acc) (* Add last entry of remaining week *))
+            if include_partial_week then
+              List.rev (data :: acc) (* Add last entry of remaining week *)
+            else
+              List.rev acc (* Skip incomplete week *))
     | data :: rest ->
         (* Process the current data point *)
         let curr_week', prev_date' =
