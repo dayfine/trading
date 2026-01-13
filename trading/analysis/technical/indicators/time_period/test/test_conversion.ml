@@ -53,26 +53,26 @@ let test_single_week _ =
 let test_multiple_weeks _ =
   let data =
     [
-      (* Week 1: Mar 12-15 *)
+      (* Week 1: Mar 12-15, prices: 2, 4, 1, 3 *)
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12)
-        ~price:1.0;
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
         ~price:2.0;
       make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:4.0;
+      make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:14)
-        ~price:3.0;
+        ~price:1.0;
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:4.0;
-      (* Week 2: Mar 18-20 *)
+        ~price:3.0;
+      (* Week 2: Mar 18-20, prices: 6, 5, 7 *)
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:18)
-        ~price:5.0;
+        ~price:6.0;
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:19)
-        ~price:6.0;
+        ~price:5.0;
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20)
         ~price:7.0;
@@ -85,16 +85,16 @@ let test_multiple_weeks _ =
     [
       {
         date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
-        open_price = 1.0;
+        open_price = 2.0;
         high_price = 4.0;
         low_price = 1.0;
-        close_price = 4.0;
+        close_price = 3.0;
         volume = default_volume * 4;
-        adjusted_close = 4.0;
+        adjusted_close = 3.0;
       };
       {
         date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
-        open_price = 5.0;
+        open_price = 6.0;
         high_price = 7.0;
         low_price = 5.0;
         close_price = 7.0;
