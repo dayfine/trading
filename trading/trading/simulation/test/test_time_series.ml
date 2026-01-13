@@ -112,18 +112,18 @@ let test_convert_cadence_weekly_complete _ =
     ]
   in
   let result = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
-  (* Conversion returns last entry of the week, not aggregated OHLCV *)
+  (* Weekly bar properly aggregates OHLCV values *)
   assert_that result
     (elements_are
        [
          equal_to
            ({
               date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
-              open_price = 5.0;
+              open_price = 1.0;
               high_price = 5.0;
-              low_price = 5.0;
+              low_price = 1.0;
               close_price = 5.0;
-              volume = default_volume;
+              volume = default_volume * 3;
               adjusted_close = 5.0;
             }
              : Types.Daily_price.t);
@@ -156,18 +156,18 @@ let test_convert_cadence_weekly_incomplete_provisional _ =
     convert_cadence prices ~cadence:Weekly
       ~as_of_date:(Some (Date.create_exn ~y:2024 ~m:Month.Mar ~d:13))
   in
-  (* Conversion returns last entry of the week *)
+  (* Weekly bar aggregates incomplete week *)
   assert_that result
     (elements_are
        [
          equal_to
            ({
               date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:13;
-              open_price = 3.0;
+              open_price = 1.0;
               high_price = 3.0;
-              low_price = 3.0;
+              low_price = 1.0;
               close_price = 3.0;
-              volume = default_volume;
+              volume = default_volume * 2;
               adjusted_close = 3.0;
             }
              : Types.Daily_price.t);
@@ -188,18 +188,18 @@ let test_convert_cadence_weekly_mixed _ =
   in
   (* Exclude incomplete: only week 1 *)
   let finalized = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
-  (* Conversion returns last entry of each week *)
+  (* Weekly bars aggregate OHLCV values *)
   assert_that finalized
     (elements_are
        [
          equal_to
            ({
               date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
-              open_price = 5.0;
+              open_price = 1.0;
               high_price = 5.0;
-              low_price = 5.0;
+              low_price = 1.0;
               close_price = 5.0;
-              volume = default_volume;
+              volume = default_volume * 2;
               adjusted_close = 5.0;
             }
              : Types.Daily_price.t);
@@ -215,22 +215,22 @@ let test_convert_cadence_weekly_mixed _ =
          equal_to
            ({
               date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
-              open_price = 5.0;
+              open_price = 1.0;
               high_price = 5.0;
-              low_price = 5.0;
+              low_price = 1.0;
               close_price = 5.0;
-              volume = default_volume;
+              volume = default_volume * 2;
               adjusted_close = 5.0;
             }
              : Types.Daily_price.t);
          equal_to
            ({
               date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
-              open_price = 8.0;
+              open_price = 6.0;
               high_price = 8.0;
-              low_price = 8.0;
+              low_price = 6.0;
               close_price = 8.0;
-              volume = default_volume;
+              volume = default_volume * 2;
               adjusted_close = 8.0;
             }
              : Types.Daily_price.t);

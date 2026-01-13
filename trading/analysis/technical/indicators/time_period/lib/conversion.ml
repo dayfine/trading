@@ -27,6 +27,31 @@ let _validate_ordering prev curr =
       (Invalid_argument
          "Data must be sorted chronologically by date with no duplicates")
 
+(* Aggregate a week of data into a single weekly bar *)
+let _aggregate_week (week_data : t list) : t =
+  match week_data with
+  | [] -> failwith "Cannot aggregate empty week"
+  | [ single ] -> single
+  | _ :: _ ->
+      (* week_data is in reverse chronological order (last day first) *)
+      let last = List.hd_exn week_data in
+      let first = List.last_exn week_data in
+      {
+        date = last.date;
+        open_price = first.open_price;
+        high_price =
+          List.map week_data ~f:(fun d -> d.high_price)
+          |> List.max_elt ~compare:Float.compare
+          |> Option.value_exn;
+        low_price =
+          List.map week_data ~f:(fun d -> d.low_price)
+          |> List.min_elt ~compare:Float.compare
+          |> Option.value_exn;
+        close_price = last.close_price;
+        volume = List.sum (module Int) week_data ~f:(fun d -> d.volume);
+        adjusted_close = last.adjusted_close;
+      }
+
 (* Process a new data point *)
 let _process_data_point ~weekdays_only ~prev_date ~curr_week data =
   _validate_weekday ~weekdays_only data.date;
@@ -40,8 +65,8 @@ let _process_data_point ~weekdays_only ~prev_date ~curr_week data =
 
 let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data =
   (* Recursively process data points, maintaining:
-     - acc: list of completed weekly entries (last entry of each week)
-     - curr_week: entries in the current week being processed
+     - acc: list of completed weekly bars (aggregated)
+     - curr_week: entries in the current week being processed (reverse chronological)
      - prev_date: last processed date (for chronological validation)
   *)
   let rec aux acc curr_week prev_date = function
@@ -49,11 +74,13 @@ let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data
         (* End of data - handle any remaining week *)
         match curr_week with
         | [] -> List.rev acc (* No remaining week *)
-        | data :: _ ->
+        | week_data ->
             (* Check if the last day is a Friday (complete week) *)
-            let is_complete_week = _is_friday data.date in
+            let last = List.hd_exn week_data in
+            let is_complete_week = _is_friday last.date in
             if include_partial_week || is_complete_week then
-              List.rev (data :: acc) (* Include if flag is true OR week is complete *)
+              (* Aggregate the week and add to results *)
+              List.rev (_aggregate_week week_data :: acc)
             else
               List.rev acc (* Skip incomplete week when include_partial_week=false *))
     | data :: rest ->
@@ -61,11 +88,11 @@ let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data
         let curr_week', prev_date' =
           _process_data_point ~weekdays_only ~prev_date ~curr_week data
         in
-        (* If we've moved to a new week, add the last entry of previous week to acc *)
+        (* If we've moved to a new week, aggregate previous week and add to acc *)
         let acc' =
           match curr_week with
-          | last :: _ when not (_is_same_week last.date data.date) ->
-              last :: acc
+          | _ :: _ when not (_is_same_week (List.hd_exn curr_week).date data.date) ->
+              _aggregate_week curr_week :: acc
           | _ -> acc
         in
         aux acc' curr_week' prev_date' rest
