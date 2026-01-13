@@ -7,9 +7,11 @@
   trading.engine
   types
   indicators.time_period
+  indicators.ema
+  indicators.types
   csv
   fpath
   core)
- (modules simulator time_series price_cache)
+ (modules simulator time_series price_cache indicator_computer)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
