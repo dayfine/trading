@@ -63,7 +63,8 @@ let _process_data_point ~weekdays_only ~prev_date ~curr_week data =
         (data :: curr_week, Some data.date)
       else ([ data ], Some data.date)
 
-let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data =
+let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data
+    =
   (* Recursively process data points, maintaining:
      - acc: list of completed weekly bars (aggregated)
      - curr_week: entries in the current week being processed (reverse chronological)
@@ -82,7 +83,8 @@ let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data
               (* Aggregate the week and add to results *)
               List.rev (_aggregate_week week_data :: acc)
             else
-              List.rev acc (* Skip incomplete week when include_partial_week=false *))
+              List.rev
+                acc (* Skip incomplete week when include_partial_week=false *))
     | data :: rest ->
         (* Process the current data point *)
         let curr_week', prev_date' =
@@ -91,7 +93,8 @@ let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data
         (* If we've moved to a new week, aggregate previous week and add to acc *)
         let acc' =
           match curr_week with
-          | _ :: _ when not (_is_same_week (List.hd_exn curr_week).date data.date) ->
+          | _ :: _
+            when not (_is_same_week (List.hd_exn curr_week).date data.date) ->
               _aggregate_week curr_week :: acc
           | _ -> acc
         in

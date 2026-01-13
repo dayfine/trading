@@ -28,8 +28,10 @@ let test_cadence_equality _ =
 let test_is_period_end_daily _ =
   let monday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:11 in
   let friday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15 in
-  assert_bool "Daily: Monday is period end" (is_period_end ~cadence:Daily monday);
-  assert_bool "Daily: Friday is period end" (is_period_end ~cadence:Daily friday)
+  assert_bool "Daily: Monday is period end"
+    (is_period_end ~cadence:Daily monday);
+  assert_bool "Daily: Friday is period end"
+    (is_period_end ~cadence:Daily friday)
 
 let test_is_period_end_weekly _ =
   let monday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:11 in
@@ -39,7 +41,8 @@ let test_is_period_end_weekly _ =
     (not (is_period_end ~cadence:Weekly monday));
   assert_bool "Weekly: Wednesday not period end"
     (not (is_period_end ~cadence:Weekly wednesday));
-  assert_bool "Weekly: Friday is period end" (is_period_end ~cadence:Weekly friday)
+  assert_bool "Weekly: Friday is period end"
+    (is_period_end ~cadence:Weekly friday)
 
 let test_is_period_end_monthly _ =
   let mid_month = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15 in
@@ -57,9 +60,15 @@ let test_is_period_end_monthly _ =
 let test_convert_cadence_daily _ =
   let prices =
     [
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11) ~price:1.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12) ~price:2.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13) ~price:3.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12)
+        ~price:2.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:3.0;
     ]
   in
   let result = convert_cadence prices ~cadence:Daily ~as_of_date:None in
@@ -105,9 +114,15 @@ let test_convert_cadence_weekly_complete _ =
   let prices =
     [
       (* Complete week Mon-Fri *)
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11) ~price:1.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12) ~price:2.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15) ~price:5.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12)
+        ~price:2.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
+        ~price:5.0;
       (* Friday *)
     ]
   in
@@ -133,8 +148,12 @@ let test_convert_cadence_weekly_incomplete_excluded _ =
   let prices =
     [
       (* Incomplete week Mon-Wed *)
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11) ~price:1.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13) ~price:3.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:3.0;
       (* Wednesday *)
     ]
   in
@@ -146,8 +165,12 @@ let test_convert_cadence_weekly_incomplete_provisional _ =
   let prices =
     [
       (* Incomplete week Mon-Wed *)
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11) ~price:1.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13) ~price:3.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:3.0;
       (* Wednesday *)
     ]
   in
@@ -177,12 +200,20 @@ let test_convert_cadence_weekly_mixed _ =
   let prices =
     [
       (* Week 1: Complete *)
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11) ~price:1.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15) ~price:5.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
+        ~price:5.0;
       (* Friday *)
       (* Week 2: Incomplete *)
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:18) ~price:6.0;
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20) ~price:8.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:18)
+        ~price:6.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20)
+        ~price:8.0;
       (* Wednesday *)
     ]
   in
@@ -240,7 +271,9 @@ let test_convert_cadence_monthly_todo _ =
   (* Monthly conversion not yet implemented *)
   let prices =
     [
-      make_test_price ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:1) ~price:1.0;
+      make_test_price
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:1)
+        ~price:1.0;
     ]
   in
   let result = convert_cadence prices ~cadence:Monthly ~as_of_date:None in
@@ -264,8 +297,10 @@ let suite =
          >:: test_convert_cadence_weekly_incomplete_excluded;
          "test_convert_cadence_weekly_incomplete_provisional"
          >:: test_convert_cadence_weekly_incomplete_provisional;
-         "test_convert_cadence_weekly_mixed" >:: test_convert_cadence_weekly_mixed;
-         "test_convert_cadence_monthly_todo" >:: test_convert_cadence_monthly_todo;
+         "test_convert_cadence_weekly_mixed"
+         >:: test_convert_cadence_weekly_mixed;
+         "test_convert_cadence_monthly_todo"
+         >:: test_convert_cadence_monthly_todo;
        ]
 
 let () = run_test_tt_main suite

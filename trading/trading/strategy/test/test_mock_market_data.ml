@@ -135,10 +135,12 @@ let test_ema_computation _ =
   (* EMA should be computed *)
   let ema_10 = Mock_market_data.get_ema market_data "AAPL" 10 in
   assert_that ema_10
-    (is_some_and (fun ema -> assert_bool "EMA 10 should be positive" Float.(ema > 0.0)));
+    (is_some_and (fun ema ->
+         assert_bool "EMA 10 should be positive" Float.(ema > 0.0)));
   let ema_20 = Mock_market_data.get_ema market_data "AAPL" 20 in
   assert_that ema_20
-    (is_some_and (fun ema -> assert_bool "EMA 20 should be positive" Float.(ema > 0.0)));
+    (is_some_and (fun ema ->
+         assert_bool "EMA 20 should be positive" Float.(ema > 0.0)));
   (* EMA series should have values starting from period-1 *)
   (* For 30 days with period 10: 30 - (10 - 1) = 21 values *)
   let ema_series = Mock_market_data.get_ema_series market_data "AAPL" 10 () in

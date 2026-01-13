@@ -1,7 +1,13 @@
 (library
  (public_name trading.simulation)
  (name trading_simulation)
- (libraries trading.base trading.portfolio trading.engine types indicators.time_period core)
+ (libraries
+  trading.base
+  trading.portfolio
+  trading.engine
+  types
+  indicators.time_period
+  core)
  (modules simulator time_series)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

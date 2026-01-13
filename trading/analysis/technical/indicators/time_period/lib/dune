@@ -1,4 +1,5 @@
 (library
+ (public_name indicators.time_period)
  (name time_period)
  (libraries core types)
  (preprocess
