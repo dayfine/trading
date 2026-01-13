@@ -12,3 +12,7 @@
 (test
  (name test_time_series)
  (libraries ounit2 core trading.simulation types matchers))
+
+(test
+ (name test_storage_backend)
+ (libraries ounit2 core trading.simulation types matchers bos csv fpath))
