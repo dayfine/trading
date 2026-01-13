@@ -301,12 +301,20 @@ let test_complete_and_partial_weeks _ =
 let test_all_complete_weeks_unaffected _ =
   let data =
     [
-      (* Week 1 *)
+      (* Week 1: Complete week with multiple days *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      (* Monday *)
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
         ~price:5.0;
       (* Friday *)
-      (* Week 2 *)
+      (* Week 2: Complete week with multiple days *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:18)
+        ~price:6.0;
+      (* Monday *)
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:22)
         ~price:10.0;
@@ -327,13 +335,13 @@ let test_all_complete_weeks_unaffected _ =
   assert_equal
     ~printer:(fun l ->
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
-    (daily_to_weekly ~include_partial_week:true data)
-    expected;
+    expected
+    (daily_to_weekly ~include_partial_week:true data);
   assert_equal
     ~printer:(fun l ->
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
-    (daily_to_weekly ~include_partial_week:false data)
     expected
+    (daily_to_weekly ~include_partial_week:false data)
 
 let suite =
   "Time period conversion tests"

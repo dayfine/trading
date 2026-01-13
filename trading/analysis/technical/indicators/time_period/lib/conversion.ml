@@ -10,6 +10,10 @@ let _is_weekend (date : Date.t) : bool =
   let day = Date.day_of_week date in
   Day_of_week.equal day Day_of_week.Sat || Day_of_week.equal day Day_of_week.Sun
 
+(* Check if a date is a Friday (end of trading week) *)
+let _is_friday (date : Date.t) : bool =
+  Day_of_week.equal (Date.day_of_week date) Day_of_week.Fri
+
 (* Validate date based on weekdays_only setting *)
 let _validate_weekday ~weekdays_only date =
   if weekdays_only && _is_weekend date then
@@ -46,10 +50,12 @@ let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data
         match curr_week with
         | [] -> List.rev acc (* No remaining week *)
         | data :: _ ->
-            if include_partial_week then
-              List.rev (data :: acc) (* Add last entry of remaining week *)
+            (* Check if the last day is a Friday (complete week) *)
+            let is_complete_week = _is_friday data.date in
+            if include_partial_week || is_complete_week then
+              List.rev (data :: acc) (* Include if flag is true OR week is complete *)
             else
-              List.rev acc (* Skip incomplete week *))
+              List.rev acc (* Skip incomplete week when include_partial_week=false *))
     | data :: rest ->
         (* Process the current data point *)
         let curr_week', prev_date' =
