@@ -39,34 +39,40 @@ let test_single_week _ =
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
     (daily_to_weekly data)
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:4.0;
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+        open_price = 1.0;
+        high_price = 4.0;
+        low_price = 1.0;
+        close_price = 4.0;
+        volume = default_volume * 4;
+        adjusted_close = 4.0;
+      };
     ]
 
 let test_multiple_weeks _ =
   let data =
     [
-      (* Week 1: Mar 12-15 *)
+      (* Week 1: Mar 12-15, prices: 2, 4, 1, 3 *)
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12)
-        ~price:1.0;
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
         ~price:2.0;
       make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:4.0;
+      make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:14)
-        ~price:3.0;
+        ~price:1.0;
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:4.0;
-      (* Week 2: Mar 18-20 *)
+        ~price:3.0;
+      (* Week 2: Mar 18-20, prices: 6, 5, 7 *)
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:18)
-        ~price:5.0;
+        ~price:6.0;
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:19)
-        ~price:6.0;
+        ~price:5.0;
       make_test_data
         ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20)
         ~price:7.0;
@@ -77,12 +83,24 @@ let test_multiple_weeks _ =
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
     (daily_to_weekly data)
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:4.0;
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20)
-        ~price:7.0;
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+        open_price = 2.0;
+        high_price = 4.0;
+        low_price = 1.0;
+        close_price = 3.0;
+        volume = default_volume * 4;
+        adjusted_close = 3.0;
+      };
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
+        open_price = 6.0;
+        high_price = 7.0;
+        low_price = 5.0;
+        close_price = 7.0;
+        volume = default_volume * 3;
+        adjusted_close = 7.0;
+      };
     ]
 
 let test_empty_list _ =
@@ -132,9 +150,15 @@ let test_weekdays_only _ =
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
     (daily_to_weekly ~weekdays_only:true data)
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:4.0;
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+        open_price = 1.0;
+        high_price = 4.0;
+        low_price = 1.0;
+        close_price = 4.0;
+        volume = default_volume * 4;
+        adjusted_close = 4.0;
+      };
     ]
 
 let test_unsorted_data_raises_invalid_argument _ =
@@ -172,9 +196,15 @@ let test_weekend_data_with_weekdays_only_raises_invalid_argument _ =
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
     (daily_to_weekly weekend_data)
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:16)
-        ~price:5.0;
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:16;
+        open_price = 4.0;
+        high_price = 5.0;
+        low_price = 4.0;
+        close_price = 5.0;
+        volume = default_volume * 2;
+        adjusted_close = 5.0;
+      };
     ];
   (* Should fail when weekdays_only is true *)
   assert_raises
@@ -222,10 +252,15 @@ let test_partial_week_included_by_default _ =
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
     (daily_to_weekly data)
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
-        ~price:3.0;
-      (* Last day of incomplete week *)
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:13;
+        open_price = 1.0;
+        high_price = 3.0;
+        low_price = 1.0;
+        close_price = 3.0;
+        volume = default_volume * 3;
+        adjusted_close = 3.0;
+      };
     ]
 
 let test_partial_week_excluded _ =
@@ -280,12 +315,24 @@ let test_complete_and_partial_weeks _ =
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
     (daily_to_weekly ~include_partial_week:true data)
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:5.0;
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20)
-        ~price:8.0;
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+        open_price = 1.0;
+        high_price = 5.0;
+        low_price = 1.0;
+        close_price = 5.0;
+        volume = default_volume * 2;
+        adjusted_close = 5.0;
+      };
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
+        open_price = 6.0;
+        high_price = 8.0;
+        low_price = 6.0;
+        close_price = 8.0;
+        volume = default_volume * 2;
+        adjusted_close = 8.0;
+      };
     ];
   (* Exclude partial: only complete week *)
   assert_equal
@@ -293,9 +340,15 @@ let test_complete_and_partial_weeks _ =
       List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
     (daily_to_weekly ~include_partial_week:false data)
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:5.0;
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+        open_price = 1.0;
+        high_price = 5.0;
+        low_price = 1.0;
+        close_price = 5.0;
+        volume = default_volume * 2;
+        adjusted_close = 5.0;
+      };
     ]
 
 let test_all_complete_weeks_unaffected _ =
@@ -324,12 +377,24 @@ let test_all_complete_weeks_unaffected _ =
   (* Both settings should give same result for complete weeks *)
   let expected =
     [
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
-        ~price:5.0;
-      make_test_data
-        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:22)
-        ~price:10.0;
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15;
+        open_price = 1.0;
+        high_price = 5.0;
+        low_price = 1.0;
+        close_price = 5.0;
+        volume = default_volume * 2;
+        adjusted_close = 5.0;
+      };
+      {
+        date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:22;
+        open_price = 6.0;
+        high_price = 10.0;
+        low_price = 6.0;
+        close_price = 10.0;
+        volume = default_volume * 2;
+        adjusted_close = 10.0;
+      };
     ]
   in
   assert_equal
