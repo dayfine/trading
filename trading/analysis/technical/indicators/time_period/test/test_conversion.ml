@@ -197,6 +197,152 @@ let test_duplicate_dates_raises_invalid_argument _ =
        "Data must be sorted chronologically by date with no duplicates")
     (fun () -> daily_to_weekly duplicate_data)
 
+(* Tests for include_partial_week parameter *)
+let test_partial_week_included_by_default _ =
+  (* Incomplete week (Mon-Wed) *)
+  let data =
+    [
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      (* Monday *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12)
+        ~price:2.0;
+      (* Tuesday *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:3.0;
+      (* Wednesday *)
+    ]
+  in
+  (* Default behavior: include partial week *)
+  assert_equal
+    ~printer:(fun l ->
+      List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
+    (daily_to_weekly data)
+    [
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:3.0;
+      (* Last day of incomplete week *)
+    ]
+
+let test_partial_week_excluded _ =
+  (* Incomplete week (Mon-Wed) *)
+  let data =
+    [
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      (* Monday *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:12)
+        ~price:2.0;
+      (* Tuesday *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:13)
+        ~price:3.0;
+      (* Wednesday *)
+    ]
+  in
+  (* Exclude partial week: should return empty *)
+  assert_equal
+    ~printer:(fun l ->
+      List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
+    (daily_to_weekly ~include_partial_week:false data)
+    []
+
+let test_complete_and_partial_weeks _ =
+  let data =
+    [
+      (* Week 1: Complete (Mon-Fri) *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
+        ~price:5.0;
+      (* Friday *)
+      (* Week 2: Incomplete (Mon-Wed) *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:18)
+        ~price:6.0;
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20)
+        ~price:8.0;
+      (* Wednesday *)
+    ]
+  in
+  (* Include partial: both weeks *)
+  assert_equal
+    ~printer:(fun l ->
+      List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
+    (daily_to_weekly ~include_partial_week:true data)
+    [
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
+        ~price:5.0;
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:20)
+        ~price:8.0;
+    ];
+  (* Exclude partial: only complete week *)
+  assert_equal
+    ~printer:(fun l ->
+      List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
+    (daily_to_weekly ~include_partial_week:false data)
+    [
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
+        ~price:5.0;
+    ]
+
+let test_all_complete_weeks_unaffected _ =
+  let data =
+    [
+      (* Week 1: Complete week with multiple days *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:11)
+        ~price:1.0;
+      (* Monday *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
+        ~price:5.0;
+      (* Friday *)
+      (* Week 2: Complete week with multiple days *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:18)
+        ~price:6.0;
+      (* Monday *)
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:22)
+        ~price:10.0;
+      (* Friday *)
+    ]
+  in
+  (* Both settings should give same result for complete weeks *)
+  let expected =
+    [
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:15)
+        ~price:5.0;
+      make_test_data
+        ~date:(Date.create_exn ~y:2024 ~m:Month.Mar ~d:22)
+        ~price:10.0;
+    ]
+  in
+  assert_equal
+    ~printer:(fun l ->
+      List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
+    expected
+    (daily_to_weekly ~include_partial_week:true data);
+  assert_equal
+    ~printer:(fun l ->
+      List.map ~f:Types.Daily_price.show l |> String.concat ~sep:"; ")
+    expected
+    (daily_to_weekly ~include_partial_week:false data)
+
 let suite =
   "Time period conversion tests"
   >::: [
@@ -211,6 +357,13 @@ let suite =
          >:: test_weekend_data_with_weekdays_only_raises_invalid_argument;
          "test_duplicate_dates_raises_invalid_argument"
          >:: test_duplicate_dates_raises_invalid_argument;
+         (* Tests for include_partial_week parameter *)
+         "test_partial_week_included_by_default"
+         >:: test_partial_week_included_by_default;
+         "test_partial_week_excluded" >:: test_partial_week_excluded;
+         "test_complete_and_partial_weeks" >:: test_complete_and_partial_weeks;
+         "test_all_complete_weeks_unaffected"
+         >:: test_all_complete_weeks_unaffected;
        ]
 
 let () = run_test_tt_main suite
