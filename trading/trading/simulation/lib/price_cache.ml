@@ -27,7 +27,9 @@ let _filter_by_date_range prices ~start_date ~end_date =
         | Some start -> Date.(price.date >= start)
       in
       let date_ok_end =
-        match end_date with None -> true | Some end_ -> Date.(price.date <= end_)
+        match end_date with
+        | None -> true
+        | Some end_ -> Date.(price.date <= end_)
       in
       date_ok_start && date_ok_end)
 
@@ -65,5 +67,4 @@ let preload_symbols t symbols =
          (Printf.sprintf "Failed to load symbols: %s" error_messages))
 
 let clear_cache t = Hashtbl.clear t.cache
-
 let get_cached_symbols t = Hashtbl.keys t.cache

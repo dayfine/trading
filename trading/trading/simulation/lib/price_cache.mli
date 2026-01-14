@@ -6,8 +6,7 @@
     - Caching: Keeps loaded data in memory for subsequent queries
     - Date filtering: Returns only prices within requested date ranges
 
-    Uses Csv.Csv_storage internally for actual file I/O.
-*)
+    Uses Csv.Csv_storage internally for actual file I/O. *)
 
 open Core
 
@@ -17,8 +16,8 @@ type t
 val create : data_dir:Fpath.t -> t
 (** Create a new price cache pointing to a data directory.
 
-    The data directory should contain CSV files for historical prices.
-    Symbols are loaded lazily on first access. *)
+    The data directory should contain CSV files for historical prices. Symbols
+    are loaded lazily on first access. *)
 
 val get_prices :
   t ->
@@ -40,9 +39,9 @@ val get_prices :
 val preload_symbols : t -> string list -> (unit, Status.t) Result.t
 (** Preload data for multiple symbols upfront.
 
-    Useful for batch loading all symbols needed for a simulation.
-    Returns Ok () if all symbols loaded successfully, or Error with
-    aggregated error message if any symbols failed to load. *)
+    Useful for batch loading all symbols needed for a simulation. Returns Ok ()
+    if all symbols loaded successfully, or Error with aggregated error message
+    if any symbols failed to load. *)
 
 val clear_cache : t -> unit
 (** Clear all cached data. Useful for freeing memory or reloading data. *)

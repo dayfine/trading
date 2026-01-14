@@ -16,3 +16,7 @@
 (test
  (name test_price_cache)
  (libraries ounit2 core trading.simulation types matchers bos csv fpath))
+
+(test
+ (name test_indicator_computer)
+ (libraries ounit2 core trading.simulation types matchers indicators.types))
