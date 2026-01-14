@@ -19,7 +19,8 @@
 open Core
 
 (** Time period for indicator computation *)
-type cadence = Daily | Weekly | Monthly [@@deriving show, eq]
+type cadence = Daily | Weekly | Monthly
+[@@deriving show, eq, hash, sexp, compare]
 
 val convert_cadence :
   Types.Daily_price.t list ->
