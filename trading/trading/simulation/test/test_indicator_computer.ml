@@ -41,8 +41,35 @@ let test_compute_ema_daily _ =
   in
   (* Verify symbol *)
   assert_that result.symbol (equal_to "AAPL");
-  (* Verify we have EMA values (should have 8 - 3 + 1 = 6 values after 3-period EMA) *)
-  assert_that result.indicator_values (size_is 6)
+  (* Verify EMA values: period 3, multiplier = 0.5
+     Day 3: SMA = (100+101+102)/3 = 101.0
+     Day 4: (103-101)*0.5 + 101 = 102.0
+     Day 5: (104-102)*0.5 + 102 = 103.0
+     Day 8: (105-103)*0.5 + 103 = 104.0
+     Day 9: (106-104)*0.5 + 104 = 105.0
+     Day 10: (107-105)*0.5 + 105 = 106.0 *)
+  assert_that result.indicator_values
+    (elements_are
+       [
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:3; value = 101.0 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:4; value = 102.0 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:5; value = 103.0 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:8; value = 104.0 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:9; value = 105.0 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:10; value = 106.0 }
+             : Indicator_types.indicator_value);
+       ])
 
 (** Test: compute EMA with weekly cadence *)
 let test_compute_ema_weekly _ =
@@ -81,8 +108,24 @@ let test_compute_ema_weekly _ =
   in
   (* Verify symbol *)
   assert_that result.symbol (equal_to "MSFT");
-  (* Should have weekly values: 4 weeks, and with period=2, we get 4 - 2 + 1 = 3 EMA values *)
-  assert_that result.indicator_values (size_is 3)
+  (* Weekly closes: 104 (Jan5), 109 (Jan12), 114 (Jan19), 119 (Jan26)
+     Period 2, multiplier = 2/3:
+     Week 2 (Jan 12): SMA = (104+109)/2 = 106.5
+     Week 3 (Jan 19): (114-106.5)*(2/3) + 106.5 = 111.5
+     Week 4 (Jan 26): (119-111.5)*(2/3) + 111.5 = 116.5 *)
+  assert_that result.indicator_values
+    (elements_are
+       [
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:12; value = 106.5 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:19; value = 111.5 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:26; value = 116.5 }
+             : Indicator_types.indicator_value);
+       ])
 
 (** Test: compute EMA with monthly cadence *)
 let test_compute_ema_monthly _ =
@@ -137,8 +180,15 @@ let test_compute_ema_weekly_with_as_of_date _ =
   in
   (* Verify symbol *)
   assert_that result.symbol (equal_to "TSLA");
-  (* Should have 2 weeks: 1 complete + 1 provisional, with period=2 gives 2 - 2 + 1 = 1 EMA value *)
-  assert_that result.indicator_values (size_is 1)
+  (* Week 1: close = 104.0 (Jan 5), Week 2 partial: close = 107.0 (Jan 10)
+     Period 2: SMA = (104 + 107) / 2 = 105.5 *)
+  assert_that result.indicator_values
+    (elements_are
+       [
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:10; value = 105.5 }
+             : Indicator_types.indicator_value);
+       ])
 
 (** Test: error when period is zero *)
 let test_error_zero_period _ =
@@ -204,15 +254,20 @@ let test_uses_close_prices _ =
       ~cadence:Daily ()
     |> ok_or_fail_status
   in
-  (* Verify we got EMA values (should have 2 values from 3-day data with 2-period EMA) *)
-  assert_that result.indicator_values (size_is 2);
-  (* The EMA calculation uses close prices (100, 105, 110), not open/high/low *)
-  let ema_values = result.indicator_values in
-  let first : Indicator_types.indicator_value = List.nth_exn ema_values 0 in
-  let second : Indicator_types.indicator_value = List.nth_exn ema_values 1 in
-  (* Verify dates are preserved *)
-  assert_that first.date (equal_to (Date.create_exn ~y:2024 ~m:Month.Jan ~d:2));
-  assert_that second.date (equal_to (Date.create_exn ~y:2024 ~m:Month.Jan ~d:3))
+  (* EMA uses close prices (100, 105, 110), not open/high/low
+     Period 2, multiplier = 2/3:
+     Jan 2: SMA = (100+105)/2 = 102.5
+     Jan 3: (110-102.5)*(2/3) + 102.5 = 107.5 *)
+  assert_that result.indicator_values
+    (elements_are
+       [
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:2; value = 102.5 }
+             : Indicator_types.indicator_value);
+         equal_to
+           ({ date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:3; value = 107.5 }
+             : Indicator_types.indicator_value);
+       ])
 
 let suite =
   "IndicatorComputerTests"
