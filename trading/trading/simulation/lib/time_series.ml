@@ -2,7 +2,8 @@
 
 open Core
 
-type cadence = Daily | Weekly | Monthly [@@deriving show, eq]
+type cadence = Daily | Weekly | Monthly
+[@@deriving show, eq, hash, sexp, compare]
 
 let _is_last_day_of_month date =
   (* Check if the next day is in a different month *)

@@ -12,6 +12,17 @@
   csv
   fpath
   core)
- (modules simulator time_series price_cache indicator_computer)
+ (modules
+  simulator
+  time_series
+  price_cache
+  indicator_computer
+  indicator_manager)
  (preprocess
-  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+  (pps
+   ppx_let
+   ppx_deriving.show
+   ppx_deriving.eq
+   ppx_hash
+   ppx_sexp_conv
+   ppx_compare)))
