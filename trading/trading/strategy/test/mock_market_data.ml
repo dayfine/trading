@@ -96,7 +96,10 @@ let get_ema_series t symbol period ?lookback_days () =
         ?lookback_days ema_series
 
 (** Get indicator value at current date (generic interface) *)
-let get_indicator t symbol indicator_name period =
-  match indicator_name with
-  | "EMA" -> get_ema t symbol period
+let get_indicator t symbol indicator_name period (cadence : Types.Cadence.t) =
+  match (indicator_name, cadence) with
+  | "EMA", Daily -> get_ema t symbol period
+  | "EMA", _ ->
+      (* Weekly/Monthly not supported in mock data yet - return None *)
+      None
   | _ -> None (* Only EMA supported for now *)

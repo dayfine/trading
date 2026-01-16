@@ -111,7 +111,7 @@ let test_enter_immediately _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Strategy execution"
   in
@@ -156,7 +156,7 @@ let test_enter_on_specific_date _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Day 1"
   in
@@ -171,7 +171,7 @@ let test_enter_on_specific_date _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price:get_price'
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Day 5"
   in
@@ -213,7 +213,7 @@ let test_holds_indefinitely _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Day 1"
   in
@@ -235,7 +235,7 @@ let test_holds_indefinitely _ =
       let output =
         unwrap_result
           (S.on_market_close ~get_price:get_price'
-             ~get_indicator:(fun _ _ _ -> None)
+             ~get_indicator:(fun _ _ _ _ -> None)
              ~positions:!positions)
           date_str
       in
@@ -272,7 +272,7 @@ let test_no_double_entry _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Day 1"
   in
@@ -287,7 +287,7 @@ let test_no_double_entry _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price:get_price'
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Day 2"
   in

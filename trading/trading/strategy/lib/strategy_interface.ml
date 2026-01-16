@@ -4,7 +4,10 @@ open Core
 
 type indicator_name = string
 type get_price_fn = string -> Types.Daily_price.t option
-type get_indicator_fn = string -> indicator_name -> int -> float option
+
+type get_indicator_fn =
+  string -> indicator_name -> int -> Types.Cadence.t -> float option
+
 type output = { transitions : Position.transition list } [@@deriving show, eq]
 
 module type STRATEGY = sig

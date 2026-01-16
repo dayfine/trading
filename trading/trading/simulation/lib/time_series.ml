@@ -2,7 +2,8 @@
 
 open Core
 
-type cadence = Daily | Weekly | Monthly
+(** Re-export cadence type from Types for backward compatibility *)
+type cadence = Types.Cadence.t = Daily | Weekly | Monthly
 [@@deriving show, eq, hash, sexp, compare]
 
 let _is_last_day_of_month date =

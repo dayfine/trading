@@ -20,7 +20,8 @@ type get_price_fn = string -> Types.Daily_price.t option
 
     Returns [Some price] if price data is available, [None] otherwise *)
 
-type get_indicator_fn = string -> indicator_name -> int -> float option
+type get_indicator_fn =
+  string -> indicator_name -> int -> Types.Cadence.t -> float option
 (** Function type for retrieving indicator values
 
     The market data source is already captured in the function closure.
@@ -29,6 +30,7 @@ type get_indicator_fn = string -> indicator_name -> int -> float option
     - [string]: Symbol (e.g., "AAPL")
     - [indicator_name]: Indicator type (e.g., "EMA", "SMA")
     - [int]: Period (e.g., 20 for 20-period EMA)
+    - [Types.Cadence.t]: Time cadence (Daily, Weekly, Monthly)
 
     Returns [Some value] if indicator is available, [None] otherwise *)
 
