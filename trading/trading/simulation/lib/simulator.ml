@@ -4,9 +4,6 @@ open Core
 
 (** {1 Input Types} *)
 
-type symbol_prices = { symbol : string; prices : Types.Daily_price.t list }
-[@@deriving show, eq]
-
 type config = {
   start_date : Date.t;
   end_date : Date.t;
@@ -15,7 +12,7 @@ type config = {
 }
 [@@deriving show, eq]
 
-type dependencies = { prices : symbol_prices list } [@@warning "-69"]
+type dependencies = { symbols : string list; data_dir : Fpath.t }
 
 (** {1 Simulator Types} *)
 
@@ -37,6 +34,7 @@ and t = {
   portfolio : Trading_portfolio.Portfolio.t;
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
+  adapter : Market_data_adapter.t;
 }
 
 (** {1 Creation} *)
@@ -48,6 +46,7 @@ let create ~config ~deps =
   let engine_config = { Trading_engine.Types.commission = config.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
+  let adapter = Market_data_adapter.create ~data_dir:deps.data_dir in
   {
     config;
     deps;
@@ -55,6 +54,7 @@ let create ~config ~deps =
     portfolio;
     engine;
     order_manager;
+    adapter;
   }
 
 (** {1 Running} *)
@@ -63,11 +63,6 @@ let submit_orders t orders =
   Trading_orders.Manager.submit_orders t.order_manager orders
 
 let _is_complete t = Date.( >= ) t.current_date t.config.end_date
-
-(** Get today's price data for a symbol *)
-let _get_price_for_date (sp : symbol_prices) (date : Date.t) =
-  List.find sp.prices ~f:(fun (p : Types.Daily_price.t) ->
-      Date.equal p.date date)
 
 (** Convert Daily_price to engine price_bar *)
 let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
@@ -80,13 +75,14 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
     close_price = daily_price.close_price;
   }
 
-(** Get all price bars for today *)
+(** Get all price bars for today using market data adapter *)
 let _get_today_bars t =
-  List.filter_map t.deps.prices ~f:(fun symbol_prices ->
-      match _get_price_for_date symbol_prices t.current_date with
+  List.filter_map t.deps.symbols ~f:(fun symbol ->
+      match
+        Market_data_adapter.get_price t.adapter ~symbol ~date:t.current_date
+      with
       | None -> None
-      | Some daily_price ->
-          Some (_to_price_bar symbol_prices.symbol daily_price))
+      | Some daily_price -> Some (_to_price_bar symbol daily_price))
 
 (** Extract trades from execution reports *)
 let _extract_trades reports =

@@ -4,13 +4,6 @@ open Core
 
 (** {1 Input Types} *)
 
-type symbol_prices = {
-  symbol : string;
-  prices : Types.Daily_price.t list;  (** sorted by date, ascending *)
-}
-[@@deriving show, eq]
-(** Historical price data for a single symbol *)
-
 type config = {
   start_date : Date.t;
   end_date : Date.t;
@@ -20,8 +13,12 @@ type config = {
 [@@deriving show, eq]
 (** Configuration for running a simulation *)
 
-type dependencies = { prices : symbol_prices list }
-(** External dependencies injected into the simulator *)
+type dependencies = {
+  symbols : string list;  (** Watchlist of symbols to track *)
+  data_dir : Fpath.t;  (** Directory containing CSV price files *)
+}
+(** External dependencies injected into the simulator. The simulator lazily
+    loads price data from CSV storage. *)
 
 (** {1 Simulator Types} *)
 

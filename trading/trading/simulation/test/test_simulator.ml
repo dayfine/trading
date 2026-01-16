@@ -17,6 +17,35 @@ let make_daily_price ~date ~open_price ~high ~low ~close ~volume =
       adjusted_close = close;
     }
 
+let ok_or_fail_status = function
+  | Ok x -> x
+  | Error (err : Status.t) -> failwith err.message
+
+(** Set up test CSV data for a given test name *)
+let setup_test_data test_name prices_by_symbol =
+  let test_data_dir =
+    Fpath.v (Printf.sprintf "test_data/simulator_%s" test_name)
+  in
+  let dir_str = Fpath.to_string test_data_dir in
+  (match Sys_unix.file_exists dir_str with
+  | `Yes -> ignore (Bos.OS.Dir.delete ~recurse:true test_data_dir)
+  | _ -> ());
+  ignore (Bos.OS.Dir.create ~path:true test_data_dir);
+  (* Save prices for each symbol *)
+  List.iter prices_by_symbol ~f:(fun (symbol, prices) ->
+      let storage =
+        Csv.Csv_storage.create ~data_dir:test_data_dir symbol
+        |> ok_or_fail_status
+      in
+      ignore (Csv.Csv_storage.save storage prices |> ok_or_fail_status));
+  test_data_dir
+
+let teardown_test_data test_data_dir =
+  let dir_str = Fpath.to_string test_data_dir in
+  match Sys_unix.file_exists dir_str with
+  | `Yes -> ignore (Bos.OS.Dir.delete ~recurse:true test_data_dir)
+  | _ -> ()
+
 let sample_config =
   {
     start_date = date_of_string "2024-01-02";
@@ -25,28 +54,22 @@ let sample_config =
     commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
   }
 
-let sample_prices =
+let sample_aapl_prices =
   [
-    {
-      symbol = "AAPL";
-      prices =
-        [
-          make_daily_price
-            ~date:(date_of_string "2024-01-02")
-            ~open_price:150.0 ~high:155.0 ~low:149.0 ~close:154.0
-            ~volume:1000000;
-          make_daily_price
-            ~date:(date_of_string "2024-01-03")
-            ~open_price:154.0 ~high:158.0 ~low:153.0 ~close:157.0
-            ~volume:1200000;
-          make_daily_price
-            ~date:(date_of_string "2024-01-04")
-            ~open_price:157.0 ~high:160.0 ~low:155.0 ~close:159.0 ~volume:900000;
-        ];
-    };
+    make_daily_price
+      ~date:(date_of_string "2024-01-02")
+      ~open_price:150.0 ~high:155.0 ~low:149.0 ~close:154.0 ~volume:1000000;
+    make_daily_price
+      ~date:(date_of_string "2024-01-03")
+      ~open_price:154.0 ~high:158.0 ~low:153.0 ~close:157.0 ~volume:1200000;
+    make_daily_price
+      ~date:(date_of_string "2024-01-04")
+      ~open_price:157.0 ~high:160.0 ~low:155.0 ~close:159.0 ~volume:900000;
   ]
 
-let sample_deps = { prices = sample_prices }
+let make_sample_deps test_name =
+  let data_dir = setup_test_data test_name [ ("AAPL", sample_aapl_prices) ] in
+  ({ symbols = [ "AAPL" ]; data_dir }, data_dir)
 
 (* Helper to create expected step_result for comparison *)
 let make_expected_step_result ~date ~portfolio ~trades =
@@ -64,7 +87,8 @@ let is_completed f = function
 (* ==================== create tests ==================== *)
 
 let test_create_returns_simulator _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps, data_dir = make_sample_deps "create" in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -75,10 +99,13 @@ let test_create_returns_simulator _ =
   in
   assert_that (step sim)
     (is_ok_and_holds
-       (is_stepped (fun (_, result) -> assert_equal expected_result result)))
+       (is_stepped (fun (_, result) -> assert_equal expected_result result)));
+  teardown_test_data data_dir
 
-let test_create_with_empty_prices _ =
-  let sim = create ~config:sample_config ~deps:{ prices = [] } in
+let test_create_with_empty_symbols _ =
+  let data_dir = setup_test_data "empty_symbols" [] in
+  let deps = { symbols = []; data_dir } in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -89,12 +116,14 @@ let test_create_with_empty_prices _ =
   in
   assert_that (step sim)
     (is_ok_and_holds
-       (is_stepped (fun (_, result) -> assert_equal expected_result result)))
+       (is_stepped (fun (_, result) -> assert_equal expected_result result)));
+  teardown_test_data data_dir
 
 (* ==================== step tests ==================== *)
 
 let test_step_executes_market_order _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps, data_dir = make_sample_deps "market_order" in
+  let sim = create ~config:sample_config ~deps in
   (* Place a market order for AAPL *)
   let order_params =
     Trading_orders.Create_order.
@@ -113,7 +142,7 @@ let test_step_executes_market_order _ =
   in
   submit_orders sim [ order ] |> ignore;
   (* Step should execute the market order *)
-  match step sim with
+  (match step sim with
   | Error err -> failwith ("Step failed: " ^ Status.show err)
   | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
   | Ok (Stepped (_, result)) ->
@@ -129,10 +158,12 @@ let test_step_executes_market_order _ =
       in
       assert_that position
         (is_some_and (fun (pos : Trading_portfolio.Types.portfolio_position) ->
-             assert_that pos.symbol (equal_to "AAPL")))
+             assert_that pos.symbol (equal_to "AAPL"))));
+  teardown_test_data data_dir
 
 let test_limit_order_executes_on_later_day _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps, data_dir = make_sample_deps "limit_order" in
+  let sim = create ~config:sample_config ~deps in
   (* First, buy shares with a market order *)
   let buy_order_params =
     Trading_orders.Create_order.
@@ -176,7 +207,7 @@ let test_limit_order_executes_on_later_day _ =
   in
   submit_orders sim_after_buy [ sell_order ] |> ignore;
   (* Step on day 2 - sell order should execute *)
-  match step sim_after_buy with
+  (match step sim_after_buy with
   | Error err -> failwith ("Sell step failed: " ^ Status.show err)
   | Ok (Completed _) -> assert_failure "Expected Stepped on day 2"
   | Ok (Stepped (_, result)) ->
@@ -188,10 +219,12 @@ let test_limit_order_executes_on_later_day _ =
       let expected_cash =
         10000.0 -. (10.0 *. 150.0) -. 1.0 +. (10.0 *. 156.0) -. 1.0
       in
-      assert_that result.portfolio.current_cash (float_equal expected_cash)
+      assert_that result.portfolio.current_cash (float_equal expected_cash));
+  teardown_test_data data_dir
 
 let test_stop_order_executes_on_later_day _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps, data_dir = make_sample_deps "stop_order" in
+  let sim = create ~config:sample_config ~deps in
   (* Place a buy stop order at 156.0
      Day 1 (2024-01-02): high=155.0 - won't trigger (price never reaches 156.0)
      Day 2 (2024-01-03): open=154.0, high=158.0 - should trigger and execute *)
@@ -212,7 +245,7 @@ let test_stop_order_executes_on_later_day _ =
   in
   submit_orders sim [ order ] |> ignore;
   (* Step 1 - order should remain pending *)
-  match step sim with
+  (match step sim with
   | Error err -> failwith ("Step 1 failed: " ^ Status.show err)
   | Ok (Completed _) -> assert_failure "Expected Stepped on day 1"
   | Ok (Stepped (sim', result1)) -> (
@@ -232,10 +265,12 @@ let test_stop_order_executes_on_later_day _ =
           assert_bool
             (Printf.sprintf "Price %.2f should be in range [156.0, 158.0]"
                trade.price)
-            Float.(trade.price >= 156.0 && trade.price <= 158.0))
+            Float.(trade.price >= 156.0 && trade.price <= 158.0)));
+  teardown_test_data data_dir
 
 let test_order_fails_due_to_insufficient_cash _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps, data_dir = make_sample_deps "insufficient_cash" in
+  let sim = create ~config:sample_config ~deps in
   (* Place two market orders:
      1. Buy 60 shares at ~150.0 = 9000 + 1.0 commission = 9001
      2. Buy 10 shares at ~150.0 = 1500 + 1.0 commission = 1501
@@ -273,7 +308,7 @@ let test_order_fails_due_to_insufficient_cash _ =
   in
   submit_orders sim [ order1; order2 ] |> ignore;
   (* Step - first order should execute, second should fail *)
-  match step sim with
+  (match step sim with
   | Error err ->
       (* Portfolio.apply_trades should return error for insufficient cash *)
       let err_msg = Status.show err in
@@ -288,10 +323,12 @@ let test_order_fails_due_to_insufficient_cash _ =
       assert_that trade.quantity (float_equal 60.0);
       (* Cash should reflect only the first trade *)
       let expected_cash = 10000.0 -. (60.0 *. 150.0) -. 1.0 in
-      assert_that result.portfolio.current_cash (float_equal expected_cash)
+      assert_that result.portfolio.current_cash (float_equal expected_cash));
+  teardown_test_data data_dir
 
 let test_step_advances_date _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps, data_dir = make_sample_deps "advances_date" in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -312,9 +349,11 @@ let test_step_advances_date _ =
             assert_that (step sim')
               (is_ok_and_holds
                  (is_stepped (fun (_, result2) ->
-                      assert_equal expected_result2 result2))))))
+                      assert_equal expected_result2 result2))))));
+  teardown_test_data data_dir
 
 let test_step_returns_completed_when_done _ =
+  let deps, data_dir = make_sample_deps "completed" in
   let config =
     {
       sample_config with
@@ -322,19 +361,21 @@ let test_step_returns_completed_when_done _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps:sample_deps in
+  let sim = create ~config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
   assert_that (step sim)
     (is_ok_and_holds
        (is_completed (fun portfolio ->
-            assert_equal expected_portfolio portfolio)))
+            assert_equal expected_portfolio portfolio)));
+  teardown_test_data data_dir
 
 (* ==================== run tests ==================== *)
 
 let test_run_completes_simulation _ =
-  let sim = create ~config:sample_config ~deps:sample_deps in
+  let deps, data_dir = make_sample_deps "run_completes" in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -354,9 +395,11 @@ let test_run_completes_simulation _ =
   assert_that (run sim)
     (is_ok_and_holds (fun (steps, final_portfolio) ->
          assert_equal expected_steps steps;
-         assert_equal expected_portfolio final_portfolio))
+         assert_equal expected_portfolio final_portfolio));
+  teardown_test_data data_dir
 
 let test_run_on_already_complete _ =
+  let deps, data_dir = make_sample_deps "run_already_complete" in
   let config =
     {
       sample_config with
@@ -364,14 +407,15 @@ let test_run_on_already_complete _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps:sample_deps in
+  let sim = create ~config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
   assert_that (run sim)
     (is_ok_and_holds (fun (steps, final_portfolio) ->
          assert_that steps (size_is 0);
-         assert_equal expected_portfolio final_portfolio))
+         assert_equal expected_portfolio final_portfolio));
+  teardown_test_data data_dir
 
 (* ==================== Test Suite ==================== *)
 
@@ -379,7 +423,7 @@ let suite =
   "Simulator Tests"
   >::: [
          "create returns simulator" >:: test_create_returns_simulator;
-         "create with empty prices" >:: test_create_with_empty_prices;
+         "create with empty symbols" >:: test_create_with_empty_symbols;
          "step executes market order" >:: test_step_executes_market_order;
          "limit order executes on later day"
          >:: test_limit_order_executes_on_later_day;

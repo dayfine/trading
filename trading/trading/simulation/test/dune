@@ -7,7 +7,10 @@
   trading.base
   trading.engine
   types
-  matchers))
+  matchers
+  bos
+  csv
+  fpath))
 
 (test
  (name test_time_series)
