@@ -24,3 +24,7 @@
 (test
  (name test_indicator_manager)
  (libraries ounit2 core trading.simulation types matchers bos csv fpath))
+
+(test
+ (name test_market_data_adapter)
+ (libraries ounit2 core trading.simulation types matchers bos csv fpath))
