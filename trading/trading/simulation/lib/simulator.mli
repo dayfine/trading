@@ -41,8 +41,17 @@ type step_outcome =
 
 (** {1 Creation} *)
 
-val create : config:config -> deps:dependencies -> t
-(** Create a simulator from config and dependencies *)
+val create :
+  config:config ->
+  deps:dependencies ->
+  ?strategy:(module Trading_strategy.Strategy_interface.STRATEGY) ->
+  unit ->
+  t
+(** Create a simulator from config and dependencies.
+
+    @param config Simulation configuration (dates, cash, commission)
+    @param deps External dependencies (symbols, data directory)
+    @param strategy Optional trading strategy to run on each step *)
 
 (** {1 Running} *)
 

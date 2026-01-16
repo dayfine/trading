@@ -88,7 +88,7 @@ let is_completed f = function
 
 let test_create_returns_simulator _ =
   let deps, data_dir = make_sample_deps "create" in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -105,7 +105,7 @@ let test_create_returns_simulator _ =
 let test_create_with_empty_symbols _ =
   let data_dir = setup_test_data "empty_symbols" [] in
   let deps = { symbols = []; data_dir } in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -123,7 +123,7 @@ let test_create_with_empty_symbols _ =
 
 let test_step_executes_market_order _ =
   let deps, data_dir = make_sample_deps "market_order" in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   (* Place a market order for AAPL *)
   let order_params =
     Trading_orders.Create_order.
@@ -163,7 +163,7 @@ let test_step_executes_market_order _ =
 
 let test_limit_order_executes_on_later_day _ =
   let deps, data_dir = make_sample_deps "limit_order" in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   (* First, buy shares with a market order *)
   let buy_order_params =
     Trading_orders.Create_order.
@@ -224,7 +224,7 @@ let test_limit_order_executes_on_later_day _ =
 
 let test_stop_order_executes_on_later_day _ =
   let deps, data_dir = make_sample_deps "stop_order" in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   (* Place a buy stop order at 156.0
      Day 1 (2024-01-02): high=155.0 - won't trigger (price never reaches 156.0)
      Day 2 (2024-01-03): open=154.0, high=158.0 - should trigger and execute *)
@@ -270,7 +270,7 @@ let test_stop_order_executes_on_later_day _ =
 
 let test_order_fails_due_to_insufficient_cash _ =
   let deps, data_dir = make_sample_deps "insufficient_cash" in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   (* Place two market orders:
      1. Buy 60 shares at ~150.0 = 9000 + 1.0 commission = 9001
      2. Buy 10 shares at ~150.0 = 1500 + 1.0 commission = 1501
@@ -328,7 +328,7 @@ let test_order_fails_due_to_insufficient_cash _ =
 
 let test_step_advances_date _ =
   let deps, data_dir = make_sample_deps "advances_date" in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -361,7 +361,7 @@ let test_step_returns_completed_when_done _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create ~config ~deps () in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -375,7 +375,7 @@ let test_step_returns_completed_when_done _ =
 
 let test_run_completes_simulation _ =
   let deps, data_dir = make_sample_deps "run_completes" in
-  let sim = create ~config:sample_config ~deps in
+  let sim = create ~config:sample_config ~deps () in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -407,7 +407,7 @@ let test_run_on_already_complete _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create ~config ~deps () in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
