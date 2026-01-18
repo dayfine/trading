@@ -19,7 +19,6 @@ type dependencies = {
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
   market_data_adapter : Market_data_adapter.t;
-  positions : Trading_strategy.Position.t String.Map.t;
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission =
@@ -27,15 +26,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission =
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
   let market_data_adapter = Market_data_adapter.create ~data_dir in
-  {
-    symbols;
-    data_dir;
-    strategy;
-    engine;
-    order_manager;
-    market_data_adapter;
-    positions = String.Map.empty;
-  }
+  { symbols; data_dir; strategy; engine; order_manager; market_data_adapter }
 
 (** {1 Simulator Types} *)
 
@@ -55,6 +46,7 @@ and t = {
   deps : dependencies;
   current_date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
+  positions : Trading_strategy.Position.t String.Map.t;
 }
 
 (** {1 Creation} *)
@@ -63,7 +55,13 @@ let create ~config ~deps =
   let portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
   in
-  { config; deps; current_date = config.start_date; portfolio }
+  {
+    config;
+    deps;
+    current_date = config.start_date;
+    portfolio;
+    positions = String.Map.empty;
+  }
 
 (** {1 Running} *)
 
@@ -117,7 +115,7 @@ let _call_strategy t =
   let get_indicator = _make_get_indicator t in
   let open Result.Let_syntax in
   let%bind output =
-    S.on_market_close ~get_price ~get_indicator ~positions:t.deps.positions
+    S.on_market_close ~get_price ~get_indicator ~positions:t.positions
   in
   Ok output.transitions
 

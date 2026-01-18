@@ -21,8 +21,6 @@ type dependencies = {
   engine : Trading_engine.Engine.t;  (** Trade execution engine *)
   order_manager : Trading_orders.Manager.order_manager;  (** Order manager *)
   market_data_adapter : Market_data_adapter.t;  (** Market data provider *)
-  positions : Trading_strategy.Position.t String.Map.t;
-      (** Initial strategy positions *)
 }
 (** External dependencies injected into the simulator. The simulator lazily
     loads price data from CSV storage and executes the strategy on each step. *)
