@@ -5,6 +5,7 @@
   trading.base
   trading.portfolio
   trading.engine
+  trading.orders
   trading.strategy
   types
   indicators.time_period
@@ -19,7 +20,8 @@
   price_cache
   indicator_computer
   indicator_manager
-  market_data_adapter)
+  market_data_adapter
+  order_generator)
  (preprocess
   (pps
    ppx_let
