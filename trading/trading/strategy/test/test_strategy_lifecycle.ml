@@ -239,7 +239,7 @@ let test_complete_lifecycle _ =
       (DummyStrategy.on_market_close
          ~get_price:(fun sym ->
            if String.equal sym "TEST" then Some price_day1 else None)
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Strategy day 1"
   in
@@ -292,7 +292,7 @@ let test_complete_lifecycle _ =
       (DummyStrategy.on_market_close
          ~get_price:(fun sym ->
            if String.equal sym "TEST" then Some price_day2 else None)
-         ~get_indicator:(fun _ _ _ -> None)
+         ~get_indicator:(fun _ _ _ _ -> None)
          ~positions:!positions)
       "Strategy day 2"
   in

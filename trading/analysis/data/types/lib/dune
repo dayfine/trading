@@ -1,7 +1,7 @@
 (library
  (name types)
  (public_name types)
- (modules daily_price)
+ (modules daily_price cadence)
  (libraries core ppx_deriving.runtime)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq)))
+  (pps ppx_deriving.show ppx_deriving.eq ppx_hash ppx_sexp_conv ppx_compare)))

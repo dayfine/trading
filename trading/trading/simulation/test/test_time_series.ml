@@ -1,6 +1,6 @@
 open OUnit2
 open Core
-open Trading_simulation.Time_series
+open Trading_simulation
 open Matchers
 
 let default_volume = 1000
@@ -19,30 +19,31 @@ let make_test_price ~date ~price =
 
 (* Cadence type tests *)
 let test_cadence_equality _ =
-  assert_that Daily (equal_to (Daily : cadence));
-  assert_that Weekly (equal_to (Weekly : cadence));
-  assert_that Monthly (equal_to (Monthly : cadence));
-  assert_bool "Daily <> Weekly" (not (equal_cadence Daily Weekly))
+  let open Types.Cadence in
+  assert_that Daily (equal_to (Daily : t));
+  assert_that Weekly (equal_to (Weekly : t));
+  assert_that Monthly (equal_to (Monthly : t));
+  assert_bool "Daily <> Weekly" (not (equal Daily Weekly))
 
 (* is_period_end tests *)
 let test_is_period_end_daily _ =
   let monday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:11 in
   let friday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15 in
   assert_bool "Daily: Monday is period end"
-    (is_period_end ~cadence:Daily monday);
+    (Time_series.is_period_end ~cadence:Types.Cadence.Daily monday);
   assert_bool "Daily: Friday is period end"
-    (is_period_end ~cadence:Daily friday)
+    (Time_series.is_period_end ~cadence:Types.Cadence.Daily friday)
 
 let test_is_period_end_weekly _ =
   let monday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:11 in
   let wednesday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:13 in
   let friday = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15 in
   assert_bool "Weekly: Monday not period end"
-    (not (is_period_end ~cadence:Weekly monday));
+    (not (Time_series.is_period_end ~cadence:Types.Cadence.Weekly monday));
   assert_bool "Weekly: Wednesday not period end"
-    (not (is_period_end ~cadence:Weekly wednesday));
+    (not (Time_series.is_period_end ~cadence:Types.Cadence.Weekly wednesday));
   assert_bool "Weekly: Friday is period end"
-    (is_period_end ~cadence:Weekly friday)
+    (Time_series.is_period_end ~cadence:Types.Cadence.Weekly friday)
 
 let test_is_period_end_monthly _ =
   let mid_month = Date.create_exn ~y:2024 ~m:Month.Mar ~d:15 in
@@ -50,11 +51,11 @@ let test_is_period_end_monthly _ =
   let feb_last = Date.create_exn ~y:2024 ~m:Month.Feb ~d:29 in
   (* 2024 is leap year *)
   assert_bool "Monthly: Mid-month not period end"
-    (not (is_period_end ~cadence:Monthly mid_month));
+    (not (Time_series.is_period_end ~cadence:Types.Cadence.Monthly mid_month));
   assert_bool "Monthly: Last day of March is period end"
-    (is_period_end ~cadence:Monthly last_day);
+    (Time_series.is_period_end ~cadence:Types.Cadence.Monthly last_day);
   assert_bool "Monthly: Feb 29 (leap year) is period end"
-    (is_period_end ~cadence:Monthly feb_last)
+    (Time_series.is_period_end ~cadence:Types.Cadence.Monthly feb_last)
 
 (* convert_cadence tests *)
 let test_convert_cadence_daily _ =
@@ -71,7 +72,10 @@ let test_convert_cadence_daily _ =
         ~price:3.0;
     ]
   in
-  let result = convert_cadence prices ~cadence:Daily ~as_of_date:None in
+  let result =
+    Time_series.convert_cadence prices ~cadence:Types.Cadence.Daily
+      ~as_of_date:None
+  in
   assert_that result
     (elements_are
        [
@@ -126,7 +130,10 @@ let test_convert_cadence_weekly_complete _ =
       (* Friday *)
     ]
   in
-  let result = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
+  let result =
+    Time_series.convert_cadence prices ~cadence:Types.Cadence.Weekly
+      ~as_of_date:None
+  in
   (* Weekly bar properly aggregates OHLCV values *)
   assert_that result
     (elements_are
@@ -158,7 +165,10 @@ let test_convert_cadence_weekly_incomplete_excluded _ =
     ]
   in
   (* as_of_date=None means exclude incomplete weeks *)
-  let result = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
+  let result =
+    Time_series.convert_cadence prices ~cadence:Types.Cadence.Weekly
+      ~as_of_date:None
+  in
   assert_that result (elements_are [])
 
 let test_convert_cadence_weekly_incomplete_provisional _ =
@@ -176,7 +186,7 @@ let test_convert_cadence_weekly_incomplete_provisional _ =
   in
   (* as_of_date=Some means include provisional *)
   let result =
-    convert_cadence prices ~cadence:Weekly
+    Time_series.convert_cadence prices ~cadence:Types.Cadence.Weekly
       ~as_of_date:(Some (Date.create_exn ~y:2024 ~m:Month.Mar ~d:13))
   in
   (* Weekly bar aggregates incomplete week *)
@@ -218,7 +228,10 @@ let test_convert_cadence_weekly_mixed _ =
     ]
   in
   (* Exclude incomplete: only week 1 *)
-  let finalized = convert_cadence prices ~cadence:Weekly ~as_of_date:None in
+  let finalized =
+    Time_series.convert_cadence prices ~cadence:Types.Cadence.Weekly
+      ~as_of_date:None
+  in
   (* Weekly bars aggregate OHLCV values *)
   assert_that finalized
     (elements_are
@@ -237,7 +250,7 @@ let test_convert_cadence_weekly_mixed _ =
        ]);
   (* Include provisional: both weeks *)
   let provisional =
-    convert_cadence prices ~cadence:Weekly
+    Time_series.convert_cadence prices ~cadence:Types.Cadence.Weekly
       ~as_of_date:(Some (Date.create_exn ~y:2024 ~m:Month.Mar ~d:20))
   in
   assert_that provisional
@@ -276,7 +289,10 @@ let test_convert_cadence_monthly_todo _ =
         ~price:1.0;
     ]
   in
-  let result = convert_cadence prices ~cadence:Monthly ~as_of_date:None in
+  let result =
+    Time_series.convert_cadence prices ~cadence:Types.Cadence.Monthly
+      ~as_of_date:None
+  in
   (* Currently returns empty - this is a TODO *)
   assert_that result (elements_are [])
 

@@ -4,13 +4,6 @@ open Core
 
 (** {1 Input Types} *)
 
-type symbol_prices = {
-  symbol : string;
-  prices : Types.Daily_price.t list;  (** sorted by date, ascending *)
-}
-[@@deriving show, eq]
-(** Historical price data for a single symbol *)
-
 type config = {
   start_date : Date.t;
   end_date : Date.t;
@@ -20,8 +13,27 @@ type config = {
 [@@deriving show, eq]
 (** Configuration for running a simulation *)
 
-type dependencies = { prices : symbol_prices list }
-(** External dependencies injected into the simulator *)
+type dependencies = {
+  symbols : string list;  (** Watchlist of symbols to track *)
+  data_dir : Fpath.t;  (** Directory containing CSV price files *)
+  strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
+      (** Trading strategy to run on each step *)
+  engine : Trading_engine.Engine.t;  (** Trade execution engine *)
+  order_manager : Trading_orders.Manager.order_manager;  (** Order manager *)
+  market_data_adapter : Market_data_adapter.t;  (** Market data provider *)
+}
+(** External dependencies injected into the simulator. The simulator lazily
+    loads price data from CSV storage and executes the strategy on each step. *)
+
+val create_deps :
+  symbols:string list ->
+  data_dir:Fpath.t ->
+  strategy:(module Trading_strategy.Strategy_interface.STRATEGY) ->
+  commission:Trading_engine.Types.commission_config ->
+  dependencies
+(** Create standard dependencies with default engine, order manager, and
+    adapter. Use this for the common case; inject custom components directly
+    into the dependencies record for testing. *)
 
 (** {1 Simulator Types} *)
 
@@ -45,7 +57,10 @@ type step_outcome =
 (** {1 Creation} *)
 
 val create : config:config -> deps:dependencies -> t
-(** Create a simulator from config and dependencies *)
+(** Create a simulator from config and dependencies.
+
+    @param config Simulation configuration (dates, cash, commission)
+    @param deps External dependencies (symbols, data directory, strategy) *)
 
 (** {1 Running} *)
 

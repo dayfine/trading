@@ -5,6 +5,7 @@
   trading.base
   trading.portfolio
   trading.engine
+  trading.strategy
   types
   indicators.time_period
   indicators.ema

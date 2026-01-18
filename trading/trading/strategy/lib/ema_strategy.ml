@@ -98,7 +98,10 @@ let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
     ~(positions : Position.t String.Map.t) (symbol : string) :
     Position.transition option =
   let price_opt = get_price symbol in
-  let ema_opt = get_indicator symbol "EMA" config.ema_period in
+  (* Use Daily cadence for EMA computation *)
+  let ema_opt =
+    get_indicator symbol "EMA" config.ema_period Types.Cadence.Daily
+  in
   let active_position = Map.find positions symbol in
 
   match (price_opt, ema_opt, active_position) with

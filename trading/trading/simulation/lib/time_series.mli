@@ -1,30 +1,19 @@
 (** Time series utilities for simulation
 
-    This module provides time period abstraction for the simulator, delegating
-    to the proven time period conversion logic in analysis/.
-
-    {1 Overview}
-
-    The time_series module defines cadence types (Daily, Weekly, Monthly) and
-    provides conversion functions that delegate to the
-    analysis/technical/indicators/time_period module.
+    This module provides time period conversion for the simulator, delegating to
+    the proven time period conversion logic in analysis/.
 
     {1 Design Rationale}
 
     This is a thin wrapper that:
-    - Provides type-safe cadence abstraction
     - Delegates actual conversion to proven Conversion module
     - Centralizes time period logic for simulation layer *)
 
 open Core
 
-(** Time period for indicator computation *)
-type cadence = Daily | Weekly | Monthly
-[@@deriving show, eq, hash, sexp, compare]
-
 val convert_cadence :
   Types.Daily_price.t list ->
-  cadence:cadence ->
+  cadence:Types.Cadence.t ->
   as_of_date:Date.t option ->
   Types.Daily_price.t list
 (** Convert daily prices to specified cadence.
@@ -43,14 +32,17 @@ val convert_cadence :
     Examples:
     {[
       (* Complete weeks only *)
-      let weekly = convert_cadence daily_prices ~cadence:Weekly ~as_of_date:None
+      let weekly =
+        convert_cadence daily_prices ~cadence:Types.Cadence.Weekly
+          ~as_of_date:None
 
       (* Include provisional for Wednesday *)
       let provisional =
-        convert_cadence daily_prices ~cadence:Weekly ~as_of_date:(Some wed_date)
+        convert_cadence daily_prices ~cadence:Types.Cadence.Weekly
+          ~as_of_date:(Some wed_date)
     ]} *)
 
-val is_period_end : cadence:cadence -> Date.t -> bool
+val is_period_end : cadence:Types.Cadence.t -> Date.t -> bool
 (** Check if date is a period boundary.
 
     - Daily: Always true
