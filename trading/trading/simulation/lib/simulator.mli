@@ -16,9 +16,11 @@ type config = {
 type dependencies = {
   symbols : string list;  (** Watchlist of symbols to track *)
   data_dir : Fpath.t;  (** Directory containing CSV price files *)
+  strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
+      (** Trading strategy to run on each step *)
 }
 (** External dependencies injected into the simulator. The simulator lazily
-    loads price data from CSV storage. *)
+    loads price data from CSV storage and executes the strategy on each step. *)
 
 (** {1 Simulator Types} *)
 
@@ -41,17 +43,11 @@ type step_outcome =
 
 (** {1 Creation} *)
 
-val create :
-  config:config ->
-  deps:dependencies ->
-  ?strategy:(module Trading_strategy.Strategy_interface.STRATEGY) ->
-  unit ->
-  t
+val create : config:config -> deps:dependencies -> t
 (** Create a simulator from config and dependencies.
 
     @param config Simulation configuration (dates, cash, commission)
-    @param deps External dependencies (symbols, data directory)
-    @param strategy Optional trading strategy to run on each step *)
+    @param deps External dependencies (symbols, data directory, strategy) *)
 
 (** {1 Running} *)
 

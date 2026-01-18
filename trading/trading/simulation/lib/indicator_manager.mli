@@ -28,7 +28,7 @@ type t
 type indicator_spec = {
   name : string;  (** Indicator name: "EMA", "RSI", etc. *)
   period : int;  (** Period: 10, 20, 50, etc. *)
-  cadence : Time_series.cadence;  (** Time cadence: Daily, Weekly, Monthly *)
+  cadence : Types.Cadence.t;  (** Time cadence: Daily, Weekly, Monthly *)
 }
 [@@deriving show, eq]
 (** Specification for an indicator computation *)
@@ -57,8 +57,7 @@ val get_indicator :
     @return Some value if indicator can be computed, None if insufficient data
 *)
 
-val finalize_period :
-  t -> cadence:Time_series.cadence -> end_date:Date.t -> unit
+val finalize_period : t -> cadence:Types.Cadence.t -> end_date:Date.t -> unit
 (** Mark a period as finalized and invalidate provisional caches.
 
     Call this at period boundaries (e.g., Friday for weekly) to ensure

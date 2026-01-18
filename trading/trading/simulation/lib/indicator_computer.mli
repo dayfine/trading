@@ -16,7 +16,7 @@ val compute_ema :
   symbol:string ->
   prices:Types.Daily_price.t list ->
   period:int ->
-  cadence:Time_series.cadence ->
+  cadence:Types.Cadence.t ->
   ?as_of_date:Date.t ->
   unit ->
   (indicator_result, Status.t) Result.t

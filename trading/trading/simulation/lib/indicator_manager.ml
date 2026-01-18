@@ -1,10 +1,6 @@
 open Core
 
-type indicator_spec = {
-  name : string;
-  period : int;
-  cadence : Time_series.cadence;
-}
+type indicator_spec = { name : string; period : int; cadence : Types.Cadence.t }
 [@@deriving show, eq, hash, sexp, compare]
 
 type cache_key = { symbol : string; spec : indicator_spec; date : Date.t }
@@ -28,10 +24,10 @@ let create ~price_cache =
   }
 
 let _estimate_lookback_days ~period ~cadence =
-  match cadence with
-  | Time_series.Daily -> period + 10
-  | Time_series.Weekly -> (period * 7) + 50
-  | Time_series.Monthly -> (period * 30) + 100
+  match (cadence : Types.Cadence.t) with
+  | Daily -> period + 10
+  | Weekly -> (period * 7) + 50
+  | Monthly -> (period * 30) + 100
 
 let _is_provisional ~cadence ~date =
   not (Time_series.is_period_end ~cadence date)
@@ -78,7 +74,7 @@ let finalize_period t ~cadence ~end_date =
     Hashtbl.fold t.indicator_cache ~init:[] ~f:(fun ~key ~data acc ->
         if
           data.is_provisional
-          && Time_series.equal_cadence key.spec.cadence cadence
+          && Types.Cadence.equal key.spec.cadence cadence
           && Date.( <= ) key.date end_date
         then key :: acc
         else acc)

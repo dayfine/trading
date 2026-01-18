@@ -12,7 +12,11 @@ type config = {
 }
 [@@deriving show, eq]
 
-type dependencies = { symbols : string list; data_dir : Fpath.t }
+type dependencies = {
+  symbols : string list;
+  data_dir : Fpath.t;
+  strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
+}
 
 (** {1 Simulator Types} *)
 
@@ -34,21 +38,22 @@ and t = {
   portfolio : Trading_portfolio.Portfolio.t;
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
-  adapter : Market_data_adapter.t;
-  strategy : (module Trading_strategy.Strategy_interface.STRATEGY) option;
+  market_data_adapter : Market_data_adapter.t;
   positions : Trading_strategy.Position.t String.Map.t;
 }
 
 (** {1 Creation} *)
 
-let create ~config ~deps ?strategy () =
+let create ~config ~deps =
   let portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
   in
   let engine_config = { Trading_engine.Types.commission = config.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
-  let adapter = Market_data_adapter.create ~data_dir:deps.data_dir in
+  let market_data_adapter =
+    Market_data_adapter.create ~data_dir:deps.data_dir
+  in
   {
     config;
     deps;
@@ -56,8 +61,7 @@ let create ~config ~deps ?strategy () =
     portfolio;
     engine;
     order_manager;
-    adapter;
-    strategy;
+    market_data_adapter;
     positions = String.Map.empty;
   }
 
@@ -83,7 +87,8 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
 let _get_today_bars t =
   List.filter_map t.deps.symbols ~f:(fun symbol ->
       match
-        Market_data_adapter.get_price t.adapter ~symbol ~date:t.current_date
+        Market_data_adapter.get_price t.market_data_adapter ~symbol
+          ~date:t.current_date
       with
       | None -> None
       | Some daily_price -> Some (_to_price_bar symbol daily_price))
@@ -95,27 +100,26 @@ let _extract_trades reports =
 (** Create get_price function for strategy *)
 let _make_get_price t : Trading_strategy.Strategy_interface.get_price_fn =
  fun symbol ->
-  Market_data_adapter.get_price t.adapter ~symbol ~date:t.current_date
+  Market_data_adapter.get_price t.market_data_adapter ~symbol
+    ~date:t.current_date
 
 (** Create get_indicator function for strategy *)
 let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
     =
  fun symbol indicator_name period cadence ->
-  Market_data_adapter.get_indicator t.adapter ~symbol ~indicator_name ~period
-    ~cadence ~date:t.current_date
+  Market_data_adapter.get_indicator t.market_data_adapter ~symbol
+    ~indicator_name ~period ~cadence ~date:t.current_date
 
 (** Call strategy and get transitions *)
 let _call_strategy t =
-  match t.strategy with
-  | None -> Ok []
-  | Some (module S) ->
-      let get_price = _make_get_price t in
-      let get_indicator = _make_get_indicator t in
-      let open Result.Let_syntax in
-      let%bind output =
-        S.on_market_close ~get_price ~get_indicator ~positions:t.positions
-      in
-      Ok output.transitions
+  let (module S) = t.deps.strategy in
+  let get_price = _make_get_price t in
+  let get_indicator = _make_get_indicator t in
+  let open Result.Let_syntax in
+  let%bind output =
+    S.on_market_close ~get_price ~get_indicator ~positions:t.positions
+  in
+  Ok output.transitions
 
 let step t =
   if _is_complete t then Ok (Completed t.portfolio)

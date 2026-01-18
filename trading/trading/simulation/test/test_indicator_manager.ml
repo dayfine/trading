@@ -2,10 +2,7 @@ open OUnit2
 open Core
 open Trading_simulation
 open Matchers
-
-let ok_or_fail_status = function
-  | Ok x -> x
-  | Error (err : Status.t) -> failwith err.message
+open Test_helpers
 
 (** Generate daily prices for a date range with incrementing closes *)
 let generate_prices ~start_date ~num_days ~base_price =
@@ -22,52 +19,32 @@ let generate_prices ~start_date ~num_days ~base_price =
         adjusted_close = close;
       })
 
-let setup_test_data test_name =
-  let test_data_dir =
-    Fpath.v (Printf.sprintf "test_data/indicator_manager_%s" test_name)
-  in
-  let dir_str = Fpath.to_string test_data_dir in
-  (match Sys_unix.file_exists dir_str with
-  | `Yes -> ignore (Bos.OS.Dir.delete ~recurse:true test_data_dir)
-  | _ -> ());
-  ignore (Bos.OS.Dir.create ~path:true test_data_dir);
-
-  (* Generate 30 days of AAPL prices starting from Dec 1, 2023 *)
+(** Standard test prices for indicator tests *)
+let make_indicator_test_prices () =
   let aapl_prices =
     generate_prices
       ~start_date:(Date.create_exn ~y:2023 ~m:Month.Dec ~d:1)
       ~num_days:30 ~base_price:100.0
   in
-  let aapl_storage =
-    Csv.Csv_storage.create ~data_dir:test_data_dir "AAPL" |> ok_or_fail_status
-  in
-  ignore (Csv.Csv_storage.save aapl_storage aapl_prices |> ok_or_fail_status);
-
-  (* Generate 30 days of GOOGL prices *)
   let googl_prices =
     generate_prices
       ~start_date:(Date.create_exn ~y:2023 ~m:Month.Dec ~d:1)
       ~num_days:30 ~base_price:150.0
   in
-  let googl_storage =
-    Csv.Csv_storage.create ~data_dir:test_data_dir "GOOGL" |> ok_or_fail_status
-  in
-  ignore (Csv.Csv_storage.save googl_storage googl_prices |> ok_or_fail_status);
+  [ ("AAPL", aapl_prices); ("GOOGL", googl_prices) ]
 
-  test_data_dir
+let setup_indicator_test_data test_name =
+  setup_test_data
+    ("indicator_manager_" ^ test_name)
+    (make_indicator_test_prices ())
 
-let teardown_test_data test_data_dir =
-  let dir_str = Fpath.to_string test_data_dir in
-  match Sys_unix.file_exists dir_str with
-  | `Yes -> ignore (Bos.OS.Dir.delete ~recurse:true test_data_dir)
-  | _ -> ()
-
-let make_spec ?(name = "EMA") ?(period = 3) ?(cadence = Time_series.Daily) () =
+let make_spec ?(name = "EMA") ?(period = 3) ?(cadence = Types.Cadence.Daily) ()
+    =
   Indicator_manager.{ name; period; cadence }
 
 (** Test: basic indicator retrieval *)
 let test_get_indicator_basic _ =
-  let test_data_dir = setup_test_data "basic" in
+  let test_data_dir = setup_indicator_test_data "basic" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
@@ -87,7 +64,7 @@ let test_get_indicator_basic _ =
 
 (** Test: cache hit on second access *)
 let test_cache_hit _ =
-  let test_data_dir = setup_test_data "cache_hit" in
+  let test_data_dir = setup_indicator_test_data "cache_hit" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
@@ -115,13 +92,13 @@ let test_cache_hit _ =
 
 (** Test: mid-week access produces provisional value *)
 let test_provisional_value_mid_week _ =
-  let test_data_dir = setup_test_data "provisional" in
+  let test_data_dir = setup_indicator_test_data "provisional" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
   (* Dec 13, 2023 is a Wednesday *)
   let wed_date = Date.create_exn ~y:2023 ~m:Month.Dec ~d:13 in
-  let spec = make_spec ~cadence:Weekly ~period:2 () in
+  let spec = make_spec ~cadence:Types.Cadence.Weekly ~period:2 () in
 
   let result =
     Indicator_manager.get_indicator manager ~symbol:"AAPL" ~spec ~date:wed_date
@@ -138,13 +115,13 @@ let test_provisional_value_mid_week _ =
 
 (** Test: Friday access produces finalized value *)
 let test_finalized_value_friday _ =
-  let test_data_dir = setup_test_data "finalized" in
+  let test_data_dir = setup_indicator_test_data "finalized" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
   (* Dec 15, 2023 is a Friday *)
   let fri_date = Date.create_exn ~y:2023 ~m:Month.Dec ~d:15 in
-  let spec = make_spec ~cadence:Weekly ~period:2 () in
+  let spec = make_spec ~cadence:Types.Cadence.Weekly ~period:2 () in
 
   let result =
     Indicator_manager.get_indicator manager ~symbol:"AAPL" ~spec ~date:fri_date
@@ -162,13 +139,13 @@ let test_finalized_value_friday _ =
 
 (** Test: finalize_period clears provisional caches *)
 let test_finalize_period _ =
-  let test_data_dir = setup_test_data "finalize_period" in
+  let test_data_dir = setup_indicator_test_data "finalize_period" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
   (* Add a provisional entry (Wednesday) *)
   let wed_date = Date.create_exn ~y:2023 ~m:Month.Dec ~d:13 in
-  let spec = make_spec ~cadence:Weekly ~period:2 () in
+  let spec = make_spec ~cadence:Types.Cadence.Weekly ~period:2 () in
   let _ =
     Indicator_manager.get_indicator manager ~symbol:"AAPL" ~spec ~date:wed_date
   in
@@ -179,7 +156,8 @@ let test_finalize_period _ =
 
   (* Finalize the period *)
   let fri_date = Date.create_exn ~y:2023 ~m:Month.Dec ~d:15 in
-  Indicator_manager.finalize_period manager ~cadence:Weekly ~end_date:fri_date;
+  Indicator_manager.finalize_period manager ~cadence:Types.Cadence.Weekly
+    ~end_date:fri_date;
 
   (* Provisional entry should be cleared *)
   let total, provisional_after = Indicator_manager.cache_stats manager in
@@ -190,7 +168,7 @@ let test_finalize_period _ =
 
 (** Test: multiple symbols cached independently *)
 let test_multiple_symbols _ =
-  let test_data_dir = setup_test_data "multi_symbols" in
+  let test_data_dir = setup_indicator_test_data "multi_symbols" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
@@ -217,7 +195,7 @@ let test_multiple_symbols _ =
 
 (** Test: different periods cached separately *)
 let test_different_periods _ =
-  let test_data_dir = setup_test_data "diff_periods" in
+  let test_data_dir = setup_indicator_test_data "diff_periods" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
@@ -247,15 +225,15 @@ let test_different_periods _ =
 
 (** Test: different cadences cached separately *)
 let test_different_cadences _ =
-  let test_data_dir = setup_test_data "diff_cadences" in
+  let test_data_dir = setup_indicator_test_data "diff_cadences" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
   (* Dec 15, 2023 is a Friday - works for both daily and weekly *)
   let date = Date.create_exn ~y:2023 ~m:Month.Dec ~d:15 in
 
-  let spec_daily = make_spec ~cadence:Daily ~period:3 () in
-  let spec_weekly = make_spec ~cadence:Weekly ~period:2 () in
+  let spec_daily = make_spec ~cadence:Types.Cadence.Daily ~period:3 () in
+  let spec_weekly = make_spec ~cadence:Types.Cadence.Weekly ~period:2 () in
 
   let result_daily =
     Indicator_manager.get_indicator manager ~symbol:"AAPL" ~spec:spec_daily
@@ -280,7 +258,7 @@ let test_different_cadences _ =
 
 (** Test: clear_cache removes all entries *)
 let test_clear_cache _ =
-  let test_data_dir = setup_test_data "clear_cache" in
+  let test_data_dir = setup_indicator_test_data "clear_cache" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 
@@ -304,7 +282,7 @@ let test_clear_cache _ =
 
 (** Test: unknown indicator returns error *)
 let test_unknown_indicator _ =
-  let test_data_dir = setup_test_data "unknown" in
+  let test_data_dir = setup_indicator_test_data "unknown" in
   let price_cache = Price_cache.create ~data_dir:test_data_dir in
   let manager = Indicator_manager.create ~price_cache in
 

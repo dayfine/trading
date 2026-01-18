@@ -40,7 +40,7 @@ val get_indicator :
   symbol:string ->
   indicator_name:string ->
   period:int ->
-  cadence:Time_series.cadence ->
+  cadence:Types.Cadence.t ->
   date:Date.t ->
   float option
 (** Get indicator value for symbol at specified date.
@@ -52,8 +52,7 @@ val get_indicator :
     @param date Date to compute indicator for
     @return Some value if computed, None if insufficient data *)
 
-val finalize_period :
-  t -> cadence:Time_series.cadence -> end_date:Date.t -> unit
+val finalize_period : t -> cadence:Types.Cadence.t -> end_date:Date.t -> unit
 (** Finalize a period, invalidating provisional indicator caches.
 
     Call at period boundaries (e.g., Friday for weekly) to ensure subsequent

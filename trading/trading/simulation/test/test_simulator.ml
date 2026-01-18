@@ -2,6 +2,7 @@ open OUnit2
 open Core
 open Trading_simulation.Simulator
 open Matchers
+open Test_helpers
 
 let date_of_string s = Date.of_string s
 
@@ -16,35 +17,6 @@ let make_daily_price ~date ~open_price ~high ~low ~close ~volume =
       volume;
       adjusted_close = close;
     }
-
-let ok_or_fail_status = function
-  | Ok x -> x
-  | Error (err : Status.t) -> failwith err.message
-
-(** Set up test CSV data for a given test name *)
-let setup_test_data test_name prices_by_symbol =
-  let test_data_dir =
-    Fpath.v (Printf.sprintf "test_data/simulator_%s" test_name)
-  in
-  let dir_str = Fpath.to_string test_data_dir in
-  (match Sys_unix.file_exists dir_str with
-  | `Yes -> ignore (Bos.OS.Dir.delete ~recurse:true test_data_dir)
-  | _ -> ());
-  ignore (Bos.OS.Dir.create ~path:true test_data_dir);
-  (* Save prices for each symbol *)
-  List.iter prices_by_symbol ~f:(fun (symbol, prices) ->
-      let storage =
-        Csv.Csv_storage.create ~data_dir:test_data_dir symbol
-        |> ok_or_fail_status
-      in
-      ignore (Csv.Csv_storage.save storage prices |> ok_or_fail_status));
-  test_data_dir
-
-let teardown_test_data test_data_dir =
-  let dir_str = Fpath.to_string test_data_dir in
-  match Sys_unix.file_exists dir_str with
-  | `Yes -> ignore (Bos.OS.Dir.delete ~recurse:true test_data_dir)
-  | _ -> ()
 
 let sample_config =
   {
@@ -68,8 +40,11 @@ let sample_aapl_prices =
   ]
 
 let make_sample_deps test_name =
-  let data_dir = setup_test_data test_name [ ("AAPL", sample_aapl_prices) ] in
-  ({ symbols = [ "AAPL" ]; data_dir }, data_dir)
+  let data_dir =
+    setup_test_data ("simulator_" ^ test_name) [ ("AAPL", sample_aapl_prices) ]
+  in
+  ( { symbols = [ "AAPL" ]; data_dir; strategy = (module Noop_strategy) },
+    data_dir )
 
 (* Helper to create expected step_result for comparison *)
 let make_expected_step_result ~date ~portfolio ~trades =
@@ -88,7 +63,7 @@ let is_completed f = function
 
 let test_create_returns_simulator _ =
   let deps, data_dir = make_sample_deps "create" in
-  let sim = create ~config:sample_config ~deps () in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -103,9 +78,9 @@ let test_create_returns_simulator _ =
   teardown_test_data data_dir
 
 let test_create_with_empty_symbols _ =
-  let data_dir = setup_test_data "empty_symbols" [] in
-  let deps = { symbols = []; data_dir } in
-  let sim = create ~config:sample_config ~deps () in
+  let data_dir = setup_test_data "simulator_empty_symbols" [] in
+  let deps = { symbols = []; data_dir; strategy = (module Noop_strategy) } in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -123,7 +98,7 @@ let test_create_with_empty_symbols _ =
 
 let test_step_executes_market_order _ =
   let deps, data_dir = make_sample_deps "market_order" in
-  let sim = create ~config:sample_config ~deps () in
+  let sim = create ~config:sample_config ~deps in
   (* Place a market order for AAPL *)
   let order_params =
     Trading_orders.Create_order.
@@ -163,7 +138,7 @@ let test_step_executes_market_order _ =
 
 let test_limit_order_executes_on_later_day _ =
   let deps, data_dir = make_sample_deps "limit_order" in
-  let sim = create ~config:sample_config ~deps () in
+  let sim = create ~config:sample_config ~deps in
   (* First, buy shares with a market order *)
   let buy_order_params =
     Trading_orders.Create_order.
@@ -224,7 +199,7 @@ let test_limit_order_executes_on_later_day _ =
 
 let test_stop_order_executes_on_later_day _ =
   let deps, data_dir = make_sample_deps "stop_order" in
-  let sim = create ~config:sample_config ~deps () in
+  let sim = create ~config:sample_config ~deps in
   (* Place a buy stop order at 156.0
      Day 1 (2024-01-02): high=155.0 - won't trigger (price never reaches 156.0)
      Day 2 (2024-01-03): open=154.0, high=158.0 - should trigger and execute *)
@@ -270,7 +245,7 @@ let test_stop_order_executes_on_later_day _ =
 
 let test_order_fails_due_to_insufficient_cash _ =
   let deps, data_dir = make_sample_deps "insufficient_cash" in
-  let sim = create ~config:sample_config ~deps () in
+  let sim = create ~config:sample_config ~deps in
   (* Place two market orders:
      1. Buy 60 shares at ~150.0 = 9000 + 1.0 commission = 9001
      2. Buy 10 shares at ~150.0 = 1500 + 1.0 commission = 1501
@@ -328,7 +303,7 @@ let test_order_fails_due_to_insufficient_cash _ =
 
 let test_step_advances_date _ =
   let deps, data_dir = make_sample_deps "advances_date" in
-  let sim = create ~config:sample_config ~deps () in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -361,7 +336,7 @@ let test_step_returns_completed_when_done _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps () in
+  let sim = create ~config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -375,7 +350,7 @@ let test_step_returns_completed_when_done _ =
 
 let test_run_completes_simulation _ =
   let deps, data_dir = make_sample_deps "run_completes" in
-  let sim = create ~config:sample_config ~deps () in
+  let sim = create ~config:sample_config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
@@ -407,7 +382,7 @@ let test_run_on_already_complete _ =
       end_date = date_of_string "2024-01-02";
     }
   in
-  let sim = create ~config ~deps () in
+  let sim = create ~config ~deps in
   let expected_portfolio =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
   in
