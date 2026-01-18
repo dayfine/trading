@@ -40,7 +40,9 @@ let sample_aapl_prices =
   ]
 
 let make_deps data_dir =
-  { symbols = [ "AAPL" ]; data_dir; strategy = (module Noop_strategy) }
+  create_deps ~symbols:[ "AAPL" ] ~data_dir
+    ~strategy:(module Noop_strategy)
+    ~commission:sample_config.commission
 
 (* Helper to create expected step_result for comparison *)
 let make_expected_step_result ~date ~portfolio ~trades =
@@ -78,7 +80,9 @@ let test_create_returns_simulator _ =
 let test_create_with_empty_symbols _ =
   with_test_data "simulator_empty_symbols" [] ~f:(fun data_dir ->
       let deps =
-        { symbols = []; data_dir; strategy = (module Noop_strategy) }
+        create_deps ~symbols:[] ~data_dir
+          ~strategy:(module Noop_strategy)
+          ~commission:sample_config.commission
       in
       let sim = create ~config:sample_config ~deps in
       let expected_portfolio =

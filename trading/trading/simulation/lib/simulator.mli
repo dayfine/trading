@@ -18,9 +18,24 @@ type dependencies = {
   data_dir : Fpath.t;  (** Directory containing CSV price files *)
   strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
       (** Trading strategy to run on each step *)
+  engine : Trading_engine.Engine.t;  (** Trade execution engine *)
+  order_manager : Trading_orders.Manager.order_manager;  (** Order manager *)
+  market_data_adapter : Market_data_adapter.t;  (** Market data provider *)
+  positions : Trading_strategy.Position.t String.Map.t;
+      (** Initial strategy positions *)
 }
 (** External dependencies injected into the simulator. The simulator lazily
     loads price data from CSV storage and executes the strategy on each step. *)
+
+val create_deps :
+  symbols:string list ->
+  data_dir:Fpath.t ->
+  strategy:(module Trading_strategy.Strategy_interface.STRATEGY) ->
+  commission:Trading_engine.Types.commission_config ->
+  dependencies
+(** Create standard dependencies with default engine, order manager, and
+    adapter. Use this for the common case; inject custom components directly
+    into the dependencies record for testing. *)
 
 (** {1 Simulator Types} *)
 
