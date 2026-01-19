@@ -5,6 +5,7 @@
   trading.base
   trading.portfolio
   trading.engine
+  trading.orders
   trading.strategy
   types
   indicators.time_period
@@ -15,6 +16,7 @@
   core)
  (modules
   simulator
+  order_generator
   time_series
   price_cache
   indicator_computer
