@@ -48,3 +48,15 @@
  (name test_market_data_adapter)
  (modules test_market_data_adapter)
  (libraries ounit2 core trading.simulation types matchers bos csv fpath))
+
+(test
+ (name test_order_generator)
+ (modules test_order_generator)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.orders
+  trading.base
+  trading.strategy
+  matchers))

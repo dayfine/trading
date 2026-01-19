@@ -724,6 +724,10 @@ val transitions_to_orders :
 - `TriggerExit` → Market Sell order
 - Other transitions → No orders (state updates only)
 
+**TODO**: Orders should be StopLimit orders instead of Market orders. This will
+require passing entry_price/exit_price from transitions and determining
+appropriate limit prices. This will be addressed in a future change.
+
 **Tests for order generator** (6-7 tests):
 - `CreateEntering` → Buy order
 - `TriggerExit` → Sell order
