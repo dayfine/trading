@@ -119,50 +119,6 @@ let _call_strategy t =
   in
   Ok output.transitions
 
-(** Create a sell order for TriggerExit transition by looking up position
-    quantity *)
-let _make_exit_order t (transition : Trading_strategy.Position.transition) =
-  let open Trading_strategy.Position in
-  match transition.kind with
-  | TriggerExit _ -> (
-      (* Look up the position to get the quantity to sell *)
-      match Map.find t.positions transition.position_id with
-      | None -> Ok None (* Position not found, skip *)
-      | Some position -> (
-          match get_state position with
-          | Holding { quantity; _ } ->
-              let params : Trading_orders.Create_order.order_params =
-                {
-                  symbol = position.symbol;
-                  side = Trading_base.Types.Sell;
-                  order_type = Trading_base.Types.Market;
-                  quantity;
-                  time_in_force = Trading_orders.Types.Day;
-                }
-              in
-              let open Result.Let_syntax in
-              let%bind order =
-                Trading_orders.Create_order.create_order params
-              in
-              Ok (Some order)
-          | _ -> Ok None (* Position not in Holding state, skip *)))
-  | _ -> Ok None
-
-(** Convert transitions to orders, handling TriggerExit specially *)
-let _transitions_to_orders t transitions =
-  let open Result.Let_syntax in
-  (* First, get orders from CreateEntering transitions *)
-  let%bind entry_orders = Order_generator.transitions_to_orders transitions in
-  (* Then, handle TriggerExit transitions specially (need position lookup) *)
-  let%bind exit_orders =
-    List.fold_result transitions ~init:[] ~f:(fun acc transition ->
-        let%bind maybe_order = _make_exit_order t transition in
-        match maybe_order with
-        | Some order -> Ok (order :: acc)
-        | None -> Ok acc)
-  in
-  Ok (entry_orders @ List.rev exit_orders)
-
 let step t =
   if _is_complete t then Ok (Completed t.portfolio)
   else
@@ -184,7 +140,9 @@ let step t =
     (* Call strategy to get transitions *)
     let%bind transitions = _call_strategy t in
     (* Convert transitions to orders and submit for next day execution *)
-    let%bind orders = _transitions_to_orders t transitions in
+    let%bind orders =
+      Order_generator.transitions_to_orders ~positions:t.positions transitions
+    in
     let _order_statuses = submit_orders t orders in
     (* Create step result *)
     let step_result =
