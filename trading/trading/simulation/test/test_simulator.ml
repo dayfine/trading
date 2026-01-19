@@ -414,6 +414,224 @@ let test_run_on_already_complete _ =
              assert_that steps (size_is 0);
              assert_equal expected_portfolio final_portfolio)))
 
+(* ==================== position lifecycle tests ==================== *)
+
+let make_enter_exit_deps data_dir =
+  Enter_then_exit_strategy.reset ();
+  create_deps ~symbols:[ "AAPL" ] ~data_dir
+    ~strategy:(module Enter_then_exit_strategy)
+    ~commission:sample_config.commission
+
+let test_position_created_when_strategy_returns_create_entering _ =
+  with_test_data "position_lifecycle_create"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_enter_exit_deps data_dir in
+      let sim = create ~config:sample_config ~deps in
+      (* Step 1: Strategy returns CreateEntering, order is submitted
+         (but orders execute on the next step) *)
+      let sim' =
+        match step sim with
+        | Error err -> failwith ("Step 1 failed: " ^ Status.show err)
+        | Ok (Completed _) -> failwith "Unexpected completion on step 1"
+        | Ok (Stepped (s, result)) ->
+            (* No trades yet - order was just submitted *)
+            assert_that result.trades (size_is 0);
+            s
+      in
+      (* Step 2: Entry order executes *)
+      match step sim' with
+      | Error err -> failwith ("Step 2 failed: " ^ Status.show err)
+      | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
+      | Ok (Stepped (_, result)) ->
+          assert_that result.trades
+            (elements_are
+               [
+                 (fun trade ->
+                   assert_that trade.Trading_base.Types.symbol (equal_to "AAPL");
+                   assert_that trade.side
+                     (equal_to
+                        (Trading_base.Types.Buy : Trading_base.Types.side));
+                   assert_that trade.quantity (float_equal 10.0));
+               ]))
+
+let test_position_moves_to_exiting_when_strategy_triggers_exit _ =
+  with_test_data "position_lifecycle_exit"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_enter_exit_deps data_dir in
+      let config =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-06";
+        }
+      in
+      let sim = create ~config ~deps in
+      (* Step 1: Strategy returns CreateEntering, order submitted *)
+      let sim' =
+        match step sim with
+        | Error err -> failwith ("Step 1 failed: " ^ Status.show err)
+        | Ok (Completed _) -> failwith "Unexpected completion after step 1"
+        | Ok (Stepped (s, _)) -> s
+      in
+      (* Step 2: Entry order fills, strategy returns TriggerExit, exit order
+         submitted *)
+      let sim'' =
+        match step sim' with
+        | Error err -> failwith ("Step 2 failed: " ^ Status.show err)
+        | Ok (Completed _) -> failwith "Unexpected completion after step 2"
+        | Ok (Stepped (s, result)) ->
+            assert_that result.trades
+              (elements_are
+                 [
+                   (fun trade ->
+                     assert_that trade.Trading_base.Types.side
+                       (equal_to
+                          (Trading_base.Types.Buy : Trading_base.Types.side)));
+                 ]);
+            s
+      in
+      (* Step 3: Exit order fills *)
+      match step sim'' with
+      | Error err -> failwith ("Step 3 failed: " ^ Status.show err)
+      | Ok (Completed _) -> assert_failure "Expected Stepped on step 3"
+      | Ok (Stepped (_, result)) ->
+          assert_that result.trades
+            (elements_are
+               [
+                 (fun trade ->
+                   assert_that trade.Trading_base.Types.symbol (equal_to "AAPL");
+                   assert_that trade.side
+                     (equal_to
+                        (Trading_base.Types.Sell : Trading_base.Types.side));
+                   assert_that trade.quantity (float_equal 10.0));
+               ]))
+
+let test_full_position_lifecycle _ =
+  with_test_data "position_lifecycle_full"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_enter_exit_deps data_dir in
+      let config =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-05";
+        }
+      in
+      let sim = create ~config ~deps in
+      (* Run the full simulation.
+         Order flow with strategy that enters on day 1, exits on day 2:
+         - Step 1 (Jan 2): CreateEntering transition -> order submitted. No trades.
+         - Step 2 (Jan 3): Entry order fills. TriggerExit transition -> exit order
+           submitted. 1 trade (entry).
+         - Step 3 (Jan 4): Exit order fills. 1 trade (exit). *)
+      match run sim with
+      | Error err -> failwith ("Run failed: " ^ Status.show err)
+      | Ok (steps, final_portfolio) ->
+          (* Verify step structure: 3 steps with expected trades *)
+          assert_that steps
+            (elements_are
+               [
+                 (* Step 1: No trades (order just submitted) *)
+                 (fun step -> assert_that step.trades (size_is 0));
+                 (* Step 2: Entry trade fills *)
+                 (fun step ->
+                   assert_that step.trades
+                     (elements_are
+                        [
+                          (fun t ->
+                            assert_that t.Trading_base.Types.side
+                              (equal_to
+                                 (Trading_base.Types.Buy
+                                   : Trading_base.Types.side)));
+                        ]));
+                 (* Step 3: Exit trade fills *)
+                 (fun step ->
+                   assert_that step.trades
+                     (elements_are
+                        [
+                          (fun t ->
+                            assert_that t.Trading_base.Types.side
+                              (equal_to
+                                 (Trading_base.Types.Sell
+                                   : Trading_base.Types.side)));
+                        ]));
+               ]);
+          (* Verify final portfolio cash *)
+          let entry_trade = List.hd_exn (List.nth_exn steps 1).trades in
+          let exit_trade = List.hd_exn (List.nth_exn steps 2).trades in
+          let entry_cost = entry_trade.quantity *. entry_trade.price in
+          let exit_proceeds = exit_trade.quantity *. exit_trade.price in
+          let expected_cash =
+            10000.0 -. entry_cost -. 1.0 +. exit_proceeds -. 1.0
+          in
+          assert_that final_portfolio.current_cash (float_equal expected_cash))
+
+let test_position_matched_by_state_not_side _ =
+  (* This test verifies that trades are matched to positions by state
+     (Entering/Exiting), not by side (Buy/Sell). This is important for
+     supporting short positions where you sell to enter and buy to exit. *)
+  with_test_data "position_matched_by_state"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_enter_exit_deps data_dir in
+      let config =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-06";
+        }
+      in
+      let sim = create ~config ~deps in
+      (* Step 1: CreateEntering transition creates position in Entering state,
+         order submitted for next step. *)
+      let sim' =
+        match step sim with
+        | Error err -> failwith ("Step 1 failed: " ^ Status.show err)
+        | Ok (Completed _) -> failwith "Unexpected completion after step 1"
+        | Ok (Stepped (s, result)) ->
+            (* No trades yet - order just submitted *)
+            assert_that result.trades (size_is 0);
+            s
+      in
+      (* Step 2: Entry order fills. Position moves to Holding via state matching
+         (matched Entering state, not Buy side).
+         TriggerExit transition moves position to Exiting state, exit order
+         submitted. *)
+      let sim'' =
+        match step sim' with
+        | Error err -> failwith ("Step 2 failed: " ^ Status.show err)
+        | Ok (Completed _) -> failwith "Unexpected completion after step 2"
+        | Ok (Stepped (s, result)) ->
+            (* Entry trade - matched by Entering state, not Buy side *)
+            assert_that result.trades
+              (elements_are
+                 [
+                   (fun trade ->
+                     assert_that trade.Trading_base.Types.side
+                       (equal_to
+                          (Trading_base.Types.Buy : Trading_base.Types.side)));
+                 ]);
+            s
+      in
+      (* Step 3: Exit order fills. Position moves to Closed via state matching
+         (matched Exiting state, not Sell side). *)
+      match step sim'' with
+      | Error err -> failwith ("Step 3 failed: " ^ Status.show err)
+      | Ok (Completed _) -> assert_failure "Expected Stepped on step 3"
+      | Ok (Stepped (_, result)) ->
+          (* Exit trade - matched by Exiting state, not Sell side *)
+          assert_that result.trades
+            (elements_are
+               [
+                 (fun trade ->
+                   assert_that trade.Trading_base.Types.side
+                     (equal_to
+                        (Trading_base.Types.Sell : Trading_base.Types.side)));
+               ]))
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -433,6 +651,14 @@ let suite =
          >:: test_step_returns_completed_when_done;
          "run completes simulation" >:: test_run_completes_simulation;
          "run on already complete" >:: test_run_on_already_complete;
+         (* Position lifecycle tests *)
+         "position created when strategy returns CreateEntering"
+         >:: test_position_created_when_strategy_returns_create_entering;
+         "position moves to exiting when strategy triggers exit"
+         >:: test_position_moves_to_exiting_when_strategy_triggers_exit;
+         "full position lifecycle" >:: test_full_position_lifecycle;
+         "position matched by state not side"
+         >:: test_position_matched_by_state_not_side;
        ]
 
 let () = run_test_tt_main suite

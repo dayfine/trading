@@ -208,6 +208,14 @@ type t = {
 
 (** {1 Transitions} *)
 
+(** Who triggers a transition.
+
+    - [Strategy]: Returned from strategy's on_market_close (e.g.,
+      CreateEntering, TriggerExit, UpdateRiskParams)
+    - [Simulator]: Applied by simulator in response to order fills or timeouts
+      (e.g., EntryFill, EntryComplete, ExitFill, ExitComplete, CancelEntry) *)
+type transition_trigger = Strategy | Simulator [@@deriving show, eq]
+
 (** Transition-specific data - only what's unique to each transition *)
 type transition_kind =
   | CreateEntering of {
@@ -237,6 +245,13 @@ type transition = {
 }
 [@@deriving show, eq]
 (** Transition event with common fields normalized *)
+
+val trigger_of_kind : transition_kind -> transition_trigger
+(** Get the trigger type for a transition kind.
+
+    Strategy-triggered: CreateEntering, TriggerExit, UpdateRiskParams
+    Simulator-triggered: EntryFill, EntryComplete, ExitFill, ExitComplete,
+    CancelEntry *)
 
 (** {1 Position Operations} *)
 

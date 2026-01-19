@@ -81,6 +81,8 @@ type t = {
 
 (** {1 Transitions} *)
 
+type transition_trigger = Strategy | Simulator [@@deriving show, eq]
+
 type transition_kind =
   | CreateEntering of {
       symbol : string;
@@ -103,6 +105,11 @@ type transition = {
   kind : transition_kind;
 }
 [@@deriving show, eq]
+
+let trigger_of_kind = function
+  | CreateEntering _ | TriggerExit _ | UpdateRiskParams _ -> Strategy
+  | EntryFill _ | EntryComplete _ | ExitFill _ | ExitComplete | CancelEntry _ ->
+      Simulator
 
 (** {1 Helper Functions} *)
 

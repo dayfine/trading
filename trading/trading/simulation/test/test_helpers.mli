@@ -18,3 +18,14 @@ val with_test_data :
 
 module Noop_strategy : Trading_strategy.Strategy_interface.STRATEGY
 (** No-op strategy for tests that don't need strategy logic *)
+
+(** Strategy that creates a position on first call, exits on second call.
+
+    Used for testing position lifecycle: CreateEntering -> Holding -> Exiting ->
+    Closed *)
+module Enter_then_exit_strategy : sig
+  include Trading_strategy.Strategy_interface.STRATEGY
+
+  val reset : unit -> unit
+  (** Reset the internal call counter for test isolation *)
+end

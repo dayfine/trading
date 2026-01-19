@@ -170,6 +170,9 @@ The matchers library supports declarative, composable assertions. Follow these p
    ```
 
 3. **Use `elements_are` for comprehensive list validation:**
+
+   Prefer `equal_to` on whole records when possible:
+
    ```ocaml
    (* GOOD: Validates entire list structure with position-specific assertions *)
    assert_that path
@@ -186,6 +189,50 @@ The matchers library supports declarative, composable assertions. Follow these p
        assert_that p2 (equal_to { time = 0.5; price = 105.0 });
        assert_that p3 (equal_to { time = 1.0; price = 110.0 })
    | _ -> assert_failure "Expected 3 elements"
+   ```
+
+   Prefer `elements_are` over `size_is` + extraction, even when you can't
+   use `equal_to` (e.g., records with dynamic fields like IDs/timestamps):
+
+   ```ocaml
+   (* GOOD: elements_are groups assertions per element *)
+   assert_that result.trades
+     (elements_are [
+       (fun trade ->
+         assert_that trade.symbol (equal_to "AAPL");
+         assert_that trade.side (equal_to Buy));
+     ])
+
+   (* AVOID: size_is + extraction scatters related assertions *)
+   assert_that result.trades (size_is 1);
+   let trade = List.hd_exn result.trades in
+   assert_that trade.symbol (equal_to "AAPL");
+   assert_that trade.side (equal_to Buy)
+   ```
+
+   For hierarchical structures, use nested `elements_are` so assertion
+   structure mirrors data structure:
+
+   ```ocaml
+   (* GOOD: Nested structure shows parent-child relationships *)
+   assert_that steps
+     (elements_are [
+       (fun step -> assert_that step.trades (size_is 0));
+       (fun step ->
+         assert_that step.trades
+           (elements_are [
+             (fun t -> assert_that t.side (equal_to Buy));
+           ]));
+     ])
+
+   (* AVOID: Flat assertions lose hierarchical relationship *)
+   assert_that steps (size_is 2);
+   let step1 = List.nth_exn steps 0 in
+   assert_that step1.trades (size_is 0);
+   let step2 = List.nth_exn steps 1 in
+   assert_that step2.trades (size_is 1);
+   let trade = List.hd_exn step2.trades in
+   assert_that trade.side (equal_to Buy)
    ```
 
 4. **Use `field` matcher to extract and assert on record fields:**

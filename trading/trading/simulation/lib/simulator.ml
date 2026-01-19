@@ -129,7 +129,13 @@ let _find_position_by_symbol_state positions ~symbol ~state_match =
          then Some (id, pos)
          else None)
 
-(** Apply a fill to a position (works for both entry and exit fills) *)
+(** Apply a fill to a position (works for both entry and exit fills).
+
+    TODO: Upon EntryComplete, we should place stop-loss and take-profit orders
+    immediately based on risk_params. This requires either: 1. Returning the
+    orders to place alongside the updated position, or 2. Having the simulator
+    check for newly-Holding positions and place orders. For now, risk_params are
+    set to None and protective orders are not placed. *)
 let _apply_fill ~date ~position ~trade ~is_entry =
   let open Result.Let_syntax in
   let open Trading_strategy.Position in
@@ -165,36 +171,33 @@ let _apply_fill ~date ~position ~trade ~is_entry =
   let complete_trans = { position_id = pos.id; date; kind = complete_kind } in
   apply_transition pos complete_trans
 
-(** Update positions from trades *)
+(** Update positions from trades.
+
+    Matches trades to positions by symbol and position state (not trade side),
+    supporting both long positions (buy to enter, sell to exit) and short
+    positions (sell to enter, buy to exit). *)
 let _update_positions_from_trades ~date ~positions ~trades =
   let open Result.Let_syntax in
+  let open Trading_strategy.Position in
+  (* Cases to try: (state_match, is_entry) *)
+  let fill_cases =
+    [
+      ((function Entering _ -> true | _ -> false), true);
+      ((function Exiting _ -> true | _ -> false), false);
+    ]
+  in
   List.fold_result trades ~init:positions ~f:(fun acc trade ->
       let symbol = trade.Trading_base.Types.symbol in
-      match trade.Trading_base.Types.side with
-      | Buy -> (
-          match
-            _find_position_by_symbol_state acc ~symbol ~state_match:(function
-              | Entering _ -> true
-              | _ -> false)
-          with
-          | None -> Ok acc
-          | Some (id, pos) ->
-              let%bind updated =
-                _apply_fill ~date ~position:pos ~trade ~is_entry:true
-              in
-              Ok (Map.set acc ~key:id ~data:updated))
-      | Sell -> (
-          match
-            _find_position_by_symbol_state acc ~symbol ~state_match:(function
-              | Exiting _ -> true
-              | _ -> false)
-          with
-          | None -> Ok acc
-          | Some (id, pos) ->
-              let%bind updated =
-                _apply_fill ~date ~position:pos ~trade ~is_entry:false
-              in
-              Ok (Map.set acc ~key:id ~data:updated)))
+      let matched =
+        List.find_map fill_cases ~f:(fun (state_match, is_entry) ->
+            _find_position_by_symbol_state acc ~symbol ~state_match
+            |> Option.map ~f:(fun (id, pos) -> (id, pos, is_entry)))
+      in
+      match matched with
+      | Some (id, pos, is_entry) ->
+          let%bind updated = _apply_fill ~date ~position:pos ~trade ~is_entry in
+          Ok (Map.set acc ~key:id ~data:updated)
+      | None -> Ok acc)
 
 (** Apply transitions to positions (CreateEntering creates new, TriggerExit
     updates existing) *)

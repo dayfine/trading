@@ -24,10 +24,12 @@ let _transition_to_order ~positions
       _create_order ~symbol ~side:Trading_base.Types.Buy
         ~quantity:target_quantity
   | TriggerExit _ ->
+      (* After _apply_transitions, the position is in Exiting state, not Holding.
+         We look up the Exiting position to get the quantity to sell. *)
       Map.find positions transition.position_id
       |> Option.value_map ~default:(Ok None) ~f:(fun position ->
              match get_state position with
-             | Holding { quantity; _ } ->
+             | Exiting { quantity; _ } ->
                  _create_order ~symbol:position.symbol
                    ~side:Trading_base.Types.Sell ~quantity
              | _ -> Ok None)
