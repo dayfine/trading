@@ -223,6 +223,11 @@ type transition_kind =
       target_quantity : float;
       entry_price : float;
       reasoning : entry_reasoning;
+          (* TODO: Add [side : position_side] field (Long | Short) to support short
+         positions. The order_generator currently hardcodes Buy for entry, which
+         only works for long positions. With a side field:
+         - Long: Buy to enter, Sell to exit
+         - Short: Sell to enter, Buy to exit *)
     }  (** Strategy wants to create a new position in Entering state *)
   | EntryFill of { filled_quantity : float; fill_price : float }
       (** Entry order filled (partial or complete) *)

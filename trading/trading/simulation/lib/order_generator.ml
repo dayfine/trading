@@ -1,6 +1,13 @@
 (** Order generator - converts strategy transitions to trading orders
 
-    TODO: Orders should be StopLimit orders instead of Market orders. *)
+    TODO: Orders should be StopLimit orders instead of Market orders.
+
+    TODO: Support short positions. Currently hardcodes Buy for CreateEntering
+    and Sell for TriggerExit, which only works for long positions. To support
+    short positions: 1. Add a [side] field to [CreateEntering] in Position
+    module (Long | Short) 2. Use that side to determine entry order side (Buy
+    for Long, Sell for Short) 3. Use opposite side for exit orders (Sell for
+    Long, Buy for Short) *)
 
 open Core
 

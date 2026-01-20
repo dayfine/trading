@@ -191,10 +191,13 @@ let test_limit_order_executes_on_later_day _ =
       |> ignore;
       (* Step on day 2 - sell order should execute *)
       let _, result = step_exn sim_after_buy in
-      (* Trade executed *)
-      assert_that result.trades (size_is 1);
-      let trade = List.hd_exn result.trades in
-      assert_that trade.price (float_equal 156.0);
+      (* Trade executed at limit price *)
+      assert_that result.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.price (float_equal 156.0));
+           ]);
       (* Cash: started with 10000, bought 10@150 (-1501), sold 10@156 (+1559) *)
       let quantity = 10.0 in
       let buy_price = 150.0 in
@@ -240,14 +243,17 @@ let test_stop_order_executes_on_later_day _ =
       assert_that result1.portfolio.current_cash (float_equal 10000.0);
       (* Step 2 - order should execute *)
       let _, result2 = step_exn sim' in
-      (* Trade executed on day 2 *)
-      assert_that result2.trades (size_is 1);
-      let trade = List.hd_exn result2.trades in
-      (* Stop triggers at 156.0, fills between stop and day high (158.0) *)
-      assert_bool
-        (Printf.sprintf "Price %.2f should be in range [156.0, 158.0]"
-           trade.price)
-        Float.(trade.price >= 156.0 && trade.price <= 158.0))
+      (* Trade executed on day 2: stop triggers at 156.0, fills between stop
+         and day high (158.0) *)
+      assert_that result2.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_bool
+                 (Printf.sprintf "Price %.2f should be in range [156.0, 158.0]"
+                    trade.Trading_base.Types.price)
+                 Float.(trade.price >= 156.0 && trade.price <= 158.0));
+           ]))
 
 let test_order_fails_due_to_insufficient_cash _ =
   with_test_data "simulator_insufficient_cash"
@@ -302,10 +308,14 @@ let test_order_fails_due_to_insufficient_cash _ =
             (String.is_substring err_msg ~substring:"cash")
       | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
       | Ok (Stepped (_, result)) ->
-          (* Only one trade should have executed *)
-          assert_that result.trades (size_is 1);
-          let trade = List.hd_exn result.trades in
-          assert_that trade.quantity (float_equal 60.0);
+          (* Only first order (60 shares) should have executed *)
+          assert_that result.trades
+            (elements_are
+               [
+                 (fun trade ->
+                   assert_that trade.Trading_base.Types.quantity
+                     (float_equal 60.0));
+               ]);
           (* Cash should reflect only the first trade:
              10000 initial - (60 shares * 150 open price) - 1.0 commission *)
           let quantity = 60.0 in
