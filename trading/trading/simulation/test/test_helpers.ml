@@ -53,17 +53,46 @@ module Noop_strategy : Trading_strategy.Strategy_interface.STRATEGY = struct
     Ok { Trading_strategy.Strategy_interface.transitions = [] }
 end
 
-(** Strategy that creates a position on first call, exits on second call.
+(** Position side for parameterized strategies *)
+type position_side = Long | Short
+
+type enter_exit_config = {
+  side : position_side;
+  symbol : string;
+  target_quantity : float;
+  entry_price : float;
+}
+(** Configuration for enter-then-exit test strategy *)
+
+let default_enter_exit_config =
+  { side = Long; symbol = "AAPL"; target_quantity = 10.0; entry_price = 150.0 }
+
+(** Parameterized strategy that creates a position on first call, exits on
+    second call.
 
     Used for testing position lifecycle: CreateEntering -> Holding -> Exiting ->
-    Closed *)
-module Enter_then_exit_strategy : sig
+    Closed
+
+    Note: The order_generator currently only supports long positions (hardcodes
+    Buy for entry, Sell for exit). Short position support requires adding a side
+    field to CreateEntering. *)
+module Make_enter_then_exit_strategy (Config : sig
+  val config : enter_exit_config
+end) : sig
   include Trading_strategy.Strategy_interface.STRATEGY
 
   val reset : unit -> unit
   (** Reset the internal call counter for test isolation *)
+
+  val side : position_side
+  (** The position side this strategy uses *)
 end = struct
-  let name = "EnterThenExit"
+  let name =
+    match Config.config.side with
+    | Long -> "EnterThenExitLong"
+    | Short -> "EnterThenExitShort"
+
+  let side = Config.config.side
 
   (* Mutable call counter to track which day we're on *)
   let call_count = ref 0
@@ -73,32 +102,40 @@ end = struct
       ~(positions : Trading_strategy.Position.t String.Map.t) =
     call_count := !call_count + 1;
     let open Trading_strategy.Position in
+    let config = Config.config in
+    let position_id = config.symbol ^ "-1" in
     match !call_count with
     | 1 ->
-        (* Day 1: Create entering position for AAPL *)
+        (* Day 1: Create entering position *)
         Ok
           {
             Trading_strategy.Strategy_interface.transitions =
               [
                 {
-                  position_id = "AAPL-1";
+                  position_id;
                   date = Date.of_string "2024-01-02";
                   kind =
                     CreateEntering
                       {
-                        symbol = "AAPL";
-                        target_quantity = 10.0;
-                        entry_price = 150.0;
+                        symbol = config.symbol;
+                        target_quantity = config.target_quantity;
+                        entry_price = config.entry_price;
                         reasoning =
                           TechnicalSignal
-                            { indicator = "EMA"; description = "test entry" };
+                            {
+                              indicator = "EMA";
+                              description =
+                                (match config.side with
+                                | Long -> "test long entry"
+                                | Short -> "test short entry");
+                            };
                       };
                 };
               ];
           }
     | 2 -> (
         (* Day 2: Trigger exit for the position *)
-        match Map.find positions "AAPL-1" with
+        match Map.find positions position_id with
         | Some pos when not (is_closed pos) ->
             let exit_price =
               match get_state pos with
@@ -110,13 +147,19 @@ end = struct
                 Trading_strategy.Strategy_interface.transitions =
                   [
                     {
-                      position_id = "AAPL-1";
+                      position_id;
                       date = Date.of_string "2024-01-03";
                       kind =
                         TriggerExit
                           {
                             exit_reason =
-                              SignalReversal { description = "test exit" };
+                              SignalReversal
+                                {
+                                  description =
+                                    (match config.side with
+                                    | Long -> "test long exit"
+                                    | Short -> "test short exit");
+                                };
                             exit_price;
                           };
                     };
@@ -127,6 +170,23 @@ end = struct
         (* Subsequent days: no action *)
         Ok { Trading_strategy.Strategy_interface.transitions = [] }
 end
+
+(** Long position strategy - creates long position on day 1, exits on day 2 *)
+module Long_strategy = Make_enter_then_exit_strategy (struct
+  let config = default_enter_exit_config
+end)
+
+(** Short position strategy - creates short position on day 1, exits on day 2.
+
+    Note: Short positions are not yet fully supported by the order_generator,
+    which hardcodes Buy for entry and Sell for exit. This strategy is for future
+    use when short position support is added. *)
+module Short_strategy = Make_enter_then_exit_strategy (struct
+  let config = { default_enter_exit_config with side = Short }
+end)
+
+module Enter_then_exit_strategy = Long_strategy
+(** Backward-compatible alias for Long_strategy *)
 
 let step_exn sim =
   match Trading_simulation.Simulator.step sim with

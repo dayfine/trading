@@ -434,6 +434,16 @@ let test_position_created_when_strategy_returns_create_entering _ =
       let sim', result1 = step_exn sim in
       (* No trades yet - order was just submitted *)
       assert_that result1.trades is_empty;
+      (* Verify entry order was submitted *)
+      assert_that result1.orders_submitted
+        (elements_are
+           [
+             (fun order ->
+               assert_that order.Trading_orders.Types.symbol (equal_to "AAPL");
+               assert_that order.side
+                 (equal_to (Trading_base.Types.Buy : Trading_base.Types.side));
+               assert_that order.quantity (float_equal 10.0));
+           ]);
       (* Step 2: Entry order executes *)
       let _, result2 = step_exn sim' in
       (* Quantity 10.0 comes from Enter_then_exit_strategy.target_quantity *)
@@ -460,8 +470,9 @@ let test_position_moves_to_exiting_when_strategy_triggers_exit _ =
         }
       in
       let sim = create ~config ~deps in
-      (* Step 1: Strategy returns CreateEntering, order submitted *)
-      let sim', _ = step_exn sim in
+      (* Step 1: Strategy returns CreateEntering, entry order submitted *)
+      let sim', result1 = step_exn sim in
+      assert_that result1.orders_submitted (size_is 1);
       (* Step 2: Entry order fills, strategy returns TriggerExit, exit order
          submitted *)
       let sim'', result2 = step_exn sim' in
@@ -471,6 +482,15 @@ let test_position_moves_to_exiting_when_strategy_triggers_exit _ =
              (fun trade ->
                assert_that trade.Trading_base.Types.side
                  (equal_to (Trading_base.Types.Buy : Trading_base.Types.side)));
+           ]);
+      (* Verify exit order was submitted *)
+      assert_that result2.orders_submitted
+        (elements_are
+           [
+             (fun order ->
+               assert_that order.Trading_orders.Types.symbol (equal_to "AAPL");
+               assert_that order.side
+                 (equal_to (Trading_base.Types.Sell : Trading_base.Types.side)));
            ]);
       (* Step 3: Exit order fills *)
       let _, result3 = step_exn sim'' in
@@ -483,7 +503,9 @@ let test_position_moves_to_exiting_when_strategy_triggers_exit _ =
                assert_that trade.side
                  (equal_to (Trading_base.Types.Sell : Trading_base.Types.side));
                assert_that trade.quantity (float_equal 10.0));
-           ]))
+           ]);
+      (* No more orders after position closed *)
+      assert_that result3.orders_submitted is_empty)
 
 let test_full_position_lifecycle _ =
   with_test_data "position_lifecycle_full"
@@ -548,14 +570,27 @@ let test_full_position_lifecycle _ =
           in
           assert_that final_portfolio.current_cash (float_equal expected_cash))
 
+(** Helper to create deps with Long_strategy *)
+let make_long_strategy_deps data_dir =
+  Long_strategy.reset ();
+  create_deps ~symbols:[ "AAPL" ] ~data_dir
+    ~strategy:(module Long_strategy)
+    ~commission:sample_config.commission
+
 let test_position_matched_by_state_not_side _ =
   (* This test verifies that trades are matched to positions by state
      (Entering/Exiting), not by side (Buy/Sell). This is important for
-     supporting short positions where you sell to enter and buy to exit. *)
+     supporting short positions where you sell to enter and buy to exit.
+
+     Currently tests with Long_strategy only. When order_generator adds short
+     position support (side field in CreateEntering), add a parallel test with
+     Short_strategy to verify:
+     - Entry: Sell order fills, matched to Entering state
+     - Exit: Buy order fills, matched to Exiting state *)
   with_test_data "position_matched_by_state"
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
-      let deps = make_enter_exit_deps data_dir in
+      let deps = make_long_strategy_deps data_dir in
       let config =
         {
           sample_config with
@@ -569,6 +604,8 @@ let test_position_matched_by_state_not_side _ =
       let sim', result1 = step_exn sim in
       (* No trades yet - order just submitted *)
       assert_that result1.trades is_empty;
+      (* Entry order submitted - for long position, this is a Buy *)
+      assert_that result1.orders_submitted (size_is 1);
       (* Step 2: Entry order fills. Position moves to Holding via state matching
          (matched Entering state, not Buy side).
          TriggerExit transition moves position to Exiting state, exit order
@@ -582,6 +619,8 @@ let test_position_matched_by_state_not_side _ =
                assert_that trade.Trading_base.Types.side
                  (equal_to (Trading_base.Types.Buy : Trading_base.Types.side)));
            ]);
+      (* Exit order submitted - for long position, this is a Sell *)
+      assert_that result2.orders_submitted (size_is 1);
       (* Step 3: Exit order fills. Position moves to Closed via state matching
          (matched Exiting state, not Sell side). *)
       let _, result3 = step_exn sim'' in
@@ -592,7 +631,9 @@ let test_position_matched_by_state_not_side _ =
              (fun trade ->
                assert_that trade.Trading_base.Types.side
                  (equal_to (Trading_base.Types.Sell : Trading_base.Types.side)));
-           ]))
+           ]);
+      (* No more orders after position closed *)
+      assert_that result3.orders_submitted is_empty)
 
 (* ==================== Test Suite ==================== *)
 
