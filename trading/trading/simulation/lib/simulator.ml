@@ -34,6 +34,7 @@ type step_result = {
   date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
   trades : Trading_base.Types.trade list;
+  orders_submitted : Trading_orders.Types.order list;
 }
 [@@deriving show, eq]
 
@@ -65,8 +66,9 @@ let create ~config ~deps =
 
 (** {1 Running} *)
 
-let submit_orders t orders =
-  Trading_orders.Manager.submit_orders t.deps.order_manager orders
+let _submit_orders t orders =
+  let _ = Trading_orders.Manager.submit_orders t.deps.order_manager orders in
+  orders
 
 let _is_complete t = Date.( >= ) t.current_date t.config.end_date
 
@@ -245,9 +247,11 @@ let step t =
     let%bind orders =
       Order_generator.transitions_to_orders ~positions transitions
     in
-    let _ = submit_orders t orders in
+    let orders_submitted = _submit_orders t orders in
     (* Advance to next date *)
-    let step_result = { date = t.current_date; portfolio; trades } in
+    let step_result =
+      { date = t.current_date; portfolio; trades; orders_submitted }
+    in
     let next_date = Date.add_days t.current_date 1 in
     return
       (Stepped

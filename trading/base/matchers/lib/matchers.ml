@@ -171,3 +171,9 @@ let size_is expected_size list =
   if actual_size <> expected_size then
     assert_failure
       (Printf.sprintf "Expected size %d but got %d" expected_size actual_size)
+
+let is_empty list =
+  if not (List.is_empty list) then
+    assert_failure
+      (Printf.sprintf "Expected empty list but got %d elements"
+         (List.length list))

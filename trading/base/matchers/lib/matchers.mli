@@ -269,8 +269,12 @@ val size_is : int -> 'a list matcher
     Example:
     {[
       assert_that pending_orders (size_is 3)
-    ]}
+    ]} *)
+
+val is_empty : 'a list matcher
+(** [is_empty] creates a matcher that checks a list is empty.
+
+    Example:
     {[
-      assert_that completed_orders (size_is 0)
-      (* equivalent to equal_to [] *)
+      assert_that pending_orders is_empty
     ]} *)

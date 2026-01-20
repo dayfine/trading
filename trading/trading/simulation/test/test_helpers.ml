@@ -127,3 +127,9 @@ end = struct
         (* Subsequent days: no action *)
         Ok { Trading_strategy.Strategy_interface.transitions = [] }
 end
+
+let step_exn sim =
+  match Trading_simulation.Simulator.step sim with
+  | Error err -> failwith ("Step failed: " ^ Status.show err)
+  | Ok (Completed _) -> failwith "Expected Stepped but got Completed"
+  | Ok (Stepped (sim', result)) -> (sim', result)

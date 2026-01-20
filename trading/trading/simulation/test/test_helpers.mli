@@ -16,6 +16,12 @@ val with_test_data :
     @param prices_by_symbol List of (symbol, prices) pairs
     @param f Function to run with the test data directory *)
 
+val step_exn :
+  Trading_simulation.Simulator.t ->
+  Trading_simulation.Simulator.t * Trading_simulation.Simulator.step_result
+(** Step the simulator, expecting Stepped outcome. Fails if Completed or Error.
+*)
+
 module Noop_strategy : Trading_strategy.Strategy_interface.STRATEGY
 (** No-op strategy for tests that don't need strategy logic *)
 
