@@ -89,6 +89,16 @@ let make_holding_position ~position_id ~symbol ~quantity ~price =
   let complete_trans = make_entry_complete_transition ~position_id in
   apply_transition pos complete_trans |> Result.ok |> Option.value_exn
 
+(** Helper to create a position in Exiting state (for TriggerExit order tests).
+    In the actual simulator, the TriggerExit transition is applied before
+    order_generator is called, so the position is in Exiting state. *)
+let make_exiting_position ~position_id ~symbol ~quantity ~price ~exit_price =
+  let holding_pos =
+    make_holding_position ~position_id ~symbol ~quantity ~price
+  in
+  let exit_trans = make_trigger_exit_transition ~position_id ~exit_price in
+  apply_transition holding_pos exit_trans |> Result.ok |> Option.value_exn
+
 (* ==================== transitions_to_orders tests ==================== *)
 
 let test_empty_transitions_returns_empty_orders _ =
@@ -128,9 +138,11 @@ let test_trigger_exit_no_position_returns_empty _ =
   assert_that result (is_ok_and_holds (elements_are []))
 
 let test_trigger_exit_with_position_generates_sell_order _ =
+  (* In the simulator, TriggerExit transition is applied before order_generator
+     is called, so the position is in Exiting state when we generate orders. *)
   let position =
-    make_holding_position ~position_id:"AAPL-1" ~symbol:"AAPL" ~quantity:100.0
-      ~price:150.0
+    make_exiting_position ~position_id:"AAPL-1" ~symbol:"AAPL" ~quantity:100.0
+      ~price:150.0 ~exit_price:155.0
   in
   let positions = String.Map.singleton "AAPL-1" position in
   let transitions =

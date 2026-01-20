@@ -208,6 +208,14 @@ type t = {
 
 (** {1 Transitions} *)
 
+(** Who triggers a transition.
+
+    - [Strategy]: Returned from strategy's on_market_close (e.g.,
+      CreateEntering, TriggerExit, UpdateRiskParams)
+    - [Simulator]: Applied by simulator in response to order fills or timeouts
+      (e.g., EntryFill, EntryComplete, ExitFill, ExitComplete, CancelEntry) *)
+type transition_trigger = Strategy | Simulator [@@deriving show, eq]
+
 (** Transition-specific data - only what's unique to each transition *)
 type transition_kind =
   | CreateEntering of {
@@ -215,6 +223,11 @@ type transition_kind =
       target_quantity : float;
       entry_price : float;
       reasoning : entry_reasoning;
+          (* TODO: Add [side : position_side] field (Long | Short) to support short
+         positions. The order_generator currently hardcodes Buy for entry, which
+         only works for long positions. With a side field:
+         - Long: Buy to enter, Sell to exit
+         - Short: Sell to enter, Buy to exit *)
     }  (** Strategy wants to create a new position in Entering state *)
   | EntryFill of { filled_quantity : float; fill_price : float }
       (** Entry order filled (partial or complete) *)
@@ -237,6 +250,13 @@ type transition = {
 }
 [@@deriving show, eq]
 (** Transition event with common fields normalized *)
+
+val trigger_of_kind : transition_kind -> transition_trigger
+(** Get the trigger type for a transition kind.
+
+    Strategy-triggered: CreateEntering, TriggerExit, UpdateRiskParams
+    Simulator-triggered: EntryFill, EntryComplete, ExitFill, ExitComplete,
+    CancelEntry *)
 
 (** {1 Position Operations} *)
 

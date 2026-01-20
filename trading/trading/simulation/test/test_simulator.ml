@@ -45,8 +45,8 @@ let make_deps data_dir =
     ~commission:sample_config.commission
 
 (* Helper to create expected step_result for comparison *)
-let make_expected_step_result ~date ~portfolio ~trades =
-  { date; portfolio; trades }
+let make_expected_step_result ~date ~portfolio ~trades ~orders_submitted =
+  { date; portfolio; trades; orders_submitted }
 
 (* Custom matchers for step_outcome *)
 let is_stepped f = function
@@ -71,7 +71,7 @@ let test_create_returns_simulator _ =
       let expected_result =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
       in
       assert_that (step sim)
         (is_ok_and_holds
@@ -91,7 +91,7 @@ let test_create_with_empty_symbols _ =
       let expected_result =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
       in
       assert_that (step sim)
         (is_ok_and_holds
@@ -121,26 +121,26 @@ let test_step_executes_market_order _ =
         | Ok o -> o
         | Error err -> failwith ("Failed to create order: " ^ Status.show err)
       in
-      submit_orders sim [ order ] |> ignore;
+      Trading_orders.Manager.submit_orders deps.order_manager [ order ]
+      |> ignore;
       (* Step should execute the market order *)
-      match step sim with
-      | Error err -> failwith ("Step failed: " ^ Status.show err)
-      | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
-      | Ok (Stepped (_, result)) ->
-          (* Verify that trades were generated *)
-          assert_that result.trades (size_is 1);
-          (* Verify portfolio was updated with the trade *)
-          let expected_cash = 10000.0 -. (10.0 *. 150.0) -. 1.0 in
-          (* 150.0 is open price, 1.0 is commission *)
-          assert_that result.portfolio.current_cash (float_equal expected_cash);
-          (* Verify position was created for AAPL *)
-          let position =
-            Trading_portfolio.Portfolio.get_position result.portfolio "AAPL"
-          in
-          assert_that position
-            (is_some_and
-               (fun (pos : Trading_portfolio.Types.portfolio_position) ->
-                 assert_that pos.symbol (equal_to "AAPL"))))
+      let _, result = step_exn sim in
+      (* Verify that trades were generated *)
+      assert_that result.trades (size_is 1);
+      (* Verify portfolio was updated with the trade:
+         10000 initial - (10 shares * 150 open price) - 1.0 min commission *)
+      let quantity = 10.0 in
+      let open_price = 150.0 in
+      let commission = 1.0 in
+      let expected_cash = 10000.0 -. (quantity *. open_price) -. commission in
+      assert_that result.portfolio.current_cash (float_equal expected_cash);
+      (* Verify position was created for AAPL *)
+      let position =
+        Trading_portfolio.Portfolio.get_position result.portfolio "AAPL"
+      in
+      assert_that position
+        (is_some_and (fun (pos : Trading_portfolio.Types.portfolio_position) ->
+             assert_that pos.symbol (equal_to "AAPL"))))
 
 let test_limit_order_executes_on_later_day _ =
   with_test_data "simulator_limit_order"
@@ -165,14 +165,10 @@ let test_limit_order_executes_on_later_day _ =
         | Error err ->
             failwith ("Failed to create buy order: " ^ Status.show err)
       in
-      submit_orders sim [ buy_order ] |> ignore;
+      Trading_orders.Manager.submit_orders deps.order_manager [ buy_order ]
+      |> ignore;
       (* Execute the buy on day 1 *)
-      let sim_after_buy =
-        match step sim with
-        | Error err -> failwith ("Buy step failed: " ^ Status.show err)
-        | Ok (Completed _) -> failwith "Unexpected completion after buy"
-        | Ok (Stepped (s, _)) -> s
-      in
+      let sim_after_buy, _ = step_exn sim in
       (* Now place a sell limit order at 156.0
          Day 2 (2024-01-03): high=158.0 - should execute at 156.0 *)
       let sell_order_params =
@@ -191,21 +187,27 @@ let test_limit_order_executes_on_later_day _ =
         | Error err ->
             failwith ("Failed to create sell order: " ^ Status.show err)
       in
-      submit_orders sim_after_buy [ sell_order ] |> ignore;
+      Trading_orders.Manager.submit_orders deps.order_manager [ sell_order ]
+      |> ignore;
       (* Step on day 2 - sell order should execute *)
-      match step sim_after_buy with
-      | Error err -> failwith ("Sell step failed: " ^ Status.show err)
-      | Ok (Completed _) -> assert_failure "Expected Stepped on day 2"
-      | Ok (Stepped (_, result)) ->
-          (* Trade executed *)
-          assert_that result.trades (size_is 1);
-          let trade = List.hd_exn result.trades in
-          assert_that trade.price (float_equal 156.0);
-          (* Cash: started with 10000, bought 10@150 (-1501), sold 10@156 (+1559) *)
-          let expected_cash =
-            10000.0 -. (10.0 *. 150.0) -. 1.0 +. (10.0 *. 156.0) -. 1.0
-          in
-          assert_that result.portfolio.current_cash (float_equal expected_cash))
+      let _, result = step_exn sim_after_buy in
+      (* Trade executed at limit price *)
+      assert_that result.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.price (float_equal 156.0));
+           ]);
+      (* Cash: started with 10000, bought 10@150 (-1501), sold 10@156 (+1559) *)
+      let quantity = 10.0 in
+      let buy_price = 150.0 in
+      let sell_price = 156.0 in
+      let commission = 1.0 in
+      let expected_cash =
+        10000.0 -. (quantity *. buy_price) -. commission
+        +. (quantity *. sell_price) -. commission
+      in
+      assert_that result.portfolio.current_cash (float_equal expected_cash))
 
 let test_stop_order_executes_on_later_day _ =
   with_test_data "simulator_stop_order"
@@ -231,29 +233,27 @@ let test_stop_order_executes_on_later_day _ =
         | Ok o -> o
         | Error err -> failwith ("Failed to create order: " ^ Status.show err)
       in
-      submit_orders sim [ order ] |> ignore;
+      Trading_orders.Manager.submit_orders deps.order_manager [ order ]
+      |> ignore;
       (* Step 1 - order should remain pending *)
-      match step sim with
-      | Error err -> failwith ("Step 1 failed: " ^ Status.show err)
-      | Ok (Completed _) -> assert_failure "Expected Stepped on day 1"
-      | Ok (Stepped (sim', result1)) -> (
-          (* No trades on day 1 *)
-          assert_that result1.trades (size_is 0);
-          (* Cash unchanged *)
-          assert_that result1.portfolio.current_cash (float_equal 10000.0);
-          (* Step 2 - order should execute *)
-          match step sim' with
-          | Error err -> failwith ("Step 2 failed: " ^ Status.show err)
-          | Ok (Completed _) -> assert_failure "Expected Stepped on day 2"
-          | Ok (Stepped (_, result2)) ->
-              (* Trade executed on day 2 *)
-              assert_that result2.trades (size_is 1);
-              let trade = List.hd_exn result2.trades in
-              (* Stop triggers at 156.0, fills between stop and day high (158.0) *)
-              assert_bool
-                (Printf.sprintf "Price %.2f should be in range [156.0, 158.0]"
-                   trade.price)
-                Float.(trade.price >= 156.0 && trade.price <= 158.0)))
+      let sim', result1 = step_exn sim in
+      (* No trades on day 1 *)
+      assert_that result1.trades is_empty;
+      (* Cash unchanged *)
+      assert_that result1.portfolio.current_cash (float_equal 10000.0);
+      (* Step 2 - order should execute *)
+      let _, result2 = step_exn sim' in
+      (* Trade executed on day 2: stop triggers at 156.0, fills between stop
+         and day high (158.0) *)
+      assert_that result2.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_bool
+                 (Printf.sprintf "Price %.2f should be in range [156.0, 158.0]"
+                    trade.Trading_base.Types.price)
+                 Float.(trade.price >= 156.0 && trade.price <= 158.0));
+           ]))
 
 let test_order_fails_due_to_insufficient_cash _ =
   with_test_data "simulator_insufficient_cash"
@@ -296,7 +296,8 @@ let test_order_fails_due_to_insufficient_cash _ =
         | Ok o -> o
         | Error err -> failwith ("Failed to create order2: " ^ Status.show err)
       in
-      submit_orders sim [ order1; order2 ] |> ignore;
+      Trading_orders.Manager.submit_orders deps.order_manager [ order1; order2 ]
+      |> ignore;
       (* Step - first order should execute, second should fail *)
       match step sim with
       | Error err ->
@@ -307,12 +308,22 @@ let test_order_fails_due_to_insufficient_cash _ =
             (String.is_substring err_msg ~substring:"cash")
       | Ok (Completed _) -> assert_failure "Expected Stepped, got Completed"
       | Ok (Stepped (_, result)) ->
-          (* Only one trade should have executed *)
-          assert_that result.trades (size_is 1);
-          let trade = List.hd_exn result.trades in
-          assert_that trade.quantity (float_equal 60.0);
-          (* Cash should reflect only the first trade *)
-          let expected_cash = 10000.0 -. (60.0 *. 150.0) -. 1.0 in
+          (* Only first order (60 shares) should have executed *)
+          assert_that result.trades
+            (elements_are
+               [
+                 (fun trade ->
+                   assert_that trade.Trading_base.Types.quantity
+                     (float_equal 60.0));
+               ]);
+          (* Cash should reflect only the first trade:
+             10000 initial - (60 shares * 150 open price) - 1.0 commission *)
+          let quantity = 60.0 in
+          let open_price = 150.0 in
+          let commission = 1.0 in
+          let expected_cash =
+            10000.0 -. (quantity *. open_price) -. commission
+          in
           assert_that result.portfolio.current_cash (float_equal expected_cash))
 
 let test_step_advances_date _ =
@@ -327,12 +338,12 @@ let test_step_advances_date _ =
       let expected_result1 =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
       in
       let expected_result2 =
         make_expected_step_result
           ~date:(date_of_string "2024-01-03")
-          ~portfolio:expected_portfolio ~trades:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
       in
       assert_that (step sim)
         (is_ok_and_holds
@@ -379,13 +390,13 @@ let test_run_completes_simulation _ =
         [
           make_expected_step_result
             ~date:(date_of_string "2024-01-02")
-            ~portfolio:expected_portfolio ~trades:[];
+            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[];
           make_expected_step_result
             ~date:(date_of_string "2024-01-03")
-            ~portfolio:expected_portfolio ~trades:[];
+            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[];
           make_expected_step_result
             ~date:(date_of_string "2024-01-04")
-            ~portfolio:expected_portfolio ~trades:[];
+            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[];
         ]
       in
       assert_that (run sim)
@@ -414,6 +425,226 @@ let test_run_on_already_complete _ =
              assert_that steps (size_is 0);
              assert_equal expected_portfolio final_portfolio)))
 
+(* ==================== position lifecycle tests ==================== *)
+
+let make_enter_exit_deps data_dir =
+  Enter_then_exit_strategy.reset ();
+  create_deps ~symbols:[ "AAPL" ] ~data_dir
+    ~strategy:(module Enter_then_exit_strategy)
+    ~commission:sample_config.commission
+
+let test_position_created_when_strategy_returns_create_entering _ =
+  with_test_data "position_lifecycle_create"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_enter_exit_deps data_dir in
+      let sim = create ~config:sample_config ~deps in
+      (* Step 1: Strategy returns CreateEntering, order is submitted
+         (but orders execute on the next step) *)
+      let sim', result1 = step_exn sim in
+      (* No trades yet - order was just submitted *)
+      assert_that result1.trades is_empty;
+      (* Verify entry order was submitted *)
+      assert_that result1.orders_submitted
+        (elements_are
+           [
+             (fun order ->
+               assert_that order.Trading_orders.Types.symbol (equal_to "AAPL");
+               assert_that order.side
+                 (equal_to (Trading_base.Types.Buy : Trading_base.Types.side));
+               assert_that order.quantity (float_equal 10.0));
+           ]);
+      (* Step 2: Entry order executes *)
+      let _, result2 = step_exn sim' in
+      (* Quantity 10.0 comes from Enter_then_exit_strategy.target_quantity *)
+      assert_that result2.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.symbol (equal_to "AAPL");
+               assert_that trade.side
+                 (equal_to (Trading_base.Types.Buy : Trading_base.Types.side));
+               assert_that trade.quantity (float_equal 10.0));
+           ]))
+
+let test_position_moves_to_exiting_when_strategy_triggers_exit _ =
+  with_test_data "position_lifecycle_exit"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_enter_exit_deps data_dir in
+      let config =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-06";
+        }
+      in
+      let sim = create ~config ~deps in
+      (* Step 1: Strategy returns CreateEntering, entry order submitted *)
+      let sim', result1 = step_exn sim in
+      assert_that result1.orders_submitted (size_is 1);
+      (* Step 2: Entry order fills, strategy returns TriggerExit, exit order
+         submitted *)
+      let sim'', result2 = step_exn sim' in
+      assert_that result2.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.side
+                 (equal_to (Trading_base.Types.Buy : Trading_base.Types.side)));
+           ]);
+      (* Verify exit order was submitted *)
+      assert_that result2.orders_submitted
+        (elements_are
+           [
+             (fun order ->
+               assert_that order.Trading_orders.Types.symbol (equal_to "AAPL");
+               assert_that order.side
+                 (equal_to (Trading_base.Types.Sell : Trading_base.Types.side)));
+           ]);
+      (* Step 3: Exit order fills *)
+      let _, result3 = step_exn sim'' in
+      (* Quantity 10.0 comes from Enter_then_exit_strategy.target_quantity *)
+      assert_that result3.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.symbol (equal_to "AAPL");
+               assert_that trade.side
+                 (equal_to (Trading_base.Types.Sell : Trading_base.Types.side));
+               assert_that trade.quantity (float_equal 10.0));
+           ]);
+      (* No more orders after position closed *)
+      assert_that result3.orders_submitted is_empty)
+
+let test_full_position_lifecycle _ =
+  with_test_data "position_lifecycle_full"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_enter_exit_deps data_dir in
+      let config =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-05";
+        }
+      in
+      let sim = create ~config ~deps in
+      (* Run the full simulation.
+         Order flow with strategy that enters on day 1, exits on day 2:
+         - Step 1 (Jan 2): CreateEntering transition -> order submitted. No trades.
+         - Step 2 (Jan 3): Entry order fills. TriggerExit transition -> exit order
+           submitted. 1 trade (entry).
+         - Step 3 (Jan 4): Exit order fills. 1 trade (exit). *)
+      match run sim with
+      | Error err -> failwith ("Run failed: " ^ Status.show err)
+      | Ok (steps, final_portfolio) ->
+          (* Verify step structure: 3 steps with expected trades *)
+          assert_that steps
+            (elements_are
+               [
+                 (* Step 1: No trades (order just submitted) *)
+                 (fun step -> assert_that step.trades is_empty);
+                 (* Step 2: Entry trade fills *)
+                 (fun step ->
+                   assert_that step.trades
+                     (elements_are
+                        [
+                          (fun t ->
+                            assert_that t.Trading_base.Types.side
+                              (equal_to
+                                 (Trading_base.Types.Buy
+                                   : Trading_base.Types.side)));
+                        ]));
+                 (* Step 3: Exit trade fills *)
+                 (fun step ->
+                   assert_that step.trades
+                     (elements_are
+                        [
+                          (fun t ->
+                            assert_that t.Trading_base.Types.side
+                              (equal_to
+                                 (Trading_base.Types.Sell
+                                   : Trading_base.Types.side)));
+                        ]));
+               ]);
+          (* Verify final portfolio cash:
+             initial - (quantity * entry_price) - commission + (quantity * exit_price) - commission *)
+          let entry_trade = List.hd_exn (List.nth_exn steps 1).trades in
+          let exit_trade = List.hd_exn (List.nth_exn steps 2).trades in
+          let commission = 1.0 in
+          let entry_cost = entry_trade.quantity *. entry_trade.price in
+          let exit_proceeds = exit_trade.quantity *. exit_trade.price in
+          let expected_cash =
+            10000.0 -. entry_cost -. commission +. exit_proceeds -. commission
+          in
+          assert_that final_portfolio.current_cash (float_equal expected_cash))
+
+(** Helper to create deps with Long_strategy *)
+let make_long_strategy_deps data_dir =
+  Long_strategy.reset ();
+  create_deps ~symbols:[ "AAPL" ] ~data_dir
+    ~strategy:(module Long_strategy)
+    ~commission:sample_config.commission
+
+let test_position_matched_by_state_not_side _ =
+  (* This test verifies that trades are matched to positions by state
+     (Entering/Exiting), not by side (Buy/Sell). This is important for
+     supporting short positions where you sell to enter and buy to exit.
+
+     Currently tests with Long_strategy only. When order_generator adds short
+     position support (side field in CreateEntering), add a parallel test with
+     Short_strategy to verify:
+     - Entry: Sell order fills, matched to Entering state
+     - Exit: Buy order fills, matched to Exiting state *)
+  with_test_data "position_matched_by_state"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_long_strategy_deps data_dir in
+      let config =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-06";
+        }
+      in
+      let sim = create ~config ~deps in
+      (* Step 1: CreateEntering transition creates position in Entering state,
+         order submitted for next step. *)
+      let sim', result1 = step_exn sim in
+      (* No trades yet - order just submitted *)
+      assert_that result1.trades is_empty;
+      (* Entry order submitted - for long position, this is a Buy *)
+      assert_that result1.orders_submitted (size_is 1);
+      (* Step 2: Entry order fills. Position moves to Holding via state matching
+         (matched Entering state, not Buy side).
+         TriggerExit transition moves position to Exiting state, exit order
+         submitted. *)
+      let sim'', result2 = step_exn sim' in
+      (* Entry trade - matched by Entering state, not Buy side *)
+      assert_that result2.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.side
+                 (equal_to (Trading_base.Types.Buy : Trading_base.Types.side)));
+           ]);
+      (* Exit order submitted - for long position, this is a Sell *)
+      assert_that result2.orders_submitted (size_is 1);
+      (* Step 3: Exit order fills. Position moves to Closed via state matching
+         (matched Exiting state, not Sell side). *)
+      let _, result3 = step_exn sim'' in
+      (* Exit trade - matched by Exiting state, not Sell side *)
+      assert_that result3.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.side
+                 (equal_to (Trading_base.Types.Sell : Trading_base.Types.side)));
+           ]);
+      (* No more orders after position closed *)
+      assert_that result3.orders_submitted is_empty)
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -433,6 +664,14 @@ let suite =
          >:: test_step_returns_completed_when_done;
          "run completes simulation" >:: test_run_completes_simulation;
          "run on already complete" >:: test_run_on_already_complete;
+         (* Position lifecycle tests *)
+         "position created when strategy returns CreateEntering"
+         >:: test_position_created_when_strategy_returns_create_entering;
+         "position moves to exiting when strategy triggers exit"
+         >:: test_position_moves_to_exiting_when_strategy_triggers_exit;
+         "full position lifecycle" >:: test_full_position_lifecycle;
+         "position matched by state not side"
+         >:: test_position_matched_by_state_not_side;
        ]
 
 let () = run_test_tt_main suite

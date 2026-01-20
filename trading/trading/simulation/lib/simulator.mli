@@ -44,7 +44,9 @@ type step_result = {
   date : Date.t;  (** The date this step executed on *)
   portfolio : Trading_portfolio.Portfolio.t;  (** Portfolio state after step *)
   trades : Trading_base.Types.trade list;
-      (** Trades executed during this step (empty if no orders filled) *)
+      (** Trades from orders that filled during this step *)
+  orders_submitted : Trading_orders.Types.order list;
+      (** Orders submitted for execution on the next step *)
 }
 [@@deriving show, eq]
 (** Result of a single simulation step *)
@@ -63,10 +65,6 @@ val create : config:config -> deps:dependencies -> t
     @param deps External dependencies (symbols, data directory, strategy) *)
 
 (** {1 Running} *)
-
-val submit_orders : t -> Trading_orders.Types.order list -> Status.status list
-(** Submit orders to the simulator. Orders will be processed in the next step.
-*)
 
 val step : t -> step_outcome Status.status_or
 (** Advance simulation by one day. Returns [Completed] when simulation reaches
