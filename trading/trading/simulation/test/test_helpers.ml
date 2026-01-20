@@ -71,11 +71,7 @@ let default_enter_exit_config =
     second call.
 
     Used for testing position lifecycle: CreateEntering -> Holding -> Exiting ->
-    Closed
-
-    Note: The order_generator currently only supports long positions (hardcodes
-    Buy for entry, Sell for exit). Short position support requires adding a side
-    field to CreateEntering. *)
+    Closed *)
 module Make_enter_then_exit_strategy (Config : sig
   val config : enter_exit_config
 end) : sig
@@ -118,6 +114,10 @@ end = struct
                     CreateEntering
                       {
                         symbol = config.symbol;
+                        side =
+                          (match config.side with
+                          | Long -> Trading_strategy.Position.Long
+                          | Short -> Trading_strategy.Position.Short);
                         target_quantity = config.target_quantity;
                         entry_price = config.entry_price;
                         reasoning =

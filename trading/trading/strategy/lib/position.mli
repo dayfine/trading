@@ -117,6 +117,14 @@
 
 open Core
 
+(** {1 Position Types} *)
+
+(** Position side - long or short *)
+type position_side =
+  | Long  (** Buy to enter, sell to exit *)
+  | Short  (** Sell to enter, buy to exit *)
+[@@deriving show, eq]
+
 (** {1 Position States} *)
 
 (** Entry reasoning - why we're entering this position *)
@@ -190,6 +198,7 @@ type position_state =
 type t = {
   id : string;  (** Unique position identifier *)
   symbol : string;  (** Trading symbol *)
+  side : position_side;  (** Long or short position *)
   entry_reasoning : entry_reasoning;  (** Why we entered (set once) *)
   exit_reason : exit_reason option;  (** Why we're exiting (set when exiting) *)
   state : position_state;  (** Current position state *)
@@ -220,14 +229,12 @@ type transition_trigger = Strategy | Simulator [@@deriving show, eq]
 type transition_kind =
   | CreateEntering of {
       symbol : string;
+      side : position_side;
+          (** Long: Buy to enter, Sell to exit. Short: Sell to enter, Buy to
+              exit *)
       target_quantity : float;
       entry_price : float;
       reasoning : entry_reasoning;
-          (* TODO: Add [side : position_side] field (Long | Short) to support short
-         positions. The order_generator currently hardcodes Buy for entry, which
-         only works for long positions. With a side field:
-         - Long: Buy to enter, Sell to exit
-         - Short: Sell to enter, Buy to exit *)
     }  (** Strategy wants to create a new position in Entering state *)
   | EntryFill of { filled_quantity : float; fill_price : float }
       (** Entry order filled (partial or complete) *)

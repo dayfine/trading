@@ -17,6 +17,7 @@ let make_entering ?(id = "pos-1") ?(symbol = "AAPL") ?(target = 100.0)
         CreateEntering
           {
             symbol;
+            side = Long;
             target_quantity = target;
             entry_price;
             reasoning =
@@ -45,6 +46,7 @@ let make_holding ?(id = "pos-1") ?(symbol = "AAPL") ?(quantity = 100.0)
   {
     id;
     symbol;
+    side = Long;
     entry_reasoning =
       TechnicalSignal { indicator = "EMA"; description = "Test" };
     exit_reason = None;
@@ -76,6 +78,7 @@ let test_create_entering _ =
         CreateEntering
           {
             symbol = "AAPL";
+            side = Long;
             target_quantity = 100.0;
             entry_price = 150.0;
             reasoning =
@@ -91,6 +94,7 @@ let test_create_entering _ =
               ({
                  id = "pos-1";
                  symbol = "AAPL";
+                 side = Long;
                  entry_reasoning =
                    TechnicalSignal { indicator = "EMA"; description = "Test" };
                  exit_reason = None;
@@ -351,6 +355,7 @@ let test_exit_fill _ =
     {
       id = "pos-1";
       symbol = "AAPL";
+      side = Long;
       entry_reasoning =
         TechnicalSignal { indicator = "EMA"; description = "Test" };
       exit_reason =
@@ -405,6 +410,7 @@ let test_exit_complete _ =
     {
       id = "pos-1";
       symbol = "AAPL";
+      side = Long;
       entry_reasoning =
         TechnicalSignal { indicator = "EMA"; description = "Test" };
       exit_reason =
@@ -462,6 +468,7 @@ let test_invalid_transition_from_closed _ =
     {
       id = "pos-1";
       symbol = "AAPL";
+      side = Long;
       entry_reasoning =
         TechnicalSignal { indicator = "EMA"; description = "Test" };
       exit_reason = None;
@@ -529,6 +536,7 @@ let test_create_entering_creates_position _ =
         CreateEntering
           {
             symbol = "AAPL";
+            side = Long;
             target_quantity = 100.0;
             entry_price = 150.0;
             reasoning = ManualDecision { description = "Buy and hold" };
@@ -543,6 +551,7 @@ let test_create_entering_creates_position _ =
               ({
                  id = "AAPL-1";
                  symbol = "AAPL";
+                 side = Long;
                  entry_reasoning =
                    ManualDecision { description = "Buy and hold" };
                  exit_reason = None;
@@ -570,6 +579,7 @@ let test_create_entering_with_various_reasoning _ =
           CreateEntering
             {
               symbol = "TEST";
+              side = Long;
               target_quantity = 100.0;
               entry_price = 100.0;
               reasoning;
@@ -588,6 +598,7 @@ let test_create_entering_with_various_reasoning _ =
     {
       id = "test-1";
       symbol = "TEST";
+      side = Long;
       entry_reasoning =
         TechnicalSignal { indicator = "RSI"; description = "Oversold" };
       exit_reason = None;
@@ -606,6 +617,7 @@ let test_create_entering_with_various_reasoning _ =
     {
       id = "test-1";
       symbol = "TEST";
+      side = Long;
       entry_reasoning = PricePattern "Cup and Handle";
       exit_reason = None;
       state =
@@ -623,6 +635,7 @@ let test_create_entering_with_various_reasoning _ =
     {
       id = "test-1";
       symbol = "TEST";
+      side = Long;
       entry_reasoning = Rebalancing;
       exit_reason = None;
       state =
@@ -641,6 +654,7 @@ let test_create_entering_with_various_reasoning _ =
     {
       id = "test-1";
       symbol = "TEST";
+      side = Long;
       entry_reasoning = ManualDecision { description = "Strong fundamentals" };
       exit_reason = None;
       state =
@@ -665,6 +679,7 @@ let test_create_entering_negative_quantity _ =
         CreateEntering
           {
             symbol = "TEST";
+            side = Long;
             target_quantity = -100.0;
             entry_price = 100.0;
             reasoning = Rebalancing;
@@ -686,6 +701,7 @@ let test_create_entering_negative_price _ =
         CreateEntering
           {
             symbol = "TEST";
+            side = Long;
             target_quantity = 100.0;
             entry_price = -100.0;
             reasoning = Rebalancing;
