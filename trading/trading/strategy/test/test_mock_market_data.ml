@@ -21,12 +21,12 @@ let test_create_and_query _ =
     (date_of_string "2024-01-05")
     (Mock_market_data.current_date market_data);
   let price_opt = Mock_market_data.get_price market_data "AAPL" in
-  (* Check actual price - should be day 5 with deterministic value *)
+  (* Day 5 with 0.5% daily uptrend from 150.0, deterministic from Random.init 42 *)
   assert_that price_opt
     (is_some_and
        (field
           (fun (p : Types.Daily_price.t) -> p.close_price)
-          (float_equal ~epsilon:0.5 154.0)))
+          (float_equal ~epsilon:0.01 156.06)))
 
 let test_advance_date _ =
   let prices =
@@ -60,26 +60,24 @@ let test_price_history _ =
       ~current_date:(date_of_string "2024-01-10")
   in
   let history = Mock_market_data.get_price_history market_data "AAPL" () in
-  (* Should have all 10 days with deterministic values *)
+  (* Should have all 10 days with deterministic values from Random.init 42 *)
   assert_that history (size_is 10);
   let close_prices =
     List.map history ~f:(fun (p : Types.Daily_price.t) -> p.close_price)
   in
-  (* Verify deterministic values - Sideways trend with base 150.0 should stay near 150 *)
-  (* These values are from fixed Random seed 42, scaled from base=100 pattern *)
   assert_that close_prices
     (elements_are
        [
-         float_equal ~epsilon:1.0 150.27;
-         float_equal ~epsilon:1.0 150.75;
-         float_equal ~epsilon:1.0 150.765;
-         float_equal ~epsilon:1.0 150.81;
-         float_equal ~epsilon:1.0 151.11;
-         float_equal ~epsilon:1.0 150.975;
-         float_equal ~epsilon:1.0 150.99;
-         float_equal ~epsilon:1.0 151.395;
-         float_equal ~epsilon:1.0 151.185;
-         float_equal ~epsilon:1.0 151.215;
+         float_equal ~epsilon:0.01 150.27;
+         float_equal ~epsilon:0.01 150.75;
+         float_equal ~epsilon:0.01 150.76;
+         float_equal ~epsilon:0.01 150.81;
+         float_equal ~epsilon:0.01 151.11;
+         float_equal ~epsilon:0.01 151.44;
+         float_equal ~epsilon:0.01 151.52;
+         float_equal ~epsilon:0.01 152.15;
+         float_equal ~epsilon:0.01 152.25;
+         float_equal ~epsilon:0.01 152.46;
        ]);
   (* Test lookback - should only get last 3 days *)
   let recent =
@@ -92,9 +90,9 @@ let test_price_history _ =
   assert_that recent_close_prices
     (elements_are
        [
-         float_equal ~epsilon:1.0 151.395;
-         float_equal ~epsilon:1.0 151.185;
-         float_equal ~epsilon:1.0 151.215;
+         float_equal ~epsilon:0.01 152.15;
+         float_equal ~epsilon:0.01 152.25;
+         float_equal ~epsilon:0.01 152.46;
        ])
 
 let test_no_lookahead _ =
