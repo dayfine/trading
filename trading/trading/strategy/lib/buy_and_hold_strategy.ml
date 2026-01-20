@@ -37,6 +37,7 @@ let _execute_entry ~(symbol : string) ~(config : config)
       CreateEntering
         {
           symbol;
+          side = Long;
           target_quantity = config.position_size;
           entry_price;
           reasoning =

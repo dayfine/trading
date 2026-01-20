@@ -70,11 +70,7 @@ module Long_strategy : sig
   val side : position_side
 end
 
-(** Short position strategy - creates short position on day 1, exits on day 2.
-
-    Note: Short positions are not yet fully supported by the order_generator,
-    which hardcodes Buy for entry and Sell for exit. This strategy is for future
-    use when short position support is added. *)
+(** Short position strategy - creates short position on day 1, exits on day 2 *)
 module Short_strategy : sig
   include Trading_strategy.Strategy_interface.STRATEGY
 

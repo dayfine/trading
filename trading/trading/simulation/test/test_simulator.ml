@@ -587,16 +587,19 @@ let make_long_strategy_deps data_dir =
     ~strategy:(module Long_strategy)
     ~commission:sample_config.commission
 
+(** Helper to create deps with Short_strategy *)
+let make_short_strategy_deps data_dir =
+  Short_strategy.reset ();
+  create_deps ~symbols:[ "AAPL" ] ~data_dir
+    ~strategy:(module Short_strategy)
+    ~commission:sample_config.commission
+
 let test_position_matched_by_state_not_side _ =
   (* This test verifies that trades are matched to positions by state
      (Entering/Exiting), not by side (Buy/Sell). This is important for
      supporting short positions where you sell to enter and buy to exit.
 
-     Currently tests with Long_strategy only. When order_generator adds short
-     position support (side field in CreateEntering), add a parallel test with
-     Short_strategy to verify:
-     - Entry: Sell order fills, matched to Entering state
-     - Exit: Buy order fills, matched to Exiting state *)
+     See also: test_short_position_lifecycle for short position verification. *)
   with_test_data "position_matched_by_state"
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
@@ -645,6 +648,52 @@ let test_position_matched_by_state_not_side _ =
       (* No more orders after position closed *)
       assert_that result3.orders_submitted is_empty)
 
+let test_short_position_lifecycle _ =
+  (* Verify short position lifecycle: Sell to enter, Buy to exit.
+     This is the counterpart to test_position_matched_by_state_not_side,
+     verifying that order_generator correctly handles short positions. *)
+  with_test_data "short_position_lifecycle"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_short_strategy_deps data_dir in
+      let config =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-06";
+        }
+      in
+      let sim = create ~config ~deps in
+      (* Step 1: CreateEntering transition with Short side, order submitted *)
+      let sim', result1 = step_exn sim in
+      assert_that result1.trades is_empty;
+      (* Entry order submitted - for short position, this is a Sell *)
+      assert_that result1.orders_submitted (size_is 1);
+      (* Step 2: Entry order fills. For short position, entry is Sell.
+         Position moves to Holding, then TriggerExit moves to Exiting. *)
+      let sim'', result2 = step_exn sim' in
+      (* Entry trade - Sell order for short entry *)
+      assert_that result2.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.side
+                 (equal_to (Trading_base.Types.Sell : Trading_base.Types.side)));
+           ]);
+      (* Exit order submitted - for short position, this is a Buy to cover *)
+      assert_that result2.orders_submitted (size_is 1);
+      (* Step 3: Exit order fills. For short position, exit is Buy. *)
+      let _, result3 = step_exn sim'' in
+      (* Exit trade - Buy order to cover short position *)
+      assert_that result3.trades
+        (elements_are
+           [
+             (fun trade ->
+               assert_that trade.Trading_base.Types.side
+                 (equal_to (Trading_base.Types.Buy : Trading_base.Types.side)));
+           ]);
+      assert_that result3.orders_submitted is_empty)
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -672,6 +721,7 @@ let suite =
          "full position lifecycle" >:: test_full_position_lifecycle;
          "position matched by state not side"
          >:: test_position_matched_by_state_not_side;
+         "short position lifecycle" >:: test_short_position_lifecycle;
        ]
 
 let () = run_test_tt_main suite

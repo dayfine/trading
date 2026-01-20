@@ -68,9 +68,12 @@ type position_state =
     }
 [@@deriving show, eq]
 
+type position_side = Long | Short [@@deriving show, eq]
+
 type t = {
   id : string;
   symbol : string;
+  side : position_side;
   entry_reasoning : entry_reasoning;
   exit_reason : exit_reason option;
   state : position_state;
@@ -86,6 +89,7 @@ type transition_trigger = Strategy | Simulator [@@deriving show, eq]
 type transition_kind =
   | CreateEntering of {
       symbol : string;
+      side : position_side;
       target_quantity : float;
       entry_price : float;
       reasoning : entry_reasoning;
@@ -181,10 +185,11 @@ let _validate_transition t transition =
 let create_entering ?(id = None) ?(date = None) transition =
   let open Result.Let_syntax in
   (* Check transition kind first and extract fields *)
-  let%bind symbol, target_quantity, entry_price, reasoning =
+  let%bind symbol, side, target_quantity, entry_price, reasoning =
     match transition.kind with
-    | CreateEntering { symbol; target_quantity; entry_price; reasoning } ->
-        Ok (symbol, target_quantity, entry_price, reasoning)
+    | CreateEntering { symbol; side; target_quantity; entry_price; reasoning }
+      ->
+        Ok (symbol, side, target_quantity, entry_price, reasoning)
     | kind ->
         Error
           (Status.invalid_argument_error
@@ -203,6 +208,7 @@ let create_entering ?(id = None) ?(date = None) transition =
     {
       id = position_id;
       symbol;
+      side;
       entry_reasoning = reasoning;
       exit_reason = None;
       state =

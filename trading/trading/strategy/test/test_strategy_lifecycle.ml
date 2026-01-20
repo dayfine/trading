@@ -48,6 +48,7 @@ module DummyStrategy = struct
                 CreateEntering
                   {
                     symbol = "TEST";
+                    side = Long;
                     target_quantity = 100.0;
                     entry_price = 50.0;
                     reasoning =
