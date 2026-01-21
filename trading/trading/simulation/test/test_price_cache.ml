@@ -208,11 +208,10 @@ let test_nonexistent_symbol _ =
   let test_data_dir = setup_test_data "nonexistent" in
   let backend = create ~data_dir:test_data_dir in
 
-  (* Try to load non-existent symbol - CSV storage raises exception *)
-  (try
-     let _ = get_prices backend ~symbol:"NONEXISTENT" () in
-     assert_failure "Expected exception for non-existent symbol"
-   with Sys_error _ -> ());
+  (* Try to load non-existent symbol - should return error, not exception *)
+  assert_that
+    (get_prices backend ~symbol:"NONEXISTENT" ())
+    (is_error_with NotFound ~msg:"not found");
 
   teardown_test_data test_data_dir
 

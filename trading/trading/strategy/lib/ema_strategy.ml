@@ -93,6 +93,13 @@ let _execute_exit ~(position : Position.t) ~quantity:_
         { exit_reason; exit_price = price.Types.Daily_price.close_price };
   }
 
+(* Find a position for a given symbol.
+   The positions map is keyed by position_id, so we need to search by symbol. *)
+let _find_position_for_symbol positions symbol =
+  Map.to_alist positions
+  |> List.find_map ~f:(fun (_id, pos) ->
+         if String.equal pos.Position.symbol symbol then Some pos else None)
+
 (* Process one symbol - returns optional transition *)
 let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
     ~(get_indicator : Strategy_interface.get_indicator_fn) ~(config : config)
@@ -103,7 +110,7 @@ let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
   let ema_opt =
     get_indicator symbol "EMA" config.ema_period Types.Cadence.Daily
   in
-  let active_position = Map.find positions symbol in
+  let active_position = _find_position_for_symbol positions symbol in
 
   match (price_opt, ema_opt, active_position) with
   (* Entry: no position and entry signal *)

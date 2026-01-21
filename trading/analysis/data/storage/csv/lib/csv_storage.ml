@@ -168,7 +168,16 @@ let create ?(data_dir = _default_data_dir) symbol =
 
 let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
-  let%bind prices = In_channel.read_lines t.path |> Parser.parse_lines in
+  (* Check if file exists before trying to read *)
+  let%bind lines =
+    match Sys_unix.file_exists t.path with
+    | `Yes -> (
+        try Ok (In_channel.read_lines t.path)
+        with Sys_error msg -> Status.error_not_found msg)
+    | `No | `Unknown ->
+        Status.error_not_found (Printf.sprintf "Data file not found: %s" t.path)
+  in
+  let%bind prices = Parser.parse_lines lines in
   match (start_date, end_date) with
   | Some start, Some end_ when Date.compare start end_ > 0 ->
       Status.error_invalid_argument
