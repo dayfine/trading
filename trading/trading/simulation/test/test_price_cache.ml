@@ -208,11 +208,16 @@ let test_nonexistent_symbol _ =
   let test_data_dir = setup_test_data "nonexistent" in
   let backend = create ~data_dir:test_data_dir in
 
-  (* Try to load non-existent symbol - CSV storage raises exception *)
-  (try
-     let _ = get_prices backend ~symbol:"NONEXISTENT" () in
-     assert_failure "Expected exception for non-existent symbol"
-   with Sys_error _ -> ());
+  (* Try to load non-existent symbol - should return error, not exception *)
+  (match get_prices backend ~symbol:"NONEXISTENT" () with
+  | Error err ->
+      (* Should get a NotFound error *)
+      let err_msg = Status.show err in
+      assert_bool
+        (Printf.sprintf "Error should indicate data not found: %s" err_msg)
+        (String.is_substring err_msg ~substring:"not found"
+        || String.is_substring err_msg ~substring:"NotFound")
+  | Ok _ -> assert_failure "Expected error for non-existent symbol");
 
   teardown_test_data test_data_dir
 

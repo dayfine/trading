@@ -60,3 +60,18 @@
   trading.base
   trading.strategy
   matchers))
+
+(test
+ (name test_e2e_integration)
+ (modules test_e2e_integration)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
