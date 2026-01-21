@@ -45,6 +45,12 @@ let real_data_dir =
 (** Sample commission config *)
 let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
+(** Helper to run simulation and extract results, failing on error *)
+let run_sim_exn sim =
+  match run sim with
+  | Error err -> failwith ("Simulation failed: " ^ Status.show err)
+  | Ok (steps, final_portfolio) -> (steps, final_portfolio)
+
 (* ==================== Real Data Loading Tests ==================== *)
 
 let test_load_real_symbol_aapl _ =
@@ -63,14 +69,11 @@ let test_load_real_symbol_aapl _ =
     }
   in
   let sim = create ~config ~deps in
-  (* Run the simulation - should complete without errors *)
-  match run sim with
-  | Error err -> failwith ("Run failed: " ^ Status.show err)
-  | Ok (steps, final_portfolio) ->
-      (* Should have 4 trading days (Jan 2-5, 2024 were Tuesday-Friday) *)
-      assert_that steps (size_is 3);
-      (* With no trades, cash should remain unchanged *)
-      assert_that final_portfolio.current_cash (float_equal 10000.0)
+  let steps, final_portfolio = run_sim_exn sim in
+  (* Should have 3 steps (Jan 2-4), Jan 5 returns Completed *)
+  assert_that steps (size_is 3);
+  (* With no trades, cash should remain unchanged *)
+  assert_that final_portfolio.current_cash (float_equal config.initial_cash)
 
 let test_load_multiple_real_symbols _ =
   (* Test loading multiple symbols from real data *)
@@ -89,13 +92,11 @@ let test_load_multiple_real_symbols _ =
     }
   in
   let sim = create ~config ~deps in
-  match run sim with
-  | Error err -> failwith ("Run failed: " ^ Status.show err)
-  | Ok (steps, final_portfolio) ->
-      (* Should complete successfully with all symbols loaded.
-         Jan 2-10 is 9 calendar days, last day returns Completed = 8 steps *)
-      assert_that steps (size_is 8);
-      assert_that final_portfolio.current_cash (float_equal 50000.0)
+  let steps, final_portfolio = run_sim_exn sim in
+  (* Should complete successfully with all symbols loaded.
+     Jan 2-10 is 9 calendar days, last day returns Completed = 8 steps *)
+  assert_that steps (size_is 8);
+  assert_that final_portfolio.current_cash (float_equal config.initial_cash)
 
 (* ==================== Date Range Validation Tests ==================== *)
 
@@ -171,12 +172,9 @@ let test_partial_date_overlap _ =
     }
   in
   let sim = create ~config ~deps in
-  (* Should handle partial data gracefully *)
-  match run sim with
-  | Error err -> failwith ("Run failed unexpectedly: " ^ Status.show err)
-  | Ok (steps, _) ->
-      (* Should have some steps, even if some days have no data *)
-      assert_bool "Should have at least some steps" (List.length steps > 0)
+  let steps, _ = run_sim_exn sim in
+  (* Should have some steps, even if some days have no data *)
+  assert_bool "Should have at least some steps" (List.length steps > 0)
 
 (* ==================== Missing Symbol Tests ==================== *)
 
@@ -311,21 +309,19 @@ let test_buy_and_hold_e2e _ =
     }
   in
   let sim = create ~config ~deps in
-  match run sim with
-  | Error err -> failwith ("E2E run failed: " ^ Status.show err)
-  | Ok (steps, final_portfolio) ->
-      (* Should have multiple steps *)
-      assert_bool "Should have steps" (List.length steps > 0);
-      (* After buying, cash should be reduced *)
-      assert_bool "Cash should be reduced after buying"
-        Float.(final_portfolio.current_cash < 10000.0);
-      (* Should have a position in AAPL *)
-      let aapl_position =
-        Trading_portfolio.Portfolio.get_position final_portfolio "AAPL"
-      in
-      assert_that aapl_position
-        (is_some_and (fun (pos : Trading_portfolio.Types.portfolio_position) ->
-             assert_that pos.symbol (equal_to "AAPL")))
+  let steps, final_portfolio = run_sim_exn sim in
+  (* Should have multiple steps *)
+  assert_bool "Should have steps" (List.length steps > 0);
+  (* After buying, cash should be reduced *)
+  assert_bool "Cash should be reduced after buying"
+    Float.(final_portfolio.current_cash < config.initial_cash);
+  (* Should have a position in AAPL *)
+  let aapl_position =
+    Trading_portfolio.Portfolio.get_position final_portfolio "AAPL"
+  in
+  assert_that aapl_position
+    (is_some_and (fun (pos : Trading_portfolio.Types.portfolio_position) ->
+         assert_that pos.symbol (equal_to "AAPL")))
 
 (* ==================== Longer Simulation Test ==================== *)
 
@@ -345,12 +341,10 @@ let test_longer_simulation_period _ =
     }
   in
   let sim = create ~config ~deps in
-  match run sim with
-  | Error err -> failwith ("Long simulation failed: " ^ Status.show err)
-  | Ok (steps, final_portfolio) ->
-      (* Jan 2-31 is 30 calendar days, last day returns Completed = 29 steps *)
-      assert_that steps (size_is 29);
-      assert_that final_portfolio.current_cash (float_equal 100000.0)
+  let steps, final_portfolio = run_sim_exn sim in
+  (* Jan 2-31 is 30 calendar days, last day returns Completed = 29 steps *)
+  assert_that steps (size_is 29);
+  assert_that final_portfolio.current_cash (float_equal config.initial_cash)
 
 (* ==================== EMA Strategy E2E Test ==================== *)
 
@@ -457,55 +451,48 @@ let test_ema_strategy_e2e _ =
     }
   in
   let sim = create ~config ~deps in
-  match run sim with
-  | Error err -> failwith ("EMA strategy run failed: " ^ Status.show err)
-  | Ok (steps, final_portfolio) ->
-      (* Extract and display metrics *)
-      let round_trips = extract_round_trips steps in
-      Printf.printf "\n=== EMA Strategy E2E Results (Q1 2024) ===\n";
-      Printf.printf "Simulation period: %s to %s\n"
-        (Date.to_string config.start_date)
-        (Date.to_string config.end_date);
-      Printf.printf "Initial cash: $%.2f\n" config.initial_cash;
-      Printf.printf "Final cash: $%.2f\n" final_portfolio.current_cash;
-      Printf.printf "Number of round-trip trades: %d\n"
-        (List.length round_trips);
+  let steps, final_portfolio = run_sim_exn sim in
+  (* Extract and display metrics *)
+  let round_trips = extract_round_trips steps in
+  Printf.printf "\n=== EMA Strategy E2E Results (Q1 2024) ===\n";
+  Printf.printf "Simulation period: %s to %s\n"
+    (Date.to_string config.start_date)
+    (Date.to_string config.end_date);
+  Printf.printf "Initial cash: $%.2f\n" config.initial_cash;
+  Printf.printf "Final cash: $%.2f\n" final_portfolio.current_cash;
+  Printf.printf "Number of round-trip trades: %d\n" (List.length round_trips);
 
-      (* Print each trade *)
-      List.iter round_trips ~f:(fun m ->
-          Printf.printf "  %s\n" (show_trade_metrics m));
+  (* Print each trade *)
+  List.iter round_trips ~f:(fun m ->
+      Printf.printf "  %s\n" (show_trade_metrics m));
 
-      (* Summary stats *)
-      if not (List.is_empty round_trips) then (
-        let total_pnl =
-          List.fold round_trips ~init:0.0 ~f:(fun acc m -> acc +. m.pnl_dollars)
-        in
-        let avg_days =
-          Float.of_int
-            (List.fold round_trips ~init:0 ~f:(fun acc m -> acc + m.days_held))
-          /. Float.of_int (List.length round_trips)
-        in
-        let win_count =
-          List.count round_trips ~f:(fun m -> Float.(m.pnl_dollars > 0.0))
-        in
-        Printf.printf "\nSummary:\n";
-        Printf.printf "  Total P&L: $%.2f\n" total_pnl;
-        Printf.printf "  Avg holding period: %.1f days\n" avg_days;
-        Printf.printf "  Win rate: %d/%d (%.1f%%)\n" win_count
-          (List.length round_trips)
-          (Float.of_int win_count
-          /. Float.of_int (List.length round_trips)
-          *. 100.0));
-      Printf.printf "==========================================\n";
+  (* Summary stats *)
+  if not (List.is_empty round_trips) then (
+    let total_pnl =
+      List.fold round_trips ~init:0.0 ~f:(fun acc m -> acc +. m.pnl_dollars)
+    in
+    let avg_days =
+      Float.of_int
+        (List.fold round_trips ~init:0 ~f:(fun acc m -> acc + m.days_held))
+      /. Float.of_int (List.length round_trips)
+    in
+    let win_count =
+      List.count round_trips ~f:(fun m -> Float.(m.pnl_dollars > 0.0))
+    in
+    Printf.printf "\nSummary:\n";
+    Printf.printf "  Total P&L: $%.2f\n" total_pnl;
+    Printf.printf "  Avg holding period: %.1f days\n" avg_days;
+    Printf.printf "  Win rate: %d/%d (%.1f%%)\n" win_count
+      (List.length round_trips)
+      (Float.of_int win_count /. Float.of_int (List.length round_trips) *. 100.0));
+  Printf.printf "==========================================\n";
 
-      (* Basic assertions - strategy should run without errors *)
-      assert_bool "Should have steps" (List.length steps > 0);
-      (* Cash should change if there were trades *)
-      let total_trades =
-        List.sum (module Int) steps ~f:(fun s -> List.length s.trades)
-      in
-      Printf.printf "Total individual trades: %d\n" total_trades;
-      ()
+  (* Basic assertions - strategy should run without errors *)
+  assert_bool "Should have steps" (List.length steps > 0);
+  let total_trades =
+    List.sum (module Int) steps ~f:(fun s -> List.length s.trades)
+  in
+  Printf.printf "Total individual trades: %d\n" total_trades
 
 (* ==================== Test Suite ==================== *)
 
