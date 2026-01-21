@@ -21,7 +21,8 @@
   price_cache
   indicator_computer
   indicator_manager
-  market_data_adapter)
+  market_data_adapter
+  metrics)
  (preprocess
   (pps
    ppx_let
