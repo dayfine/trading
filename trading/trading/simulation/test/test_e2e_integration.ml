@@ -348,84 +348,6 @@ let test_longer_simulation_period _ =
 
 (* ==================== EMA Strategy E2E Test ==================== *)
 
-type trade_metrics = {
-  symbol : string;
-  entry_date : Date.t;
-  exit_date : Date.t;
-  days_held : int;
-  entry_price : float;
-  exit_price : float;
-  quantity : float;
-  pnl_dollars : float;
-  pnl_percent : float;
-}
-(** Metrics for a completed round-trip trade *)
-
-let show_trade_metrics m =
-  Printf.sprintf
-    "%s: %s -> %s (%d days), entry=%.2f exit=%.2f qty=%.0f, P&L=$%.2f (%.2f%%)"
-    m.symbol
-    (Date.to_string m.entry_date)
-    (Date.to_string m.exit_date)
-    m.days_held m.entry_price m.exit_price m.quantity m.pnl_dollars
-    m.pnl_percent
-
-(** Extract round-trip trades from step results. A round-trip is a buy followed
-    by a sell for the same symbol. *)
-let extract_round_trips (steps : step_result list) : trade_metrics list =
-  (* Collect all trades *)
-  let all_trades =
-    List.concat_map steps ~f:(fun step ->
-        List.map step.trades ~f:(fun trade -> (step.date, trade)))
-  in
-  (* Group by symbol *)
-  let by_symbol =
-    List.fold all_trades
-      ~init:(Map.empty (module String))
-      ~f:(fun acc (date, trade) ->
-        let symbol = trade.Trading_base.Types.symbol in
-        let existing = Map.find acc symbol |> Option.value ~default:[] in
-        Map.set acc ~key:symbol ~data:((date, trade) :: existing))
-  in
-  (* For each symbol, pair buys with sells *)
-  Map.fold by_symbol ~init:[] ~f:(fun ~key:symbol ~data:trades acc ->
-      let sorted =
-        List.sort trades ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2)
-      in
-      (* Simple pairing: assume alternating buy/sell *)
-      let rec pair_trades trades_list metrics =
-        match trades_list with
-        | (entry_date, entry) :: (exit_date, exit) :: rest
-          when Trading_base.Types.(
-                 equal_side entry.side Buy && equal_side exit.side Sell) ->
-            let days_held = Date.diff exit_date entry_date in
-            let pnl_dollars =
-              (exit.Trading_base.Types.price -. entry.Trading_base.Types.price)
-              *. entry.Trading_base.Types.quantity
-            in
-            let pnl_percent =
-              (exit.Trading_base.Types.price -. entry.Trading_base.Types.price)
-              /. entry.Trading_base.Types.price *. 100.0
-            in
-            let m =
-              {
-                symbol;
-                entry_date;
-                exit_date;
-                days_held;
-                entry_price = entry.Trading_base.Types.price;
-                exit_price = exit.Trading_base.Types.price;
-                quantity = entry.Trading_base.Types.quantity;
-                pnl_dollars;
-                pnl_percent;
-              }
-            in
-            pair_trades rest (m :: metrics)
-        | _ :: rest -> pair_trades rest metrics
-        | [] -> List.rev metrics
-      in
-      pair_trades sorted [] @ acc)
-
 let test_ema_strategy_e2e _ =
   (* Run EMA crossover strategy on AAPL for Q1 2024 *)
   let ema_config =
@@ -452,8 +374,8 @@ let test_ema_strategy_e2e _ =
   in
   let sim = create ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
-  (* Extract and display metrics *)
-  let round_trips = extract_round_trips steps in
+  (* Extract and display metrics using the Metrics module *)
+  let round_trips = Trading_simulation.Metrics.extract_round_trips steps in
   Printf.printf "\n=== EMA Strategy E2E Results (Q1 2024) ===\n";
   Printf.printf "Simulation period: %s to %s\n"
     (Date.to_string config.start_date)
@@ -464,27 +386,14 @@ let test_ema_strategy_e2e _ =
 
   (* Print each trade *)
   List.iter round_trips ~f:(fun m ->
-      Printf.printf "  %s\n" (show_trade_metrics m));
+      Printf.printf "  %s\n" (Trading_simulation.Metrics.show_trade_metrics m));
 
   (* Summary stats *)
-  if not (List.is_empty round_trips) then (
-    let total_pnl =
-      List.fold round_trips ~init:0.0 ~f:(fun acc m -> acc +. m.pnl_dollars)
-    in
-    let avg_days =
-      Float.of_int
-        (List.fold round_trips ~init:0 ~f:(fun acc m -> acc + m.days_held))
-      /. Float.of_int (List.length round_trips)
-    in
-    let win_count =
-      List.count round_trips ~f:(fun m -> Float.(m.pnl_dollars > 0.0))
-    in
-    Printf.printf "\nSummary:\n";
-    Printf.printf "  Total P&L: $%.2f\n" total_pnl;
-    Printf.printf "  Avg holding period: %.1f days\n" avg_days;
-    Printf.printf "  Win rate: %d/%d (%.1f%%)\n" win_count
-      (List.length round_trips)
-      (Float.of_int win_count /. Float.of_int (List.length round_trips) *. 100.0));
+  (match Trading_simulation.Metrics.compute_summary round_trips with
+  | Some summary ->
+      Printf.printf "\nSummary:\n";
+      Printf.printf "  %s\n" (Trading_simulation.Metrics.show_summary summary)
+  | None -> ());
   Printf.printf "==========================================\n";
 
   (* Basic assertions - strategy should run without errors *)
