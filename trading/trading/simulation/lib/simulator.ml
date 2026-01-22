@@ -33,6 +33,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission =
 type step_result = {
   date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
+  portfolio_value : float;
   trades : Trading_base.Types.trade list;
   orders_submitted : Trading_orders.Types.order list;
 }
@@ -92,6 +93,24 @@ let _get_today_bars t =
       with
       | None -> None
       | Some daily_price -> Some (_to_price_bar symbol daily_price))
+
+(** Compute total portfolio value (cash + position market values).
+
+    Uses close prices from today's bars to value positions. If a position's
+    symbol has no price data for today, its market value is assumed to be zero
+    (the position is illiquid). *)
+let _compute_portfolio_value ~portfolio ~today_bars =
+  let prices =
+    List.map today_bars ~f:(fun bar ->
+        (bar.Trading_engine.Types.symbol, bar.close_price))
+  in
+  match
+    Trading_portfolio.Calculations.portfolio_value
+      portfolio.Trading_portfolio.Portfolio.positions portfolio.current_cash
+      prices
+  with
+  | Ok value -> value
+  | Error _ -> portfolio.current_cash
 
 (** Extract trades from execution reports *)
 let _extract_trades reports =
@@ -248,14 +267,24 @@ let step t =
       Order_generator.transitions_to_orders ~positions transitions
     in
     let orders_submitted = _submit_orders t orders in
+    (* Compute portfolio value using today's close prices *)
+    let portfolio_value = _compute_portfolio_value ~portfolio ~today_bars in
     (* Advance to next date *)
     let step_result =
-      { date = t.current_date; portfolio; trades; orders_submitted }
+      {
+        date = t.current_date;
+        portfolio;
+        portfolio_value;
+        trades;
+        orders_submitted;
+      }
     in
     let next_date = Date.add_days t.current_date 1 in
     return
       (Stepped
          ({ t with current_date = next_date; portfolio; positions }, step_result))
+
+let get_config t = t.config
 
 let run t =
   let rec loop t acc =

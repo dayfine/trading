@@ -1,5 +1,23 @@
 open Core
 
+(** {1 Generic Metric Types} *)
+
+type metric_unit = Dollars | Percent | Days | Count | Ratio
+[@@deriving show, eq]
+
+type metric = {
+  name : string;
+  display_name : string;
+  description : string;
+  value : float;
+  unit : metric_unit;
+}
+[@@deriving show, eq]
+
+type metric_set = metric list
+
+(** {1 Trade Metrics Types} *)
+
 type trade_metrics = {
   symbol : string;
   entry_date : Date.t;
@@ -21,6 +39,39 @@ type summary_stats = {
   win_rate : float;
 }
 [@@deriving show, eq]
+
+(** {1 Metric Computer Abstraction} *)
+
+type 'state metric_computer = {
+  name : string;
+  init : config:Simulator.config -> 'state;
+  update : state:'state -> step:Simulator.step_result -> 'state;
+  finalize : state:'state -> config:Simulator.config -> metric list;
+}
+
+type any_metric_computer = {
+  run :
+    config:Simulator.config -> steps:Simulator.step_result list -> metric list;
+}
+(** Type-erased wrapper using existential type via closure *)
+
+let wrap_computer (type s) (computer : s metric_computer) : any_metric_computer
+    =
+  {
+    run =
+      (fun ~config ~steps ->
+        let state = computer.init ~config in
+        let final_state =
+          List.fold steps ~init:state ~f:(fun state step ->
+              computer.update ~state ~step)
+        in
+        computer.finalize ~state:final_state ~config);
+  }
+
+let compute_metrics ~computers ~config ~steps =
+  List.concat_map computers ~f:(fun computer -> computer.run ~config ~steps)
+
+(** {1 Trade Metrics Functions} *)
 
 let show_trade_metrics m =
   Printf.sprintf
@@ -118,3 +169,75 @@ let compute_summary (trades : trade_metrics list) : summary_stats option =
         Float.of_int win_count /. Float.of_int (List.length trades) *. 100.0
       in
       Some { total_pnl; avg_holding_days; win_count; loss_count; win_rate }
+
+(** {1 Metric Utilities} *)
+
+let find_metric (metrics : metric_set) ~name =
+  List.find metrics ~f:(fun m -> String.equal m.name name)
+
+let _format_unit_suffix = function
+  | Dollars -> ""
+  | Percent -> "%"
+  | Days -> " days"
+  | Count -> ""
+  | Ratio -> ""
+
+let format_metric m =
+  match m.unit with
+  | Dollars -> Printf.sprintf "%s: $%.2f" m.display_name m.value
+  | Percent -> Printf.sprintf "%s: %.2f%%" m.display_name m.value
+  | Days -> Printf.sprintf "%s: %.1f days" m.display_name m.value
+  | Count -> Printf.sprintf "%s: %.0f" m.display_name m.value
+  | Ratio -> Printf.sprintf "%s: %.4f" m.display_name m.value
+
+let format_metrics metrics =
+  List.map metrics ~f:format_metric |> String.concat ~sep:"\n"
+
+(** {1 Conversion Functions} *)
+
+let summary_stats_to_metrics (stats : summary_stats) : metric list =
+  [
+    {
+      name = "total_pnl";
+      display_name = "Total P&L";
+      description = "Sum of profit/loss across all trades";
+      value = stats.total_pnl;
+      unit = Dollars;
+    };
+    {
+      name = "avg_holding_days";
+      display_name = "Avg Holding Period";
+      description = "Average number of days positions were held";
+      value = stats.avg_holding_days;
+      unit = Days;
+    };
+    {
+      name = "win_count";
+      display_name = "Winning Trades";
+      description = "Number of profitable trades";
+      value = Float.of_int stats.win_count;
+      unit = Count;
+    };
+    {
+      name = "loss_count";
+      display_name = "Losing Trades";
+      description = "Number of unprofitable trades";
+      value = Float.of_int stats.loss_count;
+      unit = Count;
+    };
+    {
+      name = "win_rate";
+      display_name = "Win Rate";
+      description = "Percentage of trades that were profitable";
+      value = stats.win_rate;
+      unit = Percent;
+    };
+  ]
+
+(** {1 Run Result Type} *)
+
+type run_result = {
+  steps : Simulator.step_result list;
+  final_portfolio : Trading_portfolio.Portfolio.t;
+  metrics : metric_set;
+}

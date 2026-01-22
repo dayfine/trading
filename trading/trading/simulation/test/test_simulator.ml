@@ -44,9 +44,16 @@ let make_deps data_dir =
     ~strategy:(module Noop_strategy)
     ~commission:sample_config.commission
 
-(* Helper to create expected step_result for comparison *)
-let make_expected_step_result ~date ~portfolio ~trades ~orders_submitted =
-  { date; portfolio; trades; orders_submitted }
+(* Helper to create expected step_result for comparison.
+   portfolio_value defaults to the portfolio's current_cash if not specified,
+   which is correct for portfolios with no positions. *)
+let make_expected_step_result ~date ~portfolio ?portfolio_value ~trades
+    ~orders_submitted () =
+  let portfolio_value =
+    Option.value portfolio_value
+      ~default:portfolio.Trading_portfolio.Portfolio.current_cash
+  in
+  { date; portfolio; portfolio_value; trades; orders_submitted }
 
 (* Custom matchers for step_outcome *)
 let is_stepped f = function
@@ -71,7 +78,7 @@ let test_create_returns_simulator _ =
       let expected_result =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ()
       in
       assert_that (step sim)
         (is_ok_and_holds
@@ -91,7 +98,7 @@ let test_create_with_empty_symbols _ =
       let expected_result =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ()
       in
       assert_that (step sim)
         (is_ok_and_holds
@@ -338,12 +345,12 @@ let test_step_advances_date _ =
       let expected_result1 =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ()
       in
       let expected_result2 =
         make_expected_step_result
           ~date:(date_of_string "2024-01-03")
-          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[]
+          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ()
       in
       assert_that (step sim)
         (is_ok_and_holds
@@ -390,13 +397,13 @@ let test_run_completes_simulation _ =
         [
           make_expected_step_result
             ~date:(date_of_string "2024-01-02")
-            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[];
+            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ();
           make_expected_step_result
             ~date:(date_of_string "2024-01-03")
-            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[];
+            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ();
           make_expected_step_result
             ~date:(date_of_string "2024-01-04")
-            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[];
+            ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ();
         ]
       in
       assert_that (run sim)

@@ -43,6 +43,8 @@ type t
 type step_result = {
   date : Date.t;  (** The date this step executed on *)
   portfolio : Trading_portfolio.Portfolio.t;  (** Portfolio state after step *)
+  portfolio_value : float;
+      (** Total portfolio value: cash + market value of all positions *)
   trades : Trading_base.Types.trade list;
       (** Trades from orders that filled during this step *)
   orders_submitted : Trading_orders.Types.order list;
@@ -74,3 +76,7 @@ val run :
   t -> (step_result list * Trading_portfolio.Portfolio.t) Status.status_or
 (** Run the full simulation from start to end date. Returns list of step results
     and final portfolio. *)
+
+val get_config : t -> config
+(** Get the config from a simulator. Useful for metric computers that need
+    access to simulation parameters. *)

@@ -75,3 +75,15 @@
   types
   matchers
   simulation_test_helpers))
+
+(test
+ (name test_metrics)
+ (modules test_metrics)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.base
+  trading.engine
+  trading.portfolio
+  matchers))

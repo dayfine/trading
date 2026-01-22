@@ -22,7 +22,8 @@
   indicator_computer
   indicator_manager
   market_data_adapter
-  metrics)
+  metrics
+  metric_computers)
  (preprocess
   (pps
    ppx_let
