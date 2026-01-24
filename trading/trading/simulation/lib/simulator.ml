@@ -1,44 +1,7 @@
 (** Simulation engine for backtesting trading strategies *)
 
 open Core
-
-(** {1 Re-exported Types from Simulator_types} *)
-
-type config = Simulator_types.config = {
-  start_date : Date.t;
-  end_date : Date.t;
-  initial_cash : float;
-  commission : Trading_engine.Types.commission_config;
-}
-[@@deriving show, eq]
-
-type step_result = Simulator_types.step_result = {
-  date : Date.t;
-  portfolio : Trading_portfolio.Portfolio.t;
-  portfolio_value : float;
-  trades : Trading_base.Types.trade list;
-  orders_submitted : Trading_orders.Types.order list;
-}
-[@@deriving show, eq]
-
-type run_result = Simulator_types.run_result = {
-  steps : step_result list;
-  final_portfolio : Trading_portfolio.Portfolio.t;
-  metrics : Metric_types.metric_set;
-}
-
-type 'state metric_computer = 'state Simulator_types.metric_computer = {
-  name : string;
-  init : config:config -> 'state;
-  update : state:'state -> step:step_result -> 'state;
-  finalize : state:'state -> config:config -> Metric_types.metric list;
-}
-
-type any_metric_computer = Simulator_types.any_metric_computer = {
-  run : config:config -> steps:step_result list -> Metric_types.metric list;
-}
-
-let wrap_computer = Simulator_types.wrap_computer
+include Simulator_types
 
 (** Internal: compute metrics by running all computers over the steps *)
 let _compute_metrics ~computers ~config ~steps =
