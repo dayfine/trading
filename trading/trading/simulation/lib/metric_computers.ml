@@ -1,10 +1,45 @@
+(** Metric computers for computing performance metrics. *)
+
 open Core
+
+(** {1 Metric Computer Abstraction} *)
+
+type 'state metric_computer = {
+  name : string;
+  init : config:Simulator.config -> 'state;
+  update : state:'state -> step:Simulator.step_result -> 'state;
+  finalize : state:'state -> config:Simulator.config -> Metric_types.metric list;
+}
+
+type any_metric_computer = {
+  run :
+    config:Simulator.config ->
+    steps:Simulator.step_result list ->
+    Metric_types.metric list;
+}
+(** Type-erased wrapper using existential type via closure *)
+
+let wrap_computer (type s) (computer : s metric_computer) : any_metric_computer
+    =
+  {
+    run =
+      (fun ~config ~steps ->
+        let state = computer.init ~config in
+        let final_state =
+          List.fold steps ~init:state ~f:(fun state step ->
+              computer.update ~state ~step)
+        in
+        computer.finalize ~state:final_state ~config);
+  }
+
+let compute_metrics ~computers ~config ~steps =
+  List.concat_map computers ~f:(fun computer -> computer.run ~config ~steps)
 
 (** {1 Summary Statistics Computer} *)
 
 type summary_state = { steps : Simulator.step_result list }
 
-let _summary_computer_impl : summary_state Metrics.metric_computer =
+let _summary_computer_impl : summary_state metric_computer =
   {
     name = "summary";
     init = (fun ~config:_ -> { steps = [] });
@@ -18,7 +53,7 @@ let _summary_computer_impl : summary_state Metrics.metric_computer =
         | Some stats -> Metrics.summary_stats_to_metrics stats);
   }
 
-let summary_computer () = Metrics.wrap_computer _summary_computer_impl
+let summary_computer () = wrap_computer _summary_computer_impl
 
 (** {1 Sharpe Ratio Computer} *)
 
@@ -63,8 +98,7 @@ let _compute_daily_returns values =
   in
   match values with [] | [ _ ] -> [] | first :: rest -> loop first rest []
 
-let _sharpe_computer_impl ~risk_free_rate : sharpe_state Metrics.metric_computer
-    =
+let _sharpe_computer_impl ~risk_free_rate : sharpe_state metric_computer =
   {
     name = "sharpe_ratio";
     init = (fun ~config:_ -> { portfolio_values = []; risk_free_rate });
@@ -93,7 +127,7 @@ let _sharpe_computer_impl ~risk_free_rate : sharpe_state Metrics.metric_computer
         in
         [
           {
-            Metrics.name = "sharpe_ratio";
+            Metric_types.name = "sharpe_ratio";
             display_name = "Sharpe Ratio";
             description =
               "Risk-adjusted return (annualized): excess return over risk-free \
@@ -105,7 +139,7 @@ let _sharpe_computer_impl ~risk_free_rate : sharpe_state Metrics.metric_computer
   }
 
 let sharpe_ratio_computer ?(risk_free_rate = 0.0) () =
-  Metrics.wrap_computer (_sharpe_computer_impl ~risk_free_rate)
+  wrap_computer (_sharpe_computer_impl ~risk_free_rate)
 
 (** {1 Maximum Drawdown Computer} *)
 
@@ -115,7 +149,7 @@ type drawdown_state = {
   has_data : bool;  (** Whether we've seen any data points *)
 }
 
-let _drawdown_computer_impl : drawdown_state Metrics.metric_computer =
+let _drawdown_computer_impl : drawdown_state metric_computer =
   {
     name = "max_drawdown";
     init =
@@ -137,7 +171,7 @@ let _drawdown_computer_impl : drawdown_state Metrics.metric_computer =
       (fun ~state ~config:_ ->
         [
           {
-            Metrics.name = "max_drawdown";
+            Metric_types.name = "max_drawdown";
             display_name = "Max Drawdown";
             description =
               "Maximum percentage decline from peak portfolio value during \
@@ -148,7 +182,16 @@ let _drawdown_computer_impl : drawdown_state Metrics.metric_computer =
         ]);
   }
 
-let max_drawdown_computer () = Metrics.wrap_computer _drawdown_computer_impl
+let max_drawdown_computer () = wrap_computer _drawdown_computer_impl
+
+(** {1 Factory} *)
+
+let create_computer (metric_type : Metric_types.metric_type) :
+    any_metric_computer =
+  match metric_type with
+  | Summary -> summary_computer ()
+  | SharpeRatio -> sharpe_ratio_computer ()
+  | MaxDrawdown -> max_drawdown_computer ()
 
 (** {1 Default Computer Set} *)
 
@@ -166,5 +209,5 @@ let run_with_metrics ?computers sim =
   let%bind steps, final_portfolio = Simulator.run sim in
   let computers = Option.value computers ~default:(default_computers ()) in
   let config = Simulator.get_config sim in
-  let metrics = Metrics.compute_metrics ~computers ~config ~steps in
-  Ok { Metrics.steps; final_portfolio; metrics }
+  let metrics = compute_metrics ~computers ~config ~steps in
+  Ok { Simulator.steps; final_portfolio; metrics }

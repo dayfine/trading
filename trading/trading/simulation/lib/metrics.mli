@@ -4,36 +4,9 @@
     simulation results. It extracts round-trip trades (buy followed by sell) and
     computes summary statistics like P&L, win rate, and holding periods.
 
-    Also provides a generic metric framework with fold-based computation for
-    advanced metrics like Sharpe ratio and maximum drawdown.
-
     Part of Phase 7: Performance Metrics in the simulation framework. *)
 
 open Core
-
-(** {1 Generic Metric Types} *)
-
-(** Unit of measurement for a metric value *)
-type metric_unit =
-  | Dollars  (** Monetary value in dollars *)
-  | Percent  (** Percentage value (0-100 scale) *)
-  | Days  (** Time duration in days *)
-  | Count  (** Discrete count *)
-  | Ratio  (** Dimensionless ratio *)
-[@@deriving show, eq]
-
-type metric = {
-  name : string;  (** Machine-readable identifier (e.g., "sharpe_ratio") *)
-  display_name : string;  (** Human-readable name (e.g., "Sharpe Ratio") *)
-  description : string;  (** Brief explanation of what this metric measures *)
-  value : float;  (** The computed value *)
-  unit : metric_unit;  (** Unit of measurement *)
-}
-[@@deriving show, eq]
-(** A single computed metric with metadata *)
-
-type metric_set = metric list
-(** A collection of metrics from a simulation run *)
 
 (** {1 Trade Metrics Types} *)
 
@@ -68,41 +41,6 @@ type summary_stats = {
     Aggregates individual trade metrics into portfolio-level performance
     statistics useful for evaluating strategy effectiveness. *)
 
-(** {1 Metric Computer Abstraction}
-
-    Metric computers use a fold-based model: they maintain state that is updated
-    on each simulation step, then finalized to produce metrics. *)
-
-type 'state metric_computer = {
-  name : string;  (** Identifier for this computer *)
-  init : config:Simulator.config -> 'state;
-      (** Create initial state from simulation config *)
-  update : state:'state -> step:Simulator.step_result -> 'state;
-      (** Update state with a simulation step *)
-  finalize : state:'state -> config:Simulator.config -> metric list;
-      (** Produce final metrics from accumulated state *)
-}
-(** A metric computer that folds over simulation steps to produce metrics.
-
-    The 'state type parameter allows each computer to maintain its own internal
-    state during the fold (e.g., collecting daily values for Sharpe ratio). *)
-
-type any_metric_computer
-(** Type-erased wrapper for heterogeneous collections of metric computers *)
-
-val wrap_computer : 'state metric_computer -> any_metric_computer
-(** Wrap a typed metric computer for use in heterogeneous collections *)
-
-val compute_metrics :
-  computers:any_metric_computer list ->
-  config:Simulator.config ->
-  steps:Simulator.step_result list ->
-  metric_set
-(** Compute metrics by running all computers over the simulation steps.
-
-    Each computer's init/update/finalize cycle is executed, and all resulting
-    metrics are collected into a single metric_set. *)
-
 (** {1 Trade Metrics Functions} *)
 
 val extract_round_trips : Simulator.step_result list -> trade_metrics list
@@ -134,28 +72,7 @@ val show_summary : summary_stats -> string
     Example output:
     [Total P&L: $1234.56 | Avg hold: 8.5 days | Win rate: 60.0% (6/10)] *)
 
-(** {1 Metric Utilities} *)
-
-val find_metric : metric_set -> name:string -> metric option
-(** Find a metric by its machine-readable name *)
-
-val format_metric : metric -> string
-(** Format a single metric for display (e.g., "Sharpe Ratio: 1.25") *)
-
-val format_metrics : metric_set -> string
-(** Format all metrics for display, one per line *)
-
 (** {1 Conversion Functions} *)
 
-val summary_stats_to_metrics : summary_stats -> metric list
+val summary_stats_to_metrics : summary_stats -> Metric_types.metric list
 (** Convert legacy summary_stats to the generic metric format *)
-
-(** {1 Run Result Type} *)
-
-type run_result = {
-  steps : Simulator.step_result list;
-      (** All step results in chronological order *)
-  final_portfolio : Trading_portfolio.Portfolio.t;  (** Final portfolio state *)
-  metrics : metric_set;  (** Computed metrics from the simulation *)
-}
-(** Complete result of running a simulation with metrics *)

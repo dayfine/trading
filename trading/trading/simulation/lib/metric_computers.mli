@@ -1,11 +1,55 @@
-(** Pre-built metric computers for common performance metrics.
+(** Metric computers for computing performance metrics.
 
-    This module provides ready-to-use metric computers that can be passed to
-    [Metrics.compute_metrics] or the simulator's [run_with_metrics] function. *)
+    This module provides the metric computer abstraction and pre-built metric
+    computers that can be used to compute performance metrics from simulation
+    results. *)
+
+(** {1 Metric Computer Abstraction}
+
+    Metric computers use a fold-based model: they maintain state that is updated
+    on each simulation step, then finalized to produce metrics. *)
+
+type 'state metric_computer = {
+  name : string;  (** Identifier for this computer *)
+  init : config:Simulator.config -> 'state;
+      (** Create initial state from simulation config *)
+  update : state:'state -> step:Simulator.step_result -> 'state;
+      (** Update state with a simulation step *)
+  finalize : state:'state -> config:Simulator.config -> Metric_types.metric list;
+      (** Produce final metrics from accumulated state *)
+}
+(** A metric computer that folds over simulation steps to produce metrics.
+
+    The 'state type parameter allows each computer to maintain its own internal
+    state during the fold (e.g., collecting daily values for Sharpe ratio). *)
+
+type any_metric_computer
+(** Type-erased wrapper for heterogeneous collections of metric computers *)
+
+val wrap_computer : 'state metric_computer -> any_metric_computer
+(** Wrap a typed metric computer for use in heterogeneous collections *)
+
+val compute_metrics :
+  computers:any_metric_computer list ->
+  config:Simulator.config ->
+  steps:Simulator.step_result list ->
+  Metric_types.metric_set
+(** Compute metrics by running all computers over the simulation steps.
+
+    Each computer's init/update/finalize cycle is executed, and all resulting
+    metrics are collected into a single metric_set. *)
+
+(** {1 Factory} *)
+
+val create_computer : Metric_types.metric_type -> any_metric_computer
+(** Create a metric computer from a metric type.
+
+    @param metric_type The type of metric to compute
+    @return A wrapped metric computer for the specified type *)
 
 (** {1 Summary Statistics Computer} *)
 
-val summary_computer : unit -> Metrics.any_metric_computer
+val summary_computer : unit -> any_metric_computer
 (** Metric computer that produces summary statistics from round-trip trades.
 
     This wraps the existing [Metrics.extract_round_trips] and
@@ -21,8 +65,7 @@ val summary_computer : unit -> Metrics.any_metric_computer
 
 (** {1 Sharpe Ratio Computer} *)
 
-val sharpe_ratio_computer :
-  ?risk_free_rate:float -> unit -> Metrics.any_metric_computer
+val sharpe_ratio_computer : ?risk_free_rate:float -> unit -> any_metric_computer
 (** Metric computer that calculates the annualized Sharpe ratio.
 
     The Sharpe ratio measures risk-adjusted returns:
@@ -45,7 +88,7 @@ val sharpe_ratio_computer :
 
 (** {1 Maximum Drawdown Computer} *)
 
-val max_drawdown_computer : unit -> Metrics.any_metric_computer
+val max_drawdown_computer : unit -> any_metric_computer
 (** Metric computer that calculates maximum drawdown.
 
     Maximum drawdown measures the largest peak-to-trough decline in portfolio
@@ -63,7 +106,7 @@ val max_drawdown_computer : unit -> Metrics.any_metric_computer
 (** {1 Default Computer Set} *)
 
 val default_computers :
-  ?risk_free_rate:float -> unit -> Metrics.any_metric_computer list
+  ?risk_free_rate:float -> unit -> any_metric_computer list
 (** Returns all default metric computers: summary, Sharpe ratio, and max
     drawdown.
 
@@ -73,9 +116,9 @@ val default_computers :
 (** {1 Running with Metrics} *)
 
 val run_with_metrics :
-  ?computers:Metrics.any_metric_computer list ->
+  ?computers:any_metric_computer list ->
   Simulator.t ->
-  Metrics.run_result Status.status_or
+  Simulator.run_result Status.status_or
 (** Run the full simulation and compute metrics.
 
     @param computers

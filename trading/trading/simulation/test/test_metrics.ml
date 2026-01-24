@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Trading_simulation.Metrics
+open Trading_simulation.Metric_types
 open Trading_simulation.Metric_computers
 open Trading_simulation.Simulator
 open Matchers
@@ -10,11 +11,11 @@ let date_of_string s = Date.of_string s
 (* ==================== Type Derivations Tests ==================== *)
 
 let test_metric_unit_show _ =
-  assert_that (show_metric_unit Dollars) (equal_to "Metrics.Dollars");
-  assert_that (show_metric_unit Percent) (equal_to "Metrics.Percent");
-  assert_that (show_metric_unit Days) (equal_to "Metrics.Days");
-  assert_that (show_metric_unit Count) (equal_to "Metrics.Count");
-  assert_that (show_metric_unit Ratio) (equal_to "Metrics.Ratio")
+  assert_that (show_metric_unit Dollars) (equal_to "Metric_types.Dollars");
+  assert_that (show_metric_unit Percent) (equal_to "Metric_types.Percent");
+  assert_that (show_metric_unit Days) (equal_to "Metric_types.Days");
+  assert_that (show_metric_unit Count) (equal_to "Metric_types.Count");
+  assert_that (show_metric_unit Ratio) (equal_to "Metric_types.Ratio")
 
 let test_metric_unit_eq _ =
   assert_that (equal_metric_unit Dollars Dollars) (equal_to true);
@@ -494,6 +495,34 @@ let test_default_computers _ =
   (* Should have at least summary, sharpe, and drawdown computers *)
   assert_that computers (size_is 3)
 
+(* ==================== Factory Tests ==================== *)
+
+let test_create_computer_summary _ =
+  let computer = create_computer Summary in
+  let config = make_config () in
+  let steps = [] in
+  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  (* Empty steps means no summary metrics *)
+  assert_that metrics is_empty
+
+let test_create_computer_sharpe _ =
+  let computer = create_computer SharpeRatio in
+  let config = make_config () in
+  let steps = [] in
+  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  assert_that
+    (find_metric metrics ~name:"sharpe_ratio")
+    (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
+
+let test_create_computer_max_drawdown _ =
+  let computer = create_computer MaxDrawdown in
+  let config = make_config () in
+  let steps = [] in
+  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  assert_that
+    (find_metric metrics ~name:"max_drawdown")
+    (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -541,6 +570,10 @@ let suite =
          "compute_metrics combines results"
          >:: test_compute_metrics_combines_results;
          "default_computers" >:: test_default_computers;
+         (* Factory tests *)
+         "create_computer Summary" >:: test_create_computer_summary;
+         "create_computer SharpeRatio" >:: test_create_computer_sharpe;
+         "create_computer MaxDrawdown" >:: test_create_computer_max_drawdown;
        ]
 
 let () = run_test_tt_main suite

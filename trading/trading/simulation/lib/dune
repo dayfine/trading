@@ -15,6 +15,7 @@
   fpath
   core)
  (modules
+  metric_types
   simulator
   order_generator
   time_series

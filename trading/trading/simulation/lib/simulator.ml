@@ -294,3 +294,11 @@ let run t =
     | Ok (Stepped (t', step_result)) -> loop t' (step_result :: acc)
   in
   loop t []
+
+(** {1 Run Result Type} *)
+
+type run_result = {
+  steps : step_result list;
+  final_portfolio : Trading_portfolio.Portfolio.t;
+  metrics : Metric_types.metric_set;
+}

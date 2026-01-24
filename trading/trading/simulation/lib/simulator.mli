@@ -80,3 +80,12 @@ val run :
 val get_config : t -> config
 (** Get the config from a simulator. Useful for metric computers that need
     access to simulation parameters. *)
+
+(** {1 Run Result Type} *)
+
+type run_result = {
+  steps : step_result list;  (** All step results in chronological order *)
+  final_portfolio : Trading_portfolio.Portfolio.t;  (** Final portfolio state *)
+  metrics : Metric_types.metric_set;  (** Computed metrics from the simulation *)
+}
+(** Complete result of running a simulation with metrics *)
