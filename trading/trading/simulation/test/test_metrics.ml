@@ -10,168 +10,71 @@ let date_of_string s = Date.of_string s
 
 (* ==================== Type Derivations Tests ==================== *)
 
-let test_metric_unit_show _ =
-  assert_that (show_metric_unit Dollars) (equal_to "Metric_types.Dollars");
-  assert_that (show_metric_unit Percent) (equal_to "Metric_types.Percent");
-  assert_that (show_metric_unit Days) (equal_to "Metric_types.Days");
-  assert_that (show_metric_unit Count) (equal_to "Metric_types.Count");
-  assert_that (show_metric_unit Ratio) (equal_to "Metric_types.Ratio")
+let test_metric_type_show _ =
+  assert_that (show_metric_type TotalPnl) (equal_to "Metric_types.TotalPnl");
+  assert_that
+    (show_metric_type SharpeRatio)
+    (equal_to "Metric_types.SharpeRatio");
+  assert_that
+    (show_metric_type MaxDrawdown)
+    (equal_to "Metric_types.MaxDrawdown")
 
-let test_metric_unit_eq _ =
-  assert_that (equal_metric_unit Dollars Dollars) (equal_to true);
-  assert_that (equal_metric_unit Dollars Percent) (equal_to false)
+let test_metric_type_eq _ =
+  assert_that (equal_metric_type TotalPnl TotalPnl) (equal_to true);
+  assert_that (equal_metric_type TotalPnl SharpeRatio) (equal_to false)
 
 let test_metric_show _ =
-  let m =
-    {
-      name = "test";
-      display_name = "Test Metric";
-      description = "A test";
-      value = 42.5;
-      unit = Dollars;
-    }
-  in
+  let m = make_metric SharpeRatio 1.5 in
   let s = show_metric m in
   assert_bool "show_metric includes name"
-    (String.is_substring s ~substring:"test");
+    (String.is_substring s ~substring:"sharpe_ratio");
   assert_bool "show_metric includes value"
-    (String.is_substring s ~substring:"42.5")
+    (String.is_substring s ~substring:"1.5")
 
 let test_metric_eq _ =
-  let m1 =
-    {
-      name = "test";
-      display_name = "Test";
-      description = "desc";
-      value = 1.0;
-      unit = Dollars;
-    }
-  in
-  let m2 = { m1 with value = 2.0 } in
+  let m1 = make_metric SharpeRatio 1.0 in
+  let m2 = make_metric SharpeRatio 2.0 in
   assert_that (equal_metric m1 m1) (equal_to true);
   assert_that (equal_metric m1 m2) (equal_to false)
 
 (* ==================== Utility Function Tests ==================== *)
 
 let test_find_metric_found _ =
-  let metrics =
-    [
-      {
-        name = "a";
-        display_name = "A";
-        description = "";
-        value = 1.0;
-        unit = Count;
-      };
-      {
-        name = "b";
-        display_name = "B";
-        description = "";
-        value = 2.0;
-        unit = Count;
-      };
-    ]
-  in
+  let metrics = [ make_metric TotalPnl 1.0; make_metric SharpeRatio 2.0 ] in
   assert_that
-    (find_metric metrics ~name:"b")
+    (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun m -> assert_that m.value (float_equal 2.0)))
 
 let test_find_metric_not_found _ =
-  let metrics =
-    [
-      {
-        name = "a";
-        display_name = "A";
-        description = "";
-        value = 1.0;
-        unit = Count;
-      };
-    ]
-  in
-  assert_that (find_metric metrics ~name:"z") is_none
+  let metrics = [ make_metric TotalPnl 1.0 ] in
+  assert_that (find_metric metrics ~name:"nonexistent") is_none
 
 let test_format_metric_dollars _ =
-  let m =
-    {
-      name = "pnl";
-      display_name = "P&L";
-      description = "";
-      value = 1234.56;
-      unit = Dollars;
-    }
-  in
-  assert_that (format_metric m) (equal_to "P&L: $1234.56")
+  let m = make_metric TotalPnl 1234.56 in
+  assert_that (format_metric m) (equal_to "Total P&L: $1234.56")
 
 let test_format_metric_percent _ =
-  let m =
-    {
-      name = "rate";
-      display_name = "Win Rate";
-      description = "";
-      value = 75.5;
-      unit = Percent;
-    }
-  in
+  let m = make_metric WinRate 75.5 in
   assert_that (format_metric m) (equal_to "Win Rate: 75.50%")
 
 let test_format_metric_days _ =
-  let m =
-    {
-      name = "hold";
-      display_name = "Hold Time";
-      description = "";
-      value = 12.5;
-      unit = Days;
-    }
-  in
-  assert_that (format_metric m) (equal_to "Hold Time: 12.5 days")
+  let m = make_metric AvgHoldingDays 12.5 in
+  assert_that (format_metric m) (equal_to "Avg Holding Period: 12.5 days")
 
 let test_format_metric_count _ =
-  let m =
-    {
-      name = "wins";
-      display_name = "Wins";
-      description = "";
-      value = 42.0;
-      unit = Count;
-    }
-  in
-  assert_that (format_metric m) (equal_to "Wins: 42")
+  let m = make_metric WinCount 42.0 in
+  assert_that (format_metric m) (equal_to "Winning Trades: 42")
 
 let test_format_metric_ratio _ =
-  let m =
-    {
-      name = "sharpe";
-      display_name = "Sharpe";
-      description = "";
-      value = 1.2345;
-      unit = Ratio;
-    }
-  in
-  assert_that (format_metric m) (equal_to "Sharpe: 1.2345")
+  let m = make_metric SharpeRatio 1.2345 in
+  assert_that (format_metric m) (equal_to "Sharpe Ratio: 1.2345")
 
 let test_format_metrics_multiple _ =
-  let metrics =
-    [
-      {
-        name = "a";
-        display_name = "A";
-        description = "";
-        value = 1.0;
-        unit = Count;
-      };
-      {
-        name = "b";
-        display_name = "B";
-        description = "";
-        value = 2.0;
-        unit = Count;
-      };
-    ]
-  in
+  let metrics = [ make_metric TotalPnl 100.0; make_metric WinRate 50.0 ] in
   let s = format_metrics metrics in
-  assert_bool "contains A" (String.is_substring s ~substring:"A: 1");
-  assert_bool "contains B" (String.is_substring s ~substring:"B: 2");
+  assert_bool "contains Total P&L"
+    (String.is_substring s ~substring:"Total P&L");
+  assert_bool "contains Win Rate" (String.is_substring s ~substring:"Win Rate");
   assert_bool "contains newline" (String.is_substring s ~substring:"\n")
 
 (* ==================== Summary Stats Conversion Tests ==================== *)
@@ -192,12 +95,12 @@ let test_summary_stats_to_metrics _ =
     (find_metric metrics ~name:"total_pnl")
     (is_some_and (fun m ->
          assert_that m.value (float_equal 1500.0);
-         assert_that m.unit (equal_to (Dollars : metric_unit))));
+         assert_that m.metric_type (equal_to (TotalPnl : metric_type))));
   assert_that
     (find_metric metrics ~name:"win_rate")
     (is_some_and (fun m ->
          assert_that m.value (float_equal 70.0);
-         assert_that m.unit (equal_to (Percent : metric_unit))))
+         assert_that m.metric_type (equal_to (WinRate : metric_type))))
 
 (* ==================== Metric Computer Tests ==================== *)
 
@@ -240,7 +143,6 @@ let test_sharpe_ratio_zero_with_single_point _ =
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
 
 let test_sharpe_ratio_zero_with_constant_value _ =
-  (* Zero variance should result in zero Sharpe *)
   let config = make_config () in
   let steps =
     [
@@ -262,7 +164,6 @@ let test_sharpe_ratio_zero_with_constant_value _ =
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
 
 let test_sharpe_ratio_positive_with_gains _ =
-  (* Steadily increasing portfolio should have positive Sharpe *)
   let config = make_config () in
   let steps =
     [
@@ -288,7 +189,6 @@ let test_sharpe_ratio_positive_with_gains _ =
          assert_bool "Sharpe should be positive" Float.(m.value > 0.0)))
 
 let test_sharpe_ratio_negative_with_losses _ =
-  (* Steadily decreasing portfolio should have negative Sharpe *)
   let config = make_config () in
   let steps =
     [
@@ -314,7 +214,6 @@ let test_sharpe_ratio_negative_with_losses _ =
          assert_bool "Sharpe should be negative" Float.(m.value < 0.0)))
 
 let test_sharpe_ratio_with_risk_free_rate _ =
-  (* With positive risk-free rate, Sharpe should be lower *)
   let config = make_config () in
   let steps =
     [
@@ -349,7 +248,6 @@ let test_sharpe_ratio_with_risk_free_rate _ =
 (* ==================== Maximum Drawdown Tests ==================== *)
 
 let test_max_drawdown_zero_with_no_decline _ =
-  (* Steadily increasing portfolio should have zero drawdown *)
   let config = make_config () in
   let steps =
     [
@@ -371,7 +269,6 @@ let test_max_drawdown_zero_with_no_decline _ =
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
 
 let test_max_drawdown_captures_decline _ =
-  (* 10000 -> 11000 -> 9900 should have drawdown of (11000-9900)/11000 = 10% *)
   let config = make_config () in
   let steps =
     [
@@ -393,7 +290,6 @@ let test_max_drawdown_captures_decline _ =
     (is_some_and (fun m -> assert_that m.value (float_equal 10.0)))
 
 let test_max_drawdown_captures_largest _ =
-  (* Multiple declines - should capture the largest *)
   let config = make_config () in
   let steps =
     [
@@ -403,15 +299,12 @@ let test_max_drawdown_captures_largest _ =
       make_step_result
         ~date:(date_of_string "2024-01-02")
         ~portfolio_value:9500.0;
-      (* 5% dd *)
       make_step_result
         ~date:(date_of_string "2024-01-03")
         ~portfolio_value:12000.0;
-      (* new peak *)
       make_step_result
         ~date:(date_of_string "2024-01-04")
         ~portfolio_value:9600.0;
-      (* 20% dd from 12000 *)
     ]
   in
   let computer = max_drawdown_computer () in
@@ -421,7 +314,6 @@ let test_max_drawdown_captures_largest _ =
     (is_some_and (fun m -> assert_that m.value (float_equal 20.0)))
 
 let test_max_drawdown_with_recovery _ =
-  (* Recovery after drawdown should not reduce max drawdown *)
   let config = make_config () in
   let steps =
     [
@@ -431,15 +323,12 @@ let test_max_drawdown_with_recovery _ =
       make_step_result
         ~date:(date_of_string "2024-01-02")
         ~portfolio_value:9000.0;
-      (* 10% dd *)
       make_step_result
         ~date:(date_of_string "2024-01-03")
         ~portfolio_value:10500.0;
-      (* recovery, new peak *)
       make_step_result
         ~date:(date_of_string "2024-01-04")
         ~portfolio_value:10500.0;
-      (* no change *)
     ]
   in
   let computer = max_drawdown_computer () in
@@ -461,7 +350,6 @@ let test_summary_computer_with_no_trades _ =
   in
   let computer = summary_computer () in
   let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
-  (* No trades means no summary metrics *)
   assert_that metrics is_empty
 
 (* ==================== Multiple Computers Tests ==================== *)
@@ -492,18 +380,9 @@ let test_compute_metrics_combines_results _ =
 
 let test_default_computers _ =
   let computers = default_computers () in
-  (* Should have at least summary, sharpe, and drawdown computers *)
   assert_that computers (size_is 3)
 
 (* ==================== Factory Tests ==================== *)
-
-let test_create_computer_summary _ =
-  let computer = create_computer Summary in
-  let config = make_config () in
-  let steps = [] in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
-  (* Empty steps means no summary metrics *)
-  assert_that metrics is_empty
 
 let test_create_computer_sharpe _ =
   let computer = create_computer SharpeRatio in
@@ -529,8 +408,8 @@ let suite =
   "Metrics Tests"
   >::: [
          (* Type derivation tests *)
-         "metric_unit show" >:: test_metric_unit_show;
-         "metric_unit eq" >:: test_metric_unit_eq;
+         "metric_type show" >:: test_metric_type_show;
+         "metric_type eq" >:: test_metric_type_eq;
          "metric show" >:: test_metric_show;
          "metric eq" >:: test_metric_eq;
          (* Utility function tests *)
@@ -571,7 +450,6 @@ let suite =
          >:: test_compute_metrics_combines_results;
          "default_computers" >:: test_default_computers;
          (* Factory tests *)
-         "create_computer Summary" >:: test_create_computer_summary;
          "create_computer SharpeRatio" >:: test_create_computer_sharpe;
          "create_computer MaxDrawdown" >:: test_create_computer_max_drawdown;
        ]

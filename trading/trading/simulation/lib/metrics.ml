@@ -43,8 +43,7 @@ let show_summary s =
     s.total_pnl s.avg_holding_days s.win_rate s.win_count
     (s.win_count + s.loss_count)
 
-(** Pair buy trades with sells to form round-trips for a single symbol. Assumes
-    trades are sorted chronologically. *)
+(** Pair buy trades with sells to form round-trips for a single symbol. *)
 let _pair_trades_for_symbol symbol
     (trades : (Date.t * Trading_base.Types.trade) list) : trade_metrics list =
   let rec pair_trades trades_list metrics =
@@ -82,12 +81,10 @@ let _pair_trades_for_symbol symbol
 
 let extract_round_trips (steps : Simulator.step_result list) :
     trade_metrics list =
-  (* Collect all trades with their dates *)
   let all_trades =
     List.concat_map steps ~f:(fun step ->
         List.map step.trades ~f:(fun trade -> (step.date, trade)))
   in
-  (* Group by symbol *)
   let by_symbol =
     List.fold all_trades
       ~init:(Map.empty (module String))
@@ -96,7 +93,6 @@ let extract_round_trips (steps : Simulator.step_result list) :
         let existing = Map.find acc symbol |> Option.value ~default:[] in
         Map.set acc ~key:symbol ~data:((date, trade) :: existing))
   in
-  (* For each symbol, sort by date and pair trades *)
   Map.fold by_symbol ~init:[] ~f:(fun ~key:symbol ~data:trades acc ->
       let sorted =
         List.sort trades ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2)
@@ -130,39 +126,9 @@ let compute_summary (trades : trade_metrics list) : summary_stats option =
 let summary_stats_to_metrics (stats : summary_stats) : Metric_types.metric list
     =
   [
-    {
-      Metric_types.name = "total_pnl";
-      display_name = "Total P&L";
-      description = "Sum of profit/loss across all trades";
-      value = stats.total_pnl;
-      unit = Dollars;
-    };
-    {
-      name = "avg_holding_days";
-      display_name = "Avg Holding Period";
-      description = "Average number of days positions were held";
-      value = stats.avg_holding_days;
-      unit = Days;
-    };
-    {
-      name = "win_count";
-      display_name = "Winning Trades";
-      description = "Number of profitable trades";
-      value = Float.of_int stats.win_count;
-      unit = Count;
-    };
-    {
-      name = "loss_count";
-      display_name = "Losing Trades";
-      description = "Number of unprofitable trades";
-      value = Float.of_int stats.loss_count;
-      unit = Count;
-    };
-    {
-      name = "win_rate";
-      display_name = "Win Rate";
-      description = "Percentage of trades that were profitable";
-      value = stats.win_rate;
-      unit = Percent;
-    };
+    Metric_types.make_metric TotalPnl stats.total_pnl;
+    Metric_types.make_metric AvgHoldingDays stats.avg_holding_days;
+    Metric_types.make_metric WinCount (Float.of_int stats.win_count);
+    Metric_types.make_metric LossCount (Float.of_int stats.loss_count);
+    Metric_types.make_metric WinRate stats.win_rate;
   ]

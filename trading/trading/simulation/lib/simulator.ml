@@ -12,22 +12,6 @@ type config = {
 }
 [@@deriving show, eq]
 
-type dependencies = {
-  symbols : string list;
-  data_dir : Fpath.t;
-  strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
-  engine : Trading_engine.Engine.t;
-  order_manager : Trading_orders.Manager.order_manager;
-  market_data_adapter : Market_data_adapter.t;
-}
-
-let create_deps ~symbols ~data_dir ~strategy ~commission =
-  let engine_config = { Trading_engine.Types.commission } in
-  let engine = Trading_engine.Engine.create engine_config in
-  let order_manager = Trading_orders.Manager.create () in
-  let market_data_adapter = Market_data_adapter.create ~data_dir in
-  { symbols; data_dir; strategy; engine; order_manager; market_data_adapter }
-
 (** {1 Simulator Types} *)
 
 type step_result = {
@@ -39,9 +23,73 @@ type step_result = {
 }
 [@@deriving show, eq]
 
-type step_outcome =
-  | Stepped of t * step_result
-  | Completed of Trading_portfolio.Portfolio.t
+(** {1 Run Result Type} *)
+
+type run_result = {
+  steps : step_result list;
+  final_portfolio : Trading_portfolio.Portfolio.t;
+  metrics : Metric_types.metric_set;
+}
+
+(** {1 Metric Computer Abstraction} *)
+
+type 'state metric_computer = {
+  name : string;
+  init : config:config -> 'state;
+  update : state:'state -> step:step_result -> 'state;
+  finalize : state:'state -> config:config -> Metric_types.metric list;
+}
+
+type any_metric_computer = {
+  run : config:config -> steps:step_result list -> Metric_types.metric list;
+}
+
+let wrap_computer (type s) (computer : s metric_computer) : any_metric_computer
+    =
+  {
+    run =
+      (fun ~config ~steps ->
+        let state = computer.init ~config in
+        let final_state =
+          List.fold steps ~init:state ~f:(fun state step ->
+              computer.update ~state ~step)
+        in
+        computer.finalize ~state:final_state ~config);
+  }
+
+let compute_metrics ~computers ~config ~steps =
+  List.concat_map computers ~f:(fun computer -> computer.run ~config ~steps)
+
+(** {1 Dependencies} *)
+
+type dependencies = {
+  symbols : string list;
+  data_dir : Fpath.t;
+  strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
+  engine : Trading_engine.Engine.t;
+  order_manager : Trading_orders.Manager.order_manager;
+  market_data_adapter : Market_data_adapter.t;
+  computers : any_metric_computer list;
+}
+
+let create_deps ~symbols ~data_dir ~strategy ~commission ?(computers = []) () =
+  let engine_config = { Trading_engine.Types.commission } in
+  let engine = Trading_engine.Engine.create engine_config in
+  let order_manager = Trading_orders.Manager.create () in
+  let market_data_adapter = Market_data_adapter.create ~data_dir in
+  {
+    symbols;
+    data_dir;
+    strategy;
+    engine;
+    order_manager;
+    market_data_adapter;
+    computers;
+  }
+
+(** {1 Simulator State} *)
+
+type step_outcome = Stepped of t * step_result | Completed of run_result
 
 and t = {
   config : config;
@@ -49,6 +97,7 @@ and t = {
   current_date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
   positions : Trading_strategy.Position.t String.Map.t;
+  step_history : step_result list;  (** Accumulated steps in reverse order *)
 }
 
 (** {1 Creation} *)
@@ -63,6 +112,7 @@ let create ~config ~deps =
     current_date = config.start_date;
     portfolio;
     positions = String.Map.empty;
+    step_history = [];
   }
 
 (** {1 Running} *)
@@ -94,11 +144,7 @@ let _get_today_bars t =
       | None -> None
       | Some daily_price -> Some (_to_price_bar symbol daily_price))
 
-(** Compute total portfolio value (cash + position market values).
-
-    Uses close prices from today's bars to value positions. If a position's
-    symbol has no price data for today, its market value is assumed to be zero
-    (the position is illiquid). *)
+(** Compute total portfolio value (cash + position market values). *)
 let _compute_portfolio_value ~portfolio ~today_bars =
   let prices =
     List.map today_bars ~f:(fun bar ->
@@ -150,13 +196,7 @@ let _find_position_by_symbol_state positions ~symbol ~state_match =
       then Some (id, pos)
       else None)
 
-(** Apply a fill to a position (works for both entry and exit fills).
-
-    TODO: Upon EntryComplete, we should place stop-loss and take-profit orders
-    immediately based on risk_params. This requires either: 1. Returning the
-    orders to place alongside the updated position, or 2. Having the simulator
-    check for newly-Holding positions and place orders. For now, risk_params are
-    set to None and protective orders are not placed. *)
+(** Apply a fill to a position (works for both entry and exit fills). *)
 let _apply_fill ~date ~position ~trade ~is_entry =
   let open Result.Let_syntax in
   let open Trading_strategy.Position in
@@ -192,15 +232,10 @@ let _apply_fill ~date ~position ~trade ~is_entry =
   let complete_trans = { position_id = pos.id; date; kind = complete_kind } in
   apply_transition pos complete_trans
 
-(** Update positions from trades.
-
-    Matches trades to positions by symbol and position state (not trade side),
-    supporting both long positions (buy to enter, sell to exit) and short
-    positions (sell to enter, buy to exit). *)
+(** Update positions from trades. *)
 let _update_positions_from_trades ~date ~positions ~trades =
   let open Result.Let_syntax in
   let open Trading_strategy.Position in
-  (* Cases to try: (state_match, is_entry) *)
   let fill_cases =
     [
       ((function Entering _ -> true | _ -> false), true);
@@ -220,8 +255,7 @@ let _update_positions_from_trades ~date ~positions ~trades =
           Ok (Map.set acc ~key:id ~data:updated)
       | None -> Ok acc)
 
-(** Apply transitions to positions (CreateEntering creates new, TriggerExit
-    updates existing) *)
+(** Apply transitions to positions *)
 let _apply_transitions ~positions ~transitions =
   let open Result.Let_syntax in
   List.fold_result transitions ~init:positions ~f:(fun acc trans ->
@@ -239,8 +273,16 @@ let _apply_transitions ~positions ~transitions =
               Ok (Map.set acc ~key:trans.position_id ~data:updated))
       | _ -> Ok acc)
 
+(** Build run_result from accumulated state *)
+let _build_run_result t =
+  let steps = List.rev t.step_history in
+  let metrics =
+    compute_metrics ~computers:t.deps.computers ~config:t.config ~steps
+  in
+  { steps; final_portfolio = t.portfolio; metrics }
+
 let step t =
-  if _is_complete t then Ok (Completed t.portfolio)
+  if _is_complete t then Ok (Completed (_build_run_result t))
   else
     let open Result.Let_syntax in
     (* Get today's prices and update engine *)
@@ -259,7 +301,7 @@ let step t =
     let%bind portfolio =
       Trading_portfolio.Portfolio.apply_trades t.portfolio trades
     in
-    (* Call strategy and apply transitions (creates new positions, triggers exits) *)
+    (* Call strategy and apply transitions *)
     let%bind transitions = _call_strategy { t with positions } in
     let%bind positions = _apply_transitions ~positions ~transitions in
     (* Generate and submit orders for next day *)
@@ -269,7 +311,7 @@ let step t =
     let orders_submitted = _submit_orders t orders in
     (* Compute portfolio value using today's close prices *)
     let portfolio_value = _compute_portfolio_value ~portfolio ~today_bars in
-    (* Advance to next date *)
+    (* Build step result *)
     let step_result =
       {
         date = t.current_date;
@@ -279,26 +321,26 @@ let step t =
         orders_submitted;
       }
     in
+    (* Advance to next date and accumulate step *)
     let next_date = Date.add_days t.current_date 1 in
-    return
-      (Stepped
-         ({ t with current_date = next_date; portfolio; positions }, step_result))
+    let t' =
+      {
+        t with
+        current_date = next_date;
+        portfolio;
+        positions;
+        step_history = step_result :: t.step_history;
+      }
+    in
+    return (Stepped (t', step_result))
 
 let get_config t = t.config
 
 let run t =
-  let rec loop t acc =
+  let rec loop t =
     match step t with
     | Error e -> Error e
-    | Ok (Completed portfolio) -> Ok (List.rev acc, portfolio)
-    | Ok (Stepped (t', step_result)) -> loop t' (step_result :: acc)
+    | Ok (Completed result) -> Ok result
+    | Ok (Stepped (t', _)) -> loop t'
   in
-  loop t []
-
-(** {1 Run Result Type} *)
-
-type run_result = {
-  steps : step_result list;
-  final_portfolio : Trading_portfolio.Portfolio.t;
-  metrics : Metric_types.metric_set;
-}
+  loop t

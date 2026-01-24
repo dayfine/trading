@@ -4,9 +4,35 @@
     no dependencies on other simulation modules, allowing it to be used as a
     foundation for both Simulator and Metrics modules. *)
 
+(** {1 Metric Type Enum} *)
+
+(** Enum identifying the type of metric *)
+type metric_type =
+  | TotalPnl  (** Total profit/loss in dollars *)
+  | AvgHoldingDays  (** Average holding period *)
+  | WinCount  (** Number of winning trades *)
+  | LossCount  (** Number of losing trades *)
+  | WinRate  (** Win percentage *)
+  | SharpeRatio  (** Risk-adjusted return metric *)
+  | MaxDrawdown  (** Maximum peak-to-trough decline *)
+[@@deriving show, eq]
+
 (** {1 Metric Types} *)
 
-(** Unit of measurement for a metric value *)
+type metric = {
+  name : string;  (** Machine-readable identifier (e.g., "sharpe_ratio") *)
+  metric_type : metric_type;  (** The type of this metric *)
+  value : float;  (** The computed value *)
+}
+[@@deriving show, eq]
+(** A single computed metric *)
+
+type metric_set = metric list
+(** A collection of metrics from a simulation run *)
+
+(** {1 Metric Unit} *)
+
+(** Unit of measurement for formatting *)
 type metric_unit =
   | Dollars  (** Monetary value in dollars *)
   | Percent  (** Percentage value (0-100 scale) *)
@@ -15,27 +41,17 @@ type metric_unit =
   | Ratio  (** Dimensionless ratio *)
 [@@deriving show, eq]
 
-type metric = {
-  name : string;  (** Machine-readable identifier (e.g., "sharpe_ratio") *)
-  display_name : string;  (** Human-readable name (e.g., "Sharpe Ratio") *)
-  description : string;  (** Brief explanation of what this metric measures *)
-  value : float;  (** The computed value *)
-  unit : metric_unit;  (** Unit of measurement *)
+(** {1 Metric Info} *)
+
+type metric_info = {
+  display_name : string;  (** Human-readable name *)
+  description : string;  (** Brief explanation *)
+  unit : metric_unit;  (** Unit for formatting *)
 }
-[@@deriving show, eq]
-(** A single computed metric with metadata *)
+(** Metadata about a metric type *)
 
-type metric_set = metric list
-(** A collection of metrics from a simulation run *)
-
-(** {1 Metric Type Enum} *)
-
-(** Enum for factory dispatch of metric computers *)
-type metric_type =
-  | Summary  (** Summary statistics from round-trip trades *)
-  | SharpeRatio  (** Risk-adjusted return metric *)
-  | MaxDrawdown  (** Maximum peak-to-trough decline *)
-[@@deriving show, eq]
+val get_metric_info : metric_type -> metric_info
+(** Get display info for a metric type *)
 
 (** {1 Utility Functions} *)
 
@@ -47,3 +63,6 @@ val format_metric : metric -> string
 
 val format_metrics : metric_set -> string
 (** Format all metrics for display, one per line *)
+
+val make_metric : metric_type -> float -> metric
+(** Create a metric with the canonical name for its type *)

@@ -42,7 +42,7 @@ let sample_aapl_prices =
 let make_deps data_dir =
   create_deps ~symbols:[ "AAPL" ] ~data_dir
     ~strategy:(module Noop_strategy)
-    ~commission:sample_config.commission
+    ~commission:sample_config.commission ()
 
 (* Helper to create expected step_result for comparison.
    portfolio_value defaults to the portfolio's current_cash if not specified,
@@ -61,7 +61,7 @@ let is_stepped f = function
   | Completed _ -> assert_failure "Expected Stepped, got Completed"
 
 let is_completed f = function
-  | Completed portfolio -> f portfolio
+  | Completed result -> f result
   | Stepped _ -> assert_failure "Expected Completed, got Stepped"
 
 (* ==================== create tests ==================== *)
@@ -89,7 +89,7 @@ let test_create_with_empty_symbols _ =
       let deps =
         create_deps ~symbols:[] ~data_dir
           ~strategy:(module Noop_strategy)
-          ~commission:sample_config.commission
+          ~commission:sample_config.commission ()
       in
       let sim = create ~config:sample_config ~deps in
       let expected_portfolio =
@@ -379,8 +379,8 @@ let test_step_returns_completed_when_done _ =
       in
       assert_that (step sim)
         (is_ok_and_holds
-           (is_completed (fun portfolio ->
-                assert_equal expected_portfolio portfolio))))
+           (is_completed (fun result ->
+                assert_equal expected_portfolio result.final_portfolio))))
 
 (* ==================== run tests ==================== *)
 
@@ -407,9 +407,9 @@ let test_run_completes_simulation _ =
         ]
       in
       assert_that (run sim)
-        (is_ok_and_holds (fun (steps, final_portfolio) ->
-             assert_equal expected_steps steps;
-             assert_equal expected_portfolio final_portfolio)))
+        (is_ok_and_holds (fun result ->
+             assert_equal expected_steps result.steps;
+             assert_equal expected_portfolio result.final_portfolio)))
 
 let test_run_on_already_complete _ =
   with_test_data "simulator_run_already_complete"
@@ -428,9 +428,9 @@ let test_run_on_already_complete _ =
         Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
       in
       assert_that (run sim)
-        (is_ok_and_holds (fun (steps, final_portfolio) ->
-             assert_that steps (size_is 0);
-             assert_equal expected_portfolio final_portfolio)))
+        (is_ok_and_holds (fun result ->
+             assert_that result.steps (size_is 0);
+             assert_equal expected_portfolio result.final_portfolio)))
 
 (* ==================== position lifecycle tests ==================== *)
 
@@ -438,7 +438,7 @@ let make_enter_exit_deps data_dir =
   Enter_then_exit_strategy.reset ();
   create_deps ~symbols:[ "AAPL" ] ~data_dir
     ~strategy:(module Enter_then_exit_strategy)
-    ~commission:sample_config.commission
+    ~commission:sample_config.commission ()
 
 let test_position_created_when_strategy_returns_create_entering _ =
   with_test_data "position_lifecycle_create"
@@ -545,7 +545,9 @@ let test_full_position_lifecycle _ =
          - Step 3 (Jan 4): Exit order fills. 1 trade (exit). *)
       match run sim with
       | Error err -> failwith ("Run failed: " ^ Status.show err)
-      | Ok (steps, final_portfolio) ->
+      | Ok result ->
+          let steps = result.steps in
+          let final_portfolio = result.final_portfolio in
           (* Verify step structure: 3 steps with expected trades *)
           assert_that steps
             (elements_are
@@ -592,14 +594,14 @@ let make_long_strategy_deps data_dir =
   Long_strategy.reset ();
   create_deps ~symbols:[ "AAPL" ] ~data_dir
     ~strategy:(module Long_strategy)
-    ~commission:sample_config.commission
+    ~commission:sample_config.commission ()
 
 (** Helper to create deps with Short_strategy *)
 let make_short_strategy_deps data_dir =
   Short_strategy.reset ();
   create_deps ~symbols:[ "AAPL" ] ~data_dir
     ~strategy:(module Short_strategy)
-    ~commission:sample_config.commission
+    ~commission:sample_config.commission ()
 
 let test_position_matched_by_state_not_side _ =
   (* This test verifies that trades are matched to positions by state
