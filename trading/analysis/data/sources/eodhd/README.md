@@ -2,8 +2,7 @@
 
 ## Install dependencies
 
-In `trading/trading/analysi
-s/data_sources`
+In `trading/analysis/data/sources/eodhd`
 
 ```sh
 $ sudo apt-get install libffi-dev
@@ -18,4 +17,9 @@ $ dune build && dune runtest
 
 ## Setup
 
-- There should be a `secrets` file with the API key in it
+1. Get an API key from [EOD Historical Data](https://eodhd.com/cp/dashboard)
+2. Create a `secrets` file in this directory with your API key:
+   ```sh
+   echo "YOUR_API_KEY_HERE" > trading/analysis/data/sources/eodhd/secrets
+   ```
+3. The `secrets` file is git-ignored and should never be committed
