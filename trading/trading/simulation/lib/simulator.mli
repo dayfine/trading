@@ -1,73 +1,60 @@
 (** Simulation engine for backtesting trading strategies *)
 
-open Core
+(** {1 Re-exported Types}
 
-(** {1 Input Types} *)
+    These types are defined in {!Simulator_types} and re-exported here for
+    convenience. *)
 
-type config = {
-  start_date : Date.t;
-  end_date : Date.t;
+type config = Simulator_types.config = {
+  start_date : Core.Date.t;
+  end_date : Core.Date.t;
   initial_cash : float;
   commission : Trading_engine.Types.commission_config;
 }
 [@@deriving show, eq]
 (** Configuration for running a simulation *)
 
-(** {1 Simulator Types} *)
-
-type t
-(** Abstract simulator type *)
-
-type step_result = {
-  date : Date.t;  (** The date this step executed on *)
-  portfolio : Trading_portfolio.Portfolio.t;  (** Portfolio state after step *)
+type step_result = Simulator_types.step_result = {
+  date : Core.Date.t;
+  portfolio : Trading_portfolio.Portfolio.t;
   portfolio_value : float;
-      (** Total portfolio value: cash + market value of all positions *)
   trades : Trading_base.Types.trade list;
-      (** Trades from orders that filled during this step *)
   orders_submitted : Trading_orders.Types.order list;
-      (** Orders submitted for execution on the next step *)
 }
 [@@deriving show, eq]
 (** Result of a single simulation step *)
 
-(** {1 Run Result Type} *)
-
-type run_result = {
-  steps : step_result list;  (** All step results in chronological order *)
-  final_portfolio : Trading_portfolio.Portfolio.t;  (** Final portfolio state *)
-  metrics : Metric_types.metric_set;  (** Computed metrics from the simulation *)
+type run_result = Simulator_types.run_result = {
+  steps : step_result list;
+  final_portfolio : Trading_portfolio.Portfolio.t;
+  metrics : Metric_types.metric_set;
 }
 (** Complete result of running a simulation with metrics *)
 
-type step_outcome =
-  | Stepped of t * step_result  (** Simulation advanced one step *)
-  | Completed of run_result  (** Simulation complete with final results *)
-
-(** {1 Metric Computer Abstraction} *)
-
-type 'state metric_computer = {
-  name : string;  (** Identifier for this computer *)
-  init : config:config -> 'state;  (** Create initial state from config *)
+type 'state metric_computer = 'state Simulator_types.metric_computer = {
+  name : string;
+  init : config:config -> 'state;
   update : state:'state -> step:step_result -> 'state;
-      (** Update state with a simulation step *)
   finalize : state:'state -> config:config -> Metric_types.metric list;
-      (** Produce final metrics from accumulated state *)
 }
 (** A metric computer that folds over simulation steps to produce metrics. *)
 
-type any_metric_computer
+type any_metric_computer = Simulator_types.any_metric_computer = {
+  run : config:config -> steps:step_result list -> Metric_types.metric list;
+}
 (** Type-erased wrapper for heterogeneous collections of metric computers *)
 
 val wrap_computer : 'state metric_computer -> any_metric_computer
 (** Wrap a typed metric computer for use in heterogeneous collections *)
 
-val compute_metrics :
-  computers:any_metric_computer list ->
-  config:config ->
-  steps:step_result list ->
-  Metric_types.metric_set
-(** Compute metrics by running all computers over the simulation steps. *)
+(** {1 Simulator Types} *)
+
+type t
+(** Abstract simulator type *)
+
+type step_outcome =
+  | Stepped of t * step_result  (** Simulation advanced one step *)
+  | Completed of run_result  (** Simulation complete with final results *)
 
 (** {1 Dependencies} *)
 

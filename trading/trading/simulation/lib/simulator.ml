@@ -2,9 +2,9 @@
 
 open Core
 
-(** {1 Input Types} *)
+(** {1 Re-exported Types from Simulator_types} *)
 
-type config = {
+type config = Simulator_types.config = {
   start_date : Date.t;
   end_date : Date.t;
   initial_cash : float;
@@ -12,9 +12,7 @@ type config = {
 }
 [@@deriving show, eq]
 
-(** {1 Simulator Types} *)
-
-type step_result = {
+type step_result = Simulator_types.step_result = {
   date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
   portfolio_value : float;
@@ -23,42 +21,29 @@ type step_result = {
 }
 [@@deriving show, eq]
 
-(** {1 Run Result Type} *)
-
-type run_result = {
+type run_result = Simulator_types.run_result = {
   steps : step_result list;
   final_portfolio : Trading_portfolio.Portfolio.t;
   metrics : Metric_types.metric_set;
 }
 
-(** {1 Metric Computer Abstraction} *)
-
-type 'state metric_computer = {
+type 'state metric_computer = 'state Simulator_types.metric_computer = {
   name : string;
   init : config:config -> 'state;
   update : state:'state -> step:step_result -> 'state;
   finalize : state:'state -> config:config -> Metric_types.metric list;
 }
 
-type any_metric_computer = {
+type any_metric_computer = Simulator_types.any_metric_computer = {
   run : config:config -> steps:step_result list -> Metric_types.metric list;
 }
 
-let wrap_computer (type s) (computer : s metric_computer) : any_metric_computer
-    =
-  {
-    run =
-      (fun ~config ~steps ->
-        let state = computer.init ~config in
-        let final_state =
-          List.fold steps ~init:state ~f:(fun state step ->
-              computer.update ~state ~step)
-        in
-        computer.finalize ~state:final_state ~config);
-  }
+let wrap_computer = Simulator_types.wrap_computer
 
-let compute_metrics ~computers ~config ~steps =
-  List.concat_map computers ~f:(fun computer -> computer.run ~config ~steps)
+(** Internal: compute metrics by running all computers over the steps *)
+let _compute_metrics ~computers ~config ~steps =
+  List.concat_map computers ~f:(fun (computer : any_metric_computer) ->
+      computer.run ~config ~steps)
 
 (** {1 Dependencies} *)
 
@@ -277,7 +262,7 @@ let _apply_transitions ~positions ~transitions =
 let _build_run_result t =
   let steps = List.rev t.step_history in
   let metrics =
-    compute_metrics ~computers:t.deps.computers ~config:t.config ~steps
+    _compute_metrics ~computers:t.deps.computers ~config:t.config ~steps
   in
   { steps; final_portfolio = t.portfolio; metrics }
 

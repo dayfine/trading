@@ -8,6 +8,11 @@ open Matchers
 
 let date_of_string s = Date.of_string s
 
+(** Helper to run metric computers over steps (run_computers is internal) *)
+let run_computers ~computers ~config ~steps =
+  List.concat_map computers ~f:(fun (c : any_metric_computer) ->
+      c.run ~config ~steps)
+
 (* ==================== Type Derivations Tests ==================== *)
 
 let test_metric_type_show _ =
@@ -122,7 +127,7 @@ let make_config () =
 let test_sharpe_ratio_zero_with_no_data _ =
   let config = make_config () in
   let computer = sharpe_ratio_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps:[] in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps:[] in
   assert_that
     (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
@@ -137,7 +142,7 @@ let test_sharpe_ratio_zero_with_single_point _ =
     ]
   in
   let computer = sharpe_ratio_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
@@ -158,7 +163,7 @@ let test_sharpe_ratio_zero_with_constant_value _ =
     ]
   in
   let computer = sharpe_ratio_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
@@ -182,7 +187,7 @@ let test_sharpe_ratio_positive_with_gains _ =
     ]
   in
   let computer = sharpe_ratio_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun m ->
@@ -207,7 +212,7 @@ let test_sharpe_ratio_negative_with_losses _ =
     ]
   in
   let computer = sharpe_ratio_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun m ->
@@ -231,10 +236,10 @@ let test_sharpe_ratio_with_risk_free_rate _ =
   let computer_no_rf = sharpe_ratio_computer () in
   let computer_with_rf = sharpe_ratio_computer ~risk_free_rate:0.05 () in
   let metrics_no_rf =
-    compute_metrics ~computers:[ computer_no_rf ] ~config ~steps
+    run_computers ~computers:[ computer_no_rf ] ~config ~steps
   in
   let metrics_with_rf =
-    compute_metrics ~computers:[ computer_with_rf ] ~config ~steps
+    run_computers ~computers:[ computer_with_rf ] ~config ~steps
   in
   let sharpe_no_rf =
     Option.value_exn (find_metric metrics_no_rf ~name:"sharpe_ratio")
@@ -263,7 +268,7 @@ let test_max_drawdown_zero_with_no_decline _ =
     ]
   in
   let computer = max_drawdown_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"max_drawdown")
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
@@ -284,7 +289,7 @@ let test_max_drawdown_captures_decline _ =
     ]
   in
   let computer = max_drawdown_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"max_drawdown")
     (is_some_and (fun m -> assert_that m.value (float_equal 10.0)))
@@ -308,7 +313,7 @@ let test_max_drawdown_captures_largest _ =
     ]
   in
   let computer = max_drawdown_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"max_drawdown")
     (is_some_and (fun m -> assert_that m.value (float_equal 20.0)))
@@ -332,7 +337,7 @@ let test_max_drawdown_with_recovery _ =
     ]
   in
   let computer = max_drawdown_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"max_drawdown")
     (is_some_and (fun m -> assert_that m.value (float_equal 10.0)))
@@ -349,12 +354,12 @@ let test_summary_computer_with_no_trades _ =
     ]
   in
   let computer = summary_computer () in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that metrics is_empty
 
 (* ==================== Multiple Computers Tests ==================== *)
 
-let test_compute_metrics_combines_results _ =
+let test_run_computers_combines_results _ =
   let config = make_config () in
   let steps =
     [
@@ -370,7 +375,7 @@ let test_compute_metrics_combines_results _ =
     ]
   in
   let computers = [ sharpe_ratio_computer (); max_drawdown_computer () ] in
-  let metrics = compute_metrics ~computers ~config ~steps in
+  let metrics = run_computers ~computers ~config ~steps in
   assert_that
     (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun _ -> ()));
@@ -388,7 +393,7 @@ let test_create_computer_sharpe _ =
   let computer = create_computer SharpeRatio in
   let config = make_config () in
   let steps = [] in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"sharpe_ratio")
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
@@ -397,7 +402,7 @@ let test_create_computer_max_drawdown _ =
   let computer = create_computer MaxDrawdown in
   let config = make_config () in
   let steps = [] in
-  let metrics = compute_metrics ~computers:[ computer ] ~config ~steps in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that
     (find_metric metrics ~name:"max_drawdown")
     (is_some_and (fun m -> assert_that m.value (float_equal 0.0)))
@@ -446,8 +451,8 @@ let suite =
          "summary computer with no trades"
          >:: test_summary_computer_with_no_trades;
          (* Multiple computers tests *)
-         "compute_metrics combines results"
-         >:: test_compute_metrics_combines_results;
+         "run_computers combines results"
+         >:: test_run_computers_combines_results;
          "default_computers" >:: test_default_computers;
          (* Factory tests *)
          "create_computer SharpeRatio" >:: test_create_computer_sharpe;

@@ -16,6 +16,7 @@
   core)
  (modules
   metric_types
+  simulator_types
   simulator
   order_generator
   time_series
