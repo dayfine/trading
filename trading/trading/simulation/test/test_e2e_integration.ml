@@ -15,19 +15,22 @@ open Test_helpers
 
 let date_of_string s = Date.of_string s
 
-(** Real data directory path. Tests run from
-    _build/default/trading/simulation/test/ via dune, so we need to navigate up
-    to find the data directory. *)
+(** Data directory path. Tests run from _build/default/trading/simulation/test/
+    via dune, so we need to navigate up to find the data directory.
+
+    Tries real data first (../data), then falls back to test_data/ which
+    contains a minimal sample dataset for reproducible testing. *)
 let real_data_dir =
-  (* Try multiple possible locations for the data directory *)
   let candidates =
     [
+      (* Real data locations *)
       "../data";
-      (* When running from trading/ directly *)
       "../../../../../data";
-      (* When running from _build/default/trading/simulation/test/ *)
       "../../../../../../data";
-      (* Alternative _build layout *)
+      (* Sample test data locations (fallback for reproducible builds) *)
+      "../test_data";
+      "../../../../../test_data";
+      "../../../../../../test_data";
     ]
   in
   let data_dir_opt =
@@ -40,7 +43,10 @@ let real_data_dir =
   in
   match data_dir_opt with
   | Some path -> path
-  | None -> failwith "Could not find real data directory"
+  | None ->
+      failwith
+        "Could not find data directory. Either provide real data in ../data or \
+         use test_data/ sample dataset."
 
 (** Sample commission config *)
 let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
