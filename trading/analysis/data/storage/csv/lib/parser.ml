@@ -43,7 +43,7 @@ let parse_lines (lines : string list) :
     (* Skip header *)
     List.tl_exn lines
     |> List.map ~f:(fun line ->
-           match parse_line line with
-           | Ok price -> Ok price
-           | Error msg -> Status.error_invalid_argument msg)
+        match parse_line line with
+        | Ok price -> Ok price
+        | Error msg -> Status.error_invalid_argument msg)
     |> Result.all

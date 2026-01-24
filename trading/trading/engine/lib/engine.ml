@@ -173,11 +173,11 @@ let _create_execution_report order_id trade =
 let _process_order_with_execution order_mgr order execute_fn =
   execute_fn ()
   |> Option.map ~f:(fun trade ->
-         let updated_order =
-           ({ order with status = Filled } : Trading_orders.Types.order)
-         in
-         let _ = update_order order_mgr updated_order in
-         _create_execution_report order.id trade)
+      let updated_order =
+        ({ order with status = Filled } : Trading_orders.Types.order)
+      in
+      let _ = update_order order_mgr updated_order in
+      _create_execution_report order.id trade)
 
 let _process_market_order engine order_mgr order =
   _process_order_with_execution order_mgr order (fun () ->

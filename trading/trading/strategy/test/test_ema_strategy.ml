@@ -27,9 +27,8 @@ let apply_transition positions transition =
       let position_opt =
         Map.to_alist positions
         |> List.find_map ~f:(fun (_symbol, pos) ->
-               if String.equal pos.Position.id transition.position_id then
-                 Some pos
-               else None)
+            if String.equal pos.Position.id transition.position_id then Some pos
+            else None)
       in
       match position_opt with
       | Some position -> (

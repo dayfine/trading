@@ -40,12 +40,12 @@ let _transition_to_order ~positions
          We look up the Exiting position to get the quantity and side. *)
       Map.find positions transition.position_id
       |> Option.value_map ~default:(Ok None) ~f:(fun position ->
-             match get_state position with
-             | Exiting { quantity; _ } ->
-                 _create_order ~symbol:position.symbol
-                   ~side:(_exit_order_side position.side)
-                   ~quantity
-             | _ -> Ok None)
+          match get_state position with
+          | Exiting { quantity; _ } ->
+              _create_order ~symbol:position.symbol
+                ~side:(_exit_order_side position.side)
+                ~quantity
+          | _ -> Ok None)
   | EntryFill _ | EntryComplete _ | CancelEntry _ | UpdateRiskParams _
   | ExitFill _ | ExitComplete ->
       Ok None

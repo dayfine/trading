@@ -70,8 +70,8 @@ let _write_prices_to_file path prices =
       Ok ())
     ~finally:(fun () -> Out_channel.close oc)
   |> Result.map_error ~f:(fun e ->
-         Status.internal_error
-           (sprintf "Failed to write file: %s" (Exn.to_string e)))
+      Status.internal_error
+        (sprintf "Failed to write file: %s" (Exn.to_string e)))
 
 let _append_prices_to_file path prices =
   let oc = Stdlib.open_out_gen [ Open_append ] 0o666 path in
@@ -81,8 +81,8 @@ let _append_prices_to_file path prices =
       Ok ())
     ~finally:(fun () -> Out_channel.close oc)
   |> Result.map_error ~f:(fun e ->
-         Status.internal_error
-           (sprintf "Failed to write file: %s" (Exn.to_string e)))
+      Status.internal_error
+        (sprintf "Failed to write file: %s" (Exn.to_string e)))
 
 let _price_map_of_list prices =
   List.fold prices ~init:Date.Map.empty ~f:(fun acc p ->

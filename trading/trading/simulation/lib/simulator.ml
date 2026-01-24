@@ -125,11 +125,11 @@ let _call_strategy t =
 let _find_position_by_symbol_state positions ~symbol ~state_match =
   Map.to_alist positions
   |> List.find_map ~f:(fun (id, pos) ->
-         if
-           String.equal pos.Trading_strategy.Position.symbol symbol
-           && state_match (Trading_strategy.Position.get_state pos)
-         then Some (id, pos)
-         else None)
+      if
+        String.equal pos.Trading_strategy.Position.symbol symbol
+        && state_match (Trading_strategy.Position.get_state pos)
+      then Some (id, pos)
+      else None)
 
 (** Apply a fill to a position (works for both entry and exit fills).
 

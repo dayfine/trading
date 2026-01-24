@@ -25,7 +25,7 @@ let calculate_metrics symbol (historical_data : Types.Daily_price.t list) :
   let prices =
     historical_data
     |> List.map ~f:(fun (price : Types.Daily_price.t) ->
-           { date = price.date; value = price.adjusted_close })
+        { date = price.date; value = price.adjusted_close })
   in
   let ema_values = calculate_ema prices 30 in
   let current_price = (List.last_exn prices).value in

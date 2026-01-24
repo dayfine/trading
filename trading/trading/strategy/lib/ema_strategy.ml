@@ -98,7 +98,7 @@ let _execute_exit ~(position : Position.t) ~quantity:_
 let _find_position_for_symbol positions symbol =
   Map.to_alist positions
   |> List.find_map ~f:(fun (_id, pos) ->
-         if String.equal pos.Position.symbol symbol then Some pos else None)
+      if String.equal pos.Position.symbol symbol then Some pos else None)
 
 (* Process one symbol - returns optional transition *)
 let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
