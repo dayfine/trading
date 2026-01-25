@@ -51,12 +51,6 @@ let real_data_dir =
 (** Sample commission config *)
 let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
-(** Helper to create simulator, failing on error *)
-let create_exn ~config ~deps =
-  match create ~config ~deps with
-  | Error err -> failwith ("Failed to create simulator: " ^ Status.show err)
-  | Ok sim -> sim
-
 (** Helper to run simulation and extract results, failing on error *)
 let run_sim_exn sim =
   match run sim with
