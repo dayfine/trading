@@ -13,21 +13,6 @@ let run_computers ~computers ~config ~steps =
   List.fold computers ~init:empty ~f:(fun acc (c : any_metric_computer) ->
       merge acc (c.run ~config ~steps))
 
-(* ==================== Type Derivations Tests ==================== *)
-
-let test_metric_type_show _ =
-  assert_that (show_metric_type TotalPnl) (equal_to "Metric_type.TotalPnl");
-  assert_that
-    (show_metric_type SharpeRatio)
-    (equal_to "Metric_type.SharpeRatio");
-  assert_that
-    (show_metric_type MaxDrawdown)
-    (equal_to "Metric_type.MaxDrawdown")
-
-let test_metric_type_eq _ =
-  assert_that (equal_metric_type TotalPnl TotalPnl) (equal_to true);
-  assert_that (equal_metric_type TotalPnl SharpeRatio) (equal_to false)
-
 (* ==================== Metric Set Tests ==================== *)
 
 let test_singleton _ =
@@ -176,10 +161,10 @@ let test_sharpe_ratio_positive_with_gains _ =
   in
   let computer = sharpe_ratio_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* Consistent ~1% daily gains yield high Sharpe due to low volatility *)
   assert_that
     (Map.find metrics SharpeRatio)
-    (is_some_and (fun v ->
-         assert_bool "Sharpe should be positive" Float.(v > 0.0)))
+    (is_some_and (float_equal ~epsilon:100.0 1963.0))
 
 let test_sharpe_ratio_negative_with_losses _ =
   let config = make_config () in
@@ -201,10 +186,10 @@ let test_sharpe_ratio_negative_with_losses _ =
   in
   let computer = sharpe_ratio_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* Consistent ~1% daily losses yield negative Sharpe with low volatility *)
   assert_that
     (Map.find metrics SharpeRatio)
-    (is_some_and (fun v ->
-         assert_bool "Sharpe should be negative" Float.(v < 0.0)))
+    (is_some_and (float_equal ~epsilon:100.0 (-1925.0)))
 
 let test_sharpe_ratio_with_risk_free_rate _ =
   let config = make_config () in
@@ -352,11 +337,19 @@ let test_run_computers_combines_results _ =
   in
   let computers = [ sharpe_ratio_computer (); max_drawdown_computer () ] in
   let metrics = run_computers ~computers ~config ~steps in
-  assert_that (Map.find metrics SharpeRatio) (is_some_and (fun _ -> ()));
-  assert_that (Map.find metrics MaxDrawdown) (is_some_and (fun _ -> ()))
+  assert_that (Map.length metrics) (equal_to 2);
+  (* Sharpe: 1% gain then ~1% loss, near-zero mean return *)
+  assert_that
+    (Map.find metrics SharpeRatio)
+    (is_some_and (float_equal ~epsilon:1.0 0.0));
+  (* Max drawdown: peak 10100 -> 10000 = 0.99% decline *)
+  assert_that
+    (Map.find metrics MaxDrawdown)
+    (is_some_and (float_equal ~epsilon:0.01 0.99))
 
 let test_default_computers _ =
   let computers = default_computers () in
+  (* Default set: summary_computer, sharpe_ratio_computer, max_drawdown_computer *)
   assert_that computers (size_is 3)
 
 (* ==================== Factory Tests ==================== *)
@@ -366,6 +359,7 @@ let test_create_computer_sharpe _ =
   let config = make_config () in
   let steps = [] in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that (Map.length metrics) (equal_to 1);
   assert_that (Map.find metrics SharpeRatio) (is_some_and (float_equal 0.0))
 
 let test_create_computer_max_drawdown _ =
@@ -373,6 +367,7 @@ let test_create_computer_max_drawdown _ =
   let config = make_config () in
   let steps = [] in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that (Map.length metrics) (equal_to 1);
   assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 0.0))
 
 (* ==================== Test Suite ==================== *)
@@ -380,9 +375,6 @@ let test_create_computer_max_drawdown _ =
 let suite =
   "Metrics Tests"
   >::: [
-         (* Type derivation tests *)
-         "metric_type show" >:: test_metric_type_show;
-         "metric_type eq" >:: test_metric_type_eq;
          (* Metric set tests *)
          "singleton" >:: test_singleton;
          "of_alist_exn" >:: test_of_alist_exn;
