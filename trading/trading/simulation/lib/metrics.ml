@@ -125,12 +125,12 @@ let compute_summary (trades : trade_metrics list) : summary_stats option =
 
 (** {1 Conversion Functions} *)
 
-let summary_stats_to_metrics (stats : summary_stats) : Metric_types.metric list
-    =
-  [
-    Metric_types.make_metric TotalPnl stats.total_pnl;
-    Metric_types.make_metric AvgHoldingDays stats.avg_holding_days;
-    Metric_types.make_metric WinCount (Float.of_int stats.win_count);
-    Metric_types.make_metric LossCount (Float.of_int stats.loss_count);
-    Metric_types.make_metric WinRate stats.win_rate;
-  ]
+let summary_stats_to_metrics (stats : summary_stats) : Metric_types.metric_set =
+  Metric_types.of_alist_exn
+    [
+      (TotalPnl, stats.total_pnl);
+      (AvgHoldingDays, stats.avg_holding_days);
+      (WinCount, Float.of_int stats.win_count);
+      (LossCount, Float.of_int stats.loss_count);
+      (WinRate, stats.win_rate);
+    ]

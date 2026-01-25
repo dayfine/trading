@@ -36,11 +36,11 @@ type 'state metric_computer = {
   name : string;
   init : config:config -> 'state;
   update : state:'state -> step:step_result -> 'state;
-  finalize : state:'state -> config:config -> Metric_types.metric list;
+  finalize : state:'state -> config:config -> Metric_types.metric_set;
 }
 
 type any_metric_computer = {
-  run : config:config -> steps:step_result list -> Metric_types.metric list;
+  run : config:config -> steps:step_result list -> Metric_types.metric_set;
 }
 
 let wrap_computer (type s) (computer : s metric_computer) : any_metric_computer

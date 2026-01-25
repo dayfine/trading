@@ -18,7 +18,7 @@ let _summary_computer_impl : summary_state Simulator_types.metric_computer =
         let steps = List.rev state.steps in
         let round_trips = Metrics.extract_round_trips steps in
         match Metrics.compute_summary round_trips with
-        | None -> []
+        | None -> Metric_types.empty
         | Some stats -> Metrics.summary_stats_to_metrics stats);
   }
 
@@ -87,7 +87,7 @@ let _sharpe_computer_impl ~risk_free_rate :
                 let excess_return = mean_return -. daily_rf in
                 excess_return /. std_return *. Float.sqrt 252.0
         in
-        [ Metric_types.make_metric SharpeRatio sharpe_ratio ]);
+        Metric_types.singleton SharpeRatio sharpe_ratio);
   }
 
 let sharpe_ratio_computer ?(risk_free_rate = 0.0) () =
@@ -116,7 +116,7 @@ let _drawdown_computer_impl : drawdown_state Simulator_types.metric_computer =
           { peak; max_drawdown; has_data = true });
     finalize =
       (fun ~state ~config:_ ->
-        [ Metric_types.make_metric MaxDrawdown state.max_drawdown ]);
+        Metric_types.singleton MaxDrawdown state.max_drawdown);
   }
 
 let max_drawdown_computer () =

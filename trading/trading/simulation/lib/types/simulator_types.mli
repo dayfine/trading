@@ -48,13 +48,13 @@ type 'state metric_computer = {
   init : config:config -> 'state;  (** Create initial state from config *)
   update : state:'state -> step:step_result -> 'state;
       (** Update state with a simulation step *)
-  finalize : state:'state -> config:config -> Metric_types.metric list;
+  finalize : state:'state -> config:config -> Metric_types.metric_set;
       (** Produce final metrics from accumulated state *)
 }
 (** A metric computer that folds over simulation steps to produce metrics. *)
 
 type any_metric_computer = {
-  run : config:config -> steps:step_result list -> Metric_types.metric list;
+  run : config:config -> steps:step_result list -> Metric_types.metric_set;
 }
 (** Type-erased wrapper for heterogeneous collections of metric computers *)
 

@@ -5,8 +5,10 @@ include Trading_simulation_types.Simulator_types
 
 (** Internal: compute metrics by running all computers over the steps *)
 let _compute_metrics ~computers ~config ~steps =
-  List.concat_map computers ~f:(fun (computer : any_metric_computer) ->
-      computer.run ~config ~steps)
+  List.fold computers ~init:Trading_simulation_types.Metric_types.empty
+    ~f:(fun acc (computer : any_metric_computer) ->
+      Trading_simulation_types.Metric_types.merge acc
+        (computer.run ~config ~steps))
 
 (** {1 Dependencies} *)
 

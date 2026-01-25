@@ -4,7 +4,24 @@ open Core
 
 (** {1 Metric Type Enum} *)
 
-type metric_type =
+module Metric_type = struct
+  module T = struct
+    type t =
+      | TotalPnl
+      | AvgHoldingDays
+      | WinCount
+      | LossCount
+      | WinRate
+      | SharpeRatio
+      | MaxDrawdown
+    [@@deriving show, eq, compare, sexp]
+  end
+
+  include T
+  include Comparator.Make (T)
+end
+
+type metric_type = Metric_type.t =
   | TotalPnl
   | AvgHoldingDays
   | WinCount
@@ -12,14 +29,21 @@ type metric_type =
   | WinRate
   | SharpeRatio
   | MaxDrawdown
-[@@deriving show, eq]
+[@@deriving show, eq, compare, sexp]
 
-(** {1 Metric Types} *)
+include (Metric_type : Comparator.S with type t := metric_type)
 
-type metric = { name : string; metric_type : metric_type; value : float }
-[@@deriving show, eq]
+(** {1 Metric Set} *)
 
-type metric_set = metric list
+type metric_set = float Map.M(Metric_type).t
+
+let empty = Map.empty (module Metric_type)
+
+let singleton metric_type value =
+  Map.singleton (module Metric_type) metric_type value
+
+let of_alist_exn alist = Map.of_alist_exn (module Metric_type) alist
+let merge m1 m2 = Map.merge_skewed m1 m2 ~combine:(fun ~key:_ _v1 v2 -> v2)
 
 (** {1 Metric Unit} *)
 
@@ -82,31 +106,18 @@ let get_metric_info = function
         unit = Percent;
       }
 
-let _name_of_metric_type = function
-  | TotalPnl -> "total_pnl"
-  | AvgHoldingDays -> "avg_holding_days"
-  | WinCount -> "win_count"
-  | LossCount -> "loss_count"
-  | WinRate -> "win_rate"
-  | SharpeRatio -> "sharpe_ratio"
-  | MaxDrawdown -> "max_drawdown"
+(** {1 Formatting} *)
 
-let make_metric metric_type value =
-  { name = _name_of_metric_type metric_type; metric_type; value }
-
-(** {1 Utility Functions} *)
-
-let find_metric (metrics : metric_set) ~name =
-  List.find metrics ~f:(fun m -> String.equal m.name name)
-
-let format_metric m =
-  let info = get_metric_info m.metric_type in
+let format_metric metric_type value =
+  let info = get_metric_info metric_type in
   match info.unit with
-  | Dollars -> Printf.sprintf "%s: $%.2f" info.display_name m.value
-  | Percent -> Printf.sprintf "%s: %.2f%%" info.display_name m.value
-  | Days -> Printf.sprintf "%s: %.1f days" info.display_name m.value
-  | Count -> Printf.sprintf "%s: %.0f" info.display_name m.value
-  | Ratio -> Printf.sprintf "%s: %.4f" info.display_name m.value
+  | Dollars -> Printf.sprintf "%s: $%.2f" info.display_name value
+  | Percent -> Printf.sprintf "%s: %.2f%%" info.display_name value
+  | Days -> Printf.sprintf "%s: %.1f days" info.display_name value
+  | Count -> Printf.sprintf "%s: %.0f" info.display_name value
+  | Ratio -> Printf.sprintf "%s: %.4f" info.display_name value
 
 let format_metrics metrics =
-  List.map metrics ~f:format_metric |> String.concat ~sep:"\n"
+  Map.fold metrics ~init:[] ~f:(fun ~key ~data acc ->
+      format_metric key data :: acc)
+  |> List.rev |> String.concat ~sep:"\n"

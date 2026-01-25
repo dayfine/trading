@@ -4,31 +4,52 @@
     no dependencies on other simulation modules, allowing it to be used as a
     foundation for both Simulator and Metrics modules. *)
 
+open Core
+
 (** {1 Metric Type Enum} *)
 
-(** Enum identifying the type of metric *)
-type metric_type =
-  | TotalPnl  (** Total profit/loss in dollars *)
-  | AvgHoldingDays  (** Average holding period *)
-  | WinCount  (** Number of winning trades *)
-  | LossCount  (** Number of losing trades *)
-  | WinRate  (** Win percentage *)
-  | SharpeRatio  (** Risk-adjusted return metric *)
-  | MaxDrawdown  (** Maximum peak-to-trough decline *)
-[@@deriving show, eq]
+(** Module containing the metric type enum with Map-compatible comparator *)
+module Metric_type : sig
+  type t =
+    | TotalPnl  (** Total profit/loss in dollars *)
+    | AvgHoldingDays  (** Average holding period *)
+    | WinCount  (** Number of winning trades *)
+    | LossCount  (** Number of losing trades *)
+    | WinRate  (** Win percentage *)
+    | SharpeRatio  (** Risk-adjusted return metric *)
+    | MaxDrawdown  (** Maximum peak-to-trough decline *)
+  [@@deriving show, eq, compare, sexp]
 
-(** {1 Metric Types} *)
+  include Comparator.S with type t := t
+end
 
-type metric = {
-  name : string;  (** Machine-readable identifier (e.g., "sharpe_ratio") *)
-  metric_type : metric_type;  (** The type of this metric *)
-  value : float;  (** The computed value *)
-}
-[@@deriving show, eq]
-(** A single computed metric *)
+(** Alias for convenience *)
+type metric_type = Metric_type.t =
+  | TotalPnl
+  | AvgHoldingDays
+  | WinCount
+  | LossCount
+  | WinRate
+  | SharpeRatio
+  | MaxDrawdown
+[@@deriving show, eq, compare, sexp]
 
-type metric_set = metric list
-(** A collection of metrics from a simulation run *)
+(** {1 Metric Set} *)
+
+type metric_set = float Map.M(Metric_type).t
+(** A collection of metrics keyed by type. Use [Map.find] for lookup. *)
+
+val empty : metric_set
+(** Empty metric set *)
+
+val singleton : metric_type -> float -> metric_set
+(** Create a metric set with a single entry *)
+
+val of_alist_exn : (metric_type * float) list -> metric_set
+(** Create from association list. Raises if duplicate keys. *)
+
+val merge : metric_set -> metric_set -> metric_set
+(** Merge two metric sets. Later values override earlier ones. *)
 
 (** {1 Metric Unit} *)
 
@@ -53,16 +74,10 @@ type metric_info = {
 val get_metric_info : metric_type -> metric_info
 (** Get display info for a metric type *)
 
-(** {1 Utility Functions} *)
+(** {1 Formatting} *)
 
-val find_metric : metric_set -> name:string -> metric option
-(** Find a metric by its machine-readable name *)
-
-val format_metric : metric -> string
+val format_metric : metric_type -> float -> string
 (** Format a single metric for display (e.g., "Sharpe Ratio: 1.25") *)
 
 val format_metrics : metric_set -> string
 (** Format all metrics for display, one per line *)
-
-val make_metric : metric_type -> float -> metric
-(** Create a metric with the canonical name for its type *)

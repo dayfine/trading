@@ -77,5 +77,5 @@ val show_summary : summary_stats -> string
 (** {1 Conversion Functions} *)
 
 val summary_stats_to_metrics :
-  summary_stats -> Trading_simulation_types.Metric_types.metric list
-(** Convert legacy summary_stats to the generic metric format *)
+  summary_stats -> Trading_simulation_types.Metric_types.metric_set
+(** Convert summary_stats to metric_set *)
