@@ -26,8 +26,7 @@ type step_result = {
 (** {1 Run Result} *)
 
 type run_result = {
-  steps : step_result list;
-  final_portfolio : Trading_portfolio.Portfolio.t;
+  steps : step_result list;  (** Non-empty list of step results *)
   metrics : Metric_types.metric_set;
 }
 

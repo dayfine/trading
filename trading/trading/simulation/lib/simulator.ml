@@ -53,17 +53,25 @@ and t = {
 (** {1 Creation} *)
 
 let create ~config ~deps =
-  let portfolio =
-    Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
-  in
-  {
-    config;
-    deps;
-    current_date = config.start_date;
-    portfolio;
-    positions = String.Map.empty;
-    step_history = [];
-  }
+  if Date.(config.end_date <= config.start_date) then
+    Error
+      (Status.invalid_argument_error
+         (Printf.sprintf "end_date (%s) must be after start_date (%s)"
+            (Date.to_string config.end_date)
+            (Date.to_string config.start_date)))
+  else
+    let portfolio =
+      Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
+    in
+    Ok
+      {
+        config;
+        deps;
+        current_date = config.start_date;
+        portfolio;
+        positions = String.Map.empty;
+        step_history = [];
+      }
 
 (** {1 Running} *)
 
@@ -230,7 +238,7 @@ let _build_run_result t =
   let metrics =
     _compute_metrics ~computers:t.deps.computers ~config:t.config ~steps
   in
-  { steps; final_portfolio = t.portfolio; metrics }
+  { steps; metrics }
 
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))

@@ -34,8 +34,9 @@ type step_result = {
 (** {1 Run Result} *)
 
 type run_result = {
-  steps : step_result list;  (** All step results in chronological order *)
-  final_portfolio : Trading_portfolio.Portfolio.t;  (** Final portfolio state *)
+  steps : step_result list;
+      (** Non-empty list of step results in chronological order. The final
+          portfolio can be obtained from [(List.last_exn steps).portfolio]. *)
   metrics : Metric_types.metric_set;  (** Computed metrics from the simulation *)
 }
 (** Complete result of running a simulation with metrics *)

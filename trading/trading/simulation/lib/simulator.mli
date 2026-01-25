@@ -38,7 +38,8 @@ val create_deps :
 
 (** {1 Creation} *)
 
-val create : config:config -> deps:dependencies -> t
+val create : config:config -> deps:dependencies -> t Status.status_or
+(** Create a simulator. Returns error if end_date <= start_date. *)
 
 (** {1 Running} *)
 

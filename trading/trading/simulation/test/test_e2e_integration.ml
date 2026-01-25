@@ -51,11 +51,19 @@ let real_data_dir =
 (** Sample commission config *)
 let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
+(** Helper to create simulator, failing on error *)
+let create_exn ~config ~deps =
+  match create ~config ~deps with
+  | Error err -> failwith ("Failed to create simulator: " ^ Status.show err)
+  | Ok sim -> sim
+
 (** Helper to run simulation and extract results, failing on error *)
 let run_sim_exn sim =
   match run sim with
   | Error err -> failwith ("Simulation failed: " ^ Status.show err)
-  | Ok result -> (result.steps, result.final_portfolio)
+  | Ok result ->
+      let final_portfolio = (List.last_exn result.steps).portfolio in
+      (result.steps, final_portfolio)
 
 (* ==================== Real Data Loading Tests ==================== *)
 
@@ -74,7 +82,7 @@ let test_load_real_symbol_aapl _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Should have 3 steps (Jan 2-4), Jan 5 returns Completed *)
   assert_that steps (size_is 3);
@@ -97,7 +105,7 @@ let test_load_multiple_real_symbols _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Should complete successfully with all symbols loaded.
      Jan 2-10 is 9 calendar days, last day returns Completed = 8 steps *)
@@ -121,7 +129,7 @@ let test_date_range_before_data_starts _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   (* The simulator should handle this gracefully - no data for those dates.
      Expected: simulation runs but with no price data available. *)
   match run sim with
@@ -149,7 +157,7 @@ let test_date_range_after_data_ends _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   (* The simulator should handle this gracefully *)
   match run sim with
   | Error _ ->
@@ -177,7 +185,7 @@ let test_partial_date_overlap _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, _ = run_sim_exn sim in
   (* Should have some steps, even if some days have no data *)
   assert_bool "Should have at least some steps" (List.length steps > 0)
@@ -203,7 +211,7 @@ let test_missing_symbol_graceful_handling _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   match run sim with
   | Error err ->
       (* Should get an error about missing data file *)
@@ -235,7 +243,7 @@ let test_mixed_valid_and_invalid_symbols _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   match run sim with
   | Error err ->
       (* Error is expected - invalid symbol can't be loaded *)
@@ -314,7 +322,7 @@ let test_buy_and_hold_e2e _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Should have multiple steps *)
   assert_bool "Should have steps" (List.length steps > 0);
@@ -346,7 +354,7 @@ let test_longer_simulation_period _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Jan 2-31 is 30 calendar days, last day returns Completed = 29 steps *)
   assert_that steps (size_is 29);
@@ -378,7 +386,7 @@ let test_ema_strategy_e2e _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Extract and display metrics using the Metrics module *)
   let round_trips = Trading_simulation.Metrics.extract_round_trips steps in

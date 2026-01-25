@@ -71,7 +71,7 @@ let test_create_returns_simulator _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       let expected_portfolio =
         Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
       in
@@ -91,7 +91,7 @@ let test_create_with_empty_symbols _ =
           ~strategy:(module Noop_strategy)
           ~commission:sample_config.commission ()
       in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       let expected_portfolio =
         Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
       in
@@ -111,7 +111,7 @@ let test_step_executes_market_order _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       (* Place a market order for AAPL *)
       let order_params =
         Trading_orders.Create_order.
@@ -154,7 +154,7 @@ let test_limit_order_executes_on_later_day _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       (* First, buy shares with a market order *)
       let buy_order_params =
         Trading_orders.Create_order.
@@ -221,7 +221,7 @@ let test_stop_order_executes_on_later_day _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       (* Place a buy stop order at 156.0
          Day 1 (2024-01-02): high=155.0 - won't trigger (price never reaches 156.0)
          Day 2 (2024-01-03): open=154.0, high=158.0 - should trigger and execute *)
@@ -267,7 +267,7 @@ let test_order_fails_due_to_insufficient_cash _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       (* Place two market orders:
          1. Buy 60 shares at ~150.0 = 9000 + 1.0 commission = 9001
          2. Buy 10 shares at ~150.0 = 1500 + 1.0 commission = 1501
@@ -338,7 +338,7 @@ let test_step_advances_date _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       let expected_portfolio =
         Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
       in
@@ -370,17 +370,23 @@ let test_step_returns_completed_when_done _ =
         {
           sample_config with
           start_date = date_of_string "2024-01-02";
-          end_date = date_of_string "2024-01-02";
+          end_date = date_of_string "2024-01-03";
         }
       in
-      let sim = create ~config ~deps in
+      let sim = Test_helpers.create_exn ~config ~deps in
       let expected_portfolio =
         Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
       in
+      (* First step advances from start_date to end_date *)
       assert_that (step sim)
         (is_ok_and_holds
-           (is_completed (fun result ->
-                assert_equal expected_portfolio result.final_portfolio))))
+           (is_stepped (fun (sim', _) ->
+                (* Second step returns Completed *)
+                assert_that (step sim')
+                  (is_ok_and_holds
+                     (is_completed (fun result ->
+                          let final = (List.last_exn result.steps).portfolio in
+                          assert_equal expected_portfolio final)))))))
 
 (* ==================== run tests ==================== *)
 
@@ -389,7 +395,7 @@ let test_run_completes_simulation _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       let expected_portfolio =
         Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
       in
@@ -409,28 +415,36 @@ let test_run_completes_simulation _ =
       assert_that (run sim)
         (is_ok_and_holds (fun result ->
              assert_equal expected_steps result.steps;
-             assert_equal expected_portfolio result.final_portfolio)))
+             let final = (List.last_exn result.steps).portfolio in
+             assert_equal expected_portfolio final)))
 
-let test_run_on_already_complete _ =
-  with_test_data "simulator_run_already_complete"
+let test_create_rejects_invalid_date_range _ =
+  with_test_data "simulator_invalid_date_range"
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_deps data_dir in
-      let config =
+      (* end_date == start_date should fail *)
+      let config_same =
         {
           sample_config with
           start_date = date_of_string "2024-01-02";
           end_date = date_of_string "2024-01-02";
         }
       in
-      let sim = create ~config ~deps in
-      let expected_portfolio =
-        Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
+      assert_that
+        (create ~config:config_same ~deps)
+        (is_error_with Invalid_argument ~msg:"end_date");
+      (* end_date < start_date should fail *)
+      let config_before =
+        {
+          sample_config with
+          start_date = date_of_string "2024-01-05";
+          end_date = date_of_string "2024-01-02";
+        }
       in
-      assert_that (run sim)
-        (is_ok_and_holds (fun result ->
-             assert_that result.steps (size_is 0);
-             assert_equal expected_portfolio result.final_portfolio)))
+      assert_that
+        (create ~config:config_before ~deps)
+        (is_error_with Invalid_argument ~msg:"end_date"))
 
 (* ==================== position lifecycle tests ==================== *)
 
@@ -445,7 +459,7 @@ let test_position_created_when_strategy_returns_create_entering _ =
     [ ("AAPL", sample_aapl_prices) ]
     ~f:(fun data_dir ->
       let deps = make_enter_exit_deps data_dir in
-      let sim = create ~config:sample_config ~deps in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
       (* Step 1: Strategy returns CreateEntering, order is submitted
          (but orders execute on the next step) *)
       let sim', result1 = step_exn sim in
@@ -486,7 +500,7 @@ let test_position_moves_to_exiting_when_strategy_triggers_exit _ =
           end_date = date_of_string "2024-01-06";
         }
       in
-      let sim = create ~config ~deps in
+      let sim = Test_helpers.create_exn ~config ~deps in
       (* Step 1: Strategy returns CreateEntering, entry order submitted *)
       let sim', result1 = step_exn sim in
       assert_that result1.orders_submitted (size_is 1);
@@ -536,7 +550,7 @@ let test_full_position_lifecycle _ =
           end_date = date_of_string "2024-01-05";
         }
       in
-      let sim = create ~config ~deps in
+      let sim = Test_helpers.create_exn ~config ~deps in
       (* Run the full simulation.
          Order flow with strategy that enters on day 1, exits on day 2:
          - Step 1 (Jan 2): CreateEntering transition -> order submitted. No trades.
@@ -547,7 +561,7 @@ let test_full_position_lifecycle _ =
       | Error err -> failwith ("Run failed: " ^ Status.show err)
       | Ok result ->
           let steps = result.steps in
-          let final_portfolio = result.final_portfolio in
+          let final_portfolio = (List.last_exn steps).portfolio in
           (* Verify step structure: 3 steps with expected trades *)
           assert_that steps
             (elements_are
@@ -620,7 +634,7 @@ let test_position_matched_by_state_not_side _ =
           end_date = date_of_string "2024-01-06";
         }
       in
-      let sim = create ~config ~deps in
+      let sim = Test_helpers.create_exn ~config ~deps in
       (* Step 1: CreateEntering transition creates position in Entering state,
          order submitted for next step. *)
       let sim', result1 = step_exn sim in
@@ -672,7 +686,7 @@ let test_short_position_lifecycle _ =
           end_date = date_of_string "2024-01-06";
         }
       in
-      let sim = create ~config ~deps in
+      let sim = Test_helpers.create_exn ~config ~deps in
       (* Step 1: CreateEntering transition with Short side, order submitted *)
       let sim', result1 = step_exn sim in
       assert_that result1.trades is_empty;
@@ -721,7 +735,8 @@ let suite =
          "step returns Completed when done"
          >:: test_step_returns_completed_when_done;
          "run completes simulation" >:: test_run_completes_simulation;
-         "run on already complete" >:: test_run_on_already_complete;
+         "create rejects invalid date range"
+         >:: test_create_rejects_invalid_date_range;
          (* Position lifecycle tests *)
          "position created when strategy returns CreateEntering"
          >:: test_position_created_when_strategy_returns_create_entering;

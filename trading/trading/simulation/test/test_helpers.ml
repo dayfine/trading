@@ -188,6 +188,12 @@ end)
 module Enter_then_exit_strategy = Long_strategy
 (** Backward-compatible alias for Long_strategy *)
 
+let create_exn ~config ~deps =
+  match Trading_simulation.Simulator.create ~config ~deps with
+  | Error err -> failwith ("Failed to create simulator: " ^ Status.show err)
+  | Ok sim -> sim
+[@@warning "-32"]
+
 let step_exn sim =
   match Trading_simulation.Simulator.step sim with
   | Error err -> failwith ("Step failed: " ^ Status.show err)
