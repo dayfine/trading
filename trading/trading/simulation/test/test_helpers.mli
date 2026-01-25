@@ -16,6 +16,12 @@ val with_test_data :
     @param prices_by_symbol List of (symbol, prices) pairs
     @param f Function to run with the test data directory *)
 
+val create_exn :
+  config:Trading_simulation.Simulator.config ->
+  deps:Trading_simulation.Simulator.dependencies ->
+  Trading_simulation.Simulator.t
+(** Create a simulator, failing if end_date <= start_date. *)
+
 val step_exn :
   Trading_simulation.Simulator.t ->
   Trading_simulation.Simulator.t * Trading_simulation.Simulator.step_result

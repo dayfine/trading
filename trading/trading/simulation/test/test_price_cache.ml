@@ -1,6 +1,6 @@
 open OUnit2
 open Core
-open Trading_simulation.Price_cache
+open Trading_simulation_data.Price_cache
 open Matchers
 
 let ok_or_fail_status = function

@@ -8,7 +8,7 @@
 
 open Core
 
-(** {1 Types} *)
+(** {1 Trade Metrics Types} *)
 
 type trade_metrics = {
   symbol : string;  (** The traded symbol *)
@@ -41,9 +41,11 @@ type summary_stats = {
     Aggregates individual trade metrics into portfolio-level performance
     statistics useful for evaluating strategy effectiveness. *)
 
-(** {1 Functions} *)
+(** {1 Trade Metrics Functions} *)
 
-val extract_round_trips : Simulator.step_result list -> trade_metrics list
+val extract_round_trips :
+  Trading_simulation_types.Simulator_types.step_result list ->
+  trade_metrics list
 (** Extract round-trip trades from simulation step results.
 
     A round-trip is identified by pairing buy trades with subsequent sell trades
@@ -71,3 +73,9 @@ val show_summary : summary_stats -> string
 
     Example output:
     [Total P&L: $1234.56 | Avg hold: 8.5 days | Win rate: 60.0% (6/10)] *)
+
+(** {1 Conversion Functions} *)
+
+val summary_stats_to_metrics :
+  summary_stats -> Trading_simulation_types.Metric_types.metric_set
+(** Convert summary_stats to metric_set *)

@@ -1,4 +1,10 @@
+(** Trade metrics computation for performance analysis. *)
+
 open Core
+module Metric_types = Trading_simulation_types.Metric_types
+module Simulator_types = Trading_simulation_types.Simulator_types
+
+(** {1 Trade Metrics Types} *)
 
 type trade_metrics = {
   symbol : string;
@@ -22,6 +28,8 @@ type summary_stats = {
 }
 [@@deriving show, eq]
 
+(** {1 Trade Metrics Functions} *)
+
 let show_trade_metrics m =
   Printf.sprintf
     "%s: %s -> %s (%d days), entry=%.2f exit=%.2f qty=%.0f, P&L=$%.2f (%.2f%%)"
@@ -37,8 +45,7 @@ let show_summary s =
     s.total_pnl s.avg_holding_days s.win_rate s.win_count
     (s.win_count + s.loss_count)
 
-(** Pair buy trades with sells to form round-trips for a single symbol. Assumes
-    trades are sorted chronologically. *)
+(** Pair buy trades with sells to form round-trips for a single symbol. *)
 let _pair_trades_for_symbol symbol
     (trades : (Date.t * Trading_base.Types.trade) list) : trade_metrics list =
   let rec pair_trades trades_list metrics =
@@ -74,14 +81,12 @@ let _pair_trades_for_symbol symbol
   in
   pair_trades trades []
 
-let extract_round_trips (steps : Simulator.step_result list) :
+let extract_round_trips (steps : Simulator_types.step_result list) :
     trade_metrics list =
-  (* Collect all trades with their dates *)
   let all_trades =
     List.concat_map steps ~f:(fun step ->
         List.map step.trades ~f:(fun trade -> (step.date, trade)))
   in
-  (* Group by symbol *)
   let by_symbol =
     List.fold all_trades
       ~init:(Map.empty (module String))
@@ -90,7 +95,6 @@ let extract_round_trips (steps : Simulator.step_result list) :
         let existing = Map.find acc symbol |> Option.value ~default:[] in
         Map.set acc ~key:symbol ~data:((date, trade) :: existing))
   in
-  (* For each symbol, sort by date and pair trades *)
   Map.fold by_symbol ~init:[] ~f:(fun ~key:symbol ~data:trades acc ->
       let sorted =
         List.sort trades ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2)
@@ -118,3 +122,15 @@ let compute_summary (trades : trade_metrics list) : summary_stats option =
         Float.of_int win_count /. Float.of_int (List.length trades) *. 100.0
       in
       Some { total_pnl; avg_holding_days; win_count; loss_count; win_rate }
+
+(** {1 Conversion Functions} *)
+
+let summary_stats_to_metrics (stats : summary_stats) : Metric_types.metric_set =
+  Metric_types.of_alist_exn
+    [
+      (TotalPnl, stats.total_pnl);
+      (AvgHoldingDays, stats.avg_holding_days);
+      (WinCount, Float.of_int stats.win_count);
+      (LossCount, Float.of_int stats.loss_count);
+      (WinRate, stats.win_rate);
+    ]

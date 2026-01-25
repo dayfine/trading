@@ -1,76 +1,52 @@
-(** Simulation engine for backtesting trading strategies *)
+(** Simulation engine for backtesting trading strategies.
 
-open Core
+    Core types are defined in {!Simulator_types} and included here. *)
 
-(** {1 Input Types} *)
+include module type of Trading_simulation_types.Simulator_types
 
-type config = {
-  start_date : Date.t;
-  end_date : Date.t;
-  initial_cash : float;
-  commission : Trading_engine.Types.commission_config;
-}
-[@@deriving show, eq]
-(** Configuration for running a simulation *)
+(** {1 Simulator} *)
+
+type t
+(** Abstract simulator type *)
+
+type step_outcome =
+  | Stepped of t * step_result  (** Simulation advanced one step *)
+  | Completed of run_result  (** Simulation complete with final results *)
+
+(** {1 Dependencies} *)
 
 type dependencies = {
-  symbols : string list;  (** Watchlist of symbols to track *)
-  data_dir : Fpath.t;  (** Directory containing CSV price files *)
+  symbols : string list;
+  data_dir : Fpath.t;
   strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
-      (** Trading strategy to run on each step *)
-  engine : Trading_engine.Engine.t;  (** Trade execution engine *)
-  order_manager : Trading_orders.Manager.order_manager;  (** Order manager *)
-  market_data_adapter : Market_data_adapter.t;  (** Market data provider *)
+  engine : Trading_engine.Engine.t;
+  order_manager : Trading_orders.Manager.order_manager;
+  market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
+  computers : any_metric_computer list;
 }
-(** External dependencies injected into the simulator. The simulator lazily
-    loads price data from CSV storage and executes the strategy on each step. *)
 
 val create_deps :
   symbols:string list ->
   data_dir:Fpath.t ->
   strategy:(module Trading_strategy.Strategy_interface.STRATEGY) ->
   commission:Trading_engine.Types.commission_config ->
+  ?computers:any_metric_computer list ->
+  unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
-    adapter. Use this for the common case; inject custom components directly
-    into the dependencies record for testing. *)
-
-(** {1 Simulator Types} *)
-
-type t
-(** Abstract simulator type *)
-
-type step_result = {
-  date : Date.t;  (** The date this step executed on *)
-  portfolio : Trading_portfolio.Portfolio.t;  (** Portfolio state after step *)
-  trades : Trading_base.Types.trade list;
-      (** Trades from orders that filled during this step *)
-  orders_submitted : Trading_orders.Types.order list;
-      (** Orders submitted for execution on the next step *)
-}
-[@@deriving show, eq]
-(** Result of a single simulation step *)
-
-type step_outcome =
-  | Stepped of t * step_result
-  | Completed of Trading_portfolio.Portfolio.t
-      (** Outcome of calling step - either advanced or simulation complete *)
+    adapter. *)
 
 (** {1 Creation} *)
 
-val create : config:config -> deps:dependencies -> t
-(** Create a simulator from config and dependencies.
-
-    @param config Simulation configuration (dates, cash, commission)
-    @param deps External dependencies (symbols, data directory, strategy) *)
+val create : config:config -> deps:dependencies -> t Status.status_or
+(** Create a simulator. Returns error if end_date <= start_date. *)
 
 (** {1 Running} *)
 
 val step : t -> step_outcome Status.status_or
-(** Advance simulation by one day. Returns [Completed] when simulation reaches
-    end date, or [Stepped] with updated simulator and step result. *)
+(** Advance simulation by one day. *)
 
-val run :
-  t -> (step_result list * Trading_portfolio.Portfolio.t) Status.status_or
-(** Run the full simulation from start to end date. Returns list of step results
-    and final portfolio. *)
+val run : t -> run_result Status.status_or
+(** Run the full simulation from start to end date. *)
+
+val get_config : t -> config

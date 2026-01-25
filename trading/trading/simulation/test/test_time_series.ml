@@ -1,6 +1,6 @@
 open OUnit2
 open Core
-open Trading_simulation
+open Trading_simulation_data
 open Matchers
 
 let default_volume = 1000

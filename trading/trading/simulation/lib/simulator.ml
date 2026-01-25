@@ -1,16 +1,16 @@
 (** Simulation engine for backtesting trading strategies *)
 
 open Core
+include Trading_simulation_types.Simulator_types
 
-(** {1 Input Types} *)
+(** Internal: compute metrics by running all computers over the steps *)
+let _compute_metrics ~computers ~config ~steps =
+  List.fold computers ~init:Trading_simulation_types.Metric_types.empty
+    ~f:(fun acc (computer : any_metric_computer) ->
+      Trading_simulation_types.Metric_types.merge acc
+        (computer.run ~config ~steps))
 
-type config = {
-  start_date : Date.t;
-  end_date : Date.t;
-  initial_cash : float;
-  commission : Trading_engine.Types.commission_config;
-}
-[@@deriving show, eq]
+(** {1 Dependencies} *)
 
 type dependencies = {
   symbols : string list;
@@ -18,29 +18,30 @@ type dependencies = {
   strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
-  market_data_adapter : Market_data_adapter.t;
+  market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
+  computers : any_metric_computer list;
 }
 
-let create_deps ~symbols ~data_dir ~strategy ~commission =
+let create_deps ~symbols ~data_dir ~strategy ~commission ?(computers = []) () =
   let engine_config = { Trading_engine.Types.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
-  let market_data_adapter = Market_data_adapter.create ~data_dir in
-  { symbols; data_dir; strategy; engine; order_manager; market_data_adapter }
+  let market_data_adapter =
+    Trading_simulation_data.Market_data_adapter.create ~data_dir
+  in
+  {
+    symbols;
+    data_dir;
+    strategy;
+    engine;
+    order_manager;
+    market_data_adapter;
+    computers;
+  }
 
-(** {1 Simulator Types} *)
+(** {1 Simulator State} *)
 
-type step_result = {
-  date : Date.t;
-  portfolio : Trading_portfolio.Portfolio.t;
-  trades : Trading_base.Types.trade list;
-  orders_submitted : Trading_orders.Types.order list;
-}
-[@@deriving show, eq]
-
-type step_outcome =
-  | Stepped of t * step_result
-  | Completed of Trading_portfolio.Portfolio.t
+type step_outcome = Stepped of t * step_result | Completed of run_result
 
 and t = {
   config : config;
@@ -48,21 +49,31 @@ and t = {
   current_date : Date.t;
   portfolio : Trading_portfolio.Portfolio.t;
   positions : Trading_strategy.Position.t String.Map.t;
+  step_history : step_result list;  (** Accumulated steps in reverse order *)
 }
 
 (** {1 Creation} *)
 
 let create ~config ~deps =
-  let portfolio =
-    Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
-  in
-  {
-    config;
-    deps;
-    current_date = config.start_date;
-    portfolio;
-    positions = String.Map.empty;
-  }
+  if Date.(config.end_date <= config.start_date) then
+    Error
+      (Status.invalid_argument_error
+         (Printf.sprintf "end_date (%s) must be after start_date (%s)"
+            (Date.to_string config.end_date)
+            (Date.to_string config.start_date)))
+  else
+    let portfolio =
+      Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
+    in
+    Ok
+      {
+        config;
+        deps;
+        current_date = config.start_date;
+        portfolio;
+        positions = String.Map.empty;
+        step_history = [];
+      }
 
 (** {1 Running} *)
 
@@ -87,11 +98,25 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
 let _get_today_bars t =
   List.filter_map t.deps.symbols ~f:(fun symbol ->
       match
-        Market_data_adapter.get_price t.deps.market_data_adapter ~symbol
-          ~date:t.current_date
+        Trading_simulation_data.Market_data_adapter.get_price
+          t.deps.market_data_adapter ~symbol ~date:t.current_date
       with
       | None -> None
       | Some daily_price -> Some (_to_price_bar symbol daily_price))
+
+(** Compute total portfolio value (cash + position market values). *)
+let _compute_portfolio_value ~portfolio ~today_bars =
+  let prices =
+    List.map today_bars ~f:(fun bar ->
+        (bar.Trading_engine.Types.symbol, bar.close_price))
+  in
+  match
+    Trading_portfolio.Calculations.portfolio_value
+      portfolio.Trading_portfolio.Portfolio.positions portfolio.current_cash
+      prices
+  with
+  | Ok value -> value
+  | Error _ -> portfolio.current_cash
 
 (** Extract trades from execution reports *)
 let _extract_trades reports =
@@ -100,15 +125,16 @@ let _extract_trades reports =
 (** Create get_price function for strategy *)
 let _make_get_price t : Trading_strategy.Strategy_interface.get_price_fn =
  fun symbol ->
-  Market_data_adapter.get_price t.deps.market_data_adapter ~symbol
-    ~date:t.current_date
+  Trading_simulation_data.Market_data_adapter.get_price
+    t.deps.market_data_adapter ~symbol ~date:t.current_date
 
 (** Create get_indicator function for strategy *)
 let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
     =
  fun symbol indicator_name period cadence ->
-  Market_data_adapter.get_indicator t.deps.market_data_adapter ~symbol
-    ~indicator_name ~period ~cadence ~date:t.current_date
+  Trading_simulation_data.Market_data_adapter.get_indicator
+    t.deps.market_data_adapter ~symbol ~indicator_name ~period ~cadence
+    ~date:t.current_date
 
 (** Call strategy and get transitions *)
 let _call_strategy t =
@@ -131,13 +157,7 @@ let _find_position_by_symbol_state positions ~symbol ~state_match =
       then Some (id, pos)
       else None)
 
-(** Apply a fill to a position (works for both entry and exit fills).
-
-    TODO: Upon EntryComplete, we should place stop-loss and take-profit orders
-    immediately based on risk_params. This requires either: 1. Returning the
-    orders to place alongside the updated position, or 2. Having the simulator
-    check for newly-Holding positions and place orders. For now, risk_params are
-    set to None and protective orders are not placed. *)
+(** Apply a fill to a position (works for both entry and exit fills). *)
 let _apply_fill ~date ~position ~trade ~is_entry =
   let open Result.Let_syntax in
   let open Trading_strategy.Position in
@@ -173,15 +193,10 @@ let _apply_fill ~date ~position ~trade ~is_entry =
   let complete_trans = { position_id = pos.id; date; kind = complete_kind } in
   apply_transition pos complete_trans
 
-(** Update positions from trades.
-
-    Matches trades to positions by symbol and position state (not trade side),
-    supporting both long positions (buy to enter, sell to exit) and short
-    positions (sell to enter, buy to exit). *)
+(** Update positions from trades. *)
 let _update_positions_from_trades ~date ~positions ~trades =
   let open Result.Let_syntax in
   let open Trading_strategy.Position in
-  (* Cases to try: (state_match, is_entry) *)
   let fill_cases =
     [
       ((function Entering _ -> true | _ -> false), true);
@@ -201,8 +216,7 @@ let _update_positions_from_trades ~date ~positions ~trades =
           Ok (Map.set acc ~key:id ~data:updated)
       | None -> Ok acc)
 
-(** Apply transitions to positions (CreateEntering creates new, TriggerExit
-    updates existing) *)
+(** Apply transitions to positions *)
 let _apply_transitions ~positions ~transitions =
   let open Result.Let_syntax in
   List.fold_result transitions ~init:positions ~f:(fun acc trans ->
@@ -220,8 +234,16 @@ let _apply_transitions ~positions ~transitions =
               Ok (Map.set acc ~key:trans.position_id ~data:updated))
       | _ -> Ok acc)
 
+(** Build run_result from accumulated state *)
+let _build_run_result t =
+  let steps = List.rev t.step_history in
+  let metrics =
+    _compute_metrics ~computers:t.deps.computers ~config:t.config ~steps
+  in
+  { steps; metrics }
+
 let step t =
-  if _is_complete t then Ok (Completed t.portfolio)
+  if _is_complete t then Ok (Completed (_build_run_result t))
   else
     let open Result.Let_syntax in
     (* Get today's prices and update engine *)
@@ -240,7 +262,7 @@ let step t =
     let%bind portfolio =
       Trading_portfolio.Portfolio.apply_trades t.portfolio trades
     in
-    (* Call strategy and apply transitions (creates new positions, triggers exits) *)
+    (* Call strategy and apply transitions *)
     let%bind transitions = _call_strategy { t with positions } in
     let%bind positions = _apply_transitions ~positions ~transitions in
     (* Generate and submit orders for next day *)
@@ -248,20 +270,38 @@ let step t =
       Order_generator.transitions_to_orders ~positions transitions
     in
     let orders_submitted = _submit_orders t orders in
-    (* Advance to next date *)
+    (* Compute portfolio value using today's close prices *)
+    let portfolio_value = _compute_portfolio_value ~portfolio ~today_bars in
+    (* Build step result *)
     let step_result =
-      { date = t.current_date; portfolio; trades; orders_submitted }
+      {
+        date = t.current_date;
+        portfolio;
+        portfolio_value;
+        trades;
+        orders_submitted;
+      }
     in
+    (* Advance to next date and accumulate step *)
     let next_date = Date.add_days t.current_date 1 in
-    return
-      (Stepped
-         ({ t with current_date = next_date; portfolio; positions }, step_result))
+    let t' =
+      {
+        t with
+        current_date = next_date;
+        portfolio;
+        positions;
+        step_history = step_result :: t.step_history;
+      }
+    in
+    return (Stepped (t', step_result))
+
+let get_config t = t.config
 
 let run t =
-  let rec loop t acc =
+  let rec loop t =
     match step t with
     | Error e -> Error e
-    | Ok (Completed portfolio) -> Ok (List.rev acc, portfolio)
-    | Ok (Stepped (t', step_result)) -> loop t' (step_result :: acc)
+    | Ok (Completed result) -> Ok result
+    | Ok (Stepped (t', _)) -> loop t'
   in
-  loop t []
+  loop t

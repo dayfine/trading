@@ -55,7 +55,9 @@ let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 let run_sim_exn sim =
   match run sim with
   | Error err -> failwith ("Simulation failed: " ^ Status.show err)
-  | Ok (steps, final_portfolio) -> (steps, final_portfolio)
+  | Ok result ->
+      let final_portfolio = (List.last_exn result.steps).portfolio in
+      (result.steps, final_portfolio)
 
 (* ==================== Real Data Loading Tests ==================== *)
 
@@ -64,7 +66,7 @@ let test_load_real_symbol_aapl _ =
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -74,7 +76,7 @@ let test_load_real_symbol_aapl _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Should have 3 steps (Jan 2-4), Jan 5 returns Completed *)
   assert_that steps (size_is 3);
@@ -87,7 +89,7 @@ let test_load_multiple_real_symbols _ =
   let deps =
     create_deps ~symbols ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -97,7 +99,7 @@ let test_load_multiple_real_symbols _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Should complete successfully with all symbols loaded.
      Jan 2-10 is 9 calendar days, last day returns Completed = 8 steps *)
@@ -111,7 +113,7 @@ let test_date_range_before_data_starts _ =
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -121,16 +123,16 @@ let test_date_range_before_data_starts _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   (* The simulator should handle this gracefully - no data for those dates.
      Expected: simulation runs but with no price data available. *)
   match run sim with
   | Error _ ->
       (* Error is acceptable - no data available *)
       ()
-  | Ok (steps, _) ->
+  | Ok result ->
       (* Or it completes with steps but no price data available *)
-      List.iter steps ~f:(fun step ->
+      List.iter result.steps ~f:(fun step ->
           assert_that step.trades is_empty;
           assert_that step.orders_submitted is_empty)
 
@@ -139,7 +141,7 @@ let test_date_range_after_data_ends _ =
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -149,15 +151,15 @@ let test_date_range_after_data_ends _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   (* The simulator should handle this gracefully *)
   match run sim with
   | Error _ ->
       (* Error is acceptable - no data available for future dates *)
       ()
-  | Ok (steps, _) ->
+  | Ok result ->
       (* Or it completes with steps but no price data available *)
-      List.iter steps ~f:(fun step ->
+      List.iter result.steps ~f:(fun step ->
           assert_that step.trades is_empty;
           assert_that step.orders_submitted is_empty)
 
@@ -167,7 +169,7 @@ let test_partial_date_overlap _ =
   let deps =
     create_deps ~symbols:[ "GOOGL" ] ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -177,7 +179,7 @@ let test_partial_date_overlap _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, _ = run_sim_exn sim in
   (* Should have some steps, even if some days have no data *)
   assert_bool "Should have at least some steps" (List.length steps > 0)
@@ -193,7 +195,7 @@ let test_missing_symbol_graceful_handling _ =
       ~symbols:[ "NONEXISTENT_SYMBOL_XYZ" ]
       ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -203,7 +205,7 @@ let test_missing_symbol_graceful_handling _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   match run sim with
   | Error err ->
       (* Should get an error about missing data file *)
@@ -225,7 +227,7 @@ let test_mixed_valid_and_invalid_symbols _ =
       ~symbols:[ "AAPL"; "INVALID_SYMBOL" ]
       ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -235,7 +237,7 @@ let test_mixed_valid_and_invalid_symbols _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   match run sim with
   | Error err ->
       (* Error is expected - invalid symbol can't be loaded *)
@@ -304,7 +306,7 @@ let test_buy_and_hold_e2e _ =
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
       ~strategy:(module Buy_first_day_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -314,7 +316,7 @@ let test_buy_and_hold_e2e _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Should have multiple steps *)
   assert_bool "Should have steps" (List.length steps > 0);
@@ -336,7 +338,7 @@ let test_longer_simulation_period _ =
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
       ~strategy:(module Noop_strategy)
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -346,7 +348,7 @@ let test_longer_simulation_period _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Jan 2-31 is 30 calendar days, last day returns Completed = 29 steps *)
   assert_that steps (size_is 29);
@@ -368,7 +370,7 @@ let test_ema_strategy_e2e _ =
   let strategy = Trading_strategy.Ema_strategy.make ema_config in
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir ~strategy
-      ~commission:sample_commission
+      ~commission:sample_commission ()
   in
   let config =
     {
@@ -378,7 +380,7 @@ let test_ema_strategy_e2e _ =
       commission = sample_commission;
     }
   in
-  let sim = create ~config ~deps in
+  let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Extract and display metrics using the Metrics module *)
   let round_trips = Trading_simulation.Metrics.extract_round_trips steps in
