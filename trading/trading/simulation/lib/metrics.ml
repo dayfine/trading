@@ -1,6 +1,8 @@
 (** Trade metrics computation for performance analysis. *)
 
 open Core
+module Metric_types = Trading_simulation_types.Metric_types
+module Simulator_types = Trading_simulation_types.Simulator_types
 
 (** {1 Trade Metrics Types} *)
 
@@ -79,7 +81,7 @@ let _pair_trades_for_symbol symbol
   in
   pair_trades trades []
 
-let extract_round_trips (steps : Simulator.step_result list) :
+let extract_round_trips (steps : Simulator_types.step_result list) :
     trade_metrics list =
   let all_trades =
     List.concat_map steps ~f:(fun step ->

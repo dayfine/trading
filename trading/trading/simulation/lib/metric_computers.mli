@@ -52,7 +52,9 @@ val default_computers :
 
 (** {1 Factory} *)
 
-val create_computer : Metric_types.metric_type -> Simulator.any_metric_computer
+val create_computer :
+  Trading_simulation_types.Metric_types.metric_type ->
+  Simulator.any_metric_computer
 (** Create a metric computer from a metric type.
 
     Note: Only SharpeRatio and MaxDrawdown are supported as individual

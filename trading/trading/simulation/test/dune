@@ -2,7 +2,16 @@
  (name simulation_test_helpers)
  (modules test_helpers)
  (wrapped false)
- (libraries core trading.simulation trading.strategy types bos csv fpath))
+ (libraries
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.simulation.data
+  trading.strategy
+  types
+  bos
+  csv
+  fpath))
 
 (test
  (name test_simulator)
@@ -11,6 +20,8 @@
   ounit2
   core
   trading.simulation
+  trading.simulation.types
+  trading.simulation.data
   trading.base
   trading.engine
   trading.strategy
@@ -21,17 +32,23 @@
 (test
  (name test_time_series)
  (modules test_time_series)
- (libraries ounit2 core trading.simulation types matchers))
+ (libraries ounit2 core trading.simulation.data types matchers))
 
 (test
  (name test_price_cache)
  (modules test_price_cache)
- (libraries ounit2 core trading.simulation types matchers bos csv fpath))
+ (libraries ounit2 core trading.simulation.data types matchers bos csv fpath))
 
 (test
  (name test_indicator_computer)
  (modules test_indicator_computer)
- (libraries ounit2 core trading.simulation types matchers indicators.types))
+ (libraries
+  ounit2
+  core
+  trading.simulation.data
+  types
+  matchers
+  indicators.types))
 
 (test
  (name test_indicator_manager)
@@ -39,7 +56,7 @@
  (libraries
   ounit2
   core
-  trading.simulation
+  trading.simulation.data
   types
   matchers
   simulation_test_helpers))
@@ -47,7 +64,7 @@
 (test
  (name test_market_data_adapter)
  (modules test_market_data_adapter)
- (libraries ounit2 core trading.simulation types matchers bos csv fpath))
+ (libraries ounit2 core trading.simulation.data types matchers bos csv fpath))
 
 (test
  (name test_order_generator)
@@ -68,6 +85,7 @@
   ounit2
   core
   trading.simulation
+  trading.simulation.types
   trading.base
   trading.engine
   trading.portfolio
@@ -83,6 +101,7 @@
   ounit2
   core
   trading.simulation
+  trading.simulation.types
   trading.base
   trading.engine
   trading.portfolio

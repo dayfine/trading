@@ -1,7 +1,7 @@
 open OUnit2
 open Core
 open Trading_simulation.Metrics
-open Trading_simulation.Metric_types
+open Trading_simulation_types.Metric_types
 open Trading_simulation.Metric_computers
 open Trading_simulation.Simulator
 open Matchers

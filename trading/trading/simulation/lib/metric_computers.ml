@@ -1,12 +1,14 @@
 (** Pre-built metric computers for common performance metrics. *)
 
 open Core
+module Metric_types = Trading_simulation_types.Metric_types
+module Simulator_types = Trading_simulation_types.Simulator_types
 
 (** {1 Summary Statistics Computer} *)
 
-type summary_state = { steps : Simulator.step_result list }
+type summary_state = { steps : Simulator_types.step_result list }
 
-let _summary_computer_impl : summary_state Simulator.metric_computer =
+let _summary_computer_impl : summary_state Simulator_types.metric_computer =
   {
     name = "summary";
     init = (fun ~config:_ -> { steps = [] });
@@ -20,7 +22,7 @@ let _summary_computer_impl : summary_state Simulator.metric_computer =
         | Some stats -> Metrics.summary_stats_to_metrics stats);
   }
 
-let summary_computer () = Simulator.wrap_computer _summary_computer_impl
+let summary_computer () = Simulator_types.wrap_computer _summary_computer_impl
 
 (** {1 Sharpe Ratio Computer} *)
 
@@ -58,7 +60,7 @@ let _compute_daily_returns values =
   match values with [] | [ _ ] -> [] | first :: rest -> loop first rest []
 
 let _sharpe_computer_impl ~risk_free_rate :
-    sharpe_state Simulator.metric_computer =
+    sharpe_state Simulator_types.metric_computer =
   {
     name = "sharpe_ratio";
     init = (fun ~config:_ -> { portfolio_values = []; risk_free_rate });
@@ -67,7 +69,7 @@ let _sharpe_computer_impl ~risk_free_rate :
         {
           state with
           portfolio_values =
-            step.Simulator.portfolio_value :: state.portfolio_values;
+            step.Simulator_types.portfolio_value :: state.portfolio_values;
         });
     finalize =
       (fun ~state ~config:_ ->
@@ -89,20 +91,20 @@ let _sharpe_computer_impl ~risk_free_rate :
   }
 
 let sharpe_ratio_computer ?(risk_free_rate = 0.0) () =
-  Simulator.wrap_computer (_sharpe_computer_impl ~risk_free_rate)
+  Simulator_types.wrap_computer (_sharpe_computer_impl ~risk_free_rate)
 
 (** {1 Maximum Drawdown Computer} *)
 
 type drawdown_state = { peak : float; max_drawdown : float; has_data : bool }
 
-let _drawdown_computer_impl : drawdown_state Simulator.metric_computer =
+let _drawdown_computer_impl : drawdown_state Simulator_types.metric_computer =
   {
     name = "max_drawdown";
     init =
       (fun ~config:_ -> { peak = 0.0; max_drawdown = 0.0; has_data = false });
     update =
       (fun ~state ~step ->
-        let value = step.Simulator.portfolio_value in
+        let value = step.Simulator_types.portfolio_value in
         if not state.has_data then
           { peak = value; max_drawdown = 0.0; has_data = true }
         else
@@ -117,12 +119,13 @@ let _drawdown_computer_impl : drawdown_state Simulator.metric_computer =
         [ Metric_types.make_metric MaxDrawdown state.max_drawdown ]);
   }
 
-let max_drawdown_computer () = Simulator.wrap_computer _drawdown_computer_impl
+let max_drawdown_computer () =
+  Simulator_types.wrap_computer _drawdown_computer_impl
 
 (** {1 Factory} *)
 
 let create_computer (metric_type : Metric_types.metric_type) :
-    Simulator.any_metric_computer =
+    Simulator_types.any_metric_computer =
   match metric_type with
   | TotalPnl | AvgHoldingDays | WinCount | LossCount | WinRate ->
       summary_computer ()

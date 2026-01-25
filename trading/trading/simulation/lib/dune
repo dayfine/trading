@@ -2,35 +2,14 @@
  (public_name trading.simulation)
  (name trading_simulation)
  (libraries
+  trading.simulation.types
+  trading.simulation.data
   trading.base
   trading.portfolio
   trading.engine
   trading.orders
   trading.strategy
-  types
-  indicators.time_period
-  indicators.ema
-  indicators.types
-  csv
-  fpath
   core)
- (modules
-  metric_types
-  simulator_types
-  simulator
-  order_generator
-  time_series
-  price_cache
-  indicator_computer
-  indicator_manager
-  market_data_adapter
-  metrics
-  metric_computers)
+ (modules simulator order_generator metrics metric_computers)
  (preprocess
-  (pps
-   ppx_let
-   ppx_deriving.show
-   ppx_deriving.eq
-   ppx_hash
-   ppx_sexp_conv
-   ppx_compare)))
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

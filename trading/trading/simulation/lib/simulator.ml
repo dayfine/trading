@@ -1,7 +1,7 @@
 (** Simulation engine for backtesting trading strategies *)
 
 open Core
-include Simulator_types
+include Trading_simulation_types.Simulator_types
 
 (** Internal: compute metrics by running all computers over the steps *)
 let _compute_metrics ~computers ~config ~steps =
@@ -16,7 +16,7 @@ type dependencies = {
   strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
-  market_data_adapter : Market_data_adapter.t;
+  market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
   computers : any_metric_computer list;
 }
 
@@ -24,7 +24,9 @@ let create_deps ~symbols ~data_dir ~strategy ~commission ?(computers = []) () =
   let engine_config = { Trading_engine.Types.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
-  let market_data_adapter = Market_data_adapter.create ~data_dir in
+  let market_data_adapter =
+    Trading_simulation_data.Market_data_adapter.create ~data_dir
+  in
   {
     symbols;
     data_dir;
@@ -86,8 +88,8 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
 let _get_today_bars t =
   List.filter_map t.deps.symbols ~f:(fun symbol ->
       match
-        Market_data_adapter.get_price t.deps.market_data_adapter ~symbol
-          ~date:t.current_date
+        Trading_simulation_data.Market_data_adapter.get_price
+          t.deps.market_data_adapter ~symbol ~date:t.current_date
       with
       | None -> None
       | Some daily_price -> Some (_to_price_bar symbol daily_price))
@@ -113,15 +115,16 @@ let _extract_trades reports =
 (** Create get_price function for strategy *)
 let _make_get_price t : Trading_strategy.Strategy_interface.get_price_fn =
  fun symbol ->
-  Market_data_adapter.get_price t.deps.market_data_adapter ~symbol
-    ~date:t.current_date
+  Trading_simulation_data.Market_data_adapter.get_price
+    t.deps.market_data_adapter ~symbol ~date:t.current_date
 
 (** Create get_indicator function for strategy *)
 let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
     =
  fun symbol indicator_name period cadence ->
-  Market_data_adapter.get_indicator t.deps.market_data_adapter ~symbol
-    ~indicator_name ~period ~cadence ~date:t.current_date
+  Trading_simulation_data.Market_data_adapter.get_indicator
+    t.deps.market_data_adapter ~symbol ~indicator_name ~period ~cadence
+    ~date:t.current_date
 
 (** Call strategy and get transitions *)
 let _call_strategy t =

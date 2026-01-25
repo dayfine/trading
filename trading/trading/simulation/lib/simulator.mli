@@ -2,7 +2,7 @@
 
     Core types are defined in {!Simulator_types} and included here. *)
 
-include module type of Simulator_types
+include module type of Trading_simulation_types.Simulator_types
 
 (** {1 Simulator} *)
 
@@ -21,7 +21,7 @@ type dependencies = {
   strategy : (module Trading_strategy.Strategy_interface.STRATEGY);
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
-  market_data_adapter : Market_data_adapter.t;
+  market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
   computers : any_metric_computer list;
 }
 

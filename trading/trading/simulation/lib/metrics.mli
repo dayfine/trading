@@ -43,7 +43,9 @@ type summary_stats = {
 
 (** {1 Trade Metrics Functions} *)
 
-val extract_round_trips : Simulator.step_result list -> trade_metrics list
+val extract_round_trips :
+  Trading_simulation_types.Simulator_types.step_result list ->
+  trade_metrics list
 (** Extract round-trip trades from simulation step results.
 
     A round-trip is identified by pairing buy trades with subsequent sell trades
@@ -74,5 +76,6 @@ val show_summary : summary_stats -> string
 
 (** {1 Conversion Functions} *)
 
-val summary_stats_to_metrics : summary_stats -> Metric_types.metric list
+val summary_stats_to_metrics :
+  summary_stats -> Trading_simulation_types.Metric_types.metric list
 (** Convert legacy summary_stats to the generic metric format *)

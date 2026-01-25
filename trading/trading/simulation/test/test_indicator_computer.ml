@@ -1,6 +1,6 @@
 open Core
 open OUnit2
-open Trading_simulation
+open Trading_simulation_data
 open Matchers
 
 (** Test helper: create a daily price *)
