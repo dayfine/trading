@@ -192,7 +192,6 @@ let create_exn ~config ~deps =
   match Trading_simulation.Simulator.create ~config ~deps with
   | Error err -> failwith ("Failed to create simulator: " ^ Status.show err)
   | Ok sim -> sim
-[@@warning "-32"]
 
 let step_exn sim =
   match Trading_simulation.Simulator.step sim with
