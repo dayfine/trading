@@ -555,22 +555,24 @@ let prop_holding_valid position transition =
 
 ## Implementation Plan
 
-### Phase 1: Core Types and Transitions
-- [ ] Define state types (entering_state, holding_state, exiting_state, closed_state)
-- [ ] Define transition type
-- [ ] Implement apply_transition with validation
-- [ ] Unit tests for each transition
-- [ ] Property-based tests for invariants
+**Status: All phases completed ✅**
 
-### Phase 2: Strategy Integration
-- [ ] Update strategy_state to use position map
-- [ ] Update strategy_output to use transitions
-- [ ] Example strategy using state machine
+### Phase 1: Core Types and Transitions ✅
+- [x] Define state types (entering_state, holding_state, exiting_state, closed_state)
+- [x] Define transition type
+- [x] Implement apply_transition with validation
+- [x] Unit tests for each transition
+- [x] Property-based tests for invariants
 
-### Phase 3: Simulator Integration
-- [ ] Simulator applies transitions from strategy
-- [ ] Simulator triggers transitions based on engine results (fills)
-- [ ] Integration tests
+### Phase 2: Strategy Integration ✅
+- [x] Update strategy_state to use position map
+- [x] Update strategy_output to use transitions
+- [x] Example strategy using state machine (EMA strategy, Buy and Hold)
+
+### Phase 3: Simulator Integration ✅
+- [x] Simulator applies transitions from strategy
+- [x] Simulator triggers transitions based on engine results (fills)
+- [x] Integration tests (see `test_e2e_integration.ml`)
 
 ## Open Questions
 

@@ -169,21 +169,24 @@ let simulator = Simulator.create_with_strategy
 in
 ```
 
-## Work Items
+## Implementation Status
 
-### Phase 4a: Define Interface (This Phase)
-- [ ] Define `MARKET_DATA` module type in `simulation/lib/market_data.mli`
-- [ ] Document requirements and expected behavior
-- [ ] Write tests with mock implementation
+### Completed ✅
 
-### Future: Implement Data Processing Pipeline (Separate Work)
-- [ ] Design preprocessing architecture
-- [ ] Implement data loader (from storage)
-- [ ] Implement indicator pre-computation
-- [ ] Build efficient lookup structures
-- [ ] Implement `MARKET_DATA` interface backed by preprocessed data
-- [ ] Performance benchmarking and optimization
-- [ ] Handle edge cases (missing data, date gaps, etc.)
+- [x] Define market data interface via `get_price_fn` and `get_indicator_fn` in `Strategy_interface`
+- [x] Implement `Market_data_adapter` in `Trading_simulation_data` module
+- [x] Implement `Price_cache` with lazy CSV loading
+- [x] Implement `Indicator_manager` for cached indicator orchestration
+- [x] Implement `Indicator_computer` for EMA computation
+- [x] Implement `Time_series` wrapper for cadence abstraction (daily/weekly)
+- [x] Handle edge cases (missing data, date gaps)
+- [x] E2E tests with real CSV data
+
+### Future Enhancements
+
+- [ ] Performance benchmarking and optimization for large backtests
+- [ ] Add more indicators (RSI, MACD, Bollinger Bands)
+- [ ] Streaming data support for live trading
 
 ## Notes
 
