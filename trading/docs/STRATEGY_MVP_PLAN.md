@@ -633,17 +633,21 @@ let step simulator =
 - Daily simulation loop
 - Order execution via Engine
 - Trade application to Portfolio
-- (Future) Strategy integration
+- Strategy integration (calls `Strategy.on_market_close` each day)
 
-### Current Gaps
+### Completed Integration ✅
 
-1. **Simulator ↔ Strategy Integration**
-   - Simulator doesn't call strategies yet
-   - Strategies work in isolation (test-only)
+The following items have been fully implemented:
 
-2. **Full Execution Loop**
-   - No automated: Strategy → Transitions → Orders → Trades → Portfolio
-   - Components work but not connected end-to-end
+1. **Simulator ↔ Strategy Integration** ✅
+   - Simulator calls `Strategy.on_market_close` each simulation day
+   - Strategies receive `get_price` and `get_indicator` functions
+   - Strategies return transitions which are applied to positions
+
+2. **Full Execution Loop** ✅
+   - Complete flow: Strategy → Transitions → Orders → Engine → Trades → Portfolio
+   - Verified by E2E tests (`test_e2e_integration.ml`)
+   - EMA strategy runs on real CSV data with actual trades
 
 ### Design Rationale
 
@@ -670,7 +674,19 @@ let step simulator =
 - ✅ Order generation separation (transitions → orders)
 - ✅ Multi-symbol support with immutable state
 - ✅ Clear understanding of Strategy vs Portfolio positions
+- ✅ Full simulator ↔ strategy integration
+- ✅ E2E tests with real CSV data
 
 **Approach**: Build bottom-up, test thoroughly at each level, validate design with real scenarios.
 
-**Next Integration Step**: Connect Simulator to Strategies for end-to-end execution loop.
+**Status**: MVP complete. Full end-to-end execution loop is working.
+
+## Next Steps
+
+With the MVP complete, potential next steps include:
+
+1. **Add more strategies** - Mean Reversion, Momentum, etc.
+2. **Staged entry/exit** - Scale in/out of positions over multiple orders
+3. **More indicators** - RSI, MACD, Bollinger Bands
+4. **Performance optimization** - Profiling and optimization for large backtests
+5. **Enhanced metrics** - Win rate by strategy, risk-adjusted returns, etc.

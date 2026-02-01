@@ -112,39 +112,41 @@ val run_with_metrics :
 
 ## Implementation Phases
 
-### Phase 1: Core Generic Types
-1. Add `metric_unit`, `metric`, `metric_set` types to metrics.mli/ml
-2. Add `metric_computer`, `any_metric_computer` types
-3. Add `wrap_computer`, `compute_metrics` functions
-4. Add `summary_stats_to_metrics` conversion
-5. Add `find_metric`, `format_metric`, `format_metrics` helpers
+**Status: All phases completed ✅**
 
-### Phase 2: Extend step_result
-1. Add `portfolio_value` field to `step_result`
-2. Add `_compute_portfolio_value` helper in simulator.ml
-3. Update `step` function to compute portfolio value
-4. Update existing tests for new field
+### Phase 1: Core Generic Types ✅
+1. ✅ Add `metric_unit`, `metric`, `metric_set` types to metrics.mli/ml
+2. ✅ Add `metric_computer`, `any_metric_computer` types
+3. ✅ Add `wrap_computer`, `compute_metrics` functions
+4. ✅ Add `summary_stats_to_metrics` conversion
+5. ✅ Add `find_metric`, `format_metric`, `format_metrics` helpers
 
-### Phase 3: Metric Computers (new files)
-1. Create `metric_computers.mli` / `metric_computers.ml`
-2. Implement `summary_computer` (wraps existing compute_summary)
-3. Implement `sharpe_ratio_computer`:
+### Phase 2: Extend step_result ✅
+1. ✅ Add `portfolio_value` field to `step_result`
+2. ✅ Add `_compute_portfolio_value` helper in simulator.ml
+3. ✅ Update `step` function to compute portfolio value
+4. ✅ Update existing tests for new field
+
+### Phase 3: Metric Computers (new files) ✅
+1. ✅ Create `metric_computers.mli` / `metric_computers.ml`
+2. ✅ Implement `summary_computer` (wraps existing compute_summary)
+3. ✅ Implement `sharpe_ratio_computer`:
    - Collect daily portfolio values
    - Compute daily returns
    - Sharpe = (mean - rf) / std * sqrt(252)
-4. Implement `max_drawdown_computer`:
+4. ✅ Implement `max_drawdown_computer`:
    - Track peak value
    - Track max drawdown (peak - trough) / peak
-5. Add `default_computers` function
-6. Update dune
+5. ✅ Add `default_computers` function
+6. ✅ Update dune
 
-### Phase 4: Simulator Integration
-1. Add `run_result` type to Metrics module
-2. Add `run_with_metrics` to Metric_computers module
-3. Add `get_config` accessor to Simulator
+### Phase 4: Simulator Integration ✅
+1. ✅ Add `run_result` type to Metrics module
+2. ✅ Add `run_with_metrics` to Metric_computers module
+3. ✅ Add `get_config` accessor to Simulator
 
-### Phase 5: Tests
-1. Create `test_metrics.ml` with tests for:
+### Phase 5: Tests ✅
+1. ✅ Create `test_metrics.ml` with tests for:
    - Metric type derivations (show, eq)
    - summary_stats_to_metrics conversion
    - compute_metrics combining multiple computers
@@ -152,9 +154,9 @@ val run_with_metrics :
    - Max drawdown edge cases (no loss, captures largest decline)
    - Backward compatibility (existing API unchanged)
 
-### Phase 6: Polish
-1. Run `dune fmt`
-2. Verify all tests pass
+### Phase 6: Polish ✅
+1. ✅ Run `dune fmt`
+2. ✅ Verify all tests pass
 
 ## Key Metric Formulas
 
