@@ -36,10 +36,18 @@ While waiting, you can:
 
 ## Your branch
 
+```bash
+# Initialize jj (safe to run every session)
+jj git init --colocate 2>/dev/null || true
+jj git fetch
+
+# Start a new commit on top of your feature branch
+jj new feat/simulation@origin
 ```
-git checkout feat/simulation
-# or create it:
-git checkout -b feat/simulation
+
+If the bookmark doesn't exist yet on the remote, create it after your first commit:
+```bash
+jj bookmark create feat/simulation -r @
 ```
 
 Never commit to `main` directly.
@@ -58,11 +66,23 @@ Never commit to `main` directly.
 3. Implement → make tests pass: `dune build && dune runtest`
 4. Self-review: style, abstraction, edge cases, readability
 5. `dune fmt`
-6. Commit with a clear message
+6. Commit and push:
+   ```bash
+   jj describe -m "your commit message"   # no git add needed
+   jj bookmark set feat/simulation -r @
+   jj git push --bookmark feat/simulation
+   ```
 
-Commands run inside Docker:
+Build/test inside Docker:
 ```
 docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune runtest'
+```
+
+Check your work with:
+```bash
+jj status      # what changed
+jj diff        # full diff
+jj log -l 10  # recent history
 ```
 
 ## At the end of every session

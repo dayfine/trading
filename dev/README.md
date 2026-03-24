@@ -51,6 +51,30 @@ each agent did, what's blocked, and any open questions for you.
 **To see feature progress:** check `status/<feature>.md`. Each agent keeps this
 up to date with current phase, what's done, what's next, and any blockers.
 
+## Version control (jj)
+
+The repo uses [Jujutsu (jj)](https://github.com/jj-vcs/jj) in colocated mode on
+top of git. `jj` is installed in the devcontainer and initialized automatically
+on container start (`postStartCommand` in `devcontainer.json`).
+
+Agents use jj instead of raw git for all VCS operations. Key differences:
+
+| git | jj |
+|-----|-----|
+| `git add && git commit -m "..."` | `jj describe -m "..."` (no staging area) |
+| `git status` | `jj status` |
+| `git diff` | `jj diff` |
+| `git log` | `jj log` |
+| `git push -u origin feat/x` | `jj git push --bookmark feat/x` |
+| `git diff main...feat/x` | `jj diff --from main@origin --to feat/x@origin` |
+
+The main benefit for parallel agents: jj stores merge conflicts as first-class
+commits rather than blocking the push. Conflicts can be resolved later without
+losing work.
+
+You can still use git for anything not covered by jj (e.g. `git fetch`, viewing
+GitHub PRs). The two coexist cleanly.
+
 ## Dependency order
 
 Feature agents run in this order (earlier features must have stable interfaces

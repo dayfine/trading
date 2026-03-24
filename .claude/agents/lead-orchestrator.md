@@ -58,16 +58,21 @@ Read these files first:
 6. dev/status/<feature>.md  ← pick up where you left off
 
 Your branch: feat/<feature>
-  git checkout feat/<feature> || git checkout -b feat/<feature>
+  jj git init --colocate 2>/dev/null || true
+  jj git fetch
+  jj new feat/<feature>@origin
+  # If bookmark doesn't exist yet: jj bookmark create feat/<feature> -r @
 
 Work using TDD (CLAUDE.md workflow):
   1. .mli interface + skeleton → dune build passes
   2. Write tests
   3. Implement → dune build && dune runtest passes
   4. dune fmt
-  5. Commit
+  5. jj describe -m "commit message"
+     jj bookmark set feat/<feature> -r @
+     jj git push --bookmark feat/<feature>
 
-Run all commands inside Docker:
+Build/test inside Docker:
   docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && <cmd>'
 
 Do as much meaningful work as you can in one session.
@@ -105,11 +110,11 @@ Review the feature: <FEATURE>
 Branch: feat/<feature>
 
 Steps:
-1. git checkout feat/<feature>
+1. jj git init --colocate 2>/dev/null || true && jj git fetch && jj new feat/<feature>@origin
 2. Build: docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build'
 3. Test: docker exec <container-name> bash -c '... && dune runtest'
 4. Read: docs/design/eng-design-<N>-<name>.md
-5. Review diff: git diff main...feat/<feature>
+5. Review diff: jj diff --from main@origin --to feat/<feature>@origin
 
 Evaluate:
 - All design-specified interfaces implemented?
