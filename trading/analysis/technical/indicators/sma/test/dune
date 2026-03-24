@@ -1,0 +1,4 @@
+(tests
+ (names test_sma)
+ (modules test_sma)
+ (libraries sma ounit2 indicator_types core))

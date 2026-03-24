@@ -1,0 +1,4 @@
+(library
+ (name sma)
+ (public_name indicators.sma)
+ (libraries core indicators.types))
