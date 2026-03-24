@@ -3,6 +3,17 @@
 This directory coordinates daily parallel development by a team of Claude agents
 building the Weinstein Trading System.
 
+## Where agents run
+
+**Agents run on the host machine, not inside Docker.**
+
+`claude` is a CLI tool installed on your host. `run.sh` calls it directly.
+The agents use `docker exec <container>` to run build and test commands inside
+the container, but the agent processes themselves (and all file I/O) happen on
+the host.
+
+This is why `claude` is not found inside the container — it doesn't need to be.
+
 ## How to run
 
 ```bash
@@ -25,6 +36,44 @@ exists or a run is in progress. Hook this into container startup or shell login.
 2. Lead spawns eligible feature agents in parallel (respecting dependency order)
 3. Lead spawns QC agents for any features marked `READY_FOR_REVIEW`
 4. Lead writes a daily summary to `daily/YYYY-MM-DD.md`
+
+## Monitoring a running session
+
+**Watch the live log:**
+```bash
+tail -f dev/logs/$(date +%Y-%m-%d).log
+```
+
+**Check if a session is currently running:**
+```bash
+ls dev/logs/*.running 2>/dev/null && echo "running" || echo "not running"
+# or
+ps aux | grep 'claude -p' | grep -v grep
+```
+
+**Check what agents are active** (subagent processes):
+```bash
+ps aux | grep claude | grep -v grep
+```
+
+## Stopping a running session
+
+```bash
+# Find the lead orchestrator process:
+ps aux | grep 'claude -p' | grep -v grep
+
+# Kill it (subagents will also stop):
+kill <PID>
+
+# Or kill all claude processes on the host:
+pkill -f 'claude -p'
+```
+
+The lock file (`dev/logs/YYYY-MM-DD.running`) is cleaned up automatically on
+exit. If a session was killed uncleanly, remove it manually:
+```bash
+rm dev/logs/*.running
+```
 
 ## Directory layout
 
@@ -72,8 +121,24 @@ The main benefit for parallel agents: jj stores merge conflicts as first-class
 commits rather than blocking the push. Conflicts can be resolved later without
 losing work.
 
-You can still use git for anything not covered by jj (e.g. `git fetch`, viewing
-GitHub PRs). The two coexist cleanly.
+You can still use git for anything not covered by jj (e.g. viewing GitHub PRs).
+The two coexist cleanly.
+
+### Viewing pending agent work (not yet a PR)
+
+```bash
+# See all feature branches and their tip commits:
+jj log -r 'bookmarks()' --no-graph
+
+# See what a feature branch has that main doesn't:
+jj log -r 'main@origin..feat/data-layer@origin' --no-graph
+
+# Diff a feature branch against main:
+jj diff --from main@origin --to feat/data-layer@origin
+
+# See all changes across all feature branches at once:
+jj log -r 'main@origin..bookmarks()' --no-graph
+```
 
 ## Dependency order
 
