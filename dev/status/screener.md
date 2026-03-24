@@ -5,6 +5,11 @@
 ## Status
 READY_FOR_REVIEW
 
+## QC Review
+NEEDS_REWORK — See dev/reviews/screener.md for full findings.
+Blockers: hardcoded magic numbers in screener.ml / macro.ml / stock_analysis.ml (must
+move to config); tests must be migrated from raw OUnit2 to the Matchers library.
+
 ## Interface stable
 YES
 
