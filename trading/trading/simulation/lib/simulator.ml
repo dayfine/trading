@@ -136,19 +136,6 @@ let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
     t.deps.market_data_adapter ~symbol ~indicator_name ~period ~cadence
     ~date:t.current_date
 
-(** Determine whether to call the strategy on the current date.
-
-    For [Daily] cadence: always call the strategy.
-    For [Weekly] cadence: only call on Fridays (Weinstein's end-of-week review
-    cadence). Orders placed Friday execute during the following week against
-    daily price paths. *)
-let _should_call_strategy t =
-  match t.config.strategy_cadence with
-  | Daily -> true
-  | Weekly ->
-      Trading_simulation_data.Time_series.is_period_end
-        ~cadence:Types.Cadence.Weekly t.current_date
-
 (** Call strategy and get transitions *)
 let _call_strategy t =
   let (module S) = t.deps.strategy in
@@ -275,13 +262,8 @@ let step t =
     let%bind portfolio =
       Trading_portfolio.Portfolio.apply_trades t.portfolio trades
     in
-    (* Call strategy (respecting cadence) and apply transitions *)
-    let t_with_positions = { t with positions } in
-    let%bind transitions =
-      if _should_call_strategy t_with_positions then
-        _call_strategy t_with_positions
-      else Ok []
-    in
+    (* Call strategy and apply transitions *)
+    let%bind transitions = _call_strategy { t with positions } in
     let%bind positions = _apply_transitions ~positions ~transitions in
     (* Generate and submit orders for next day *)
     let%bind orders =

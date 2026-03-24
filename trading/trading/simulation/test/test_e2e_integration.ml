@@ -74,7 +74,6 @@ let test_load_real_symbol_aapl _ =
       end_date = date_of_string "2024-01-05";
       initial_cash = 10000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -98,7 +97,6 @@ let test_load_multiple_real_symbols _ =
       end_date = date_of_string "2024-01-10";
       initial_cash = 50000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -123,7 +121,6 @@ let test_date_range_before_data_starts _ =
       end_date = date_of_string "1970-01-10";
       initial_cash = 10000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -152,7 +149,6 @@ let test_date_range_after_data_ends _ =
       end_date = date_of_string "2030-01-10";
       initial_cash = 10000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -181,7 +177,6 @@ let test_partial_date_overlap _ =
       end_date = date_of_string "2004-08-31";
       initial_cash = 10000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -208,7 +203,6 @@ let test_missing_symbol_graceful_handling _ =
       end_date = date_of_string "2024-01-05";
       initial_cash = 10000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -241,7 +235,6 @@ let test_mixed_valid_and_invalid_symbols _ =
       end_date = date_of_string "2024-01-05";
       initial_cash = 10000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -321,7 +314,6 @@ let test_buy_and_hold_e2e _ =
       end_date = date_of_string "2024-01-10";
       initial_cash = 10000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -354,7 +346,6 @@ let test_longer_simulation_period _ =
       end_date = date_of_string "2024-01-31";
       initial_cash = 100000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
@@ -387,7 +378,6 @@ let test_ema_strategy_e2e _ =
       end_date = date_of_string "2024-03-31";
       initial_cash = 100000.0;
       commission = sample_commission;
-      strategy_cadence = Daily;
     }
   in
   let sim = create_exn ~config ~deps in
