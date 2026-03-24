@@ -61,21 +61,23 @@ Never commit to `main` directly.
 
 ## Development workflow (from CLAUDE.md)
 
-1. Write `.mli` interface + skeleton → `dune build` must pass
-2. Write tests → mostly failing at first is expected
-3. Implement → make tests pass: `dune build && dune runtest`
-4. Self-review: style, abstraction, edge cases, readability
-5. `dune fmt`
-6. Commit and push:
-   ```bash
-   jj describe -m "your commit message"   # no git add needed
-   jj bookmark set feat/simulation -r @
-   jj git push --bookmark feat/simulation
-   ```
+Work one module at a time. The full cycle per module:
+
+1. Write `.mli` interface + skeleton → `dune build` passes → **commit**
+2. Write tests → **commit**
+3. Implement → `dune build && dune runtest` passes → **commit**
+4. `dune fmt` → **commit if anything changed**
 
 Build/test inside Docker:
 ```
 docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune runtest'
+```
+
+Commit and push after each step:
+```bash
+jj describe -m "your commit message"   # no git add needed
+jj bookmark set feat/simulation -r @
+jj git push --bookmark feat/simulation
 ```
 
 Check your work with:
@@ -84,6 +86,13 @@ jj status      # what changed
 jj diff        # full diff
 jj log -l 10  # recent history
 ```
+
+## Commit discipline
+
+- **One module per commit** — never batch multiple modules together
+- **Target 200–300 lines per commit** (hard max ~400 including tests)
+- **Push after every commit** — don't accumulate local-only work
+- Each commit must build cleanly on its own
 
 ## At the end of every session
 
