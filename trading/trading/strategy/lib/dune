@@ -7,6 +7,7 @@
   strategy_interface
   ema_strategy
   buy_and_hold_strategy
-  strategy)
+  strategy
+  weinstein_strategy)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

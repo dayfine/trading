@@ -24,6 +24,7 @@ let sample_config =
     end_date = date_of_string "2024-01-05";
     initial_cash = 10000.0;
     commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
+    strategy_cadence = Daily;
   }
 
 let sample_aapl_prices =
