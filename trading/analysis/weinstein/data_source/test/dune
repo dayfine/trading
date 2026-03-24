@@ -1,0 +1,5 @@
+(test
+ (name test_data_source)
+ (libraries data_source core async async_unix ounit2 types csv file.sexp core_unix)
+ (preprocess
+  (pps ppx_sexp_conv)))
