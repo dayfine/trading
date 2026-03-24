@@ -30,6 +30,3 @@ _opam/
 
 # Local data directory
 /data
-
-# Claude Code local settings (personal/machine-specific)
-.claude/settings.local.json
