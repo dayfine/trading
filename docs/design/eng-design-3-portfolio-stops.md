@@ -2,7 +2,7 @@
 
 **Codebase:** `dayfine/trading` — ~18,600 lines OCaml, 34 test files. Core + Async throughout.
 
-**Related docs:** [System Design](weinstein-trading-system-v2.md) · [Detailed Design](weinstein-detailed-design.md) · [Book Reference](weinstein-screener-design-doc-v2.md)
+**Related docs:** [System Design](weinstein-trading-system-v2.md) · [Book Reference](weinstein-book-reference.md)
 
 ## Portfolio / Orders / Stops
 

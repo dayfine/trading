@@ -453,7 +453,106 @@ tuning:
 
 ---
 
-## 7. Build plan
+## 7. Milestones
+
+Milestones mark the points where you gain new capability — not just "code compiles" but "I can do something I couldn't before."
+
+### Milestone 1: Single-Stock Analyst (after P1)
+
+**You can:** Run `weinstein analyze AAPL.US` and get back a complete analysis of any individual stock — its current stage, whether it's near a breakout, volume confirmation quality, relative strength vs the market, overhead resistance grade, and suggested stop level.
+
+**What this enables:**
+- Validate the system's analysis against your own chart reading
+- Spot-check any ticker on demand
+- Start building intuition for how the classifier behaves
+- Compare the system's stage calls against the book's examples
+
+**What it doesn't do yet:** No macro context, no sector filtering, no screening the full universe.
+
+### Milestone 2: Market Context (after P2)
+
+**You can:** Run `weinstein macro` to see the current market regime (bullish/bearish/neutral with indicator breakdown) and `weinstein sector` to see which sectors are strong, weak, or transitioning.
+
+**What this enables:**
+- Know whether to be aggressive (buying) or defensive (raising cash, looking for shorts)
+- Identify which sectors to focus on before looking at individual stocks
+- Get the "forest" view that gates everything else
+
+**Combined with M1:** You can now manually apply the full Weinstein three-layer filter — check macro, check sector, then analyze individual stocks from favorable sectors. It's manual, but the analysis is automated.
+
+### Milestone 3: Automated Screening (after P3)
+
+**You can:** Run `weinstein scan` and get a ranked list of buy and short candidates across the entire US equity universe, graded A+ through F, with suggested entries, stops, and risk percentages.
+
+**What this enables:**
+- Your Saturday morning workflow begins. Run the scan, review candidates, decide which to act on.
+- Stop manually scanning hundreds of charts — the system surfaces the best setups
+- Each candidate comes with a rationale explaining why it scored the way it did
+
+**What it doesn't do yet:** No position tracking, no trailing stop management, no portfolio awareness. You're using it as a screener, not as a portfolio manager.
+
+### Milestone 4: Position Management (after P4)
+
+**You can:** Log your trades with `weinstein enter AAPL --price 152 --shares 200 --stop 137`, and the system tracks your positions, computes trailing stops, monitors for stop hits, and alerts you when something needs attention.
+
+**What this enables:**
+- The full weekly cycle: scan → enter positions → system manages stops → alerts on exits
+- Position sizing: the system tells you how many shares to buy given your risk budget
+- Portfolio awareness: exposure tracking, sector concentration warnings
+- No more manually tracking where your stops should be — the system implements Weinstein's trailing stop state machine mechanically
+
+**Combined with M3:** The screener now knows what you hold and won't suggest buying something you already own. It factors your exposure limits into candidate rankings.
+
+### Milestone 5: Historical Backtesting (after P6)
+
+**You can:** Run `weinstein backtest --from 2015-01-01 --to 2025-12-31` and get a full performance report — equity curve, Sharpe ratio, max drawdown, win rate, trade log.
+
+**What this enables:**
+- Validate the system before risking real money (or validate it alongside real trading)
+- Test the strategy across different market regimes (bull, bear, sideways)
+- Compare different time periods to understand when Weinstein's approach works best
+- Build confidence (or identify weaknesses) in the approach
+
+**Combined with M4:** You can now run the system in parallel — live trading with real positions while backtesting parameter variations on the side.
+
+### Milestone 6: Full Automated Cycle (after P5)
+
+**You can:** Set up a cron job and the system runs automatically: weekly scan on Friday close, daily stop monitoring, alerts sent to you, weekly report generated and waiting for you Saturday morning.
+
+**What this enables:**
+- Zero effort during the week unless an alert fires
+- The Saturday review session is structured: open the report, check alerts, review candidates, decide, place orders
+- Trade history accumulates, giving you a record to review and learn from
+
+**This is the system described in §3 — the target operating state.**
+
+### Milestone 7: Parameter Optimization (after P7)
+
+**You can:** Run `weinstein tune --param analysis.ma_period:20-40 --param screening.volume_breakout_ratio:1.5-3.0 --objective sharpe` and the system searches the config space, running hundreds of backtests, and reports the best configuration with sensitivity analysis.
+
+**What this enables:**
+- Empirically optimize scoring weights, MA periods, stop thresholds
+- Understand which parameters matter most (sensitivity) and which don't
+- Detect overfitting risk before applying new parameters to live trading
+- Experiment with strategy variations (e.g. "what if I use 20-week MA instead of 30?")
+
+### Milestone summary
+
+```
+M1  Single-Stock Analyst    P1          Analyze any ticker on demand
+M2  Market Context          +P2         Macro regime + sector health
+M3  Automated Screening     +P3         Weekly scan → ranked candidates
+M4  Position Management     +P4         Full portfolio tracking + stops
+M5  Historical Backtesting  +P6         Backtest over any date range
+M6  Full Automated Cycle    +P5         Cron → report → review → trade
+M7  Parameter Optimization  +P7         Tune config against history
+```
+
+Each milestone is independently valuable. You could stop at M3 and have a useful screener. You could stop at M4 and have a complete manual trading system. M5+ adds simulation and optimization on top.
+
+---
+
+## 8. Build plan
 
 Ordered by what gets you to a usable system fastest. Backtesting and tuning are designed from the start but can be implemented slightly later because they use the same pipeline.
 
@@ -471,12 +570,13 @@ Ordered by what gets you to a usable system fastest. Backtesting and tuning are 
 
 ---
 
-## 8. Next steps
+## 9. Next steps
 
-This document establishes the top-level design: what we're building, how it's used, what the components are, and how they interact. Three things follow from here:
+This document establishes the top-level design: what we're building, how it's used, what the components are, and how they interact. The engineering design docs cover each subsystem in detail:
 
-1. **Component design docs.** Each of the seven components needs its own detailed spec: internal structure, sub-components, algorithms, edge cases, error handling. These can be done one at a time, in build-plan order. The Weinstein reference notes (book extracts) serve as the domain spec for the Analyzer and Screener.
+- [Data Layer](eng-design-1-data-layer.md) — EODHD client, DATA_SOURCE abstraction, cache
+- [Screener / Analysis](eng-design-2-screener-analysis.md) — Stage classifier, macro/sector analysis, scoring
+- [Portfolio / Stops](eng-design-3-portfolio-stops.md) — Weinstein trailing stops, risk management, order generation
+- [Simulation / Tuning](eng-design-4-simulation-tuning.md) — Weekly simulation, strategy module, parameter tuner
 
-2. **Data source interface spec.** The DataSource abstraction is the most important contract — it's the seam between live and simulated modes. Its detailed design (what exactly each method returns, caching semantics, error handling, rate limiting) should be nailed down early since everything depends on it.
-
-3. **Start building P1.** Config + types + data source + MA + stage classifier. This is small enough to build quickly and gives you something you can run against real tickers immediately, which validates the data pipeline and the core analysis primitives before layering on the rest.
+The [Book Reference](weinstein-book-reference.md) contains the domain rules extracted from Weinstein's book — the specific criteria to encode in the analysis modules.
