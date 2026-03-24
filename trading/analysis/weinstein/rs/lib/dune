@@ -1,0 +1,7 @@
+(library
+ (name rs)
+ (public_name weinstein.rs)
+ (wrapped false)
+ (libraries core types weinstein_types indicators.relative_strength)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
