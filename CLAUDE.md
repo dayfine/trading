@@ -38,6 +38,38 @@ The codebase is organized into two main areas:
 - **Technical Indicators** (`analysis/technical/indicators/`): EMA, time period conversion, and indicator framework
 - **Scripts** (`analysis/scripts/`): Analysis workflows and utilities
 
+## Weinstein Trading System — Design Documentation
+
+The project is building a semi-automated trading system based on Stan Weinstein's stage analysis methodology. All design documentation lives in `docs/design/`. **Read these docs before making changes to understand the system goals, component boundaries, and technical decisions.**
+
+### Start here (read in this order):
+
+1. **System Design** (`docs/design/weinstein-trading-system-v2.md`): What we're building, how it's used (weekly workflow, mid-week adjustments, backtesting, tuning), the core abstraction (live and simulation share the same pipeline), component map, config surface, milestones (M1–M7), and build phases.
+
+2. **Codebase Assessment** (`docs/design/codebase-assessment.md`): How the Weinstein system maps onto the existing codebase — what we reuse (orders, portfolio, engine, simulation, strategy interface, EODHD client), what we extend, what we build new. **Read this to understand which existing modules to touch and which to leave alone.**
+
+### Engineering design docs (one per subsystem):
+
+3. **Data Layer** (`docs/design/eng-design-1-data-layer.md`): EODHD client extensions, DATA_SOURCE abstraction (live/historical/synthetic), cache design, storage format decisions, idempotency, performance.
+
+4. **Screener / Analysis** (`docs/design/eng-design-2-screener-analysis.md`): Stage classifier, macro analyzer, sector analyzer, relative strength, volume confirmation, resistance mapping, breakout detection, and the screener cascade filter. All analysis modules are pure functions. All thresholds configurable.
+
+5. **Portfolio / Orders / Stops** (`docs/design/eng-design-3-portfolio-stops.md`): Weinstein trailing stop state machine, portfolio risk management (position sizing, exposure limits, sector concentration), trading state persistence, order generation. **Key decision: don't modify existing Portfolio/Orders/Position modules — build alongside them.**
+
+6. **Simulation / Tuning** (`docs/design/eng-design-4-simulation-tuning.md`): Weekly simulation mode (extend existing simulator with strategy_cadence), Weinstein strategy module (implements existing STRATEGY interface), parameter tuner with walk-forward validation.
+
+### Domain reference:
+
+7. **Weinstein Book Reference** (`docs/design/weinstein-book-reference.md`): Detailed notes from Stan Weinstein's book — stage definitions, buy/sell criteria, stop-loss rules, macro indicators, sector analysis, short-selling rules. **Use this as the domain reference when implementing analysis logic — it contains the specific rules to encode so you don't need to re-read the book.**
+
+### Key principles from the design docs:
+
+- **Same pipeline for live and simulation.** The DATA_SOURCE interface is the seam — live calls EODHD, historical replays from cache, synthetic generates programmatically. Analysis and screening code is identical in both modes.
+- **All parameters in config, never hardcoded.** Every threshold, weight, lookback period, and limit is configurable. This enables backtesting and tuning.
+- **Don't modify existing modules** (Portfolio, Orders, Engine, Position). Build Weinstein-specific logic alongside them.
+- **Every analysis function is pure.** Same input → same output. No hidden state. Essential for reproducible backtests.
+- **The Weinstein strategy implements the existing `STRATEGY` module type.** Integration point is `on_market_close` — the strategy receives market data, looks at positions, returns transitions.
+
 ## Code Patterns
 
 ### Type Definitions
