@@ -5,87 +5,31 @@ description: Implements the Data Layer for the Weinstein Trading System. Works o
 
 You are building the **Data Layer** for the Weinstein Trading System.
 
-## Your design doc
-
-Read `docs/design/eng-design-1-data-layer.md` fully before starting any implementation.
-
-Also read:
-- `docs/design/weinstein-trading-system-v2.md` — section 4.3 for the DataSource contract
-- `docs/design/codebase-assessment.md` — "Analysis (partially reusable)" section for what already exists
-- `CLAUDE.md` — development patterns, OCaml idioms, test patterns, workflow
-
 ## At the start of every session
 
-1. Read `dev/decisions.md` — check for any guidance relevant to your work
-2. Read `dev/status/data-layer.md` — resume from exactly where you left off
-3. State your plan for this session before writing any code
+1. Read `dev/agent-feature-workflow.md` — shared workflow, commit discipline, session procedures
+2. Read `dev/decisions.md` — human guidance
+3. Read `dev/status/data-layer.md` — resume from exactly where you left off
+4. Read `docs/design/eng-design-1-data-layer.md` — your design doc
+5. Also read: `docs/design/weinstein-trading-system-v2.md` §4.3, `docs/design/codebase-assessment.md` "Analysis" section, `CLAUDE.md`
+6. State your plan for this session before writing any code
 
-## Your branch
+Your branch: `feat/data-layer`
 
-```bash
-# Initialize jj (safe to run every session)
-jj git init --colocate 2>/dev/null || true
-jj git fetch
+## Critical milestone: interface stability
 
-# Start a new commit on top of your feature branch
-jj new feat/data-layer@origin
-```
-
-If the bookmark doesn't exist yet on the remote, create it after your first commit:
-```bash
-jj bookmark create feat/data-layer -r @
-```
-
-Never commit to `main` directly.
-
-## Development workflow (from CLAUDE.md)
-
-Work one module at a time. The full cycle per module:
-
-1. Write `.mli` interface + skeleton → `dune build` passes → **commit**
-2. Write tests → **commit**
-3. Implement → `dune build && dune runtest` passes → **commit**
-4. `dune fmt` → **commit if anything changed**
-
-Build/test inside Docker:
-```
-docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune runtest'
-```
-
-Commit and push after each step:
-```bash
-jj describe -m "your commit message"   # no git add needed
-jj bookmark set feat/data-layer -r @
-jj git push --bookmark feat/data-layer
-```
-
-Check your work with:
-```bash
-jj status      # what changed
-jj diff        # full diff
-jj log -l 10  # recent history
-```
-
-## Commit discipline
-
-- **One module per commit** — never batch multiple modules together
-- **Target 200–300 lines per commit** (hard max ~400 including tests)
-- **Push after every commit** — don't accumulate local-only work
-- Each commit must build cleanly on its own
-
-## A critical milestone: interface stability
-
-The screener agent is blocked until the `DataSource` module type is stable. Once you have finalized the `.mli` for the DataSource interface (even before full implementation), update `dev/status/data-layer.md`:
+The screener agent is blocked until the `DataSource` module type is stable.
+Once the `.mli` is finalized (even before full implementation), update `dev/status/data-layer.md`:
 
 ```
 Interface stable: YES
 ```
 
-This unblocks `feat-screener`. Prioritize getting to this point.
+Prioritize getting to this point first.
 
-## At the end of every session
+## Status file format
 
-Update `dev/status/data-layer.md`:
+Update `dev/status/data-layer.md` at the end of every session:
 
 ```markdown
 ## Last updated: YYYY-MM-DD
@@ -111,6 +55,3 @@ YES | NO
 ## Recent Commits
 - <hash> <message>
 ```
-
-When all work is complete and `dune build && dune runtest` passes clean:
-Set status to `READY_FOR_REVIEW`. The QC agent will pick it up.
