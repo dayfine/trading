@@ -393,6 +393,15 @@ If the initial prompt is expected to result in a really large change (> 1000
 lines), plan it out beforehand and make multiple commits, each no more than
 500-1000 lines (includig tests).
 
+For large modules (e.g. a module with many sub-modules or a complex pipeline),
+implement iteratively step by step:
+
+- Break the module into logical sub-units (e.g. types → core logic → integration)
+- Implement and commit each sub-unit before moving to the next
+- Each commit / PR should remain small and self-contained (< 500 lines)
+- A sub-unit is done when it builds, has tests, and tests pass
+- Plan the full sequence upfront, but execute one step at a time
+
 ### Debugging Tips
 
 - For compilation errors with published packages, inspect opam/build to check
