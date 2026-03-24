@@ -1,0 +1,7 @@
+(library
+ (name volume)
+ (public_name weinstein.volume)
+ (wrapped false)
+ (libraries core types weinstein_types)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
