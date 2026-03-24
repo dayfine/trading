@@ -36,7 +36,8 @@ Read all of the following before doing anything else:
 | screener | data-layer status shows "Interface stable: YES" |
 | simulation | data-layer, portfolio-stops, AND screener all show "Interface stable: YES" |
 
-### Skip a feature if its status is MERGED or APPROVED (awaiting human merge decision).
+### Skip a feature if its status is MERGED with no Follow-up items, or APPROVED (awaiting human merge decision).
+### Run a feature agent if its status is MERGED but its status file has a non-empty `## Follow-up` section — the agent will address those items before anything else.
 
 ---
 
@@ -195,6 +196,13 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 
 ## QC Status
 - data-layer: ✅ APPROVED | ⚠️ NEEDS_REWORK (see dev/reviews/data-layer.md) | ⏳ PENDING | —
+- portfolio-stops: ...
+- screener: ...
+- simulation: ...
+
+## Follow-up Queue
+(Read from ## Follow-up sections in each status file — omit this section if all are empty)
+- data-layer: <list items verbatim, or "none">
 - portfolio-stops: ...
 - screener: ...
 - simulation: ...

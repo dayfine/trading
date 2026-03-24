@@ -8,9 +8,6 @@ MERGED
 ## Review
 See dev/reviews/data-layer.md — APPROVED (merged PRs #124, #125, #127, #132)
 
-## Review
-See dev/reviews/data-layer.md — NEEDS_REWORK
-
 ## Interface stable
 YES
 

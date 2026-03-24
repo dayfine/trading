@@ -38,6 +38,12 @@ While waiting, you can:
 - The tuner is a loop around the simulator — no new pipeline, no special cases
 - All thresholds and parameters must be in config, never hardcoded
 
+## At the start of every session — check for follow-up items
+
+After reading the status file, check `dev/status/simulation.md` for a `## Follow-up` section.
+**If follow-up items exist, address them before any new feature work.** Each item should be a
+small focused PR on top of `main@origin`. Clear the item from the Follow-up section once fixed.
+
 ## Status file format
 
 Update `dev/status/simulation.md` at the end of every session:
@@ -61,6 +67,10 @@ screener: STABLE / WAITING
 
 ## In Progress
 - ...
+
+## Follow-up
+Post-merge fixes from QC review (remove items as they are addressed):
+- <item> — <file and line reference>
 
 ## Next Steps
 - ...

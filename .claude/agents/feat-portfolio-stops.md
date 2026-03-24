@@ -34,6 +34,12 @@ Interface stable: YES
 
 This is a prerequisite for the simulation agent.
 
+## At the start of every session — check for follow-up items
+
+After reading the status file, check `dev/status/portfolio-stops.md` for a `## Follow-up` section.
+**If follow-up items exist, address them before any new feature work.** Each item should be a
+small focused PR on top of `main@origin`. Clear the item from the Follow-up section once fixed.
+
 ## Status file format
 
 Update `dev/status/portfolio-stops.md` at the end of every session:
@@ -55,6 +61,10 @@ YES | NO
 
 ## Blocked
 - None / description
+
+## Follow-up
+Post-merge fixes from QC review (remove items as they are addressed):
+- <item> — <file and line reference>
 
 ## Next Steps
 - ...
