@@ -1,0 +1,10 @@
+{
+  "General": {
+    "Code": "AAPL",
+    "Name": "Apple Inc",
+    "Sector": "Technology",
+    "Industry": "Consumer Electronics",
+    "MarketCapitalization": 2800000000000.0,
+    "Exchange": "NASDAQ"
+  }
+}

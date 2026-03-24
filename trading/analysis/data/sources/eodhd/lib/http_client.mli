@@ -7,12 +7,23 @@ type fetch_fn = Uri.t -> string Status.status_or Deferred.t
     [Error status] if the request fails. *)
 
 type historical_price_params = {
-  symbol : string;
-  (* If not specified, omitted from the API call *)
-  start_date : Date.t option;
-  (* If not specified, defaults to today *)
+  symbol : string;  (** If not specified, omitted from the API call *)
+  start_date : Date.t option;  (** If not specified, defaults to today *)
   end_date : Date.t option;
+      (** Cadence of price bars. Defaults to [Daily] if not specified. *)
+  period : Types.Cadence.t;
 }
+
+type fundamentals = {
+  symbol : string;
+  name : string;
+  sector : string;
+  industry : string;
+  market_cap : float;
+  exchange : string;
+}
+[@@deriving show, eq]
+(** Fundamental data for a security, including sector and industry metadata. *)
 
 val get_historical_price :
   token:string ->
@@ -20,6 +31,28 @@ val get_historical_price :
   ?fetch:fetch_fn ->
   unit ->
   Types.Daily_price.t list Status.status_or Deferred.t
+(** Fetch historical OHLCV price bars for a symbol.
+
+    The [params.period] field controls whether daily, weekly, or monthly bars
+    are returned. Use [Types.Cadence.Weekly] for Weinstein-style weekly
+    analysis. *)
+
+val get_fundamentals :
+  token:string ->
+  symbol:string ->
+  ?fetch:fetch_fn ->
+  unit ->
+  fundamentals Status.status_or Deferred.t
+(** Fetch fundamental data (sector, industry, market cap) for a symbol. *)
+
+val get_index_symbols :
+  token:string ->
+  index:string ->
+  ?fetch:fetch_fn ->
+  unit ->
+  string list Status.status_or Deferred.t
+(** Fetch the constituent symbols of a market index (e.g. ["GSPC"] for S&P 500
+    or ["DJI"] for Dow Jones Industrial Average). *)
 
 val get_symbols :
   token:string ->

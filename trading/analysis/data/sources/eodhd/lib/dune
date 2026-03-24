@@ -2,5 +2,5 @@
  (name eodhd)
  (public_name eodhd)
  (preprocess
-  (pps ppx_let))
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq))
  (libraries base core cohttp-async status yojson types))

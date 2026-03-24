@@ -7,7 +7,18 @@ type historical_price_params = {
   symbol : string;
   start_date : Date.t option;
   end_date : Date.t option;
+  period : Types.Cadence.t;
 }
+
+type fundamentals = {
+  symbol : string;
+  name : string;
+  sector : string;
+  industry : string;
+  market_cap : float;
+  exchange : string;
+}
+[@@deriving show, eq]
 
 let _api_host = "eodhd.com"
 
@@ -20,11 +31,18 @@ let _fetch_body uri : string Status.status_or Deferred.t =
       Cohttp_async.Body.to_string body >>| fun body_str ->
       Error (Status.internal_error ("Error: " ^ status_str ^ "\n" ^ body_str))
 
+let _period_to_string = function
+  | Types.Cadence.Daily -> "d"
+  | Types.Cadence.Weekly -> "w"
+  | Types.Cadence.Monthly -> "m"
+
 let _historical_price_uri (params : historical_price_params) =
+  let period_str = _period_to_string params.period in
   let uri =
     Uri.make ~scheme:"https" ~host:_api_host
       ~path:("/api/eod/" ^ params.symbol)
-      ~query:[ ("fmt", [ "json" ]); ("period", [ "d" ]); ("order", [ "a" ]) ]
+      ~query:
+        [ ("fmt", [ "json" ]); ("period", [ period_str ]); ("order", [ "a" ]) ]
       ()
   in
   let uri' =
@@ -73,6 +91,14 @@ let _float_of_yojson = function
       Status.error_invalid_argument
         ("Expected float or int, got: " ^ Yojson.Safe.to_string v)
 
+let _float_or_null_of_yojson = function
+  | `Float f -> Ok f
+  | `Int i -> Ok (float_of_int i)
+  | `Null -> Ok 0.0
+  | v ->
+      Status.error_invalid_argument
+        ("Expected float, int, or null, got: " ^ Yojson.Safe.to_string v)
+
 let _int_of_yojson = function
   | `Int i -> Ok i
   | v ->
@@ -84,6 +110,13 @@ let _string_of_yojson = function
   | v ->
       Status.error_invalid_argument
         ("Expected string, got: " ^ Yojson.Safe.to_string v)
+
+let _string_or_null_of_yojson = function
+  | `String s -> Ok s
+  | `Null -> Ok ""
+  | v ->
+      Status.error_invalid_argument
+        ("Expected string or null, got: " ^ Yojson.Safe.to_string v)
 
 let _find_field fields name =
   match List.Assoc.find ~equal:String.equal fields name with
@@ -161,3 +194,64 @@ let get_bulk_last_day ~token ~exchange ?(fetch = _fetch_body) () :
       ()
   in
   fetch uri >>| Result.bind ~f:_parse_bulk_last_day_prices
+
+(* Fundamentals parsing *)
+
+let _parse_fundamentals_response symbol body_str =
+  let open Result.Let_syntax in
+  try
+    match Yojson.Safe.from_string body_str with
+    | `Assoc fields -> (
+        (* Navigate to General section *)
+        match List.Assoc.find ~equal:String.equal fields "General" with
+        | Some (`Assoc general) ->
+            let find_str key =
+              match List.Assoc.find ~equal:String.equal general key with
+              | Some v -> _string_or_null_of_yojson v
+              | None -> Ok ""
+            in
+            let find_float key =
+              match List.Assoc.find ~equal:String.equal general key with
+              | Some v -> _float_or_null_of_yojson v
+              | None -> Ok 0.0
+            in
+            let%bind name = find_str "Name" in
+            let%bind sector = find_str "Sector" in
+            let%bind industry = find_str "Industry" in
+            let%bind market_cap = find_float "MarketCapitalization" in
+            let%bind exchange = find_str "Exchange" in
+            Ok { symbol; name; sector; industry; market_cap; exchange }
+        | Some _ ->
+            Status.error_invalid_argument "General field is not an object"
+        | None -> Status.error_not_found "General section not found in response"
+        )
+    | _ -> Status.error_invalid_argument "Invalid response format"
+  with Yojson.Json_error msg ->
+    Status.error_invalid_argument ("Invalid JSON: " ^ msg)
+
+let get_fundamentals ~token ~symbol ?(fetch = _fetch_body) () :
+    fundamentals Status.status_or Deferred.t =
+  let uri =
+    Uri.make ~scheme:"https" ~host:_api_host
+      ~path:("/api/fundamentals/" ^ symbol)
+      ~query:
+        [
+          ("api_token", [ token ]);
+          ("filter", [ "General" ]);
+          ("fmt", [ "json" ]);
+        ]
+      ()
+  in
+  fetch uri >>| Result.bind ~f:(_parse_fundamentals_response symbol)
+
+(* Index symbols *)
+
+let get_index_symbols ~token ~index ?(fetch = _fetch_body) () :
+    string list Status.status_or Deferred.t =
+  let uri =
+    Uri.make ~scheme:"https" ~host:_api_host
+      ~path:("/api/exchange-symbol-list/" ^ index)
+      ~query:[ ("api_token", [ token ]); ("fmt", [ "json" ]) ]
+      ()
+  in
+  fetch uri >>| Result.bind ~f:_parse_symbols_response

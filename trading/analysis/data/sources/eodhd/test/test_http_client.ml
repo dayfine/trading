@@ -50,6 +50,7 @@ let test_get_historical_price _ =
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
       end_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:31);
+      period = Types.Cadence.Daily;
     }
   in
   let result =
@@ -73,6 +74,7 @@ let test_get_historical_price_error _ =
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
       end_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:31);
+      period = Types.Cadence.Daily;
     }
   in
   let result =
@@ -93,6 +95,7 @@ let test_get_historical_price_malformed_data _ =
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
       end_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:31);
+      period = Types.Cadence.Daily;
     }
   in
   let result =
@@ -120,7 +123,12 @@ let test_get_historical_price_no_dates _ =
     Deferred.return (Ok test_data)
   in
   let params : Eodhd.Http_client.historical_price_params =
-    { symbol = "AAPL"; start_date = None; end_date = None }
+    {
+      symbol = "AAPL";
+      start_date = None;
+      end_date = None;
+      period = Types.Cadence.Daily;
+    }
   in
   let result =
     Async.Thread_safe.block_on_async_exn (fun () ->
@@ -152,6 +160,7 @@ let test_get_historical_price_only_start_date _ =
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
       end_date = None;
+      period = Types.Cadence.Daily;
     }
   in
   let result =
@@ -181,6 +190,7 @@ let test_get_historical_price_only_end_date _ =
       symbol = "AAPL";
       start_date = None;
       end_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:31);
+      period = Types.Cadence.Daily;
     }
   in
   let result =
@@ -207,6 +217,7 @@ let test_get_historical_price_invalid_date_range _ =
       symbol = "AAPL";
       start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:31);
       end_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
+      period = Types.Cadence.Daily;
     }
   in
   let result =
@@ -335,6 +346,93 @@ let test_get_bulk_last_day _ =
             (Types.Daily_price.equal actual_price expected_price))
   | Error err -> assert_failure (Status.show err)
 
+let test_get_historical_price_weekly _ =
+  let mock_fetch uri =
+    let actual_uri_str = Uri.to_string uri in
+    let expected_uri_str =
+      "https://eodhd.com/api/eod/AAPL?api_token=test_token&to=2024-01-31&from=2024-01-01&fmt=json&period=w&order=a"
+    in
+    assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
+    let test_data = In_channel.read_all "./data/get_historical_price.json" in
+    Deferred.return (Ok test_data)
+  in
+  let params : Eodhd.Http_client.historical_price_params =
+    {
+      symbol = "AAPL";
+      start_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:1);
+      end_date = Some (Date.create_exn ~y:2024 ~m:Month.Jan ~d:31);
+      period = Types.Cadence.Weekly;
+    }
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_historical_price ~fetch:mock_fetch ~token:"test_token" ~params ())
+  in
+  match result with
+  | Ok prices -> assert_equal ~printer:Int.to_string 3 (List.length prices)
+  | Error err -> assert_failure (Status.show err)
+
+let test_get_fundamentals _ =
+  let mock_fetch uri =
+    let actual_uri_str = Uri.to_string uri in
+    let expected_uri_str =
+      "https://eodhd.com/api/fundamentals/AAPL?api_token=test_token&filter=General&fmt=json"
+    in
+    assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
+    let test_data =
+      In_channel.read_all "./data/get_fundamentals_response.json"
+    in
+    Deferred.return (Ok test_data)
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_fundamentals ~fetch:mock_fetch ~token:"test_token" ~symbol:"AAPL" ())
+  in
+  match result with
+  | Ok f ->
+      assert_equal ~printer:Fn.id "AAPL" f.Eodhd.Http_client.symbol;
+      assert_equal ~printer:Fn.id "Apple Inc" f.name;
+      assert_equal ~printer:Fn.id "Technology" f.sector;
+      assert_equal ~printer:Fn.id "Consumer Electronics" f.industry;
+      assert_equal ~printer:Fn.id "NASDAQ" f.exchange;
+      assert_bool "market_cap should be positive" Float.(f.market_cap > 0.0)
+  | Error err -> assert_failure (Status.show err)
+
+let test_get_fundamentals_error _ =
+  let mock_fetch _uri =
+    Deferred.return (Error (Status.internal_error "API rate limit exceeded"))
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_fundamentals ~fetch:mock_fetch ~token:"test_token" ~symbol:"AAPL" ())
+  in
+  match result with
+  | Ok _ -> assert_failure "Expected Error result"
+  | Error status ->
+      assert_equal ~printer:Status.show
+        (Status.internal_error "API rate limit exceeded")
+        status
+
+let test_get_index_symbols _ =
+  let mock_fetch uri =
+    let actual_uri_str = Uri.to_string uri in
+    let expected_uri_str =
+      "https://eodhd.com/api/exchange-symbol-list/GSPC?api_token=test_token&fmt=json"
+    in
+    assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
+    let test_data =
+      In_channel.read_all "./data/get_symbol_list_response.json"
+    in
+    Deferred.return (Ok test_data)
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_index_symbols ~fetch:mock_fetch ~token:"test_token" ~index:"GSPC" ())
+  in
+  match result with
+  | Ok symbols -> assert_bool "symbols not empty" (not (List.is_empty symbols))
+  | Error err -> assert_failure (Status.show err)
+
 let suite =
   "http_client_test"
   >::: [
@@ -349,6 +447,10 @@ let suite =
          >:: test_get_historical_price_only_end_date;
          "get_historical_price_invalid_date_range"
          >:: test_get_historical_price_invalid_date_range;
+         "get_historical_price_weekly" >:: test_get_historical_price_weekly;
+         "get_fundamentals" >:: test_get_fundamentals;
+         "get_fundamentals_error" >:: test_get_fundamentals_error;
+         "get_index_symbols" >:: test_get_index_symbols;
          "get_symbols" >:: test_get_symbols;
          "get_symbols_error" >:: test_get_symbols_error;
          "get_symbols_malformed_data" >:: test_get_symbols_malformed_data;

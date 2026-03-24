@@ -6,7 +6,7 @@ let read_file_as_string filename =
 
 let fetch_data ~token ~symbol =
   let params : Eodhd.Http_client.historical_price_params =
-    { symbol; start_date = None; end_date = None }
+    { symbol; start_date = None; end_date = None; period = Types.Cadence.Daily }
   in
   Eodhd.Http_client.get_historical_price ~token ~params ()
 
