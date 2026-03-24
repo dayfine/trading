@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Daily development run for the Weinstein Trading System.
+# Runs the lead orchestrator non-interactively.
+# Usage: ./dev/run.sh
+#        or via cron: 0 7 * * * /home/user/trading/dev/run.sh
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOG_DIR="$REPO_ROOT/dev/logs"
+mkdir -p "$LOG_DIR"
+
+DATE="$(date +%Y-%m-%d)"
+LOG_FILE="$LOG_DIR/$DATE.log"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting daily run" | tee -a "$LOG_FILE"
+
+cd "$REPO_ROOT"
+
+claude -p \
+  --allowedTools "Agent,Bash,Read,Write,Edit,Glob,Grep" \
+  --agent lead-orchestrator \
+  "Run the daily development session for the Weinstein Trading System.
+Today's date is $(date +%Y-%m-%d).
+
+Follow your instructions exactly:
+1. Read dev/decisions.md and all dev/status/*.md
+2. Spawn eligible feature agents as parallel subagents (isolation: worktree)
+3. Spawn QC agents for any READY_FOR_REVIEW features
+4. Write dev/daily/$(date +%Y-%m-%d).md with the full status summary" \
+  2>&1 | tee -a "$LOG_FILE"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Daily run complete. Summary: $REPO_ROOT/dev/daily/$DATE.md" \
+  | tee -a "$LOG_FILE"

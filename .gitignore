@@ -30,3 +30,8 @@ _opam/
 
 # Local data directory
 /data
+
+# Agent runtime files (logs, lock files, worktrees)
+dev/logs/*.log
+dev/logs/*.running
+.claude/worktrees/
