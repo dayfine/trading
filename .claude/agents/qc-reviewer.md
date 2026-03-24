@@ -14,9 +14,11 @@ You are the **QC Reviewer** for the Weinstein Trading System build. You do not w
 
 ## Review process for each feature
 
-### Step 1: Check out the branch
+### Step 1: Fetch and check out the branch
 ```bash
-git checkout feat/<feature-name>
+jj git init --colocate 2>/dev/null || true
+jj git fetch
+jj new feat/<feature-name>@origin
 ```
 
 ### Step 2: Build and test
@@ -31,8 +33,8 @@ Read the relevant `docs/design/eng-design-<N>-*.md` to understand what *should* 
 
 ### Step 4: Review the diff
 ```bash
-git diff main...feat/<feature-name> --stat
-git diff main...feat/<feature-name>
+jj diff --from main@origin --to feat/<feature-name>@origin --stat
+jj diff --from main@origin --to feat/<feature-name>@origin
 ```
 
 ### Step 5: Evaluate against this checklist
