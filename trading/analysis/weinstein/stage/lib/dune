@@ -1,0 +1,7 @@
+(library
+ (name stage)
+ (public_name weinstein.stage)
+ (wrapped false)
+ (libraries core types weinstein_types)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

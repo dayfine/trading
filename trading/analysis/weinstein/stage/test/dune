@@ -1,0 +1,4 @@
+(tests
+ (names test_stage)
+ (modules test_stage)
+ (libraries stage weinstein_types types core ounit2))
