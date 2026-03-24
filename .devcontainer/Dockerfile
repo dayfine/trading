@@ -118,6 +118,22 @@ RUN opam install --yes \
 RUN opam install --yes ocaml-lsp-server odoc ocamlformat utop
 
 # =============================================================================
+# Jujutsu (jj) — Git-compatible VCS
+# =============================================================================
+# Install from pre-built musl binaries. Uses dpkg arch to select the right
+# binary for both amd64 and arm64 hosts.
+# =============================================================================
+ARG JJ_VERSION=0.39.0
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+      amd64) JJ_ARCH="x86_64" ;; \
+      arm64) JJ_ARCH="aarch64" ;; \
+      *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${JJ_ARCH}-unknown-linux-musl.tar.gz" \
+      | sudo tar xz -C /usr/local/bin --strip-components=0 ./jj
+
+# =============================================================================
 # Build Verification
 # =============================================================================
 # Verify the project builds successfully with all dependencies.
