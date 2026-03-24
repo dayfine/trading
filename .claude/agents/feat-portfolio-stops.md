@@ -22,10 +22,18 @@ Also read:
 
 ## Your branch
 
+```bash
+# Initialize jj (safe to run every session)
+jj git init --colocate 2>/dev/null || true
+jj git fetch
+
+# Start a new commit on top of your feature branch
+jj new feat/portfolio-stops@origin
 ```
-git checkout feat/portfolio-stops
-# or create it:
-git checkout -b feat/portfolio-stops
+
+If the bookmark doesn't exist yet on the remote, create it after your first commit:
+```bash
+jj bookmark create feat/portfolio-stops -r @
 ```
 
 Never commit to `main` directly.
