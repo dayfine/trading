@@ -5,12 +5,21 @@ commit discipline, and session procedures.
 
 ## Branch setup
 
+**Always branch from `main@origin`.** Never branch from another feature branch,
+even if that feature is a dependency. Wait for dependencies to land in `main`
+first (the dependency gate in your agent file enforces this).
+
 ```bash
 jj git init --colocate 2>/dev/null || true
 jj git fetch
+
+# If your feature branch already exists on the remote (resuming a session):
 jj new feat/<your-feature>@origin
-# If the bookmark doesn't exist yet on the remote:
+
+# If starting fresh (bookmark does not exist on remote yet):
+jj new main@origin
 jj bookmark create feat/<your-feature> -r @
+jj git push --bookmark feat/<your-feature>
 ```
 
 Never commit to `main` directly.
@@ -41,7 +50,7 @@ Check your work:
 ```bash
 jj status      # what changed
 jj diff        # full diff
-jj log -l 10  # recent history
+jj log -n 10  # recent history
 ```
 
 ## Commit discipline

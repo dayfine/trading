@@ -35,3 +35,7 @@ _opam/
 dev/logs/*.log
 dev/logs/*.running
 .claude/worktrees/
+
+# jj conflict materialization directories (never commit these)
+.jjconflict-base-*/
+.jjconflict-side-*/
