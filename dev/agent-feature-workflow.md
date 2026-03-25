@@ -39,9 +39,15 @@ docker exec <container-name> bash -c \
   'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune runtest'
 ```
 
-Commit and push after each step:
+After each commit, tag the change with a per-module bookmark and push:
 ```bash
 jj describe -m "your commit message"   # no git add needed
+jj bookmark create <feature>/<module> -r @   # e.g. screener/sma, portfolio-stops/types
+jj git push --bookmark <feature>/<module>
+```
+
+Also keep the top-level feature bookmark pointing at your latest change:
+```bash
 jj bookmark set feat/<your-feature> -r @
 jj git push --bookmark feat/<your-feature>
 ```
@@ -60,6 +66,19 @@ jj log -n 10  # recent history
 - **Push after every commit** — don't accumulate local-only work
 - Each commit must build cleanly on its own
 
+## Submitting for review (stacked PRs)
+
+At session end, submit the full stack as stacked PRs using `jst`:
+
+```bash
+GH_TOKEN=$(echo "protocol=https\nhost=github.com" | git credential fill | grep ^password | cut -d= -f2)
+GH_TOKEN=$GH_TOKEN jst submit feat/<your-feature>
+```
+
+This creates one PR per module bookmark, each targeting the one below it, so
+reviewers can read changes one module at a time. Re-run after each session to
+update existing PRs.
+
 ## At the end of every session
 
 Before returning:
@@ -68,3 +87,4 @@ Before returning:
 2. All changes committed and pushed — nothing uncommitted
 3. `dev/status/<your-feature>.md` updated (see your agent file for the exact fields)
 4. If all work is complete and tests pass: set status to `READY_FOR_REVIEW`
+5. Run `jst submit feat/<your-feature>` to create/update stacked PRs
