@@ -1,5 +1,5 @@
-(test
- (name test_live_source)
+(tests
+ (names test_live_source test_historical_source)
  (libraries
   data_source
   core
