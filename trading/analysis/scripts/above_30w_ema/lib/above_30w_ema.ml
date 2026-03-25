@@ -12,6 +12,7 @@ let get_historical_prices ~token symbol =
       symbol;
       start_date = Some (Date.add_days (Date.today ~zone) (-365));
       end_date = Some (Date.today ~zone);
+      period = Types.Cadence.Daily;
     }
   in
   Eodhd.Http_client.get_historical_price ~token ~params () >>| function

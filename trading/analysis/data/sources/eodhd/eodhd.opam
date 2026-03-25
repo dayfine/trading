@@ -8,6 +8,7 @@ depends: [
   "core"
   "cohttp-async"
   "yojson"
+  "ppx_deriving"
   "odoc" {with-doc}
 ]
 build: [
