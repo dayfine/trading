@@ -134,6 +134,18 @@ RUN ARCH=$(dpkg --print-architecture) && \
       | sudo tar xz -C /usr/local/bin --strip-components=0 ./jj
 
 # =============================================================================
+# jj-stack (jst) — Stacked PR tool for jj
+# =============================================================================
+# Used by agents to submit stacked PRs at session end.
+# Requires Node.js; install via nvm or system node if available.
+# =============================================================================
+ARG JST_VERSION=1.2.1
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && \
+    sudo apt-get install -y nodejs && \
+    sudo npm install -g jj-stack@${JST_VERSION} && \
+    sudo rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
 # Build Verification
 # =============================================================================
 # Verify the project builds successfully with all dependencies.
