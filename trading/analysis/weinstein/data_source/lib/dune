@@ -1,0 +1,6 @@
+(library
+ (name data_source)
+ (public_name weinstein.data_source)
+ (libraries async core status types eodhd csv)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
