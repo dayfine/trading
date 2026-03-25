@@ -370,8 +370,9 @@ Use Test driven development to develop iteratively
        - Does a module contains more than 3-5 methods?
        - Does a function contains more than a page (~35 lines) of code?
 6. At the end, format the code using `dune fmt`
-7. Make a commit using `git commit -m "..."` by summarizing a concise commit
-   message
+7. Make a commit using `jj describe -m "..."` by summarizing a concise commit
+   message. This repo uses **jj (Jujutsu)** as the VCS — always use `jj`
+   commands, never bare `git` commands for committing, branching, or pushing.
 
 ### Write new code incrementally
 
