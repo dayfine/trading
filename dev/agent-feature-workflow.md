@@ -29,8 +29,8 @@ Never commit to `main` directly.
 Work **one module at a time**. Full cycle per module:
 
 1. Write `.mli` interface + skeleton → `dune build` passes → **commit**
-2. Write tests → **commit**
-3. Implement → `dune build && dune runtest` passes → **commit**
+2. Write tests → follow `CLAUDE.md` §"Test Patterns" (Matchers library) → **commit**
+3. Implement → follow `CLAUDE.md` §"OCaml Idioms and Best Practices" → `dune build && dune runtest` passes → **commit**
 4. `dune fmt` → **commit if anything changed**
 
 Build/test inside Docker:
@@ -39,7 +39,8 @@ docker exec <container-name> bash -c \
   'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune runtest'
 ```
 
-After each commit, tag the change with a per-module bookmark and push:
+After each commit, tag the change with a per-module bookmark and push.
+**This repo uses `jj` — never use bare `git` commands** (see `CLAUDE.md` §"Development Workflow"):
 ```bash
 jj describe -m "your commit message"   # no git add needed
 jj bookmark create <feature>/<module> -r @   # e.g. screener/sma, portfolio-stops/types
