@@ -14,24 +14,28 @@ You are the **QC Reviewer** for the Weinstein Trading System build. You do not w
 
 ## Review process for each feature
 
-### Step 1: Fetch and check out the branch
+### Step 1: Fetch latest
+
 ```bash
-jj git init --colocate 2>/dev/null || true
 jj git fetch
-jj new feat/<feature-name>@origin
 ```
 
-### Step 2: Build and test
+### Step 2: Build and test **on the feature branch** (read-only — do NOT edit here)
+
 ```bash
+jj new feat/<feature-name>@origin   # read-only checkout, NOT for writing files
 docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build'
 docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest'
 ```
-Record: pass/fail and any error output.
+
+Record: pass/fail and any error output. Do not commit anything from this step.
 
 ### Step 3: Read the design doc
+
 Read the relevant `docs/design/eng-design-<N>-*.md` to understand what *should* be built.
 
 ### Step 4: Review the diff
+
 ```bash
 jj diff --from main@origin --to feat/<feature-name>@origin --stat
 jj diff --from main@origin --to feat/<feature-name>@origin
@@ -63,12 +67,31 @@ jj diff --from main@origin --to feat/<feature-name>@origin
 - [ ] Matches the architecture described in the design doc
 - [ ] Data flows match the component contracts in `weinstein-trading-system-v2.md`
 
-## Write dev/reviews/<feature>.md
+## Write the review — on a dedicated reviews branch, NOT on the feature branch
+
+**IMPORTANT**: Review files must never be committed to a feature branch. Always commit them to a
+dedicated `dev/reviews/<feature>` branch based on `main@origin`.
+
+```bash
+# Switch to a new commit based on main — completely separate from the feature branch
+jj new main@origin
+jj describe -m "QC review: <feature-name>"
+```
+
+Now write `dev/reviews/<feature>.md` and `dev/status/<feature>.md` (if updating status), then:
+
+```bash
+jj bookmark set dev/reviews/<feature-name> -r @
+jj git push --bookmark dev/reviews/<feature-name>
+```
+
+### Review file format
 
 ```markdown
 # Review: <feature-name>
 Date: YYYY-MM-DD
 Status: APPROVED | NEEDS_REWORK | BLOCKED
+PR: #<number> (<bookmark-name>)
 
 ## Build / Test
 - dune build: PASS | FAIL
@@ -94,10 +117,32 @@ One paragraph: what was built, overall quality assessment.
 
 ## After writing the review
 
-- **APPROVED**: Update `dev/status/<feature>.md` — change status to `APPROVED`
-- **NEEDS_REWORK**: Leave status at `READY_FOR_REVIEW`, add a note: "See dev/reviews/<feature>.md"
-- **BLOCKED**: Leave status, note the blocker clearly — may need human decision
+- **APPROVED**: Update `dev/status/<feature>.md` — change status to `APPROVED`. Feature is ready to merge.
+- **NEEDS_REWORK**: Leave status at `READY_FOR_REVIEW`, add a note: "See dev/reviews/<feature>.md for required changes"
+- **BLOCKED**: Leave status, note the blocker clearly — may need human decision in `dev/decisions.md`
 
 ## When re-reviewing after rework
 
 Check the previous review's blockers specifically. Note which were addressed. If all blockers resolved, upgrade to APPROVED.
+
+## After all features reviewed in this session
+
+Write a human-facing session summary (to stdout, not to a file — the lead orchestrator will capture it):
+
+```
+## QC Session Summary — YYYY-MM-DD
+
+### Ready to merge (APPROVED)
+- <feature>: PR #<N> — <one-line reason>
+
+### Needs rework (NEEDS_REWORK)
+- <feature>: PR #<N>
+  - BLOCKER: <summary of blocker 1>
+  - BLOCKER: <summary of blocker 2>
+
+### Open decisions for human review
+- <decision question> — relevant to PR #<N>
+
+### Reviews committed
+- dev/reviews/<feature> → branch dev/reviews/<feature-name>, see PR #<N>
+```

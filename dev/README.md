@@ -85,8 +85,42 @@ dev/
   status/             # Agents update their feature status each session
   daily/              # Lead writes daily summaries here (you read here)
   reviews/            # QC agent writes approval/rework decisions here
+                      #   Each review is on its own branch: dev/reviews/<feature>
+                      #   NEVER inside a feature branch
   logs/               # Raw claude -p output logs (gitignored)
 ```
+
+## Review → rework cycle
+
+This is the full lifecycle from feature development to merge:
+
+```
+1. Feature agent develops on feat/<feature> and stacked PR branches
+   → marks status READY_FOR_REVIEW when done
+
+2. QC agent reviews each READY_FOR_REVIEW feature:
+   → builds and tests on the feature branch (read-only)
+   → writes dev/reviews/<feature>.md on a SEPARATE dev/reviews/<feature> branch
+     based on main@origin — never committed inside the feature branch
+   → outputs a session summary listing: approved PRs, rework needed, open decisions
+
+3. Human reviews the QC session summary (in daily/<date>.md or direct output):
+   → approves APPROVED PRs for merge
+   → reads NEEDS_REWORK findings and either:
+       a. directs the feature agent to fix specific issues, or
+       b. overrides the review if the finding is not a real blocker
+   → answers any BLOCKED/open decisions in dev/decisions.md
+
+4. Feature agent does rework on the same branch
+   → updates PR, marks status READY_FOR_REVIEW again
+
+5. QC agent re-reviews — checks blockers specifically, upgrades to APPROVED if resolved
+
+6. Human merges APPROVED PRs in dependency order
+```
+
+**Cross-references**: every review file includes the PR number; every daily summary
+lists which reviews were written and which PRs they cover.
 
 ## Human workflow
 
@@ -99,6 +133,10 @@ each agent did, what's blocked, and any open questions for you.
 
 **To see feature progress:** check `status/<feature>.md`. Each agent keeps this
 up to date with current phase, what's done, what's next, and any blockers.
+
+**To see QC findings:** check `dev/reviews/<feature>.md` (on branch
+`dev/reviews/<feature>`). Each review includes the PR number, status
+(APPROVED / NEEDS_REWORK / BLOCKED), and specific findings.
 
 ## Version control (jj)
 
