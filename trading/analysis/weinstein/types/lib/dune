@@ -1,0 +1,6 @@
+(library
+ (name weinstein_types)
+ (public_name weinstein.types)
+ (libraries)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
