@@ -1,3 +1,5 @@
+open Core
+
 type t = {
   symbol : string;
   name : string;
@@ -6,4 +8,4 @@ type t = {
   market_cap : float;
   exchange : string;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]

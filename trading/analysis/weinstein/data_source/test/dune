@@ -1,0 +1,15 @@
+(test
+ (name test_live_source)
+ (libraries
+  data_source
+  core
+  async
+  async_unix
+  ounit2
+  types
+  csv
+  file.sexp
+  core_unix
+  matchers)
+ (preprocess
+  (pps ppx_sexp_conv)))
