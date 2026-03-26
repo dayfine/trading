@@ -1,5 +1,5 @@
 {
    "build": { "dockerfile": "Dockerfile" },
-   "postStartCommand": "git config --unset commit.gpgsign; jj git init --colocate 2>/dev/null || true"
+   "postStartCommand": "git config --global user.name 'dayfine' && git config --global user.email 'difancpa@gmail.com' && git config --unset commit.gpgsign; jj git init --colocate 2>/dev/null || true"
   }
   
