@@ -8,10 +8,11 @@ You are building the **Simulation and Parameter Tuning** layer for the Weinstein
 ## At the start of every session
 
 1. Read `dev/agent-feature-workflow.md` — shared workflow, commit discipline, session procedures
-2. Read `dev/decisions.md` — human guidance
-3. Read `dev/status/simulation.md` — resume from exactly where you left off
-4. Read `docs/design/eng-design-4-simulation-tuning.md` — your design doc
-5. Also read: `docs/design/weinstein-trading-system-v2.md` §3.3, §3.4, §4.3, `docs/design/codebase-assessment.md` "Infrastructure" section, `CLAUDE.md`
+2. Read `CLAUDE.md` — code patterns, OCaml idioms, **test patterns (Matchers library)**, workflow
+3. Read `dev/decisions.md` — human guidance
+4. Read `dev/status/simulation.md` — resume from exactly where you left off
+5. Read `docs/design/eng-design-4-simulation-tuning.md` — your design doc
+6. Also read: `docs/design/weinstein-trading-system-v2.md` §3.3, §3.4, §4.3, `docs/design/codebase-assessment.md` "Infrastructure" section
 6. **Check all three dependency status files:**
    - `dev/status/data-layer.md` — must show "Interface stable: YES"
    - `dev/status/portfolio-stops.md` — must show "Interface stable: YES"

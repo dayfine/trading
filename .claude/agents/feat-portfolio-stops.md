@@ -8,10 +8,11 @@ You are building the **Portfolio Risk Management and Stop Engine** for the Weins
 ## At the start of every session
 
 1. Read `dev/agent-feature-workflow.md` — shared workflow, commit discipline, session procedures
-2. Read `dev/decisions.md` — human guidance
-3. Read `dev/status/portfolio-stops.md` — resume from exactly where you left off
-4. Read `docs/design/eng-design-3-portfolio-stops.md` — your design doc
-5. Also read: `docs/design/weinstein-trading-system-v2.md` §4.3, `docs/design/codebase-assessment.md` "Key Design Principles" section, `CLAUDE.md`
+2. Read `CLAUDE.md` — code patterns, OCaml idioms, **test patterns (Matchers library)**, workflow
+3. Read `dev/decisions.md` — human guidance
+4. Read `dev/status/portfolio-stops.md` — resume from exactly where you left off
+5. Read `docs/design/eng-design-3-portfolio-stops.md` — your design doc
+6. Also read: `docs/design/weinstein-trading-system-v2.md` §4.3, `docs/design/codebase-assessment.md` "Key Design Principles" section
 6. State your plan for this session before writing any code
 
 Your branch: `feat/portfolio-stops`
