@@ -15,10 +15,9 @@ val calculate_weighted_ma : indicator_value list -> int -> indicator_value list
 (** Calculate linearly weighted moving average (WMA) from a series of indicator
     values. The most recent observation receives the highest weight.
 
-    Weight for observation [i] steps back from current = [period - i].
-    So for period=3: weights are [1, 2, 3] (oldest to newest), sum = 6.
+    Weight for observation [i] steps back from current = [period - i]. So for
+    period=3: weights are [1, 2, 3] (oldest to newest), sum = 6.
 
     @param data List of indicator values in chronological order
     @param period Number of periods for WMA calculation
-    @return
-      List of WMA results starting from the [period]-th element. *)
+    @return List of WMA results starting from the [period]-th element. *)

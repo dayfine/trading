@@ -4,16 +4,16 @@ open Core
 (** Uniform data access interface for the Weinstein analysis pipeline.
 
     Three implementations serve different use cases:
-    - {b Live_source}: fetches from EODHD API, writes to local cache.
-      Used for weekly live scans.
+    - {b Live_source}: fetches from EODHD API, writes to local cache. Used for
+      weekly live scans.
     - {b Historical_source}: reads from local cache with a date ceiling.
       Enforces no-lookahead for backtest integrity.
-    - {b Synthetic_source}: generates price data programmatically.
-      Used for stress testing and edge-case validation.
+    - {b Synthetic_source}: generates price data programmatically. Used for
+      stress testing and edge-case validation.
 
-    All analysis and screening code is written against this interface.
-    Swapping the implementation changes the data source without touching
-    any analysis logic. *)
+    All analysis and screening code is written against this interface. Swapping
+    the implementation changes the data source without touching any analysis
+    logic. *)
 
 (** {1 Query parameters} *)
 
@@ -39,8 +39,8 @@ module type DATA_SOURCE = sig
       [query.period] cadence, optionally bounded by [query.start_date] and
       [query.end_date].
 
-      For {!Historical_source}, [end_date] is clamped to the simulation date
-      to prevent lookahead. The returned list is sorted ascending by date. *)
+      For {!Historical_source}, [end_date] is clamped to the simulation date to
+      prevent lookahead. The returned list is sorted ascending by date. *)
 
   val get_universe :
     unit -> Types.Instrument_info.t list Status.status_or Deferred.t
