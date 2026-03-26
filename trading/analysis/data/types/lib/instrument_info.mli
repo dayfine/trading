@@ -1,4 +1,3 @@
-(** Fundamental metadata for a tradeable instrument (stock, ETF, or index). *)
 type t = {
   symbol : string;
   name : string;
@@ -8,3 +7,4 @@ type t = {
   exchange : string;
 }
 [@@deriving show, eq, sexp]
+(** Fundamental metadata for a tradeable instrument (stock, ETF, or index). *)
