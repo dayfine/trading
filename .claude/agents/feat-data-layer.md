@@ -28,6 +28,13 @@ Interface stable: YES
 
 Prioritize getting to this point first.
 
+## At the start of every session — check for follow-up items
+
+After reading the status file, check `dev/status/data-layer.md` for a `## Follow-up` section.
+**If follow-up items exist, address them before any new feature work.** Each item should be a
+small focused PR on top of `main@origin` (not on the feature branch). Clear the item from the
+Follow-up section once the fix is committed and pushed.
+
 ## Status file format
 
 Update `dev/status/data-layer.md` at the end of every session:
@@ -49,6 +56,10 @@ YES | NO
 
 ## Blocked
 - None / description
+
+## Follow-up
+Post-merge fixes from QC review (remove items as they are addressed):
+- <item> — <file and line reference>
 
 ## Next Steps
 - ...

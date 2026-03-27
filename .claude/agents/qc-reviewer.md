@@ -117,7 +117,7 @@ One paragraph: what was built, overall quality assessment.
 
 ## After writing the review
 
-- **APPROVED**: Update `dev/status/<feature>.md` — change status to `APPROVED`. Feature is ready to merge.
+- **APPROVED**: Update `dev/status/<feature>.md` — change status to `APPROVED`. Feature is ready to merge. If the review has any "Should Fix" items, copy them into a `## Follow-up` section in the status file so the feature agent addresses them after merge.
 - **NEEDS_REWORK**: Leave status at `READY_FOR_REVIEW`, add a note: "See dev/reviews/<feature>.md for required changes"
 - **BLOCKED**: Leave status, note the blocker clearly — may need human decision in `dev/decisions.md`
 

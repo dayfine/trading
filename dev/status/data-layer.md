@@ -1,12 +1,12 @@
 # Status: data-layer
 
-## Last updated: 2026-03-26
+## Last updated: 2026-03-27
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## Review
-See dev/reviews/data-layer.md — NEEDS_REWORK
+See dev/reviews/data-layer.md — APPROVED (merged PRs #124, #125, #127, #132)
 
 ## Interface stable
 YES
@@ -38,10 +38,16 @@ YES
 ## Blocked
 - None
 
+## Follow-up
+Post-merge issues found in QC review (see dev/reviews/data-layer.md). Address before starting new work:
+1. Fix misplaced doc comment in `http_client.mli` — comment for `period` is on `end_date` field
+2. Log (don't ignore) cache-write error in `live_source.ml` — `ignore (_save_bars_to_cache ...)` silently drops failures
+3. Extract duplicated `_load_universe` — identical copy in `live_source.ml` and `historical_source.ml`
+4. Document that `period` is silently ignored in `Historical_source` — note it in both `historical_source.mli` and `data_source.mli` `get_bars` doc
+5. Remove `Synthetic_source` reference from `data_source.mli` module doc — deferred to eng-design-4
+
 ## Next Steps
-- Review and merge `feat/data-layer` to `main`
 - `Synthetic_source`: deterministic programmatic bar generation (Trending, Basing, Breakout patterns) — deferred, not needed until simulation tuning (eng-design-4)
-- The screener agent can now use `(module Data_source.DATA_SOURCE)` from `weinstein.data_source`
 - Universe cache writer: script/tool to populate `data/fundamentals/universe.json` via `get_fundamentals`
 
 ## Recent Commits
