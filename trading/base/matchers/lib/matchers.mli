@@ -56,6 +56,19 @@ val field : ('a -> 'b) -> ('b -> unit) -> 'a -> unit
         ]
     ]} *)
 
+val not_ : ?msg:string -> 'a matcher -> 'a matcher
+(** [not_ ?msg matcher] inverts a matcher — passes if [matcher] would fail,
+    fails if [matcher] would pass. Useful for asserting inequality.
+
+    Example:
+    {[
+      assert_that actual (not_ (equal_to unexpected))
+    ]}
+    {[
+      assert_that stage
+        (not_ (equal_to (Stage2 { weeks_advancing = 3; late = false })))
+    ]} *)
+
 val all_of : ('a -> unit) list -> 'a -> unit
 (** [all_of matchers] returns a matcher that applies all matchers to a given
     value. This is useful for combining multiple assertions.

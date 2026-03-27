@@ -20,6 +20,15 @@ let equal_to ?(cmp = Poly.equal) ?(msg = "Values should be equal") expected
 let field accessor matcher value = matcher (accessor value)
 let all_of checks value = List.iter checks ~f:(fun check -> check value)
 
+let not_ ?(msg = "Expected matcher to fail but it succeeded") matcher value =
+  let passed =
+    try
+      matcher value;
+      true
+    with _ -> false
+  in
+  if passed then assert_failure msg
+
 (* ========================================================================== *)
 (* Result Matchers                                                           *)
 (* ========================================================================== *)
