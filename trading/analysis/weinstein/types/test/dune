@@ -1,0 +1,5 @@
+(test
+ (name test_weinstein_types)
+ (libraries weinstein.types ounit2 matchers)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
