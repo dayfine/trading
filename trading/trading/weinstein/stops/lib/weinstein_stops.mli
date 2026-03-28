@@ -58,13 +58,26 @@ type config = {
   round_number_nudge : float;
       (** Distance from round number that triggers a nudge (default: 0.125). *)
   min_correction_pct : float;
-      (** Minimum pullback to qualify as a correction (default: 0.08 = 8%). *)
+      (** Minimum pullback to qualify as a correction (default: 0.08 = 8%).
+
+          Future improvement: derive this threshold from the security's
+          historical or implied volatility rather than using a fixed value. A
+          more volatile stock needs a wider threshold to avoid counting noise as
+          a meaningful correction. *)
   tighten_on_flat_ma : bool;
       (** Whether to tighten stops when the 30-week MA flattens (default: true).
       *)
   ma_flat_threshold : float;
       (** MA slope threshold below which MA is considered flat (default: 0.002).
       *)
+  trailing_stop_buffer_pct : float;
+      (** Buffer applied below a correction low (long) or above a correction
+          high (short) when computing a trailing stop candidate (default: 0.01 =
+          1%). *)
+  tightened_stop_buffer_pct : float;
+      (** Tighter buffer used in the Tightened state (default: 0.005 = 0.5%).
+          Smaller than [trailing_stop_buffer_pct] to keep the stop close to
+          market once tightening is triggered. *)
 }
 [@@deriving show, eq]
 (** Configuration for stop management behavior. All thresholds are configurable
@@ -106,7 +119,18 @@ val update :
   ma_direction:ma_direction ->
   stage:stage ->
   stop_state * stop_event
-(** Update stop state given current market data. Called once per week.
+(** Advance the stop state machine by one price period.
+
+    - [config]: tuning parameters for stop behavior.
+    - [side]: direction of the position ([Long] or [Short]).
+    - [state]: current stop state.
+    - [current_bar]: OHLCV bar for this period.
+    - [ma_value]: current 30-week moving average value.
+    - [ma_direction]: whether the MA is rising, flat, or falling this period.
+    - [stage]: Weinstein stage classification for this period.
+
+    Calling cadence is the caller's responsibility — typically once per weekly
+    bar, but the function itself is period-agnostic.
 
     The stop is never moved against the position (never lowered for long, never
     raised for short). *)

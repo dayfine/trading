@@ -34,6 +34,8 @@ type config = {
   min_correction_pct : float;
   tighten_on_flat_ma : bool;
   ma_flat_threshold : float;
+  trailing_stop_buffer_pct : float;
+  tightened_stop_buffer_pct : float;
 }
 [@@deriving show, eq]
 
@@ -43,6 +45,8 @@ let default_config =
     min_correction_pct = 0.08;
     tighten_on_flat_ma = true;
     ma_flat_threshold = 0.002;
+    trailing_stop_buffer_pct = 0.01;
+    tightened_stop_buffer_pct = 0.005;
   }
 
 (* ---- Nudge functions ---- *)
@@ -105,33 +109,38 @@ let compute_initial_stop ~config ~side ~reference_level =
 
 (* ---- Directional helpers ---- *)
 
-(* Trigger price for stop hit events. *)
-let _trigger_price ~side ~bar =
+(* The bar's extreme price in the against-trend direction.
+   Long: session low (how far price pulled back against the uptrend).
+   Short: session high (how far price counter-rallied against the downtrend).
+   This same price is also the stop trigger: longs exit when the low reaches the
+   stop level; shorts exit when the high reaches the stop level. *)
+let _bar_extreme ~side ~bar =
   match side with
   | Long -> bar.Types.Daily_price.low_price
   | Short -> bar.Types.Daily_price.high_price
 
-(* Extreme price for tracking corrections (against the trend). *)
-let _correction_price ~side ~bar =
-  match side with
-  | Long -> bar.Types.Daily_price.low_price (* pullback lows *)
-  | Short -> bar.Types.Daily_price.high_price (* counter-rally highs *)
-
-(* Stop candidate from a correction extreme (trailing: 1% buffer). *)
+(* Stop candidate from a correction extreme.
+   Applies [config.trailing_stop_buffer_pct] in the position's favour, then a
+   round-number nudge. The nudge only widens the effective buffer — it moves
+   longs further down and shorts further up, never the reverse. *)
 let _stop_candidate ~config ~side ~correction_extreme =
+  let buf = config.trailing_stop_buffer_pct in
   let adjusted =
     match side with
-    | Long -> correction_extreme *. 0.99
-    | Short -> correction_extreme *. 1.01
+    | Long -> correction_extreme *. (1.0 -. buf)
+    | Short -> correction_extreme *. (1.0 +. buf)
   in
   nudge_round_number ~config ~side adjusted
 
-(* Stop candidate for tightened ratchet (0.5% buffer — tighter than trailing). *)
+(* Stop candidate for tightened ratchet.
+   Uses [config.tightened_stop_buffer_pct] — tighter than the trailing buffer
+   to keep the stop close to market once tightening is triggered. *)
 let _tightened_stop_candidate ~config ~side ~correction_extreme =
+  let buf = config.tightened_stop_buffer_pct in
   let adjusted =
     match side with
-    | Long -> correction_extreme *. 0.995
-    | Short -> correction_extreme *. 1.005
+    | Long -> correction_extreme *. (1.0 -. buf)
+    | Short -> correction_extreme *. (1.0 +. buf)
   in
   nudge_round_number ~config ~side adjusted
 
@@ -158,8 +167,9 @@ let _is_recovery ~side ~close ~trend_extreme =
 
 (* ---- Tightening trigger checks ---- *)
 
-(* Long: tighten when stock enters topping/declining territory or MA deteriorates. *)
-let _should_tighten_long ~config ~ma_direction ~stage =
+(* Long: tighten when stock enters topping/declining territory or MA deteriorates.
+   Returns (should_tighten, reason). *)
+let _should_tighten_long ~config ~ma_direction ~stage : bool * string =
   match stage with
   | Stage3 _ | Stage4 _ -> (true, "Stage 3/4 detected")
   | Stage1 _ -> (false, "")
@@ -171,8 +181,9 @@ let _should_tighten_long ~config ~ma_direction ~stage =
         | Rising -> (false, "")
       else (false, "")
 
-(* Short: tighten when stock shows bullish recovery (Stage 1/2) or MA turns up. *)
-let _should_tighten_short ~config ~ma_direction ~stage =
+(* Short: tighten when stock shows bullish recovery (Stage 1/2) or MA turns up.
+   Returns (should_tighten, reason). *)
+let _should_tighten_short ~config ~ma_direction ~stage : bool * string =
   match stage with
   | Stage1 _ | Stage2 _ -> (true, "Stage 1/2 detected")
   | Stage3 _ -> (false, "")
@@ -184,7 +195,7 @@ let _should_tighten_short ~config ~ma_direction ~stage =
         | Declining -> (false, "")
       else (false, "")
 
-let _should_tighten ~config ~side ~ma_direction ~stage =
+let _should_tighten ~config ~side ~ma_direction ~stage : bool * string =
   match side with
   | Long -> _should_tighten_long ~config ~ma_direction ~stage
   | Short -> _should_tighten_short ~config ~ma_direction ~stage
@@ -192,7 +203,7 @@ let _should_tighten ~config ~side ~ma_direction ~stage =
 (* ---- Shared transition builders ---- *)
 
 let _stop_hit_event ~side ~stop_level ~bar =
-  Stop_hit { trigger_price = _trigger_price ~side ~bar; stop_level }
+  Stop_hit { trigger_price = _bar_extreme ~side ~bar; stop_level }
 
 (* Transitions to Tightened state. Used by both Initial and Trailing handlers. *)
 let _to_tightened ~config ~side ~stop_level ~correction_extreme ~reason =
@@ -214,11 +225,29 @@ let _to_trailing ~side ~ma_value ~stop_level ~bar =
   Trailing
     {
       stop_level;
-      last_correction_extreme = _correction_price ~side ~bar;
+      last_correction_extreme = _bar_extreme ~side ~bar;
       last_trend_extreme = bar.Types.Daily_price.close_price;
       ma_at_last_adjustment = ma_value;
       correction_count = 0;
     }
+
+(* ---- Shared stop-hit and tighten dispatch ---- *)
+
+(* Handles the stop-hit and tightening checks shared by Initial and Trailing states.
+   Returns [Some (new_state, event)] if the stop was hit or tightening triggered,
+   or [None] to proceed with state-specific update logic. *)
+let _check_stop_or_tighten ~config ~side ~state ~bar ~correction_extreme
+    ~ma_direction ~stage =
+  let stop_level = get_stop_level state in
+  if check_stop_hit ~state ~side ~bar then
+    Some (state, _stop_hit_event ~side ~stop_level ~bar)
+  else
+    let should_tighten, reason =
+      _should_tighten ~config ~side ~ma_direction ~stage
+    in
+    if should_tighten then
+      Some (_to_tightened ~config ~side ~stop_level ~correction_extreme ~reason)
+    else None
 
 (* ---- Update: Initial state ---- *)
 
@@ -226,30 +255,32 @@ let _update_initial ~config ~side ~state ~current_bar ~ma_value ~ma_direction
     ~stage =
   let bar = current_bar in
   let stop_level = get_stop_level state in
-  if check_stop_hit ~state ~side ~bar then
-    (state, _stop_hit_event ~side ~stop_level ~bar)
-  else
-    let should_tighten, reason =
-      _should_tighten ~config ~side ~ma_direction ~stage
-    in
-    if should_tighten then
-      _to_tightened ~config ~side ~stop_level
-        ~correction_extreme:(_correction_price ~side ~bar)
-        ~reason
-    else (_to_trailing ~side ~ma_value ~stop_level ~bar, No_change)
+  let correction_extreme = _bar_extreme ~side ~bar in
+  match
+    _check_stop_or_tighten ~config ~side ~state ~bar ~correction_extreme
+      ~ma_direction ~stage
+  with
+  | Some result -> result
+  | None -> (_to_trailing ~side ~ma_value ~stop_level ~bar, No_change)
 
 (* ---- Correction cycle helpers ---- *)
 
 (* Advance correction_extreme/trend_extreme tracking for one bar.
    Returns (new_trend_extreme, new_correction_extreme). *)
 let _advance_tracking ~side ~last_correction_extreme ~last_trend_extreme ~bar =
-  let corr_price = _correction_price ~side ~bar in
+  let extreme = _bar_extreme ~side ~bar in
+  (* Correction extreme: track the worst the pullback has gone so far.
+     Long → lowest low seen (deepest pullback below the trend peak).
+     Short → highest high seen (highest counter-rally above the trend trough). *)
   let new_correction_extreme =
     match side with
-    | Long -> Float.min last_correction_extreme corr_price
-    | Short -> Float.max last_correction_extreme corr_price
+    | Long -> Float.min last_correction_extreme extreme
+    | Short -> Float.max last_correction_extreme extreme
   in
   let close = bar.Types.Daily_price.close_price in
+  (* Trend extreme: track how far the main trend has extended.
+     Long → highest close seen (rally peak to ratchet stop above).
+     Short → lowest close seen (decline trough to ratchet stop below). *)
   let new_trend_extreme =
     match side with
     | Long -> Float.max last_trend_extreme close
@@ -302,7 +333,7 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
       ( Trailing
           {
             stop_level = new_stop;
-            last_correction_extreme = _correction_price ~side ~bar;
+            last_correction_extreme = _bar_extreme ~side ~bar;
             last_trend_extreme = bar.Types.Daily_price.close_price;
             ma_at_last_adjustment = ma_value;
             correction_count = correction_count + 1;
@@ -322,20 +353,16 @@ let _update_trailing ~config ~side ~state ~current_bar ~ma_value ~ma_direction
         last_trend_extreme;
         ma_at_last_adjustment;
         correction_count;
-      } ->
-      if check_stop_hit ~state ~side ~bar then
-        (state, _stop_hit_event ~side ~stop_level ~bar)
-      else
-        let should_tighten, reason =
-          _should_tighten ~config ~side ~ma_direction ~stage
-        in
-        if should_tighten then
-          _to_tightened ~config ~side ~stop_level
-            ~correction_extreme:last_correction_extreme ~reason
-        else
+      } -> (
+      match
+        _check_stop_or_tighten ~config ~side ~state ~bar
+          ~correction_extreme:last_correction_extreme ~ma_direction ~stage
+      with
+      | Some result -> result
+      | None ->
           _raise_after_cycle ~config ~side ~ma_value ~correction_count
             ~stop_level ~last_correction_extreme ~last_trend_extreme
-            ~ma_at_last_adjustment ~bar
+            ~ma_at_last_adjustment ~bar)
   | _ -> (state, No_change)
 
 (* ---- Tightened ratchet ---- *)
@@ -343,11 +370,11 @@ let _update_trailing ~config ~side ~state ~current_bar ~ma_value ~ma_direction
 (* Ratchets the tightened stop in the position's favour as new extremes are set. *)
 let _ratchet_tightened ~config ~side ~stop_level ~last_correction_extreme
     ~reason ~bar =
-  let corr_price = _correction_price ~side ~bar in
+  let extreme = _bar_extreme ~side ~bar in
   let new_extreme =
     match side with
-    | Long -> Float.min last_correction_extreme corr_price
-    | Short -> Float.max last_correction_extreme corr_price
+    | Long -> Float.min last_correction_extreme extreme
+    | Short -> Float.max last_correction_extreme extreme
   in
   let candidate =
     _tightened_stop_candidate ~config ~side ~correction_extreme:new_extreme

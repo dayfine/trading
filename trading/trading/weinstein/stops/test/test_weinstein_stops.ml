@@ -139,13 +139,15 @@ let test_deriving _ =
 let test_update_stop_hit_initial _ =
   let state = Initial { stop_level = 45.0; reference_level = 47.0 } in
   let bar = make_bar ~low_price:44.0 ~close_price:44.5 () in
-  let _new_state, event =
+  let new_state, event =
     update ~config:cfg ~side:Long ~state ~current_bar:bar ~ma_value:48.0
       ~ma_direction:Rising ~stage:stage2
   in
   assert_that event
     (equal_to
-       (Stop_hit { trigger_price = 44.0; stop_level = 45.0 } : stop_event))
+       (Stop_hit { trigger_price = 44.0; stop_level = 45.0 } : stop_event));
+  (* State is preserved unchanged — the caller decides whether to close the position. *)
+  assert_that new_state (equal_to (state : stop_state))
 
 let test_update_stop_hit_trailing _ =
   let state =
@@ -159,13 +161,14 @@ let test_update_stop_hit_trailing _ =
       }
   in
   let bar = make_bar ~low_price:47.0 ~close_price:47.5 () in
-  let _new_state, event =
+  let new_state, event =
     update ~config:cfg ~side:Long ~state ~current_bar:bar ~ma_value:50.0
       ~ma_direction:Rising ~stage:stage2
   in
   assert_that event
     (equal_to
-       (Stop_hit { trigger_price = 47.0; stop_level = 48.0 } : stop_event))
+       (Stop_hit { trigger_price = 47.0; stop_level = 48.0 } : stop_event));
+  assert_that new_state (equal_to (state : stop_state))
 
 let test_update_stop_hit_short _ =
   let state =
@@ -361,11 +364,15 @@ let test_update_no_ratchet_insufficient_correction _ =
       }
   in
   let bar = make_bar ~low_price:53.0 ~close_price:56.0 () in
-  let _new_state, event =
+  let new_state, event =
     update ~config:cfg ~side:Long ~state ~current_bar:bar ~ma_value:51.0
       ~ma_direction:Rising ~stage:stage2
   in
-  assert_that event (equal_to (No_change : stop_event))
+  assert_that event (equal_to (No_change : stop_event));
+  assert_that new_state (fun s ->
+      match s with
+      | Trailing { stop_level; _ } -> assert_that stop_level (float_equal 45.0)
+      | _ -> assert_failure "Expected Trailing state with unchanged stop level")
 
 (* ---- update: tightened state ---- *)
 
@@ -394,7 +401,7 @@ let test_stop_never_lowered_for_long _ =
       {
         stop_level = 50.0;
         last_correction_extreme = 48.0;
-        (* 48.0 * 0.99 ≈ 47.52 < current stop of 50.0 *)
+        (* 48.0 * (1 - trailing_stop_buffer_pct=1%) ≈ 47.52 < current stop 50.0 *)
         last_trend_extreme = 55.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
