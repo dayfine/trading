@@ -1,0 +1,6 @@
+(library
+ (name portfolio_risk)
+ (public_name weinstein.portfolio_risk)
+ (libraries core weinstein.types trading.portfolio status)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
