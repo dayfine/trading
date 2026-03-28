@@ -27,3 +27,55 @@ type stage =
     threshold. A [Rising] MA with price above is Stage 2 territory; [Declining]
     with price below is Stage 4. *)
 type ma_direction = Rising | Flat | Declining [@@deriving show, eq]
+
+(** Overhead resistance quality above a potential breakout level.
+
+    Grades the risk that prior trading congestion will absorb buying power. *)
+type overhead_quality =
+  | Virgin_territory
+      (** No prior trading above this price (new multi-year high). Most
+          explosive potential — no trapped sellers wanting to break even. *)
+  | Clean
+      (** No significant resistance on the 2.5-year chart. Minor old resistance
+          only. *)
+  | Moderate_resistance
+      (** Some resistance overhead but not dense. Stock can push through. *)
+  | Heavy_resistance
+      (** Dense trading zone just above breakout. Stock will use up buying power
+          working through this zone. *)
+[@@deriving show, eq]
+
+(** Relative strength trend vs benchmark. *)
+type rs_trend =
+  | Bullish_crossover
+      (** RS just crossed from negative to positive territory — A+ bonus. *)
+  | Positive_rising  (** RS positive and trending higher. *)
+  | Positive_flat  (** RS positive but flat — hold, don't add. *)
+  | Negative_improving
+      (** RS still negative but improving — watch, not yet a buy. *)
+  | Negative_declining  (** RS negative and falling — avoid or short. *)
+  | Bearish_crossover
+      (** RS just crossed from positive to negative — bearish warning. *)
+[@@deriving show, eq]
+
+(** Volume confirmation quality for a breakout or breakdown. *)
+type volume_confirmation =
+  | Strong of float
+      (** Volume ≥ 2× recent average. [float] is the actual ratio. Required for
+          high-quality long entries. *)
+  | Adequate of float
+      (** Volume 1.5–2× recent average. Acceptable but not ideal. *)
+  | Weak of float
+      (** Volume < 1.5× recent average. Treat breakout with suspicion. *)
+[@@deriving show, eq]
+
+(** Overall market trend from macro analysis. *)
+type market_trend = Bullish | Bearish | Neutral [@@deriving show, eq]
+
+(** Quality grade for candidates. Higher is better.
+
+    [compare] gives [A_plus > A > B > C > D > F] ordering. *)
+type grade = A_plus | A | B | C | D | F [@@deriving show, eq, ord]
+
+val grade_to_string : grade -> string
+(** Convert grade to a human-readable string (e.g. [A_plus] → ["A+"]). *)
