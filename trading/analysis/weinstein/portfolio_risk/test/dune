@@ -1,5 +1,12 @@
 (test
  (name test_portfolio_risk)
- (libraries portfolio_risk ounit2 core)
+ (libraries
+  portfolio_risk
+  ounit2
+  core
+  matchers
+  trading.portfolio
+  trading.base
+  status)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

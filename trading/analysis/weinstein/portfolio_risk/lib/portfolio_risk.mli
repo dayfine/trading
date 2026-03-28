@@ -108,15 +108,36 @@ val default_config : config
 
 (** {1 Core Functions} *)
 
+val snapshot_of_portfolio :
+  portfolio:Trading_portfolio.Portfolio.t ->
+  prices:(string * float) list ->
+  portfolio_snapshot
+(** Compute portfolio snapshot from an existing portfolio and current prices.
+
+    @param portfolio Current portfolio (cash and positions)
+    @param prices List of (symbol, current_price) pairs
+    @return Portfolio snapshot with exposure metrics
+
+    Note: sector_counts is always empty -- use
+    [snapshot_of_portfolio_with_sectors] when sector tracking is needed. *)
+
+val snapshot_of_portfolio_with_sectors :
+  portfolio:Trading_portfolio.Portfolio.t ->
+  prices:(string * float) list ->
+  sectors:(string * string) list ->
+  portfolio_snapshot
+(** Compute portfolio snapshot including sector concentration tracking.
+
+    @param portfolio Current portfolio (cash and positions)
+    @param prices List of (symbol, current_price) pairs
+    @param sectors List of (symbol, sector_name) pairs
+    @return Portfolio snapshot with sector_counts populated *)
+
 val snapshot :
   cash:float -> positions:(string * float * float) list -> portfolio_snapshot
-(** Compute portfolio snapshot for risk calculations.
+(** Low-level snapshot builder from raw (symbol, quantity, price) triples.
 
-    @param cash Current cash balance
-    @param positions
-      List of (symbol, quantity, current_price) triples. Quantity is positive
-      for long, negative for short.
-    @return Portfolio snapshot with exposure metrics
+    Prefer [snapshot_of_portfolio] when a [Portfolio.t] is available.
 
     Note: sector_counts is always empty in this function -- use
     [snapshot_with_sectors] when sector tracking is needed. *)
@@ -126,12 +147,10 @@ val snapshot_with_sectors :
   positions:(string * float * float) list ->
   sectors:(string * string) list ->
   portfolio_snapshot
-(** Compute portfolio snapshot including sector concentration tracking.
+(** Low-level snapshot builder with sector tracking.
 
-    @param cash Current cash balance
-    @param positions List of (symbol, quantity, current_price) triples
-    @param sectors List of (symbol, sector_name) pairs
-    @return Portfolio snapshot with sector_counts populated *)
+    Prefer [snapshot_of_portfolio_with_sectors] when a [Portfolio.t] is
+    available. *)
 
 val compute_position_size :
   config:config ->

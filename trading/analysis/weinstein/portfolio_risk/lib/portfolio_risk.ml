@@ -100,6 +100,27 @@ let snapshot_with_sectors ~cash ~positions ~sectors =
   let sector_counts = _compute_sector_counts positions sectors in
   _make_snapshot ~cash ~positions ~sector_counts
 
+(* Extract (symbol, total_quantity, current_price) triples from a portfolio
+   and price lookup. Position quantity is the sum across all lots. *)
+let _positions_of_portfolio ~portfolio ~prices =
+  let price_of sym =
+    List.Assoc.find prices ~equal:String.equal sym |> Option.value ~default:0.0
+  in
+  let (p : Trading_portfolio.Portfolio.t) = portfolio in
+  List.map p.positions ~f:(fun pos ->
+      let qty =
+        List.fold pos.lots ~init:0.0 ~f:(fun acc lot -> acc +. lot.quantity)
+      in
+      (pos.symbol, qty, price_of pos.symbol))
+
+let snapshot_of_portfolio ~portfolio ~prices =
+  let positions = _positions_of_portfolio ~portfolio ~prices in
+  snapshot ~cash:portfolio.current_cash ~positions
+
+let snapshot_of_portfolio_with_sectors ~portfolio ~prices ~sectors =
+  let positions = _positions_of_portfolio ~portfolio ~prices in
+  snapshot_with_sectors ~cash:portfolio.current_cash ~positions ~sectors
+
 (* ---- Position sizing ---- *)
 
 let compute_position_size ~config ~portfolio_value ~entry_price ~stop_price
