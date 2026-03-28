@@ -119,8 +119,9 @@ open Core
 
 (** {1 Position Types} *)
 
-(** Position side - long or short *)
-type position_side =
+(** Position side - long or short. Alias for [Trading_base.Types.position_side].
+*)
+type position_side = Trading_base.Types.position_side =
   | Long  (** Buy to enter, sell to exit *)
   | Short  (** Sell to enter, buy to exit *)
 [@@deriving show, eq]
