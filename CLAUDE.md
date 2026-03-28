@@ -374,6 +374,18 @@ Use Test driven development to develop iteratively
    message. This repo uses **jj (Jujutsu)** as the VCS — always use `jj`
    commands, never bare `git` commands for committing, branching, or pushing.
 
+### Review feedback workflow
+
+When the user gives feedback on a PR, add the changes as a **second commit on top** of the original — do not amend. This lets the reviewer see exactly what changed in response to their feedback.
+
+1. `jj edit <bookmark>` — land on the commit under review
+2. `jj new -m "Apply review: <short description>"` — creates an empty child commit; the bookmark still points to the original
+3. Make the changes, then `dune build && dune runtest` and `dune fmt`
+4. `jj bookmark set <bookmark> -r @` — advance the bookmark to the new tip
+5. `jj git push -b <bookmark>`
+
+Descendant commits in the stack rebase automatically. The PR will contain two commits; GitHub lets the reviewer diff each one independently.
+
 ### Write new code incrementally
 
 Make one small changes at a time.
