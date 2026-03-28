@@ -9,6 +9,8 @@ type price = float [@@deriving show, eq]
 type quantity = float [@@deriving show, eq]
 (** Quantity represents the number of shares/contracts *)
 
+type position_side = Long | Short [@@deriving show, eq]
+
 (** Side represents whether an order is to buy or sell *)
 type side = Buy | Sell [@@deriving show, eq]
 

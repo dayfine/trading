@@ -68,7 +68,8 @@ type position_state =
     }
 [@@deriving show, eq]
 
-type position_side = Long | Short [@@deriving show, eq]
+type position_side = Trading_base.Types.position_side = Long | Short
+[@@deriving show, eq]
 
 type t = {
   id : string;

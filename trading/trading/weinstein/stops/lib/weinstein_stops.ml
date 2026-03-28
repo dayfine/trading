@@ -1,3 +1,6 @@
+open Core
+open Weinstein_types
+
 type stop_state =
   | Initial of {
       stop_level : float;
