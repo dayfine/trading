@@ -8,6 +8,7 @@
     It is {b never moved against the position} — never lowered for a long, never
     raised for a short. See individual type docs for state semantics. *)
 
+open Weinstein_types
 open Trading_base.Types
 
 (** {1 Types} *)
@@ -77,10 +78,7 @@ val default_config : config
 (** {1 Core Functions} *)
 
 val compute_initial_stop :
-  config:config ->
-  side:position_side ->
-  reference_level:float ->
-  stop_state
+  config:config -> side:position_side -> reference_level:float -> stop_state
 (** Compute the initial stop level at the time of entry.
 
     For a long, [reference_level] is the support floor; the stop is placed just
@@ -96,3 +94,19 @@ val check_stop_hit :
 
 val get_stop_level : stop_state -> float
 (** Extract the current stop price from any state. *)
+
+(** {1 Update} *)
+
+val update :
+  config:config ->
+  side:position_side ->
+  state:stop_state ->
+  current_bar:Types.Daily_price.t ->
+  ma_value:float ->
+  ma_direction:ma_direction ->
+  stage:stage ->
+  stop_state * stop_event
+(** Update stop state given current market data. Called once per week.
+
+    The stop is never moved against the position (never lowered for long, never
+    raised for short). *)
