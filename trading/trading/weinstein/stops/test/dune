@@ -1,0 +1,5 @@
+(test
+ (name test_weinstein_stops)
+ (libraries weinstein_trading.stops types trading.base core ounit2 matchers)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
