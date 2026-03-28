@@ -135,7 +135,7 @@ let process portfolio trade =
 
 **Helper Functions:**
 - Prefix internal helpers with underscore: `_validate_symbol`, `_calculate_cost`
-- Keep functions small and focused (< 25 lines preferred)
+- Keep functions small and focused (≤ 25 lines recommended, 50 lines hard limit)
 - Name functions clearly to indicate their purpose
 - Extract complex logic into named helper functions
 
@@ -368,7 +368,7 @@ Use Test driven development to develop iteratively
        - Does a record contains more than 7~9 fields?
        - Does a function contains more than 5-7 parameters?
        - Does a module contains more than 3-5 methods?
-       - Does a function contains more than a page (~35 lines) of code?
+       - Does a function contain more than 25 lines (recommended) or 50 lines (hard limit)?
 6. At the end, format the code using `dune fmt`
 7. Make a commit using `jj describe -m "..."` by summarizing a concise commit
    message. This repo uses **jj (Jujutsu)** as the VCS — always use `jj`
