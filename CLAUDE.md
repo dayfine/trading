@@ -66,7 +66,7 @@ The project is building a semi-automated trading system based on Stan Weinstein'
 
 - **Same pipeline for live and simulation.** The DATA_SOURCE interface is the seam — live calls EODHD, historical replays from cache, synthetic generates programmatically. Analysis and screening code is identical in both modes.
 - **All parameters in config, never hardcoded.** Every threshold, weight, lookback period, and limit is configurable. This enables backtesting and tuning.
-- **Don't modify existing modules** (Portfolio, Orders, Engine, Position). Build Weinstein-specific logic alongside them.
+- **Prefer building alongside existing modules** (Portfolio, Orders, Engine, Position) rather than modifying them. When a well-scoped refactor to an existing module is clearly beneficial (e.g., adding a shared type to the canonical location), feature agents should **propose it as a decision item** for human or review-agent approval rather than executing it directly. This prevents unintended cross-module changes from being silently bundled into feature PRs.
 - **Every analysis function is pure.** Same input → same output. No hidden state. Essential for reproducible backtests.
 - **The Weinstein strategy implements the existing `STRATEGY` module type.** Integration point is `on_market_close` — the strategy receives market data, looks at positions, returns transitions.
 
