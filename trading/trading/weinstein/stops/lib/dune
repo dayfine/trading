@@ -1,6 +1,6 @@
 (library
  (name weinstein_stops)
  (public_name weinstein_trading.stops)
- (libraries core weinstein.types)
+ (libraries core types trading.base weinstein.types)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
