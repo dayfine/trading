@@ -93,10 +93,7 @@ let _make_snapshot ~cash ~positions ~sector_counts =
     sector_counts;
   }
 
-let snapshot ~cash ~positions =
-  _make_snapshot ~cash ~positions ~sector_counts:[]
-
-let snapshot_with_sectors ~cash ~positions ~sectors =
+let snapshot ~cash ~positions ?(sectors = []) () =
   let sector_counts = _compute_sector_counts positions sectors in
   _make_snapshot ~cash ~positions ~sector_counts
 
@@ -113,13 +110,9 @@ let _positions_of_portfolio ~portfolio ~prices =
       in
       (pos.symbol, qty, price_of pos.symbol))
 
-let snapshot_of_portfolio ~portfolio ~prices =
+let snapshot_of_portfolio ~portfolio ~prices ?(sectors = []) () =
   let positions = _positions_of_portfolio ~portfolio ~prices in
-  snapshot ~cash:portfolio.current_cash ~positions
-
-let snapshot_of_portfolio_with_sectors ~portfolio ~prices ~sectors =
-  let positions = _positions_of_portfolio ~portfolio ~prices in
-  snapshot_with_sectors ~cash:portfolio.current_cash ~positions ~sectors
+  snapshot ~cash:portfolio.current_cash ~positions ~sectors ()
 
 (* ---- Position sizing ---- *)
 
@@ -148,36 +141,54 @@ let compute_position_size ~config ~portfolio_value ~entry_price ~stop_price
 
 (* ---- Limit checks ---- *)
 
+(* Each check returns a (possibly empty) list of violations. check_limits
+   combines them — the monoid is list concatenation over the empty list. *)
+
 let check_limits ~config ~snapshot ~proposed_side ~proposed_value
     ~proposed_sector =
-  let violations = ref [] in
-  if snapshot.position_count >= config.max_positions then
-    violations := Max_positions_exceeded snapshot.position_count :: !violations;
-  (match proposed_side with
-  | `Long ->
-      let new_long_pct =
-        (snapshot.long_exposure +. proposed_value) /. snapshot.total_value
-      in
-      if Float.( > ) new_long_pct config.max_long_exposure_pct then
-        violations := Long_exposure_exceeded new_long_pct :: !violations
-  | `Short ->
-      let new_short_pct =
-        (snapshot.short_exposure +. proposed_value) /. snapshot.total_value
-      in
-      if Float.( > ) new_short_pct config.max_short_exposure_pct then
-        violations := Short_exposure_exceeded new_short_pct :: !violations);
-  let cash_after = snapshot.cash -. proposed_value in
-  let cash_pct_after =
-    if Float.( <= ) snapshot.total_value 0.0 then 0.0
-    else cash_after /. snapshot.total_value
+  let check_max_positions () =
+    if snapshot.position_count >= config.max_positions then
+      [ Max_positions_exceeded snapshot.position_count ]
+    else []
   in
-  if Float.( < ) cash_pct_after config.min_cash_pct then
-    violations := Cash_below_minimum cash_pct_after :: !violations;
-  let sector_count =
-    List.Assoc.find snapshot.sector_counts ~equal:String.equal proposed_sector
-    |> Option.value ~default:0
+  let check_exposure () =
+    match proposed_side with
+    | `Long ->
+        let new_pct =
+          (snapshot.long_exposure +. proposed_value) /. snapshot.total_value
+        in
+        if Float.( > ) new_pct config.max_long_exposure_pct then
+          [ Long_exposure_exceeded new_pct ]
+        else []
+    | `Short ->
+        let new_pct =
+          (snapshot.short_exposure +. proposed_value) /. snapshot.total_value
+        in
+        if Float.( > ) new_pct config.max_short_exposure_pct then
+          [ Short_exposure_exceeded new_pct ]
+        else []
   in
-  if sector_count + 1 > config.max_sector_concentration then
-    violations :=
-      Sector_concentration (proposed_sector, sector_count + 1) :: !violations;
-  match !violations with [] -> Result.Ok () | vs -> Result.Error (List.rev vs)
+  let check_cash () =
+    let cash_pct_after =
+      if Float.( <= ) snapshot.total_value 0.0 then 0.0
+      else (snapshot.cash -. proposed_value) /. snapshot.total_value
+    in
+    if Float.( < ) cash_pct_after config.min_cash_pct then
+      [ Cash_below_minimum cash_pct_after ]
+    else []
+  in
+  let check_sector () =
+    let count =
+      List.Assoc.find snapshot.sector_counts ~equal:String.equal proposed_sector
+      |> Option.value ~default:0
+    in
+    if count + 1 > config.max_sector_concentration then
+      [ Sector_concentration (proposed_sector, count + 1) ]
+    else []
+  in
+  let violations =
+    List.concat_map
+      [ check_max_positions; check_exposure; check_cash; check_sector ]
+      ~f:(fun check -> check ())
+  in
+  match violations with [] -> Result.Ok () | vs -> Result.Error vs

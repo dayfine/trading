@@ -8,7 +8,7 @@ open Matchers
 (* Directly constructs a portfolio_snapshot for limit-check tests, bypassing
    the snapshot functions. This lets us set arbitrary exposure values without
    needing a real portfolio + trade history. *)
-let make_snap ?(cash = 80000.0) ?(long_exp = 15000.0) ?(short_exp = 0.0)
+let make_snapshot ?(cash = 80000.0) ?(long_exp = 15000.0) ?(short_exp = 0.0)
     ?(positions = 3) ?(sectors = []) () =
   let total = cash +. long_exp -. short_exp in
   {
@@ -46,7 +46,7 @@ let apply_trades_exn portfolio trades =
 (* ---- Snapshot tests ---- *)
 
 let test_snapshot_empty _ =
-  let snap = snapshot ~cash:100000.0 ~positions:[] in
+  let snap = snapshot ~cash:100000.0 ~positions:[] () in
   assert_that snap
     (all_of
        [
@@ -60,7 +60,7 @@ let test_snapshot_empty _ =
 
 let test_snapshot_long_only _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("MSFT", 50.0, 200.0) ] in
-  let snap = snapshot ~cash:50000.0 ~positions in
+  let snap = snapshot ~cash:50000.0 ~positions () in
   assert_that snap
     (all_of
        [
@@ -75,7 +75,7 @@ let test_snapshot_long_only _ =
 
 let test_snapshot_with_short _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("TSLA", -50.0, 200.0) ] in
-  let snap = snapshot ~cash:80000.0 ~positions in
+  let snap = snapshot ~cash:80000.0 ~positions () in
   assert_that snap
     (all_of
        [
@@ -90,7 +90,7 @@ let test_snapshot_with_sectors _ =
     [ ("AAPL", 100.0, 150.0); ("MSFT", 50.0, 200.0); ("AMZN", 20.0, 180.0) ]
   in
   let sectors = [ ("AAPL", "Tech"); ("MSFT", "Tech"); ("AMZN", "Tech") ] in
-  let snap = snapshot_with_sectors ~cash:50000.0 ~positions ~sectors in
+  let snap = snapshot ~cash:50000.0 ~positions ~sectors () in
   assert_that snap
     (all_of
        [
@@ -115,7 +115,7 @@ let test_snapshot_of_portfolio _ =
      long exposure at current prices: 100*150 + 50*200 = 15000 + 10000 = 25000
      total: 85000 + 25000 = 110000 *)
   let prices = [ ("AAPL", 150.0); ("MSFT", 200.0) ] in
-  let snap = snapshot_of_portfolio ~portfolio ~prices in
+  let snap = snapshot_of_portfolio ~portfolio ~prices () in
   assert_that snap
     (all_of
        [
@@ -174,7 +174,7 @@ let test_position_size_big_winner _ =
 (* ---- Limit check tests ---- *)
 
 let test_check_limits_ok _ =
-  let snap = make_snap () in
+  let snap = make_snapshot () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
       ~proposed_value:5000.0 ~proposed_sector:"Tech"
@@ -182,7 +182,7 @@ let test_check_limits_ok _ =
   assert_that result (equal_to (Result.Ok ()))
 
 let test_check_limits_max_positions _ =
-  let snap = make_snap ~positions:20 () in
+  let snap = make_snapshot ~positions:20 () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
       ~proposed_value:5000.0 ~proposed_sector:"Tech"
@@ -191,7 +191,7 @@ let test_check_limits_max_positions _ =
 
 let test_check_limits_long_exposure _ =
   (* long_exp=85000, cash=15000, total=100000; adding 10000 long pushes to 95% *)
-  let snap = make_snap ~cash:15000.0 ~long_exp:85000.0 () in
+  let snap = make_snapshot ~cash:15000.0 ~long_exp:85000.0 () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
       ~proposed_value:10000.0 ~proposed_sector:"Tech"
@@ -202,7 +202,7 @@ let test_check_limits_long_exposure _ =
 
 let test_check_limits_cash_minimum _ =
   (* cash=12000, long_exp=88000, total=100000; adding 5000 leaves 7% cash *)
-  let snap = make_snap ~cash:12000.0 ~long_exp:88000.0 () in
+  let snap = make_snapshot ~cash:12000.0 ~long_exp:88000.0 () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
       ~proposed_value:5000.0 ~proposed_sector:"Tech"
@@ -213,7 +213,7 @@ let test_check_limits_cash_minimum _ =
 
 let test_check_limits_sector_concentration _ =
   let sectors = [ ("Tech", 5) ] in
-  let snap = make_snap ~sectors () in
+  let snap = make_snapshot ~sectors () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
       ~proposed_value:5000.0 ~proposed_sector:"Tech"
@@ -223,7 +223,7 @@ let test_check_limits_sector_concentration _ =
 
 let test_check_limits_multiple_violations _ =
   (* positions=20 (max), cash=5000, long=95000; adding 10000 long hits 3 limits *)
-  let snap = make_snap ~positions:20 ~cash:5000.0 ~long_exp:95000.0 () in
+  let snap = make_snapshot ~positions:20 ~cash:5000.0 ~long_exp:95000.0 () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
       ~proposed_value:10000.0 ~proposed_sector:"Tech"
@@ -239,7 +239,7 @@ let test_check_limits_multiple_violations _ =
 
 let test_check_limits_short_side _ =
   (* short_exp=28000, cash=80000, long=0, total=52000; adding 10000 short → 73% *)
-  let snap = make_snap ~short_exp:28000.0 ~long_exp:0.0 () in
+  let snap = make_snapshot ~short_exp:28000.0 ~long_exp:0.0 () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Short
       ~proposed_value:10000.0 ~proposed_sector:"Finance"
@@ -248,7 +248,7 @@ let test_check_limits_short_side _ =
     (equal_to (Result.Error [ Short_exposure_exceeded (38000.0 /. 52000.0) ]))
 
 let test_deriving _ =
-  let _ = show_portfolio_snapshot (make_snap ()) in
+  let _ = show_portfolio_snapshot (make_snapshot ()) in
   let _ =
     show_sizing_result
       {

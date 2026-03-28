@@ -24,55 +24,76 @@
 
 type portfolio_snapshot = {
   total_value : float;
-      (** Total portfolio value: cash + market value of all positions *)
+      (** Total portfolio value: cash + long market value − short market value
+      *)
   cash : float;  (** Current cash balance *)
-  cash_pct : float;  (** Cash as percentage of total value [0.0, 1.0] *)
+  cash_pct : float;
+      (** Cash as fraction of total value [0.0, 1.0]. Low values indicate high
+          deployment; falling below [config.min_cash_pct] blocks new trades. *)
   long_exposure : float;  (** Total long position market value *)
   long_exposure_pct : float;
-      (** Long exposure as percentage of total value [0.0, 1.0] *)
+      (** Long exposure as fraction of total value [0.0, 1.0]. High values mean
+          concentrated long-side risk; limited by
+          [config.max_long_exposure_pct]. *)
   short_exposure : float;
       (** Total short position market value (absolute value) *)
   short_exposure_pct : float;
-      (** Short exposure as percentage of total value [0.0, 1.0] *)
+      (** Short exposure as fraction of total value [0.0, 1.0]. Limited by
+          [config.max_short_exposure_pct] to cap downside from short squeezes.
+      *)
   position_count : int;  (** Number of open positions (long + short) *)
   sector_counts : (string * int) list;
-      (** Sector -> position count mapping, sorted by sector name *)
+      (** Positions per sector, sorted by sector name. Empty when no sector data
+          is provided. High counts in one sector indicate concentration risk;
+          limited by [config.max_sector_concentration]. *)
 }
 [@@deriving show, eq]
 (** Point-in-time view of portfolio composition used for risk calculations.
 
-    Computed from the existing Portfolio.t plus current market prices. *)
+    Build via [snapshot_of_portfolio] when a [Portfolio.t] is available, or via
+    [snapshot] for custom data sources. *)
 
-(** {1 Sizing Result} *)
+val snapshot_of_portfolio :
+  portfolio:Trading_portfolio.Portfolio.t ->
+  prices:(string * float) list ->
+  ?sectors:(string * string) list ->
+  unit ->
+  portfolio_snapshot
+(** Compute portfolio snapshot from an existing portfolio and current prices.
+
+    @param portfolio Current portfolio (cash and positions)
+    @param prices List of (symbol, current_price) pairs
+    @param sectors Optional (symbol, sector_name) pairs for sector tracking
+    @return Portfolio snapshot with exposure metrics *)
+
+val snapshot :
+  cash:float ->
+  positions:(string * float * float) list ->
+  ?sectors:(string * string) list ->
+  unit ->
+  portfolio_snapshot
+(** Low-level snapshot builder from raw (symbol, quantity, price) triples.
+
+    Prefer [snapshot_of_portfolio] when a [Portfolio.t] is available.
+
+    @param cash Current cash balance
+    @param positions
+      (symbol, quantity, current_price) triples; negative quantity for short
+      positions
+    @param sectors Optional (symbol, sector_name) pairs for sector tracking *)
+
+(** {1 Position Sizing} *)
 
 type sizing_result = {
   shares : int;
-      (** Number of shares to buy/sell -- rounded down to avoid overcommit *)
+      (** Number of shares to buy/sell — rounded down to avoid overcommit *)
   position_value : float;  (** Total position value = shares * entry_price *)
   position_pct : float;
-      (** Position as percentage of portfolio value [0.0, 1.0] *)
+      (** Position as fraction of portfolio value [0.0, 1.0] *)
   risk_amount : float;  (** Dollar risk: shares * (entry_price - stop_price) *)
 }
 [@@deriving show, eq]
 (** Result of position size computation. *)
-
-(** {1 Limit Violations} *)
-
-(** Reasons a proposed position would violate portfolio risk limits. *)
-type limit_violation =
-  | Max_positions_exceeded of int
-      (** Portfolio already has [n] positions, at maximum *)
-  | Long_exposure_exceeded of float
-      (** Adding this position would push long exposure to [pct] *)
-  | Short_exposure_exceeded of float
-      (** Adding this position would push short exposure to [pct] *)
-  | Cash_below_minimum of float
-      (** After this trade, cash would fall to [pct] of portfolio *)
-  | Sector_concentration of string * int
-      (** Sector [name] would have [n] positions, over limit *)
-  | Risk_too_high of float
-      (** Risk amount is [pct] of portfolio, over configured limit *)
-[@@deriving show]
 
 (** {1 Configuration} *)
 
@@ -91,10 +112,10 @@ type config = {
   max_sector_concentration : int;
       (** Maximum positions in any single sector (default: 5) *)
   big_winner_multiplier : float;
-      (** Scale up sizing for high-conviction trades (default: 1.5x) *)
+      (** Size multiplier for high-conviction trades (default: 1.5x) *)
 }
 [@@deriving show, eq]
-(** All risk management parameters -- nothing hardcoded. *)
+(** All risk management parameters — nothing hardcoded. *)
 
 val default_config : config
 (** Default configuration:
@@ -105,52 +126,6 @@ val default_config : config
     - min_cash_pct = 0.10 (10%)
     - max_sector_concentration = 5
     - big_winner_multiplier = 1.5 *)
-
-(** {1 Core Functions} *)
-
-val snapshot_of_portfolio :
-  portfolio:Trading_portfolio.Portfolio.t ->
-  prices:(string * float) list ->
-  portfolio_snapshot
-(** Compute portfolio snapshot from an existing portfolio and current prices.
-
-    @param portfolio Current portfolio (cash and positions)
-    @param prices List of (symbol, current_price) pairs
-    @return Portfolio snapshot with exposure metrics
-
-    Note: sector_counts is always empty -- use
-    [snapshot_of_portfolio_with_sectors] when sector tracking is needed. *)
-
-val snapshot_of_portfolio_with_sectors :
-  portfolio:Trading_portfolio.Portfolio.t ->
-  prices:(string * float) list ->
-  sectors:(string * string) list ->
-  portfolio_snapshot
-(** Compute portfolio snapshot including sector concentration tracking.
-
-    @param portfolio Current portfolio (cash and positions)
-    @param prices List of (symbol, current_price) pairs
-    @param sectors List of (symbol, sector_name) pairs
-    @return Portfolio snapshot with sector_counts populated *)
-
-val snapshot :
-  cash:float -> positions:(string * float * float) list -> portfolio_snapshot
-(** Low-level snapshot builder from raw (symbol, quantity, price) triples.
-
-    Prefer [snapshot_of_portfolio] when a [Portfolio.t] is available.
-
-    Note: sector_counts is always empty in this function -- use
-    [snapshot_with_sectors] when sector tracking is needed. *)
-
-val snapshot_with_sectors :
-  cash:float ->
-  positions:(string * float * float) list ->
-  sectors:(string * string) list ->
-  portfolio_snapshot
-(** Low-level snapshot builder with sector tracking.
-
-    Prefer [snapshot_of_portfolio_with_sectors] when a [Portfolio.t] is
-    available. *)
 
 val compute_position_size :
   config:config ->
@@ -172,9 +147,27 @@ val compute_position_size :
     @param entry_price Price at which to enter the position
     @param stop_price Stop-loss price for the position
     @param big_winner
-      If true, applies big_winner_multiplier to sizing (default: false)
-    @return Sizing result with shares, position_value, position_pct, risk_amount
-*)
+      If [true], scales position size by [config.big_winner_multiplier]. Use for
+      high-conviction setups — Stage 2 breakouts with strong volume and relative
+      strength — where you want to commit more capital. (default: false) *)
+
+(** {1 Limit Checks} *)
+
+(** Reasons a proposed position would violate portfolio risk limits. *)
+type limit_violation =
+  | Max_positions_exceeded of int
+      (** Portfolio already has [n] positions, at maximum *)
+  | Long_exposure_exceeded of float
+      (** Adding this position would push long exposure to [pct] *)
+  | Short_exposure_exceeded of float
+      (** Adding this position would push short exposure to [pct] *)
+  | Cash_below_minimum of float
+      (** After this trade, cash would fall to [pct] of portfolio *)
+  | Sector_concentration of string * int
+      (** Sector [name] would have [n] positions, over limit *)
+  | Risk_too_high of float
+      (** Risk amount is [pct] of portfolio, over configured limit *)
+[@@deriving show]
 
 val check_limits :
   config:config ->
@@ -183,18 +176,13 @@ val check_limits :
   proposed_value:float ->
   proposed_sector:string ->
   (unit, limit_violation list) Result.t
-(** Check if a proposed position would violate any portfolio risk limits.
+(** Check whether a proposed position would violate any portfolio risk limits.
 
-    Checks in order: 1. Max positions 2. Exposure limits (long or short
-    depending on side) 3. Minimum cash 4. Sector concentration (Risk_too_high is
-    checked separately via [compute_position_size])
-
-    Returns [Ok ()] if all limits pass, [Error violations] with all violations
-    found (not just the first).
+    Every limit is evaluated independently — returns [Ok ()] only if all pass,
+    [Error violations] listing every limit that would be exceeded.
 
     @param config Risk configuration
     @param snapshot Current portfolio snapshot
     @param proposed_side Long or short for the proposed position
     @param proposed_value Dollar value of the proposed position
-    @param proposed_sector Sector of the proposed ticker
-    @return Ok if all limits pass, Error with all violations *)
+    @param proposed_sector Sector of the proposed ticker *)
