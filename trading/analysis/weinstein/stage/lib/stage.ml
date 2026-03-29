@@ -163,6 +163,68 @@ let _advance_stage (s : stage) : stage =
       Stage4 { weeks_declining = weeks_declining + 1 }
 
 (* ------------------------------------------------------------------ *)
+(* Classify helpers                                                     *)
+(* ------------------------------------------------------------------ *)
+
+(** Align bars with their corresponding MA values. [ma_series] starts at index
+    [(List.length bars - List.length ma_series)] of [bars]. *)
+let _align_bars_with_ma (bars : Daily_price.t list)
+    (ma_series : (Date.t * float) list) : (Daily_price.t * float) list =
+  let offset = List.length bars - List.length ma_series in
+  List.mapi ma_series ~f:(fun i (_, mv) ->
+      let bar = List.nth_exn bars (offset + i) in
+      (bar, mv))
+
+(** Determine the new stage from MA direction, prior stage, and price/MA
+    position counts. *)
+let _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
+    ~is_late ~confirm_weeks : stage =
+  match (ma_dir, prior_stage) with
+  (* Rising MA with price mostly above → Stage 2 *)
+  | Rising, _ when above_ma_count > below_ma_count ->
+      let weeks =
+        match prior_stage with
+        | Some (Stage2 { weeks_advancing; _ }) -> weeks_advancing + 1
+        | _ -> 1
+      in
+      Stage2 { weeks_advancing = weeks; late = is_late }
+  (* Declining MA with price mostly below → Stage 4 *)
+  | Declining, _ when below_ma_count > above_ma_count ->
+      let weeks =
+        match prior_stage with
+        | Some (Stage4 { weeks_declining }) -> weeks_declining + 1
+        | _ -> 1
+      in
+      Stage4 { weeks_declining = weeks }
+  (* Flat MA: use prior context to disambiguate Stage 1 vs Stage 3 *)
+  | Flat, Some prior -> (
+      match prior with
+      | Stage1 _ | Stage4 _ ->
+          _advance_stage (Stage1 { weeks_in_base = _weeks_in_stage prior })
+      | Stage2 _ | Stage3 _ ->
+          _advance_stage (Stage3 { weeks_topping = _weeks_in_stage prior }))
+  (* Rising MA but price not yet mostly above (early transition) *)
+  | Rising, Some (Stage1 { weeks_in_base }) ->
+      Stage1 { weeks_in_base = weeks_in_base + 1 }
+  (* Declining MA but price not yet mostly below (early transition) *)
+  | Declining, Some (Stage3 { weeks_topping }) ->
+      Stage3 { weeks_topping = weeks_topping + 1 }
+  (* No prior stage: infer from MA direction and price position *)
+  | _, None ->
+      _infer_initial_stage ~ma_direction:ma_dir ~above_ma_count ~confirm_weeks
+  (* Catch-all for mixed signals: continue prior or default Stage1 *)
+  | _, Some prior -> _advance_stage prior
+
+(** Detect a stage number transition between prior and new stage. *)
+let _detect_transition ~prior_stage ~new_stage : (stage * stage) option =
+  match prior_stage with
+  | None -> None
+  | Some p ->
+      if equal_stage new_stage p then None
+      else if _stage_number p = _stage_number new_stage then None
+      else Some (p, new_stage)
+
+(* ------------------------------------------------------------------ *)
 (* Main classifier                                                      *)
 (* ------------------------------------------------------------------ *)
 
@@ -177,9 +239,7 @@ let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
   } =
     config
   in
-  (* Need at least ma_period bars to compute a meaningful MA *)
   let ma_series = _compute_ma ~period:ma_period ~weighted:ma_weighted bars in
-  (* Fall back to safe defaults if insufficient data *)
   if List.is_empty ma_series then
     {
       stage = Stage1 { weeks_in_base = 0 };
@@ -191,7 +251,6 @@ let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
     }
   else
     let current_ma = snd (List.last_exn ma_series) in
-    (* Compute slope: compare current MA to MA [slope_lookback] steps back *)
     let lookback_ma =
       let ma_len = List.length ma_series in
       if ma_len > slope_lookback then
@@ -202,74 +261,21 @@ let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
       _classify_direction ~threshold:slope_threshold ~current:current_ma
         ~lookback:lookback_ma
     in
-    (* Count recent bars above MA *)
-    let bars_len = List.length bars in
-    let ma_len = List.length ma_series in
-    (* Align: bars and ma_series — ma_series starts at index (ma_period - 1) of bars *)
-    let aligned =
-      let offset = bars_len - ma_len in
-      List.mapi ma_series ~f:(fun i (_, mv) ->
-          let bar = List.nth_exn bars (offset + i) in
-          (bar, mv))
-    in
+    let aligned = _align_bars_with_ma bars ma_series in
     let above_ma_count = _count_above_ma aligned ~n:confirm_weeks in
-    let below_ma_count = min confirm_weeks ma_len - above_ma_count in
-    (* Detect late Stage 2 *)
+    let below_ma_count =
+      min confirm_weeks (List.length ma_series) - above_ma_count
+    in
     let is_late =
       _is_late_stage2 ~decel_threshold:late_stage2_decel
         (List.map ma_series ~f:snd)
         ~slope_lookback
     in
-    (* Classify stage based on MA direction and price position *)
     let new_stage =
-      match (ma_dir, prior_stage) with
-      (* Rising MA with price mostly above → Stage 2 *)
-      | Rising, _ when above_ma_count > below_ma_count ->
-          let weeks =
-            match prior_stage with
-            | Some (Stage2 { weeks_advancing; _ }) -> weeks_advancing + 1
-            | _ -> 1
-          in
-          Stage2 { weeks_advancing = weeks; late = is_late }
-      (* Declining MA with price mostly below → Stage 4 *)
-      | Declining, _ when below_ma_count > above_ma_count ->
-          let weeks =
-            match prior_stage with
-            | Some (Stage4 { weeks_declining }) -> weeks_declining + 1
-            | _ -> 1
-          in
-          Stage4 { weeks_declining = weeks }
-      (* Flat MA: use prior context to disambiguate Stage 1 vs Stage 3 *)
-      | Flat, Some prior -> (
-          match prior with
-          | Stage1 _ | Stage4 _ ->
-              _advance_stage (Stage1 { weeks_in_base = _weeks_in_stage prior })
-          | Stage2 _ | Stage3 _ ->
-              _advance_stage (Stage3 { weeks_topping = _weeks_in_stage prior }))
-      (* Rising MA but price not yet mostly above (early transition) *)
-      | Rising, Some (Stage1 { weeks_in_base }) ->
-          Stage1 { weeks_in_base = weeks_in_base + 1 }
-      (* Declining MA but price not yet mostly below (early transition) *)
-      | Declining, Some (Stage3 { weeks_topping }) ->
-          Stage3 { weeks_topping = weeks_topping + 1 }
-      (* No prior stage: infer from MA direction and price position *)
-      | _, None ->
-          _infer_initial_stage ~ma_direction:ma_dir ~above_ma_count
-            ~confirm_weeks
-      (* Catch-all for mixed signals: continue prior or default Stage1 *)
-      | _, Some prior -> _advance_stage prior
+      _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
+        ~is_late ~confirm_weeks
     in
-    let transition =
-      match prior_stage with
-      | None -> None
-      | Some p ->
-          if equal_stage new_stage p then None
-          else
-            (* Compare by stage number to detect actual transitions *)
-            let pn = _stage_number p in
-            let nn = _stage_number new_stage in
-            if pn = nn then None else Some (p, new_stage)
-    in
+    let transition = _detect_transition ~prior_stage ~new_stage in
     {
       stage = new_stage;
       ma_value = current_ma;
