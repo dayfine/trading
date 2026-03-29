@@ -1,0 +1,15 @@
+(library
+ (name weinstein_trading_state)
+ (public_name weinstein_trading.trading_state)
+ (libraries
+  core
+  yojson
+  types
+  trading.base
+  trading.portfolio
+  trading.strategy
+  weinstein.types
+  weinstein_trading.stops
+  status)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

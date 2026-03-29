@@ -1,0 +1,16 @@
+(test
+ (name test_weinstein_trading_state)
+ (libraries
+  weinstein_trading.trading_state
+  weinstein_trading.stops
+  weinstein.types
+  types
+  trading.base
+  trading.portfolio
+  core
+  core_unix
+  ounit2
+  matchers
+  status)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

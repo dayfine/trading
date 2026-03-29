@@ -1,0 +1,3 @@
+; order_gen: blocked until feat/screener is merged to main.
+; weinstein.screener is not yet available on main branch.
+; This dune file is a placeholder — no source files exist yet.
