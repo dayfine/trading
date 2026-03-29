@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: —
+## Last updated: 2026-03-29
 
 ## Status
 WAITING
@@ -9,9 +9,9 @@ WAITING
 NO
 
 ## Blocked on
-data-layer: WAITING
-portfolio-stops: WAITING
-screener: WAITING
+- data-layer: MERGED (unblocked)
+- portfolio-stops: PLANNING
+- screener: READY_FOR_REVIEW
 
 ## Completed
 —
@@ -22,7 +22,7 @@ screener: WAITING
 ## Next Steps
 - Read docs/design/eng-design-4-simulation-tuning.md
 - Study existing trading/simulation/ and trading/strategy/ modules
-- Wait for all three dependencies → "Interface stable: YES"
+- Wait for portfolio-stops and screener → "Interface stable: YES"
 - While waiting: draft Weinstein_strategy .mli and config types
 
 ## Inherited from data-layer
