@@ -1,6 +1,6 @@
 # Status: data-layer
 
-## Last updated: 2026-03-27
+## Last updated: 2026-03-29
 
 ## Status
 MERGED
@@ -39,16 +39,15 @@ YES
 - None
 
 ## Follow-up
-Post-merge issues found in QC review (see dev/reviews/data-layer.md). Address before starting new work:
+The following are known gaps — address before downstream features (portfolio-stops, simulation) depend on them:
+
 1. Fix misplaced doc comment in `http_client.mli` — comment for `period` is on `end_date` field
 2. Log (don't ignore) cache-write error in `live_source.ml` — `ignore (_save_bars_to_cache ...)` silently drops failures
 3. Extract duplicated `_load_universe` — identical copy in `live_source.ml` and `historical_source.ml`
 4. Document that `period` is silently ignored in `Historical_source` — note it in both `historical_source.mli` and `data_source.mli` `get_bars` doc
-5. Remove `Synthetic_source` reference from `data_source.mli` module doc — deferred to eng-design-4
-
-## Next Steps
-- `Synthetic_source`: deterministic programmatic bar generation (Trending, Basing, Breakout patterns) — deferred, not needed until simulation tuning (eng-design-4)
-- Universe cache writer: script/tool to populate `data/fundamentals/universe.json` via `get_fundamentals`
+5. Remove `Synthetic_source` reference from `data_source.mli` module doc — implementation deferred to simulation (tracked in dev/status/simulation.md)
+6. Add `get_daily_close` to `DATA_SOURCE` interface — needed by portfolio-stops for mid-week stop checks; not yet implemented in `Live_source` or `Historical_source`
+7. Universe cache writer: script to populate `data/universe.sexp` by calling `get_fundamentals` for each symbol in `get_index_symbols`. Required before any live run. Suggested: `analysis/scripts/fetch_universe.ml`
 
 ## Recent Commits
 - PR #132: Add Historical data source with no-lookahead guarantee

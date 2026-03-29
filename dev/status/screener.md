@@ -1,27 +1,38 @@
 # Status: screener
 
-## Last updated: —
+## Last updated: 2026-03-29
 
 ## Status
-WAITING
+READY_FOR_REVIEW
 
 ## Interface stable
-NO
+YES
 
 ## Blocked on
-data-layer interface: WAITING
+- None (data-layer MERGED)
 
 ## Completed
-—
+
+### 2026-03-29
+- Stack rebased onto new main after screener/stage merge
+
+### 2026-03-28
+- All screener modules implemented and passing tests
+- `screener/rs`: Relative Strength analyzer
+- `screener/volume-resistance`: Volume and Resistance analyzers
+- `screener/stock-analysis`: StockAnalysis aggregation module
+- `screener/stock-screener`: Screener cascade filter (macro → sector → stock)
+- `screener/macro`: Macro market analyzer (with review commit strengthening test)
+- `screener/sector`: Sector analyzer
+- `feat/screener`: SMA refactor (share impl with WMA via weight_fn)
+- All PRs open and awaiting review/merge in order (screener/rs first)
+
+### 2026-03-27
+- `screener/stage` (stage classifier) reviewed and merged (#134)
+- Review commits applied: helpers extracted, Sma lib integrated, ma_type variant (Sma/Wma/Ema) added
 
 ## In Progress
-—
-
-## Next Steps
-- Read docs/design/eng-design-2-screener-analysis.md
-- Read docs/design/weinstein-book-reference.md (primary domain reference)
-- Wait for dev/status/data-layer.md → "Interface stable: YES"
-- While waiting: draft Analyzer + Screener .mli interfaces
+- None — all code done, PRs open for review
 
 ## Followup / Known Improvements
 
@@ -54,4 +65,10 @@ existing `classify` stays as the cold-start entry point. See module comment in
 `stage.mli` for the proposed signature.
 
 ## Recent Commits
-—
+- screener/rs: Add Relative Strength (RS) analyzer
+- screener/volume-resistance: Add Resistance and Volume analysis modules
+- screener/stock-analysis: Add StockAnalysis module
+- screener/stock-screener: Add Screener module with cascade filter
+- screener/macro: Add Macro market analyzer
+- screener/sector: Add Sector analyzer
+- feat/screener: Refactor SMA, share impl with WMA
