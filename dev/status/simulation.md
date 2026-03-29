@@ -10,8 +10,22 @@ NO
 
 ## Blocked on
 - data-layer: MERGED (unblocked)
-- portfolio-stops: PLANNING
-- screener: READY_FOR_REVIEW
+- portfolio-stops: PLANNING (need stop state machine interface)
+- screener: READY_FOR_REVIEW (need Screener + StockAnalysis interface)
+
+## Existing infrastructure — DO NOT reimplement
+`trading/trading/simulation/` already has phases 1–3 complete and tested:
+- **Phase 1** (core types): `config`, `step_result`, `step_outcome`, `run_result` in `lib/types/simulator_types.ml`
+- **Phase 2** (OHLC price path): intraday path generation, order fill detection for all order types
+- **Phase 3** (daily loop): `step` and `run` implemented; engine + order manager + portfolio wired up
+- The simulator already takes a `(module STRATEGY)` in its `dependencies` record
+
+The Weinstein work in eng-design-4 **extends** this — it does not replace it. Key additions:
+- Add `strategy_cadence : Types.Cadence.t` to `config` so strategy fires weekly not daily
+- Implement `Weinstein_strategy` satisfying the existing `STRATEGY` interface
+- Add parameter tuner with walk-forward validation
+
+Read `trading/trading/simulation/lib/simulator.mli` and `README.md` before writing any code.
 
 ## Completed
 —
@@ -21,7 +35,8 @@ NO
 
 ## Next Steps
 - Read docs/design/eng-design-4-simulation-tuning.md
-- Study existing trading/simulation/ and trading/strategy/ modules
+- Read `trading/trading/simulation/lib/simulator.mli` and `README.md`
+- Study existing `trading/trading/strategy/` modules
 - Wait for portfolio-stops and screener → "Interface stable: YES"
 - While waiting: draft Weinstein_strategy .mli and config types
 
