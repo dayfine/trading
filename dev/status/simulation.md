@@ -14,16 +14,16 @@ NO
 - screener: READY_FOR_REVIEW (need Screener + StockAnalysis interface)
 
 ## Existing infrastructure — DO NOT reimplement
-`trading/trading/simulation/` already has phases 1–3 complete and tested:
+`trading/trading/simulation/` is a **generic** framework shared across all strategies (not Weinstein-specific). Phases 1–3 are complete and tested:
 - **Phase 1** (core types): `config`, `step_result`, `step_outcome`, `run_result` in `lib/types/simulator_types.ml`
 - **Phase 2** (OHLC price path): intraday path generation, order fill detection for all order types
 - **Phase 3** (daily loop): `step` and `run` implemented; engine + order manager + portfolio wired up
 - The simulator already takes a `(module STRATEGY)` in its `dependencies` record
 
-The Weinstein work in eng-design-4 **extends** this — it does not replace it. Key additions:
-- Add `strategy_cadence : Types.Cadence.t` to `config` so strategy fires weekly not daily
-- Implement `Weinstein_strategy` satisfying the existing `STRATEGY` interface
-- Add parameter tuner with walk-forward validation
+The Weinstein work in eng-design-4 adds Weinstein-specific components **on top** without breaking general use:
+- Add `strategy_cadence : Types.Cadence.t` to the generic simulator `config` (backwards-compatible)
+- Implement `Weinstein_strategy` in `analysis/weinstein/` satisfying the generic `STRATEGY` interface
+- Add a Weinstein-specific parameter tuner with walk-forward validation
 
 Read `trading/trading/simulation/lib/simulator.mli` and `README.md` before writing any code.
 
