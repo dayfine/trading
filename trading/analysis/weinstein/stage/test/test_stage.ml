@@ -44,6 +44,38 @@ let declining_bars ?(n = 35) start stop_ =
   let step = (start -. stop_) /. Float.of_int (n - 1) in
   List.init n ~f:(fun i -> start -. (Float.of_int i *. step)) |> bars_of_prices
 
+let is_stage2 : stage matcher =
+ fun s ->
+  match s with
+  | Stage2 _ -> ()
+  | other ->
+      OUnit2.assert_failure
+        (Printf.sprintf "Expected Stage2, got %s" (show_stage other))
+
+let is_stage4 : stage matcher =
+ fun s ->
+  match s with
+  | Stage4 _ -> ()
+  | other ->
+      OUnit2.assert_failure
+        (Printf.sprintf "Expected Stage4, got %s" (show_stage other))
+
+let is_stage1 : stage matcher =
+ fun s ->
+  match s with
+  | Stage1 _ -> ()
+  | other ->
+      OUnit2.assert_failure
+        (Printf.sprintf "Expected Stage1, got %s" (show_stage other))
+
+let is_stage3 : stage matcher =
+ fun s ->
+  match s with
+  | Stage3 _ -> ()
+  | other ->
+      OUnit2.assert_failure
+        (Printf.sprintf "Expected Stage3, got %s" (show_stage other))
+
 (* ------------------------------------------------------------------ *)
 (* Stage 2 tests — rising MA, price above MA                           *)
 (* ------------------------------------------------------------------ *)
@@ -52,11 +84,7 @@ let test_stage2_rising_trend _ =
   (* 35 bars of rising prices: MA will be rising, prices above MA *)
   let bars = rising_bars 50.0 100.0 in
   let result = classify ~config:cfg ~bars ~prior_stage:None in
-  (match result.stage with
-  | Stage2 _ -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Stage2, got %s" (show_stage other)));
+  assert_that result.stage is_stage2;
   assert_that result.ma_direction (equal_to Rising)
 
 let test_stage2_advancing_weeks _ =
@@ -64,12 +92,8 @@ let test_stage2_advancing_weeks _ =
   let bars = rising_bars 50.0 100.0 in
   let prior = Some (Stage2 { weeks_advancing = 5; late = false }) in
   let result = classify ~config:cfg ~bars ~prior_stage:prior in
-  match result.stage with
-  | Stage2 { weeks_advancing = 6; _ } -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Stage2 with 6 weeks, got %s"
-           (show_stage other))
+  assert_that result.stage
+    (equal_to (Stage2 { weeks_advancing = 6; late = false } : stage))
 
 (* ------------------------------------------------------------------ *)
 (* Stage 4 tests — declining MA, price below MA                        *)
@@ -79,11 +103,7 @@ let test_stage4_declining_trend _ =
   (* 35 bars of declining prices: MA declining, prices below MA *)
   let bars = declining_bars 100.0 50.0 in
   let result = classify ~config:cfg ~bars ~prior_stage:None in
-  (match result.stage with
-  | Stage4 _ -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Stage4, got %s" (show_stage other)));
+  assert_that result.stage is_stage4;
   assert_that result.ma_direction (equal_to Declining)
 
 (* ------------------------------------------------------------------ *)
@@ -98,12 +118,7 @@ let test_stage1_flat_after_decline _ =
   let bars = declining @ flat |> bars_of_prices in
   let prior = Some (Stage4 { weeks_declining = 10 }) in
   let result = classify ~config:cfg ~bars ~prior_stage:prior in
-  match result.stage with
-  | Stage1 _ -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Stage1 after Stage4 flat, got %s"
-           (show_stage other))
+  assert_that result.stage is_stage1
 
 (* ------------------------------------------------------------------ *)
 (* Stage 3 tests — flat MA after advance, prior Stage 2                *)
@@ -116,12 +131,7 @@ let test_stage3_flat_after_advance _ =
   let bars = rising @ flat |> bars_of_prices in
   let prior = Some (Stage2 { weeks_advancing = 10; late = false }) in
   let result = classify ~config:cfg ~bars ~prior_stage:prior in
-  match result.stage with
-  | Stage3 _ -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Stage3 after Stage2 flat, got %s"
-           (show_stage other))
+  assert_that result.stage is_stage3
 
 (* ------------------------------------------------------------------ *)
 (* Transition detection                                                 *)
@@ -138,13 +148,10 @@ let test_transition_from_stage1_to_stage2 _ =
   let bars = rising_bars 50.0 100.0 in
   let prior = Some (Stage1 { weeks_in_base = 10 }) in
   let result = classify ~config:cfg ~bars ~prior_stage:prior in
-  match result.transition with
-  | Some (Stage1 _, Stage2 _) -> ()
-  | Some (from, to_) ->
-      assert_failure
-        (Printf.sprintf "Expected Stage1→Stage2 transition, got %s → %s"
-           (show_stage from) (show_stage to_))
-  | None -> assert_failure "Expected a transition but got None"
+  assert_that result.transition
+    (is_some_and (fun (from_stage, to_stage) ->
+         assert_that from_stage is_stage1;
+         assert_that to_stage is_stage2))
 
 (* ------------------------------------------------------------------ *)
 (* Insufficient data edge case                                          *)
@@ -154,12 +161,7 @@ let test_insufficient_data_returns_stage1 _ =
   (* Fewer bars than ma_period: should return Stage1 with zero ma_value *)
   let bars = List.init 10 ~f:(fun _ -> 50.0) |> bars_of_prices in
   let result = classify ~config:cfg ~bars ~prior_stage:None in
-  (match result.stage with
-  | Stage1 _ -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Stage1 for insufficient data, got %s"
-           (show_stage other)));
+  assert_that result.stage is_stage1;
   assert_that result.ma_value (float_equal 0.0)
 
 (* ------------------------------------------------------------------ *)
@@ -201,7 +203,10 @@ let test_above_ma_count_all_above _ =
   let bars = rising_bars 50.0 200.0 in
   let result = classify ~config:cfg ~bars ~prior_stage:None in
   (* In a strong uptrend, all confirm_weeks bars should be above MA *)
-  assert_bool "above_ma_count > 0" (result.above_ma_count > 0)
+  assert_that result.above_ma_count (fun n ->
+      if n <= 0 then
+        OUnit2.assert_failure
+          (Printf.sprintf "Expected above_ma_count > 0, got %d" n))
 
 let suite =
   "stage_tests"
