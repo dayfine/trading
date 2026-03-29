@@ -1,5 +1,14 @@
 open Types
 
+(** Moving average type for the stage classifier.
+
+    [Sma] is a simple moving average; [Wma] is a linearly weighted MA (gives
+    more weight to recent bars); [Ema] is an exponential MA (via ta-lib).
+    Weinstein's book specifies a plain 30-week SMA, but [Wma] is a common
+    practical substitute; [Ema] is available for parameter-tuning experiments.
+*)
+type ma_type = Sma | Wma | Ema [@@deriving show, eq]
+
 (** Stage classifier for the Weinstein methodology.
 
     Classifies a stock into one of four stages based on weekly price bars and
@@ -9,9 +18,8 @@ open Types
 
 type config = {
   ma_period : int;  (** Number of weeks for the moving average. Default: 30. *)
-  ma_weighted : bool;
-      (** If true, use linearly weighted MA; otherwise simple MA. Default: true.
-      *)
+  ma_type : ma_type;
+      (** Which moving average to use. Default: [Wma] (linearly weighted). *)
   slope_threshold : float;
       (** Minimum |slope_pct| to classify MA as Rising or Declining. Below this
           is Flat. Default: 0.005 (0.5% per [slope_lookback] weeks). *)

@@ -1,6 +1,12 @@
 (library
  (name stage)
  (public_name weinstein.stage)
- (libraries core types weinstein.types indicators.sma indicators.types)
+ (libraries
+  core
+  types
+  weinstein.types
+  indicators.sma
+  indicators.ema
+  indicators.types)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

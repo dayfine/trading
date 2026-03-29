@@ -6,9 +6,11 @@ open Weinstein_types
 (* Config and defaults                                                  *)
 (* ------------------------------------------------------------------ *)
 
+type ma_type = Sma | Wma | Ema [@@deriving show, eq]
+
 type config = {
   ma_period : int;
-  ma_weighted : bool;
+  ma_type : ma_type;
   slope_threshold : float;
   slope_lookback : int;
   confirm_weeks : int;
@@ -18,7 +20,7 @@ type config = {
 let default_config =
   {
     ma_period = 30;
-    ma_weighted = true;
+    ma_type = Wma;
     slope_threshold = 0.005;
     slope_lookback = 4;
     confirm_weeks = 6;
@@ -60,8 +62,8 @@ let _weeks_in_stage = function
 
 (** Compute moving average values across a price series. Returns a list of
     (date, ma_value) pairs aligned to the last bar of each window. Delegates to
-    [Sma.calculate_sma] / [Sma.calculate_weighted_ma]. *)
-let _compute_ma ~period ~weighted (bars : Daily_price.t list) :
+    [Sma.calculate_sma] / [Sma.calculate_weighted_ma] / [Ema.calculate_ema]. *)
+let _compute_ma ~period ~ma_type (bars : Daily_price.t list) :
     (Date.t * float) list =
   let data =
     List.map bars ~f:(fun b ->
@@ -69,8 +71,10 @@ let _compute_ma ~period ~weighted (bars : Daily_price.t list) :
           { date = b.Daily_price.date; value = b.Daily_price.adjusted_close })
   in
   let result =
-    if weighted then Sma.calculate_weighted_ma data period
-    else Sma.calculate_sma data period
+    match ma_type with
+    | Sma -> Sma.calculate_sma data period
+    | Wma -> Sma.calculate_weighted_ma data period
+    | Ema -> Ema.calculate_ema data period
   in
   List.map result ~f:(fun iv -> Indicator_types.(iv.date, iv.value))
 
@@ -267,7 +271,7 @@ let _classify_with_ma ~config ~(bars : Daily_price.t list) ~prior_stage
 
 let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
   let ma_series =
-    _compute_ma ~period:config.ma_period ~weighted:config.ma_weighted bars
+    _compute_ma ~period:config.ma_period ~ma_type:config.ma_type bars
   in
   if List.is_empty ma_series then
     {
