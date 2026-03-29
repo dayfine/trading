@@ -1,0 +1,7 @@
+(library
+ (name sector)
+ (public_name weinstein.sector)
+ (wrapped false)
+ (libraries core types weinstein_types stage rs stock_analysis screener)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
