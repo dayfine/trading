@@ -79,16 +79,16 @@ let test_bearish_regime_declining_index _ =
 (* ------------------------------------------------------------------ *)
 
 let test_neutral_flat_index _ =
-  (* Flat MA → Stage1 or Stage3 → Neutral index stage signal *)
+  (* A flat index with no A-D or global data produces all-Neutral indicators.
+     _compute_confidence returns 0.5 (fallback when all indicators are Neutral).
+     0.5 is between bearish_threshold=0.35 and bullish_threshold=0.65 → Neutral. *)
   let index = flat_bars ~n:40 100.0 in
   let result =
     analyze ~config:cfg ~index_bars:index ~ad_bars:[] ~global_index_bars:[]
       ~prior_stage:None ~prior:None
   in
-  (* Flat index should produce Neutral or mild Bullish/Bearish depending on A-D *)
-  match result.trend with
-  | Bullish | Bearish | Neutral -> ()
-(* all valid *)
+  assert_that result.trend (equal_to Neutral);
+  assert_that result.confidence (float_equal 0.5)
 
 (* ------------------------------------------------------------------ *)
 (* A-D line influence                                                   *)
