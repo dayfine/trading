@@ -23,19 +23,6 @@ let _load_bars data_dir symbol ~start_date ~end_date ~simulation_date =
       | Error { Status.code = NotFound; _ } -> Ok []
       | result -> result)
 
-(* Universe type for sexp serialisation *)
-module Universe = struct
-  type t = Types.Instrument_info.t list [@@deriving sexp]
-end
-
-(* Load universe from sexp file; return empty list if file absent *)
-let _load_universe data_dir =
-  let path = Fpath.(v data_dir / "universe.sexp") in
-  match File_sexp.Sexp.load (module Universe) ~path with
-  | Ok instruments -> Ok instruments
-  | Error { Status.code = NotFound; _ } -> Ok []
-  | Error e -> Error e
-
 let make config =
   let data_dir = config.data_dir in
   let simulation_date = config.simulation_date in
@@ -45,6 +32,6 @@ let make config =
         (_load_bars data_dir query.symbol ~start_date:query.start_date
            ~end_date:query.end_date ~simulation_date)
 
-    let get_universe () = return (_load_universe data_dir)
+    let get_universe () = return (Universe.load data_dir)
   end in
   (module S : Data_source.DATA_SOURCE)

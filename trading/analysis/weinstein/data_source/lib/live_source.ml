@@ -42,7 +42,11 @@ let _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
   Eodhd.Http_client.get_historical_price ~token ~params ?fetch () >>= function
   | Error e -> return (Error e)
   | Ok fetched ->
-      ignore (_save_bars_to_cache data_dir symbol fetched);
+      (match _save_bars_to_cache data_dir symbol fetched with
+      | Ok () -> ()
+      | Error e ->
+          Core.eprintf "warn: cache write failed for %s: %s\n" symbol
+            (Status.show e));
       return (Ok fetched)
 
 (* Serve bars: return cached data if fresh; fetch from API if stale *)
@@ -75,19 +79,6 @@ let _get_bars ?fetch ~token ~data_dir ~throttle ~symbol ~period ~start_date
           _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
             ~end_date ())
 
-(* Universe type for sexp serialisation *)
-module Universe = struct
-  type t = Types.Instrument_info.t list [@@deriving sexp]
-end
-
-(* Load universe from sexp file; return empty list if file absent *)
-let _load_universe data_dir =
-  let path = Fpath.(v data_dir / "universe.sexp") in
-  match File_sexp.Sexp.load (module Universe) ~path with
-  | Ok instruments -> Ok instruments
-  | Error { Status.code = NotFound; _ } -> Ok []
-  | Error e -> Error e
-
 let make ?fetch config =
   let token = config.token in
   let data_dir = config.data_dir in
@@ -101,6 +92,6 @@ let make ?fetch config =
         ~period:query.period ~start_date:query.start_date
         ~end_date:query.end_date ()
 
-    let get_universe () = return (_load_universe data_dir)
+    let get_universe () = return (Universe.load data_dir)
   end in
   return (module S : Data_source.DATA_SOURCE)

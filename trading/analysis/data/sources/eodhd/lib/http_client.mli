@@ -9,9 +9,9 @@ type fetch_fn = Uri.t -> string Status.status_or Deferred.t
 type historical_price_params = {
   symbol : string;  (** If not specified, omitted from the API call *)
   start_date : Date.t option;  (** If not specified, defaults to today *)
-  end_date : Date.t option;
-      (** Cadence of price bars. Defaults to [Daily] if not specified. *)
+  end_date : Date.t option;  (** If not specified, defaults to today *)
   period : Types.Cadence.t;
+      (** Cadence of price bars. Defaults to [Daily] if not specified. *)
 }
 
 type fundamentals = {
