@@ -224,6 +224,23 @@ let _detect_transition ~prior_stage ~new_stage : (stage * stage) option =
       else if _stage_number p = _stage_number new_stage then None
       else Some (p, new_stage)
 
+(** Compute the current MA value, direction, and slope from [ma_series]. Returns
+    [(current_ma, direction, slope_pct)]. *)
+let _compute_ma_slope ~slope_threshold ~slope_lookback
+    (ma_series : (Date.t * float) list) : float * ma_direction * float =
+  let current_ma = snd (List.last_exn ma_series) in
+  let lookback_ma =
+    let n = List.length ma_series in
+    if n > slope_lookback then
+      snd (List.nth_exn ma_series (n - 1 - slope_lookback))
+    else snd (List.hd_exn ma_series)
+  in
+  let dir, slope_pct =
+    _classify_direction ~threshold:slope_threshold ~current:current_ma
+      ~lookback:lookback_ma
+  in
+  (current_ma, dir, slope_pct)
+
 (* ------------------------------------------------------------------ *)
 (* Main classifier                                                      *)
 (* ------------------------------------------------------------------ *)
@@ -250,16 +267,8 @@ let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
       above_ma_count = 0;
     }
   else
-    let current_ma = snd (List.last_exn ma_series) in
-    let lookback_ma =
-      let ma_len = List.length ma_series in
-      if ma_len > slope_lookback then
-        snd (List.nth_exn ma_series (ma_len - 1 - slope_lookback))
-      else snd (List.hd_exn ma_series)
-    in
-    let ma_dir, ma_slope_pct =
-      _classify_direction ~threshold:slope_threshold ~current:current_ma
-        ~lookback:lookback_ma
+    let current_ma, ma_dir, ma_slope_pct =
+      _compute_ma_slope ~slope_threshold ~slope_lookback ma_series
     in
     let aligned = _align_bars_with_ma bars ma_series in
     let above_ma_count = _count_above_ma aligned ~n:confirm_weeks in

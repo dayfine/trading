@@ -65,3 +65,33 @@ val classify :
 
     Pure function: same [bars] and [prior_stage] always produce the same
     [result]. *)
+
+(** {2 Followup / Known Improvements}
+
+    {3 Segmentation-based MA direction}
+
+    MA direction is currently determined by a simple two-point slope comparison
+    ([MA_now] vs [MA_lookback_ago]). A more robust alternative would use the
+    piecewise linear segmentation in
+    [analysis/technical/trend/lib/segmentation.ml]: fit a regression to the MA
+    series over a rolling window and classify the most recent segment's slope as
+    Rising/Flat/Declining. This would reduce false direction flips from
+    short-term noise and better identify the transition out of Stage 1
+    base-building periods.
+
+    {3 Incremental [classify_step]}
+
+    [classify] recomputes the full MA series from all [bars] on every call. For
+    the simulation loop (where the screener runs weekly and adds one bar at a
+    time) this is O(n) per step. When simulation performance becomes a
+    bottleneck, add:
+
+    {[
+      val classify_step :
+        config:config -> prev_result:result -> new_bar:Daily_price.t -> result
+    ]}
+
+    [classify_step] would maintain an incremental MA state (e.g. a sliding
+    window of the last [ma_period] closes) and update the MA value with the
+    single new bar in O(1), reusing the rest of [classify]'s logic. The existing
+    [classify] stays as the "cold-start" entry point. *)
