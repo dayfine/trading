@@ -59,35 +59,25 @@ let _weeks_in_stage = function
 (* ------------------------------------------------------------------ *)
 
 (** Compute moving average values across a price series. Returns a list of
-    (date, ma_value) pairs aligned to the last bar of each window. *)
+    (date, ma_value) pairs aligned to the last bar of each window. Delegates to
+    [Sma.calculate_sma] / [Sma.calculate_weighted_ma]. *)
 let _compute_ma ~period ~weighted (bars : Daily_price.t list) :
     (Date.t * float) list =
-  let n = List.length bars in
-  if n < period then []
-  else
-    List.init
-      (n - period + 1)
-      ~f:(fun i ->
-        let window = List.sub bars ~pos:i ~len:period in
-        let prices =
-          List.map window ~f:(fun b -> b.Daily_price.adjusted_close)
-        in
-        let ma_val =
-          if weighted then
-            let weight_sum = Float.of_int (period * (period + 1) / 2) in
-            let weighted_sum =
-              List.foldi prices ~init:0.0 ~f:(fun j acc p ->
-                  acc +. (p *. Float.of_int (j + 1)))
-            in
-            weighted_sum /. weight_sum
-          else
-            let sum = List.sum (module Float) prices ~f:Fn.id in
-            sum /. Float.of_int period
-        in
-        let date = (List.last_exn window).Daily_price.date in
-        (date, ma_val))
+  let data =
+    List.map bars ~f:(fun b ->
+        Indicator_types.
+          { date = b.Daily_price.date; value = b.Daily_price.adjusted_close })
+  in
+  let result =
+    if weighted then Sma.calculate_weighted_ma data period
+    else Sma.calculate_sma data period
+  in
+  List.map result ~f:(fun iv -> Indicator_types.(iv.date, iv.value))
 
-(** Classify the MA direction given current and lookback MA values. *)
+(** Classify the MA direction given current and lookback MA values. Returns
+    [(direction, slope_pct)] where
+    [slope_pct = (current - lookback) / |lookback|] (positive = rising, negative
+    = declining). *)
 let _classify_direction ~threshold ~current ~lookback : ma_direction * float =
   if Float.(lookback = 0.0) then (Flat, 0.0)
   else
@@ -115,25 +105,23 @@ let _is_late_stage2 ~decel_threshold (ma_values : float list) ~slope_lookback :
   let n = List.length ma_values in
   if n < slope_lookback * 2 then false
   else
-    (* Compute slopes over successive [slope_lookback] windows *)
     let recent_ma =
       List.rev ma_values
       |> (fun l -> List.sub l ~pos:0 ~len:(slope_lookback * 2))
       |> List.rev
     in
+    let old_ma = List.nth_exn recent_ma 0 in
+    let mid_ma = List.nth_exn recent_ma slope_lookback in
+    let cur_ma = List.last_exn recent_ma in
     let old_slope =
-      let old_ma = List.nth_exn recent_ma 0 in
-      let mid_ma = List.nth_exn recent_ma slope_lookback in
       if Float.(old_ma = 0.0) then 0.0
       else (mid_ma -. old_ma) /. Float.abs old_ma
     in
     let new_slope =
-      let mid_ma = List.nth_exn recent_ma slope_lookback in
-      let cur_ma = List.last_exn recent_ma in
       if Float.(mid_ma = 0.0) then 0.0
       else (cur_ma -. mid_ma) /. Float.abs mid_ma
     in
-    (* Late Stage 2 if old slope was positive and new slope is ≤ decel_threshold fraction of it *)
+    (* Late Stage 2 if old slope was positive and new slope has decelerated *)
     Float.(old_slope > 0.0)
     && Float.(new_slope < old_slope *. (1.0 -. decel_threshold))
 
@@ -241,22 +229,46 @@ let _compute_ma_slope ~slope_threshold ~slope_lookback
   in
   (current_ma, dir, slope_pct)
 
+(** Classify stage from a non-empty [ma_series]. All signals are derived from
+    the MA and bar alignment computed here. *)
+let _classify_with_ma ~config ~(bars : Daily_price.t list) ~prior_stage
+    ma_series : result =
+  let current_ma, ma_dir, ma_slope_pct =
+    _compute_ma_slope ~slope_threshold:config.slope_threshold
+      ~slope_lookback:config.slope_lookback ma_series
+  in
+  let aligned = _align_bars_with_ma bars ma_series in
+  let above_ma_count = _count_above_ma aligned ~n:config.confirm_weeks in
+  let below_ma_count =
+    min config.confirm_weeks (List.length ma_series) - above_ma_count
+  in
+  let is_late =
+    _is_late_stage2 ~decel_threshold:config.late_stage2_decel
+      (List.map ma_series ~f:snd)
+      ~slope_lookback:config.slope_lookback
+  in
+  let new_stage =
+    _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
+      ~is_late ~confirm_weeks:config.confirm_weeks
+  in
+  let transition = _detect_transition ~prior_stage ~new_stage in
+  {
+    stage = new_stage;
+    ma_value = current_ma;
+    ma_direction = ma_dir;
+    ma_slope_pct;
+    transition;
+    above_ma_count;
+  }
+
 (* ------------------------------------------------------------------ *)
 (* Main classifier                                                      *)
 (* ------------------------------------------------------------------ *)
 
 let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
-  let {
-    ma_period;
-    ma_weighted;
-    slope_threshold;
-    slope_lookback;
-    confirm_weeks;
-    late_stage2_decel;
-  } =
-    config
+  let ma_series =
+    _compute_ma ~period:config.ma_period ~weighted:config.ma_weighted bars
   in
-  let ma_series = _compute_ma ~period:ma_period ~weighted:ma_weighted bars in
   if List.is_empty ma_series then
     {
       stage = Stage1 { weeks_in_base = 0 };
@@ -266,30 +278,4 @@ let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
       transition = None;
       above_ma_count = 0;
     }
-  else
-    let current_ma, ma_dir, ma_slope_pct =
-      _compute_ma_slope ~slope_threshold ~slope_lookback ma_series
-    in
-    let aligned = _align_bars_with_ma bars ma_series in
-    let above_ma_count = _count_above_ma aligned ~n:confirm_weeks in
-    let below_ma_count =
-      min confirm_weeks (List.length ma_series) - above_ma_count
-    in
-    let is_late =
-      _is_late_stage2 ~decel_threshold:late_stage2_decel
-        (List.map ma_series ~f:snd)
-        ~slope_lookback
-    in
-    let new_stage =
-      _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
-        ~is_late ~confirm_weeks
-    in
-    let transition = _detect_transition ~prior_stage ~new_stage in
-    {
-      stage = new_stage;
-      ma_value = current_ma;
-      ma_direction = ma_dir;
-      ma_slope_pct;
-      transition;
-      above_ma_count;
-    }
+  else _classify_with_ma ~config ~bars ~prior_stage ma_series

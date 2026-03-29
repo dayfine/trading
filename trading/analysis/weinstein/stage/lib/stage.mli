@@ -94,4 +94,32 @@ val classify :
     [classify_step] would maintain an incremental MA state (e.g. a sliding
     window of the last [ma_period] closes) and update the MA value with the
     single new bar in O(1), reusing the rest of [classify]'s logic. The existing
-    [classify] stays as the "cold-start" entry point. *)
+    [classify] stays as the "cold-start" entry point.
+
+    {3 State machine functor for [_classify_new_stage]}
+
+    [_classify_new_stage] encodes the valid transitions between Stage 1–4. A
+    well-defined state machine functor would make the states, guards, and
+    transitions explicit (e.g. Stage1 → Stage2 is valid; Stage1 → Stage4 is
+    not). This would also benefit the Weinstein stop state machine in
+    [weinstein/portfolio_risk], which tracks the same lifecycle. Consider a
+    shared [Stage_machine] functor if the two state machines diverge enough to
+    need independent parameterisation.
+
+    {3 Shared MA slope utility}
+
+    [_compute_ma_slope] duplicates a pattern also present in the RS analyser
+    (slope of the RS moving average) and likely the macro analyser (index MA
+    slope). Consider extracting a small [Ma_utils] module under
+    [analysis/technical/indicators/] with a [slope] function:
+
+    {[
+      val slope :
+        lookback:int ->
+        threshold:float ->
+        (Date.t * float) list ->
+        ma_direction * float
+    ]}
+
+    This would eliminate the per-module slope implementations and give a single
+    tested home for the two-point slope classification logic. *)
