@@ -29,4 +29,8 @@ val make : config -> (module Data_source.DATA_SOURCE)
 (** [make config] creates a historical data source with the given configuration.
 
     The returned module satisfies {!Data_source.DATA_SOURCE}. All queries are
-    bounded by [config.simulation_date] to enforce no-lookahead. *)
+    bounded by [config.simulation_date] to enforce no-lookahead.
+
+    Note: [bar_query.period] is silently ignored — the cache stores bars at
+    whatever cadence they were originally fetched, and no resampling is
+    performed. Callers are responsible for querying at the correct cadence. *)
