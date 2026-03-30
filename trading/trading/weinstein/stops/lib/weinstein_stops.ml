@@ -20,14 +20,14 @@ type stop_state =
       last_correction_extreme : float;
       reason : string;
     }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type stop_event =
   | Stop_hit of { trigger_price : float; stop_level : float }
   | Stop_raised of { old_level : float; new_level : float; reason : string }
   | Entered_tightening of { reason : string }
   | No_change
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type config = {
   round_number_nudge : float;
@@ -37,7 +37,7 @@ type config = {
   trailing_stop_buffer_pct : float;
   tightened_stop_buffer_pct : float;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 let default_config =
   {
