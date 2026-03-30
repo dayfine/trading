@@ -11,7 +11,7 @@ type t = {
   positions : portfolio_position list;
   accounting_method : accounting_method;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Portfolio type. All fields are accessible for pattern matching and direct
     access. The portfolio is functionally immutable - [apply_trades] returns a
     new portfolio rather than modifying the existing one.

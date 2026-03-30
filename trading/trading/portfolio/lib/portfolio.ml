@@ -12,7 +12,7 @@ type t = {
   accounting_method : accounting_method;
       (* Default accounting method for new positions *)
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 let create ?(accounting_method = AverageCost) ~initial_cash () =
   {
