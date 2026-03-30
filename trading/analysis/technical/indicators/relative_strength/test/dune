@@ -1,0 +1,4 @@
+(tests
+ (names test_relative_strength)
+ (modules test_relative_strength)
+ (libraries relative_strength ounit2 indicator_types types core matchers))
