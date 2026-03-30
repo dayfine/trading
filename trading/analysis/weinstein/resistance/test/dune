@@ -1,0 +1,4 @@
+(tests
+ (names test_resistance)
+ (modules test_resistance)
+ (libraries resistance weinstein_types types core ounit2 matchers))
