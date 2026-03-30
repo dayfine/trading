@@ -5,7 +5,7 @@ open Types
     Weinstein rule (Ch. 4): "Never trust a breakout that isn't accompanied by a
     significant increase in volume."
 
-    - Breakout volume ≥ 2× average of prior 4 weeks → Strong
+    - Breakout volume ≥ 2× average of prior 4 bars → Strong
     - Breakout volume 1.5–2× average → Adequate
     - Breakout volume < 1.5× average → Weak
 
@@ -15,9 +15,9 @@ open Types
     All functions are pure. *)
 
 type config = {
-  lookback_weeks : int;
-      (** Number of weeks used to compute average volume before the event bar.
-          Default: 4 (as specified by Weinstein). *)
+  lookback_bars : int;
+      (** Number of bars used to compute average volume before the event bar.
+          Default: 4 (as specified by Weinstein for weekly bars). *)
   strong_threshold : float;
       (** Volume ratio ≥ this is [Strong]. Default: 2.0. *)
   adequate_threshold : float;
@@ -36,9 +36,9 @@ type result = {
   confirmation : Weinstein_types.volume_confirmation;
       (** Quality classification of the volume event. *)
   event_volume : int;
-      (** Volume on the event bar (breakout or breakdown week). *)
+      (** Volume on the event bar (breakout or breakdown bar). *)
   avg_volume : float;
-      (** Average volume over [config.lookback_weeks] prior bars. *)
+      (** Average volume over [config.lookback_bars] prior bars. *)
   volume_ratio : float;  (** event_volume / avg_volume. *)
 }
 (** Result of volume confirmation for a single event bar. *)
@@ -48,11 +48,12 @@ val analyze_breakout :
 (** [analyze_breakout ~config ~bars ~event_idx] evaluates volume confirmation at
     [event_idx] (a 0-based index into [bars]).
 
-    Uses the [lookback_weeks] bars immediately prior to [event_idx] as the
+    Uses the [lookback_bars] bars immediately prior to [event_idx] as the
     baseline average.
 
-    Returns [None] if there are fewer than [lookback_weeks] bars before
-    [event_idx], or if [event_idx] is out of range.
+    Returns [None] if there are fewer than [lookback_bars] bars before
+    [event_idx], or if [event_idx] is out of range, or if baseline volume is
+    zero.
 
     Pure function. *)
 
@@ -68,6 +69,6 @@ val is_pullback_confirmed :
 
 val average_volume : bars:Daily_price.t list -> n:int -> float
 (** [average_volume ~bars ~n] computes the average volume of the last [n] bars
-    in [bars]. Returns 0.0 if [bars] is empty or [n] = 0.
+    in [bars]. Returns 0.0 if [bars] is empty or [n] ≤ 0.
 
     Pure convenience function for computing baseline volumes. *)
