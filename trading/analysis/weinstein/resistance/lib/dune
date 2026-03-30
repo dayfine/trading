@@ -1,0 +1,7 @@
+(library
+ (name resistance)
+ (public_name weinstein.resistance)
+ (wrapped false)
+ (libraries core types weinstein_types)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
