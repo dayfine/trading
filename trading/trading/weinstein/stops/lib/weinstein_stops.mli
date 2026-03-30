@@ -40,7 +40,7 @@ type stop_state =
           (** Extreme of most recent correction (see [Trailing] docs) *)
       reason : string;  (** Why tightening was triggered *)
     }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** Event produced by [update] describing what happened to the stop. *)
 type stop_event =
@@ -52,7 +52,7 @@ type stop_event =
   | Entered_tightening of { reason : string }
       (** Transitioned from Trailing to Tightened *)
   | No_change  (** No adjustment this period *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 type config = {
   round_number_nudge : float;
@@ -79,7 +79,7 @@ type config = {
           Smaller than [trailing_stop_buffer_pct] to keep the stop close to
           market once tightening is triggered. *)
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable
     so backtesting can tune them. *)
 

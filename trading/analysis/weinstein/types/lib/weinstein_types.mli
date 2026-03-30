@@ -19,14 +19,14 @@ type stage =
   | Stage4 of { weeks_declining : int }
       (** Declining / markdown: MA falling, price consistently below MA. Never
           buy or hold in Stage 4. *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** Direction of the 30-week moving average.
 
     Derived from the MA slope value; [Flat] means within the configured
     threshold. A [Rising] MA with price above is Stage 2 territory; [Declining]
     with price below is Stage 4. *)
-type ma_direction = Rising | Flat | Declining [@@deriving show, eq]
+type ma_direction = Rising | Flat | Declining [@@deriving show, eq, sexp]
 
 (** Overhead resistance quality above a potential breakout level.
 
@@ -43,7 +43,7 @@ type overhead_quality =
   | Heavy_resistance
       (** Dense trading zone just above breakout. Stock will use up buying power
           working through this zone. *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** Relative strength trend vs benchmark. *)
 type rs_trend =
@@ -56,7 +56,7 @@ type rs_trend =
   | Negative_declining  (** RS negative and falling — avoid or short. *)
   | Bearish_crossover
       (** RS just crossed from positive to negative — bearish warning. *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** Volume confirmation quality for a breakout or breakdown. *)
 type volume_confirmation =
@@ -67,15 +67,15 @@ type volume_confirmation =
       (** Volume 1.5–2× recent average. Acceptable but not ideal. *)
   | Weak of float
       (** Volume < 1.5× recent average. Treat breakout with suspicion. *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 (** Overall market trend from macro analysis. *)
-type market_trend = Bullish | Bearish | Neutral [@@deriving show, eq]
+type market_trend = Bullish | Bearish | Neutral [@@deriving show, eq, sexp]
 
 (** Quality grade for candidates. Higher is better.
 
     [compare] gives [A_plus > A > B > C > D > F] ordering. *)
-type grade = A_plus | A | B | C | D | F [@@deriving show, eq, ord]
+type grade = A_plus | A | B | C | D | F [@@deriving show, eq, ord, sexp]
 
 val grade_to_string : grade -> string
 (** Convert grade to a human-readable string (e.g. [A_plus] → ["A+"]). *)
