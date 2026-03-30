@@ -1,0 +1,4 @@
+(tests
+ (names test_rs)
+ (modules test_rs)
+ (libraries rs weinstein_types types core ounit2 matchers))
