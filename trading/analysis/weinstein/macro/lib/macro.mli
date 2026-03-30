@@ -26,15 +26,7 @@ type indicator_reading = {
 }
 (** One indicator reading with its signal and weight. *)
 
-type config = {
-  stage_config : Stage.config;  (** Config for classifying the index stage. *)
-  bullish_threshold : float;  (** confidence > this → Bullish. Default: 0.65. *)
-  bearish_threshold : float;  (** confidence < this → Bearish. Default: 0.35. *)
-  indicator_weights : indicator_weights;
-}
-(** Configuration for macro analysis. *)
-
-and indicator_weights = {
+type indicator_weights = {
   w_index_stage : float;  (** Weight for index stage analysis. Default: 3.0. *)
   w_ad_line : float;  (** Weight for A-D line divergence. Default: 2.0. *)
   w_momentum_index : float;
@@ -44,8 +36,34 @@ and indicator_weights = {
   w_global : float;  (** Weight for global market consensus. Default: 1.5. *)
 }
 
+type indicator_thresholds = {
+  ad_line_lookback : int;
+      (** Lookback for A-D divergence comparison (~6 months). Default: 26. *)
+  momentum_period : int;  (** MA period for the momentum index. Default: 200. *)
+  nh_nl_lookback : int;
+      (** Lookback for NH-NL proxy comparison (~3 months). Default: 13. *)
+  nh_nl_up_threshold : float;
+      (** Price ratio above which NH-NL proxy is bullish. Default: 1.02. *)
+  nh_nl_down_threshold : float;
+      (** Price ratio below which NH-NL proxy is bearish. Default: 0.98. *)
+  global_consensus_threshold : float;
+      (** Fraction of markets for a global consensus signal. Default: 0.6. *)
+}
+
+type config = {
+  stage_config : Stage.config;  (** Config for classifying the index stage. *)
+  bullish_threshold : float;  (** confidence > this → Bullish. Default: 0.65. *)
+  bearish_threshold : float;  (** confidence < this → Bearish. Default: 0.35. *)
+  indicator_weights : indicator_weights;
+  indicator_thresholds : indicator_thresholds;
+}
+(** Configuration for macro analysis. *)
+
 val default_indicator_weights : indicator_weights
 (** [default_indicator_weights] returns Weinstein's reference weights. *)
+
+val default_indicator_thresholds : indicator_thresholds
+(** [default_indicator_thresholds] returns Weinstein's reference thresholds. *)
 
 val default_config : config
 (** [default_config] returns sensible defaults. *)

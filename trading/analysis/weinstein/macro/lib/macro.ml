@@ -17,11 +17,28 @@ type indicator_weights = {
   w_global : float;
 }
 
+type indicator_thresholds = {
+  ad_line_lookback : int;
+      (** Lookback window for A-D divergence comparison (~6 months). Default:
+          26. *)
+  momentum_period : int;  (** MA period for the momentum index. Default: 200. *)
+  nh_nl_lookback : int;
+      (** Lookback window for NH-NL proxy (~3 months). Default: 13. *)
+  nh_nl_up_threshold : float;
+      (** Price ratio above which NH-NL proxy is bullish. Default: 1.02. *)
+  nh_nl_down_threshold : float;
+      (** Price ratio below which NH-NL proxy is bearish. Default: 0.98. *)
+  global_consensus_threshold : float;
+      (** Fraction of markets needed for global consensus signal. Default: 0.6.
+      *)
+}
+
 type config = {
   stage_config : Stage.config;
   bullish_threshold : float;
   bearish_threshold : float;
   indicator_weights : indicator_weights;
+  indicator_thresholds : indicator_thresholds;
 }
 
 type ad_bar = { date : Date.t; advancing : int; declining : int }
@@ -44,12 +61,23 @@ let default_indicator_weights =
     w_global = 1.5;
   }
 
+let default_indicator_thresholds =
+  {
+    ad_line_lookback = 26;
+    momentum_period = 200;
+    nh_nl_lookback = 13;
+    nh_nl_up_threshold = 1.02;
+    nh_nl_down_threshold = 0.98;
+    global_consensus_threshold = 0.6;
+  }
+
 let default_config =
   {
     stage_config = Stage.default_config;
     bullish_threshold = 0.65;
     bearish_threshold = 0.35;
     indicator_weights = default_indicator_weights;
+    indicator_thresholds = default_indicator_thresholds;
   }
 
 (* ------------------------------------------------------------------ *)
@@ -106,54 +134,63 @@ let _index_stage_signal ~weight (stage_result : Stage.result) :
   in
   { name = "Index Stage"; signal; weight; detail }
 
+(** Build cumulative A-D line from daily advance/decline bars. *)
+let _build_cum_ad ad_bars =
+  List.fold ad_bars ~init:[] ~f:(fun acc bar ->
+      let net = bar.advancing - bar.declining in
+      let prev = Option.value (List.hd acc) ~default:0 in
+      (prev + net) :: acc)
+  |> List.rev
+
+(** Compute A-D divergence signal given a pre-built cumulative A-D list. *)
+let _ad_divergence_signal ~ad_line_lookback ~cum_ad
+    ~(index_bars : Daily_price.t list) =
+  let n_ad = List.length cum_ad in
+  let n_idx = List.length index_bars in
+  let lookback = min ad_line_lookback (min n_ad n_idx) in
+  if lookback < 4 then (`Neutral, "Insufficient A-D data")
+  else
+    let ad_recent = List.last_exn cum_ad in
+    let ad_prior = List.nth_exn cum_ad (n_ad - lookback) in
+    let idx_recent = (List.last_exn index_bars).Daily_price.adjusted_close in
+    let idx_prior =
+      (List.nth_exn index_bars (n_idx - lookback)).Daily_price.adjusted_close
+    in
+    let ad_rising = ad_recent > ad_prior in
+    let idx_rising = Float.(idx_recent > idx_prior) in
+    match (idx_rising, ad_rising) with
+    | true, true -> (`Bullish, "A-D line confirming index advance")
+    | false, false -> (`Bearish, "A-D line confirming index decline")
+    | true, false ->
+        (`Bearish, "A-D line diverging bearishly (index up, A-D down)")
+    | false, true ->
+        (`Bullish, "A-D line diverging bullishly (index down, A-D up)")
+
 (** Compute A-D cumulative line and detect divergence vs index. *)
-let _ad_line_signal ~weight ~ad_bars ~(index_bars : Daily_price.t list) :
-    indicator_reading =
+let _ad_line_signal ~weight ~ad_line_lookback ~ad_bars
+    ~(index_bars : Daily_price.t list) : indicator_reading =
   if List.is_empty ad_bars || List.is_empty index_bars then
     { name = "A-D Line"; signal = `Neutral; weight; detail = "No A-D data" }
   else
-    (* Compute cumulative A-D line *)
-    let cum_ad =
-      List.fold ad_bars ~init:[] ~f:(fun acc bar ->
-          let net = bar.advancing - bar.declining in
-          let prev = Option.value (List.hd acc) ~default:0 in
-          (prev + net) :: acc)
-      |> List.rev
+    let cum_ad = _build_cum_ad ad_bars in
+    let signal, detail =
+      _ad_divergence_signal ~ad_line_lookback ~cum_ad ~index_bars
     in
-    let n_ad = List.length cum_ad in
-    let n_idx = List.length index_bars in
-    let lookback = min 26 (min n_ad n_idx) in
-    (* ~6 months *)
-    if lookback < 4 then
-      {
-        name = "A-D Line";
-        signal = `Neutral;
-        weight;
-        detail = "Insufficient A-D data";
-      }
-    else
-      let ad_recent = List.last_exn cum_ad in
-      let ad_prior = List.nth_exn cum_ad (n_ad - lookback) in
-      let idx_recent = (List.last_exn index_bars).Daily_price.adjusted_close in
-      let idx_prior =
-        (List.nth_exn index_bars (n_idx - lookback)).Daily_price.adjusted_close
-      in
-      let ad_rising = ad_recent > ad_prior in
-      let idx_rising = Float.(idx_recent > idx_prior) in
-      let signal, detail =
-        match (idx_rising, ad_rising) with
-        | true, true -> (`Bullish, "A-D line confirming index advance")
-        | false, false -> (`Bearish, "A-D line confirming index decline")
-        | true, false ->
-            (`Bearish, "A-D line diverging bearishly (index up, A-D down)")
-        | false, true ->
-            (`Bullish, "A-D line diverging bullishly (index down, A-D up)")
-      in
-      { name = "A-D Line"; signal; weight; detail }
+    { name = "A-D Line"; signal; weight; detail }
 
-(** Compute simple MA of A-D net (momentum index) and signal zero-line crossing.
-*)
-let _momentum_index_signal ~weight ~ad_bars : indicator_reading =
+(** Compute simple moving average of the A-D net series. *)
+let _compute_momentum_ma ~momentum_period ~ad_bars =
+  let nets = List.map ad_bars ~f:(fun b -> b.advancing - b.declining) in
+  let period = min momentum_period (List.length nets) in
+  let recent_nets =
+    List.rev nets |> (fun l -> List.sub l ~pos:0 ~len:period) |> List.rev
+  in
+  let sum = List.sum (module Int) recent_nets ~f:Fn.id in
+  Float.of_int sum /. Float.of_int period
+
+(** Signal zero-line crossing of the A-D momentum MA. *)
+let _momentum_index_signal ~weight ~momentum_period ~ad_bars : indicator_reading
+    =
   if List.is_empty ad_bars then
     {
       name = "Momentum Index";
@@ -162,15 +199,7 @@ let _momentum_index_signal ~weight ~ad_bars : indicator_reading =
       detail = "No A-D data";
     }
   else
-    let nets = List.map ad_bars ~f:(fun b -> b.advancing - b.declining) in
-    let period = min 200 (List.length nets) in
-    let recent_nets =
-      List.rev nets |> (fun l -> List.sub l ~pos:0 ~len:period) |> List.rev
-    in
-    let ma =
-      let sum = List.sum (module Int) recent_nets ~f:Fn.id in
-      Float.of_int sum /. Float.of_int period
-    in
+    let ma = _compute_momentum_ma ~momentum_period ~ad_bars in
     let signal, detail =
       if Float.(ma > 0.0) then
         (`Bullish, Printf.sprintf "Momentum index positive (%.1f)" ma)
@@ -178,32 +207,69 @@ let _momentum_index_signal ~weight ~ad_bars : indicator_reading =
     in
     { name = "Momentum Index"; signal; weight; detail }
 
+(** Compute NH-NL proxy signal from index price trend. *)
+let _nh_nl_trend_signal ~nh_nl_lookback ~nh_nl_up_threshold
+    ~nh_nl_down_threshold ~(index_bars : Daily_price.t list) =
+  let n = List.length index_bars in
+  let lookback = min nh_nl_lookback (n - 1) in
+  let recent = (List.last_exn index_bars).Daily_price.adjusted_close in
+  let prior =
+    (List.nth_exn index_bars (n - 1 - lookback)).Daily_price.adjusted_close
+  in
+  if Float.(recent > prior *. nh_nl_up_threshold) then
+    (`Bullish, "Index trending higher over 3 months (NH-NL proxy positive)")
+  else if Float.(recent < prior *. nh_nl_down_threshold) then
+    (`Bearish, "Index trending lower over 3 months (NH-NL proxy negative)")
+  else (`Neutral, "Index flat over 3 months (NH-NL proxy neutral)")
+
 (** Check NH-NL indicator: ratio of new highs to (new highs + new lows). *)
-let _nh_nl_signal ~weight ~(index_bars : Daily_price.t list) : indicator_reading
+let _nh_nl_signal ~weight ~nh_nl_lookback ~nh_nl_up_threshold
+    ~nh_nl_down_threshold ~(index_bars : Daily_price.t list) : indicator_reading
     =
   (* We don't have NH-NL data directly; approximate using index MA slope as proxy *)
   if List.length index_bars < 10 then
     { name = "NH-NL"; signal = `Neutral; weight; detail = "Insufficient data" }
   else
-    let n = List.length index_bars in
-    let lookback = min 13 (n - 1) in
-    (* ~3 months *)
-    let recent = (List.last_exn index_bars).Daily_price.adjusted_close in
-    let prior =
-      (List.nth_exn index_bars (n - 1 - lookback)).Daily_price.adjusted_close
-    in
     let signal, detail =
-      if Float.(recent > prior *. 1.02) then
-        (`Bullish, "Index trending higher over 3 months (NH-NL proxy positive)")
-      else if Float.(recent < prior *. 0.98) then
-        (`Bearish, "Index trending lower over 3 months (NH-NL proxy negative)")
-      else (`Neutral, "Index flat over 3 months (NH-NL proxy neutral)")
+      _nh_nl_trend_signal ~nh_nl_lookback ~nh_nl_up_threshold
+        ~nh_nl_down_threshold ~index_bars
     in
     { name = "NH-NL"; signal; weight; detail }
 
+(** Classify each global index and compute the consensus signal. *)
+let _global_consensus_signal ~stage_config ~global_consensus_threshold
+    ~global_index_bars =
+  let classify_index bars =
+    let result = Stage.classify ~config:stage_config ~bars ~prior_stage:None in
+    match result.stage with
+    | Stage2 _ -> `Bullish
+    | Stage4 _ -> `Bearish
+    | _ -> `Neutral
+  in
+  let signals =
+    List.map global_index_bars ~f:(fun (_, bars) -> classify_index bars)
+  in
+  let bullish_count = List.count signals ~f:(fun s -> Poly.(s = `Bullish)) in
+  let bearish_count = List.count signals ~f:(fun s -> Poly.(s = `Bearish)) in
+  let total = List.length signals in
+  let bullish_frac = Float.of_int bullish_count /. Float.of_int total in
+  let bearish_frac = Float.of_int bearish_count /. Float.of_int total in
+  if Float.(bullish_frac > global_consensus_threshold) then
+    ( `Bullish,
+      Printf.sprintf "Global consensus bullish (%d/%d markets Stage2)"
+        bullish_count total )
+  else if Float.(bearish_frac > global_consensus_threshold) then
+    ( `Bearish,
+      Printf.sprintf "Global consensus bearish (%d/%d markets Stage4)"
+        bearish_count total )
+  else
+    ( `Neutral,
+      Printf.sprintf "Global markets mixed (%d bullish, %d bearish)"
+        bullish_count bearish_count )
+
 (** Check global index consensus: majority of world indices in bullish stages.
 *)
-let _global_signal ~weight ~stage_config
+let _global_signal ~weight ~stage_config ~global_consensus_threshold
     ~(global_index_bars : (string * Daily_price.t list) list) :
     indicator_reading =
   if List.is_empty global_index_bars then
@@ -214,36 +280,9 @@ let _global_signal ~weight ~stage_config
       detail = "No global data";
     }
   else
-    let classify_index bars =
-      let result =
-        Stage.classify ~config:stage_config ~bars ~prior_stage:None
-      in
-      match result.stage with
-      | Stage2 _ -> `Bullish
-      | Stage4 _ -> `Bearish
-      | _ -> `Neutral
-    in
-    let signals =
-      List.map global_index_bars ~f:(fun (_, bars) -> classify_index bars)
-    in
-    let bullish_count = List.count signals ~f:(fun s -> Poly.(s = `Bullish)) in
-    let bearish_count = List.count signals ~f:(fun s -> Poly.(s = `Bearish)) in
-    let total = List.length signals in
-    let bullish_frac = Float.of_int bullish_count /. Float.of_int total in
     let signal, detail =
-      if Float.(bullish_frac > 0.6) then
-        ( `Bullish,
-          Printf.sprintf "Global consensus bullish (%d/%d markets Stage2)"
-            bullish_count total )
-      else if Float.(Float.of_int bearish_count /. Float.of_int total > 0.6)
-      then
-        ( `Bearish,
-          Printf.sprintf "Global consensus bearish (%d/%d markets Stage4)"
-            bearish_count total )
-      else
-        ( `Neutral,
-          Printf.sprintf "Global markets mixed (%d bullish, %d bearish)"
-            bullish_count bearish_count )
+      _global_consensus_signal ~stage_config ~global_consensus_threshold
+        ~global_index_bars
     in
     { name = "Global Markets"; signal; weight; detail }
 
@@ -258,6 +297,7 @@ let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
     bullish_threshold;
     bearish_threshold;
     indicator_weights = iw;
+    indicator_thresholds = it;
   } =
     config
   in
@@ -267,10 +307,16 @@ let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
   let indicators =
     [
       _index_stage_signal ~weight:iw.w_index_stage index_stage;
-      _ad_line_signal ~weight:iw.w_ad_line ~ad_bars ~index_bars;
-      _momentum_index_signal ~weight:iw.w_momentum_index ~ad_bars;
-      _nh_nl_signal ~weight:iw.w_nh_nl ~index_bars;
-      _global_signal ~weight:iw.w_global ~stage_config ~global_index_bars;
+      _ad_line_signal ~weight:iw.w_ad_line ~ad_line_lookback:it.ad_line_lookback
+        ~ad_bars ~index_bars;
+      _momentum_index_signal ~weight:iw.w_momentum_index
+        ~momentum_period:it.momentum_period ~ad_bars;
+      _nh_nl_signal ~weight:iw.w_nh_nl ~nh_nl_lookback:it.nh_nl_lookback
+        ~nh_nl_up_threshold:it.nh_nl_up_threshold
+        ~nh_nl_down_threshold:it.nh_nl_down_threshold ~index_bars;
+      _global_signal ~weight:iw.w_global ~stage_config
+        ~global_consensus_threshold:it.global_consensus_threshold
+        ~global_index_bars;
     ]
   in
   let confidence = _compute_confidence indicators in
