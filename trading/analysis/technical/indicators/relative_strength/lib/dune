@@ -1,0 +1,4 @@
+(library
+ (name relative_strength)
+ (public_name indicators.relative_strength)
+ (libraries core types sma))
