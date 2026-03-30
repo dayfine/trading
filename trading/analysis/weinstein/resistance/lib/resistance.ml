@@ -2,22 +2,38 @@ open Core
 open Types
 open Weinstein_types
 
+(* ------------------------------------------------------------------ *)
+(* Config and defaults                                                  *)
+(* ------------------------------------------------------------------ *)
+
 type config = {
-  chart_years : float;
-  virgin_years : float;
+  chart_lookback_bars : int;
+      (** How many bars of history to analyse for zone density. *)
+  virgin_lookback_bars : int;
+      (** If no bar in this tail had a high above the breakout price, classify
+          as virgin territory. *)
   congestion_band_pct : float;
-  heavy_resistance_weeks : int;
-  moderate_resistance_weeks : int;
+      (** Price band width (fraction of breakout price) for bucketing bars. *)
+  heavy_resistance_bars : int;
+      (** Min bars in a zone to classify as Heavy resistance. *)
+  moderate_resistance_bars : int;
+      (** Min bars in a zone to classify as Moderate resistance. *)
 }
 
 let default_config =
   {
-    chart_years = 2.5;
-    virgin_years = 10.0;
+    chart_lookback_bars = 130;
+    (* ~2.5 years of weekly bars *)
+    virgin_lookback_bars = 520;
+    (* ~10 years of weekly bars *)
     congestion_band_pct = 0.05;
-    heavy_resistance_weeks = 8;
-    moderate_resistance_weeks = 3;
+    heavy_resistance_bars = 8;
+    moderate_resistance_bars = 3;
   }
+
+(* ------------------------------------------------------------------ *)
+(* Result types                                                         *)
+(* ------------------------------------------------------------------ *)
 
 type resistance_zone = {
   price_low : float;
@@ -33,102 +49,97 @@ type result = {
   nearest_zone : resistance_zone option;
 }
 
-(** Age in fractional years between [date] and [as_of_date]. *)
+(* ------------------------------------------------------------------ *)
+(* Helpers                                                              *)
+(* ------------------------------------------------------------------ *)
+
+let days_per_year = 365.25
+
+let _take_last n lst =
+  let len = List.length lst in
+  if len <= n then lst else List.drop lst (len - n)
+
 let _age_years date as_of_date : float =
-  let days = Date.diff as_of_date date in
-  Float.of_int days /. 365.25
+  Float.of_int (Date.diff as_of_date date) /. days_per_year
 
-(** Group bars above [breakout_price] into resistance zones using
-    [congestion_band_pct] buckets. Each bucket is a [band_size]-wide price
-    range. *)
-let _find_zones ~bars ~breakout_price ~band_pct ~as_of_date :
-    resistance_zone list =
-  let band_size = breakout_price *. band_pct in
-  (* Filter bars that traded above breakout_price *)
-  let above_bars =
-    List.filter bars ~f:(fun b ->
-        Float.(b.Daily_price.high_price > breakout_price))
-  in
-  if List.is_empty above_bars then []
-  else
-    (* Bucket by price zone starting from breakout_price *)
-    let bucket bar =
-      let mid =
-        (bar.Daily_price.high_price +. bar.Daily_price.low_price) /. 2.0
-      in
-      let offset = Float.((mid - breakout_price) /. band_size) in
-      Int.of_float (Float.round_down offset)
-    in
-    let grouped = Hashtbl.create (module Int) in
-    List.iter above_bars ~f:(fun b ->
-        let bkt = bucket b in
+(** Bucket index for a bar in the congestion-band grid rooted at
+    [breakout_price]. Index 0 covers the first band above [breakout_price],
+    index 1 the next, etc. *)
+let _bucket_idx ~breakout_price ~band_size bar =
+  let mid = (bar.Daily_price.high_price +. bar.Daily_price.low_price) /. 2.0 in
+  let offset = Float.((mid - breakout_price) /. band_size) in
+  Int.of_float (Float.round_down offset)
+
+(** Group above-breakout bars into a hash table keyed by bucket index. Bars
+    whose midpoint falls below [breakout_price] (bucket < 0) are discarded. *)
+let _group_by_bucket ~breakout_price ~band_size bars =
+  let tbl = Hashtbl.create (module Int) in
+  List.iter bars ~f:(fun b ->
+      if Float.(b.Daily_price.high_price > breakout_price) then
+        let bkt = _bucket_idx ~breakout_price ~band_size b in
         if bkt >= 0 then
-          Hashtbl.update grouped bkt ~f:(fun existing ->
+          Hashtbl.update tbl bkt ~f:(fun existing ->
               match existing with None -> [ b ] | Some bs -> b :: bs));
-    Hashtbl.fold grouped ~init:[] ~f:(fun ~key:bkt ~data:bkd_bars acc ->
-        let price_low = breakout_price +. (Float.of_int bkt *. band_size) in
-        let price_high = price_low +. band_size in
-        let weeks = List.length bkd_bars in
-        let most_recent_date =
-          List.map bkd_bars ~f:(fun b -> b.Daily_price.date)
-          |> List.max_elt ~compare:Date.compare
-          |> Option.value_exn
-        in
-        let age = _age_years most_recent_date as_of_date in
-        { price_low; price_high; weeks_of_trading = weeks; age_years = age }
-        :: acc)
-    |> List.sort ~compare:(fun a b -> Float.compare a.price_low b.price_low)
+  tbl
 
-(** Classify overhead quality based on zones found. *)
-let _classify_quality ~config ~virgin_years ~zones ~bars ~breakout_price
-    ~as_of_date : overhead_quality =
-  (* Check for virgin territory: no trading above this price in virgin_years *)
-  let has_old_or_no_history =
-    let above_ever =
-      List.exists bars ~f:(fun b ->
-          Float.(b.Daily_price.high_price > breakout_price))
-    in
-    if not above_ever then true
-    else
-      let oldest_above =
-        List.filter bars ~f:(fun b ->
-            Float.(b.Daily_price.high_price > breakout_price))
-        |> List.map ~f:(fun b -> b.Daily_price.date)
-        |> List.min_elt ~compare:Date.compare
-        |> Option.value_exn
-      in
-      Float.(_age_years oldest_above as_of_date > virgin_years)
+(** Convert a single bucket's bars into a [resistance_zone]. *)
+let _zone_of_bucket ~breakout_price ~band_size ~as_of_date bkt bkt_bars =
+  let price_low = breakout_price +. (Float.of_int bkt *. band_size) in
+  let most_recent_date =
+    List.map bkt_bars ~f:(fun b -> b.Daily_price.date)
+    |> List.max_elt ~compare:Date.compare
+    |> Option.value_exn
   in
-  if has_old_or_no_history then Virgin_territory
+  {
+    price_low;
+    price_high = price_low +. band_size;
+    weeks_of_trading = List.length bkt_bars;
+    age_years = _age_years most_recent_date as_of_date;
+  }
+
+(* ------------------------------------------------------------------ *)
+(* Core analysis functions                                              *)
+(* ------------------------------------------------------------------ *)
+
+let _find_zones ~bars ~breakout_price ~band_pct ~as_of_date =
+  let band_size = breakout_price *. band_pct in
+  let grouped = _group_by_bucket ~breakout_price ~band_size bars in
+  Hashtbl.fold grouped ~init:[] ~f:(fun ~key:bkt ~data:bkt_bars acc ->
+      _zone_of_bucket ~breakout_price ~band_size ~as_of_date bkt bkt_bars :: acc)
+  |> List.sort ~compare:(fun a b -> Float.compare a.price_low b.price_low)
+
+let _is_virgin_territory ~virgin_bars breakout_price =
+  not
+    (List.exists virgin_bars ~f:(fun b ->
+         Float.(b.Daily_price.high_price > breakout_price)))
+
+let _grade_zones ~config zones =
+  let max_bars =
+    List.map zones ~f:(fun z -> z.weeks_of_trading)
+    |> List.max_elt ~compare:Int.compare
+    |> Option.value ~default:0
+  in
+  if max_bars >= config.heavy_resistance_bars then Heavy_resistance
+  else if max_bars >= config.moderate_resistance_bars then Moderate_resistance
+  else Clean
+
+let _classify_quality ~config ~virgin_bars ~zones breakout_price =
+  if _is_virgin_territory ~virgin_bars breakout_price then Virgin_territory
   else if List.is_empty zones then Clean
-  else
-    (* Find the heaviest nearby zone *)
-    let max_weeks =
-      List.map zones ~f:(fun z -> z.weeks_of_trading)
-      |> List.max_elt ~compare:Int.compare
-      |> Option.value ~default:0
-    in
-    if max_weeks >= config.heavy_resistance_weeks then Heavy_resistance
-    else if max_weeks >= config.moderate_resistance_weeks then
-      Moderate_resistance
-    else Clean
+  else _grade_zones ~config zones
 
-let analyze ~config ~bars ~breakout_price ~as_of_date : result =
-  let { chart_years; virgin_years; congestion_band_pct; _ } = config in
-  (* Filter to the relevant history window *)
-  let cutoff_date =
-    Date.add_days as_of_date (-Int.of_float (chart_years *. 365.25))
-  in
-  let relevant_bars =
-    List.filter bars ~f:(fun b -> Date.(b.Daily_price.date >= cutoff_date))
-  in
+(* ------------------------------------------------------------------ *)
+(* Public interface                                                     *)
+(* ------------------------------------------------------------------ *)
+
+let analyze ~config ~bars ~breakout_price ~as_of_date =
+  let virgin_bars = _take_last config.virgin_lookback_bars bars in
+  let chart_bars = _take_last config.chart_lookback_bars bars in
   let zones_above =
-    _find_zones ~bars:relevant_bars ~breakout_price
-      ~band_pct:congestion_band_pct ~as_of_date
+    _find_zones ~bars:chart_bars ~breakout_price
+      ~band_pct:config.congestion_band_pct ~as_of_date
   in
   let quality =
-    _classify_quality ~config ~virgin_years ~zones:zones_above
-      ~bars:relevant_bars ~breakout_price ~as_of_date
+    _classify_quality ~config ~virgin_bars ~zones:zones_above breakout_price
   in
-  let nearest_zone = List.hd zones_above in
-  { quality; breakout_price; zones_above; nearest_zone }
+  { quality; breakout_price; zones_above; nearest_zone = List.hd zones_above }

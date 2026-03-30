@@ -12,9 +12,11 @@ open Types
 let cfg = default_config
 let as_of = Date.of_string "2024-01-01"
 
-let make_bar ?(low = 90.0) ?(high = 110.0) date close =
+(** Bar with optional low/high overrides; date is fixed (irrelevant to
+    bar-count-based window logic, used only for [age_years] computation). *)
+let make_bar ?(low = 90.0) ?(high = 110.0) close =
   {
-    Daily_price.date = Date.of_string date;
+    Daily_price.date = Date.of_string "2023-06-01";
     open_price = close;
     high_price = high;
     low_price = low;
@@ -28,19 +30,24 @@ let make_bar ?(low = 90.0) ?(high = 110.0) date close =
 (* ------------------------------------------------------------------ *)
 
 let test_no_prior_history_virgin _ =
-  (* No bars at all → Virgin territory (never traded above breakout) *)
+  (* No bars at all → Virgin territory *)
   let result =
     analyze ~config:cfg ~bars:[] ~breakout_price:50.0 ~as_of_date:as_of
   in
   assert_that result.quality (equal_to Virgin_territory)
 
 let test_old_history_virgin _ =
-  (* All trading above breakout was 11+ years ago → Virgin territory *)
-  let old_date = Date.of_string "2010-01-01" in
-  (* as_of = 2024, so age = 14 years > virgin_years=10 *)
-  let bars = [ make_bar ~high:80.0 (Date.to_string old_date) 75.0 ] in
+  (* Above-breakout bars are older than virgin_lookback_bars → Virgin territory.
+     virgin_lookback_bars=10: the 5 old above-breakout bars are outside the tail
+     of 10, so the virgin check sees only 10 recent below-breakout bars. *)
+  let small_cfg = { cfg with virgin_lookback_bars = 10 } in
+  let bars =
+    List.init 5 ~f:(fun _ -> make_bar ~high:80.0 75.0) (* old, above breakout *)
+    @ List.init 10 ~f:(fun _ -> make_bar ~high:50.0 45.0)
+    (* recent, below *)
+  in
   let result =
-    analyze ~config:cfg ~bars ~breakout_price:60.0 ~as_of_date:as_of
+    analyze ~config:small_cfg ~bars ~breakout_price:60.0 ~as_of_date:as_of
   in
   assert_that result.quality (equal_to Virgin_territory)
 
@@ -49,17 +56,14 @@ let test_old_history_virgin _ =
 (* ------------------------------------------------------------------ *)
 
 let test_clean_no_resistance_above _ =
-  (* Bars that once briefly traded above breakout but not many — within
-     the chart_years window but very sparse (< moderate threshold) *)
+  (* Only 1 bar traded above breakout — below moderate threshold (3) → Clean. *)
   let bars =
     [
-      make_bar ~low:40.0 ~high:48.0 "2023-01-01" 45.0;
-      make_bar ~low:42.0 ~high:49.0 "2023-06-01" 47.0
-      (* One recent bar that briefly poked above breakout — 1 week only *);
-      make_bar ~low:49.0 ~high:53.0 "2023-10-01" 51.0;
+      make_bar ~low:40.0 ~high:48.0 45.0;
+      make_bar ~low:42.0 ~high:49.0 47.0;
+      make_bar ~low:49.0 ~high:53.0 51.0 (* only this one is above 50 *);
     ]
   in
-  (* breakout at 50.0 — only one bar traded above 50, which is < moderate threshold (3) *)
   let result =
     analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
   in
@@ -69,13 +73,9 @@ let test_clean_no_resistance_above _ =
 (* Heavy resistance                                                     *)
 (* ------------------------------------------------------------------ *)
 
-let test_heavy_resistance_many_weeks _ =
-  (* 10 recent bars all trading through the same zone above breakout *)
-  let bars =
-    List.init 10 ~f:(fun i ->
-        let d = Date.add_days (Date.of_string "2023-01-02") (i * 7) in
-        make_bar ~low:52.0 ~high:58.0 (Date.to_string d) 55.0)
-  in
+let test_heavy_resistance_many_bars _ =
+  (* 10 bars all in the same zone above breakout → heavy (threshold 8). *)
+  let bars = List.init 10 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
   let result =
     analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
   in
@@ -86,12 +86,8 @@ let test_heavy_resistance_many_weeks _ =
 (* ------------------------------------------------------------------ *)
 
 let test_moderate_resistance _ =
-  (* 5 bars trading above breakout — above moderate threshold (3) but below heavy (8) *)
-  let bars =
-    List.init 5 ~f:(fun i ->
-        let d = Date.add_days (Date.of_string "2023-01-02") (i * 7) in
-        make_bar ~low:52.0 ~high:58.0 (Date.to_string d) 55.0)
-  in
+  (* 5 bars above breakout: above moderate threshold (3) but below heavy (8). *)
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
   let result =
     analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
   in
@@ -102,11 +98,7 @@ let test_moderate_resistance _ =
 (* ------------------------------------------------------------------ *)
 
 let test_nearest_zone_present _ =
-  let bars =
-    List.init 5 ~f:(fun i ->
-        let d = Date.add_days (Date.of_string "2023-06-01") (i * 7) in
-        make_bar ~low:52.0 ~high:58.0 (Date.to_string d) 55.0)
-  in
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
   let result =
     analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
   in
@@ -116,46 +108,40 @@ let test_nearest_zone_present _ =
            Float.(zone.price_low >= 50.0)))
 
 let test_nearest_zone_absent _ =
-  (* No bars above breakout → no nearest zone *)
-  let bars = [ make_bar ~low:40.0 ~high:49.0 "2023-01-01" 45.0 ] in
+  let bars = [ make_bar ~low:40.0 ~high:49.0 45.0 ] in
   let result =
     analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
   in
   assert_that result.nearest_zone is_none
 
 (* ------------------------------------------------------------------ *)
-(* chart_years window filtering                                         *)
+(* chart_lookback_bars window filtering                                 *)
 (* ------------------------------------------------------------------ *)
 
-let test_old_bars_outside_window_excluded _ =
-  (* Bar from 5 years ago with heavy resistance above breakout — but
-     chart_years=2.5 so it should be excluded *)
-  let old_bar = make_bar ~low:52.0 ~high:58.0 "2015-01-01" 55.0 in
-  let bars = [ old_bar ] in
-  (* The old bar is >2.5 years ago from as_of=2024, so excluded from analysis *)
-  (* Since it's also >virgin_years=10 from 2024, might be virgin *)
-  let result =
-    analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
+let test_old_bars_outside_chart_window_excluded _ =
+  (* 10 old above-breakout bars + 5 recent below-breakout bars.
+     chart_lookback_bars=5: zone analysis only sees the 5 recent bars (below)
+     → no zones → Clean.
+     virgin_lookback_bars=15: virgin check sees all 15 bars → has above-breakout
+     bars → not Virgin. *)
+  let small_cfg =
+    { cfg with chart_lookback_bars = 5; virgin_lookback_bars = 15 }
   in
-  (* Old bar from 2015 is ~9 years old — within virgin_years (10) boundary *)
-  (* So it won't be virgin but will be clean since it's excluded from 2.5y window *)
-  match result.quality with
-  | Clean | Virgin_territory -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Clean or Virgin for old bar, got %s"
-           (show_overhead_quality other))
+  let bars =
+    List.init 10 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0)
+    @ List.init 5 ~f:(fun _ -> make_bar ~high:48.0 45.0)
+  in
+  let result =
+    analyze ~config:small_cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
+  in
+  assert_that result.quality (equal_to Clean)
 
 (* ------------------------------------------------------------------ *)
 (* Purity                                                               *)
 (* ------------------------------------------------------------------ *)
 
 let test_pure_same_inputs_same_output _ =
-  let bars =
-    List.init 6 ~f:(fun i ->
-        let d = Date.add_days (Date.of_string "2023-06-01") (i * 7) in
-        make_bar ~low:52.0 ~high:58.0 (Date.to_string d) 55.0)
-  in
+  let bars = List.init 6 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
   let r1 = analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of in
   let r2 = analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of in
   assert_that r1.quality (equal_to (r2.quality : overhead_quality));
@@ -167,12 +153,12 @@ let suite =
          "test_no_prior_history_virgin" >:: test_no_prior_history_virgin;
          "test_old_history_virgin" >:: test_old_history_virgin;
          "test_clean_no_resistance_above" >:: test_clean_no_resistance_above;
-         "test_heavy_resistance_many_weeks" >:: test_heavy_resistance_many_weeks;
+         "test_heavy_resistance_many_bars" >:: test_heavy_resistance_many_bars;
          "test_moderate_resistance" >:: test_moderate_resistance;
          "test_nearest_zone_present" >:: test_nearest_zone_present;
          "test_nearest_zone_absent" >:: test_nearest_zone_absent;
-         "test_old_bars_outside_window_excluded"
-         >:: test_old_bars_outside_window_excluded;
+         "test_old_bars_outside_chart_window_excluded"
+         >:: test_old_bars_outside_chart_window_excluded;
          "test_pure_same_inputs_same_output"
          >:: test_pure_same_inputs_same_output;
        ]
