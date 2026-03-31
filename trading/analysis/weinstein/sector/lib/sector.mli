@@ -29,7 +29,10 @@ type config = {
       (** Weight of constituent breadth score in overall confidence (0–1).
           Default: 0.25. *)
 }
-(** Configuration for sector analysis. *)
+(** Configuration for sector analysis.
+
+    [stage_weight + rs_weight + constituent_weight] should sum to 1.0 so that
+    the composite confidence stays in the [0.0, 1.0] range. *)
 
 val default_config : config
 (** [default_config] returns sensible defaults. *)

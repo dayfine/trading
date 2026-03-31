@@ -98,16 +98,17 @@ let test_sector_context_of _ =
 (* ------------------------------------------------------------------ *)
 
 let test_no_constituents_uses_stage _ =
+  (* Rising sector bars → Stage2 (score 1.0), no RS (neutral 0.5),
+     no constituents (default pct 0.5).
+     confidence = 1.0×0.40 + 0.5×0.35 + 0.5×0.25 = 0.70 ≥ strong_confidence=0.6
+     → Strong. *)
   let sector_bars = rising_bars ~n:40 50.0 100.0 in
   let result =
     analyze ~config:cfg ~sector_name:"Misc" ~sector_bars ~benchmark_bars:[]
       ~constituent_analyses:[] ~prior_stage:None
   in
   assert_that result.constituent_count (equal_to 0);
-  (* Default constituent pct = 0.5, stage drives the decision *)
-  match result.rating with
-  | Strong | Neutral | Weak -> ()
-(* just ensure no crash *)
+  assert_that result.rating (equal_to (Strong : sector_rating))
 
 (* ------------------------------------------------------------------ *)
 (* Rationale list                                                       *)
