@@ -6,6 +6,13 @@ type config = {
   rs_config : Rs.config;
   strong_confidence : float;
   weak_confidence : float;
+  stage_weight : float;
+      (** Weight of stage score in overall confidence (0–1). Default: 0.40. *)
+  rs_weight : float;
+      (** Weight of RS score in overall confidence (0–1). Default: 0.35. *)
+  constituent_weight : float;
+      (** Weight of constituent breadth score in overall confidence (0–1).
+          Default: 0.25. *)
 }
 
 let default_config =
@@ -14,6 +21,9 @@ let default_config =
     rs_config = Rs.default_config;
     strong_confidence = 0.6;
     weak_confidence = 0.4;
+    stage_weight = 0.40;
+    rs_weight = 0.35;
+    constituent_weight = 0.25;
   }
 
 type result = {
@@ -31,7 +41,7 @@ type result = {
 (* ------------------------------------------------------------------ *)
 
 (** Compute a 0.0–1.0 confidence score for the sector being bullish. *)
-let _sector_confidence ~stage ~rs ~constituent_pct : float =
+let _sector_confidence ~config ~stage ~rs ~constituent_pct : float =
   let stage_score =
     match stage.Stage.stage with
     | Stage2 { late = false; _ } -> 1.0
@@ -48,8 +58,9 @@ let _sector_confidence ~stage ~rs ~constituent_pct : float =
     | Some { Rs.trend = Negative_improving; _ } -> 0.4
     | Some { Rs.trend = Negative_declining | Bearish_crossover; _ } -> 0.0
   in
-  (* Weighted combination: stage 40%, RS 35%, constituent breadth 25% *)
-  (stage_score *. 0.40) +. (rs_score *. 0.35) +. (constituent_pct *. 0.25)
+  (stage_score *. config.stage_weight)
+  +. (rs_score *. config.rs_weight)
+  +. (constituent_pct *. config.constituent_weight)
 
 (** Compute what fraction of constituents are in Stage 2. *)
 let _bullish_constituent_pct (analyses : Stock_analysis.t list) : float =
@@ -62,6 +73,11 @@ let _bullish_constituent_pct (analyses : Stock_analysis.t list) : float =
           | _ -> false)
     in
     Float.of_int bullish /. Float.of_int (List.length analyses)
+
+let _rating_string = function
+  | Screener.Strong -> "Strong"
+  | Screener.Neutral -> "Neutral"
+  | Screener.Weak -> "Weak"
 
 (** Build rationale strings. *)
 let _build_rationale ~stage ~rs ~constituent_pct ~rating : string list =
@@ -76,9 +92,7 @@ let _build_rationale ~stage ~rs ~constituent_pct ~rating : string list =
   let breadth_msg =
     Printf.sprintf "Bullish constituents: %.0f%%" (constituent_pct *. 100.0)
   in
-  let rating_msg =
-    Printf.sprintf "Rating: %s" (Screener.show_sector_rating rating)
-  in
+  let rating_msg = Printf.sprintf "Rating: %s" (_rating_string rating) in
   [ stage_msg; rs_msg; breadth_msg; rating_msg ]
 
 (* ------------------------------------------------------------------ *)
@@ -94,7 +108,7 @@ let analyze ~config ~sector_name ~sector_bars ~benchmark_bars
     Rs.analyze ~config:config.rs_config ~stock_bars:sector_bars ~benchmark_bars
   in
   let constituent_pct = _bullish_constituent_pct constituent_analyses in
-  let confidence = _sector_confidence ~stage ~rs ~constituent_pct in
+  let confidence = _sector_confidence ~config ~stage ~rs ~constituent_pct in
   let rating =
     if Float.(confidence >= config.strong_confidence) then Screener.Strong
     else if Float.(confidence <= config.weak_confidence) then Screener.Weak

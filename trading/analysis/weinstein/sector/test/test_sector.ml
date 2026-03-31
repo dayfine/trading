@@ -55,11 +55,7 @@ let test_strong_sector _ =
     analyze ~config:cfg ~sector_name:"Tech" ~sector_bars ~benchmark_bars:bench
       ~constituent_analyses:constituents ~prior_stage:None
   in
-  match result.rating with
-  | Strong -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Strong, got %s" (show_sector_rating other))
+  assert_that result.rating (equal_to (Strong : sector_rating))
 
 (* ------------------------------------------------------------------ *)
 (* Weak sector: declining bars                                          *)
@@ -81,11 +77,7 @@ let test_weak_sector _ =
     analyze ~config:cfg ~sector_name:"Energy" ~sector_bars:declining
       ~benchmark_bars:bench ~constituent_analyses:constituents ~prior_stage:None
   in
-  match result.rating with
-  | Weak -> ()
-  | other ->
-      assert_failure
-        (Printf.sprintf "Expected Weak, got %s" (show_sector_rating other))
+  assert_that result.rating (equal_to (Weak : sector_rating))
 
 (* ------------------------------------------------------------------ *)
 (* sector_context_of conversion                                         *)

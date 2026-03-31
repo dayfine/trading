@@ -21,6 +21,13 @@ type config = {
           0.6. *)
   weak_confidence : float;
       (** Maximum confidence for rating Weak. Default: 0.4. *)
+  stage_weight : float;
+      (** Weight of stage score in overall confidence (0–1). Default: 0.40. *)
+  rs_weight : float;
+      (** Weight of RS score in overall confidence (0–1). Default: 0.35. *)
+  constituent_weight : float;
+      (** Weight of constituent breadth score in overall confidence (0–1).
+          Default: 0.25. *)
 }
 (** Configuration for sector analysis. *)
 
