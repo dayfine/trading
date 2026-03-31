@@ -5,6 +5,11 @@
 ## Status
 READY_FOR_REVIEW
 
+## QC Review
+NEEDS_REWORK — See dev/reviews/screener.md for full findings.
+Blockers: hardcoded magic numbers in screener.ml / macro.ml / stock_analysis.ml (must
+move to config); tests must be migrated from raw OUnit2 to the Matchers library.
+
 ## Interface stable
 YES
 
@@ -13,23 +18,29 @@ YES
 
 ## Completed
 
-### 2026-03-29
-- Stack rebased onto new main after screener/stage merge
+- SMA and Weighted MA indicators (`analysis/technical/indicators/sma/`) — 11 tests
+- Weinstein shared types (`analysis/weinstein/types/`) — stage, ma_slope, overhead_quality,
+  rs_trend, volume_confirmation, market_trend, grade variant types with metadata
+- Stage Classifier (`analysis/weinstein/stage/`) — pure 4-stage classification with MA slope
+  computation, prior_stage disambiguation (Stage1 vs Stage3), late-Stage2 detection,
+  transition tracking — 12 tests; ma_type variant (Sma/Wma/Ema) added in review
+- Relative Strength analyzer (`analysis/weinstein/rs/`) — Mansfield RS formula with
+  zero-line normalization, 6 trend states, date-aligned intersection — 10 tests
+- Volume analyzer (`analysis/weinstein/volume/`) — Weinstein's 2× breakout rule,
+  Strong/Adequate/Weak classification, pullback contraction check — 12 tests
+- Resistance mapper (`analysis/weinstein/resistance/`) — overhead resistance zone finder,
+  Virgin/Clean/Moderate/Heavy grading, chart_years window filtering — 9 tests
+- Stock Analyzer (`analysis/weinstein/stock_analysis/`) — aggregates all sub-analyses
+  per ticker, breakout/breakdown candidate detection — 8 tests
+- Screener (`analysis/weinstein/screener/`) — cascade filter (macro gate → sector gate →
+  scoring → grade), buy/short candidate ranking with entry/stop/risk/swing — 9 tests
+- Macro Analyzer (`analysis/weinstein/macro/`) — weighted composite regime from 5 indicators
+  (index stage, A-D divergence, momentum index, NH-NL, global consensus), regime change
+  detection — 10 tests
+- Sector Analyzer (`analysis/weinstein/sector/`) — stage + RS + constituent breadth
+  combines into Strong/Neutral/Weak rating, sector_context_of for screener — 6 tests
 
-### 2026-03-28
-- All screener modules implemented and passing tests
-- `screener/rs`: Relative Strength analyzer
-- `screener/volume-resistance`: Volume and Resistance analyzers
-- `screener/stock-analysis`: StockAnalysis aggregation module
-- `screener/stock-screener`: Screener cascade filter (macro → sector → stock)
-- `screener/macro`: Macro market analyzer (with review commit strengthening test)
-- `screener/sector`: Sector analyzer
-- `feat/screener`: SMA refactor (share impl with WMA via weight_fn)
-- All PRs open and awaiting review/merge in order (screener/rs first)
-
-### 2026-03-27
-- `screener/stage` (stage classifier) reviewed and merged (#134)
-- Review commits applied: helpers extracted, Sma lib integrated, ma_type variant (Sma/Wma/Ema) added
+Total: 87 new tests across 9 modules, all passing.
 
 ## In Progress
 - None — all code done, PRs open for review
