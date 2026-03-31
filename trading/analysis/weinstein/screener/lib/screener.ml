@@ -103,93 +103,113 @@ type result = {
 }
 
 (* ------------------------------------------------------------------ *)
-(* Internal helpers                                                     *)
+(* Scoring signal helpers                                               *)
+(* ------------------------------------------------------------------ *)
+
+(** Stage signal for long setups: Stage1→2 transition or early Stage2. *)
+let _stage_long_signal ~w ~(a : Stock_analysis.t) =
+  match (a.stage.stage, a.prior_stage) with
+  | Stage2 _, Some (Stage1 _) ->
+      [ (w.w_stage2_breakout, "Stage1→Stage2 breakout") ]
+  | Stage2 { weeks_advancing; _ }, _ when weeks_advancing <= 4 ->
+      [ (w.w_stage2_breakout / 2, "Early Stage2") ]
+  | _ -> []
+
+(** Late Stage2 deceleration penalty. *)
+let _late_stage2_signal ~w ~(a : Stock_analysis.t) =
+  match a.stage.stage with
+  | Stage2 { late = true; _ } ->
+      [ (w.w_late_stage2_penalty, "Late Stage2 (penalty)") ]
+  | _ -> []
+
+(** Volume confirmation signal. *)
+let _volume_signal ~w ~(a : Stock_analysis.t) =
+  match a.volume with
+  | Some { confirmation = Strong _; _ } ->
+      [ (w.w_strong_volume, "Strong volume") ]
+  | Some { confirmation = Adequate _; _ } ->
+      [ (w.w_adequate_volume, "Adequate volume") ]
+  | _ -> []
+
+(** Bullish RS signal for long setups. *)
+let _rs_long_signal ~w ~(a : Stock_analysis.t) =
+  match a.rs with
+  | Some { trend = Bullish_crossover; _ } ->
+      [ (w.w_positive_rs + w.w_bullish_rs_crossover, "RS bullish crossover") ]
+  | Some { trend = Positive_rising; _ } ->
+      [ (w.w_positive_rs, "RS positive & rising") ]
+  | Some { trend = Positive_flat; _ } ->
+      [ (w.w_positive_rs / 2, "RS positive") ]
+  | _ -> []
+
+(** Bearish RS signal for short setups. *)
+let _rs_short_signal ~w ~(a : Stock_analysis.t) =
+  match a.rs with
+  | Some { trend = Bearish_crossover; _ } ->
+      [ (w.w_positive_rs + w.w_bullish_rs_crossover, "RS bearish crossover") ]
+  | Some { trend = Negative_declining; _ } ->
+      [ (w.w_positive_rs, "RS negative & declining") ]
+  | Some { trend = Negative_improving; _ } ->
+      [ (w.w_positive_rs / 2, "RS negative") ]
+  | _ -> []
+
+(** Overhead resistance signal. *)
+let _resistance_signal ~w ~(a : Stock_analysis.t) =
+  match a.resistance with
+  | Some { quality = Virgin_territory; _ } ->
+      [ (w.w_clean_resistance, "Virgin territory") ]
+  | Some { quality = Clean; _ } -> [ (w.w_clean_resistance, "Clean overhead") ]
+  | Some { quality = Moderate_resistance; _ } ->
+      [ (w.w_clean_resistance / 2, "Moderate resistance") ]
+  | _ -> []
+
+(** Sector bonus/penalty for long setups. *)
+let _sector_long_signal ~w ~sector =
+  match sector.rating with
+  | Strong -> [ (w.w_sector_strong, "Strong sector") ]
+  | Neutral -> []
+  | Weak -> [ (-w.w_sector_strong, "Weak sector (penalty)") ]
+
+(** Sector bonus/penalty for short setups. *)
+let _sector_short_signal ~w ~sector =
+  match sector.rating with
+  | Weak -> [ (w.w_sector_strong, "Weak sector") ]
+  | Neutral -> []
+  | Strong -> [ (-w.w_sector_strong, "Strong sector (penalty)") ]
+
+(** Stage signal for short setups: Stage3→4 transition or early Stage4. *)
+let _stage_short_signal ~w ~(a : Stock_analysis.t) =
+  match (a.stage.stage, a.prior_stage) with
+  | Stage4 _, Some (Stage3 _) ->
+      [ (w.w_stage2_breakout, "Stage3→Stage4 breakdown") ]
+  | Stage4 { weeks_declining }, _ when weeks_declining <= 4 ->
+      [ (w.w_stage2_breakout / 2, "Early Stage4") ]
+  | _ -> []
+
+(** Reduce a list of (points, label) signals to (total_score, rationale list).
+    Zero-point entries are dropped from both the total and the rationale. *)
+let _tally signals =
+  let non_zero = List.filter signals ~f:(fun (pts, _) -> pts <> 0) in
+  (List.sum (module Int) non_zero ~f:fst, List.map non_zero ~f:snd)
+
+(* ------------------------------------------------------------------ *)
+(* Scoring                                                              *)
 (* ------------------------------------------------------------------ *)
 
 (** Compute a long-side score for a stock analysis. *)
 let _score_long ~weights ~sector (a : Stock_analysis.t) : int * string list =
   let w = weights in
-  let entries =
-    (* Stage 2 breakout (transition from Stage 1) *)
-    (match (a.stage.stage, a.prior_stage) with
-      | Stage2 _, Some (Stage1 _) ->
-          [ (w.w_stage2_breakout, "Stage1→Stage2 breakout") ]
-      | Stage2 { weeks_advancing; _ }, _ when weeks_advancing <= 4 ->
-          [ (w.w_stage2_breakout / 2, "Early Stage2") ]
-      | _ -> [])
-    (* Late Stage2 penalty *)
-    @ (match a.stage.stage with
-      | Stage2 { late = true; _ } ->
-          [ (w.w_late_stage2_penalty, "Late Stage2 (penalty)") ]
-      | _ -> [])
-    (* Volume confirmation *)
-    @ (match a.volume with
-      | Some { confirmation = Strong _; _ } ->
-          [ (w.w_strong_volume, "Strong volume") ]
-      | Some { confirmation = Adequate _; _ } ->
-          [ (w.w_adequate_volume, "Adequate volume") ]
-      | _ -> [])
-    (* Relative strength *)
-    @ (match a.rs with
-      | Some { trend = Bullish_crossover; _ } ->
-          [
-            (w.w_positive_rs + w.w_bullish_rs_crossover, "RS bullish crossover");
-          ]
-      | Some { trend = Positive_rising; _ } ->
-          [ (w.w_positive_rs, "RS positive & rising") ]
-      | Some { trend = Positive_flat; _ } ->
-          [ (w.w_positive_rs / 2, "RS positive") ]
-      | _ -> [])
-    (* Overhead resistance *)
-    @ (match a.resistance with
-      | Some { quality = Virgin_territory; _ } ->
-          [ (w.w_clean_resistance, "Virgin territory") ]
-      | Some { quality = Clean; _ } ->
-          [ (w.w_clean_resistance, "Clean overhead") ]
-      | Some { quality = Moderate_resistance; _ } ->
-          [ (w.w_clean_resistance / 2, "Moderate resistance") ]
-      | _ -> [])
-    (* Sector bonus *)
-    @
-    match sector.rating with
-    | Strong -> [ (w.w_sector_strong, "Strong sector") ]
-    | Neutral -> []
-    | Weak -> [ (-w.w_sector_strong, "Weak sector (penalty)") ]
-  in
-  let non_zero = List.filter entries ~f:(fun (pts, _) -> pts <> 0) in
-  (List.sum (module Int) non_zero ~f:fst, List.map non_zero ~f:snd)
+  _tally
+    (_stage_long_signal ~w ~a @ _late_stage2_signal ~w ~a @ _volume_signal ~w ~a
+   @ _rs_long_signal ~w ~a @ _resistance_signal ~w ~a
+    @ _sector_long_signal ~w ~sector)
 
 (** Compute a short-side score for a stock analysis. *)
 let _score_short ~weights ~sector (a : Stock_analysis.t) : int * string list =
   let w = weights in
-  let entries =
-    (* Stage 4 breakdown (transition from Stage 3) *)
-    (match (a.stage.stage, a.prior_stage) with
-      | Stage4 _, Some (Stage3 _) ->
-          [ (w.w_stage2_breakout, "Stage3→Stage4 breakdown") ]
-      | Stage4 { weeks_declining }, _ when weeks_declining <= 4 ->
-          [ (w.w_stage2_breakout / 2, "Early Stage4") ]
-      | _ -> [])
-    (* Negative RS is good for shorts *)
-    @ (match a.rs with
-      | Some { trend = Bearish_crossover; _ } ->
-          [
-            (w.w_positive_rs + w.w_bullish_rs_crossover, "RS bearish crossover");
-          ]
-      | Some { trend = Negative_declining; _ } ->
-          [ (w.w_positive_rs, "RS negative & declining") ]
-      | Some { trend = Negative_improving; _ } ->
-          [ (w.w_positive_rs / 2, "RS negative") ]
-      | _ -> [])
-    (* Weak sector is good for shorts *)
-    @
-    match sector.rating with
-    | Weak -> [ (w.w_sector_strong, "Weak sector") ]
-    | Neutral -> []
-    | Strong -> [ (-w.w_sector_strong, "Strong sector (penalty)") ]
-  in
-  let non_zero = List.filter entries ~f:(fun (pts, _) -> pts <> 0) in
-  (List.sum (module Int) non_zero ~f:fst, List.map non_zero ~f:snd)
+  _tally
+    (_stage_short_signal ~w ~a @ _rs_short_signal ~w ~a
+    @ _sector_short_signal ~w ~sector)
 
 (** Convert score to grade using configurable thresholds. *)
 let _grade_of_score ~thresholds score =
@@ -199,6 +219,10 @@ let _grade_of_score ~thresholds score =
   else if score >= thresholds.c then C
   else if score >= thresholds.d then D
   else F
+
+(* ------------------------------------------------------------------ *)
+(* Price and candidate helpers                                          *)
+(* ------------------------------------------------------------------ *)
 
 (** Suggested entry: breakout price plus a configurable buffer. *)
 let _suggested_entry ~entry_buffer_pct breakout_price =
@@ -257,85 +281,110 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     rationale = reasons;
   }
 
-(** Evaluate long candidates: filter, score, grade, sort, and cap. *)
+(* ------------------------------------------------------------------ *)
+(* Per-candidate filters                                               *)
+(* ------------------------------------------------------------------ *)
+
+(** Evaluate one (analysis, sector) pair as a long candidate. Returns [None] if
+    excluded by the sector gate, breakout test, or grade floor. *)
+let _long_candidate ~weights ~thresholds ~params ~min_grade (a, sector) =
+  if equal_sector_rating sector.rating Weak then None
+  else if not (Stock_analysis.is_breakout_candidate a) then None
+  else
+    let score, reasons = _score_long ~weights ~sector a in
+    let grade = _grade_of_score ~thresholds score in
+    if compare_grade grade min_grade > 0 then None
+    else
+      Some
+        (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
+           ~is_short:false)
+
+(** Evaluate one (analysis, sector) pair as a short candidate. Bearish/Neutral
+    only: grade must meet [min_grade]. *)
+let _short_candidate ~weights ~thresholds ~params ~min_grade (a, sector) =
+  if equal_sector_rating sector.rating Strong then None
+  else if not (Stock_analysis.is_breakdown_candidate a) then None
+  else
+    let score, reasons = _score_short ~weights ~sector a in
+    let grade = _grade_of_score ~thresholds score in
+    if compare_grade grade min_grade > 0 then None
+    else
+      Some
+        (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
+           ~is_short:true)
+
+(** Evaluate one (analysis, sector) pair as a watchlist entry. Included when it
+    is a grade-C or grade-D breakout candidate not already in [buy_candidates].
+*)
+let _watchlist_entry ~weights ~thresholds ~buy_candidates (sa, sector) =
+  if not (Stock_analysis.is_breakout_candidate sa) then None
+  else
+    let score, _ = _score_long ~weights ~sector sa in
+    let grade = _grade_of_score ~thresholds score in
+    let in_buy_list =
+      List.exists buy_candidates ~f:(fun c ->
+          String.(c.ticker = sa.Stock_analysis.ticker))
+    in
+    if in_buy_list then None
+    else if equal_grade grade C || equal_grade grade D then
+      Some
+        ( sa.Stock_analysis.ticker,
+          Printf.sprintf "Grade %s, score %d" (grade_to_string grade) score )
+    else None
+
+(* ------------------------------------------------------------------ *)
+(* Evaluate + sort + cap                                               *)
+(* ------------------------------------------------------------------ *)
+
+let _top_n n lst =
+  List.sort lst ~compare:(fun a b -> Int.compare b.score a.score) |> fun l ->
+  List.sub l ~pos:0 ~len:(min n (List.length l))
+
+(** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~max_buy_candidates
     ~candidates ~macro_trend : scored_candidate list =
-  let buys_active =
-    match macro_trend with Bullish | Neutral -> true | Bearish -> false
-  in
-  if not buys_active then []
-  else
-    candidates
-    |> List.filter_map ~f:(fun (a, sector) ->
-        if equal_sector_rating sector.rating Weak then None
-        else if not (Stock_analysis.is_breakout_candidate a) then None
-        else
-          let score, reasons = _score_long ~weights ~sector a in
-          let grade = _grade_of_score ~thresholds score in
-          if compare_grade grade min_grade > 0 then None
-          else
-            Some
-              (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
-                 ~is_short:false))
-    |> List.sort ~compare:(fun a b -> Int.compare b.score a.score)
-    |> fun l -> List.sub l ~pos:0 ~len:(min max_buy_candidates (List.length l))
+  match macro_trend with
+  | Bearish -> []
+  | Bullish | Neutral ->
+      candidates
+      |> List.filter_map
+           ~f:(_long_candidate ~weights ~thresholds ~params ~min_grade)
+      |> _top_n max_buy_candidates
 
-(** Evaluate short candidates: filter, score, grade, sort, and cap. *)
+(** Filter, score, grade, sort, and cap short candidates. *)
 let _evaluate_shorts ~weights ~thresholds ~params ~min_grade
     ~max_short_candidates ~candidates ~macro_trend : scored_candidate list =
-  let shorts_active =
-    match macro_trend with Bearish | Neutral -> true | Bullish -> false
-  in
-  if not shorts_active then []
-  else
-    candidates
-    |> List.filter_map ~f:(fun (a, sector) ->
-        if equal_sector_rating sector.rating Strong then None
-        else if not (Stock_analysis.is_breakdown_candidate a) then None
-        else
-          let score, reasons = _score_short ~weights ~sector a in
-          let grade = _grade_of_score ~thresholds score in
-          let grade_ok =
-            match macro_trend with
-            | Bullish -> equal_grade grade A_plus
-            | _ -> compare_grade grade min_grade <= 0
-          in
-          if not grade_ok then None
-          else
-            Some
-              (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
-                 ~is_short:true))
-    |> List.sort ~compare:(fun a b -> Int.compare b.score a.score)
-    |> fun l ->
-    List.sub l ~pos:0 ~len:(min max_short_candidates (List.length l))
+  match macro_trend with
+  | Bullish -> []
+  | Bearish | Neutral ->
+      candidates
+      |> List.filter_map
+           ~f:(_short_candidate ~weights ~thresholds ~params ~min_grade)
+      |> _top_n max_short_candidates
 
-(** Build watchlist: C/D grade candidates not already in the buy list.
-    [candidates] is already filtered for held tickers. *)
+(** Build watchlist: breakout candidates with grade C/D not in the buy list.
+    Empty when buys are inactive (Bearish market). *)
 let _build_watchlist ~weights ~thresholds ~candidates ~buy_candidates
     ~buys_active : (string * string) list =
   if not buys_active then []
   else
-    candidates
-    |> List.filter_map ~f:(fun (sa, sector) ->
-        if not (Stock_analysis.is_breakout_candidate sa) then None
-        else
-          let score, _ = _score_long ~weights ~sector sa in
-          let grade = _grade_of_score ~thresholds score in
-          let in_buy_list =
-            List.exists buy_candidates ~f:(fun c ->
-                String.(c.ticker = sa.Stock_analysis.ticker))
-          in
-          if in_buy_list then None
-          else if equal_grade grade C || equal_grade grade D then
-            Some
-              ( sa.Stock_analysis.ticker,
-                Printf.sprintf "Grade %s, score %d" (grade_to_string grade)
-                  score )
-          else None)
+    List.filter_map candidates
+      ~f:(_watchlist_entry ~weights ~thresholds ~buy_candidates)
 
 (* ------------------------------------------------------------------ *)
 (* Main screener                                                        *)
 (* ------------------------------------------------------------------ *)
+
+(** Look up sector context for a ticker, defaulting to Neutral/Unknown. *)
+let _resolve_sector ~sector_map ticker =
+  Option.value
+    (Hashtbl.find sector_map ticker)
+    ~default:
+      {
+        sector_name = "Unknown";
+        rating = Neutral;
+        stage = Stage1 { weeks_in_base = 0 };
+      }
 
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   let held_set = String.Set.of_list held_tickers in
@@ -353,20 +402,11 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
     match macro_trend with Bullish | Neutral -> true | Bearish -> false
   in
   let candidates =
-    List.filter_map stocks ~f:(fun (a : Stock_analysis.t) ->
-        if Set.mem held_set a.ticker then None
-        else
-          let sector =
-            Option.value
-              (Hashtbl.find sector_map a.ticker)
-              ~default:
-                {
-                  sector_name = "Unknown";
-                  rating = Neutral;
-                  stage = Stage1 { weeks_in_base = 0 };
-                }
-          in
-          Some (a, sector))
+    stocks
+    |> List.filter ~f:(fun (a : Stock_analysis.t) ->
+        not (Set.mem held_set a.ticker))
+    |> List.map ~f:(fun (a : Stock_analysis.t) ->
+        (a, _resolve_sector ~sector_map a.ticker))
   in
   let buy_candidates =
     _evaluate_longs ~weights ~thresholds:grade_thresholds
