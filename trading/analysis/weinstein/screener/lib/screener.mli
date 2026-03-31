@@ -46,8 +46,39 @@ type scoring_weights = {
 val default_scoring_weights : scoring_weights
 (** [default_scoring_weights] provides the reference weights. *)
 
+type grade_thresholds = { a_plus : int; a : int; b : int; c : int; d : int }
+(** Score cutoffs for each grade. All are configurable. *)
+
+val default_grade_thresholds : grade_thresholds
+(** [default_grade_thresholds] provides the reference thresholds. *)
+
+type candidate_params = {
+  entry_buffer_pct : float;
+      (** Fraction above breakout price for the suggested entry. Default: 0.005.
+      *)
+  initial_stop_pct : float;
+      (** Fraction below entry for the long initial stop. Default: 0.08. *)
+  short_stop_pct : float;
+      (** Fraction above entry for the short initial stop. Default: 0.08. *)
+  base_low_proxy_pct : float;
+      (** Fraction below MA used as proxy for the prior base low. Default: 0.15.
+      *)
+  breakout_fallback_pct : float;
+      (** Fraction above MA used as breakout price when none is detected.
+          Default: 0.05. *)
+}
+(** Per-candidate price computation parameters. All configurable. *)
+
+val default_candidate_params : candidate_params
+(** [default_candidate_params] provides the reference parameters. *)
+
 type config = {
   weights : scoring_weights;
+  grade_thresholds : grade_thresholds;
+      (** Score cutoffs for each grade. Default: [default_grade_thresholds]. *)
+  candidate_params : candidate_params;
+      (** Per-candidate price parameters. Default: [default_candidate_params].
+      *)
   min_grade : Weinstein_types.grade;
       (** Minimum grade to include in output. Default: C. *)
   max_buy_candidates : int;

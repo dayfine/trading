@@ -12,7 +12,7 @@ open Types
 let cfg = default_config
 let as_of = Date.of_string "2024-01-01"
 
-let make_bar date adjusted_close =
+let make_bar ?(volume = 1000) date adjusted_close =
   {
     Daily_price.date = Date.of_string date;
     open_price = adjusted_close;
@@ -20,17 +20,30 @@ let make_bar date adjusted_close =
     low_price = adjusted_close *. 0.98;
     close_price = adjusted_close;
     adjusted_close;
-    volume = 1000;
+    volume;
   }
 
-let weekly_bars prices =
+let weekly_bars_with_volumes prices_and_volumes =
   let base = Date.of_string "2020-01-06" in
-  List.mapi prices ~f:(fun i p ->
-      make_bar (Date.to_string (Date.add_days base (i * 7))) p)
+  List.mapi prices_and_volumes ~f:(fun i (p, v) ->
+      make_bar ~volume:v (Date.to_string (Date.add_days base (i * 7))) p)
+
+let weekly_bars prices =
+  weekly_bars_with_volumes (List.map prices ~f:(fun p -> (p, 1000)))
 
 let rising_bars ~n start stop_ =
   let step = (stop_ -. start) /. Float.of_int (n - 1) in
   List.init n ~f:(fun i -> start +. (Float.of_int i *. step)) |> weekly_bars
+
+(** Rising bars with a volume spike at [spike_idx]: spike volume 3000, rest
+    1000. *)
+let rising_bars_with_spike ~n start stop_ ~spike_idx =
+  let step = (stop_ -. start) /. Float.of_int (n - 1) in
+  List.init n ~f:(fun i ->
+      let p = start +. (Float.of_int i *. step) in
+      let v = if i = spike_idx then 3000 else 1000 in
+      (p, v))
+  |> weekly_bars_with_volumes
 
 (** Make a Stock_analysis.t for a given ticker with controlled stage. *)
 let make_analysis ticker prior bars =
@@ -155,7 +168,9 @@ let test_macro_trend_neutral _ =
 (* ------------------------------------------------------------------ *)
 
 let test_candidate_has_suggested_entry _ =
-  let bars = rising_bars ~n:35 50.0 100.0 in
+  (* spike_idx = n-4 = 31: inside default 8-bar lookback, 4 baseline bars
+     before it → ratio = 3.0 → Strong volume → is_breakout_candidate = true *)
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
   let stocks =
     [ make_analysis "MSFT" (Some (Stage1 { weeks_in_base = 10 })) bars ]
   in
@@ -164,7 +179,7 @@ let test_candidate_has_suggested_entry _ =
       ~stocks ~held_tickers:[]
   in
   match result.buy_candidates with
-  | [] -> () (* pass — may not score high enough *)
+  | [] -> assert_failure "Expected at least one buy candidate"
   | c :: _ ->
       assert_bool "entry > 0" Float.(c.suggested_entry > 0.0);
       assert_bool "stop < entry" Float.(c.suggested_stop < c.suggested_entry);

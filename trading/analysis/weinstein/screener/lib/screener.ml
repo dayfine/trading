@@ -32,8 +32,41 @@ let default_scoring_weights =
     w_late_stage2_penalty = -15;
   }
 
+type grade_thresholds = { a_plus : int; a : int; b : int; c : int; d : int }
+(** Score cutoffs for each grade. All are configurable. *)
+
+let default_grade_thresholds = { a_plus = 85; a = 70; b = 55; c = 40; d = 25 }
+
+type candidate_params = {
+  entry_buffer_pct : float;
+      (** Fraction above breakout price for the suggested entry. Default: 0.005.
+      *)
+  initial_stop_pct : float;
+      (** Fraction below entry for the long initial stop. Default: 0.08. *)
+  short_stop_pct : float;
+      (** Fraction above entry for the short initial stop. Default: 0.08. *)
+  base_low_proxy_pct : float;
+      (** Fraction below MA used as proxy for the prior base low. Default: 0.15.
+      *)
+  breakout_fallback_pct : float;
+      (** Fraction above MA used as breakout price when none is detected.
+          Default: 0.05. *)
+}
+(** Per-candidate price computation parameters. All configurable. *)
+
+let default_candidate_params =
+  {
+    entry_buffer_pct = 0.005;
+    initial_stop_pct = 0.08;
+    short_stop_pct = 0.08;
+    base_low_proxy_pct = 0.15;
+    breakout_fallback_pct = 0.05;
+  }
+
 type config = {
   weights : scoring_weights;
+  grade_thresholds : grade_thresholds;
+  candidate_params : candidate_params;
   min_grade : grade;
   max_buy_candidates : int;
   max_short_candidates : int;
@@ -42,6 +75,8 @@ type config = {
 let default_config =
   {
     weights = default_scoring_weights;
+    grade_thresholds = default_grade_thresholds;
+    candidate_params = default_candidate_params;
     min_grade = C;
     max_buy_candidates = 20;
     max_short_candidates = 10;
@@ -156,28 +191,25 @@ let _score_short ~weights ~sector (a : Stock_analysis.t) : int * string list =
   let non_zero = List.filter entries ~f:(fun (pts, _) -> pts <> 0) in
   (List.sum (module Int) non_zero ~f:fst, List.map non_zero ~f:snd)
 
-(** Convert score to grade. *)
-let _grade_of_score score =
-  if score >= 85 then A_plus
-  else if score >= 70 then A
-  else if score >= 55 then B
-  else if score >= 40 then C
-  else if score >= 25 then D
+(** Convert score to grade using configurable thresholds. *)
+let _grade_of_score ~thresholds score =
+  if score >= thresholds.a_plus then A_plus
+  else if score >= thresholds.a then A
+  else if score >= thresholds.b then B
+  else if score >= thresholds.c then C
+  else if score >= thresholds.d then D
   else F
 
-(** Estimate suggested entry (breakout price + 0.5% buffer above round number).
-*)
-let _suggested_entry breakout_price =
-  let raw = breakout_price *. 1.005 in
-  (* Round to nearest 0.01 *)
+(** Suggested entry: breakout price plus a configurable buffer. *)
+let _suggested_entry ~entry_buffer_pct breakout_price =
+  let raw = breakout_price *. (1.0 +. entry_buffer_pct) in
   Float.round_nearest (raw *. 100.0) /. 100.0
 
-(** Estimate stop: 8% below entry (Weinstein's max acceptable risk for initial
-    stop). *)
-let _suggested_stop entry = entry *. 0.92
+(** Long stop: configurable fraction below entry. *)
+let _suggested_stop ~initial_stop_pct entry = entry *. (1.0 -. initial_stop_pct)
 
-(** Estimate swing target using simplified Weinstein swing rule: if we have a
-    base, target = breakout + (breakout - base_low). *)
+(** Estimate swing target using simplified Weinstein swing rule: target =
+    breakout + (breakout - base_low). *)
 let _swing_target ~breakout ~base_low_opt =
   match base_low_opt with
   | None -> None
@@ -186,26 +218,29 @@ let _swing_target ~breakout ~base_low_opt =
         Some (breakout +. (breakout -. base_low))
       else None
 
-(** Estimate base low from MA value (proxy: 85% of current MA). *)
-let _base_low (a : Stock_analysis.t) : float option =
+(** Proxy for the prior base low: configurable fraction below the 30-week MA. *)
+let _base_low ~base_low_proxy_pct (a : Stock_analysis.t) : float option =
   match a.stage.ma_value with
-  | v when Float.(v > 0.0) -> Some (v *. 0.85)
+  | v when Float.(v > 0.0) -> Some (v *. (1.0 -. base_low_proxy_pct))
   | _ -> None
 
-let _build_candidate ~weights:_ ~sector ~(a : Stock_analysis.t) ~score ~reasons
-    ~is_short : scored_candidate =
+let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
+    ~thresholds ~is_short : scored_candidate =
   let breakout =
-    Option.value a.breakout_price ~default:(a.stage.ma_value *. 1.05)
+    Option.value a.breakout_price
+      ~default:(a.stage.ma_value *. (1.0 +. params.breakout_fallback_pct))
   in
-  let entry = _suggested_entry breakout in
+  let entry =
+    _suggested_entry ~entry_buffer_pct:params.entry_buffer_pct breakout
+  in
   let stop_ =
-    if is_short then entry *. 1.08 (* short stop above entry *)
-    else _suggested_stop entry
+    if is_short then entry *. (1.0 +. params.short_stop_pct)
+    else _suggested_stop ~initial_stop_pct:params.initial_stop_pct entry
   in
   let risk_pct =
     if Float.(entry = 0.0) then 0.0 else Float.abs ((entry -. stop_) /. entry)
   in
-  let base_low = _base_low a in
+  let base_low = _base_low ~base_low_proxy_pct:params.base_low_proxy_pct a in
   let swing =
     if is_short then None else _swing_target ~breakout ~base_low_opt:base_low
   in
@@ -213,7 +248,7 @@ let _build_candidate ~weights:_ ~sector ~(a : Stock_analysis.t) ~score ~reasons
     ticker = a.ticker;
     analysis = a;
     sector;
-    grade = _grade_of_score score;
+    grade = _grade_of_score ~thresholds score;
     score;
     suggested_entry = entry;
     suggested_stop = stop_;
@@ -223,8 +258,8 @@ let _build_candidate ~weights:_ ~sector ~(a : Stock_analysis.t) ~score ~reasons
   }
 
 (** Evaluate long candidates: filter, score, grade, sort, and cap. *)
-let _evaluate_longs ~weights ~min_grade ~max_buy_candidates ~candidates
-    ~macro_trend : scored_candidate list =
+let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~max_buy_candidates
+    ~candidates ~macro_trend : scored_candidate list =
   let buys_active =
     match macro_trend with Bullish | Neutral -> true | Bearish -> false
   in
@@ -236,18 +271,18 @@ let _evaluate_longs ~weights ~min_grade ~max_buy_candidates ~candidates
         else if not (Stock_analysis.is_breakout_candidate a) then None
         else
           let score, reasons = _score_long ~weights ~sector a in
-          let grade = _grade_of_score score in
-          if compare_grade grade min_grade < 0 then None
+          let grade = _grade_of_score ~thresholds score in
+          if compare_grade grade min_grade > 0 then None
           else
             Some
-              (_build_candidate ~weights ~sector ~a ~score ~reasons
+              (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
                  ~is_short:false))
     |> List.sort ~compare:(fun a b -> Int.compare b.score a.score)
     |> fun l -> List.sub l ~pos:0 ~len:(min max_buy_candidates (List.length l))
 
 (** Evaluate short candidates: filter, score, grade, sort, and cap. *)
-let _evaluate_shorts ~weights ~min_grade ~max_short_candidates ~candidates
-    ~macro_trend : scored_candidate list =
+let _evaluate_shorts ~weights ~thresholds ~params ~min_grade
+    ~max_short_candidates ~candidates ~macro_trend : scored_candidate list =
   let shorts_active =
     match macro_trend with Bearish | Neutral -> true | Bullish -> false
   in
@@ -259,33 +294,33 @@ let _evaluate_shorts ~weights ~min_grade ~max_short_candidates ~candidates
         else if not (Stock_analysis.is_breakdown_candidate a) then None
         else
           let score, reasons = _score_short ~weights ~sector a in
-          let grade = _grade_of_score score in
+          let grade = _grade_of_score ~thresholds score in
           let grade_ok =
             match macro_trend with
             | Bullish -> equal_grade grade A_plus
-            | _ -> compare_grade grade min_grade >= 0
+            | _ -> compare_grade grade min_grade <= 0
           in
           if not grade_ok then None
           else
             Some
-              (_build_candidate ~weights ~sector ~a ~score ~reasons
+              (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
                  ~is_short:true))
     |> List.sort ~compare:(fun a b -> Int.compare b.score a.score)
     |> fun l ->
     List.sub l ~pos:0 ~len:(min max_short_candidates (List.length l))
 
-(** Build watchlist: C/D grade candidates not already in the buy list. *)
-let _build_watchlist ~weights ~candidates ~buy_candidates ~held_set ~buys_active
-    : (string * string) list =
+(** Build watchlist: C/D grade candidates not already in the buy list.
+    [candidates] is already filtered for held tickers. *)
+let _build_watchlist ~weights ~thresholds ~candidates ~buy_candidates
+    ~buys_active : (string * string) list =
   if not buys_active then []
   else
     candidates
     |> List.filter_map ~f:(fun (sa, sector) ->
-        if Set.mem held_set sa.Stock_analysis.ticker then None
-        else if not (Stock_analysis.is_breakout_candidate sa) then None
+        if not (Stock_analysis.is_breakout_candidate sa) then None
         else
           let score, _ = _score_long ~weights ~sector sa in
-          let grade = _grade_of_score score in
+          let grade = _grade_of_score ~thresholds score in
           let in_buy_list =
             List.exists buy_candidates ~f:(fun c ->
                 String.(c.ticker = sa.Stock_analysis.ticker))
@@ -304,7 +339,14 @@ let _build_watchlist ~weights ~candidates ~buy_candidates ~held_set ~buys_active
 
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   let held_set = String.Set.of_list held_tickers in
-  let { weights; min_grade; max_buy_candidates; max_short_candidates } =
+  let {
+    weights;
+    grade_thresholds;
+    candidate_params;
+    min_grade;
+    max_buy_candidates;
+    max_short_candidates;
+  } =
     config
   in
   let buys_active =
@@ -327,14 +369,17 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
           Some (a, sector))
   in
   let buy_candidates =
-    _evaluate_longs ~weights ~min_grade ~max_buy_candidates ~candidates
+    _evaluate_longs ~weights ~thresholds:grade_thresholds
+      ~params:candidate_params ~min_grade ~max_buy_candidates ~candidates
       ~macro_trend
   in
   let short_candidates =
-    _evaluate_shorts ~weights ~min_grade ~max_short_candidates ~candidates
+    _evaluate_shorts ~weights ~thresholds:grade_thresholds
+      ~params:candidate_params ~min_grade ~max_short_candidates ~candidates
       ~macro_trend
   in
   let watchlist =
-    _build_watchlist ~weights ~candidates ~buy_candidates ~held_set ~buys_active
+    _build_watchlist ~weights ~thresholds:grade_thresholds ~candidates
+      ~buy_candidates ~buys_active
   in
   { buy_candidates; short_candidates; watchlist; macro_trend }
