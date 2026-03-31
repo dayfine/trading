@@ -1,0 +1,12 @@
+(tests
+ (names test_screener)
+ (modules test_screener)
+ (libraries
+  screener
+  stock_analysis
+  weinstein_types
+  stage
+  types
+  core
+  ounit2
+  matchers))

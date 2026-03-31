@@ -1,0 +1,387 @@
+open OUnit2
+open Core
+open Matchers
+open Screener
+open Weinstein_types
+open Types
+
+(* ------------------------------------------------------------------ *)
+(* Helpers                                                              *)
+(* ------------------------------------------------------------------ *)
+
+let cfg = default_config
+let as_of = Date.of_string "2024-01-01"
+
+let make_bar ?(volume = 1000) date adjusted_close =
+  {
+    Daily_price.date = Date.of_string date;
+    open_price = adjusted_close;
+    high_price = adjusted_close *. 1.02;
+    low_price = adjusted_close *. 0.98;
+    close_price = adjusted_close;
+    adjusted_close;
+    volume;
+  }
+
+let weekly_bars_with_volumes prices_and_volumes =
+  let base = Date.of_string "2020-01-06" in
+  List.mapi prices_and_volumes ~f:(fun i (p, v) ->
+      make_bar ~volume:v (Date.to_string (Date.add_days base (i * 7))) p)
+
+let weekly_bars prices =
+  weekly_bars_with_volumes (List.map prices ~f:(fun p -> (p, 1000)))
+
+let rising_bars ~n start stop_ =
+  let step = (stop_ -. start) /. Float.of_int (n - 1) in
+  List.init n ~f:(fun i -> start +. (Float.of_int i *. step)) |> weekly_bars
+
+(** Rising bars with a configurable volume spike at [spike_idx]. *)
+let rising_bars_with_custom_spike ~n start stop_ ~spike_idx ~spike_volume =
+  let step = (stop_ -. start) /. Float.of_int (n - 1) in
+  List.init n ~f:(fun i ->
+      let p = start +. (Float.of_int i *. step) in
+      let v = if i = spike_idx then spike_volume else 1000 in
+      (p, v))
+  |> weekly_bars_with_volumes
+
+(** Rising bars with a Strong-volume spike (3000) at [spike_idx]. *)
+let rising_bars_with_spike ~n start stop_ ~spike_idx =
+  rising_bars_with_custom_spike ~n start stop_ ~spike_idx ~spike_volume:3000
+
+(** Declining bars with a Strong-volume spike (3000) at [spike_idx]. *)
+let declining_bars_with_spike ~n start stop_ ~spike_idx =
+  let step = (start -. stop_) /. Float.of_int (n - 1) in
+  List.init n ~f:(fun i ->
+      let p = start -. (Float.of_int i *. step) in
+      let v = if i = spike_idx then 3000 else 1000 in
+      (p, v))
+  |> weekly_bars_with_volumes
+
+(** Make a Stock_analysis.t for a given ticker with controlled stage. *)
+let make_analysis ticker prior bars =
+  Stock_analysis.analyze ~config:Stock_analysis.default_config ~ticker ~bars
+    ~benchmark_bars:[] ~prior_stage:prior ~as_of_date:as_of
+
+(** Build a sector context. *)
+let make_sector ?(rating = (Neutral : sector_rating)) name =
+  {
+    sector_name = name;
+    rating;
+    stage = Stage2 { weeks_advancing = 5; late = false };
+  }
+
+(** Build an empty sector map. *)
+let empty_sector_map () = Hashtbl.create (module String)
+
+(** Build a sector map with entries. *)
+let sector_map_of entries =
+  let m = Hashtbl.create (module String) in
+  List.iter entries ~f:(fun (ticker, sector) ->
+      Hashtbl.set m ~key:ticker ~data:sector);
+  m
+
+(* ------------------------------------------------------------------ *)
+(* Macro gate: Bearish → no buys                                       *)
+(* ------------------------------------------------------------------ *)
+
+let test_bearish_macro_no_buys _ =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let stocks =
+    [ make_analysis "AAPL" (Some (Stage1 { weeks_in_base = 12 })) bars ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates is_empty
+
+let test_bullish_macro_no_shorts _ =
+  let declining = List.init 15 ~f:(fun i -> 100.0 -. Float.of_int i) in
+  let flat = List.init 50 ~f:(fun _ -> 85.0) in
+  let decline2 = List.init 20 ~f:(fun i -> 85.0 -. (Float.of_int i *. 1.5)) in
+  let bars = declining @ flat @ decline2 |> weekly_bars in
+  let stocks =
+    [ make_analysis "XYZ" (Some (Stage3 { weeks_topping = 8 })) bars ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  assert_that result.short_candidates is_empty
+
+(* ------------------------------------------------------------------ *)
+(* Sector gate: weak sector excluded from buys                         *)
+(* ------------------------------------------------------------------ *)
+
+let test_weak_sector_excluded_from_buys _ =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let stocks =
+    [ make_analysis "AAPL" (Some (Stage1 { weeks_in_base = 12 })) bars ]
+  in
+  let sector_map =
+    sector_map_of [ ("AAPL", make_sector ~rating:Weak "Tech") ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Neutral ~sector_map ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates is_empty
+
+let test_strong_sector_excluded_from_shorts _ =
+  let declining = List.init 15 ~f:(fun i -> 100.0 -. Float.of_int i) in
+  let flat = List.init 50 ~f:(fun _ -> 85.0) in
+  let decline2 = List.init 20 ~f:(fun i -> 85.0 -. (Float.of_int i *. 1.5)) in
+  let bars = declining @ flat @ decline2 |> weekly_bars in
+  let stocks =
+    [ make_analysis "XYZ" (Some (Stage3 { weeks_topping = 8 })) bars ]
+  in
+  let sector_map =
+    sector_map_of [ ("XYZ", make_sector ~rating:Strong "Energy") ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Neutral ~sector_map ~stocks ~held_tickers:[]
+  in
+  assert_that result.short_candidates is_empty
+
+(* ------------------------------------------------------------------ *)
+(* Held tickers excluded                                               *)
+(* ------------------------------------------------------------------ *)
+
+let test_held_tickers_excluded _ =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let stocks =
+    [ make_analysis "AAPL" (Some (Stage1 { weeks_in_base = 12 })) bars ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[ "AAPL" ]
+  in
+  assert_that result.buy_candidates is_empty
+
+(* ------------------------------------------------------------------ *)
+(* Macro trend propagated                                              *)
+(* ------------------------------------------------------------------ *)
+
+let test_macro_trend_propagated _ =
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks:[] ~held_tickers:[]
+  in
+  assert_that result.macro_trend (equal_to Bearish)
+
+let test_macro_trend_neutral _ =
+  let result =
+    screen ~config:cfg ~macro_trend:Neutral ~sector_map:(empty_sector_map ())
+      ~stocks:[] ~held_tickers:[]
+  in
+  assert_that result.macro_trend (equal_to Neutral)
+
+(* ------------------------------------------------------------------ *)
+(* Candidate fields                                                     *)
+(* ------------------------------------------------------------------ *)
+
+let test_candidate_has_suggested_entry _ =
+  (* spike_idx = n-4 = 31: inside default 8-bar lookback, 4 baseline bars
+     before it → ratio = 3.0 → Strong volume → is_breakout_candidate = true *)
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let stocks =
+    [ make_analysis "MSFT" (Some (Stage1 { weeks_in_base = 10 })) bars ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  match result.buy_candidates with
+  | [] -> assert_failure "Expected at least one buy candidate"
+  | c :: _ ->
+      assert_bool "entry > 0" Float.(c.suggested_entry > 0.0);
+      assert_bool "stop < entry" Float.(c.suggested_stop < c.suggested_entry);
+      assert_bool "risk_pct > 0" Float.(c.risk_pct > 0.0)
+
+(* ------------------------------------------------------------------ *)
+(* Purity                                                               *)
+(* ------------------------------------------------------------------ *)
+
+let test_pure_same_inputs _ =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let stocks =
+    [ make_analysis "AAPL" (Some (Stage1 { weeks_in_base = 12 })) bars ]
+  in
+  let r1 =
+    screen ~config:cfg ~macro_trend:Neutral ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  let r2 =
+    screen ~config:cfg ~macro_trend:Neutral ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  assert_that
+    (List.length r1.buy_candidates)
+    (equal_to (List.length r2.buy_candidates));
+  assert_that
+    (List.length r1.short_candidates)
+    (equal_to (List.length r2.short_candidates))
+
+(* ------------------------------------------------------------------ *)
+(* Sort order: higher score appears first                              *)
+(* ------------------------------------------------------------------ *)
+
+let test_scores_drive_sort_order _ =
+  (* Both stocks: Stage1→Stage2 breakout + Strong volume.
+     A is in a Strong sector (+10 pts), B is Neutral → A scores higher. *)
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  let stocks = [ make_analysis "A" prior bars; make_analysis "B" prior bars ] in
+  let sector_map =
+    sector_map_of
+      [
+        ("A", make_sector ~rating:Strong "Tech");
+        ("B", make_sector ~rating:Neutral "Tech");
+      ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map ~stocks ~held_tickers:[]
+  in
+  match result.buy_candidates with
+  | c1 :: c2 :: _ ->
+      assert_that c1.ticker (equal_to "A");
+      assert_that c2.ticker (equal_to "B");
+      assert_bool "A scores higher" (c1.score > c2.score)
+  | _ -> assert_failure "Expected at least two buy candidates"
+
+(* ------------------------------------------------------------------ *)
+(* Max cap: only top-N returned                                        *)
+(* ------------------------------------------------------------------ *)
+
+let test_max_buy_candidates_cap _ =
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  let stocks =
+    List.init 4 ~f:(fun i -> make_analysis (Printf.sprintf "T%d" i) prior bars)
+  in
+  let capped_cfg = { cfg with max_buy_candidates = 2 } in
+  let result =
+    screen ~config:capped_cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that (List.length result.buy_candidates) (equal_to 2)
+
+(* ------------------------------------------------------------------ *)
+(* Grade filter and watchlist                                          *)
+(* ------------------------------------------------------------------ *)
+
+(** A stock with Stage1→Stage2 + Adequate volume scores grade C (40 pts). With
+    [min_grade=B] it is excluded from buy_candidates but grade C ≥ D, so it ends
+    up on the watchlist. *)
+let test_watchlist_captures_low_grade _ =
+  (* Adequate volume: spike=1500 → ratio 1.5 → Adequate (+10).
+     Score: Stage1→Stage2 (30) + Adequate (10) = 40 → grade C.
+     With min_grade=B that excludes this stock from buy_candidates,
+     but grade C lands on the watchlist. *)
+  let bars =
+    rising_bars_with_custom_spike ~n:35 50.0 100.0 ~spike_idx:31
+      ~spike_volume:1500
+  in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  let stocks = [ make_analysis "LOW" prior bars ] in
+  let b_cfg = { cfg with min_grade = B } in
+  let result =
+    screen ~config:b_cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates is_empty;
+  assert_bool "LOW on watchlist"
+    (List.exists result.watchlist ~f:(fun (t, _) -> String.(t = "LOW")))
+
+(* ------------------------------------------------------------------ *)
+(* Short candidates in Neutral market                                  *)
+(* ------------------------------------------------------------------ *)
+
+let test_neutral_macro_produces_shorts _ =
+  (* Stage4 stock in a Weak sector: stage score (30) + weak-sector bonus (10)
+     = 40 → grade C, which meets the default min_grade=C threshold. *)
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let stocks = [ make_analysis "SHORT" prior bars ] in
+  let sector_map =
+    sector_map_of [ ("SHORT", make_sector ~rating:Weak "Energy") ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Neutral ~sector_map ~stocks ~held_tickers:[]
+  in
+  assert_bool "expected short candidate"
+    (not (List.is_empty result.short_candidates))
+
+(* ------------------------------------------------------------------ *)
+(* Short candidate fields: stop above entry                            *)
+(* ------------------------------------------------------------------ *)
+
+let test_short_candidate_stop_above_entry _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let stocks = [ make_analysis "SHT" prior bars ] in
+  let sector_map =
+    sector_map_of [ ("SHT", make_sector ~rating:Weak "Energy") ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map ~stocks ~held_tickers:[]
+  in
+  match result.short_candidates with
+  | [] -> assert_failure "Expected a short candidate"
+  | c :: _ ->
+      assert_bool "short stop > entry"
+        Float.(c.suggested_stop > c.suggested_entry);
+      assert_bool "risk_pct > 0" Float.(c.risk_pct > 0.0)
+
+(* ------------------------------------------------------------------ *)
+(* Candidate grade field matches score                                 *)
+(* ------------------------------------------------------------------ *)
+
+let test_candidate_grade_matches_score _ =
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  let stocks = [ make_analysis "G" prior bars ] in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  match result.buy_candidates with
+  | [] -> assert_failure "Expected a buy candidate"
+  | c :: _ ->
+      let expected_grade =
+        if c.score >= 85 then A_plus
+        else if c.score >= 70 then A
+        else if c.score >= 55 then B
+        else if c.score >= 40 then C
+        else if c.score >= 25 then D
+        else F
+      in
+      assert_that c.grade (equal_to (expected_grade : grade))
+
+let suite =
+  "screener_tests"
+  >::: [
+         "test_bearish_macro_no_buys" >:: test_bearish_macro_no_buys;
+         "test_bullish_macro_no_shorts" >:: test_bullish_macro_no_shorts;
+         "test_weak_sector_excluded_from_buys"
+         >:: test_weak_sector_excluded_from_buys;
+         "test_strong_sector_excluded_from_shorts"
+         >:: test_strong_sector_excluded_from_shorts;
+         "test_held_tickers_excluded" >:: test_held_tickers_excluded;
+         "test_macro_trend_propagated" >:: test_macro_trend_propagated;
+         "test_macro_trend_neutral" >:: test_macro_trend_neutral;
+         "test_candidate_has_suggested_entry"
+         >:: test_candidate_has_suggested_entry;
+         "test_pure_same_inputs" >:: test_pure_same_inputs;
+         "test_scores_drive_sort_order" >:: test_scores_drive_sort_order;
+         "test_max_buy_candidates_cap" >:: test_max_buy_candidates_cap;
+         "test_watchlist_captures_low_grade"
+         >:: test_watchlist_captures_low_grade;
+         "test_neutral_macro_produces_shorts"
+         >:: test_neutral_macro_produces_shorts;
+         "test_short_candidate_stop_above_entry"
+         >:: test_short_candidate_stop_above_entry;
+         "test_candidate_grade_matches_score"
+         >:: test_candidate_grade_matches_score;
+       ]
+
+let () = run_test_tt_main suite

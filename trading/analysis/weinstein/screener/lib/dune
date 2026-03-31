@@ -1,0 +1,7 @@
+(library
+ (name screener)
+ (public_name weinstein.screener)
+ (wrapped false)
+ (libraries core types weinstein_types stock_analysis)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
