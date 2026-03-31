@@ -1,0 +1,13 @@
+(tests
+ (names test_sector)
+ (modules test_sector)
+ (libraries
+  sector
+  screener
+  weinstein_types
+  stock_analysis
+  stage
+  types
+  core
+  ounit2
+  matchers))
