@@ -7,6 +7,15 @@ type config = {
   rs : Rs.config;
   volume : Volume.config;
   resistance : Resistance.config;
+  breakout_event_lookback : int;
+      (** Bars to scan for peak-volume event when detecting a breakout. Default:
+          8 (~2 months of weekly bars). *)
+  base_lookback_weeks : int;
+      (** How far back (in bars) to search for the prior base high. Default: 52
+          (~1 year). *)
+  base_end_offset_weeks : int;
+      (** How many recent bars to exclude from the base search (avoids counting
+          the current advance as part of the base). Default: 8. *)
 }
 
 let default_config =
@@ -15,6 +24,9 @@ let default_config =
     rs = Rs.default_config;
     volume = Volume.default_config;
     resistance = Resistance.default_config;
+    breakout_event_lookback = 8;
+    base_lookback_weeks = 52;
+    base_end_offset_weeks = 8;
   }
 
 type t = {
@@ -28,16 +40,16 @@ type t = {
   as_of_date : Date.t;
 }
 
-(** Find the most recent bar index where the stock appears to have broken above
-    prior resistance (a candidate breakout event). Looks at the last [lookback]
-    bars for a significant up-move on the closing bar. *)
-let _find_breakout_bar_idx ~lookback (bars : Daily_price.t list) : int option =
+(** Return the index of the highest-volume bar within the last [lookback] bars.
+    Used as a proxy for the breakout event (breakouts should be the loudest
+    volume bar in the recent window). Returns [None] if [bars] has fewer than 2
+    elements. *)
+let _find_peak_volume_idx ~lookback (bars : Daily_price.t list) : int option =
   let n = List.length bars in
   if n < 2 then None
   else
     let start = max 0 (n - lookback) in
     let recent = List.sub bars ~pos:start ~len:(n - start) in
-    (* Find the bar with the highest volume in recent history — proxy for breakout *)
     let max_vol_idx =
       List.foldi recent ~init:(0, 0) ~f:(fun i (best_i, best_v) b ->
           if b.Daily_price.volume > best_v then (i, b.Daily_price.volume)
@@ -46,27 +58,23 @@ let _find_breakout_bar_idx ~lookback (bars : Daily_price.t list) : int option =
     in
     Some (start + max_vol_idx)
 
-(** Estimate breakout price: the highest close in the base period (bars before
-    the MA starts rising). *)
-let _estimate_breakout_price (bars : Daily_price.t list) : float option =
-  match bars with
-  | [] -> None
-  | _ ->
-      (* Use the high of the final completed base region: approximate as
-       the 52-week high of bars 9-13 months ago relative to the end *)
-      let n = List.length bars in
-      let base_start = max 0 (n - 52) in
-      let base_end = max 0 (n - 8) in
-      if base_end <= base_start then None
-      else
-        let base_bars =
-          List.sub bars ~pos:base_start ~len:(base_end - base_start)
-        in
-        let max_high =
-          List.map base_bars ~f:(fun b -> b.Daily_price.high_price)
-          |> List.max_elt ~compare:Float.compare
-        in
-        max_high
+(** Estimate the breakout price: highest high in the prior base region.
+
+    The base region is [base_lookback_weeks] bars back, excluding the most
+    recent [base_end_offset_weeks] bars (which belong to the current advance,
+    not the base). *)
+let _estimate_breakout_price ~base_lookback_weeks ~base_end_offset_weeks
+    (bars : Daily_price.t list) : float option =
+  let n = List.length bars in
+  let base_start = max 0 (n - base_lookback_weeks) in
+  let base_end = max 0 (n - base_end_offset_weeks) in
+  if base_end <= base_start then None
+  else
+    let base_bars =
+      List.sub bars ~pos:base_start ~len:(base_end - base_start)
+    in
+    List.map base_bars ~f:(fun b -> b.Daily_price.high_price)
+    |> List.max_elt ~compare:Float.compare
 
 let analyze ~(config : config) ~ticker ~bars ~benchmark_bars ~prior_stage
     ~as_of_date : t =
@@ -74,11 +82,15 @@ let analyze ~(config : config) ~ticker ~bars ~benchmark_bars ~prior_stage
   let rs_result =
     Rs.analyze ~config:config.rs ~stock_bars:bars ~benchmark_bars
   in
-  let breakout_price = _estimate_breakout_price bars in
-  (* Find volume confirmation at the candidate breakout event *)
+  let breakout_price =
+    _estimate_breakout_price ~base_lookback_weeks:config.base_lookback_weeks
+      ~base_end_offset_weeks:config.base_end_offset_weeks bars
+  in
+  (* Find volume confirmation at the peak-volume bar in the recent window *)
   let volume_result =
-    let lookback = 8 in
-    match _find_breakout_bar_idx ~lookback bars with
+    match
+      _find_peak_volume_idx ~lookback:config.breakout_event_lookback bars
+    with
     | None -> None
     | Some event_idx ->
         Volume.analyze_breakout ~config:config.volume ~bars ~event_idx

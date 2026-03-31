@@ -13,6 +13,14 @@ type config = {
   rs : Rs.config;
   volume : Volume.config;
   resistance : Resistance.config;
+  breakout_event_lookback : int;
+      (** Bars to scan for peak-volume event when detecting a breakout. Default:
+          8 (~2 months of weekly bars). *)
+  base_lookback_weeks : int;
+      (** How far back (in bars) to search for the prior base high. Default: 52
+          (~1 year). *)
+  base_end_offset_weeks : int;
+      (** How many recent bars to exclude from the base search. Default: 8. *)
 }
 (** Configuration bundling all sub-module configs. *)
 
