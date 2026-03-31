@@ -96,19 +96,141 @@ let test_neutral_flat_index _ =
 
 let test_bullish_ad_line_boosts_confidence _ =
   let index = rising_bars ~n:40 100.0 150.0 in
-  (* Advancing > declining on all bars → positive A-D line *)
+  (* Advancing > declining → cumulative A-D rising → confirms index advance → Bullish *)
   let ad = ad_bars ~n:200 ~advancing:2000 ~declining:1000 in
-  let r_with_ad =
+  let result =
     analyze ~config:cfg ~index_bars:index ~ad_bars:ad ~global_index_bars:[]
       ~prior_stage:None ~prior:None
   in
-  let r_no_ad =
+  let ad_indicator =
+    List.find_exn result.indicators ~f:(fun r -> String.(r.name = "A-D Line"))
+  in
+  assert_that ad_indicator.signal
+    (equal_to (`Bullish : [ `Bullish | `Bearish | `Neutral ]))
+
+(* ------------------------------------------------------------------ *)
+(* A-D bearish divergence: index up, A-D down                          *)
+(* ------------------------------------------------------------------ *)
+
+let test_ad_bearish_divergence _ =
+  (* Index rising but A-D cumulative declining → bearish divergence *)
+  let index = rising_bars ~n:40 100.0 150.0 in
+  let ad = ad_bars ~n:40 ~advancing:800 ~declining:1200 in
+  let result =
+    analyze ~config:cfg ~index_bars:index ~ad_bars:ad ~global_index_bars:[]
+      ~prior_stage:None ~prior:None
+  in
+  let ad_indicator =
+    List.find_exn result.indicators ~f:(fun r -> String.(r.name = "A-D Line"))
+  in
+  assert_that ad_indicator.signal
+    (equal_to (`Bearish : [ `Bullish | `Bearish | `Neutral ]))
+
+(* ------------------------------------------------------------------ *)
+(* Momentum index signal                                               *)
+(* ------------------------------------------------------------------ *)
+
+let test_momentum_index_bullish _ =
+  (* Advancing > declining → net positive → MA > 0 → Bullish *)
+  let index = rising_bars ~n:40 100.0 150.0 in
+  let ad = ad_bars ~n:40 ~advancing:1500 ~declining:1000 in
+  let result =
+    analyze ~config:cfg ~index_bars:index ~ad_bars:ad ~global_index_bars:[]
+      ~prior_stage:None ~prior:None
+  in
+  let mom =
+    List.find_exn result.indicators ~f:(fun r ->
+        String.(r.name = "Momentum Index"))
+  in
+  assert_that mom.signal
+    (equal_to (`Bullish : [ `Bullish | `Bearish | `Neutral ]))
+
+let test_momentum_index_bearish _ =
+  (* Declining > advancing → net negative → MA < 0 → Bearish *)
+  let index = rising_bars ~n:40 100.0 150.0 in
+  let ad = ad_bars ~n:40 ~advancing:500 ~declining:1500 in
+  let result =
+    analyze ~config:cfg ~index_bars:index ~ad_bars:ad ~global_index_bars:[]
+      ~prior_stage:None ~prior:None
+  in
+  let mom =
+    List.find_exn result.indicators ~f:(fun r ->
+        String.(r.name = "Momentum Index"))
+  in
+  assert_that mom.signal
+    (equal_to (`Bearish : [ `Bullish | `Bearish | `Neutral ]))
+
+(* ------------------------------------------------------------------ *)
+(* NH-NL proxy boundaries                                              *)
+(* ------------------------------------------------------------------ *)
+
+let test_nh_nl_bullish _ =
+  (* Index gains > 2% over lookback window (13 bars) → NH-NL proxy bullish.
+     20 bars: recent = bars[19], prior = bars[19-13] = bars[6].
+     Prices rise 100 → 150, so bars[6]=~130, bars[19]=150 → ratio ~1.15 > 1.02. *)
+  let index = rising_bars ~n:20 100.0 150.0 in
+  let result =
     analyze ~config:cfg ~index_bars:index ~ad_bars:[] ~global_index_bars:[]
       ~prior_stage:None ~prior:None
   in
-  (* Adding bullish A-D data should not decrease confidence *)
-  assert_bool "A-D boosts or maintains confidence"
-    Float.(r_with_ad.confidence >= r_no_ad.confidence -. 0.1)
+  let nh_nl =
+    List.find_exn result.indicators ~f:(fun r -> String.(r.name = "NH-NL"))
+  in
+  assert_that nh_nl.signal
+    (equal_to (`Bullish : [ `Bullish | `Bearish | `Neutral ]))
+
+let test_nh_nl_bearish _ =
+  (* Index drops > 2% over lookback → NH-NL proxy bearish. *)
+  let index =
+    List.init 20 ~f:(fun i -> 150.0 -. (Float.of_int i *. 2.5)) |> weekly_bars
+  in
+  let result =
+    analyze ~config:cfg ~index_bars:index ~ad_bars:[] ~global_index_bars:[]
+      ~prior_stage:None ~prior:None
+  in
+  let nh_nl =
+    List.find_exn result.indicators ~f:(fun r -> String.(r.name = "NH-NL"))
+  in
+  assert_that nh_nl.signal
+    (equal_to (`Bearish : [ `Bullish | `Bearish | `Neutral ]))
+
+(* ------------------------------------------------------------------ *)
+(* Global market consensus                                             *)
+(* ------------------------------------------------------------------ *)
+
+let test_global_consensus_bullish _ =
+  (* 3 global indices all in Stage2 (rising) → bullish_frac = 1.0 > 0.6 *)
+  let rising = rising_bars ~n:40 100.0 200.0 in
+  let global = [ ("DAX", rising); ("FTSE", rising); ("Nikkei", rising) ] in
+  let result =
+    analyze ~config:cfg ~index_bars:rising ~ad_bars:[] ~global_index_bars:global
+      ~prior_stage:None ~prior:None
+  in
+  let global_ind =
+    List.find_exn result.indicators ~f:(fun r ->
+        String.(r.name = "Global Markets"))
+  in
+  assert_that global_ind.signal
+    (equal_to (`Bullish : [ `Bullish | `Bearish | `Neutral ]))
+
+let test_global_consensus_bearish _ =
+  (* 3 global indices all declining (Stage4) → bearish_frac = 1.0 > 0.6 *)
+  let declining =
+    List.init 60 ~f:(fun i -> 200.0 -. Float.of_int i) |> weekly_bars
+  in
+  let global =
+    [ ("DAX", declining); ("FTSE", declining); ("Nikkei", declining) ]
+  in
+  let result =
+    analyze ~config:cfg ~index_bars:declining ~ad_bars:[]
+      ~global_index_bars:global ~prior_stage:None ~prior:None
+  in
+  let global_ind =
+    List.find_exn result.indicators ~f:(fun r ->
+        String.(r.name = "Global Markets"))
+  in
+  assert_that global_ind.signal
+    (equal_to (`Bearish : [ `Bullish | `Bearish | `Neutral ]))
 
 (* ------------------------------------------------------------------ *)
 (* Regime change detection                                              *)
@@ -196,6 +318,13 @@ let suite =
          "test_neutral_flat_index" >:: test_neutral_flat_index;
          "test_bullish_ad_line_boosts_confidence"
          >:: test_bullish_ad_line_boosts_confidence;
+         "test_ad_bearish_divergence" >:: test_ad_bearish_divergence;
+         "test_momentum_index_bullish" >:: test_momentum_index_bullish;
+         "test_momentum_index_bearish" >:: test_momentum_index_bearish;
+         "test_nh_nl_bullish" >:: test_nh_nl_bullish;
+         "test_nh_nl_bearish" >:: test_nh_nl_bearish;
+         "test_global_consensus_bullish" >:: test_global_consensus_bullish;
+         "test_global_consensus_bearish" >:: test_global_consensus_bearish;
          "test_regime_changed_when_trend_flips"
          >:: test_regime_changed_when_trend_flips;
          "test_no_regime_change_same_trend" >:: test_no_regime_change_same_trend;

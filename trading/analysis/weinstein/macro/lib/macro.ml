@@ -28,6 +28,10 @@ type indicator_thresholds = {
       (** Price ratio above which NH-NL proxy is bullish. Default: 1.02. *)
   nh_nl_down_threshold : float;
       (** Price ratio below which NH-NL proxy is bearish. Default: 0.98. *)
+  ad_min_bars : int;
+      (** Minimum bars required to compute A-D divergence. Default: 4. *)
+  nh_nl_min_bars : int;
+      (** Minimum index bars required to compute NH-NL proxy. Default: 10. *)
   global_consensus_threshold : float;
       (** Fraction of markets needed for global consensus signal. Default: 0.6.
       *)
@@ -68,6 +72,8 @@ let default_indicator_thresholds =
     nh_nl_lookback = 13;
     nh_nl_up_threshold = 1.02;
     nh_nl_down_threshold = 0.98;
+    ad_min_bars = 4;
+    nh_nl_min_bars = 10;
     global_consensus_threshold = 0.6;
   }
 
@@ -143,12 +149,12 @@ let _build_cum_ad ad_bars =
   |> List.rev
 
 (** Compute A-D divergence signal given a pre-built cumulative A-D list. *)
-let _ad_divergence_signal ~ad_line_lookback ~cum_ad
+let _ad_divergence_signal ~ad_min_bars ~ad_line_lookback ~cum_ad
     ~(index_bars : Daily_price.t list) =
   let n_ad = List.length cum_ad in
   let n_idx = List.length index_bars in
   let lookback = min ad_line_lookback (min n_ad n_idx) in
-  if lookback < 4 then (`Neutral, "Insufficient A-D data")
+  if lookback < ad_min_bars then (`Neutral, "Insufficient A-D data")
   else
     let ad_recent = List.last_exn cum_ad in
     let ad_prior = List.nth_exn cum_ad (n_ad - lookback) in
@@ -167,14 +173,14 @@ let _ad_divergence_signal ~ad_line_lookback ~cum_ad
         (`Bullish, "A-D line diverging bullishly (index down, A-D up)")
 
 (** Compute A-D cumulative line and detect divergence vs index. *)
-let _ad_line_signal ~weight ~ad_line_lookback ~ad_bars
+let _ad_line_signal ~weight ~ad_min_bars ~ad_line_lookback ~ad_bars
     ~(index_bars : Daily_price.t list) : indicator_reading =
   if List.is_empty ad_bars || List.is_empty index_bars then
     { name = "A-D Line"; signal = `Neutral; weight; detail = "No A-D data" }
   else
     let cum_ad = _build_cum_ad ad_bars in
     let signal, detail =
-      _ad_divergence_signal ~ad_line_lookback ~cum_ad ~index_bars
+      _ad_divergence_signal ~ad_min_bars ~ad_line_lookback ~cum_ad ~index_bars
     in
     { name = "A-D Line"; signal; weight; detail }
 
@@ -223,11 +229,11 @@ let _nh_nl_trend_signal ~nh_nl_lookback ~nh_nl_up_threshold
   else (`Neutral, "Index flat over 3 months (NH-NL proxy neutral)")
 
 (** Check NH-NL indicator: ratio of new highs to (new highs + new lows). *)
-let _nh_nl_signal ~weight ~nh_nl_lookback ~nh_nl_up_threshold
+let _nh_nl_signal ~weight ~nh_nl_min_bars ~nh_nl_lookback ~nh_nl_up_threshold
     ~nh_nl_down_threshold ~(index_bars : Daily_price.t list) : indicator_reading
     =
   (* We don't have NH-NL data directly; approximate using index MA slope as proxy *)
-  if List.length index_bars < 10 then
+  if List.length index_bars < nh_nl_min_bars then
     { name = "NH-NL"; signal = `Neutral; weight; detail = "Insufficient data" }
   else
     let signal, detail =
@@ -249,8 +255,14 @@ let _global_consensus_signal ~stage_config ~global_consensus_threshold
   let signals =
     List.map global_index_bars ~f:(fun (_, bars) -> classify_index bars)
   in
-  let bullish_count = List.count signals ~f:(fun s -> Poly.(s = `Bullish)) in
-  let bearish_count = List.count signals ~f:(fun s -> Poly.(s = `Bearish)) in
+  let bullish_count =
+    List.count signals ~f:(fun s ->
+        match s with `Bullish -> true | _ -> false)
+  in
+  let bearish_count =
+    List.count signals ~f:(fun s ->
+        match s with `Bearish -> true | _ -> false)
+  in
   let total = List.length signals in
   let bullish_frac = Float.of_int bullish_count /. Float.of_int total in
   let bearish_frac = Float.of_int bearish_count /. Float.of_int total in
@@ -307,11 +319,12 @@ let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
   let indicators =
     [
       _index_stage_signal ~weight:iw.w_index_stage index_stage;
-      _ad_line_signal ~weight:iw.w_ad_line ~ad_line_lookback:it.ad_line_lookback
-        ~ad_bars ~index_bars;
+      _ad_line_signal ~weight:iw.w_ad_line ~ad_min_bars:it.ad_min_bars
+        ~ad_line_lookback:it.ad_line_lookback ~ad_bars ~index_bars;
       _momentum_index_signal ~weight:iw.w_momentum_index
         ~momentum_period:it.momentum_period ~ad_bars;
-      _nh_nl_signal ~weight:iw.w_nh_nl ~nh_nl_lookback:it.nh_nl_lookback
+      _nh_nl_signal ~weight:iw.w_nh_nl ~nh_nl_min_bars:it.nh_nl_min_bars
+        ~nh_nl_lookback:it.nh_nl_lookback
         ~nh_nl_up_threshold:it.nh_nl_up_threshold
         ~nh_nl_down_threshold:it.nh_nl_down_threshold ~index_bars;
       _global_signal ~weight:iw.w_global ~stage_config

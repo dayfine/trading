@@ -46,6 +46,10 @@ type indicator_thresholds = {
       (** Price ratio above which NH-NL proxy is bullish. Default: 1.02. *)
   nh_nl_down_threshold : float;
       (** Price ratio below which NH-NL proxy is bearish. Default: 0.98. *)
+  ad_min_bars : int;
+      (** Minimum bars required to compute A-D divergence. Default: 4. *)
+  nh_nl_min_bars : int;
+      (** Minimum index bars required to compute NH-NL proxy. Default: 10. *)
   global_consensus_threshold : float;
       (** Fraction of markets for a global consensus signal. Default: 0.6. *)
 }
