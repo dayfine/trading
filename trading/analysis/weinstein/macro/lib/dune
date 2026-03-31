@@ -1,0 +1,7 @@
+(library
+ (name macro)
+ (public_name weinstein.macro)
+ (wrapped false)
+ (libraries core types weinstein_types stage)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
