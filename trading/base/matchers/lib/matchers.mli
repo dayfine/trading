@@ -6,6 +6,23 @@
 
 (** {1 Core Matcher Types} *)
 
+(** Module type for ordered, displayable types. Passed as a first-class module
+    to the ordering matchers. Types with [[@@deriving show, compare]] satisfy
+    this automatically. Use the provided [Int_ord] and [Float_ord] convenience
+    modules for primitive types. *)
+module type Ord = sig
+  type t
+
+  val compare : t -> t -> int
+  val show : t -> string
+end
+
+module Int_ord : Ord with type t = int
+(** Ready-made [Ord] instance for [int]. *)
+
+module Float_ord : Ord with type t = float
+(** Ready-made [Ord] instance for [float]. *)
+
 type 'a matcher = 'a -> unit
 (** A matcher is a function that takes a value and performs assertions on it.
     Matchers can be composed and combined to create complex assertions. *)
@@ -174,6 +191,34 @@ val is_none : 'a option matcher
       assert_that (Map.find cache "nonexistent") is_none
     ]} *)
 
+val matching : ?msg:string -> ('a -> 'b option) -> 'b matcher -> 'a matcher
+(** [matching ?msg extract inner_matcher] extracts an inner value via [extract]
+    and applies [inner_matcher] to it. Fails with [msg] if [extract] returns
+    [None]. Generalises [is_some_and] to arbitrary variant cases.
+
+    Example:
+    {[
+      assert_that result.stage
+        (matching ~msg:"Expected Stage2"
+           (function Stage2 x -> Some x | _ -> None)
+           (field (fun s -> s.weeks_advancing) (gt (module Int_ord) 0)))
+    ]}
+    {[
+      assert_that pos_state
+        (matching
+           (function Entering e -> Some e | _ -> None)
+           (field (fun e -> e.filled_quantity) (float_equal 50.0)))
+    ]} *)
+
+val pair : 'a matcher -> 'b matcher -> ('a * 'b) matcher
+(** [pair fst_matcher snd_matcher] applies [fst_matcher] to the first element
+    and [snd_matcher] to the second element of a two-tuple.
+
+    Example:
+    {[
+      assert_that result.transition (is_some_and (pair is_stage1 is_stage2))
+    ]} *)
+
 (** {1 Numeric Matchers} *)
 
 val float_equal : ?epsilon:float -> float -> float matcher
@@ -186,6 +231,43 @@ val float_equal : ?epsilon:float -> float -> float matcher
     ]}
     {[
       assert_that computed_value (float_equal ~epsilon:0.01 expected)
+    ]} *)
+
+val gt : (module Ord with type t = 'a) -> 'a -> 'a matcher
+(** [gt m threshold] asserts the actual value is strictly greater than
+    [threshold]. Requires a first-class [Ord] module for comparison and error
+    messages.
+
+    Example:
+    {[
+      assert_that result.count (gt (module Int_ord) 0)
+    ]}
+    {[
+      assert_that stats.r_squared (gt (module Float_ord) 0.99)
+    ]} *)
+
+val ge : (module Ord with type t = 'a) -> 'a -> 'a matcher
+(** [ge m threshold] asserts the actual value is [>=] [threshold].
+
+    Example:
+    {[
+      assert_that trade.price (ge (module Float_ord) min_price)
+    ]} *)
+
+val lt : (module Ord with type t = 'a) -> 'a -> 'a matcher
+(** [lt m threshold] asserts the actual value is strictly less than [threshold].
+
+    Example:
+    {[
+      assert_that sharpe_with_rf (lt (module Float_ord) sharpe_no_rf)
+    ]} *)
+
+val le : (module Ord with type t = 'a) -> 'a -> 'a matcher
+(** [le m threshold] asserts the actual value is [<=] [threshold].
+
+    Example:
+    {[
+      assert_that trade.price (le (module Float_ord) max_price)
     ]} *)
 
 (** {1 List Matchers} *)

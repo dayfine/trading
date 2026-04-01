@@ -1,6 +1,27 @@
 open Core
 open OUnit2
 
+module type Ord = sig
+  type t
+
+  val compare : t -> t -> int
+  val show : t -> string
+end
+
+module Int_ord = struct
+  type t = int
+
+  let compare = Int.compare
+  let show = Int.to_string
+end
+
+module Float_ord = struct
+  type t = float
+
+  let compare = Float.compare
+  let show = Float.to_string
+end
+
 (* ========================================================================== *)
 (* Core Matcher Types                                                        *)
 (* ========================================================================== *)
@@ -81,6 +102,16 @@ let is_none option =
   | Some _ -> assert_failure "Expected None but got Some"
   | None -> () (* Expected *)
 
+let matching ?(msg = "Value did not match expected variant") extract
+    inner_matcher value =
+  match extract value with
+  | Some inner -> inner_matcher inner
+  | None -> assert_failure msg
+
+let pair fst_matcher snd_matcher (a, b) =
+  fst_matcher a;
+  snd_matcher b
+
 (* ========================================================================== *)
 (* Numeric Matchers                                                          *)
 (* ========================================================================== *)
@@ -90,6 +121,30 @@ let float_equal ?(epsilon = 1e-9) expected actual =
     assert_failure
       (Printf.sprintf "Expected float %f but got %f (epsilon: %g)" expected
          actual epsilon)
+
+let gt (type a) (module M : Ord with type t = a) threshold actual =
+  if M.compare actual threshold <= 0 then
+    assert_failure
+      (Printf.sprintf "Expected value > %s but got %s" (M.show threshold)
+         (M.show actual))
+
+let ge (type a) (module M : Ord with type t = a) threshold actual =
+  if M.compare actual threshold < 0 then
+    assert_failure
+      (Printf.sprintf "Expected value >= %s but got %s" (M.show threshold)
+         (M.show actual))
+
+let lt (type a) (module M : Ord with type t = a) threshold actual =
+  if M.compare actual threshold >= 0 then
+    assert_failure
+      (Printf.sprintf "Expected value < %s but got %s" (M.show threshold)
+         (M.show actual))
+
+let le (type a) (module M : Ord with type t = a) threshold actual =
+  if M.compare actual threshold > 0 then
+    assert_failure
+      (Printf.sprintf "Expected value <= %s but got %s" (M.show threshold)
+         (M.show actual))
 
 (* ========================================================================== *)
 (* List Matchers                                                             *)
