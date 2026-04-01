@@ -57,11 +57,7 @@ let test_compute_initial_stop_no_nudge _ =
       (compute_initial_stop ~config:cfg ~side:Long ~reference_level:52.4)
   in
   assert_that stop
-    (all_of
-       [
-         (fun s -> assert_that Float.(s > 50.25) (equal_to true));
-         (fun s -> assert_that Float.(s < 50.35) (equal_to true));
-       ])
+    (all_of [ gt (module Float_ord) 50.25; lt (module Float_ord) 50.35 ])
 
 let test_compute_initial_stop_short _ =
   (* Short: reference_level=50.0 → raw_stop=52.0 → nudged to 52.125 (above 52.0) *)
@@ -200,12 +196,13 @@ let test_update_initial_to_trailing _ =
       ~ma_direction:Rising ~stage:stage2
   in
   assert_that event (equal_to (No_change : stop_event));
-  assert_that new_state (fun s ->
-      match s with
-      | Trailing { stop_level; correction_count; _ } ->
-          assert_that stop_level (float_equal 45.0);
-          assert_that correction_count (equal_to 0)
-      | _ -> assert_failure "Expected Trailing state after Initial update")
+  assert_that new_state
+    (matching ~msg:"Expected Trailing state after Initial update"
+       (function
+         | Trailing { stop_level; correction_count; _ } ->
+             Some (stop_level, correction_count)
+         | _ -> None)
+       (pair (float_equal 45.0) (equal_to 0)))
 
 (* ---- update: tightening trigger ---- *)
 
@@ -226,16 +223,16 @@ let test_update_tighten_on_stage3 _ =
       ~ma_direction:Flat
       ~stage:(Stage3 { weeks_topping = 2 })
   in
-  assert_that event (fun e ->
-      match e with
-      | Entered_tightening { reason } ->
-          assert_that (String.length reason > 0) (equal_to true)
-      | _ -> assert_failure "Expected Entered_tightening event");
-  assert_that new_state (fun s ->
-      match s with
-      | Tightened { stop_level; _ } ->
-          assert_that Float.(stop_level >= 45.0) (equal_to true)
-      | _ -> assert_failure "Expected Tightened state")
+  assert_that event
+    (matching ~msg:"Expected Entered_tightening event"
+       (function
+         | Entered_tightening { reason } -> Some (String.length reason)
+         | _ -> None)
+       (gt (module Int_ord) 0));
+  assert_that new_state
+    (matching ~msg:"Expected Tightened state"
+       (function Tightened { stop_level; _ } -> Some stop_level | _ -> None)
+       (ge (module Float_ord) 45.0))
 
 let test_update_tighten_on_flat_ma _ =
   let state =
@@ -253,14 +250,14 @@ let test_update_tighten_on_flat_ma _ =
     update ~config:cfg ~side:Long ~state ~current_bar:bar ~ma_value:52.0
       ~ma_direction:Flat ~stage:stage2
   in
-  assert_that event (fun e ->
-      match e with
-      | Entered_tightening _ -> ()
-      | _ -> assert_failure "Expected Entered_tightening on flat MA in Stage 2");
-  assert_that new_state (fun s ->
-      match s with
-      | Tightened _ -> ()
-      | _ -> assert_failure "Expected Tightened state")
+  assert_that event
+    (matching ~msg:"Expected Entered_tightening on flat MA in Stage 2"
+       (function Entered_tightening _ -> Some () | _ -> None)
+       (equal_to ()));
+  assert_that new_state
+    (matching ~msg:"Expected Tightened state"
+       (function Tightened _ -> Some () | _ -> None)
+       (equal_to ()))
 
 let test_update_no_tighten_when_disabled _ =
   let cfg_no_tighten = { cfg with tighten_on_flat_ma = false } in
@@ -280,10 +277,10 @@ let test_update_no_tighten_when_disabled _ =
       ~ma_value:52.0 ~ma_direction:Flat ~stage:stage2
   in
   assert_that event (equal_to (No_change : stop_event));
-  assert_that new_state (fun s ->
-      match s with
-      | Trailing _ -> ()
-      | _ -> assert_failure "Expected Trailing state when tightening disabled")
+  assert_that new_state
+    (matching ~msg:"Expected Trailing state when tightening disabled"
+       (function Trailing _ -> Some () | _ -> None)
+       (equal_to ()))
 
 let test_update_tighten_short_on_stage2 _ =
   (* Short: tighten when stock enters Stage 2 (advancing, bad for short) *)
@@ -302,14 +299,14 @@ let test_update_tighten_short_on_stage2 _ =
     update ~config:cfg ~side:Short ~state ~current_bar:bar ~ma_value:48.0
       ~ma_direction:Rising ~stage:stage2
   in
-  assert_that event (fun e ->
-      match e with
-      | Entered_tightening _ -> ()
-      | _ -> assert_failure "Expected Entered_tightening for short in Stage 2");
-  assert_that new_state (fun s ->
-      match s with
-      | Tightened _ -> ()
-      | _ -> assert_failure "Expected Tightened state")
+  assert_that event
+    (matching ~msg:"Expected Entered_tightening for short in Stage 2"
+       (function Entered_tightening _ -> Some () | _ -> None)
+       (equal_to ()));
+  assert_that new_state
+    (matching ~msg:"Expected Tightened state"
+       (function Tightened _ -> Some () | _ -> None)
+       (equal_to ()))
 
 (* ---- update: stop ratchet after correction cycle ---- *)
 
@@ -334,19 +331,20 @@ let test_update_stop_raised_after_cycle _ =
     update ~config:cfg ~side:Long ~state ~current_bar:bar ~ma_value:51.0
       ~ma_direction:Rising ~stage:stage2
   in
-  assert_that event (fun e ->
-      match e with
-      | Stop_raised { old_level; new_level; _ } ->
-          assert_that old_level (float_equal 45.0);
-          assert_that Float.(new_level > old_level) (equal_to true);
-          assert_that Float.(new_level > 47.0) (equal_to true)
-      | _ -> assert_failure "Expected Stop_raised event after correction cycle");
-  assert_that new_state (fun s ->
-      match s with
-      | Trailing { stop_level; correction_count; _ } ->
-          assert_that Float.(stop_level > 45.0) (equal_to true);
-          assert_that correction_count (equal_to 2)
-      | _ -> assert_failure "Expected Trailing state")
+  assert_that event
+    (matching ~msg:"Expected Stop_raised event after correction cycle"
+       (function
+         | Stop_raised { old_level; new_level; _ } -> Some (old_level, new_level)
+         | _ -> None)
+       (pair (float_equal 45.0)
+          (all_of [ gt (module Float_ord) 45.0; gt (module Float_ord) 47.0 ])));
+  assert_that new_state
+    (matching ~msg:"Expected Trailing state"
+       (function
+         | Trailing { stop_level; correction_count; _ } ->
+             Some (stop_level, correction_count)
+         | _ -> None)
+       (pair (gt (module Float_ord) 45.0) (equal_to 2)))
 
 let test_update_no_ratchet_insufficient_correction _ =
   (* Correction is only 4.5%, below min_correction_pct of 8% — no ratchet *)
@@ -369,10 +367,10 @@ let test_update_no_ratchet_insufficient_correction _ =
       ~ma_direction:Rising ~stage:stage2
   in
   assert_that event (equal_to (No_change : stop_event));
-  assert_that new_state (fun s ->
-      match s with
-      | Trailing { stop_level; _ } -> assert_that stop_level (float_equal 45.0)
-      | _ -> assert_failure "Expected Trailing state with unchanged stop level")
+  assert_that new_state
+    (matching ~msg:"Expected Trailing state with unchanged stop level"
+       (function Trailing { stop_level; _ } -> Some stop_level | _ -> None)
+       (float_equal 45.0))
 
 (* ---- update: tightened state ---- *)
 
@@ -387,10 +385,10 @@ let test_update_tightened_stop_hit _ =
       ~ma_direction:Flat
       ~stage:(Stage3 { weeks_topping = 2 })
   in
-  assert_that event (fun e ->
-      match e with
-      | Stop_hit { stop_level; _ } -> assert_that stop_level (float_equal 50.0)
-      | _ -> assert_failure "Expected Stop_hit")
+  assert_that event
+    (matching ~msg:"Expected Stop_hit"
+       (function Stop_hit { stop_level; _ } -> Some stop_level | _ -> None)
+       (float_equal 50.0))
 
 (* ---- stop never moved against the position ---- *)
 
