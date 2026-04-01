@@ -103,9 +103,8 @@ let test_nearest_zone_present _ =
     analyze ~config:cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
   in
   assert_that result.nearest_zone
-    (is_some_and (fun zone ->
-         assert_bool "zone starts at or above breakout"
-           Float.(zone.price_low >= 50.0)))
+    (is_some_and
+       (field (fun zone -> zone.price_low) (ge (module Float_ord) 50.0)))
 
 let test_nearest_zone_absent _ =
   let bars = [ make_bar ~low:40.0 ~high:49.0 45.0 ] in

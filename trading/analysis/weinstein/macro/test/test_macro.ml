@@ -57,8 +57,8 @@ let test_confidence_between_0_and_1 _ =
     analyze ~config:cfg ~index_bars:index ~ad_bars:[] ~global_index_bars:[]
       ~prior_stage:None ~prior:None
   in
-  assert_bool "confidence >= 0" Float.(result.confidence >= 0.0);
-  assert_bool "confidence <= 1" Float.(result.confidence <= 1.0)
+  assert_that result.confidence (ge (module Float_ord) 0.0);
+  assert_that result.confidence (le (module Float_ord) 1.0)
 
 (* ------------------------------------------------------------------ *)
 (* Bearish regime: declining index                                      *)

@@ -216,8 +216,7 @@ let test_sharpe_ratio_with_risk_free_rate _ =
   in
   let sharpe_no_rf = Map.find_exn metrics_no_rf SharpeRatio in
   let sharpe_with_rf = Map.find_exn metrics_with_rf SharpeRatio in
-  assert_bool "Sharpe with RF should be lower than without"
-    Float.(sharpe_with_rf < sharpe_no_rf)
+  assert_that sharpe_with_rf (lt (module Float_ord) sharpe_no_rf)
 
 (* ==================== Maximum Drawdown Tests ==================== *)
 

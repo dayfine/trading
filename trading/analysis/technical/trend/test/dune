@@ -1,6 +1,6 @@
 (test
  (name regression_test)
- (libraries trend ounit2 owl))
+ (libraries trend ounit2 owl matchers))
 
 (test
  (name segmentation_test)

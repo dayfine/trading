@@ -81,8 +81,7 @@ let test_downtrend_sequence _ =
   assert_that day5.close_price (float_equal ~epsilon:0.01 91.06);
 
   (* Day 5 is clearly lower than day 1: 91.06 < 98.18 *)
-  assert_bool "Downtrend: day 5 < day 1"
-    Float.(day5.close_price < day1.close_price)
+  assert_that day5.close_price (lt (module Float_ord) day1.close_price)
 
 (** Test: Sideways trend maintains stable prices *)
 let test_sideways_sequence _ =
@@ -113,8 +112,9 @@ let test_sideways_sequence _ =
 
   (* All prices stay within ~1% of base price 100.0 *)
   List.iter prices ~f:(fun (p : Types.Daily_price.t) ->
-      assert_bool "Sideways: price stays near 100.0"
-        Float.(abs (p.close_price -. 100.0) < 1.0))
+      assert_that
+        (Float.abs (p.close_price -. 100.0))
+        (lt (module Float_ord) 1.0))
 
 (** Test: Price spike creates a jump at specific date *)
 let test_price_spike _ =
@@ -222,10 +222,8 @@ let test_trend_reversal _ =
   assert_that day10.close_price (float_equal ~epsilon:0.01 100.84);
 
   (* Verify trend directions *)
-  assert_bool "Uptrend: day 5 > day 1"
-    Float.(day5.close_price > day1.close_price);
-  assert_bool "Downtrend: day 10 < day 6"
-    Float.(day10.close_price < day6.close_price)
+  assert_that day5.close_price (gt (module Float_ord) day1.close_price);
+  assert_that day10.close_price (lt (module Float_ord) day6.close_price)
 
 (** Test: Verify specific generated values for reproducibility *)
 let test_reproducible_values _ =
@@ -254,13 +252,11 @@ let test_reproducible_values _ =
 
   (* Day 2: ~150 * 1.005 ≈ 150.75 *)
   assert_that day2.date (equal_to (date_of_string "2024-01-02"));
-  assert_bool "Day 2 close should be higher than day 1"
-    Float.(day2.close_price > day1.close_price);
+  assert_that day2.close_price (gt (module Float_ord) day1.close_price);
 
   (* Day 3: should continue uptrend *)
   assert_that day3.date (equal_to (date_of_string "2024-01-03"));
-  assert_bool "Day 3 close should be higher than day 2"
-    Float.(day3.close_price > day2.close_price);
+  assert_that day3.close_price (gt (module Float_ord) day2.close_price);
 
   (* Print actual values for manual verification *)
   printf "\nActual generated values:\n";

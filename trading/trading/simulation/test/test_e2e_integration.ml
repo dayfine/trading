@@ -182,7 +182,7 @@ let test_partial_date_overlap _ =
   let sim = create_exn ~config ~deps in
   let steps, _ = run_sim_exn sim in
   (* Should have some steps, even if some days have no data *)
-  assert_bool "Should have at least some steps" (List.length steps > 0)
+  assert_that steps (not_ is_empty)
 
 (* ==================== Missing Symbol Tests ==================== *)
 
@@ -319,10 +319,10 @@ let test_buy_and_hold_e2e _ =
   let sim = create_exn ~config ~deps in
   let steps, final_portfolio = run_sim_exn sim in
   (* Should have multiple steps *)
-  assert_bool "Should have steps" (List.length steps > 0);
+  assert_that steps (not_ is_empty);
   (* After buying, cash should be reduced *)
-  assert_bool "Cash should be reduced after buying"
-    Float.(final_portfolio.current_cash < config.initial_cash);
+  assert_that final_portfolio.current_cash
+    (lt (module Float_ord) config.initial_cash);
   (* Should have a position in AAPL *)
   let aapl_position =
     Trading_portfolio.Portfolio.get_position final_portfolio "AAPL"
@@ -405,7 +405,7 @@ let test_ema_strategy_e2e _ =
   Printf.printf "==========================================\n";
 
   (* Basic assertions - strategy should run without errors *)
-  assert_bool "Should have steps" (List.length steps > 0);
+  assert_that steps (not_ is_empty);
   let total_trades =
     List.sum (module Int) steps ~f:(fun s -> List.length s.trades)
   in

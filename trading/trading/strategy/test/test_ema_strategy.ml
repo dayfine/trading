@@ -3,6 +3,7 @@
 open OUnit2
 open Core
 open Trading_strategy
+open Matchers
 
 let date_of_string s = Date.of_string s
 
@@ -131,10 +132,12 @@ let test_entry_signal _ =
 
   (* Should have position in Entering state *)
   let pos = Map.find_exn !positions "AAPL" in
-  match Position.get_state pos with
-  | Entering e ->
-      assert_bool "Target quantity" Float.(e.target_quantity = 100.0)
-  | _ -> assert_failure "Expected Entering state"
+  assert_that (Position.get_state pos)
+    (matching ~msg:"Expected Entering state"
+       (function
+         | Position.Entering { target_quantity; _ } -> Some target_quantity
+         | _ -> None)
+       (float_equal 100.0))
 
 (** Test: Take profit exit *)
 let test_take_profit _ =

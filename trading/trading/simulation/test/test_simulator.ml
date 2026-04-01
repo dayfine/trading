@@ -256,10 +256,9 @@ let test_stop_order_executes_on_later_day _ =
         (elements_are
            [
              (fun trade ->
-               assert_bool
-                 (Printf.sprintf "Price %.2f should be in range [156.0, 158.0]"
-                    trade.Trading_base.Types.price)
-                 Float.(trade.price >= 156.0 && trade.price <= 158.0));
+               assert_that trade.Trading_base.Types.price
+                 (all_of
+                    [ ge (module Float_ord) 156.0; le (module Float_ord) 158.0 ]));
            ]))
 
 let test_order_fails_due_to_insufficient_cash _ =

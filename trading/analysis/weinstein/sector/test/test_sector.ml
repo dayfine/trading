@@ -120,7 +120,7 @@ let test_rationale_not_empty _ =
     analyze ~config:cfg ~sector_name:"X" ~sector_bars ~benchmark_bars:[]
       ~constituent_analyses:[] ~prior_stage:None
   in
-  assert_bool "rationale not empty" (not (List.is_empty result.rationale))
+  assert_that result.rationale (not_ is_empty)
 
 (* ------------------------------------------------------------------ *)
 (* Purity                                                               *)

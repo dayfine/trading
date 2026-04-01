@@ -193,9 +193,9 @@ let test_candidate_has_suggested_entry _ =
   match result.buy_candidates with
   | [] -> assert_failure "Expected at least one buy candidate"
   | c :: _ ->
-      assert_bool "entry > 0" Float.(c.suggested_entry > 0.0);
-      assert_bool "stop < entry" Float.(c.suggested_stop < c.suggested_entry);
-      assert_bool "risk_pct > 0" Float.(c.risk_pct > 0.0)
+      assert_that c.suggested_entry (gt (module Float_ord) 0.0);
+      assert_that c.suggested_stop (lt (module Float_ord) c.suggested_entry);
+      assert_that c.risk_pct (gt (module Float_ord) 0.0)
 
 (* ------------------------------------------------------------------ *)
 (* Purity                                                               *)
@@ -245,7 +245,7 @@ let test_scores_drive_sort_order _ =
   | c1 :: c2 :: _ ->
       assert_that c1.ticker (equal_to "A");
       assert_that c2.ticker (equal_to "B");
-      assert_bool "A scores higher" (c1.score > c2.score)
+      assert_that c1.score (gt (module Int_ord) c2.score)
   | _ -> assert_failure "Expected at least two buy candidates"
 
 (* ------------------------------------------------------------------ *)
@@ -328,9 +328,8 @@ let test_short_candidate_stop_above_entry _ =
   match result.short_candidates with
   | [] -> assert_failure "Expected a short candidate"
   | c :: _ ->
-      assert_bool "short stop > entry"
-        Float.(c.suggested_stop > c.suggested_entry);
-      assert_bool "risk_pct > 0" Float.(c.risk_pct > 0.0)
+      assert_that c.suggested_stop (gt (module Float_ord) c.suggested_entry);
+      assert_that c.risk_pct (gt (module Float_ord) 0.0)
 
 (* ------------------------------------------------------------------ *)
 (* Candidate grade field matches score                                 *)
