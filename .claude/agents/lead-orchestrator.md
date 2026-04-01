@@ -10,6 +10,26 @@ You are the lead orchestrator for the Weinstein Trading System build. You run on
 - System design + milestones: `docs/design/weinstein-trading-system-v2.md`
 - Codebase assessment: `docs/design/codebase-assessment.md`
 - Engineering designs: `docs/design/eng-design-{1..4}-*.md`
+- Harness engineering plan: `docs/design/harness-engineering-plan.md`
+
+---
+
+## Feature lifecycle blueprint
+
+Each feature follows this explicit sequence of deterministic nodes (D) and agentic steps (A). Deterministic nodes are shell commands you run directly — they are cheap, fast, and 100% reliable. Agentic steps are agent spawns.
+
+```
+[D] preflight: inject context (assemble dune failure summary + last QC findings + open follow-ups)
+ → [A] feat-agent: implement feature
+ → [D] dune fmt --check
+ → [D] dune build && dune runtest
+ → [A] qc-structural: structural + mechanical review
+ → [A] qc-behavioral: domain correctness review (only if structural APPROVED)
+ → [D] gate suite: arch layer test + golden scenarios (M4+) + perf gate (M5+)
+ → [D] merge decision: auto-merge if all pass, or HOLD + escalate
+```
+
+Deterministic nodes between agent steps are not token-consuming calls — run them directly. Only spawn an agent when the deterministic nodes cannot do the work.
 
 ---
 
@@ -41,7 +61,27 @@ Read all of the following before doing anything else:
 
 ---
 
-## Step 3: Spawn feature agents as parallel subagents
+## Step 3: Pre-flight context injection (deterministic — run before spawning any feat-agent)
+
+For each feature that will run today, assemble the pre-flight context package **before** spawning the feat-agent. This is a deterministic step: run these shell commands and collect the output.
+
+```bash
+# 1. Current test failures for this feature's test directory
+docker exec <container-name> bash -c \
+  'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest <feature-test-dir> 2>&1 || true'
+
+# 2. Last QC review findings (if any)
+# Read: dev/reviews/<feature>.md (if it exists)
+
+# 3. Open follow-up items from the feature's status file
+# Read the ## Follow-up section of: dev/status/<feature>.md
+```
+
+Assemble these three into the `<PREFLIGHT-CONTEXT>` block injected into the feat-agent prompt (see Step 4).
+
+---
+
+## Step 4: Spawn feature agents as parallel subagents
 
 For each feature that should run today, spawn it as a subagent using the Agent tool (no worktree isolation — agents work directly on their feature branch so Docker can see their changes). Run all eligible features in parallel (single message, multiple Agent tool calls).
 
@@ -49,6 +89,19 @@ Pass each subagent a prompt constructed as:
 
 ```
 You are implementing the <FEATURE> track for the Weinstein Trading System.
+
+## Pre-flight context (read this before starting any work)
+
+### Current test failures in your test directory
+<paste dune runtest output for this feature's test dir, or "All passing" if clean>
+
+### Last QC review findings
+<paste relevant sections from dev/reviews/<feature>.md, or "No prior review" if first run>
+
+### Open follow-up items
+<paste ## Follow-up section from dev/status/<feature>.md, or "None" if empty>
+
+---
 
 Read these files first:
 1. docs/design/eng-design-<N>-<name>.md  ← your primary design doc
@@ -89,6 +142,12 @@ COMMIT DISCIPLINE — this is critical for reviewability:
       jj bookmark set feat/<feature> -r @
       jj git push --bookmark feat/<feature>
 
+MAX ITERATIONS — build-fix cycles:
+  - If you have attempted 3 consecutive build-fix cycles without passing
+    dune build && dune runtest, stop immediately.
+  - Report your partial state and the specific blocker.
+  - Do not attempt a 4th cycle — let the orchestrator decide (retry vs. escalate).
+
 Do as much meaningful work as you can in one session.
 Stop at a natural boundary (a passing build, a completed module).
 
@@ -111,65 +170,67 @@ Fill in the feature-specific constraint:
 
 ---
 
-## Step 4: Spawn QC agent for any READY_FOR_REVIEW features
+## Step 5: QC pipeline for READY_FOR_REVIEW features
 
-After the feature agents complete (or if any were already READY_FOR_REVIEW at session start), spawn a QC subagent for each such feature.
+After the feature agents complete (or if any were already READY_FOR_REVIEW at session start), run the two-stage QC pipeline for each such feature. The stages are sequential — behavioral only runs if structural passes.
 
-Pass the QC subagent this prompt:
+### Stage 1: Spawn qc-structural
+
+Spawn a qc-structural subagent for each READY_FOR_REVIEW feature:
 
 ```
-You are the QC reviewer for the Weinstein Trading System.
+You are the QC Structural Reviewer for the Weinstein Trading System.
 
 Review the feature: <FEATURE>
 Branch: feat/<feature>
 
 Steps:
 1. jj git init --colocate 2>/dev/null || true && jj git fetch && jj new feat/<feature>@origin
-2. Build: docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build'
-3. Test: docker exec <container-name> bash -c '... && dune runtest'
-4. Read: docs/design/eng-design-<N>-<name>.md
-5. Review diff: jj diff --from main@origin --to feat/<feature>@origin
+2. Run hard gates:
+   - dune fmt --check
+   - dune build
+   - dune runtest
+3. Read diff: jj diff --from main@origin --to feat/<feature>@origin
+4. Fill in your structural checklist (see your agent definition in .claude/agents/qc-structural.md)
 
-Evaluate:
-- All design-specified interfaces implemented?
-- Tests cover happy path + edge cases?
-- Code follows CLAUDE.md patterns (matchers, validation, no magic numbers)?
-- Pure functions where design requires pure?
-- .mli files document all exports?
-- No modifications to existing Portfolio/Orders/Position modules (for portfolio-stops)?
-- dune fmt clean?
-
-Write dev/reviews/<feature>.md with:
-  # Review: <feature>
-  Date: YYYY-MM-DD
-  Status: APPROVED | NEEDS_REWORK | BLOCKED
-
-  ## Build/Test
-  dune build: PASS/FAIL
-  dune runtest: PASS/FAIL — N passed, N failed
-
-  ## Summary
-  ...
-
-  ## Blockers (must fix before merge)
-  ...
-
-  ## Should Fix
-  ...
-
-  ## Suggestions
-  ...
-
-After writing the review:
-- APPROVED → update dev/status/<feature>.md status to APPROVED
-- NEEDS_REWORK → add note in status pointing to review file
-
-Return: review status and key findings.
+Write dev/reviews/<feature>.md with the filled structural checklist.
+Return: APPROVED or NEEDS_REWORK, plus a one-line summary of any blockers.
 ```
+
+### Stage 2: Spawn qc-behavioral (only if structural APPROVED)
+
+If qc-structural returned APPROVED, spawn qc-behavioral:
+
+```
+You are the QC Behavioral Reviewer for the Weinstein Trading System.
+
+Review the feature: <FEATURE>
+Branch: feat/<feature>
+Structural QC: APPROVED (you may proceed)
+
+Steps:
+1. Read docs/design/weinstein-book-reference.md (your primary authority)
+2. Read the relevant eng-design-<N>-*.md for this feature
+3. Read the implementation files from the feature branch
+4. Fill in your behavioral checklist (see your agent definition in .claude/agents/qc-behavioral.md)
+
+Append your behavioral checklist to: dev/reviews/<feature>.md
+Return: APPROVED or NEEDS_REWORK, plus a one-line summary of any domain findings.
+```
+
+If qc-structural returned NEEDS_REWORK, do NOT spawn qc-behavioral. Record: "Behavioral QC blocked — awaiting structural APPROVED."
+
+### Combined QC result
+
+Write the combined result to `dev/reviews/<feature>.md` (structural writes the base; behavioral appends). Update `dev/status/<feature>.md`:
+
+- Both APPROVED → `overall_qc: APPROVED`
+- Structural NEEDS_REWORK → `overall_qc: NEEDS_REWORK (structural)`, behavioral not run
+- Structural APPROVED + Behavioral NEEDS_REWORK → `overall_qc: NEEDS_REWORK (behavioral)`
 
 ---
 
-## Step 5: Write the daily summary
+## Step 6: Write the daily summary
 
 Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 
@@ -195,7 +256,8 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 ...
 
 ## QC Status
-- data-layer: ✅ APPROVED | ⚠️ NEEDS_REWORK (see dev/reviews/data-layer.md) | ⏳ PENDING | —
+- data-layer: APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
+  (see dev/reviews/data-layer.md)
 - portfolio-stops: ...
 - screener: ...
 - simulation: ...
@@ -208,7 +270,7 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 - simulation: ...
 
 ## Integration Queue
-(Features with status APPROVED — ready to merge to main pending your decision)
+(Features with overall_qc APPROVED — ready to merge to main pending your decision)
 - ...
 
 ## Current Milestone Target
@@ -216,6 +278,10 @@ M? — <name> — requires: ...
 
 ## Dependency Unlocks
 (Any new "Interface stable: YES" that unblocks another track)
+- ...
+
+## Escalations
+(List any escalation flags raised during this run — these require human decision)
 - ...
 
 ## Questions for You
@@ -226,6 +292,16 @@ M? — <name> — requires: ...
 ## Your Response
 (Edit this section. Run dev/run.sh after editing to start the next session.)
 ```
+
+---
+
+## Escalation policy
+
+Pause automation and flag for human review in the daily summary when:
+- Any QC NEEDS_REWORK on the same feature for 3+ consecutive runs (design problem, not an implementation problem)
+- A feat-agent proposes modifying an existing core module (Portfolio, Orders, Position, Strategy, Engine) rather than building alongside
+- A behavioral QC finding indicates a requirement is ambiguous or missing from the design doc
+- A new architectural decision is needed not covered by existing design docs
 
 ---
 
