@@ -148,10 +148,7 @@ let test_transition_from_stage1_to_stage2 _ =
   let bars = rising_bars 50.0 100.0 in
   let prior = Some (Stage1 { weeks_in_base = 10 }) in
   let result = classify ~config:cfg ~bars ~prior_stage:prior in
-  assert_that result.transition
-    (is_some_and (fun (from_stage, to_stage) ->
-         assert_that from_stage is_stage1;
-         assert_that to_stage is_stage2))
+  assert_that result.transition (is_some_and (pair is_stage1 is_stage2))
 
 (* ------------------------------------------------------------------ *)
 (* Insufficient data edge case                                          *)
@@ -203,10 +200,7 @@ let test_above_ma_count_all_above _ =
   let bars = rising_bars 50.0 200.0 in
   let result = classify ~config:cfg ~bars ~prior_stage:None in
   (* In a strong uptrend, all confirm_weeks bars should be above MA *)
-  assert_that result.above_ma_count (fun n ->
-      if n <= 0 then
-        OUnit2.assert_failure
-          (Printf.sprintf "Expected above_ma_count > 0, got %d" n))
+  assert_that result.above_ma_count (gt (module Int_ord) 0)
 
 let suite =
   "stage_tests"

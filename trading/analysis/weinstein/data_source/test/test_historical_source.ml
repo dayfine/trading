@@ -76,8 +76,7 @@ let test_no_lookahead_hides_future_bars _ =
       let ds = make_ds dir simulation_date in
       let module DS = (val ds : Data_source.DATA_SOURCE) in
       let result = run_deferred (DS.get_bars ~query:(make_query "AAPL") ()) in
-      assert_that result
-        (is_ok_and_holds (fun returned -> assert_that returned (size_is 10))))
+      assert_that result (is_ok_and_holds (size_is 10)))
 
 (* Bar exactly on simulation_date is visible *)
 let test_boundary_inclusive _ =
@@ -88,8 +87,7 @@ let test_boundary_inclusive _ =
       let ds = make_ds dir simulation_date in
       let module DS = (val ds : Data_source.DATA_SOURCE) in
       let result = run_deferred (DS.get_bars ~query:(make_query "AAPL") ()) in
-      assert_that result
-        (is_ok_and_holds (fun returned -> assert_that returned (size_is 1))))
+      assert_that result (is_ok_and_holds (size_is 1)))
 
 (* Bar one day after simulation_date is invisible *)
 let test_boundary_exclusive _ =
@@ -101,8 +99,7 @@ let test_boundary_exclusive _ =
       let ds = make_ds dir simulation_date in
       let module DS = (val ds : Data_source.DATA_SOURCE) in
       let result = run_deferred (DS.get_bars ~query:(make_query "AAPL") ()) in
-      assert_that result
-        (is_ok_and_holds (fun returned -> assert_that returned is_empty)))
+      assert_that result (is_ok_and_holds is_empty))
 
 (* All cached bars are in the future — returns empty, not an error *)
 let test_all_bars_in_future _ =
@@ -116,8 +113,7 @@ let test_all_bars_in_future _ =
       let ds = make_ds dir simulation_date in
       let module DS = (val ds : Data_source.DATA_SOURCE) in
       let result = run_deferred (DS.get_bars ~query:(make_query "AAPL") ()) in
-      assert_that result
-        (is_ok_and_holds (fun returned -> assert_that returned is_empty)))
+      assert_that result (is_ok_and_holds is_empty))
 
 (* --- end_date clamping --- *)
 
@@ -137,10 +133,11 @@ let test_end_date_beyond_simulation_clamped _ =
         run_deferred (DS.get_bars ~query:(make_query "AAPL" ~end_date) ())
       in
       assert_that result
-        (is_ok_and_holds (fun returned ->
-             assert_bool "end_date clamped to simulation_date"
-               (List.for_all returned ~f:(fun b ->
-                    Date.compare b.Types.Daily_price.date simulation_date <= 0)))))
+        (is_ok_and_holds
+           (each (fun b ->
+                assert_that
+                  (Date.compare b.Types.Daily_price.date simulation_date)
+                  (le (module Int_ord) 0)))))
 
 (* An explicit end_date before simulation_date is respected as-is *)
 let test_end_date_before_simulation_respected _ =
@@ -158,8 +155,7 @@ let test_end_date_before_simulation_respected _ =
       let result =
         run_deferred (DS.get_bars ~query:(make_query "AAPL" ~end_date) ())
       in
-      assert_that result
-        (is_ok_and_holds (fun returned -> assert_that returned (size_is 4))))
+      assert_that result (is_ok_and_holds (size_is 4)))
 
 (* --- start_date filtering --- *)
 
@@ -178,8 +174,7 @@ let test_start_date_combined_with_simulation_date _ =
       let result =
         run_deferred (DS.get_bars ~query:(make_query "AAPL" ~start_date) ())
       in
-      assert_that result
-        (is_ok_and_holds (fun returned -> assert_that returned (size_is 6))))
+      assert_that result (is_ok_and_holds (size_is 6)))
 
 (* --- missing data --- *)
 
@@ -192,8 +187,7 @@ let test_unknown_symbol_returns_empty _ =
       let result =
         run_deferred (DS.get_bars ~query:(make_query "UNKNOWN") ())
       in
-      assert_that result
-        (is_ok_and_holds (fun returned -> assert_that returned is_empty)))
+      assert_that result (is_ok_and_holds is_empty))
 
 (* --- universe --- *)
 
@@ -206,9 +200,8 @@ let test_universe_loaded _ =
       let module DS = (val ds : Data_source.DATA_SOURCE) in
       let result = run_deferred (DS.get_universe ()) in
       assert_that result
-        (is_ok_and_holds (fun loaded ->
-             assert_that loaded
-               (equal_to (instruments : Types.Instrument_info.t list)))))
+        (is_ok_and_holds
+           (equal_to (instruments : Types.Instrument_info.t list))))
 
 (* Universe file absent returns empty list, not an error *)
 let test_universe_absent_returns_empty _ =
@@ -217,8 +210,7 @@ let test_universe_absent_returns_empty _ =
       let ds = make_ds dir simulation_date in
       let module DS = (val ds : Data_source.DATA_SOURCE) in
       let result = run_deferred (DS.get_universe ()) in
-      assert_that result
-        (is_ok_and_holds (fun loaded -> assert_that loaded is_empty)))
+      assert_that result (is_ok_and_holds is_empty))
 
 (* --- simulation stepping semantics --- *)
 

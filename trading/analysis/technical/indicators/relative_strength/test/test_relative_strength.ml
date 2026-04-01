@@ -73,9 +73,10 @@ let test_outperforming_stock_rs_value_above_1 _ =
   in
   assert_that
     (analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:bench)
-    (is_some_and (fun history ->
-         assert_bool "outperforming: rs_value > 1.0"
-           Float.((List.last_exn history).rs_value > 1.0)))
+    (is_some_and
+       (field
+          (fun history -> (List.last_exn history).rs_value)
+          (gt (module Float_ord) 1.0)))
 
 let test_underperforming_stock_rs_value_below_1 _ =
   let n = 60 in
@@ -87,9 +88,10 @@ let test_underperforming_stock_rs_value_below_1 _ =
   in
   assert_that
     (analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:bench)
-    (is_some_and (fun history ->
-         assert_bool "underperforming: rs_value < 1.0"
-           Float.((List.last_exn history).rs_value < 1.0)))
+    (is_some_and
+       (field
+          (fun history -> (List.last_exn history).rs_value)
+          (lt (module Float_ord) 1.0)))
 
 (* ------------------------------------------------------------------ *)
 (* Normalized RS (Mansfield zero line)                                  *)

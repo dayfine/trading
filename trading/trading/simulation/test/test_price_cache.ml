@@ -112,11 +112,15 @@ let test_get_prices_all _ =
 
   let result = get_prices backend ~symbol:"AAPL" () in
   assert_that result
-    (is_ok_and_holds (fun prices ->
-         assert_that prices (size_is 3);
-         (* Verify first price *)
-         let first : Types.Daily_price.t = List.hd_exn prices in
-         assert_that first.close_price (float_equal 101.0)));
+    (is_ok_and_holds
+       (all_of
+          [
+            size_is 3;
+            field List.hd_exn
+              (field
+                 (fun (p : Types.Daily_price.t) -> p.close_price)
+                 (float_equal 101.0));
+          ]));
 
   teardown_test_data test_data_dir
 
@@ -131,10 +135,15 @@ let test_get_prices_with_date_filter _ =
       ()
   in
   assert_that result
-    (is_ok_and_holds (fun prices ->
-         assert_that prices (size_is 2);
-         let first : Types.Daily_price.t = List.hd_exn prices in
-         assert_that first.close_price (float_equal 102.0)));
+    (is_ok_and_holds
+       (all_of
+          [
+            size_is 2;
+            field List.hd_exn
+              (field
+                 (fun (p : Types.Daily_price.t) -> p.close_price)
+                 (float_equal 102.0));
+          ]));
 
   (* Get prices up to Jan 2 *)
   let result2 =
@@ -142,8 +151,7 @@ let test_get_prices_with_date_filter _ =
       ~end_date:(Date.create_exn ~y:2024 ~m:Month.Jan ~d:2)
       ()
   in
-  assert_that result2
-    (is_ok_and_holds (fun prices -> assert_that prices (size_is 2)));
+  assert_that result2 (is_ok_and_holds (size_is 2));
 
   (* Get prices for specific date range *)
   let result3 =
@@ -153,10 +161,15 @@ let test_get_prices_with_date_filter _ =
       ()
   in
   assert_that result3
-    (is_ok_and_holds (fun prices ->
-         assert_that prices (size_is 1);
-         let first : Types.Daily_price.t = List.hd_exn prices in
-         assert_that first.close_price (float_equal 102.0)));
+    (is_ok_and_holds
+       (all_of
+          [
+            size_is 1;
+            field List.hd_exn
+              (field
+                 (fun (p : Types.Daily_price.t) -> p.close_price)
+                 (float_equal 102.0));
+          ]));
 
   teardown_test_data test_data_dir
 

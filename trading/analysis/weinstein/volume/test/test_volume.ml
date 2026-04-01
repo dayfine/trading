@@ -46,18 +46,22 @@ let test_adequate_breakout _ =
   let bars = build_bars ~baseline_vol:1000 ~n:4 ~event_vol:1700 in
   assert_that
     (analyze_breakout ~config:cfg ~bars ~event_idx:4)
-    (is_some_and (fun r ->
-         assert_bool "expected Adequate"
-           (match r.confirmation with Adequate _ -> true | _ -> false)))
+    (is_some_and
+       (field
+          (fun r -> r.confirmation)
+          (matching
+             (function Adequate _ -> Some () | _ -> None)
+             (equal_to ()))))
 
 let test_weak_breakout _ =
   (* event = 1100 → ratio 1.1, below adequate threshold (1.5) *)
   let bars = build_bars ~baseline_vol:1000 ~n:4 ~event_vol:1100 in
   assert_that
     (analyze_breakout ~config:cfg ~bars ~event_idx:4)
-    (is_some_and (fun r ->
-         assert_bool "expected Weak"
-           (match r.confirmation with Weak _ -> true | _ -> false)))
+    (is_some_and
+       (field
+          (fun r -> r.confirmation)
+          (matching (function Weak _ -> Some () | _ -> None) (equal_to ()))))
 
 (* ------------------------------------------------------------------ *)
 (* analyze_breakout — boundary and edge cases                          *)

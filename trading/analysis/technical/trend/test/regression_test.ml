@@ -1,4 +1,5 @@
 open OUnit2
+open Matchers
 open Trend.Regression
 
 let test_linear_regression _ =
@@ -12,7 +13,7 @@ let test_r_squared _ =
   (* Test with slightly noisy data *)
   let y = [| 2.1; 3.8; 6.2; 7.9; 9.8 |] in
   let stats = calculate_stats y in
-  assert_bool "R-squared should be close to 1.0" (stats.r_squared > 0.99)
+  assert_that stats.r_squared (gt (module Float_ord) 0.99)
 
 let test_perfect_line _ =
   (* Test with a perfect line y = 2x + 1 *)

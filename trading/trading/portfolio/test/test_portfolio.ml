@@ -545,7 +545,7 @@ let test_fifo_vs_average_cost _ =
       let cost_diff =
         Float.abs (avg_cost_of_position fifo -. avg_cost_of_position avg)
       in
-      assert_bool "Cost basis should differ" Float.(cost_diff > 0.01)
+      assert_that cost_diff (gt (module Float_ord) 0.01)
   | _ -> assert_failure "Both positions should exist"
 
 let test_fifo_multiple_partial_sells _ =

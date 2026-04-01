@@ -47,7 +47,7 @@ let test_exact_minimum_data _ =
   let bench = const_bars ~n:52 100.0 in
   assert_that
     (analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:bench)
-    (is_some_and (fun r -> assert_that r.history (size_is 1)))
+    (is_some_and (field (fun r -> r.history) (size_is 1)))
 
 let test_current_fields_populated _ =
   (* Verify result fields mirror the last point of the underlying RS history. *)
@@ -143,7 +143,7 @@ let test_flat_threshold_configurable _ =
   in
   assert_that
     (analyze ~config:strict_cfg ~stock_bars:stock ~benchmark_bars:bench)
-    (is_some_and (fun _ -> ()))
+    (not_ is_none)
 
 (* ------------------------------------------------------------------ *)
 (* Purity                                                               *)
@@ -157,16 +157,17 @@ let test_pure_same_inputs_same_output _ =
   let bench =
     List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 1.0)) |> weekly_bars
   in
-  let r1 = analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:bench in
-  let r2 = analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:bench in
-  assert_that r1
-    (is_some_and (fun a ->
-         assert_that r2
-           (is_some_and (fun b ->
-                assert_that a.current_rs (float_equal b.current_rs);
-                assert_that a.current_normalized
-                  (float_equal b.current_normalized);
-                assert_that a.trend (equal_to (b.trend : rs_trend))))))
+  let r1 =
+    Option.value_exn
+      (analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:bench)
+  in
+  let r2 =
+    Option.value_exn
+      (analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:bench)
+  in
+  assert_that r1.current_rs (float_equal r2.current_rs);
+  assert_that r1.current_normalized (float_equal r2.current_normalized);
+  assert_that r1.trend (equal_to (r2.trend : rs_trend))
 
 let suite =
   "rs_tests"

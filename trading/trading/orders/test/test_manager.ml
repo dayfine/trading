@@ -98,9 +98,7 @@ let test_get_order _ =
       ~time_in_force:IOC
   in
   let _ = submit_orders manager [ order ] in
-  assert_that
-    (get_order manager order.id)
-    (is_ok_and_holds (fun retrieved_order -> assert_equal order retrieved_order))
+  assert_that (get_order manager order.id) (is_ok_and_holds (equal_to order))
 
 let test_get_nonexistent_order _ =
   let manager = create () in
@@ -317,9 +315,7 @@ let test_update_order_success _ =
   (* Verify the order was updated *)
   assert_that
     (get_order manager order.id)
-    (is_ok_and_holds (fun retrieved_order ->
-         assert_equal Filled retrieved_order.status
-           ~msg:"Order status should be Filled"))
+    (is_ok_and_holds (field (fun r -> r.status) (equal_to Filled)))
 
 let test_update_nonexistent_order _ =
   let manager = create () in
@@ -358,12 +354,17 @@ let test_update_order_preserves_changes _ =
   (* Retrieve and verify all fields updated *)
   assert_that
     (get_order manager order.id)
-    (is_ok_and_holds (fun retrieved_order ->
-         assert_equal (PartiallyFilled 50.0) retrieved_order.status
-           ~msg:"Status should be PartiallyFilled";
-         assert_that retrieved_order.filled_quantity (float_equal 50.0);
-         assert_equal (Some 150.0) retrieved_order.avg_fill_price
-           ~msg:"Average fill price should be Some 150.0"))
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun r -> r.status)
+              (equal_to (PartiallyFilled 50.0 : order_status));
+            field (fun r -> r.filled_quantity) (float_equal 50.0);
+            field
+              (fun r -> r.avg_fill_price)
+              (equal_to (Some 150.0 : float option));
+          ]))
 
 let test_update_order_timestamp _ =
   let manager = create () in
@@ -383,10 +384,8 @@ let test_update_order_timestamp _ =
   (* Verify timestamp was preserved *)
   assert_that
     (get_order manager order.id)
-    (is_ok_and_holds (fun retrieved_order ->
-         assert_bool "Retrieved order should have updated timestamp"
-           (Time_ns_unix.equal filled_order.updated_at
-              retrieved_order.updated_at)))
+    (is_ok_and_holds
+       (field (fun r -> r.updated_at) (equal_to filled_order.updated_at)))
 
 let suite =
   "Order Manager"

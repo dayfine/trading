@@ -19,6 +19,7 @@
 open OUnit2
 open Core
 open Trading_strategy
+open Matchers
 
 let date_of_string s = Date.of_string s
 
@@ -268,10 +269,11 @@ let test_complete_lifecycle _ =
   positions := apply_transitions !positions engine_completes;
 
   let pos = Map.find_exn !positions "TEST" in
-  (match Position.get_state pos with
-  | Holding h ->
-      assert_bool "Should be holding 100 shares" Float.(h.quantity = 100.0)
-  | _ -> assert_failure "Expected Holding after EntryComplete");
+  assert_that (Position.get_state pos)
+    (matching ~msg:"Expected Holding after EntryComplete"
+       (function
+         | Position.Holding { quantity; _ } -> Some quantity | _ -> None)
+       (float_equal 100.0));
 
   (* Day 2: Price = 60.0, position in Holding *)
   let price_day2 =
@@ -322,10 +324,10 @@ let test_complete_lifecycle _ =
   let pos = Map.find_exn !positions "TEST" in
   assert_bool "Position should be closed" (Position.is_closed pos);
   match Position.get_state pos with
-  | Closed c ->
-      assert_bool "Closed quantity should be 100.0" Float.(c.quantity = 100.0);
-      assert_bool "Entry price should be 50.0" Float.(c.entry_price = 50.0);
-      assert_bool "Exit price should be 60.0" Float.(c.exit_price = 60.0)
+  | Position.Closed c ->
+      assert_that c.quantity (float_equal 100.0);
+      assert_that c.entry_price (float_equal 50.0);
+      assert_that c.exit_price (float_equal 60.0)
   | _ -> assert_failure "Expected Closed after ExitComplete"
 
 let suite =
