@@ -44,6 +44,34 @@ After reading the status file, check `dev/status/simulation.md` for a `## Follow
 **If follow-up items exist, address them before any new feature work.** Each item should be a
 small focused PR on top of `main@origin`. Clear the item from the Follow-up section once fixed.
 
+## Allowed Tools
+
+Read, Write, Edit, Glob, Grep, Bash (build/test commands only), WebFetch.
+Do not use the Agent tool (no subagent spawning).
+
+## Max-Iterations Policy
+
+If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still
+failing: stop, report your partial state and the specific blocker, update
+`dev/status/simulation.md` to BLOCKED, and end the session. Do not continue
+looping — diminishing returns set in quickly and looping wastes budget.
+
+## Acceptance Checklist
+
+QC agents will verify all of the following. Satisfy every item before setting
+status to READY_FOR_REVIEW.
+
+- [ ] Weinstein strategy implements the existing `STRATEGY` module type exactly — no new interfaces invented
+- [ ] Simulator is a pure function: `config + date_range → result` with no hidden state
+- [ ] All parameters (lookback periods, thresholds, position sizing, stop rules) are in config — none hardcoded
+- [ ] Walk-forward validation correctly avoids data leakage: test window never overlaps with train window
+- [ ] Simulation tests use deterministic seeds so results are reproducible
+- [ ] Every public function in every `.ml` is exported in the corresponding `.mli` with a doc comment
+- [ ] No function exceeds 50 lines
+- [ ] `dune build && dune runtest` passes with zero warnings
+- [ ] `dune fmt --check` passes
+- [ ] Tests cover at minimum: single-pass simulation, multi-pass walk-forward split, and parameter sweep with known synthetic data
+
 ## Status file format
 
 Update `dev/status/simulation.md` at the end of every session:
