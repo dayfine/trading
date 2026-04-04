@@ -1,3 +1,4 @@
+(* @large-module: position state machine covers entry, partial fills, stop management, and exit transitions *)
 (** Position lifecycle state machine *)
 
 open Core

@@ -12,11 +12,12 @@ IN_PROGRESS
 
 ## Tier 1 — Immediate
 
-- [ ] T1-A: Add `dune fmt --check` as hard gate (document in CLAUDE.md)
-- [ ] T1-A: Add architecture layer test (`analysis/` cannot import `trading/trading/`)
-- [ ] T1-A+: Custom linter — function length (>50 lines = test failure)
-- [ ] T1-A+: Custom linter — magic numbers in `analysis/weinstein/` not in config
-- [ ] T1-A+: Custom linter — public `.ml` functions missing from `.mli`
+- [ ] T1-A: Add `dune fmt --check` as hard gate — needs a real check script in `devtools/checks/`, not just docs
+- [x] T1-A: Add architecture layer test (`analysis/` cannot import `trading/trading/`)
+- [ ] T1-A+: Custom linter — function length (>50 lines = test failure) — shell heuristic has too many false positives; needs AST-based approach or dune plugin
+- [x] T1-A+: Custom linter — magic numbers in `analysis/weinstein/` not in config — extended to whole codebase; path exceptions in `devtools/checks/linter_exceptions.conf`
+- [ ] T1-A+: Custom linter — magic numbers: allow named constant definitions (`let foo = <num>`) — current linter flags these; needs a followup fix
+- [x] T1-A+: Custom linter — public `.ml` functions missing from `.mli`
 - [x] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`; A1 is FLAG not FAIL)
 - [x] T1-B: Create `qc-behavioral` agent (new, domain-focused; includes A1 generalizability judgment)
 - [x] T1-B: Update `lead-orchestrator` to spawn both QC agents (structural gates behavioral)
@@ -80,3 +81,5 @@ IN_PROGRESS
 - [x] T1-H: Added `## Allowed Tools` subset to all four feat-agent definitions (#174)
 - [x] Documented jj and jst workflow in `CLAUDE.md` (#173)
 - [x] Deleted `qc-reviewer.md` — superseded by `qc-structural` + `qc-behavioral`
+- [x] T1-A: Architecture layer test + magic numbers + mli coverage linters in `trading/devtools/checks/` with `linter_exceptions.conf` for documented path exceptions
+- [x] T1-A: File length linter — 300-line soft limit, 500-line declared-large (`@large-module`), 11% cap

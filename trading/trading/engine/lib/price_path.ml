@@ -1,3 +1,4 @@
+(* @large-module: price path generation covers multiple interpolation modes and order-fill simulation *)
 (** Realistic intraday price path generation from OHLC bars *)
 
 open Core
