@@ -16,7 +16,10 @@
       "Write",
       "WebSearch",
       "WebFetch(domain:api.github.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(jj status:*)",
+      "Bash(jj bookmark:*)",
+      "Bash(jj git:*)"
     ],
     "deny": [],
     "ask": []
