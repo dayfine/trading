@@ -17,14 +17,14 @@ IN_PROGRESS
 - [ ] T1-A+: Custom linter — function length (>50 lines = test failure)
 - [ ] T1-A+: Custom linter — magic numbers in `analysis/weinstein/` not in config
 - [ ] T1-A+: Custom linter — public `.ml` functions missing from `.mli`
-- [ ] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`; A1 is FLAG not FAIL)
-- [ ] T1-B: Create `qc-behavioral` agent (new, domain-focused; includes A1 generalizability judgment)
-- [ ] T1-B: Update `lead-orchestrator` to spawn both QC agents (structural gates behavioral)
+- [x] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`; A1 is FLAG not FAIL)
+- [x] T1-B: Create `qc-behavioral` agent (new, domain-focused; includes A1 generalizability judgment)
+- [x] T1-B: Update `lead-orchestrator` to spawn both QC agents (structural gates behavioral)
 - [x] T1-C: Add `## Acceptance Checklist` to each `feat-*.md` agent definition
-- [ ] T1-C: Create `feat-agent-template.md` — required sections for all feat-agents (extensibility + health-scanner compliance)
-- [ ] T1-D: Define structured QC checklist output format (per-item PASS/FAIL/FLAG, not prose)
-- [ ] T1-E: Pre-flight context injection on every feat-agent dispatch (test failures, last QC, open follow-ups)
-- [ ] T1-F: Define lead-orchestrator blueprint format (explicit deterministic vs agentic nodes)
+- [x] T1-C: Create `feat-agent-template.md` — required sections for all feat-agents (extensibility + health-scanner compliance)
+- [x] T1-D: Define structured QC checklist output format (per-item PASS/FAIL/FLAG, not prose)
+- [x] T1-E: Pre-flight context injection on every feat-agent dispatch (test failures, last QC, open follow-ups)
+- [x] T1-F: Define lead-orchestrator blueprint format (explicit deterministic vs agentic nodes)
 - [x] T1-G: Add max-iterations policy to each feat-agent definition (cap build-fix cycles at 3)
 - [x] T1-H: Specify allowed tool subsets per agent type in agent definitions
 
@@ -71,6 +71,12 @@ IN_PROGRESS
 - [x] Refined architecture checks: A1 FLAG not FAIL in qc-structural; generalizability judgment in qc-behavioral; feat-agent-template.md for extensibility
 - [x] Added T3-F: architecture graph analyzer + dependency-rules.md lifecycle
 - [x] Created `docs/design/engineering-principles.md` — living document of guiding principles
-- [x] T1-C: Added `## Acceptance Checklist` to all four feat-agent definitions (feature-specific, from design docs)
-- [x] T1-G: Added `## Max-Iterations Policy` (cap build-fix cycles at 3) to all four feat-agent definitions
-- [x] T1-H: Added `## Allowed Tools` subset to all four feat-agent definitions
+- [x] T1-B: Created `qc-structural` and `qc-behavioral` agents; updated `lead-orchestrator` with two-stage QC pipeline (#171)
+- [x] T1-C: Added `## Acceptance Checklist` and `feat-agent-template.md` (#171, #174)
+- [x] T1-D: Structured per-item PASS/FAIL/FLAG checklist format in qc-structural and qc-behavioral (#171)
+- [x] T1-E: Pre-flight context injection documented in `lead-orchestrator` (#171)
+- [x] T1-F: Blueprint format (deterministic → agentic sequence) documented in `lead-orchestrator` (#171)
+- [x] T1-G: Added `## Max-Iterations Policy` (cap build-fix cycles at 3) to all four feat-agent definitions (#174)
+- [x] T1-H: Added `## Allowed Tools` subset to all four feat-agent definitions (#174)
+- [x] Documented jj and jst workflow in `CLAUDE.md` (#173)
+- [x] Deleted `qc-reviewer.md` — superseded by `qc-structural` + `qc-behavioral`
