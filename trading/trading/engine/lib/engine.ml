@@ -31,9 +31,8 @@ let _generate_trade_id order_id = "trade_" ^ order_id
     - Stop orders: Fill at current point price when triggered (natural slippage)
     - Market orders: Fill at first available point (open price)
 
-    Natural slippage is modeled by path granularity (~390 points/day). Stop
-    orders fill at the observed price when triggered, not the trigger price,
-    giving realistic slippage based on the time between price samples. *)
+    Natural slippage is modeled by path granularity: stop orders fill at the
+    observed price when triggered, not the trigger price. (~390 points/day.) *)
 
 let _would_fill_market (path : intraday_path) : fill_result option =
   (* Market orders always fill at open *)

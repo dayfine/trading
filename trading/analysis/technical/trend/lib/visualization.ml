@@ -3,6 +3,9 @@ module Arr = Owl.Dense.Ndarray.S
 module Mat = Owl.Dense.Matrix.D
 module Linalg = Owl.Linalg.S
 
+let white_bg = (255, 255, 255)
+let gray = Plot.RGB (100, 100, 100)
+
 (* Helper function to get color based on trend *)
 let get_trend_color = function
   | Trend_type.Increasing -> Plot.(RGB (0, 200, 0)) (* green *)
@@ -18,7 +21,8 @@ let init_plot () =
 
   let h = Plot.create ~n:1 ~m:1 "segmentation.png" in
   Plot.set_output h "segmentation.png";
-  Plot.set_background_color h 255 255 255;
+  let r, g, b = white_bg in
+  Plot.set_background_color h r g b;
   (* white background *)
   Plot.set_pen_size h 2.;
   Plot.set_title h "Trend Segmentation";
@@ -56,10 +60,7 @@ let plot_data_series ~h data =
   let x = Array.init n float_of_int in
   let x_mat = Mat.of_array x 1 n in
   let y_mat = Mat.of_array data 1 n in
-  Plot.(
-    plot ~h
-      ~spec:[ RGB (100, 100, 100); Marker "*"; MarkerSize 1.0 ]
-      x_mat y_mat)
+  Plot.(plot ~h ~spec:[ gray; Marker "*"; MarkerSize 1.0 ] x_mat y_mat)
 
 (* Plot trend line for a segment *)
 let plot_trend_line ~h ~x_segment ~trend_y ~color =

@@ -11,12 +11,14 @@ type order_params = {
 }
 [@@deriving show, eq]
 
+let id_suffix_range = 10000
+
 let _generate_order_id () =
   let timestamp =
     Time_ns_unix.now () |> Time_ns_unix.to_int63_ns_since_epoch
     |> Core.Int63.to_string
   in
-  let random_suffix = Random.int 10000 |> Printf.sprintf "%04d" in
+  let random_suffix = Random.int id_suffix_range |> Printf.sprintf "%04d" in
   timestamp ^ "_" ^ random_suffix
 
 (* Pure validation functions - each returns Ok () or Error *)
