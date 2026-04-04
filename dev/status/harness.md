@@ -17,11 +17,12 @@ IN_PROGRESS
 - [ ] T1-A+: Custom linter — function length (>50 lines = test failure)
 - [ ] T1-A+: Custom linter — magic numbers in `analysis/weinstein/` not in config
 - [ ] T1-A+: Custom linter — public `.ml` functions missing from `.mli`
-- [ ] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`)
-- [ ] T1-B: Create `qc-behavioral` agent (new, domain-focused)
+- [ ] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`; A1 is FLAG not FAIL)
+- [ ] T1-B: Create `qc-behavioral` agent (new, domain-focused; includes A1 generalizability judgment)
 - [ ] T1-B: Update `lead-orchestrator` to spawn both QC agents (structural gates behavioral)
 - [ ] T1-C: Add `## Acceptance Checklist` to each `feat-*.md` agent definition
-- [ ] T1-D: Define structured QC checklist output format (per-item PASS/FAIL, not prose)
+- [ ] T1-C: Create `feat-agent-template.md` — required sections for all feat-agents (extensibility + health-scanner compliance)
+- [ ] T1-D: Define structured QC checklist output format (per-item PASS/FAIL/FLAG, not prose)
 - [ ] T1-E: Pre-flight context injection on every feat-agent dispatch (test failures, last QC, open follow-ups)
 - [ ] T1-F: Define lead-orchestrator blueprint format (explicit deterministic vs agentic nodes)
 - [ ] T1-G: Add max-iterations policy to each feat-agent definition (cap build-fix cycles at 3)
@@ -38,11 +39,18 @@ IN_PROGRESS
 
 ## Tier 3 — After M5 stable
 
-- [ ] T3-A: `health-scanner` agent definition (`.claude/agents/health-scanner.md`)
+- [ ] T3-A: `health-scanner` agent — fast scan (post-run: stale status, new magic numbers, main build health)
+- [ ] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations)
+- [ ] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history)
+- [ ] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
+- [ ] T3-A: `health-scanner` deep scan — feat-agent template compliance check
 - [ ] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
-- [ ] T3-C: Dynamic context injection into feat-agent prompts (last QC findings, failing tests)
-- [ ] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` per auto-merge action
+- [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)
+- [ ] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` with `harness_gap` field on NEEDS_REWORK
 - [ ] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
+- [ ] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
+- [ ] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc)
+- [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
 
 ## Tier 4 — Continuous development loop (target end state)
 
@@ -60,3 +68,6 @@ IN_PROGRESS
 - [x] Automation goals and target state defined (Target State + Tier 4)
 - [x] Added audit trail, rollback/recovery, live trading gate, QC non-determinism policy, cost visibility
 - [x] Incorporated learnings from Anthropic, Fowler, Stripe Minions, and OpenAI harness articles (T1-A+, T1-E through T1-H, T3-A fast/deep split, T3-D harness_gap field)
+- [x] Refined architecture checks: A1 FLAG not FAIL in qc-structural; generalizability judgment in qc-behavioral; feat-agent-template.md for extensibility
+- [x] Added T3-F: architecture graph analyzer + dependency-rules.md lifecycle
+- [x] Created `docs/design/engineering-principles.md` — living document of guiding principles

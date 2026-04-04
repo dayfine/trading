@@ -7,6 +7,8 @@ loops.
 
 **Tracking status:** `dev/status/harness.md`
 
+**Guiding principles:** `docs/design/engineering-principles.md` — the *why* behind this plan.
+
 **Reference reading:**
 - Anthropic: [Building long-running agentic apps](https://www.anthropic.com/engineering/harness-design-long-running-apps)
 - Martin Fowler: [Harness Engineering](https://martinfowler.com/articles/harness-engineering.html)
@@ -417,6 +419,57 @@ This is the primary debugging surface when a regression gets through. The health
 scanner includes an audit trail integrity check: every merged commit in `main`
 since auto-merge was enabled must have a corresponding audit record.
 
+### T3-F: Architecture graph analyzer and dependency rules
+
+The current architecture layer test (T1-A) hardcodes one known boundary. As the
+system grows, more boundaries emerge — simulation vs. live execution, analysis
+vs. order generation, data layer vs. everything else — and hardcoded rules won't
+keep up.
+
+**Three-state rule lifecycle:**
+
+| State | Enforcement | Who manages |
+|---|---|---|
+| `proposed` | None — under discussion | Human reviews and approves |
+| `monitored` | Soft — health-scanner reports violations | Agent surfaces, human decides |
+| `enforced` | Hard — fails `dune runtest` | Deterministic gate |
+
+**Canonical source of truth: `docs/design/dependency-rules.md`**
+
+A document that lists all known architectural dependency rules with:
+- The rule itself (module A cannot import from module B)
+- The rationale (why this boundary exists)
+- The current state (`proposed` / `monitored` / `enforced`)
+- The enforcement mechanism (for `enforced` rules: which dune test)
+
+The first entries should document the existing known boundaries:
+- `analysis/` cannot import from `trading/trading/` (currently enforced by T1-A)
+- `trading/weinstein/simulation/` cannot be imported by the live execution path
+  (simulation wraps the pipeline; it must not leak into live code)
+- `analysis/` can only receive data via the `DATA_SOURCE` interface, not by
+  importing concrete data-layer implementations directly
+
+**Architecture analyzer (runs as part of T3-A deep scan):**
+
+1. Scan the actual import graph of the codebase (grep `open`/`include` in `.ml`
+   files, build a module → module dependency map)
+2. Compare against `dependency-rules.md`:
+   - Flag violations of `monitored` and `enforced` rules
+   - Flag dependencies present in the codebase but not covered by any rule
+     (undocumented dependencies → proposed rule candidates)
+   - Flag rules that are vacuously true (module renamed or deleted)
+3. Output: a proposed diff to `dependency-rules.md` for human review — new
+   proposed rules for undocumented dependencies, rule promotions where violations
+   are consistently zero
+
+**Rule promotion path:**
+
+When the analyzer reports zero violations of a `monitored` rule for N consecutive
+deep scans, it proposes promoting the rule to `enforced` and generates the
+corresponding dune check. The human approves the promotion; the generated check
+gets committed as a T1-A+ style linter. The architecture test suite grows
+organically from the doc rather than being hand-maintained.
+
 ### T3-E: Cost and token budget visibility
 
 Each orchestrator run records estimated token usage and cost per agent spawn to
@@ -529,6 +582,8 @@ start of each run. This is the kill switch.
 | After M5 stable | T3-C: Cross-feature context injection (beyond T1-E baseline) | — |
 | Before T4-B | T3-D: Audit trail + harness_gap field on NEEDS_REWORK records | — |
 | After M5 stable | T3-E: Cost/token budget visibility in daily summary | — |
+| After M5 stable | T3-F: Create dependency-rules.md + architecture graph analyzer in health-scanner | — |
+| After T3-F | T3-F: Promote monitored rules to enforced gates as violations reach zero | — |
 | After T3 complete | T4-A: Automated PR creation | — |
 | After T3-D + T4-A | T4-B: Auto-merge + automation-enabled.json kill switch | — |
 | After T4-B | T4-C: Requirements intake workflow | — |
