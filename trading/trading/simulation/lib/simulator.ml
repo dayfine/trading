@@ -1,3 +1,4 @@
+(* @large-module: simulation engine orchestrates strategy dispatch, order execution, and multi-step stepping *)
 (** Simulation engine for backtesting trading strategies *)
 
 open Core

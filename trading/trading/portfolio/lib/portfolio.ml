@@ -1,3 +1,4 @@
+(* @large-module: portfolio tracks cash, positions, and trade history with full validation pipeline *)
 open Core
 open Result.Let_syntax
 open Status

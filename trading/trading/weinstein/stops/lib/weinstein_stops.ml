@@ -1,3 +1,4 @@
+(* @large-module: Weinstein stop state machine covers entry, trailing, and exit transitions across all stages *)
 open Core
 open Weinstein_types
 open Trading_base.Types

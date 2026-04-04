@@ -1,3 +1,4 @@
+(* @large-module: screener cascade integrates multiple analysis passes in a single pipeline *)
 open Core
 open Weinstein_types
 

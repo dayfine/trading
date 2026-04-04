@@ -1,3 +1,4 @@
+(* @large-module: trend segmentation integrates regression, peak/trough detection, and stage mapping *)
 module Reg = Regression
 module Arr = Owl.Dense.Ndarray.S
 module Mat = Owl.Dense.Matrix.D

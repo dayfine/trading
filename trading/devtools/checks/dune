@@ -1,0 +1,27 @@
+; Codebase-wide structural checks. Run as part of `dune runtest`.
+; Each check is a shell script that fails fast with a clear message.
+; Path exceptions are declared in linter_exceptions.conf.
+
+; Architecture layer boundary: analysis/ must not import trading/trading/
+(rule
+ (alias runtest)
+ (action
+  (run sh %{dep:arch_layer_test.sh} %{dep:linter_exceptions.conf})))
+
+; File length: 300-line soft limit, 500-line declared-large limit (11% cap)
+(rule
+ (alias runtest)
+ (action
+  (run sh %{dep:linter_file_length.sh})))
+
+; .mli coverage: every lib/*.ml must have a matching .mli
+(rule
+ (alias runtest)
+ (action
+  (run sh %{dep:linter_mli_coverage.sh} %{dep:linter_exceptions.conf})))
+
+; Magic numbers: numeric literals must be routed through config records
+(rule
+ (alias runtest)
+ (action
+  (run sh %{dep:linter_magic_numbers.sh} %{dep:linter_exceptions.conf})))
