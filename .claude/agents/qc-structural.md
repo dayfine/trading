@@ -75,7 +75,7 @@ Do not use freeform narrative in the Status column — put detail in the Notes c
 | P4 | .mli files cover all public symbols | PASS/FAIL/NA | List any uncovered symbols |
 | P5 | Internal helpers prefixed with _ | PASS/FAIL/NA | List violations if any |
 | P6 | Tests use the matchers library (per CLAUDE.md) | PASS/FAIL/NA | |
-| A1 | No modifications to Portfolio/Orders/Position/Strategy/Engine modules | PASS/FAIL/NA | |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) — FLAG if any found | PASS/FLAG/NA | FLAG does not block approval; it routes to qc-behavioral for generalizability judgment |
 | A2 | No imports from analysis/ into trading/trading/ | PASS/FAIL/NA | |
 | A3 | No unnecessary modifications to existing (non-feature) modules | PASS/FAIL/NA | |
 
@@ -83,7 +83,7 @@ Do not use freeform narrative in the Status column — put detail in the Notes c
 
 APPROVED | NEEDS_REWORK
 
-(Derived mechanically: APPROVED only if all applicable items are PASS. Any FAIL → NEEDS_REWORK.)
+(Derived mechanically: APPROVED only if all applicable items are PASS or FLAG. Any FAIL → NEEDS_REWORK. FLAG on A1 passes structural review but is noted in the return value so the orchestrator informs qc-behavioral.)
 
 ## NEEDS_REWORK Items
 
@@ -143,7 +143,7 @@ Return the overall verdict (APPROVED / NEEDS_REWORK) and a one-line summary of a
 | P4 | .mli coverage | PASS | |
 | P5 | Internal helpers prefixed with _ | PASS | |
 | P6 | Tests use matchers library | PASS | |
-| A1 | No Portfolio/Orders/Position/Strategy/Engine modifications | PASS | |
+| A1 | Core module modifications | PASS | No modifications to Portfolio/Orders/Position/Strategy/Engine |
 | A2 | No analysis/ → trading/ imports | PASS | |
 | A3 | No unnecessary existing module modifications | PASS | |
 

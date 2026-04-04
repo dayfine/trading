@@ -13,6 +13,8 @@ Read, Glob, Grep (no Write, no Edit, no Bash — review only).
 
 This agent only runs after `qc-structural` has returned APPROVED for this feature. If you are invoked before structural QC passes, stop and return: "Behavioral QC blocked — awaiting structural APPROVED."
 
+If qc-structural flagged **A1** (core module modification), you must evaluate the A1 item in your checklist. The structural agent cannot judge generalizability — that is your responsibility.
+
 ## Authority documents
 
 - `docs/design/weinstein-book-reference.md` — primary authority for all domain rules
@@ -50,6 +52,7 @@ Put the authority document reference in the Notes column for every non-NA item.
 
 | # | Check | Status | Notes (cite authority doc section) |
 |---|-------|--------|------------------------------------|
+| A1 | Core module modification is strategy-agnostic (only fill if qc-structural flagged A1) | PASS/FAIL/NA | PASS: change generalizes to any strategy. FAIL: Weinstein-specific logic leaked into shared module — must decouple |
 | S1 | Stage 1 definition matches book (basing/accumulation: price consolidating, MA flat or declining) | PASS/FAIL/NA | weinstein-book-reference.md §Stage Definitions |
 | S2 | Stage 2 definition matches book (advancing: price above rising 30-week MA, volume expansion on up weeks) | PASS/FAIL/NA | |
 | S3 | Stage 3 definition matches book (topping/distribution: price above MA but MA flattening) | PASS/FAIL/NA | |
