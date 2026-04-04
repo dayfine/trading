@@ -417,7 +417,53 @@ Use Test driven development to develop iteratively
    message. This repo uses **jj (Jujutsu)** as the VCS — always use `jj`
    commands, never bare `git` commands for committing, branching, or pushing.
 
-### Review feedback workflow
+### VCS & PR Workflow
+
+This repo uses **jj (Jujutsu)** as the VCS in colocated mode (`.jj/` and `.git/` coexist). Always use `jj` commands — never bare `git` for committing, branching, or pushing.
+
+#### Key jj commands
+
+```bash
+jj status                          # what changed in working copy
+jj diff                            # full diff of working copy
+jj log -n 10                       # recent history
+jj describe -m "message"           # set commit message on current @
+jj new -m "message"                # create new child commit
+jj new main@origin                 # create new commit off main (start a feature)
+jj bookmark create <name> -r @     # create bookmark at current commit
+jj bookmark set <name> -r @        # move bookmark to current commit
+jj git push -b <name>              # push a bookmark to origin
+jj git fetch                       # fetch from origin
+jj rebase -b <bookmark> -d <dest>  # rebase a bookmark onto a destination
+jj squash --from <rev> --into <rev> --message "..." # squash commits
+```
+
+jj auto-snapshots the working copy into `@` continuously — no `git add` needed.
+
+#### Branch conventions
+
+- Feature branches: `feat/<feature-name>` (e.g. `feat/screener`)
+- Module sub-bookmarks: `feat/<feature>/<module>` (e.g. `screener/sma`) — one per module commit, used by `jst` for stacked PRs
+- Always branch from `main@origin`, never from another feature branch
+
+#### Creating and submitting PRs with jst
+
+PRs are created using `jst` (stacked PR tool), which reads the module-level bookmarks and creates one PR per module, each targeting the one below it:
+
+```bash
+GH_TOKEN=$(echo "protocol=https\nhost=github.com" | git credential fill | grep ^password | cut -d= -f2)
+GH_TOKEN=$GH_TOKEN jst submit feat/<your-feature>
+```
+
+Re-run `jst submit` after each session to update existing PRs. The full workflow is documented in `dev/agent-feature-workflow.md`.
+
+For non-feature branches (e.g. harness work), use the URL printed by `jj git push`:
+```
+remote: Create a pull request for '<branch>' on GitHub by visiting:
+remote:      https://github.com/dayfine/trading/pull/new/<branch>
+```
+
+#### Review feedback workflow
 
 When the user gives feedback on a PR, add the changes as a **second commit on top** of the original — do not amend. This lets the reviewer see exactly what changed in response to their feedback.
 
