@@ -63,9 +63,15 @@ for f in $(find "$TRADING_DIR" -path "*/lib/*.ml" \
       *'(*'* | *'*)'* | *'e.g.'*) continue ;;
     esac
 
-    # Skip record field assignments (= <num>) — these are defaults
+    # Skip record field assignments and named constant definitions (= <num>)
+    # e.g. "field = 42", "let max_size = 100", "let pi = 3.14"
     case "$line" in
       *'= '[0-9]* | *'= -'[0-9]*) continue ;;
+    esac
+
+    # Skip named constant bindings: lines with "let <identifier> ="
+    case "$line" in
+      *'let '*' = '* | *'let '*'='[0-9]*) continue ;;
     esac
 
     # Skip config-routed values
