@@ -48,6 +48,36 @@ After reading the status file, check `dev/status/screener.md` for a `## Follow-u
 **If follow-up items exist, address them before any new feature work.** Each item should be a
 small focused PR on top of `main@origin`. Clear the item from the Follow-up section once fixed.
 
+## Allowed Tools
+
+Read, Write, Edit, Glob, Grep, Bash (build/test commands only), WebFetch.
+Do not use the Agent tool (no subagent spawning).
+
+## Max-Iterations Policy
+
+If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still
+failing: stop, report your partial state and the specific blocker, update
+`dev/status/screener.md` to BLOCKED, and end the session. Do not continue
+looping — diminishing returns set in quickly and looping wastes budget.
+
+## Acceptance Checklist
+
+QC agents will verify all of the following. Satisfy every item before setting
+status to READY_FOR_REVIEW.
+
+- [ ] All analysis functions are pure: same inputs → same outputs, no hidden state, no IO
+- [ ] All thresholds and weights (MA periods, volume ratios, RS score cutoffs, stage boundaries) are configurable via the config record — no magic numbers
+- [ ] Stage classifier covers all 4 Weinstein stages with test cases for each transition
+- [ ] Screener cascade order matches design: macro gate → sector filter → stock scoring → ranking
+- [ ] Macro gate: a bearish macro score produces zero buy candidates regardless of individual stock quality (test case required)
+- [ ] Volume confirmation logic matches `weinstein-book-reference.md` definitions
+- [ ] Every public function in every `.ml` is exported in the corresponding `.mli` with a doc comment
+- [ ] No function exceeds 50 lines
+- [ ] No module under `analysis/` imports from `trading/trading/`
+- [ ] `dune build && dune runtest` passes with zero warnings
+- [ ] `dune fmt --check` passes
+- [ ] `Interface stable: YES` is set in `dev/status/screener.md` once `.mli` is finalized
+
 ## Status file format
 
 Update `dev/status/screener.md` at the end of every session:

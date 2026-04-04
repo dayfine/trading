@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-04
+## Last updated: 2026-04-05
 
 ## Status
 IN_PROGRESS
@@ -20,13 +20,13 @@ IN_PROGRESS
 - [ ] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`; A1 is FLAG not FAIL)
 - [ ] T1-B: Create `qc-behavioral` agent (new, domain-focused; includes A1 generalizability judgment)
 - [ ] T1-B: Update `lead-orchestrator` to spawn both QC agents (structural gates behavioral)
-- [ ] T1-C: Add `## Acceptance Checklist` to each `feat-*.md` agent definition
+- [x] T1-C: Add `## Acceptance Checklist` to each `feat-*.md` agent definition
 - [ ] T1-C: Create `feat-agent-template.md` — required sections for all feat-agents (extensibility + health-scanner compliance)
 - [ ] T1-D: Define structured QC checklist output format (per-item PASS/FAIL/FLAG, not prose)
 - [ ] T1-E: Pre-flight context injection on every feat-agent dispatch (test failures, last QC, open follow-ups)
 - [ ] T1-F: Define lead-orchestrator blueprint format (explicit deterministic vs agentic nodes)
-- [ ] T1-G: Add max-iterations policy to each feat-agent definition (cap build-fix cycles at 3)
-- [ ] T1-H: Specify allowed tool subsets per agent type in agent definitions
+- [x] T1-G: Add max-iterations policy to each feat-agent definition (cap build-fix cycles at 3)
+- [x] T1-H: Specify allowed tool subsets per agent type in agent definitions
 
 ## Tier 2 — Milestone-gated
 
@@ -71,3 +71,6 @@ IN_PROGRESS
 - [x] Refined architecture checks: A1 FLAG not FAIL in qc-structural; generalizability judgment in qc-behavioral; feat-agent-template.md for extensibility
 - [x] Added T3-F: architecture graph analyzer + dependency-rules.md lifecycle
 - [x] Created `docs/design/engineering-principles.md` — living document of guiding principles
+- [x] T1-C: Added `## Acceptance Checklist` to all four feat-agent definitions (feature-specific, from design docs)
+- [x] T1-G: Added `## Max-Iterations Policy` (cap build-fix cycles at 3) to all four feat-agent definitions
+- [x] T1-H: Added `## Allowed Tools` subset to all four feat-agent definitions
