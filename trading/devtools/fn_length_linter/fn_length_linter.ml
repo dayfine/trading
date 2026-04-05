@@ -34,6 +34,9 @@ let contains_substring s sub =
 
 (* --- File collection ---------------------------------------------------- *)
 
+let is_excluded_dir entry =
+  String.equal entry "_build" || String.equal entry "ta_ocaml"
+
 (* Collect all lib/*.ml files under [root], skipping _build/ and ta_ocaml/. *)
 let collect_lib_ml_files root =
   let result = ref [] in
@@ -43,8 +46,7 @@ let collect_lib_ml_files root =
     | entries ->
         Array.iter
           (fun entry ->
-            if String.equal entry "_build" || String.equal entry "ta_ocaml" then
-              ()
+            if is_excluded_dir entry then ()
             else
               let path = Filename.concat dir entry in
               if Sys.is_directory path then walk path
