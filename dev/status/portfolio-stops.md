@@ -1,9 +1,14 @@
 # Status: portfolio-stops
 
-## Last updated: 2026-03-30
+## Last updated: 2026-04-05
 
 ## Status
 READY_FOR_REVIEW
+
+## Structural QC
+structural_qc: NEEDS_REWORK
+structural_qc_date: 2026-04-05
+See dev/reviews/portfolio-stops.md. Behavioral QC blocked until structural passes.
 
 ## Interface stable
 YES
