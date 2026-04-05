@@ -49,7 +49,7 @@ IN_PROGRESS
 - [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)
 - [ ] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` with `harness_gap` field on NEEDS_REWORK
 - [ ] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
-- [ ] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
+- [x] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
 - [ ] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc)
 - [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
 
@@ -83,3 +83,4 @@ IN_PROGRESS
 - [x] Deleted `qc-reviewer.md` — superseded by `qc-structural` + `qc-behavioral`
 - [x] T1-A: Architecture layer test + magic numbers + mli coverage linters in `trading/devtools/checks/` with `linter_exceptions.conf` for documented path exceptions
 - [x] T1-A: File length linter — 300-line soft limit, 500-line declared-large (`@large-module`), 11% cap
+- [x] T3-F: Created `docs/design/dependency-rules.md` — R1–R6 rules with lifecycle states; R1, R4, R6 enforced; R2, R3 monitored; R5 proposed
