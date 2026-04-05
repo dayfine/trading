@@ -1,74 +1,65 @@
-# Review: portfolio-stops
-Date: 2026-03-30
-Status: APPROVED
+# QC Structural Review: portfolio-stops
 
-## Build/Test
-dune build: PASS
-dune runtest: PASS — portfolio_risk: 16 tests, weinstein_trading_state: 25 tests; full project suite clean
-dune fmt: PASS
+Date: 2026-04-05
+Reviewer: qc-structural
+Branch reviewed: portfolio-stops/trading-state-sexp
+Merge base: 4fcfc160f29e6c3990399d653d9337b5f7ab52e3 (Add sexp derivation to weinstein types and stops)
 
-## Summary
+## Scope
 
-The portfolio-stops feature delivers two new modules, both built alongside existing modules
-without modifying Portfolio, Orders, or Position:
+This review covers the two commits unique to `portfolio-stops/trading-state-sexp`
+relative to its fork point:
 
-**portfolio_risk** (analysis/weinstein/portfolio_risk/): Position sizing, exposure limits,
-sector concentration checks, and portfolio snapshots. Uses a `Snapshot.t` value type
-(not the mutable Portfolio.t) for pure calculations. `check_limits` returns a validated
-result with all violations collected. Config-driven: all thresholds in `config` type.
-`snapshot_of_portfolio` is the main integration point — it converts `Portfolio.t` to
-`Snapshot.t` for risk calculations.
+1. `8305e76` Add sexp derivation to weinstein types and stops
+2. `dbf038b` Rewrite weinstein_trading_state to use sexp serialisation
 
-**weinstein_trading_state** (trading/weinstein/trading_state/): JSON persistence for
-weekly session state. Atomic writes (temp + rename), stop states stored for human
-inspection but intentionally not deserialized (rebuilt from bars), stage history round-
-trips correctly via Scanf parsing of ppx_deriving.show output format. All 25 tests cover
-happy path, edge cases, round-trips, and the intentional non-restoration of stop states.
+New files added:
+- `analysis/weinstein/resistance/` (resistance mapper, 3 source files + test)
+- `trading/trading/weinstein/trading_state/` (sexp-based persistence, 3 source files + test)
+- `analysis/weinstein/order_gen/lib/dune` (empty placeholder stub)
 
-## Findings
+---
 
-### Minor Issues (non-blocking)
+## Structural Checklist
 
-1. **`_load_universe` still duplicated** — This issue was noted in the data-layer QC review
-   (dev/reviews/data-layer.md item #3). It is in merged code on main, not in these modules.
-   Tracked separately.
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune fmt --check | FAIL | resistance.mli, resistance.ml, test_resistance.ml have formatting diffs (double-space after sentence ends in comments; record destructuring layout in resistance.ml:65-68) |
+| H2 | dune build | PASS | |
+| H3 | dune runtest | FAIL | 499 tests across 44 suites, 1 failure: test_resistance.ml "high exactly at breakout_price counts" (line 226) |
+| P1 | Functions <= 50 lines | PASS | H3 linter passed for all suites except resistance — resistance failure is a behavioral test failure, not a length violation |
+| P2 | No magic numbers | PASS | All numeric literals in resistance.ml are inside default_config (520, 130, 0.10, 4, 10); trading_state has no numeric literals |
+| P3 | All configurable thresholds/periods/weights in config record | PASS | resistance: all five thresholds (virgin_territory_weeks, clean_lookback_weeks, zone_proximity_pct, moderate_weeks_threshold, heavy_weeks_threshold) routed through config; trading_state has no tunable parameters |
+| P4 | .mli files cover all public symbols | PASS | Both new modules have .mli files; resistance.mli exports config, default_config, result, analyze; trading_state.mli exports t, trade_action, trade_log_entry, empty, add_log_entry, set_stop_state, get_stop_state, remove_stop_state, set_prior_stage, get_prior_stage, save, load |
+| P5 | Internal helpers prefixed with _ | PASS | resistance.ml: _take_last, _weeks_since_high; trading_state.ml: no internal helpers |
+| P6 | Tests use the matchers library | PASS | Both test files open Matchers and use assert_that throughout |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | No modifications to any of these modules; all new code is in weinstein/ namespace |
+| A2 | No imports from analysis/ into trading/trading/ | PASS | New resistance/ and order_gen/ files do not import from trading/trading/; new trading_state uses Trading_portfolio and Weinstein_stops (weinstein/ namespace, not analysis/) |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | All 11 changed files are newly created files; no existing module files were modified |
 
-2. **`portfolio_risk.mli` `check_limits` return type** — Returns `unit status_or` with
-   all violations as a combined error. This is correct design but the error message
-   concatenates violations; callers cannot enumerate them programmatically. If future
-   tooling needs structured violations, consider a `violation list` return type. Not a
-   blocker.
+---
 
-3. **`weinstein_trading_state` stage deserialization fragile** — Uses `Scanf.sscanf`
-   on `ppx_deriving.show` output. If ppx_deriving changes its format (unlikely but
-   possible), stage history will silently not restore. Documented in the code; acceptable
-   for now given the fallback is "rebuild from bars" (same as stop_state behavior).
+## Verdict
 
-## Blockers (must fix before merge)
-None.
+NEEDS_REWORK
 
-## Checklist
+---
 
-**Correctness**
-- [x] All design-specified interfaces implemented (portfolio risk management, session state persistence)
-- [x] No placeholder / TODO code
-- [x] Pure functions — `check_limits`, `snapshot`, `snapshot_of_portfolio` are all pure
-- [x] All parameters in config, none hardcoded
+## NEEDS_REWORK Items
 
-**Tests**
-- [x] Tests exist for all public functions
-- [x] Happy path covered
-- [x] Edge cases covered (empty portfolio, zero positions, invalid limits, nonexistent file)
-- [x] Tests use the matchers library
+### H1: Format violations in resistance module
 
-**Code quality**
-- [x] dune fmt clean
-- [x] .mli files document all exported symbols
-- [x] No magic numbers
-- [x] No modifications to existing Portfolio/Orders/Position modules
-- [x] Internal helpers prefixed with _
+- Finding: `dune build @fmt` produces diffs in three files. The formatter changes double-space after sentence-ending periods in doc comments to single-space, and reformats the record destructuring in `analyze` (lines 65-68 of resistance.ml). These are deterministic formatting violations that `dune fmt` would fix automatically.
+- Location:
+  - `trading/analysis/weinstein/resistance/lib/resistance.mli`
+  - `trading/analysis/weinstein/resistance/lib/resistance.ml`
+  - `trading/analysis/weinstein/resistance/test/test_resistance.ml`
+- Required fix: Run `dune fmt` in the trading directory and commit the result.
+- harness_gap: LINTER_CANDIDATE — this is exactly what H1 (dune build @fmt) catches deterministically; no inferential judgment needed.
 
-**Design adherence**
-- [x] Builds alongside existing modules (no modifications to Portfolio, Orders, Position)
-- [x] `order_gen` correctly deferred (blocked on screener merge)
-- [x] `weinstein_trading_state` uses atomic writes (temp file + rename)
+### H3: Failing test in resistance module
+
+- Finding: `test_high_exactly_at_breakout_price_counts` fails at test_resistance.ml line 226. The test sets up 5 bars all with high = 100.0 and breakout_price = 100.0, then asserts `quality = Clean` and `overhead_weeks = 5`. The assertion on `overhead_weeks` fails — the test reports "Values should be equal / not equal", meaning the proximate-overhead count is not 5. The proximate zone check in resistance.ml is `h >= breakout_price && h <= ceiling` where ceiling = 100.0 * 1.10 = 110.0. With h = 100.0 >= 100.0 and h <= 110.0, this condition is true, so all 5 bars should be counted — meaning the test should pass. The most likely cause is a discrepancy in the `has_overhead` step or `_take_last` with a config that has `virgin_territory_weeks = 10` but only 5 bars: `_take_last 10 [5 bars]` returns all 5, and `has_overhead` should be true. This requires investigation of the actual failure message (the OUnit output says "not equal" without showing the actual value — the test needs a better error message to diagnose, but the code logic appears correct on inspection). The test is definitively failing.
+- Location: `trading/analysis/weinstein/resistance/test/test_resistance.ml` line 212-227
+- Required fix: Investigate and fix either the test assertion or the resistance.ml implementation to make this test pass. Run `dune runtest` to confirm.
+- harness_gap: ONGOING_REVIEW — test failures require understanding the behavioral intent; cannot be mechanically detected beyond "test failed".
