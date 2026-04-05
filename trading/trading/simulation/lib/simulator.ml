@@ -247,10 +247,8 @@ let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
   else
     let open Result.Let_syntax in
-    (* Get today's prices and update engine *)
     let today_bars = _get_today_bars t in
     Trading_engine.Engine.update_market t.deps.engine today_bars;
-    (* Process pending orders and apply fills to positions *)
     let%bind execution_reports =
       Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
     in
@@ -259,36 +257,27 @@ let step t =
       _update_positions_from_trades ~date:t.current_date ~positions:t.positions
         ~trades
     in
-    (* Apply trades to portfolio *)
     let%bind portfolio =
       Trading_portfolio.Portfolio.apply_trades t.portfolio trades
     in
-    (* Call strategy and apply transitions *)
     let%bind transitions = _call_strategy { t with positions } in
     let%bind positions = _apply_transitions ~positions ~transitions in
-    (* Generate and submit orders for next day *)
     let%bind orders =
       Order_generator.transitions_to_orders ~positions transitions
     in
-    let orders_submitted = _submit_orders t orders in
-    (* Compute portfolio value using today's close prices *)
-    let portfolio_value = _compute_portfolio_value ~portfolio ~today_bars in
-    (* Build step result *)
     let step_result =
       {
         date = t.current_date;
         portfolio;
-        portfolio_value;
+        portfolio_value = _compute_portfolio_value ~portfolio ~today_bars;
         trades;
-        orders_submitted;
+        orders_submitted = _submit_orders t orders;
       }
     in
-    (* Advance to next date and accumulate step *)
-    let next_date = Date.add_days t.current_date 1 in
     let t' =
       {
         t with
-        current_date = next_date;
+        current_date = Date.add_days t.current_date 1;
         portfolio;
         positions;
         step_history = step_result :: t.step_history;
