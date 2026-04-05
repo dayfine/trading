@@ -14,7 +14,7 @@ IN_PROGRESS
 
 - [x] T1-A: Add `dune fmt --check` as hard gate — `devtools/checks/fmt_check.sh` uses `ocamlformat --check` on all source files
 - [x] T1-A: Add architecture layer test (`analysis/` cannot import `trading/trading/`)
-- [ ] T1-A+: Custom linter — function length (>50 lines = test failure) — shell heuristic has too many false positives; needs AST-based approach or dune plugin
+- [x] T1-A+: Custom linter — function length (>50 lines = test failure) — OCaml AST-based via `compiler-libs`; `@large-function` annotation to opt out specific functions
 - [x] T1-A+: Custom linter — magic numbers in `analysis/weinstein/` not in config — extended to whole codebase; path exceptions in `devtools/checks/linter_exceptions.conf`
 - [x] T1-A+: Custom linter — magic numbers: allow named constant definitions (`let foo = <num>`)
 - [x] T1-A+: Custom linter — public `.ml` functions missing from `.mli`
@@ -83,4 +83,5 @@ IN_PROGRESS
 - [x] Deleted `qc-reviewer.md` — superseded by `qc-structural` + `qc-behavioral`
 - [x] T1-A: Architecture layer test + magic numbers + mli coverage linters in `trading/devtools/checks/` with `linter_exceptions.conf` for documented path exceptions
 - [x] T1-A: File length linter — 300-line soft limit, 500-line declared-large (`@large-module`), 11% cap
+- [x] T1-A+: Function length linter — `devtools/fn_length_linter/` OCaml AST via `compiler-libs`; 5 annotated exceptions with `@large-function`
 - [x] T3-F: Created `docs/design/dependency-rules.md` — R1–R6 rules with lifecycle states; R1, R4, R6 enforced; R2, R3 monitored; R5 proposed

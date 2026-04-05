@@ -30,6 +30,13 @@
  (action
   (run sh %{dep:linter_magic_numbers.sh} %{dep:linter_exceptions.conf})))
 
+; Function length: no top-level function body may exceed 50 lines (AST-based)
+
+(rule
+ (alias runtest)
+ (action
+  (run %{exe:../fn_length_linter/fn_length_linter.exe} %{workspace_root})))
+
 ; Formatting gate: all .ml/.mli files must be formatted with ocamlformat
 
 (rule
