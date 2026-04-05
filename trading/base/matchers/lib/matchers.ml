@@ -168,7 +168,6 @@ let elements_are matchers list =
   else List.iter2_exn list matchers ~f:(fun elem matcher -> matcher elem)
 
 let unordered_elements_are matchers list =
-  (* Check length first *)
   if List.length matchers <> List.length list then
     assert_failure
       (Printf.sprintf "Expected %d elements but got %d" (List.length matchers)
@@ -183,52 +182,40 @@ let unordered_elements_are matchers list =
                 true
               with _ -> false))
     in
-    (* Check which matchers matched at least one element *)
     let matcher_matched =
       List.init (List.length matchers) ~f:(fun j ->
           List.exists matrix ~f:(fun row -> List.nth_exn row j))
     in
-    (* Check which elements matched at least one matcher *)
     let element_matched =
       List.map matrix ~f:(fun row -> List.exists row ~f:Fn.id)
     in
-    (* Find unmatched matchers *)
     let unmatched_matchers =
-      List.filter_mapi matcher_matched ~f:(fun i matched ->
-          if matched then None else Some i)
+      List.filter_mapi matcher_matched ~f:(fun i m -> Option.some_if (not m) i)
     in
-    (* Find unmatched elements *)
     let unmatched_elements =
-      List.filter_mapi element_matched ~f:(fun i matched ->
-          if matched then None else Some i)
+      List.filter_mapi element_matched ~f:(fun i m -> Option.some_if (not m) i)
     in
-    (* Report errors if any *)
-    if
-      (not (List.is_empty unmatched_matchers))
-      || not (List.is_empty unmatched_elements)
-    then
-      let msgs = [] in
-      let msgs =
-        if not (List.is_empty unmatched_matchers) then
-          Printf.sprintf
-            "where the following matchers don't match any elements: %s"
-            (String.concat ~sep:", "
-               (List.map unmatched_matchers ~f:(fun i ->
-                    Printf.sprintf "matcher #%d" i)))
-          :: msgs
-        else msgs
-      in
-      let msgs =
-        if not (List.is_empty unmatched_elements) then
-          Printf.sprintf
-            "where the following elements don't match any matchers: %s"
-            (String.concat ~sep:", "
-               (List.map unmatched_elements ~f:(fun i ->
-                    Printf.sprintf "element #%d" i)))
-          :: msgs
-        else msgs
-      in
-      assert_failure (String.concat ~sep:"\nand " (List.rev msgs))
+    let msgs =
+      List.filter_map ~f:Fn.id
+        [
+          Option.some_if
+            (not (List.is_empty unmatched_matchers))
+            (Printf.sprintf
+               "where the following matchers don't match any elements: %s"
+               (String.concat ~sep:", "
+                  (List.map unmatched_matchers
+                     ~f:(Printf.sprintf "matcher #%d"))));
+          Option.some_if
+            (not (List.is_empty unmatched_elements))
+            (Printf.sprintf
+               "where the following elements don't match any matchers: %s"
+               (String.concat ~sep:", "
+                  (List.map unmatched_elements
+                     ~f:(Printf.sprintf "element #%d"))));
+        ]
+    in
+    if not (List.is_empty msgs) then
+      assert_failure (String.concat ~sep:"\nand " msgs)
 
 let size_is expected_size list =
   let actual_size = List.length list in

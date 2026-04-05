@@ -219,35 +219,35 @@ let _global_signal ~weight ~stage_config ~global_consensus_threshold
 (* Main function                                                        *)
 (* ------------------------------------------------------------------ *)
 
-let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
-    : result =
-  let {
-    stage_config;
-    bullish_threshold;
-    bearish_threshold;
-    indicator_weights = iw;
-    indicator_thresholds = it;
-  } =
+let _build_indicators ~config ~index_stage ~ad_bars ~index_bars
+    ~global_index_bars =
+  let { stage_config; indicator_weights = iw; indicator_thresholds = it; _ } =
     config
   in
+  [
+    _index_stage_signal ~weight:iw.w_index_stage index_stage;
+    _ad_line_signal ~weight:iw.w_ad_line ~ad_min_bars:it.ad_min_bars
+      ~ad_line_lookback:it.ad_line_lookback ~ad_bars ~index_bars;
+    _momentum_index_signal ~weight:iw.w_momentum_index
+      ~momentum_period:it.momentum_period ~ad_bars;
+    _nh_nl_signal ~weight:iw.w_nh_nl ~nh_nl_min_bars:it.nh_nl_min_bars
+      ~nh_nl_lookback:it.nh_nl_lookback
+      ~nh_nl_up_threshold:it.nh_nl_up_threshold
+      ~nh_nl_down_threshold:it.nh_nl_down_threshold ~index_bars;
+    _global_signal ~weight:iw.w_global ~stage_config
+      ~global_consensus_threshold:it.global_consensus_threshold
+      ~global_index_bars;
+  ]
+
+let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
+    : result =
+  let { stage_config; bullish_threshold; bearish_threshold; _ } = config in
   let index_stage =
     Stage.classify ~config:stage_config ~bars:index_bars ~prior_stage
   in
   let indicators =
-    [
-      _index_stage_signal ~weight:iw.w_index_stage index_stage;
-      _ad_line_signal ~weight:iw.w_ad_line ~ad_min_bars:it.ad_min_bars
-        ~ad_line_lookback:it.ad_line_lookback ~ad_bars ~index_bars;
-      _momentum_index_signal ~weight:iw.w_momentum_index
-        ~momentum_period:it.momentum_period ~ad_bars;
-      _nh_nl_signal ~weight:iw.w_nh_nl ~nh_nl_min_bars:it.nh_nl_min_bars
-        ~nh_nl_lookback:it.nh_nl_lookback
-        ~nh_nl_up_threshold:it.nh_nl_up_threshold
-        ~nh_nl_down_threshold:it.nh_nl_down_threshold ~index_bars;
-      _global_signal ~weight:iw.w_global ~stage_config
-        ~global_consensus_threshold:it.global_consensus_threshold
-        ~global_index_bars;
-    ]
+    _build_indicators ~config ~index_stage ~ad_bars ~index_bars
+      ~global_index_bars
   in
   let confidence = _compute_confidence indicators in
   let trend =

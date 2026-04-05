@@ -389,59 +389,52 @@ let _generate_bridge_segment ~random_state ~start_price ~end_price ~n_points
 
 (** {1 Main Path Generation} *)
 
+(** Interpolate between waypoints using Brownian bridge segments, accumulating
+    path points. Each segment is bridged from its start waypoint to its end
+    waypoint. The opening price is prepended on the first segment. *)
+let rec _generate_segments ~random_state ~volatility_scale ~degrees_of_freedom
+    ~total_points ~low_bound ~high_bound prices indices acc =
+  match (prices, indices) with
+  | p1 :: p2 :: rest_prices, idx1 :: idx2 :: rest_indices ->
+      let acc' =
+        if List.is_empty acc then ({ price = p1 } : path_point) :: acc else acc
+      in
+      let segment =
+        _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
+          ~n_points:(idx2 - idx1) ~volatility_scale ~degrees_of_freedom
+          ~resolution:total_points ~low_bound ~high_bound
+      in
+      let acc'' =
+        ({ price = p2 } : path_point) :: List.rev_append segment acc'
+      in
+      _generate_segments ~random_state ~volatility_scale ~degrees_of_freedom
+        ~total_points ~low_bound ~high_bound (p2 :: rest_prices)
+        (idx2 :: rest_indices) acc''
+  | _, _ -> List.rev acc
+
 let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
-  (* Initialize random state based on seed *)
   let random_state =
     match config.seed with
     | Some seed -> Random.State.make [| seed |]
     | None -> Random.State.make_self_init ()
   in
-  (* Step 1: Decide path order *)
   let high_first = _decide_high_first random_state bar in
   let waypoint_prices =
     if high_first then
       [ bar.open_price; bar.high_price; bar.low_price; bar.close_price ]
     else [ bar.open_price; bar.low_price; bar.high_price; bar.close_price ]
   in
-  (* Step 2: Generate waypoint indices *)
   let waypoint_indices =
     _generate_waypoint_indices random_state config.profile config.total_points
   in
-  (* Step 3: Infer volatility *)
   let volatility_scale = _infer_volatility_scale bar in
-  (* Step 4: Generate path segments between waypoints *)
-  (* Special case: if total_points <= 4, just return waypoints without interpolation *)
   if config.total_points <= 4 then
     List.map waypoint_prices ~f:(fun price -> ({ price } : path_point))
   else
-    (* Standard case: interpolate between waypoints with Brownian bridge *)
-    let rec generate_segments prices indices acc =
-      match (prices, indices) with
-      | p1 :: p2 :: rest_prices, idx1 :: idx2 :: rest_indices ->
-          (* Create opening point if this is first segment *)
-          let acc' =
-            if List.is_empty acc then ({ price = p1 } : path_point) :: acc
-            else acc
-          in
-          (* Each segment gets points proportional to its length
-             Since waypoint indices are in [0, total_points-1],
-             segment_length directly gives us the number of points *)
-          let n_points = idx2 - idx1 in
-          (* Generate bridge segment *)
-          let segment =
-            _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
-              ~n_points ~volatility_scale
-              ~degrees_of_freedom:config.degrees_of_freedom
-              ~resolution:config.total_points ~low_bound:bar.low_price
-              ~high_bound:bar.high_price
-          in
-          (* Add ending waypoint and continue *)
-          let waypoint : path_point = { price = p2 } in
-          let acc'' = waypoint :: List.rev_append segment acc' in
-          generate_segments (p2 :: rest_prices) (idx2 :: rest_indices) acc''
-      | _, _ -> List.rev acc
-    in
-    generate_segments waypoint_prices waypoint_indices []
+    _generate_segments ~random_state ~volatility_scale
+      ~degrees_of_freedom:config.degrees_of_freedom
+      ~total_points:config.total_points ~low_bound:bar.low_price
+      ~high_bound:bar.high_price waypoint_prices waypoint_indices []
 
 (** {1 Early Exit Optimization} *)
 

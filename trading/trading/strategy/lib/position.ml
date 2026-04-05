@@ -223,43 +223,49 @@ let create_entering ?(id = None) ?(date = None) transition =
 let get_state t = t.state
 let is_closed t = match t.state with Closed _ -> true | _ -> false
 
-(** {1 Transition Application} *)
+(** {1 Transition Handlers} *)
 
-let apply_transition t transition =
-  let open Result.Let_syntax in
-  let%bind () = _validate_position_id t.id transition.position_id in
-  let%bind () =
-    Status.combine_status_list (_validate_transition t transition)
-  in
+let _invalid_transition kind =
+  Error
+    (Status.invalid_argument_error
+       (Printf.sprintf "Invalid transition %s for current state"
+          (show_transition_kind kind)))
+
+let _apply_entering_transition t transition =
+  let date = transition.date in
   match (t.state, transition.kind) with
-  (* Entering state transitions *)
-  | Entering entry_state, EntryFill { filled_quantity; fill_price = _ } ->
+  | ( Entering
+        { target_quantity; entry_price; filled_quantity = curr; created_date },
+      EntryFill { filled_quantity; _ } ) ->
       Ok
         {
           t with
           state =
             Entering
               {
-                entry_state with
-                filled_quantity = entry_state.filled_quantity +. filled_quantity;
+                target_quantity;
+                entry_price;
+                filled_quantity = curr +. filled_quantity;
+                created_date;
               };
-          last_updated = transition.date;
+          last_updated = date;
         }
-  | Entering entry_state, EntryComplete { risk_params } ->
+  | Entering { filled_quantity; entry_price; _ }, EntryComplete { risk_params }
+    ->
       Ok
         {
           t with
           state =
             Holding
               {
-                quantity = entry_state.filled_quantity;
-                entry_price = entry_state.entry_price;
-                entry_date = transition.date;
+                quantity = filled_quantity;
+                entry_price;
+                entry_date = date;
                 risk_params;
               };
-          last_updated = transition.date;
+          last_updated = date;
         }
-  | Entering entry_state, CancelEntry { reason = _ } ->
+  | Entering { entry_price; created_date; _ }, CancelEntry _ ->
       Ok
         {
           t with
@@ -267,18 +273,22 @@ let apply_transition t transition =
             Closed
               {
                 quantity = 0.0;
-                entry_price = entry_state.entry_price;
-                exit_price = entry_state.entry_price;
+                entry_price;
+                exit_price = entry_price;
                 gross_pnl = None;
-                entry_date = entry_state.created_date;
-                exit_date = transition.date;
-                days_held = Date.diff transition.date entry_state.created_date;
+                entry_date = created_date;
+                exit_date = date;
+                days_held = Date.diff date created_date;
               };
           exit_reason = Some PortfolioRebalancing;
-          last_updated = transition.date;
+          last_updated = date;
         }
-  (* Holding state transitions *)
-  | ( Holding { quantity; entry_price; entry_date; risk_params = _ },
+  | _, kind -> _invalid_transition kind
+
+let _apply_holding_transition t transition =
+  let date = transition.date in
+  match (t.state, transition.kind) with
+  | ( Holding { quantity; entry_price; entry_date; _ },
       TriggerExit { exit_reason; exit_price } ) ->
       Ok
         {
@@ -292,55 +302,91 @@ let apply_transition t transition =
                 target_quantity = quantity;
                 exit_price;
                 filled_quantity = 0.0;
-                started_date = transition.date;
+                started_date = date;
               };
           exit_reason = Some exit_reason;
-          last_updated = transition.date;
+          last_updated = date;
         }
-  | Holding holding_state, UpdateRiskParams { new_risk_params } ->
+  | ( Holding { quantity; entry_price; entry_date; _ },
+      UpdateRiskParams { new_risk_params } ) ->
       Ok
         {
           t with
-          state = Holding { holding_state with risk_params = new_risk_params };
-          last_updated = transition.date;
+          state =
+            Holding
+              {
+                quantity;
+                entry_price;
+                entry_date;
+                risk_params = new_risk_params;
+              };
+          last_updated = date;
         }
-  (* Exiting state transitions *)
-  | Exiting exit_state, ExitFill { filled_quantity; fill_price = _ } ->
+  | _, kind -> _invalid_transition kind
+
+let _apply_exiting_transition t transition =
+  let date = transition.date in
+  match (t.state, transition.kind) with
+  | ( Exiting
+        {
+          quantity;
+          entry_price;
+          entry_date;
+          target_quantity;
+          exit_price;
+          filled_quantity = curr;
+          started_date;
+        },
+      ExitFill { filled_quantity; _ } ) ->
       Ok
         {
           t with
           state =
             Exiting
               {
-                exit_state with
-                filled_quantity = exit_state.filled_quantity +. filled_quantity;
+                quantity;
+                entry_price;
+                entry_date;
+                target_quantity;
+                exit_price;
+                filled_quantity = curr +. filled_quantity;
+                started_date;
               };
-          last_updated = transition.date;
+          last_updated = date;
         }
-  | Exiting exit_state, ExitComplete ->
+  | ( Exiting { filled_quantity; entry_price; exit_price; entry_date; _ },
+      ExitComplete ) ->
       Ok
         {
           t with
           state =
             Closed
               {
-                quantity = exit_state.filled_quantity;
-                entry_price = exit_state.entry_price;
-                exit_price = exit_state.exit_price;
+                quantity = filled_quantity;
+                entry_price;
+                exit_price;
                 gross_pnl = None;
-                entry_date = exit_state.entry_date;
-                exit_date = transition.date;
-                days_held = Date.diff transition.date exit_state.entry_date;
+                entry_date;
+                exit_date = date;
+                days_held = Date.diff date entry_date;
               };
-          last_updated = transition.date;
+          last_updated = date;
         }
-  (* Invalid transitions *)
-  | Closed _, _ ->
+  | _, kind -> _invalid_transition kind
+
+(** {1 Transition Application} *)
+
+let apply_transition t transition =
+  let open Result.Let_syntax in
+  let%bind () = _validate_position_id t.id transition.position_id in
+  let%bind () =
+    Status.combine_status_list (_validate_transition t transition)
+  in
+  match t.state with
+  | Entering _ -> _apply_entering_transition t transition
+  | Holding _ -> _apply_holding_transition t transition
+  | Exiting _ -> _apply_exiting_transition t transition
+  | Closed _ ->
       Error
         (Status.invalid_argument_error
            "Cannot apply transitions to closed position")
-  | _, kind ->
-      Error
-        (Status.invalid_argument_error
-           (Printf.sprintf "Invalid transition %s for current state"
-              (show_transition_kind kind)))
