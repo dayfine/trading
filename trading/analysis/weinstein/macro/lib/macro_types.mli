@@ -39,11 +39,7 @@ type config = {
   indicator_thresholds : indicator_thresholds;
 }
 
-type ad_bar = {
-  date : Core.Date.t;
-  advancing : int;
-  declining : int;
-}
+type ad_bar = { date : Core.Date.t; advancing : int; declining : int }
 
 type result = {
   index_stage : Stage.result;

@@ -1,6 +1,9 @@
 (** Pre-built metric computers for common performance metrics. *)
 
 open Core
+
+let trading_days_per_year = 252.0
+
 module Metric_types = Trading_simulation_types.Metric_types
 module Simulator_types = Trading_simulation_types.Simulator_types
 
@@ -83,9 +86,9 @@ let _sharpe_computer_impl ~risk_free_rate :
               let std_return = _std daily_returns in
               if Float.(std_return = 0.0) then 0.0
               else
-                let daily_rf = state.risk_free_rate /. 252.0 in
+                let daily_rf = state.risk_free_rate /. trading_days_per_year in
                 let excess_return = mean_return -. daily_rf in
-                excess_return /. std_return *. Float.sqrt 252.0
+                excess_return /. std_return *. Float.sqrt trading_days_per_year
         in
         Metric_types.singleton SharpeRatio sharpe_ratio);
   }

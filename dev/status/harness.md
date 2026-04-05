@@ -12,11 +12,11 @@ IN_PROGRESS
 
 ## Tier 1 — Immediate
 
-- [ ] T1-A: Add `dune fmt --check` as hard gate — needs a real check script in `devtools/checks/`, not just docs
+- [x] T1-A: Add `dune fmt --check` as hard gate — `devtools/checks/fmt_check.sh` uses `ocamlformat --check` on all source files
 - [x] T1-A: Add architecture layer test (`analysis/` cannot import `trading/trading/`)
 - [ ] T1-A+: Custom linter — function length (>50 lines = test failure) — shell heuristic has too many false positives; needs AST-based approach or dune plugin
 - [x] T1-A+: Custom linter — magic numbers in `analysis/weinstein/` not in config — extended to whole codebase; path exceptions in `devtools/checks/linter_exceptions.conf`
-- [ ] T1-A+: Custom linter — magic numbers: allow named constant definitions (`let foo = <num>`) — current linter flags these; needs a followup fix
+- [x] T1-A+: Custom linter — magic numbers: allow named constant definitions (`let foo = <num>`)
 - [x] T1-A+: Custom linter — public `.ml` functions missing from `.mli`
 - [x] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`; A1 is FLAG not FAIL)
 - [x] T1-B: Create `qc-behavioral` agent (new, domain-focused; includes A1 generalizability judgment)
