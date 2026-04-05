@@ -45,7 +45,7 @@ IN_PROGRESS
 - [ ] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history)
 - [ ] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
 - [ ] T3-A: `health-scanner` deep scan — feat-agent template compliance check
-- [ ] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
+- [x] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
 - [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)
 - [ ] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` with `harness_gap` field on NEEDS_REWORK
 - [ ] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
@@ -84,4 +84,6 @@ IN_PROGRESS
 - [x] T1-A: Architecture layer test + magic numbers + mli coverage linters in `trading/devtools/checks/` with `linter_exceptions.conf` for documented path exceptions
 - [x] T1-A: File length linter — 300-line soft limit, 500-line declared-large (`@large-module`), 11% cap
 - [x] T1-A+: Function length linter — `devtools/fn_length_linter/` OCaml AST via `compiler-libs`; 5 annotated exceptions with `@large-function`
+- [x] T3-B: AVR loop closure already implemented in `lead-orchestrator` Step 5 — auto-dispatches QC for any READY_FOR_REVIEW feature in the same run
+- [x] qc-structural: P1/P2/P4 updated to "verified by linter (H3)" — QC no longer manually re-scans; linters are deterministic
 - [x] T3-F: Created `docs/design/dependency-rules.md` — R1–R6 rules with lifecycle states; R1, R4, R6 enforced; R2, R3 monitored; R5 proposed
