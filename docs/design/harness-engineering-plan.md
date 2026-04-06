@@ -484,6 +484,105 @@ already review.
 
 ---
 
+## Maintenance Cycles
+
+The harness is primarily designed for forward feature work, but the codebase also
+accumulates maintenance debt: cross-cutting refactors, pattern consistency fixes,
+and quality improvements. Without an explicit model for this, maintenance work
+either blocks features silently or never happens.
+
+### The two classes of maintenance work
+
+**Blocking refactors** — refactoring that must complete before a feature's next
+phase can start. Example: a state machine wrapper that both `weinstein_stops` and
+`stage` depend on before their respective clean-up work can proceed. These are
+urgent: they sit on the critical path.
+
+**Non-blocking refactors** — improvements that should happen eventually but don't
+block anything now. These accumulate in `## Followup / Known Improvements` sections
+of status files. Individual items are small; the risk is that they pile up into an
+unmanageable backlog.
+
+### Maintenance cycle triggers in `lead-orchestrator`
+
+The orchestrator checks two conditions at the start of each run **before**
+dispatching feat-agents:
+
+1. **Blocking refactors** (immediate): read `## Blocking Refactors` from every
+   feature status file. If any are non-empty, dispatch a refactor work item for
+   each one before spawning the dependent feat-agent. The refactor item goes
+   through the full blueprint (agent → gates → QC → merge) just like a feature.
+
+2. **Non-blocking accumulation** (scheduled): count total open followup items
+   across all status files. If the count exceeds a threshold (default: 10 items),
+   replace one feature slot in the current run with a maintenance cycle — an agent
+   pass focused on clearing the oldest/highest-value followup items. After the
+   threshold is crossed, one maintenance cycle runs per N feature cycles
+   (default: every 3rd run). The threshold and ratio live in
+   `dev/config/merge-policy.json`.
+
+### Status file conventions
+
+Feature status files gain two sections:
+
+```markdown
+## Blocking Refactors
+- [ ] <description> — blocks: <next phase>
+  (empty when nothing is blocking)
+
+## Followup / Known Improvements
+- <description>
+- <description>
+  (items accumulate here; cleared by maintenance cycles)
+```
+
+The lead orchestrator reads `## Blocking Refactors` as a prerequisite check.
+The health-scanner deep scan counts `## Followup / Known Improvements` items
+and reports the total in its weekly output, with a flag when the threshold is
+crossed.
+
+### Refactor agent
+
+Refactor work items use the same feat-agents (each feat-agent owns its own
+module scope). For cross-cutting refactors (touching multiple feature areas),
+a standalone prompt is passed to the most appropriate feat-agent with a
+`## Refactor Mode` header instead of the normal feature development prompt.
+The refactor mode prompt includes:
+- The specific pattern or abstraction to implement
+- The files to change
+- The expected quality improvement (what metric improves, by how much)
+- The same MAX ITERATIONS cap and TDD workflow as feature work
+
+### Quality metrics
+
+Refactors should produce measurable improvements. Two metrics are tracked:
+
+**Cyclomatic complexity (CC)**: extend the function length linter (already uses
+`compiler-libs`) to also compute CC per function. CC = number of branches
+(match arms, if/else, when guards) + 1. Report functions with CC > 10 as
+warnings (not failures — CC is a quality signal, not a hard gate like length).
+Store per-function CC in `dev/metrics/cc-YYYY-MM-DD.json` after each
+orchestrator run so trends are visible.
+
+**QC quality score**: add a `## Quality Score` section to qc-behavioral output:
+a 1–5 integer rating with a one-sentence rationale, covering code clarity,
+abstraction appropriateness, and domain model fidelity. This is explicitly
+subjective (the agent's judgment) and is not used as a hard gate. It goes into
+the audit trail (`dev/audit/`) so the health-scanner can track per-feature
+quality trends over time and flag regressions.
+
+### Relationship to existing harness items
+
+- T3-A deep scan: add followup-item counting and CC trend analysis to the deep
+  scan report
+- T3-D audit trail: QC quality score goes in the audit record alongside the
+  checklist results
+- T1-A+: CC linter extension (quality signal only, not a gate) — implement
+  alongside the existing fn_length_linter using the same compiler-libs
+  infrastructure
+
+---
+
 ## Tier 4 — Continuous Development Loop (target end state)
 
 This tier completes the automation vision. Items here depend on Tier 3 being
