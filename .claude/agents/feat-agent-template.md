@@ -82,8 +82,40 @@ status to READY_FOR_REVIEW.
 ### 7. Status file format (required, feature-specific fields)
 
 Document the canonical format for `dev/status/<feature>.md` that this agent must
-maintain. At minimum it must track: last-updated date, status enum, interface stable
-flag, completed/in-progress/blocked/follow-up/next-steps sections.
+maintain. The canonical sections are:
+
+```markdown
+## Last updated: YYYY-MM-DD
+## Status
+IN_PROGRESS | READY_FOR_REVIEW | MERGED
+
+## Interface stable
+YES | NO
+
+## Completed
+(what is merged and done — no done items belong in Follow-up)
+
+## In Progress
+(current session work)
+
+## Blocking Refactors
+(items that must be resolved before downstream features can depend on this one;
+the lead-orchestrator dispatches these before feat-agents on each run)
+
+## Follow-up
+(non-blocking open items; the orchestrator counts these for maintenance cycles;
+remove items once addressed — this is a backlog, not a ledger)
+
+## Known gaps
+(long-horizon items with no immediate action needed; informational only;
+the orchestrator does not act on this section)
+```
+
+**Rules:**
+- Remove done items from `## Follow-up` immediately — do not accumulate history there
+- Omit `## Recent Commits` — git log is authoritative; PR numbers belong in `## Completed`
+- `## Blocking Refactors` takes priority over feature work on the next run
+- `## Known gaps` is never empty-checked by automation; it is for human awareness only
 
 ---
 
