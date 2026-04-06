@@ -43,3 +43,10 @@
  (alias runtest)
  (action
   (run sh %{dep:fmt_check.sh})))
+
+; Agent definition compliance: every feat-*.md must have required sections
+
+(rule
+ (alias runtest)
+ (action
+  (run sh %{dep:agent_compliance_check.sh})))
