@@ -34,6 +34,17 @@ IN_PROGRESS
 - [x] T1-L: Parallel write conflict policy documented in `lead-orchestrator` Step 4 — shared files read-only during parallel execution; proposed changes surfaced in return values
 - [ ] T1-M: "Done" definition — add explicit acceptance criteria to each Tier 1 item's completion note (harness items should state what was built, where it lives, and how to verify)
 
+## Maintenance Cycles
+
+- [ ] M1: Add `## Blocking Refactors` section to all feat-agent status files
+- [ ] M1: Update `lead-orchestrator` to read blocking refactors and dispatch before feat-agents
+- [ ] M1: Update `lead-orchestrator` to count followup items and schedule maintenance cycles (threshold: 10 items, every 3rd run)
+- [ ] M1: Add `## Refactor Mode` prompt variant to feat-agent definitions
+- [ ] M2: Cyclomatic complexity linter — extend `fn_length_linter` via `compiler-libs`; CC > 10 = warning; output to `dev/metrics/cc-YYYY-MM-DD.json`
+- [ ] M2: qc-behavioral quality score — add `## Quality Score` (1–5 + rationale) to output; tracked in audit trail
+- [ ] M3: T3-A deep scan extension — followup-item count + CC trend analysis in weekly report
+- [ ] M3: T3-D audit trail — include quality score in audit records
+
 ## Tier 2 — Milestone-gated
 
 - [ ] T2-A: Golden scenario test suite — screener regression tests (after M4)

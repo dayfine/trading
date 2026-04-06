@@ -45,9 +45,32 @@ Read all of the following before doing anything else:
 
 ---
 
-## Step 2: Determine which agents to run today
+## Step 2: Check for maintenance work (before feature agents)
 
-### Dependency rules
+### 2a: Blocking refactors (immediate — runs before any feat-agent)
+
+Read the `## Blocking Refactors` section of each feature status file. If any
+unchecked items exist, dispatch a refactor work item for each one **before**
+spawning the dependent feat-agent. Use the same blueprint as a feature (preflight
+→ agent → gates → QC → merge). Pass the feat-agent a `## Refactor Mode` prompt
+(see Step 4) instead of the normal feature prompt.
+
+Blocking refactors take a feature slot in the current run. If all slots are
+consumed by blocking refactors, no feat-agents run today — this is correct.
+
+### 2b: Non-blocking followup accumulation (scheduled)
+
+Count total open items across all `## Followup / Known Improvements` sections.
+Read threshold and cycle ratio from `dev/config/merge-policy.json` (defaults:
+threshold = 10 items, maintenance every 3rd run if threshold exceeded).
+
+If the count exceeds the threshold AND this run falls on a maintenance cycle:
+replace one feature slot with a maintenance pass — dispatch the feat-agent owning
+the most followup items with a `## Refactor Mode` prompt listing the top items.
+
+Record the total followup count in today's daily summary regardless.
+
+### 2c: Feature dependency rules
 
 | Feature | Can run when |
 |---------|--------------|
@@ -56,8 +79,7 @@ Read all of the following before doing anything else:
 | screener | data-layer status shows "Interface stable: YES" |
 | simulation | data-layer, portfolio-stops, AND screener all show "Interface stable: YES" |
 
-### Skip a feature if its status is MERGED with no Follow-up items, or APPROVED (awaiting human merge decision).
-### Run a feature agent if its status is MERGED but its status file has a non-empty `## Follow-up` section — the agent will address those items before anything else.
+Skip a feature if its status is MERGED with no Blocking Refactors or Follow-up items, or APPROVED (awaiting human merge decision).
 
 ---
 
@@ -175,6 +197,43 @@ Fill in the feature-specific constraint:
 - **portfolio-stops**: "Do NOT modify existing Portfolio, Orders, or Position modules. Build alongside them. Set 'Interface stable: YES' in status once your Portfolio_manager .mli is final."
 - **screener**: "All analysis functions must be pure (same input → same output). Reference weinstein-book-reference.md for the specific domain rules to encode."
 - **simulation**: "The Weinstein strategy must implement the existing STRATEGY module type. The simulator is a pure function: config + date_range → result. All parameters in config."
+
+### Refactor Mode prompt (use instead of above when dispatching a refactor work item)
+
+```
+You are performing a REFACTOR task for the Weinstein Trading System.
+This is maintenance work, not feature development.
+
+## Refactor Mode
+
+### Task
+<describe the specific refactoring: what to extract, consolidate, or restructure>
+
+### Files to change
+<list specific files>
+
+### Expected quality improvement
+<what improves: e.g., "eliminates duplication of _compute_ma_slope across 3 modules",
+ "reduces cyclomatic complexity of _classify_new_stage from 12 to <6",
+ "establishes canonical state machine shape in engineering-principles.md">
+
+### Constraints
+- Do NOT add new features or change external interfaces
+- All existing tests must still pass — add new tests only if refactoring reveals
+  untested behaviour
+- Changes must be smaller in total diff than equivalent feature work (refactor,
+  not rewrite)
+
+Your branch: refactor/<short-name>
+  jj new main@origin
+  jj bookmark create refactor/<short-name> -r @
+
+Same build/test/commit discipline as feature work. Same MAX ITERATIONS cap (3).
+When done: set a new status entry in the relevant dev/status/<feature>.md marking
+the blocking refactor item as complete (check the box).
+
+Return: what changed, what quality metric improved, any surprises.
+```
 
 ---
 
