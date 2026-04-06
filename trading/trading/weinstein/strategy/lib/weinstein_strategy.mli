@@ -3,29 +3,33 @@
     Implements Stan Weinstein's Stage 2 entry / Stage 3-4 exit methodology as a
     [STRATEGY] module that the existing simulator can run.
 
-    {1 Weekly cadence}
+    {1 Cadence}
 
-    This strategy is designed for weekly calls (Friday close). Pair it with
-    [Simulator.create_deps ~strategy_cadence:Weekly] so the simulator only calls
-    [on_market_close] on Fridays.
+    This strategy runs on daily cadence. Pair it with
+    [Simulator.create_deps ~strategy_cadence:Daily].
+
+    Stop adjustments happen every day — trailing stops follow the MA, which
+    moves daily. Macro analysis and screening for new entries happen only on
+    Fridays (weekly review), detected from the date of the index bar.
 
     {1 State}
 
     The STRATEGY interface is stateless (positions are passed in every call).
     Weinstein-specific state (stop states, prior stage classifications, last
     macro result) lives in a closure created by [make]. In simulation the state
-    evolves across weekly calls. In live mode it should be saved/loaded via
+    evolves across daily calls. In live mode it should be saved/loaded via
     [Weinstein_trading_state].
 
     {1 on_market_close behaviour}
 
-    On each weekly call the strategy: 1. Updates trailing stops for all held
+    On each daily call the strategy: 1. Updates trailing stops for all held
     positions; emits [UpdateRiskParams] for adjusted stops, [TriggerExit] for
-    stops hit. 2. Runs macro analysis using the index bars provided via
-    [get_price]. 3. If in a non-bearish regime (or the first call): runs stock
-    screener over all symbols available via [get_price]. 4. Emits
+    stops hit. 2. On Fridays only: runs macro analysis using the index bars
+    provided via [get_price]; runs stock screener over all symbols; emits
     [CreateEntering] for top-ranked buy candidates that pass portfolio-risk
     limits (no new entries if macro is Bearish). *)
+
+open Core
 
 (** {1 Configuration} *)
 
@@ -34,11 +38,12 @@ type config = {
   index_symbol : string;
       (** Symbol for the broad market index (e.g. "GSPCX"). Used for macro
           analysis and RS computation. *)
-  stage : Stage.config;  (** Stage classifier parameters. *)
-  macro : Macro.config;  (** Macro analyser parameters. *)
-  screening : Screener.config;  (** Screener cascade parameters. *)
-  portfolio : Portfolio_risk.config;  (** Position sizing and risk limits. *)
-  stops : Weinstein_stops.config;
+  stage_config : Stage.config;  (** Stage classifier parameters. *)
+  macro_config : Macro.config;  (** Macro analyser parameters. *)
+  screening_config : Screener.config;  (** Screener cascade parameters. *)
+  portfolio_config : Portfolio_risk.config;
+      (** Position sizing and risk limits. *)
+  stops_config : Weinstein_stops.config;
       (** Trailing stop state machine parameters. *)
   initial_stop_buffer : float;
       (** Multiplier applied to [suggested_stop] when computing the initial stop
@@ -62,12 +67,16 @@ val default_config : universe:string list -> index_symbol:string -> config
 val name : string
 (** Strategy name, always ["Weinstein"]. *)
 
-val make : config -> (module Trading_strategy.Strategy_interface.STRATEGY)
+val make :
+  ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
+  config ->
+  (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
 
     Calling [make] twice creates two independent instances with their own stop
     states. Re-use the same instance across weekly calls to accumulate stop
     history.
 
-    The returned module satisfies the [STRATEGY] interface. Register it with the
-    simulator via [Simulator.create_deps ~strategy]. *)
+    @param initial_stop_states
+      Seed the stop state map — useful for tests and for restoring live state
+      from persistence. Default: empty map. *)
