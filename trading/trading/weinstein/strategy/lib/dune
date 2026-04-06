@@ -1,0 +1,17 @@
+(library
+ (name weinstein_strategy)
+ (public_name weinstein_trading.strategy)
+ (libraries
+  core
+  types
+  status
+  trading.base
+  trading.strategy
+  weinstein.types
+  weinstein_trading.stops
+  weinstein.portfolio_risk
+  weinstein.stage
+  weinstein.macro
+  weinstein.screener)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
