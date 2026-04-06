@@ -1,19 +1,15 @@
 # Status: screener
 
-## Last updated: 2026-03-30
+## Last updated: 2026-04-06
 
 ## Status
-READY_FOR_REVIEW
-
-## QC Review
-APPROVED — See dev/reviews/screener.md (2026-03-30). All prior blockers resolved.
-Ready to merge pending human decision.
+MERGED
 
 ## Interface stable
 YES
 
 ## Blocked on
-- None (data-layer MERGED)
+- None
 
 ## Completed
 
@@ -39,12 +35,12 @@ YES
 - Sector Analyzer (`analysis/weinstein/sector/`) — stage + RS + constituent breadth
   combines into Strong/Neutral/Weak rating, sector_context_of for screener — 6 tests
 
-Total: 87 new tests across 9 modules, all passing.
+Total: 87 new tests across 9 modules, all merged to main.
 
 ## In Progress
-- None — all code done, PRs open for review
+- None — all code merged to main
 
-## Followup / Known Improvements
+## Follow-up / Known Improvements
 
 ### Stage classifier: segmentation-based MA direction
 `stage/lib/stage.ml` currently classifies MA direction via a two-point slope
@@ -74,11 +70,10 @@ previous `result` + one new bar and updates the MA incrementally in O(1). The
 existing `classify` stays as the cold-start entry point. See module comment in
 `stage.mli` for the proposed signature.
 
-## Recent Commits
-- screener/rs: Add Relative Strength (RS) analyzer
-- screener/volume-resistance: Add Resistance and Volume analysis modules
-- screener/stock-analysis: Add StockAnalysis module
-- screener/stock-screener: Add Screener module with cascade filter
-- screener/macro: Add Macro market analyzer
-- screener/sector: Add Sector analyzer
-- feat/screener: Refactor SMA, share impl with WMA
+## Recent Commits (merged PRs)
+- #120: Add Stock Analyzer and Cascade Screener
+- #121: Add Macro Analyzer and Sector Analyzer
+- #122: Screener QC: APPROVED — migrate tests to Matchers, fix magic numbers
+- #160: screener/stock-analysis: Add StockAnalysis module
+- #164: Add Resistance analysis module
+- #165: Add Volume analysis module

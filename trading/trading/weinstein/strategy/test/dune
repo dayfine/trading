@@ -1,0 +1,19 @@
+(test
+ (name test_weinstein_strategy)
+ (libraries
+  core
+  types
+  status
+  trading.base
+  trading.strategy
+  weinstein_trading.strategy
+  weinstein.types
+  weinstein.screener
+  weinstein.stage
+  weinstein.macro
+  weinstein.portfolio_risk
+  weinstein_trading.stops
+  ounit2
+  matchers)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

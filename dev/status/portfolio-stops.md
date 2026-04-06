@@ -1,37 +1,39 @@
 # Status: portfolio-stops
 
-## Last updated: 2026-04-05
+## Last updated: 2026-04-06
 
 ## Status
 READY_FOR_REVIEW
 
-## Structural QC
-structural_qc: NEEDS_REWORK
-structural_qc_date: 2026-04-05
-See dev/reviews/portfolio-stops.md. Behavioral QC blocked until structural passes.
+## QC Status
+Overall QC: PENDING (new order_gen module needs review)
+Note: Prior QC review (2026-04-05) was on a stale branch; all prior code is on main.
+New work: order_gen on feat/portfolio-stops-order-gen.
 
 ## Interface stable
 YES
 
 ## Completed
-- Stop state machine (`weinstein/stops/`): Initial → Trailing → Tightened, Long/Short, configurable buffers
-- Portfolio risk management (`weinstein/portfolio_risk/`): snapshot_of_portfolio, compute_position_size, check_limits — MERGED (#137)
-- Trading state persistence (`weinstein/trading_state/`): JSON save/load, stop states, stage history, trade log — 25 tests
+- Stop state machine (`trading/weinstein/stops/`): Initial → Trailing → Tightened, Long/Short, configurable buffers — MERGED to main
+- Portfolio risk management (`analysis/weinstein/portfolio_risk/`): snapshot_of_portfolio, compute_position_size, check_limits — MERGED to main (#137)
+- Trading state persistence (`trading/weinstein/trading_state/`): sexp save/load, stop states, stage history, trade log — MERGED to main (#168)
+- Order generation (`analysis/weinstein/order_gen/`): from_candidates, from_stop_adjustments, from_exits — 9 tests — on feat/portfolio-stops-order-gen
 
 ## In Progress
-— (all remaining work blocked on screener merge)
+- QC review of order_gen pending
 
 ## Blocked
-- `order_gen`: blocked until feat/screener merges to main (needs weinstein.screener for scored_candidate type)
+- None
 
 ## Next Steps
-- `weinstein/order_gen/`: generate suggested orders from screener candidates and stop events.
-  Builds alongside (not replacing) `trading/simulation/lib/order_generator.ml`, which converts
-  Position.transitions → Market orders. Weinstein order_gen adds grades, rationale, and
-  StopLimit entry orders from screener output.
+- QC review order_gen; merge to main
+
+## Follow-up
+- None
+
 ## Recent Commits
-- #147 Add stop state types, config, and basic API
-- #148 Add stop update machinery (merged into #147 PR)
-- #149 Improve stop module: configurable buffers, unified bar extreme, extracted dispatch
-- #137 Add Portfolio risk management module
-- portfolio-stops/trading-state: Add Weinstein trading state persistence (25 tests)
+- feat/portfolio-stops-order-gen: Add Weinstein order generation module (9 tests)
+- #172: Apply review: migrate test_weinstein_stops.ml to new matchers
+- #168: Rewrite weinstein_trading_state to use sexp serialisation
+- #167: Add sexp derivation to weinstein types and stops
+- #137: Add Portfolio risk management module
