@@ -10,8 +10,7 @@ type historical_price_params = {
   symbol : string;  (** If not specified, omitted from the API call *)
   start_date : Date.t option;  (** If not specified, defaults to today *)
   end_date : Date.t option;  (** If not specified, defaults to today *)
-  period : Types.Cadence.t;
-      (** Cadence of price bars. Defaults to [Daily] if not specified. *)
+  period : Types.Cadence.t;  (** Cadence of price bars. *)
 }
 
 type fundamentals = {
