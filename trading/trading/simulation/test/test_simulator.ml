@@ -24,6 +24,7 @@ let sample_config =
     end_date = date_of_string "2024-01-05";
     initial_cash = 10000.0;
     commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
+    strategy_cadence = Types.Cadence.Daily;
   }
 
 let sample_aapl_prices =
@@ -764,7 +765,7 @@ let test_weekly_cadence_calls_strategy_only_on_fridays _ =
       let deps =
         create_deps ~symbols:[ "AAPL" ] ~data_dir
           ~strategy:(module Counting_strategy)
-          ~strategy_cadence:Types.Cadence.Weekly ~commission ()
+          ~commission ()
       in
       let config =
         {
@@ -773,6 +774,7 @@ let test_weekly_cadence_calls_strategy_only_on_fridays _ =
           (* covers Mon 8 – Fri 19, two full weeks *)
           initial_cash = 10000.0;
           commission;
+          strategy_cadence = Types.Cadence.Weekly;
         }
       in
       let sim = Test_helpers.create_exn ~config ~deps in

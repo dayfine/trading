@@ -23,11 +23,6 @@ type dependencies = {
   order_manager : Trading_orders.Manager.order_manager;
   market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
   computers : any_metric_computer list;
-  strategy_cadence : Types.Cadence.t;
-      (** How often to call the strategy. [Daily] (default) calls every step.
-          [Weekly] calls only on Fridays. [Monthly] calls only on the last day
-          of each month. Non-strategy days still process pending orders and fill
-          existing orders against intraday price paths. *)
 }
 
 val create_deps :
@@ -35,16 +30,11 @@ val create_deps :
   data_dir:Fpath.t ->
   strategy:(module Trading_strategy.Strategy_interface.STRATEGY) ->
   commission:Trading_engine.Types.commission_config ->
-  ?strategy_cadence:Types.Cadence.t ->
   ?computers:any_metric_computer list ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
-    adapter.
-
-    @param strategy_cadence
-      How often to call the strategy. Default: [Daily] (every step). Use
-      [Weekly] for the Weinstein system (Friday close calls only). *)
+    adapter. Strategy cadence is set via [config.strategy_cadence]. *)
 
 (** {1 Creation} *)
 

@@ -9,6 +9,7 @@ type config = {
   end_date : Date.t;
   initial_cash : float;
   commission : Trading_engine.Types.commission_config;
+  strategy_cadence : Types.Cadence.t;
 }
 [@@deriving show, eq]
 

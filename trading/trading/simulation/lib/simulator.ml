@@ -21,14 +21,9 @@ type dependencies = {
   order_manager : Trading_orders.Manager.order_manager;
   market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
   computers : any_metric_computer list;
-  strategy_cadence : Types.Cadence.t;
-      (** How often to call the strategy. [Daily] (default) calls every step.
-          [Weekly] calls only on Fridays. [Monthly] calls only on the last day
-          of each month. Non-strategy days still process pending orders. *)
 }
 
-let create_deps ~symbols ~data_dir ~strategy ~commission
-    ?(strategy_cadence = Types.Cadence.Daily) ?(computers = []) () =
+let create_deps ~symbols ~data_dir ~strategy ~commission ?(computers = []) () =
   let engine_config = { Trading_engine.Types.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -43,7 +38,6 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     order_manager;
     market_data_adapter;
     computers;
-    strategy_cadence;
   }
 
 (** {1 Simulator State} *)
@@ -146,7 +140,7 @@ let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
 (** True if the strategy should be called today given the configured cadence. *)
 let _should_call_strategy t =
   Trading_simulation_data.Time_series.is_period_end
-    ~cadence:t.deps.strategy_cadence t.current_date
+    ~cadence:t.config.strategy_cadence t.current_date
 
 (** Call strategy and get transitions, or skip and return [] on non-cadence
     days. *)

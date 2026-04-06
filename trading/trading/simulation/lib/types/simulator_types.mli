@@ -12,6 +12,10 @@ type config = {
   end_date : Date.t;
   initial_cash : float;
   commission : Trading_engine.Types.commission_config;
+  strategy_cadence : Types.Cadence.t;
+      (** How often to call the strategy. [Daily] calls every step. [Weekly]
+          calls only on Fridays. [Monthly] calls only on the last trading day of
+          each month. Non-strategy days still process pending orders. *)
 }
 [@@deriving show, eq]
 (** Configuration for running a simulation *)
