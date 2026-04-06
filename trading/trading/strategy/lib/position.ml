@@ -231,6 +231,7 @@ let _invalid_transition kind =
        (Printf.sprintf "Invalid transition %s for current state"
           (show_transition_kind kind)))
 
+(* @large-function: exhaustive match over (state × transition) pairs; each arm is one case, not reducible without losing clarity *)
 let _apply_entering_transition t transition =
   let date = transition.date in
   match (t.state, transition.kind) with
