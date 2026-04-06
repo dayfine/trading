@@ -25,6 +25,18 @@ jj git fetch
 jj new feat/<feature-name>@origin   # read-only — do NOT write files here
 ```
 
+After fetching, check staleness — how many commits is `main@origin` ahead of this branch's
+merge base? Run:
+
+```bash
+# Count commits on main not reachable from the feature branch
+jj log --revset "main@origin ~ ancestors(feat/<feature-name>@origin)" --no-graph -T "commit_id\n" | wc -l
+```
+
+If this count is > 10, add a **FLAG** note to the checklist: "Branch is N commits behind
+main@origin — consider rebasing before merge." This is a FLAG, not a FAIL: it does not
+block APPROVED, but the orchestrator escalation policy should note it.
+
 ### Step 2: Hard deterministic gates
 
 Run each command and record PASS or FAIL with any error output:

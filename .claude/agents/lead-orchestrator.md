@@ -85,6 +85,14 @@ Assemble these three into the `<PREFLIGHT-CONTEXT>` block injected into the feat
 
 For each feature that should run today, spawn it as a subagent using the Agent tool (no worktree isolation — agents work directly on their feature branch so Docker can see their changes). Run all eligible features in parallel (single message, multiple Agent tool calls).
 
+**Parallel write conflict policy**: parallel feat-agents must not write to any shared file.
+The files `dev/decisions.md`, `CLAUDE.md`, and `docs/design/*.md` are read-only during
+parallel execution. If an agent needs to propose a change to a shared file, it must record
+the proposed change in its return value — the orchestrator (this agent) applies it after all
+parallel agents complete. Status files (`dev/status/<feature>.md`) are per-feature and safe
+to write in parallel. QC review files (`dev/reviews/<feature>.md`) are written by QC agents
+sequentially (Step 5), never by feat-agents.
+
 Pass each subagent a prompt constructed as:
 
 ```
