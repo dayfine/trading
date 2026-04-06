@@ -6,6 +6,7 @@
   trading.engine
   trading.orders
   trading.base
+  types
   core)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq ppx_compare ppx_sexp_conv)))

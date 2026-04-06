@@ -34,7 +34,7 @@ val create_deps :
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
-    adapter. *)
+    adapter. Strategy cadence is set via [config.strategy_cadence]. *)
 
 (** {1 Creation} *)
 

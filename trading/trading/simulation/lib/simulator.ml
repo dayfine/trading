@@ -137,16 +137,24 @@ let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
     t.deps.market_data_adapter ~symbol ~indicator_name ~period ~cadence
     ~date:t.current_date
 
-(** Call strategy and get transitions *)
+(** True if the strategy should be called today given the configured cadence. *)
+let _should_call_strategy t =
+  Trading_simulation_data.Time_series.is_period_end
+    ~cadence:t.config.strategy_cadence t.current_date
+
+(** Call strategy and get transitions, or skip and return [] on non-cadence
+    days. *)
 let _call_strategy t =
-  let (module S) = t.deps.strategy in
-  let get_price = _make_get_price t in
-  let get_indicator = _make_get_indicator t in
-  let open Result.Let_syntax in
-  let%bind output =
-    S.on_market_close ~get_price ~get_indicator ~positions:t.positions
-  in
-  Ok output.transitions
+  if not (_should_call_strategy t) then Ok []
+  else
+    let (module S) = t.deps.strategy in
+    let get_price = _make_get_price t in
+    let get_indicator = _make_get_indicator t in
+    let open Result.Let_syntax in
+    let%bind output =
+      S.on_market_close ~get_price ~get_indicator ~positions:t.positions
+    in
+    Ok output.transitions
 
 (** Find position by symbol and state *)
 let _find_position_by_symbol_state positions ~symbol ~state_match =

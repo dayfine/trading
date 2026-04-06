@@ -24,6 +24,7 @@ let sample_config =
     end_date = date_of_string "2024-01-05";
     initial_cash = 10000.0;
     commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 };
+    strategy_cadence = Types.Cadence.Daily;
   }
 
 let sample_aapl_prices =
@@ -716,6 +717,77 @@ let test_short_position_lifecycle _ =
            ]);
       assert_that result3.orders_submitted is_empty)
 
+(* ==================== Weekly Cadence ==================== *)
+
+(** A strategy that counts how many times it is called. *)
+let call_count = ref 0
+
+module Counting_strategy : Trading_strategy.Strategy_interface.STRATEGY = struct
+  let name = "Counting"
+
+  let on_market_close ~get_price:_ ~get_indicator:_ ~positions:_ =
+    Int.incr call_count;
+    Ok { Trading_strategy.Strategy_interface.transitions = [] }
+end
+
+(** Generates N weekdays starting from [start] (skipping Saturday/Sunday). *)
+let make_daily_prices_for_weekdays ~start ~n price =
+  let rec loop date acc count =
+    if count >= n then List.rev acc
+    else
+      let weekday = Date.day_of_week date in
+      if
+        Day_of_week.equal weekday Day_of_week.Sat
+        || Day_of_week.equal weekday Day_of_week.Sun
+      then loop (Date.add_days date 1) acc count
+      else
+        let bar =
+          make_daily_price ~date ~open_price:price ~high:price ~low:price
+            ~close:price ~volume:1000000
+        in
+        loop (Date.add_days date 1) (bar :: acc) (count + 1)
+  in
+  loop (Date.of_string start) [] 0
+
+let test_weekly_cadence_calls_strategy_only_on_fridays _ =
+  (* Week of 2024-01-08: Mon=08, Tue=09, Wed=10, Thu=11, Fri=12 *)
+  let start = "2024-01-08" in
+  let n_days = 10 in
+  (* Two full Mon–Fri weeks *)
+  let prices = make_daily_prices_for_weekdays ~start ~n:n_days 100.0 in
+  with_test_data "weekly_cadence"
+    [ ("AAPL", prices) ]
+    ~f:(fun data_dir ->
+      call_count := 0;
+      let commission =
+        { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
+      in
+      let deps =
+        create_deps ~symbols:[ "AAPL" ] ~data_dir
+          ~strategy:(module Counting_strategy)
+          ~commission ()
+      in
+      let config =
+        {
+          start_date = Date.of_string start;
+          end_date = Date.of_string "2024-01-20";
+          (* covers Mon 8 – Fri 19, two full weeks *)
+          initial_cash = 10000.0;
+          commission;
+          strategy_cadence = Types.Cadence.Weekly;
+        }
+      in
+      let sim = Test_helpers.create_exn ~config ~deps in
+      let result =
+        match Trading_simulation.Simulator.run sim with
+        | Ok r -> r
+        | Error err -> failwith ("Run failed: " ^ Status.show err)
+      in
+      (* Simulator steps every calendar day: Jan 8–19 = 12 calendar days *)
+      assert_that result.steps (size_is 12);
+      (* Strategy should only be called on the two Fridays (Jan 12 and Jan 19) *)
+      assert_that !call_count (equal_to 2))
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -745,6 +817,8 @@ let suite =
          "position matched by state not side"
          >:: test_position_matched_by_state_not_side;
          "short position lifecycle" >:: test_short_position_lifecycle;
+         "weekly cadence calls strategy only on Fridays"
+         >:: test_weekly_cadence_calls_strategy_only_on_fridays;
        ]
 
 let () = run_test_tt_main suite
