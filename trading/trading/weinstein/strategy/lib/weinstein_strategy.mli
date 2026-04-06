@@ -40,6 +40,10 @@ type config = {
   portfolio : Portfolio_risk.config;  (** Position sizing and risk limits. *)
   stops : Weinstein_stops.config;
       (** Trailing stop state machine parameters. *)
+  initial_stop_buffer : float;
+      (** Multiplier applied to [suggested_stop] when computing the initial stop
+          level for a new entry. Default: 1.02 (2% buffer above the screener
+          stop). *)
   lookback_bars : int;
       (** Number of weekly bars to pass to stage/macro analysers (default: 52).
           Must be >= 30 (one MA period). *)

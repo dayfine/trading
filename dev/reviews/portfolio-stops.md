@@ -1,65 +1,90 @@
-# QC Structural Review: portfolio-stops
+# QC Review: portfolio-stops / order_gen
 
-Date: 2026-04-05
-Reviewer: qc-structural
-Branch reviewed: portfolio-stops/trading-state-sexp
-Merge base: 4fcfc160f29e6c3990399d653d9337b5f7ab52e3 (Add sexp derivation to weinstein types and stops)
+## Review date: 2026-04-06
+## Branch: feat/portfolio-stops-order-gen
+## Commit: 1a98016e (Add arch_layer exception; QC APPROVED)
 
-## Scope
-
-This review covers the two commits unique to `portfolio-stops/trading-state-sexp`
-relative to its fork point:
-
-1. `8305e76` Add sexp derivation to weinstein types and stops
-2. `dbf038b` Rewrite weinstein_trading_state to use sexp serialisation
-
-New files added:
-- `analysis/weinstein/resistance/` (resistance mapper, 3 source files + test)
-- `trading/trading/weinstein/trading_state/` (sexp-based persistence, 3 source files + test)
-- `analysis/weinstein/order_gen/lib/dune` (empty placeholder stub)
+Note: All prior code (stops, portfolio_risk, trading_state) is already on main.
+This review covers `analysis/weinstein/order_gen/` only.
 
 ---
 
-## Structural Checklist
+## Stage 1: Structural QC
 
-| # | Check | Status | Notes |
-|---|-------|--------|-------|
-| H1 | dune fmt --check | FAIL | resistance.mli, resistance.ml, test_resistance.ml have formatting diffs (double-space after sentence ends in comments; record destructuring layout in resistance.ml:65-68) |
-| H2 | dune build | PASS | |
-| H3 | dune runtest | FAIL | 499 tests across 44 suites, 1 failure: test_resistance.ml "high exactly at breakout_price counts" (line 226) |
-| P1 | Functions <= 50 lines | PASS | H3 linter passed for all suites except resistance — resistance failure is a behavioral test failure, not a length violation |
-| P2 | No magic numbers | PASS | All numeric literals in resistance.ml are inside default_config (520, 130, 0.10, 4, 10); trading_state has no numeric literals |
-| P3 | All configurable thresholds/periods/weights in config record | PASS | resistance: all five thresholds (virgin_territory_weeks, clean_lookback_weeks, zone_proximity_pct, moderate_weeks_threshold, heavy_weeks_threshold) routed through config; trading_state has no tunable parameters |
-| P4 | .mli files cover all public symbols | PASS | Both new modules have .mli files; resistance.mli exports config, default_config, result, analyze; trading_state.mli exports t, trade_action, trade_log_entry, empty, add_log_entry, set_stop_state, get_stop_state, remove_stop_state, set_prior_stage, get_prior_stage, save, load |
-| P5 | Internal helpers prefixed with _ | PASS | resistance.ml: _take_last, _weeks_since_high; trading_state.ml: no internal helpers |
-| P6 | Tests use the matchers library | PASS | Both test files open Matchers and use assert_that throughout |
-| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | No modifications to any of these modules; all new code is in weinstein/ namespace |
-| A2 | No imports from analysis/ into trading/trading/ | PASS | New resistance/ and order_gen/ files do not import from trading/trading/; new trading_state uses Trading_portfolio and Weinstein_stops (weinstein/ namespace, not analysis/) |
-| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | All 11 changed files are newly created files; no existing module files were modified |
+### Hard Gates
+
+| Check | Result |
+|-------|--------|
+| dune build | PASS |
+| dune runtest (full) | PASS — 9/9 order_gen tests pass, all existing tests pass |
+| arch_layer_test.sh | PASS — exception registered in linter_exceptions.conf |
+| linter_mli_coverage.sh | PASS |
+| linter_magic_numbers.sh | PASS |
+| fn_length_linter | PASS — no functions exceed 50 lines |
+
+### Structural Checklist
+
+**Interface completeness**
+- [x] `.mli` exists with doc comments on all public types and functions
+- [x] `suggested_order` type has `[@@deriving show, eq]`
+- [x] All three functions have `@param` and `@return` docs
+- [x] Module-level doc explains design intent and relationship to `order_generator.ml`
+
+**Function signatures**
+- [x] Match the design spec in `eng-design-3-portfolio-stops.md`
+- [x] One intentional deviation: `rationale` is `string list` not `string` — preserves screener rationale list intact (better than design spec)
+- [x] Pure functions — no state, no side effects
+
+**Code quality**
+- [x] `_exit_side` and `_holding_quantity` helpers are small (< 5 lines each)
+- [x] `from_candidates` filters on both sizing (shares = 0) and limits (check_limits)
+- [x] Pattern match on `stop_event` uses `| _ -> None` catch-all for forward compatibility
+- [x] No magic numbers in lib/ — all thresholds delegated to `Portfolio_risk.config`
+- [x] `StopLimit (entry, entry)` for entries — correct buy-stop at breakout price
+
+**Test coverage**
+- [x] 9 tests: empty input, max-position limit exclusion, StopLimit entry, Stop_raised adjustment, Stop_hit ignored in adjustments, Stop_hit market exit, short position Buy-to-cover, Stop_raised ignored in exits, unknown ticker graceful no-op
+- [x] `make_holding_position` helper exercises full Position state machine (CreateEntering -> EntryFill -> EntryComplete)
+- [x] `elements_are` matcher used for list structure validation
+- [x] `is_some_and`/`is_none` used for Option assertions
+
+**Architecture**
+- [x] Does NOT modify existing Portfolio, Orders, Position, or Engine modules
+- [x] Arch exception added to `linter_exceptions.conf` with reason and `review_at` note
+- [x] Placed alongside (not replacing) `trading/simulation/lib/order_generator.ml`
+
+### Structural Decision: APPROVED
 
 ---
 
-## Verdict
+## Stage 2: Behavioral QC
 
-NEEDS_REWORK
+### Domain correctness
+
+**Entry order type**
+- [x] `StopLimit (entry, entry)` for new entries: Correct Weinstein mechanic — buy-stop triggers when price breaks above resistance level
+- [x] Long-only entries (`side = Buy`): Correct — screener produces Stage 2 buy candidates
+
+**Stop order semantics**
+- [x] `Stop_raised` -> `Stop new_level` order with exit side: Sell stop for long, Buy stop for short — correct Weinstein trailing stop replacement
+- [x] `Stop_hit` -> `Market` exit: Correct — Weinstein advises immediate exit at market when stop is breached
+- [x] Short position exit -> `Buy` side: Correct cover direction
+
+**Portfolio risk integration**
+- [x] `check_limits` gates entry generation — enforces max_positions, exposure limits, sector concentration
+- [x] `compute_position_size` uses `entry_price` and `stop_price` for fixed-risk sizing — correct Weinstein sizing formula
+- [x] `sizing.shares = 0` edge case handled
+
+**Separation of concerns**
+- [x] `from_candidates` handles entries only
+- [x] `from_stop_adjustments` handles stop raises only
+- [x] `from_exits` handles stop hits only
+- [x] Each function ignores irrelevant events via `| _ -> None`
+
+### Behavioral Decision: APPROVED
 
 ---
 
-## NEEDS_REWORK Items
+## Combined QC Result: APPROVED
 
-### H1: Format violations in resistance module
-
-- Finding: `dune build @fmt` produces diffs in three files. The formatter changes double-space after sentence-ending periods in doc comments to single-space, and reformats the record destructuring in `analyze` (lines 65-68 of resistance.ml). These are deterministic formatting violations that `dune fmt` would fix automatically.
-- Location:
-  - `trading/analysis/weinstein/resistance/lib/resistance.mli`
-  - `trading/analysis/weinstein/resistance/lib/resistance.ml`
-  - `trading/analysis/weinstein/resistance/test/test_resistance.ml`
-- Required fix: Run `dune fmt` in the trading directory and commit the result.
-- harness_gap: LINTER_CANDIDATE — this is exactly what H1 (dune build @fmt) catches deterministically; no inferential judgment needed.
-
-### H3: Failing test in resistance module
-
-- Finding: `test_high_exactly_at_breakout_price_counts` fails at test_resistance.ml line 226. The test sets up 5 bars all with high = 100.0 and breakout_price = 100.0, then asserts `quality = Clean` and `overhead_weeks = 5`. The assertion on `overhead_weeks` fails — the test reports "Values should be equal / not equal", meaning the proximate-overhead count is not 5. The proximate zone check in resistance.ml is `h >= breakout_price && h <= ceiling` where ceiling = 100.0 * 1.10 = 110.0. With h = 100.0 >= 100.0 and h <= 110.0, this condition is true, so all 5 bars should be counted — meaning the test should pass. The most likely cause is a discrepancy in the `has_overhead` step or `_take_last` with a config that has `virgin_territory_weeks = 10` but only 5 bars: `_take_last 10 [5 bars]` returns all 5, and `has_overhead` should be true. This requires investigation of the actual failure message (the OUnit output says "not equal" without showing the actual value — the test needs a better error message to diagnose, but the code logic appears correct on inspection). The test is definitively failing.
-- Location: `trading/analysis/weinstein/resistance/test/test_resistance.ml` line 212-227
-- Required fix: Investigate and fix either the test assertion or the resistance.ml implementation to make this test pass. Run `dune runtest` to confirm.
-- harness_gap: ONGOING_REVIEW — test failures require understanding the behavioral intent; cannot be mechanically detected beyond "test failed".
+Ready to merge `feat/portfolio-stops-order-gen` to main. The arch exception in `linter_exceptions.conf` is included in the commit.

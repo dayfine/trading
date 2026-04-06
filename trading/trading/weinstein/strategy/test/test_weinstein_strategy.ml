@@ -46,9 +46,10 @@ let test_empty_universe_no_transitions _ =
       ~get_indicator:empty_get_indicator ~positions:empty_positions
   in
   assert_that result
-    (is_ok_and_holds (fun output ->
-         assert_that output.Trading_strategy.Strategy_interface.transitions
-           is_empty))
+    (is_ok_and_holds
+       (field
+          (fun o -> o.Trading_strategy.Strategy_interface.transitions)
+          is_empty))
 
 (* ------------------------------------------------------------------ *)
 (* on_market_close: no price data returns empty transitions            *)
@@ -61,9 +62,10 @@ let test_no_price_data_no_transitions _ =
       ~get_indicator:empty_get_indicator ~positions:empty_positions
   in
   assert_that result
-    (is_ok_and_holds (fun output ->
-         assert_that output.Trading_strategy.Strategy_interface.transitions
-           is_empty))
+    (is_ok_and_holds
+       (field
+          (fun o -> o.Trading_strategy.Strategy_interface.transitions)
+          is_empty))
 
 (* ------------------------------------------------------------------ *)
 (* on_market_close: called multiple times stays consistent             *)
