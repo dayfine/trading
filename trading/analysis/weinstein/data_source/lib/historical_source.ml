@@ -32,6 +32,6 @@ let make config =
         (_load_bars data_dir query.symbol ~start_date:query.start_date
            ~end_date:query.end_date ~simulation_date)
 
-    let get_universe () = return (Universe.load data_dir)
+    let get_universe () = Universe.get_deferred data_dir
   end in
   (module S : Data_source.DATA_SOURCE)

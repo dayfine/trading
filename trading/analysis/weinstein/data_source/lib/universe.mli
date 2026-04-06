@@ -4,6 +4,14 @@
     [data_dir/universe.sexp]. All source implementations (Live, Historical) load
     it with the same logic. *)
 
-val load : string -> Types.Instrument_info.t list Status.status_or
-(** [load data_dir] reads [data_dir/universe.sexp] and returns the instrument
-    list. Returns an empty list (not an error) when the file is absent. *)
+open Async
+
+val get_deferred :
+  string -> Types.Instrument_info.t list Status.status_or Deferred.t
+(** [get_deferred data_dir] reads [data_dir/universe.sexp] and returns the
+    instrument list wrapped in a deferred value.
+
+    Returns an empty list (not an error) when the file is absent.
+
+    Use this in {!Data_source.DATA_SOURCE.get_universe} implementations. The
+    underlying sync [load] function is internal to this module. *)

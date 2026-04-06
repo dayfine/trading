@@ -1,3 +1,4 @@
+open Async
 open Core
 
 module Instruments = struct
@@ -10,3 +11,5 @@ let load data_dir =
   | Ok instruments -> Ok instruments
   | Error { Status.code = NotFound; _ } -> Ok []
   | Error e -> Error e
+
+let get_deferred data_dir = return (load data_dir)
