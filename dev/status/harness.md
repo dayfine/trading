@@ -33,22 +33,17 @@ IN_PROGRESS
 - [x] T1-K: Linter exception retirement policy — `linter_exceptions.conf` entries now carry `# review_at:` annotations; health-scanner deep scan will surface expired ones (T3-A)
 - [x] T1-L: Parallel write conflict policy documented in `lead-orchestrator` Step 4 — shared files read-only during parallel execution; proposed changes surfaced in return values
 - [ ] T1-M: "Done" definition — add explicit acceptance criteria to each Tier 1 item's completion note (harness items should state what was built, where it lives, and how to verify)
-
-## Maintenance Cycles
-
-- [ ] M1: Add `## Blocking Refactors` section to all feat-agent status files
-- [ ] M1: Update `lead-orchestrator` to read blocking refactors and dispatch before feat-agents
-- [ ] M1: Update `lead-orchestrator` to count followup items and schedule maintenance cycles (threshold: 10 items, every 3rd run)
-- [ ] M1: Add `## Refactor Mode` prompt variant to feat-agent definitions
-- [ ] M2: Cyclomatic complexity linter — extend `fn_length_linter` via `compiler-libs`; CC > 10 = warning; output to `dev/metrics/cc-YYYY-MM-DD.json`
-- [ ] M2: qc-behavioral quality score — add `## Quality Score` (1–5 + rationale) to output; tracked in audit trail
-- [ ] M3: T3-A deep scan extension — followup-item count + CC trend analysis in weekly report
-- [ ] M3: T3-D audit trail — include quality score in audit records
+- [ ] T1-N: Golden scenario test suite — screener regression tests; spec at `docs/design/t2a-golden-scenarios.md`; uses `data/A/L/AAPL/data.csv` via `Historical_source`; target `analysis/weinstein/screener/test/regression_test.ml`
+- [ ] T1-N: Golden scenario test suite — stop state machine regression tests; 5 scenarios covering Stage2 trailing, Stage3 tightening, stop-hit, short side; target `trading/weinstein/stops/test/regression_test.ml`
+- [ ] T1-O: `health-scanner` agent — fast scan: stale status files, main build health, new unexcepted magic numbers; runs post-orchestrator; spec extends `docs/design/harness-engineering-plan.md`
+- [ ] T1-P: Add `## Blocking Refactors` section to all feat-agent status files; update `lead-orchestrator` to dispatch blocking refactors before feat-agents
+- [ ] T1-P: Update `lead-orchestrator` to count followup items and schedule non-blocking maintenance cycles (threshold: 10 items or every 3rd run)
+- [ ] T1-P: Add `## Refactor Mode` prompt variant to feat-agent definitions
+- [ ] T1-Q: Cyclomatic complexity linter — extend `fn_length_linter` via `compiler-libs`; CC > 10 = warning; output to `dev/metrics/cc-YYYY-MM-DD.json`
+- [ ] T1-Q: qc-behavioral quality score — add `## Quality Score` (1–5 + rationale) to output; tracked in audit trail
 
 ## Tier 2 — Milestone-gated
 
-- [ ] T2-A: Golden scenario test suite — screener regression tests (after M4)
-- [ ] T2-A: Golden scenario test suite — stop state machine regression tests (after M4)
 - [ ] T2-B: Performance gate test (`trading/weinstein/simulation/test/performance_gate_test.ml`) (at M5)
 - [ ] T2-B: Reference backtest config + expected metrics (`dev/benchmarks/reference_backtest.json`) (at M5)
 - [ ] T2-C: Walk-forward regression gate (`dev/benchmarks/best_config.json`) (at M7)
@@ -56,11 +51,10 @@ IN_PROGRESS
 
 ## Tier 3 — After M5 stable
 
-- [ ] T3-A: `health-scanner` agent — fast scan (post-run: stale status, new magic numbers, main build health)
 - [ ] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations)
 - [ ] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history)
 - [ ] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
-- [ ] T3-A: `health-scanner` deep scan — feat-agent template compliance check
+- [x] T3-A: `health-scanner` deep scan — feat-agent template compliance check (covered by T1-I: `agent_compliance_check.sh`)
 - [x] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
 - [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)
 - [ ] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` with `harness_gap` field on NEEDS_REWORK
@@ -68,8 +62,10 @@ IN_PROGRESS
 - [x] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
 - [ ] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc)
 - [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
-- [ ] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries
-- [ ] T3-H: Commit-level QC mode — spawn `qc-structural` on individual commits (not whole branches) to catch violations earlier; low priority, adds cost; explore when golden scenarios (T2-A) are stable
+- [ ] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries (part of T1-O fast scan)
+- [ ] T3-G: `health-scanner` deep scan extension — followup-item count + CC trend analysis in weekly report (extends T1-Q CC linter output)
+- [ ] T3-G: Audit trail — include qc-behavioral quality score in `dev/audit/` records (extends T3-D)
+- [ ] T3-H: Commit-level QC mode — spawn `qc-structural` on individual commits (not whole branches) to catch violations earlier; low priority, adds cost; explore when golden scenarios (T1-N) are stable
 
 ## Tier 4 — Continuous development loop (target end state)
 
