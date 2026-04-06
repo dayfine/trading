@@ -1,9 +1,9 @@
 # Status: data-layer
 
-## Last updated: 2026-03-29
+## Last updated: 2026-04-06
 
 ## Status
-MERGED
+READY_FOR_REVIEW
 
 ## Review
 See dev/reviews/data-layer.md — APPROVED (merged PRs #124, #125, #127, #132)
@@ -12,6 +12,12 @@ See dev/reviews/data-layer.md — APPROVED (merged PRs #124, #125, #127, #132)
 YES
 
 ## Completed
+
+### 2026-04-06
+- Follow-up item 1: Fixed doc comment placement for `period` field in `http_client.mli` — moved to inline style for consistency
+- Follow-up item 3: Extracted duplicated `get_universe` into `Universe.get_deferred`; both `Live_source` and `Historical_source` now delegate to it
+- Follow-up item 5: Removed stale `Synthetic_source` reference from `data_source.mli` module doc
+- Items 2 and 4 were already addressed in the previous merged session (cache-write logging and period-ignored documentation)
 
 ### 2026-03-26
 - `Historical_source`: read-only from local cache, no-lookahead enforced via `simulation_date` ceiling
@@ -39,13 +45,16 @@ YES
 - None
 
 ## Follow-up
-The following are known gaps — address before downstream features (portfolio-stops, simulation) depend on them:
+All 5 QC follow-up items from the original review have been addressed:
 
-1. Fix misplaced doc comment in `http_client.mli` — comment for `period` is on `end_date` field
-2. Log (don't ignore) cache-write error in `live_source.ml` — `ignore (_save_bars_to_cache ...)` silently drops failures
-3. Extract duplicated `_load_universe` — identical copy in `live_source.ml` and `historical_source.ml`
-4. Document that `period` is silently ignored in `Historical_source` — note it in both `historical_source.mli` and `data_source.mli` `get_bars` doc
-5. Remove `Synthetic_source` reference from `data_source.mli` module doc — implementation deferred to simulation (tracked in dev/status/simulation.md)
+1. DONE: Fixed misplaced doc comment in `http_client.mli` — period comment now inline
+2. DONE (previous session): Cache-write error logged via `Core.eprintf` in `live_source.ml`
+3. DONE: Extracted duplicated `get_universe` to `Universe.get_deferred`
+4. DONE (previous session): `period` silently ignored documented in both `historical_source.mli` and `data_source.mli`
+5. DONE: Removed `Synthetic_source` reference from `data_source.mli` module doc
+
+### Remaining known gaps (deferred, not blocking screener)
+
 6. Add `get_daily_close` to `DATA_SOURCE` interface — needed by portfolio-stops for mid-week stop checks; not yet implemented in `Live_source` or `Historical_source`
 7. Universe cache writer: script to populate `data/universe.sexp` by calling `get_fundamentals` for each symbol in `get_index_symbols`. Required before any live run. Suggested: `analysis/scripts/fetch_universe.ml`
 
@@ -74,7 +83,14 @@ Until items 8–10 are complete, `Macro.analyze` should be called with `ad_bars:
 `Macro.result` directly rather than running the full pipeline (see `docs/design/t2a-golden-scenarios.md`).
 
 ## Recent Commits
+- 7ad0038f data-layer follow-up: extract shared get_universe to Universe module
+- cac4b67d data-layer follow-up: remove Synthetic_source reference from data_source.mli
+- 63083dbe data-layer follow-up: fix http_client.mli period doc comment placement
 - PR #132: Add Historical data source with no-lookahead guarantee
 - PR #127: Update data-source-impl: sexp universe, injectable fetch, file-based tests
 - PR #125: Add DataSource module type for Weinstein data abstraction layer
 - PR #124: Extend EODHD client with period, fundamentals, and index symbols
+
+## Next Steps
+- All follow-up items addressed. Data layer is complete.
+- Downstream agents (screener, portfolio-stops, simulation) can proceed.
