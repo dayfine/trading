@@ -3,15 +3,11 @@ open Core
 
 (** Uniform data access interface for the Weinstein analysis pipeline.
 
-    Two implementations are available:
+    Two implementations are provided:
     - {b Live_source}: fetches from EODHD API, writes to local cache. Used for
       weekly live scans.
     - {b Historical_source}: reads from local cache with a date ceiling.
       Enforces no-lookahead for backtest integrity.
-
-    A third implementation ({b Synthetic_source}, for programmatic bar
-    generation used in simulation tuning) is planned but not yet implemented.
-    See [eng-design-4-simulation-tuning.md].
 
     All analysis and screening code is written against this interface. Swapping
     the implementation changes the data source without touching any analysis
