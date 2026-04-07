@@ -43,19 +43,21 @@ let _validate_price_positive price price_name =
 let _validate_stop_limit_relationship side stop_price limit_price =
   match side with
   | Buy when stop_price > limit_price ->
-      Error
-        (invalid_argument_error
-           (Printf.sprintf
-              "For buy stop-limit orders, stop price (%.2f) must be <= limit \
-               price (%.2f)"
-              stop_price limit_price))
+      let msg =
+        Printf.sprintf
+          "For buy stop-limit orders, stop price (%.2f) must be <= limit price \
+           (%.2f)"
+          stop_price limit_price
+      in
+      Error (invalid_argument_error msg)
   | Sell when stop_price < limit_price ->
-      Error
-        (invalid_argument_error
-           (Printf.sprintf
-              "For sell stop-limit orders, stop price (%.2f) must be >= limit \
-               price (%.2f)"
-              stop_price limit_price))
+      let msg =
+        Printf.sprintf
+          "For sell stop-limit orders, stop price (%.2f) must be >= limit \
+           price (%.2f)"
+          stop_price limit_price
+      in
+      Error (invalid_argument_error msg)
   | _ -> Ok ()
 
 let _validate_order_type params =
