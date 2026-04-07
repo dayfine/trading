@@ -312,12 +312,14 @@ let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
     else None
   else None
 
-(* Build a Trailing state after a completed correction cycle. *)
-let _raised_trailing ~side ~new_stop ~ma_value ~correction_count ~bar =
+(* Build a Trailing state after a completed correction cycle.
+   Both extremes reset to close_price so the next cycle starts fresh — no phantom
+   cycles from a prior correction low being reused against a continuing advance. *)
+let _raised_trailing ~side:_ ~new_stop ~ma_value ~correction_count ~bar =
   Trailing
     {
       stop_level = new_stop;
-      last_correction_extreme = _bar_extreme ~side ~bar;
+      last_correction_extreme = bar.Types.Daily_price.close_price;
       last_trend_extreme = bar.Types.Daily_price.close_price;
       ma_at_last_adjustment = ma_value;
       correction_count = correction_count + 1;
