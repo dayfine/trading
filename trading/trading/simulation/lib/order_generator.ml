@@ -28,6 +28,15 @@ let _create_order ~symbol ~side ~quantity =
   in
   Result.map (Trading_orders.Create_order.create_order params) ~f:Option.some
 
+let _exit_order_for_position position =
+  let open Trading_strategy.Position in
+  match get_state position with
+  | Exiting { quantity; _ } ->
+      _create_order ~symbol:position.symbol
+        ~side:(_exit_order_side position.side)
+        ~quantity
+  | _ -> Ok None
+
 let _transition_to_order ~positions
     (transition : Trading_strategy.Position.transition) =
   let open Trading_strategy.Position in
@@ -39,13 +48,7 @@ let _transition_to_order ~positions
       (* After _apply_transitions, the position is in Exiting state, not Holding.
          We look up the Exiting position to get the quantity and side. *)
       Map.find positions transition.position_id
-      |> Option.value_map ~default:(Ok None) ~f:(fun position ->
-          match get_state position with
-          | Exiting { quantity; _ } ->
-              _create_order ~symbol:position.symbol
-                ~side:(_exit_order_side position.side)
-                ~quantity
-          | _ -> Ok None)
+      |> Option.value_map ~default:(Ok None) ~f:_exit_order_for_position
   | EntryFill _ | EntryComplete _ | CancelEntry _ | UpdateRiskParams _
   | ExitFill _ | ExitComplete ->
       Ok None

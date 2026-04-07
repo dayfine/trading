@@ -217,18 +217,15 @@ let _process_stop_limit_order engine order_mgr order stop_price limit_price =
   _process_order_with_execution order_mgr order (fun () ->
       _execute_stop_limit_order engine order stop_price limit_price)
 
+let _process_order engine order_mgr order =
+  match order.order_type with
+  | Market -> _process_market_order engine order_mgr order
+  | Limit limit_price -> _process_limit_order engine order_mgr order limit_price
+  | Stop stop_price -> _process_stop_order engine order_mgr order stop_price
+  | StopLimit (stop_price, limit_price) ->
+      _process_stop_limit_order engine order_mgr order stop_price limit_price
+
 let process_orders engine order_mgr =
   let pending = list_orders order_mgr ~filter:ActiveOnly in
-  let reports =
-    List.filter_map pending ~f:(fun order ->
-        match order.order_type with
-        | Market -> _process_market_order engine order_mgr order
-        | Limit limit_price ->
-            _process_limit_order engine order_mgr order limit_price
-        | Stop stop_price ->
-            _process_stop_order engine order_mgr order stop_price
-        | StopLimit (stop_price, limit_price) ->
-            _process_stop_limit_order engine order_mgr order stop_price
-              limit_price)
-  in
+  let reports = List.filter_map pending ~f:(_process_order engine order_mgr) in
   Result.Ok reports

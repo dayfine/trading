@@ -24,18 +24,20 @@ let submit_orders manager orders =
         Result.Ok ()))
     orders
 
+let _cancel_order manager order_id order =
+  if not (is_active order) then
+    error_invalid_argument ("Order " ^ order_id ^ " is not active")
+  else
+    let cancelled_order = update_status order Cancelled in
+    Hashtbl.replace manager.orders order_id cancelled_order;
+    Result.Ok ()
+
 let cancel_orders manager order_ids =
   List.map
     (fun order_id ->
       match Hashtbl.find_opt manager.orders order_id with
       | None -> error_not_found ("Order with ID " ^ order_id ^ " not found")
-      | Some order ->
-          if not (is_active order) then
-            error_invalid_argument ("Order " ^ order_id ^ " is not active")
-          else
-            let cancelled_order = update_status order Cancelled in
-            Hashtbl.replace manager.orders order_id cancelled_order;
-            Result.Ok ())
+      | Some order -> _cancel_order manager order_id order)
     order_ids
 
 let get_order manager order_id =

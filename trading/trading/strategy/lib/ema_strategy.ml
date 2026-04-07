@@ -46,38 +46,42 @@ let _execute_entry ~(symbol : string) ~(config : config)
         };
   }
 
+let _stop_loss_exit current_price entry_price stop =
+  let loss_pct = (current_price -. entry_price) /. entry_price in
+  Some
+    (Position.StopLoss
+       {
+         stop_price = stop;
+         actual_price = current_price;
+         loss_percent = loss_pct *. 100.0;
+       })
+
+let _take_profit_exit current_price entry_price target =
+  let profit_pct = (current_price -. entry_price) /. entry_price in
+  Some
+    (Position.TakeProfit
+       {
+         target_price = target;
+         actual_price = current_price;
+         profit_percent = profit_pct *. 100.0;
+       })
+
 (* Check if exit condition is met and return exit_reason if should exit *)
 let _check_exit_signal ~(current_price : float) ~(ema : float)
     ~(risk_params : Position.risk_params) ~(entry_price : float) :
     Position.exit_reason option =
-  let open Position in
-  (* Check stop loss first *)
   match risk_params.stop_loss_price with
   | Some stop when Float.(current_price <= stop) ->
-      let loss_pct = (current_price -. entry_price) /. entry_price in
-      Some
-        (StopLoss
-           {
-             stop_price = stop;
-             actual_price = current_price;
-             loss_percent = loss_pct *. 100.0;
-           })
+      _stop_loss_exit current_price entry_price stop
   | _ -> (
-      (* Check take profit *)
       match risk_params.take_profit_price with
       | Some target when Float.(current_price >= target) ->
-          let profit_pct = (current_price -. entry_price) /. entry_price in
-          Some
-            (TakeProfit
-               {
-                 target_price = target;
-                 actual_price = current_price;
-                 profit_percent = profit_pct *. 100.0;
-               })
+          _take_profit_exit current_price entry_price target
       | _ ->
-          (* Check EMA signal reversal *)
           if Float.(current_price < ema) then
-            Some (SignalReversal { description = "Price crossed below EMA" })
+            Some
+              (Position.SignalReversal
+                 { description = "Price crossed below EMA" })
           else None)
 
 (* Execute exit: produce TriggerExit transition only *)
@@ -112,25 +116,24 @@ let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
   in
   let active_position = _find_position_for_symbol positions symbol in
 
+  let check_exit price ema position =
+    match Position.get_state position with
+    | Position.Holding holding ->
+        let current_price = price.Types.Daily_price.close_price in
+        let exit_reason_opt =
+          _check_exit_signal ~current_price ~ema
+            ~risk_params:holding.risk_params ~entry_price:holding.entry_price
+        in
+        Option.map exit_reason_opt ~f:(fun exit_reason ->
+            _execute_exit ~position ~quantity:holding.quantity ~price
+              ~exit_reason)
+    | _ -> None
+  in
   match (price_opt, ema_opt, active_position) with
-  (* Entry: no position and entry signal *)
   | Some price, Some ema, None
     when _has_entry_signal ~price:price.Types.Daily_price.close_price ~ema ->
       Some (_execute_entry ~symbol ~config ~price ~ema)
-  (* Exit check: has position in Holding state *)
-  | Some price, Some ema, Some position -> (
-      match Position.get_state position with
-      | Position.Holding holding ->
-          let current_price = price.Types.Daily_price.close_price in
-          let exit_reason_opt =
-            _check_exit_signal ~current_price ~ema
-              ~risk_params:holding.risk_params ~entry_price:holding.entry_price
-          in
-          Option.map exit_reason_opt ~f:(fun exit_reason ->
-              _execute_exit ~position ~quantity:holding.quantity ~price
-                ~exit_reason)
-      | _ -> None)
-  (* All other cases: no action *)
+  | Some price, Some ema, Some position -> check_exit price ema position
   | _ -> None
 
 let make (config : config) : (module Strategy_interface.STRATEGY) =

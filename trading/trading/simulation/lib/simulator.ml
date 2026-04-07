@@ -57,11 +57,12 @@ and t = {
 
 let create ~config ~deps =
   if Date.(config.end_date <= config.start_date) then
-    Error
-      (Status.invalid_argument_error
-         (Printf.sprintf "end_date (%s) must be after start_date (%s)"
-            (Date.to_string config.end_date)
-            (Date.to_string config.start_date)))
+    let msg =
+      Printf.sprintf "end_date (%s) must be after start_date (%s)"
+        (Date.to_string config.end_date)
+        (Date.to_string config.start_date)
+    in
+    Error (Status.invalid_argument_error msg)
   else
     let portfolio =
       Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
@@ -166,64 +167,64 @@ let _find_position_by_symbol_state positions ~symbol ~state_match =
       then Some (id, pos)
       else None)
 
+let _no_risk_params =
+  Trading_strategy.Position.
+    { stop_loss_price = None; take_profit_price = None; max_hold_days = None }
+
 (** Apply a fill to a position (works for both entry and exit fills). *)
 let _apply_fill ~date ~position ~trade ~is_entry =
   let open Result.Let_syntax in
   let open Trading_strategy.Position in
+  let qty = trade.Trading_base.Types.quantity in
+  let price = trade.Trading_base.Types.price in
   let fill_kind =
-    if is_entry then
-      EntryFill
-        {
-          filled_quantity = trade.Trading_base.Types.quantity;
-          fill_price = trade.Trading_base.Types.price;
-        }
-    else
-      ExitFill
-        {
-          filled_quantity = trade.Trading_base.Types.quantity;
-          fill_price = trade.Trading_base.Types.price;
-        }
+    if is_entry then EntryFill { filled_quantity = qty; fill_price = price }
+    else ExitFill { filled_quantity = qty; fill_price = price }
   in
   let fill_trans = { position_id = position.id; date; kind = fill_kind } in
   let%bind pos = apply_transition position fill_trans in
   let complete_kind =
-    if is_entry then
-      EntryComplete
-        {
-          risk_params =
-            {
-              stop_loss_price = None;
-              take_profit_price = None;
-              max_hold_days = None;
-            };
-        }
+    if is_entry then EntryComplete { risk_params = _no_risk_params }
     else ExitComplete
   in
   let complete_trans = { position_id = pos.id; date; kind = complete_kind } in
   apply_transition pos complete_trans
 
+let _is_entering_state = function
+  | Trading_strategy.Position.Entering _ -> true
+  | _ -> false
+
+let _is_exiting_state = function
+  | Trading_strategy.Position.Exiting _ -> true
+  | _ -> false
+
+let _find_fill_target acc symbol =
+  let try_find state_match is_entry =
+    _find_position_by_symbol_state acc ~symbol ~state_match
+    |> Option.map ~f:(fun (id, pos) -> (id, pos, is_entry))
+  in
+  match try_find _is_entering_state true with
+  | Some _ as r -> r
+  | None -> try_find _is_exiting_state false
+
 (** Update positions from trades. *)
 let _update_positions_from_trades ~date ~positions ~trades =
   let open Result.Let_syntax in
-  let open Trading_strategy.Position in
-  let fill_cases =
-    [
-      ((function Entering _ -> true | _ -> false), true);
-      ((function Exiting _ -> true | _ -> false), false);
-    ]
-  in
   List.fold_result trades ~init:positions ~f:(fun acc trade ->
       let symbol = trade.Trading_base.Types.symbol in
-      let matched =
-        List.find_map fill_cases ~f:(fun (state_match, is_entry) ->
-            _find_position_by_symbol_state acc ~symbol ~state_match
-            |> Option.map ~f:(fun (id, pos) -> (id, pos, is_entry)))
-      in
-      match matched with
+      match _find_fill_target acc symbol with
       | Some (id, pos, is_entry) ->
           let%bind updated = _apply_fill ~date ~position:pos ~trade ~is_entry in
           Ok (Map.set acc ~key:id ~data:updated)
       | None -> Ok acc)
+
+let _apply_trigger_exit acc trans =
+  let open Result.Let_syntax in
+  match Map.find acc trans.Trading_strategy.Position.position_id with
+  | None -> Ok acc
+  | Some pos ->
+      let%bind updated = Trading_strategy.Position.apply_transition pos trans in
+      Ok (Map.set acc ~key:trans.position_id ~data:updated)
 
 (** Apply transitions to positions *)
 let _apply_transitions ~positions ~transitions =
@@ -233,14 +234,7 @@ let _apply_transitions ~positions ~transitions =
       | CreateEntering _ ->
           let%bind pos = Trading_strategy.Position.create_entering trans in
           Ok (Map.set acc ~key:pos.id ~data:pos)
-      | TriggerExit _ -> (
-          match Map.find acc trans.position_id with
-          | None -> Ok acc
-          | Some pos ->
-              let%bind updated =
-                Trading_strategy.Position.apply_transition pos trans
-              in
-              Ok (Map.set acc ~key:trans.position_id ~data:updated))
+      | TriggerExit _ -> _apply_trigger_exit acc trans
       | _ -> Ok acc)
 
 (** Build run_result from accumulated state *)

@@ -99,47 +99,37 @@ let _infer_volatility_scale (bar : price_bar) : float =
     - Doji (no direction): exactly 50% chance
 
     Returns true if high should come before low. *)
+let _decide_high_first_directional random_state bar body =
+  let volatility_scale = _infer_volatility_scale bar in
+  let neutral_prob = 0.5 in
+  (* Base: 50/50 *)
+  let max_direction_bias = 0.3 in
+  (* Maximum influence from direction *)
+  let min_prob = 0.2 in
+  (* Never go below 20% *)
+  let max_prob = 0.8 in
+  (* Never go above 80% *)
+  (* Confidence: how much to trust the direction signal
+     - Low/typical volatility (≤1.0): full confidence, use max bias (0.3)
+     - High volatility (~1.5): reduced confidence, bias ≈ 0.2
+     - Very high volatility (~2.0): low confidence, bias ≈ 0.15 *)
+  let confidence_factor = 1.0 /. Float.max volatility_scale 1.0 in
+  let direction_bias =
+    let raw_bias =
+      if Float.(body > 0.0) then max_direction_bias else -.max_direction_bias
+    in
+    raw_bias *. confidence_factor
+  in
+  let prob_clamped =
+    _clamp ~min_val:min_prob ~max_val:max_prob (neutral_prob +. direction_bias)
+  in
+  Float.(Random.State.float random_state 1.0 < prob_clamped)
+
 let _decide_high_first (random_state : Random.State.t) (bar : price_bar) : bool
     =
   let body = bar.close_price -. bar.open_price in
-
-  (* Edge case: doji bar (no direction) - use pure random *)
   if Float.(body = 0.0) then Random.State.bool random_state
-  else
-    let volatility_scale = _infer_volatility_scale bar in
-
-    (* Constants for probability calculation *)
-    let neutral_prob = 0.5 in
-    (* Base: 50/50 *)
-    let max_direction_bias = 0.3 in
-    (* Maximum influence from direction *)
-    let min_prob = 0.2 in
-    (* Never go below 20% *)
-    let max_prob = 0.8 in
-    (* Never go above 80% *)
-
-    (* Confidence: how much to trust the direction signal
-       - Low/typical volatility (≤1.0): full confidence, use max bias (0.3)
-       - High volatility (~1.5): reduced confidence, bias ≈ 0.2
-       - Very high volatility (~2.0): low confidence, bias ≈ 0.15 *)
-    let confidence_factor = 1.0 /. Float.max volatility_scale 1.0 in
-
-    (* Direction bias: positive for bullish, negative for bearish *)
-    let direction_bias =
-      let raw_bias =
-        if Float.(body > 0.0) then max_direction_bias else -.max_direction_bias
-      in
-      raw_bias *. confidence_factor
-    in
-
-    (* Combine and clamp to valid probability range *)
-    let prob_high_first = neutral_prob +. direction_bias in
-    let prob_clamped =
-      _clamp ~min_val:min_prob ~max_val:max_prob prob_high_first
-    in
-
-    (* Make random decision based on calculated probability *)
-    Float.(Random.State.float random_state 1.0 < prob_clamped)
+  else _decide_high_first_directional random_state bar body
 
 (** {1 Distribution Profiles and Time Sampling} *)
 

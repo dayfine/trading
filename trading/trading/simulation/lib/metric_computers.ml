@@ -62,6 +62,19 @@ let _compute_daily_returns values =
   in
   match values with [] | [ _ ] -> [] | first :: rest -> loop first rest []
 
+let _compute_sharpe daily_returns risk_free_rate =
+  match daily_returns with
+  | [] | [ _ ] -> 0.0
+  | _ ->
+      let mean_return = _mean daily_returns in
+      let std_return = _std daily_returns in
+      if Float.(std_return = 0.0) then 0.0
+      else
+        let excess_return =
+          mean_return -. (risk_free_rate /. trading_days_per_year)
+        in
+        excess_return /. std_return *. Float.sqrt trading_days_per_year
+
 let _sharpe_computer_impl ~risk_free_rate :
     sharpe_state Simulator_types.metric_computer =
   {
@@ -76,21 +89,11 @@ let _sharpe_computer_impl ~risk_free_rate :
         });
     finalize =
       (fun ~state ~config:_ ->
-        let values = List.rev state.portfolio_values in
-        let daily_returns = _compute_daily_returns values in
-        let sharpe_ratio =
-          match daily_returns with
-          | [] | [ _ ] -> 0.0
-          | _ ->
-              let mean_return = _mean daily_returns in
-              let std_return = _std daily_returns in
-              if Float.(std_return = 0.0) then 0.0
-              else
-                let daily_rf = state.risk_free_rate /. trading_days_per_year in
-                let excess_return = mean_return -. daily_rf in
-                excess_return /. std_return *. Float.sqrt trading_days_per_year
+        let daily_returns =
+          _compute_daily_returns (List.rev state.portfolio_values)
         in
-        Metric_types.singleton SharpeRatio sharpe_ratio);
+        let sharpe = _compute_sharpe daily_returns state.risk_free_rate in
+        Metric_types.singleton SharpeRatio sharpe);
   }
 
 let sharpe_ratio_computer ?(risk_free_rate = 0.0) () =
@@ -99,6 +102,17 @@ let sharpe_ratio_computer ?(risk_free_rate = 0.0) () =
 (** {1 Maximum Drawdown Computer} *)
 
 type drawdown_state = { peak : float; max_drawdown : float; has_data : bool }
+
+let _update_drawdown state value =
+  let peak = Float.max state.peak value in
+  let drawdown =
+    if Float.(peak = 0.0) then 0.0 else (peak -. value) /. peak *. 100.0
+  in
+  {
+    peak;
+    max_drawdown = Float.max state.max_drawdown drawdown;
+    has_data = true;
+  }
 
 let _drawdown_computer_impl : drawdown_state Simulator_types.metric_computer =
   {
@@ -110,13 +124,7 @@ let _drawdown_computer_impl : drawdown_state Simulator_types.metric_computer =
         let value = step.Simulator_types.portfolio_value in
         if not state.has_data then
           { peak = value; max_drawdown = 0.0; has_data = true }
-        else
-          let peak = Float.max state.peak value in
-          let drawdown =
-            if Float.(peak = 0.0) then 0.0 else (peak -. value) /. peak *. 100.0
-          in
-          let max_drawdown = Float.max state.max_drawdown drawdown in
-          { peak; max_drawdown; has_data = true });
+        else _update_drawdown state value);
     finalize =
       (fun ~state ~config:_ ->
         Metric_types.singleton MaxDrawdown state.max_drawdown);
