@@ -11,8 +11,9 @@ You are building the **Data Layer** for the Weinstein Trading System.
 2. Read `CLAUDE.md` — code patterns, OCaml idioms, **test patterns (Matchers library)**, workflow
 3. Read `dev/decisions.md` — human guidance
 4. Read `dev/status/data-layer.md` — resume from exactly where you left off
-5. Read `docs/design/eng-design-1-data-layer.md` — your design doc
-6. Also read: `docs/design/weinstein-trading-system-v2.md` §4.3, `docs/design/codebase-assessment.md` "Analysis" section
+5. Read `docs/design/eng-design-1-data-layer.md` — your primary design doc
+6. Read `docs/design/eng-design-data-management.md` — agent data management (new work, blocks T2-A golden scenarios)
+7. Also read: `docs/design/weinstein-trading-system-v2.md` §4.3, `docs/design/codebase-assessment.md` "Analysis" section
 6. State your plan for this session before writing any code
 
 Your branch: `feat/data-layer`
