@@ -69,24 +69,27 @@ let is_error result =
   | Ok _ -> assert_failure "Expected Error but got Ok"
   | Error _ -> () (* Expected *)
 
+let _check_error_code ~expected_code (status : Status.t) =
+  if not (Status.equal_code status.code expected_code) then
+    assert_failure
+      (Printf.sprintf "Expected error code %s but got %s"
+         (Status.show_code expected_code)
+         (Status.show_code status.code))
+
+let _check_error_message ~substring (status : Status.t) =
+  let msg_str = Status.show status in
+  if not (String.is_substring msg_str ~substring) then
+    assert_failure
+      (Printf.sprintf "Expected error message to contain '%s' but got: %s"
+         substring msg_str)
+
 let is_error_with ?msg expected_code result =
   match result with
   | Ok _ -> assert_failure "Expected Error but got Ok"
-  | Error ({ Status.code; _ } as status) -> (
-      if not (Status.equal_code code expected_code) then
-        assert_failure
-          (Printf.sprintf "Expected error code %s but got %s"
-             (Status.show_code expected_code)
-             (Status.show_code code));
-      match msg with
-      | Some substring ->
-          let msg_str = Status.show status in
-          if not (String.is_substring msg_str ~substring) then
-            assert_failure
-              (Printf.sprintf
-                 "Expected error message to contain '%s' but got: %s" substring
-                 msg_str)
-      | None -> ())
+  | Error status ->
+      _check_error_code ~expected_code status;
+      Option.iter msg ~f:(fun substring ->
+          _check_error_message ~substring status)
 
 (* ========================================================================== *)
 (* Option Matchers                                                           *)
@@ -167,21 +170,26 @@ let elements_are matchers list =
          (List.length list) (List.length matchers))
   else List.iter2_exn list matchers ~f:(fun elem matcher -> matcher elem)
 
+(* Build match matrix: matrix.(i).(j) = true if element i satisfies matcher j *)
+let _build_match_matrix list matchers =
+  List.map list ~f:(fun element ->
+      List.map matchers ~f:(fun matcher ->
+          try
+            matcher element;
+            true
+          with _ -> false))
+
+let _format_unmatched prefix unmatched =
+  Printf.sprintf "%s: %s" prefix
+    (String.concat ~sep:", " (List.map unmatched ~f:(Printf.sprintf "#%d")))
+
 let unordered_elements_are matchers list =
   if List.length matchers <> List.length list then
     assert_failure
       (Printf.sprintf "Expected %d elements but got %d" (List.length matchers)
          (List.length list))
   else
-    (* Build match matrix: matrix.(i).(j) = true if element i matches matcher j *)
-    let matrix =
-      List.map list ~f:(fun element ->
-          List.map matchers ~f:(fun matcher ->
-              try
-                matcher element;
-                true
-              with _ -> false))
-    in
+    let matrix = _build_match_matrix list matchers in
     let matcher_matched =
       List.init (List.length matchers) ~f:(fun j ->
           List.exists matrix ~f:(fun row -> List.nth_exn row j))
@@ -200,18 +208,12 @@ let unordered_elements_are matchers list =
         [
           Option.some_if
             (not (List.is_empty unmatched_matchers))
-            (Printf.sprintf
-               "where the following matchers don't match any elements: %s"
-               (String.concat ~sep:", "
-                  (List.map unmatched_matchers
-                     ~f:(Printf.sprintf "matcher #%d"))));
+            (_format_unmatched "matchers without matching elements"
+               unmatched_matchers);
           Option.some_if
             (not (List.is_empty unmatched_elements))
-            (Printf.sprintf
-               "where the following elements don't match any matchers: %s"
-               (String.concat ~sep:", "
-                  (List.map unmatched_elements
-                     ~f:(Printf.sprintf "element #%d"))));
+            (_format_unmatched "elements without matching matchers"
+               unmatched_elements);
         ]
     in
     if not (List.is_empty msgs) then
