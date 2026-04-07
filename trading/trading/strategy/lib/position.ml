@@ -122,10 +122,11 @@ let trigger_of_kind = function
 let _validate_position_id position_id transition_id =
   if String.equal position_id transition_id then Ok ()
   else
-    Error
-      (Status.invalid_argument_error
-         (Printf.sprintf "Position ID mismatch: expected %s, got %s" position_id
-            transition_id))
+    let msg =
+      Printf.sprintf "Position ID mismatch: expected %s, got %s" position_id
+        transition_id
+    in
+    Error (Status.invalid_argument_error msg)
 
 let _validate_positive name value =
   if Float.(value > 0.0) then Ok ()
@@ -137,10 +138,11 @@ let _validate_positive name value =
 let _validate_quantity_bounds filled target =
   if Float.(filled <= target) then Ok ()
   else
-    Error
-      (Status.invalid_argument_error
-         (Printf.sprintf "Filled quantity (%.2f) exceeds target (%.2f)" filled
-            target))
+    let msg =
+      Printf.sprintf "Filled quantity (%.2f) exceeds target (%.2f)" filled
+        target
+    in
+    Error (Status.invalid_argument_error msg)
 
 let _validate_has_fills filled =
   if Float.(filled > 0.0) then Ok ()
@@ -193,10 +195,11 @@ let create_entering ?(id = None) ?(date = None) transition =
       ->
         Ok (symbol, side, target_quantity, entry_price, reasoning)
     | kind ->
-        Error
-          (Status.invalid_argument_error
-             (Printf.sprintf "Expected CreateEntering transition, got %s"
-                (show_transition_kind kind)))
+        let kind_str = show_transition_kind kind in
+        let msg =
+          Printf.sprintf "Expected CreateEntering transition, got %s" kind_str
+        in
+        Error (Status.invalid_argument_error msg)
   in
   (* Validate extracted values *)
   let%bind () = _validate_positive "target_quantity" target_quantity in
@@ -206,6 +209,10 @@ let create_entering ?(id = None) ?(date = None) transition =
     match id with Some id -> id | None -> transition.position_id
   in
   let created_date = match date with Some d -> d | None -> transition.date in
+  let state =
+    Entering
+      { target_quantity; entry_price; filled_quantity = 0.0; created_date }
+  in
   Ok
     {
       id = position_id;
@@ -213,9 +220,7 @@ let create_entering ?(id = None) ?(date = None) transition =
       side;
       entry_reasoning = reasoning;
       exit_reason = None;
-      state =
-        Entering
-          { target_quantity; entry_price; filled_quantity = 0.0; created_date };
+      state;
       last_updated = created_date;
       portfolio_lot_ids = [];
     }
@@ -233,50 +238,46 @@ let _invalid_transition kind =
 
 let _entry_fill t ~date ~target_quantity ~entry_price ~curr ~created_date
     ~filled_quantity =
-  Ok
-    {
-      t with
-      state =
-        Entering
-          {
-            target_quantity;
-            entry_price;
-            filled_quantity = curr +. filled_quantity;
-            created_date;
-          };
-      last_updated = date;
-    }
+  let state =
+    Entering
+      {
+        target_quantity;
+        entry_price;
+        filled_quantity = curr +. filled_quantity;
+        created_date;
+      }
+  in
+  Ok { t with state; last_updated = date }
 
 let _entry_complete t ~date ~filled_quantity ~entry_price ~risk_params =
-  Ok
-    {
-      t with
-      state =
-        Holding
-          {
-            quantity = filled_quantity;
-            entry_price;
-            entry_date = date;
-            risk_params;
-          };
-      last_updated = date;
-    }
+  let state =
+    Holding
+      {
+        quantity = filled_quantity;
+        entry_price;
+        entry_date = date;
+        risk_params;
+      }
+  in
+  Ok { t with state; last_updated = date }
 
 let _cancel_entry t ~date ~entry_price ~created_date =
+  let state =
+    Closed
+      {
+        quantity = 0.0;
+        entry_price;
+        exit_price = entry_price;
+        gross_pnl = None;
+        entry_date = created_date;
+        exit_date = date;
+        days_held = Date.diff date created_date;
+      }
+  in
   Ok
     {
       t with
-      state =
-        Closed
-          {
-            quantity = 0.0;
-            entry_price;
-            exit_price = entry_price;
-            gross_pnl = None;
-            entry_date = created_date;
-            exit_date = date;
-            days_held = Date.diff date created_date;
-          };
+      state;
       exit_reason = Some PortfolioRebalancing;
       last_updated = date;
     }
@@ -298,23 +299,19 @@ let _apply_entering_transition t transition =
 
 let _trigger_exit t ~date ~quantity ~entry_price ~entry_date ~exit_reason
     ~exit_price =
-  Ok
-    {
-      t with
-      state =
-        Exiting
-          {
-            quantity;
-            entry_price;
-            entry_date;
-            target_quantity = quantity;
-            exit_price;
-            filled_quantity = 0.0;
-            started_date = date;
-          };
-      exit_reason = Some exit_reason;
-      last_updated = date;
-    }
+  let state =
+    Exiting
+      {
+        quantity;
+        entry_price;
+        entry_date;
+        target_quantity = quantity;
+        exit_price;
+        filled_quantity = 0.0;
+        started_date = date;
+      }
+  in
+  Ok { t with state; exit_reason = Some exit_reason; last_updated = date }
 
 let _update_risk_params t ~date ~quantity ~entry_price ~entry_date
     ~new_risk_params =
@@ -342,42 +339,37 @@ let _apply_holding_transition t transition =
 
 let _exit_fill t ~date ~quantity ~entry_price ~entry_date ~target_quantity
     ~exit_price ~curr ~started_date ~filled_quantity =
-  Ok
-    {
-      t with
-      state =
-        Exiting
-          {
-            quantity;
-            entry_price;
-            entry_date;
-            target_quantity;
-            exit_price;
-            filled_quantity = curr +. filled_quantity;
-            started_date;
-          };
-      last_updated = date;
-    }
+  let state =
+    Exiting
+      {
+        quantity;
+        entry_price;
+        entry_date;
+        target_quantity;
+        exit_price;
+        filled_quantity = curr +. filled_quantity;
+        started_date;
+      }
+  in
+  Ok { t with state; last_updated = date }
 
 let _exit_complete t ~date ~filled_quantity ~entry_price ~exit_price ~entry_date
     =
-  Ok
-    {
-      t with
-      state =
-        Closed
-          {
-            quantity = filled_quantity;
-            entry_price;
-            exit_price;
-            gross_pnl = None;
-            entry_date;
-            exit_date = date;
-            days_held = Date.diff date entry_date;
-          };
-      last_updated = date;
-    }
+  let state =
+    Closed
+      {
+        quantity = filled_quantity;
+        entry_price;
+        exit_price;
+        gross_pnl = None;
+        entry_date;
+        exit_date = date;
+        days_held = Date.diff date entry_date;
+      }
+  in
+  Ok { t with state; last_updated = date }
 
+(* @nesting-ok: 7-field Exiting pattern forces multiline match; depth is structural *)
 let _apply_exiting_transition t transition =
   let date = transition.date in
   match (t.state, transition.kind) with

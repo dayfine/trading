@@ -286,19 +286,25 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
 (* Per-candidate filters                                               *)
 (* ------------------------------------------------------------------ *)
 
+(** Score, grade, and build a candidate after passing preliminary gates. Returns
+    [None] if the grade does not meet [min_grade]. *)
+let _score_and_build ~weights ~thresholds ~params ~min_grade ~is_short ~scorer
+    ~sector a =
+  let score, reasons = scorer ~weights ~sector a in
+  let grade = _grade_of_score ~thresholds score in
+  if compare_grade grade min_grade > 0 then None
+  else
+    Some
+      (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds ~is_short)
+
 (** Evaluate one (analysis, sector) pair as a long candidate. Returns [None] if
     excluded by the sector gate, breakout test, or grade floor. *)
 let _long_candidate ~weights ~thresholds ~params ~min_grade (a, sector) =
   if equal_sector_rating sector.rating Weak then None
   else if not (Stock_analysis.is_breakout_candidate a) then None
   else
-    let score, reasons = _score_long ~weights ~sector a in
-    let grade = _grade_of_score ~thresholds score in
-    if compare_grade grade min_grade > 0 then None
-    else
-      Some
-        (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
-           ~is_short:false)
+    _score_and_build ~weights ~thresholds ~params ~min_grade ~is_short:false
+      ~scorer:_score_long ~sector a
 
 (** Evaluate one (analysis, sector) pair as a short candidate. Bearish/Neutral
     only: grade must meet [min_grade]. *)
@@ -306,13 +312,23 @@ let _short_candidate ~weights ~thresholds ~params ~min_grade (a, sector) =
   if equal_sector_rating sector.rating Strong then None
   else if not (Stock_analysis.is_breakdown_candidate a) then None
   else
-    let score, reasons = _score_short ~weights ~sector a in
-    let grade = _grade_of_score ~thresholds score in
-    if compare_grade grade min_grade > 0 then None
-    else
-      Some
-        (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds
-           ~is_short:true)
+    _score_and_build ~weights ~thresholds ~params ~min_grade ~is_short:true
+      ~scorer:_score_short ~sector a
+
+(** Check watchlist eligibility after the breakout gate. Returns [None] if the
+    ticker is already in [buy_candidates] or the grade is above C/D. *)
+let _check_watchlist_grade ~thresholds ~buy_candidates ~score
+    (sa : Stock_analysis.t) =
+  let grade = _grade_of_score ~thresholds score in
+  let in_buy_list =
+    List.exists buy_candidates ~f:(fun c -> String.(c.ticker = sa.ticker))
+  in
+  if in_buy_list then None
+  else if equal_grade grade C || equal_grade grade D then
+    Some
+      ( sa.ticker,
+        Printf.sprintf "Grade %s, score %d" (grade_to_string grade) score )
+  else None
 
 (** Evaluate one (analysis, sector) pair as a watchlist entry. Included when it
     is a grade-C or grade-D breakout candidate not already in [buy_candidates].
@@ -321,17 +337,7 @@ let _watchlist_entry ~weights ~thresholds ~buy_candidates (sa, sector) =
   if not (Stock_analysis.is_breakout_candidate sa) then None
   else
     let score, _ = _score_long ~weights ~sector sa in
-    let grade = _grade_of_score ~thresholds score in
-    let in_buy_list =
-      List.exists buy_candidates ~f:(fun c ->
-          String.(c.ticker = sa.Stock_analysis.ticker))
-    in
-    if in_buy_list then None
-    else if equal_grade grade C || equal_grade grade D then
-      Some
-        ( sa.Stock_analysis.ticker,
-          Printf.sprintf "Grade %s, score %d" (grade_to_string grade) score )
-    else None
+    _check_watchlist_grade ~thresholds ~buy_candidates ~score sa
 
 (* ------------------------------------------------------------------ *)
 (* Evaluate + sort + cap                                               *)

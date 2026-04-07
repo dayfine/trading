@@ -45,36 +45,35 @@ let show_summary s =
     s.total_pnl s.avg_holding_days s.win_rate s.win_count
     (s.win_count + s.loss_count)
 
+let _make_trade_metric symbol entry_date entry exit_date exit =
+  let open Trading_base.Types in
+  let days_held = Date.diff exit_date entry_date in
+  let pnl_dollars = (exit.price -. entry.price) *. entry.quantity in
+  let pnl_percent = (exit.price -. entry.price) /. entry.price *. 100.0 in
+  {
+    symbol;
+    entry_date;
+    exit_date;
+    days_held;
+    entry_price = entry.price;
+    exit_price = exit.price;
+    quantity = entry.quantity;
+    pnl_dollars;
+    pnl_percent;
+  }
+
+let _is_buy_sell_pair entry exit =
+  let open Trading_base.Types in
+  equal_side entry.side Buy && equal_side exit.side Sell
+
 (** Pair buy trades with sells to form round-trips for a single symbol. *)
 let _pair_trades_for_symbol symbol
     (trades : (Date.t * Trading_base.Types.trade) list) : trade_metrics list =
   let rec pair_trades trades_list metrics =
     match trades_list with
     | (entry_date, entry) :: (exit_date, exit) :: rest
-      when Trading_base.Types.(
-             equal_side entry.side Buy && equal_side exit.side Sell) ->
-        let days_held = Date.diff exit_date entry_date in
-        let pnl_dollars =
-          (exit.Trading_base.Types.price -. entry.Trading_base.Types.price)
-          *. entry.Trading_base.Types.quantity
-        in
-        let pnl_percent =
-          (exit.Trading_base.Types.price -. entry.Trading_base.Types.price)
-          /. entry.Trading_base.Types.price *. 100.0
-        in
-        let m =
-          {
-            symbol;
-            entry_date;
-            exit_date;
-            days_held;
-            entry_price = entry.Trading_base.Types.price;
-            exit_price = exit.Trading_base.Types.price;
-            quantity = entry.Trading_base.Types.quantity;
-            pnl_dollars;
-            pnl_percent;
-          }
-        in
+      when _is_buy_sell_pair entry exit ->
+        let m = _make_trade_metric symbol entry_date entry exit_date exit in
         pair_trades rest (m :: metrics)
     | _ :: rest -> pair_trades rest metrics
     | [] -> List.rev metrics

@@ -379,27 +379,32 @@ let _generate_bridge_segment ~random_state ~start_price ~end_price ~n_points
 
 (** {1 Main Path Generation} *)
 
-(** Interpolate between waypoints using Brownian bridge segments, accumulating
-    path points. Each segment is bridged from its start waypoint to its end
-    waypoint. The opening price is prepended on the first segment. *)
+let _append_segment ~random_state ~volatility_scale ~degrees_of_freedom
+    ~total_points ~low_bound ~high_bound acc p1 p2 idx1 idx2 =
+  let acc' =
+    if List.is_empty acc then ({ price = p1 } : path_point) :: acc else acc
+  in
+  let segment =
+    _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
+      ~n_points:(idx2 - idx1) ~volatility_scale ~degrees_of_freedom
+      ~resolution:total_points ~low_bound ~high_bound
+  in
+  ({ price = p2 } : path_point) :: List.rev_append segment acc'
+
+(* Interpolate between waypoints using Brownian bridge segments, accumulating
+   path points. Each segment is bridged from its start waypoint to its end
+   waypoint. The opening price is prepended on the first segment. *)
 let rec _generate_segments ~random_state ~volatility_scale ~degrees_of_freedom
     ~total_points ~low_bound ~high_bound prices indices acc =
   match (prices, indices) with
   | p1 :: p2 :: rest_prices, idx1 :: idx2 :: rest_indices ->
       let acc' =
-        if List.is_empty acc then ({ price = p1 } : path_point) :: acc else acc
-      in
-      let segment =
-        _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
-          ~n_points:(idx2 - idx1) ~volatility_scale ~degrees_of_freedom
-          ~resolution:total_points ~low_bound ~high_bound
-      in
-      let acc'' =
-        ({ price = p2 } : path_point) :: List.rev_append segment acc'
+        _append_segment ~random_state ~volatility_scale ~degrees_of_freedom
+          ~total_points ~low_bound ~high_bound acc p1 p2 idx1 idx2
       in
       _generate_segments ~random_state ~volatility_scale ~degrees_of_freedom
         ~total_points ~low_bound ~high_bound (p2 :: rest_prices)
-        (idx2 :: rest_indices) acc''
+        (idx2 :: rest_indices) acc'
   | _, _ -> List.rev acc
 
 let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =

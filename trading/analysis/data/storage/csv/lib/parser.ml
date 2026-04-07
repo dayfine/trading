@@ -17,19 +17,24 @@ let _build_price date_str open_str high_str low_str close_str adj_close_str
     volume = int_of_string volume_str;
   }
 
+let _build_price_result date_str open_str high_str low_str close_str
+    adj_close_str volume_str line =
+  try
+    Ok
+      (_build_price date_str open_str high_str low_str close_str adj_close_str
+         volume_str)
+  with
+  | Invalid_argument msg -> Error msg
+  | Failure _ -> Error ("Invalid number in line: " ^ line)
+
 let parse_line (line : string) : (Types.Daily_price.t, string) Result.t =
   let parts = String.split_on_chars ~on:[ ',' ] line in
   match parts with
   | [
    date_str; open_str; high_str; low_str; close_str; adj_close_str; volume_str;
-  ] -> (
-      try
-        Ok
-          (_build_price date_str open_str high_str low_str close_str
-             adj_close_str volume_str)
-      with
-      | Invalid_argument msg -> Error msg
-      | Failure _ -> Error ("Invalid number in line: " ^ line))
+  ] ->
+      _build_price_result date_str open_str high_str low_str close_str
+        adj_close_str volume_str line
   | _ -> Error ("Expected 7 columns, line: " ^ line)
 
 let parse_lines (lines : string list) :

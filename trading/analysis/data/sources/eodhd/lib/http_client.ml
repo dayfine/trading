@@ -218,16 +218,17 @@ let _parse_general_section symbol general =
   let%bind exchange = find_str "Exchange" in
   Ok { symbol; name; sector; industry; market_cap; exchange }
 
+let _parse_general_field symbol = function
+  | Some (`Assoc general) -> _parse_general_section symbol general
+  | Some _ -> Status.error_invalid_argument "General field is not an object"
+  | None -> Status.error_not_found "General section not found in response"
+
 let _parse_fundamentals_response symbol body_str =
   try
     match Yojson.Safe.from_string body_str with
-    | `Assoc fields -> (
-        match List.Assoc.find ~equal:String.equal fields "General" with
-        | Some (`Assoc general) -> _parse_general_section symbol general
-        | Some _ ->
-            Status.error_invalid_argument "General field is not an object"
-        | None -> Status.error_not_found "General section not found in response"
-        )
+    | `Assoc fields ->
+        let general = List.Assoc.find ~equal:String.equal fields "General" in
+        _parse_general_field symbol general
     | _ -> Status.error_invalid_argument "Invalid response format"
   with Yojson.Json_error msg ->
     Status.error_invalid_argument ("Invalid JSON: " ^ msg)
