@@ -12,10 +12,11 @@
 - **Orders** — existing `trading/orders/` — **no changes**
 - **Engine** — existing `trading/engine/` — **no changes**
 - **Position** — existing `trading/strategy/lib/position.ml` — **no changes**
-- **Weinstein Stops** — new: `analysis/weinstein/stops/`
+- **Weinstein Stops** — new: `trading/weinstein/stops/`
 - **Portfolio Risk** — new: `analysis/weinstein/portfolio_risk/`
-- **Order Generator** — new: `analysis/weinstein/order_gen/`
-- **Trading State** — new: `analysis/weinstein/trading_state/`
+- **Weinstein Strategy** — new: `trading/weinstein/strategy/` — implements `STRATEGY` interface; IS the portfolio manager for both live and simulation
+- **Trading State** — new: `trading/weinstein/trading_state/` — persistence for live runs
+- **Order Generator** — new: `trading/weinstein/order_gen/` — formats `Position.transition list` → broker orders for the live runner
 
 ## 3.2 Requirements
 
@@ -162,27 +163,89 @@ val load : path:Fpath.t -> t Status.status_or
 
 **Why JSON, not SQLite?** Human-inspectable (`cat state.json`). Easy to debug. Schema evolution is trivial. Performance irrelevant — read/write once per scan. If trade log grows to thousands of entries, could move history to SQLite while keeping active state in JSON.
 
+### Live Runner vs Simulator
+
+The `STRATEGY` interface is the generic seam between decision logic and execution —
+the same strategy runs in both contexts. There is no separate "portfolio manager"
+component.
+
+```
+Simulation (backtesting):
+  Simulator drives a time loop
+    → calls strategy.on_market_close at each step (strategy is the callback)
+    → auto-executes Position.transition list (fills, position tracking)
+    → accumulates equity curve + metrics
+  Simulator IS the stateful portfolio manager for backtesting.
+
+Live (weekly scan):
+  Live runner triggered by cron or manually
+    → loads trading_state from disk
+    → constructs strategy with initial_stop_states = trading_state.stop_states
+    → calls strategy.on_market_close (same call as simulation)
+    → passes Position.transition list to order_gen → broker order suggestions
+    → saves updated trading_state
+  trading_state is the live runner's equivalent of the simulator's in-memory state.
+```
+
+Both paths call the same `strategy.on_market_close`. The difference is what happens
+to the output: the simulator auto-executes; the live runner formats it for human review.
+
+The strategy already supports live initialization:
+```ocaml
+(* weinstein_strategy already accepts saved stop state *)
+val make : ?initial_stop_states:Weinstein_stops.stop_state String.Map.t
+        -> config -> (module Strategy_interface.STRATEGY)
+```
+
 ### Order Generation
 
-```ocaml
-(* weinstein_order_gen.mli *)
-type suggested_order = {
-  ticker : string; side : Types.side;
-  order_type : Types.order_type;  (* StopLimit for entries, Stop for stops *)
-  shares : int; rationale : string;
-  grade : Weinstein_types.grade option;
-}
+`order_gen` translates `Position.transition list` from the strategy into concrete
+broker order specifications for the live runner. It is not used by the simulator.
 
-val from_candidates : candidates:Screener.scored_candidate list ->
-  snapshot:Portfolio_risk.portfolio_snapshot -> config:Portfolio_risk.config ->
-  suggested_order list
+**Input:** `Position.transition list` from `strategy.on_market_close` + a position
+quantity lookup (to determine share count for stop and exit orders).
 
-val from_stop_adjustments : adjustments:(string * Weinstein_stops.stop_event) list ->
-  positions:Position.t String.Map.t -> suggested_order list
+**Output:** Suggested broker orders the human reviews before placing.
 
-val from_exits : exits:(string * Weinstein_stops.stop_event) list ->
-  positions:Position.t String.Map.t -> suggested_order list
 ```
+CreateEntering { symbol; side=Long; target_quantity=100; entry_price=150 }
+  → StopLimit buy 100 shares at $150 (triggers + fills at the breakout level)
+
+UpdateRiskParams { stop_loss_price=140 }
+  → Cancel old stop / place Stop sell 100 shares at $140
+
+TriggerExit { exit_price }
+  → Market sell 100 shares (stop was hit, exit at market open)
+```
+
+This translation is strategy-agnostic: any strategy using `Position.transition` gets
+broker order formatting. No Weinstein-specific logic needed.
+
+```ocaml
+(* weinstein_order_gen.mli — trading/weinstein/order_gen/ *)
+
+type suggested_order = {
+  ticker     : string;
+  side       : Trading_base.Types.side;
+  order_type : Trading_base.Types.order_type;
+  shares     : int;
+  rationale  : string;
+}
+[@@deriving show, eq]
+
+val from_transitions :
+  transitions:Trading_strategy.Position.transition list ->
+  get_position:(string -> Trading_strategy.Position.t option) ->
+  suggested_order list
+(** Translate strategy output into broker orders.
+    CreateEntering  → StopLimit entry order.
+    UpdateRiskParams { stop_loss_price } → Stop order at new level.
+    TriggerExit     → Market exit order.
+    Other transitions → ignored. *)
+```
+
+**Location:** `trading/weinstein/order_gen/` — depends on `Trading_strategy.Position`
+so it belongs in `trading/`, not `analysis/`.
 
 ---
 
@@ -190,6 +253,8 @@ val from_exits : exits:(string * Weinstein_stops.stop_event) list ->
 
 | Decision | Chosen | Alternative | Rationale |
 |---|---|---|---|
-| Don't modify existing Position | Parallel Weinstein stop state | Extend risk_params | Keeps 6 test files passing, cleaner separation, no interface pollution |
+| Don't modify existing Position | Parallel Weinstein stop state | Extend risk_params | Keeps 6 existing test files passing; Weinstein stop fields (correction lows, peaks, MA history) don't belong in a generic interface |
+| STRATEGY as the portfolio manager | Single interface for live + simulation | Separate portfolio_manager component | Avoids phantom abstraction; strategy already accepts `initial_stop_states` for live initialization; same code runs both paths |
+| order_gen takes Position.transition | Strategy-agnostic formatter | order_gen takes screener output + does sizing | Sizing decisions already made by strategy; formatting is the only live-specific concern; any strategy gets order formatting for free |
 | JSON for trading state | Simple file + atomic rename | SQLite or protobuf | Human-readable, tiny volume, easy debugging, schema evolution trivial |
-| Redundant stop price | In both risk_params and stop_state | Single source of truth | Strategy is only writer — sync is simple. Clean module boundaries worth the duplication. |
+| Redundant stop price | In both risk_params and stop_state | Single source of truth | Strategy is only writer — sync is simple; clean module boundaries worth the duplication |
