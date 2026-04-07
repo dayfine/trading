@@ -14,17 +14,17 @@ type raw_rs = { date : Date.t; rs_value : float; rs_normalized : float }
 
 (** Align stock and benchmark bars on date, returning
     [(date, stock_close, bench_close)] triples for dates present in both. *)
+let _align_bar bench_map bar =
+  Map.find bench_map bar.Daily_price.date
+  |> Option.map ~f:(fun bench_close ->
+      (bar.Daily_price.date, bar.Daily_price.adjusted_close, bench_close))
+
 let _align_bars ~stock_bars ~benchmark_bars : (Date.t * float * float) list =
   let bench_map =
     List.fold benchmark_bars ~init:Date.Map.empty ~f:(fun m b ->
         Map.set m ~key:b.Daily_price.date ~data:b.Daily_price.adjusted_close)
   in
-  List.filter_map stock_bars ~f:(fun bar ->
-      match Map.find bench_map bar.Daily_price.date with
-      | None -> None
-      | Some bench_close ->
-          Some
-            (bar.Daily_price.date, bar.Daily_price.adjusted_close, bench_close))
+  List.filter_map stock_bars ~f:(_align_bar bench_map)
 
 (** Convert [(date, rs_value)] pairs and the corresponding [ma_values] into a
     [raw_rs list].

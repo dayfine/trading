@@ -29,6 +29,9 @@ let _execute_entry ~(symbol : string) ~(config : config)
   let entry_price = price.Types.Daily_price.close_price in
   let date = price.Types.Daily_price.date in
 
+  let reasoning =
+    Position.ManualDecision { description = "Buy and hold - initial entry" }
+  in
   (* Produce CreateEntering transition - engine will create and fill position *)
   {
     Position.position_id;
@@ -40,8 +43,7 @@ let _execute_entry ~(symbol : string) ~(config : config)
           side = Long;
           target_quantity = config.position_size;
           entry_price;
-          reasoning =
-            ManualDecision { description = "Buy and hold - initial entry" };
+          reasoning;
         };
   }
 
@@ -58,18 +60,16 @@ let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
         Some (_execute_entry ~symbol ~config ~price)
     | _ -> None
 
+let _on_market_close config ~get_price ~get_indicator:_ ~positions =
+  let all_transitions =
+    List.filter_map config.symbols ~f:(fun symbol ->
+        _process_symbol ~get_price ~config ~positions symbol)
+  in
+  Result.return { Strategy_interface.transitions = all_transitions }
+
 let make (config : config) : (module Strategy_interface.STRATEGY) =
   let module M = struct
-    let on_market_close ~get_price ~get_indicator:_ ~positions =
-      (* Process all symbols and collect transitions *)
-      let all_transitions =
-        List.filter_map config.symbols ~f:(fun symbol ->
-            _process_symbol ~get_price ~config ~positions symbol)
-      in
-
-      let output = { Strategy_interface.transitions = all_transitions } in
-      Result.return output
-
+    let on_market_close = _on_market_close config
     let name = name
   end in
   (module M : Strategy_interface.STRATEGY)

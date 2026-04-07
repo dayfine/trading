@@ -38,16 +38,16 @@ let _mean values =
       let sum = List.fold values ~init:0.0 ~f:( +. ) in
       sum /. Float.of_int (List.length values)
 
+let _sq_diff mean acc x =
+  let diff = x -. mean in
+  acc +. (diff *. diff)
+
 let _std values =
   match values with
   | [] | [ _ ] -> 0.0
   | _ ->
       let mean = _mean values in
-      let sum_sq_diff =
-        List.fold values ~init:0.0 ~f:(fun acc x ->
-            let diff = x -. mean in
-            acc +. (diff *. diff))
-      in
+      let sum_sq_diff = List.fold values ~init:0.0 ~f:(_sq_diff mean) in
       Float.sqrt (sum_sq_diff /. Float.of_int (List.length values))
 
 let _compute_daily_returns values =
@@ -75,25 +75,26 @@ let _compute_sharpe daily_returns risk_free_rate =
         in
         excess_return /. std_return *. Float.sqrt trading_days_per_year
 
+let _sharpe_update ~state ~step =
+  let portfolio_values =
+    step.Simulator_types.portfolio_value :: state.portfolio_values
+  in
+  { state with portfolio_values }
+
+let _sharpe_finalize ~state ~config:_ =
+  let daily_returns =
+    _compute_daily_returns (List.rev state.portfolio_values)
+  in
+  let sharpe = _compute_sharpe daily_returns state.risk_free_rate in
+  Metric_types.singleton SharpeRatio sharpe
+
 let _sharpe_computer_impl ~risk_free_rate :
     sharpe_state Simulator_types.metric_computer =
   {
     name = "sharpe_ratio";
     init = (fun ~config:_ -> { portfolio_values = []; risk_free_rate });
-    update =
-      (fun ~state ~step ->
-        {
-          state with
-          portfolio_values =
-            step.Simulator_types.portfolio_value :: state.portfolio_values;
-        });
-    finalize =
-      (fun ~state ~config:_ ->
-        let daily_returns =
-          _compute_daily_returns (List.rev state.portfolio_values)
-        in
-        let sharpe = _compute_sharpe daily_returns state.risk_free_rate in
-        Metric_types.singleton SharpeRatio sharpe);
+    update = _sharpe_update;
+    finalize = _sharpe_finalize;
   }
 
 let sharpe_ratio_computer ?(risk_free_rate = 0.0) () =

@@ -98,13 +98,12 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
 
 (** Get all price bars for today using market data adapter *)
 let _get_today_bars t =
-  List.filter_map t.deps.symbols ~f:(fun symbol ->
-      match
-        Trading_simulation_data.Market_data_adapter.get_price
-          t.deps.market_data_adapter ~symbol ~date:t.current_date
-      with
-      | None -> None
-      | Some daily_price -> Some (_to_price_bar symbol daily_price))
+  let get_bar symbol =
+    Trading_simulation_data.Market_data_adapter.get_price
+      t.deps.market_data_adapter ~symbol ~date:t.current_date
+    |> Option.map ~f:(_to_price_bar symbol)
+  in
+  List.filter_map t.deps.symbols ~f:get_bar
 
 (** Compute total portfolio value (cash + position market values). *)
 let _compute_portfolio_value ~portfolio ~today_bars =

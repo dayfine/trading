@@ -40,6 +40,7 @@ let _validate_price_positive price price_name =
          (Printf.sprintf "%s must be positive: %.2f" price_name price))
   else Ok ()
 
+(* @nesting-ok: Printf.sprintf format string continuation forces depth in error arms *)
 let _validate_stop_limit_relationship side stop_price limit_price =
   match side with
   | Buy when stop_price > limit_price ->
@@ -75,8 +76,22 @@ let _validate_order_type params =
       combine_status_list validations
   | Market -> Ok ()
 
+let _build_order ~now_time params =
+  {
+    id = _generate_order_id ();
+    symbol = params.symbol;
+    side = params.side;
+    order_type = params.order_type;
+    quantity = params.quantity;
+    time_in_force = params.time_in_force;
+    status = Pending;
+    filled_quantity = 0.0;
+    avg_fill_price = None;
+    created_at = now_time;
+    updated_at = now_time;
+  }
+
 let create_order ?(now_time = Time_ns_unix.now ()) params =
-  (* Collect all validation results *)
   let validations =
     [
       _validate_symbol params.symbol;
@@ -85,19 +100,5 @@ let create_order ?(now_time = Time_ns_unix.now ()) params =
     ]
   in
   match combine_status_list validations with
-  | Ok () ->
-      Result.Ok
-        {
-          id = _generate_order_id ();
-          symbol = params.symbol;
-          side = params.side;
-          order_type = params.order_type;
-          quantity = params.quantity;
-          time_in_force = params.time_in_force;
-          status = Pending;
-          filled_quantity = 0.0;
-          avg_fill_price = None;
-          created_at = now_time;
-          updated_at = now_time;
-        }
+  | Ok () -> Result.Ok (_build_order ~now_time params)
   | Error err -> Result.Error err

@@ -52,35 +52,39 @@ let _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
       _log_cache_failure symbol (_save_bars_to_cache data_dir symbol fetched);
       return (Ok fetched)
 
+(* Check if a bar falls within the requested date range *)
+let _in_date_range ~start_date ~end_date (bar : Types.Daily_price.t) =
+  let d = bar.date in
+  let after_start =
+    match start_date with None -> true | Some s -> Date.compare d s >= 0
+  in
+  let before_end =
+    match end_date with None -> true | Some e -> Date.compare d e <= 0
+  in
+  after_start && before_end
+
+(* Enqueue a throttled fetch for the given symbol *)
+let _fetch_throttled ?fetch ~token ~data_dir ~throttle ~period ~symbol
+    ~start_date ~end_date () =
+  Throttle.enqueue throttle (fun () ->
+      _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
+        ~end_date ())
+
 (* Serve bars: return cached data if fresh; fetch from API if stale *)
 let _get_bars ?fetch ~token ~data_dir ~throttle ~symbol ~period ~start_date
     ~end_date () =
   match _load_cached_bars data_dir symbol ~start_date ~end_date with
   | Error _ ->
-      Throttle.enqueue throttle (fun () ->
-          _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
-            ~end_date ())
+      _fetch_throttled ?fetch ~token ~data_dir ~throttle ~period ~symbol
+        ~start_date ~end_date ()
   | Ok cached when _cache_is_current cached ->
       let filtered =
-        List.filter cached ~f:(fun bar ->
-            let d = bar.Types.Daily_price.date in
-            let after_start =
-              match start_date with
-              | None -> true
-              | Some s -> Date.compare d s >= 0
-            in
-            let before_end =
-              match end_date with
-              | None -> true
-              | Some e -> Date.compare d e <= 0
-            in
-            after_start && before_end)
+        List.filter cached ~f:(_in_date_range ~start_date ~end_date)
       in
       return (Ok filtered)
   | Ok _stale ->
-      Throttle.enqueue throttle (fun () ->
-          _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
-            ~end_date ())
+      _fetch_throttled ?fetch ~token ~data_dir ~throttle ~period ~symbol
+        ~start_date ~end_date ()
 
 let make ?fetch config =
   let token = config.token in

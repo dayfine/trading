@@ -70,6 +70,11 @@ let _bucket_idx ~breakout_price ~band_size bar =
   let offset = Float.((mid - breakout_price) /. band_size) in
   Int.of_float (Float.round_down offset)
 
+(** Prepend bar [b] to the list at bucket [bkt] in [tbl], creating it if absent.
+*)
+let _prepend_to_bucket tbl bkt b =
+  Hashtbl.update tbl bkt ~f:(function None -> [ b ] | Some bs -> b :: bs)
+
 (** Group above-breakout bars into a hash table keyed by bucket index. Bars
     whose midpoint falls below [breakout_price] (bucket < 0) are discarded. *)
 let _group_by_bucket ~breakout_price ~band_size bars =
@@ -77,9 +82,7 @@ let _group_by_bucket ~breakout_price ~band_size bars =
   List.iter bars ~f:(fun b ->
       if Float.(b.Daily_price.high_price > breakout_price) then
         let bkt = _bucket_idx ~breakout_price ~band_size b in
-        if bkt >= 0 then
-          Hashtbl.update tbl bkt ~f:(fun existing ->
-              match existing with None -> [ b ] | Some bs -> b :: bs));
+        if bkt >= 0 then _prepend_to_bucket tbl bkt b);
   tbl
 
 (** Convert a single bucket's bars into a [resistance_zone]. *)
