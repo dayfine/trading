@@ -63,41 +63,35 @@ let _process_data_point ~weekdays_only ~prev_date ~curr_week data =
         (data :: curr_week, Some data.date)
       else ([ data ], Some data.date)
 
+(* Recursively process data points, maintaining:
+   - acc: list of completed weekly bars (aggregated)
+   - curr_week: entries in the current week being processed (reverse chronological)
+   - prev_date: last processed date (for chronological validation) *)
+let rec _weekly_aux ~weekdays_only ~include_partial_week acc curr_week prev_date
+    = function
+  | [] -> (
+      match curr_week with
+      | [] -> List.rev acc
+      | week_data ->
+          let last = List.hd_exn week_data in
+          let is_complete_week = _is_friday last.date in
+          if include_partial_week || is_complete_week then
+            List.rev (_aggregate_week week_data :: acc)
+          else List.rev acc)
+  | data :: rest ->
+      let curr_week', prev_date' =
+        _process_data_point ~weekdays_only ~prev_date ~curr_week data
+      in
+      let acc' =
+        match curr_week with
+        | _ :: _ when not (_is_same_week (List.hd_exn curr_week).date data.date)
+          ->
+            _aggregate_week curr_week :: acc
+        | _ -> acc
+      in
+      _weekly_aux ~weekdays_only ~include_partial_week acc' curr_week'
+        prev_date' rest
+
 let daily_to_weekly ?(weekdays_only = false) ?(include_partial_week = true) data
     =
-  (* Recursively process data points, maintaining:
-     - acc: list of completed weekly bars (aggregated)
-     - curr_week: entries in the current week being processed (reverse chronological)
-     - prev_date: last processed date (for chronological validation)
-  *)
-  let rec aux acc curr_week prev_date = function
-    | [] -> (
-        (* End of data - handle any remaining week *)
-        match curr_week with
-        | [] -> List.rev acc (* No remaining week *)
-        | week_data ->
-            (* Check if the last day is a Friday (complete week) *)
-            let last = List.hd_exn week_data in
-            let is_complete_week = _is_friday last.date in
-            if include_partial_week || is_complete_week then
-              (* Aggregate the week and add to results *)
-              List.rev (_aggregate_week week_data :: acc)
-            else
-              List.rev
-                acc (* Skip incomplete week when include_partial_week=false *))
-    | data :: rest ->
-        (* Process the current data point *)
-        let curr_week', prev_date' =
-          _process_data_point ~weekdays_only ~prev_date ~curr_week data
-        in
-        (* If we've moved to a new week, aggregate previous week and add to acc *)
-        let acc' =
-          match curr_week with
-          | _ :: _
-            when not (_is_same_week (List.hd_exn curr_week).date data.date) ->
-              _aggregate_week curr_week :: acc
-          | _ -> acc
-        in
-        aux acc' curr_week' prev_date' rest
-  in
-  aux [] [] None data
+  _weekly_aux ~weekdays_only ~include_partial_week [] [] None data
