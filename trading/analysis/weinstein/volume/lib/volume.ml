@@ -59,11 +59,13 @@ let _compute_result ~config ~event_bar ~prior_bars : result option =
   else
     let ev = event_bar.Daily_price.volume in
     let ratio = Float.of_int ev /. avg_vol in
+    let confirmation =
+      _classify_confirmation ~strong_threshold:config.strong_threshold
+        ~adequate_threshold:config.adequate_threshold ratio
+    in
     Some
       {
-        confirmation =
-          _classify_confirmation ~strong_threshold:config.strong_threshold
-            ~adequate_threshold:config.adequate_threshold ratio;
+        confirmation;
         event_volume = ev;
         avg_volume = avg_vol;
         volume_ratio = ratio;

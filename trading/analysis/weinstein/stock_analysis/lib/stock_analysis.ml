@@ -97,12 +97,9 @@ let analyze ~(config : config) ~ticker ~bars ~benchmark_bars ~prior_stage
   in
   (* Map resistance above estimated breakout price *)
   let resistance_result =
-    match breakout_price with
-    | None -> None
-    | Some bp ->
-        Some
-          (Resistance.analyze ~config:config.resistance ~bars ~breakout_price:bp
-             ~as_of_date)
+    Option.map breakout_price ~f:(fun bp ->
+        Resistance.analyze ~config:config.resistance ~bars ~breakout_price:bp
+          ~as_of_date)
   in
   {
     ticker;

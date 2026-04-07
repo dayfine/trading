@@ -35,6 +35,17 @@ let _classify_trend ~bullish_threshold ~bearish_threshold confidence :
   else if Float.(confidence < bearish_threshold) then Bearish
   else Neutral
 
+let _stage1_detail transition =
+  match transition with
+  | Some (Stage4 _, _) -> (`Neutral, "Index entering Stage 1 base after Stage 4")
+  | _ -> (`Neutral, "Index in Stage 1 base")
+
+let _stage3_detail transition =
+  match transition with
+  | Some (Stage2 _, Stage3 _) ->
+      (`Bearish, "Index entering Stage 3 top — caution")
+  | _ -> (`Bearish, "Index in Stage 3 top")
+
 (** Analyze index stage signal. *)
 let _index_stage_signal ~weight (stage_result : Stage.result) :
     indicator_reading =
@@ -43,17 +54,9 @@ let _index_stage_signal ~weight (stage_result : Stage.result) :
     | Stage2 { late = false; _ } -> (`Bullish, "Index in Stage 2 (advancing)")
     | Stage2 { late = true; _ } ->
         (`Neutral, "Index in late Stage 2 (decelerating)")
-    | Stage1 _ -> (
-        match stage_result.transition with
-        | Some (Stage4 _, Stage1 _) | Some (Stage4 _, _) ->
-            (`Neutral, "Index entering Stage 1 base after Stage 4")
-        | _ -> (`Neutral, "Index in Stage 1 base"))
+    | Stage1 _ -> _stage1_detail stage_result.transition
     | Stage4 _ -> (`Bearish, "Index in Stage 4 (declining)")
-    | Stage3 _ -> (
-        match stage_result.transition with
-        | Some (Stage2 _, Stage3 _) ->
-            (`Bearish, "Index entering Stage 3 top — caution")
-        | _ -> (`Bearish, "Index in Stage 3 top"))
+    | Stage3 _ -> _stage3_detail stage_result.transition
   in
   { name = "Index Stage"; signal; weight; detail }
 

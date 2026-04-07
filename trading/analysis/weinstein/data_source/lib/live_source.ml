@@ -33,6 +33,13 @@ let _cache_is_current bars =
       let yesterday = Date.add_days today (-1) in
       Date.compare last_bar.Types.Daily_price.date yesterday >= 0
 
+(* Log a cache-write failure as a warning; silently ignore success *)
+let _log_cache_failure symbol = function
+  | Ok () -> ()
+  | Error e ->
+      Core.eprintf "warn: cache write failed for %s: %s\n" symbol
+        (Status.show e)
+
 (* Fetch bars from EODHD API and write to cache *)
 let _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
     ~end_date () =
@@ -42,11 +49,7 @@ let _fetch_and_cache ?fetch ~token ~data_dir ~period ~symbol ~start_date
   Eodhd.Http_client.get_historical_price ~token ~params ?fetch () >>= function
   | Error e -> return (Error e)
   | Ok fetched ->
-      (match _save_bars_to_cache data_dir symbol fetched with
-      | Ok () -> ()
-      | Error e ->
-          Core.eprintf "warn: cache write failed for %s: %s\n" symbol
-            (Status.show e));
+      _log_cache_failure symbol (_save_bars_to_cache data_dir symbol fetched);
       return (Ok fetched)
 
 (* Serve bars: return cached data if fresh; fetch from API if stale *)
