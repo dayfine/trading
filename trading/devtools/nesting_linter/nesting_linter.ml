@@ -6,6 +6,8 @@
 
    Usage: nesting_linter <trading-root> [<exceptions-conf>]
 
+   Scans all lib/*.ml and scripts/**/*.ml files under <trading-root>.
+
    Limits (hard):
    - Per-function avg depth  > 3.0   → FAIL
    - Per-function max depth  > 5     → FAIL
@@ -95,7 +97,8 @@ let collect_lib_ml_files root =
               let path = Filename.concat dir entry in
               if Sys.is_directory path then walk path
               else if
-                String.equal (Filename.basename dir) "lib"
+                (String.equal (Filename.basename dir) "lib"
+                || contains_substring path "/scripts/")
                 && Filename.check_suffix path ".ml"
                 && not (Filename.check_suffix path ".pp.ml")
               then result := path :: !result)
