@@ -4,8 +4,9 @@
 
    Usage: fn_length_linter <trading-root>
 
-   Scans all lib/*.ml files under <trading-root>, excluding _build/ and
-   ta_ocaml/ directories. Exits 1 if any violations are found.
+   Scans all lib/*.ml and scripts/**/*.ml files under <trading-root>,
+   excluding _build/ and ta_ocaml/ directories. Exits 1 if any violations
+   are found.
 
    Only top-level let bindings whose right-hand side is a function (i.e.
    Pexp_function, covering all fun/function forms in OCaml 5.x) are checked.
@@ -37,7 +38,8 @@ let contains_substring s sub =
 let is_excluded_dir entry =
   String.equal entry "_build" || String.equal entry "ta_ocaml"
 
-(* Collect all lib/*.ml files under [root], skipping _build/ and ta_ocaml/. *)
+(* Collect all lib/*.ml and scripts/**/*.ml files under [root], skipping
+   _build/ and ta_ocaml/ directories. *)
 let collect_lib_ml_files root =
   let result = ref [] in
   let rec walk dir =
@@ -51,7 +53,8 @@ let collect_lib_ml_files root =
               let path = Filename.concat dir entry in
               if Sys.is_directory path then walk path
               else if
-                String.equal (Filename.basename dir) "lib"
+                (String.equal (Filename.basename dir) "lib"
+                || contains_substring path "/scripts/")
                 && Filename.check_suffix path ".ml"
                 && not (Filename.check_suffix path ".pp.ml")
               then result := path :: !result)
