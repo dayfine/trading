@@ -1,0 +1,13 @@
+(library
+ (name weinstein_order_gen)
+ (public_name weinstein.order_gen)
+ (libraries
+  core
+  types
+  weinstein.types
+  weinstein.screener
+  weinstein_trading.stops
+  trading.strategy
+  weinstein.portfolio_risk)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

@@ -1,0 +1,15 @@
+(test
+ (name test_weinstein_order_gen)
+ (libraries
+  core
+  types
+  weinstein.types
+  weinstein.screener
+  weinstein_trading.stops
+  trading.strategy
+  weinstein.portfolio_risk
+  weinstein.order_gen
+  ounit2
+  matchers)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
