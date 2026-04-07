@@ -436,6 +436,41 @@ let test_stop_never_raised_for_short _ =
   (* close=50.0 is NOT <= last_trend_extreme=45.0, so no cycle completion *)
   assert_that event (equal_to (No_change : stop_event))
 
+(* ---- no phantom cycle on continuous advance after reset ---- *)
+
+let test_no_phantom_cycle_on_continuous_advance _ =
+  (* After a cycle completes at close=100, the state resets with both
+     last_correction_extreme and last_trend_extreme = 100.0.
+     A bar that advances to close=110 (low=107) should NOT trigger another
+     cycle: the "correction" depth is (110-100)/110=9%, but the low=107 never
+     actually fell below last_trend_extreme=100, so no pullback occurred.
+     Before the fix, _raised_trailing seeded last_correction_extreme with the
+     bar's low (e.g. 97), which made a continuous advance look like a pullback. *)
+  let state =
+    Trailing
+      {
+        stop_level = 85.0;
+        last_correction_extreme = 100.0;
+        (* Both equal after fix: next cycle starts fresh *)
+        last_trend_extreme = 100.0;
+        ma_at_last_adjustment = 90.0;
+        correction_count = 1;
+      }
+  in
+  let bar = make_bar ~low_price:107.0 ~close_price:110.0 () in
+  let new_state, event =
+    update ~config:cfg ~side:Long ~state ~current_bar:bar ~ma_value:92.0
+      ~ma_direction:Rising ~stage:stage2
+  in
+  (* No phantom cycle — close=110 advances trend_extreme but no correction occurred *)
+  assert_that event (equal_to (No_change : stop_event));
+  assert_that new_state
+    (matching ~msg:"Expected Trailing with count=1 (no new cycle)"
+       (function
+         | Trailing { correction_count; _ } -> Some correction_count
+         | _ -> None)
+       (equal_to 1))
+
 let suite =
   "weinstein_stops"
   >::: [
@@ -468,6 +503,8 @@ let suite =
          "update_tightened_stop_hit" >:: test_update_tightened_stop_hit;
          "stop_never_lowered_for_long" >:: test_stop_never_lowered_for_long;
          "stop_never_raised_for_short" >:: test_stop_never_raised_for_short;
+         "no_phantom_cycle_on_continuous_advance"
+         >:: test_no_phantom_cycle_on_continuous_advance;
          "deriving" >:: test_deriving;
        ]
 
