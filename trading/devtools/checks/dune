@@ -44,6 +44,17 @@
  (action
   (run sh %{dep:fmt_check.sh})))
 
+; Nesting depth: fn avg > 3.0 or max > 5, file avg > 2.5 → FAIL (AST-based)
+; Exempt a function with (* @nesting-ok: reason *) before the let keyword.
+
+(rule
+ (alias runtest)
+ (action
+  (run
+   %{exe:../nesting_linter/nesting_linter.exe}
+   %{workspace_root}
+   %{dep:linter_exceptions.conf})))
+
 ; Agent definition compliance: every feat-*.md must have required sections
 
 (rule
