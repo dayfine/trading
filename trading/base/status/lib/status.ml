@@ -34,21 +34,19 @@ let internal_error message = { code = Internal; message }
 let not_found_error message = { code = NotFound; message }
 let permission_denied_error message = { code = Permission_denied; message }
 
+let _combine_messages first rest =
+  match rest with
+  | [] -> first.message
+  | _ ->
+      String.concat ~sep:"; "
+        (first.message :: List.map rest ~f:(fun s -> s.message))
+
 let combine statuses =
   let errors = List.filter ~f:is_error statuses in
   match errors with
   | [] -> { code = Ok; message = "" }
-  | first_error :: rest ->
-      let combined_message =
-        match rest with
-        | [] -> first_error.message
-        | _ ->
-            let error_messages =
-              first_error.message :: List.map rest ~f:(fun s -> s.message)
-            in
-            String.concat ~sep:"; " error_messages
-      in
-      { code = first_error.code; message = combined_message }
+  | first :: rest ->
+      { code = first.code; message = _combine_messages first rest }
 
 let combine_status_list status_list =
   List.fold_right status_list ~init:(Result.Ok ()) ~f:(fun status acc ->

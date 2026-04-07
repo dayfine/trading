@@ -234,6 +234,17 @@ let _to_trailing ~side ~ma_value ~stop_level ~bar =
 
 (* ---- Shared stop-hit and tighten dispatch ---- *)
 
+(* Check whether a tightening transition should fire; returns the new state pair
+   or [None] if no tightening is warranted. *)
+let _check_tighten ~config ~side ~stop_level ~correction_extreme ~ma_direction
+    ~stage =
+  let should_tighten, reason =
+    _should_tighten ~config ~side ~ma_direction ~stage
+  in
+  if should_tighten then
+    Some (_to_tightened ~config ~side ~stop_level ~correction_extreme ~reason)
+  else None
+
 (* Handles the stop-hit and tightening checks shared by Initial and Trailing states.
    Returns [Some (new_state, event)] if the stop was hit or tightening triggered,
    or [None] to proceed with state-specific update logic. *)
@@ -243,12 +254,8 @@ let _check_stop_or_tighten ~config ~side ~state ~bar ~correction_extreme
   if check_stop_hit ~state ~side ~bar then
     Some (state, _stop_hit_event ~side ~stop_level ~bar)
   else
-    let should_tighten, reason =
-      _should_tighten ~config ~side ~ma_direction ~stage
-    in
-    if should_tighten then
-      Some (_to_tightened ~config ~side ~stop_level ~correction_extreme ~reason)
-    else None
+    _check_tighten ~config ~side ~stop_level ~correction_extreme ~ma_direction
+      ~stage
 
 (* ---- Update: Initial state ---- *)
 
@@ -305,6 +312,17 @@ let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
     else None
   else None
 
+(* Build a Trailing state after a completed correction cycle. *)
+let _raised_trailing ~side ~new_stop ~ma_value ~correction_count ~bar =
+  Trailing
+    {
+      stop_level = new_stop;
+      last_correction_extreme = _bar_extreme ~side ~bar;
+      last_trend_extreme = bar.Types.Daily_price.close_price;
+      ma_at_last_adjustment = ma_value;
+      correction_count = correction_count + 1;
+    }
+
 (* Advances tracking and adjusts stop if a correction cycle completed. *)
 let _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
     ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment ~bar =
@@ -331,17 +349,26 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
       let reason =
         Printf.sprintf "Correction cycle %d complete" (correction_count + 1)
       in
-      ( Trailing
-          {
-            stop_level = new_stop;
-            last_correction_extreme = _bar_extreme ~side ~bar;
-            last_trend_extreme = bar.Types.Daily_price.close_price;
-            ma_at_last_adjustment = ma_value;
-            correction_count = correction_count + 1;
-          },
+      let new_state =
+        _raised_trailing ~side ~new_stop ~ma_value ~correction_count ~bar
+      in
+      ( new_state,
         Stop_raised { old_level = stop_level; new_level = new_stop; reason } )
 
 (* ---- Update: Trailing state ---- *)
+
+(* Apply stop/tighten/cycle logic to a fully unpacked Trailing state. *)
+let _apply_trailing ~config ~side ~state ~bar ~ma_value ~stop_level
+    ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment
+    ~correction_count ~ma_direction ~stage =
+  match
+    _check_stop_or_tighten ~config ~side ~state ~bar
+      ~correction_extreme:last_correction_extreme ~ma_direction ~stage
+  with
+  | Some result -> result
+  | None ->
+      _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
+        ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment ~bar
 
 let _update_trailing ~config ~side ~state ~current_bar ~ma_value ~ma_direction
     ~stage =
@@ -354,16 +381,10 @@ let _update_trailing ~config ~side ~state ~current_bar ~ma_value ~ma_direction
         last_trend_extreme;
         ma_at_last_adjustment;
         correction_count;
-      } -> (
-      match
-        _check_stop_or_tighten ~config ~side ~state ~bar
-          ~correction_extreme:last_correction_extreme ~ma_direction ~stage
-      with
-      | Some result -> result
-      | None ->
-          _raise_after_cycle ~config ~side ~ma_value ~correction_count
-            ~stop_level ~last_correction_extreme ~last_trend_extreme
-            ~ma_at_last_adjustment ~bar)
+      } ->
+      _apply_trailing ~config ~side ~state ~bar ~ma_value ~stop_level
+        ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment
+        ~correction_count ~ma_direction ~stage
   | _ -> (state, No_change)
 
 (* ---- Tightened ratchet ---- *)

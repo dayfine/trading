@@ -93,27 +93,30 @@ let _partially_consume_lot (lot : position_lot) (consume_qty : float) :
   in
   (remaining_lot, consumed_lot)
 
-let rec _match_single_lot (remaining_qty : float) (lot : position_lot)
+(* Consume a lot that is in the opposite direction to [remaining_qty]. *)
+let rec _consume_opposite_lot (remaining_qty : float) (lot : position_lot) rest
+    : position_lot list * position_lot list =
+  let lot_qty_abs = Float.abs lot.quantity in
+  let remaining_qty_abs = Float.abs remaining_qty in
+  if Float.(lot_qty_abs <= remaining_qty_abs) then
+    (* Fully consume this lot *)
+    let new_remaining_qty = remaining_qty +. lot.quantity in
+    let remaining_lots, matched = _match_lots_rec new_remaining_qty rest in
+    (remaining_lots, lot :: matched)
+  else
+    (* Partially consume this lot *)
+    let remaining_lot, consumed_lot =
+      _partially_consume_lot lot remaining_qty
+    in
+    (remaining_lot :: rest, [ consumed_lot ])
+
+and _match_single_lot (remaining_qty : float) (lot : position_lot)
     (rest : position_lot list) : position_lot list * position_lot list =
   if _is_same_direction lot.quantity remaining_qty then
     (* Lot in same direction - keep it, continue matching *)
     let remaining_lots, matched = _match_lots_rec remaining_qty rest in
     (lot :: remaining_lots, matched)
-  else
-    (* Lot in opposite direction - consume it *)
-    let lot_qty_abs = Float.abs lot.quantity in
-    let remaining_qty_abs = Float.abs remaining_qty in
-    if Float.(lot_qty_abs <= remaining_qty_abs) then
-      (* Fully consume this lot *)
-      let new_remaining_qty = remaining_qty +. lot.quantity in
-      let remaining_lots, matched = _match_lots_rec new_remaining_qty rest in
-      (remaining_lots, lot :: matched)
-    else
-      (* Partially consume this lot *)
-      let remaining_lot, consumed_lot =
-        _partially_consume_lot lot remaining_qty
-      in
-      (remaining_lot :: rest, [ consumed_lot ])
+  else _consume_opposite_lot remaining_qty lot rest
 
 and _match_lots_rec (remaining_qty : float) (lots : position_lot list) :
     position_lot list * position_lot list =
