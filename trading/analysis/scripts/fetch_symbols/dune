@@ -1,0 +1,14 @@
+(executable
+ (name fetch_symbols)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  bos
+  file.sexp
+  storage.metadata
+  csv
+  eodhd
+  types)
+ (preprocess
+  (pps ppx_jane)))

@@ -1,0 +1,11 @@
+(executable
+ (name build_inventory)
+ (libraries
+  core
+  core_unix.command_unix
+  bos
+  file.sexp
+  storage.metadata
+  yojson)
+ (preprocess
+  (pps ppx_jane)))

@@ -2,6 +2,6 @@
  (name data_source)
  (public_name weinstein.data_source)
  (wrapped false)
- (libraries async core status types eodhd csv file.sexp)
+ (libraries async core status types eodhd csv file.sexp yojson)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
