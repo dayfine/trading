@@ -1,5 +1,5 @@
-(test
- (name test_weinstein_stops)
+(tests
+ (names test_weinstein_stops regression_test)
  (libraries
   weinstein_trading.stops
   weinstein.types
