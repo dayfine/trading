@@ -16,18 +16,20 @@ let save_prices symbol (data : Types.Daily_price.t list) :
   Csv_storage.create symbol >>= fun storage ->
   Csv_storage.save storage ~override:true data
 
+let _fetch_and_save ~token symbol :
+    (string * (unit, Status.t) Result.t) Deferred.t =
+  get_historical_prices ~token symbol >>= fun data ->
+  Deferred.return
+    ( symbol,
+      match data with
+      | Ok data -> save_prices symbol data
+      | Error status -> Error status )
+
 let fetch_and_save_prices ~token ~symbols () :
     (string * (unit, Status.t) Result.t) list Deferred.t =
-  (* Create a throttle to limit concurrent requests *)
   let throttle =
     Throttle.create ~max_concurrent_jobs:20 ~continue_on_error:false
   in
   Deferred.List.map symbols ~how:`Parallel ~f:(fun symbol ->
-      Throttle.enqueue throttle (fun () ->
-          get_historical_prices ~token symbol >>= fun data ->
-          Deferred.return
-            ( symbol,
-              match data with
-              | Ok data -> save_prices symbol data
-              | Error status -> Error status )))
+      Throttle.enqueue throttle (fun () -> _fetch_and_save ~token symbol))
   >>| List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)

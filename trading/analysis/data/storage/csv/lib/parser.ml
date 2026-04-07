@@ -5,6 +5,18 @@ let parse_date (str : string) : Date.t =
   with _ ->
     raise (Invalid_argument "Invalid date format, expected YYYY-MM-DD")
 
+let _build_price date_str open_str high_str low_str close_str adj_close_str
+    volume_str : Types.Daily_price.t =
+  {
+    date = parse_date date_str;
+    open_price = float_of_string open_str;
+    high_price = float_of_string high_str;
+    low_price = float_of_string low_str;
+    close_price = float_of_string close_str;
+    adjusted_close = float_of_string adj_close_str;
+    volume = int_of_string volume_str;
+  }
+
 let parse_line (line : string) : (Types.Daily_price.t, string) Result.t =
   let parts = String.split_on_chars ~on:[ ',' ] line in
   match parts with
@@ -12,25 +24,9 @@ let parse_line (line : string) : (Types.Daily_price.t, string) Result.t =
    date_str; open_str; high_str; low_str; close_str; adj_close_str; volume_str;
   ] -> (
       try
-        let date = parse_date date_str in
-        let open_price = float_of_string open_str in
-        let high_price = float_of_string high_str in
-        let low_price = float_of_string low_str in
-        let close_price = float_of_string close_str in
-        let adjusted_close = float_of_string adj_close_str in
-        let volume = int_of_string volume_str in
-        let price : Types.Daily_price.t =
-          {
-            date;
-            open_price;
-            high_price;
-            low_price;
-            close_price;
-            volume;
-            adjusted_close;
-          }
-        in
-        Ok price
+        Ok
+          (_build_price date_str open_str high_str low_str close_str
+             adj_close_str volume_str)
       with
       | Invalid_argument msg -> Error msg
       | Failure _ -> Error ("Invalid number in line: " ^ line))

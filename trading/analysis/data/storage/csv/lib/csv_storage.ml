@@ -2,21 +2,21 @@ open Core
 open Result.Let_syntax
 open Bos
 
+let _not_sorted_error =
+  Status.invalid_argument_error
+    "Prices must be sorted by date in ascending order and contain no duplicates"
+
+let rec _check_sorted_and_unique prev = function
+  | [] -> Ok ()
+  | price :: rest ->
+      let curr = price.Types.Daily_price.date in
+      if Date.compare curr prev <= 0 then Error _not_sorted_error
+      else _check_sorted_and_unique curr rest
+
 let _validate_prices prices =
-  let rec check_sorted_and_unique prev = function
-    | [] -> Ok ()
-    | price :: rest ->
-        let curr = price.Types.Daily_price.date in
-        if Date.compare curr prev <= 0 then
-          Error
-            (Status.invalid_argument_error
-               "Prices must be sorted by date in ascending order and contain \
-                no duplicates")
-        else check_sorted_and_unique curr rest
-  in
   match prices with
   | [] -> Ok ()
-  | first :: rest -> check_sorted_and_unique first.Types.Daily_price.date rest
+  | first :: rest -> _check_sorted_and_unique first.Types.Daily_price.date rest
 
 let _write_price oc price =
   let open Types.Daily_price in
@@ -88,24 +88,27 @@ let _price_map_of_list prices =
   List.fold prices ~init:Date.Map.empty ~f:(fun acc p ->
       Map.set acc ~key:p.Types.Daily_price.date ~data:p)
 
+let _merge_price_into_map ~override_old_price map p =
+  match Map.find map p.Types.Daily_price.date with
+  | Some old_price when not (Poly.equal old_price p) ->
+      if override_old_price then
+        Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)
+      else
+        Status.error_invalid_argument
+          "Cannot save data with overlapping dates and different values"
+  | Some _ -> Ok map
+  | None -> Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)
+
+let _fold_merge_prices ~override_old_price price_map new_prices =
+  List.fold new_prices ~init:(Ok price_map) ~f:(fun acc p ->
+      match acc with
+      | Error _ as e -> e
+      | Ok map -> _merge_price_into_map ~override_old_price map p)
+
 let _merge_prices ~override_old_price old_prices new_prices =
   let price_map = _price_map_of_list old_prices in
   let%bind updated_map =
-    List.fold new_prices ~init:(Ok price_map) ~f:(fun acc p ->
-        match acc with
-        | Error _ as e -> e
-        | Ok map -> (
-            match Map.find map p.Types.Daily_price.date with
-            | Some old_price when not (Poly.equal old_price p) ->
-                if override_old_price then
-                  Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)
-                else
-                  Status.error_invalid_argument
-                    "Cannot save data with overlapping dates and different \
-                     values"
-            | Some _ -> Ok map (* Skip if identical *)
-            | None -> Ok (Map.set map ~key:p.Types.Daily_price.date ~data:p)))
-    (* Add if new date *)
+    _fold_merge_prices ~override_old_price price_map new_prices
   in
   Ok
     (List.sort
@@ -121,24 +124,18 @@ let _merge_prices ~override_old_price old_prices new_prices =
    - `Empty` if either list is empty *)
 type date_range = Before | After | Overlapping | Empty
 
+let _date_of p = p.Types.Daily_price.date
+
 let _compare_date_ranges old_prices new_prices =
   match (old_prices, new_prices) with
   | [], _ | _, [] -> Empty
-  | old_prices, new_prices ->
-      let old_first = List.hd_exn old_prices in
-      let old_last = List.last_exn old_prices in
-      let new_first = List.hd_exn new_prices in
-      let new_last = List.last_exn new_prices in
-      if
-        Date.compare new_last.Types.Daily_price.date
-          old_first.Types.Daily_price.date
-        < 0
-      then Before
-      else if
-        Date.compare old_last.Types.Daily_price.date
-          new_first.Types.Daily_price.date
-        < 0
-      then After
+  | _ ->
+      let old_first = _date_of (List.hd_exn old_prices) in
+      let old_last = _date_of (List.last_exn old_prices) in
+      let new_first = _date_of (List.hd_exn new_prices) in
+      let new_last = _date_of (List.last_exn new_prices) in
+      if Date.compare new_last old_first < 0 then Before
+      else if Date.compare old_last new_first < 0 then After
       else Overlapping
 
 let _handle_existing_and_new_prices path ~override existing_prices new_prices =
@@ -166,6 +163,16 @@ let create ?(data_dir = _default_data_dir) symbol =
   let path = Fpath.(symbol_dir / "data.csv") in
   Ok { path = Fpath.to_string path }
 
+let _in_date_range ~start_date ~end_date (price : Types.Daily_price.t) =
+  let date = price.date in
+  let after_start =
+    match start_date with None -> true | Some s -> Date.compare date s >= 0
+  in
+  let before_end =
+    match end_date with None -> true | Some e -> Date.compare date e <= 0
+  in
+  after_start && before_end
+
 let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
   (* Check if file exists before trying to read *)
@@ -182,23 +189,7 @@ let get t ?start_date ?end_date () =
   | Some start, Some end_ when Date.compare start end_ > 0 ->
       Status.error_invalid_argument
         "start_date must be before or equal to end_date"
-  | _ ->
-      let filtered_prices =
-        List.filter prices ~f:(fun price ->
-            let date = price.Types.Daily_price.date in
-            let after_start =
-              match start_date with
-              | None -> true
-              | Some start -> Date.compare date start >= 0
-            in
-            let before_end =
-              match end_date with
-              | None -> true
-              | Some end_ -> Date.compare date end_ <= 0
-            in
-            after_start && before_end)
-      in
-      Ok filtered_prices
+  | _ -> Ok (List.filter prices ~f:(_in_date_range ~start_date ~end_date))
 
 let save t ?(override = false) prices =
   let open Result.Let_syntax in
