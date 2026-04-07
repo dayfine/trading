@@ -1,8 +1,15 @@
 # T2-A: Golden Scenario Test Suite — Screener
 
-**Status:** Ready to implement (screener fully on main)
+**Status:** Blocked — see dependency below
 **Target file:** `trading/analysis/weinstein/screener/test/regression_test.ml`
 **Trigger:** Screener merged to main (done). Stop state machine scenarios deferred until order_gen merges.
+
+**Dependency:** `docs/design/eng-design-data-management.md` must land first (assigned to
+`feat-data-layer`). Specifically: `Data_path.default_data_dir` (§1) and
+`data/inventory.json` (§2). Once those are on main, this file can be assigned to
+`feat-screener` for implementation.
+
+**Assigned to:** `feat-screener` (implement the test file once data-management prework lands)
 
 ---
 
@@ -37,9 +44,9 @@ let bars = Historical_source.get_bars source ~symbol:"AAPL"
              ~end_date:(Date.of_string "2022-12-31")
 ```
 
-**Verify the correct relative path** by checking how
-`trading/analysis/weinstein/data_source/test/test_historical_source.ml` loads data
-— use the same pattern.
+**Data path:** use `Data_path.default_data_dir ()` from
+`analysis/weinstein/data_source/lib/data_path.ml` (see `eng-design-data-management.md`).
+Do not hardcode a relative path.
 
 ---
 
