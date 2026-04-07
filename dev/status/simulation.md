@@ -1,17 +1,15 @@
 # Status: simulation
 
-## Last updated: 2026-03-29
+## Last updated: 2026-04-07
 
 ## Status
-WAITING
+IN_PROGRESS
 
 ## Interface stable
-NO
+YES
 
 ## Blocked on
-- data-layer: MERGED (unblocked)
-- portfolio-stops: PLANNING (need stop state machine interface)
-- screener: READY_FOR_REVIEW (need Screener + StockAnalysis interface)
+- None
 
 ## Existing infrastructure — DO NOT reimplement
 `trading/trading/simulation/` is a **generic** framework shared across all strategies (not Weinstein-specific). Phases 1–3 are complete and tested:
@@ -20,28 +18,42 @@ NO
 - **Phase 3** (daily loop): `step` and `run` implemented; engine + order manager + portfolio wired up
 - The simulator already takes a `(module STRATEGY)` in its `dependencies` record
 
-The Weinstein work in eng-design-4 adds Weinstein-specific components **on top** without breaking general use:
-- Add `strategy_cadence : Types.Cadence.t` to the generic simulator `config` (backwards-compatible)
-- Implement `Weinstein_strategy` in `analysis/weinstein/` satisfying the generic `STRATEGY` interface
-- Add a Weinstein-specific parameter tuner with walk-forward validation
-
-Read `trading/trading/simulation/lib/simulator.mli` and `README.md` before writing any code.
+The Weinstein work in eng-design-4 adds Weinstein-specific components **on top** without breaking general use.
 
 ## Completed
-—
+
+- `strategy_cadence` added to simulator config — Weekly/Daily gate (#195)
+- `Weinstein_strategy` — full `STRATEGY` impl, daily stop cadence, Friday-gated screening (#196, merged 2026-04-07)
+  - Stop updates: daily (adjusts trailing stops as MA moves)
+  - Macro analysis + screening: Fridays only (Weinstein weekly review cadence)
+  - `_update_stops`, `_screen_universe`, `_make_entry_transition` wired to all analysis modules
 
 ## In Progress
-—
+- None
+
+## Blocking Refactors
+- None
+
+## Follow-up
+
+- `_collect_bars` returns only the current bar (1 bar) — full history requires `Historical_source` wired into the simulation loop (Slice 2)
+- `portfolio_value = 0.0` placeholder in `_entries_from_candidates` — needs real cash from simulator snapshot
+- `ma_direction = Flat` placeholder in `_handle_stop` — needs computed MA slope from full bar history
+- `Date.today` in `_make_entry_transition` — should use the simulation date from the current bar
+
+## Known gaps
+
+- `Synthetic_source` not yet implemented — needed for deterministic simulation tests and parameter tuning
+- No end-to-end simulation integration test — no script/test that runs `Simulator.run` with `Weinstein_strategy` on real or synthetic data
+- `T2-B` performance gate test deferred to M5
 
 ## Next Steps
-- Read docs/design/eng-design-4-simulation-tuning.md
-- Read `trading/trading/simulation/lib/simulator.mli` and `README.md`
-- Study existing `trading/trading/strategy/` modules
-- Wait for portfolio-stops and screener → "Interface stable: YES"
-- While waiting: draft Weinstein_strategy .mli and config types
 
-## Inherited from data-layer
-- `Synthetic_source`: implement `analysis/weinstein/data_source/lib/synthetic_source.ml` — deterministic programmatic bar generation (Trending, Basing, Breakout patterns) for stress testing and parameter tuning. Must satisfy `DATA_SOURCE` interface. Deferred here because it is only needed for simulation/tuning, not for live screener runs.
+1. Implement `Synthetic_source` (`analysis/weinstein/data_source/lib/synthetic_source.ml`) — deterministic bar generation for Trending/Basing/Breakout patterns; satisfies `DATA_SOURCE` interface
+2. Write end-to-end simulation smoke test using `Synthetic_source` — run `Simulator.run` with `Weinstein_strategy` on a known breakout scenario
+3. Wire `Historical_source` into simulation loop to replace `_collect_bars` 1-bar placeholder (Slice 2)
 
 ## Recent Commits
-—
+
+- #195 simulation: Add strategy_cadence to simulator dependencies
+- #196 simulation: Weinstein strategy skeleton (STRATEGY impl) — merged 2026-04-07
