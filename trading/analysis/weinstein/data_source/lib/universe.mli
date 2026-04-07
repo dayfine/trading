@@ -15,3 +15,8 @@ val get_deferred :
 
     Use this in {!Data_source.DATA_SOURCE.get_universe} implementations. The
     underlying sync [load] function is internal to this module. *)
+
+val save :
+  data_dir:Fpath.t -> Types.Instrument_info.t list -> (unit, Status.t) result
+(** [save ~data_dir instruments] writes [data_dir/universe.sexp]. Used by
+    scripts that bootstrap or update the universe from fetched data. *)

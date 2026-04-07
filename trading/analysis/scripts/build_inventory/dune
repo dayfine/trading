@@ -1,0 +1,5 @@
+(executable
+ (name build_inventory)
+ (libraries core core_unix.command_unix status weinstein.data_source)
+ (preprocess
+  (pps ppx_jane)))

@@ -467,8 +467,7 @@ let test_no_phantom_cycle_on_continuous_advance _ =
   assert_that new_state
     (matching ~msg:"Expected Trailing with count=1 (no new cycle)"
        (function
-         | Trailing { correction_count; _ } -> Some correction_count
-         | _ -> None)
+         | Trailing { correction_count; _ } -> Some correction_count | _ -> None)
        (equal_to 1))
 
 let suite =
