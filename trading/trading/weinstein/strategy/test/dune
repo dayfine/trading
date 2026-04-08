@@ -1,10 +1,18 @@
-(test
- (name test_weinstein_strategy)
+(tests
+ (names test_weinstein_strategy test_weinstein_strategy_smoke)
  (libraries
   core
+  core_unix
   types
   status
+  bos
+  csv
+  fpath
   trading.base
+  trading.engine
+  trading.portfolio
+  trading.simulation
+  trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
   weinstein.types
@@ -13,6 +21,9 @@
   weinstein.macro
   weinstein.portfolio_risk
   weinstein_trading.stops
+  weinstein.data_source.testing
+  weinstein.data_source
+  async
   ounit2
   matchers)
  (preprocess
