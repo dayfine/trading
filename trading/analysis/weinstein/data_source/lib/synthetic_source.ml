@@ -153,6 +153,8 @@ let _gen_declining ~start_date ~start_price ~weekly_loss_pct ~volume ~n =
          let price = start_price *. (daily_loss ** Float.of_int i) in
          _make_bar date price volume :: acc))
 
+(* @nesting-ok: flat dispatch match — all arms are single function calls to named helpers; no nested control flow *)
+
 (** Generate bars for one symbol pattern. [end_date] is applied after
     generation. *)
 let _gen_bars ~(start_date : Date.t) ~(end_date : Date.t option) pattern :
