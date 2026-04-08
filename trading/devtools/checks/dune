@@ -55,6 +55,14 @@
    %{workspace_root}
    %{dep:linter_exceptions.conf})))
 
+; @testing-only enforcement: libraries annotated "; @testing-only" must not
+; appear in (library ...) stanza dependencies — only (test ...) / (tests ...)
+
+(rule
+ (alias runtest)
+ (action
+  (run sh %{dep:testing_only_check.sh})))
+
 ; Agent definition compliance: every feat-*.md must have required sections
 
 (rule
