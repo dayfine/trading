@@ -47,7 +47,8 @@ let to_weekly_bars daily =
 (* ------------------------------------------------------------------ *)
 
 (** AAPL rose ~50% in 2023. By 2023-12-29 the 30-week MA was clearly rising and
-    price was consistently above it: all 6 confirm_weeks bars should be above MA. *)
+    price was consistently above it: all 6 confirm_weeks bars should be above
+    MA. *)
 let test_aapl_stage2_2023_bull_run _ =
   let daily =
     load_aapl
@@ -96,9 +97,9 @@ let test_aapl_stage4_2022_bear_market _ =
 (* ------------------------------------------------------------------ *)
 
 (** AAPL in early-to-mid 2023 is a clean Stage 2 advance. Verifies that
-    [Stock_analysis.analyze] correctly reports Stage 2 with a rising MA and
-    all 6 confirm_weeks bars above the MA. Uses the full stock_analysis path
-    (not just the stage classifier) to exercise the aggregation layer. *)
+    [Stock_analysis.analyze] correctly reports Stage 2 with a rising MA and all
+    6 confirm_weeks bars above the MA. Uses the full stock_analysis path (not
+    just the stage classifier) to exercise the aggregation layer. *)
 let test_aapl_stock_analysis_stage2_mid_2023 _ =
   let as_of = Date.of_string "2023-06-30" in
   let daily =
@@ -148,8 +149,8 @@ let test_aapl_stage2_2019_precovid _ =
 (* ------------------------------------------------------------------ *)
 
 (** AAPL fell ~35% in five weeks (Feb-Mar 2020). The COVID crash was so sharp
-    and brief that the 30-week MA never turned declining — it remained Flat.
-    At the trough, price had been below the MA for most of the confirm window:
+    and brief that the 30-week MA never turned declining — it remained Flat. At
+    the trough, price had been below the MA for most of the confirm window:
     [above_ma_count] = 3 (exactly half of [confirm_weeks] = 6). Stage resolves
     to Stage1 (Flat MA with no clear prior context). *)
 let test_aapl_covid_crash_2020 _ =
@@ -203,9 +204,9 @@ let test_aapl_stage2_2024_ai_era _ =
 (* ------------------------------------------------------------------ *)
 
 (** When macro is [Bearish], the screener gates out all buy candidates.
-    [Bearish] macro also enables short candidates — but AAPL at 2023-06-30 is
-    in Stage 2 (rising MA, price above MA), so it passes no short-side criteria
-    and [short_candidates] is also empty. The test uses AAPL as a deliberately
+    [Bearish] macro also enables short candidates — but AAPL at 2023-06-30 is in
+    Stage 2 (rising MA, price above MA), so it passes no short-side criteria and
+    [short_candidates] is also empty. The test uses AAPL as a deliberately
     strong Stage 2 stock to confirm both gates fire as expected. *)
 let test_macro_gate_bearish_no_buys _ =
   let as_of = Date.of_string "2023-06-30" in
@@ -232,13 +233,13 @@ let test_macro_gate_bearish_no_buys _ =
 (*             candidate under Neutral macro                            *)
 (* ------------------------------------------------------------------ *)
 
-(** AAPL at 2022-10-14 was in Stage 4 (MA declining, price below MA).
-    Paired with a synthetic benchmark that rose +10% over the same period,
-    the RS is Negative_declining. With [prior_stage = Stage3] (simulating
-    the immediately preceding topping phase), the screener recognises a
-    Stage3→Stage4 breakdown — the highest-conviction short setup in
-    Weinstein's methodology. Under a [Neutral] macro (shorts active, buys
-    inactive), AAPL appears in [short_candidates] with grade C. *)
+(** AAPL at 2022-10-14 was in Stage 4 (MA declining, price below MA). Paired
+    with a synthetic benchmark that rose +10% over the same period, the RS is
+    Negative_declining. With [prior_stage = Stage3] (simulating the immediately
+    preceding topping phase), the screener recognises a Stage3→Stage4 breakdown
+    — the highest-conviction short setup in Weinstein's methodology. Under a
+    [Neutral] macro (shorts active, buys inactive), AAPL appears in
+    [short_candidates] with grade C. *)
 let test_stage4_aapl_is_short_candidate _ =
   let daily =
     load_aapl
@@ -306,7 +307,8 @@ let suite =
          "aapl_stage2_2024_ai_era" >:: test_aapl_stage2_2024_ai_era;
          (* Screener *)
          "macro_gate_bearish_no_buys" >:: test_macro_gate_bearish_no_buys;
-         "stage4_aapl_is_short_candidate" >:: test_stage4_aapl_is_short_candidate;
+         "stage4_aapl_is_short_candidate"
+         >:: test_stage4_aapl_is_short_candidate;
        ]
 
 let () = run_test_tt_main suite
