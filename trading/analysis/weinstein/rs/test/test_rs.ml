@@ -169,8 +169,8 @@ let test_pure_same_inputs_same_output _ =
   assert_that r1.current_normalized (float_equal r2.current_normalized);
   assert_that r1.trend (equal_to (r2.trend : rs_trend))
 
-(** Stock falls 20% while benchmark rises 10% over 60 weeks.
-    Unambiguous underperformance — RS must be [Negative_declining]. *)
+(** Stock falls 20% while benchmark rises 10% over 60 weeks. Unambiguous
+    underperformance — RS must be [Negative_declining]. *)
 let test_stock_falling_benchmark_rising _ =
   let n = 60 in
   let benchmark =
@@ -196,7 +196,8 @@ let suite =
          "current_fields_populated" >:: test_current_fields_populated;
          "positive_rising_trend" >:: test_positive_rising_trend;
          "negative_declining_trend" >:: test_negative_declining_trend;
-         "stock_falling_benchmark_rising" >:: test_stock_falling_benchmark_rising;
+         "stock_falling_benchmark_rising"
+         >:: test_stock_falling_benchmark_rising;
          "bullish_crossover" >:: test_bullish_crossover;
          "flat_threshold_configurable" >:: test_flat_threshold_configurable;
          "pure_same_inputs_same_output" >:: test_pure_same_inputs_same_output;
