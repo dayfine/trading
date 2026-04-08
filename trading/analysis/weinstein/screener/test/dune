@@ -10,3 +10,19 @@
   core
   ounit2
   matchers))
+
+(test
+ (name regression_test)
+ (modules regression_test)
+ (libraries
+  screener
+  stock_analysis
+  weinstein_types
+  stage
+  weinstein.data_source
+  indicators.time_period
+  types
+  core
+  async
+  ounit2
+  matchers))

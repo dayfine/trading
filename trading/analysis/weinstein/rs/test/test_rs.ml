@@ -169,6 +169,24 @@ let test_pure_same_inputs_same_output _ =
   assert_that r1.current_normalized (float_equal r2.current_normalized);
   assert_that r1.trend (equal_to (r2.trend : rs_trend))
 
+(** Stock falls 20% while benchmark rises 10% over 60 weeks.
+    Unambiguous underperformance — RS must be [Negative_declining]. *)
+let test_stock_falling_benchmark_rising _ =
+  let n = 60 in
+  let benchmark =
+    List.init n ~f:(fun i ->
+        100.0 *. (1.0 +. (Float.of_int i *. 0.10 /. Float.of_int (n - 1))))
+    |> weekly_bars
+  in
+  let stock =
+    List.init n ~f:(fun i ->
+        100.0 *. (1.0 -. (Float.of_int i *. 0.20 /. Float.of_int (n - 1))))
+    |> weekly_bars
+  in
+  assert_that
+    (analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:benchmark)
+    (is_some_and (field (fun r -> r.trend) (equal_to Negative_declining)))
+
 let suite =
   "rs_tests"
   >::: [
@@ -178,6 +196,7 @@ let suite =
          "current_fields_populated" >:: test_current_fields_populated;
          "positive_rising_trend" >:: test_positive_rising_trend;
          "negative_declining_trend" >:: test_negative_declining_trend;
+         "stock_falling_benchmark_rising" >:: test_stock_falling_benchmark_rising;
          "bullish_crossover" >:: test_bullish_crossover;
          "flat_threshold_configurable" >:: test_flat_threshold_configurable;
          "pure_same_inputs_same_output" >:: test_pure_same_inputs_same_output;
