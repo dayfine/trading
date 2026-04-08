@@ -1,13 +1,13 @@
 # Status: screener
 
-## Last updated: 2026-03-30
+## Last updated: 2026-04-07
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## QC Review
 APPROVED — See dev/reviews/screener.md (2026-03-30). All prior blockers resolved.
-Ready to merge pending human decision.
+Merged to main (PRs #120, #121, #122, #134, #144, #160, #164, #165).
 
 ## Interface stable
 YES
