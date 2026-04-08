@@ -37,11 +37,12 @@ Deterministic nodes between agent steps are not token-consuming calls — run th
 
 Read all of the following before doing anything else:
 - `dev/decisions.md` — human guidance from last session
-- `dev/status/data-layer.md`
-- `dev/status/portfolio-stops.md`
-- `dev/status/screener.md`
-- `dev/status/simulation.md`
+- `dev/status/portfolio-stops.md` — order_gen track (feat-weinstein)
+- `dev/status/simulation.md` — Slice 2 track (feat-weinstein)
+- `dev/status/harness.md` — harness backlog
 - Any `dev/reviews/*.md` that exist
+
+Note: `dev/status/data-layer.md` and `dev/status/screener.md` are MERGED — skip unless reading for context.
 
 ---
 
@@ -84,12 +85,12 @@ Harness items with external dependencies (e.g., T1-N golden scenarios require re
 
 | Feature | Can run when |
 |---------|--------------|
-| data-layer | Always (unless MERGED) |
-| portfolio-stops | Always (unless MERGED) |
-| screener | data-layer status shows "Interface stable: YES" |
-| simulation | data-layer, portfolio-stops, AND screener all show "Interface stable: YES" |
+| weinstein (order_gen) | Always — no remaining blockers |
+| weinstein (Slice 2) | Always — no remaining blockers |
 
-Skip a feature if its status is MERGED with no Blocking Refactors or Follow-up items, or APPROVED (awaiting human merge decision).
+Both tracks are dispatched via the `feat-weinstein` agent. Run order_gen first (smaller, self-contained), then Slice 2.
+
+Skip a track if its status file shows MERGED with no Blocking Refactors or Follow-up items, or APPROVED (awaiting human merge decision).
 
 ---
 
@@ -203,10 +204,8 @@ Return a concise summary: what you completed, what's next, any blockers or quest
 ```
 
 Fill in the feature-specific constraint:
-- **data-layer**: "As soon as the DataSource .mli interface is finalized (even before full impl), set 'Interface stable: YES' in the status file. This unblocks the screener agent."
-- **portfolio-stops**: "Do NOT modify existing Portfolio, Orders, or Position modules. Build alongside them. Set 'Interface stable: YES' in status once your Portfolio_manager .mli is final."
-- **screener**: "All analysis functions must be pure (same input → same output). Reference weinstein-book-reference.md for the specific domain rules to encode."
-- **simulation**: "The Weinstein strategy must implement the existing STRATEGY module type. The simulator is a pure function: config + date_range → result. All parameters in config."
+- **weinstein (order_gen)**: "Do NOT modify existing Portfolio, Orders, or Position modules. order_gen is a pure formatter: input is Position.transition list, output is broker order suggestions, no sizing logic. See dev/decisions.md for the full spec — two prior attempts were closed for violating it."
+- **weinstein (Slice 2)**: "The Weinstein strategy must implement the existing STRATEGY module type. The Slice 2 design plan is in dev/status/simulation.md ## Next Steps — follow it exactly. The key design decisions (bar accumulation in closure, ?portfolio_value optional param) are documented there."
 
 ### Refactor Mode prompt (use instead of above when dispatching a refactor work item)
 
@@ -337,28 +336,23 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 
 ## Feature Progress
 
-### data-layer  [STATUS]
+### weinstein/order_gen  [STATUS]
 - Done today: ...
 - In progress: ...
-- Interface stable: Yes/No
 - Blocked: Yes/No — reason
 - Recent commits: ...
 
-### portfolio-stops  [STATUS]
-...
-
-### screener  [STATUS | WAITING]
-...
-
-### simulation  [STATUS | WAITING]
-...
+### weinstein/simulation-slice-2  [STATUS]
+- Done today: ...
+- In progress: ...
+- Blocked: Yes/No — reason
+- Recent commits: ...
 
 ## QC Status
-- data-layer: APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
-  (see dev/reviews/data-layer.md)
-- portfolio-stops: ...
-- screener: ...
-- simulation: ...
+- portfolio-stops (order_gen): APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
+  (see dev/reviews/portfolio-stops.md)
+- simulation (Slice 2): APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
+  (see dev/reviews/simulation.md)
 
 ## Harness Work
 (Omit if no harness-maintainer ran today)
@@ -373,9 +367,7 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 
 ## Follow-up Queue
 (Read from ## Follow-up sections in each status file — omit this section if all are empty)
-- data-layer: <list items verbatim, or "none">
-- portfolio-stops: ...
-- screener: ...
+- portfolio-stops: <list items verbatim, or "none">
 - simulation: ...
 
 ## Integration Queue
