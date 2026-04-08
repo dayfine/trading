@@ -1,14 +1,15 @@
 # Status: portfolio-stops
 
-## Last updated: 2026-04-05
+## Last updated: 2026-04-07
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
-## Structural QC
-structural_qc: NEEDS_REWORK
-structural_qc_date: 2026-04-05
-See dev/reviews/portfolio-stops.md. Behavioral QC blocked until structural passes.
+## QC
+overall_qc: — (order_gen not yet implemented correctly; prior APPROVED was for a wrong implementation, PR #214 closed)
+
+## Blocking Refactors
+- None
 
 ## Interface stable
 YES
@@ -19,16 +20,16 @@ YES
 - Trading state persistence (`weinstein/trading_state/`): JSON save/load, stop states, stage history, trade log — 25 tests
 
 ## In Progress
-— (all remaining work blocked on screener merge)
+- `order_gen`: not yet implemented (two prior attempts closed — see decisions.md for the correct spec)
 
 ## Blocked
-- `order_gen`: blocked until feat/screener merges to main (needs weinstein.screener for scored_candidate type)
+- None (screener MERGED to main; order_gen dependency resolved)
 
 ## Next Steps
-- `weinstein/order_gen/`: generate suggested orders from screener candidates and stop events.
-  Builds alongside (not replacing) `trading/simulation/lib/order_generator.ml`, which converts
-  Position.transitions → Market orders. Weinstein order_gen adds grades, rationale, and
-  StopLimit entry orders from screener output.
+- `trading/weinstein/order_gen/`: pure formatter — translates `Position.transition list` from
+  `strategy.on_market_close` into broker order suggestions. No sizing decisions. No screener
+  input. Strategy-agnostic: any strategy using Position.transition gets order formatting for free.
+  See `docs/design/eng-design-3-portfolio-stops.md` §"Order Generation" for the exact interface.
 ## Recent Commits
 - #147 Add stop state types, config, and basic API
 - #148 Add stop update machinery (merged into #147 PR)

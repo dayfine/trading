@@ -34,11 +34,11 @@ IN_PROGRESS
 - [x] T1-L: Parallel write conflict policy documented in `lead-orchestrator` Step 4 — shared files read-only during parallel execution; proposed changes surfaced in return values
 - [ ] T1-M: "Done" definition — add explicit acceptance criteria to each Tier 1 item's completion note (harness items should state what was built, where it lives, and how to verify)
 - [ ] T1-N: Golden scenario test suite — screener regression tests; spec at `docs/design/t2a-golden-scenarios.md`; uses `data/A/L/AAPL/data.csv` via `Historical_source`; target `analysis/weinstein/screener/test/regression_test.ml`
-- [ ] T1-N: Golden scenario test suite — stop state machine regression tests; 5 scenarios covering Stage2 trailing, Stage3 tightening, stop-hit, short side; target `trading/weinstein/stops/test/regression_test.ml`
+- [x] T1-N: Golden scenario test suite — stop state machine regression tests; 5 scenarios covering Stage2 trailing, Stage3 tightening, stop-hit, short side; target `trading/weinstein/stops/test/regression_test.ml` (PR #204)
 - [ ] T1-O: `health-scanner` agent — fast scan: stale status files, main build health, new unexcepted magic numbers; runs post-orchestrator; spec extends `docs/design/harness-engineering-plan.md`
-- [ ] T1-P: Add `## Blocking Refactors` section to all feat-agent status files; update `lead-orchestrator` to dispatch blocking refactors before feat-agents
-- [ ] T1-P: Update `lead-orchestrator` to count followup items and schedule non-blocking maintenance cycles (threshold: 10 items or every 3rd run)
-- [ ] T1-P: Add `## Refactor Mode` prompt variant to feat-agent definitions
+- [x] T1-P: Add `## Blocking Refactors` section to all feat-agent status files; update `lead-orchestrator` to dispatch blocking refactors before feat-agents
+- [x] T1-P: Update `lead-orchestrator` to count followup items and schedule non-blocking maintenance cycles (threshold: 10 items or every 3rd run)
+- [x] T1-P: Add `## Refactor Mode` prompt variant to feat-agent definitions
 - [ ] T1-Q: Cyclomatic complexity linter — extend `fn_length_linter` via `compiler-libs`; CC > 10 = warning; output to `dev/metrics/cc-YYYY-MM-DD.json`
 - [ ] T1-Q: qc-behavioral quality score — add `## Quality Score` (1–5 + rationale) to output; tracked in audit trail
 

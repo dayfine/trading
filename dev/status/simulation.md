@@ -3,7 +3,7 @@
 ## Last updated: 2026-04-07
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
 ## Interface stable
 YES
@@ -27,6 +27,8 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
   - Stop updates: daily (adjusts trailing stops as MA moves)
   - Macro analysis + screening: Fridays only (Weinstein weekly review cadence)
   - `_update_stops`, `_screen_universe`, `_make_entry_transition` wired to all analysis modules
+- `Synthetic_source` — deterministic `DATA_SOURCE` impl for testing; 4 bar patterns: Trending/Basing/Breakout/Declining; 8 tests (feat/simulation branch)
+- End-to-end smoke test — `Simulator.run` with `Weinstein_strategy` on CSV data in temp dir; 2 tests covering smoke + date range (feat/simulation branch)
 
 ## In Progress
 - None
@@ -43,17 +45,17 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
 
 ## Known gaps
 
-- `Synthetic_source` not yet implemented — needed for deterministic simulation tests and parameter tuning
-- No end-to-end simulation integration test — no script/test that runs `Simulator.run` with `Weinstein_strategy` on real or synthetic data
 - `T2-B` performance gate test deferred to M5
 
 ## Next Steps
 
-1. Implement `Synthetic_source` (`analysis/weinstein/data_source/lib/synthetic_source.ml`) — deterministic bar generation for Trending/Basing/Breakout patterns; satisfies `DATA_SOURCE` interface
-2. Write end-to-end simulation smoke test using `Synthetic_source` — run `Simulator.run` with `Weinstein_strategy` on a known breakout scenario
-3. Wire `Historical_source` into simulation loop to replace `_collect_bars` 1-bar placeholder (Slice 2)
+1. Wire `Historical_source` into simulation loop to replace `_collect_bars` 1-bar placeholder (Slice 2)
+2. Replace `portfolio_value = 0.0` placeholder in `_entries_from_candidates` with real cash from simulator snapshot
+3. Replace `ma_direction = Flat` placeholder in `_handle_stop` with computed MA slope from full bar history
+4. Replace `Date.today` in `_make_entry_transition` with simulation date from current bar
 
 ## Recent Commits
 
 - #195 simulation: Add strategy_cadence to simulator dependencies
 - #196 simulation: Weinstein strategy skeleton (STRATEGY impl) — merged 2026-04-07
+- feat/simulation: Add Synthetic_source and Weinstein strategy smoke tests (pending PR)
