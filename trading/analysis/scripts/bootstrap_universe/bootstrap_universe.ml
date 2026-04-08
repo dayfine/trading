@@ -36,25 +36,27 @@ let _instrument_of_entry (e : Inventory.entry) : Types.Instrument_info.t =
     exchange = "";
   }
 
+let _save_universe ~data_dir instruments =
+  match Universe.save ~data_dir instruments with
+  | Ok () ->
+      Printf.printf "Wrote universe.sexp (sector/industry fields empty).\n%!"
+  | Error e ->
+      Printf.eprintf "Error writing universe: %s\n%!" (Status.show e);
+      exit 1
+
 let main ~data_dir_str () =
   let data_dir = Fpath.v data_dir_str in
   match Inventory.load ~data_dir with
   | Error e ->
       Printf.eprintf "Error loading inventory: %s\n%!" (Status.show e);
       exit 1
-  | Ok inv -> (
+  | Ok inv ->
       let instruments =
         List.map inv.Inventory.symbols ~f:_instrument_of_entry
       in
       Printf.printf "Building universe from %d symbols ...\n%!"
         (List.length instruments);
-      match Universe.save ~data_dir instruments with
-      | Ok () ->
-          Printf.printf
-            "Wrote universe.sexp (sector/industry fields empty).\n%!"
-      | Error e ->
-          Printf.eprintf "Error writing universe: %s\n%!" (Status.show e);
-          exit 1)
+      _save_universe ~data_dir instruments
 
 let command =
   Command.basic
