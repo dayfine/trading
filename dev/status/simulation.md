@@ -5,6 +5,12 @@
 ## Status
 READY_FOR_REVIEW
 
+## QC
+overall_qc: APPROVED
+structural_qc: APPROVED (2026-04-07)
+behavioral_qc: APPROVED (2026-04-07)
+See dev/reviews/simulation.md.
+
 ## Interface stable
 YES
 
