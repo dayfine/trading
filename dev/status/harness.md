@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-06
+## Last updated: 2026-04-08
 
 ## Status
 IN_PROGRESS
@@ -79,6 +79,10 @@ IN_PROGRESS
 
 ## Completed
 
+- [x] `harness-maintainer` agent defined — `.claude/agents/harness-maintainer.md`; owns T1-M, T1-N, T1-P, T1-Q and future harness items; dispatched by lead-orchestrator Step 2d
+- [x] `health-scanner` agent defined — `.claude/agents/health-scanner.md`; fast scan (post-run) and deep scan (weekly); dispatched by lead-orchestrator Step 6; read-only
+- [x] `ops-data` agent defined — `.claude/agents/ops-data.md`; on-demand data fetch + inventory refresh; human-triggered
+- [x] `lead-orchestrator` updated — Step 2d (harness backlog dispatch), Step 6 (health-scanner fast scan), daily summary template updated with Harness Work and Health Scan sections
 - [x] Harness plan drafted and committed (`docs/design/harness-engineering-plan.md`)
 - [x] Automation goals and target state defined (Target State + Tier 4)
 - [x] Added audit trail, rollback/recovery, live trading gate, QC non-determinism policy, cost visibility

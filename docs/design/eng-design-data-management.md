@@ -1,8 +1,8 @@
 # Data Management for Agents and Regression Tests
 
-**Status:** Design (not yet implemented)
-**Assigned to:** feat-data-layer agent
-**Blocking:** `docs/design/t2a-golden-scenarios.md` (screener regression tests)
+**Status:** IMPLEMENTED — merged in PR #209
+**Assigned to:** feat-data-layer agent (complete)
+**Unblocks:** `docs/design/t2a-golden-scenarios.md` (screener regression tests)
 
 ---
 
