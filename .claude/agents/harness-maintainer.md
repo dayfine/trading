@@ -66,6 +66,15 @@ Two sub-tasks (split into separate branches):
 2. Verify `lead-orchestrator.md` Step 2a correctly dispatches blocking refactors before feat-agents
 3. Add `## Refactor Mode` prompt variant to feat-agent definitions that are missing it
 
+### T1-O: health-scanner fast scan implementation
+The `health-scanner` agent (`.claude/agents/health-scanner.md`) is defined but the fast scan has not been implemented yet. Your job is to flesh out the fast scan spec in `docs/design/harness-engineering-plan.md` and ensure the agent definition has enough operational detail to run it reliably. The fast scan covers:
+- Stale status files (status files not updated in > 14 days)
+- Main build health (`dune build && dune runtest` on `main`)
+- New unexpected magic numbers (any new linter violations since last run)
+- Status file integrity (required fields present: Status, Last updated, Interface stable)
+
+The health-scanner is read-only — it never modifies source or agent files. It writes findings to `dev/health/`. The fast scan runs post-orchestrator (after each lead-orchestrator run). Spec is in `docs/design/harness-engineering-plan.md` — extend it with the fast scan procedure if the spec is missing or incomplete. Then update the health-scanner agent definition to be self-sufficient: it should be able to run the fast scan without additional prompting.
+
 ### T1-Q: Cyclomatic complexity linter + QC quality score
 1. Extend `trading/devtools/fn_length_linter/fn_length_linter.ml` (already uses `compiler-libs`) to compute CC per function (branches in match/if/when + 1); CC > 10 = warning (not failure); output to `dev/metrics/cc-YYYY-MM-DD.json`
 2. Add `## Quality Score` (1–5 integer + one-sentence rationale) to `qc-behavioral.md` output format and checklist
