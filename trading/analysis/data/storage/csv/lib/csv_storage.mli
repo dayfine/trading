@@ -6,6 +6,11 @@ open Core
 
 type t
 
+val symbol_data_dir : data_dir:Fpath.t -> string -> Fpath.t
+(** [symbol_data_dir ~data_dir symbol] returns the directory where a symbol's
+    data files are stored: [data_dir / first_char / last_char / symbol]. Pure
+    path computation — does not create directories. *)
+
 val create : ?data_dir:Fpath.t -> string -> (t, Status.t) Result.t
 (** Create a new CSV storage with the given symbol and optional data directory.
     If no data directory is provided, a default value is used. *)

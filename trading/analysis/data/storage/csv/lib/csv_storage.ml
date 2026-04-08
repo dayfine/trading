@@ -42,16 +42,16 @@ let _write_price oc price =
 
 let _default_data_dir = Fpath.v (Sys_unix.getcwd () ^ "/data")
 
+let symbol_data_dir ~data_dir symbol =
+  let first_char = String.get symbol 0 in
+  let last_char = String.get symbol (String.length symbol - 1) in
+  Fpath.(data_dir / String.make 1 first_char / String.make 1 last_char / symbol)
+
 let _create_symbol_dirs data_dir symbol =
   if String.is_empty symbol then
     Status.error_invalid_argument "Symbol cannot be empty"
   else
-    let first_char = String.get symbol 0 in
-    let last_char = String.get symbol (String.length symbol - 1) in
-    let dir_path =
-      Fpath.(
-        data_dir / String.make 1 first_char / String.make 1 last_char / symbol)
-    in
+    let dir_path = symbol_data_dir ~data_dir symbol in
     match OS.Dir.exists dir_path with
     | Ok true -> Ok dir_path
     | Ok false -> (
