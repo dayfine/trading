@@ -32,6 +32,25 @@ let _resolve_token = function
   | Some key -> Ok key
   | None -> Error "No API key provided. Use --api-key."
 
+(** Save [bars] to CSV and write the accompanying metadata file. *)
+let _save_bars_and_meta ~data_dir ~bars symbol =
+  let open Result.Let_syntax in
+  let%bind storage = Csv.Csv_storage.create ~data_dir symbol in
+  let%bind () = Csv.Csv_storage.save storage ~override:true bars in
+  let meta = Metadata.generate_metadata ~price_data:bars ~symbol () in
+  let sym_dir = Csv.Csv_storage.symbol_data_dir ~data_dir symbol in
+  let meta_path = Fpath.(sym_dir / "data.metadata.sexp") in
+  File_sexp.Sexp.save (module Metadata.T_sexp) meta ~path:meta_path
+
+(** Log the result of caching [bars] and return [Ok symbol]. *)
+let _cache_bars ~data_dir ~bars symbol =
+  (match _save_bars_and_meta ~data_dir ~bars symbol with
+  | Ok () -> printf "  OK: %d bars cached\n%!" (List.length bars)
+  | Error e ->
+      printf "  WARN: bars fetched but metadata write failed: %s\n%!"
+        (Status.show e));
+  return (Ok symbol)
+
 (** Fetch and cache a single symbol, writing CSV + metadata. *)
 let _fetch_one ~token ~data_dir symbol =
   printf "Fetching %s ...\n%!" symbol;
@@ -42,28 +61,7 @@ let _fetch_one ~token ~data_dir symbol =
   | Error e ->
       printf "  ERROR: %s\n%!" (Status.show e);
       return (Error symbol)
-  | Ok bars ->
-      let storage_result = Csv.Csv_storage.create ~data_dir symbol in
-      let save_result =
-        match storage_result with
-        | Error e -> Error e
-        | Ok storage -> Csv.Csv_storage.save storage ~override:true bars
-      in
-      let meta_result =
-        match save_result with
-        | Error e -> Error e
-        | Ok () ->
-            let meta = Metadata.generate_metadata ~price_data:bars ~symbol () in
-            let sym_dir = Csv.Csv_storage.symbol_data_dir ~data_dir symbol in
-            let meta_path = Fpath.(sym_dir / "data.metadata.sexp") in
-            File_sexp.Sexp.save (module Metadata.T_sexp) meta ~path:meta_path
-      in
-      (match meta_result with
-      | Ok () -> printf "  OK: %d bars cached\n%!" (List.length bars)
-      | Error e ->
-          printf "  WARN: bars fetched but metadata write failed: %s\n%!"
-            (Status.show e));
-      return (Ok symbol)
+  | Ok bars -> _cache_bars ~data_dir ~bars symbol
 
 let main ~symbols ~data_dir_str ~api_key_flag () =
   match _resolve_token api_key_flag with
