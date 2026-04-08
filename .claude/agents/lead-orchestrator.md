@@ -70,7 +70,17 @@ the most followup items with a `## Refactor Mode` prompt listing the top items.
 
 Record the total followup count in today's daily summary regardless.
 
-### 2c: Feature dependency rules
+### 2c: Harness backlog (runs alongside or instead of feat-agents)
+
+Read `dev/status/harness.md`. If any Tier 1 items are unchecked (`[ ]`) and no harness branch is already in progress (check `jj log`):
+
+- Dispatch `harness-maintainer` for the highest-priority open item
+- Harness work runs **in parallel** with feat-agents (it touches different files)
+- If there are only harness items and no feature work ready, harness fills the session
+
+Harness items with external dependencies (e.g., T1-N golden scenarios require real data in `data/`) should be skipped if the dependency isn't met — note the blocker in the daily summary.
+
+### 2d: Feature dependency rules
 
 | Feature | Can run when |
 |---------|--------------|
@@ -297,7 +307,28 @@ Write the combined result to `dev/reviews/<feature>.md` (structural writes the b
 
 ---
 
-## Step 6: Write the daily summary
+## Step 6: Health scanner fast scan
+
+After all feature agents and QC have completed (or if no agents ran today), spawn a `health-scanner` subagent in fast mode:
+
+```
+You are the health scanner for the Weinstein Trading System.
+
+Mode: fast scan
+
+Run the fast scan checks as defined in your agent definition (.claude/agents/health-scanner.md).
+Today's date: <YYYY-MM-DD>
+
+Write your findings to: dev/health/<YYYY-MM-DD>-fast.md
+
+Return: CLEAN or FINDINGS, plus a one-line summary of any critical items.
+```
+
+If the health scanner reports FINDINGS, include the critical items in the daily summary's Escalations section.
+
+---
+
+## Step 7: Write the daily summary
 
 Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 
@@ -328,6 +359,17 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 - portfolio-stops: ...
 - screener: ...
 - simulation: ...
+
+## Harness Work
+(Omit if no harness-maintainer ran today)
+- Item worked on: T1-X — <description>
+- Status: DONE | IN_PROGRESS | BLOCKED
+- Branch: harness/<name>
+
+## Health Scan
+(From dev/health/<YYYY-MM-DD>-fast.md — omit if health scanner found nothing)
+- Result: CLEAN | FINDINGS
+- Critical items: <list or "none">
 
 ## Follow-up Queue
 (Read from ## Follow-up sections in each status file — omit this section if all are empty)
