@@ -160,6 +160,63 @@ let test_weinstein_date_range _ =
       assert_that result.steps (size_is 3))
 
 (* ------------------------------------------------------------------ *)
+(* Smoke test: weekly cadence exercises Friday-gated strategy path      *)
+(* ------------------------------------------------------------------ *)
+
+let test_weinstein_weekly_cadence _ =
+  let data_dir = Core_unix.mkdtemp "/tmp/test_weinstein_weekly" in
+  Fun.protect
+    ~finally:(fun () ->
+      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" data_dir) in
+      ())
+    (fun () ->
+      (* Jan 2 – Jan 19 spans two Fridays (Jan 5 and Jan 12); Jan 19 is
+         end_date so returns Completed without a step. Weekly cadence means
+         the strategy is called only on those Fridays; all other trading days
+         still produce steps with only pending-order processing. *)
+      let start_date = date_of_string "2024-01-02" in
+      let end_date = date_of_string "2024-01-19" in
+      let hist_start = Date.add_days start_date (-70) in
+      let aapl_bars = make_bars hist_start 180.0 80 in
+      let index_bars = make_bars hist_start 4500.0 80 in
+      write_csv_bars data_dir "AAPL" aapl_bars;
+      write_csv_bars data_dir "GSPCX" index_bars;
+      let strategy =
+        Weinstein_strategy.make
+          (Weinstein_strategy.default_config ~universe:[ "AAPL" ]
+             ~index_symbol:"GSPCX")
+      in
+      let deps =
+        Trading_simulation.Simulator.create_deps ~symbols:[ "AAPL"; "GSPCX" ]
+          ~data_dir:(Fpath.v data_dir) ~strategy ~commission:sample_commission
+          ()
+      in
+      let config =
+        Trading_simulation.Simulator.
+          {
+            start_date;
+            end_date;
+            initial_cash = 100_000.0;
+            commission = sample_commission;
+            strategy_cadence = Types.Cadence.Weekly;
+          }
+      in
+      let sim =
+        match Trading_simulation.Simulator.create ~config ~deps with
+        | Ok s -> s
+        | Error e -> OUnit2.assert_failure ("create failed: " ^ Status.show e)
+      in
+      let result =
+        match Trading_simulation.Simulator.run sim with
+        | Ok r -> r
+        | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
+      in
+      assert_that result.steps (not_ is_empty);
+      let final_portfolio = (List.last_exn result.steps).portfolio in
+      assert_that final_portfolio.Trading_portfolio.Portfolio.current_cash
+        (gt (module Float_ord) 0.0))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -168,6 +225,8 @@ let suite =
   >::: [
          "smoke test completes without error" >:: test_weinstein_strategy_smoke;
          "simulation respects date range" >:: test_weinstein_date_range;
+         "weekly cadence exercises Friday-gated strategy path"
+         >:: test_weinstein_weekly_cadence;
        ]
 
 let () = run_test_tt_main suite
