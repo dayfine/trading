@@ -69,3 +69,12 @@
  (alias runtest)
  (action
   (run sh %{dep:agent_compliance_check.sh})))
+
+; Cyclomatic complexity: CC > 10 = warning (not failure); exits 0 always.
+; To generate the per-function JSON for trend analysis, run:
+;   cc_linter <trading-root> <path-to-dev/metrics/cc-YYYY-MM-DD.json>
+
+(rule
+ (alias runtest)
+ (action
+  (run %{exe:../cc_linter/cc_linter.exe} %{workspace_root})))
