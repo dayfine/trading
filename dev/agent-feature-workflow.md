@@ -80,6 +80,24 @@ This creates one PR per module bookmark, each targeting the one below it, so
 reviewers can read changes one module at a time. Re-run after each session to
 update existing PRs.
 
+## Troubleshooting jst
+
+### `Unexpected token '<', ..."commitId":<Error: No"... is not valid JSON`
+
+**Cause:** jst's jj template calls `normal_target.commit_id()` on every local bookmark. If any bookmark is **conflicted** (shown as `(conflicted):` in `jj bookmark list`), jj emits `<Error: No normal target>` inline instead of a commit ID, producing invalid JSON.
+
+**Fix:**
+```bash
+# Find conflicted bookmarks
+jj bookmark list --revisions "mine() ~ trunk()" | grep conflicted
+
+# Delete the offending bookmark (these are typically stale local artifacts
+# that were never pushed to origin)
+jj bookmark delete <conflicted-bookmark-name>
+```
+
+Then re-run `jst submit`.
+
 ## At the end of every session
 
 Before returning:
