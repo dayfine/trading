@@ -167,6 +167,29 @@ let _align_bars_with_ma (bars : Daily_price.t list)
       let bar = List.nth_exn bars (offset + i) in
       (bar, mv))
 
+let _next_stage2 prior_stage is_late =
+  let weeks =
+    match prior_stage with
+    | Some (Stage2 { weeks_advancing; _ }) -> weeks_advancing + 1
+    | _ -> 1
+  in
+  Stage2 { weeks_advancing = weeks; late = is_late }
+
+let _next_stage4 prior_stage =
+  let weeks =
+    match prior_stage with
+    | Some (Stage4 { weeks_declining }) -> weeks_declining + 1
+    | _ -> 1
+  in
+  Stage4 { weeks_declining = weeks }
+
+let _classify_flat_ma prior =
+  match prior with
+  | Stage1 _ | Stage4 _ ->
+      _advance_stage (Stage1 { weeks_in_base = _weeks_in_stage prior })
+  | Stage2 _ | Stage3 _ ->
+      _advance_stage (Stage3 { weeks_topping = _weeks_in_stage prior })
+
 (** Determine the new stage from MA direction, prior stage, and price/MA
     position counts. *)
 let _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
@@ -174,27 +197,12 @@ let _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
   match (ma_dir, prior_stage) with
   (* Rising MA with price mostly above → Stage 2 *)
   | Rising, _ when above_ma_count > below_ma_count ->
-      let weeks =
-        match prior_stage with
-        | Some (Stage2 { weeks_advancing; _ }) -> weeks_advancing + 1
-        | _ -> 1
-      in
-      Stage2 { weeks_advancing = weeks; late = is_late }
+      _next_stage2 prior_stage is_late
   (* Declining MA with price mostly below → Stage 4 *)
   | Declining, _ when below_ma_count > above_ma_count ->
-      let weeks =
-        match prior_stage with
-        | Some (Stage4 { weeks_declining }) -> weeks_declining + 1
-        | _ -> 1
-      in
-      Stage4 { weeks_declining = weeks }
+      _next_stage4 prior_stage
   (* Flat MA: use prior context to disambiguate Stage 1 vs Stage 3 *)
-  | Flat, Some prior -> (
-      match prior with
-      | Stage1 _ | Stage4 _ ->
-          _advance_stage (Stage1 { weeks_in_base = _weeks_in_stage prior })
-      | Stage2 _ | Stage3 _ ->
-          _advance_stage (Stage3 { weeks_topping = _weeks_in_stage prior }))
+  | Flat, Some prior -> _classify_flat_ma prior
   (* Rising MA but price not yet mostly above (early transition) *)
   | Rising, Some (Stage1 { weeks_in_base }) ->
       Stage1 { weeks_in_base = weeks_in_base + 1 }
