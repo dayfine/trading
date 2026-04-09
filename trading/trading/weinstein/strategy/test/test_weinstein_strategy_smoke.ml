@@ -9,12 +9,12 @@
     because of two scaffold gaps in [Weinstein_strategy]:
 
     1. [_collect_bars] returns only today's bar (1 bar per symbol). Stage
-       classification needs 30+ weekly bars, so the screener never finds Stage 2
-       candidates and no buy signals are produced.
+    classification needs 30+ weekly bars, so the screener never finds Stage 2
+    candidates and no buy signals are produced.
 
     2. [_entries_from_candidates] uses [portfolio_value = 0] for position
-       sizing, so even if candidates were found, all positions would be sized to
-       zero shares and filtered out.
+    sizing, so even if candidates were found, all positions would be sized to
+    zero shares and filtered out.
 
     {1 Design plan for meaningful trade assertions}
 
@@ -22,14 +22,14 @@
 
     Add a per-symbol daily bar buffer to the [make] closure — same pattern as
     [stop_states]. On each [on_market_close] call, push today's bar via
-    [get_price] into a [Hashtbl<symbol, Daily_price.t list>]. On screening
-    days (Fridays), call [Time_period.Conversion.daily_to_weekly] over the
-    buffer to produce the weekly bar list for [Stock_analysis.analyze] and
+    [get_price] into a [Hashtbl<symbol, Daily_price.t list>]. On screening days
+    (Fridays), call [Time_period.Conversion.daily_to_weekly] over the buffer to
+    produce the weekly bar list for [Stock_analysis.analyze] and
     [Macro.analyze]. This requires no change to the [STRATEGY] interface.
 
     The warmup period before meaningful classification ≈ 30 weeks. The smoke
-    test history start should be moved to 2022-01-01 so the simulation has
-    ~100 weekly bars of warmup before the assertion window.
+    test history start should be moved to 2022-01-01 so the simulation has ~100
+    weekly bars of warmup before the assertion window.
 
     {2 Portfolio value for position sizing}
 
