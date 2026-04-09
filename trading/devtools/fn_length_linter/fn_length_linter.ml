@@ -36,7 +36,9 @@ let contains_substring s sub =
 (* --- File collection ---------------------------------------------------- *)
 
 let is_excluded_dir entry =
-  String.equal entry "_build" || String.equal entry "ta_ocaml"
+  String.equal entry "_build"
+  || String.equal entry "ta_ocaml"
+  || String.equal entry ".claude"
 
 (* Collect all lib/*.ml and scripts/**/*.ml files under [root], skipping
    _build/ and ta_ocaml/ directories. *)

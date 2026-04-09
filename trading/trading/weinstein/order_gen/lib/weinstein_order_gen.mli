@@ -16,8 +16,10 @@
       [StopLimit] sell short [shares] at [entry_price]
     - [UpdateRiskParams { new_risk_params = { stop_loss_price = Some p } }] →
       [Stop] order at [p] for the existing position quantity
-    - [TriggerExit { exit_price }] → [Market] exit order for the full position
-      quantity
+    - [TriggerExit] → ignored. The [Stop] order placed via [UpdateRiskParams] is
+      already working at the broker as a GTC order; it executes automatically
+      when price hits the stop. [TriggerExit] is internal accounting for the
+      strategy — no additional broker order is needed.
     - All other transition kinds (EntryFill, CancelEntry, etc.) → ignored
       (simulator-internal; not relevant to the live broker)
 
