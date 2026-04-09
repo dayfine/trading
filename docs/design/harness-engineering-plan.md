@@ -354,9 +354,13 @@ Two modes — **fast** (runs after every orchestrator run) and **deep** (runs
 weekly). Does NOT make changes — only reports findings.
 
 **Fast scan** (post-run, lightweight, ~1 minute):
-- Stale status files: READY_FOR_REVIEW features with no QC review within 24h
-- New numeric literals in `analysis/weinstein/` added in this run (grep delta)
-- Any `dune build` or `dune runtest` failures on `main` since last run
+1. **Stale review check**: any `dev/status/*.md` with Status `READY_FOR_REVIEW` and no `dev/reviews/<feature>.md` updated today
+2. **Main build health**: `dune build && dune runtest` on current `main`; report FAILING if non-zero exit
+3. **New magic numbers**: run `dune runtest devtools/checks/` — flag if linter fails (would mean a violation slipped through the gate)
+4. **Status file integrity**: verify each `dev/status/*.md` has `## Status`, `## Last updated`, and `## Interface stable` fields with valid values
+5. **Linter exceptions past review date**: scan `trading/devtools/checks/linter_exceptions.conf` for `# review_at:` entries whose date has passed
+
+Writes to: `dev/health/<YYYY-MM-DD>-fast.md`. Agent definition: `.claude/agents/health-scanner.md`.
 
 **Deep scan** (weekly, writes to `dev/health/YYYY-MM-DD.md`):
 - **Dead code**: OCaml unused-variable warnings, functions in `.ml` not exported

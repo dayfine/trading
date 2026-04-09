@@ -35,7 +35,7 @@ IN_PROGRESS
 - [x] T1-M: "Done" definition — add explicit acceptance criteria to each Tier 1 item's completion note (harness items should state what was built, where it lives, and how to verify) — DONE: see Completed section below
 - [x] T1-N: Golden scenario test suite — screener regression tests; 8 scenarios using real AAPL data; `trading/analysis/weinstein/screener/test/regression_test.ml`. Verify: run `./_build/default/analysis/weinstein/screener/test/regression_test.exe` (8 tests, OK)
 - [x] T1-N: Golden scenario test suite — stop state machine regression tests; 5 scenarios covering Stage2 trailing, Stage3 tightening, stop-hit, short side; `trading/trading/weinstein/stops/test/regression_test.ml` — DONE: see completion note below (#204)
-- [ ] T1-O: `health-scanner` agent — fast scan: stale status files, main build health, new unexcepted magic numbers; runs post-orchestrator; spec extends `docs/design/harness-engineering-plan.md`
+- [x] T1-O: `health-scanner` agent — fast scan: stale status files, main build health, new unexcepted magic numbers; runs post-orchestrator; spec extends `docs/design/harness-engineering-plan.md`
 - [x] T1-P: Add `## Blocking Refactors` section to all feat-agent status files; update `lead-orchestrator` to dispatch blocking refactors before feat-agents
 - [x] T1-P: Update `lead-orchestrator` to count followup items and schedule non-blocking maintenance cycles (threshold: 10 items or every 3rd run)
 - [x] T1-P: Add `## Refactor Mode` prompt variant to feat-agent definitions
@@ -83,6 +83,7 @@ IN_PROGRESS
 
 - [x] `harness-maintainer` agent defined — `.claude/agents/harness-maintainer.md`; owns T1-M, T1-N, T1-P, T1-Q and future harness items; dispatched by lead-orchestrator Step 2d. Verify: `cat .claude/agents/harness-maintainer.md` — should have `## Acceptance Checklist`, `## Max-Iterations Policy`, `## Allowed Tools`.
 - [x] `health-scanner` agent defined — `.claude/agents/health-scanner.md`; fast scan (post-run) and deep scan (weekly); dispatched by lead-orchestrator Step 6; read-only. Verify: `cat .claude/agents/health-scanner.md`.
+- [x] T1-O: `health-scanner` fast scan — operational spec added. Fast scan now has 5 explicit steps with shell commands: (1) stale review check, (2) main build health via `dune build && dune runtest`, (3) magic number gate check via `dune runtest devtools/checks/`, (4) status file integrity check, (5) linter exception review date check. Harness plan §T3-A updated to match. Agent definition now self-sufficient — agent can run fast scan without additional prompting. Verify: `cat .claude/agents/health-scanner.md` — should have numbered steps with bash commands; `cat docs/design/harness-engineering-plan.md` — T3-A fast scan should have 5 items.
 - [x] `ops-data` agent defined — `.claude/agents/ops-data.md`; on-demand data fetch + inventory refresh; human-triggered. Verify: `cat .claude/agents/ops-data.md`.
 - [x] `lead-orchestrator` updated — Step 2d (harness backlog dispatch), Step 6 (health-scanner fast scan), daily summary template updated with Harness Work and Health Scan sections. Verify: grep for "Step 2d\|Step 6\|health-scanner" in `.claude/agents/lead-orchestrator.md`.
 
