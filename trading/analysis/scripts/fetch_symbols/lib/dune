@@ -1,0 +1,13 @@
+(library
+ (name fetch_symbols_lib)
+ (libraries
+  core
+  async
+  file.sexp
+  storage.metadata
+  csv
+  eodhd
+  types
+  weinstein.data_source)
+ (preprocess
+  (pps ppx_jane)))
