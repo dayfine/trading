@@ -67,9 +67,9 @@ let _weekly_bars_for ~bar_history ~symbol ~n =
   let len = List.length weekly in
   if len <= n then weekly else List.drop weekly (len - n)
 
-(** Compute MA direction for a symbol from its accumulated bar history.
-    Uses and updates the per-symbol prior_stages map to improve stage
-    classification accuracy (enables Stage1->Stage2 transition detection). *)
+(** Compute MA direction for a symbol from its accumulated bar history. Uses and
+    updates the per-symbol prior_stages map to improve stage classification
+    accuracy (enables Stage1->Stage2 transition detection). *)
 let _compute_ma_direction ~(config : config) ~bar_history ~prior_stages ~symbol
     =
   let weekly = _weekly_bars_for ~bar_history ~symbol ~n:config.lookback_bars in
@@ -281,9 +281,7 @@ let _on_market_close ~config ~stop_states ~prior_macro ~bar_history
   let entry_transitions =
     if not (_is_screening_day index_bars) then []
     else
-      let index_prior_stage =
-        Hashtbl.find prior_stages config.index_symbol
-      in
+      let index_prior_stage = Hashtbl.find prior_stages config.index_symbol in
       let macro_result =
         Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars:[]
           ~global_index_bars:[] ~prior_stage:index_prior_stage ~prior:None
