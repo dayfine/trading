@@ -1,0 +1,6 @@
+(library
+ (name weinstein_order_gen)
+ (public_name weinstein_trading.order_gen)
+ (libraries trading.base trading.strategy)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

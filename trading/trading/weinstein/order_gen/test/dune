@@ -1,0 +1,11 @@
+(tests
+ (names test_order_gen)
+ (libraries
+  weinstein_trading.order_gen
+  trading.base
+  trading.strategy
+  core
+  ounit2
+  matchers)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

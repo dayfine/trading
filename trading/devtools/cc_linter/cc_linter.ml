@@ -34,7 +34,9 @@ let contains_substring s sub =
 (* --- File collection ------------------------------------------------------- *)
 
 let is_excluded_dir entry =
-  String.equal entry "_build" || String.equal entry "ta_ocaml"
+  String.equal entry "_build"
+  || String.equal entry "ta_ocaml"
+  || String.equal entry ".claude"
 
 let collect_lib_ml_files root =
   let result = ref [] in
