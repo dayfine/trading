@@ -1,7 +1,5 @@
 (** Strategy factory and execution *)
 
-open Core
-
 include Strategy_interface
 (** Re-export interface types *)
 
@@ -12,10 +10,9 @@ type t = { strategy_module : (module STRATEGY); name : string }
 
 (** Execute strategy *)
 let use_strategy ~(get_price : get_price_fn) ~(get_indicator : get_indicator_fn)
-    ~(positions : Position.t String.Map.t) (strategy : t) :
-    output Status.status_or =
+    ~(portfolio : Portfolio_view.t) (strategy : t) : output Status.status_or =
   let (module S) = strategy.strategy_module in
-  S.on_market_close ~get_price ~get_indicator ~positions
+  S.on_market_close ~get_price ~get_indicator ~portfolio
 
 (** Strategy configuration - wraps concrete strategy configs *)
 type config =

@@ -725,7 +725,7 @@ let call_count = ref 0
 module Counting_strategy : Trading_strategy.Strategy_interface.STRATEGY = struct
   let name = "Counting"
 
-  let on_market_close ~get_price:_ ~get_indicator:_ ~positions:_ =
+  let on_market_close ~get_price:_ ~get_indicator:_ ~portfolio:_ =
     Int.incr call_count;
     Ok { Trading_strategy.Strategy_interface.transitions = [] }
 end

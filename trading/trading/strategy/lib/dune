@@ -4,6 +4,7 @@
  (libraries trading.base trading.portfolio trading.orders types core status)
  (modules
   position
+  portfolio_view
   strategy_interface
   ema_strategy
   buy_and_hold_strategy

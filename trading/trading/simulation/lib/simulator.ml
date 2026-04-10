@@ -151,9 +151,13 @@ let _call_strategy t =
     let get_price = _make_get_price t in
     let get_indicator = _make_get_indicator t in
     let open Result.Let_syntax in
-    let%bind output =
-      S.on_market_close ~get_price ~get_indicator ~positions:t.positions
+    let portfolio : Trading_strategy.Portfolio_view.t =
+      {
+        cash = t.portfolio.Trading_portfolio.Portfolio.current_cash;
+        positions = t.positions;
+      }
     in
+    let%bind output = S.on_market_close ~get_price ~get_indicator ~portfolio in
     Ok output.transitions
 
 (** Find position by symbol and state *)

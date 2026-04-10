@@ -60,14 +60,14 @@ module type STRATEGY = sig
   val on_market_close :
     get_price:get_price_fn ->
     get_indicator:get_indicator_fn ->
-    positions:Position.t Core.String.Map.t ->
+    portfolio:Portfolio_view.t ->
     output Status.status_or
   (** Execute strategy logic after market close
 
       Called once per trading day after the market closes to make trading
       decisions. Market data is already captured in the accessor functions.
 
-      Strategies are pure functions: given market data and current positions,
+      Strategies are pure functions: given market data and current portfolio,
       they produce transitions. The caller (engine/tests) is responsible for
       tracking positions and applying transitions.
 
@@ -76,9 +76,8 @@ module type STRATEGY = sig
       @param get_indicator
         Function to retrieve indicator value for a symbol (market data already
         captured)
-      @param positions
-        Current positions map (symbol -> position). Caller owns and manages this
-        state.
+      @param portfolio
+        Read-only portfolio snapshot with cash balance and open positions.
       @return output containing transitions to execute *)
 
   val name : string

@@ -48,3 +48,8 @@
   test_helpers
   types
   matchers))
+
+(test
+ (name test_portfolio_view)
+ (modules test_portfolio_view)
+ (libraries ounit2 core trading.strategy types matchers))
