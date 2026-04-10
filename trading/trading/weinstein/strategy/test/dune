@@ -1,5 +1,5 @@
 (tests
- (names test_weinstein_strategy test_weinstein_strategy_smoke)
+ (names test_weinstein_strategy test_weinstein_strategy_smoke test_ad_bars)
  (libraries
   core
   core_unix

@@ -1,6 +1,11 @@
 open Core
 open Trading_strategy
 
+module Ad_bars = Ad_bars
+(** {!Ad_bars} loader is exposed as a top-level submodule so that tests and
+    external callers (e.g. live-mode boot) can load NYSE breadth data before
+    wiring it into the strategy. *)
+
 type config = {
   universe : string list;
   index_symbol : string;

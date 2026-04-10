@@ -31,6 +31,11 @@
 
 open Core
 
+(** {1 Sub-modules} *)
+
+module Ad_bars = Ad_bars
+(** NYSE advance/decline breadth data loader. See {!Ad_bars}. *)
+
 (** {1 Configuration} *)
 
 type config = {
