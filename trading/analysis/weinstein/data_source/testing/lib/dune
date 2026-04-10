@@ -4,6 +4,6 @@
  (name weinstein_data_source_testing)
  (public_name weinstein.data_source.testing)
  (wrapped false)
- (libraries async core data_source status types)
+ (libraries async core data_source indicators.time_period status types)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

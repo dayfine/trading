@@ -270,6 +270,17 @@ val le : (module Ord with type t = 'a) -> 'a -> 'a matcher
       assert_that trade.price (le (module Float_ord) max_price)
     ]} *)
 
+val is_between :
+  (module Ord with type t = 'a) -> low:'a -> high:'a -> 'a matcher
+(** [is_between m ~low ~high] asserts the actual value is in [[low, high]]
+    (inclusive on both ends).
+
+    Example:
+    {[
+      assert_that result.confidence
+        (is_between (module Float_ord) ~low:0.0 ~high:1.0)
+    ]} *)
+
 (** {1 List Matchers} *)
 
 val each : 'a matcher -> 'a list matcher

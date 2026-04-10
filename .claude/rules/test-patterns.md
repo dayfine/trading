@@ -112,10 +112,16 @@ assert_that position (is_some_and (fun pos -> ...))
    assert_that result is_none
    ```
 
-6. **Use `gt`/`ge`/`lt`/`le` with `Int_ord`/`Float_ord` for numeric comparisons:**
+6. **Use `gt`/`ge`/`lt`/`le`/`is_between` with `Int_ord`/`Float_ord` for numeric comparisons:**
    ```ocaml
    assert_that result.count (gt (module Int_ord) 0)
    assert_that price (ge (module Float_ord) min_price)
+
+   (* GOOD: is_between for range checks *)
+   assert_that result.confidence
+     (is_between (module Float_ord) ~low:0.0 ~high:1.0)
+
+   (* AVOID: all_of [ ge ...; le ... ] for ranges — use is_between *)
    assert_that price
      (all_of [ ge (module Float_ord) 100.0; le (module Float_ord) 200.0 ])
 

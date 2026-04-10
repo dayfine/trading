@@ -149,6 +149,12 @@ let le (type a) (module M : Ord with type t = a) threshold actual =
       (Printf.sprintf "Expected value <= %s but got %s" (M.show threshold)
          (M.show actual))
 
+let is_between (type a) (module M : Ord with type t = a) ~low ~high actual =
+  if M.compare actual low < 0 || M.compare actual high > 0 then
+    assert_failure
+      (Printf.sprintf "Expected value in [%s, %s] but got %s" (M.show low)
+         (M.show high) (M.show actual))
+
 (* ========================================================================== *)
 (* List Matchers                                                             *)
 (* ========================================================================== *)
