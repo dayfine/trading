@@ -1,0 +1,11 @@
+(executable
+ (name fetch_universe)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  status
+  types
+  weinstein.data_source)
+ (preprocess
+  (pps ppx_jane)))

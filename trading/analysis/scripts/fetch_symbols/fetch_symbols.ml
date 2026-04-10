@@ -78,11 +78,25 @@ let main ~symbols ~data_dir_str ~api_key_flag () =
       printf "\nDone: %d fetched, %d errors.\n%!" ok_count err_count;
       return ()
 
+let _symbols_from_universe ~data_dir_str =
+  let data_dir = Fpath.v data_dir_str in
+  Universe.get_deferred (Fpath.to_string data_dir) >>| function
+  | Error e ->
+      eprintf "Error loading universe: %s\n%!" (Status.show e);
+      []
+  | Ok instruments ->
+      List.map instruments ~f:(fun (i : Types.Instrument_info.t) -> i.symbol)
+
 let command =
-  Command.async ~summary:"Fetch named symbols from EODHD and cache them locally"
+  Command.async
+    ~summary:
+      "Fetch symbols from EODHD and cache them locally. If --symbols is \
+       omitted, fetches all symbols from universe.sexp."
     (let%map_open.Command symbols =
-       flag "symbols" (required string)
-         ~doc:"SYM1,SYM2,... Comma-separated list of symbols to fetch"
+       flag "symbols" (optional string)
+         ~doc:
+           "SYM1,SYM2,... Comma-separated list of symbols (default: all from \
+            universe.sexp)"
      and data_dir =
        flag "data-dir"
          (optional_with_default
@@ -91,11 +105,21 @@ let command =
          ~doc:"PATH Directory to write cached data"
      and api_key = flag "api-key" (optional string) ~doc:"KEY EODHD API key" in
      fun () ->
-       let sym_list =
-         String.split ~on:',' symbols
-         |> List.map ~f:String.strip
-         |> List.filter ~f:(fun s -> not (String.is_empty s))
+       let%bind sym_list =
+         match symbols with
+         | Some s ->
+             return
+               (String.split ~on:',' s |> List.map ~f:String.strip
+               |> List.filter ~f:(fun s -> not (String.is_empty s)))
+         | None ->
+             printf "No --symbols flag; reading from universe.sexp ...\n%!";
+             _symbols_from_universe ~data_dir_str:data_dir
        in
-       main ~symbols:sym_list ~data_dir_str:data_dir ~api_key_flag:api_key ())
+       if List.is_empty sym_list then (
+         eprintf "No symbols to fetch.\n%!";
+         return ())
+       else (
+         printf "Fetching %d symbols ...\n%!" (List.length sym_list);
+         main ~symbols:sym_list ~data_dir_str:data_dir ~api_key_flag:api_key ()))
 
 let () = Command_unix.run command
