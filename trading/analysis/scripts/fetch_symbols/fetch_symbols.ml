@@ -78,6 +78,11 @@ let main ~symbols ~data_dir_str ~api_key_flag () =
       printf "\nDone: %d fetched, %d errors.\n%!" ok_count err_count;
       return ()
 
+let _parse_symbols csv =
+  String.split ~on:',' csv
+  |> List.map ~f:String.strip
+  |> List.filter ~f:(fun s -> not (String.is_empty s))
+
 let _symbols_from_universe ~data_dir_str =
   let data_dir = Fpath.v data_dir_str in
   Universe.get_deferred (Fpath.to_string data_dir) >>| function
@@ -107,10 +112,7 @@ let command =
      fun () ->
        let%bind sym_list =
          match symbols with
-         | Some s ->
-             return
-               (String.split ~on:',' s |> List.map ~f:String.strip
-               |> List.filter ~f:(fun s -> not (String.is_empty s)))
+         | Some s -> return (_parse_symbols s)
          | None ->
              printf "No --symbols flag; reading from universe.sexp ...\n%!";
              _symbols_from_universe ~data_dir_str:data_dir
