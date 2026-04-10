@@ -122,7 +122,7 @@ let test_entry_signal _ =
   let get_indicator = Test_helpers.Mock_market_data.get_indicator market_data in
   let output =
     unwrap_result
-      (S.on_market_close ~get_price ~get_indicator ~positions:!positions)
+      (S.on_market_close ~get_price ~get_indicator ~positions:!positions ())
       "Strategy execution"
   in
 
@@ -172,7 +172,7 @@ let test_take_profit _ =
   let get_indicator = Test_helpers.Mock_market_data.get_indicator market_data in
   let output =
     unwrap_result
-      (S.on_market_close ~get_price ~get_indicator ~positions:!positions)
+      (S.on_market_close ~get_price ~get_indicator ~positions:!positions ())
       "Day 1"
   in
   positions := apply_transitions !positions output.transitions;
@@ -211,7 +211,7 @@ let test_take_profit _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price:get_price' ~get_indicator:get_indicator'
-         ~positions:!positions)
+         ~positions:!positions ())
       "Day 2"
   in
 
@@ -253,7 +253,7 @@ let test_stop_loss _ =
   let get_indicator = Test_helpers.Mock_market_data.get_indicator market_data in
   let output =
     unwrap_result
-      (S.on_market_close ~get_price ~get_indicator ~positions:!positions)
+      (S.on_market_close ~get_price ~get_indicator ~positions:!positions ())
       "Day 1"
   in
   positions := apply_transitions !positions output.transitions;
@@ -285,7 +285,7 @@ let test_stop_loss _ =
   let output =
     unwrap_result
       (S.on_market_close ~get_price:get_price' ~get_indicator:get_indicator'
-         ~positions:!positions)
+         ~positions:!positions ())
       "Day 2"
   in
 
@@ -327,7 +327,7 @@ let test_no_entry_below_ema _ =
   let get_indicator = Test_helpers.Mock_market_data.get_indicator market_data in
   let output =
     unwrap_result
-      (S.on_market_close ~get_price ~get_indicator ~positions:!positions)
+      (S.on_market_close ~get_price ~get_indicator ~positions:!positions ())
       "Strategy execution"
   in
 

@@ -61,6 +61,8 @@ module type STRATEGY = sig
     get_price:get_price_fn ->
     get_indicator:get_indicator_fn ->
     positions:Position.t Core.String.Map.t ->
+    ?portfolio_value:float ->
+    unit ->
     output Status.status_or
   (** Execute strategy logic after market close
 
@@ -79,6 +81,10 @@ module type STRATEGY = sig
       @param positions
         Current positions map (symbol -> position). Caller owns and manages this
         state.
+      @param portfolio_value
+        Total portfolio value (cash + positions). Optional — strategies that
+        don't need it for sizing can ignore it. The simulator supplies it from
+        the portfolio snapshot each step.
       @return output containing transitions to execute *)
 
   val name : string

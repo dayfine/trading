@@ -49,7 +49,8 @@ let with_test_data test_name prices_by_symbol ~f =
 module Noop_strategy : Trading_strategy.Strategy_interface.STRATEGY = struct
   let name = "Noop"
 
-  let on_market_close ~get_price:_ ~get_indicator:_ ~positions:_ =
+  let on_market_close ~get_price:_ ~get_indicator:_ ~positions:_
+      ?portfolio_value:_ () =
     Ok { Trading_strategy.Strategy_interface.transitions = [] }
 end
 
@@ -95,7 +96,8 @@ end = struct
   let reset () = call_count := 0
 
   let on_market_close ~get_price:_ ~get_indicator:_
-      ~(positions : Trading_strategy.Position.t String.Map.t) =
+      ~(positions : Trading_strategy.Position.t String.Map.t) ?portfolio_value:_
+      () =
     call_count := !call_count + 1;
     let open Trading_strategy.Position in
     let config = Config.config in

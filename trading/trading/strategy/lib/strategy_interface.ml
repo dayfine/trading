@@ -32,6 +32,8 @@ module type STRATEGY = sig
     get_price:get_price_fn ->
     get_indicator:get_indicator_fn ->
     positions:Position.t String.Map.t ->
+    ?portfolio_value:float ->
+    unit ->
     output Status.status_or
 
   val name : string

@@ -140,7 +140,8 @@ let _process_symbol ~(get_price : Strategy_interface.get_price_fn)
   | Some price, Some ema, Some position -> _check_exit price ema position
   | _ -> None
 
-let _on_market_close config ~get_price ~get_indicator ~positions =
+let _on_market_close config ~get_price ~get_indicator ~positions
+    ?portfolio_value:_ () =
   let all_transitions =
     List.filter_map config.symbols ~f:(fun symbol ->
         _process_symbol ~get_price ~get_indicator ~config ~positions symbol)

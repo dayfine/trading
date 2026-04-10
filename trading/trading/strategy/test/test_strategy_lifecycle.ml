@@ -34,7 +34,8 @@ module DummyStrategy = struct
   let name = "DummyDecisionStrategy" [@@warning "-32"]
   let position_counter = ref 0
 
-  let on_market_close ~get_price ~get_indicator:_ ~positions =
+  let on_market_close ~get_price ~get_indicator:_ ~positions ?portfolio_value:_
+      () =
     let transitions =
       (* Check if we should enter: no position and price is 50.0 *)
       match (Map.find positions "TEST", get_price "TEST") with
@@ -241,7 +242,7 @@ let test_complete_lifecycle _ =
          ~get_price:(fun sym ->
            if String.equal sym "TEST" then Some price_day1 else None)
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~positions:!positions ())
       "Strategy day 1"
   in
   assert_equal 1 (List.length strategy_output.transitions);
@@ -295,7 +296,7 @@ let test_complete_lifecycle _ =
          ~get_price:(fun sym ->
            if String.equal sym "TEST" then Some price_day2 else None)
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~positions:!positions ())
       "Strategy day 2"
   in
   assert_equal 1 (List.length strategy_output.transitions);

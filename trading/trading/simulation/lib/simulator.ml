@@ -151,8 +151,13 @@ let _call_strategy t =
     let get_price = _make_get_price t in
     let get_indicator = _make_get_indicator t in
     let open Result.Let_syntax in
+    let today_bars = _get_today_bars t in
+    let portfolio_value =
+      _compute_portfolio_value ~portfolio:t.portfolio ~today_bars
+    in
     let%bind output =
       S.on_market_close ~get_price ~get_indicator ~positions:t.positions
+        ~portfolio_value ()
     in
     Ok output.transitions
 
