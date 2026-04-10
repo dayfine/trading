@@ -1,15 +1,17 @@
 # Status: simulation
 
-## Last updated: 2026-04-07
+## Last updated: 2026-04-09
 
 ## Status
 READY_FOR_REVIEW
 
 ## QC
-overall_qc: APPROVED
+overall_qc: APPROVED (Slice 1)
 structural_qc: APPROVED (2026-04-07)
 behavioral_qc: APPROVED (2026-04-07)
 See dev/reviews/simulation.md.
+
+Note: Slice 2 changes need fresh QC review.
 
 ## Interface stable
 YES
@@ -34,7 +36,15 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
   - Macro analysis + screening: Fridays only (Weinstein weekly review cadence)
   - `_update_stops`, `_screen_universe`, `_make_entry_transition` wired to all analysis modules
 - `Synthetic_source` — deterministic `DATA_SOURCE` impl for testing; 4 bar patterns: Trending/Basing/Breakout/Declining; 8 tests (feat/simulation branch)
-- End-to-end smoke test — `Simulator.run` with `Weinstein_strategy` on CSV data in temp dir; 2 tests covering smoke + date range (feat/simulation branch)
+- End-to-end smoke test — `Simulator.run` with `Weinstein_strategy` on CSV data in temp dir; 3 tests covering smoke + date range + weekly cadence
+
+### Slice 2 (2026-04-09)
+
+- **`?portfolio_value` on STRATEGY interface** — added as truly optional param on `on_market_close`. Existing strategies (EMA, BuyAndHold) ignore it. Simulator passes it from `_compute_portfolio_value`. Weinstein threads it to `_entries_from_candidates` for position sizing. All callers (14 files) updated.
+- **Bar accumulation** — per-symbol daily bar buffer (`Hashtbl<string, Daily_price.t list>`) in `make` closure. Accumulated idempotently on each `on_market_close` call. Converted to weekly via `Time_period.Conversion.daily_to_weekly` for stage/macro/screening analysis. Replaces `_collect_bars` placeholder.
+- **MA direction** — computed from `Stage.classify` on the weekly bar buffer instead of hardcoded `Flat`. Falls back to `Flat` when insufficient bars (< ma_period).
+- **Simulation date** — `_make_entry_transition` uses current bar's date instead of `Date.today`.
+- **Smoke test extended** — `hist_start` moved to 2022-01-01 (100+ weekly bars warmup). Added `portfolio_value > 0` assertion.
 
 ## In Progress
 - None
@@ -44,58 +54,35 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
 
 ## Follow-up
 
-- `_collect_bars` returns only the current bar (1 bar) — full history requires `Historical_source` wired into the simulation loop (Slice 2)
-- `portfolio_value = 0.0` placeholder in `_entries_from_candidates` — needs real cash from simulator snapshot
-- `ma_direction = Flat` placeholder in `_handle_stop` — needs computed MA slope from full bar history
-- `Date.today` in `_make_entry_transition` — should use the simulation date from the current bar
+- Trade assertions (trades made, open position, realized/unrealized PnL) deferred to Slice 3: the screener cascade's `is_breakout_candidate` gate requires a `Breakout` pattern with carefully timed parameters (early Stage 2, `weeks_advancing <= 4`) that the current `Trending` pattern does not produce. Need screener-aware synthetic test data.
+- `prior_stage` is passed as `None` to `Stock_analysis.analyze` — accumulating prior stage results per symbol would improve screener accuracy (allows detecting Stage 1 -> Stage 2 transitions).
 
 ## Known gaps
 
 - `T2-B` performance gate test deferred to M5
+- Trade assertions deferred to Slice 3 (see Follow-up)
 
 ## Next Steps
 
-### Slice 2: wire real bar history into the strategy (4 coordinated changes)
+### Slice 3: screener-aware test data for trade assertions
 
-**1. Bar accumulation — replace `_collect_bars` 1-bar placeholder**
+Design synthetic data patterns that pass the full screener cascade:
 
-Accumulate daily bars per-symbol in the `make` closure (same pattern as `stop_states`):
+1. Use `Breakout` pattern with `base_weeks` timed so the breakout happens 1-3 weeks before the first screening Friday. This gives `weeks_advancing <= 4` in `is_breakout_candidate`.
 
-```ocaml
-(* in make *)
-let bar_history : Types.Daily_price.t list String.Table.t = String.Table.create () in
-```
+2. Accumulate `prior_stage` per symbol in the `make` closure (same pattern as `stop_states` / `bar_history`). Pass it to `Stock_analysis.analyze` instead of `None`. This enables the `Stage1 -> Stage2` transition path in `is_breakout_candidate`.
 
-On each `on_market_close` call, append the current bar (from `get_price`) to the per-symbol buffer. When the strategy needs bars for stage/RS/volume analysis, use the full buffer instead of `_collect_bars`. Convert daily bars to weekly via `Time_period.Conversion.daily_to_weekly` (already used in `time_series.ml`). Aggregate on Fridays (or when producing weekly output).
-
-**2. `portfolio_value` — replace `0.0` placeholder in `_entries_from_candidates`**
-
-Add an optional labeled parameter to `on_market_close`:
-```ocaml
-val on_market_close :
-  get_price:get_price_fn ->
-  get_indicator:get_indicator_fn ->
-  positions:Position.t String.Map.t ->
-  ?portfolio_value:float ->
-  output Status.status_or
-```
-This is truly optional — existing strategies (`ema_strategy`, `buy_and_hold_strategy`) ignore it with `?portfolio_value:_` in their implementation. The simulator passes it from `portfolio.current_cash` (already available in `step`). Weinstein uses it for position sizing in `_entries_from_candidates`.
-
-**3. `ma_direction` — replace `Flat` placeholder in `_handle_stop`**
-
-Use the per-symbol bar buffer (from change 1) to compute MA slope via the existing `Stage.classify` function, which already returns `ma_slope`. Extract direction from its result.
-
-**4. Simulation date — replace `Date.today` in `_make_entry_transition`**
-
-The current bar's date is available from `get_price`. Pass it through from the bar to `_make_entry_transition`.
-
-**Smoke test extension (after all 4 changes)**
-
-- Extend `hist_start` to `2022-01-01` so the bar buffer is large enough for stage classification
-- Add assertions: trades were made, open AAPL position exists, realized PnL ≥ 0, unrealized PnL > 0
+3. With both changes, the smoke test should produce trades. Add assertions:
+   - At least one trade was made across all steps
+   - Final portfolio has an open AAPL position
+   - Total realized PnL >= 0
+   - Total unrealized PnL > 0
 
 ## Recent Commits
 
 - #195 simulation: Add strategy_cadence to simulator dependencies
 - #196 simulation: Weinstein strategy skeleton (STRATEGY impl) — merged 2026-04-07
 - feat/simulation: Add Synthetic_source and Weinstein strategy smoke tests (pending PR)
+- feat/simulation: add ?portfolio_value optional param to STRATEGY interface (2026-04-09)
+- feat/simulation: bar accumulation, MA direction, and simulation date (2026-04-09)
+- feat/simulation: extend smoke tests with 2022-01-01 history start (2026-04-09)

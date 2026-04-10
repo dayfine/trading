@@ -41,23 +41,22 @@ let _gen_position_id symbol =
 (** Accumulate today's bar for each symbol into the per-symbol bar history.
     Skips if the bar date is not strictly after the last recorded date
     (idempotent for repeated calls on the same day). *)
+let _is_new_bar (existing : Types.Daily_price.t list) bar =
+  match List.last existing with
+  | None -> true
+  | Some last -> Date.( > ) bar.Types.Daily_price.date last.date
+
+let _append_bar_if_new bar_history ~symbol bar =
+  let existing = Hashtbl.find bar_history symbol |> Option.value ~default:[] in
+  if _is_new_bar existing bar then
+    Hashtbl.set bar_history ~key:symbol ~data:(existing @ [ bar ])
+
 let _accumulate_bars
     ~(bar_history : Types.Daily_price.t list Hashtbl.M(String).t)
     ~(get_price : Strategy_interface.get_price_fn) ~symbols =
   List.iter symbols ~f:(fun symbol ->
-      match get_price symbol with
-      | Some bar ->
-          let existing =
-            Hashtbl.find bar_history symbol |> Option.value ~default:[]
-          in
-          let should_append =
-            match List.last existing with
-            | None -> true
-            | Some last -> Date.( > ) bar.Types.Daily_price.date last.date
-          in
-          if should_append then
-            Hashtbl.set bar_history ~key:symbol ~data:(existing @ [ bar ])
-      | None -> ())
+      get_price symbol
+      |> Option.iter ~f:(_append_bar_if_new bar_history ~symbol))
 
 (** Get weekly bars for a symbol from the accumulated daily history. *)
 let _weekly_bars_for ~bar_history ~symbol ~n =
