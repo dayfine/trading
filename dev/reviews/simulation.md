@@ -61,8 +61,75 @@ APPROVED
 
 ---
 
-## Combined Result
+## Combined Result (Slice 1)
 
 overall_qc: APPROVED
 Both structural and behavioral QC passed on 2026-04-07.
+
+---
+
+# QC Structural Review: simulation (Slice 3)
+
+Date: 2026-04-10
+Reviewer: lead-orchestrator (inline QC)
+Branch reviewed: feat/simulation (commits adfc5902, 3c71f99e)
+
+## Scope
+
+Modified files:
+- `trading/weinstein/strategy/lib/weinstein_strategy.ml` — prior_stage accumulation
+- `trading/weinstein/strategy/test/test_weinstein_strategy_smoke.ml` — breakout pattern test + doc update
+- `dev/status/simulation.md` — status update
+
+## Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune fmt | PASS | No format violations |
+| H2 | dune build | PASS | Clean build |
+| H3 | dune runtest | PASS | All tests pass (13 strategy tests: 9 unit + 4 smoke) |
+| P1 | Functions ≤ 50 lines | PASS | No new functions; existing functions unchanged in length |
+| P2 | No magic numbers | PASS | `base_weeks=40`, `breakout_volume_mult=8.0` are test parameters |
+| P3 | Config completeness | PASS | No new user-facing parameters |
+| P4 | .mli coverage | PASS | No new public API; .mli unchanged |
+| P5 | Internal helpers prefixed | PASS | All existing helpers retain `_` prefix |
+| P6 | Tests use matchers | PASS | `assert_that`, `gt`, `not_`, `is_empty` used |
+| A1 | Core module modifications | PASS | No modifications to Portfolio/Orders/Position/Strategy/Engine |
+| A2 | No analysis/ → trading/ imports | PASS | No cross-layer changes |
+| A3 | No unnecessary modifications | PASS | Only strategy impl + test + status file |
+
+## Verdict
+
+APPROVED
+
+---
+
+# QC Behavioral Review: simulation (Slice 3)
+
+Date: 2026-04-10
+Reviewer: lead-orchestrator (inline QC)
+Branch reviewed: feat/simulation
+
+## Behavioral Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| B1 | Prior stage accumulation correct | PASS | Hashtbl stores stage after each `Stage.classify`; next call receives it |
+| B2 | Stock_analysis receives prior_stage | PASS | `Hashtbl.find prior_stages ticker` passed to `analyze` |
+| B3 | Index prior stage wired to Macro | PASS | `Hashtbl.find prior_stages config.index_symbol` → `Macro.analyze ~prior_stage` |
+| B4 | Side effects contained in closure | PASS | `prior_stages` Hashtbl created in `make`, same pattern as `stop_states` and `bar_history` |
+| B5 | Test exercises full pipeline | PASS | Breakout pattern → Stage1→Stage2 → screener → orders → trades → assertions |
+| B6 | Test assertions meaningful | PASS | Verifies orders submitted, trades executed, positive portfolio value |
+| T1 | Domain correctness | PASS | Prior stage accumulation matches Weinstein's weekly stage progression concept |
+
+## Verdict
+
+APPROVED
+
+---
+
+## Combined Result (Slice 3)
+
+overall_qc: APPROVED
+Both structural and behavioral QC passed on 2026-04-10.
 Feature is in Integration Queue — ready to merge to main pending human decision.

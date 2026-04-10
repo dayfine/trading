@@ -1,17 +1,15 @@
 # Status: simulation
 
-## Last updated: 2026-04-09
+## Last updated: 2026-04-10
 
 ## Status
 READY_FOR_REVIEW
 
 ## QC
-overall_qc: APPROVED (Slice 1)
-structural_qc: APPROVED (2026-04-07)
-behavioral_qc: APPROVED (2026-04-07)
+overall_qc: APPROVED (Slice 1 + Slice 3)
+structural_qc: APPROVED (Slice 1: 2026-04-07, Slice 3: 2026-04-10)
+behavioral_qc: APPROVED (Slice 1: 2026-04-07, Slice 3: 2026-04-10)
 See dev/reviews/simulation.md.
-
-Note: Slice 2 changes need fresh QC review.
 
 ## Interface stable
 YES
@@ -46,6 +44,12 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
 - **Simulation date** — `_make_entry_transition` uses current bar's date instead of `Date.today`.
 - **Smoke test extended** — `hist_start` moved to 2022-01-01 (100+ weekly bars warmup). Added `portfolio_value > 0` assertion.
 
+### Slice 3 (2026-04-10)
+
+- **Prior stage accumulation** — per-symbol `prior_stages` Hashtbl in the `make` closure. `Stage.classify` and `Stock_analysis.analyze` now receive accumulated prior stage instead of `None`. Enables accurate Stage1→Stage2 transition detection in `is_breakout_candidate`.
+- **Index prior stage** — `Macro.analyze` receives accumulated index prior stage instead of `None`.
+- **Breakout smoke test** — new test using `Breakout` synthetic pattern (40 weeks basing, 8x breakout volume, 1-year sim from data start). Asserts: orders submitted, trades executed, positive portfolio value. Full screener→order→trade pipeline verified end-to-end.
+
 ## In Progress
 - None
 
@@ -54,8 +58,8 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
 
 ## Follow-up
 
-- Trade assertions (trades made, open position, realized/unrealized PnL) deferred to Slice 3: the screener cascade's `is_breakout_candidate` gate requires a `Breakout` pattern with carefully timed parameters (early Stage 2, `weeks_advancing <= 4`) that the current `Trending` pattern does not produce. Need screener-aware synthetic test data.
-- `prior_stage` is passed as `None` to `Stock_analysis.analyze` — accumulating prior stage results per symbol would improve screener accuracy (allows detecting Stage 1 -> Stage 2 transitions).
+- Volume dilution in weekly aggregation: a single high-volume daily breakout bar gets averaged with 4 normal-volume bars in the weekly sum, requiring unrealistically high `breakout_volume_mult` (8x daily) to achieve 2x weekly ratio. Consider enhancing `Synthetic_source.Breakout` to apply volume spike across multiple days of the breakout week.
+- Test does not yet assert on specific position symbols (AAPL open position) or PnL direction — trades are confirmed but position-level assertions deferred.
 
 ## Known gaps
 
@@ -64,19 +68,15 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
 
 ## Next Steps
 
-### Slice 3: screener-aware test data for trade assertions
+### QC review for Slice 2+3
 
-Design synthetic data patterns that pass the full screener cascade:
+Both Slice 2 (merged PRs #237, #240, #241, #242) and Slice 3 (feat/simulation branch) need fresh QC review.
 
-1. Use `Breakout` pattern with `base_weeks` timed so the breakout happens 1-3 weeks before the first screening Friday. This gives `weeks_advancing <= 4` in `is_breakout_candidate`.
+### Future slices
 
-2. Accumulate `prior_stage` per symbol in the `make` closure (same pattern as `stop_states` / `bar_history`). Pass it to `Stock_analysis.analyze` instead of `None`. This enables the `Stage1 -> Stage2` transition path in `is_breakout_candidate`.
-
-3. With both changes, the smoke test should produce trades. Add assertions:
-   - At least one trade was made across all steps
-   - Final portfolio has an open AAPL position
-   - Total realized PnL >= 0
-   - Total unrealized PnL > 0
+- Position-level assertions: verify AAPL open position, PnL direction
+- Walk-forward backtest (M5): parameter tuner with validation period
+- Performance gate test (T2-B)
 
 ## Recent Commits
 
@@ -86,3 +86,5 @@ Design synthetic data patterns that pass the full screener cascade:
 - feat/simulation: add ?portfolio_value optional param to STRATEGY interface (2026-04-09)
 - feat/simulation: bar accumulation, MA direction, and simulation date (2026-04-09)
 - feat/simulation: extend smoke tests with 2022-01-01 history start (2026-04-09)
+- feat/simulation: accumulate prior_stage per symbol for Stage1->Stage2 detection (2026-04-10)
+- feat/simulation: add breakout pattern smoke test with trade assertions (2026-04-10)

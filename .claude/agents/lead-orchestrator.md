@@ -39,6 +39,7 @@ Read all of the following before doing anything else:
 - `dev/decisions.md` — human guidance from last session
 - `dev/status/portfolio-stops.md` — order_gen track (feat-weinstein)
 - `dev/status/simulation.md` — Slice 2 track (feat-weinstein)
+- `dev/status/data-gaps.md` — known data gaps (ADL, sectors, global indices)
 - `dev/status/harness.md` — harness backlog
 - Any `dev/reviews/*.md` that exist
 
@@ -81,7 +82,37 @@ Read `dev/status/harness.md`. If any Tier 1 items are unchecked (`[ ]`) and no h
 
 Harness items with external dependencies (e.g., T1-N golden scenarios require real data in `data/`) should be skipped if the dependency isn't met — note the blocker in the daily summary.
 
-### 2d: Feature dependency rules
+### 2d: Data operations (ops-data)
+
+Read `dev/status/data-gaps.md`. If any gap has an actionable next step that
+does not require a human decision (e.g., "fetch sector ETFs" once the ETF list
+is known, "wire global index bars" once cached), spawn `ops-data` as a subagent:
+
+```
+You are the data operations agent for the Weinstein Trading System.
+
+## Task
+<describe the specific data operation: fetch, parse, inventory rebuild, etc.>
+
+## Context
+<paste the relevant section from dev/status/data-gaps.md>
+
+Read your full agent definition in .claude/agents/ops-data.md for scripts and workflow.
+
+Docker container: <container-name>
+
+When done:
+1. Update dev/status/data-gaps.md to reflect what was resolved or what still blocks
+2. Run build_inventory.exe if any data was fetched
+3. Return: what changed, what still blocks, any errors
+```
+
+ops-data runs **before** feature agents — resolved data gaps may unblock
+feature work in the same session. If all gaps require human decisions (API tier
+upgrade, alternative data source), skip ops-data and note the blockers in the
+daily summary.
+
+### 2e: Feature dependency rules
 
 | Feature | Can run when |
 |---------|--------------|
@@ -353,6 +384,12 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
   (see dev/reviews/portfolio-stops.md)
 - simulation (Slice 2): APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
   (see dev/reviews/simulation.md)
+
+## Data Operations
+(Omit if ops-data did not run today)
+- Gaps resolved: <list or "none">
+- Gaps still blocked: <list with reason — e.g. "ADL: needs alternative source (human decision)">
+- Data fetched: <symbols and bar counts, or "none">
 
 ## Harness Work
 (Omit if no harness-maintainer ran today)
