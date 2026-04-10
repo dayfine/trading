@@ -1,3 +1,6 @@
+(* @large-module: strategy integrates stop logic, macro, sector, screener, and
+   entry sizing into a single on_market_close closure; splitting each helper
+   group into its own file would obscure the closure state they share. *)
 open Core
 open Trading_strategy
 
@@ -351,6 +354,27 @@ let _all_accumulated_symbols ~(config : config) : string list =
   let global_symbols = List.map config.global_index_symbols ~f:fst in
   (config.index_symbol :: config.universe) @ sector_symbols @ global_symbols
 
+(** Run the Friday macro + screener path and return entry transitions.
+    Returns [] if macro is Bearish (no new buys). *)
+let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
+    ~prior_stages ~sector_prior_stages ~get_price ~portfolio ~current_date
+    ~index_bars =
+  let index_prior_stage = Hashtbl.find prior_stages config.index_symbol in
+  let global_index_bars = _build_global_index_bars ~bar_history ~config in
+  let macro_result =
+    Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars
+      ~global_index_bars ~prior_stage:index_prior_stage ~prior:None
+  in
+  prior_macro := macro_result.trend;
+  if Weinstein_types.(equal_market_trend !prior_macro Bearish) then []
+  else
+    let sector_map =
+      _build_sector_map ~config ~bar_history ~sector_prior_stages ~index_bars
+    in
+    _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
+      ~sector_map ~stop_states ~portfolio ~get_price ~bar_history ~prior_stages
+      ~current_date
+
 let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~sector_prior_stages ~get_price ~get_indicator:_
     ~(portfolio : Portfolio_view.t) =
@@ -373,22 +397,9 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
   let entry_transitions =
     if not (_is_screening_day index_bars) then []
     else
-      let index_prior_stage = Hashtbl.find prior_stages config.index_symbol in
-      let global_index_bars = _build_global_index_bars ~bar_history ~config in
-      let macro_result =
-        Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars
-          ~global_index_bars ~prior_stage:index_prior_stage ~prior:None
-      in
-      prior_macro := macro_result.trend;
-      if Weinstein_types.(equal_market_trend !prior_macro Bearish) then []
-      else
-        let sector_map =
-          _build_sector_map ~config ~bar_history ~sector_prior_stages
-            ~index_bars
-        in
-        _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
-          ~sector_map ~stop_states ~portfolio ~get_price ~bar_history
-          ~prior_stages ~current_date
+      _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
+        ~prior_stages ~sector_prior_stages ~get_price ~portfolio ~current_date
+        ~index_bars
   in
   Ok
     {

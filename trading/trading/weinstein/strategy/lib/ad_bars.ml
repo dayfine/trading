@@ -23,20 +23,23 @@ let _parse_row line =
       | _ -> None)
   | _ -> None
 
+(** Apply one parsed row to the accumulator table. *)
+let _insert_row tbl line =
+  match _parse_row line with
+  | Some (date, count) -> Hashtbl.set tbl ~key:date ~data:count
+  | None -> ()
+
+(** Populate [tbl] with all rows of [path]. *)
+let _read_into tbl path =
+  In_channel.with_file path ~f:(fun ic ->
+      In_channel.iter_lines ic ~f:(_insert_row tbl))
+
 (** Read one A/D count CSV from disk into a (date -> count) hashtable. Missing
     or unreadable files return an empty table. *)
 let _read_count_file path =
   let tbl = Hashtbl.create (module Date) in
   if not (Stdlib.Sys.file_exists path) then tbl
-  else
-    try
-      In_channel.with_file path ~f:(fun ic ->
-          In_channel.iter_lines ic ~f:(fun line ->
-              match _parse_row line with
-              | Some (date, count) -> Hashtbl.set tbl ~key:date ~data:count
-              | None -> ()));
-      tbl
-    with _ -> tbl
+  else try _read_into tbl path; tbl with _ -> tbl
 
 (** Join the two count tables on date. A row with both [advancing] and
     [declining] equal to zero is treated as a placeholder and dropped — the
