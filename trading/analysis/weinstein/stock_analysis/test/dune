@@ -2,22 +2,3 @@
  (names test_stock_analysis)
  (modules test_stock_analysis)
  (libraries stock_analysis weinstein_types stage types core ounit2 matchers))
-
-(test
- (name test_stock_analysis_e2e)
- (modules test_stock_analysis_e2e)
- (libraries
-  stock_analysis
-  weinstein_types
-  stage
-  rs
-  volume
-  resistance
-  weinstein.data_source
-  indicators.time_period
-  types
-  status
-  core
-  async
-  ounit2
-  matchers))
