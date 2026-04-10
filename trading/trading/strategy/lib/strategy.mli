@@ -72,7 +72,7 @@ val create_strategy : config -> t
 val use_strategy :
   get_price:get_price_fn ->
   get_indicator:get_indicator_fn ->
-  positions:Position.t Core.String.Map.t ->
+  portfolio:Portfolio_view.t ->
   t ->
   output Status.status_or
 (** Execute a strategy's logic without pattern matching

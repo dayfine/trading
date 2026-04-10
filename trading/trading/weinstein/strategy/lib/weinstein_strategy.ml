@@ -222,7 +222,8 @@ let _is_screening_day index_bars =
       |> Day_of_week.equal Day_of_week.Fri
 
 let _on_market_close ~config ~stop_states ~prior_macro ~get_price ~get_indicator
-    ~positions =
+    ~(portfolio : Portfolio_view.t) =
+  let positions = portfolio.positions in
   let exit_transitions, adjust_transitions =
     _update_stops ~config ~positions ~get_price ~stop_states
   in

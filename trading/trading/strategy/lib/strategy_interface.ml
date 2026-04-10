@@ -1,7 +1,5 @@
 (** Strategy interface - pure interface definition *)
 
-open Core
-
 type indicator_name = string
 (** Indicator name (e.g., "EMA", "SMA", "RSI") *)
 
@@ -31,7 +29,7 @@ module type STRATEGY = sig
   val on_market_close :
     get_price:get_price_fn ->
     get_indicator:get_indicator_fn ->
-    positions:Position.t String.Map.t ->
+    portfolio:Portfolio_view.t ->
     output Status.status_or
 
   val name : string

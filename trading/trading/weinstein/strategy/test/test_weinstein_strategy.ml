@@ -24,6 +24,10 @@ let get_price_of prices symbol =
 
 let empty_get_indicator _symbol _name _period _cadence = None
 let empty_positions = String.Map.empty
+
+let empty_portfolio : Trading_strategy.Portfolio_view.t =
+  { cash = 100000.0; positions = empty_positions }
+
 let cfg = default_config ~universe:[ "AAPL"; "GSPCX" ] ~index_symbol:"GSPCX"
 
 (* ------------------------------------------------------------------ *)
@@ -43,7 +47,7 @@ let test_empty_universe_no_transitions _ =
   let (module S) = make cfg in
   let result =
     S.on_market_close ~get_price:(get_price_of [])
-      ~get_indicator:empty_get_indicator ~positions:empty_positions
+      ~get_indicator:empty_get_indicator ~portfolio:empty_portfolio
   in
   assert_that result
     (is_ok_and_holds
@@ -59,7 +63,7 @@ let test_no_price_data_no_transitions _ =
   let (module S) = make cfg in
   let result =
     S.on_market_close ~get_price:(get_price_of [])
-      ~get_indicator:empty_get_indicator ~positions:empty_positions
+      ~get_indicator:empty_get_indicator ~portfolio:empty_portfolio
   in
   assert_that result
     (is_ok_and_holds
@@ -82,11 +86,11 @@ let test_multiple_calls_consistent _ =
   let get_price = get_price_of prices in
   let result1 =
     S.on_market_close ~get_price ~get_indicator:empty_get_indicator
-      ~positions:empty_positions
+      ~portfolio:empty_portfolio
   in
   let result2 =
     S.on_market_close ~get_price ~get_indicator:empty_get_indicator
-      ~positions:empty_positions
+      ~portfolio:empty_portfolio
   in
   assert_that result1 is_ok;
   assert_that result2 is_ok
@@ -160,7 +164,8 @@ let test_stop_hit_emits_trigger_exit _ =
       ~get_price:
         (get_price_of
            [ (ticker, bar); ("GSPCX", make_bar "2024-01-12" 4500.0) ])
-      ~get_indicator:empty_get_indicator ~positions
+      ~get_indicator:empty_get_indicator
+      ~portfolio:{ cash = 100000.0; positions }
   in
   assert_that result
     (is_ok_and_holds
@@ -202,7 +207,8 @@ let test_stop_fires_on_non_friday _ =
       ~get_price:
         (get_price_of
            [ (ticker, bar); ("GSPCX", make_bar "2024-01-09" 4500.0) ])
-      ~get_indicator:empty_get_indicator ~positions
+      ~get_indicator:empty_get_indicator
+      ~portfolio:{ cash = 100000.0; positions }
   in
   assert_that result
     (is_ok_and_holds

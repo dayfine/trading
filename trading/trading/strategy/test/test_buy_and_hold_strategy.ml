@@ -112,7 +112,7 @@ let test_enter_immediately _ =
     unwrap_result
       (S.on_market_close ~get_price
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~portfolio:{ cash = 0.0; positions = !positions })
       "Strategy execution"
   in
 
@@ -160,7 +160,7 @@ let test_enter_on_specific_date _ =
     unwrap_result
       (S.on_market_close ~get_price
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~portfolio:{ cash = 0.0; positions = !positions })
       "Day 1"
   in
   assert_equal 0 (List.length output.transitions);
@@ -175,7 +175,7 @@ let test_enter_on_specific_date _ =
     unwrap_result
       (S.on_market_close ~get_price:get_price'
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~portfolio:{ cash = 0.0; positions = !positions })
       "Day 5"
   in
   assert_equal 1 (List.length output.transitions);
@@ -217,7 +217,7 @@ let test_holds_indefinitely _ =
     unwrap_result
       (S.on_market_close ~get_price
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~portfolio:{ cash = 0.0; positions = !positions })
       "Day 1"
   in
   positions := apply_transitions !positions output.transitions;
@@ -239,7 +239,7 @@ let test_holds_indefinitely _ =
         unwrap_result
           (S.on_market_close ~get_price:get_price'
              ~get_indicator:(fun _ _ _ _ -> None)
-             ~positions:!positions)
+             ~portfolio:{ cash = 0.0; positions = !positions })
           date_str
       in
       (* Should produce no transitions *)
@@ -276,7 +276,7 @@ let test_no_double_entry _ =
     unwrap_result
       (S.on_market_close ~get_price
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~portfolio:{ cash = 0.0; positions = !positions })
       "Day 1"
   in
   positions := apply_transitions !positions output.transitions;
@@ -291,7 +291,7 @@ let test_no_double_entry _ =
     unwrap_result
       (S.on_market_close ~get_price:get_price'
          ~get_indicator:(fun _ _ _ _ -> None)
-         ~positions:!positions)
+         ~portfolio:{ cash = 0.0; positions = !positions })
       "Day 2"
   in
   assert_equal 0 (List.length output.transitions)

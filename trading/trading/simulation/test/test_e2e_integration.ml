@@ -276,7 +276,8 @@ end = struct
         String.equal pos.Trading_strategy.Position.symbol symbol)
 
   let on_market_close ~get_price ~get_indicator:_
-      ~(positions : Trading_strategy.Position.t String.Map.t) =
+      ~(portfolio : Trading_strategy.Portfolio_view.t) =
+    let positions = portfolio.positions in
     let open Trading_strategy.Position in
     (* Only enter once, and only if no position exists for AAPL *)
     if !entered || _has_position_for_symbol positions "AAPL" then
