@@ -168,13 +168,12 @@ let _make_entry_transition ~config ~stop_states ~portfolio_value
       }
 
 (** Generate CreateEntering transitions for top screener candidates. *)
-let _entries_from_candidates ~config ~candidates ~stop_states ~positions =
-  let held = Map.keys positions in
-  (* Placeholder: portfolio value = 0 until Slice 2 supplies real cash. *)
-  let snapshot = Portfolio_risk.snapshot ~cash:0.0 ~positions:[] () in
+let _entries_from_candidates ~config ~candidates ~stop_states
+    ~(portfolio : Portfolio_view.t) ~get_price =
+  let held = Map.keys portfolio.positions in
+  let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let make_entry =
-    _make_entry_transition ~config ~stop_states
-      ~portfolio_value:snapshot.total_value
+    _make_entry_transition ~config ~stop_states ~portfolio_value
   in
   candidates
   |> List.filter ~f:(fun (c : Screener.scored_candidate) ->
@@ -183,7 +182,7 @@ let _entries_from_candidates ~config ~candidates ~stop_states ~positions =
 
 (** Screen the universe for buy candidates. Returns entry transitions. *)
 let _screen_universe ~config ~get_price ~get_indicator ~index_bars ~macro_trend
-    ~stop_states ~positions =
+    ~stop_states ~(portfolio : Portfolio_view.t) =
   let sector_map = Hashtbl.create (module String) in
   let _analyze_ticker ticker =
     let bars =
@@ -204,10 +203,12 @@ let _screen_universe ~config ~get_price ~get_indicator ~index_bars ~macro_trend
   let stocks = List.filter_map config.universe ~f:_analyze_ticker in
   let screen_result =
     Screener.screen ~config:config.screening_config ~macro_trend ~sector_map
-      ~stocks ~held_tickers:(Map.keys positions)
+      ~stocks
+      ~held_tickers:(Map.keys portfolio.positions)
   in
   _entries_from_candidates ~config
-    ~candidates:screen_result.Screener.buy_candidates ~stop_states ~positions
+    ~candidates:screen_result.Screener.buy_candidates ~stop_states ~portfolio
+    ~get_price
 
 (* ------------------------------------------------------------------ *)
 (* make                                                                  *)
@@ -242,7 +243,7 @@ let _on_market_close ~config ~stop_states ~prior_macro ~get_price ~get_indicator
       if Weinstein_types.(equal_market_trend !prior_macro Bearish) then []
       else
         _screen_universe ~config ~get_price ~get_indicator ~index_bars
-          ~macro_trend:macro_result.trend ~stop_states ~positions
+          ~macro_trend:macro_result.trend ~stop_states ~portfolio
   in
   Ok
     {
