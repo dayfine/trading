@@ -43,9 +43,11 @@ type portfolio_snapshot = {
       *)
   position_count : int;  (** Number of open positions (long + short) *)
   sector_counts : (string * int) list;
-      (** Positions per sector, sorted by sector name. Empty when no sector data
-          is provided. High counts in one sector indicate concentration risk;
-          limited by [config.max_sector_concentration]. *)
+      (** Positions per sector, sorted by sector name. The empty-string sector
+          represents positions whose sector metadata is missing — this bucket is
+          limited separately by [config.max_unknown_sector_positions]. High
+          counts in any named sector indicate concentration risk; limited by
+          [config.max_sector_concentration]. *)
 }
 [@@deriving show, eq]
 (** Point-in-time view of portfolio composition used for risk calculations.
@@ -110,7 +112,11 @@ type config = {
   min_cash_pct : float;
       (** Minimum cash fraction to maintain (default: 0.10 = 10%) *)
   max_sector_concentration : int;
-      (** Maximum positions in any single sector (default: 5) *)
+      (** Maximum positions in any single named sector (default: 5) *)
+  max_unknown_sector_positions : int;
+      (** Maximum positions whose sector is unknown — tracked under the
+          empty-string sector key (default: 2). Prevents long-tail names with
+          missing sector metadata from dominating the portfolio. *)
   big_winner_multiplier : float;
       (** Size multiplier for high-conviction trades (default: 1.5x) *)
 }
@@ -125,6 +131,7 @@ val default_config : config
     - max_short_exposure_pct = 0.30 (30%)
     - min_cash_pct = 0.10 (10%)
     - max_sector_concentration = 5
+    - max_unknown_sector_positions = 2
     - big_winner_multiplier = 1.5 *)
 
 val compute_position_size :
@@ -165,6 +172,10 @@ type limit_violation =
       (** After this trade, cash would fall to [pct] of portfolio *)
   | Sector_concentration of string * int
       (** Sector [name] would have [n] positions, over limit *)
+  | Unknown_sector_exceeded of int
+      (** Adding this position would push the unknown-sector (empty-string)
+          bucket to [n] positions, over [config.max_unknown_sector_positions].
+      *)
   | Risk_too_high of float
       (** Risk amount is [pct] of portfolio, over configured limit *)
 [@@deriving show]

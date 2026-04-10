@@ -247,6 +247,70 @@ let test_check_limits_short_side _ =
   assert_that result
     (equal_to (Result.Error [ Short_exposure_exceeded (38000.0 /. 52000.0) ]))
 
+(* ---- Unknown-sector bucket tests ---- *)
+
+(* With the default config (max_unknown_sector_positions = 2), a proposed
+   position whose sector is empty is allowed as long as the unknown bucket
+   has fewer than 2 entries already. *)
+let test_check_limits_unknown_sector_allowed _ =
+  let snap = make_snapshot ~sectors:[ ("", 1) ] () in
+  let result =
+    check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5000.0 ~proposed_sector:""
+  in
+  assert_that result (equal_to (Result.Ok ()))
+
+(* Proposing a third unknown-sector position violates the cap with the
+   dedicated Unknown_sector_exceeded violation — not Sector_concentration. *)
+let test_check_limits_unknown_sector_exceeded _ =
+  let snap = make_snapshot ~sectors:[ ("", 2) ] () in
+  let result =
+    check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5000.0 ~proposed_sector:""
+  in
+  assert_that result (equal_to (Result.Error [ Unknown_sector_exceeded 3 ]))
+
+(* A named-sector position is governed by max_sector_concentration (default 5),
+   not the unknown-sector cap — even if the portfolio also has a full unknown
+   bucket, a new "Tech" position with count 4 -> 5 must still be accepted. *)
+let test_check_limits_named_sector_unaffected_by_unknown_cap _ =
+  let snap = make_snapshot ~sectors:[ ("", 5); ("Tech", 4) ] () in
+  let result =
+    check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5000.0 ~proposed_sector:"Tech"
+  in
+  assert_that result (equal_to (Result.Ok ()))
+
+(* The unknown-sector cap is configurable — raising it lets more unknown
+   positions through. *)
+let test_check_limits_unknown_sector_configurable _ =
+  let config = { default_config with max_unknown_sector_positions = 4 } in
+  let snap = make_snapshot ~sectors:[ ("", 3) ] () in
+  let result =
+    check_limits ~config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5000.0 ~proposed_sector:""
+  in
+  assert_that result (equal_to (Result.Ok ()))
+
+(* snapshot derives sector counts from positions. Positions whose symbol is
+   absent from the sectors list are bucketed under the empty-string key. *)
+let test_snapshot_buckets_missing_sectors_as_unknown _ =
+  let positions =
+    [ ("AAPL", 100.0, 150.0); ("UNK", 10.0, 50.0); ("UNK2", 5.0, 100.0) ]
+  in
+  let sectors = [ ("AAPL", "Tech") ] in
+  let snap = snapshot ~cash:50000.0 ~positions ~sectors () in
+  assert_that snap
+    (all_of
+       [
+         field
+           (fun s -> List.Assoc.find s.sector_counts ~equal:String.equal "")
+           (is_some_and (equal_to 2));
+         field
+           (fun s -> List.Assoc.find s.sector_counts ~equal:String.equal "Tech")
+           (is_some_and (equal_to 1));
+       ])
+
 let test_deriving _ =
   let _ = show_portfolio_snapshot (make_snapshot ()) in
   let _ =
@@ -283,6 +347,16 @@ let suite =
          "check_limits_multiple_violations"
          >:: test_check_limits_multiple_violations;
          "check_limits_short_side" >:: test_check_limits_short_side;
+         "check_limits_unknown_sector_allowed"
+         >:: test_check_limits_unknown_sector_allowed;
+         "check_limits_unknown_sector_exceeded"
+         >:: test_check_limits_unknown_sector_exceeded;
+         "check_limits_named_sector_unaffected_by_unknown_cap"
+         >:: test_check_limits_named_sector_unaffected_by_unknown_cap;
+         "check_limits_unknown_sector_configurable"
+         >:: test_check_limits_unknown_sector_configurable;
+         "snapshot_buckets_missing_sectors_as_unknown"
+         >:: test_snapshot_buckets_missing_sectors_as_unknown;
          "deriving" >:: test_deriving;
        ]
 
