@@ -12,6 +12,7 @@
   weinstein.portfolio_risk
   weinstein.stage
   weinstein.macro
-  weinstein.screener)
+  weinstein.screener
+  indicators.time_period)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
