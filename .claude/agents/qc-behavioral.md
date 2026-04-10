@@ -39,6 +39,22 @@ Use the structural QC agent's checklist (already in `dev/reviews/<feature>.md`) 
 
 Work through each item. Every claim must be traceable to a specific section of the authority document. Use Grep to find the implementation evidence.
 
+### Step 4: Assign a quality score
+
+After filling the checklist, assign a quality score (1–5) with a brief rationale. The score is a trend-tracking signal for code quality over time — it does NOT affect the verdict (APPROVED/NEEDS_REWORK is derived mechanically from the checklist).
+
+---
+
+## Quality Score Rubric
+
+| Score | Label | Meaning |
+|-------|-------|---------|
+| 5 | Exemplary | All checks pass, clean design, could serve as reference implementation |
+| 4 | Good | All checks pass, minor style nits only |
+| 3 | Acceptable | Passes with FLAGs, no domain violations |
+| 2 | Below standard | Behavioral NEEDS_REWORK, fixable issues |
+| 1 | Significant issues | Fundamental domain logic errors or missing requirements |
+
 ---
 
 ## Behavioral Checklist
@@ -70,6 +86,12 @@ Put the authority document reference in the Notes column for every non-NA item.
 | T2 | Tests include a bearish macro scenario that produces zero buy candidates | PASS/FAIL/NA | |
 | T3 | Stop-loss tests verify trailing behavior over multiple price advances | PASS/FAIL/NA | |
 | T4 | Tests assert domain outcomes (correct stage, correct signal), not just "no error" | PASS/FAIL/NA | |
+
+## Quality Score
+
+<1–5> — <brief rationale (1–2 sentences)>
+
+(Does not affect verdict. Tracked for quality trends over time.)
 
 ## Verdict
 
@@ -114,6 +136,9 @@ Reviewer: qc-behavioral
 ## Behavioral Checklist
 ... (filled checklist) ...
 
+## Quality Score
+<1–5> — <rationale>
+
 ## Verdict
 APPROVED | NEEDS_REWORK
 ```
@@ -132,7 +157,7 @@ jj git push --bookmark dev/reviews/<feature-name>-behavioral
 
 ### Return value
 
-Return the overall verdict (APPROVED / NEEDS_REWORK) and a one-line summary of any domain findings.
+Return the overall verdict (APPROVED / NEEDS_REWORK), the quality score (1–5), and a one-line summary of any domain findings.
 
 ---
 
@@ -160,6 +185,10 @@ Return the overall verdict (APPROVED / NEEDS_REWORK) and a one-line summary of a
 | T2 | Bearish macro → zero buy candidates test | PASS | |
 | T3 | Stop trailing tests | NA | |
 | T4 | Tests assert domain outcomes | PASS | |
+
+## Quality Score
+
+2 — Wrong MA period is a fundamental domain parameter error; otherwise clean implementation.
 
 ## Verdict
 
