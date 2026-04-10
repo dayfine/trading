@@ -146,59 +146,66 @@ let compute_position_size ~config ~portfolio_value ~entry_price ~stop_price
 
 (* ---- Limit checks ---- *)
 
-(* Each check returns a (possibly empty) list of violations. check_limits
-   combines them — the monoid is list concatenation over the empty list. *)
+(* Each individual check returns a (possibly empty) list of violations.
+   check_limits concatenates them — the monoid is list concatenation over
+   the empty list. Extracted as top-level helpers to keep check_limits
+   short enough for the function-length linter and to let each check be
+   unit-tested in isolation if needed. *)
+
+let _check_max_positions ~config ~snapshot =
+  if snapshot.position_count >= config.max_positions then
+    [ Max_positions_exceeded snapshot.position_count ]
+  else []
+
+let _check_exposure ~config ~snapshot ~proposed_side ~proposed_value =
+  match proposed_side with
+  | `Long ->
+      let new_pct =
+        (snapshot.long_exposure +. proposed_value) /. snapshot.total_value
+      in
+      if Float.( > ) new_pct config.max_long_exposure_pct then
+        [ Long_exposure_exceeded new_pct ]
+      else []
+  | `Short ->
+      let new_pct =
+        (snapshot.short_exposure +. proposed_value) /. snapshot.total_value
+      in
+      if Float.( > ) new_pct config.max_short_exposure_pct then
+        [ Short_exposure_exceeded new_pct ]
+      else []
+
+let _check_cash ~config ~snapshot ~proposed_value =
+  let cash_pct_after =
+    if Float.( <= ) snapshot.total_value 0.0 then 0.0
+    else (snapshot.cash -. proposed_value) /. snapshot.total_value
+  in
+  if Float.( < ) cash_pct_after config.min_cash_pct then
+    [ Cash_below_minimum cash_pct_after ]
+  else []
+
+let _check_sector ~config ~snapshot ~proposed_sector =
+  let count =
+    List.Assoc.find snapshot.sector_counts ~equal:String.equal proposed_sector
+    |> Option.value ~default:0
+  in
+  let new_count = count + 1 in
+  if String.is_empty proposed_sector then
+    if new_count > config.max_unknown_sector_positions then
+      [ Unknown_sector_exceeded new_count ]
+    else []
+  else if new_count > config.max_sector_concentration then
+    [ Sector_concentration (proposed_sector, new_count) ]
+  else []
 
 let check_limits ~config ~snapshot ~proposed_side ~proposed_value
     ~proposed_sector =
-  let check_max_positions () =
-    if snapshot.position_count >= config.max_positions then
-      [ Max_positions_exceeded snapshot.position_count ]
-    else []
-  in
-  let check_exposure () =
-    match proposed_side with
-    | `Long ->
-        let new_pct =
-          (snapshot.long_exposure +. proposed_value) /. snapshot.total_value
-        in
-        if Float.( > ) new_pct config.max_long_exposure_pct then
-          [ Long_exposure_exceeded new_pct ]
-        else []
-    | `Short ->
-        let new_pct =
-          (snapshot.short_exposure +. proposed_value) /. snapshot.total_value
-        in
-        if Float.( > ) new_pct config.max_short_exposure_pct then
-          [ Short_exposure_exceeded new_pct ]
-        else []
-  in
-  let check_cash () =
-    let cash_pct_after =
-      if Float.( <= ) snapshot.total_value 0.0 then 0.0
-      else (snapshot.cash -. proposed_value) /. snapshot.total_value
-    in
-    if Float.( < ) cash_pct_after config.min_cash_pct then
-      [ Cash_below_minimum cash_pct_after ]
-    else []
-  in
-  let check_sector () =
-    let count =
-      List.Assoc.find snapshot.sector_counts ~equal:String.equal proposed_sector
-      |> Option.value ~default:0
-    in
-    let new_count = count + 1 in
-    if String.is_empty proposed_sector then
-      if new_count > config.max_unknown_sector_positions then
-        [ Unknown_sector_exceeded new_count ]
-      else []
-    else if new_count > config.max_sector_concentration then
-      [ Sector_concentration (proposed_sector, new_count) ]
-    else []
-  in
   let violations =
-    List.concat_map
-      [ check_max_positions; check_exposure; check_cash; check_sector ]
-      ~f:(fun check -> check ())
+    List.concat
+      [
+        _check_max_positions ~config ~snapshot;
+        _check_exposure ~config ~snapshot ~proposed_side ~proposed_value;
+        _check_cash ~config ~snapshot ~proposed_value;
+        _check_sector ~config ~snapshot ~proposed_sector;
+      ]
   in
   match violations with [] -> Result.Ok () | vs -> Result.Error vs

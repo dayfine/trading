@@ -17,8 +17,10 @@ let sectors_csv_path data_dir = Fpath.(data_dir / "sectors.csv")
 
 (* Parse a single CSV line as (symbol, sector). This is a minimal parser —
    the Python scraper only emits unquoted ASCII symbols and sector names,
-   so we do not need RFC 4180 quoted-field handling. Returns [None] for
-   blank lines so the caller can drop them without an error. *)
+   so we do not need quoted-field handling (the CSV RFC allows
+   double-quoted fields with embedded commas; we simply do not use them).
+   Returns [None] for blank lines so the caller can drop them without an
+   error. *)
 let _split_line line =
   let line = String.strip line in
   if String.is_empty line then None
