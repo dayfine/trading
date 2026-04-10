@@ -2,3 +2,15 @@
  (names test_macro)
  (modules test_macro)
  (libraries macro weinstein_types stage types core ounit2 matchers))
+
+(test
+ (name test_macro_e2e)
+ (modules test_macro_e2e)
+ (libraries
+  macro
+  weinstein_types
+  weinstein.data_source.testing
+  types
+  core
+  ounit2
+  matchers))

@@ -79,8 +79,7 @@ let main ~symbols ~data_dir_str ~api_key_flag () =
       return ()
 
 let _parse_symbols csv =
-  String.split ~on:',' csv
-  |> List.map ~f:String.strip
+  String.split ~on:',' csv |> List.map ~f:String.strip
   |> List.filter ~f:(fun s -> not (String.is_empty s))
 
 let _symbols_from_universe ~data_dir_str =
