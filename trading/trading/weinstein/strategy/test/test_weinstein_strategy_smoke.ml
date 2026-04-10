@@ -399,6 +399,124 @@ let test_weinstein_breakout_trade _ =
         (is_between (module Float_ord) ~low:125_000.0 ~high:128_000.0))
 
 (* ------------------------------------------------------------------ *)
+(* Strategy wiring: ad_bars + sector ETFs + global indices              *)
+(* ------------------------------------------------------------------ *)
+
+(** Smoke test that the strategy accepts and exercises the new macro-input
+    wiring (NYSE breadth ad_bars, sector ETFs, global indices) without
+    regressing the breakout trade flow. Uses [Basing] patterns for the ETFs and
+    globals — they accumulate bars but do not trigger any new signals of their
+    own, so the breakout outcome matches [test_weinstein_breakout_trade].
+
+    Asserts:
+    - Pipeline runs to completion without error
+    - At least one AAPL buy was executed (sector wiring did not block screen)
+    - Final portfolio value is positive *)
+let test_weinstein_strategy_wiring_smoke _ =
+  let data_dir = Core_unix.mkdtemp "/tmp/test_weinstein_wiring" in
+  Fun.protect
+    ~finally:(fun () ->
+      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" data_dir) in
+      ())
+    (fun () ->
+      let hist_start = date_of_string "2022-01-01" in
+      let basing price =
+        Synthetic_source.Basing
+          { base_price = price; noise_pct = 0.01; volume = 20_000_000 }
+      in
+      write_synthetic_bars data_dir
+        Synthetic_source.
+          {
+            start_date = hist_start;
+            symbols =
+              [
+                ( "AAPL",
+                  Breakout
+                    {
+                      base_price = 150.0;
+                      base_weeks = 40;
+                      weekly_gain_pct = 0.02;
+                      breakout_volume_mult = 8.0;
+                      base_volume = 50_000_000;
+                    } );
+                ( "GSPCX",
+                  Trending
+                    {
+                      start_price = 4500.0;
+                      weekly_gain_pct = 0.005;
+                      volume = 1_000_000_000;
+                    } );
+                (* Sector ETF proxies: two synthetic tickers that the
+                   strategy will accumulate + classify via Sector.analyze. *)
+                ("XLK_SYN", basing 160.0);
+                ("XLF_SYN", basing 35.0);
+                (* Global index proxy *)
+                ("DAX_SYN", basing 15000.0);
+              ];
+          };
+      let start_date = date_of_string "2022-01-03" in
+      let end_date = date_of_string "2023-01-06" in
+      let base_config =
+        Weinstein_strategy.default_config ~universe:[ "AAPL" ]
+          ~index_symbol:"GSPCX"
+      in
+      let config =
+        {
+          base_config with
+          sector_etfs = [ ("XLK_SYN", "Technology"); ("XLF_SYN", "Financials") ];
+          global_index_symbols = [ ("DAX_SYN", "DAX") ];
+        }
+      in
+      (* Synthetic ad_bars — enough rows to cover macro's [ad_min_bars] gate. *)
+      let ad_bars =
+        List.init 60 ~f:(fun i ->
+            {
+              Macro.date = Date.add_days hist_start i;
+              advancing = 1500 + i;
+              declining = 1400 - i;
+            })
+      in
+      let strategy = Weinstein_strategy.make ~ad_bars config in
+      let deps =
+        Trading_simulation.Simulator.create_deps
+          ~symbols:[ "AAPL"; "GSPCX"; "XLK_SYN"; "XLF_SYN"; "DAX_SYN" ]
+          ~data_dir:(Fpath.v data_dir) ~strategy ~commission:sample_commission
+          ()
+      in
+      let sim_config =
+        Trading_simulation.Simulator.
+          {
+            start_date;
+            end_date;
+            initial_cash = 100_000.0;
+            commission = sample_commission;
+            strategy_cadence = Types.Cadence.Daily;
+          }
+      in
+      let sim =
+        match Trading_simulation.Simulator.create ~config:sim_config ~deps with
+        | Ok s -> s
+        | Error e -> OUnit2.assert_failure ("create failed: " ^ Status.show e)
+      in
+      let result =
+        match Trading_simulation.Simulator.run sim with
+        | Ok r -> r
+        | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
+      in
+      assert_that result.steps (not_ is_empty);
+      let all_trades =
+        List.concat_map result.steps ~f:(fun step -> step.trades)
+      in
+      let aapl_buys =
+        List.filter all_trades ~f:(fun t ->
+            String.equal t.Trading_base.Types.symbol "AAPL"
+            && Trading_base.Types.equal_side t.side Buy)
+      in
+      assert_that (List.length aapl_buys) (gt (module Int_ord) 0);
+      let final_value = (List.last_exn result.steps).portfolio_value in
+      assert_that final_value (gt (module Float_ord) 0.0))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -411,6 +529,8 @@ let suite =
          >:: test_weinstein_weekly_cadence;
          "breakout pattern produces trades via screener"
          >:: test_weinstein_breakout_trade;
+         "strategy wiring accepts ad_bars + sector ETFs + globals"
+         >:: test_weinstein_strategy_wiring_smoke;
        ]
 
 let () = run_test_tt_main suite

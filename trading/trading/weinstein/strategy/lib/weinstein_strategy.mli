@@ -43,6 +43,16 @@ type config = {
   index_symbol : string;
       (** Symbol for the broad market index (e.g. "GSPCX"). Used for macro
           analysis and RS computation. *)
+  sector_etfs : (string * string) list;
+      (** [(etf_symbol, sector_name)] pairs — one per sector tracked by the
+          screener. When non-empty, the strategy accumulates bars for each ETF
+          via [get_price] and builds a sector context map on screening days.
+          Default: empty (sector gate degrades to Neutral). *)
+  global_index_symbols : (string * string) list;
+      (** [(index_symbol, label)] pairs for the world-markets macro indicator.
+          [index_symbol] is what the data source knows (e.g. ["GDAXI.INDX"]);
+          [label] is the human-readable name passed to {!Macro.analyze}.
+          Default: empty (global consensus indicator degrades to Neutral). *)
   stage_config : Stage.config;  (** Stage classifier parameters. *)
   macro_config : Macro.config;  (** Macro analyser parameters. *)
   screening_config : Screener.config;  (** Screener cascade parameters. *)
@@ -72,8 +82,26 @@ val default_config : universe:string list -> index_symbol:string -> config
 val name : string
 (** Strategy name, always ["Weinstein"]. *)
 
+val spdr_sector_etfs : (string * string) list
+(** Canonical mapping from SPDR sector ETF symbols to human-readable sector
+    names. Covers the eleven US GICS sectors: XLK (Technology), XLF
+    (Financials), XLE (Energy), XLV (Health Care), XLI (Industrials), XLP
+    (Consumer Staples), XLY (Consumer Discretionary), XLU (Utilities), XLB
+    (Materials), XLRE (Real Estate), XLC (Communication Services).
+
+    Use as the [sector_etfs] field of {!config} when running against a data
+    source that caches these ETFs. *)
+
+val default_global_indices : (string * string) list
+(** Canonical mapping from major non-US equity indices to labels for the macro
+    global-consensus indicator. Covers DAX, Nikkei, and the FTSE proxy ETF
+    (ISF.LSE — iShares Core FTSE UCITS, per dev/status/data-gaps.md). Use as the
+    [global_index_symbols] field of {!config} when the data source has these
+    cached. *)
+
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
+  ?ad_bars:Macro.ad_bar list ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -84,4 +112,8 @@ val make :
 
     @param initial_stop_states
       Seed the stop state map — useful for tests and for restoring live state
-      from persistence. Default: empty map. *)
+      from persistence. Default: empty map.
+    @param ad_bars
+      NYSE advance/decline breadth bars used by the macro analyzer. Typically
+      produced by {!Ad_bars.load}. Default: empty — macro degrades to Neutral on
+      A-D indicators when missing. *)
