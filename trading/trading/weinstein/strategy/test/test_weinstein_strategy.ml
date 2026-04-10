@@ -228,6 +228,113 @@ let test_stop_fires_on_non_friday _ =
              ])))
 
 (* ------------------------------------------------------------------ *)
+(* bar accumulation: idempotent — same date twice does not duplicate    *)
+(* ------------------------------------------------------------------ *)
+
+let _transition_count result =
+  match result with
+  | Ok (o : Trading_strategy.Strategy_interface.output) ->
+      List.length o.transitions
+  | Error _ -> -1
+
+let test_bar_accumulation_idempotent _ =
+  (* Two strategies: one called once per date, the other called twice on day 1.
+     If accumulation is idempotent, both produce the same result on day 2. *)
+  let make_env () =
+    let (module S) = make cfg in
+    (module S : Trading_strategy.Strategy_interface.STRATEGY)
+  in
+  let (module S1) = make_env () in
+  let (module S2) = make_env () in
+  let call (module S : Trading_strategy.Strategy_interface.STRATEGY) d =
+    let prices = [ ("AAPL", make_bar d 180.0); ("GSPCX", make_bar d 4500.0) ] in
+    S.on_market_close ~get_price:(get_price_of prices)
+      ~get_indicator:empty_get_indicator ~portfolio:empty_portfolio
+  in
+  (* S1: day1, day2. S2: day1, day1 (duplicate), day2. *)
+  ignore (call (module S1) "2024-01-08" : _ result);
+  ignore (call (module S2) "2024-01-08" : _ result);
+  ignore (call (module S2) "2024-01-08" : _ result);
+  let r1 = _transition_count (call (module S1) "2024-01-09") in
+  let r2 = _transition_count (call (module S2) "2024-01-09") in
+  (* Same result on day 2 — the duplicate day 1 call had no effect *)
+  assert_that r1 (equal_to r2)
+
+(* ------------------------------------------------------------------ *)
+(* bar accumulation: multiple days accumulate distinct bars             *)
+(* ------------------------------------------------------------------ *)
+
+let test_bar_accumulation_multiple_days _ =
+  let ticker = "AAPL" in
+  let date = Date.of_string "2024-01-05" in
+  let stop_state =
+    Weinstein_stops.Initial { stop_level = 150.0; reference_level = 160.0 }
+  in
+  let initial_stop_states = String.Map.singleton ticker stop_state in
+  let (module S) = make ~initial_stop_states cfg in
+  let pos = make_holding_pos ticker 170.0 date in
+  let positions = String.Map.singleton ticker pos in
+  let portfolio : Trading_strategy.Portfolio_view.t =
+    { cash = 100000.0; positions }
+  in
+  (* Three consecutive days with rising price — stop adjusts each day *)
+  let days_and_prices =
+    [ ("2024-01-08", 175.0); ("2024-01-09", 180.0); ("2024-01-10", 185.0) ]
+  in
+  let counts =
+    List.map days_and_prices ~f:(fun (d, price) ->
+        let prices =
+          [ (ticker, make_bar d price); ("GSPCX", make_bar d 4500.0) ]
+        in
+        let result =
+          S.on_market_close ~get_price:(get_price_of prices)
+            ~get_indicator:empty_get_indicator ~portfolio
+        in
+        _transition_count result)
+  in
+  (* Day 1: Initial stop, no raise yet (0 transitions).
+     Day 2: bar history now has 2 days; stop adjusts (1 transition).
+     Day 3: stop already adjusted, no further raise at this level (0). *)
+  assert_that counts (elements_are [ equal_to 0; equal_to 1; equal_to 0 ])
+
+(* ------------------------------------------------------------------ *)
+(* simulation date: transition uses bar date, not Date.today            *)
+(* ------------------------------------------------------------------ *)
+
+let test_transition_uses_bar_date _ =
+  let ticker = "AAPL" in
+  let date = Date.of_string "2024-01-05" in
+  let stop_state =
+    Weinstein_stops.Initial { stop_level = 90.0; reference_level = 95.0 }
+  in
+  let initial_stop_states = String.Map.singleton ticker stop_state in
+  let (module S) = make ~initial_stop_states cfg in
+  let pos = make_holding_pos ticker 100.0 date in
+  let positions = String.Map.singleton ticker pos in
+  (* Bar date is 2024-01-12 — transition should use this, not today *)
+  let bar_date = "2024-01-12" in
+  let bar =
+    { (make_bar bar_date 95.0) with Types.Daily_price.low_price = 85.0 }
+  in
+  let result =
+    S.on_market_close
+      ~get_price:
+        (get_price_of [ (ticker, bar); ("GSPCX", make_bar bar_date 4500.0) ])
+      ~get_indicator:empty_get_indicator
+      ~portfolio:{ cash = 100000.0; positions }
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun o -> o.Trading_strategy.Strategy_interface.transitions)
+          (elements_are
+             [
+               (fun tr ->
+                 assert_that tr.Trading_strategy.Position.date
+                   (equal_to (Date.of_string bar_date)));
+             ])))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -242,4 +349,8 @@ let () =
            "multiple calls consistent" >:: test_multiple_calls_consistent;
            "stop hit emits trigger exit" >:: test_stop_hit_emits_trigger_exit;
            "stop fires on non-Friday" >:: test_stop_fires_on_non_friday;
+           "bar accumulation idempotent" >:: test_bar_accumulation_idempotent;
+           "bar accumulation multiple days"
+           >:: test_bar_accumulation_multiple_days;
+           "transition uses bar date" >:: test_transition_uses_bar_date;
          ])
