@@ -86,11 +86,12 @@ For each day, compute `advancers = count(close > prev_close)`, `decliners = coun
 - Append to the combined CSV starting 2020-02-11
 - **Unlocks**: live and recent-history coverage
 
-### Phase C: OCaml loader module (~40-60 lines)
-- `Ad_bars.load : data_dir:Fpath.t -> ad_bar list`
-- Parses the combined CSV into `Macro.ad_bar` records
-- Wire into `Weinstein_strategy.on_market_close` (replaces hardcoded `~ad_bars:[]`)
+### Phase C: OCaml loader module — DONE (2026-04-10, feat-weinstein, branch `feat/strategy-wiring`)
+- `Weinstein_strategy.Ad_bars.load : data_dir:string -> Macro.ad_bar list` — reads both CSVs from `data_dir/breadth/`, joins on date, filters (0,0) placeholder rows, sorts chronologically, returns `[]` if either file is missing.
+- New `?ad_bars` optional parameter on `Weinstein_strategy.make`, default `[]`. Callers that want real breadth data write `let ad_bars = Ad_bars.load ~data_dir in make ~ad_bars config`.
+- `_on_market_close` forwards the closure-held `ad_bars` to `Macro.analyze` on every screening call.
+- Tests: 8 unit cases + 1 real-data integration check (opt-in, skipped when cached file absent).
 
-**Total estimate**: ~250-300 lines including tests. Phase A alone (<100 lines) unlocks backtesting.
+**Total landed**: ~250 lines including tests.
 
-**Owner**: ops-data agent for Phase A (download + parser). feat-weinstein agent for Phase C (strategy wiring). Phase B can go either way.
+**Owner**: ops-data agent for Phase A (downloaded). feat-weinstein agent for Phase C (DONE). Phase B (live bridge from 2020-02-11) is still open but not blocking backtesting.

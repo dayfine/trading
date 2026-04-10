@@ -1,91 +1,79 @@
 # Data Gaps — features blocked on missing data
 
-Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates identified)
+Last updated: 2026-04-10 (ADL Phase C + sector/global strategy-side wiring landed on feat/strategy-wiring)
 
 ## A-D Breadth (ADL)
 
-**Status**: Candidate sources identified; needs validation  
-**Blocks**: Full macro analysis (currently passes `~ad_bars:[]`, degrades gracefully)  
-**Affects**: `Macro.analyze` — ADL indicators (`_ad_line_signal`, `_momentum_index_signal`) return zero weight when `ad_bars` is empty
+**Status**: RESOLVED for the historical backtest window (1965-03-01 → 2020-02-10). Phase C strategy wiring complete.
+**Blocks**: None for backtesting. Live-mode bridge (Phase B, Russell 3000 compute-from-universe) optional and not yet built.
+**Affects**: `Macro.analyze` now receives real `ad_bars` from `Weinstein_strategy.Ad_bars.load ~data_dir`, wired through the strategy's `make` closure via the new `?ad_bars` parameter.
 
-### What we tried
-- EODHD `ADV.NYSE` / `DEC.NYSE`: "Ticker Not Found". Not available on this platform.
+### What landed
+- Phase A (2026-04-10, ops-data): `data/breadth/nyse_advn.csv` + `data/breadth/nyse_decln.csv` downloaded from unicorn.us.com (13,873 rows each, 1965–2020).
+- Phase C (2026-04-10, feat-weinstein, branch `feat/strategy-wiring`):
+  - New `Weinstein_strategy.Ad_bars.load : data_dir:string -> Macro.ad_bar list` loader. Joins the two CSVs on date, filters (0,0) placeholder rows, sorts chronologically, returns `[]` if either file is missing.
+  - New `?ad_bars` optional parameter on `Weinstein_strategy.make`. Default `[]`, so existing callers compile unchanged. Callers that want breadth data call `let ad_bars = Ad_bars.load ~data_dir in make ~ad_bars config`.
+  - `_on_market_close` now forwards the closure-held `ad_bars` to `Macro.analyze` on every screening call.
+  - Unit tests: 8 cases covering missing files, basic parse, (0,0) placeholder filter, chronological sort, malformed-row skip, unmatched-date drop, and a real-data integration check (opt-in; skipped when `/workspaces/trading-1/data/breadth/` is absent).
 
-### Candidate sources (ranked, 2026-04-10 research)
-
-1. **Yahoo Finance `C:ISSU` (NYSE) / `C:ISSQ` (NASDAQ)** — daily adv/dec/unchanged. Accessible via `yfinance` Python library or scraping. Free. **Needs validation**: does the symbol actually work? What historical coverage? What's the non-OCHLCV response format?
-2. **EODData.com `INDEX:ADRN`** — NYSE Advance-Decline Ratio, up to 30 years of EOD quotes, downloadable in multiple formats. Free/low-cost. **Needs validation**: is ADRN a ratio (adv/dec) or absolute counts? Scraper required.
-3. **Unicorn.us.com `advdec`** — comma-delimited historical A-D data for major indexes, free, computed from public sources. **Needs validation**: freshness, licence.
-4. **Compute from Russell 3000 universe** — count advancers/decliners across the cached universe each day. Tradeoffs: universe mismatch with official NYSE (no ETFs/ADRs/preferreds/CEFs), survivorship bias from current-constituents, but should correlate well. Fallback if scraper options fail. **Cost**: need Russell 3000 bars cached first (~3000 symbols × daily bars).
-
-### What's needed
-- **Next step**: research agent to validate each candidate and propose concrete fetch/parse plan
-- New parser for non-OHLCV response format (whatever source wins)
-- Once available: wire into `Weinstein_strategy.on_market_close` (line ~288, currently hardcoded `~ad_bars:[]`)
-
-### Impact of gap
-- Macro trend detection works but misses breadth divergence signals
-- Weinstein methodology relies on ADL for confirming/denying market trends
-- E2e tests verify graceful degradation (`test_macro_degrades_without_breadth`)
+### What's still open (NOT blocking backtesting)
+- **Phase B — live bridge from 2020-02-11 to present**: compute `advancers = count(close > prev_close)`, `decliners = count(close < prev_close)` across the Russell 3000 universe, append to the combined CSV. Owner: ops-data, when live trading is prioritised.
 
 ---
 
 ## Sector Analysis
 
-**Status**: Module implemented, data not populated  
-**Blocks**: Screener sector filter, portfolio sector concentration limits  
-**Affects**: `Sector.analyze`, `Screener.screen` (receives empty `~sector_map`), `Portfolio_risk.check_sector_limits`
+**Status**: Strategy-side wiring complete; per-stock join still blocked on instrument metadata.
+**Blocks**: Screener sector filter still degrades to Neutral for every stock (because the `sector_map` is keyed by ETF symbol, and the screener looks up by stock ticker). Portfolio sector concentration limits remain bypassed.
+**Affects**: `Sector.analyze` is now exercised; `Screener.screen` receives a non-empty `~sector_map` when sector ETFs are configured.
 
 ### Three gaps
 
-1. **Sector ETF bars** — Need daily bars for sector index ETFs: XLK, XLF, XLE, XLV, XLI, XLP, XLY, XLU, XLB, XLRE, XLC. Not yet cached. **Blocked on `EODHD_API_KEY` not set in host environment.** Once key is available, fetch with:
-   ```
-   docker exec -e EODHD_API_KEY trading-1-dev bash -c \
-     'cd /workspaces/trading-1/trading && eval $(opam env) && \
-      ./_build/default/analysis/scripts/fetch_symbols/fetch_symbols.exe \
-      --symbols XLK,XLF,XLE,XLV,XLI,XLP,XLY,XLU,XLB,XLRE,XLC \
-      --data-dir /workspaces/trading-1/data \
-      --api-key "$EODHD_API_KEY"'
-   ```
-   Then rebuild inventory with `build_inventory.exe`. Once cached, feed into `Sector.analyze ~sector_bars`.
+1. **Sector ETF bars** — **RESOLVED** (2026-04-10, ops-data). All 11 SPDR sector ETFs are cached under `data/X/{K,F,E,V,I,P,Y,U,B,E,C}/XL*/` with weekly bars since ~1998.
 
-2. **Instrument sector metadata** — `Instrument_info.sector` is empty for all symbols.
+2. **Instrument sector metadata** — STILL OPEN. `Instrument_info.sector` is empty for all symbols.
    - `bootstrap_universe.exe` leaves sector/industry blank by design (offline tool)
    - `fetch_universe.exe` populates name/exchange but not sector/industry
-   - EODHD `get_fundamentals` endpoint returns sector data but requires **Fundamentals Data Feed** tier at **$59.99/mo** (only standalone fundamentals option; All-In-One at $99.99/mo is the other path)
-   - **Decision pending**: upgrade tier, or use alternative source. See `dev/status/fundamentals-requirements.md` for what fields we actually need and alternative candidates.
-   - Until populated: screener cannot group stocks by sector, portfolio risk cannot enforce sector concentration limits
+   - EODHD `get_fundamentals` endpoint returns sector data but requires **Fundamentals Data Feed** tier at **$59.99/mo**
+   - **Decision pending**: upgrade tier, or use alternative source. See `dev/status/fundamentals-requirements.md`.
+   - Parallel work on `sectors-wikipedia` branch adds a Wikipedia-derived GICS sector map — once it lands, the `sector_map` key scheme can migrate from ETF-symbol to stock-ticker.
+   - Until populated: the screener's sector gate still falls through to Neutral on every stock lookup.
 
-3. **Strategy wiring** — `Weinstein_strategy.on_market_close` creates an empty `sector_map` (line ~213). Once sector data is available, build the map from `Sector.analyze` results and pass to `Screener.screen`.
+3. **Strategy wiring** — **RESOLVED** (2026-04-10, feat-weinstein, branch `feat/strategy-wiring`):
+   - New `config.sector_etfs : (string * string) list` field. Default empty; callers populate with e.g. `Weinstein_strategy.spdr_sector_etfs`.
+   - `_on_market_close` accumulates daily bars for each configured ETF in the same per-symbol `bar_history` hashtable as the universe tickers (via `get_price`).
+   - On screening days, `_build_sector_map` runs `Sector.analyze` on each ETF's weekly bars + benchmark bars + empty `constituent_analyses`, and emits `(etf_symbol, sector_context)` entries into the map passed to `Screener.screen`.
+   - Prior-stage accumulation for sector ETFs uses a dedicated `sector_prior_stages` hashtable in the closure, enabling Stage1->Stage2 transition detection across screening days.
+   - **Caveat**: because `Screener.screen` looks up sector context by **stock ticker**, and the current map is keyed by **ETF symbol**, the lookup always misses and the screener still applies a Neutral sector gate. The pipeline is fully exercised end-to-end — only the final ticker -> sector -> ETF join is still absent. That join will land when instrument sector metadata is populated.
 
-### Impact of gap
-- Screener runs without sector context — a stock in a weak sector gets the same treatment as one in a strong sector
-- Portfolio risk sector concentration checks are effectively bypassed
-- Weinstein methodology considers sector strength a key factor (Ch. 3: "favorable chart in bullish group → 50-75% advance; same chart in bearish group → 5-10% gain")
+### Impact of gap (remaining)
+- Screener still runs without per-stock sector scoring until gap (2) closes
+- Portfolio risk sector concentration checks still bypassed until gap (2) closes
 
 ---
 
 ## Global Index Bars
 
-**Status**: Cached and verified (2026-04-10)  
-**Blocks**: Strategy wiring only (data is available)  
-**Affects**: `Macro.analyze ~global_index_bars`
+**Status**: RESOLVED — data cached AND strategy wired (2026-04-10).
+**Blocks**: None.
+**Affects**: `Macro.analyze ~global_index_bars` now receives real bars on every screening call.
 
 ### Current state
-- GSPC.INDX (S&P 500): cached, 1927-12-30 to 2026-04-09 — VERIFIED
-- GDAXI.INDX (DAX): cached, 1980-01-02 to 2026-04-09 — VERIFIED
-- N225.INDX (Nikkei 225): cached, 1965-01-05 to 2026-04-10 — VERIFIED
-- **FTSE 100 via `ISF.LSE` (iShares Core FTSE 100 UCITS ETF)** — **DECISION: use as proxy** (2026-04-10). Physical-replication tracker, ~bps tracking error, functionally indistinguishable from the index at weekly cadence. Try `UKX.INDX` on EODHD first as a cheaper alternative; fall back to `ISF.LSE` if that doesn't work. Still needs to be fetched.
+- GSPC.INDX (S&P 500): cached, 1927-12-30 → 2026-04-09 — VERIFIED
+- GDAXI.INDX (DAX): cached, 1980-01-02 → 2026-04-09 — VERIFIED
+- N225.INDX (Nikkei 225): cached, 1965-01-05 → 2026-04-10 — VERIFIED
+- `ISF.LSE` (iShares Core FTSE UCITS): cached, used as FTSE 100 proxy
 
-### What's needed
-- **ops-data**: try `UKX.INDX` first, else fetch `ISF.LSE` once API key is available
-- **feat-weinstein**: wire cached global index bars into strategy (currently passes `~global_index_bars:[]`)
+### What landed (2026-04-10, feat-weinstein, branch `feat/strategy-wiring`)
+- New `config.global_index_symbols : (string * string) list` field — `(index_symbol, label)` pairs. Default empty; `Weinstein_strategy.default_global_indices` exports the canonical (GDAXI, N225, ISF.LSE) triple. GSPC.INDX is intentionally omitted — it is already passed to `Macro.analyze` as `~index_bars`.
+- `_on_market_close` accumulates bars for each global index alongside the universe.
+- `_build_global_index_bars` emits `(label, weekly_bars)` pairs for `Macro.analyze`. Indices with no accumulated bars yet are silently dropped.
 
 ---
 
 ## Resolution ownership
 
-Data fetching and inventory: **ops-data** agent  
-EODHD API tier upgrade decision: **human**  
-Alternative ADL source research: **human** (or ops-data if a source is identified)  
+Data fetching and inventory: **ops-data** agent
+EODHD API tier upgrade decision: **human**
+Alternative ADL source research: **human** (or ops-data if a source is identified)
 Strategy wiring once data available: **feat-weinstein** agent
