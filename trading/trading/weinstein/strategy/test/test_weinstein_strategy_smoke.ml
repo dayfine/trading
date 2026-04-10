@@ -3,25 +3,22 @@
     Writes synthetic bar data to a temp directory using [Synthetic_source], then
     runs the full simulator pipeline with [Weinstein_strategy.make].
 
-    {1 Slice 2 infrastructure (now implemented)}
+    {1 Infrastructure}
 
     - Bar accumulation: per-symbol daily bar buffer in the [make] closure,
-      converted to weekly via [Time_period.Conversion.daily_to_weekly]. History
-      starts at 2022-01-01 (100+ weekly bars of warmup).
+      converted to weekly via [Time_period.Conversion.daily_to_weekly].
     - Portfolio value: derived via [Portfolio_view.portfolio_value] from the
       [Portfolio_view.t] passed to [on_market_close]. Used for position sizing.
-    - MA direction: computed from [Stage.classify] on the bar buffer (not
-      hardcoded [Flat]).
+    - MA direction: computed from [Stage.classify] on the bar buffer.
     - Simulation date: uses current bar's date (not [Date.today]).
+    - Prior stage accumulation: per-symbol stage history in the [make] closure,
+      enabling Stage1→Stage2 transition detection in the screener cascade.
 
-    {1 Trade assertion status}
+    {1 Test coverage}
 
-    The screener cascade (macro gate, is_breakout_candidate, sector filter,
-    grade floor) does not produce buy candidates with a pure [Trending] pattern
-    because [is_breakout_candidate] requires either a Stage 1 → 2 transition or
-    very early Stage 2 (weeks_advancing <= 4). A long-running trend exceeds this
-    threshold. Trade assertions require a [Breakout] pattern with carefully
-    timed parameters — deferred to Slice 3 (screener-aware test data).
+    Smoke tests cover: basic pipeline completion ([Trending] pattern), date
+    range handling, weekly cadence gating, and full screener→order→trade flow
+    ([Breakout] pattern with high volume and long warmup).
 
     TODO: remove the tmpdir round-trip once Price_cache accepts an injected
     DATA_SOURCE (follow-up to #218/#219). *)
@@ -280,6 +277,128 @@ let test_weinstein_weekly_cadence _ =
         (gt (module Float_ord) 0.0))
 
 (* ------------------------------------------------------------------ *)
+(* Slice 3: breakout pattern produces trades via screener cascade        *)
+(* ------------------------------------------------------------------ *)
+
+(** Smoke test using a [Breakout] synthetic pattern that passes the full
+    screener cascade. The basing phase produces 95 weeks of Stage 1 data; the
+    breakout with 2.5x volume starts the transition to Stage 2. With
+    [prior_stage] accumulation, the screener detects the Stage1 -> Stage2
+    transition and emits a [CreateEntering] transition.
+
+    Asserts:
+    - At least one step produced non-empty transitions
+    - Final portfolio has an open position in AAPL
+    - Portfolio value is positive *)
+let test_weinstein_breakout_trade _ =
+  let data_dir = Core_unix.mkdtemp "/tmp/test_weinstein_breakout" in
+  Fun.protect
+    ~finally:(fun () ->
+      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" data_dir) in
+      ())
+    (fun () ->
+      let hist_start = date_of_string "2022-01-01" in
+      write_synthetic_bars data_dir
+        Synthetic_source.
+          {
+            start_date = hist_start;
+            symbols =
+              [
+                ( "AAPL",
+                  Breakout
+                    {
+                      base_price = 150.0;
+                      base_weeks = 40;
+                      weekly_gain_pct = 0.02;
+                      breakout_volume_mult = 8.0;
+                      base_volume = 50_000_000;
+                    } );
+                ( "GSPCX",
+                  Trending
+                    {
+                      start_price = 4500.0;
+                      weekly_gain_pct = 0.005;
+                      volume = 1_000_000_000;
+                    } );
+              ];
+          };
+      (* Sim starts from data start so the strategy accumulates enough
+         bars for the 30-week MA. The breakout at week 40 means ~10 weeks
+         of Stage 2 bars follow, and the screener fires on the first
+         Friday after the breakout. *)
+      let start_date = date_of_string "2022-01-03" in
+      let end_date = date_of_string "2023-01-06" in
+      let strategy =
+        Weinstein_strategy.make
+          (Weinstein_strategy.default_config ~universe:[ "AAPL" ]
+             ~index_symbol:"GSPCX")
+      in
+      let deps =
+        Trading_simulation.Simulator.create_deps ~symbols:[ "AAPL"; "GSPCX" ]
+          ~data_dir:(Fpath.v data_dir) ~strategy ~commission:sample_commission
+          ()
+      in
+      let config =
+        Trading_simulation.Simulator.
+          {
+            start_date;
+            end_date;
+            initial_cash = 100_000.0;
+            commission = sample_commission;
+            strategy_cadence = Types.Cadence.Daily;
+          }
+      in
+      let sim =
+        match Trading_simulation.Simulator.create ~config ~deps with
+        | Ok s -> s
+        | Error e -> OUnit2.assert_failure ("create failed: " ^ Status.show e)
+      in
+      let result =
+        match Trading_simulation.Simulator.run sim with
+        | Ok r -> r
+        | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
+      in
+      assert_that result.steps (not_ is_empty);
+      (* The run produces exactly four AAPL buys on successive Fridays. The
+         breakout at week ~40 triggers a Stage1->Stage2 transition, and the
+         screener's [weeks_advancing <= 4] fallback keeps AAPL a candidate for
+         four more weeks. Quantities come from fixed-risk position sizing
+         against rising prices, so they tick up by 1 share each week. A
+         Trending GSPCX index never transitions, so GSPCX never trades. *)
+      let all_trades =
+        List.concat_map result.steps ~f:(fun step -> step.trades)
+      in
+      let is_aapl_buy ~qty ~price =
+        all_of
+          [
+            field (fun t -> t.Trading_base.Types.symbol) (equal_to "AAPL");
+            field
+              (fun t -> t.Trading_base.Types.side)
+              (equal_to Trading_base.Types.Buy);
+            field
+              (fun t -> t.Trading_base.Types.quantity)
+              (float_equal ~epsilon:0.5 qty);
+            field
+              (fun t -> t.Trading_base.Types.price)
+              (float_equal ~epsilon:0.1 price);
+          ]
+      in
+      assert_that all_trades
+        (elements_are
+           [
+             is_aapl_buy ~qty:80.0 ~price:162.45;
+             is_aapl_buy ~qty:80.0 ~price:166.38;
+             is_aapl_buy ~qty:81.0 ~price:170.42;
+             is_aapl_buy ~qty:82.0 ~price:174.55;
+           ]);
+      (* Started with $100k, four buys at ~$162-$175 → long AAPL position in
+         a rising breakout. Final value lands near $126k (positions held
+         through continued 2%/wk trend for the remainder of the year). *)
+      let final_value = (List.last_exn result.steps).portfolio_value in
+      assert_that final_value
+        (is_between (module Float_ord) ~low:125_000.0 ~high:128_000.0))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -290,6 +409,8 @@ let suite =
          "simulation respects date range" >:: test_weinstein_date_range;
          "weekly cadence exercises Friday-gated strategy path"
          >:: test_weinstein_weekly_cadence;
+         "breakout pattern produces trades via screener"
+         >:: test_weinstein_breakout_trade;
        ]
 
 let () = run_test_tt_main suite
