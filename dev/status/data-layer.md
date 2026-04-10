@@ -22,7 +22,7 @@ YES
 ## Follow-up
 
 - Add `get_daily_close` to `DATA_SOURCE` interface — needed by portfolio-stops for mid-week stop checks
-- Universe cache writer: populate `data/universe.sexp` via `get_fundamentals` + `get_index_symbols`; required before any live run; suggested `analysis/scripts/fetch_universe.ml`
+- ~~Universe cache writer~~: DONE — `analysis/scripts/fetch_universe/fetch_universe.exe` fetches from EODHD exchange-symbol-list, populates name/exchange. Sector/industry empty (fundamentals endpoint requires higher API tier). 24,529 Common Stock + ETF instruments.
 
 ## Data management — MERGED (PR #209)
 
