@@ -1,0 +1,11 @@
+(executable
+ (name enrich_universe_sectors)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  types
+  status
+  weinstein.data_source)
+ (preprocess
+  (pps ppx_jane)))
