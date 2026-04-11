@@ -31,6 +31,15 @@
 
 open Core
 
+(** {1 Sub-modules} *)
+
+module Bar_history = Bar_history
+(** Per-symbol daily bar buffer. See {!Bar_history}. *)
+
+module Stops_runner = Stops_runner
+(** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
+*)
+
 (** {1 Configuration} *)
 
 type config = {
