@@ -3,6 +3,11 @@ open Trading_strategy
 module Bar_history = Bar_history
 module Stops_runner = Stops_runner
 
+module Ad_bars = Ad_bars
+(** NYSE advance/decline breadth data loader. Exposed as a top-level submodule
+    so tests and external callers (e.g. live-mode boot) can load NYSE breadth
+    data before wiring it into the strategy. *)
+
 type config = {
   universe : string list;
   index_symbol : string;
@@ -137,7 +142,7 @@ let _is_screening_day index_bars =
       Date.day_of_week bar.Types.Daily_price.date
       |> Day_of_week.equal Day_of_week.Fri
 
-let _on_market_close ~config ~stop_states ~prior_macro ~bar_history
+let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~get_price ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let all_symbols = config.index_symbol :: config.universe in
@@ -161,7 +166,7 @@ let _on_market_close ~config ~stop_states ~prior_macro ~bar_history
     else
       let index_prior_stage = Hashtbl.find prior_stages config.index_symbol in
       let macro_result =
-        Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars:[]
+        Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars
           ~global_index_bars:[] ~prior_stage:index_prior_stage ~prior:None
       in
       prior_macro := macro_result.trend;
@@ -177,7 +182,7 @@ let _on_market_close ~config ~stop_states ~prior_macro ~bar_history
         exit_transitions @ adjust_transitions @ entry_transitions;
     }
 
-let make ?(initial_stop_states = String.Map.empty) config =
+let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = []) config =
   let stop_states = ref initial_stop_states in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
@@ -190,7 +195,7 @@ let make ?(initial_stop_states = String.Map.empty) config =
     let name = name
 
     let on_market_close =
-      _on_market_close ~config ~stop_states ~prior_macro ~bar_history
+      _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
         ~prior_stages
   end in
   (module M : Strategy_interface.STRATEGY)

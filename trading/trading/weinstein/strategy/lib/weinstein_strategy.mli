@@ -33,6 +33,9 @@ open Core
 
 (** {1 Sub-modules} *)
 
+module Ad_bars = Ad_bars
+(** NYSE advance/decline breadth data loader. See {!Ad_bars}. *)
+
 module Bar_history = Bar_history
 (** Per-symbol daily bar buffer. See {!Bar_history}. *)
 
@@ -78,6 +81,7 @@ val name : string
 
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
+  ?ad_bars:Macro.ad_bar list ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -88,4 +92,9 @@ val make :
 
     @param initial_stop_states
       Seed the stop state map — useful for tests and for restoring live state
-      from persistence. Default: empty map. *)
+      from persistence. Default: empty map.
+    @param ad_bars
+      NYSE advance/decline daily bars, passed through to {!Macro.analyze} on
+      every screening day. Load once via {!Ad_bars.load} before calling [make] —
+      the list lives in the closure for the lifetime of the strategy instance.
+      Default: empty list (macro breadth indicators degrade to zero weight). *)
