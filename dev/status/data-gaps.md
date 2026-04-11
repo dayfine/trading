@@ -52,9 +52,9 @@ Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates iden
 2. **Instrument sector metadata** — `Instrument_info.sector` is empty for all symbols.
    - `bootstrap_universe.exe` leaves sector/industry blank by design (offline tool)
    - `fetch_universe.exe` populates name/exchange but not sector/industry
-   - EODHD `get_fundamentals` endpoint returns sector data but requires **Fundamentals Data Feed** tier at **$59.99/mo** (only standalone fundamentals option; All-In-One at $99.99/mo is the other path)
-   - **Decision pending**: upgrade tier, or use alternative source. See `dev/status/fundamentals-requirements.md` for what fields we actually need and alternative candidates.
-   - Until populated: screener cannot group stocks by sector, portfolio risk cannot enforce sector concentration limits
+   - **Plan**: See [`sector-data-plan.md`](./sector-data-plan.md) — fetch SPDR sector ETF holdings from State Street (SSGA) daily. One data provider, no Python, automatic refresh cadence tied to ETF fetch. Covers ~500 S&P 500 names; long-tail goes to the "unknown sector" bucket (`max_unknown_sector_positions = 2`, merged in #250).
+   - **Deprecated**: the Wikipedia scrape approach (PRs #251/#252/#253, now closed). See the deprecation note at the top of [`fundamentals-requirements.md`](./fundamentals-requirements.md).
+   - Until populated: screener cannot group stocks by sector, portfolio risk cannot enforce sector concentration limits for named sectors (but the unknown bucket is enforced)
 
 3. **Strategy wiring** — `Weinstein_strategy.on_market_close` creates an empty `sector_map` (line ~213). Once sector data is available, build the map from `Sector.analyze` results and pass to `Screener.screen`.
 
