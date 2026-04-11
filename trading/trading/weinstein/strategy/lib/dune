@@ -12,6 +12,7 @@
   weinstein.portfolio_risk
   weinstein.stage
   weinstein.macro
+  weinstein.sector
   weinstein.screener
   indicators.time_period)
  (preprocess
