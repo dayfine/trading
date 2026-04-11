@@ -2,6 +2,7 @@
  (names
   test_ad_bars_unicorn
   test_bar_history
+  test_macro_inputs
   test_stops_runner
   test_weinstein_strategy
   test_weinstein_strategy_smoke)

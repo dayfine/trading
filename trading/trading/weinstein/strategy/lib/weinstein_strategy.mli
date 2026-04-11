@@ -43,13 +43,40 @@ module Stops_runner = Stops_runner
 (** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
 *)
 
+module Macro_inputs = Macro_inputs
+(** Sector map + global index assembly from accumulated bar history. Exposes the
+    canonical {!Macro_inputs.spdr_sector_etfs} and
+    {!Macro_inputs.default_global_indices} constants for use in {!config}. *)
+
 (** {1 Configuration} *)
+
+type index_config = {
+  primary : string;
+      (** The US benchmark symbol (e.g. ["GSPCX"]). Dual-use: passed to
+          {!Macro.analyze} as [~index_bars], and used by
+          {!Stock_analysis.analyze} as [~benchmark_bars] when computing relative
+          strength. *)
+  global : (string * string) list;
+      (** [(symbol, label)] pairs for non-US indices used by the macro
+          global-consensus indicator. Default: empty. Use
+          {!Macro_inputs.default_global_indices} for the canonical (GDAXI, N225,
+          ISF.LSE) triple. [primary] is intentionally excluded from this list —
+          it is already passed via [~index_bars]. *)
+}
+(** Indices consumed by the macro analyser. The primary index is the US
+    benchmark; globals are additional markets used only for the global consensus
+    indicator. *)
 
 type config = {
   universe : string list;  (** All ticker symbols to consider for screening. *)
-  index_symbol : string;
-      (** Symbol for the broad market index (e.g. "GSPCX"). Used for macro
-          analysis and RS computation. *)
+  indices : index_config;
+      (** Market indices consumed by the macro analyser. See {!index_config}. *)
+  sector_etfs : (string * string) list;
+      (** [(etf_symbol, sector_name)] pairs — one per sector tracked by the
+          screener. When non-empty, the strategy accumulates bars for each ETF
+          via [get_price] and builds a sector context map on screening days.
+          Default: empty (sector gate degrades to Neutral). Use
+          {!Macro_inputs.spdr_sector_etfs} for the canonical 11-sector list. *)
   stage_config : Stage.config;  (** Stage classifier parameters. *)
   macro_config : Macro.config;  (** Macro analyser parameters. *)
   screening_config : Screener.config;  (** Screener cascade parameters. *)
@@ -69,10 +96,13 @@ type config = {
     backtesting. *)
 
 val default_config : universe:string list -> index_symbol:string -> config
-(** Build a default config with Weinstein book values.
+(** Build a default config with Weinstein book values. The resulting config has
+    [indices.primary = index_symbol] and [indices.global = []]; callers can set
+    [indices.global] and [sector_etfs] via record update to opt into the full
+    macro pipeline.
 
     @param universe Ticker symbols to screen.
-    @param index_symbol Broad market index symbol for macro analysis. *)
+    @param index_symbol US benchmark index (becomes [indices.primary]). *)
 
 (** {1 Factory} *)
 
