@@ -1,0 +1,15 @@
+(test
+ (name test_fetch_symbols)
+ (libraries
+  fetch_symbols_lib
+  core
+  core_unix.filename_unix
+  async
+  async_unix
+  ounit2
+  matchers
+  eodhd
+  types
+  status)
+ (preprocess
+  (pps ppx_jane)))

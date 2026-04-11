@@ -1,14 +1,9 @@
 (executable
  (name fetch_symbols)
  (libraries
-  core
   core_unix.command_unix
   async
-  file.sexp
-  storage.metadata
-  csv
-  eodhd
-  types
-  weinstein.data_source)
+  weinstein.data_source
+  fetch_symbols_lib)
  (preprocess
   (pps ppx_jane)))
