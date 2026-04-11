@@ -1,6 +1,19 @@
 # Fundamentals Data Requirements
 
-Last updated: 2026-04-10
+Last updated: 2026-04-11
+
+## DEPRECATED: Wikipedia scrape plan (superseded 2026-04-11)
+
+The earlier plan in this doc recommended scraping S&P 500 / 400 / 600 + Russell 1000 Wikipedia pages via a Python stdlib script. **This plan is deprecated.** See [`sector-data-plan.md`](./sector-data-plan.md) for the replacement — use **SPDR ETF holdings files** instead.
+
+Why the change:
+1. **Python runtime reliability**: the container does not guarantee a working Python stdlib across upgrades. Either we invest in maintenance (pinning, CI check, doc) or we write the scraper in OCaml. Both are effort; the underlying question is whether Wikipedia is even the right source.
+2. **Composition is incidental**: Wikipedia pages are being used as a two-for-one (constituents + sector tags). What we actually need is `ticker → sector`. Index composition is not a requirement.
+3. **SPDR holdings files are authoritative**: State Street publishes daily holdings CSVs for each XL* ETF, including GICS sector tags direct from the fund manager. Same provider we already fetch prices from. Refresh cadence is naturally tied to the ETF fetch. No Wikipedia, no Python scraper, no staleness policy to enforce separately.
+
+The deprecated candidate evaluation (yfinance, FMP, Finnhub, Wikipedia) is kept below for historical context. New work should follow [`sector-data-plan.md`](./sector-data-plan.md).
+
+---
 
 ## What we actually need
 
