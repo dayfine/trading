@@ -27,6 +27,7 @@ type limit_violation =
   | Short_exposure_exceeded of float
   | Cash_below_minimum of float
   | Sector_concentration of string * int
+  | Unknown_sector_exceeded of int
   | Risk_too_high of float
 [@@deriving show]
 
@@ -37,6 +38,7 @@ type config = {
   max_short_exposure_pct : float;
   min_cash_pct : float;
   max_sector_concentration : int;
+  max_unknown_sector_positions : int;
   big_winner_multiplier : float;
 }
 [@@deriving show, eq]
@@ -49,6 +51,7 @@ let default_config =
     max_short_exposure_pct = 0.30;
     min_cash_pct = 0.10;
     max_sector_concentration = 5;
+    max_unknown_sector_positions = 2;
     big_winner_multiplier = 1.5;
   }
 
@@ -62,16 +65,18 @@ let _compute_exposures positions =
         (long_exp +. market_value, short_exp, count + 1)
       else (long_exp, short_exp +. Float.abs market_value, count + 1))
 
+(* Build a (sector_name, count) list from open positions and an optional
+   (symbol, sector) lookup. Positions whose symbol is missing from the lookup
+   — or whose sector is the empty string — are bucketed under the empty
+   string, which [max_unknown_sector_positions] governs. *)
 let _compute_sector_counts positions sectors =
   let sector_map =
     List.fold sectors ~init:String.Map.empty ~f:(fun m (sym, sec) ->
         Map.set m ~key:sym ~data:sec)
   in
   List.fold positions ~init:String.Map.empty ~f:(fun acc (sym, _, _) ->
-      match Map.find sector_map sym with
-      | None -> acc
-      | Some sector ->
-          Map.update acc sector ~f:(function None -> 1 | Some n -> n + 1))
+      let sector = Map.find sector_map sym |> Option.value ~default:"" in
+      Map.update acc sector ~f:(function None -> 1 | Some n -> n + 1))
   |> Map.to_alist
   |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
 
@@ -182,8 +187,13 @@ let check_limits ~config ~snapshot ~proposed_side ~proposed_value
       List.Assoc.find snapshot.sector_counts ~equal:String.equal proposed_sector
       |> Option.value ~default:0
     in
-    if count + 1 > config.max_sector_concentration then
-      [ Sector_concentration (proposed_sector, count + 1) ]
+    let new_count = count + 1 in
+    if String.is_empty proposed_sector then
+      if new_count > config.max_unknown_sector_positions then
+        [ Unknown_sector_exceeded new_count ]
+      else []
+    else if new_count > config.max_sector_concentration then
+      [ Sector_concentration (proposed_sector, new_count) ]
     else []
   in
   let violations =
