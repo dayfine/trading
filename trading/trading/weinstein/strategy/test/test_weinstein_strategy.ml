@@ -335,6 +335,81 @@ let test_transition_uses_bar_date _ =
              ])))
 
 (* ------------------------------------------------------------------ *)
+(* Macro-inputs wiring                                                  *)
+(* ------------------------------------------------------------------ *)
+
+(** Record-and-return wrapper: build a [get_price] that records every symbol
+    lookup into a ref and returns the baseline bar for known symbols. *)
+let recording_get_price ~bars_by_symbol ~recorded symbol =
+  recorded := symbol :: !recorded;
+  List.Assoc.find bars_by_symbol symbol ~equal:String.equal
+
+let test_strategy_accumulates_configured_symbols _ =
+  (* One test for the wiring: sector ETFs and global indices configured in
+     the config are queried via get_price on every on_market_close call.
+     Regression guard against silent drop-on-the-floor for extra symbols. *)
+  let base = default_config ~universe:[ "AAPL" ] ~index_symbol:"GSPCX" in
+  let cfg =
+    {
+      base with
+      sector_etfs = [ ("XLK", "Technology"); ("XLF", "Financials") ];
+      indices =
+        {
+          primary = base.indices.primary;
+          global = [ ("GDAXI.INDX", "DAX"); ("N225.INDX", "Nikkei") ];
+        };
+    }
+  in
+  let (module S) = make cfg in
+  let bars_by_symbol =
+    List.map
+      [
+        ("AAPL", 180.0);
+        ("GSPCX", 4500.0);
+        ("XLK", 200.0);
+        ("XLF", 40.0);
+        ("GDAXI.INDX", 16000.0);
+        ("N225.INDX", 33000.0);
+      ]
+      ~f:(fun (sym, p) -> (sym, make_bar "2024-01-05" p))
+  in
+  let recorded = ref [] in
+  let _ =
+    S.on_market_close
+      ~get_price:(recording_get_price ~bars_by_symbol ~recorded)
+      ~get_indicator:empty_get_indicator ~portfolio:empty_portfolio
+  in
+  let unique_calls = List.dedup_and_sort !recorded ~compare:String.compare in
+  assert_that unique_calls
+    (equal_to [ "AAPL"; "GDAXI.INDX"; "GSPCX"; "N225.INDX"; "XLF"; "XLK" ])
+
+let test_strategy_empty_macro_config_queries_only_universe _ =
+  (* Regression guard: default config queries only universe + indices.primary,
+     nothing else. If a future change accidentally accumulates for unrelated
+     symbols, this test fails. *)
+  let (module S) = make cfg in
+  let bars_by_symbol =
+    [
+      ("AAPL", make_bar "2024-01-05" 180.0);
+      ("GSPCX", make_bar "2024-01-05" 4500.0);
+    ]
+  in
+  let recorded = ref [] in
+  let _ =
+    S.on_market_close
+      ~get_price:(recording_get_price ~bars_by_symbol ~recorded)
+      ~get_indicator:empty_get_indicator ~portfolio:empty_portfolio
+  in
+  let unique_calls = List.dedup_and_sort !recorded ~compare:String.compare in
+  assert_that unique_calls (equal_to [ "AAPL"; "GSPCX" ])
+
+(* Decision-making tests that depend on the screener producing trades under
+   Normal conditions (and NOT producing trades under bearish conditions) live
+   in [test_weinstein_strategy_smoke.ml]. Direct [on_market_close] calls in
+   this file cannot reliably produce entries — the Simulator path is the only
+   reliable harness for comparing two macro-input scenarios. *)
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -353,4 +428,8 @@ let () =
            "bar accumulation multiple days"
            >:: test_bar_accumulation_multiple_days;
            "transition uses bar date" >:: test_transition_uses_bar_date;
+           "strategy accumulates configured sector ETF and global index bars"
+           >:: test_strategy_accumulates_configured_symbols;
+           "strategy with empty macro config queries only universe + index"
+           >:: test_strategy_empty_macro_config_queries_only_universe;
          ])
