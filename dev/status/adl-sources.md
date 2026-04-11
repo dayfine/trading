@@ -1,6 +1,8 @@
 # A-D Breadth (ADL) — Source Investigation
 
-Last updated: 2026-04-10
+**Owners**: `ops-data` (Phase A/B data fetch + cadence), `feat-weinstein` (Phase C OCaml loader + strategy wiring)
+**Status**: ACTIVE — Phase A complete, Phase B blocked on human source decision, Phase C pending
+**Last updated**: 2026-04-10
 
 ## What we need
 

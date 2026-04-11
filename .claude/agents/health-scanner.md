@@ -57,20 +57,23 @@ If the linter fails, that is a critical finding (the gate should have caught it 
 **Step 4: Status file integrity**
 
 For each `dev/status/*.md`, verify these fields are present:
-- `## Status` — with a valid value (IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED)
-- `## Last updated` — with a date
-- `## Interface stable` — YES or NO (required for feature status files; may be absent for harness.md)
+
+- **Header block** (first 10 lines): must contain
+  - `**Owner**:` — one or more agent names (e.g. `feat-weinstein`, `ops-data`, `harness-maintainer`), or the literal string `none` if the file is DEPRECATED. N-to-1 ownership is fine (one agent owns several files), as is N-to-N for hybrid files.
+  - `**Status**:` — one of ACTIVE | IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED | DEPRECATED | ARCHIVED
+  - `**Last updated**:` — ISO date (YYYY-MM-DD)
+- `## Status` body section — with a valid value (for feature status files that use the old style; new docs can rely on the header block alone)
+- `## Interface stable` — YES or NO (feature status files only)
 
 ```bash
-# Read each status file and check fields
-cat /Users/difan/Projects/trading-1/dev/status/data-layer.md
-cat /Users/difan/Projects/trading-1/dev/status/portfolio-stops.md
-cat /Users/difan/Projects/trading-1/dev/status/screener.md
-cat /Users/difan/Projects/trading-1/dev/status/simulation.md
-cat /Users/difan/Projects/trading-1/dev/status/harness.md
+# Quick owner-header sanity check across all status files
+for f in /Users/difan/Projects/trading-1/dev/status/*.md; do
+  echo "=== $f ==="
+  head -8 "$f" | grep -E '^\*\*(Owner|Status|Last updated)\*\*:' || echo "MISSING HEADER BLOCK"
+done
 ```
 
-Flag any file missing a required field as a warning.
+Flag any file missing a required field as a warning. Flag files with `Owner: none` that are not marked DEPRECATED/ARCHIVED as errors.
 
 **Step 5: Linter exceptions past review date**
 

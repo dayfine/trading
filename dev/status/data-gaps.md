@@ -1,6 +1,8 @@
 # Data Gaps — features blocked on missing data
 
-Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates identified)
+**Owners**: `ops-data` (tracks + resolves fetch gaps), `feat-weinstein` (wires resolved data into strategy)
+**Status**: ACTIVE — rolling index of all open data blockers
+**Last updated**: 2026-04-10
 
 ## A-D Breadth (ADL)
 

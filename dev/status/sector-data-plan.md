@@ -1,6 +1,8 @@
 # Sector Data Plan — SPDR ETF Holdings
 
-Last updated: 2026-04-11
+**Owners**: `ops-data` (Phase 0 validation + Phase 1 fetcher + Phase 3 cadence), `feat-weinstein` (Phase 2 OCaml loader + Phase 4 strategy wiring)
+**Status**: ACTIVE — Phase 0 blocked on ops-data validation of SSGA URLs
+**Last updated**: 2026-04-11
 
 **Supersedes**: the Wikipedia scrape plan in `fundamentals-requirements.md` (now marked deprecated).
 

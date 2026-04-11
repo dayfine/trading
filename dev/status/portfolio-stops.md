@@ -1,6 +1,8 @@
 # Status: portfolio-stops
 
-## Last updated: 2026-04-08
+**Owner**: `feat-weinstein` (order_gen track)
+**Status**: APPROVED — awaiting merge
+**Last updated**: 2026-04-08
 
 ## Status
 APPROVED

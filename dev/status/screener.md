@@ -1,6 +1,8 @@
 # Status: screener
 
-## Last updated: 2026-04-07
+**Owner**: `feat-weinstein`
+**Status**: MERGED — historical reference, no active work
+**Last updated**: 2026-04-07
 
 ## Status
 MERGED

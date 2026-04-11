@@ -1,6 +1,8 @@
 # Macro.analyze — Cadence Mismatch Design Note
 
-Last updated: 2026-04-11
+**Owner**: `feat-weinstein` (design + implementation follow-up)
+**Status**: ACTIVE — design captured, implementation not yet scheduled
+**Last updated**: 2026-04-11
 
 ## Problem
 

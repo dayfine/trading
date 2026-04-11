@@ -1,6 +1,8 @@
 # Status: simulation
 
-## Last updated: 2026-04-10
+**Owner**: `feat-weinstein`
+**Status**: READY_FOR_REVIEW — QC passed, awaiting merge
+**Last updated**: 2026-04-10
 
 ## Status
 READY_FOR_REVIEW

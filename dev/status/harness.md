@@ -1,6 +1,8 @@
 # Status: harness
 
-## Last updated: 2026-04-09
+**Owner**: `harness-maintainer`
+**Status**: ACTIVE — Tier 1 backlog in progress
+**Last updated**: 2026-04-09
 
 ## Status
 IN_PROGRESS

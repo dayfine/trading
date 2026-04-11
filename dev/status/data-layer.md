@@ -1,6 +1,8 @@
 # Status: data-layer
 
-## Last updated: 2026-04-06
+**Owner**: `ops-data`
+**Status**: MERGED — historical reference, no active work
+**Last updated**: 2026-04-06
 
 ## Status
 MERGED

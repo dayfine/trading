@@ -1,6 +1,8 @@
 # Fundamentals Data Requirements
 
-Last updated: 2026-04-11
+**Owner**: none — **DEPRECATED** (see [`sector-data-plan.md`](./sector-data-plan.md))
+**Status**: DEPRECATED — Wikipedia scrape approach replaced by SPDR ETF holdings
+**Last updated**: 2026-04-11
 
 ## DEPRECATED: Wikipedia scrape plan (superseded 2026-04-11)
 
