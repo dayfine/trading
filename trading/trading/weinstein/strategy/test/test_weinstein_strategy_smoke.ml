@@ -399,6 +399,101 @@ let test_weinstein_breakout_trade _ =
         (is_between (module Float_ord) ~low:125_000.0 ~high:128_000.0))
 
 (* ------------------------------------------------------------------ *)
+(* Decision test: bearish macro suppresses entries                      *)
+(* ------------------------------------------------------------------ *)
+
+(** Companion to [test_weinstein_breakout_trade]. Same Breakout pattern for
+    AAPL, but GSPCX is Declining instead of Trending. [Macro.analyze] runs the
+    NH-NL proxy + index stage on the declining index and returns [Bearish],
+    which the strategy honours by skipping the entire screener cascade on every
+    Friday.
+
+    Expected: zero trades across the whole year, even though AAPL would
+    otherwise qualify (the breakout test proves it produces 4 buys when the
+    index is Trending).
+
+    This is the companion decision test: the wiring has to actually feed
+    [global_index_bars] (and the index stage) through [Macro.analyze] AND the
+    strategy has to respect the returned trend. If either side is broken, this
+    test fails. *)
+let test_weinstein_bearish_index_suppresses_entries _ =
+  let data_dir = Core_unix.mkdtemp "/tmp/test_weinstein_bearish" in
+  Fun.protect
+    ~finally:(fun () ->
+      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" data_dir) in
+      ())
+    (fun () ->
+      let hist_start = date_of_string "2022-01-01" in
+      write_synthetic_bars data_dir
+        Synthetic_source.
+          {
+            start_date = hist_start;
+            symbols =
+              [
+                ( "AAPL",
+                  Breakout
+                    {
+                      base_price = 150.0;
+                      base_weeks = 40;
+                      weekly_gain_pct = 0.02;
+                      breakout_volume_mult = 8.0;
+                      base_volume = 50_000_000;
+                    } );
+                ( "GSPCX",
+                  Declining
+                    {
+                      start_price = 4500.0;
+                      weekly_loss_pct = 0.01;
+                      volume = 1_000_000_000;
+                    } );
+              ];
+          };
+      let start_date = date_of_string "2022-01-03" in
+      let end_date = date_of_string "2023-01-06" in
+      let strategy =
+        Weinstein_strategy.make
+          (Weinstein_strategy.default_config ~universe:[ "AAPL" ]
+             ~index_symbol:"GSPCX")
+      in
+      let deps =
+        Trading_simulation.Simulator.create_deps ~symbols:[ "AAPL"; "GSPCX" ]
+          ~data_dir:(Fpath.v data_dir) ~strategy ~commission:sample_commission
+          ()
+      in
+      let config =
+        Trading_simulation.Simulator.
+          {
+            start_date;
+            end_date;
+            initial_cash = 100_000.0;
+            commission = sample_commission;
+            strategy_cadence = Types.Cadence.Daily;
+          }
+      in
+      let sim =
+        match Trading_simulation.Simulator.create ~config ~deps with
+        | Ok s -> s
+        | Error e -> OUnit2.assert_failure ("create failed: " ^ Status.show e)
+      in
+      let result =
+        match Trading_simulation.Simulator.run sim with
+        | Ok r -> r
+        | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
+      in
+      let all_trades =
+        List.concat_map result.steps ~f:(fun step -> step.trades)
+      in
+      (* The declining index flips macro to Bearish via the NH-NL proxy and
+         the Stage-4 index classification. No entries, no trades.
+         Complementary to test_weinstein_breakout_trade, which uses the same
+         AAPL Breakout pattern but a Trending index and produces 4 buys —
+         so any zero-trades result here must come from the macro gate. *)
+      assert_that all_trades is_empty;
+      (* Portfolio stays at the starting $100k (no trades, no fees). *)
+      let final_value = (List.last_exn result.steps).portfolio_value in
+      assert_that final_value (float_equal ~epsilon:0.01 100_000.0))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -411,6 +506,8 @@ let suite =
          >:: test_weinstein_weekly_cadence;
          "breakout pattern produces trades via screener"
          >:: test_weinstein_breakout_trade;
+         "bearish index (Declining) suppresses all entries"
+         >:: test_weinstein_bearish_index_suppresses_entries;
        ]
 
 let () = run_test_tt_main suite
