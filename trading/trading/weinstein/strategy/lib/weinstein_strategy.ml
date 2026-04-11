@@ -1,6 +1,3 @@
-(* @large-module: strategy integrates stop logic, macro, sector, screener, and
-   entry sizing into a single on_market_close closure; splitting each helper
-   group into its own file would obscure the closure state they share. *)
 open Core
 open Trading_strategy
 
@@ -8,6 +5,12 @@ module Ad_bars = Ad_bars
 (** {!Ad_bars} loader is exposed as a top-level submodule so that tests and
     external callers (e.g. live-mode boot) can load NYSE breadth data before
     wiring it into the strategy. *)
+
+module Macro_inputs = Macro_inputs
+(** {!Macro_inputs} builds the sector_map and global_index_bars that the macro
+    analyzer and screener consume. Exposed so that callers can use the
+    well-known constants ([spdr_sector_etfs], [default_global_indices]) when
+    constructing a config. *)
 
 type config = {
   universe : string list;
@@ -22,29 +25,6 @@ type config = {
   initial_stop_buffer : float;
   lookback_bars : int;
 }
-
-(** SPDR sector ETFs covering the 11 US GICS sectors. Stable since 2018 (XLC was
-    added that year when GICS added Communication Services). *)
-let spdr_sector_etfs =
-  [
-    ("XLK", "Technology");
-    ("XLF", "Financials");
-    ("XLE", "Energy");
-    ("XLV", "Health Care");
-    ("XLI", "Industrials");
-    ("XLP", "Consumer Staples");
-    ("XLY", "Consumer Discretionary");
-    ("XLU", "Utilities");
-    ("XLB", "Materials");
-    ("XLRE", "Real Estate");
-    ("XLC", "Communication Services");
-  ]
-
-(** Major non-US equity indices used by the macro global-consensus indicator.
-    GSPC.INDX (the US benchmark) is intentionally omitted here — it is already
-    passed to {!Macro.analyze} as [~index_bars]. *)
-let default_global_indices =
-  [ ("GDAXI.INDX", "DAX"); ("N225.INDX", "Nikkei"); ("ISF.LSE", "FTSE") ]
 
 let default_config ~universe ~index_symbol =
   {
@@ -72,132 +52,6 @@ let _position_counter = ref 0
 let _gen_position_id symbol =
   Int.incr _position_counter;
   Printf.sprintf "%s-wein-%d" symbol !_position_counter
-
-(** Accumulate today's bar for each symbol into the per-symbol bar history.
-    Skips if the bar date is not strictly after the last recorded date
-    (idempotent for repeated calls on the same day). *)
-let _is_new_bar (existing : Types.Daily_price.t list) bar =
-  match List.last existing with
-  | None -> true
-  | Some last -> Date.( > ) bar.Types.Daily_price.date last.date
-
-let _append_bar_if_new bar_history ~symbol bar =
-  let existing = Hashtbl.find bar_history symbol |> Option.value ~default:[] in
-  if _is_new_bar existing bar then
-    Hashtbl.set bar_history ~key:symbol ~data:(existing @ [ bar ])
-
-let _accumulate_bars
-    ~(bar_history : Types.Daily_price.t list Hashtbl.M(String).t)
-    ~(get_price : Strategy_interface.get_price_fn) ~symbols =
-  List.iter symbols ~f:(fun symbol ->
-      get_price symbol
-      |> Option.iter ~f:(_append_bar_if_new bar_history ~symbol))
-
-(** Get weekly bars for a symbol from the accumulated daily history. *)
-let _weekly_bars_for ~bar_history ~symbol ~n =
-  let daily = Hashtbl.find bar_history symbol |> Option.value ~default:[] in
-  let weekly =
-    Time_period.Conversion.daily_to_weekly ~include_partial_week:true daily
-  in
-  let len = List.length weekly in
-  if len <= n then weekly else List.drop weekly (len - n)
-
-(** Compute MA direction for a symbol from its accumulated bar history. Uses and
-    updates the per-symbol prior_stages map to improve stage classification
-    accuracy (enables Stage1->Stage2 transition detection). *)
-let _compute_ma_direction ~(config : config) ~bar_history ~prior_stages ~symbol
-    =
-  let weekly = _weekly_bars_for ~bar_history ~symbol ~n:config.lookback_bars in
-  if List.length weekly < config.stage_config.ma_period then
-    Weinstein_types.Flat
-  else
-    let prior_stage = Hashtbl.find prior_stages symbol in
-    let result =
-      Stage.classify ~config:config.stage_config ~bars:weekly ~prior_stage
-    in
-    Hashtbl.set prior_stages ~key:symbol ~data:result.stage;
-    result.ma_direction
-
-let _make_exit_transition ~(pos : Position.t) ~current_date ~state ~bar =
-  let actual_price = bar.Types.Daily_price.low_price in
-  let exit_reason =
-    Position.StopLoss
-      {
-        stop_price = Weinstein_stops.get_stop_level state;
-        actual_price;
-        loss_percent = 0.0;
-      }
-  in
-  {
-    Position.position_id = pos.id;
-    date = current_date;
-    kind = Position.TriggerExit { exit_reason; exit_price = actual_price };
-  }
-
-let _make_adjust_transition ~(pos : Position.t) ~current_date
-    ~(risk_params : Position.risk_params) ~new_level =
-  let new_risk_params =
-    {
-      Position.stop_loss_price = Some new_level;
-      take_profit_price = risk_params.take_profit_price;
-      max_hold_days = risk_params.max_hold_days;
-    }
-  in
-  {
-    Position.position_id = pos.id;
-    date = current_date;
-    kind = Position.UpdateRiskParams { new_risk_params };
-  }
-
-(** Process stop logic for one held position. Returns (exit_transition option,
-    adjust_transition option). *)
-let _handle_stop ~config ~(pos : Position.t)
-    ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
-    ~bar_history ~prior_stages =
-  let current_date = bar.Types.Daily_price.date in
-  let ma_direction =
-    _compute_ma_direction ~config ~bar_history ~prior_stages ~symbol:ticker
-  in
-  let new_state, event =
-    Weinstein_stops.update ~config:config.stops_config ~side:pos.Position.side
-      ~state ~current_bar:bar ~ma_value:bar.close_price ~ma_direction
-      ~stage:(Weinstein_types.Stage2 { weeks_advancing = 1; late = false })
-  in
-  stop_states := Map.set !stop_states ~key:ticker ~data:new_state;
-  match event with
-  | Weinstein_stops.Stop_hit _ ->
-      (Some (_make_exit_transition ~pos ~current_date ~state ~bar), None)
-  | Weinstein_stops.Stop_raised { new_level; _ } ->
-      ( None,
-        Some
-          (_make_adjust_transition ~pos ~current_date ~risk_params ~new_level)
-      )
-  | _ -> (None, None)
-
-(** Process stop for one position; returns updated (exits, adjusts) accumulator.
-*)
-let _process_stop ~config ~stop_states ~get_price ~bar_history ~prior_stages
-    ticker (pos : Position.t) (exits, adjusts) =
-  match
-    (Position.get_state pos, Map.find !stop_states ticker, get_price ticker)
-  with
-  | Position.Holding h, Some state, Some bar -> (
-      match
-        _handle_stop ~config ~pos ~risk_params:h.risk_params ~state ~bar
-          ~stop_states ~ticker ~bar_history ~prior_stages
-      with
-      | Some exit_tr, _ -> (exit_tr :: exits, adjusts)
-      | _, Some adj_tr -> (exits, adj_tr :: adjusts)
-      | None, None -> (exits, adjusts))
-  | _ -> (exits, adjusts)
-
-(** Update stops for all held positions. Returns (exit_transitions,
-    adjust_transitions). *)
-let _update_stops ~config ~positions ~get_price ~stop_states ~bar_history
-    ~prior_stages =
-  Map.fold positions ~init:([], []) ~f:(fun ~key:ticker ~data:pos acc ->
-      _process_stop ~config ~stop_states ~get_price ~bar_history ~prior_stages
-        ticker pos acc)
 
 (** Try to build a CreateEntering transition for one screened candidate.
     Registers the initial stop state as a side effect. Returns None if the
@@ -255,7 +109,8 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
     ~current_date =
   let _analyze_ticker ticker =
     let bars =
-      _weekly_bars_for ~bar_history ~symbol:ticker ~n:config.lookback_bars
+      Bar_history.weekly_bars_for bar_history ~symbol:ticker
+        ~n:config.lookback_bars
     in
     if List.is_empty bars then None
     else
@@ -283,59 +138,6 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
     ~get_price ~current_date
 
 (* ------------------------------------------------------------------ *)
-(* Macro inputs — sector map and global indices                        *)
-(* ------------------------------------------------------------------ *)
-
-(** Build the [(name, weekly_bars)] list consumed by {!Macro.analyze} for the
-    global-consensus indicator. Indices with no accumulated bars are dropped so
-    that Macro sees only usable inputs. *)
-let _build_global_index_bars ~bar_history ~config :
-    (string * Types.Daily_price.t list) list =
-  List.filter_map config.global_index_symbols ~f:(fun (symbol, label) ->
-      let bars =
-        _weekly_bars_for ~bar_history ~symbol ~n:config.lookback_bars
-      in
-      if List.is_empty bars then None else Some (label, bars))
-
-(** Analyze one sector ETF and return its {!Screener.sector_context} entry,
-    keyed by the ETF symbol. Returns [None] if not enough bars are accumulated
-    yet for a stage classification. The [sector_prior_stages] hashtable lets us
-    detect Stage1->Stage2 transitions across screening days. *)
-let _sector_context_for ~config ~bar_history ~sector_prior_stages ~index_bars
-    ~(etf_symbol : string) ~(sector_name : string) :
-    (string * Screener.sector_context) option =
-  let sector_bars =
-    _weekly_bars_for ~bar_history ~symbol:etf_symbol ~n:config.lookback_bars
-  in
-  if List.length sector_bars < config.stage_config.ma_period then None
-  else if List.is_empty index_bars then None
-  else
-    let prior_stage = Hashtbl.find sector_prior_stages etf_symbol in
-    let result =
-      Sector.analyze ~config:Sector.default_config ~sector_name ~sector_bars
-        ~benchmark_bars:index_bars ~constituent_analyses:[] ~prior_stage
-    in
-    Hashtbl.set sector_prior_stages ~key:etf_symbol ~data:result.stage.stage;
-    Some (etf_symbol, Sector.sector_context_of result)
-
-(** Build a sector map keyed by ETF symbol. Each entry is produced by
-    {!Sector.analyze} on that ETF's accumulated weekly bars. Until per-stock
-    sector metadata is populated on [Instrument_info], the stock-ticker lookup
-    in {!Screener.screen} will miss and fall back to Neutral — but the sector
-    pipeline itself is fully exercised and ready for that downstream wiring. *)
-let _build_sector_map ~config ~bar_history ~sector_prior_stages ~index_bars :
-    (string, Screener.sector_context) Hashtbl.t =
-  let map = Hashtbl.create (module String) in
-  List.iter config.sector_etfs ~f:(fun (etf_symbol, sector_name) ->
-      match
-        _sector_context_for ~config ~bar_history ~sector_prior_stages
-          ~index_bars ~etf_symbol ~sector_name
-      with
-      | None -> ()
-      | Some (key, ctx) -> Hashtbl.set map ~key ~data:ctx);
-  map
-
-(* ------------------------------------------------------------------ *)
 (* make                                                                  *)
 (* ------------------------------------------------------------------ *)
 
@@ -354,13 +156,16 @@ let _all_accumulated_symbols ~(config : config) : string list =
   let global_symbols = List.map config.global_index_symbols ~f:fst in
   (config.index_symbol :: config.universe) @ sector_symbols @ global_symbols
 
-(** Run the Friday macro + screener path and return entry transitions.
-    Returns [] if macro is Bearish (no new buys). *)
+(** Run the Friday macro + screener path and return entry transitions. Returns
+    [] if macro is Bearish (no new buys). *)
 let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~sector_prior_stages ~get_price ~portfolio ~current_date
     ~index_bars =
   let index_prior_stage = Hashtbl.find prior_stages config.index_symbol in
-  let global_index_bars = _build_global_index_bars ~bar_history ~config in
+  let global_index_bars =
+    Macro_inputs.build_global_index_bars ~lookback_bars:config.lookback_bars
+      ~global_index_symbols:config.global_index_symbols ~bar_history
+  in
   let macro_result =
     Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars
       ~global_index_bars ~prior_stage:index_prior_stage ~prior:None
@@ -369,7 +174,9 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
   if Weinstein_types.(equal_market_trend !prior_macro Bearish) then []
   else
     let sector_map =
-      _build_sector_map ~config ~bar_history ~sector_prior_stages ~index_bars
+      Macro_inputs.build_sector_map ~stage_config:config.stage_config
+        ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
+        ~bar_history ~sector_prior_stages ~index_bars
     in
     _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
       ~sector_map ~stop_states ~portfolio ~get_price ~bar_history ~prior_stages
@@ -380,18 +187,19 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let all_symbols = _all_accumulated_symbols ~config in
-  _accumulate_bars ~bar_history ~get_price ~symbols:all_symbols;
+  Bar_history.accumulate bar_history ~get_price ~symbols:all_symbols;
   let current_date =
     match get_price config.index_symbol with
     | Some bar -> bar.Types.Daily_price.date
     | None -> Date.today ~zone:Time_float.Zone.utc
   in
   let exit_transitions, adjust_transitions =
-    _update_stops ~config ~positions ~get_price ~stop_states ~bar_history
-      ~prior_stages
+    Stops_runner.update ~stops_config:config.stops_config
+      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
+      ~positions ~get_price ~stop_states ~bar_history ~prior_stages
   in
   let index_bars =
-    _weekly_bars_for ~bar_history ~symbol:config.index_symbol
+    Bar_history.weekly_bars_for bar_history ~symbol:config.index_symbol
       ~n:config.lookback_bars
   in
   let entry_transitions =
@@ -412,9 +220,7 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = []) config =
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
-  let bar_history : Types.Daily_price.t list Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
+  let bar_history = Bar_history.create () in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in

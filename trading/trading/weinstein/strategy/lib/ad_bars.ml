@@ -39,7 +39,11 @@ let _read_into tbl path =
 let _read_count_file path =
   let tbl = Hashtbl.create (module Date) in
   if not (Stdlib.Sys.file_exists path) then tbl
-  else try _read_into tbl path; tbl with _ -> tbl
+  else
+    try
+      _read_into tbl path;
+      tbl
+    with _ -> tbl
 
 (** Join the two count tables on date. A row with both [advancing] and
     [declining] equal to zero is treated as a placeholder and dropped — the

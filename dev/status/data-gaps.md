@@ -40,9 +40,9 @@ Last updated: 2026-04-10 (ADL Phase C + sector/global strategy-side wiring lande
    - Until populated: the screener's sector gate still falls through to Neutral on every stock lookup.
 
 3. **Strategy wiring** — **RESOLVED** (2026-04-10, feat-weinstein, branch `feat/strategy-wiring`):
-   - New `config.sector_etfs : (string * string) list` field. Default empty; callers populate with e.g. `Weinstein_strategy.spdr_sector_etfs`.
+   - New `config.sector_etfs : (string * string) list` field. Default empty; callers populate with e.g. `Weinstein_strategy.Macro_inputs.spdr_sector_etfs`.
    - `_on_market_close` accumulates daily bars for each configured ETF in the same per-symbol `bar_history` hashtable as the universe tickers (via `get_price`).
-   - On screening days, `_build_sector_map` runs `Sector.analyze` on each ETF's weekly bars + benchmark bars + empty `constituent_analyses`, and emits `(etf_symbol, sector_context)` entries into the map passed to `Screener.screen`.
+   - On screening days, `Macro_inputs.build_sector_map` runs `Sector.analyze` on each ETF's weekly bars + benchmark bars + empty `constituent_analyses`, and emits `(etf_symbol, sector_context)` entries into the map passed to `Screener.screen`.
    - Prior-stage accumulation for sector ETFs uses a dedicated `sector_prior_stages` hashtable in the closure, enabling Stage1->Stage2 transition detection across screening days.
    - **Caveat**: because `Screener.screen` looks up sector context by **stock ticker**, and the current map is keyed by **ETF symbol**, the lookup always misses and the screener still applies a Neutral sector gate. The pipeline is fully exercised end-to-end — only the final ticker -> sector -> ETF join is still absent. That join will land when instrument sector metadata is populated.
 
@@ -65,9 +65,9 @@ Last updated: 2026-04-10 (ADL Phase C + sector/global strategy-side wiring lande
 - `ISF.LSE` (iShares Core FTSE UCITS): cached, used as FTSE 100 proxy
 
 ### What landed (2026-04-10, feat-weinstein, branch `feat/strategy-wiring`)
-- New `config.global_index_symbols : (string * string) list` field — `(index_symbol, label)` pairs. Default empty; `Weinstein_strategy.default_global_indices` exports the canonical (GDAXI, N225, ISF.LSE) triple. GSPC.INDX is intentionally omitted — it is already passed to `Macro.analyze` as `~index_bars`.
+- New `config.global_index_symbols : (string * string) list` field — `(index_symbol, label)` pairs. Default empty; `Weinstein_strategy.Macro_inputs.default_global_indices` exports the canonical (GDAXI, N225, ISF.LSE) triple. GSPC.INDX is intentionally omitted — it is already passed to `Macro.analyze` as `~index_bars`.
 - `_on_market_close` accumulates bars for each global index alongside the universe.
-- `_build_global_index_bars` emits `(label, weekly_bars)` pairs for `Macro.analyze`. Indices with no accumulated bars yet are silently dropped.
+- `Macro_inputs.build_global_index_bars` emits `(label, weekly_bars)` pairs for `Macro.analyze`. Indices with no accumulated bars yet are silently dropped.
 
 ---
 
