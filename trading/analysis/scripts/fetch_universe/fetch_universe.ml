@@ -69,6 +69,21 @@ let _to_instrument (entry : symbol_entry) : Types.Instrument_info.t =
     exchange = entry.exchange;
   }
 
+let _filter_entries ~allowed_types entries =
+  List.filter entries ~f:(fun e -> Set.mem allowed_types e.symbol_type)
+
+let _save_universe ~data_dir ~types ~total_fetched ~instruments =
+  printf "Fetched %d symbols, %d match type filter [%s]\n%!" total_fetched
+    (List.length instruments)
+    (String.concat ~sep:", " types);
+  match Universe.save ~data_dir instruments with
+  | Ok () ->
+      printf "Wrote universe.sexp: %d instruments\n%!" (List.length instruments);
+      return ()
+  | Error e ->
+      eprintf "Error writing universe: %s\n%!" (Status.show e);
+      Async.exit 1
+
 let main ~api_key ~exchange ~types ~data_dir_str () =
   let data_dir = Fpath.v data_dir_str in
   let allowed_types = String.Set.of_list types in
@@ -77,22 +92,11 @@ let main ~api_key ~exchange ~types ~data_dir_str () =
   | Error e ->
       eprintf "Error fetching symbols: %s\n%!" (Status.show e);
       Async.exit 1
-  | Ok entries -> (
-      let filtered =
-        List.filter entries ~f:(fun e -> Set.mem allowed_types e.symbol_type)
-      in
-      printf "Fetched %d symbols, %d match type filter [%s]\n%!"
-        (List.length entries) (List.length filtered)
-        (String.concat ~sep:", " types);
+  | Ok entries ->
+      let filtered = _filter_entries ~allowed_types entries in
       let instruments = List.map filtered ~f:_to_instrument in
-      match Universe.save ~data_dir instruments with
-      | Ok () ->
-          printf "Wrote universe.sexp: %d instruments\n%!"
-            (List.length instruments);
-          return ()
-      | Error e ->
-          eprintf "Error writing universe: %s\n%!" (Status.show e);
-          Async.exit 1)
+      _save_universe ~data_dir ~types ~total_fetched:(List.length entries)
+        ~instruments
 
 let command =
   Command.async
