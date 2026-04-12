@@ -11,7 +11,9 @@
   trading.base
   trading.orders
   matchers
-  core_unix.time_ns_unix))
+  core_unix.time_ns_unix)
+ (preprocess
+  (pps ppx_test_matcher)))
 
 (test
  (name test_price_path)
