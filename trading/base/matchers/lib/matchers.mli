@@ -33,10 +33,10 @@ val assert_that : 'a -> 'a matcher -> unit
 
     Example:
     {[
-      assert_that actual_price (float_equal 150.25)
+    assert_that actual_price (float_equal 150.25)
     ]}
     {[
-      assert_that result (is_ok_and_holds (equal_to expected_value))
+    assert_that result (is_ok_and_holds (equal_to expected_value))
     ]} *)
 
 (** {1 Basic Matchers} *)
@@ -47,10 +47,10 @@ val equal_to : ?cmp:('a -> 'a -> bool) -> ?msg:string -> 'a -> 'a -> unit
 
     Example:
     {[
-      assert_that result (is_ok_and_holds (equal_to expected))
+    assert_that result (is_ok_and_holds (equal_to expected))
     ]}
     {[
-      field (fun r -> r.order_id) (equal_to "order123")
+    field (fun r -> r.order_id) (equal_to "order123")
     ]} *)
 
 val field : ('a -> 'b) -> ('b -> unit) -> 'a -> unit
@@ -60,17 +60,17 @@ val field : ('a -> 'b) -> ('b -> unit) -> 'a -> unit
 
     Example:
     {[
-      assert_that order (field (fun o -> o.status) (equal_to Filled))
+    assert_that order (field (fun o -> o.status) (equal_to Filled))
     ]}
     {[
-      elements_are reports
-        [
-          all_of
-            [
-              field (fun r -> r.order_id) (equal_to order.id);
-              field (fun r -> r.status) (equal_to Filled);
-            ];
-        ]
+    elements_are reports
+      [
+        all_of
+          [
+            field (fun r -> r.order_id) (equal_to order.id);
+            field (fun r -> r.status) (equal_to Filled);
+          ];
+      ]
     ]} *)
 
 val not_ : ?msg:string -> 'a matcher -> 'a matcher
@@ -79,11 +79,11 @@ val not_ : ?msg:string -> 'a matcher -> 'a matcher
 
     Example:
     {[
-      assert_that actual (not_ (equal_to unexpected))
+    assert_that actual (not_ (equal_to unexpected))
     ]}
     {[
-      assert_that stage
-        (not_ (equal_to (Stage2 { weeks_advancing = 3; late = false })))
+    assert_that stage
+      (not_ (equal_to (Stage2 { weeks_advancing = 3; late = false })))
     ]} *)
 
 val all_of : ('a -> unit) list -> 'a -> unit
@@ -92,22 +92,22 @@ val all_of : ('a -> unit) list -> 'a -> unit
 
     Example:
     {[
-      assert_that order
-        (all_of
-           [
-             (fun o -> assert_equal "order1" o.order_id);
-             (fun o -> assert_equal Filled o.status);
-           ])
+    assert_that order
+      (all_of
+         [
+           (fun o -> assert_equal "order1" o.order_id);
+           (fun o -> assert_equal Filled o.status);
+         ])
     ]}
     {[
-      elements_are reports
-        [
-          all_of
-            [
-              field (fun r -> r.order_id) (equal_to order.id);
-              field (fun r -> r.status) (equal_to Filled);
-            ];
-        ]
+    elements_are reports
+      [
+        all_of
+          [
+            field (fun r -> r.order_id) (equal_to order.id);
+            field (fun r -> r.status) (equal_to Filled);
+          ];
+      ]
     ]} *)
 
 (** {1 Result Matchers}
@@ -120,7 +120,7 @@ val is_ok : 'a Status.status_or matcher
 
     Example:
     {[
-      assert_that (validate_input valid_data) is_ok
+    assert_that (validate_input valid_data) is_ok
     ]} *)
 
 val is_ok_and_holds : 'a matcher -> 'a Status.status_or matcher
@@ -129,10 +129,10 @@ val is_ok_and_holds : 'a matcher -> 'a Status.status_or matcher
 
     Example:
     {[
-      assert_that result (is_ok_and_holds (equal_to expected_value))
+    assert_that result (is_ok_and_holds (equal_to expected_value))
     ]}
     {[
-      assert_that result (is_ok_and_holds (float_equal 150.25))
+    assert_that result (is_ok_and_holds (float_equal 150.25))
     ]} *)
 
 val is_error : 'a Status.status_or matcher
@@ -142,7 +142,7 @@ val is_error : 'a Status.status_or matcher
 
     Example:
     {[
-      assert_that (validate_input invalid_data) is_error
+    assert_that (validate_input invalid_data) is_error
     ]} *)
 
 val is_error_with : ?msg:string -> Status.code -> 'a Status.status_or matcher
@@ -152,14 +152,13 @@ val is_error_with : ?msg:string -> Status.code -> 'a Status.status_or matcher
 
     Example:
     {[
-      assert_that (get_order manager "nonexistent") (is_error_with NotFound)
+    assert_that (get_order manager "nonexistent") (is_error_with NotFound)
     ]}
     {[
-      assert_that (create_order invalid_params) (is_error_with Invalid_argument)
+    assert_that (create_order invalid_params) (is_error_with Invalid_argument)
     ]}
     {[
-      assert_that result
-        (is_error_with Invalid_argument ~msg:"must be positive")
+    assert_that result (is_error_with Invalid_argument ~msg:"must be positive")
     ]} *)
 
 (** {1 Option Matchers}
@@ -172,12 +171,12 @@ val is_some_and : 'a matcher -> 'a option matcher
 
     Example:
     {[
-      assert_that
-        (get_position portfolio "AAPL")
-        (is_some_and (field position_quantity (float_equal 100.0)))
+    assert_that
+      (get_position portfolio "AAPL")
+      (is_some_and (field position_quantity (float_equal 100.0)))
     ]}
     {[
-      assert_that (Map.find cache key) (is_some_and (equal_to expected))
+    assert_that (Map.find cache key) (is_some_and (equal_to expected))
     ]} *)
 
 val is_none : 'a option matcher
@@ -185,10 +184,10 @@ val is_none : 'a option matcher
 
     Example:
     {[
-      assert_that (get_position portfolio "AAPL") is_none
+    assert_that (get_position portfolio "AAPL") is_none
     ]}
     {[
-      assert_that (Map.find cache "nonexistent") is_none
+    assert_that (Map.find cache "nonexistent") is_none
     ]} *)
 
 val matching : ?msg:string -> ('a -> 'b option) -> 'b matcher -> 'a matcher
@@ -198,16 +197,16 @@ val matching : ?msg:string -> ('a -> 'b option) -> 'b matcher -> 'a matcher
 
     Example:
     {[
-      assert_that result.stage
-        (matching ~msg:"Expected Stage2"
-           (function Stage2 x -> Some x | _ -> None)
-           (field (fun s -> s.weeks_advancing) (gt (module Int_ord) 0)))
+    assert_that result.stage
+      (matching ~msg:"Expected Stage2"
+         (function Stage2 x -> Some x | _ -> None)
+         (field (fun s -> s.weeks_advancing) (gt (module Int_ord) 0)))
     ]}
     {[
-      assert_that pos_state
-        (matching
-           (function Entering e -> Some e | _ -> None)
-           (field (fun e -> e.filled_quantity) (float_equal 50.0)))
+    assert_that pos_state
+      (matching
+         (function Entering e -> Some e | _ -> None)
+         (field (fun e -> e.filled_quantity) (float_equal 50.0)))
     ]} *)
 
 val pair : 'a matcher -> 'b matcher -> ('a * 'b) matcher
@@ -216,7 +215,7 @@ val pair : 'a matcher -> 'b matcher -> ('a * 'b) matcher
 
     Example:
     {[
-      assert_that result.transition (is_some_and (pair is_stage1 is_stage2))
+    assert_that result.transition (is_some_and (pair is_stage1 is_stage2))
     ]} *)
 
 (** {1 Numeric Matchers} *)
@@ -227,10 +226,10 @@ val float_equal : ?epsilon:float -> float -> float matcher
 
     Example:
     {[
-      assert_that actual_price (float_equal 150.25)
+    assert_that actual_price (float_equal 150.25)
     ]}
     {[
-      assert_that computed_value (float_equal ~epsilon:0.01 expected)
+    assert_that computed_value (float_equal ~epsilon:0.01 expected)
     ]} *)
 
 val gt : (module Ord with type t = 'a) -> 'a -> 'a matcher
@@ -240,10 +239,10 @@ val gt : (module Ord with type t = 'a) -> 'a -> 'a matcher
 
     Example:
     {[
-      assert_that result.count (gt (module Int_ord) 0)
+    assert_that result.count (gt (module Int_ord) 0)
     ]}
     {[
-      assert_that stats.r_squared (gt (module Float_ord) 0.99)
+    assert_that stats.r_squared (gt (module Float_ord) 0.99)
     ]} *)
 
 val ge : (module Ord with type t = 'a) -> 'a -> 'a matcher
@@ -251,7 +250,7 @@ val ge : (module Ord with type t = 'a) -> 'a -> 'a matcher
 
     Example:
     {[
-      assert_that trade.price (ge (module Float_ord) min_price)
+    assert_that trade.price (ge (module Float_ord) min_price)
     ]} *)
 
 val lt : (module Ord with type t = 'a) -> 'a -> 'a matcher
@@ -259,7 +258,7 @@ val lt : (module Ord with type t = 'a) -> 'a -> 'a matcher
 
     Example:
     {[
-      assert_that sharpe_with_rf (lt (module Float_ord) sharpe_no_rf)
+    assert_that sharpe_with_rf (lt (module Float_ord) sharpe_no_rf)
     ]} *)
 
 val le : (module Ord with type t = 'a) -> 'a -> 'a matcher
@@ -267,7 +266,7 @@ val le : (module Ord with type t = 'a) -> 'a -> 'a matcher
 
     Example:
     {[
-      assert_that trade.price (le (module Float_ord) max_price)
+    assert_that trade.price (le (module Float_ord) max_price)
     ]} *)
 
 val is_between :
@@ -277,8 +276,8 @@ val is_between :
 
     Example:
     {[
-      assert_that result.confidence
-        (is_between (module Float_ord) ~low:0.0 ~high:1.0)
+    assert_that result.confidence
+      (is_between (module Float_ord) ~low:0.0 ~high:1.0)
     ]} *)
 
 (** {1 List Matchers} *)
@@ -289,11 +288,11 @@ val each : 'a matcher -> 'a list matcher
 
     Example:
     {[
-      assert_that orders (each (field (fun o -> o.status) (equal_to Filled)))
+    assert_that orders (each (field (fun o -> o.status) (equal_to Filled)))
     ]}
     {[
-      assert_that reports
-        (each (all_of [ field (fun r -> r.status) (equal_to Filled) ]))
+    assert_that reports
+      (each (all_of [ field (fun r -> r.status) (equal_to Filled) ]))
     ]} *)
 
 val one : 'a matcher -> 'a list matcher
@@ -302,10 +301,10 @@ val one : 'a matcher -> 'a list matcher
 
     Example:
     {[
-      assert_that pending_orders (one (field (fun o -> o.id) (equal_to id)))
+    assert_that pending_orders (one (field (fun o -> o.id) (equal_to id)))
     ]}
     {[
-      assert_that results (one (equal_to expected))
+    assert_that results (one (equal_to expected))
     ]} *)
 
 val elements_are : 'a matcher list -> 'a list matcher
@@ -316,29 +315,29 @@ val elements_are : 'a matcher list -> 'a list matcher
 
     Example:
     {[
-      assert_that reports
-        (elements_are
-           [
-             (fun r -> assert_equal "order1" r.order_id);
-             (fun r -> assert_equal "order2" r.order_id);
-             (fun r -> assert_equal "order3" r.order_id);
-           ])
+    assert_that reports
+      (elements_are
+         [
+           (fun r -> assert_equal "order1" r.order_id);
+           (fun r -> assert_equal "order2" r.order_id);
+           (fun r -> assert_equal "order3" r.order_id);
+         ])
     ]}
     {[
-      assert_that orders
-        (elements_are
-           [
-             all_of
-               [
-                 field (fun o -> o.id) (equal_to "order1");
-                 field (fun o -> o.status) (equal_to Pending);
-               ];
-             all_of
-               [
-                 field (fun o -> o.id) (equal_to "order2");
-                 field (fun o -> o.status) (equal_to Filled);
-               ];
-           ])
+    assert_that orders
+      (elements_are
+         [
+           all_of
+             [
+               field (fun o -> o.id) (equal_to "order1");
+               field (fun o -> o.status) (equal_to Pending);
+             ];
+           all_of
+             [
+               field (fun o -> o.id) (equal_to "order2");
+               field (fun o -> o.status) (equal_to Filled);
+             ];
+         ])
     ]} *)
 
 val unordered_elements_are : 'a matcher list -> 'a list matcher
@@ -352,21 +351,21 @@ val unordered_elements_are : 'a matcher list -> 'a list matcher
 
     Example:
     {[
-      assert_that reports
-        (unordered_elements_are
-           [
-             field (fun r -> r.order_id) (equal_to "order1");
-             field (fun r -> r.order_id) (equal_to "order2");
-             field (fun r -> r.order_id) (equal_to "order3");
-           ])
+    assert_that reports
+      (unordered_elements_are
+         [
+           field (fun r -> r.order_id) (equal_to "order1");
+           field (fun r -> r.order_id) (equal_to "order2");
+           field (fun r -> r.order_id) (equal_to "order3");
+         ])
     ]}
     {[
-      assert_that positions
-        (unordered_elements_are
-           [
-             field (fun p -> p.symbol) (equal_to "AAPL");
-             field (fun p -> p.symbol) (equal_to "MSFT");
-           ])
+    assert_that positions
+      (unordered_elements_are
+         [
+           field (fun p -> p.symbol) (equal_to "AAPL");
+           field (fun p -> p.symbol) (equal_to "MSFT");
+         ])
     ]} *)
 
 val size_is : int -> 'a list matcher
@@ -374,7 +373,7 @@ val size_is : int -> 'a list matcher
 
     Example:
     {[
-      assert_that pending_orders (size_is 3)
+    assert_that pending_orders (size_is 3)
     ]} *)
 
 val is_empty : 'a list matcher
@@ -382,5 +381,5 @@ val is_empty : 'a list matcher
 
     Example:
     {[
-      assert_that pending_orders is_empty
+    assert_that pending_orders is_empty
     ]} *)
