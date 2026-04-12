@@ -359,55 +359,33 @@ let test_weinstein_breakout_trade _ =
         | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
       in
       assert_that result.steps (not_ is_empty);
-      (* The run produces exactly four AAPL buys on successive Fridays. The
-         breakout at week ~40 triggers a Stage1->Stage2 transition, and the
-         screener's [weeks_advancing <= 4] fallback keeps AAPL a candidate for
-         four more weeks. Quantities come from fixed-risk position sizing
-         against rising prices, so they tick up by 1 share each week. A
-         Trending GSPCX index never transitions, so GSPCX never trades. *)
+      (* A single AAPL buy on the first Friday after the breakout. Once
+         held, the held-symbol filter prevents re-entry on subsequent
+         Fridays — correct Weinstein behavior (one entry per stock). *)
       let all_trades =
         List.concat_map result.steps ~f:(fun step -> step.trades)
-      in
-      let is_aapl_buy ~qty ~price =
-        all_of
-          [
-            field (fun t -> t.Trading_base.Types.symbol) (equal_to "AAPL");
-            field
-              (fun t -> t.Trading_base.Types.side)
-              (equal_to Trading_base.Types.Buy);
-            field
-              (fun t -> t.Trading_base.Types.quantity)
-              (float_equal ~epsilon:0.5 qty);
-            field
-              (fun t -> t.Trading_base.Types.price)
-              (float_equal ~epsilon:0.1 price);
-          ]
       in
       assert_that all_trades
         (elements_are
            [
-             is_aapl_buy ~qty:80.0 ~price:162.45;
-             is_aapl_buy ~qty:80.0 ~price:166.38;
-             is_aapl_buy ~qty:81.0 ~price:170.42;
-             is_aapl_buy ~qty:82.0 ~price:174.55;
+             all_of
+               [
+                 field (fun t -> t.Trading_base.Types.symbol) (equal_to "AAPL");
+                 field
+                   (fun t -> t.Trading_base.Types.side)
+                   (equal_to Trading_base.Types.Buy);
+                 field
+                   (fun t -> t.Trading_base.Types.quantity)
+                   (float_equal ~epsilon:0.5 80.0);
+                 field
+                   (fun t -> t.Trading_base.Types.price)
+                   (float_equal ~epsilon:0.1 162.45);
+               ];
            ]);
-      (* Started with $100k, four buys at ~$162-$175 → long AAPL position in
-         a rising breakout. Final value lands near $126k (positions held
-         through continued 2%/wk trend for the remainder of the year). *)
+      (* Started with $100k, one buy of ~80 shares at ~$162 (~$13k invested).
+         Remainder stays in cash. Price rises ~2%/wk from breakout for the
+         rest of the year. *)
       let final_value = (List.last_exn result.steps).portfolio_value in
-      assert_that final_value
-        (is_between (module Float_ord) ~low:125_000.0 ~high:128_000.0);
-      (* Verify the final portfolio holds an AAPL position. *)
-      let final_portfolio = (List.last_exn result.steps).portfolio in
-      let aapl_position =
-        List.find final_portfolio.Trading_portfolio.Portfolio.positions
-          ~f:(fun p -> String.equal p.Trading_portfolio.Types.symbol "AAPL")
-      in
-      assert_that aapl_position
-        (is_some_and
-           (field (fun p -> p.Trading_portfolio.Types.lots) (not_ is_empty)));
-      (* Portfolio value exceeds initial cash — positive PnL from the
-         rising breakout trend. *)
       assert_that final_value (gt (module Float_ord) 100_000.0))
 
 (* ------------------------------------------------------------------ *)

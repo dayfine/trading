@@ -91,11 +91,28 @@ let _make_entry_transition ~config ~stop_states ~portfolio_value ~current_date
     in
     Some { Position.position_id = id; date = current_date; kind }
 
-(** Generate CreateEntering transitions for top screener candidates. *)
+(** Check that entry cost fits remaining cash; deduct if so. *)
+let _check_cash_and_deduct remaining_cash (trans : Position.transition) =
+  match trans.kind with
+  | Position.CreateEntering e ->
+      let cost = e.target_quantity *. e.entry_price in
+      if Float.( > ) cost !remaining_cash then None
+      else (
+        remaining_cash := !remaining_cash -. cost;
+        Some trans)
+  | _ -> Some trans
+
+(** Collect ticker symbols of all held positions. *)
+let _held_symbols (portfolio : Portfolio_view.t) =
+  Map.data portfolio.positions |> List.map ~f:(fun (p : Position.t) -> p.symbol)
+
+(** Generate CreateEntering transitions for top screener candidates. Tracks
+    remaining cash to avoid generating orders that exceed funds. *)
 let _entries_from_candidates ~config ~candidates ~stop_states
     ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
-  let held = Map.keys portfolio.positions in
+  let held = _held_symbols portfolio in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
+  let remaining_cash = ref portfolio.cash in
   let make_entry =
     _make_entry_transition ~config ~stop_states ~portfolio_value ~current_date
   in
@@ -103,6 +120,7 @@ let _entries_from_candidates ~config ~candidates ~stop_states
   |> List.filter ~f:(fun (c : Screener.scored_candidate) ->
       not (List.mem held c.ticker ~equal:String.equal))
   |> List.filter_map ~f:make_entry
+  |> List.filter_map ~f:(_check_cash_and_deduct remaining_cash)
 
 (** Screen the universe for buy candidates. Returns entry transitions. *)
 let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
@@ -131,8 +149,7 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
   let stocks = List.filter_map config.universe ~f:_analyze_ticker in
   let screen_result =
     Screener.screen ~config:config.screening_config ~macro_trend ~sector_map
-      ~stocks
-      ~held_tickers:(Map.keys portfolio.positions)
+      ~stocks ~held_tickers:(_held_symbols portfolio)
   in
   _entries_from_candidates ~config
     ~candidates:screen_result.Screener.buy_candidates ~stop_states ~portfolio

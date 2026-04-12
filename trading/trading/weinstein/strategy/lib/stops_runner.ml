@@ -1,22 +1,24 @@
 open Core
 open Trading_strategy
 
-(** Compute MA direction for a symbol from its accumulated bar history. Reads
-    and updates [prior_stages] so Stage1->Stage2 transition detection works
-    across calls. Returns [Flat] if there aren't enough bars yet for the MA. *)
-let _compute_ma_direction ~(stage_config : Stage.config) ~lookback_bars
-    ~bar_history ~prior_stages ~symbol =
+(** Compute MA direction and value for a symbol from its accumulated bar
+    history. Reads and updates [prior_stages] so Stage1->Stage2 transition
+    detection works across calls. Returns [(Flat, close_price)] when there
+    aren't enough bars yet for the MA. *)
+let _compute_ma ~(stage_config : Stage.config) ~lookback_bars ~bar_history
+    ~prior_stages ~symbol ~fallback_price =
   let weekly =
     Bar_history.weekly_bars_for bar_history ~symbol ~n:lookback_bars
   in
-  if List.length weekly < stage_config.ma_period then Weinstein_types.Flat
+  if List.length weekly < stage_config.ma_period then
+    (Weinstein_types.Flat, fallback_price)
   else
     let prior_stage = Hashtbl.find prior_stages symbol in
     let result =
       Stage.classify ~config:stage_config ~bars:weekly ~prior_stage
     in
     Hashtbl.set prior_stages ~key:symbol ~data:result.stage;
-    result.ma_direction
+    (result.ma_direction, result.ma_value)
 
 let _make_exit_transition ~(pos : Position.t) ~current_date ~state ~bar =
   let actual_price = bar.Types.Daily_price.low_price in
@@ -55,13 +57,13 @@ let _handle_stop ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
     ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
     ~bar_history ~prior_stages =
   let current_date = bar.Types.Daily_price.date in
-  let ma_direction =
-    _compute_ma_direction ~stage_config ~lookback_bars ~bar_history
-      ~prior_stages ~symbol:ticker
+  let ma_direction, ma_value =
+    _compute_ma ~stage_config ~lookback_bars ~bar_history ~prior_stages
+      ~symbol:ticker ~fallback_price:bar.Types.Daily_price.close_price
   in
   let new_state, event =
     Weinstein_stops.update ~config:stops_config ~side:pos.Position.side ~state
-      ~current_bar:bar ~ma_value:bar.close_price ~ma_direction
+      ~current_bar:bar ~ma_value ~ma_direction
       ~stage:(Weinstein_types.Stage2 { weeks_advancing = 1; late = false })
   in
   stop_states := Map.set !stop_states ~key:ticker ~data:new_state;
@@ -78,8 +80,8 @@ let _handle_stop ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
 (** Process stop for one position; returns updated (exits, adjusts) accumulator.
 *)
 let _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
-    ~get_price ~bar_history ~prior_stages ticker (pos : Position.t)
-    (exits, adjusts) =
+    ~get_price ~bar_history ~prior_stages (pos : Position.t) (exits, adjusts) =
+  let ticker = pos.symbol in
   match
     (Position.get_state pos, Map.find !stop_states ticker, get_price ticker)
   with
@@ -96,6 +98,6 @@ let _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
 
 let update ~stops_config ~stage_config ~lookback_bars ~positions ~get_price
     ~stop_states ~bar_history ~prior_stages =
-  Map.fold positions ~init:([], []) ~f:(fun ~key:ticker ~data:pos acc ->
+  Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
       _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
-        ~get_price ~bar_history ~prior_stages ticker pos acc)
+        ~get_price ~bar_history ~prior_stages pos acc)
