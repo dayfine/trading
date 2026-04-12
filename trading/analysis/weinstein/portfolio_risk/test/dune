@@ -1,5 +1,6 @@
 (test
  (name test_portfolio_risk)
+ (modules test_portfolio_risk)
  (libraries
   portfolio_risk
   ounit2
@@ -8,5 +9,23 @@
   trading.portfolio
   trading.base
   status)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(test
+ (name test_portfolio_risk_e2e)
+ (modules test_portfolio_risk_e2e)
+ (libraries
+  portfolio_risk
+  weinstein_trading.stops
+  weinstein_trading.order_gen
+  weinstein.data_source.testing
+  weinstein.types
+  stage
+  trading.base
+  trading.strategy
+  core
+  ounit2
+  matchers)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
