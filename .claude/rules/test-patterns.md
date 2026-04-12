@@ -3,15 +3,44 @@ description: Test patterns using the Matchers library (base/matchers/)
 globs: ["**/test/*.ml"]
 ---
 
+## Core Rule: One `assert_that` per Value
+
+Each value under test gets **one** `assert_that` call. Compose multiple checks into the matcher tree using `all_of`, `field`, `elements_are`, etc. — never nest a second `assert_that` inside a matcher callback.
+
+```ocaml
+(* GOOD: single assert_that, multiple checks via all_of + field *)
+assert_that order_result
+  (is_ok_and_holds
+    (all_of [
+      field (fun o -> o.status) (equal_to Filled);
+      field (fun o -> o.price) (float_equal 100.0);
+    ]))
+
+(* AVOID: nested assert_that inside matcher callback *)
+assert_that order_result
+  (is_ok_and_holds (fun order ->
+    assert_that order.status (equal_to Filled);
+    assert_that order.price (float_equal 100.0)))
+```
+
+When checking multiple aspects of the same value, compose them into one `assert_that`:
+
+```ocaml
+(* GOOD: one assert on portfolio, checks composed via all_of + field *)
+assert_that portfolio
+  (all_of [
+    field (fun p -> p.current_cash) (float_equal 9000.0);
+    field (fun p -> Hashtbl.length p.positions) (equal_to 1);
+  ])
+```
+
 ## Use the Matchers Library (`base/matchers/`)
 
 ```ocaml
 open Matchers
 
 (* Assert on Result types with fluent matchers *)
-assert_that result
-  (is_ok_and_holds (fun value ->
-       assert_that value (float_equal expected)))
+assert_that result (is_ok_and_holds (float_equal expected))
 
 (* Assert errors *)
 assert_that result is_error
@@ -28,8 +57,8 @@ assert_that actual (float_equal ~epsilon:1e-6 expected)
 
 (* Accessing portfolio fields directly *)
 assert_that portfolio.current_cash (float_equal 10000.0)
-let position = Hashtbl.find portfolio.positions "AAPL" in
-assert_that position (is_some_and (fun pos -> ...))
+assert_that (Hashtbl.find portfolio.positions "AAPL")
+  (is_some_and (field (fun pos -> pos.quantity) (float_equal 10.0)))
 ```
 
 ## Matcher Composition Patterns
@@ -65,23 +94,23 @@ assert_that position (is_some_and (fun pos -> ...))
        equal_to ({ time = 0.5; price = 105.0 } : path_point);
      ])
 
-   (* GOOD: per-element callbacks when records have dynamic fields *)
+   (* GOOD: per-element matchers using all_of + field *)
    assert_that result.trades
      (elements_are [
-       (fun trade ->
-         assert_that trade.symbol (equal_to "AAPL");
-         assert_that trade.side (equal_to Buy));
+       all_of [
+         field (fun t -> t.symbol) (equal_to "AAPL");
+         field (fun t -> t.side) (equal_to Buy);
+       ];
      ])
 
    (* GOOD: nested elements_are mirrors data structure *)
    assert_that steps
      (elements_are [
-       (fun step -> assert_that step.trades (size_is 0));
-       (fun step ->
-         assert_that step.trades
-           (elements_are [
-             (fun t -> assert_that t.side (equal_to Buy));
-           ]));
+       field (fun step -> step.trades) (size_is 0);
+       field (fun step -> step.trades)
+         (elements_are [
+           field (fun t -> t.side) (equal_to Buy);
+         ]);
      ])
    ```
 
@@ -144,7 +173,7 @@ assert_that position (is_some_and (fun pos -> ...))
    ```
 
 **Key Principles:**
-- Never nest `assert_that` inside `is_some_and`/`is_ok_and_holds`/`matching` callbacks — use `field` or `all_of [field ...]`
+- **One `assert_that` per value** — never nest `assert_that` inside a matcher callback; use `field`, `all_of`, `elements_are` to compose checks
 - Use type annotations to enable structural equality
 - Inline values for clarity; prefer `elements_are` over `size_is` + extraction
 
