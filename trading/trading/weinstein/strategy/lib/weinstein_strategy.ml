@@ -228,11 +228,15 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = []) config =
   let sector_prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
+  (* Macro.analyze requires weekly-cadence ad_bars (see Macro.ad_bar's
+     cadence contract). Loaders like Ad_bars.Unicorn return daily bars, so
+     normalize once at load time — not on every on_market_close call. *)
+  let weekly_ad_bars = Ad_bars_aggregation.daily_to_weekly ad_bars in
   let module M = struct
     let name = name
 
     let on_market_close =
-      _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
-        ~prior_stages ~sector_prior_stages
+      _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states ~prior_macro
+        ~bar_history ~prior_stages ~sector_prior_stages
   end in
   (module M : Strategy_interface.STRATEGY)
