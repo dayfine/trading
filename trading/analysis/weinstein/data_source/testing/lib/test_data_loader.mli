@@ -12,9 +12,7 @@
     - [GSPC.INDX] — daily bars from at least 2020-01-01
 
     If data is missing, run:
-    {v
-      fetch_symbols.exe --symbols AAPL,GSPC.INDX --api-key <key>
-    v}
+    {v   fetch_symbols.exe --symbols AAPL,GSPC.INDX --api-key <key> v}
 
     See also: [ops-data] agent for data inventory management. *)
 
