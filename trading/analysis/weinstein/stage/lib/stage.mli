@@ -95,8 +95,8 @@ val classify :
     bottleneck, add:
 
     {[
-      val classify_step :
-        config:config -> prev_result:result -> new_bar:Daily_price.t -> result
+    val classify_step :
+      config:config -> prev_result:result -> new_bar:Daily_price.t -> result
     ]}
 
     [classify_step] would maintain an incremental MA state (e.g. a sliding
@@ -122,11 +122,11 @@ val classify :
     [analysis/technical/indicators/] with a [slope] function:
 
     {[
-      val slope :
-        lookback:int ->
-        threshold:float ->
-        (Date.t * float) list ->
-        ma_direction * float
+    val slope :
+      lookback:int ->
+      threshold:float ->
+      (Date.t * float) list ->
+      ma_direction * float
     ]}
 
     This would eliminate the per-module slope implementations and give a single
