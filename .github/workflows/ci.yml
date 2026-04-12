@@ -26,6 +26,15 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+      # The ocaml/opam base image sets USER opam (uid 1000) by default.
+      # GitHub Actions creates /__w/_temp/_runner_file_commands/ owned by
+      # the host runner user — the non-root container user can't write to
+      # it, which crashes actions/checkout's post-step save_state (EACCES).
+      # Run the container as root and point HOME at /home/opam so opam env
+      # still finds the installed 5.3 switch at /home/opam/.opam.
+      options: --user 0
+    env:
+      HOME: /home/opam
     defaults:
       run:
         shell: bash
