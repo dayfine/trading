@@ -150,7 +150,88 @@ If SSGA holdings prove unusable:
 
 ## Open questions
 
-1. Does the SSGA holdings URL pattern above actually return CSV-parseable data without auth? (Phase 0 validation)
-2. How many tickers appear in multiple SPDR sector ETFs? (Affects dedup logic in Phase 1)
-3. Is ETF selection expressed per-ticker or per-holding-row in the SSGA file? (Affects parser)
+1. Does the SSGA holdings URL pattern above actually return CSV-parseable data without auth? (Phase 0 validation) — **Answered in Phase 0 below: yes, with XLSX.**
+2. How many tickers appear in multiple SPDR sector ETFs? (Affects dedup logic in Phase 1) — **Answered: zero.**
+3. Is ETF selection expressed per-ticker or per-holding-row in the SSGA file? (Affects parser) — **Answered: each ETF is a separate file; the sector is implied by the ETF symbol.**
 4. Do we care about Russell 2000 small-caps right now? If yes, we need more ETFs (VB, IWM constituents). If no, the 11 SPDR ETFs are sufficient.
+
+## Phase 0 validation — 2026-04-11
+
+**Verdict: SSGA works. Proceed with Phase 1 as planned.**
+
+### Confirmed URL pattern
+
+```
+https://www.ssga.com/us/en/individual/etfs/library-content/products/fund-data/etfs/us/holdings-daily-us-en-{symbol}.xlsx
+```
+
+All 11 SPDR sector ETFs return `HTTP 200` with a valid XLSX payload, no authentication, no API key, no cookies required. The URL issues a 301 chain to the canonical host
+`https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-{symbol}.xlsx` — either form works; any HTTP client that follows redirects is fine. `cohttp` does.
+
+Working example (XLK, 2026-04-11 fetch): 22,898 bytes, `content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `last-modified: Fri, 10 Apr 2026 10:12:09 GMT`, served via Akamai.
+
+### File format
+
+**XLSX (Office Open XML).** No CSV variant exposed on the same URL. Structure is uniform across all 11 ETFs:
+
+| Row | Content |
+|-----|---------|
+| 1 | `Fund Name:` \| `State Street® ... Select Sector SPDR® ETF` |
+| 2 | `Ticker Symbol:` \| `<ETF>` (e.g. `XLK`) |
+| 3 | `Holdings:` \| `As of DD-Mon-YYYY` |
+| 4 | *(blank)* |
+| 5 | Header: `Name` \| `Ticker` \| `Identifier` \| `SEDOL` \| `Weight` \| `Sector` \| `Shares Held` \| `Local Currency` |
+| 6… | Holdings rows until a blank row |
+| trailing | ~100 trailing blank rows (padding) |
+
+**Critical note: the `Sector` column is literally populated with `-`** across every row in every file sampled. SSGA does not tag individual holdings with GICS sectors in the daily-holdings disclosure. **This is fine** — each ETF *is* a GICS sector, so the parser should derive sector from the filename/ETF symbol, not from column F. The plan already assumed this (phrased as "sector assignment is a function of the ticker"), but it's worth stating explicitly: Phase 1 must map `ETF symbol → GICS sector name` with a hardcoded 11-entry table, not read the `Sector` column.
+
+### Coverage sampled on 2026-04-11
+
+| ETF | GICS sector | Holdings |
+|-----|-------------|----------|
+| XLK | Technology | 72 |
+| XLF | Financials | 75 |
+| XLE | Energy | 21 |
+| XLV | Health Care | 57 |
+| XLI | Industrials | 78 |
+| XLP | Consumer Staples | 35 |
+| XLY | Consumer Discretionary | 47 |
+| XLU | Utilities | 30 |
+| XLB | Materials | 25 |
+| XLRE | Real Estate | 30 |
+| XLC | Communication Services | 22 |
+| **Total unique** | | **492** |
+
+**Zero ticker overlap between ETFs.** The SPDR sector ETFs cleanly partition the S&P 500 — every ticker belongs to exactly one sector file. This means Phase 1 does **not** need dedup logic, resolving open question #2 above.
+
+Ticker formats observed include dotted class shares: `BRK.B` in XLF. The Phase 1 ticker validator should accept `[A-Z]+(\.[A-Z]+)?`, not just `[A-Z]+`.
+
+### Engineering notes for Phase 1 (OCaml fetcher)
+
+1. **HTTP**: `cohttp-lwt-unix` with redirect following. No auth, no custom headers beyond a benign `User-Agent` (verified working with `Mozilla/5.0`). Akamai returns standard `ETag` + `Last-Modified` — Phase 1 can use these for conditional requests on refresh.
+2. **XLSX parsing**: the container does not currently have an OCaml XLSX library. Options, in order of preference:
+   - Write a minimal XLSX reader in OCaml. XLSX is a zip containing `xl/sharedStrings.xml` and `xl/worksheets/sheet1.xml`. We only need: (a) unzip (use `camlzip`, already pulled in transitively by other deps — verify), (b) parse two flat XML files with `xmlm`. The sheet has ≤200 rows, ≤8 columns, no formulas, no styles, no merged cells. A 100-line reader suffices.
+   - Convert XLSX → CSV offline with `ssconvert` (gnumeric) or `libreoffice --headless --convert-to csv` as a build step, then commit the CSVs. Rejected: reintroduces the external-tool concern that killed the Wikipedia/Python plan.
+   - Shell out to a Python one-liner using `openpyxl`. Rejected for the same reason.
+   - **Recommendation**: native OCaml XLSX reader, scoped to exactly the shape SSGA produces. Put it under `analysis/data/sources/ssga/` as `xlsx_reader.ml` — narrow interface, ~100 lines, one test that reads a committed fixture.
+3. **Parser behavior**:
+   - Skip rows 1–4 (metadata).
+   - Row 5 is the header; assert `Ticker` is column B and `Weight` is column E. Fail loudly on schema drift.
+   - Iterate rows 6..N. Stop at the first row where column B is blank or does not match `^[A-Z]+(\.[A-Z]+)?$`. The trailing padding rows are all-empty.
+   - Emit `(ticker, etf_symbol, weight, fetched_at)` per row.
+4. **Sector mapping**: hardcode `ETF → GICS sector name` in an `Etf_sectors` module. Do not read the `Sector` column (always `-`).
+5. **Idempotency**: running twice in one day should be a no-op. Use `ETag`/`Last-Modified` from the HTTP response and skip rewriting `data/sectors.csv` if nothing changed.
+6. **Error handling**: if any single ETF fails, log and continue with the others; write a partial `sectors.csv` and record the failures in `sectors.csv.manifest`. Phase 1's success criterion is "at least 9 of 11 ETFs parsed" — the screener degrades gracefully on missing sectors.
+
+### Rate limits, auth, and ToS
+
+- **No auth.** Public, unauthenticated endpoint served via Akamai CDN.
+- **No rate-limit headers.** No `X-RateLimit-*` in responses. Fetching 11 files once/day is trivial traffic and will not trip any reasonable limiter.
+- **ToS**: SSGA's site terms permit personal/informational use of fund data. This is ETF regulatory disclosure data — it is distributed specifically so that third parties (including automated systems) can ingest it. No commercial redistribution is planned; we only use it to build an internal ticker→sector map.
+- **Cache politeness**: respect `ETag`/`If-None-Match` on refreshes so unchanged files return `304` rather than re-downloading.
+- **No stability guarantee** from SSGA that the URL will never move. The Phase 3 refresh cadence should surface a loud error (not silent failure) if HTTP 404 is ever returned, so a URL move is caught at the next refresh.
+
+### Fallback sources — not tested
+
+SSGA succeeded on the first try, so iShares / Invesco / Vanguard alternatives were not exercised. If SSGA ever breaks, the fallback order stays as documented in "Fallback options" above.
