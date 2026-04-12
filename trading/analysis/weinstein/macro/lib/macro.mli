@@ -74,10 +74,17 @@ val default_config : config
 
 type ad_bar = {
   date : Core.Date.t;
-  advancing : int;  (** Number of NYSE advancing issues. *)
-  declining : int;  (** Number of NYSE declining issues. *)
+  advancing : int;  (** Number of NYSE advancing issues in the period. *)
+  declining : int;  (** Number of NYSE declining issues in the period. *)
 }
-(** A-D line data for one period. *)
+(** A-D line data for one period.
+
+    {b Cadence contract}: {!analyze} interprets [ad_bar list] as {b weekly} data
+    so that its bar-count lookback parameters (e.g. [ad_line_lookback],
+    [momentum_period]) are unit-consistent with [index_bars]. Loaders such as
+    [Ad_bars.Unicorn] return daily bars; callers must aggregate them with
+    {!Ad_bars_aggregation.daily_to_weekly} before passing them into [analyze].
+*)
 
 type result = {
   index_stage : Stage.result;
@@ -106,7 +113,11 @@ val analyze :
     @param index_bars
       Weekly bars for the primary index (DJI or SPX), chronological
       oldest-first.
-    @param ad_bars Daily A-D data. May be empty if not available.
+    @param ad_bars
+      {b Weekly}-cadence A-D breadth data, chronological oldest-first. Each bar
+      holds the week's total advancing and declining issue counts. May be empty
+      if breadth data is not available. Callers that start from a daily feed
+      must aggregate first via {!Ad_bars_aggregation.daily_to_weekly}.
     @param global_index_bars
       Weekly bars for each global index, as [(name, bars)] pairs. May be empty.
     @param prior_stage Prior week's index stage (for transition detection).
