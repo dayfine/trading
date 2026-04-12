@@ -125,4 +125,6 @@
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk
   ounit2
-  matchers))
+  matchers)
+ (preprocess
+  (pps ppx_test_matcher)))

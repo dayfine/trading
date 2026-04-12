@@ -1,0 +1,5 @@
+(executable
+ (name compute_synthetic_adl)
+ (libraries core core_unix.command_unix weinstein.data_source)
+ (preprocess
+  (pps ppx_jane)))
