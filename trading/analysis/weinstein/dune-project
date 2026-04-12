@@ -17,4 +17,5 @@
   status
   types
   csv
-  eodhd))
+  eodhd
+  indicators))
