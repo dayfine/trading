@@ -310,7 +310,7 @@ let test_weinstein_breakout_trade _ =
                       base_price = 150.0;
                       base_weeks = 40;
                       weekly_gain_pct = 0.02;
-                      breakout_volume_mult = 8.0;
+                      breakout_volume_mult = 3.0;
                       base_volume = 50_000_000;
                     } );
                 ( "GSPCX",
@@ -436,7 +436,7 @@ let test_weinstein_bearish_index_suppresses_entries _ =
                       base_price = 150.0;
                       base_weeks = 40;
                       weekly_gain_pct = 0.02;
-                      breakout_volume_mult = 8.0;
+                      breakout_volume_mult = 3.0;
                       base_volume = 50_000_000;
                     } );
                 ( "GSPCX",
