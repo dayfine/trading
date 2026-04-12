@@ -34,6 +34,9 @@ _opam/
 # Agent runtime files (logs, lock files, worktrees)
 dev/logs/*.log
 dev/logs/*.running
+
+# Backtest output
+dev/backtest/
 .claude/worktrees/
 
 # jj conflict materialization directories (never commit these)
