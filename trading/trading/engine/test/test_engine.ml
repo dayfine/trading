@@ -51,7 +51,8 @@ let setup_order_test ~order_type ~side ?(symbol = "AAPL") ?(quantity = 100.0)
     | Error err -> failwith ("Failed to create order: " ^ Status.show err)
   in
   submit_single_order order_mgr order;
-  update_market engine [ quote ];
+  let path_config = { default_config with seed = Some 42 } in
+  update_market ~path_config engine [ quote ];
   (engine, order_mgr, order)
 
 (* Assert that order was not executed and remains pending *)
