@@ -21,7 +21,7 @@
   weinstein_trading.order_gen
   weinstein.data_source.testing
   weinstein.types
-  stage
+  weinstein.stage
   trading.base
   trading.strategy
   core

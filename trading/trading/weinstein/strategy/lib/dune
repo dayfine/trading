@@ -9,7 +9,7 @@
   trading.strategy
   weinstein.types
   weinstein_trading.stops
-  weinstein.portfolio_risk
+  weinstein_trading.portfolio_risk
   weinstein.stage
   weinstein.macro
   weinstein.sector

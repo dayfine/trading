@@ -123,6 +123,6 @@
   trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
-  weinstein.portfolio_risk
+  weinstein_trading.portfolio_risk
   ounit2
   matchers))
