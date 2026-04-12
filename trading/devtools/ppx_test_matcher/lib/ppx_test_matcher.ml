@@ -8,30 +8,23 @@ open Ppxlib
     type t = { x : float; y : int } [@@deriving test_matcher]
     ]}
 
-    It generates a function [match_t] with one labeled parameter per field, each
-    defaulting to [ignore] (accept anything):
+    It generates a function [match_t] with one required labeled parameter per
+    field:
     {[
-    let match_t ?(x = fun _ -> ()) ?(y = fun _ -> ()) () (r : t) =
+    let match_t ~x ~y (r : t) =
       x r.x;
       y r.y
     ]}
 
-    When a field is added to the record, call sites that do not supply the new
-    label still compile, but adding [~strict:true] (or removing the default)
-    makes omissions a compiler error. The primary exhaustiveness guarantee comes
-    from the generated function touching every field — if the type changes, the
-    deriver output changes, and any pattern-match or field access in the
-    generated code will fail to compile. *)
+    Every field must be explicitly matched or ignored with [__] (the wildcard
+    matcher from [Matchers]). If a field is added to the record, all call sites
+    get a compiler error until they handle it. *)
 
-let ignore_expr ~loc = [%expr fun _ -> ()]
-
-(** Build one optional labeled parameter: [?(field_name = fun _ -> ())] *)
+(** Build one required labeled parameter: [~field_name] *)
 let _make_field_param ~loc (ld : label_declaration) =
   let field_name = ld.pld_name.txt in
   let pat = Ast_builder.Default.ppat_var ~loc { txt = field_name; loc } in
-  Ast_builder.Default.pexp_fun ~loc (Optional field_name)
-    (Some (ignore_expr ~loc))
-    pat
+  Ast_builder.Default.pexp_fun ~loc (Labelled field_name) None pat
 
 (** Build a field assertion expression: [field_name r.field_name] *)
 let _make_field_assert ~loc ~record_var (ld : label_declaration) =
@@ -70,17 +63,11 @@ let _generate_matcher ~loc ~type_name ~record_var
   let with_record_param =
     Ast_builder.Default.pexp_fun ~loc Nolabel None record_pat body
   in
-  (* Add unit parameter before the record param for optional arg erasure *)
-  let with_unit =
-    Ast_builder.Default.pexp_fun ~loc Nolabel None
-      (Ast_builder.Default.ppat_construct ~loc { txt = Lident "()"; loc } None)
-      with_record_param
-  in
-  (* Wrap with optional labeled parameters for each field (in reverse so
+  (* Wrap with required labeled parameters for each field (in reverse so
      first field is outermost) *)
   List.fold_right
     (fun (ld : label_declaration) acc -> _make_field_param ~loc ld acc)
-    fields with_unit
+    fields with_record_param
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
   let loc = Expansion_context.Deriver.derived_item_loc ctxt in

@@ -35,24 +35,20 @@ let _make_snapshot () : Portfolio_risk.portfolio_snapshot =
 
 let test_point_matcher_all_fields _ =
   let p = { x = 1.0; y = 2.0 } in
-  assert_that p (match_point ~x:(float_equal 1.0) ~y:(float_equal 2.0) ())
+  assert_that p (match_point ~x:(float_equal 1.0) ~y:(float_equal 2.0))
 
-let test_point_matcher_partial _ =
+let test_point_matcher_ignore_with_wildcard _ =
   let p = { x = 1.0; y = 2.0 } in
-  (* Only check x, ignore y *)
-  assert_that p (match_point ~x:(float_equal 1.0) ())
-
-let test_point_matcher_ignore_all _ =
-  let p = { x = 1.0; y = 2.0 } in
-  (* All fields ignored — just verifies the function exists *)
-  assert_that p (match_point ())
+  (* Only check x, explicitly ignore y with __ *)
+  assert_that p (match_point ~x:(float_equal 1.0) ~y:__)
 
 let test_snapshot_matcher _ =
   let s = _make_snapshot () in
   assert_that s
     (match_snapshot ~total_value:(float_equal 100_000.0)
        ~cash:(float_equal 50_000.0) ~cash_pct:(float_equal 0.5)
-       ~position_count:(equal_to 5) ())
+       ~long_exposure:__ ~long_exposure_pct:__ ~short_exposure:__
+       ~short_exposure_pct:__ ~position_count:(equal_to 5) ~sector_counts:__)
 
 let test_snapshot_matcher_all_fields _ =
   let s = _make_snapshot () in
@@ -68,14 +64,15 @@ let test_snapshot_matcher_all_fields _ =
             [
               pair (equal_to "Tech") (equal_to 3);
               pair (equal_to "Finance") (equal_to 2);
-            ])
-       ())
+            ]))
 
 let test_snapshot_matcher_failure _ =
   let s = _make_snapshot () in
   let failed =
     try
-      match_snapshot ~total_value:(float_equal 999.0) () s;
+      match_snapshot ~total_value:(float_equal 999.0) ~cash:__ ~cash_pct:__
+        ~long_exposure:__ ~long_exposure_pct:__ ~short_exposure:__
+        ~short_exposure_pct:__ ~position_count:__ ~sector_counts:__ s;
       false
     with _ -> true
   in
@@ -85,9 +82,9 @@ let suite =
   "ppx_test_matcher"
   >::: [
          "point matcher all fields" >:: test_point_matcher_all_fields;
-         "point matcher partial" >:: test_point_matcher_partial;
-         "point matcher ignore all" >:: test_point_matcher_ignore_all;
-         "snapshot matcher partial" >:: test_snapshot_matcher;
+         "point matcher ignore with __"
+         >:: test_point_matcher_ignore_with_wildcard;
+         "snapshot matcher with wildcards" >:: test_snapshot_matcher;
          "snapshot matcher all fields" >:: test_snapshot_matcher_all_fields;
          "snapshot matcher failure" >:: test_snapshot_matcher_failure;
        ]
