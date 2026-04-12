@@ -37,6 +37,10 @@ let flat_bars ~n price = List.init n ~f:(fun _ -> price) |> weekly_bars
     Matches the weekly-cadence contract of {!Macro.analyze} — each bar is dated
     7 days apart so they land in distinct ISO weeks. *)
 let ad_bars ~n ~advancing ~declining =
+  (* 2020-01-06 is a Monday. [i * 7] advances the anchor date by [i] whole
+     weeks (7 calendar days per step): every bar lands on a Monday, weekends
+     are crossed but no bar is placed on them — one emission per iteration,
+     not seven. *)
   let base = Date.of_string "2020-01-06" in
   List.init n ~f:(fun i ->
       { date = Date.add_days base (i * 7); advancing; declining })
