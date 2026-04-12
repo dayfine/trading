@@ -61,8 +61,9 @@ let stage4 = Stage4 { weeks_declining = 3 }
 
    Phase B (5 bars): price continues up through 131→140, pulls back to 122,
    recovers to 143. One more cycle completes:
-     cycle 3 at c=143: trend=140, corr=122 (reset by fix), (140-122)/140=13%,
-       stop 102.96→120.78 *)
+     cycle 3 at c=143: trend=140, corr=122, MA=120.
+       Per min(correction, MA) rule: min(122, 120)=120.
+       stop = 120 * 0.99 = 118.80. (102.96→118.80) *)
 
 let stage2_trailing_stop_raised_phase_a _ =
   let state0 =
@@ -146,16 +147,16 @@ let stage2_trailing_stop_raised_phase_b _ =
   in
   let final_state, last_event = run_sequence initial_state Long steps in
   assert_that last_event
-    (matching ~msg:"cycle 3: stop raised to 120.78"
+    (matching ~msg:"cycle 3: stop raised to 118.80"
        (function Stop_raised { new_level; _ } -> Some new_level | _ -> None)
-       (float_equal 120.78));
+       (float_equal 118.80));
   assert_that final_state
-    (matching ~msg:"Trailing: stop=120.78, count=3"
+    (matching ~msg:"Trailing: stop=118.80, count=3"
        (function
          | Trailing { stop_level; correction_count; _ } ->
              Some (stop_level, correction_count)
          | _ -> None)
-       (pair (float_equal 120.78) (equal_to 3)))
+       (pair (float_equal 118.80) (equal_to 3)))
 
 (* ------------------------------------------------------------------ *)
 (* Stage 3 transition — flat MA triggers tightening                     *)
@@ -254,18 +255,20 @@ let short_stage4_stop_lowered _ =
   in
   let final_state, last_event = run_sequence initial_state Short steps in
   (* After the fix, cycle 1 resets corr to close=88 (not bar high=90).
-     Cycle 2's corr tracks up to 89 (bar5 high=89 > 88), so stop = 89*1.01≈90.125. *)
+     Cycle 2's corr tracks up to 89 (bar5 high=89 > 88). Per the
+     min/max(correction, MA) rule for shorts: max(89, 98)=98, so
+     stop = 98 * 1.01 = 98.98 → nudged above 99 to 99.125. *)
   assert_that last_event
-    (matching ~msg:"cycle 2: stop lowered to 90.125"
+    (matching ~msg:"cycle 2: stop lowered to 99.125"
        (function Stop_raised { new_level; _ } -> Some new_level | _ -> None)
-       (float_equal 90.125));
+       (float_equal 99.125));
   assert_that final_state
-    (matching ~msg:"Trailing: stop=90.125, count=2"
+    (matching ~msg:"Trailing: stop=99.125, count=2"
        (function
          | Trailing { stop_level; correction_count; _ } ->
              Some (stop_level, correction_count)
          | _ -> None)
-       (pair (float_equal 90.125) (equal_to 2)))
+       (pair (float_equal 99.125) (equal_to 2)))
 
 (* ------------------------------------------------------------------ *)
 (* Full lifecycle long — Initial → Trailing → Tightened → Stop_hit      *)
@@ -273,7 +276,8 @@ let short_stage4_stop_lowered _ =
 (* Complete long position lifecycle:
    1. Entry: Initial stop at 49.92 (= 52 × 0.96)
    2. First advance bar transitions to Trailing (stop unchanged)
-   3. Four-bar sequence: 2 correction cycles raise stop 49.92→52.375→59.4
+   3. Four-bar sequence: 2 correction cycles raise stop 49.92→52.375→56.43
+      (cycle 2: min(correction_low=60, MA=57) = 57, stop = 57×0.99 = 56.43)
    4. Flat MA + Stage 3 → Tightened at 69.3 (corr reset to close=70 by fix)
    5. Price drops through tightened stop → Stop_hit: trigger=67.3, stop=69.3 *)
 
@@ -306,12 +310,12 @@ let full_lifecycle_long _ =
   in
   let state2, _ = run_sequence state1 Long steps_to_raise in
   assert_that state2
-    (matching ~msg:"Trailing: stop=59.4, count=2 after raise steps"
+    (matching ~msg:"Trailing: stop=56.43, count=2 after raise steps"
        (function
          | Trailing { stop_level; correction_count; _ } ->
              Some (stop_level, correction_count)
          | _ -> None)
-       (pair (float_equal 59.4) (equal_to 2)));
+       (pair (float_equal 56.43) (equal_to 2)));
   let bar_top = make_bar ~low_price:68.0 ~high_price:72.0 70.0 in
   let state3, event3 =
     update ~config:cfg ~side:Long ~state:state2 ~current_bar:bar_top
@@ -415,7 +419,7 @@ let () =
     >::: [
            "stage2 trailing stop raised — phase A (2 cycles, stop→102.96)"
            >:: stage2_trailing_stop_raised_phase_a;
-           "stage2 trailing stop raised — phase B (1 more cycle, stop→120.78)"
+           "stage2 trailing stop raised — phase B (1 more cycle, stop→118.80)"
            >:: stage2_trailing_stop_raised_phase_b;
            "stage3 tightening on flat MA" >:: stage3_tightening;
            "stop hit on long position" >:: stop_hit_long;
