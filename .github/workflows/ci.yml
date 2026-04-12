@@ -38,7 +38,10 @@ jobs:
       # Data_path.default_data_dir defaults to /workspaces/trading-1/data (the
       # dev container's mounted data dir). In CI the checkout lives under
       # /__w/..., so point the data-loading code at $GITHUB_WORKSPACE/data.
-      TRADING_DATA_DIR: ${{ github.workspace }}/data
+      # test_data/ is a curated subset of production data/ (both use the
+      # same CSV format + sharding layout). It is checked into git so CI
+      # can run data-dependent tests without the full /data mount.
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
     defaults:
       run:
         shell: bash
