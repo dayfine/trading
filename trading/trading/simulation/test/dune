@@ -106,3 +106,23 @@
   trading.engine
   trading.portfolio
   matchers))
+
+(test
+ (name test_m5_backtest)
+ (modules test_m5_backtest)
+ (libraries
+  core
+  core_unix
+  types
+  status
+  fpath
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.simulation
+  trading.simulation.types
+  trading.strategy
+  weinstein_trading.strategy
+  weinstein.portfolio_risk
+  ounit2
+  matchers))
