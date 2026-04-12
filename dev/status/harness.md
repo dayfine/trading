@@ -1,9 +1,15 @@
 # Status: harness
 
-## Last updated: 2026-04-09
+## Last updated: 2026-04-12
 
 ## Status
 IN_PROGRESS
+
+## CI
+
+- CI is now live (#270, #271) — `dune build && dune runtest && dune build @fmt` gates on every PR
+- Weekly deps-freshness workflow added
+- `test_data/` fixtures committed for CI reproducibility
 
 ## Design doc
 `docs/design/harness-engineering-plan.md`

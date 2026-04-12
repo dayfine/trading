@@ -17,7 +17,12 @@ val spdr_sector_etfs : (string * string) list
 val default_global_indices : (string * string) list
 (** Major non-US equity indices used by the macro global-consensus indicator.
     [GSPC.INDX] (the US benchmark) is intentionally omitted — it is already
-    passed to {!Macro.analyze} as [~index_bars]. *)
+    passed to {!Macro.analyze} as [~index_bars].
+
+    Note: FTSE 100 is represented by [ISF.LSE] (iShares Core FTSE 100 UCITS ETF)
+    because EODHD does not carry [FTSE.INDX] or [UKX.INDX]. The ETF is a
+    physical-replication tracker with negligible tracking error at weekly
+    cadence. *)
 
 val build_global_index_bars :
   lookback_bars:int ->

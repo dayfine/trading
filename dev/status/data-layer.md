@@ -40,6 +40,6 @@ All four items from `docs/design/eng-design-data-management.md` are implemented 
 
 - **Primary index bars** (`~index_bars`): EODHD symbols `GSPC.INDX` or `DJI.INDX`. `GSPCX` (cached at `data/G/X/GSPCX/`, daily from 1997) is a usable stand-in.
 - **NYSE A-D breadth** (`~ad_bars`): daily advancing/declining counts — not derivable from price bars. EODHD symbols likely `ADV.NYSE` / `DEC.NYSE`; verify. Requires a new parser (not OHLCV format).
-- **Global index bars** (`~global_index_bars`): FTSE 100 (`FTSE.INDX`), DAX (`GDAXI.INDX`), Nikkei 225 (`N225.INDX`). `IWM` (cached at `data/I/M/IWM/`) usable as interim US small-cap proxy.
+- **Global index bars** (`~global_index_bars`): FTSE 100 via `ISF.LSE` (iShares ETF proxy — EODHD does not carry `FTSE.INDX`), DAX (`GDAXI.INDX`), Nikkei 225 (`N225.INDX`). `IWM` (cached at `data/I/M/IWM/`) usable as interim US small-cap proxy.
 
 Until cached: call with `ad_bars:[]` and `global_index_bars:[]`; analyzer degrades gracefully.
