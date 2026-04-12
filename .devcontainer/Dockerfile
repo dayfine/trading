@@ -115,7 +115,11 @@ RUN opam install --yes \
 # =============================================================================
 # Development Tools
 # =============================================================================
-RUN opam install --yes ocaml-lsp-server odoc ocamlformat utop
+# Pin ocamlformat to match the version declared in trading/.ocamlformat
+# (version = 0.29.0). If these drift, dune fmt refuses to run with a clear
+# error, but pinning here prevents the image from silently upgrading the
+# formatter and breaking the CI fmt gate.
+RUN opam install --yes ocaml-lsp-server odoc ocamlformat.0.29.0 utop
 
 # =============================================================================
 # Jujutsu (jj) — Git-compatible VCS

@@ -58,61 +58,59 @@
     {1 Usage Example}
 
     {[
-      (* Create position in Entering state from transition *)
-      let transition =
-        {
-          position_id = "AAPL-1";
-          date = Date.today ();
-          kind =
-            CreateEntering
-              {
-                symbol = "AAPL";
-                target_quantity = 100.0;
-                entry_price = 150.0;
-                reasoning =
-                  TechnicalSignal { indicator = "EMA"; description = "..." };
-              };
-        }
-      in
-      let pos = Position.create_entering transition |> Status.ok_exn in
+    (* Create position in Entering state from transition *)
+    let transition =
+      {
+        position_id = "AAPL-1";
+        date = Date.today ();
+        kind =
+          CreateEntering
+            {
+              symbol = "AAPL";
+              target_quantity = 100.0;
+              entry_price = 150.0;
+              reasoning =
+                TechnicalSignal { indicator = "EMA"; description = "..." };
+            };
+      }
+    in
+    let pos = Position.create_entering transition |> Status.ok_exn in
 
-      (* Apply fill transition *)
-      let fill_transition =
-        {
-          position_id = "AAPL-1";
-          date = Date.today ();
-          kind = EntryFill { filled_quantity = 100.0; fill_price = 150.25 };
-        }
-      in
-      let pos =
-        Position.apply_transition pos fill_transition |> Status.ok_exn
-      in
+    (* Apply fill transition *)
+    let fill_transition =
+      {
+        position_id = "AAPL-1";
+        date = Date.today ();
+        kind = EntryFill { filled_quantity = 100.0; fill_price = 150.25 };
+      }
+    in
+    let pos = Position.apply_transition pos fill_transition |> Status.ok_exn in
 
-      (* Complete entry, move to Holding *)
-      let complete_transition =
-        {
-          position_id = "AAPL-1";
-          date = Date.today ();
-          kind =
-            EntryComplete
-              {
-                risk_params =
-                  {
-                    stop_loss_price = Some 142.50;
-                    take_profit_price = Some 165.00;
-                    max_hold_days = None;
-                  };
-              };
-        }
-      in
-      let pos =
-        Position.apply_transition pos complete_transition |> Status.ok_exn
-      in
+    (* Complete entry, move to Holding *)
+    let complete_transition =
+      {
+        position_id = "AAPL-1";
+        date = Date.today ();
+        kind =
+          EntryComplete
+            {
+              risk_params =
+                {
+                  stop_loss_price = Some 142.50;
+                  take_profit_price = Some 165.00;
+                  max_hold_days = None;
+                };
+            };
+      }
+    in
+    let pos =
+      Position.apply_transition pos complete_transition |> Status.ok_exn
+    in
 
-      (* Position now in Holding state *)
-      match Position.get_state pos with
-      | Holding h -> Printf.printf "Holding %f shares\\n" h.quantity
-      | _ -> ()
+    (* Position now in Holding state *)
+    match Position.get_state pos with
+    | Holding h -> Printf.printf "Holding %f shares\\n" h.quantity
+    | _ -> ()
     ]} *)
 
 open Core

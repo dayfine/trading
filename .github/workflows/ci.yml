@@ -1,0 +1,66 @@
+# Build + test gate for pull requests and main pushes.
+#
+# Runs inside the prebuilt GHCR image produced by image.yml, so the job only
+# has to check out the source and invoke dune. All deps (opam, ta-lib,
+# openblas, plplot, …) are already installed in the image.
+#
+# The image bakes a copy of `trading/` under /workspaces/trading-1/ for its
+# build verification step, but GitHub Actions mounts the checkout under
+# /__w/... and runs there — so the baked snapshot is ignored and we build
+# the PR's actual source.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      # The ocaml/opam base image sets USER opam (uid 1000) by default.
+      # GitHub Actions creates /__w/_temp/_runner_file_commands/ owned by
+      # the host runner user — the non-root container user can't write to
+      # it, which crashes actions/checkout's post-step save_state (EACCES).
+      # Run the container as root and point HOME at /home/opam so opam env
+      # still finds the installed 5.3 switch at /home/opam/.opam.
+      options: --user 0
+    env:
+      HOME: /home/opam
+      # Data_path.default_data_dir defaults to /workspaces/trading-1/data (the
+      # dev container's mounted data dir). In CI the checkout lives under
+      # /__w/..., so point the data-loading code at $GITHUB_WORKSPACE/data.
+      # test_data/ is a curated subset of production data/ (both use the
+      # same CSV format + sharding layout). It is checked into git so CI
+      # can run data-dependent tests without the full /data mount.
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    defaults:
+      run:
+        shell: bash
+        working-directory: trading
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: dune build
+        run: |
+          eval $(opam env)
+          dune build
+
+      - name: dune runtest
+        run: |
+          eval $(opam env)
+          dune runtest
+
+      - name: dune fmt (check only)
+        run: |
+          eval $(opam env)
+          # @fmt fails if formatting would change anything; no --auto-promote.
+          dune build @fmt

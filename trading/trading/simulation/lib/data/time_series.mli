@@ -31,15 +31,15 @@ val convert_cadence :
 
     Examples:
     {[
-      (* Complete weeks only *)
-      let weekly =
-        convert_cadence daily_prices ~cadence:Types.Cadence.Weekly
-          ~as_of_date:None
+    (* Complete weeks only *)
+    let weekly =
+      convert_cadence daily_prices ~cadence:Types.Cadence.Weekly
+        ~as_of_date:None
 
-      (* Include provisional for Wednesday *)
-      let provisional =
-        convert_cadence daily_prices ~cadence:Types.Cadence.Weekly
-          ~as_of_date:(Some wed_date)
+    (* Include provisional for Wednesday *)
+    let provisional =
+      convert_cadence daily_prices ~cadence:Types.Cadence.Weekly
+        ~as_of_date:(Some wed_date)
     ]} *)
 
 val is_period_end : cadence:Types.Cadence.t -> Date.t -> bool
