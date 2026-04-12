@@ -396,7 +396,19 @@ let test_weinstein_breakout_trade _ =
          through continued 2%/wk trend for the remainder of the year). *)
       let final_value = (List.last_exn result.steps).portfolio_value in
       assert_that final_value
-        (is_between (module Float_ord) ~low:125_000.0 ~high:128_000.0))
+        (is_between (module Float_ord) ~low:125_000.0 ~high:128_000.0);
+      (* Verify the final portfolio holds an AAPL position. *)
+      let final_portfolio = (List.last_exn result.steps).portfolio in
+      let aapl_position =
+        List.find final_portfolio.Trading_portfolio.Portfolio.positions
+          ~f:(fun p -> String.equal p.Trading_portfolio.Types.symbol "AAPL")
+      in
+      assert_that aapl_position
+        (is_some_and
+           (field (fun p -> p.Trading_portfolio.Types.lots) (not_ is_empty)));
+      (* Portfolio value exceeds initial cash — positive PnL from the
+         rising breakout trend. *)
+      assert_that final_value (gt (module Float_ord) 100_000.0))
 
 (* ------------------------------------------------------------------ *)
 (* Decision test: bearish macro suppresses entries                      *)

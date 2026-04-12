@@ -131,7 +131,8 @@ let _next_start_after bars fallback =
 let _breakout_spike_days = 3
 
 (** Apply the breakout volume multiplier to the first [_breakout_spike_days]
-    bars in [bars], so the weekly aggregate retains a meaningful volume ratio. *)
+    bars in [bars], so the weekly aggregate retains a meaningful volume ratio.
+*)
 let _mark_breakout_bars base_volume breakout_volume_mult bars =
   let vol = Float.to_int (Float.of_int base_volume *. breakout_volume_mult) in
   List.mapi bars ~f:(fun i bar ->
