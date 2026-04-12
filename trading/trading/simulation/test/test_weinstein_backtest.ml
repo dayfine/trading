@@ -4,18 +4,14 @@
     real stocks + GSPC.INDX index, using committed test data fixtures at
     [test_data/].
 
-    Verifies: 1. The simulation runs to completion without error over ~1500
-    trading days 2. Entries are generated (buy orders during bullish periods) 3.
-    Exits fire (trailing stops produce sell trades) 4. P&L is tracked (final
-    portfolio value computed and reasonable) 5. Full cycle: entry -> trailing
-    stop management -> exit observed
-
-    Uses conservative position sizing (0.3% risk per trade) to avoid cash
-    exhaustion when multiple symbols enter simultaneously. *)
+    All test data is committed and deterministic — assertions pin exact trade
+    counts, symbols, and portfolio values. If the strategy logic changes, these
+    tests catch it. *)
 
 open OUnit2
 open Core
 open Matchers
+open Trading_simulation
 
 (* ------------------------------------------------------------------ *)
 (* Constants                                                            *)
@@ -26,6 +22,7 @@ let universe = [ "AAPL"; "MSFT"; "JPM"; "JNJ"; "CVX"; "KO"; "HD" ]
 let index_symbol = "GSPC.INDX"
 let all_symbols = index_symbol :: universe
 let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
+let initial_cash = 500_000.0
 
 (* Conservative position sizing: 0.3% risk per trade keeps each position
    small enough to avoid cash exhaustion when multiple stocks enter. *)
@@ -41,120 +38,163 @@ let conservative_portfolio_config =
 (* ------------------------------------------------------------------ *)
 
 (** Build a Weinstein strategy configured for the 7-stock universe. *)
-let make_backtest_strategy ~data_dir =
+let _make_strategy () =
   let ad_bars = Weinstein_strategy.Ad_bars.load ~data_dir in
+  let ticker_sectors =
+    Sector_map.load ~data_dir:(Data_path.default_data_dir ())
+  in
   let base_config = Weinstein_strategy.default_config ~universe ~index_symbol in
   let config =
     { base_config with portfolio_config = conservative_portfolio_config }
   in
-  Weinstein_strategy.make ~ad_bars config
+  Weinstein_strategy.make ~ad_bars ~ticker_sectors config
 
 (** Create simulator deps and config, then run the simulation. *)
-let run_backtest ~data_dir ~start_date ~end_date =
-  let strategy = make_backtest_strategy ~data_dir in
+let _run_backtest ~start_date ~end_date =
+  let strategy = _make_strategy () in
   let deps =
-    Trading_simulation.Simulator.create_deps ~symbols:all_symbols
-      ~data_dir:(Fpath.v data_dir) ~strategy ~commission:sample_commission ()
+    Simulator.create_deps ~symbols:all_symbols ~data_dir:(Fpath.v data_dir)
+      ~strategy ~commission:sample_commission ()
   in
   let sim_config =
-    Trading_simulation.Simulator.
+    Simulator.
       {
         start_date;
         end_date;
-        initial_cash = 500_000.0;
+        initial_cash;
         commission = sample_commission;
         strategy_cadence = Types.Cadence.Daily;
       }
   in
   let sim =
-    match Trading_simulation.Simulator.create ~config:sim_config ~deps with
+    match Simulator.create ~config:sim_config ~deps with
     | Ok s -> s
     | Error e -> OUnit2.assert_failure ("create failed: " ^ Status.show e)
   in
-  match Trading_simulation.Simulator.run sim with
+  match Simulator.run sim with
   | Ok r -> r
   | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
 
-(** Count trades by side across all steps. *)
-let count_trades_by_side steps side =
-  List.concat_map steps ~f:(fun step ->
-      step.Trading_simulation.Simulator.trades)
+let _count_by_side steps side =
+  List.concat_map steps ~f:(fun s -> s.Simulator.trades)
   |> List.count ~f:(fun t ->
       Trading_base.Types.equal_side t.Trading_base.Types.side side)
 
-(** Collect all unique symbols that were traded. *)
-let traded_symbols steps =
-  List.concat_map steps ~f:(fun step ->
-      step.Trading_simulation.Simulator.trades)
+let _traded_symbols steps =
+  List.concat_map steps ~f:(fun s -> s.Simulator.trades)
   |> List.map ~f:(fun t -> t.Trading_base.Types.symbol)
   |> List.dedup_and_sort ~compare:String.compare
 
+let _min_portfolio_value steps =
+  List.fold steps ~init:Float.max_value ~f:(fun acc s ->
+      Float.min acc s.Simulator.portfolio_value)
+
 (* ------------------------------------------------------------------ *)
-(* 6-year historical run                                                *)
+(* 6-year full lifecycle: 2018–2023                                     *)
 (* ------------------------------------------------------------------ *)
 
 let test_six_year_full_lifecycle _ =
   let result =
-    run_backtest ~data_dir
+    _run_backtest
       ~start_date:(Date.of_string "2018-01-02")
       ~end_date:(Date.of_string "2023-12-29")
   in
-  (* 1. Simulation runs to completion -- many steps over 6 years *)
-  let n_steps = List.length result.steps in
-  assert_that n_steps (gt (module Int_ord) 1000);
-  (* 2. Entries generated -- at least some buy trades *)
-  let n_buys = count_trades_by_side result.steps Trading_base.Types.Buy in
-  assert_that n_buys (gt (module Int_ord) 0);
-  (* 3. Exits fire -- sell trades from trailing stops *)
-  let n_sells = count_trades_by_side result.steps Trading_base.Types.Sell in
-  assert_that n_sells (gt (module Int_ord) 0);
-  (* 4. Multiple symbols traded -- not just one lucky pick *)
-  let syms = traded_symbols result.steps in
-  assert_that (List.length syms) (gt (module Int_ord) 1);
-  (* 5. Final portfolio value is positive and reasonable *)
-  let final_step = List.last_exn result.steps in
-  let final_value = final_step.portfolio_value in
-  assert_that final_value (gt (module Float_ord) 0.0);
-  (* Started at $500k, after 6 years should be between $100k and $2M. *)
+  let n_buys = _count_by_side result.steps Trading_base.Types.Buy in
+  let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
+  let final_value = (List.last_exn result.steps).portfolio_value in
+  let round_trips = Metrics.extract_round_trips result.steps in
+  let summary = Metrics.compute_summary round_trips in
+  (* Pinned: 2187 steps, 7 buys, 7 sells, all 7 symbols traded *)
+  assert_that (List.length result.steps) (equal_to 2187);
+  assert_that n_buys (equal_to 7);
+  assert_that n_sells (equal_to 7);
+  assert_that
+    (_traded_symbols result.steps)
+    (equal_to [ "AAPL"; "CVX"; "HD"; "JNJ"; "JPM"; "KO"; "MSFT" ]);
+  (* 7 completed round-trips with 1 winner, 6 losers *)
+  assert_that (List.length round_trips) (equal_to 7);
+  assert_that summary
+    (is_some_and
+       (all_of
+          [
+            field (fun (s : Metrics.summary_stats) -> s.win_count) (equal_to 1);
+            field (fun (s : Metrics.summary_stats) -> s.loss_count) (equal_to 6);
+          ]));
+  (* Final value ~$495k on $500k start — small loss from conservative sizing *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:100_000.0 ~high:2_000_000.0);
-  (* 6. Full cycle observed: buys AND sells happened *)
-  assert_that (n_buys + n_sells) (gt (module Int_ord) 2)
+    (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
+  (* Max drawdown under 10% *)
+  let max_drawdown_pct =
+    (initial_cash -. _min_portfolio_value result.steps) /. initial_cash
+  in
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.10)
 
 (* ------------------------------------------------------------------ *)
-(* Entry/exit cycle around COVID crash                                  *)
+(* Entry/exit cycle around COVID crash: 2019–mid 2020                   *)
 (* ------------------------------------------------------------------ *)
 
 let test_entry_exit_cycle_around_covid _ =
   let result =
-    run_backtest ~data_dir
+    _run_backtest
       ~start_date:(Date.of_string "2019-01-02")
       ~end_date:(Date.of_string "2020-06-30")
   in
-  assert_that result.steps (not_ is_empty);
+  let n_buys = _count_by_side result.steps Trading_base.Types.Buy in
+  let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
   let final_value = (List.last_exn result.steps).portfolio_value in
-  assert_that final_value (gt (module Float_ord) 0.0);
-  (* Over 2019-2020 the strategy should enter positions in the bull run
-     and exit some during the COVID crash. *)
-  let all_trades = List.concat_map result.steps ~f:(fun step -> step.trades) in
-  assert_that all_trades (not_ is_empty)
+  let round_trips = Metrics.extract_round_trips result.steps in
+  let summary = Metrics.compute_summary round_trips in
+  (* Pinned: 545 steps, 4 buys/sells in AAPL HD JNJ KO *)
+  assert_that (List.length result.steps) (equal_to 545);
+  assert_that n_buys (equal_to 4);
+  assert_that n_sells (equal_to 4);
+  assert_that
+    (_traded_symbols result.steps)
+    (equal_to [ "AAPL"; "HD"; "JNJ"; "KO" ]);
+  (* All 4 round-trips are losses — COVID crash stops out every position *)
+  assert_that (List.length round_trips) (equal_to 4);
+  assert_that summary
+    (is_some_and
+       (all_of
+          [
+            field (fun (s : Metrics.summary_stats) -> s.win_count) (equal_to 0);
+            field (fun (s : Metrics.summary_stats) -> s.loss_count) (equal_to 4);
+            field
+              (fun (s : Metrics.summary_stats) -> s.total_pnl)
+              (lt (module Float_ord) 0.0);
+          ]));
+  (* Final value ~$496k — losses are small due to conservative sizing *)
+  assert_that final_value
+    (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
+  (* Max drawdown under 12% even through COVID *)
+  let max_drawdown_pct =
+    (initial_cash -. _min_portfolio_value result.steps) /. initial_cash
+  in
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.12)
 
 (* ------------------------------------------------------------------ *)
-(* Portfolio value stays positive through time                          *)
+(* Portfolio value stays positive: 2020–2021                            *)
 (* ------------------------------------------------------------------ *)
 
 let test_portfolio_value_stays_positive _ =
   let result =
-    run_backtest ~data_dir
+    _run_backtest
       ~start_date:(Date.of_string "2020-01-02")
       ~end_date:(Date.of_string "2021-12-31")
   in
-  (* Every step should have positive portfolio value *)
-  List.iter result.steps ~f:(fun step ->
-      assert_that step.portfolio_value (gt (module Float_ord) 0.0));
-  (* ~500 trading days in 2 years *)
-  let n_values = List.length result.steps in
-  assert_that n_values (gt (module Int_ord) 400)
+  (* Pinned: 729 steps, 2 buys (HD, KO), no sells — positions held to end *)
+  assert_that (List.length result.steps) (equal_to 729);
+  assert_that (_count_by_side result.steps Trading_base.Types.Buy) (equal_to 2);
+  assert_that (_count_by_side result.steps Trading_base.Types.Sell) (equal_to 0);
+  (* Every step has positive portfolio value *)
+  let min_value = _min_portfolio_value result.steps in
+  assert_that min_value (gt (module Float_ord) 0.0);
+  (* Max drawdown under 8% *)
+  let max_drawdown_pct = (initial_cash -. min_value) /. initial_cash in
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.08);
+  (* Final value above starting capital — recovery after COVID *)
+  let final_value = (List.last_exn result.steps).portfolio_value in
+  assert_that final_value (gt (module Float_ord) initial_cash)
 
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
