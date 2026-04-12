@@ -176,8 +176,8 @@ let () =
     (Date.to_string start_date)
     (Date.to_string end_date);
   let deps =
-    Simulator.create_deps ~symbols:all_symbols ~data_dir:data_dir_fpath ~strategy
-      ~commission ()
+    Simulator.create_deps ~symbols:all_symbols ~data_dir:data_dir_fpath
+      ~strategy ~commission ()
   in
   let sim_config =
     Simulator.
