@@ -224,12 +224,17 @@ STATE: FIRST_CORRECTION
     TRANSITION to TRAILING
 
 STATE: TRAILING (repeat for each correction cycle)
-  AFTER each correction + recovery:
-    WHEN stock rallies back near prior peak:
-      new_stop = below(min(correction_low, MA))
-      -- always below round numbers
-    KEY: give stock plenty of room while MA is rising sharply
-    KEY: don't raise stop until stock rallies well off the low
+  AFTER each correction (8-10%+) + recovery back near prior peak:
+    new_stop = below(min(correction_low, MA))
+    -- "the sell-stop was always kept below the MA even if the correction
+       low held above it" (Ch. 6, Merck example)
+    -- "Continue moving the sell-stop up as the MA advances (points E, G, I)"
+       — each successive ratchet uses the current (risen) MA, so stops
+       trend upward across correction cycles
+    -- always below round numbers
+  BETWEEN corrections: stop stays put
+    -- "give stock plenty of room while MA is rising sharply"
+    -- "don't raise stop until stock rallies well off the low"
 
 STATE: STAGE3_TIGHTENING
   TRIGGER: MA flattens out, stock oscillating around MA

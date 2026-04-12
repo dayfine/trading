@@ -297,9 +297,16 @@ let _advance_tracking ~side ~last_correction_extreme ~last_trend_extreme ~bar =
   (new_trend_extreme, new_correction_extreme)
 
 (* Returns [Some new_stop] if a correction cycle just completed and the
-   candidate stop is better than the current stop, otherwise [None]. *)
+   candidate stop is better than the current stop, otherwise [None].
+
+   Per Weinstein Ch. 6: the stop is placed below min(correction_low, MA) —
+   "the sell-stop was always kept below the MA even if the correction low
+   held above it." When the correction dips below the MA (common in a
+   healthy Stage 2), the correction low is the binding constraint.  When
+   the correction holds above the MA (shallow pullback), the MA is lower
+   and becomes the reference. Either way, the stop stays below BOTH. *)
 let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
-    ~correction_extreme ~bar =
+    ~correction_extreme ~ma_value ~bar =
   let had_correction =
     _is_correction ~config ~side ~trend_extreme ~correction_extreme
   in
@@ -307,7 +314,15 @@ let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
     _is_recovery ~side ~close:bar.Types.Daily_price.close_price ~trend_extreme
   in
   if had_correction && recovered then
-    let candidate = _stop_candidate ~config ~side ~correction_extreme in
+    (* Use whichever reference is more conservative: correction low or MA *)
+    let effective_ref =
+      match side with
+      | Long -> Float.min correction_extreme ma_value
+      | Short -> Float.max correction_extreme ma_value
+    in
+    let candidate =
+      _stop_candidate ~config ~side ~correction_extreme:effective_ref
+    in
     if _is_better_stop ~side ~current:stop_level ~candidate then Some candidate
     else None
   else None
@@ -344,7 +359,7 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
   match
     _completed_cycle_stop ~config ~side ~stop_level
       ~trend_extreme:last_trend_extreme
-      ~correction_extreme:new_correction_extreme ~bar
+      ~correction_extreme:new_correction_extreme ~ma_value ~bar
   with
   | None -> (no_change, No_change)
   | Some new_stop ->
