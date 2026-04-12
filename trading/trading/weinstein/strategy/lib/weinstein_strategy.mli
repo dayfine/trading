@@ -112,6 +112,7 @@ val name : string
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->
+  ?ticker_sectors:(string, string) Hashtbl.t ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -127,4 +128,9 @@ val make :
       NYSE advance/decline daily bars, passed through to {!Macro.analyze} on
       every screening day. Load once via {!Ad_bars.load} before calling [make] —
       the list lives in the closure for the lifetime of the strategy instance.
-      Default: empty list (macro breadth indicators degrade to zero weight). *)
+      Default: empty list (macro breadth indicators degrade to zero weight).
+    @param ticker_sectors
+      Stock ticker → GICS sector name hashtable, typically loaded via
+      {!Sector_map.load}. Used to expand the ETF-level sector analysis to
+      individual stock tickers in the screener. Default: empty table (sector
+      gate degrades to Neutral for all tickers). *)

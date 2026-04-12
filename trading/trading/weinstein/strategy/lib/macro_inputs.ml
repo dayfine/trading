@@ -50,13 +50,21 @@ let _sector_context_for ~(stage_config : Stage.config) ~lookback_bars
     Some (etf_symbol, Sector.sector_context_of result)
 
 let build_sector_map ~stage_config ~lookback_bars ~sector_etfs ~bar_history
-    ~sector_prior_stages ~index_bars =
-  let map = Hashtbl.create (module String) in
+    ~sector_prior_stages ~index_bars ~ticker_sectors =
+  (* Step 1: Analyze each sector ETF to get sector_name -> sector_context. *)
+  let sector_ctx_by_name = Hashtbl.create (module String) in
   List.iter sector_etfs ~f:(fun (etf_symbol, sector_name) ->
       match
         _sector_context_for ~stage_config ~lookback_bars ~bar_history
           ~sector_prior_stages ~index_bars ~etf_symbol ~sector_name
       with
       | None -> ()
-      | Some (key, ctx) -> Hashtbl.set map ~key ~data:ctx);
+      | Some (_key, ctx) ->
+          Hashtbl.set sector_ctx_by_name ~key:sector_name ~data:ctx);
+  (* Step 2: Expand to ticker-level map using ticker_sectors. *)
+  let map = Hashtbl.create (module String) in
+  Hashtbl.iteri ticker_sectors ~f:(fun ~key:ticker ~data:sector_name ->
+      match Hashtbl.find sector_ctx_by_name sector_name with
+      | Some ctx -> Hashtbl.set map ~key:ticker ~data:ctx
+      | None -> ());
   map
