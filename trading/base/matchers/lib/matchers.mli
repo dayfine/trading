@@ -27,6 +27,15 @@ type 'a matcher = 'a -> unit
 (** A matcher is a function that takes a value and performs assertions on it.
     Matchers can be composed and combined to create complex assertions. *)
 
+val __ : 'a matcher
+(** [__] is the wildcard/ignore matcher — always succeeds regardless of the
+    value. Useful as a default or placeholder in generated matchers.
+
+    Example:
+    {[
+    assert_that p (match_point ~x:(float_equal 1.0) ~y:__ ())
+    ]} *)
+
 val assert_that : 'a -> 'a matcher -> unit
 (** [assert_that value matcher] applies the matcher to the value. This is the
     entry point for fluent assertions.
