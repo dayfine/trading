@@ -106,3 +106,23 @@
   trading.engine
   trading.portfolio
   matchers))
+
+(test
+ (name test_weinstein_backtest)
+ (modules test_weinstein_backtest)
+ (libraries
+  core
+  types
+  status
+  fpath
+  weinstein.data_source
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.simulation
+  trading.simulation.types
+  trading.strategy
+  weinstein_trading.strategy
+  weinstein.portfolio_risk
+  ounit2
+  matchers))
