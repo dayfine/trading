@@ -177,8 +177,8 @@ let _all_accumulated_symbols ~(config : config) : string list =
 (** Run the Friday macro + screener path and return entry transitions. Returns
     [] if macro is Bearish (no new buys). *)
 let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
-    ~prior_stages ~sector_prior_stages ~get_price ~portfolio ~current_date
-    ~index_bars =
+    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
+    ~current_date ~index_bars =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
   let global_index_bars =
     Macro_inputs.build_global_index_bars ~lookback_bars:config.lookback_bars
@@ -194,14 +194,14 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     let sector_map =
       Macro_inputs.build_sector_map ~stage_config:config.stage_config
         ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
-        ~bar_history ~sector_prior_stages ~index_bars
+        ~bar_history ~sector_prior_stages ~index_bars ~ticker_sectors
     in
     _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
       ~sector_map ~stop_states ~portfolio ~get_price ~bar_history ~prior_stages
       ~current_date
 
 let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
-    ~prior_stages ~sector_prior_stages ~get_price ~get_indicator:_
+    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~get_indicator:_
     ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let all_symbols = _all_accumulated_symbols ~config in
@@ -224,8 +224,8 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     if not (_is_screening_day index_bars) then []
     else
       _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
-        ~prior_stages ~sector_prior_stages ~get_price ~portfolio ~current_date
-        ~index_bars
+        ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
+        ~current_date ~index_bars
   in
   Ok
     {
@@ -233,7 +233,8 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
         exit_transitions @ adjust_transitions @ entry_transitions;
     }
 
-let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = []) config =
+let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
+    ?(ticker_sectors = Hashtbl.create (module String)) config =
   let stop_states = ref initial_stop_states in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
@@ -254,6 +255,6 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = []) config =
 
     let on_market_close =
       _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states ~prior_macro
-        ~bar_history ~prior_stages ~sector_prior_stages
+        ~bar_history ~prior_stages ~sector_prior_stages ~ticker_sectors
   end in
   (module M : Strategy_interface.STRATEGY)

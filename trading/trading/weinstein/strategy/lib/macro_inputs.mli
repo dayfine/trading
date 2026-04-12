@@ -42,11 +42,19 @@ val build_sector_map :
   bar_history:Bar_history.t ->
   sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
   index_bars:Types.Daily_price.t list ->
+  ticker_sectors:(string, string) Hashtbl.t ->
   (string, Screener.sector_context) Hashtbl.t
-(** [build_sector_map] returns a map keyed by ETF symbol. Each entry is the
-    {!Screener.sector_context} produced by {!Sector.analyze} on that ETF's
-    accumulated weekly bars. ETFs with fewer than [stage_config.ma_period] bars
-    are skipped. An empty [index_bars] also skips analysis.
+(** [build_sector_map] returns a map keyed by stock ticker (e.g. ["AAPL"]).
+    Each entry is the {!Screener.sector_context} produced by {!Sector.analyze}
+    on the corresponding sector ETF's accumulated weekly bars.
+
+    The expansion from ETF-level to ticker-level uses [ticker_sectors], a
+    ticker→sector-name hashtable typically loaded from [sectors.csv] via
+    {!Sector_map.load}. Tickers whose sector name does not match any ETF in
+    [sector_etfs] are omitted (the screener defaults them to Neutral).
+
+    ETFs with fewer than [stage_config.ma_period] bars are skipped. An empty
+    [index_bars] also skips analysis.
 
     [sector_prior_stages] is read and updated in place so that Stage1->Stage2
     transitions are detected across screening days — the caller owns this
