@@ -1,28 +1,8 @@
 open OUnit2
 open Core
 open Portfolio_risk
+open Portfolio_risk_accessors
 open Matchers
-
-(* ---- Test-local accessors ---- *)
-
-(* Simple getter functions for record fields, used with the [field] matcher to
-   avoid repeating [fun s -> s.field_name] lambdas throughout test assertions. *)
-module Snap = struct
-  let total_value (s : portfolio_snapshot) = s.total_value
-  let cash s = s.cash
-  let cash_pct s = s.cash_pct
-  let long_exposure s = s.long_exposure
-  let long_exposure_pct s = s.long_exposure_pct
-  let short_exposure s = s.short_exposure
-  let position_count s = s.position_count
-end
-
-module Sizing = struct
-  let shares (r : sizing_result) = r.shares
-  let position_value r = r.position_value
-  let position_pct r = r.position_pct
-  let risk_amount r = r.risk_amount
-end
 
 (* ---- Test helpers ---- *)
 
@@ -71,12 +51,12 @@ let test_snapshot_empty _ =
   assert_that snap
     (all_of
        [
-         field Snap.total_value (float_equal 100000.0);
-         field Snap.cash (float_equal 100000.0);
-         field Snap.cash_pct (float_equal 1.0);
-         field Snap.long_exposure (float_equal 0.0);
-         field Snap.short_exposure (float_equal 0.0);
-         field Snap.position_count (equal_to 0);
+         field Snapshot.total_value (float_equal 100000.0);
+         field Snapshot.cash (float_equal 100000.0);
+         field Snapshot.cash_pct (float_equal 1.0);
+         field Snapshot.long_exposure (float_equal 0.0);
+         field Snapshot.short_exposure (float_equal 0.0);
+         field Snapshot.position_count (equal_to 0);
        ])
 
 let test_snapshot_long_only _ =
@@ -85,11 +65,12 @@ let test_snapshot_long_only _ =
   assert_that snap
     (all_of
        [
-         field Snap.total_value (float_equal 75000.0);
-         field Snap.long_exposure (float_equal 25000.0);
-         field Snap.short_exposure (float_equal 0.0);
-         field Snap.position_count (equal_to 2);
-         field Snap.long_exposure_pct (float_equal ~epsilon:1e-6 (1.0 /. 3.0));
+         field Snapshot.total_value (float_equal 75000.0);
+         field Snapshot.long_exposure (float_equal 25000.0);
+         field Snapshot.short_exposure (float_equal 0.0);
+         field Snapshot.position_count (equal_to 2);
+         field Snapshot.long_exposure_pct
+           (float_equal ~epsilon:1e-6 (1.0 /. 3.0));
        ])
 
 let test_snapshot_with_short _ =
@@ -98,10 +79,10 @@ let test_snapshot_with_short _ =
   assert_that snap
     (all_of
        [
-         field Snap.total_value (float_equal 85000.0);
-         field Snap.long_exposure (float_equal 15000.0);
-         field Snap.short_exposure (float_equal 10000.0);
-         field Snap.position_count (equal_to 2);
+         field Snapshot.total_value (float_equal 85000.0);
+         field Snapshot.long_exposure (float_equal 15000.0);
+         field Snapshot.short_exposure (float_equal 10000.0);
+         field Snapshot.position_count (equal_to 2);
        ])
 
 let test_snapshot_with_sectors _ =
@@ -113,7 +94,7 @@ let test_snapshot_with_sectors _ =
   assert_that snap
     (all_of
        [
-         field Snap.position_count (equal_to 3);
+         field Snapshot.position_count (equal_to 3);
          field
            (fun s -> List.Assoc.find s.sector_counts ~equal:String.equal "Tech")
            (is_some_and (equal_to 3));
@@ -138,11 +119,11 @@ let test_snapshot_of_portfolio _ =
   assert_that snap
     (all_of
        [
-         field Snap.total_value (float_equal 110000.0);
-         field Snap.cash (float_equal 85000.0);
-         field Snap.long_exposure (float_equal 25000.0);
-         field Snap.short_exposure (float_equal 0.0);
-         field Snap.position_count (equal_to 2);
+         field Snapshot.total_value (float_equal 110000.0);
+         field Snapshot.cash (float_equal 85000.0);
+         field Snapshot.long_exposure (float_equal 25000.0);
+         field Snapshot.short_exposure (float_equal 0.0);
+         field Snapshot.position_count (equal_to 2);
        ])
 
 (* ---- Position sizing tests ---- *)

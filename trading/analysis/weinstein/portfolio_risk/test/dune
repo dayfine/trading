@@ -3,6 +3,7 @@
  (modules test_portfolio_risk)
  (libraries
   portfolio_risk
+  weinstein.portfolio_risk.testing
   ounit2
   core
   matchers

@@ -1,0 +1,5 @@
+(library
+ (name portfolio_risk_testing)
+ (public_name weinstein.portfolio_risk.testing)
+ (wrapped false)
+ (libraries portfolio_risk))
