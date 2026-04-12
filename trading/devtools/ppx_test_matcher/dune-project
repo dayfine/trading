@@ -1,0 +1,15 @@
+(lang dune 3.0)
+
+(name ppx_test_matcher)
+
+(generate_opam_files true)
+
+(package
+ (name ppx_test_matcher)
+ (allow_empty)
+ (synopsis
+  "PPX deriver for exhaustive record matchers in test assertions")
+ (depends
+  (ocaml
+   (>= 5.2.0))
+  ppxlib))

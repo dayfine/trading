@@ -28,6 +28,7 @@ end
 
 type 'a matcher = 'a -> unit
 
+let __ _ = ()
 let assert_that value matcher = matcher value
 
 (* ========================================================================== *)
