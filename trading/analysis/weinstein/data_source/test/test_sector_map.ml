@@ -21,12 +21,26 @@ let test_load_all_rows _ =
   (* CI uses test_data/ (7 rows); dev container uses data/ (1654 rows) *)
   assert_that (Hashtbl.length tbl) (gt (module Int_ord) 0)
 
+(* Every sector name in the CSV must be a recognized GICS sector. This catches
+   drift between the CSV data and the canonical enum. *)
+let test_all_sector_names_are_valid_gics _ =
+  let tbl = Sector_map.load ~data_dir:test_data_dir in
+  let invalid =
+    Hashtbl.fold tbl ~init:[] ~f:(fun ~key:ticker ~data:sector_name acc ->
+        match Weinstein_types.gics_sector_of_string_opt sector_name with
+        | Some _ -> acc
+        | None -> (ticker, sector_name) :: acc)
+  in
+  assert_that invalid is_empty
+
 let suite =
   "Sector_map"
   >::: [
          "load valid CSV" >:: test_load_valid_csv;
          "load missing file returns empty" >:: test_load_missing_file;
          "load all rows" >:: test_load_all_rows;
+         "all sector names are valid GICS"
+         >:: test_all_sector_names_are_valid_gics;
        ]
 
 let () = run_test_tt_main suite
