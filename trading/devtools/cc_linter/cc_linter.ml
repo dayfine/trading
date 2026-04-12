@@ -88,20 +88,29 @@ let rec count_decisions expr =
       let n = 1 + count_decisions cond + count_decisions then_e in
       match else_opt with None -> n | Some e -> n + count_decisions e)
   | Pexp_match (scrutinee, cases) ->
-      (* Each arm beyond the first is a branch point; first arm is the baseline *)
-      let extra_arms = max 0 (List.length cases - 1) in
-      let guards =
-        List.fold_left
-          (fun acc c ->
-            let guard_n =
-              match c.pc_guard with
-              | None -> 0
-              | Some g -> 1 + count_decisions g
-            in
-            acc + guard_n + count_decisions c.pc_rhs)
-          0 cases
+      (* A "flat mapping" match has no guards and no decisions in any RHS —
+         it's an exhaustive enum conversion, not branching logic. Don't
+         count the arms as decision points in that case. *)
+      let is_flat_mapping =
+        List.for_all
+          (fun c -> c.pc_guard = None && count_decisions c.pc_rhs = 0)
+          cases
       in
-      extra_arms + guards + count_decisions scrutinee
+      if is_flat_mapping then count_decisions scrutinee
+      else
+        let extra_arms = max 0 (List.length cases - 1) in
+        let guards =
+          List.fold_left
+            (fun acc c ->
+              let guard_n =
+                match c.pc_guard with
+                | None -> 0
+                | Some g -> 1 + count_decisions g
+              in
+              acc + guard_n + count_decisions c.pc_rhs)
+            0 cases
+        in
+        extra_arms + guards + count_decisions scrutinee
   | Pexp_try (body, cases) ->
       (* Each with-arm is a branch point *)
       let extra_arms = max 0 (List.length cases - 1) in
@@ -132,19 +141,26 @@ let rec count_decisions expr =
       match body with
       | Pfunction_body e -> params_n + count_decisions e
       | Pfunction_cases (cases, _, _) ->
-          let extra_arms = max 0 (List.length cases - 1) in
-          let guards =
-            List.fold_left
-              (fun acc c ->
-                let guard_n =
-                  match c.pc_guard with
-                  | None -> 0
-                  | Some g -> 1 + count_decisions g
-                in
-                acc + guard_n + count_decisions c.pc_rhs)
-              0 cases
+          let is_flat_mapping =
+            List.for_all
+              (fun c -> c.pc_guard = None && count_decisions c.pc_rhs = 0)
+              cases
           in
-          params_n + extra_arms + guards)
+          if is_flat_mapping then params_n
+          else
+            let extra_arms = max 0 (List.length cases - 1) in
+            let guards =
+              List.fold_left
+                (fun acc c ->
+                  let guard_n =
+                    match c.pc_guard with
+                    | None -> 0
+                    | Some g -> 1 + count_decisions g
+                  in
+                  acc + guard_n + count_decisions c.pc_rhs)
+                0 cases
+            in
+            params_n + extra_arms + guards)
   | Pexp_let (_, bindings, body) ->
       let bindings_n =
         List.fold_left
