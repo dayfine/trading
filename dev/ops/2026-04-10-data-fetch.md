@@ -70,7 +70,7 @@ Rationale for using an ETF proxy: ISF.LSE is a physical-replication tracker with
 
 ## 3. ADL historical breadth — Phase A (Unicorn.us.com)
 
-NYSE daily advancing/declining issue counts are not on EODHD (`ADV.NYSE` / `DEC.NYSE` return "Ticker Not Found"). Research (see `dev/status/adl-sources.md`) identified unicorn.us.com as the free historical source.
+NYSE daily advancing/declining issue counts are not on EODHD (`ADV.NYSE` / `DEC.NYSE` return "Ticker Not Found"). Research (see `dev/notes/adl-sources.md`) identified unicorn.us.com as the free historical source.
 
 ### Commands
 
@@ -109,7 +109,7 @@ No explicit licence on the Unicorn site. Cache locally, do not redistribute. Tre
 
 ### Not yet done
 
-**Phase B** (live coverage 2020-02-11 → present): no source picked yet. Candidates in `dev/status/adl-sources.md`.
+**Phase B** (live coverage 2020-02-11 → present): no source picked yet. Candidates in `dev/notes/adl-sources.md`.
 
 **Phase C** (OCaml loader + strategy wiring): a ~40-60 line `Ad_bars` module that parses the two CSVs, joins on date, filters placeholders, and returns `Macro.ad_bar list`. Then wire into `Weinstein_strategy.on_market_close` which currently hardcodes `~ad_bars:[]`.
 

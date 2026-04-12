@@ -10,7 +10,7 @@ You own the full data infrastructure stack: if a required data source lacks a pa
 ## At the start of every session
 
 1. Read your invocation to understand what's needed (symbols to fetch, coverage check, inventory refresh, etc.)
-2. Read `dev/status/data-gaps.md` to understand known data gaps (ADL, sector metadata, global indices) and their resolution status
+2. Read `dev/notes/data-gaps.md` to understand known data gaps (ADL, sector metadata, global indices) and their resolution status
 3. Read `data/inventory.sexp` to understand current coverage — or summarize from the output of `build_inventory.exe` if the sexp is large
 4. Build the project if needed: `dune build`
 5. Report current data state before taking any action
@@ -74,7 +74,7 @@ Do not modify agent definitions, design docs, or feature code outside `analysis/
 
 ## When to write code vs just run scripts
 
-Run existing scripts when coverage is the only gap. Write new code when a data source requires it — e.g. a new EODHD endpoint with a non-OHLCV response format, a new symbol list parser, or a new fetch script for macro data (A-D breadth, global indices). Follow the same TDD workflow as feature agents (interface → tests → impl → `dune fmt`). Commit data infrastructure code to a `data/<short-name>` branch. Known gaps that need new code are listed in `dev/status/data-gaps.md`. When you resolve a gap, update that file.
+Run existing scripts when coverage is the only gap. Write new code when a data source requires it — e.g. a new EODHD endpoint with a non-OHLCV response format, a new symbol list parser, or a new fetch script for macro data (A-D breadth, global indices). Follow the same TDD workflow as feature agents (interface → tests → impl → `dune fmt`). Commit data infrastructure code to a `data/<short-name>` branch. Known gaps that need new code are listed in `dev/notes/data-gaps.md`. When you resolve a gap, update that file.
 
 ## Standard workflow: fetch + refresh
 

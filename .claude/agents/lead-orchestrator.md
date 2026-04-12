@@ -39,7 +39,7 @@ Read all of the following before doing anything else:
 - `dev/decisions.md` — human guidance from last session
 - `dev/status/portfolio-stops.md` — order_gen track (feat-weinstein)
 - `dev/status/simulation.md` — Slice 2 track (feat-weinstein)
-- `dev/status/data-gaps.md` — known data gaps (ADL, sectors, global indices)
+- `dev/notes/data-gaps.md` — known data gaps (ADL, sectors, global indices)
 - `dev/status/harness.md` — harness backlog
 - Any `dev/reviews/*.md` that exist
 
@@ -84,7 +84,7 @@ Harness items with external dependencies (e.g., T1-N golden scenarios require re
 
 ### 2d: Data operations (ops-data)
 
-Read `dev/status/data-gaps.md`. If any gap has an actionable next step that
+Read `dev/notes/data-gaps.md`. If any gap has an actionable next step that
 does not require a human decision (e.g., "fetch sector ETFs" once the ETF list
 is known, "wire global index bars" once cached), spawn `ops-data` as a subagent:
 
@@ -95,14 +95,14 @@ You are the data operations agent for the Weinstein Trading System.
 <describe the specific data operation: fetch, parse, inventory rebuild, etc.>
 
 ## Context
-<paste the relevant section from dev/status/data-gaps.md>
+<paste the relevant section from dev/notes/data-gaps.md>
 
 Read your full agent definition in .claude/agents/ops-data.md for scripts and workflow.
 
 Docker container: <container-name>
 
 When done:
-1. Update dev/status/data-gaps.md to reflect what was resolved or what still blocks
+1. Update dev/notes/data-gaps.md to reflect what was resolved or what still blocks
 2. Run build_inventory.exe if any data was fetched
 3. Return: what changed, what still blocks, any errors
 ```
