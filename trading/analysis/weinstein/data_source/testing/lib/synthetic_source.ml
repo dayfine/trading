@@ -124,15 +124,21 @@ let _next_start_after bars fallback =
   | Some b -> _next_weekday b.Types.Daily_price.date
   | None -> fallback
 
-(** Apply the breakout volume multiplier to the first bar in [bars]. *)
-let _mark_breakout_bar base_volume breakout_volume_mult bars =
-  match bars with
-  | [] -> []
-  | first :: rest ->
-      let vol =
-        Float.to_int (Float.of_int base_volume *. breakout_volume_mult)
-      in
-      { first with Types.Daily_price.volume = vol } :: rest
+(* Number of trading days in the breakout week that receive elevated volume.
+   Spreading the spike across 3 of 5 days avoids dilution when daily bars are
+   summed into weekly bars: 3 × mult + 2 × base gives a realistic weekly ratio
+   (e.g. mult=3 → weekly ratio ≈ 2.2×). *)
+let _breakout_spike_days = 3
+
+(** Apply the breakout volume multiplier to the first [_breakout_spike_days]
+    bars in [bars], so the weekly aggregate retains a meaningful volume ratio.
+*)
+let _mark_breakout_bars base_volume breakout_volume_mult bars =
+  let vol = Float.to_int (Float.of_int base_volume *. breakout_volume_mult) in
+  List.mapi bars ~f:(fun i bar ->
+      if i < _breakout_spike_days then
+        { bar with Types.Daily_price.volume = vol }
+      else bar)
 
 let _gen_breakout ~start_date ~base_price ~base_weeks ~weekly_gain_pct
     ~breakout_volume_mult ~base_volume ~n =
@@ -149,7 +155,7 @@ let _gen_breakout ~start_date ~base_price ~base_weeks ~weekly_gain_pct
       _gen_trending ~start_date:trending_start
         ~start_price:(base_price *. _breakout_start_factor)
         ~weekly_gain_pct ~volume:base_volume ~n:remaining
-      |> _mark_breakout_bar base_volume breakout_volume_mult
+      |> _mark_breakout_bars base_volume breakout_volume_mult
     in
     basing_bars @ trending_bars
 
