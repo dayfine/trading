@@ -49,7 +49,7 @@ let test_spdr_sector_etfs_is_canonical_11_sector_list _ =
   assert_that Macro_inputs.spdr_sector_etfs
     (equal_to
        [
-         ("XLK", "Technology");
+         ("XLK", "Information Technology");
          ("XLF", "Financials");
          ("XLE", "Energy");
          ("XLV", "Health Care");
@@ -61,6 +61,15 @@ let test_spdr_sector_etfs_is_canonical_11_sector_list _ =
          ("XLRE", "Real Estate");
          ("XLC", "Communication Services");
        ])
+
+(* Every sector label in spdr_sector_etfs must parse to a valid gics_sector.
+   This catches mismatches like "Technology" vs "Information Technology". *)
+let test_spdr_sector_etfs_names_are_valid_gics _ =
+  let invalid =
+    List.filter Macro_inputs.spdr_sector_etfs ~f:(fun (_, name) ->
+        Option.is_none (Weinstein_types.gics_sector_of_string_opt name))
+  in
+  assert_that invalid is_empty
 
 let test_default_global_indices_is_canonical_triple _ =
   (* GSPC.INDX is intentionally excluded — it is passed to Macro.analyze as
@@ -132,10 +141,12 @@ let test_build_sector_map_drops_etfs_with_insufficient_bars _ =
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
-      ~sector_etfs:[ ("XLK", "Technology") ]
+      ~sector_etfs:[ ("XLK", "Information Technology") ]
       ~bar_history:t ~sector_prior_stages ~index_bars
       ~ticker_sectors:
-        (Hashtbl.of_alist_exn (module String) [ ("XLK", "Technology") ])
+        (Hashtbl.of_alist_exn
+           (module String)
+           [ ("XLK", "Information Technology") ])
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -150,10 +161,12 @@ let test_build_sector_map_drops_etfs_when_index_bars_empty _ =
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
-      ~sector_etfs:[ ("XLK", "Technology") ]
+      ~sector_etfs:[ ("XLK", "Information Technology") ]
       ~bar_history:t ~sector_prior_stages ~index_bars:[]
       ~ticker_sectors:
-        (Hashtbl.of_alist_exn (module String) [ ("XLK", "Technology") ])
+        (Hashtbl.of_alist_exn
+           (module String)
+           [ ("XLK", "Information Technology") ])
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -175,10 +188,12 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
-      ~sector_etfs:[ ("XLK", "Technology") ]
+      ~sector_etfs:[ ("XLK", "Information Technology") ]
       ~bar_history:t ~sector_prior_stages ~index_bars
       ~ticker_sectors:
-        (Hashtbl.of_alist_exn (module String) [ ("XLK", "Technology") ])
+        (Hashtbl.of_alist_exn
+           (module String)
+           [ ("XLK", "Information Technology") ])
   in
   assert_that (Hashtbl.to_alist result)
     (elements_are
@@ -188,7 +203,7 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
              field fst (equal_to "XLK");
              field
                (fun (_, (ctx : Screener.sector_context)) -> ctx.sector_name)
-               (equal_to "Technology");
+               (equal_to "Information Technology");
            ];
        ]);
   (* Sector_prior_stages was updated as a side effect so subsequent calls can
@@ -207,6 +222,8 @@ let () =
     >::: [
            "spdr_sector_etfs is the canonical 11-sector list"
            >:: test_spdr_sector_etfs_is_canonical_11_sector_list;
+           "spdr_sector_etfs names are valid GICS"
+           >:: test_spdr_sector_etfs_names_are_valid_gics;
            "default_global_indices is the canonical triple"
            >:: test_default_global_indices_is_canonical_triple;
            "build_global_index_bars returns empty for empty bar history"

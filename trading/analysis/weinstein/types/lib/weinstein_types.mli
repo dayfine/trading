@@ -79,3 +79,33 @@ type grade = A_plus | A | B | C | D | F [@@deriving show, eq, ord, sexp]
 
 val grade_to_string : grade -> string
 (** Convert grade to a human-readable string (e.g. [A_plus] → ["A+"]). *)
+
+(** {1 GICS Sectors} *)
+
+(** The 11 GICS (Global Industry Classification Standard) sectors used by
+    S&P/MSCI. These are the canonical sector names used throughout the system —
+    in [sectors.csv], in the SPDR sector ETF mapping, and in screener output. *)
+type gics_sector =
+  | Information_technology
+  | Financials
+  | Health_care
+  | Energy
+  | Industrials
+  | Consumer_staples
+  | Consumer_discretionary
+  | Utilities
+  | Materials
+  | Real_estate
+  | Communication_services
+[@@deriving show, eq, ord, sexp]
+
+val all_gics_sectors : gics_sector list
+(** All 11 GICS sectors in standard order. *)
+
+val gics_sector_to_string : gics_sector -> string
+(** Canonical display name (e.g. [Information_technology] →
+    ["Information Technology"]). *)
+
+val gics_sector_of_string_opt : string -> gics_sector option
+(** Parse a sector name (case-insensitive). Returns [None] for unrecognized
+    names. *)

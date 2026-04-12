@@ -2,7 +2,7 @@ open Core
 
 let spdr_sector_etfs =
   [
-    ("XLK", "Technology");
+    ("XLK", "Information Technology");
     ("XLF", "Financials");
     ("XLE", "Energy");
     ("XLV", "Health Care");
