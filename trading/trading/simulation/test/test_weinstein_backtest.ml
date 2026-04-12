@@ -13,6 +13,16 @@ open Core
 open Matchers
 open Trading_simulation
 
+(* Re-declare summary_stats for exhaustive ppx-generated matcher. *)
+type stats = Trading_simulation.Metrics.summary_stats = {
+  total_pnl : float;
+  avg_holding_days : float;
+  win_count : int;
+  loss_count : int;
+  win_rate : float;
+}
+[@@deriving test_matcher]
+
 (* ------------------------------------------------------------------ *)
 (* Constants                                                            *)
 (* ------------------------------------------------------------------ *)
@@ -115,11 +125,8 @@ let test_six_year_full_lifecycle _ =
   assert_that (List.length round_trips) (equal_to 7);
   assert_that summary
     (is_some_and
-       (all_of
-          [
-            field (fun (s : Metrics.summary_stats) -> s.win_count) (equal_to 1);
-            field (fun (s : Metrics.summary_stats) -> s.loss_count) (equal_to 6);
-          ]));
+       (match_stats ~total_pnl:__ ~avg_holding_days:__ ~win_count:(equal_to 1)
+          ~loss_count:(equal_to 6) ~win_rate:__));
   (* Final value ~$495k on $500k start — small loss from conservative sizing *)
   assert_that final_value
     (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
@@ -155,14 +162,10 @@ let test_entry_exit_cycle_around_covid _ =
   assert_that (List.length round_trips) (equal_to 4);
   assert_that summary
     (is_some_and
-       (all_of
-          [
-            field (fun (s : Metrics.summary_stats) -> s.win_count) (equal_to 0);
-            field (fun (s : Metrics.summary_stats) -> s.loss_count) (equal_to 4);
-            field
-              (fun (s : Metrics.summary_stats) -> s.total_pnl)
-              (lt (module Float_ord) 0.0);
-          ]));
+       (match_stats
+          ~total_pnl:(lt (module Float_ord) 0.0)
+          ~avg_holding_days:__ ~win_count:(equal_to 0) ~loss_count:(equal_to 4)
+          ~win_rate:__));
   (* Final value ~$496k — losses are small due to conservative sizing *)
   assert_that final_value
     (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
