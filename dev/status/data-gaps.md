@@ -75,10 +75,9 @@ Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates iden
 - GSPC.INDX (S&P 500): cached, 1927-12-30 to 2026-04-09 — VERIFIED
 - GDAXI.INDX (DAX): cached, 1980-01-02 to 2026-04-09 — VERIFIED
 - N225.INDX (Nikkei 225): cached, 1965-01-05 to 2026-04-10 — VERIFIED
-- **FTSE 100 via `ISF.LSE` (iShares Core FTSE 100 UCITS ETF)** — **DECISION: use as proxy** (2026-04-10). Physical-replication tracker, ~bps tracking error, functionally indistinguishable from the index at weekly cadence. Try `UKX.INDX` on EODHD first as a cheaper alternative; fall back to `ISF.LSE` if that doesn't work. Still needs to be fetched.
+- **FTSE 100 via `ISF.LSE` (iShares Core FTSE 100 UCITS ETF)** — **DECISION: use as proxy** (2026-04-10). Physical-replication tracker, ~bps tracking error, functionally indistinguishable from the index at weekly cadence. `UKX.INDX` returned empty; `ISF.LSE` fetched successfully (6,552 bars, 2000-05-02 to 2026-04-10) — VERIFIED (2026-04-11).
 
 ### What's needed
-- **ops-data**: try `UKX.INDX` first, else fetch `ISF.LSE` once API key is available
 - **feat-weinstein**: wire cached global index bars into strategy (currently passes `~global_index_bars:[]`)
 
 ---

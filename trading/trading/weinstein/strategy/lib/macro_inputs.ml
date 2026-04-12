@@ -15,6 +15,10 @@ let spdr_sector_etfs =
     ("XLC", "Communication Services");
   ]
 
+(* ISF.LSE (iShares Core FTSE UCITS ETF) proxies the UK large-cap index
+   because EODHD does not carry FTSE.INDX or UKX.INDX. Physical-replication
+   tracker with ~bps tracking error — functionally indistinguishable from the
+   index at weekly cadence. See dev/ops/2026-04-10-data-fetch.md. *)
 let default_global_indices =
   [ ("GDAXI.INDX", "DAX"); ("N225.INDX", "Nikkei"); ("ISF.LSE", "FTSE") ]
 

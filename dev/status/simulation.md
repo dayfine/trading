@@ -1,9 +1,9 @@
 # Status: simulation
 
-## Last updated: 2026-04-10
+## Last updated: 2026-04-12
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)
@@ -44,14 +44,16 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
 - **Simulation date** — `_make_entry_transition` uses current bar's date instead of `Date.today`.
 - **Smoke test extended** — `hist_start` moved to 2022-01-01 (100+ weekly bars warmup). Added `portfolio_value > 0` assertion.
 
-### Slice 3 (2026-04-10)
+### Slice 3 (2026-04-10) — merged (#246)
 
 - **Prior stage accumulation** — per-symbol `prior_stages` Hashtbl in the `make` closure. `Stage.classify` and `Stock_analysis.analyze` now receive accumulated prior stage instead of `None`. Enables accurate Stage1→Stage2 transition detection in `is_breakout_candidate`.
 - **Index prior stage** — `Macro.analyze` receives accumulated index prior stage instead of `None`.
 - **Breakout smoke test** — new test using `Breakout` synthetic pattern (40 weeks basing, 8x breakout volume, 1-year sim from data start). Asserts: orders submitted, trades executed, positive portfolio value. Full screener→order→trade pipeline verified end-to-end.
 
+All slices merged: Slice 1 (#196), Slice 2 (#237, #240, #241, #242), Slice 3 (#246).
+
 ## In Progress
-- None
+- M5 (walk-forward backtest, parameter tuner) is next
 
 ## Blocking Refactors
 - None
