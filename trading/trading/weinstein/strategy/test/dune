@@ -26,7 +26,7 @@
   weinstein.screener
   weinstein.stage
   weinstein.macro
-  weinstein.portfolio_risk
+  weinstein_trading.portfolio_risk
   weinstein_trading.stops
   weinstein.data_source.testing
   weinstein.data_source
