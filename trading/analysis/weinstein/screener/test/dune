@@ -26,3 +26,16 @@
   async
   ounit2
   matchers))
+
+(test
+ (name test_screener_e2e)
+ (modules test_screener_e2e)
+ (libraries
+  screener
+  stock_analysis
+  weinstein_types
+  weinstein.data_source.testing
+  types
+  core
+  ounit2
+  matchers))
