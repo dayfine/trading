@@ -1,4 +1,4 @@
-(** M5 historical backtesting integration test.
+(** Weinstein strategy historical backtesting integration tests.
 
     Runs [Simulator.run] with [Weinstein_strategy] over a multi-year window on 7
     real stocks + GSPC.INDX index, using committed test data fixtures at
@@ -18,36 +18,10 @@ open Core
 open Matchers
 
 (* ------------------------------------------------------------------ *)
-(* Test data resolution                                                 *)
-(* ------------------------------------------------------------------ *)
-
-(** Resolve the test_data directory. Checks [TRADING_DATA_DIR] env var first,
-    then walks up from the current directory looking for [test_data/]. *)
-let resolve_test_data_dir () =
-  match Sys.getenv "TRADING_DATA_DIR" with
-  | Some d when String.length d > 0 -> d
-  | _ -> (
-      (* Walk up from cwd looking for test_data/ (handles both source and
-         _build/ contexts). Also try absolute Docker container path. *)
-      let rec walk dir depth =
-        if depth > 8 then None
-        else
-          let candidate = Filename.concat dir "test_data" in
-          match Sys_unix.is_directory candidate with
-          | `Yes -> Some candidate
-          | _ -> walk (Filename.concat dir Filename.parent_dir_name) (depth + 1)
-      in
-      match walk (Sys_unix.getcwd ()) 0 with
-      | Some d -> d
-      | None ->
-          OUnit2.assert_failure
-            "Cannot find test_data/ directory. Set TRADING_DATA_DIR or run \
-             from the trading/ directory.")
-
-(* ------------------------------------------------------------------ *)
 (* Constants                                                            *)
 (* ------------------------------------------------------------------ *)
 
+let data_dir = Fpath.to_string (Data_path.default_data_dir ())
 let universe = [ "AAPL"; "MSFT"; "JPM"; "JNJ"; "CVX"; "KO"; "HD" ]
 let index_symbol = "GSPC.INDX"
 let all_symbols = index_symbol :: universe
@@ -116,11 +90,10 @@ let traded_symbols steps =
   |> List.dedup_and_sort ~compare:String.compare
 
 (* ------------------------------------------------------------------ *)
-(* M5 backtest: 6-year historical run                                   *)
+(* 6-year historical run                                                *)
 (* ------------------------------------------------------------------ *)
 
-let test_m5_historical_backtest _ =
-  let data_dir = resolve_test_data_dir () in
+let test_six_year_full_lifecycle _ =
   let result =
     run_backtest ~data_dir
       ~start_date:(Date.of_string "2018-01-02")
@@ -149,11 +122,10 @@ let test_m5_historical_backtest _ =
   assert_that (n_buys + n_sells) (gt (module Int_ord) 2)
 
 (* ------------------------------------------------------------------ *)
-(* M5 backtest: verify entry/exit cycle                                 *)
+(* Entry/exit cycle around COVID crash                                  *)
 (* ------------------------------------------------------------------ *)
 
-let test_m5_entry_exit_cycle _ =
-  let data_dir = resolve_test_data_dir () in
+let test_entry_exit_cycle_around_covid _ =
   let result =
     run_backtest ~data_dir
       ~start_date:(Date.of_string "2019-01-02")
@@ -168,11 +140,10 @@ let test_m5_entry_exit_cycle _ =
   assert_that all_trades (not_ is_empty)
 
 (* ------------------------------------------------------------------ *)
-(* M5 backtest: portfolio value tracks through time                     *)
+(* Portfolio value stays positive through time                          *)
 (* ------------------------------------------------------------------ *)
 
-let test_m5_portfolio_value_continuity _ =
-  let data_dir = resolve_test_data_dir () in
+let test_portfolio_value_stays_positive _ =
   let result =
     run_backtest ~data_dir
       ~start_date:(Date.of_string "2020-01-02")
@@ -190,11 +161,12 @@ let test_m5_portfolio_value_continuity _ =
 (* ------------------------------------------------------------------ *)
 
 let suite =
-  "m5_backtest"
+  "weinstein_backtest"
   >::: [
-         "6-year historical backtest" >:: test_m5_historical_backtest;
-         "entry/exit cycle around COVID" >:: test_m5_entry_exit_cycle;
-         "portfolio value continuity" >:: test_m5_portfolio_value_continuity;
+         "6-year full lifecycle" >:: test_six_year_full_lifecycle;
+         "entry/exit cycle around COVID" >:: test_entry_exit_cycle_around_covid;
+         "portfolio value stays positive"
+         >:: test_portfolio_value_stays_positive;
        ]
 
 let () = run_test_tt_main suite

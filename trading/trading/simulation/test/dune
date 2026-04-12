@@ -108,14 +108,14 @@
   matchers))
 
 (test
- (name test_m5_backtest)
- (modules test_m5_backtest)
+ (name test_weinstein_backtest)
+ (modules test_weinstein_backtest)
  (libraries
   core
-  core_unix
   types
   status
   fpath
+  weinstein.data_source
   trading.base
   trading.engine
   trading.portfolio
