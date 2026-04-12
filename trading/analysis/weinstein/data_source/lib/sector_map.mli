@@ -1,7 +1,7 @@
 (** Load stock-ticker → GICS-sector assignments from a CSV file.
 
-    The canonical CSV lives at [data/sectors.csv] and is generated from SSGA SPDR
-    ETF holdings data. Format: [symbol,sector] with a header line. *)
+    The canonical CSV lives at [data/sectors.csv] and is generated from SSGA
+    SPDR ETF holdings data. Format: [symbol,sector] with a header line. *)
 
 val load : data_dir:Fpath.t -> (string, string) Core.Hashtbl.t
 (** [load ~data_dir] reads [data_dir/sectors.csv] and returns a hashtable

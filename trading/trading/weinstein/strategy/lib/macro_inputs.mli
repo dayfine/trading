@@ -44,9 +44,9 @@ val build_sector_map :
   index_bars:Types.Daily_price.t list ->
   ticker_sectors:(string, string) Hashtbl.t ->
   (string, Screener.sector_context) Hashtbl.t
-(** [build_sector_map] returns a map keyed by stock ticker (e.g. ["AAPL"]).
-    Each entry is the {!Screener.sector_context} produced by {!Sector.analyze}
-    on the corresponding sector ETF's accumulated weekly bars.
+(** [build_sector_map] returns a map keyed by stock ticker (e.g. ["AAPL"]). Each
+    entry is the {!Screener.sector_context} produced by {!Sector.analyze} on the
+    corresponding sector ETF's accumulated weekly bars.
 
     The expansion from ETF-level to ticker-level uses [ticker_sectors], a
     ticker→sector-name hashtable typically loaded from [sectors.csv] via

@@ -111,6 +111,7 @@ let test_build_sector_map_empty_bar_history _ =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52 ~sector_etfs:Macro_inputs.spdr_sector_etfs
       ~bar_history:t ~sector_prior_stages ~index_bars:[]
+      ~ticker_sectors:(Hashtbl.create (module String))
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -133,6 +134,8 @@ let test_build_sector_map_drops_etfs_with_insufficient_bars _ =
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Technology") ]
       ~bar_history:t ~sector_prior_stages ~index_bars
+      ~ticker_sectors:
+        (Hashtbl.of_alist_exn (module String) [ ("XLK", "Technology") ])
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -149,6 +152,8 @@ let test_build_sector_map_drops_etfs_when_index_bars_empty _ =
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Technology") ]
       ~bar_history:t ~sector_prior_stages ~index_bars:[]
+      ~ticker_sectors:
+        (Hashtbl.of_alist_exn (module String) [ ("XLK", "Technology") ])
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -172,6 +177,8 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Technology") ]
       ~bar_history:t ~sector_prior_stages ~index_bars
+      ~ticker_sectors:
+        (Hashtbl.of_alist_exn (module String) [ ("XLK", "Technology") ])
   in
   assert_that (Hashtbl.to_alist result)
     (elements_are

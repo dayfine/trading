@@ -201,8 +201,8 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
       ~current_date
 
 let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~get_indicator:_
-    ~(portfolio : Portfolio_view.t) =
+    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
+    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let all_symbols = _all_accumulated_symbols ~config in
   Bar_history.accumulate bar_history ~get_price ~symbols:all_symbols;
