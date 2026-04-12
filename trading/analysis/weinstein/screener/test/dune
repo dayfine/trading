@@ -38,6 +38,4 @@
   types
   core
   ounit2
-  matchers)
- (preprocess
-  (pps ppx_test_matcher)))
+  matchers))

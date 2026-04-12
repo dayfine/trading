@@ -17,6 +17,4 @@
 
 (test
  (name test_synthetic_source)
- (libraries weinstein_data_source_testing core async ounit2 types matchers)
- (preprocess
-  (pps ppx_test_matcher)))
+ (libraries weinstein_data_source_testing core async ounit2 types matchers))

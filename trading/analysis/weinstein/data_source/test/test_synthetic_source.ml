@@ -4,19 +4,6 @@ open Core
 open OUnit2
 open Matchers
 
-
-(* Re-declare Daily_price for exhaustive ppx-generated matcher. *)
-type bar = Types.Daily_price.t = {
-  date : Core.Date.t;
-  open_price : float;
-  high_price : float;
-  low_price : float;
-  close_price : float;
-  volume : int;
-  adjusted_close : float;
-}
-[@@deriving test_matcher]
-
 let run_deferred d = Async.Thread_safe.block_on_async_exn (fun () -> d)
 let start_date = Date.of_string "2024-01-02"
 
@@ -49,8 +36,7 @@ let test_trending_generates_bars _ =
   assert_that (List.length bars) (gt (module Int_ord) 50);
   (* First bar should be at start_date *)
   assert_that (List.hd_exn bars)
-    (match_bar ~date:(equal_to start_date) ~open_price:__ ~high_price:__
-       ~low_price:__ ~close_price:__ ~volume:__ ~adjusted_close:__)
+    (field (fun b -> b.Types.Daily_price.date) (equal_to start_date))
 
 let test_trending_prices_increase _ =
   let cfg =
@@ -108,10 +94,17 @@ let test_trending_exact_bar_values _ =
     (elements_are
        [
          (* 2024-01-02: bar 0, close = 100.0 *)
-         match_bar ~date:(equal_to start_date) ~close_price:(float_equal 100.0)
-           ~open_price:(float_equal 99.5) ~high_price:(float_equal 101.0)
-           ~low_price:(float_equal 99.0) ~volume:(equal_to 2000)
-           ~adjusted_close:__;
+         all_of
+           [
+             field (fun b -> b.Types.Daily_price.date) (equal_to start_date);
+             field
+               (fun b -> b.Types.Daily_price.close_price)
+               (float_equal 100.0);
+             field (fun b -> b.Types.Daily_price.open_price) (float_equal 99.5);
+             field (fun b -> b.Types.Daily_price.high_price) (float_equal 101.0);
+             field (fun b -> b.Types.Daily_price.low_price) (float_equal 99.0);
+             field (fun b -> b.Types.Daily_price.volume) (equal_to 2000);
+           ];
          (* 2024-01-03: bar 1, close = 100.0 × 1.004 = 100.4 *)
          all_of
            [

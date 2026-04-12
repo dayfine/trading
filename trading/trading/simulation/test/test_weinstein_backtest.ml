@@ -13,7 +13,6 @@ open Core
 open Matchers
 open Trading_simulation
 
-
 (* Re-declare summary_stats for exhaustive ppx-generated matcher. *)
 type stats = Trading_simulation.Metrics.summary_stats = {
   total_pnl : float;
@@ -163,9 +162,10 @@ let test_entry_exit_cycle_around_covid _ =
   assert_that (List.length round_trips) (equal_to 4);
   assert_that summary
     (is_some_and
-       (match_stats ~total_pnl:(lt (module Float_ord) 0.0)
-          ~avg_holding_days:__ ~win_count:(equal_to 0)
-          ~loss_count:(equal_to 4) ~win_rate:__));
+       (match_stats
+          ~total_pnl:(lt (module Float_ord) 0.0)
+          ~avg_holding_days:__ ~win_count:(equal_to 0) ~loss_count:(equal_to 4)
+          ~win_rate:__));
   (* Final value ~$496k — losses are small due to conservative sizing *)
   assert_that final_value
     (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
