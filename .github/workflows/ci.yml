@@ -35,6 +35,10 @@ jobs:
       options: --user 0
     env:
       HOME: /home/opam
+      # Data_path.default_data_dir defaults to /workspaces/trading-1/data (the
+      # dev container's mounted data dir). In CI the checkout lives under
+      # /__w/..., so point the data-loading code at $GITHUB_WORKSPACE/data.
+      TRADING_DATA_DIR: ${{ github.workspace }}/data
     defaults:
       run:
         shell: bash
