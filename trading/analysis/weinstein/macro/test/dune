@@ -1,6 +1,6 @@
 (tests
- (names test_macro)
- (modules test_macro)
+ (names test_macro test_ad_bars_aggregation)
+ (modules test_macro test_ad_bars_aggregation)
  (libraries macro weinstein_types stage types core ounit2 matchers))
 
 (test

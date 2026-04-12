@@ -12,6 +12,7 @@ depends: [
   "types"
   "csv"
   "eodhd"
+  "indicators"
   "odoc" {with-doc}
 ]
 build: [

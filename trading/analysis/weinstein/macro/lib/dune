@@ -2,6 +2,6 @@
  (name macro)
  (public_name weinstein.macro)
  (wrapped false)
- (libraries core types weinstein_types stage)
+ (libraries core types weinstein_types stage indicators.time_period)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
