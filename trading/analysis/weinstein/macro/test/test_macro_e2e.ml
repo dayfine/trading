@@ -8,10 +8,10 @@
 
     {b Not tested yet} (data not available):
     - A-D breadth (ADL): EODHD does not carry [ADV.NYSE]/[DEC.NYSE]. Needs an
-      alternative data source. Tracked in [dev/status/data-gaps.md].
+      alternative data source. Tracked in [dev/notes/data-gaps.md].
     - Sector analysis: requires sector ETF bars + [Instrument_info.sector]
       populated via EODHD fundamentals tier. Tracked in
-      [dev/status/data-gaps.md]. *)
+      [dev/notes/data-gaps.md]. *)
 
 open Core
 open OUnit2

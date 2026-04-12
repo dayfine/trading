@@ -13,7 +13,7 @@
 
     Sector map is left empty (Neutral by fall-through) because per-stock sector
     metadata is not yet populated on [Instrument_info.sector] — see
-    [dev/status/sector-data-plan.md]. Once that's wired, a follow-up can add a
+    [dev/notes/sector-data-plan.md]. Once that's wired, a follow-up can add a
     populated sector map here. *)
 
 open Core
