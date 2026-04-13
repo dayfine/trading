@@ -8,21 +8,6 @@ type daily_counts = { advances : int; declines : int; total : int }
 [@@deriving show, eq]
 (** Per-date aggregated breadth counts. *)
 
-(** {1 Symbol parsing} *)
-
-val parse_symbols : string list -> string list
-(** [parse_symbols rows] extracts ticker symbols from CSV rows (excluding the
-    header). Each row is expected to have the symbol as the first
-    comma-separated field. Blank symbols are skipped. *)
-
-(** {1 Price parsing} *)
-
-val parse_close_prices : string list -> (string * float) list
-(** [parse_close_prices rows] parses CSV rows (excluding the header) into
-    [(date, close)] pairs. Rows with unparseable close prices are skipped.
-    Results are sorted by date ascending. The expected CSV column order is:
-    date, open, high, low, close, ... *)
-
 (** {1 Advance/decline computation} *)
 
 val compute_daily_changes :
@@ -41,17 +26,21 @@ val pearson_correlation : float list -> float list -> float
 (** [pearson_correlation xs ys] computes the Pearson correlation coefficient.
     Returns [0.0] for empty inputs or zero variance. *)
 
-val mean_absolute_error : float list -> float list -> float
-(** [mean_absolute_error xs ys] computes the mean absolute error between two
-    float lists. Returns [0.0] for empty inputs. *)
+(** {1 Validation} *)
 
-(** {1 Formatting} *)
+type validation_result = {
+  overlap_count : int;
+  correlation : float;
+  mae : float;
+}
+[@@deriving show, eq]
+(** Result of comparing synthetic breadth data against golden data. *)
 
-val format_date_yyyymmdd : string -> string
-(** [format_date_yyyymmdd "2024-01-15"] returns ["20240115"]. Removes dashes
-    from a date string. *)
-
-val format_breadth_row : string * int -> string
-(** [format_breadth_row (date, count)] formats a breadth row as
-    ["YYYYMMDD, count"]. The date is converted from [YYYY-MM-DD] to [YYYYMMDD].
-*)
+val validate_against_golden :
+  synthetic:int Core.Map.M(Core.String).t ->
+  golden:int Core.Map.M(Core.String).t ->
+  validation_result
+(** [validate_against_golden ~synthetic ~golden] compares synthetic breadth
+    counts against golden reference data on overlapping dates. Returns
+    correlation, mean absolute error, and overlap count. Returns zeros when
+    there are no overlapping dates. *)

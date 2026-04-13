@@ -17,6 +17,42 @@ open Synthetic_adl
 
 let _min_stocks = 100
 
+(* ---------- CSV parsing helpers ---------- *)
+
+(** Extract ticker symbol from a CSV line (first comma-separated field). *)
+let _parse_symbol_line line =
+  match String.lsplit2 line ~on:',' with
+  | Some (sym, _) ->
+      let sym = String.strip sym in
+      if String.is_empty sym then None else Some sym
+  | None -> None
+
+let _parse_symbols rows = List.filter_map rows ~f:_parse_symbol_line
+
+(** Parse a CSV row into [(date, close)] if the close price is valid. *)
+let _parse_price_row line =
+  let fields = String.split line ~on:',' in
+  match fields with
+  | date :: _open :: _high :: _low :: close :: _ -> (
+      let date = String.strip date in
+      let close_str = String.strip close in
+      match Float.of_string_opt close_str with
+      | Some c -> Some (date, c)
+      | None -> None)
+  | _ -> None
+
+let _parse_close_prices rows =
+  List.filter_map rows ~f:_parse_price_row
+  |> List.sort ~compare:(fun (d1, _) (d2, _) -> String.compare d1 d2)
+
+(* ---------- formatting helpers ---------- *)
+
+let _format_date_yyyymmdd date_str =
+  String.filter date_str ~f:(fun c -> not (Char.equal c '-'))
+
+let _format_breadth_row (date_str, count) =
+  Printf.sprintf "%s, %d" (_format_date_yyyymmdd date_str) count
+
 (* ---------- path helpers ---------- *)
 
 (** [_symbol_data_path ~data_dir symbol] returns the path to a symbol's
@@ -35,13 +71,13 @@ let _symbol_data_path ~data_dir symbol =
 let _load_symbols ~data_dir =
   let path = Fpath.(data_dir / "sectors.csv") |> Fpath.to_string in
   let lines = In_channel.read_lines path in
-  match lines with [] -> [] | _header :: rows -> parse_symbols rows
+  match lines with [] -> [] | _header :: rows -> _parse_symbols rows
 
 (** Load close prices from a stock's [data.csv]. Returns [(date, close)] pairs
     sorted by date ascending. Skips rows with unparseable close prices. *)
 let _load_close_prices path =
   let lines = try In_channel.read_lines path with Sys_error _ -> [] in
-  match lines with [] -> [] | _header :: rows -> parse_close_prices rows
+  match lines with [] -> [] | _header :: rows -> _parse_close_prices rows
 
 (** Parse a single golden breadth CSV line into [(date, count)] if valid. *)
 let _parse_golden_breadth_line line =
@@ -67,7 +103,7 @@ let _load_golden_breadth path =
 let _write_breadth_csv path pairs =
   Out_channel.with_file path ~f:(fun oc ->
       List.iter pairs ~f:(fun pair ->
-          Out_channel.fprintf oc "%s\n" (format_breadth_row pair)))
+          Out_channel.fprintf oc "%s\n" (_format_breadth_row pair)))
 
 (* ---------- main: loading ---------- *)
 
@@ -118,77 +154,43 @@ let _write_output_csvs ~data_dir daily =
 (* ---------- main: validation ---------- *)
 
 (** Print validation stats for one component (advances or declines). *)
-let _print_validation_stats ~label overlap_dates corr mae =
-  let n = List.length overlap_dates in
+let _print_validation_stats ~label (r : validation_result) =
   printf "\n  %s:\n%!" label;
-  printf "    Overlapping dates: %d\n%!" n;
-  printf "    Date range: %s - %s\n%!"
-    (List.hd_exn overlap_dates)
-    (List.last_exn overlap_dates);
-  printf "    Pearson correlation: %.4f\n%!" corr;
-  printf "    Mean absolute error: %.1f\n%!" mae
-
-(** Compare synthetic data against golden data for overlapping dates. Prints
-    stats and returns [(correlation, mae, overlap_count)]. *)
-let _validate_against_golden ~label synthetic golden =
-  let overlap_dates =
-    Map.fold synthetic ~init:[] ~f:(fun ~key:date ~data:_ acc ->
-        if Map.mem golden date then date :: acc else acc)
-    |> List.sort ~compare:String.compare
-  in
-  if List.is_empty overlap_dates then (
-    printf "  No overlapping dates for %s\n%!" label;
-    (0.0, 0.0, 0))
-  else
-    let syn_vals =
-      List.map overlap_dates ~f:(fun d ->
-          Float.of_int (Map.find_exn synthetic d))
-    in
-    let gold_vals =
-      List.map overlap_dates ~f:(fun d -> Float.of_int (Map.find_exn golden d))
-    in
-    let corr = pearson_correlation syn_vals gold_vals in
-    let mae = mean_absolute_error syn_vals gold_vals in
-    _print_validation_stats ~label overlap_dates corr mae;
-    (corr, mae, List.length overlap_dates)
+  printf "    Overlapping dates: %d\n%!" r.overlap_count;
+  printf "    Pearson correlation: %.4f\n%!" r.correlation;
+  printf "    Mean absolute error: %.1f\n%!" r.mae
 
 (** Build synthetic lookup maps keyed by YYYYMMDD. *)
 let _build_synthetic_maps daily =
   let syn_advn =
     List.fold daily ~init:String.Map.empty ~f:(fun acc (d, c) ->
-        Map.set acc ~key:(format_date_yyyymmdd d) ~data:c.advances)
+        Map.set acc ~key:(_format_date_yyyymmdd d) ~data:c.advances)
   in
   let syn_decln =
     List.fold daily ~init:String.Map.empty ~f:(fun acc (d, c) ->
-        Map.set acc ~key:(format_date_yyyymmdd d) ~data:c.declines)
+        Map.set acc ~key:(_format_date_yyyymmdd d) ~data:c.declines)
   in
   (syn_advn, syn_decln)
 
-(** Compute net breadth correlation and print results. *)
-let _validate_net_breadth syn_advn syn_decln golden_advn golden_decln =
-  let overlap_dates =
+(** Build net breadth maps (advances - declines) for overlapping dates. *)
+let _build_net_maps syn_advn syn_decln golden_advn golden_decln =
+  let dates =
     Map.keys syn_advn
     |> List.filter ~f:(fun date ->
         Map.mem golden_advn date && Map.mem syn_decln date
         && Map.mem golden_decln date)
-    |> List.sort ~compare:String.compare
   in
-  if List.is_empty overlap_dates then 0.0
-  else
-    let syn_net =
-      List.map overlap_dates ~f:(fun d ->
-          Float.of_int (Map.find_exn syn_advn d - Map.find_exn syn_decln d))
-    in
-    let gold_net =
-      List.map overlap_dates ~f:(fun d ->
-          Float.of_int (Map.find_exn golden_advn d - Map.find_exn golden_decln d))
-    in
-    let corr = pearson_correlation syn_net gold_net in
-    let mae = mean_absolute_error syn_net gold_net in
-    printf "\n  Net breadth (advances - declines):\n%!";
-    printf "    Pearson correlation: %.4f\n%!" corr;
-    printf "    Mean absolute error: %.1f\n%!" mae;
-    corr
+  let syn_net =
+    List.fold dates ~init:String.Map.empty ~f:(fun acc d ->
+        Map.set acc ~key:d
+          ~data:(Map.find_exn syn_advn d - Map.find_exn syn_decln d))
+  in
+  let gold_net =
+    List.fold dates ~init:String.Map.empty ~f:(fun acc d ->
+        Map.set acc ~key:d
+          ~data:(Map.find_exn golden_advn d - Map.find_exn golden_decln d))
+  in
+  (syn_net, gold_net)
 
 (** Run validation against golden NYSE breadth data. *)
 let _run_validation ~breadth_dir daily =
@@ -202,20 +204,29 @@ let _run_validation ~breadth_dir daily =
       let golden_advn = _load_golden_breadth golden_advn_path in
       let golden_decln = _load_golden_breadth golden_decln_path in
       let syn_advn, syn_decln = _build_synthetic_maps daily in
-      let corr_a, _mae_a, n_a =
-        _validate_against_golden ~label:"Advances" syn_advn golden_advn
+      let r_a =
+        validate_against_golden ~synthetic:syn_advn ~golden:golden_advn
       in
-      let corr_d, _mae_d, n_d =
-        _validate_against_golden ~label:"Declines" syn_decln golden_decln
+      _print_validation_stats ~label:"Advances" r_a;
+      let r_d =
+        validate_against_golden ~synthetic:syn_decln ~golden:golden_decln
       in
-      let net_corr =
-        _validate_net_breadth syn_advn syn_decln golden_advn golden_decln
+      _print_validation_stats ~label:"Declines" r_d;
+      let syn_net, gold_net =
+        _build_net_maps syn_advn syn_decln golden_advn golden_decln
       in
+      let r_net = validate_against_golden ~synthetic:syn_net ~golden:gold_net in
+      if r_net.overlap_count > 0 then (
+        printf "\n  Net breadth (advances - declines):\n%!";
+        printf "    Pearson correlation: %.4f\n%!" r_net.correlation;
+        printf "    Mean absolute error: %.1f\n%!" r_net.mae);
       printf "\n--- Summary ---\n%!";
-      printf "Advance correlation:    %.4f (n=%d)\n%!" corr_a n_a;
-      printf "Decline correlation:    %.4f (n=%d)\n%!" corr_d n_d;
-      if Float.( <> ) net_corr 0.0 then
-        printf "Net breadth correlation: %.4f\n%!" net_corr;
+      printf "Advance correlation:    %.4f (n=%d)\n%!" r_a.correlation
+        r_a.overlap_count;
+      printf "Decline correlation:    %.4f (n=%d)\n%!" r_d.correlation
+        r_d.overlap_count;
+      if r_net.overlap_count > 0 then
+        printf "Net breadth correlation: %.4f\n%!" r_net.correlation;
       printf "\n%!"
 
 (* ---------- main ---------- *)

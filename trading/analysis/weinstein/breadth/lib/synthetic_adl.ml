@@ -14,7 +14,7 @@ let _parse_symbol_line line =
       if String.is_empty sym then None else Some sym
   | None -> None
 
-let parse_symbols rows = List.filter_map rows ~f:_parse_symbol_line
+let _parse_symbols rows = List.filter_map rows ~f:_parse_symbol_line
 
 (* ---------- price parsing ---------- *)
 
@@ -29,7 +29,7 @@ let _parse_price_row line =
       | None -> None)
   | _ -> None
 
-let parse_close_prices rows =
+let _parse_close_prices rows =
   List.filter_map rows ~f:_parse_price_row
   |> List.sort ~compare:(fun (d1, _) (d2, _) -> String.compare d1 d2)
 
@@ -97,7 +97,7 @@ let pearson_correlation xs ys =
     let denom = Float.sqrt (var_x *. var_y) in
     if Float.( = ) denom 0.0 then 0.0 else cov /. denom
 
-let mean_absolute_error xs ys =
+let _mean_absolute_error xs ys =
   let n = List.length xs in
   if n = 0 then 0.0
   else
@@ -106,8 +106,37 @@ let mean_absolute_error xs ys =
 
 (* ---------- formatting ---------- *)
 
-let format_date_yyyymmdd date_str =
+let _format_date_yyyymmdd date_str =
   String.filter date_str ~f:(fun c -> not (Char.equal c '-'))
 
-let format_breadth_row (date_str, count) =
-  Printf.sprintf "%s, %d" (format_date_yyyymmdd date_str) count
+let _format_breadth_row (date_str, count) =
+  Printf.sprintf "%s, %d" (_format_date_yyyymmdd date_str) count
+
+(* ---------- validation ---------- *)
+
+type validation_result = {
+  overlap_count : int;
+  correlation : float;
+  mae : float;
+}
+[@@deriving show, eq]
+
+let validate_against_golden ~synthetic ~golden =
+  let overlap_dates =
+    Map.fold synthetic ~init:[] ~f:(fun ~key:date ~data:_ acc ->
+        if Map.mem golden date then date :: acc else acc)
+    |> List.sort ~compare:String.compare
+  in
+  if List.is_empty overlap_dates then
+    { overlap_count = 0; correlation = 0.0; mae = 0.0 }
+  else
+    let syn_vals =
+      List.map overlap_dates ~f:(fun d ->
+          Float.of_int (Map.find_exn synthetic d))
+    in
+    let gold_vals =
+      List.map overlap_dates ~f:(fun d -> Float.of_int (Map.find_exn golden d))
+    in
+    let corr = pearson_correlation syn_vals gold_vals in
+    let mae = _mean_absolute_error syn_vals gold_vals in
+    { overlap_count = List.length overlap_dates; correlation = corr; mae }
