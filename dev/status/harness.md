@@ -51,7 +51,7 @@ IN_PROGRESS
 ## Tier 2 — Milestone-gated
 
 - [ ] T2-B: Performance gate test (`trading/weinstein/simulation/test/performance_gate_test.ml`) (at M5)
-- [ ] T2-B: Reference backtest config + expected metrics (`dev/benchmarks/reference_backtest.json`) (at M5)
+- [x] T2-B: Reference backtest config + expected metrics (`dev/benchmarks/reference_backtest.sexp`, `dev/benchmarks/expected_metrics.sexp`) — DONE: see completion note below
 - [ ] T2-C: Walk-forward regression gate (`dev/benchmarks/best_config.json`) (at M7)
 - [ ] T2-D: Live trading gate + paper-trading validation period in `dev/milestones/m6-paper-trading.md` (before M6)
 
@@ -164,6 +164,11 @@ IN_PROGRESS
 ### T1-Q: Cyclomatic complexity linter
 
 - [x] T1-Q: CC linter — `trading/devtools/cc_linter/cc_linter.ml`; OCaml AST via `compiler-libs`; CC > 10 = warning (not failure); exits 0 always; optional JSON output to `dev/metrics/cc-YYYY-MM-DD.json`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest trading/devtools/checks/` — exits 0; prints OK or warning list.
+
+### T2-B: Reference backtest config + expected metrics
+
+- [x] T2-B: Reference backtest config — `dev/benchmarks/reference_backtest.sexp`; full default strategy config extracted from `Weinstein_strategy.default_config` and all sub-module defaults (stage, macro, screening, portfolio_risk, stops, stock_analysis, rs, volume, resistance, sector). Includes runner parameters (initial_cash, commission, warmup_days, strategy_cadence). Verify: `cat dev/benchmarks/reference_backtest.sexp` — should list all configurable parameters with their default values.
+- [x] T2-B: Expected metrics — `dev/benchmarks/expected_metrics.sexp`; observed metrics from 3 golden scenarios (2018-2023, 2015-2020, 2020-2024) on 1,654 stocks, plus acceptable ranges for regression detection: return 20-350%, trades 70-120, win rate 25-55%, Sharpe 0.60-1.50, max drawdown 25-45%, avg holding 20-60 days. Ranges set wide enough to absorb Hashtbl ordering non-determinism while catching genuine regressions. Verify: `cat dev/benchmarks/expected_metrics.sexp`.
 
 ### T3-B and T3-F
 
