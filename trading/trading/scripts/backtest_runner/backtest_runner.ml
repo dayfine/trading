@@ -23,19 +23,104 @@ let warmup_days = 210
 (* Helpers                                                             *)
 (* ------------------------------------------------------------------ *)
 
+(* ------------------------------------------------------------------ *)
+(* Config overrides                                                    *)
+(* ------------------------------------------------------------------ *)
+
+let _parse_override_pair kv =
+  match String.lsplit2 kv ~on:'=' with
+  | Some (k, v) -> (k, v)
+  | None ->
+      eprintf "Error: --override requires key=value, got: %s\n" kv;
+      Stdlib.exit 1
+
+let _extract_overrides argv =
+  let n = Array.length argv in
+  let overrides = ref [] in
+  let positional = ref [] in
+  let i = ref 1 in
+  while !i < n do
+    if String.equal argv.(!i) "--override" && !i + 1 < n then (
+      overrides := _parse_override_pair argv.(!i + 1) :: !overrides;
+      i := !i + 2)
+    else (
+      positional := argv.(!i) :: !positional;
+      incr i)
+  done;
+  (List.rev !positional, List.rev !overrides)
+
+let _override_portfolio pc key value =
+  match key with
+  | "risk_per_trade_pct" ->
+      { pc with Portfolio_risk.risk_per_trade_pct = Float.of_string value }
+  | "max_positions" -> { pc with max_positions = Int.of_string value }
+  | _ ->
+      eprintf "Warning: unknown portfolio key: %s\n" key;
+      pc
+
+let _override_stage sc key value =
+  match key with
+  | "ma_period" -> { sc with Stage.ma_period = Int.of_string value }
+  | _ ->
+      eprintf "Warning: unknown stage key: %s\n" key;
+      sc
+
+let _override_screening sc key value =
+  match key with
+  | "max_buy_candidates" ->
+      { sc with Screener.max_buy_candidates = Int.of_string value }
+  | _ ->
+      eprintf "Warning: unknown screening key: %s\n" key;
+      sc
+
+let _apply_override (config : Weinstein_strategy.config) (key, value) =
+  match String.lsplit2 key ~on:'.' with
+  | Some ("portfolio", sub) ->
+      {
+        config with
+        portfolio_config = _override_portfolio config.portfolio_config sub value;
+      }
+  | Some ("stage", sub) ->
+      {
+        config with
+        stage_config = _override_stage config.stage_config sub value;
+      }
+  | Some ("screening", sub) ->
+      {
+        config with
+        screening_config = _override_screening config.screening_config sub value;
+      }
+  | Some ("stops", "initial_stop_buffer") ->
+      { config with initial_stop_buffer = Float.of_string value }
+  | None when String.equal key "lookback_bars" ->
+      { config with lookback_bars = Int.of_string value }
+  | _ ->
+      eprintf "Warning: unknown override: %s\n" key;
+      config
+
+let _apply_overrides config overrides =
+  List.fold overrides ~init:config ~f:_apply_override
+
+(* ------------------------------------------------------------------ *)
+(* CLI parsing                                                         *)
+(* ------------------------------------------------------------------ *)
+
 let _parse_args () =
   let argv = Sys.get_argv () in
-  if Array.length argv < 2 then (
-    eprintf "Usage: backtest_runner <start_date> [end_date]\n";
-    eprintf "  start_date: required (e.g. 2018-01-02)\n";
-    eprintf "  end_date:   optional (defaults to today)\n";
-    Stdlib.exit 1);
-  let start_date = Date.of_string argv.(1) in
+  let positional, overrides = _extract_overrides argv in
+  (match positional with
+  | [] ->
+      eprintf
+        "Usage: backtest_runner <start_date> [end_date] [--override k=v ...]\n";
+      Stdlib.exit 1
+  | _ -> ());
+  let start_date = Date.of_string (List.hd_exn positional) in
   let end_date =
-    if Array.length argv > 2 then Date.of_string argv.(2)
-    else Date.today ~zone:Time_float.Zone.utc
+    match List.nth positional 1 with
+    | Some s -> Date.of_string s
+    | None -> Date.today ~zone:Time_float.Zone.utc
   in
-  (start_date, end_date)
+  (start_date, end_date, overrides)
 
 let _code_version () =
   try
@@ -96,20 +181,29 @@ let _commission_sexp () =
       _sexp_of_pair "minimum" (_sexp_of_float commission.minimum);
     ]
 
-let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir =
-  let sexp =
-    Sexp.List
-      [
-        _sexp_of_pair "code_version" (_sexp_of_string (_code_version ()));
-        _sexp_of_pair "start_date" (_sexp_of_string (Date.to_string start_date));
-        _sexp_of_pair "end_date" (_sexp_of_string (Date.to_string end_date));
-        _sexp_of_pair "initial_cash" (_sexp_of_float initial_cash);
-        _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
-        _sexp_of_pair "data_dir" (_sexp_of_string data_dir);
-        _sexp_of_pair "commission" (_commission_sexp ());
-      ]
+let _overrides_sexp overrides =
+  Sexp.List
+    (List.map overrides ~f:(fun (k, v) ->
+         Sexp.List [ Sexp.Atom k; Sexp.Atom v ]))
+
+let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir
+    ~overrides =
+  let base =
+    [
+      _sexp_of_pair "code_version" (_sexp_of_string (_code_version ()));
+      _sexp_of_pair "start_date" (_sexp_of_string (Date.to_string start_date));
+      _sexp_of_pair "end_date" (_sexp_of_string (Date.to_string end_date));
+      _sexp_of_pair "initial_cash" (_sexp_of_float initial_cash);
+      _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
+      _sexp_of_pair "data_dir" (_sexp_of_string data_dir);
+      _sexp_of_pair "commission" (_commission_sexp ());
+    ]
   in
-  Sexp.save_hum (output_dir ^ "/params.sexp") sexp
+  let with_overrides =
+    if List.is_empty overrides then base
+    else base @ [ _sexp_of_pair "overrides" (_overrides_sexp overrides) ]
+  in
+  Sexp.save_hum (output_dir ^ "/params.sexp") (Sexp.List with_overrides)
 
 let _build_summary_sexp
     ~(metrics : Trading_simulation_types.Metric_types.metric_set) ~final_value
@@ -160,7 +254,7 @@ let _write_equity_curve ~output_dir
 (* ------------------------------------------------------------------ *)
 
 let () =
-  let start_date, end_date = _parse_args () in
+  let start_date, end_date, overrides = _parse_args () in
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
 
@@ -178,10 +272,12 @@ let () =
   eprintf "Building strategy...\n%!";
   let base_config = Weinstein_strategy.default_config ~universe ~index_symbol in
   let config =
-    {
-      base_config with
-      sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs;
-    }
+    _apply_overrides
+      {
+        base_config with
+        sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs;
+      }
+      overrides
   in
   let strategy = Weinstein_strategy.make ~ad_bars ~ticker_sectors config in
 
@@ -249,7 +345,8 @@ let () =
       ~end_date ~universe_size ~n_steps:(List.length steps)
       ~n_round_trips:(List.length round_trips)
   in
-  _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir;
+  _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir
+    ~overrides;
   _write_summary ~output_dir ~summary_sexp;
   _write_trades ~output_dir ~round_trips;
   _write_equity_curve ~output_dir ~steps;
