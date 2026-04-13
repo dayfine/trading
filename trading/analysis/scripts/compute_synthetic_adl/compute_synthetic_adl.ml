@@ -88,13 +88,14 @@ let _load_golden_breadth path =
 let _format_date_yyyymmdd date_str =
   String.filter date_str ~f:(fun c -> not (Char.equal c '-'))
 
+(** Write one breadth row: [YYYYMMDD, count]. *)
+let _write_breadth_row oc (date_str, count) =
+  Out_channel.fprintf oc "%s, %d\n" (_format_date_yyyymmdd date_str) count
+
 (** Write breadth CSV in existing format: [YYYYMMDD, count] (no header). *)
 let _write_breadth_csv path pairs =
   Out_channel.with_file path ~f:(fun oc ->
-      List.iter pairs ~f:(fun (date_str, count) ->
-          Out_channel.fprintf oc "%s, %d\n"
-            (_format_date_yyyymmdd date_str)
-            count))
+      List.iter pairs ~f:(_write_breadth_row oc))
 
 (* ---------- advance/decline computation ---------- *)
 
@@ -117,14 +118,18 @@ let _accumulate_direction tbl date ~prev_close ~close =
   else if Float.( < ) close prev_close then _record_direction tbl date `Decline
   else _record_direction tbl date `Unchanged
 
+(** Process one price point, recording a direction change if there is a previous
+    close. Returns the current close for use as the next previous value. *)
+let _process_price_point tbl prev (date, close) =
+  Option.iter prev ~f:(fun prev_close ->
+      _accumulate_direction tbl date ~prev_close ~close);
+  Some close
+
 (** Accumulate price changes for a single symbol's price series. *)
 let _accumulate_symbol_changes tbl prices =
   if List.length prices >= 2 then
     let (_ : float option) =
-      List.fold prices ~init:None ~f:(fun prev (date, close) ->
-          Option.iter prev ~f:(fun prev_close ->
-              _accumulate_direction tbl date ~prev_close ~close);
-          Some close)
+      List.fold prices ~init:None ~f:(_process_price_point tbl)
     in
     ()
 
@@ -156,15 +161,18 @@ let _pearson_components xs ys ~mx ~my =
       let dy = y -. my in
       (cov +. (dx *. dy), var_x +. (dx *. dx), var_y +. (dy *. dy)))
 
-(** Pearson correlation coefficient between two float lists. *)
+(** Compute Pearson correlation for non-empty lists. *)
+let _pearson_correlation_nonempty xs ys =
+  let mx = _mean xs in
+  let my = _mean ys in
+  let cov, var_x, var_y = _pearson_components xs ys ~mx ~my in
+  let denom = Float.sqrt (var_x *. var_y) in
+  if Float.( = ) denom 0.0 then 0.0 else cov /. denom
+
+(** Pearson correlation coefficient between two float lists. Returns [0.0] for
+    empty inputs or zero variance. *)
 let _pearson_correlation xs ys =
-  if List.is_empty xs then 0.0
-  else
-    let mx = _mean xs in
-    let my = _mean ys in
-    let cov, var_x, var_y = _pearson_components xs ys ~mx ~my in
-    let denom = Float.sqrt (var_x *. var_y) in
-    if Float.( = ) denom 0.0 then 0.0 else cov /. denom
+  if List.is_empty xs then 0.0 else _pearson_correlation_nonempty xs ys
 
 (** Mean absolute error between two float lists. *)
 let _mean_absolute_error xs ys =
@@ -217,16 +225,22 @@ let _validate_against_golden ~label synthetic golden =
 
 let _min_stocks = 100
 
+(** Try loading prices for a single symbol. Returns [Some prices] on success,
+    [None] if the file is missing or contains no valid rows. *)
+let _try_load_symbol_prices ~data_dir symbol =
+  let path = _symbol_data_path ~data_dir symbol in
+  match Sys_unix.file_exists path with
+  | `Yes ->
+      let prices = _load_close_prices path in
+      if List.is_empty prices then None else Some prices
+  | `No | `Unknown -> None
+
 (** Load all symbol prices, returning [(prices_list, missing_count)]. *)
 let _load_all_prices ~data_dir symbols =
   List.fold symbols ~init:([], 0) ~f:(fun (prices_acc, miss) symbol ->
-      let path = _symbol_data_path ~data_dir symbol in
-      match Sys_unix.file_exists path with
-      | `Yes ->
-          let prices = _load_close_prices path in
-          if List.is_empty prices then (prices_acc, miss + 1)
-          else (prices :: prices_acc, miss)
-      | `No | `Unknown -> (prices_acc, miss + 1))
+      match _try_load_symbol_prices ~data_dir symbol with
+      | Some prices -> (prices :: prices_acc, miss)
+      | None -> (prices_acc, miss + 1))
 
 (** Print date range summary for computed daily data. *)
 let _print_daily_summary daily avg_stocks =
