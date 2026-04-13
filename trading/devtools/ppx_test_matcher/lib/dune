@@ -1,5 +1,6 @@
 (library
  (name ppx_test_matcher)
+ (public_name ppx_test_matcher)
  (kind ppx_rewriter)
  (libraries ppxlib)
  (preprocess
