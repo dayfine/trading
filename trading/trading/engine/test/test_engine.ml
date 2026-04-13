@@ -9,6 +9,15 @@ open Trading_engine.Price_path
 open Matchers
 module OrderManager = Trading_orders.Manager
 
+(* Re-declare execution_report for exhaustive ppx-generated matcher.
+   If the production type adds/removes a field, this fails to compile. *)
+type report = Trading_engine.Types.execution_report = {
+  order_id : string;
+  status : Trading_engine.Types.fill_status;
+  trades : Trading_base.Types.trade list;
+}
+[@@deriving test_matcher]
+
 (* Test helpers *)
 let test_timestamp = Time_ns_unix.of_string "2024-01-15 10:30:00Z"
 
@@ -67,25 +76,20 @@ let assert_order_executed engine order_mgr order ~price =
     (process_orders engine order_mgr)
     (is_ok_and_holds
        (one
-          (all_of
-             [
-               field (fun r -> r.order_id) (equal_to order.id);
-               field (fun r -> r.status) (equal_to Filled);
-               field
-                 (fun (r : execution_report) -> r.trades)
-                 (one
-                    (trade_like
-                       {
-                         id = "";
-                         order_id = order.id;
-                         symbol = order.symbol;
-                         side = order.side;
-                         quantity = order.quantity;
-                         price;
-                         commission = 1.0;
-                         timestamp = Time_ns_unix.epoch;
-                       }));
-             ])))
+          (match_report ~order_id:(equal_to order.id) ~status:(equal_to Filled)
+             ~trades:
+               (one
+                  (trade_like
+                     {
+                       id = "";
+                       order_id = order.id;
+                       symbol = order.symbol;
+                       side = order.side;
+                       quantity = order.quantity;
+                       price;
+                       commission = 1.0;
+                       timestamp = Time_ns_unix.epoch;
+                     })))))
 
 (* Assert order executed with price in range (for natural slippage) *)
 let assert_order_executed_in_range engine order_mgr order ~min_price ~max_price
@@ -163,9 +167,9 @@ let test_update_market_enables_execution _ =
     (process_orders engine order_mgr)
     (is_ok_and_holds
        (one
-          (field
-             (fun (r : execution_report) -> r.trades)
-             (one (field (fun (t : trade) -> t.price) (equal_to 150.25))))))
+          (match_report ~order_id:__ ~status:__
+             ~trades:
+               (one (field (fun (t : trade) -> t.price) (equal_to 150.25))))))
 
 let test_update_market_overwrites_prices _ =
   let config = make_config () in
@@ -208,9 +212,9 @@ let test_update_market_overwrites_prices _ =
     (process_orders engine order_mgr)
     (is_ok_and_holds
        (one
-          (field
-             (fun (r : execution_report) -> r.trades)
-             (one (field (fun (t : trade) -> t.price) (equal_to 155.25))))))
+          (match_report ~order_id:__ ~status:__
+             ~trades:
+               (one (field (fun (t : trade) -> t.price) (equal_to 155.25))))))
 
 (* process_orders tests *)
 let test_process_orders_empty_manager _ =
@@ -245,25 +249,20 @@ let test_process_orders_with_market_order _ =
     (process_orders engine order_mgr)
     (is_ok_and_holds
        (one
-          (all_of
-             [
-               field (fun r -> r.order_id) (equal_to order.id);
-               field (fun r -> r.status) (equal_to Filled);
-               field
-                 (fun (r : execution_report) -> r.trades)
-                 (one
-                    (trade_like
-                       {
-                         id = "";
-                         order_id = order.id;
-                         symbol = "AAPL";
-                         side = Buy;
-                         quantity = 100.0;
-                         price = 150.25;
-                         commission = 1.0;
-                         timestamp = Time_ns_unix.epoch;
-                       }));
-             ])))
+          (match_report ~order_id:(equal_to order.id) ~status:(equal_to Filled)
+             ~trades:
+               (one
+                  (trade_like
+                     {
+                       id = "";
+                       order_id = order.id;
+                       symbol = "AAPL";
+                       side = Buy;
+                       quantity = 100.0;
+                       price = 150.25;
+                       commission = 1.0;
+                       timestamp = Time_ns_unix.epoch;
+                     })))))
 
 let test_process_orders_calculates_commission _ =
   let config = make_config ~per_share:0.01 ~minimum:1.0 () in
@@ -293,20 +292,20 @@ let test_process_orders_calculates_commission _ =
     (process_orders engine order_mgr)
     (is_ok_and_holds
        (one
-          (field
-             (fun (r : execution_report) -> r.trades)
-             (one
-                (trade_like
-                   {
-                     id = "";
-                     order_id = order.id;
-                     symbol = "AAPL";
-                     side = Buy;
-                     quantity = 50.0;
-                     price = 100.25;
-                     commission = 1.0;
-                     timestamp = Time_ns_unix.epoch;
-                   })))))
+          (match_report ~order_id:__ ~status:__
+             ~trades:
+               (one
+                  (trade_like
+                     {
+                       id = "";
+                       order_id = order.id;
+                       symbol = "AAPL";
+                       side = Buy;
+                       quantity = 50.0;
+                       price = 100.25;
+                       commission = 1.0;
+                       timestamp = Time_ns_unix.epoch;
+                     })))))
 
 let test_process_orders_updates_order_status _ =
   let config = make_config () in
@@ -392,21 +391,12 @@ let test_process_orders_with_multiple_orders _ =
     (is_ok_and_holds
        (unordered_elements_are
           [
-            all_of
-              [
-                field (fun r -> r.order_id) (equal_to order1.id);
-                field (fun r -> r.status) (equal_to Filled);
-              ];
-            all_of
-              [
-                field (fun r -> r.order_id) (equal_to order2.id);
-                field (fun r -> r.status) (equal_to Filled);
-              ];
-            all_of
-              [
-                field (fun r -> r.order_id) (equal_to order3.id);
-                field (fun r -> r.status) (equal_to Filled);
-              ];
+            match_report ~order_id:(equal_to order1.id)
+              ~status:(equal_to Filled) ~trades:__;
+            match_report ~order_id:(equal_to order2.id)
+              ~status:(equal_to Filled) ~trades:__;
+            match_report ~order_id:(equal_to order3.id)
+              ~status:(equal_to Filled) ~trades:__;
           ]))
 
 let test_process_orders_with_multiple_orders_same_symbol _ =
@@ -450,21 +440,12 @@ let test_process_orders_with_multiple_orders_same_symbol _ =
     (is_ok_and_holds
        (unordered_elements_are
           [
-            all_of
-              [
-                field (fun r -> r.order_id) (equal_to order1.id);
-                field (fun r -> r.status) (equal_to Filled);
-              ];
-            all_of
-              [
-                field (fun r -> r.order_id) (equal_to order2.id);
-                field (fun r -> r.status) (equal_to Filled);
-              ];
-            all_of
-              [
-                field (fun r -> r.order_id) (equal_to order3.id);
-                field (fun r -> r.status) (equal_to Filled);
-              ];
+            match_report ~order_id:(equal_to order1.id)
+              ~status:(equal_to Filled) ~trades:__;
+            match_report ~order_id:(equal_to order2.id)
+              ~status:(equal_to Filled) ~trades:__;
+            match_report ~order_id:(equal_to order3.id)
+              ~status:(equal_to Filled) ~trades:__;
           ]))
 
 (* Limit order tests *)
