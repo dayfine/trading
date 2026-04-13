@@ -1,0 +1,5 @@
+((start_date 2019-06-01) (end_date 2019-12-31) (universe_size 1654)
+ (steps 146) (final_portfolio_value 1236690.49) (total_pnl -8275.41)
+ (win_count 8) (loss_count 12) (win_rate 40.00) (sharpe_ratio 2.65)
+ (max_drawdown_pct 8.00) (total_trades 20) (round_trips 20)
+ (avg_holding_days 7.25))

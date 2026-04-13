@@ -193,7 +193,9 @@ let () =
 
   eprintf "Loading universe from sectors.csv...\n%!";
   let ticker_sectors = Sector_map.load ~data_dir:data_dir_fpath in
-  let universe = Hashtbl.keys ticker_sectors in
+  let universe =
+    Hashtbl.keys ticker_sectors |> List.sort ~compare:String.compare
+  in
   let universe_size = List.length universe in
   eprintf "Universe: %d stocks\n%!" universe_size;
 
