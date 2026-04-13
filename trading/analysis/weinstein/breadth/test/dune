@@ -1,3 +1,0 @@
-(test
- (name test_synthetic_adl)
- (libraries synthetic_adl core ounit2 matchers))
