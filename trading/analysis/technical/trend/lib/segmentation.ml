@@ -225,8 +225,9 @@ let evaluate_split_point ~start_idx ~end_idx ~split_idx ~data_array ~params =
       left_stats.slope right_stats.slope
   in
 
-  (* TODO: move score weights into params for tuning —
-     trend_bonus_weight (0.5) and penalty_weight (0.2) are currently hardcoded *)
+  (* Tracked: move score weights into params for tuning —
+     trend_bonus_weight (0.5) and penalty_weight (0.2) are currently hardcoded.
+     See dev/status/screener.md Followup. *)
   let score =
     weighted_r2
     +. (trend_change_bonus *. 0.5)

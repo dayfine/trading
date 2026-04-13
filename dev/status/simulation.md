@@ -62,6 +62,10 @@ All slices merged: Slice 1 (#196), Slice 2 (#237, #240, #241, #242), Slice 3 (#2
 
 - Volume dilution in weekly aggregation: a single high-volume daily breakout bar gets averaged with 4 normal-volume bars in the weekly sum, requiring unrealistically high `breakout_volume_mult` (8x daily) to achieve 2x weekly ratio. Consider enhancing `Synthetic_source.Breakout` to apply volume spike across multiple days of the breakout week.
 - Test does not yet assert on specific position symbols (AAPL open position) or PnL direction — trades are confirmed but position-level assertions deferred.
+- Remove tmpdir round-trip in strategy smoke tests once `Price_cache` accepts an injected `DATA_SOURCE` (follow-up to #218/#219). See `trading/weinstein/strategy/test/test_weinstein_strategy_smoke.ml`.
+- `order_generator` uses Market orders; should be StopLimit orders with entry/exit prices from transitions. See `simulation/lib/order_generator.ml` and `.mli`.
+- Monthly cadence conversion not implemented in `time_series.ml` — currently returns empty. See `simulation/lib/data/time_series.ml`.
+- Engine `price_bar` type lacks configurable bar granularity (daily/hourly/minute) and volume data. See `engine/lib/types.mli`.
 
 ## Known gaps
 

@@ -19,5 +19,6 @@ let convert_cadence prices ~cadence ~as_of_date =
       let include_partial_week = Option.is_some as_of_date in
       Time_period.Conversion.daily_to_weekly ~include_partial_week prices
   | Monthly ->
-      (* TODO: Implement monthly conversion in future *)
+      (* Monthly conversion not yet implemented.
+         Tracked in dev/status/simulation.md Followup. *)
       []

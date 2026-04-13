@@ -66,6 +66,9 @@ macro analyser. Extract a `Ma_utils` module under `analysis/technical/indicators
 with a single `slope ~lookback ~threshold series → ma_direction * float` function.
 See module comment in `stage.mli` for the proposed signature.
 
+### Segmentation score weights hardcoded
+`analysis/technical/trend/lib/segmentation.ml` has `trend_bonus_weight` (0.5) and `penalty_weight` (0.2) hardcoded in the scoring function. Move into `params` record for tuning.
+
 ### Stage classifier: incremental `classify_step` for simulation
 `classify` recomputes the full MA series from all bars on each call — O(n) per
 weekly step. For the simulation loop this is fine at current scale, but when
