@@ -64,20 +64,6 @@ let _is_trading_day
     Float.(abs (step.portfolio_value -. cash) > 1e-2)
   else true
 
-(** Compute max drawdown percentage from filtered step results. Returns a value
-    in [0, 100] representing the largest peak-to-trough decline as a percentage
-    of the peak. *)
-let _compute_max_drawdown_pct
-    (steps : Trading_simulation_types.Simulator_types.step_result list) =
-  let _peak, max_dd =
-    List.fold steps ~init:(0.0, 0.0) ~f:(fun (peak, max_dd) step ->
-        let v = step.portfolio_value in
-        let peak = Float.max peak v in
-        let dd = if Float.(peak = 0.0) then 0.0 else (peak -. v) /. peak in
-        (peak, Float.max max_dd dd))
-  in
-  max_dd *. 100.0
-
 let _make_output_dir ~data_dir_fpath =
   let repo_root = Fpath.parent data_dir_fpath |> Fpath.to_string in
   let now = Core_unix.gettimeofday () in
@@ -127,10 +113,11 @@ let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir =
 
 let _build_summary_sexp
     ~(metrics : Trading_simulation_types.Metric_types.metric_set)
-    ~(summary : Metrics.summary_stats option) ~max_drawdown_pct ~final_value
-    ~start_date ~end_date ~universe_size ~n_steps ~n_round_trips =
+    ~(summary : Metrics.summary_stats option) ~final_value ~start_date ~end_date
+    ~universe_size ~n_steps ~n_round_trips =
   let open Trading_simulation_types.Metric_types in
   let get key = Map.find metrics key |> Option.value ~default:0.0 in
+  let max_drawdown_pct = get MaxDrawdown in
   let total_pnl = match summary with Some s -> s.total_pnl | None -> 0.0 in
   let win_count = match summary with Some s -> s.win_count | None -> 0 in
   let loss_count = match summary with Some s -> s.loss_count | None -> 0 in
@@ -267,16 +254,15 @@ let () =
         Date.( >= ) s.date start_date && _is_trading_day s)
   in
   let final_value = (List.last_exn steps).portfolio_value in
-  let max_drawdown_pct = _compute_max_drawdown_pct steps in
   let round_trips = Metrics.extract_round_trips steps in
   let summary = Metrics.compute_summary round_trips in
 
   let output_dir = _make_output_dir ~data_dir_fpath in
   eprintf "Writing output to %s/\n%!" output_dir;
   let summary_sexp =
-    _build_summary_sexp ~metrics:result.metrics ~summary ~max_drawdown_pct
-      ~final_value ~start_date ~end_date ~universe_size
-      ~n_steps:(List.length steps) ~n_round_trips:(List.length round_trips)
+    _build_summary_sexp ~metrics:result.metrics ~summary ~final_value
+      ~start_date ~end_date ~universe_size ~n_steps:(List.length steps)
+      ~n_round_trips:(List.length round_trips)
   in
   _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir;
   _write_summary ~output_dir ~summary_sexp;
