@@ -1,0 +1,18 @@
+(executable
+ (name backtest_runner)
+ (libraries
+  core
+  core_unix
+  types
+  status
+  fpath
+  weinstein.data_source
+  trading.base
+  trading.engine
+  trading.simulation
+  trading.simulation.types
+  trading.strategy
+  weinstein_trading.strategy
+  weinstein.macro)
+ (preprocess
+  (pps ppx_let)))

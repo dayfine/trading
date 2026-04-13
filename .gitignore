@@ -34,6 +34,10 @@ _opam/
 # Agent runtime files (logs, lock files, worktrees)
 dev/logs/*.log
 dev/logs/*.running
+
+# Backtest equity curves (large, regenerable)
+dev/backtest/*/equity_curve.csv
+dev/backtest/*/steps.csv
 .claude/worktrees/
 
 # jj conflict materialization directories (never commit these)
