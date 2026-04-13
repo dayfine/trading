@@ -1,0 +1,6 @@
+(library
+ (name synthetic_adl)
+ (public_name weinstein.breadth)
+ (libraries core)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

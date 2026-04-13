@@ -11,10 +11,15 @@
     v} *)
 
 open Core
+open Synthetic_adl
+
+(* ---------- constants ---------- *)
+
+let _min_stocks = 100
 
 (* ---------- path helpers ---------- *)
 
-(** [symbol_data_path ~data_dir symbol] returns the path to a symbol's
+(** [_symbol_data_path ~data_dir symbol] returns the path to a symbol's
     [data.csv]: [data_dir / first_char / last_char / symbol / data.csv]. *)
 let _symbol_data_path ~data_dir symbol =
   let first = String.make 1 (Char.uppercase (String.get symbol 0)) in
@@ -24,45 +29,19 @@ let _symbol_data_path ~data_dir symbol =
   in
   Fpath.(data_dir / first / last / symbol / "data.csv") |> Fpath.to_string
 
-(* ---------- CSV I/O ---------- *)
-
-(** Parse a single line from [sectors.csv] into a symbol, if valid. *)
-let _parse_symbol_line line =
-  match String.lsplit2 line ~on:',' with
-  | Some (sym, _) ->
-      let sym = String.strip sym in
-      if String.is_empty sym then None else Some sym
-  | None -> None
+(* ---------- file I/O ---------- *)
 
 (** Load symbols from [sectors.csv]. Returns a list of tickers. *)
 let _load_symbols ~data_dir =
   let path = Fpath.(data_dir / "sectors.csv") |> Fpath.to_string in
   let lines = In_channel.read_lines path in
-  match lines with
-  | [] -> []
-  | _header :: rows -> List.filter_map rows ~f:_parse_symbol_line
+  match lines with [] -> [] | _header :: rows -> parse_symbols rows
 
-(** Parse a single CSV row into [(date, close)] if the close price is valid. *)
-let _parse_price_row line =
-  let fields = String.split line ~on:',' in
-  match fields with
-  | date :: _open :: _high :: _low :: close :: _ -> (
-      let date = String.strip date in
-      let close_str = String.strip close in
-      match Float.of_string_opt close_str with
-      | Some c -> Some (date, c)
-      | None -> None)
-  | _ -> None
-
-(** Load close prices from a stock's [data.csv]. Returns [(date_string, close)]
-    pairs sorted by date ascending. Skips rows with unparseable close prices. *)
+(** Load close prices from a stock's [data.csv]. Returns [(date, close)] pairs
+    sorted by date ascending. Skips rows with unparseable close prices. *)
 let _load_close_prices path =
   let lines = try In_channel.read_lines path with Sys_error _ -> [] in
-  match lines with
-  | [] -> []
-  | _header :: rows ->
-      List.filter_map rows ~f:_parse_price_row
-      |> List.sort ~compare:(fun (d1, _) (d2, _) -> String.compare d1 d2)
+  match lines with [] -> [] | _header :: rows -> parse_close_prices rows
 
 (** Parse a single golden breadth CSV line into [(date, count)] if valid. *)
 let _parse_golden_breadth_line line =
@@ -84,149 +63,16 @@ let _load_golden_breadth path =
   |> List.fold ~init:String.Map.empty ~f:(fun acc (date_str, count) ->
       Map.set acc ~key:date_str ~data:count)
 
-(** Format a [YYYY-MM-DD] date string to [YYYYMMDD]. *)
-let _format_date_yyyymmdd date_str =
-  String.filter date_str ~f:(fun c -> not (Char.equal c '-'))
-
-(** Write one breadth row: [YYYYMMDD, count]. *)
-let _write_breadth_row oc (date_str, count) =
-  Out_channel.fprintf oc "%s, %d\n" (_format_date_yyyymmdd date_str) count
-
 (** Write breadth CSV in existing format: [YYYYMMDD, count] (no header). *)
 let _write_breadth_csv path pairs =
   Out_channel.with_file path ~f:(fun oc ->
-      List.iter pairs ~f:(_write_breadth_row oc))
-
-(* ---------- advance/decline computation ---------- *)
-
-type daily_counts = { advances : int; declines : int; total : int }
-(** Per-date aggregated breadth counts. *)
-
-(** Record a price change direction for a given date into the accumulator. *)
-let _record_direction tbl date direction =
-  let adv, dec, tot =
-    Hashtbl.find_or_add tbl date ~default:(fun () -> (0, 0, 0))
-  in
-  match direction with
-  | `Advance -> Hashtbl.set tbl ~key:date ~data:(adv + 1, dec, tot + 1)
-  | `Decline -> Hashtbl.set tbl ~key:date ~data:(adv, dec + 1, tot + 1)
-  | `Unchanged -> Hashtbl.set tbl ~key:date ~data:(adv, dec, tot + 1)
-
-(** Classify a price change and record it. *)
-let _accumulate_direction tbl date ~prev_close ~close =
-  if Float.( > ) close prev_close then _record_direction tbl date `Advance
-  else if Float.( < ) close prev_close then _record_direction tbl date `Decline
-  else _record_direction tbl date `Unchanged
-
-(** Process one price point, recording a direction change if there is a previous
-    close. Returns the current close for use as the next previous value. *)
-let _process_price_point tbl prev (date, close) =
-  Option.iter prev ~f:(fun prev_close ->
-      _accumulate_direction tbl date ~prev_close ~close);
-  Some close
-
-(** Accumulate price changes for a single symbol's price series. *)
-let _accumulate_symbol_changes tbl prices =
-  if List.length prices >= 2 then
-    let (_ : float option) =
-      List.fold prices ~init:None ~f:(_process_price_point tbl)
-    in
-    ()
-
-(** Compute per-date advance/decline counts from all loaded prices.
-
-    For each symbol with at least 2 price points, compare each day's close to
-    the previous day's close. A date is included only when at least [min_stocks]
-    symbols report data for it. *)
-let _compute_daily_changes ~min_stocks all_prices =
-  let tbl = Hashtbl.create (module String) in
-  List.iter all_prices ~f:(_accumulate_symbol_changes tbl);
-  Hashtbl.fold tbl ~init:[] ~f:(fun ~key:date ~data:(adv, dec, tot) acc ->
-      if tot >= min_stocks then
-        (date, { advances = adv; declines = dec; total = tot }) :: acc
-      else acc)
-  |> List.sort ~compare:(fun (d1, _) (d2, _) -> String.compare d1 d2)
-
-(* ---------- statistics ---------- *)
-
-let _mean xs =
-  let n = List.length xs in
-  if n = 0 then 0.0
-  else List.fold xs ~init:0.0 ~f:(fun acc x -> acc +. x) /. Float.of_int n
-
-(** Compute variance components for Pearson correlation. *)
-let _pearson_components xs ys ~mx ~my =
-  List.fold2_exn xs ys ~init:(0.0, 0.0, 0.0) ~f:(fun (cov, var_x, var_y) x y ->
-      let dx = x -. mx in
-      let dy = y -. my in
-      (cov +. (dx *. dy), var_x +. (dx *. dx), var_y +. (dy *. dy)))
-
-(** Compute Pearson correlation for non-empty lists. *)
-let _pearson_correlation_nonempty xs ys =
-  let mx = _mean xs in
-  let my = _mean ys in
-  let cov, var_x, var_y = _pearson_components xs ys ~mx ~my in
-  let denom = Float.sqrt (var_x *. var_y) in
-  if Float.( = ) denom 0.0 then 0.0 else cov /. denom
-
-(** Pearson correlation coefficient between two float lists. Returns [0.0] for
-    empty inputs or zero variance. *)
-let _pearson_correlation xs ys =
-  if List.is_empty xs then 0.0 else _pearson_correlation_nonempty xs ys
-
-(** Mean absolute error between two float lists. *)
-let _mean_absolute_error xs ys =
-  let n = List.length xs in
-  if n = 0 then 0.0
-  else
-    List.fold2_exn xs ys ~init:0.0 ~f:(fun acc x y -> acc +. Float.abs (x -. y))
-    /. Float.of_int n
-
-(* ---------- validation ---------- *)
-
-(** Print validation stats for one component (advances or declines). *)
-let _print_validation_stats ~label overlap_dates syn_vals gold_vals corr mae =
-  let n = List.length overlap_dates in
-  printf "\n  %s:\n%!" label;
-  printf "    Overlapping dates: %d\n%!" n;
-  printf "    Date range: %s - %s\n%!"
-    (List.hd_exn overlap_dates)
-    (List.last_exn overlap_dates);
-  printf "    Synthetic mean: %.1f\n%!" (_mean syn_vals);
-  printf "    Golden mean:    %.1f\n%!" (_mean gold_vals);
-  printf "    Pearson correlation: %.4f\n%!" corr;
-  printf "    Mean absolute error: %.1f\n%!" mae
-
-(** Compare synthetic data against golden data for overlapping dates. Prints
-    stats and returns [(correlation, mae, overlap_count)]. *)
-let _validate_against_golden ~label synthetic golden =
-  let overlap_dates =
-    Map.fold synthetic ~init:[] ~f:(fun ~key:date ~data:_ acc ->
-        if Map.mem golden date then date :: acc else acc)
-    |> List.sort ~compare:String.compare
-  in
-  if List.is_empty overlap_dates then (
-    printf "  No overlapping dates for %s\n%!" label;
-    (0.0, 0.0, 0))
-  else
-    let syn_vals =
-      List.map overlap_dates ~f:(fun d ->
-          Float.of_int (Map.find_exn synthetic d))
-    in
-    let gold_vals =
-      List.map overlap_dates ~f:(fun d -> Float.of_int (Map.find_exn golden d))
-    in
-    let corr = _pearson_correlation syn_vals gold_vals in
-    let mae = _mean_absolute_error syn_vals gold_vals in
-    _print_validation_stats ~label overlap_dates syn_vals gold_vals corr mae;
-    (corr, mae, List.length overlap_dates)
+      List.iter pairs ~f:(fun pair ->
+          Out_channel.fprintf oc "%s\n" (format_breadth_row pair)))
 
 (* ---------- main: loading ---------- *)
 
-let _min_stocks = 100
-
 (** Try loading prices for a single symbol. Returns [Some prices] on success,
-    [None] if the file is missing or contains no valid rows. *)
+    [None] if the file is missing or has no valid rows. *)
 let _try_load_symbol_prices ~data_dir symbol =
   let path = _symbol_data_path ~data_dir symbol in
   match Sys_unix.file_exists path with
@@ -255,7 +101,7 @@ let _print_daily_summary daily avg_stocks =
 
 (* ---------- main: output ---------- *)
 
-(** Write advance and decline CSVs, returning the paths. *)
+(** Write advance and decline CSVs, returning the breadth directory path. *)
 let _write_output_csvs ~data_dir daily =
   let breadth_dir = Fpath.(data_dir / "breadth") |> Fpath.to_string in
   Core_unix.mkdir_p breadth_dir;
@@ -271,15 +117,50 @@ let _write_output_csvs ~data_dir daily =
 
 (* ---------- main: validation ---------- *)
 
+(** Print validation stats for one component (advances or declines). *)
+let _print_validation_stats ~label overlap_dates corr mae =
+  let n = List.length overlap_dates in
+  printf "\n  %s:\n%!" label;
+  printf "    Overlapping dates: %d\n%!" n;
+  printf "    Date range: %s - %s\n%!"
+    (List.hd_exn overlap_dates)
+    (List.last_exn overlap_dates);
+  printf "    Pearson correlation: %.4f\n%!" corr;
+  printf "    Mean absolute error: %.1f\n%!" mae
+
+(** Compare synthetic data against golden data for overlapping dates. Prints
+    stats and returns [(correlation, mae, overlap_count)]. *)
+let _validate_against_golden ~label synthetic golden =
+  let overlap_dates =
+    Map.fold synthetic ~init:[] ~f:(fun ~key:date ~data:_ acc ->
+        if Map.mem golden date then date :: acc else acc)
+    |> List.sort ~compare:String.compare
+  in
+  if List.is_empty overlap_dates then (
+    printf "  No overlapping dates for %s\n%!" label;
+    (0.0, 0.0, 0))
+  else
+    let syn_vals =
+      List.map overlap_dates ~f:(fun d ->
+          Float.of_int (Map.find_exn synthetic d))
+    in
+    let gold_vals =
+      List.map overlap_dates ~f:(fun d -> Float.of_int (Map.find_exn golden d))
+    in
+    let corr = pearson_correlation syn_vals gold_vals in
+    let mae = mean_absolute_error syn_vals gold_vals in
+    _print_validation_stats ~label overlap_dates corr mae;
+    (corr, mae, List.length overlap_dates)
+
 (** Build synthetic lookup maps keyed by YYYYMMDD. *)
 let _build_synthetic_maps daily =
   let syn_advn =
     List.fold daily ~init:String.Map.empty ~f:(fun acc (d, c) ->
-        Map.set acc ~key:(_format_date_yyyymmdd d) ~data:c.advances)
+        Map.set acc ~key:(format_date_yyyymmdd d) ~data:c.advances)
   in
   let syn_decln =
     List.fold daily ~init:String.Map.empty ~f:(fun acc (d, c) ->
-        Map.set acc ~key:(_format_date_yyyymmdd d) ~data:c.declines)
+        Map.set acc ~key:(format_date_yyyymmdd d) ~data:c.declines)
   in
   (syn_advn, syn_decln)
 
@@ -302,8 +183,8 @@ let _validate_net_breadth syn_advn syn_decln golden_advn golden_decln =
       List.map overlap_dates ~f:(fun d ->
           Float.of_int (Map.find_exn golden_advn d - Map.find_exn golden_decln d))
     in
-    let corr = _pearson_correlation syn_net gold_net in
-    let mae = _mean_absolute_error syn_net gold_net in
+    let corr = pearson_correlation syn_net gold_net in
+    let mae = mean_absolute_error syn_net gold_net in
     printf "\n  Net breadth (advances - declines):\n%!";
     printf "    Pearson correlation: %.4f\n%!" corr;
     printf "    Mean absolute error: %.1f\n%!" mae;
@@ -341,18 +222,15 @@ let _run_validation ~breadth_dir daily =
 
 let main ~data_dir_str () =
   let data_dir = Fpath.v data_dir_str in
-  (* Step 1: Load universe *)
   let symbols = _load_symbols ~data_dir in
   printf "Universe: %d symbols from sectors.csv\n%!" (List.length symbols);
-  (* Step 2: Load close prices *)
   printf "Loading daily close prices...\n%!";
   let all_prices, missing = _load_all_prices ~data_dir symbols in
   let loaded = List.length all_prices in
   printf "Loaded prices for %d symbols (%d missing data files)\n%!" loaded
     missing;
-  (* Step 3: Compute daily advances/declines *)
   printf "Computing daily advance/decline counts...\n%!";
-  let daily = _compute_daily_changes ~min_stocks:_min_stocks all_prices in
+  let daily = compute_daily_changes ~min_stocks:_min_stocks all_prices in
   let avg_stocks =
     if List.is_empty daily then 0.0
     else
@@ -361,9 +239,7 @@ let main ~data_dir_str () =
       /. Float.of_int (List.length daily)
   in
   _print_daily_summary daily avg_stocks;
-  (* Step 4: Write output CSVs *)
   let breadth_dir = _write_output_csvs ~data_dir daily in
-  (* Step 5: Validate against golden data *)
   _run_validation ~breadth_dir daily
 
 let command =
