@@ -22,7 +22,7 @@ type dependencies = {
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
   market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
-  computers : any_metric_computer list;
+  metric_suite : metric_suite;
 }
 
 val create_deps :
@@ -30,7 +30,7 @@ val create_deps :
   data_dir:Fpath.t ->
   strategy:(module Trading_strategy.Strategy_interface.STRATEGY) ->
   commission:Trading_engine.Types.commission_config ->
-  ?computers:any_metric_computer list ->
+  ?metric_suite:metric_suite ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and

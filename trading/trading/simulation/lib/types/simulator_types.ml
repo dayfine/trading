@@ -56,3 +56,19 @@ let wrap_computer (type s) (computer : s metric_computer) : any_metric_computer
         in
         computer.finalize ~state:final_state ~config);
   }
+
+(** {1 Derived Metric Computers} *)
+
+type derived_metric_computer = {
+  name : string;
+  depends_on : Metric_types.metric_type list;
+  compute :
+    config:config ->
+    base_metrics:Metric_types.metric_set ->
+    Metric_types.metric_set;
+}
+
+type metric_suite = {
+  computers : any_metric_computer list;
+  derived : derived_metric_computer list;
+}

@@ -64,3 +64,24 @@ type any_metric_computer = {
 
 val wrap_computer : 'state metric_computer -> any_metric_computer
 (** Wrap a typed metric computer for use in heterogeneous collections *)
+
+(** {1 Derived Metric Computers} *)
+
+type derived_metric_computer = {
+  name : string;
+  depends_on : Metric_types.metric_type list;
+      (** Metrics that must be computed before this one. *)
+  compute :
+    config:config ->
+    base_metrics:Metric_types.metric_set ->
+    Metric_types.metric_set;
+      (** Produce derived metrics from the base metric set. *)
+}
+(** A metric computed from other metrics, not from simulation steps. The
+    simulator runs these after all step-based computers, in dependency order. *)
+
+type metric_suite = {
+  computers : any_metric_computer list;
+  derived : derived_metric_computer list;
+}
+(** Bundle of step-based and derived metric computers. *)

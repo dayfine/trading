@@ -4,12 +4,25 @@
 open Core
 include Trading_simulation_types.Simulator_types
 
-(** Internal: compute metrics by running all computers over the steps *)
+(** Internal: compute metrics by running all step-based computers *)
 let _compute_metrics ~computers ~config ~steps =
   List.fold computers ~init:Trading_simulation_types.Metric_types.empty
     ~f:(fun acc (computer : any_metric_computer) ->
       Trading_simulation_types.Metric_types.merge acc
         (computer.run ~config ~steps))
+
+(** Internal: compute derived metrics from base metrics.
+
+    Derived computers are folded in list order — each sees the accumulated
+    metrics from prior computers. This means callers must list them in
+    dependency order. Currently sufficient (only CalmarRatio depends on CAGR +
+    MaxDrawdown). If multi-layer dependencies arise, replace with topological
+    sort over the [depends_on] declarations. *)
+let _compute_derived ~derived_computers ~config ~base_metrics =
+  List.fold derived_computers ~init:base_metrics
+    ~f:(fun acc (dc : derived_metric_computer) ->
+      Trading_simulation_types.Metric_types.merge acc
+        (dc.compute ~config ~base_metrics:acc))
 
 (** {1 Dependencies} *)
 
@@ -20,10 +33,11 @@ type dependencies = {
   engine : Trading_engine.Engine.t;
   order_manager : Trading_orders.Manager.order_manager;
   market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
-  computers : any_metric_computer list;
+  metric_suite : metric_suite;
 }
 
-let create_deps ~symbols ~data_dir ~strategy ~commission ?(computers = []) () =
+let create_deps ~symbols ~data_dir ~strategy ~commission
+    ?(metric_suite = { computers = []; derived = [] }) () =
   let engine_config = { Trading_engine.Types.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -37,7 +51,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission ?(computers = []) () =
     engine;
     order_manager;
     market_data_adapter;
-    computers;
+    metric_suite;
   }
 
 (** {1 Simulator State} *)
@@ -243,8 +257,13 @@ let _apply_transitions ~positions ~transitions =
 (** Build run_result from accumulated state *)
 let _build_run_result t =
   let steps = List.rev t.step_history in
+  let base_metrics =
+    _compute_metrics ~computers:t.deps.metric_suite.computers ~config:t.config
+      ~steps
+  in
   let metrics =
-    _compute_metrics ~computers:t.deps.computers ~config:t.config ~steps
+    _compute_derived ~derived_computers:t.deps.metric_suite.derived
+      ~config:t.config ~base_metrics
   in
   { steps; metrics }
 

@@ -18,6 +18,12 @@ module Metric_type : sig
     | WinRate  (** Win percentage *)
     | SharpeRatio  (** Risk-adjusted return metric *)
     | MaxDrawdown  (** Maximum peak-to-trough decline *)
+    | ProfitFactor  (** Gross profit / gross loss *)
+    | CAGR  (** Compound annual growth rate *)
+    | CalmarRatio  (** CAGR / max drawdown *)
+    | OpenPositionCount  (** Open positions at end of simulation *)
+    | UnrealizedPnl  (** Unrealized P&L at end of simulation *)
+    | TradeFrequency  (** Trades per month *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -32,6 +38,12 @@ type metric_type = Metric_type.t =
   | WinRate
   | SharpeRatio
   | MaxDrawdown
+  | ProfitFactor
+  | CAGR
+  | CalmarRatio
+  | OpenPositionCount
+  | UnrealizedPnl
+  | TradeFrequency
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)
@@ -50,6 +62,12 @@ val of_alist_exn : (metric_type * float) list -> metric_set
 
 val merge : metric_set -> metric_set -> metric_set
 (** Merge two metric sets. Later values override earlier ones. *)
+
+val sexp_of_metric_set : metric_set -> Sexp.t
+(** Serialize a metric set to sexp. *)
+
+val metric_set_to_sexp_pairs : metric_set -> Sexp.t
+(** Convert to a sexp list of [(key value)] pairs for human-readable output. *)
 
 (** {1 Metric Unit} *)
 
