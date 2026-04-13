@@ -392,3 +392,25 @@ val is_empty : 'a list matcher
     {[
     assert_that pending_orders is_empty
     ]} *)
+
+(** {1 Map Matchers} *)
+
+val contains_entry : 'k -> 'v matcher -> ('k, 'v, 'cmp) Core.Map.t matcher
+(** [contains_entry key matcher] checks the map contains [key] and the value
+    satisfies [matcher]. Fails if key is missing.
+
+    Example:
+    {[
+    assert_that metrics (contains_entry TotalPnl (float_equal 1234.0))
+    ]} *)
+
+val map_includes : ('k * 'v matcher) list -> ('k, 'v, 'cmp) Core.Map.t matcher
+(** [map_includes entries] checks the map contains all listed entries. The map
+    may contain additional keys not listed.
+
+    Example:
+    {[
+    assert_that metrics
+      (map_includes
+         [ (TotalPnl, float_equal 1234.0); (WinRate, float_equal 60.0) ])
+    ]} *)
