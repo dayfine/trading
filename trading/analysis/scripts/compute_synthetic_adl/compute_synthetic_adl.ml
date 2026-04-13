@@ -33,41 +33,46 @@ let _load_symbols ~data_dir = Sector_map.load ~data_dir |> Hashtbl.keys
 (** Load close prices for a symbol using [Csv_storage]. Returns [(date, close)]
     pairs sorted by date ascending. *)
 let _load_close_prices ~data_dir symbol =
-  match Csv.Csv_storage.create ~data_dir symbol with
-  | Error _ -> []
-  | Ok storage -> (
-      match Csv.Csv_storage.get storage () with
-      | Error _ -> []
-      | Ok prices ->
-          List.map prices ~f:(fun (p : Types.Daily_price.t) ->
-              (p.date, p.close_price)))
+  let open Result.Let_syntax in
+  let result =
+    let%bind storage = Csv.Csv_storage.create ~data_dir symbol in
+    let%bind prices = Csv.Csv_storage.get storage () in
+    Ok
+      (List.map prices ~f:(fun (p : Types.Daily_price.t) ->
+           (p.date, p.close_price)))
+  in
+  Result.ok result |> Option.value ~default:[]
+
+(** Convert YYYYMMDD to YYYY-MM-DD; pass through other formats unchanged. *)
+let _normalize_date_str date_str =
+  if String.length date_str = 8 then
+    String.concat
+      [
+        String.prefix date_str 4;
+        "-";
+        String.sub date_str ~pos:4 ~len:2;
+        "-";
+        String.sub date_str ~pos:6 ~len:2;
+      ]
+  else date_str
+
+(** Try to parse a date string and positive count into [(date, count)]. *)
+let _parse_date_and_count date_str count_str =
+  let open Option.Let_syntax in
+  let%bind count = Int.of_string_opt count_str in
+  if count <= 0 then None
+  else
+    let iso_date = _normalize_date_str date_str in
+    let%bind date = Option.try_with (fun () -> Date.of_string iso_date) in
+    Some (date, count)
 
 (** Parse a single golden breadth CSV line into [(date, count)] if valid. Golden
     files use YYYYMMDD format without dashes. *)
 let _parse_golden_breadth_line line =
   let line = String.rstrip ~drop:(Char.equal '\r') line in
-  match String.lsplit2 line ~on:',' with
-  | Some (date_str, count_str) -> (
-      let date_str = String.strip date_str in
-      let count_str = String.strip count_str in
-      match Int.of_string_opt count_str with
-      | Some count when count > 0 ->
-          let iso_date =
-            if String.length date_str = 8 then
-              String.concat
-                [
-                  String.prefix date_str 4;
-                  "-";
-                  String.sub date_str ~pos:4 ~len:2;
-                  "-";
-                  String.sub date_str ~pos:6 ~len:2;
-                ]
-            else date_str
-          in
-          let date_opt = Option.try_with (fun () -> Date.of_string iso_date) in
-          Option.map date_opt ~f:(fun date -> (date, count))
-      | _ -> None)
-  | None -> None
+  let open Option.Let_syntax in
+  let%bind date_str, count_str = String.lsplit2 line ~on:',' in
+  _parse_date_and_count (String.strip date_str) (String.strip count_str)
 
 (** Load golden breadth CSV. Format: [YYYYMMDD, count] (no header). Returns a
     map of date -> count, skipping zero-count entries. *)

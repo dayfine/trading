@@ -60,14 +60,15 @@ let _pearson_components xs ys ~mx ~my =
       let dy = y -. my in
       (cov +. (dx *. dy), var_x +. (dx *. dx), var_y +. (dy *. dy)))
 
+let _pearson_correlation_impl xs ys =
+  let mx = _mean xs in
+  let my = _mean ys in
+  let cov, var_x, var_y = _pearson_components xs ys ~mx ~my in
+  let denom = Float.sqrt (var_x *. var_y) in
+  if Float.( = ) denom 0.0 then 0.0 else cov /. denom
+
 let _pearson_correlation xs ys =
-  if List.is_empty xs then 0.0
-  else
-    let mx = _mean xs in
-    let my = _mean ys in
-    let cov, var_x, var_y = _pearson_components xs ys ~mx ~my in
-    let denom = Float.sqrt (var_x *. var_y) in
-    if Float.( = ) denom 0.0 then 0.0 else cov /. denom
+  if List.is_empty xs then 0.0 else _pearson_correlation_impl xs ys
 
 let _mean_absolute_error xs ys =
   let n = List.length xs in
