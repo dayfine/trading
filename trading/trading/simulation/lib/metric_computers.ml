@@ -150,19 +150,22 @@ let _update_drawdown state value =
     has_data = true;
   }
 
+let _init_drawdown value = { peak = value; max_drawdown = 0.0; has_data = true }
+
+let _drawdown_update ~state ~step =
+  if not (_is_trading_day_step step) then state
+  else
+    let value = step.Simulator_types.portfolio_value in
+    match state.has_data with
+    | false -> _init_drawdown value
+    | true -> _update_drawdown state value
+
 let _drawdown_computer_impl : drawdown_state Simulator_types.metric_computer =
   {
     name = "max_drawdown";
     init =
       (fun ~config:_ -> { peak = 0.0; max_drawdown = 0.0; has_data = false });
-    update =
-      (fun ~state ~step ->
-        if not (_is_trading_day_step step) then state
-        else
-          let value = step.Simulator_types.portfolio_value in
-          if not state.has_data then
-            { peak = value; max_drawdown = 0.0; has_data = true }
-          else _update_drawdown state value);
+    update = _drawdown_update;
     finalize =
       (fun ~state ~config:_ ->
         Metric_types.singleton MaxDrawdown state.max_drawdown);
@@ -177,35 +180,39 @@ type cagr_state = { first_value : float option; last_value : float option }
 
 let _days_per_year = 365.25
 
+let _cagr_update ~state ~step =
+  if not (_is_trading_day_step step) then state
+  else
+    let value = step.Simulator_types.portfolio_value in
+    let first_value =
+      match state.first_value with None -> Some value | some -> some
+    in
+    { first_value; last_value = Some value }
+
+let _compute_cagr ~first ~last ~start_date ~end_date =
+  let days = Float.of_int (Date.diff end_date start_date) in
+  let years = days /. _days_per_year in
+  if Float.(years <= 0.0) || Float.(first <= 0.0) then 0.0
+  else
+    let ratio = last /. first in
+    (Float.( ** ) ratio (1.0 /. years) -. 1.0) *. 100.0
+
+let _cagr_finalize ~state ~(config : Simulator_types.config) =
+  let cagr =
+    match (state.first_value, state.last_value) with
+    | Some first, Some last ->
+        _compute_cagr ~first ~last ~start_date:config.start_date
+          ~end_date:config.end_date
+    | _ -> 0.0
+  in
+  Metric_types.singleton CAGR cagr
+
 let _cagr_computer_impl : cagr_state Simulator_types.metric_computer =
   {
     name = "cagr";
     init = (fun ~config:_ -> { first_value = None; last_value = None });
-    update =
-      (fun ~state ~step ->
-        if not (_is_trading_day_step step) then state
-        else
-          let value = step.Simulator_types.portfolio_value in
-          let first_value =
-            match state.first_value with None -> Some value | some -> some
-          in
-          { first_value; last_value = Some value });
-    finalize =
-      (fun ~state ~config ->
-        let cagr =
-          match (state.first_value, state.last_value) with
-          | Some first, Some last ->
-              let days =
-                Float.of_int (Date.diff config.end_date config.start_date)
-              in
-              let years = days /. _days_per_year in
-              if Float.(years <= 0.0) || Float.(first <= 0.0) then 0.0
-              else
-                let ratio = last /. first in
-                (Float.( ** ) ratio (1.0 /. years) -. 1.0) *. 100.0
-          | _ -> 0.0
-        in
-        Metric_types.singleton CAGR cagr);
+    update = _cagr_update;
+    finalize = _cagr_finalize;
   }
 
 let cagr_computer () = Simulator_types.wrap_computer _cagr_computer_impl
@@ -217,6 +224,32 @@ type portfolio_state = {
   total_trades : int;
 }
 
+let _compute_trade_frequency ~total_trades ~start_date ~end_date =
+  let days = Float.of_int (Date.diff end_date start_date) in
+  let months = days /. 30.44 in
+  if Float.(months <= 0.0) then 0.0 else Float.of_int total_trades /. months
+
+let _portfolio_metrics_from_step ~(step : Simulator_types.step_result)
+    ~total_trades ~start_date ~end_date =
+  let open_count = Float.of_int (List.length step.portfolio.positions) in
+  let unrealized_pnl = step.portfolio_value -. step.portfolio.current_cash in
+  let trade_freq =
+    _compute_trade_frequency ~total_trades ~start_date ~end_date
+  in
+  Metric_types.of_alist_exn
+    [
+      (OpenPositionCount, open_count);
+      (UnrealizedPnl, unrealized_pnl);
+      (TradeFrequency, trade_freq);
+    ]
+
+let _portfolio_finalize ~state ~(config : Simulator_types.config) =
+  match state.last_step with
+  | None -> Metric_types.empty
+  | Some step ->
+      _portfolio_metrics_from_step ~step ~total_trades:state.total_trades
+        ~start_date:config.start_date ~end_date:config.end_date
+
 let _portfolio_computer_impl : portfolio_state Simulator_types.metric_computer =
   {
     name = "portfolio_state";
@@ -227,38 +260,29 @@ let _portfolio_computer_impl : portfolio_state Simulator_types.metric_computer =
           last_step = Some step;
           total_trades = state.total_trades + List.length step.trades;
         });
-    finalize =
-      (fun ~state ~config ->
-        match state.last_step with
-        | None -> Metric_types.empty
-        | Some step ->
-            let open_count =
-              Float.of_int (List.length step.portfolio.positions)
-            in
-            (* Unrealized P&L = market value of positions = final_value -
-               cash. This captures mark-to-market gains/losses on open
-               positions. *)
-            let unrealized_pnl =
-              step.portfolio_value -. step.portfolio.current_cash
-            in
-            let days =
-              Float.of_int (Date.diff config.end_date config.start_date)
-            in
-            let months = days /. 30.44 in
-            let trade_freq =
-              if Float.(months <= 0.0) then 0.0
-              else Float.of_int state.total_trades /. months
-            in
-            Metric_types.of_alist_exn
-              [
-                (OpenPositionCount, open_count);
-                (UnrealizedPnl, unrealized_pnl);
-                (TradeFrequency, trade_freq);
-              ]);
+    finalize = _portfolio_finalize;
   }
 
 let portfolio_state_computer () =
   Simulator_types.wrap_computer _portfolio_computer_impl
+
+(** {1 Calmar Ratio Stub}
+
+    CalmarRatio is derived post-hoc from CAGR and MaxDrawdown. This stub
+    computer produces 0.0 as a fallback when the metric is requested
+    individually. *)
+
+let _calmar_stub_impl : unit Simulator_types.metric_computer =
+  {
+    name = "calmar_ratio_stub";
+    init = (fun ~config:_ -> ());
+    update = (fun ~state:() ~step:_ -> ());
+    finalize =
+      (fun ~state:() ~config:_ -> Metric_types.singleton CalmarRatio 0.0);
+  }
+
+let calmar_ratio_stub_computer () =
+  Simulator_types.wrap_computer _calmar_stub_impl
 
 (** {1 Factory} *)
 
@@ -270,17 +294,7 @@ let create_computer (metric_type : Metric_types.metric_type) :
   | SharpeRatio -> sharpe_ratio_computer ()
   | MaxDrawdown -> max_drawdown_computer ()
   | CAGR -> cagr_computer ()
-  | CalmarRatio ->
-      (* CalmarRatio is derived post-hoc from CAGR and MaxDrawdown.
-         Return a stub computer that produces 0.0 as a fallback. *)
-      Simulator_types.wrap_computer
-        {
-          name = "calmar_ratio_stub";
-          init = (fun ~config:_ -> ());
-          update = (fun ~state:() ~step:_ -> ());
-          finalize =
-            (fun ~state:() ~config:_ -> Metric_types.singleton CalmarRatio 0.0);
-        }
+  | CalmarRatio -> calmar_ratio_stub_computer ()
   | OpenPositionCount | UnrealizedPnl | TradeFrequency ->
       portfolio_state_computer ()
 
