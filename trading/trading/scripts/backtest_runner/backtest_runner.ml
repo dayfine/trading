@@ -16,6 +16,9 @@ let index_symbol = "GSPC.INDX"
 let initial_cash = 1_000_000.0
 let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
+(** Number of calendar days to prepend for 30-week MA warmup. *)
+let warmup_days = 210
+
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                             *)
 (* ------------------------------------------------------------------ *)
@@ -94,8 +97,10 @@ let _build_summary_sexp
     ~universe_size ~n_steps ~n_round_trips =
   let open Trading_simulation_types.Metric_types in
   let get key = Map.find metrics key |> Option.value ~default:0.0 in
-  let win_count = Float.to_int (get WinCount) in
-  let loss_count = Float.to_int (get LossCount) in
+  let total_pnl = match summary with Some s -> s.total_pnl | None -> 0.0 in
+  let win_count = match summary with Some s -> s.win_count | None -> 0 in
+  let loss_count = match summary with Some s -> s.loss_count | None -> 0 in
+  let win_rate = match summary with Some s -> s.win_rate | None -> 0.0 in
   let avg_hold =
     match summary with Some s -> s.avg_holding_days | None -> 0.0
   in
@@ -106,10 +111,10 @@ let _build_summary_sexp
       _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
       _sexp_of_pair "steps" (_sexp_of_int n_steps);
       _sexp_of_pair "final_portfolio_value" (_sexp_of_float final_value);
-      _sexp_of_pair "total_pnl" (_sexp_of_float (get TotalPnl));
+      _sexp_of_pair "total_pnl" (_sexp_of_float total_pnl);
       _sexp_of_pair "win_count" (_sexp_of_int win_count);
       _sexp_of_pair "loss_count" (_sexp_of_int loss_count);
-      _sexp_of_pair "win_rate" (_sexp_of_float (get WinRate));
+      _sexp_of_pair "win_rate" (_sexp_of_float win_rate);
       _sexp_of_pair "sharpe_ratio" (_sexp_of_float (get SharpeRatio));
       _sexp_of_pair "max_drawdown_pct"
         (_sexp_of_float (Float.abs (get MaxDrawdown) *. 100.0));
@@ -182,17 +187,21 @@ let () =
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length all_symbols);
 
-  eprintf "Running backtest (%s to %s)...\n%!"
+  (* Start simulation early to warm up 30-week MA *)
+  let warmup_start = Date.add_days start_date (-warmup_days) in
+  eprintf "Running backtest (%s to %s, warmup from %s)...\n%!"
     (Date.to_string start_date)
-    (Date.to_string end_date);
+    (Date.to_string end_date)
+    (Date.to_string warmup_start);
+  let computers = Metric_computers.default_computers () in
   let deps =
     Simulator.create_deps ~symbols:all_symbols ~data_dir:data_dir_fpath
-      ~strategy ~commission ()
+      ~strategy ~commission ~computers ()
   in
   let sim_config =
     Simulator.
       {
-        start_date;
+        start_date = warmup_start;
         end_date;
         initial_cash;
         commission;
@@ -214,7 +223,12 @@ let () =
         Stdlib.exit 1
   in
 
-  let steps = result.steps in
+  (* Filter steps to the user's requested date range *)
+  let steps =
+    List.filter result.steps
+      ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
+        Date.( >= ) s.date start_date)
+  in
   let final_value = (List.last_exn steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips steps in
   let summary = Metrics.compute_summary round_trips in
