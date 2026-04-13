@@ -10,6 +10,16 @@
   trading.orders
   trading.strategy
   core)
- (modules simulator order_generator metrics metric_computers)
+ (modules
+  simulator
+  order_generator
+  metrics
+  metric_computers
+  metric_computer_utils
+  summary_computer
+  sharpe_computer
+  drawdown_computer
+  cagr_computer
+  portfolio_state_computer)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
