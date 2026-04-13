@@ -1,3 +1,4 @@
+(* @large-module: 7 metric computers with distinct state types and logic *)
 (** Pre-built metric computers for common performance metrics. *)
 
 open Core

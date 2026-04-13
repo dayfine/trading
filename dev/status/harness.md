@@ -165,6 +165,11 @@ IN_PROGRESS
 
 - [x] T1-Q: CC linter — `trading/devtools/cc_linter/cc_linter.ml`; OCaml AST via `compiler-libs`; CC > 10 = warning (not failure); exits 0 always; optional JSON output to `dev/metrics/cc-YYYY-MM-DD.json`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest trading/devtools/checks/` — exits 0; prints OK or warning list.
 
+### T2-B: Reference backtest config and expected metrics
+
+- [x] T2-B: Reference backtest config — `dev/benchmarks/reference_backtest.sexp`; captures all default strategy parameters from `backtest_runner.ml`, `weinstein_strategy.ml`, `stage.ml`, `macro_types.ml`, `screener.ml`, `portfolio_risk.ml`, and `stop_types.ml`. Verify: `cat dev/benchmarks/reference_backtest.sexp` — should have sections for runner, strategy, stage, macro, screener, portfolio_risk, and stops.
+- [x] T2-B: Expected metrics — `dev/benchmarks/expected_metrics.sexp`; metric ranges from 3 golden scenarios (2018-2023, 2015-2020, 2020-2024) on 1,654 stocks. Includes per-scenario observed values and aggregate expected ranges with margin for Hashtbl non-determinism. Verify: `cat dev/benchmarks/expected_metrics.sexp` — should have scenarios list and expected_ranges section.
+
 ### T3-B and T3-F
 
 - [x] T3-B: AVR loop closure already in `lead-orchestrator` Step 5 — auto-dispatches QC for any READY_FOR_REVIEW feature in the same orchestrator run. Verify: grep "READY_FOR_REVIEW\|auto.*QC\|Step 5" in `lead-orchestrator.md`.
