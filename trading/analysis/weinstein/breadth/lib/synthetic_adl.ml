@@ -38,13 +38,13 @@ let _accumulate_symbol_changes tbl prices =
     ()
 
 let compute_daily_changes ~min_stocks all_prices =
-  let tbl = Hashtbl.create (module String) in
+  let tbl = Hashtbl.create (module Date) in
   List.iter all_prices ~f:(_accumulate_symbol_changes tbl);
   Hashtbl.fold tbl ~init:[] ~f:(fun ~key:date ~data:(adv, dec, tot) acc ->
       if tot >= min_stocks then
         (date, { advances = adv; declines = dec; total = tot }) :: acc
       else acc)
-  |> List.sort ~compare:(fun (d1, _) (d2, _) -> String.compare d1 d2)
+  |> List.sort ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2)
 
 (* ---------- statistics ---------- *)
 
@@ -89,7 +89,7 @@ let validate_against_golden ~synthetic ~golden =
   let overlap_dates =
     Map.fold synthetic ~init:[] ~f:(fun ~key:date ~data:_ acc ->
         if Map.mem golden date then date :: acc else acc)
-    |> List.sort ~compare:String.compare
+    |> List.sort ~compare:Date.compare
   in
   if List.is_empty overlap_dates then
     { overlap_count = 0; correlation = 0.0; mae = 0.0 }

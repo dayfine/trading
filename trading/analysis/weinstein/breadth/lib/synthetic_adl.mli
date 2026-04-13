@@ -11,7 +11,9 @@ type daily_counts = { advances : int; declines : int; total : int }
 (** {1 Advance/decline computation} *)
 
 val compute_daily_changes :
-  min_stocks:int -> (string * float) list list -> (string * daily_counts) list
+  min_stocks:int ->
+  (Core.Date.t * float) list list ->
+  (Core.Date.t * daily_counts) list
 (** [compute_daily_changes ~min_stocks all_prices] computes per-date
     advance/decline counts from multiple symbol price series.
 
@@ -31,8 +33,8 @@ type validation_result = {
 (** Result of comparing synthetic breadth data against golden data. *)
 
 val validate_against_golden :
-  synthetic:int Core.Map.M(Core.String).t ->
-  golden:int Core.Map.M(Core.String).t ->
+  synthetic:int Core.Map.M(Core.Date).t ->
+  golden:int Core.Map.M(Core.Date).t ->
   validation_result
 (** [validate_against_golden ~synthetic ~golden] compares synthetic breadth
     counts against golden reference data on overlapping dates. Returns

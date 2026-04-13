@@ -4,6 +4,7 @@
   core
   core_unix.command_unix
   csv
+  types
   weinstein.data_source
   weinstein.breadth)
  (preprocess

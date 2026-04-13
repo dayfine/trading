@@ -17,31 +17,12 @@ open Synthetic_adl
 
 let _min_stocks = 100
 
-(* ---------- CSV parsing helpers ---------- *)
-
-(** Parse a CSV row into [(date, close)] if the close price is valid. *)
-let _parse_price_row line =
-  let fields = String.split line ~on:',' in
-  match fields with
-  | date :: _open :: _high :: _low :: close :: _ -> (
-      let date = String.strip date in
-      let close_str = String.strip close in
-      match Float.of_string_opt close_str with
-      | Some c -> Some (date, c)
-      | None -> None)
-  | _ -> None
-
-let _parse_close_prices rows =
-  List.filter_map rows ~f:_parse_price_row
-  |> List.sort ~compare:(fun (d1, _) (d2, _) -> String.compare d1 d2)
-
 (* ---------- formatting helpers ---------- *)
 
-let _format_date_yyyymmdd date_str =
-  String.filter date_str ~f:(fun c -> not (Char.equal c '-'))
+let _format_date_yyyymmdd date = Date.to_string_iso8601_basic date
 
-let _format_breadth_row (date_str, count) =
-  Printf.sprintf "%s, %d" (_format_date_yyyymmdd date_str) count
+let _format_breadth_row (date, count) =
+  Printf.sprintf "%s, %d" (_format_date_yyyymmdd date) count
 
 (* ---------- file I/O ---------- *)
 
@@ -49,13 +30,20 @@ let _format_breadth_row (date_str, count) =
 *)
 let _load_symbols ~data_dir = Sector_map.load ~data_dir |> Hashtbl.keys
 
-(** Load close prices from a stock's [data.csv]. Returns [(date, close)] pairs
-    sorted by date ascending. Skips rows with unparseable close prices. *)
-let _load_close_prices path =
-  let lines = try In_channel.read_lines path with Sys_error _ -> [] in
-  match lines with [] -> [] | _header :: rows -> _parse_close_prices rows
+(** Load close prices for a symbol using [Csv_storage]. Returns [(date, close)]
+    pairs sorted by date ascending. *)
+let _load_close_prices ~data_dir symbol =
+  match Csv.Csv_storage.create ~data_dir symbol with
+  | Error _ -> []
+  | Ok storage -> (
+      match Csv.Csv_storage.get storage () with
+      | Error _ -> []
+      | Ok prices ->
+          List.map prices ~f:(fun (p : Types.Daily_price.t) ->
+              (p.date, p.close_price)))
 
-(** Parse a single golden breadth CSV line into [(date, count)] if valid. *)
+(** Parse a single golden breadth CSV line into [(date, count)] if valid. Golden
+    files use YYYYMMDD format without dashes. *)
 let _parse_golden_breadth_line line =
   let line = String.rstrip ~drop:(Char.equal '\r') line in
   match String.lsplit2 line ~on:',' with
@@ -63,17 +51,31 @@ let _parse_golden_breadth_line line =
       let date_str = String.strip date_str in
       let count_str = String.strip count_str in
       match Int.of_string_opt count_str with
-      | Some count when count > 0 -> Some (date_str, count)
+      | Some count when count > 0 ->
+          let iso_date =
+            if String.length date_str = 8 then
+              String.concat
+                [
+                  String.prefix date_str 4;
+                  "-";
+                  String.sub date_str ~pos:4 ~len:2;
+                  "-";
+                  String.sub date_str ~pos:6 ~len:2;
+                ]
+            else date_str
+          in
+          let date_opt = Option.try_with (fun () -> Date.of_string iso_date) in
+          Option.map date_opt ~f:(fun date -> (date, count))
       | _ -> None)
   | None -> None
 
 (** Load golden breadth CSV. Format: [YYYYMMDD, count] (no header). Returns a
-    map of YYYYMMDD -> count, skipping zero-count entries. *)
+    map of date -> count, skipping zero-count entries. *)
 let _load_golden_breadth path =
   let lines = try In_channel.read_lines path with Sys_error _ -> [] in
   List.filter_map lines ~f:_parse_golden_breadth_line
-  |> List.fold ~init:String.Map.empty ~f:(fun acc (date_str, count) ->
-      Map.set acc ~key:date_str ~data:count)
+  |> List.fold ~init:Date.Map.empty ~f:(fun acc (date, count) ->
+      Map.set acc ~key:date ~data:count)
 
 (** Write breadth CSV in existing format: [YYYYMMDD, count] (no header). *)
 let _write_breadth_csv path pairs =
@@ -86,15 +88,8 @@ let _write_breadth_csv path pairs =
 (** Try loading prices for a single symbol. Returns [Some prices] on success,
     [None] if the file is missing or has no valid rows. *)
 let _try_load_symbol_prices ~data_dir symbol =
-  let path =
-    Fpath.(Csv.Csv_storage.symbol_data_dir ~data_dir symbol / "data.csv")
-    |> Fpath.to_string
-  in
-  match Sys_unix.file_exists path with
-  | `Yes ->
-      let prices = _load_close_prices path in
-      if List.is_empty prices then None else Some prices
-  | `No | `Unknown -> None
+  let prices = _load_close_prices ~data_dir symbol in
+  if List.is_empty prices then None else Some prices
 
 (** Load all symbol prices, returning [(prices_list, missing_count)]. *)
 let _load_all_prices ~data_dir symbols =
@@ -112,7 +107,9 @@ let _print_daily_summary daily avg_stocks =
     exit 1);
   let first_date = fst (List.hd_exn daily) in
   let last_date = fst (List.last_exn daily) in
-  printf "Date range: %s to %s\n%!" first_date last_date
+  printf "Date range: %s to %s\n%!"
+    (Date.to_string first_date)
+    (Date.to_string last_date)
 
 (* ---------- main: output ---------- *)
 
@@ -139,15 +136,15 @@ let _print_validation_stats ~label (r : validation_result) =
   printf "    Pearson correlation: %.4f\n%!" r.correlation;
   printf "    Mean absolute error: %.1f\n%!" r.mae
 
-(** Build synthetic lookup maps keyed by YYYYMMDD. *)
+(** Build synthetic lookup maps keyed by date. *)
 let _build_synthetic_maps daily =
   let syn_advn =
-    List.fold daily ~init:String.Map.empty ~f:(fun acc (d, c) ->
-        Map.set acc ~key:(_format_date_yyyymmdd d) ~data:c.advances)
+    List.fold daily ~init:Date.Map.empty ~f:(fun acc (d, c) ->
+        Map.set acc ~key:d ~data:c.advances)
   in
   let syn_decln =
-    List.fold daily ~init:String.Map.empty ~f:(fun acc (d, c) ->
-        Map.set acc ~key:(_format_date_yyyymmdd d) ~data:c.declines)
+    List.fold daily ~init:Date.Map.empty ~f:(fun acc (d, c) ->
+        Map.set acc ~key:d ~data:c.declines)
   in
   (syn_advn, syn_decln)
 
@@ -160,12 +157,12 @@ let _build_net_maps syn_advn syn_decln golden_advn golden_decln =
         && Map.mem golden_decln date)
   in
   let syn_net =
-    List.fold dates ~init:String.Map.empty ~f:(fun acc d ->
+    List.fold dates ~init:Date.Map.empty ~f:(fun acc d ->
         Map.set acc ~key:d
           ~data:(Map.find_exn syn_advn d - Map.find_exn syn_decln d))
   in
   let gold_net =
-    List.fold dates ~init:String.Map.empty ~f:(fun acc d ->
+    List.fold dates ~init:Date.Map.empty ~f:(fun acc d ->
         Map.set acc ~key:d
           ~data:(Map.find_exn golden_advn d - Map.find_exn golden_decln d))
   in
