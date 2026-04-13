@@ -7,6 +7,20 @@ let trading_days_per_year = 252.0
 module Metric_types = Trading_simulation_types.Metric_types
 module Simulator_types = Trading_simulation_types.Simulator_types
 
+(* On non-trading days (weekends, holidays) the simulator has no bars, so
+   positions are valued at 0 and portfolio_value equals just cash. Detect
+   this by checking if the portfolio has positions but value ≈ cash. *)
+let _cash_epsilon = 0.01
+
+let _is_trading_day_step (step : Simulator_types.step_result) =
+  let has_positions = not (List.is_empty step.portfolio.positions) in
+  let value_is_just_cash =
+    Float.( <= )
+      (Float.abs (step.portfolio_value -. step.portfolio.current_cash))
+      _cash_epsilon
+  in
+  (not has_positions) || not value_is_just_cash
+
 (** {1 Summary Statistics Computer} *)
 
 type summary_state = { steps : Simulator_types.step_result list }
@@ -76,10 +90,12 @@ let _compute_sharpe daily_returns risk_free_rate =
         excess_return /. std_return *. Float.sqrt trading_days_per_year
 
 let _sharpe_update ~state ~step =
-  let portfolio_values =
-    step.Simulator_types.portfolio_value :: state.portfolio_values
-  in
-  { state with portfolio_values }
+  if not (_is_trading_day_step step) then state
+  else
+    let portfolio_values =
+      step.Simulator_types.portfolio_value :: state.portfolio_values
+    in
+    { state with portfolio_values }
 
 let _sharpe_finalize ~state ~config:_ =
   let daily_returns =
@@ -122,10 +138,12 @@ let _drawdown_computer_impl : drawdown_state Simulator_types.metric_computer =
       (fun ~config:_ -> { peak = 0.0; max_drawdown = 0.0; has_data = false });
     update =
       (fun ~state ~step ->
-        let value = step.Simulator_types.portfolio_value in
-        if not state.has_data then
-          { peak = value; max_drawdown = 0.0; has_data = true }
-        else _update_drawdown state value);
+        if not (_is_trading_day_step step) then state
+        else
+          let value = step.Simulator_types.portfolio_value in
+          if not state.has_data then
+            { peak = value; max_drawdown = 0.0; has_data = true }
+          else _update_drawdown state value);
     finalize =
       (fun ~state ~config:_ ->
         Metric_types.singleton MaxDrawdown state.max_drawdown);
