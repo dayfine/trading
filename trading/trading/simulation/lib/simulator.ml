@@ -248,6 +248,14 @@ let _build_run_result t =
   in
   { steps; metrics }
 
+(* Apply trades one at a time, skipping any that fail (e.g. insufficient
+   cash). Returns the updated portfolio and the list of accepted trades. *)
+let _apply_trades_best_effort portfolio trades =
+  List.fold trades ~init:(portfolio, []) ~f:(fun (portfolio, accepted) trade ->
+      match Trading_portfolio.Portfolio.apply_single_trade portfolio trade with
+      | Ok p -> (p, accepted @ [ trade ])
+      | Error _ -> (portfolio, accepted))
+
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
   else
@@ -257,13 +265,11 @@ let step t =
     let%bind execution_reports =
       Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
     in
-    let trades = _extract_trades execution_reports in
+    let all_trades = _extract_trades execution_reports in
+    let portfolio, trades = _apply_trades_best_effort t.portfolio all_trades in
     let%bind positions =
       _update_positions_from_trades ~date:t.current_date ~positions:t.positions
         ~trades
-    in
-    let%bind portfolio =
-      Trading_portfolio.Portfolio.apply_trades t.portfolio trades
     in
     let%bind transitions = _call_strategy { t with positions } in
     let%bind positions = _apply_transitions ~positions ~transitions in
