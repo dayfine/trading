@@ -34,6 +34,10 @@ val get_position : t -> symbol -> portfolio_position option
 (** Find a position by symbol. Returns None if no position exists for the
     symbol. *)
 
+val apply_single_trade : t -> trade -> t status_or
+(** Apply a single trade, returning a new portfolio. Returns Error if the trade
+    would create invalid state (e.g., insufficient cash). *)
+
 val apply_trades : t -> trade list -> t status_or
 (** Apply trades sequentially, returning a new portfolio. Trades are processed
     in order. Returns Error if any trade would create invalid state (e.g.,
