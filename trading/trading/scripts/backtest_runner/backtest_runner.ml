@@ -45,11 +45,24 @@ let _code_version () =
     Option.value line ~default:"unknown"
   with _ -> "unknown"
 
-(** True if [date] falls on a weekday (Mon-Fri). *)
-let _is_weekday date =
-  match Date.day_of_week date with
-  | Day_of_week.Sat | Day_of_week.Sun -> false
-  | _ -> true
+(** True if [step] represents a real trading day. On non-trading days (weekends,
+    holidays) the simulator has no price bars, so [_compute_portfolio_value]
+    falls back to [current_cash] even when the portfolio holds positions —
+    causing a spurious near-zero portfolio value.
+
+    Detection: if the portfolio has open positions yet [portfolio_value] equals
+    [current_cash], position market values were not included, so this is not a
+    real trading day. When the portfolio is all-cash the value is correct on any
+    day, so those steps always pass through. *)
+let _is_trading_day
+    (step : Trading_simulation_types.Simulator_types.step_result) =
+  let has_positions =
+    not (List.is_empty step.portfolio.Trading_portfolio.Portfolio.positions)
+  in
+  if has_positions then
+    let cash = step.portfolio.Trading_portfolio.Portfolio.current_cash in
+    Float.(abs (step.portfolio_value -. cash) > 1e-2)
+  else true
 
 (** Compute max drawdown percentage from filtered step results. Returns a value
     in [0, 100] representing the largest peak-to-trough decline as a percentage
@@ -243,12 +256,13 @@ let () =
         Stdlib.exit 1
   in
 
-  (* Filter steps to the user's requested date range, weekdays only.
-     Weekends have no market data so portfolio_value only reflects cash. *)
+  (* Filter to the user's requested date range and real trading days only.
+     Non-trading days (weekends, holidays) have no price bars, so the simulator
+     reports portfolio_value = cash, creating spurious drawdowns. *)
   let steps =
     List.filter result.steps
       ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
-        Date.( >= ) s.date start_date && _is_weekday s.date)
+        Date.( >= ) s.date start_date && _is_trading_day s)
   in
   let final_value = (List.last_exn steps).portfolio_value in
   let max_drawdown_pct = _compute_max_drawdown_pct steps in
