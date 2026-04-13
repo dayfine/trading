@@ -63,6 +63,12 @@ val of_alist_exn : (metric_type * float) list -> metric_set
 val merge : metric_set -> metric_set -> metric_set
 (** Merge two metric sets. Later values override earlier ones. *)
 
+val sexp_of_metric_set : metric_set -> Sexp.t
+(** Serialize a metric set to sexp. *)
+
+val metric_set_to_sexp_pairs : metric_set -> Sexp.t
+(** Convert to a sexp list of [(key value)] pairs for human-readable output. *)
+
 (** {1 Metric Unit} *)
 
 (** Unit of measurement for formatting *)

@@ -63,14 +63,25 @@ val portfolio_state_computer : unit -> Simulator.any_metric_computer
 
 val default_computers :
   ?risk_free_rate:float -> unit -> Simulator.any_metric_computer list
-(** Returns all default metric computers: summary (including profit factor),
-    Sharpe ratio, max drawdown, CAGR, and portfolio state.
-
-    Note: CalmarRatio is a derived metric computed by the simulator from CAGR
-    and MaxDrawdown after all computers have run.
+(** Returns all default step-based metric computers: summary (including profit
+    factor), Sharpe ratio, max drawdown, CAGR, and portfolio state.
 
     @param risk_free_rate
       Annual risk-free rate for Sharpe calculation (default: 0.0) *)
+
+(** {1 Derived Metric Computers} *)
+
+val calmar_ratio_derived : Simulator.derived_metric_computer
+(** Computes CalmarRatio = CAGR / MaxDrawdown. Depends on CAGR and MaxDrawdown
+    being computed first by step-based computers. *)
+
+val default_derived_computers : unit -> Simulator.derived_metric_computer list
+(** Returns all default derived metric computers (currently: CalmarRatio). *)
+
+val default_metric_suite :
+  ?risk_free_rate:float -> unit -> Simulator.metric_suite
+(** Returns a complete metric suite with all step-based and derived computers.
+*)
 
 (** {1 Factory} *)
 

@@ -57,6 +57,22 @@ let singleton metric_type value =
 let of_alist_exn alist = Map.of_alist_exn (module Metric_type) alist
 let merge m1 m2 = Map.merge_skewed m1 m2 ~combine:(fun ~key:_ _v1 v2 -> v2)
 
+let sexp_of_metric_set m =
+  Map.to_alist m
+  |> List.map ~f:(fun (k, v) ->
+      Sexp.List [ Metric_type.sexp_of_t k; Float.sexp_of_t v ])
+  |> fun l -> Sexp.List l
+
+let _format_value v =
+  if Float.is_integer v then sprintf "%.0f" v else sprintf "%.2f" v
+
+let metric_set_to_sexp_pairs m =
+  Map.to_alist m
+  |> List.map ~f:(fun (k, v) ->
+      let name = String.lowercase (Metric_type.show k) in
+      Sexp.List [ Sexp.Atom name; Sexp.Atom (_format_value v) ])
+  |> fun l -> Sexp.List l
+
 (** {1 Metric Unit} *)
 
 type metric_unit = Dollars | Percent | Days | Count | Ratio

@@ -112,42 +112,22 @@ let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir =
   Sexp.save_hum (output_dir ^ "/params.sexp") sexp
 
 let _build_summary_sexp
-    ~(metrics : Trading_simulation_types.Metric_types.metric_set)
-    ~(summary : Metrics.summary_stats option) ~final_value ~start_date ~end_date
-    ~universe_size ~n_steps ~n_round_trips =
-  let open Trading_simulation_types.Metric_types in
-  let get key = Map.find metrics key |> Option.value ~default:0.0 in
-  let max_drawdown_pct = get MaxDrawdown in
-  let total_pnl = match summary with Some s -> s.total_pnl | None -> 0.0 in
-  let win_count = match summary with Some s -> s.win_count | None -> 0 in
-  let loss_count = match summary with Some s -> s.loss_count | None -> 0 in
-  let win_rate = match summary with Some s -> s.win_rate | None -> 0.0 in
-  let avg_hold =
-    match summary with Some s -> s.avg_holding_days | None -> 0.0
-  in
-  Sexp.List
+    ~(metrics : Trading_simulation_types.Metric_types.metric_set) ~final_value
+    ~start_date ~end_date ~universe_size ~n_steps ~n_round_trips =
+  let run_info =
     [
       _sexp_of_pair "start_date" (_sexp_of_string (Date.to_string start_date));
       _sexp_of_pair "end_date" (_sexp_of_string (Date.to_string end_date));
       _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
       _sexp_of_pair "steps" (_sexp_of_int n_steps);
       _sexp_of_pair "final_portfolio_value" (_sexp_of_float final_value);
-      _sexp_of_pair "total_pnl" (_sexp_of_float total_pnl);
-      _sexp_of_pair "win_count" (_sexp_of_int win_count);
-      _sexp_of_pair "loss_count" (_sexp_of_int loss_count);
-      _sexp_of_pair "win_rate" (_sexp_of_float win_rate);
-      _sexp_of_pair "sharpe_ratio" (_sexp_of_float (get SharpeRatio));
-      _sexp_of_pair "max_drawdown_pct" (_sexp_of_float max_drawdown_pct);
-      _sexp_of_pair "total_trades" (_sexp_of_int (win_count + loss_count));
       _sexp_of_pair "round_trips" (_sexp_of_int n_round_trips);
-      _sexp_of_pair "avg_holding_days" (_sexp_of_float avg_hold);
-      _sexp_of_pair "profit_factor" (_sexp_of_float (get ProfitFactor));
-      _sexp_of_pair "cagr" (_sexp_of_float (get CAGR));
-      _sexp_of_pair "calmar_ratio" (_sexp_of_float (get CalmarRatio));
-      _sexp_of_pair "open_positions" (_sexp_of_float (get OpenPositionCount));
-      _sexp_of_pair "unrealized_pnl" (_sexp_of_float (get UnrealizedPnl));
-      _sexp_of_pair "trade_frequency" (_sexp_of_float (get TradeFrequency));
     ]
+  in
+  let metrics_sexp =
+    Trading_simulation_types.Metric_types.metric_set_to_sexp_pairs metrics
+  in
+  Sexp.List (run_info @ [ _sexp_of_pair "metrics" metrics_sexp ])
 
 let _write_summary ~output_dir ~summary_sexp =
   Sexp.save_hum (output_dir ^ "/summary.sexp") summary_sexp
@@ -221,10 +201,10 @@ let () =
     (Date.to_string start_date)
     (Date.to_string end_date)
     (Date.to_string warmup_start);
-  let computers = Metric_computers.default_computers () in
+  let metric_suite = Metric_computers.default_metric_suite () in
   let deps =
     Simulator.create_deps ~symbols:all_symbols ~data_dir:data_dir_fpath
-      ~strategy ~commission ~computers ()
+      ~strategy ~commission ~metric_suite ()
   in
   let sim_config =
     Simulator.
@@ -261,13 +241,12 @@ let () =
   in
   let final_value = (List.last_exn steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips steps in
-  let summary = Metrics.compute_summary round_trips in
 
   let output_dir = _make_output_dir ~data_dir_fpath in
   eprintf "Writing output to %s/\n%!" output_dir;
   let summary_sexp =
-    _build_summary_sexp ~metrics:result.metrics ~summary ~final_value
-      ~start_date ~end_date ~universe_size ~n_steps:(List.length steps)
+    _build_summary_sexp ~metrics:result.metrics ~final_value ~start_date
+      ~end_date ~universe_size ~n_steps:(List.length steps)
       ~n_round_trips:(List.length round_trips)
   in
   _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir;

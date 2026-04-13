@@ -267,25 +267,32 @@ let _portfolio_computer_impl : portfolio_state Simulator_types.metric_computer =
 let portfolio_state_computer () =
   Simulator_types.wrap_computer _portfolio_computer_impl
 
-(** {1 Calmar Ratio Stub}
+(** {1 Derived Metric Computers} *)
 
-    CalmarRatio is derived post-hoc from CAGR and MaxDrawdown. This stub
-    computer produces 0.0 as a fallback when the metric is requested
-    individually. *)
-
-let _calmar_stub_impl : unit Simulator_types.metric_computer =
+let calmar_ratio_derived : Simulator_types.derived_metric_computer =
   {
-    name = "calmar_ratio_stub";
-    init = (fun ~config:_ -> ());
-    update = (fun ~state:() ~step:_ -> ());
-    finalize =
-      (fun ~state:() ~config:_ -> Metric_types.singleton CalmarRatio 0.0);
+    name = "calmar_ratio";
+    depends_on = [ CAGR; MaxDrawdown ];
+    compute =
+      (fun ~config:_ ~base_metrics ->
+        let get k = Map.find base_metrics k |> Option.value ~default:0.0 in
+        let cagr = get CAGR in
+        let max_dd = get MaxDrawdown in
+        let calmar = if Float.( = ) max_dd 0.0 then 0.0 else cagr /. max_dd in
+        Metric_types.singleton CalmarRatio calmar);
   }
 
-let calmar_ratio_stub_computer () =
-  Simulator_types.wrap_computer _calmar_stub_impl
-
 (** {1 Factory} *)
+
+let _calmar_stub () =
+  Simulator_types.wrap_computer
+    {
+      name = "calmar_stub";
+      init = (fun ~config:_ -> ());
+      update = (fun ~state:() ~step:_ -> ());
+      finalize =
+        (fun ~state:() ~config:_ -> Metric_types.singleton CalmarRatio 0.0);
+    }
 
 let create_computer (metric_type : Metric_types.metric_type) :
     Simulator_types.any_metric_computer =
@@ -295,7 +302,7 @@ let create_computer (metric_type : Metric_types.metric_type) :
   | SharpeRatio -> sharpe_ratio_computer ()
   | MaxDrawdown -> max_drawdown_computer ()
   | CAGR -> cagr_computer ()
-  | CalmarRatio -> calmar_ratio_stub_computer ()
+  | CalmarRatio -> _calmar_stub ()
   | OpenPositionCount | UnrealizedPnl | TradeFrequency ->
       portfolio_state_computer ()
 
@@ -309,3 +316,12 @@ let default_computers ?(risk_free_rate = 0.0) () =
     cagr_computer ();
     portfolio_state_computer ();
   ]
+
+let default_derived_computers () = [ calmar_ratio_derived ]
+
+let default_metric_suite ?(risk_free_rate = 0.0) () :
+    Simulator_types.metric_suite =
+  {
+    computers = default_computers ~risk_free_rate ();
+    derived = default_derived_computers ();
+  }
