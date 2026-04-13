@@ -241,3 +241,16 @@ let is_empty list =
     assert_failure
       (Printf.sprintf "Expected empty list but got %d elements"
          (List.length list))
+
+(* ========================================================================== *)
+(* Map Matchers                                                               *)
+(* ========================================================================== *)
+
+let contains_entry key value_matcher map =
+  match Map.find map key with
+  | None -> assert_failure "Expected map to contain key, but key not found"
+  | Some v -> value_matcher v
+
+let map_includes entries map =
+  List.iter entries ~f:(fun (key, value_matcher) ->
+      contains_entry key value_matcher map)
