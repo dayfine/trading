@@ -3,6 +3,29 @@ open Core
 open Portfolio_risk
 open Matchers
 
+(* Re-declare record types for exhaustive ppx-generated matchers.
+   If the production type adds/removes a field, this fails to compile. *)
+type snapshot = Portfolio_risk.portfolio_snapshot = {
+  total_value : float;
+  cash : float;
+  cash_pct : float;
+  long_exposure : float;
+  long_exposure_pct : float;
+  short_exposure : float;
+  short_exposure_pct : float;
+  position_count : int;
+  sector_counts : (string * int) list;
+}
+[@@deriving test_matcher]
+
+type sizing = Portfolio_risk.sizing_result = {
+  shares : int;
+  position_value : float;
+  position_pct : float;
+  risk_amount : float;
+}
+[@@deriving test_matcher]
+
 (* ---- Test helpers ---- *)
 
 (* Directly constructs a portfolio_snapshot for limit-check tests, bypassing
@@ -48,42 +71,30 @@ let apply_trades_exn portfolio trades =
 let test_snapshot_empty _ =
   let snap = snapshot ~cash:100000.0 ~positions:[] () in
   assert_that snap
-    (all_of
-       [
-         field (fun s -> s.total_value) (float_equal 100000.0);
-         field (fun s -> s.cash) (float_equal 100000.0);
-         field (fun s -> s.cash_pct) (float_equal 1.0);
-         field (fun s -> s.long_exposure) (float_equal 0.0);
-         field (fun s -> s.short_exposure) (float_equal 0.0);
-         field (fun s -> s.position_count) (equal_to 0);
-       ])
+    (match_snapshot ~total_value:(float_equal 100000.0)
+       ~cash:(float_equal 100000.0) ~cash_pct:(float_equal 1.0)
+       ~long_exposure:(float_equal 0.0) ~long_exposure_pct:__
+       ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
+       ~position_count:(equal_to 0) ~sector_counts:__)
 
 let test_snapshot_long_only _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("MSFT", 50.0, 200.0) ] in
   let snap = snapshot ~cash:50000.0 ~positions () in
   assert_that snap
-    (all_of
-       [
-         field (fun s -> s.total_value) (float_equal 75000.0);
-         field (fun s -> s.long_exposure) (float_equal 25000.0);
-         field (fun s -> s.short_exposure) (float_equal 0.0);
-         field (fun s -> s.position_count) (equal_to 2);
-         field
-           (fun s -> s.long_exposure_pct)
-           (float_equal ~epsilon:1e-6 (1.0 /. 3.0));
-       ])
+    (match_snapshot ~total_value:(float_equal 75000.0) ~cash:__ ~cash_pct:__
+       ~long_exposure:(float_equal 25000.0)
+       ~long_exposure_pct:(float_equal ~epsilon:1e-6 (1.0 /. 3.0))
+       ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
+       ~position_count:(equal_to 2) ~sector_counts:__)
 
 let test_snapshot_with_short _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("TSLA", -50.0, 200.0) ] in
   let snap = snapshot ~cash:80000.0 ~positions () in
   assert_that snap
-    (all_of
-       [
-         field (fun s -> s.total_value) (float_equal 85000.0);
-         field (fun s -> s.long_exposure) (float_equal 15000.0);
-         field (fun s -> s.short_exposure) (float_equal 10000.0);
-         field (fun s -> s.position_count) (equal_to 2);
-       ])
+    (match_snapshot ~total_value:(float_equal 85000.0) ~cash:__ ~cash_pct:__
+       ~long_exposure:(float_equal 15000.0) ~long_exposure_pct:__
+       ~short_exposure:(float_equal 10000.0) ~short_exposure_pct:__
+       ~position_count:(equal_to 2) ~sector_counts:__)
 
 let test_snapshot_with_sectors _ =
   let positions =
@@ -92,13 +103,12 @@ let test_snapshot_with_sectors _ =
   let sectors = [ ("AAPL", "Tech"); ("MSFT", "Tech"); ("AMZN", "Tech") ] in
   let snap = snapshot ~cash:50000.0 ~positions ~sectors () in
   assert_that snap
-    (all_of
-       [
-         field (fun s -> s.position_count) (equal_to 3);
-         field
-           (fun s -> List.Assoc.find s.sector_counts ~equal:String.equal "Tech")
-           (is_some_and (equal_to 3));
-       ])
+    (match_snapshot ~total_value:__ ~cash:__ ~cash_pct:__ ~long_exposure:__
+       ~long_exposure_pct:__ ~short_exposure:__ ~short_exposure_pct:__
+       ~position_count:(equal_to 3) ~sector_counts:(fun counts ->
+         assert_that
+           (List.Assoc.find counts ~equal:String.equal "Tech")
+           (is_some_and (equal_to 3))))
 
 (* Tests snapshot_of_portfolio, which derives cash and positions from an
    existing Portfolio.t rather than raw tuples. *)
@@ -117,14 +127,11 @@ let test_snapshot_of_portfolio _ =
   let prices = [ ("AAPL", 150.0); ("MSFT", 200.0) ] in
   let snap = snapshot_of_portfolio ~portfolio ~prices () in
   assert_that snap
-    (all_of
-       [
-         field (fun s -> s.total_value) (float_equal 110000.0);
-         field (fun s -> s.cash) (float_equal 85000.0);
-         field (fun s -> s.long_exposure) (float_equal 25000.0);
-         field (fun s -> s.short_exposure) (float_equal 0.0);
-         field (fun s -> s.position_count) (equal_to 2);
-       ])
+    (match_snapshot ~total_value:(float_equal 110000.0)
+       ~cash:(float_equal 85000.0) ~cash_pct:__
+       ~long_exposure:(float_equal 25000.0) ~long_exposure_pct:__
+       ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
+       ~position_count:(equal_to 2) ~sector_counts:__)
 
 (* ---- Position sizing tests ---- *)
 
@@ -135,13 +142,9 @@ let test_position_size_basic _ =
   in
   (* risk = 1000, risk_per_share = 5, shares = 200, position_value = 10000 *)
   assert_that result
-    (all_of
-       [
-         field (fun r -> r.shares) (equal_to 200);
-         field (fun r -> r.position_value) (float_equal 10000.0);
-         field (fun r -> r.risk_amount) (float_equal 1000.0);
-         field (fun r -> r.position_pct) (float_equal ~epsilon:1e-6 0.10);
-       ])
+    (match_sizing ~shares:(equal_to 200) ~position_value:(float_equal 10000.0)
+       ~position_pct:(float_equal ~epsilon:1e-6 0.10)
+       ~risk_amount:(float_equal 1000.0))
 
 let test_position_size_rounds_down _ =
   let result =
@@ -149,7 +152,9 @@ let test_position_size_rounds_down _ =
       ~entry_price:47.0 ~stop_price:44.50 ()
   in
   (* risk = 1000, risk_per_share = 2.5, shares = floor(400) = 400 *)
-  assert_that result (field (fun r -> r.shares) (equal_to 400))
+  assert_that result
+    (match_sizing ~shares:(equal_to 400) ~position_value:__ ~position_pct:__
+       ~risk_amount:__)
 
 let test_position_size_invalid_stop _ =
   let result =
@@ -157,11 +162,8 @@ let test_position_size_invalid_stop _ =
       ~entry_price:50.0 ~stop_price:50.0 ()
   in
   assert_that result
-    (all_of
-       [
-         field (fun r -> r.shares) (equal_to 0);
-         field (fun r -> r.position_value) (float_equal 0.0);
-       ])
+    (match_sizing ~shares:(equal_to 0) ~position_value:(float_equal 0.0)
+       ~position_pct:__ ~risk_amount:__)
 
 let test_position_size_big_winner _ =
   let result =
@@ -169,7 +171,9 @@ let test_position_size_big_winner _ =
       ~entry_price:50.0 ~stop_price:45.0 ~big_winner:true ()
   in
   (* risk = 1500 (1% * 1.5x), risk_per_share = 5, shares = 300 *)
-  assert_that result (field (fun r -> r.shares) (equal_to 300))
+  assert_that result
+    (match_sizing ~shares:(equal_to 300) ~position_value:__ ~position_pct:__
+       ~risk_amount:__)
 
 (* ---- Limit check tests ---- *)
 
@@ -238,7 +242,7 @@ let test_check_limits_multiple_violations _ =
           ]))
 
 let test_check_limits_short_side _ =
-  (* short_exp=28000, cash=80000, long=0, total=52000; adding 10000 short → 73% *)
+  (* short_exp=28000, cash=80000, long=0, total=52000; adding 10000 short -> 73% *)
   let snap = make_snapshot ~short_exp:28000.0 ~long_exp:0.0 () in
   let result =
     check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Short
@@ -261,7 +265,7 @@ let test_check_limits_unknown_sector_allowed _ =
   assert_that result (equal_to (Result.Ok ()))
 
 (* Proposing a third unknown-sector position violates the cap with the
-   dedicated Unknown_sector_exceeded violation — not Sector_concentration. *)
+   dedicated Unknown_sector_exceeded violation -- not Sector_concentration. *)
 let test_check_limits_unknown_sector_exceeded _ =
   let snap = make_snapshot ~sectors:[ ("", 2) ] () in
   let result =
@@ -271,7 +275,7 @@ let test_check_limits_unknown_sector_exceeded _ =
   assert_that result (equal_to (Result.Error [ Unknown_sector_exceeded 3 ]))
 
 (* A named-sector position is governed by max_sector_concentration (default 5),
-   not the unknown-sector cap — even if the portfolio also has a full unknown
+   not the unknown-sector cap -- even if the portfolio also has a full unknown
    bucket, a new "Tech" position with count 4 -> 5 must still be accepted. *)
 let test_check_limits_named_sector_unaffected_by_unknown_cap _ =
   let snap = make_snapshot ~sectors:[ ("", 5); ("Tech", 4) ] () in
@@ -281,7 +285,7 @@ let test_check_limits_named_sector_unaffected_by_unknown_cap _ =
   in
   assert_that result (equal_to (Result.Ok ()))
 
-(* The unknown-sector cap is configurable — raising it lets more unknown
+(* The unknown-sector cap is configurable -- raising it lets more unknown
    positions through. *)
 let test_check_limits_unknown_sector_configurable _ =
   let config = { default_config with max_unknown_sector_positions = 4 } in
@@ -301,15 +305,15 @@ let test_snapshot_buckets_missing_sectors_as_unknown _ =
   let sectors = [ ("AAPL", "Tech") ] in
   let snap = snapshot ~cash:50000.0 ~positions ~sectors () in
   assert_that snap
-    (all_of
-       [
-         field
-           (fun s -> List.Assoc.find s.sector_counts ~equal:String.equal "")
+    (match_snapshot ~total_value:__ ~cash:__ ~cash_pct:__ ~long_exposure:__
+       ~long_exposure_pct:__ ~short_exposure:__ ~short_exposure_pct:__
+       ~position_count:__ ~sector_counts:(fun counts ->
+         assert_that
+           (List.Assoc.find counts ~equal:String.equal "")
            (is_some_and (equal_to 2));
-         field
-           (fun s -> List.Assoc.find s.sector_counts ~equal:String.equal "Tech")
-           (is_some_and (equal_to 1));
-       ])
+         assert_that
+           (List.Assoc.find counts ~equal:String.equal "Tech")
+           (is_some_and (equal_to 1))))
 
 let test_deriving _ =
   let _ = show_portfolio_snapshot (make_snapshot ()) in

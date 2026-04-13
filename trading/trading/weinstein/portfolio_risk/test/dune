@@ -10,7 +10,7 @@
   trading.base
   status)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq)))
+  (pps ppx_deriving.show ppx_deriving.eq ppx_test_matcher)))
 
 (test
  (name test_portfolio_risk_e2e)
