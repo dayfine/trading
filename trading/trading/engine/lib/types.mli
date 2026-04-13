@@ -8,9 +8,8 @@ open Trading_base.Types
     The engine simulates execution by generating intraday paths through the OHLC
     points to determine if/when orders would fill.
 
-    Tracked: Add configurable bar granularity (daily, hourly, minute). Add
-    volume data for more realistic execution modeling. See
-    dev/status/simulation.md Followup. *)
+    TODO(simulation/T5): Add configurable bar granularity (daily, hourly,
+    minute). Add volume data for more realistic execution modeling. *)
 type price_bar = {
   symbol : symbol;
   open_price : price;
