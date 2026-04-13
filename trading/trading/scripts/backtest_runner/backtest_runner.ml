@@ -1,5 +1,9 @@
 (** Backtest runner CLI — runs the Weinstein strategy over the full universe and
-    writes structured output (params, summary, trades, equity curve). *)
+    writes structured output (params, summary, trades, equity curve).
+
+    Usage: backtest_runner <start_date> [end_date]
+    - start_date: required (e.g. 2018-01-02)
+    - end_date: optional, defaults to today *)
 
 open Core
 open Trading_simulation
@@ -11,21 +15,25 @@ open Trading_simulation
 let index_symbol = "GSPC.INDX"
 let initial_cash = 1_000_000.0
 let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
-let default_start = "2018-01-02"
-let default_end = "2023-12-29"
 
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                             *)
 (* ------------------------------------------------------------------ *)
 
-(** Parse CLI args: [backtest_runner [start_date] [end_date]]. *)
 let _parse_args () =
   let argv = Sys.get_argv () in
-  let start_str = if Array.length argv > 1 then argv.(1) else default_start in
-  let end_str = if Array.length argv > 2 then argv.(2) else default_end in
-  (Date.of_string start_str, Date.of_string end_str)
+  if Array.length argv < 2 then (
+    eprintf "Usage: backtest_runner <start_date> [end_date]\n";
+    eprintf "  start_date: required (e.g. 2018-01-02)\n";
+    eprintf "  end_date:   optional (defaults to today)\n";
+    Stdlib.exit 1);
+  let start_date = Date.of_string argv.(1) in
+  let end_date =
+    if Array.length argv > 2 then Date.of_string argv.(2)
+    else Date.today ~zone:Time_float.Zone.utc
+  in
+  (start_date, end_date)
 
-(** Get git HEAD revision, or "unknown" on failure. *)
 let _code_version () =
   try
     let ic = Core_unix.open_process_in "git rev-parse HEAD" in
@@ -34,7 +42,6 @@ let _code_version () =
     Option.value line ~default:"unknown"
   with _ -> "unknown"
 
-(** Create a timestamped output directory under [dev/backtest/]. *)
 let _make_output_dir () =
   let now = Core_unix.gettimeofday () in
   let tm = Core_unix.localtime now in
@@ -42,73 +49,78 @@ let _make_output_dir () =
     sprintf "%04d-%02d-%02d-%02d%02d%02d" (tm.tm_year + 1900) (tm.tm_mon + 1)
       tm.tm_mday tm.tm_hour tm.tm_min tm.tm_sec
   in
-  let base = "dev/backtest" in
-  let path = base ^ "/" ^ dirname in
+  let path = "dev/backtest/" ^ dirname in
   Core_unix.mkdir_p path;
   path
+
+(* ------------------------------------------------------------------ *)
+(* Sexp output helpers                                                 *)
+(* ------------------------------------------------------------------ *)
+
+let _sexp_of_pair k v = Sexp.List [ Sexp.Atom k; v ]
+let _sexp_of_float f = Sexp.Atom (sprintf "%.2f" f)
+let _sexp_of_int i = Sexp.Atom (Int.to_string i)
+let _sexp_of_string s = Sexp.Atom s
 
 (* ------------------------------------------------------------------ *)
 (* Output writers                                                      *)
 (* ------------------------------------------------------------------ *)
 
-(** Write params.json recording inputs for reproducibility. *)
-let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir =
-  let path = output_dir ^ "/params.json" in
-  let oc = Out_channel.create path in
-  fprintf oc
-    {|{
-  "code_version": "%s",
-  "start_date": "%s",
-  "end_date": "%s",
-  "initial_cash": %.1f,
-  "universe_size": %d,
-  "data_dir": "%s",
-  "commission": {"per_share": %.2f, "minimum": %.2f}
-}
-|}
-    (_code_version ())
-    (Date.to_string start_date)
-    (Date.to_string end_date) initial_cash universe_size data_dir
-    commission.per_share commission.minimum;
-  Out_channel.close oc
+let _commission_sexp () =
+  Sexp.List
+    [
+      _sexp_of_pair "per_share" (_sexp_of_float commission.per_share);
+      _sexp_of_pair "minimum" (_sexp_of_float commission.minimum);
+    ]
 
-(** Write summary.json with key performance metrics. *)
-let _write_summary ~output_dir
+let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir =
+  let sexp =
+    Sexp.List
+      [
+        _sexp_of_pair "code_version" (_sexp_of_string (_code_version ()));
+        _sexp_of_pair "start_date" (_sexp_of_string (Date.to_string start_date));
+        _sexp_of_pair "end_date" (_sexp_of_string (Date.to_string end_date));
+        _sexp_of_pair "initial_cash" (_sexp_of_float initial_cash);
+        _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
+        _sexp_of_pair "data_dir" (_sexp_of_string data_dir);
+        _sexp_of_pair "commission" (_commission_sexp ());
+      ]
+  in
+  Sexp.save_hum (output_dir ^ "/params.sexp") sexp
+
+let _build_summary_sexp
     ~(metrics : Trading_simulation_types.Metric_types.metric_set)
-    ~(summary : Metrics.summary_stats option) ~final_value =
-  let path = output_dir ^ "/summary.json" in
-  let oc = Out_channel.create path in
+    ~(summary : Metrics.summary_stats option) ~final_value ~start_date ~end_date
+    ~universe_size ~n_steps ~n_round_trips =
   let open Trading_simulation_types.Metric_types in
   let get key = Map.find metrics key |> Option.value ~default:0.0 in
-  let total_pnl = get TotalPnl in
-  let win_count = get WinCount in
-  let loss_count = get LossCount in
-  let win_rate = get WinRate in
-  let sharpe = get SharpeRatio in
-  let max_dd = get MaxDrawdown in
-  let total_trades = Float.to_int win_count + Float.to_int loss_count in
+  let win_count = Float.to_int (get WinCount) in
+  let loss_count = Float.to_int (get LossCount) in
   let avg_hold =
     match summary with Some s -> s.avg_holding_days | None -> 0.0
   in
-  fprintf oc
-    {|{
-  "total_pnl": %.2f,
-  "win_count": %d,
-  "loss_count": %d,
-  "win_rate": %.1f,
-  "sharpe_ratio": %.2f,
-  "max_drawdown_pct": %.1f,
-  "total_trades": %d,
-  "avg_holding_days": %.1f,
-  "final_portfolio_value": %.2f
-}
-|}
-    total_pnl (Float.to_int win_count) (Float.to_int loss_count) win_rate sharpe
-    (Float.abs max_dd *. 100.0)
-    total_trades avg_hold final_value;
-  Out_channel.close oc
+  Sexp.List
+    [
+      _sexp_of_pair "start_date" (_sexp_of_string (Date.to_string start_date));
+      _sexp_of_pair "end_date" (_sexp_of_string (Date.to_string end_date));
+      _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
+      _sexp_of_pair "steps" (_sexp_of_int n_steps);
+      _sexp_of_pair "final_portfolio_value" (_sexp_of_float final_value);
+      _sexp_of_pair "total_pnl" (_sexp_of_float (get TotalPnl));
+      _sexp_of_pair "win_count" (_sexp_of_int win_count);
+      _sexp_of_pair "loss_count" (_sexp_of_int loss_count);
+      _sexp_of_pair "win_rate" (_sexp_of_float (get WinRate));
+      _sexp_of_pair "sharpe_ratio" (_sexp_of_float (get SharpeRatio));
+      _sexp_of_pair "max_drawdown_pct"
+        (_sexp_of_float (Float.abs (get MaxDrawdown) *. 100.0));
+      _sexp_of_pair "total_trades" (_sexp_of_int (win_count + loss_count));
+      _sexp_of_pair "round_trips" (_sexp_of_int n_round_trips);
+      _sexp_of_pair "avg_holding_days" (_sexp_of_float avg_hold);
+    ]
 
-(** Write trades.csv with all round-trip trades. *)
+let _write_summary ~output_dir ~summary_sexp =
+  Sexp.save_hum (output_dir ^ "/summary.sexp") summary_sexp
+
 let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list) =
   let path = output_dir ^ "/trades.csv" in
   let oc = Out_channel.create path in
@@ -122,7 +134,6 @@ let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list) =
         t.pnl_percent);
   Out_channel.close oc
 
-(** Write equity_curve.csv with daily portfolio values. *)
 let _write_equity_curve ~output_dir
     ~(steps : Trading_simulation_types.Simulator_types.step_result list) =
   let path = output_dir ^ "/equity_curve.csv" in
@@ -142,16 +153,16 @@ let () =
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
 
-  printf "Loading universe from sectors.csv...\n%!";
+  eprintf "Loading universe from sectors.csv...\n%!";
   let ticker_sectors = Sector_map.load ~data_dir:data_dir_fpath in
   let universe = Hashtbl.keys ticker_sectors in
   let universe_size = List.length universe in
-  printf "Universe: %d stocks\n%!" universe_size;
+  eprintf "Universe: %d stocks\n%!" universe_size;
 
-  printf "Loading AD breadth bars...\n%!";
+  eprintf "Loading AD breadth bars...\n%!";
   let ad_bars = Weinstein_strategy.Ad_bars.load ~data_dir in
 
-  printf "Building strategy...\n%!";
+  eprintf "Building strategy...\n%!";
   let base_config = Weinstein_strategy.default_config ~universe ~index_symbol in
   let config =
     {
@@ -161,7 +172,6 @@ let () =
   in
   let strategy = Weinstein_strategy.make ~ad_bars ~ticker_sectors config in
 
-  (* All symbols = universe + index + sector ETFs *)
   let sector_etf_symbols =
     List.map config.sector_etfs ~f:(fun (sym, _) -> sym)
   in
@@ -169,10 +179,10 @@ let () =
     (index_symbol :: universe) @ sector_etf_symbols
     |> List.dedup_and_sort ~compare:String.compare
   in
-  printf "Total symbols (universe + index + sector ETFs): %d\n%!"
+  eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length all_symbols);
 
-  printf "Creating simulator (%s to %s)...\n%!"
+  eprintf "Running backtest (%s to %s)...\n%!"
     (Date.to_string start_date)
     (Date.to_string end_date);
   let deps =
@@ -196,8 +206,6 @@ let () =
         eprintf "Failed to create simulator: %s\n" (Status.show e);
         Stdlib.exit 1
   in
-
-  printf "Running backtest...\n%!";
   let result =
     match Simulator.run sim with
     | Ok r -> r
@@ -206,34 +214,24 @@ let () =
         Stdlib.exit 1
   in
 
-  (* Extract results *)
   let steps = result.steps in
   let final_value = (List.last_exn steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips steps in
   let summary = Metrics.compute_summary round_trips in
 
-  (* Write output *)
   let output_dir = _make_output_dir () in
-  printf "Writing output to %s/\n%!" output_dir;
+  eprintf "Writing output to %s/\n%!" output_dir;
+  let summary_sexp =
+    _build_summary_sexp ~metrics:result.metrics ~summary ~final_value
+      ~start_date ~end_date ~universe_size ~n_steps:(List.length steps)
+      ~n_round_trips:(List.length round_trips)
+  in
   _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir;
-  _write_summary ~output_dir ~metrics:result.metrics ~summary ~final_value;
+  _write_summary ~output_dir ~summary_sexp;
   _write_trades ~output_dir ~round_trips;
   _write_equity_curve ~output_dir ~steps;
+  eprintf "Output written to: %s/\n%!" output_dir;
 
-  (* Print summary to stdout *)
-  printf "\n=== Backtest Summary ===\n";
-  printf "Period: %s to %s\n"
-    (Date.to_string start_date)
-    (Date.to_string end_date);
-  printf "Universe: %d stocks\n" universe_size;
-  printf "Steps: %d\n" (List.length steps);
-  printf "Final portfolio value: $%.2f\n" final_value;
-  printf "Total P&L: $%.2f\n" (final_value -. initial_cash);
-  printf "Round-trip trades: %d\n" (List.length round_trips);
-  (match summary with
-  | Some s ->
-      printf "Win/Loss: %d/%d (%.1f%%)\n" s.win_count s.loss_count s.win_rate;
-      printf "Avg holding days: %.1f\n" s.avg_holding_days;
-      printf "Total trade P&L: $%.2f\n" s.total_pnl
-  | None -> printf "No completed trades.\n");
-  printf "Output written to: %s/\n" output_dir
+  (* Print structured summary to stdout *)
+  Out_channel.output_string stdout (Sexp.to_string_hum summary_sexp);
+  Out_channel.newline stdout
