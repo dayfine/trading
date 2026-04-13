@@ -1,7 +1,7 @@
 (** Order generator - converts strategy transitions to trading orders
 
-    Tracked: Orders should be StopLimit orders instead of Market orders.
-    See dev/status/simulation.md Followup. *)
+    Tracked: Orders should be StopLimit orders instead of Market orders. See
+    dev/status/simulation.md Followup. *)
 
 open Core
 

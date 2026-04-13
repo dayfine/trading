@@ -9,8 +9,8 @@ open Trading_base.Types
     points to determine if/when orders would fill.
 
     Tracked: Add configurable bar granularity (daily, hourly, minute). Add
-    volume data for more realistic execution modeling.
-    See dev/status/simulation.md Followup. *)
+    volume data for more realistic execution modeling. See
+    dev/status/simulation.md Followup. *)
 type price_bar = {
   symbol : symbol;
   open_price : price;

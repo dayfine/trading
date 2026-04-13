@@ -21,7 +21,8 @@
     ([Breakout] pattern with high volume and long warmup).
 
     Tracked: remove the tmpdir round-trip once Price_cache accepts an injected
-    DATA_SOURCE (follow-up to #218/#219). See dev/status/simulation.md Followup. *)
+    DATA_SOURCE (follow-up to #218/#219). See dev/status/simulation.md Followup.
+*)
 
 open OUnit2
 open Core
