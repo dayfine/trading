@@ -18,6 +18,12 @@ module Metric_type : sig
     | WinRate  (** Win percentage *)
     | SharpeRatio  (** Risk-adjusted return metric *)
     | MaxDrawdown  (** Maximum peak-to-trough decline *)
+    | ProfitFactor  (** Gross profit / gross loss *)
+    | CAGR  (** Compound annual growth rate *)
+    | CalmarRatio  (** CAGR / max drawdown *)
+    | OpenPositionCount  (** Open positions at end of simulation *)
+    | UnrealizedPnl  (** Unrealized P&L at end of simulation *)
+    | TradeFrequency  (** Trades per month *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -32,6 +38,12 @@ type metric_type = Metric_type.t =
   | WinRate
   | SharpeRatio
   | MaxDrawdown
+  | ProfitFactor
+  | CAGR
+  | CalmarRatio
+  | OpenPositionCount
+  | UnrealizedPnl
+  | TradeFrequency
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)

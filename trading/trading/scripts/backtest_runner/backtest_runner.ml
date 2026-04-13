@@ -141,6 +141,12 @@ let _build_summary_sexp
       _sexp_of_pair "total_trades" (_sexp_of_int (win_count + loss_count));
       _sexp_of_pair "round_trips" (_sexp_of_int n_round_trips);
       _sexp_of_pair "avg_holding_days" (_sexp_of_float avg_hold);
+      _sexp_of_pair "profit_factor" (_sexp_of_float (get ProfitFactor));
+      _sexp_of_pair "cagr" (_sexp_of_float (get CAGR));
+      _sexp_of_pair "calmar_ratio" (_sexp_of_float (get CalmarRatio));
+      _sexp_of_pair "open_positions" (_sexp_of_float (get OpenPositionCount));
+      _sexp_of_pair "unrealized_pnl" (_sexp_of_float (get UnrealizedPnl));
+      _sexp_of_pair "trade_frequency" (_sexp_of_float (get TradeFrequency));
     ]
 
 let _write_summary ~output_dir ~summary_sexp =

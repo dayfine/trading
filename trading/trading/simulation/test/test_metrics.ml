@@ -316,7 +316,9 @@ let test_summary_computer_with_no_trades _ =
   in
   let computer = summary_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.is_empty metrics) (equal_to true)
+  (* No round-trip trades, but ProfitFactor is always emitted (0.0) *)
+  assert_that (Map.length metrics) (equal_to 1);
+  assert_that (Map.find metrics ProfitFactor) (is_some_and (float_equal 0.0))
 
 (* ==================== Multiple Computers Tests ==================== *)
 
@@ -349,8 +351,8 @@ let test_run_computers_combines_results _ =
 
 let test_default_computers _ =
   let computers = default_computers () in
-  (* Default set: summary_computer, sharpe_ratio_computer, max_drawdown_computer *)
-  assert_that computers (size_is 3)
+  (* Default set: summary, sharpe, max_drawdown, cagr, portfolio_state *)
+  assert_that computers (size_is 5)
 
 (* ==================== Factory Tests ==================== *)
 
@@ -369,6 +371,212 @@ let test_create_computer_max_drawdown _ =
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that (Map.length metrics) (equal_to 1);
   assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 0.0))
+
+(* ==================== Profit Factor Tests ==================== *)
+
+let test_profit_factor_all_winners _ =
+  let config = make_config () in
+  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  let buy_trade =
+    {
+      Trading_base.Types.id = "t1";
+      order_id = "o1";
+      symbol = "AAPL";
+      side = Buy;
+      quantity = 10.0;
+      price = 100.0;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  let sell_trade =
+    {
+      Trading_base.Types.id = "t2";
+      order_id = "o2";
+      symbol = "AAPL";
+      side = Sell;
+      quantity = 10.0;
+      price = 110.0;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  let steps =
+    [
+      {
+        date = date_of_string "2024-01-01";
+        portfolio;
+        portfolio_value = 10000.0;
+        trades = [ buy_trade ];
+        orders_submitted = [];
+      };
+      {
+        date = date_of_string "2024-01-10";
+        portfolio;
+        portfolio_value = 10100.0;
+        trades = [ sell_trade ];
+        orders_submitted = [];
+      };
+    ]
+  in
+  let computer = summary_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that
+    (Map.find metrics ProfitFactor)
+    (is_some_and (float_equal Float.infinity))
+
+let test_profit_factor_no_trades _ =
+  let config = make_config () in
+  let steps =
+    [
+      make_step_result
+        ~date:(date_of_string "2024-01-01")
+        ~portfolio_value:10000.0;
+    ]
+  in
+  let computer = summary_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that (Map.find metrics ProfitFactor) (is_some_and (float_equal 0.0))
+
+(* ==================== CAGR Tests ==================== *)
+
+let test_cagr_zero_with_no_data _ =
+  let config = make_config () in
+  let computer = cagr_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps:[] in
+  assert_that (Map.find metrics CAGR) (is_some_and (float_equal 0.0))
+
+let test_cagr_with_growth _ =
+  let config =
+    {
+      (make_config ()) with
+      start_date = date_of_string "2023-01-01";
+      end_date = date_of_string "2024-01-01";
+    }
+  in
+  let steps =
+    [
+      make_step_result
+        ~date:(date_of_string "2023-01-02")
+        ~portfolio_value:10000.0;
+      make_step_result
+        ~date:(date_of_string "2024-01-01")
+        ~portfolio_value:11000.0;
+    ]
+  in
+  let computer = cagr_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* 10% growth over ~1 year should give ~10% CAGR *)
+  assert_that (Map.find metrics CAGR)
+    (is_some_and (float_equal ~epsilon:0.5 10.0))
+
+let test_cagr_with_loss _ =
+  let config =
+    {
+      (make_config ()) with
+      start_date = date_of_string "2023-01-01";
+      end_date = date_of_string "2024-01-01";
+    }
+  in
+  let steps =
+    [
+      make_step_result
+        ~date:(date_of_string "2023-01-02")
+        ~portfolio_value:10000.0;
+      make_step_result
+        ~date:(date_of_string "2024-01-01")
+        ~portfolio_value:9000.0;
+    ]
+  in
+  let computer = cagr_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that (Map.find metrics CAGR) (is_some_and (lt (module Float_ord) 0.0))
+
+(* ==================== CalmarRatio Tests ==================== *)
+
+let test_calmar_ratio_inputs _ =
+  let config =
+    {
+      (make_config ()) with
+      start_date = date_of_string "2023-01-01";
+      end_date = date_of_string "2024-01-01";
+    }
+  in
+  let steps =
+    [
+      make_step_result
+        ~date:(date_of_string "2023-01-02")
+        ~portfolio_value:10000.0;
+      make_step_result
+        ~date:(date_of_string "2023-06-01")
+        ~portfolio_value:11000.0;
+      make_step_result
+        ~date:(date_of_string "2023-09-01")
+        ~portfolio_value:10500.0;
+      make_step_result
+        ~date:(date_of_string "2024-01-01")
+        ~portfolio_value:12000.0;
+    ]
+  in
+  let computers = [ cagr_computer (); max_drawdown_computer () ] in
+  let metrics = run_computers ~computers ~config ~steps in
+  let cagr = Map.find_exn metrics CAGR in
+  let max_dd = Map.find_exn metrics MaxDrawdown in
+  (* CalmarRatio is computed by simulator post-hoc; verify inputs are present *)
+  assert_that cagr (gt (module Float_ord) 0.0);
+  assert_that max_dd (gt (module Float_ord) 0.0)
+
+(* ==================== Portfolio State Tests ==================== *)
+
+let test_portfolio_state_no_steps _ =
+  let config = make_config () in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps:[] in
+  assert_that (Map.is_empty metrics) (equal_to true)
+
+let test_portfolio_state_with_trades _ =
+  let config = make_config () in
+  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  let trade =
+    {
+      Trading_base.Types.id = "t1";
+      order_id = "o1";
+      symbol = "AAPL";
+      side = Buy;
+      quantity = 10.0;
+      price = 100.0;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  let steps =
+    [
+      {
+        date = date_of_string "2024-01-01";
+        portfolio;
+        portfolio_value = 10000.0;
+        trades = [ trade ];
+        orders_submitted = [];
+      };
+      {
+        date = date_of_string "2024-01-05";
+        portfolio;
+        portfolio_value = 10050.0;
+        trades = [ trade; trade ];
+        orders_submitted = [];
+      };
+    ]
+  in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* 3 total trades across 2 steps *)
+  assert_that
+    (Map.find metrics TradeFrequency)
+    (is_some_and (gt (module Float_ord) 0.0));
+  assert_that
+    (Map.find metrics OpenPositionCount)
+    (is_some_and (float_equal 0.0));
+  assert_that (Map.find metrics UnrealizedPnl) (is_some_and (float_equal 50.0))
 
 (* ==================== Test Suite ==================== *)
 
@@ -417,6 +625,18 @@ let suite =
          (* Factory tests *)
          "create_computer SharpeRatio" >:: test_create_computer_sharpe;
          "create_computer MaxDrawdown" >:: test_create_computer_max_drawdown;
+         (* Profit factor tests *)
+         "profit factor all winners" >:: test_profit_factor_all_winners;
+         "profit factor no trades" >:: test_profit_factor_no_trades;
+         (* CAGR tests *)
+         "cagr zero with no data" >:: test_cagr_zero_with_no_data;
+         "cagr with growth" >:: test_cagr_with_growth;
+         "cagr with loss" >:: test_cagr_with_loss;
+         (* Calmar ratio tests *)
+         "calmar ratio inputs" >:: test_calmar_ratio_inputs;
+         (* Portfolio state tests *)
+         "portfolio state no steps" >:: test_portfolio_state_no_steps;
+         "portfolio state with trades" >:: test_portfolio_state_with_trades;
        ]
 
 let () = run_test_tt_main suite

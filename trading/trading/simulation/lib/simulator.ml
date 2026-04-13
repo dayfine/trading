@@ -246,6 +246,14 @@ let _build_run_result t =
   let metrics =
     _compute_metrics ~computers:t.deps.computers ~config:t.config ~steps
   in
+  (* Compute CalmarRatio as a derived metric from CAGR and MaxDrawdown *)
+  let metrics =
+    let open Trading_simulation_types.Metric_types in
+    let cagr = Map.find metrics CAGR |> Option.value ~default:0.0 in
+    let max_dd = Map.find metrics MaxDrawdown |> Option.value ~default:0.0 in
+    let calmar = if Float.(max_dd = 0.0) then 0.0 else cagr /. max_dd in
+    merge metrics (singleton CalmarRatio calmar)
+  in
   { steps; metrics }
 
 (* Apply trades one at a time, skipping any that fail (e.g. insufficient

@@ -25,6 +25,20 @@ let _is_trading_day_step (step : Simulator_types.step_result) =
 
 type summary_state = { steps : Simulator_types.step_result list }
 
+let _compute_profit_factor (round_trips : Metrics.trade_metrics list) =
+  let gross_profit =
+    List.fold round_trips ~init:0.0 ~f:(fun acc (m : Metrics.trade_metrics) ->
+        if Float.(m.pnl_dollars > 0.0) then acc +. m.pnl_dollars else acc)
+  in
+  let gross_loss =
+    List.fold round_trips ~init:0.0 ~f:(fun acc (m : Metrics.trade_metrics) ->
+        if Float.(m.pnl_dollars < 0.0) then acc +. Float.abs m.pnl_dollars
+        else acc)
+  in
+  if Float.(gross_loss = 0.0) then
+    if Float.(gross_profit > 0.0) then Float.infinity else 0.0
+  else gross_profit /. gross_loss
+
 let _summary_computer_impl : summary_state Simulator_types.metric_computer =
   {
     name = "summary";
@@ -34,9 +48,14 @@ let _summary_computer_impl : summary_state Simulator_types.metric_computer =
       (fun ~state ~config:_ ->
         let steps = List.rev state.steps in
         let round_trips = Metrics.extract_round_trips steps in
-        match Metrics.compute_summary round_trips with
-        | None -> Metric_types.empty
-        | Some stats -> Metrics.summary_stats_to_metrics stats);
+        let base_metrics =
+          match Metrics.compute_summary round_trips with
+          | None -> Metric_types.empty
+          | Some stats -> Metrics.summary_stats_to_metrics stats
+        in
+        let profit_factor = _compute_profit_factor round_trips in
+        Metric_types.merge base_metrics
+          (Metric_types.singleton ProfitFactor profit_factor));
   }
 
 let summary_computer () = Simulator_types.wrap_computer _summary_computer_impl
@@ -152,15 +171,118 @@ let _drawdown_computer_impl : drawdown_state Simulator_types.metric_computer =
 let max_drawdown_computer () =
   Simulator_types.wrap_computer _drawdown_computer_impl
 
+(** {1 CAGR Computer} *)
+
+type cagr_state = { first_value : float option; last_value : float option }
+
+let _days_per_year = 365.25
+
+let _cagr_computer_impl : cagr_state Simulator_types.metric_computer =
+  {
+    name = "cagr";
+    init = (fun ~config:_ -> { first_value = None; last_value = None });
+    update =
+      (fun ~state ~step ->
+        if not (_is_trading_day_step step) then state
+        else
+          let value = step.Simulator_types.portfolio_value in
+          let first_value =
+            match state.first_value with None -> Some value | some -> some
+          in
+          { first_value; last_value = Some value });
+    finalize =
+      (fun ~state ~config ->
+        let cagr =
+          match (state.first_value, state.last_value) with
+          | Some first, Some last ->
+              let days =
+                Float.of_int (Date.diff config.end_date config.start_date)
+              in
+              let years = days /. _days_per_year in
+              if Float.(years <= 0.0) || Float.(first <= 0.0) then 0.0
+              else
+                let ratio = last /. first in
+                (Float.( ** ) ratio (1.0 /. years) -. 1.0) *. 100.0
+          | _ -> 0.0
+        in
+        Metric_types.singleton CAGR cagr);
+  }
+
+let cagr_computer () = Simulator_types.wrap_computer _cagr_computer_impl
+
+(** {1 Portfolio State Computer} *)
+
+type portfolio_state = {
+  last_step : Simulator_types.step_result option;
+  total_trades : int;
+}
+
+let _portfolio_computer_impl : portfolio_state Simulator_types.metric_computer =
+  {
+    name = "portfolio_state";
+    init = (fun ~config:_ -> { last_step = None; total_trades = 0 });
+    update =
+      (fun ~state ~step ->
+        {
+          last_step = Some step;
+          total_trades = state.total_trades + List.length step.trades;
+        });
+    finalize =
+      (fun ~state ~config ->
+        match state.last_step with
+        | None -> Metric_types.empty
+        | Some step ->
+            let open_count =
+              Float.of_int (List.length step.portfolio.positions)
+            in
+            (* Unrealized P&L = market value of positions = final_value -
+               cash. This captures mark-to-market gains/losses on open
+               positions. *)
+            let unrealized_pnl =
+              step.portfolio_value -. step.portfolio.current_cash
+            in
+            let days =
+              Float.of_int (Date.diff config.end_date config.start_date)
+            in
+            let months = days /. 30.44 in
+            let trade_freq =
+              if Float.(months <= 0.0) then 0.0
+              else Float.of_int state.total_trades /. months
+            in
+            Metric_types.of_alist_exn
+              [
+                (OpenPositionCount, open_count);
+                (UnrealizedPnl, unrealized_pnl);
+                (TradeFrequency, trade_freq);
+              ]);
+  }
+
+let portfolio_state_computer () =
+  Simulator_types.wrap_computer _portfolio_computer_impl
+
 (** {1 Factory} *)
 
 let create_computer (metric_type : Metric_types.metric_type) :
     Simulator_types.any_metric_computer =
   match metric_type with
-  | TotalPnl | AvgHoldingDays | WinCount | LossCount | WinRate ->
+  | TotalPnl | AvgHoldingDays | WinCount | LossCount | WinRate | ProfitFactor ->
       summary_computer ()
   | SharpeRatio -> sharpe_ratio_computer ()
   | MaxDrawdown -> max_drawdown_computer ()
+  | CAGR -> cagr_computer ()
+  | CalmarRatio ->
+      (* CalmarRatio is derived post-hoc from CAGR and MaxDrawdown.
+         Return a stub computer that produces 0.0 as a fallback. *)
+      Simulator_types.wrap_computer
+        {
+          name = "calmar_ratio_stub";
+          init = (fun ~config:_ -> ());
+          update = (fun ~state:() ~step:_ -> ());
+          finalize =
+            (fun ~state:() ~config:_ -> Metric_types.singleton CalmarRatio 0.0);
+        }
+  | OpenPositionCount | UnrealizedPnl | TradeFrequency ->
+      portfolio_state_computer ()
 
 (** {1 Default Computer Set} *)
 
@@ -169,4 +291,6 @@ let default_computers ?(risk_free_rate = 0.0) () =
     summary_computer ();
     sharpe_ratio_computer ~risk_free_rate ();
     max_drawdown_computer ();
+    cagr_computer ();
+    portfolio_state_computer ();
   ]

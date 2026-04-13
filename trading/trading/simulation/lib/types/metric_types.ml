@@ -14,6 +14,12 @@ module Metric_type = struct
       | WinRate
       | SharpeRatio
       | MaxDrawdown
+      | ProfitFactor
+      | CAGR
+      | CalmarRatio
+      | OpenPositionCount
+      | UnrealizedPnl
+      | TradeFrequency
     [@@deriving show, eq, compare, sexp]
   end
 
@@ -29,6 +35,12 @@ type metric_type = Metric_type.t =
   | WinRate
   | SharpeRatio
   | MaxDrawdown
+  | ProfitFactor
+  | CAGR
+  | CalmarRatio
+  | OpenPositionCount
+  | UnrealizedPnl
+  | TradeFrequency
 [@@deriving show, eq, compare, sexp]
 
 include (Metric_type : Comparator.S with type t := metric_type)
@@ -104,6 +116,49 @@ let get_metric_info = function
           "Maximum percentage decline from peak portfolio value during \
            simulation";
         unit = Percent;
+      }
+  | ProfitFactor ->
+      {
+        display_name = "Profit Factor";
+        description =
+          "Gross profit divided by gross loss from round-trip trades. > 1 \
+           means profitable";
+        unit = Ratio;
+      }
+  | CAGR ->
+      {
+        display_name = "CAGR";
+        description =
+          "Compound annual growth rate: annualized return as a percentage";
+        unit = Percent;
+      }
+  | CalmarRatio ->
+      {
+        display_name = "Calmar Ratio";
+        description =
+          "CAGR divided by max drawdown. Higher values indicate better \
+           risk-adjusted returns";
+        unit = Ratio;
+      }
+  | OpenPositionCount ->
+      {
+        display_name = "Open Positions";
+        description = "Number of open positions at end of simulation";
+        unit = Count;
+      }
+  | UnrealizedPnl ->
+      {
+        display_name = "Unrealized P&L";
+        description =
+          "Total unrealized profit/loss at end of simulation: final value - \
+           initial cash - realized P&L";
+        unit = Dollars;
+      }
+  | TradeFrequency ->
+      {
+        display_name = "Trade Frequency";
+        description = "Average number of trades per month";
+        unit = Ratio;
       }
 
 (** {1 Formatting} *)
