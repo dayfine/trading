@@ -2,6 +2,20 @@ open OUnit2
 open Matchers
 open Synthetic_adl
 
+type daily_counts = Synthetic_adl.daily_counts = {
+  advances : int;
+  declines : int;
+  total : int;
+}
+[@@deriving test_matcher]
+
+type validation_result = Synthetic_adl.validation_result = {
+  overlap_count : int;
+  correlation : float;
+  mae : float;
+}
+[@@deriving test_matcher]
+
 let d = Core.Date.of_string
 
 (* ------------------------------------------------------------------ *)
@@ -23,20 +37,12 @@ let test_compute_daily_changes_basic _ =
        [
          pair
            (equal_to (d "2024-01-02"))
-           (all_of
-              [
-                field (fun c -> c.advances) (equal_to 2);
-                field (fun c -> c.declines) (equal_to 0);
-                field (fun c -> c.total) (equal_to 2);
-              ]);
+           (match_daily_counts ~advances:(equal_to 2) ~declines:(equal_to 0)
+              ~total:(equal_to 2));
          pair
            (equal_to (d "2024-01-03"))
-           (all_of
-              [
-                field (fun c -> c.advances) (equal_to 1);
-                field (fun c -> c.declines) (equal_to 1);
-                field (fun c -> c.total) (equal_to 2);
-              ]);
+           (match_daily_counts ~advances:(equal_to 1) ~declines:(equal_to 1)
+              ~total:(equal_to 2));
        ])
 
 let test_compute_daily_changes_min_stocks_filter _ =
@@ -52,12 +58,8 @@ let test_compute_daily_changes_unchanged _ =
        [
          pair
            (equal_to (d "2024-01-02"))
-           (all_of
-              [
-                field (fun c -> c.advances) (equal_to 0);
-                field (fun c -> c.declines) (equal_to 0);
-                field (fun c -> c.total) (equal_to 1);
-              ]);
+           (match_daily_counts ~advances:(equal_to 0) ~declines:(equal_to 0)
+              ~total:(equal_to 1));
        ])
 
 let test_compute_daily_changes_single_price_skipped _ =
@@ -135,12 +137,8 @@ let test_validate_against_golden_no_overlap _ =
   let golden = _map_of [ (d "2024-02-01", 20) ] in
   let result = validate_against_golden ~synthetic ~golden in
   assert_that result
-    (all_of
-       [
-         field (fun r -> r.overlap_count) (equal_to 0);
-         field (fun r -> r.correlation) (float_equal 0.0);
-         field (fun r -> r.mae) (float_equal 0.0);
-       ])
+    (match_validation_result ~overlap_count:(equal_to 0)
+       ~correlation:(float_equal 0.0) ~mae:(float_equal 0.0))
 
 let test_validate_against_golden_perfect_match _ =
   let data =
@@ -149,12 +147,8 @@ let test_validate_against_golden_perfect_match _ =
   in
   let result = validate_against_golden ~synthetic:data ~golden:data in
   assert_that result
-    (all_of
-       [
-         field (fun r -> r.overlap_count) (equal_to 3);
-         field (fun r -> r.correlation) (float_equal 1.0);
-         field (fun r -> r.mae) (float_equal 0.0);
-       ])
+    (match_validation_result ~overlap_count:(equal_to 3)
+       ~correlation:(float_equal 1.0) ~mae:(float_equal 0.0))
 
 let test_validate_against_golden_partial_overlap _ =
   let synthetic =
@@ -167,12 +161,8 @@ let test_validate_against_golden_partial_overlap _ =
   in
   let result = validate_against_golden ~synthetic ~golden in
   assert_that result
-    (all_of
-       [
-         field (fun r -> r.overlap_count) (equal_to 2);
-         field (fun r -> r.correlation) (float_equal 1.0);
-         field (fun r -> r.mae) (float_equal 0.0);
-       ])
+    (match_validation_result ~overlap_count:(equal_to 2)
+       ~correlation:(float_equal 1.0) ~mae:(float_equal 0.0))
 
 let test_validate_against_golden_with_error _ =
   let synthetic =
@@ -185,13 +175,9 @@ let test_validate_against_golden_with_error _ =
   in
   let result = validate_against_golden ~synthetic ~golden in
   assert_that result
-    (all_of
-       [
-         field (fun r -> r.overlap_count) (equal_to 3);
-         (* Perfect correlation despite constant offset *)
-         field (fun r -> r.correlation) (float_equal 1.0);
-         field (fun r -> r.mae) (float_equal 10.0);
-       ])
+    (* Perfect correlation despite constant offset *)
+    (match_validation_result ~overlap_count:(equal_to 3)
+       ~correlation:(float_equal 1.0) ~mae:(float_equal 10.0))
 
 (* ------------------------------------------------------------------ *)
 (* test suite                                                           *)
