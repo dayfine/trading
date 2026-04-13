@@ -20,12 +20,6 @@ val compute_daily_changes :
     least [min_stocks] symbols report data for it. Results are sorted by date
     ascending. *)
 
-(** {1 Statistics} *)
-
-val pearson_correlation : float list -> float list -> float
-(** [pearson_correlation xs ys] computes the Pearson correlation coefficient.
-    Returns [0.0] for empty inputs or zero variance. *)
-
 (** {1 Validation} *)
 
 type validation_result = {

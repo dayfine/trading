@@ -19,16 +19,6 @@ let _min_stocks = 100
 
 (* ---------- CSV parsing helpers ---------- *)
 
-(** Extract ticker symbol from a CSV line (first comma-separated field). *)
-let _parse_symbol_line line =
-  match String.lsplit2 line ~on:',' with
-  | Some (sym, _) ->
-      let sym = String.strip sym in
-      if String.is_empty sym then None else Some sym
-  | None -> None
-
-let _parse_symbols rows = List.filter_map rows ~f:_parse_symbol_line
-
 (** Parse a CSV row into [(date, close)] if the close price is valid. *)
 let _parse_price_row line =
   let fields = String.split line ~on:',' in
@@ -53,25 +43,11 @@ let _format_date_yyyymmdd date_str =
 let _format_breadth_row (date_str, count) =
   Printf.sprintf "%s, %d" (_format_date_yyyymmdd date_str) count
 
-(* ---------- path helpers ---------- *)
-
-(** [_symbol_data_path ~data_dir symbol] returns the path to a symbol's
-    [data.csv]: [data_dir / first_char / last_char / symbol / data.csv]. *)
-let _symbol_data_path ~data_dir symbol =
-  let first = String.make 1 (Char.uppercase (String.get symbol 0)) in
-  let last =
-    String.make 1
-      (Char.uppercase (String.get symbol (String.length symbol - 1)))
-  in
-  Fpath.(data_dir / first / last / symbol / "data.csv") |> Fpath.to_string
-
 (* ---------- file I/O ---------- *)
 
-(** Load symbols from [sectors.csv]. Returns a list of tickers. *)
-let _load_symbols ~data_dir =
-  let path = Fpath.(data_dir / "sectors.csv") |> Fpath.to_string in
-  let lines = In_channel.read_lines path in
-  match lines with [] -> [] | _header :: rows -> _parse_symbols rows
+(** Load symbols from [sectors.csv] via [Sector_map]. Returns a list of tickers.
+*)
+let _load_symbols ~data_dir = Sector_map.load ~data_dir |> Hashtbl.keys
 
 (** Load close prices from a stock's [data.csv]. Returns [(date, close)] pairs
     sorted by date ascending. Skips rows with unparseable close prices. *)
@@ -110,7 +86,10 @@ let _write_breadth_csv path pairs =
 (** Try loading prices for a single symbol. Returns [Some prices] on success,
     [None] if the file is missing or has no valid rows. *)
 let _try_load_symbol_prices ~data_dir symbol =
-  let path = _symbol_data_path ~data_dir symbol in
+  let path =
+    Fpath.(Csv.Csv_storage.symbol_data_dir ~data_dir symbol / "data.csv")
+    |> Fpath.to_string
+  in
   match Sys_unix.file_exists path with
   | `Yes ->
       let prices = _load_close_prices path in

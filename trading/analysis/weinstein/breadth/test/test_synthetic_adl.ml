@@ -52,43 +52,41 @@ let test_compute_daily_changes_single_price_skipped _ =
   assert_that (List.length result) (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
-(* pearson_correlation                                                  *)
-(* ------------------------------------------------------------------ *)
-
-let test_pearson_perfect_positive _ =
-  let xs = [ 1.0; 2.0; 3.0; 4.0; 5.0 ] in
-  let ys = [ 2.0; 4.0; 6.0; 8.0; 10.0 ] in
-  assert_that (pearson_correlation xs ys) (float_equal 1.0)
-
-let test_pearson_perfect_negative _ =
-  let xs = [ 1.0; 2.0; 3.0; 4.0; 5.0 ] in
-  let ys = [ 10.0; 8.0; 6.0; 4.0; 2.0 ] in
-  assert_that (pearson_correlation xs ys) (float_equal ~epsilon:1e-10 (-1.0))
-
-let test_pearson_zero_variance _ =
-  let xs = [ 5.0; 5.0; 5.0 ] in
-  let ys = [ 1.0; 2.0; 3.0 ] in
-  assert_that (pearson_correlation xs ys) (float_equal 0.0)
-
-let test_pearson_empty _ =
-  assert_that (pearson_correlation [] []) (float_equal 0.0)
-
-let test_pearson_known_value _ =
-  let xs = [ 1.0; 2.0; 3.0; 4.0; 5.0 ] in
-  let ys = [ 2.0; 3.0; 5.0; 4.0; 6.0 ] in
-  assert_that (pearson_correlation xs ys) (float_equal ~epsilon:1e-6 0.9)
-
-(* ------------------------------------------------------------------ *)
 (* validate_against_golden                                              *)
 (* ------------------------------------------------------------------ *)
 
-let test_validate_against_golden_no_overlap _ =
+(** Helper: build a string map from an association list. *)
+let _map_of pairs = Core.Map.of_alist_exn (module Core.String) pairs
+
+let test_validate_correlation_perfect_positive _ =
   let synthetic =
-    Core.Map.of_alist_exn (module Core.String) [ ("20240101", 10) ]
+    _map_of [ ("01", 1); ("02", 2); ("03", 3); ("04", 4); ("05", 5) ]
   in
   let golden =
-    Core.Map.of_alist_exn (module Core.String) [ ("20240201", 20) ]
+    _map_of [ ("01", 2); ("02", 4); ("03", 6); ("04", 8); ("05", 10) ]
   in
+  let result = validate_against_golden ~synthetic ~golden in
+  assert_that result.correlation (float_equal 1.0)
+
+let test_validate_correlation_perfect_negative _ =
+  let synthetic =
+    _map_of [ ("01", 1); ("02", 2); ("03", 3); ("04", 4); ("05", 5) ]
+  in
+  let golden =
+    _map_of [ ("01", 10); ("02", 8); ("03", 6); ("04", 4); ("05", 2) ]
+  in
+  let result = validate_against_golden ~synthetic ~golden in
+  assert_that result.correlation (float_equal ~epsilon:1e-10 (-1.0))
+
+let test_validate_correlation_zero_variance _ =
+  let synthetic = _map_of [ ("01", 5); ("02", 5); ("03", 5) ] in
+  let golden = _map_of [ ("01", 1); ("02", 2); ("03", 3) ] in
+  let result = validate_against_golden ~synthetic ~golden in
+  assert_that result.correlation (float_equal 0.0)
+
+let test_validate_against_golden_no_overlap _ =
+  let synthetic = _map_of [ ("20240101", 10) ] in
+  let golden = _map_of [ ("20240201", 20) ] in
   let result = validate_against_golden ~synthetic ~golden in
   assert_that result.overlap_count (equal_to 0);
   assert_that result.correlation (float_equal 0.0);
@@ -96,9 +94,7 @@ let test_validate_against_golden_no_overlap _ =
 
 let test_validate_against_golden_perfect_match _ =
   let data =
-    Core.Map.of_alist_exn
-      (module Core.String)
-      [ ("20240101", 100); ("20240102", 200); ("20240103", 150) ]
+    _map_of [ ("20240101", 100); ("20240102", 200); ("20240103", 150) ]
   in
   let result = validate_against_golden ~synthetic:data ~golden:data in
   assert_that result.overlap_count (equal_to 3);
@@ -107,14 +103,10 @@ let test_validate_against_golden_perfect_match _ =
 
 let test_validate_against_golden_partial_overlap _ =
   let synthetic =
-    Core.Map.of_alist_exn
-      (module Core.String)
-      [ ("20240101", 100); ("20240102", 200); ("20240103", 300) ]
+    _map_of [ ("20240101", 100); ("20240102", 200); ("20240103", 300) ]
   in
   let golden =
-    Core.Map.of_alist_exn
-      (module Core.String)
-      [ ("20240102", 200); ("20240103", 300); ("20240104", 400) ]
+    _map_of [ ("20240102", 200); ("20240103", 300); ("20240104", 400) ]
   in
   let result = validate_against_golden ~synthetic ~golden in
   assert_that result.overlap_count (equal_to 2);
@@ -123,14 +115,10 @@ let test_validate_against_golden_partial_overlap _ =
 
 let test_validate_against_golden_with_error _ =
   let synthetic =
-    Core.Map.of_alist_exn
-      (module Core.String)
-      [ ("20240101", 100); ("20240102", 200); ("20240103", 300) ]
+    _map_of [ ("20240101", 100); ("20240102", 200); ("20240103", 300) ]
   in
   let golden =
-    Core.Map.of_alist_exn
-      (module Core.String)
-      [ ("20240101", 110); ("20240102", 210); ("20240103", 310) ]
+    _map_of [ ("20240101", 110); ("20240102", 210); ("20240103", 310) ]
   in
   let result = validate_against_golden ~synthetic ~golden in
   assert_that result.overlap_count (equal_to 3);
@@ -152,11 +140,12 @@ let suite =
          >:: test_compute_daily_changes_unchanged;
          "compute_daily_changes_single_price_skipped"
          >:: test_compute_daily_changes_single_price_skipped;
-         "pearson_perfect_positive" >:: test_pearson_perfect_positive;
-         "pearson_perfect_negative" >:: test_pearson_perfect_negative;
-         "pearson_zero_variance" >:: test_pearson_zero_variance;
-         "pearson_empty" >:: test_pearson_empty;
-         "pearson_known_value" >:: test_pearson_known_value;
+         "validate_correlation_perfect_positive"
+         >:: test_validate_correlation_perfect_positive;
+         "validate_correlation_perfect_negative"
+         >:: test_validate_correlation_perfect_negative;
+         "validate_correlation_zero_variance"
+         >:: test_validate_correlation_zero_variance;
          "validate_no_overlap" >:: test_validate_against_golden_no_overlap;
          "validate_perfect_match" >:: test_validate_against_golden_perfect_match;
          "validate_partial_overlap"

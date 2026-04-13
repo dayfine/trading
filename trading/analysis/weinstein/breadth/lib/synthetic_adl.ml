@@ -5,34 +5,6 @@ open Core
 type daily_counts = { advances : int; declines : int; total : int }
 [@@deriving show, eq]
 
-(* ---------- symbol parsing ---------- *)
-
-let _parse_symbol_line line =
-  match String.lsplit2 line ~on:',' with
-  | Some (sym, _) ->
-      let sym = String.strip sym in
-      if String.is_empty sym then None else Some sym
-  | None -> None
-
-let _parse_symbols rows = List.filter_map rows ~f:_parse_symbol_line
-
-(* ---------- price parsing ---------- *)
-
-let _parse_price_row line =
-  let fields = String.split line ~on:',' in
-  match fields with
-  | date :: _open :: _high :: _low :: close :: _ -> (
-      let date = String.strip date in
-      let close_str = String.strip close in
-      match Float.of_string_opt close_str with
-      | Some c -> Some (date, c)
-      | None -> None)
-  | _ -> None
-
-let _parse_close_prices rows =
-  List.filter_map rows ~f:_parse_price_row
-  |> List.sort ~compare:(fun (d1, _) (d2, _) -> String.compare d1 d2)
-
 (* ---------- advance/decline computation ---------- *)
 
 (** Record a price change direction for a given date into the accumulator. *)
@@ -88,7 +60,7 @@ let _pearson_components xs ys ~mx ~my =
       let dy = y -. my in
       (cov +. (dx *. dy), var_x +. (dx *. dx), var_y +. (dy *. dy)))
 
-let pearson_correlation xs ys =
+let _pearson_correlation xs ys =
   if List.is_empty xs then 0.0
   else
     let mx = _mean xs in
@@ -103,14 +75,6 @@ let _mean_absolute_error xs ys =
   else
     List.fold2_exn xs ys ~init:0.0 ~f:(fun acc x y -> acc +. Float.abs (x -. y))
     /. Float.of_int n
-
-(* ---------- formatting ---------- *)
-
-let _format_date_yyyymmdd date_str =
-  String.filter date_str ~f:(fun c -> not (Char.equal c '-'))
-
-let _format_breadth_row (date_str, count) =
-  Printf.sprintf "%s, %d" (_format_date_yyyymmdd date_str) count
 
 (* ---------- validation ---------- *)
 
@@ -137,6 +101,6 @@ let validate_against_golden ~synthetic ~golden =
     let gold_vals =
       List.map overlap_dates ~f:(fun d -> Float.of_int (Map.find_exn golden d))
     in
-    let corr = pearson_correlation syn_vals gold_vals in
+    let corr = _pearson_correlation syn_vals gold_vals in
     let mae = _mean_absolute_error syn_vals gold_vals in
     { overlap_count = List.length overlap_dates; correlation = corr; mae }

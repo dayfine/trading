@@ -3,6 +3,7 @@
  (libraries
   core
   core_unix.command_unix
+  csv
   weinstein.data_source
   weinstein.breadth)
  (preprocess
