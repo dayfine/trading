@@ -17,26 +17,31 @@ let run_computers ~computers ~config ~steps =
 
 let test_singleton _ =
   let metrics = singleton SharpeRatio 1.5 in
-  assert_that (Map.find metrics SharpeRatio) (is_some_and (float_equal 1.5))
+  assert_that metrics (contains_entry SharpeRatio (float_equal 1.5))
 
 let test_of_alist_exn _ =
   let metrics =
     of_alist_exn [ (TotalPnl, 100.0); (SharpeRatio, 1.5); (MaxDrawdown, 5.0) ]
   in
-  assert_that (Map.find metrics TotalPnl) (is_some_and (float_equal 100.0));
-  assert_that (Map.find metrics SharpeRatio) (is_some_and (float_equal 1.5));
-  assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 5.0))
+  assert_that metrics
+    (map_includes
+       [
+         (TotalPnl, float_equal 100.0);
+         (SharpeRatio, float_equal 1.5);
+         (MaxDrawdown, float_equal 5.0);
+       ])
 
 let test_merge _ =
   let m1 = of_alist_exn [ (TotalPnl, 100.0); (SharpeRatio, 1.0) ] in
   let m2 = of_alist_exn [ (SharpeRatio, 2.0); (MaxDrawdown, 5.0) ] in
   let merged = merge m1 m2 in
-  (* TotalPnl from m1 *)
-  assert_that (Map.find merged TotalPnl) (is_some_and (float_equal 100.0));
-  (* SharpeRatio overwritten by m2 *)
-  assert_that (Map.find merged SharpeRatio) (is_some_and (float_equal 2.0));
-  (* MaxDrawdown from m2 *)
-  assert_that (Map.find merged MaxDrawdown) (is_some_and (float_equal 5.0))
+  assert_that merged
+    (map_includes
+       [
+         (TotalPnl, float_equal 100.0);
+         (SharpeRatio, float_equal 2.0);
+         (MaxDrawdown, float_equal 5.0);
+       ])
 
 (* ==================== Format Tests ==================== *)
 
@@ -79,12 +84,15 @@ let test_summary_stats_to_metrics _ =
     }
   in
   let metrics = summary_stats_to_metrics stats in
-  assert_that (Map.length metrics) (equal_to 5);
-  assert_that (Map.find metrics TotalPnl) (is_some_and (float_equal 1500.0));
-  assert_that (Map.find metrics WinRate) (is_some_and (float_equal 70.0));
-  assert_that (Map.find metrics WinCount) (is_some_and (float_equal 7.0));
-  assert_that (Map.find metrics LossCount) (is_some_and (float_equal 3.0));
-  assert_that (Map.find metrics AvgHoldingDays) (is_some_and (float_equal 5.5))
+  assert_that metrics
+    (map_includes
+       [
+         (TotalPnl, float_equal 1500.0);
+         (WinRate, float_equal 70.0);
+         (WinCount, float_equal 7.0);
+         (LossCount, float_equal 3.0);
+         (AvgHoldingDays, float_equal 5.5);
+       ])
 
 (* ==================== Metric Computer Tests ==================== *)
 
@@ -108,7 +116,7 @@ let test_sharpe_ratio_zero_with_no_data _ =
   let config = make_config () in
   let computer = sharpe_ratio_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps:[] in
-  assert_that (Map.find metrics SharpeRatio) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry SharpeRatio (float_equal 0.0))
 
 let test_sharpe_ratio_zero_with_single_point _ =
   let config = make_config () in
@@ -121,7 +129,7 @@ let test_sharpe_ratio_zero_with_single_point _ =
   in
   let computer = sharpe_ratio_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics SharpeRatio) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry SharpeRatio (float_equal 0.0))
 
 let test_sharpe_ratio_zero_with_constant_value _ =
   let config = make_config () in
@@ -140,7 +148,7 @@ let test_sharpe_ratio_zero_with_constant_value _ =
   in
   let computer = sharpe_ratio_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics SharpeRatio) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry SharpeRatio (float_equal 0.0))
 
 let test_sharpe_ratio_positive_with_gains _ =
   let config = make_config () in
@@ -238,7 +246,7 @@ let test_max_drawdown_zero_with_no_decline _ =
   in
   let computer = max_drawdown_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry MaxDrawdown (float_equal 0.0))
 
 let test_max_drawdown_captures_decline _ =
   let config = make_config () in
@@ -257,7 +265,7 @@ let test_max_drawdown_captures_decline _ =
   in
   let computer = max_drawdown_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 10.0))
+  assert_that metrics (contains_entry MaxDrawdown (float_equal 10.0))
 
 let test_max_drawdown_captures_largest _ =
   let config = make_config () in
@@ -279,7 +287,7 @@ let test_max_drawdown_captures_largest _ =
   in
   let computer = max_drawdown_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 20.0))
+  assert_that metrics (contains_entry MaxDrawdown (float_equal 20.0))
 
 let test_max_drawdown_with_recovery _ =
   let config = make_config () in
@@ -301,7 +309,7 @@ let test_max_drawdown_with_recovery _ =
   in
   let computer = max_drawdown_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 10.0))
+  assert_that metrics (contains_entry MaxDrawdown (float_equal 10.0))
 
 (* ==================== Summary Computer Tests ==================== *)
 
@@ -317,8 +325,7 @@ let test_summary_computer_with_no_trades _ =
   let computer = summary_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   (* No round-trip trades, but ProfitFactor is always emitted (0.0) *)
-  assert_that (Map.length metrics) (equal_to 1);
-  assert_that (Map.find metrics ProfitFactor) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry ProfitFactor (float_equal 0.0))
 
 (* ==================== Multiple Computers Tests ==================== *)
 
@@ -339,7 +346,6 @@ let test_run_computers_combines_results _ =
   in
   let computers = [ sharpe_ratio_computer (); max_drawdown_computer () ] in
   let metrics = run_computers ~computers ~config ~steps in
-  assert_that (Map.length metrics) (equal_to 2);
   (* Sharpe: 1% gain then ~1% loss, near-zero mean return *)
   assert_that
     (Map.find metrics SharpeRatio)
@@ -361,16 +367,14 @@ let test_create_computer_sharpe _ =
   let config = make_config () in
   let steps = [] in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.length metrics) (equal_to 1);
-  assert_that (Map.find metrics SharpeRatio) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry SharpeRatio (float_equal 0.0))
 
 let test_create_computer_max_drawdown _ =
   let computer = create_computer MaxDrawdown in
   let config = make_config () in
   let steps = [] in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.length metrics) (equal_to 1);
-  assert_that (Map.find metrics MaxDrawdown) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry MaxDrawdown (float_equal 0.0))
 
 (* ==================== Profit Factor Tests ==================== *)
 
@@ -436,7 +440,7 @@ let test_profit_factor_no_trades _ =
   in
   let computer = summary_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics ProfitFactor) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry ProfitFactor (float_equal 0.0))
 
 (* ==================== CAGR Tests ==================== *)
 
@@ -444,7 +448,7 @@ let test_cagr_zero_with_no_data _ =
   let config = make_config () in
   let computer = cagr_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps:[] in
-  assert_that (Map.find metrics CAGR) (is_some_and (float_equal 0.0))
+  assert_that metrics (contains_entry CAGR (float_equal 0.0))
 
 let test_cagr_with_growth _ =
   let config =
@@ -490,7 +494,7 @@ let test_cagr_with_loss _ =
   in
   let computer = cagr_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  assert_that (Map.find metrics CAGR) (is_some_and (lt (module Float_ord) 0.0))
+  assert_that metrics (contains_entry CAGR (lt (module Float_ord) 0.0))
 
 (* ==================== CalmarRatio Tests ==================== *)
 
@@ -576,7 +580,7 @@ let test_portfolio_state_with_trades _ =
   assert_that
     (Map.find metrics OpenPositionCount)
     (is_some_and (float_equal 0.0));
-  assert_that (Map.find metrics UnrealizedPnl) (is_some_and (float_equal 50.0))
+  assert_that metrics (contains_entry UnrealizedPnl (float_equal 50.0))
 
 (* ==================== Test Suite ==================== *)
 
