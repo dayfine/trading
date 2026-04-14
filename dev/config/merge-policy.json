@@ -1,0 +1,5 @@
+{
+  "followup_threshold": 10,
+  "maintenance_cycle_ratio": 3,
+  "auto_merge_enabled": false
+}

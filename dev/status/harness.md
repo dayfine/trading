@@ -94,10 +94,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `test_data_loader.ml:load_daily_bars`, `weinstein_strategy.ml` exceed the
   nesting threshold. Grandfathered via `linter_exceptions.conf` or refactor.
   Source: `dev/daily/2026-04-11.md`.
-- **Orchestrator runner semantics** — `lead-orchestrator` now documents that
-  it must be invoked via `claude -p` (top level) to have the Agent tool.
-  The runner script `dev/run.sh` should confirm this is how it's executed.
-  Source: `dev/daily/2026-04-13.md` escalation §1.
+- ~~**Orchestrator runner semantics**~~ — RESOLVED: `dev/run.sh` now has a
+  pre-flight block that fast-fails if `claude` is missing, the
+  lead-orchestrator agent file is missing, or its `## Allowed Tools` section
+  no longer lists `Agent`. See `### run-sh hardening` in Completed.
 
 ---
 
@@ -192,3 +192,9 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - [x] T3-B: AVR loop closure already in `lead-orchestrator` Step 5 — auto-dispatches QC for any READY_FOR_REVIEW feature in the same orchestrator run. Verify: grep "READY_FOR_REVIEW\|auto.*QC\|Step 5" in `lead-orchestrator.md`.
 - [x] qc-structural: P1/P2/P4 items updated to "verified by linter (H3)" — QC no longer manually re-scans these; linters are the deterministic gate. Verify: read `qc-structural.md` checklist — P1/P2/P4 items reference linter gates.
 - [x] T3-F: `docs/design/dependency-rules.md` created — R1–R6 rules with lifecycle states (`proposed` / `monitored` / `enforced`); R1, R4, R6 enforced via dune tests; R2, R3 monitored; R5 proposed. Verify: file exists; `dune runtest trading/devtools/checks/` enforces R1.
+
+### run-sh hardening
+
+- [x] `dev/run.sh` pre-flight — fast-fails at the shell (not inside the orchestrator) if `claude` isn't on PATH, `.claude/agents/lead-orchestrator.md` is missing, or its `## Allowed Tools` section no longer lists `Agent`. Each failure prints `FAIL: <what>` to stderr and exits 1. Block is placed immediately after `REPO_ROOT=...` and uses only POSIX-compatible constructs (works with `set -euo pipefail`). Verify: `sh -n dev/run.sh` passes syntax check; temporarily rename `.claude/agents/lead-orchestrator.md` and re-run `dev/run.sh` — it exits 1 with a clear `FAIL:` message.
+- [x] `dev/config/merge-policy.json` — default merge-policy config committed with inline defaults (`followup_threshold: 10`, `maintenance_cycle_ratio: 3`, `auto_merge_enabled: false`). Matches the inline defaults previously embedded in `lead-orchestrator.md` Step 2b — now visible and tweakable without editing the agent definition. Intent documented in `dev/config/README.md`. Verify: `jq . dev/config/merge-policy.json` parses cleanly.
+- [x] Orchestrator `## Plan Mode` — added to `.claude/agents/lead-orchestrator.md`; triggered by a `--plan` token in the prompt, short-circuits Steps 2–6, writes `dev/daily/<YYYY-MM-DD>-plan.md` with `(plan mode)` marker, never mutates branches or status files. Structural smoke test at `trading/devtools/checks/orchestrator_plan_check.sh` wired into `dune runtest` — grep-asserts the required Plan Mode contract pieces in the agent definition. Does NOT invoke `claude -p` from dune runtest (credentials/network/flakiness). Verify: `dune runtest trading/devtools/checks/` — prints `OK: lead-orchestrator plan mode contract present.`
