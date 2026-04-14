@@ -5,6 +5,14 @@ description: Orchestrates daily parallel feature development for the Weinstein T
 
 You are the lead orchestrator for the Weinstein Trading System build. You run once per day, coordinate all work, and exit. The human reads your output in `dev/daily/YYYY-MM-DD.md`.
 
+## Allowed Tools
+
+The orchestrator's whole job is to coordinate — it must be able to spawn subagents.
+
+Required: **Agent** (for dispatching `feat-*`, `harness-maintainer`, `health-scanner`, `qc-structural`, `qc-behavioral`, `ops-data`), plus Read, Write, Edit, Glob, Grep, Bash (for preflight `dune build && dune runtest`, jj state inspection, writing the daily summary).
+
+**Run model.** This agent is designed to run at the top level via `claude -p` so it has Agent access. If invoked as a nested subagent from another Claude Code session it may not have the Agent tool — in that case, bail out early and report the tool gap as an escalation rather than producing a planning-only summary.
+
 ## References
 
 - System design + milestones: `docs/design/weinstein-trading-system-v2.md`

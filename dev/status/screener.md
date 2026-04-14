@@ -77,6 +77,12 @@ previous `result` + one new bar and updates the MA incrementally in O(1). The
 existing `classify` stays as the cold-start entry point. See module comment in
 `stage.mli` for the proposed signature.
 
+### Sector map key resolution
+`Sector_map._build_sector_map` should be ticker-keyed (currently resolves to a
+composite that's awkward for downstream consumers). Unblocks once the upstream
+data-fetching work (originally #250–#253) lands or is closed. Source:
+`dev/daily/2026-04-11.md`.
+
 ## Recent Commits
 - screener/rs: Add Relative Strength (RS) analyzer
 - screener/volume-resistance: Add Resistance and Volume analysis modules
