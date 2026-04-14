@@ -214,6 +214,69 @@ Assemble these three into the `<PREFLIGHT-CONTEXT>` block injected into the feat
 
 ---
 
+## Step 3.5: Plan-first trigger (for high-risk dispatches)
+
+**Prototype** — see `dev/plans/README.md` for the convention. Apply
+before the feat-agent dispatch in Step 4 for tasks meeting any of:
+
+1. **First deliverable from a new agent** — the target agent's status
+   file §Completed section is empty (or has only the status-file scaffold
+   itself). Detect by reading the status file.
+2. **Cross-cutting change** — the item the feat-agent will work on is
+   tagged `plan_required: true` in its status file's item entry, OR your
+   prior familiarity suggests the change will touch > 5 files.
+3. **Previously-failed work** — the status file's Follow-up or Completed
+   section references closed / rejected PR attempts for this item.
+4. **Experiment design** — item is under a §Potential experiments or
+   §Experiments section (e.g. the stop-buffer tuning experiment in
+   `dev/status/backtest-infra.md`), where success is empirical rather
+   than a unit-testable spec.
+
+If any trigger fires, dispatch the built-in `Plan` subagent BEFORE the
+feat-agent:
+
+```
+Agent(
+  subagent_type="Plan",
+  description="Plan <item>",
+  prompt="""
+  You are designing an implementation plan for <item> owned by the
+  <feat-agent> track.
+
+  Read:
+  - dev/status/<track>.md §<section> for the item description and
+    constraints
+  - <design doc paths from the track's startup sequence>
+  - any prior rejected attempts referenced in the status file
+  - dev/plans/README.md for the output shape
+
+  Produce a plan at dev/plans/<item-slug>-<YYYY-MM-DD>.md covering
+  context / approach / files-to-change / risks / acceptance / out-of-scope.
+
+  Commit and push the plan on a branch plan/<item-slug>. Do not
+  modify any other files. Open a PR so a human can review before
+  implementation.
+  """
+)
+```
+
+The feat-agent dispatch in Step 4 is **deferred** for this item until
+the plan PR is merged (reviewed and approved by the human). Record the
+deferral in today's daily summary under §Plan Queue with the plan PR
+number. On subsequent runs, if the plan is merged, the feat-agent
+prompt's `<PREFLIGHT-CONTEXT>` additionally includes:
+
+```
+### Approved plan
+Path: dev/plans/<item-slug>-<YYYY-MM-DD>.md
+Merged in: <PR number>
+The plan's §Approach and §Out of scope are binding. QC will verify.
+```
+
+If no trigger fires, skip to Step 4 as before.
+
+---
+
 ## Step 4: Spawn feature agents as parallel subagents
 
 For each feature that should run today, spawn it as a subagent using the Agent tool (no worktree isolation — agents work directly on their feature branch so Docker can see their changes). Run all eligible features in parallel (single message, multiple Agent tool calls).
