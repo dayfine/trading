@@ -16,7 +16,9 @@
 
 set -e
 
-TRADING_DIR="$(dirname "$0")/../.."
+. "$(dirname "$0")/_check_lib.sh"
+
+TRADING_DIR="$(trading_dir)"
 SOFT_LIMIT=300
 HARD_LIMIT=500
 MAX_LARGE_PCT=11

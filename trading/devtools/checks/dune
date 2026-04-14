@@ -1,11 +1,18 @@
 ; Codebase-wide structural checks. Run as part of `dune runtest`.
 ; Each check is a shell script that fails fast with a clear message.
 ; Path exceptions are declared in linter_exceptions.conf.
+;
+; Shell scripts source trading/devtools/checks/_check_lib.sh for the
+; shared repo_root / trading_dir / die helpers. Rules that run those
+; scripts must declare _check_lib.sh as a dep so dune sandboxes it
+; alongside the script; the script's `. "$(dirname "$0")/_check_lib.sh"`
+; then finds it at the sandboxed location.
 
 ; Architecture layer boundary: analysis/ must not import trading/trading/
 
 (rule
  (alias runtest)
+ (deps _check_lib.sh)
  (action
   (run sh %{dep:arch_layer_test.sh} %{dep:linter_exceptions.conf})))
 
@@ -13,6 +20,7 @@
 
 (rule
  (alias runtest)
+ (deps _check_lib.sh)
  (action
   (run sh %{dep:linter_file_length.sh})))
 
@@ -20,6 +28,7 @@
 
 (rule
  (alias runtest)
+ (deps _check_lib.sh)
  (action
   (run sh %{dep:linter_mli_coverage.sh} %{dep:linter_exceptions.conf})))
 
@@ -27,6 +36,7 @@
 
 (rule
  (alias runtest)
+ (deps _check_lib.sh)
  (action
   (run sh %{dep:linter_magic_numbers.sh} %{dep:linter_exceptions.conf})))
 
@@ -60,6 +70,7 @@
 
 (rule
  (alias runtest)
+ (deps _check_lib.sh)
  (action
   (run sh %{dep:testing_only_check.sh})))
 
@@ -67,6 +78,7 @@
 
 (rule
  (alias runtest)
+ (deps _check_lib.sh)
  (action
   (run sh %{dep:agent_compliance_check.sh})))
 

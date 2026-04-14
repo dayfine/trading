@@ -23,7 +23,9 @@
 
 set -e
 
-TRADING_DIR="$(dirname "$0")/../.."
+. "$(dirname "$0")/_check_lib.sh"
+
+TRADING_DIR="$(trading_dir)"
 EXCEPTIONS_CONF="$(dirname "$0")/linter_exceptions.conf"
 VIOLATIONS=""
 
