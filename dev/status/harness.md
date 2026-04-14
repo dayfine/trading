@@ -51,7 +51,7 @@ IN_PROGRESS
 ## Tier 2 — Milestone-gated
 
 - [ ] T2-B: Performance gate test (`trading/weinstein/simulation/test/performance_gate_test.ml`) (at M5)
-- [ ] T2-B: Reference backtest config + expected metrics (`dev/benchmarks/reference_backtest.json`) (at M5)
+- [x] T2-B: Reference backtest config + expected metrics — landed at `trading/test_data/backtest_scenarios/goldens/` via #316 (sexp, not json; different location than originally planned). See `dev/status/backtest-infra.md`.
 - [ ] T2-C: Walk-forward regression gate (`dev/benchmarks/best_config.json`) (at M7)
 - [ ] T2-D: Live trading gate + paper-trading validation period in `dev/milestones/m6-paper-trading.md` (before M6)
 
