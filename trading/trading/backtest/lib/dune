@@ -1,10 +1,8 @@
-(executable
- (name backtest_runner)
+(library
+ (name backtest)
  (libraries
   core
   core_unix
-  types
-  status
   fpath
   weinstein.data_source
   trading.base
@@ -15,4 +13,4 @@
   weinstein_trading.strategy
   weinstein.macro)
  (preprocess
-  (pps ppx_let)))
+  (pps ppx_let ppx_sexp_conv)))
