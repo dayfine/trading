@@ -83,6 +83,24 @@ IN_PROGRESS
 
 ---
 
+## Follow-up / Known Improvements
+
+Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
+
+- **`.claude/worktrees/` gitignore gap** — `EnterWorktree` creates git worktrees
+  jj can't track. Either ignore the directory or teach jj to ignore the paths.
+  Source: `dev/daily/2026-04-11.md`.
+- **Pre-existing nesting linter failures** — `fetch_universe.ml:main`,
+  `test_data_loader.ml:load_daily_bars`, `weinstein_strategy.ml` exceed the
+  nesting threshold. Grandfathered via `linter_exceptions.conf` or refactor.
+  Source: `dev/daily/2026-04-11.md`.
+- **Orchestrator runner semantics** — `lead-orchestrator` now documents that
+  it must be invoked via `claude -p` (top level) to have the Agent tool.
+  The runner script `dev/run.sh` should confirm this is how it's executed.
+  Source: `dev/daily/2026-04-13.md` escalation §1.
+
+---
+
 ## Completed
 
 ### Agent definitions

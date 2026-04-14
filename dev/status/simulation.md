@@ -66,6 +66,9 @@ All slices merged: Slice 1 (#196), Slice 2 (#237, #240, #241, #242), Slice 3 (#2
 - `TODO(simulation/stoplimit-orders)` — `order_generator` uses Market orders; should be StopLimit orders with entry/exit prices from transitions. See `simulation/lib/order_generator.ml` and `.mli`.
 - `TODO(simulation/monthly-cadence)` — Monthly cadence conversion not implemented in `time_series.ml` — currently returns empty. See `simulation/lib/data/time_series.ml`.
 - `TODO(simulation/bar-granularity)` — Engine `price_bar` type lacks configurable bar granularity (daily/hourly/minute) and volume data. See `engine/lib/types.mli`.
+- **Macro.analyze cadence mismatch** — `Macro.analyze` consumes daily `ad_bars`
+  but weekly `index_bars`; needs a design note + fix so the two inputs share a
+  cadence. Source: `dev/daily/2026-04-11.md`.
 
 ## Known gaps
 
