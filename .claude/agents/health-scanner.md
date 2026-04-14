@@ -57,13 +57,13 @@ If the linter fails, that is a critical finding (the gate should have caught it 
 **Step 4: Status file integrity**
 
 Schema for `dev/status/*.md`:
-- `## Status` — with a valid value (IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED)
+- `## Status` -- with a valid value (IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED)
 - `## Last updated: YYYY-MM-DD`
-- `## Interface stable` — YES or NO (required for feature status files)
+- `## Interface stable` -- YES or NO (required for feature status files)
 
 Exempt files (do not require `## Interface stable`):
-- `harness.md` — orchestrator's own backlog (different shape)
-- `backtest-infra.md` — human-driven infrastructure tracker (uses `## Ownership`)
+- `harness.md` -- orchestrator's own backlog (different shape)
+- `backtest-infra.md` -- human-driven infrastructure tracker (uses `## Ownership`)
 
 The deterministic check is wired into `dune runtest` as
 `trading/devtools/checks/status_file_integrity.sh` and runs alongside the other
@@ -94,49 +94,49 @@ Write findings to: `dev/health/<YYYY-MM-DD>-fast.md`
 
 ### Deep scan (weekly)
 
-Run once per week. Runs all fast scan checks (Steps 1–5 above) plus:
+Run once per week. The deep scan has two phases: a deterministic script and agentic analysis steps. Run all fast scan checks (Steps 1-5 above) first, then proceed with the deep scan phases below.
 
-**Step 6: Follow-up accumulation**
+#### Phase 1: Deterministic deep scan script
 
-Count open items across all `## Follow-up` and `## Followup / Known Improvements` sections in `dev/status/*.md`. Flag any that appear older than 2 weeks (compare to `## Last updated` dates). Compare total to maintenance threshold (default: 10 items).
-
-**Step 7: Size violations approaching limit**
-
-Run the function length and file length linters and collect near-limit items:
-- Functions > 35 lines (near the 50-line hard limit)
-- Files > 300 lines (near the 500-line soft limit)
+Run the standalone deep scan script. This covers dead code detection, design doc drift, TODO/FIXME/HACK accumulation, size violations, and follow-up item counting. It writes the report to `dev/health/YYYY-MM-DD-deep.md`.
 
 ```bash
+# From the repo root (local):
+sh trading/devtools/checks/deep_scan.sh
+
+# From Docker:
 docker exec trading-1-dev bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest devtools/fn_length_linter/ 2>&1'
+  'cd /workspaces/trading-1 && sh trading/devtools/checks/deep_scan.sh'
 ```
 
-**Step 8: Design doc drift**
+The script performs five checks:
+1. **Dead code detection** -- `.ml` files in `lib/` directories with no corresponding `dune` file, or not listed in a `(modules ...)` stanza
+2. **Design doc drift** -- compares actual modules in `analysis/weinstein/` and `trading/weinstein/` against `eng-design-{1,2,3}` docs
+3. **TODO/FIXME/HACK accumulation** -- counts all uppercase `TODO`, `FIXME`, `HACK` markers in `.ml` and `.mli` files; warns if total > 20
+4. **Size violations** -- files in `lib/` exceeding 300 lines without `@large-module` annotation; declared-large files exceeding 500 lines
+5. **Follow-up item count** -- counts open items in `## Follow-up` / `## Followup` sections across `dev/status/*.md`; warns if > 10
 
-Compare module structure in `analysis/weinstein/` and `trading/weinstein/` against what `docs/design/weinstein-trading-system-v2.md` describes. Flag:
-- Modules present on disk but not mentioned in the design doc
-- Modules mentioned in the design doc but absent on disk
+Read the generated report and include its findings in the health report output.
 
-```bash
-ls /Users/difan/Projects/trading-1/trading/analysis/weinstein/
-ls /Users/difan/Projects/trading-1/trading/trading/weinstein/
-```
+#### Phase 2: Agentic analysis (run after Phase 1)
 
-**Step 9: Architecture drift**
+After the deterministic script, perform these additional analysis steps that require judgment:
 
-Read `docs/design/dependency-rules.md`. Grep for `open` and `include` in `lib/*.ml` files under `analysis/` and `trading/`. Cross-check against rules R1–R6. Flag violations of `enforced` or `monitored` rules.
+**Step 6: Architecture drift**
 
-**Step 10: Dead code candidates**
+Read `docs/design/dependency-rules.md`. Grep for `open` and `include` in `lib/*.ml` files under `analysis/` and `trading/`. Cross-check against rules R1-R6. Flag violations of `enforced` or `monitored` rules.
 
-Grep for functions defined in `.ml` files in `analysis/weinstein/` and `trading/weinstein/` that are not exported in the corresponding `.mli` and not referenced elsewhere. Surface as info items (not warnings — requires human judgment).
-
-**Step 11: QC calibration**
+**Step 7: QC calibration**
 
 Scan `dev/reviews/*.md` for NEEDS_REWORK findings that were subsequently re-reviewed as APPROVED on the same commit. Flag checklist items with apparent false positives as candidates for review.
 
-**Step 12: Harness scaffolding review**
+**Step 8: Harness scaffolding review**
 
 Read `dev/status/harness.md` T1 Completed section. For each completed item, assess whether the verification step is still being exercised (e.g., the linter still runs, the compliance check still fires on violations). Flag any harness component whose underlying assumption may have been superseded.
+
+**Step 9: Append agentic findings**
+
+Append any findings from Steps 6-8 to the `dev/health/YYYY-MM-DD-deep.md` report already generated by the deterministic script. Use the same format (Critical / Warnings / Info) and update the Summary counts.
 
 Write findings to: `dev/health/<YYYY-MM-DD>-deep.md`
 
@@ -144,7 +144,7 @@ Write findings to: `dev/health/<YYYY-MM-DD>-deep.md`
 
 ## Allowed Tools
 
-Read, Glob, Grep, Bash (read-only: `dune build`, `dune runtest`, `jj log`, `ls`, `cat` — no writes to source files).
+Read, Glob, Grep, Bash (read-only: `dune build`, `dune runtest`, `jj log`, `ls`, `cat` -- no writes to source files).
 Do not use Write, Edit, or the Agent tool.
 Do not modify any source file, agent definition, status file, or design doc.
 Your only write target is `dev/health/<YYYY-MM-DD>-[fast|deep].md`.
@@ -154,7 +154,7 @@ Your only write target is `dev/health/<YYYY-MM-DD>-[fast|deep].md`.
 ## Output format
 
 ```markdown
-# Health Report — YYYY-MM-DD — [fast | deep]
+# Health Report -- YYYY-MM-DD -- [fast | deep]
 
 ## Summary
 - Findings: N  (critical: X  warnings: Y  info: Z)
@@ -162,22 +162,23 @@ Your only write target is `dev/health/<YYYY-MM-DD>-[fast|deep].md`.
 - Action required: YES | NO
 
 ## Critical (requires immediate action before next orchestrator run)
-1. <what> — <where> — recommended action: <...>
+1. <what> -- <where> -- recommended action: <...>
 
 ## Warnings (should be addressed within 1 week)
-1. <what> — <where>
+1. <what> -- <where>
 
 ## Info (no immediate action; awareness only)
-1. <what> — <where>
+1. <what> -- <where>
 
 ## Metrics
 - Open follow-up items: N (maintenance threshold: 10)
 - Linter exceptions past review date: N
-- Functions >35 lines: N (deep scan only)
+- Dead code candidates: N (deep scan only)
+- Design doc drift items: N (deep scan only)
+- TODO/FIXME/HACK annotations: N (deep scan only)
 - Files >300 lines: N (deep scan only)
-- Follow-up items older than 2 weeks: N (deep scan only)
 ```
 
-Keep the report factual and specific. Name exact files and line numbers where possible. Do not include recommendations to restructure agent definitions or rewrite design docs — those are human decisions. Surface findings; let the human decide what to do.
+Keep the report factual and specific. Name exact files and line numbers where possible. Do not include recommendations to restructure agent definitions or rewrite design docs -- those are human decisions. Surface findings; let the human decide what to do.
 
-If all checks pass and no findings, write a brief CLEAN report with the Metrics section only. Do not omit the report — a CLEAN result is useful signal.
+If all checks pass and no findings, write a brief CLEAN report with the Metrics section only. Do not omit the report -- a CLEAN result is useful signal.
