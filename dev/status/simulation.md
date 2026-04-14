@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-04-12
+## Last updated: 2026-04-14
 
 ## Status
 MERGED
@@ -69,6 +69,22 @@ All slices merged: Slice 1 (#196), Slice 2 (#237, #240, #241, #242), Slice 3 (#2
 - **Macro.analyze cadence mismatch** — `Macro.analyze` consumes daily `ad_bars`
   but weekly `index_bars`; needs a design note + fix so the two inputs share a
   cadence. Source: `dev/daily/2026-04-11.md`.
+- **Simulation loop performance** — current 6-year / 1654-stock backtest takes
+  ~40 min and ~7 GB RAM (see `dev/status/backtest-infra.md` §Performance).
+  Bottlenecks worth profiling before attempting optimization:
+  - `Stage.classify` is O(n) per weekly step (recomputes full MA series).
+    The `classify_step` incremental pattern tracked in
+    `dev/status/screener.md` §Followup / "Stage classifier: incremental
+    `classify_step` for simulation" is the direct fix.
+  - Hashtbl iteration ordering still partially non-deterministic (see #298,
+    #274) — fixing may close reruns rather than speed up.
+  - Weinstein strategy's `_screen_universe` runs the full cascade every
+    Friday — cache per-symbol stage between weeks where possible.
+  - Per-scenario parallelism already exists via `scenario_runner
+    --parallel N` (from #316); intra-simulation parallelism would require
+    design work.
+  Not yet profiled — start with `perf` / `ocaml-landmarks` / `bolt` on a
+  single golden scenario to find the actual hot path before optimising.
 
 ## Known gaps
 
