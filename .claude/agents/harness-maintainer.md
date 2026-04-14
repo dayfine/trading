@@ -36,7 +36,18 @@ jj bookmark create harness/<short-name> -r @
 # e.g. harness/cc-linter, harness/blocking-refactors-section, harness/golden-scenarios
 ```
 
+Name the branch to match the item — e.g. `harness/t3g-status-integrity` for `T3-G`.
+The orchestrator uses this mapping in Step 2c to detect in-progress work without
+a separate registry.
+
 Push after each logical unit, same as feature work.
+
+## In-progress markers
+
+When you start work on an item, flip it from `[ ]` to `[~]` in `dev/status/harness.md`
+and push that edit early (even before any code). This tells future orchestrator
+runs "this item is taken". When the PR lands, flip to `[x]` with the usual
+completion note.
 
 ## Allowed Tools
 
