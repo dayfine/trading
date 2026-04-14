@@ -1,9 +1,14 @@
 (** Backtest runner CLI — runs the Weinstein strategy over the full universe and
     writes structured output (params, summary, trades, equity curve).
 
-    Usage: backtest_runner <start_date> [end_date]
-    - start_date: required (e.g. 2018-01-02)
-    - end_date: optional, defaults to today *)
+    Usage: backtest_runner <start_date> [end_date] [--override '<sexp>']
+
+    Overrides are partial config sexps deep-merged into the default. Example:
+    {[
+      backtest_runner 2019-01-02 2020-06-30 \
+        --override '((initial_stop_buffer 1.08)
+                     (stage_config ((ma_period 40))))'
+    ]} *)
 
 open Core
 open Trading_simulation
@@ -23,19 +28,81 @@ let warmup_days = 210
 (* Helpers                                                             *)
 (* ------------------------------------------------------------------ *)
 
+(* ------------------------------------------------------------------ *)
+(* Config overrides via sexp deep-merge                                *)
+(* ------------------------------------------------------------------ *)
+
+(** Split argv (excluding argv[0]) into positional args and override sexps. Each
+    [--override <sexp>] pair consumes two slots. *)
+let _extract_overrides argv =
+  let rec loop args positional overrides =
+    match args with
+    | [] -> (List.rev positional, List.rev overrides)
+    | "--override" :: sexp_str :: rest ->
+        loop rest positional (Sexp.of_string sexp_str :: overrides)
+    | "--override" :: [] ->
+        eprintf "Error: --override requires a sexp argument\n";
+        Stdlib.exit 1
+    | arg :: rest -> loop rest (arg :: positional) overrides
+  in
+  loop (Array.to_list argv |> List.tl_exn) [] []
+
+(** Deep-merge [overlay] into [base]. Both must be sexp records (encoded as
+    [List [List [Atom key; v]; ...]]). Fields present in [overlay] replace the
+    corresponding field in [base]; nested records are merged recursively. Atoms
+    and non-record structures are replaced wholesale. *)
+let rec _merge_sexp base overlay =
+  match (base, overlay) with
+  | Sexp.List base_fields, Sexp.List overlay_fields
+    when _is_record base_fields && _is_record overlay_fields ->
+      _merge_records base_fields overlay_fields
+  | _, _ -> overlay
+
+and _is_record fields =
+  List.for_all fields ~f:(function
+    | Sexp.List [ Sexp.Atom _; _ ] -> true
+    | _ -> false)
+
+and _merge_records base_fields overlay_fields =
+  let overlay_map =
+    List.filter_map overlay_fields ~f:(function
+      | Sexp.List [ Sexp.Atom k; v ] -> Some (k, v)
+      | _ -> None)
+    |> String.Map.of_alist_exn
+  in
+  Sexp.List
+    (List.map base_fields ~f:(function
+      | Sexp.List [ Sexp.Atom k; v ] as pair -> (
+          match Map.find overlay_map k with
+          | Some overlay_v -> Sexp.List [ Sexp.Atom k; _merge_sexp v overlay_v ]
+          | None -> pair)
+      | other -> other))
+
+let _apply_overrides (config : Weinstein_strategy.config) overrides =
+  let base = Weinstein_strategy.sexp_of_config config in
+  let merged = List.fold overrides ~init:base ~f:_merge_sexp in
+  Weinstein_strategy.config_of_sexp merged
+
+(* ------------------------------------------------------------------ *)
+(* CLI parsing                                                         *)
+(* ------------------------------------------------------------------ *)
+
 let _parse_args () =
   let argv = Sys.get_argv () in
-  if Array.length argv < 2 then (
-    eprintf "Usage: backtest_runner <start_date> [end_date]\n";
-    eprintf "  start_date: required (e.g. 2018-01-02)\n";
-    eprintf "  end_date:   optional (defaults to today)\n";
-    Stdlib.exit 1);
-  let start_date = Date.of_string argv.(1) in
+  let positional, overrides = _extract_overrides argv in
+  (match positional with
+  | [] ->
+      eprintf
+        "Usage: backtest_runner <start_date> [end_date] [--override k=v ...]\n";
+      Stdlib.exit 1
+  | _ -> ());
+  let start_date = Date.of_string (List.hd_exn positional) in
   let end_date =
-    if Array.length argv > 2 then Date.of_string argv.(2)
-    else Date.today ~zone:Time_float.Zone.utc
+    match List.nth positional 1 with
+    | Some s -> Date.of_string s
+    | None -> Date.today ~zone:Time_float.Zone.utc
   in
-  (start_date, end_date)
+  (start_date, end_date, overrides)
 
 let _code_version () =
   try
@@ -96,20 +163,24 @@ let _commission_sexp () =
       _sexp_of_pair "minimum" (_sexp_of_float commission.minimum);
     ]
 
-let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir =
-  let sexp =
-    Sexp.List
-      [
-        _sexp_of_pair "code_version" (_sexp_of_string (_code_version ()));
-        _sexp_of_pair "start_date" (_sexp_of_string (Date.to_string start_date));
-        _sexp_of_pair "end_date" (_sexp_of_string (Date.to_string end_date));
-        _sexp_of_pair "initial_cash" (_sexp_of_float initial_cash);
-        _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
-        _sexp_of_pair "data_dir" (_sexp_of_string data_dir);
-        _sexp_of_pair "commission" (_commission_sexp ());
-      ]
+let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir
+    ~(overrides : Sexp.t list) =
+  let base =
+    [
+      _sexp_of_pair "code_version" (_sexp_of_string (_code_version ()));
+      _sexp_of_pair "start_date" (_sexp_of_string (Date.to_string start_date));
+      _sexp_of_pair "end_date" (_sexp_of_string (Date.to_string end_date));
+      _sexp_of_pair "initial_cash" (_sexp_of_float initial_cash);
+      _sexp_of_pair "universe_size" (_sexp_of_int universe_size);
+      _sexp_of_pair "data_dir" (_sexp_of_string data_dir);
+      _sexp_of_pair "commission" (_commission_sexp ());
+    ]
   in
-  Sexp.save_hum (output_dir ^ "/params.sexp") sexp
+  let with_overrides =
+    if List.is_empty overrides then base
+    else base @ [ _sexp_of_pair "overrides" (Sexp.List overrides) ]
+  in
+  Sexp.save_hum (output_dir ^ "/params.sexp") (Sexp.List with_overrides)
 
 let _build_summary_sexp
     ~(metrics : Trading_simulation_types.Metric_types.metric_set) ~final_value
@@ -160,7 +231,7 @@ let _write_equity_curve ~output_dir
 (* ------------------------------------------------------------------ *)
 
 let () =
-  let start_date, end_date = _parse_args () in
+  let start_date, end_date, overrides = _parse_args () in
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
 
@@ -178,10 +249,12 @@ let () =
   eprintf "Building strategy...\n%!";
   let base_config = Weinstein_strategy.default_config ~universe ~index_symbol in
   let config =
-    {
-      base_config with
-      sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs;
-    }
+    _apply_overrides
+      {
+        base_config with
+        sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs;
+      }
+      overrides
   in
   let strategy = Weinstein_strategy.make ~ad_bars ~ticker_sectors config in
 
@@ -249,7 +322,8 @@ let () =
       ~end_date ~universe_size ~n_steps:(List.length steps)
       ~n_round_trips:(List.length round_trips)
   in
-  _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir;
+  _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir
+    ~overrides;
   _write_summary ~output_dir ~summary_sexp;
   _write_trades ~output_dir ~round_trips;
   _write_equity_curve ~output_dir ~steps;
