@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-13
+## Last updated: 2026-04-14
 
 ## Status
 IN_PROGRESS
@@ -95,6 +95,37 @@ is informed by actual needs.
   shape.
 - **Token/cost tracking** (T3-E from harness.md) — unrelated to this track
   but listed here historically.
+
+## Potential experiments (cross-functional — need feature work before runnable)
+
+These have trading-behaviour impact but require upstream feature work before
+they can be framed as a scenario variant. Owner-wise they straddle feature
+tracks; tracked here so the planner sees the experiment end-state.
+
+1. **Wider sector coverage** — filling in sector/industry for more of the
+   universe (see `dev/status/data-layer.md` §Sector coverage expansion).
+   Changes which symbols pass the `Sector` screener filter. **Hypothesis**:
+   broader coverage → more qualifying Stage-2 candidates → different
+   portfolio composition and possibly different win rate. Feature work
+   needed: scrape + cache sector/industry (e.g. from Finviz).
+
+2. **Universe composition cleanup** — drop mutual funds + low-volume ETFs
+   (see `dev/status/data-layer.md` §Universe composition cleanup).
+   **Hypothesis**: removing instruments that never pass the volume filter
+   anyway should be a no-op on trade outcomes but speed up the simulation.
+   Good sanity check that the filter is doing its job. Feature work
+   needed: `universe_filter.ml`.
+
+3. **Segmentation-based stage classifier** — piecewise linear regression
+   on the MA series (already tracked in `dev/status/screener.md`
+   §Followup). **Hypothesis**: fewer false stage-direction flips from
+   short-term noise → steadier Stage 2 identification → fewer whipsaw
+   exits. Feature work needed: swap `_compute_ma_slope` for
+   `Segmentation.classify`. High likelihood of trading-behaviour
+   improvement — ranks alongside stop-buffer tuning.
+
+4. **Simulation performance** — not a trading-behaviour experiment but
+   unblocks cheaper sweeps. See `dev/status/simulation.md` §Follow-up.
 
 ## Backtest Analysis TODOs (from dev/backtest/analysis.md)
 
