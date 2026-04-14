@@ -1,8 +1,21 @@
-# Build and publish the CI image used by .github/workflows/ci.yml.
+# Build and publish two images from the multi-stage .devcontainer/Dockerfile:
 #
-# The image bakes in all system deps (ta-lib, openblas, plplot, …) and all
-# opam deps, so PR jobs can skip the multi-minute setup and run just
-# `dune build && dune runtest` inside a prebuilt container.
+#   ghcr.io/dayfine/trading-ci:latest          — used by ci.yml on every PR.
+#                                                  Lean: system + opam deps
+#                                                  + ocamlformat only.
+#   ghcr.io/dayfine/trading-devcontainer:latest — used by the planned
+#                                                  orchestrator-automation
+#                                                  workflow (see
+#                                                  dev/status/orchestrator-automation.md).
+#                                                  Fat: ci + ocaml-lsp, odoc,
+#                                                  utop, jj, jst, vim, warm
+#                                                  _build. Local devcontainer
+#                                                  builds still work too, but
+#                                                  typically build locally
+#                                                  from Dockerfile.
+#
+# devcontainer layers are incremental on top of ci in the build cache
+# (FROM ci AS devcontainer), so the second push is cheap.
 #
 # Rebuilt when:
 #   * .devcontainer/Dockerfile changes (new system / opam dep)
@@ -46,12 +59,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push
+      - name: Build and push CI image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: .devcontainer/Dockerfile
+          target: ci
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/trading-ci:${{ github.event.inputs.tag || 'latest' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push devcontainer image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          target: devcontainer
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/trading-devcontainer:${{ github.event.inputs.tag || 'latest' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
