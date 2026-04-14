@@ -49,6 +49,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Cache _build/ between runs. dune is incremental: when the source +
+      # dune files + opam dep set haven't changed, restoring _build turns
+      # `dune build` into a near-instant no-op (was ~40s cold).
+      #
+      # Key strategy: hash everything dune sees as input. On a hit we get
+      # the prior build artefacts; on a miss (any source/dep file changed)
+      # we fall back to restore-keys for a partial cache, then dune does
+      # incremental work from there.
+      - name: Cache _build
+        uses: actions/cache@v4
+        with:
+          path: trading/_build
+          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          restore-keys: |
+            dune-${{ runner.os }}-
+
       - name: dune build
         run: |
           eval $(opam env)
