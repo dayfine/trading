@@ -81,8 +81,10 @@ Read all of the following before doing anything else:
 - `dev/decisions.md` — human guidance from last session
 - `dev/status/portfolio-stops.md` — order_gen track (feat-weinstein)
 - `dev/status/simulation.md` — Slice 2 track (feat-weinstein)
+- `dev/status/backtest-infra.md` — experiments + strategy-tuning track (feat-backtest)
 - `dev/notes/data-gaps.md` — known data gaps (ADL, sectors, global indices)
 - `dev/status/harness.md` — harness backlog
+- `dev/status/orchestrator-automation.md` — your own automation roadmap; read for context, not for dispatch
 - Any `dev/reviews/*.md` that exist
 
 Note: `dev/status/data-layer.md` and `dev/status/screener.md` are MERGED — skip unless reading for context.
@@ -180,12 +182,13 @@ daily summary.
 
 ### 2e: Feature dependency rules
 
-| Feature | Can run when |
-|---------|--------------|
-| weinstein (order_gen) | Always — no remaining blockers |
-| weinstein (Slice 2) | Always — no remaining blockers |
+| Feature | Agent | Can run when |
+|---------|-------|--------------|
+| weinstein (order_gen) | feat-weinstein | Always — no remaining blockers |
+| weinstein (Slice 2) | feat-weinstein | Always — no remaining blockers |
+| backtest-infra (experiments + tuning) | feat-backtest | Always — independent of feat-weinstein |
 
-Both tracks are dispatched via the `feat-weinstein` agent. Run order_gen first (smaller, self-contained), then Slice 2.
+Run order: order_gen first (smaller, self-contained), then Slice 2, then backtest-infra. The backtest-infra track is independent of feat-weinstein's outputs and may run in parallel.
 
 Skip a track if its status file shows MERGED with no Blocking Refactors or Follow-up items, or APPROVED (awaiting human merge decision).
 
@@ -303,6 +306,7 @@ Return a concise summary: what you completed, what's next, any blockers or quest
 Fill in the feature-specific constraint:
 - **weinstein (order_gen)**: "Do NOT modify existing Portfolio, Orders, or Position modules. order_gen is a pure formatter: input is Position.transition list, output is broker order suggestions, no sizing logic. See dev/decisions.md for the full spec — two prior attempts were closed for violating it."
 - **weinstein (Slice 2)**: "The Weinstein strategy must implement the existing STRATEGY module type. The Slice 2 design plan is in dev/status/simulation.md ## Next Steps — follow it exactly. The key design decisions (bar accumulation in closure, ?portfolio_value optional param) are documented there."
+- **backtest-infra**: "Pick the highest-leverage open item from dev/status/backtest-infra.md per the priority order in feat-backtest.md (Immediate first, then Medium-term, then Potential experiments). The flagship Immediate item is the stop-buffer tuning experiment — do that first if still open. Do NOT modify weinstein_strategy.ml or core stop-machine code; build alongside or propose the change in your status file."
 
 ### Refactor Mode prompt (use instead of above when dispatching a refactor work item)
 

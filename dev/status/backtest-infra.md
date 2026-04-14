@@ -6,9 +6,11 @@
 IN_PROGRESS
 
 ## Ownership
-Human-driven. **Not** assigned to a `feat-*` agent — the existing `feat-weinstein`
-agent covers order_gen + Simulation Slice 2 only. Any future agent delegation
-for this track would need a new agent definition.
+`feat-backtest` agent — see `.claude/agents/feat-backtest.md`. Owns
+experiments + strategy-tuning features (stop-buffer tuning, drawdown
+circuit breaker, per-trade stop logging, segmentation-based stage
+classifier). Distinct from `feat-weinstein`, which owns the base
+strategy code (currently complete).
 
 ## Landed (merged to main)
 
