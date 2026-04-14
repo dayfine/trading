@@ -9,7 +9,9 @@
 
 set -e
 
-ANALYSIS_DIR="$(dirname "$0")/../../analysis"
+. "$(dirname "$0")/_check_lib.sh"
+
+ANALYSIS_DIR="$(trading_dir)/analysis"
 EXCEPTIONS_CONF="$(dirname "$0")/linter_exceptions.conf"
 
 # Build allowed-dir pattern from exceptions conf.

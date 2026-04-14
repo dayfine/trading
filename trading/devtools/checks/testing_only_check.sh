@@ -16,7 +16,9 @@
 
 set -e
 
-ROOT="$(dirname "$0")/../.."
+. "$(dirname "$0")/_check_lib.sh"
+
+ROOT="$(trading_dir)"
 TMPFILE=$(mktemp /tmp/testing_only_libs.XXXXXX)
 trap 'rm -f "$TMPFILE"' EXIT
 
