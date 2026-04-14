@@ -1,9 +1,14 @@
 (** Backtest runner CLI — runs the Weinstein strategy over the full universe and
     writes structured output (params, summary, trades, equity curve).
 
-    Usage: backtest_runner <start_date> [end_date]
-    - start_date: required (e.g. 2018-01-02)
-    - end_date: optional, defaults to today *)
+    Usage: backtest_runner <start_date> [end_date] [--override '<sexp>']
+
+    Overrides are partial config sexps deep-merged into the default. Example:
+    {[
+      backtest_runner 2019-01-02 2020-06-30 \
+        --override '((initial_stop_buffer 1.08)
+                     (stage_config ((ma_period 40))))'
+    ]} *)
 
 open Core
 open Trading_simulation
@@ -24,77 +29,58 @@ let warmup_days = 210
 (* ------------------------------------------------------------------ *)
 
 (* ------------------------------------------------------------------ *)
-(* Config overrides                                                    *)
+(* Config overrides via sexp deep-merge                                *)
 (* ------------------------------------------------------------------ *)
 
-let _parse_override_pair kv =
-  match String.lsplit2 kv ~on:'=' with
-  | Some (k, v) -> (k, v)
-  | None ->
-      eprintf "Error: --override requires key=value, got: %s\n" kv;
-      Stdlib.exit 1
-
+(** Split argv (excluding argv[0]) into positional args and override sexps. Each
+    [--override <sexp>] pair consumes two slots. *)
 let _extract_overrides argv =
-  let n = Array.length argv in
-  let overrides = ref [] in
-  let positional = ref [] in
-  let i = ref 1 in
-  while !i < n do
-    if String.equal argv.(!i) "--override" && !i + 1 < n then (
-      overrides := _parse_override_pair argv.(!i + 1) :: !overrides;
-      i := !i + 2)
-    else (
-      positional := argv.(!i) :: !positional;
-      incr i)
-  done;
-  (List.rev !positional, List.rev !overrides)
+  let rec loop args positional overrides =
+    match args with
+    | [] -> (List.rev positional, List.rev overrides)
+    | "--override" :: sexp_str :: rest ->
+        loop rest positional (Sexp.of_string sexp_str :: overrides)
+    | "--override" :: [] ->
+        eprintf "Error: --override requires a sexp argument\n";
+        Stdlib.exit 1
+    | arg :: rest -> loop rest (arg :: positional) overrides
+  in
+  loop (Array.to_list argv |> List.tl_exn) [] []
 
-(* ------------------------------------------------------------------ *)
-(* Generic sexp-based config override                                  *)
-(* ------------------------------------------------------------------ *)
+(** Deep-merge [overlay] into [base]. Both must be sexp records (encoded as
+    [List [List [Atom key; v]; ...]]). Fields present in [overlay] replace the
+    corresponding field in [base]; nested records are merged recursively. Atoms
+    and non-record structures are replaced wholesale. *)
+let rec _merge_sexp base overlay =
+  match (base, overlay) with
+  | Sexp.List base_fields, Sexp.List overlay_fields
+    when _is_record base_fields && _is_record overlay_fields ->
+      _merge_records base_fields overlay_fields
+  | _, _ -> overlay
 
-(** Replace the [key]-valued field in a sexp record with [new_value]. Records
-    are encoded by [@@deriving sexp] as [List [ List [Atom "key"; v]; ... ]]. If
-    the key is not found the sexp is returned unchanged. *)
-let _replace_field sexp key new_value =
-  match sexp with
-  | Sexp.List fields ->
-      Sexp.List
-        (List.map fields ~f:(function
-          | Sexp.List [ Sexp.Atom k; _ ] when String.equal k key ->
-              Sexp.List [ Sexp.Atom k; new_value ]
-          | other -> other))
-  | other -> other
+and _is_record fields =
+  List.for_all fields ~f:(function
+    | Sexp.List [ Sexp.Atom _; _ ] -> true
+    | _ -> false)
 
-let _find_field sexp key =
-  match sexp with
-  | Sexp.List fields ->
-      List.find_map fields ~f:(function
-        | Sexp.List [ Sexp.Atom k; v ] when String.equal k key -> Some v
-        | _ -> None)
-  | _ -> None
-
-(** Navigate a sexp tree by a dotted key path and replace the leaf value. *)
-let rec _merge_at_path sexp keys value =
-  match keys with
-  | [] -> Sexp.Atom value
-  | [ key ] -> _replace_field sexp key (Sexp.Atom value)
-  | key :: rest -> (
-      match _find_field sexp key with
-      | None ->
-          eprintf "Warning: override key path not found: %s\n" key;
-          sexp
-      | Some child ->
-          let updated = _merge_at_path child rest value in
-          _replace_field sexp key updated)
+and _merge_records base_fields overlay_fields =
+  let overlay_map =
+    List.filter_map overlay_fields ~f:(function
+      | Sexp.List [ Sexp.Atom k; v ] -> Some (k, v)
+      | _ -> None)
+    |> String.Map.of_alist_exn
+  in
+  Sexp.List
+    (List.map base_fields ~f:(function
+      | Sexp.List [ Sexp.Atom k; v ] as pair -> (
+          match Map.find overlay_map k with
+          | Some overlay_v -> Sexp.List [ Sexp.Atom k; _merge_sexp v overlay_v ]
+          | None -> pair)
+      | other -> other))
 
 let _apply_overrides (config : Weinstein_strategy.config) overrides =
-  let sexp = Weinstein_strategy.sexp_of_config config in
-  let merged =
-    List.fold overrides ~init:sexp ~f:(fun sexp (key, value) ->
-        let keys = String.split key ~on:'.' in
-        _merge_at_path sexp keys value)
-  in
+  let base = Weinstein_strategy.sexp_of_config config in
+  let merged = List.fold overrides ~init:base ~f:_merge_sexp in
   Weinstein_strategy.config_of_sexp merged
 
 (* ------------------------------------------------------------------ *)
@@ -177,13 +163,8 @@ let _commission_sexp () =
       _sexp_of_pair "minimum" (_sexp_of_float commission.minimum);
     ]
 
-let _overrides_sexp overrides =
-  Sexp.List
-    (List.map overrides ~f:(fun (k, v) ->
-         Sexp.List [ Sexp.Atom k; Sexp.Atom v ]))
-
 let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir
-    ~overrides =
+    ~(overrides : Sexp.t list) =
   let base =
     [
       _sexp_of_pair "code_version" (_sexp_of_string (_code_version ()));
@@ -197,7 +178,7 @@ let _write_params ~output_dir ~start_date ~end_date ~universe_size ~data_dir
   in
   let with_overrides =
     if List.is_empty overrides then base
-    else base @ [ _sexp_of_pair "overrides" (_overrides_sexp overrides) ]
+    else base @ [ _sexp_of_pair "overrides" (Sexp.List overrides) ]
   in
   Sexp.save_hum (output_dir ^ "/params.sexp") (Sexp.List with_overrides)
 
