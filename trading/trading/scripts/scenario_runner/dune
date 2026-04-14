@@ -1,0 +1,12 @@
+(executable
+ (name scenario_runner)
+ (public_name scenario_runner)
+ (package weinstein_trading)
+ (libraries
+  core
+  core_unix
+  fpath
+  weinstein.data_source
+  trading.simulation
+  trading.simulation.types
+  weinstein_trading.backtest_runner_lib))

@@ -1,5 +1,6 @@
-(executable
- (name backtest_runner)
+(library
+ (name backtest_runner_lib)
+ (public_name weinstein_trading.backtest_runner_lib)
  (libraries
   core
   core_unix

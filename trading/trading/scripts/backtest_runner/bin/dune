@@ -1,0 +1,10 @@
+(executable
+ (name backtest_runner)
+ (public_name backtest_runner)
+ (package weinstein_trading)
+ (libraries
+  core
+  core_unix
+  fpath
+  weinstein.data_source
+  weinstein_trading.backtest_runner_lib))
