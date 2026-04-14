@@ -112,6 +112,29 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   environment (see `dev/status/orchestrator-automation.md`), this part
   needs to land together with the automation work. Source:
   `dev/daily/2026-04-14.md` (refreshed end-of-day).
+- **Deep scan heuristic gaps** — `trading/devtools/checks/deep_scan.sh`
+  (T3-A, see #331) is missing several useful checks. Today's manual
+  audit found four real issues the script didn't surface:
+  1. **Drift coverage too narrow** — only checks `analysis/weinstein/`,
+     `trading/weinstein/`, `analysis/weinstein/data_source/` against
+     specific eng-design docs. New subsystems like
+     `trading/trading/backtest/` (added today via #315/#316) are
+     invisible. Either generalise the check or add per-subsystem
+     coverage.
+  2. **Status file template enforcement** — three status files
+     (`portfolio-stops.md`, `screener.md`, `simulation.md`) had stale
+     `## Recent Commits` sections in violation of the template's
+     "omit" rule. Stripped in this PR; deep scan should grep for the
+     forbidden heading and warn.
+  3. **Linter exception expiry** — `linter_exceptions.conf` entries
+     with `review_at: <milestone>` (e.g. M5) are never re-surfaced
+     when the milestone lands. Add a check that compares current
+     milestone in `weinstein-trading-system-v2.md` against the
+     `review_at:` values.
+  4. **Stale local jj bookmarks** — bookmarks left around after PRs
+     merge accumulate. Surface them with
+     `jj bookmark list 'glob:*'` filtered against origin.
+  Source: `dev/daily/2026-04-14.md` end-of-day audit.
 
 ---
 
