@@ -96,6 +96,17 @@
  (action
   (run sh %{dep:status_file_integrity.sh})))
 
+; Orchestrator plan-mode contract: verify lead-orchestrator.md has the
+; required Plan Mode section + --plan trigger + output path docs. Structural
+; check only — we do not invoke `claude -p` from dune runtest (credentials,
+; network, flakiness).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:orchestrator_plan_check.sh})))
+
 ; Cyclomatic complexity: CC > 10 = warning (not failure); exits 0 always.
 ; To generate the per-function JSON for trend analysis, run:
 ;   cc_linter <trading-root> <path-to-dev/metrics/cc-YYYY-MM-DD.json>
