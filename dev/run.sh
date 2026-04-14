@@ -1,52 +1,80 @@
 #!/usr/bin/env bash
-# Daily development run for the Weinstein Trading System.
-# Runs the lead orchestrator non-interactively.
-# Usage: ./dev/run.sh
-#        or via cron: 0 7 * * * /home/user/trading/dev/run.sh
+# Daily lead-orchestrator run.
+#
+# Usage:
+#   ./dev/run.sh             — full run (dispatches subagents)
+#   ./dev/run.sh --plan      — dry run (read state + print plan, no dispatch;
+#                              see lead-orchestrator.md `## Plan Mode`)
+#   via cron: 0 7 * * * /home/user/trading/dev/run.sh
+#
+# The script keeps you informed during long quiet stretches:
+#   - intermediate tool calls + subagent dispatches stream live
+#   - a heartbeat prints elapsed time every 30s
+# Raw stream-json goes to dev/logs/<date>.jsonl for forensics; the
+# human-readable view also lands in dev/logs/<date>.log.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$REPO_ROOT/dev/lib/preflight.sh"
+. "$REPO_ROOT/dev/lib/heartbeat.sh"
 
-# Pre-flight: fast-fail if the invocation environment is broken.
-# These checks catch common misconfigurations (missing CLI, relocated agent
-# file, silently-drifted Allowed Tools section) at the shell level, before
-# we burn tokens spinning up the orchestrator only for it to bail out.
-_ORCH_AGENT="$REPO_ROOT/.claude/agents/lead-orchestrator.md"
-command -v claude >/dev/null 2>&1 \
-  || { echo "FAIL: 'claude' binary not on PATH" >&2; exit 1; }
-[ -f "$_ORCH_AGENT" ] \
-  || { echo "FAIL: lead-orchestrator agent definition missing at $_ORCH_AGENT" >&2; exit 1; }
-# Soft grep: the Allowed Tools section must mention Agent. Plain-text match
-# is sufficient — catches the drift case where someone edits the file and
-# drops Agent from the tool list.
-grep -q '^## Allowed Tools' "$_ORCH_AGENT" \
-  || { echo "FAIL: lead-orchestrator missing '## Allowed Tools' section" >&2; exit 1; }
-awk '/^## Allowed Tools/{flag=1; next} /^## /{flag=0} flag' "$_ORCH_AGENT" | grep -q 'Agent' \
-  || { echo "FAIL: lead-orchestrator '## Allowed Tools' section does not list Agent" >&2; exit 1; }
-
-LOG_DIR="$REPO_ROOT/dev/logs"
-mkdir -p "$LOG_DIR"
+PLAN_FLAG=""
+for arg in "$@"; do
+  case "$arg" in
+    --plan) PLAN_FLAG=" --plan" ;;
+    *) echo "Usage: $0 [--plan]" >&2; exit 1 ;;
+  esac
+done
 
 DATE="$(date +%Y-%m-%d)"
+LOG_DIR="$REPO_ROOT/dev/logs"
+mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/$DATE.log"
+JSONL_FILE="$LOG_DIR/$DATE.jsonl"
+SUMMARY_FILE="$REPO_ROOT/dev/daily/$DATE${PLAN_FLAG:+-plan}.md"
+JQ_FILTER="$REPO_ROOT/dev/lib/format-event.jq"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting daily run" | tee -a "$LOG_FILE"
+PROMPT="Run the daily development session for the Weinstein Trading System.
+Today's date is $DATE.${PLAN_FLAG}
+
+Follow your instructions in .claude/agents/lead-orchestrator.md exactly."
+
+PIPE_FILTER='cat'
+command -v jq >/dev/null && PIPE_FILTER="jq -r --unbuffered -f $JQ_FILTER"
+
+echo "[$(date '+%H:%M:%S')] Starting daily run${PLAN_FLAG:+ (plan mode)}" \
+  | tee -a "$LOG_FILE"
+echo "[$(date '+%H:%M:%S')] Log: $LOG_FILE  Stream: $JSONL_FILE" \
+  | tee -a "$LOG_FILE"
 
 cd "$REPO_ROOT"
+heartbeat_start "$LOG_FILE"
 
+set +e
 claude -p \
+  --output-format stream-json \
+  --verbose \
   --allowedTools "Agent,Bash,Read,Write,Edit,Glob,Grep" \
   --agent lead-orchestrator \
-  "Run the daily development session for the Weinstein Trading System.
-Today's date is $(date +%Y-%m-%d).
+  "$PROMPT" \
+  2> >(tee -a "$LOG_FILE" >&2) \
+| tee -a "$JSONL_FILE" \
+| eval "$PIPE_FILTER" \
+| tee -a "$LOG_FILE"
+RC=${PIPESTATUS[0]}
+set -e
 
-Follow your instructions exactly:
-1. Read dev/decisions.md and all dev/status/*.md
-2. Spawn eligible feature agents as parallel subagents (isolation: worktree)
-3. Spawn QC agents for any READY_FOR_REVIEW features
-4. Write dev/daily/$(date +%Y-%m-%d).md with the full status summary" \
-  2>&1 | tee -a "$LOG_FILE"
+heartbeat_stop
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Daily run complete. Summary: $REPO_ROOT/dev/daily/$DATE.md" \
+ELAPSED=$SECONDS
+echo "[$(date '+%H:%M:%S')] Daily run complete in ${ELAPSED}s (rc=$RC)" \
   | tee -a "$LOG_FILE"
+if [ -f "$SUMMARY_FILE" ]; then
+  echo "[$(date '+%H:%M:%S')] Summary: $SUMMARY_FILE" | tee -a "$LOG_FILE"
+else
+  echo "[$(date '+%H:%M:%S')] WARN: no summary written at $SUMMARY_FILE" \
+    | tee -a "$LOG_FILE"
+fi
+
+exit $RC
