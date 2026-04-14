@@ -63,6 +63,7 @@ type index_config = {
           ISF.LSE) triple. [primary] is intentionally excluded from this list —
           it is already passed via [~index_bars]. *)
 }
+[@@deriving sexp]
 (** Indices consumed by the macro analyser. The primary index is the US
     benchmark; globals are additional markets used only for the global consensus
     indicator. *)
@@ -92,6 +93,7 @@ type config = {
       (** Number of weekly bars to pass to stage/macro analysers (default: 52).
           Must be >= 30 (one MA period). *)
 }
+[@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
     backtesting. *)
 

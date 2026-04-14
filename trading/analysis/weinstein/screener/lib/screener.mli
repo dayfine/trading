@@ -13,13 +13,14 @@
     All functions are pure. *)
 
 (** Sector health rating used by the screener gate. *)
-type sector_rating = Strong | Neutral | Weak [@@deriving show, eq]
+type sector_rating = Strong | Neutral | Weak [@@deriving show, eq, sexp]
 
 type sector_context = {
   sector_name : string;
   rating : sector_rating;
   stage : Weinstein_types.stage;
 }
+[@@deriving sexp]
 (** Minimal sector context the screener needs per stock. *)
 
 type scoring_weights = {
@@ -41,12 +42,14 @@ type scoring_weights = {
   w_late_stage2_penalty : int;
       (** Negative weight for late Stage2 flag. Default: -15. *)
 }
+[@@deriving sexp]
 (** Scoring weights for each positive signal. All are configurable. *)
 
 val default_scoring_weights : scoring_weights
 (** [default_scoring_weights] provides the reference weights. *)
 
 type grade_thresholds = { a_plus : int; a : int; b : int; c : int; d : int }
+[@@deriving sexp]
 (** Score cutoffs for each grade. All are configurable. *)
 
 val default_grade_thresholds : grade_thresholds
@@ -67,6 +70,7 @@ type candidate_params = {
       (** Fraction above MA used as breakout price when none is detected.
           Default: 0.05. *)
 }
+[@@deriving sexp]
 (** Per-candidate price computation parameters. All configurable. *)
 
 val default_candidate_params : candidate_params
@@ -86,6 +90,7 @@ type config = {
   max_short_candidates : int;
       (** Maximum number of short candidates returned. Default: 10. *)
 }
+[@@deriving sexp]
 (** Main screener configuration. *)
 
 val default_config : config

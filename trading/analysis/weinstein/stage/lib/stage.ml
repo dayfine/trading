@@ -6,7 +6,7 @@ open Weinstein_types
 (* Config and defaults                                                  *)
 (* ------------------------------------------------------------------ *)
 
-type ma_type = Sma | Wma | Ema [@@deriving show, eq]
+type ma_type = Sma | Wma | Ema [@@deriving show, eq, sexp]
 
 type config = {
   ma_period : int;
@@ -16,6 +16,7 @@ type config = {
   confirm_weeks : int;
   late_stage2_decel : float;
 }
+[@@deriving sexp]
 
 let default_config =
   {

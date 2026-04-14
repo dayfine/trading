@@ -14,6 +14,7 @@ module Macro_inputs = Macro_inputs
     callers to use in {!config}. *)
 
 type index_config = { primary : string; global : (string * string) list }
+[@@deriving sexp]
 
 type config = {
   universe : string list;
@@ -27,6 +28,7 @@ type config = {
   initial_stop_buffer : float;
   lookback_bars : int;
 }
+[@@deriving sexp]
 
 let default_config ~universe ~index_symbol =
   {

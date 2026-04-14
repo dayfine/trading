@@ -7,6 +7,7 @@ type indicator_reading = {
   weight : float;
   detail : string;
 }
+[@@deriving sexp]
 
 type indicator_weights = {
   w_index_stage : float;
@@ -15,6 +16,7 @@ type indicator_weights = {
   w_nh_nl : float;
   w_global : float;
 }
+[@@deriving sexp]
 
 type indicator_thresholds = {
   ad_line_lookback : int;
@@ -26,6 +28,7 @@ type indicator_thresholds = {
   nh_nl_min_bars : int;
   global_consensus_threshold : float;
 }
+[@@deriving sexp]
 
 type config = {
   stage_config : Stage.config;
@@ -34,6 +37,7 @@ type config = {
   indicator_weights : indicator_weights;
   indicator_thresholds : indicator_thresholds;
 }
+[@@deriving sexp]
 
 type ad_bar = { date : Date.t; advancing : int; declining : int }
 
