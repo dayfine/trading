@@ -57,7 +57,7 @@ IN_PROGRESS
 
 ## Tier 3 — After M5 stable
 
-- [ ] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations)
+- [x] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations) — DONE: see completion note below
 - [ ] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history)
 - [ ] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
 - [x] T3-A: `health-scanner` deep scan — feat-agent template compliance check (covered by T1-I: `agent_compliance_check.sh`)
@@ -223,6 +223,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ### T3-G: Status file integrity check
 
 - [x] T3-G: Status file integrity check — `trading/devtools/checks/status_file_integrity.sh` deterministically enforces the `dev/status/*.md` schema: `## Status` with a valid value (IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED), `## Last updated: YYYY-MM-DD`, and `## Interface stable` (YES|NO) for feature files. Exempt files: `harness.md` (orchestrator backlog, different shape) and `backtest-infra.md` (human-driven, uses `## Ownership`). Wired into `dune runtest` via `trading/devtools/checks/dune`; health-scanner fast scan Step 4 now references the script. Verify: `dune runtest devtools/checks/` — prints `OK: all dev/status/*.md files have required fields.`; removing an `## Interface stable` section from any feature status file fails the test.
+
+### T3-A: Deep scan
+
+- [x] T3-A: Deep scan deterministic script — `trading/devtools/checks/deep_scan.sh`; standalone shell script (not wired into `dune runtest` — runs weekly, not on every PR). Covers 5 checks: (1) dead code detection (`.ml` files not in any dune library), (2) design doc drift (`analysis/weinstein/` and `trading/weinstein/` modules vs `eng-design-{1,2,3}` docs), (3) TODO/FIXME/HACK accumulation across `.ml`/`.mli` files, (4) size violations (files >300 lines without `@large-module`), (5) follow-up item count across `dev/status/*.md`. Writes report to `dev/health/YYYY-MM-DD-deep.md`. Health-scanner agent definition updated with Phase 1 (deterministic script) and Phase 2 (agentic steps: architecture drift, QC calibration, harness scaffolding review). Verify: `sh trading/devtools/checks/deep_scan.sh` from repo root produces `dev/health/YYYY-MM-DD-deep.md` with Metrics section.
 
 ### T3-B and T3-F
 
