@@ -51,10 +51,33 @@
 # --------------------------------------------------------------------
 
 repo_root() {
-  git rev-parse --show-toplevel 2>/dev/null || {
-    echo "FAIL: could not locate git repo root (git rev-parse failed)" >&2
-    exit 1
-  }
+  # Resolve the git repo root without relying on `git rev-parse` (which is
+  # unreliable under CI's safe.directory setup: actions/checkout writes the
+  # safe.directory entry into a TEMPORARY HOME (/__w/_temp/<uuid>/.gitconfig)
+  # that our workflow's HOME=/home/opam never sees, so git refuses to operate
+  # and rev-parse returns nothing).
+  #
+  # Strategy: walk up from the script's own directory looking for a marker
+  # that's only at the repo root (.git or .claude). This works the same in
+  # the dune sandbox (script copied under _build/default/...) and from a
+  # direct shell invocation — the walk crosses the sandbox boundary and
+  # reaches the real repo root either way.
+  #
+  # Optional env var override REPO_ROOT lets callers pin it explicitly.
+  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
+    echo "$REPO_ROOT"
+    return 0
+  fi
+  dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    if [ -d "$dir/.git" ] || [ -d "$dir/.claude" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  echo "FAIL: could not locate repo root by walking up from $(dirname "$0")" >&2
+  exit 1
 }
 
 trading_dir() {
