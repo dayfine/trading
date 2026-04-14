@@ -293,7 +293,7 @@ let test_convert_cadence_monthly_todo _ =
     Time_series.convert_cadence prices ~cadence:Types.Cadence.Monthly
       ~as_of_date:None
   in
-  (* TODO(simulation/T2): Monthly conversion returns empty. *)
+  (* TODO(simulation/monthly-cadence): Monthly conversion returns empty. *)
   assert_that result (elements_are [])
 
 let suite =

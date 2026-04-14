@@ -10,9 +10,9 @@
     Other transitions (fills, completions, risk updates) don't generate orders
     as they represent responses to already-executed trades or state updates.
 
-    TODO(simulation/T1): Orders should be StopLimit orders instead of Market
-    orders. This will require passing entry_price/exit_price from transitions
-    and determining appropriate limit prices. *)
+    TODO(simulation/stoplimit-orders): Orders should be StopLimit orders instead
+    of Market orders. This will require passing entry_price/exit_price from
+    transitions and determining appropriate limit prices. *)
 
 val transitions_to_orders :
   positions:Trading_strategy.Position.t Core.String.Map.t ->
