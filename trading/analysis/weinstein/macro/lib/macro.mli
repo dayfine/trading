@@ -24,6 +24,7 @@ type indicator_reading = {
   weight : float;
   detail : string;
 }
+[@@deriving sexp]
 (** One indicator reading with its signal and weight. *)
 
 type indicator_weights = {
@@ -35,6 +36,7 @@ type indicator_weights = {
       (** Weight for New Highs - New Lows divergence. Default: 1.5. *)
   w_global : float;  (** Weight for global market consensus. Default: 1.5. *)
 }
+[@@deriving sexp]
 
 type indicator_thresholds = {
   ad_line_lookback : int;
@@ -53,6 +55,7 @@ type indicator_thresholds = {
   global_consensus_threshold : float;
       (** Fraction of markets for a global consensus signal. Default: 0.6. *)
 }
+[@@deriving sexp]
 
 type config = {
   stage_config : Stage.config;  (** Config for classifying the index stage. *)
@@ -61,6 +64,7 @@ type config = {
   indicator_weights : indicator_weights;
   indicator_thresholds : indicator_thresholds;
 }
+[@@deriving sexp]
 (** Configuration for macro analysis. *)
 
 val default_indicator_weights : indicator_weights

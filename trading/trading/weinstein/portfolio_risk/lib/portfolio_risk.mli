@@ -120,7 +120,7 @@ type config = {
   big_winner_multiplier : float;
       (** Size multiplier for high-conviction trades (default: 1.5x) *)
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 (** All risk management parameters — nothing hardcoded. *)
 
 val default_config : config

@@ -2,13 +2,14 @@
 open Core
 open Weinstein_types
 
-type sector_rating = Strong | Neutral | Weak [@@deriving show, eq]
+type sector_rating = Strong | Neutral | Weak [@@deriving show, eq, sexp]
 
 type sector_context = {
   sector_name : string;
   rating : sector_rating;
   stage : stage;
 }
+[@@deriving sexp]
 
 type scoring_weights = {
   w_stage2_breakout : int;
@@ -20,6 +21,7 @@ type scoring_weights = {
   w_sector_strong : int;
   w_late_stage2_penalty : int;
 }
+[@@deriving sexp]
 
 let default_scoring_weights =
   {
@@ -34,6 +36,7 @@ let default_scoring_weights =
   }
 
 type grade_thresholds = { a_plus : int; a : int; b : int; c : int; d : int }
+[@@deriving sexp]
 (** Score cutoffs for each grade. All are configurable. *)
 
 let default_grade_thresholds = { a_plus = 85; a = 70; b = 55; c = 40; d = 25 }
@@ -53,6 +56,7 @@ type candidate_params = {
       (** Fraction above MA used as breakout price when none is detected.
           Default: 0.05. *)
 }
+[@@deriving sexp]
 (** Per-candidate price computation parameters. All configurable. *)
 
 let default_candidate_params =
@@ -72,6 +76,7 @@ type config = {
   max_buy_candidates : int;
   max_short_candidates : int;
 }
+[@@deriving sexp]
 
 let default_config =
   {

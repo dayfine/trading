@@ -4,4 +4,4 @@
  (wrapped false)
  (libraries core types weinstein_types stock_analysis)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq)))
+  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

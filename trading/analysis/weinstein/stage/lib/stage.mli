@@ -7,7 +7,7 @@ open Types
     Weinstein's book specifies a plain 30-week SMA, but [Wma] is a common
     practical substitute; [Ema] is available for parameter-tuning experiments.
 *)
-type ma_type = Sma | Wma | Ema [@@deriving show, eq]
+type ma_type = Sma | Wma | Ema [@@deriving show, eq, sexp]
 
 (** Stage classifier for the Weinstein methodology.
 
@@ -33,6 +33,7 @@ type config = {
           reading this much below the recent peak slope triggers [late=true].
           Default: 0.5 (50% deceleration from recent peak). *)
 }
+[@@deriving sexp]
 (** Configuration for stage classification. All thresholds are configurable to
     enable parameter tuning via backtesting. *)
 

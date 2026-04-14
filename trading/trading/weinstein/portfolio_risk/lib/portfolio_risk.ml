@@ -41,7 +41,7 @@ type config = {
   max_unknown_sector_positions : int;
   big_winner_multiplier : float;
 }
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 let default_config =
   {
