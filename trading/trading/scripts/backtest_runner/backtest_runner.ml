@@ -49,57 +49,53 @@ let _extract_overrides argv =
   done;
   (List.rev !positional, List.rev !overrides)
 
-let _override_portfolio pc key value =
-  match key with
-  | "risk_per_trade_pct" ->
-      { pc with Portfolio_risk.risk_per_trade_pct = Float.of_string value }
-  | "max_positions" -> { pc with max_positions = Int.of_string value }
-  | _ ->
-      eprintf "Warning: unknown portfolio key: %s\n" key;
-      pc
+(* ------------------------------------------------------------------ *)
+(* Generic sexp-based config override                                  *)
+(* ------------------------------------------------------------------ *)
 
-let _override_stage sc key value =
-  match key with
-  | "ma_period" -> { sc with Stage.ma_period = Int.of_string value }
-  | _ ->
-      eprintf "Warning: unknown stage key: %s\n" key;
-      sc
+(** Replace the [key]-valued field in a sexp record with [new_value]. Records
+    are encoded by [@@deriving sexp] as [List [ List [Atom "key"; v]; ... ]]. If
+    the key is not found the sexp is returned unchanged. *)
+let _replace_field sexp key new_value =
+  match sexp with
+  | Sexp.List fields ->
+      Sexp.List
+        (List.map fields ~f:(function
+          | Sexp.List [ Sexp.Atom k; _ ] when String.equal k key ->
+              Sexp.List [ Sexp.Atom k; new_value ]
+          | other -> other))
+  | other -> other
 
-let _override_screening sc key value =
-  match key with
-  | "max_buy_candidates" ->
-      { sc with Screener.max_buy_candidates = Int.of_string value }
-  | _ ->
-      eprintf "Warning: unknown screening key: %s\n" key;
-      sc
+let _find_field sexp key =
+  match sexp with
+  | Sexp.List fields ->
+      List.find_map fields ~f:(function
+        | Sexp.List [ Sexp.Atom k; v ] when String.equal k key -> Some v
+        | _ -> None)
+  | _ -> None
 
-let _apply_override (config : Weinstein_strategy.config) (key, value) =
-  match String.lsplit2 key ~on:'.' with
-  | Some ("portfolio", sub) ->
-      {
-        config with
-        portfolio_config = _override_portfolio config.portfolio_config sub value;
-      }
-  | Some ("stage", sub) ->
-      {
-        config with
-        stage_config = _override_stage config.stage_config sub value;
-      }
-  | Some ("screening", sub) ->
-      {
-        config with
-        screening_config = _override_screening config.screening_config sub value;
-      }
-  | Some ("stops", "initial_stop_buffer") ->
-      { config with initial_stop_buffer = Float.of_string value }
-  | None when String.equal key "lookback_bars" ->
-      { config with lookback_bars = Int.of_string value }
-  | _ ->
-      eprintf "Warning: unknown override: %s\n" key;
-      config
+(** Navigate a sexp tree by a dotted key path and replace the leaf value. *)
+let rec _merge_at_path sexp keys value =
+  match keys with
+  | [] -> Sexp.Atom value
+  | [ key ] -> _replace_field sexp key (Sexp.Atom value)
+  | key :: rest -> (
+      match _find_field sexp key with
+      | None ->
+          eprintf "Warning: override key path not found: %s\n" key;
+          sexp
+      | Some child ->
+          let updated = _merge_at_path child rest value in
+          _replace_field sexp key updated)
 
-let _apply_overrides config overrides =
-  List.fold overrides ~init:config ~f:_apply_override
+let _apply_overrides (config : Weinstein_strategy.config) overrides =
+  let sexp = Weinstein_strategy.sexp_of_config config in
+  let merged =
+    List.fold overrides ~init:sexp ~f:(fun sexp (key, value) ->
+        let keys = String.split key ~on:'.' in
+        _merge_at_path sexp keys value)
+  in
+  Weinstein_strategy.config_of_sexp merged
 
 (* ------------------------------------------------------------------ *)
 (* CLI parsing                                                         *)
