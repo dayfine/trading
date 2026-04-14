@@ -56,21 +56,29 @@ If the linter fails, that is a critical finding (the gate should have caught it 
 
 **Step 4: Status file integrity**
 
-For each `dev/status/*.md`, verify these fields are present:
+Schema for `dev/status/*.md`:
 - `## Status` — with a valid value (IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED)
-- `## Last updated` — with a date
-- `## Interface stable` — YES or NO (required for feature status files; may be absent for harness.md)
+- `## Last updated: YYYY-MM-DD`
+- `## Interface stable` — YES or NO (required for feature status files)
+
+Exempt files (do not require `## Interface stable`):
+- `harness.md` — orchestrator's own backlog (different shape)
+- `backtest-infra.md` — human-driven infrastructure tracker (uses `## Ownership`)
+
+The deterministic check is wired into `dune runtest` as
+`trading/devtools/checks/status_file_integrity.sh` and runs alongside the other
+linters. Invoke it directly to get the report:
 
 ```bash
-# Read each status file and check fields
-cat /Users/difan/Projects/trading-1/dev/status/data-layer.md
-cat /Users/difan/Projects/trading-1/dev/status/portfolio-stops.md
-cat /Users/difan/Projects/trading-1/dev/status/screener.md
-cat /Users/difan/Projects/trading-1/dev/status/simulation.md
-cat /Users/difan/Projects/trading-1/dev/status/harness.md
+docker exec trading-1-dev bash -c \
+  'cd /workspaces/trading-1/trading && eval $(opam env) && \
+   sh devtools/checks/status_file_integrity.sh 2>&1; echo "EXIT:$?"'
 ```
 
-Flag any file missing a required field as a warning.
+If exit code is non-zero, quote the FAIL lines verbatim into the report as
+warnings. If the linter is already covered by the Step 3 `dune runtest` pass,
+a separate invocation is optional; re-run it here only when Step 3 reported a
+failure and you want to isolate which linter fired.
 
 **Step 5: Linter exceptions past review date**
 
