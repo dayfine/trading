@@ -40,21 +40,23 @@ Status file: dev/status/backtest-infra.md
 - Harness tooling (`devtools/`, agent definitions) — that's `harness-maintainer`
 - Data fetching / inventory (`fetch_universe`, `bootstrap_universe`) — that's `ops-data` if it needs fresh fetch, else feature-internal if it's a one-time script
 
-## Plan-first on your first experiment
+## Plan-first inline (when applicable)
 
-This agent has no merged work yet. Per `.claude/agents/lead-orchestrator.md`
-§Step 3.5 (triggers 1 "first deliverable from a new agent" and 4
-"experiment design"), your first experiment is plan-first: the
-orchestrator will dispatch the built-in `Plan` subagent to produce
-`dev/plans/stop-buffer-<YYYY-MM-DD>.md`, a human reviews and merges it,
-and only then will you be dispatched with the approved plan as pre-flight
-context.
+If the dispatch prompt includes a `## Plan-first` paragraph (set by
+the orchestrator per `.claude/agents/lead-orchestrator.md` §Step 3.5
+when triggers like "first deliverable" or "experiment design" fire),
+write your plan to `dev/plans/<item-slug>-<YYYY-MM-DD>.md` as your
+first commit on the branch (shape: see `dev/plans/README.md`). Then
+**implement in the same session** — plan and implementation land
+together in a single PR. There is no human-review gate between them.
 
-If the dispatch prompt says `### Approved plan` with a path, treat that
-path as the binding spec (§Approach and §Out of scope are binding; QC
-verifies). If no plan is cited in pre-flight and the item you're about to
-work on matches a Step 3.5 trigger, **stop and return an escalation**
-instead of implementing.
+If during implementation the plan turns out to be wrong, **update the
+plan file in place** (it's on the same branch) and continue — don't
+drift silently.
+
+If no `## Plan-first` paragraph is in the dispatch but the item matches
+a Step 3.5 trigger anyway, write the plan as a courtesy. Cheap, and
+keeps the experiment record honest.
 
 ## Item selection priority
 

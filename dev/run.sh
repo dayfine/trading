@@ -35,6 +35,21 @@ JSONL_FILE="$LOG_DIR/$DATE.jsonl"
 SUMMARY_FILE="$REPO_ROOT/dev/daily/$DATE${PLAN_FLAG:+-plan}.md"
 JQ_FILTER="$REPO_ROOT/dev/lib/format-event.jq"
 
+# GH_TOKEN is required so subagents (feat-*, harness-maintainer) can run
+# `jst submit` to open PRs at session end. If the user has gh credentials
+# cached, harvest the token; otherwise warn and continue (the orchestrator
+# will surface "no PR opened" in the daily summary's escalations).
+if [ -z "${GH_TOKEN:-}" ]; then
+  GH_TOKEN=$(echo -e "protocol=https\nhost=github.com" \
+    | git credential fill 2>/dev/null \
+    | grep ^password | cut -d= -f2 || true)
+  if [ -z "$GH_TOKEN" ]; then
+    echo "WARN: GH_TOKEN unset and not derivable from git credentials." >&2
+    echo "WARN: subagents will push branches but cannot open PRs via jst." >&2
+  fi
+  export GH_TOKEN
+fi
+
 PROMPT="Run the daily development session for the Weinstein Trading System.
 Today's date is $DATE.${PLAN_FLAG}
 

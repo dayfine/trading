@@ -1,6 +1,6 @@
 # Data Gaps — features blocked on missing data
 
-Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates identified)
+Last updated: 2026-04-14 (sharpened actionability per gap; scrape research moved into ops-data scope)
 
 ## A-D Breadth (ADL)
 
@@ -18,10 +18,17 @@ Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates iden
 3. **Unicorn.us.com `advdec`** — comma-delimited historical A-D data for major indexes, free, computed from public sources. **Needs validation**: freshness, licence.
 4. **Compute from Russell 3000 universe** — count advancers/decliners across the cached universe each day. Tradeoffs: universe mismatch with official NYSE (no ETFs/ADRs/preferreds/CEFs), survivorship bias from current-constituents, but should correlate well. Fallback if scraper options fail. **Cost**: need Russell 3000 bars cached first (~3000 symbols × daily bars).
 
-### What's needed
-- **Next step**: research agent to validate each candidate and propose concrete fetch/parse plan
-- New parser for non-OHLCV response format (whatever source wins)
-- Once available: wire into `Weinstein_strategy.on_market_close` (line ~288, currently hardcoded `~ad_bars:[]`)
+### What's needed (orchestrator-actionable)
+- **ops-data**: write a probe script per candidate source under
+  `dev/scripts/probes/`, fetch 30 days of sample data, write findings
+  to `dev/notes/adl-validation.md` (parse-ability, historical depth,
+  rate limits, license). No EODHD key required for any of these
+  sources. **This is dispatchable today** — no human input needed.
+- After validation: write the production parser for the winning source,
+  add a fetch script alongside `fetch_symbols.exe`.
+- Once cached: feat-weinstein wires into `Weinstein_strategy.on_market_close`
+  (line ~288, currently hardcoded `~ad_bars:[]`). NOTE: feat-weinstein's
+  current scope is closed — surface as escalation if so.
 
 ### Impact of gap
 - Macro trend detection works but misses breadth divergence signals
@@ -36,9 +43,12 @@ Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates iden
 **Blocks**: Screener sector filter, portfolio sector concentration limits  
 **Affects**: `Sector.analyze`, `Screener.screen` (receives empty `~sector_map`), `Portfolio_risk.check_sector_limits`
 
-### Three gaps
+### Three gaps (each with explicit ops-data dispatch criteria)
 
-1. **Sector ETF bars** — Need daily bars for sector index ETFs: XLK, XLF, XLE, XLV, XLI, XLP, XLY, XLU, XLB, XLRE, XLC. Not yet cached. **Blocked on `EODHD_API_KEY` not set in host environment.** Once key is available, fetch with:
+1. **Sector ETF bars** — daily bars for XLK, XLF, XLE, XLV, XLI, XLP,
+   XLY, XLU, XLB, XLRE, XLC. **Dispatchable when EODHD_API_KEY is set
+   in the host env** (`[ -n "$EODHD_API_KEY" ]`). Skip and surface as
+   escalation only if truly absent. Fetch:
    ```
    docker exec -e EODHD_API_KEY trading-1-dev bash -c \
      'cd /workspaces/trading-1/trading && eval $(opam env) && \
@@ -49,14 +59,28 @@ Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates iden
    ```
    Then rebuild inventory with `build_inventory.exe`. Once cached, feed into `Sector.analyze ~sector_bars`.
 
-2. **Instrument sector metadata** — `Instrument_info.sector` is empty for all symbols.
-   - `bootstrap_universe.exe` leaves sector/industry blank by design (offline tool)
+2. **Instrument sector metadata** — `Instrument_info.sector` is empty
+   for all symbols. **Dispatchable today** — the plan exists and
+   doesn't require new human input.
+   - `bootstrap_universe.exe` leaves sector/industry blank by design
    - `fetch_universe.exe` populates name/exchange but not sector/industry
-   - **Plan**: See [`sector-data-plan.md`](./sector-data-plan.md) — fetch SPDR sector ETF holdings from State Street (SSGA) daily. One data provider, no Python, automatic refresh cadence tied to ETF fetch. Covers ~500 S&P 500 names; long-tail goes to the "unknown sector" bucket (`max_unknown_sector_positions = 2`, merged in #250).
-   - **Deprecated**: the Wikipedia scrape approach (PRs #251/#252/#253, now closed). See the deprecation note at the top of [`fundamentals-requirements.md`](./fundamentals-requirements.md).
-   - Until populated: screener cannot group stocks by sector, portfolio risk cannot enforce sector concentration limits for named sectors (but the unknown bucket is enforced)
+   - **Plan**: see [`sector-data-plan.md`](./sector-data-plan.md) —
+     fetch SPDR sector ETF holdings from SSGA. One data provider, no
+     Python, automatic refresh cadence tied to ETF fetch. Covers ~500
+     S&P 500 names; long-tail goes to the "unknown sector" bucket
+     (`max_unknown_sector_positions = 2`, merged in #250).
+   - **ops-data action**: execute the plan. The plan IS the spec.
+   - **Deprecated**: the Wikipedia scrape approach (PRs #251/#252/#253,
+     now closed). See deprecation note in
+     [`fundamentals-requirements.md`](./fundamentals-requirements.md).
+   - Until populated: screener can't group by sector; portfolio risk
+     can't enforce sector limits for named sectors (unknown bucket
+     enforced).
 
-3. **Strategy wiring** — `Weinstein_strategy.on_market_close` creates an empty `sector_map` (line ~213). Once sector data is available, build the map from `Sector.analyze` results and pass to `Screener.screen`.
+3. **Strategy wiring** — `Weinstein_strategy.on_market_close` creates an
+   empty `sector_map` (line ~213). Feature work, not ops-data. Owner:
+   feat-weinstein. NOTE: feat-weinstein's current scope is closed —
+   surface as escalation if dispatched.
 
 ### Impact of gap
 - Screener runs without sector context — a stock in a weak sector gets the same treatment as one in a strong sector
@@ -77,8 +101,11 @@ Last updated: 2026-04-10 (FTSE decision made; ADL + fundamentals candidates iden
 - N225.INDX (Nikkei 225): cached, 1965-01-05 to 2026-04-10 — VERIFIED
 - **FTSE 100 via `ISF.LSE` (iShares Core FTSE 100 UCITS ETF)** — **DECISION: use as proxy** (2026-04-10). Physical-replication tracker, ~bps tracking error, functionally indistinguishable from the index at weekly cadence. `UKX.INDX` returned empty; `ISF.LSE` fetched successfully (6,552 bars, 2000-05-02 to 2026-04-10) — VERIFIED (2026-04-11).
 
-### What's needed
-- **feat-weinstein**: wire cached global index bars into strategy (currently passes `~global_index_bars:[]`)
+### What's needed (escalation territory)
+- **feat-weinstein**: wire cached global index bars into strategy
+  (currently passes `~global_index_bars:[]`). Feature work, not
+  ops-data. NOTE: feat-weinstein's current scope is closed — surface
+  as escalation when dispatched.
 
 ---
 

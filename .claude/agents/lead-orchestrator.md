@@ -152,15 +152,40 @@ Harness items with external dependencies (e.g., T1-N golden scenarios require re
 
 ### 2d: Data operations (ops-data)
 
-Read `dev/notes/data-gaps.md`. If any gap has an actionable next step that
-does not require a human decision (e.g., "fetch sector ETFs" once the ETF list
-is known, "wire global index bars" once cached), spawn `ops-data` as a subagent:
+Read `dev/notes/data-gaps.md`. **Don't be defensive** — most gaps have an
+actionable next step that does NOT require a human decision. Common
+patterns the orchestrator should dispatch on, not skip:
+
+- **"fetch X"** when EODHD_API_KEY is set in the host env. Test:
+  `[ -n "$EODHD_API_KEY" ] && echo OK`. Skip only if truly absent.
+- **"validate candidate sources"** for a data feed (e.g. ADL): a
+  research/scraping task. Dispatch ops-data to write a small probe,
+  fetch a few days, validate the format. ops-data's scope explicitly
+  includes writing new parsers + scrape research (see
+  `.claude/agents/ops-data.md` §"When to write code").
+- **"execute a written plan"** (e.g. `dev/notes/sector-data-plan.md`).
+  Dispatch ops-data to follow the plan — the plan IS the spec; no
+  human decision needed.
+- **"wire cached data into strategy"** — if data is cached, this is
+  feature work for the appropriate feat-agent (not ops-data). Surface
+  in §Escalations if the agent track is closed.
+
+Skip ops-data only when:
+- The gap genuinely requires human input (e.g. "decide whether to
+  upgrade to the EODHD paid tier"), OR
+- A required precondition is missing AND there's no API-free fallback.
+
+Surface skipped gaps in §Escalations with **what's needed to unblock**,
+not just "human decision required" — be specific.
+
+When dispatching:
 
 ```
 You are the data operations agent for the Weinstein Trading System.
 
 ## Task
-<describe the specific data operation: fetch, parse, inventory rebuild, etc.>
+<describe the specific data operation: fetch, parse, inventory rebuild,
+ source validation, plan execution, etc.>
 
 ## Context
 <paste the relevant section from dev/notes/data-gaps.md>
@@ -172,13 +197,12 @@ Docker container: <container-name>
 When done:
 1. Update dev/notes/data-gaps.md to reflect what was resolved or what still blocks
 2. Run build_inventory.exe if any data was fetched
-3. Return: what changed, what still blocks, any errors
+3. Open the PR via `jst submit` for any branch you pushed
+4. Return: what changed, what still blocks, any errors, and the PR URL
 ```
 
 ops-data runs **before** feature agents — resolved data gaps may unblock
-feature work in the same session. If all gaps require human decisions (API tier
-upgrade, alternative data source), skip ops-data and note the blockers in the
-daily summary.
+feature work in the same session.
 
 ### 2e: Feature dependency rules
 
@@ -214,66 +238,58 @@ Assemble these three into the `<PREFLIGHT-CONTEXT>` block injected into the feat
 
 ---
 
-## Step 3.5: Plan-first trigger (for high-risk dispatches)
+## Step 3.5: Plan-first inline (for high-risk dispatches)
 
-**Prototype** — see `dev/plans/README.md` for the convention. Apply
-before the feat-agent dispatch in Step 4 for tasks meeting any of:
+**Revised 2026-04-14**: plan-first is now an **inline** discipline,
+not a separate dispatch + human-review cycle. The previous
+plan-PR-then-defer flow added a round-trip without a clear win — the
+human's signal of "go ahead" is already present in the orchestrator
+having dispatched the agent in the first place.
 
-1. **First deliverable from a new agent** — the target agent's status
-   file §Completed section is empty (or has only the status-file scaffold
-   itself). Detect by reading the status file.
-2. **Cross-cutting change** — the item the feat-agent will work on is
-   tagged `plan_required: true` in its status file's item entry, OR your
-   prior familiarity suggests the change will touch > 5 files.
-3. **Previously-failed work** — the status file's Follow-up or Completed
-   section references closed / rejected PR attempts for this item.
-4. **Experiment design** — item is under a §Potential experiments or
-   §Experiments section (e.g. the stop-buffer tuning experiment in
-   `dev/status/backtest-infra.md`), where success is empirical rather
-   than a unit-testable spec.
+The plan still gets written. It just gets written by the feat-agent
+itself as the first action of its session, and the implementation
+follows in the same session. The plan file is committed alongside the
+implementation in a single PR (or stacked, if the change is large).
 
-If any trigger fires, dispatch the built-in `Plan` subagent BEFORE the
-feat-agent:
+### When plan-first applies
 
-```
-Agent(
-  subagent_type="Plan",
-  description="Plan <item>",
-  prompt="""
-  You are designing an implementation plan for <item> owned by the
-  <feat-agent> track.
+Add a `## Plan` section to the dispatched feat-agent's prompt for tasks
+meeting any of:
 
-  Read:
-  - dev/status/<track>.md §<section> for the item description and
-    constraints
-  - <design doc paths from the track's startup sequence>
-  - any prior rejected attempts referenced in the status file
-  - dev/plans/README.md for the output shape
+1. **First deliverable from a new agent** — target agent's status
+   file §Completed section is empty (or has only the scaffold itself).
+2. **Cross-cutting change** — item is tagged `plan_required: true` in
+   its status file entry, OR your prior familiarity suggests the change
+   will touch > 5 files.
+3. **Previously-failed work** — the status file references closed /
+   rejected PR attempts for this item.
+4. **Experiment design** — item is under §Potential experiments or
+   §Experiments, where success is empirical rather than unit-testable.
 
-  Produce a plan at dev/plans/<item-slug>-<YYYY-MM-DD>.md covering
-  context / approach / files-to-change / risks / acceptance / out-of-scope.
+### What to inject
 
-  Commit and push the plan on a branch plan/<item-slug>. Do not
-  modify any other files. Open a PR so a human can review before
-  implementation.
-  """
-)
-```
-
-The feat-agent dispatch in Step 4 is **deferred** for this item until
-the plan PR is merged (reviewed and approved by the human). Record the
-deferral in today's daily summary under §Plan Queue with the plan PR
-number. On subsequent runs, if the plan is merged, the feat-agent
-prompt's `<PREFLIGHT-CONTEXT>` additionally includes:
+Append this paragraph to the feat-agent's prompt in Step 4:
 
 ```
-### Approved plan
-Path: dev/plans/<item-slug>-<YYYY-MM-DD>.md
-Merged in: <PR number>
-The plan's §Approach and §Out of scope are binding. QC will verify.
+## Plan-first
+
+This task matches a plan-first trigger. Before writing any code, write
+your implementation plan to dev/plans/<item-slug>-<YYYY-MM-DD>.md
+(see dev/plans/README.md for the shape: context, approach, files-to-
+change, risks, acceptance, out-of-scope). Commit it as the first commit
+on your branch.
+
+Then implement per the plan in the same session. The plan and
+implementation land in a single PR — no review gate between them.
+QC will verify the implementation against the plan's acceptance
+criteria.
+
+If during implementation you discover the plan is wrong, update the
+plan file (it lives on the same branch) and continue. Don't revise
+silently.
 ```
 
-If no trigger fires, skip to Step 4 as before.
+If no trigger fires, dispatch normally without this paragraph.
 
 ---
 
@@ -345,6 +361,13 @@ COMMIT DISCIPLINE — this is critical for reviewability:
       jj describe -m "commit message"
       jj bookmark set feat/<feature> -r @
       jj git push --bookmark feat/<feature>
+  - At session end, ALSO open the PR via jst (don't leave branches PR-less
+    for the human to chase down):
+      GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
+    jst is on PATH in the orchestrator runtime (trading-devcontainer image
+    + dev/run.sh assumes both). If GH_TOKEN isn't set, jst will fail with
+    a clear error and the branch is still pushed — the orchestrator can
+    then fall back to opening the PR manually in Step 7.
 
 MAX ITERATIONS — build-fix cycles:
   - If you have attempted 3 consecutive build-fix cycles without passing
@@ -407,6 +430,34 @@ the blocking refactor item as complete (check the box).
 
 Return: what changed, what quality metric improved, any surprises.
 ```
+
+---
+
+## Step 4.5: PR-creation fallback (deterministic — runs after each subagent returns)
+
+After each spawned subagent completes (whether feat-* or harness-maintainer
+or ops-data), check that any branches it pushed have a corresponding open
+PR. The subagent's `When done` flow tells it to run `jst submit`, but if
+it forgot, jst failed silently, or its tool subset blocked the call, no PR
+exists and the branch sits invisible to the human.
+
+Recovery flow:
+
+```bash
+# For each branch the subagent reported pushing:
+GH_TOKEN=$GH_TOKEN gh api "repos/dayfine/trading/pulls?head=dayfine:<branch>&state=open" \
+  --jq 'length' \
+  | grep -q '^0$' && \
+  GH_TOKEN=$GH_TOKEN jst submit <branch>
+```
+
+If jst still fails, surface the branch + jst error in the daily summary
+under §Escalations so the human can open the PR manually with one
+`gh pr create` call. Don't loop on it.
+
+This catches the "agent pushed branch but no PR" gap that would
+otherwise leave work invisible until the human reads the daily summary
+and notices the missing PR.
 
 ---
 

@@ -64,7 +64,13 @@ Read `data/inventory.sexp` and report: which symbols are present, their date ran
 
 `EODHD_API_KEY` must be set in the host environment before any fetch. It is forwarded into the container via `docker exec -e EODHD_API_KEY` and passed as `--api-key "$EODHD_API_KEY"` — the OCaml script only accepts the flag, never reads env vars directly.
 
-If `EODHD_API_KEY` is not set in the host environment, report what can be done without it (inventory rebuild, universe bootstrap from existing data, coverage checks) and stop.
+If `EODHD_API_KEY` is not set in the host environment, **don't stop early**:
+- Many data gaps don't need EODHD (scrape-source validation for ADL,
+  sector-data-plan execution, parser writing, inventory rebuild,
+  universe bootstrap, coverage checks)
+- Continue with whatever subset of the task doesn't require the key
+- Report explicitly what was deferred for lack of the key, with the
+  exact command the human or a future run would need to complete it
 
 ## Allowed Tools
 
@@ -74,7 +80,26 @@ Do not modify agent definitions, design docs, or feature code outside `analysis/
 
 ## When to write code vs just run scripts
 
-Run existing scripts when coverage is the only gap. Write new code when a data source requires it — e.g. a new EODHD endpoint with a non-OHLCV response format, a new symbol list parser, or a new fetch script for macro data (A-D breadth, global indices). Follow the same TDD workflow as feature agents (interface → tests → impl → `dune fmt`). Commit data infrastructure code to a `data/<short-name>` branch. Known gaps that need new code are listed in `dev/notes/data-gaps.md`. When you resolve a gap, update that file.
+Run existing scripts when coverage is the only gap.
+
+Write new code when a data source requires it — a new EODHD endpoint
+with a non-OHLCV response format, a new symbol list parser, or a new
+fetch script for macro data (A-D breadth, global indices, sector
+holdings). Follow the same TDD workflow as feature agents (interface →
+tests → impl → `dune fmt`). Commit data infrastructure code to a
+`data/<short-name>` branch.
+
+**Scrape-source validation** is also in scope. When `data-gaps.md` lists
+candidate sources for a feed (e.g. ADL — Yahoo `C:ISSU`, EODData
+`INDEX:ADRN`, Unicorn `advdec`, computed-from-universe), write a small
+probe script per candidate, fetch a few days of data, validate the
+format (parse-able? historical depth? license?), and write up findings
+in `dev/notes/<feed>-validation.md`. The probe script can be Python
+using `requests` or `yfinance` — no need to commit it as production
+code; treat it as a research artefact under `dev/scripts/probes/`.
+
+Known gaps that need new code or research are listed in
+`dev/notes/data-gaps.md`. When you resolve a gap, update that file.
 
 ## Standard workflow: fetch + refresh
 
