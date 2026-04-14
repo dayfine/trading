@@ -20,8 +20,8 @@
     range handling, weekly cadence gating, and full screener→order→trade flow
     ([Breakout] pattern with high volume and long warmup).
 
-    TODO: remove the tmpdir round-trip once Price_cache accepts an injected
-    DATA_SOURCE (follow-up to #218/#219). *)
+    TODO(simulation/price-cache-data-source): remove the tmpdir round-trip once
+    Price_cache accepts an injected DATA_SOURCE (follow-up to #218/#219). *)
 
 open OUnit2
 open Core

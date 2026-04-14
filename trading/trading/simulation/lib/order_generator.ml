@@ -1,6 +1,7 @@
 (** Order generator - converts strategy transitions to trading orders
 
-    TODO: Orders should be StopLimit orders instead of Market orders. *)
+    TODO(simulation/stoplimit-orders): Orders should be StopLimit orders instead
+    of Market orders. *)
 
 open Core
 
