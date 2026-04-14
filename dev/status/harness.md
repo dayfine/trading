@@ -58,7 +58,7 @@ IN_PROGRESS
 ## Tier 3 — After M5 stable
 
 - [x] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations) — DONE: see completion note below
-- [ ] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history)
+- [x] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history) — DONE: see completion note below
 - [ ] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
 - [x] T3-A: `health-scanner` deep scan — feat-agent template compliance check (covered by T1-I: `agent_compliance_check.sh`)
 - [x] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
@@ -227,6 +227,8 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ### T3-A: Deep scan
 
 - [x] T3-A: Deep scan deterministic script — `trading/devtools/checks/deep_scan.sh`; standalone shell script (not wired into `dune runtest` — runs weekly, not on every PR). Covers 5 checks: (1) dead code detection (`.ml` files not in any dune library), (2) design doc drift (`analysis/weinstein/` and `trading/weinstein/` modules vs `eng-design-{1,2,3}` docs), (3) TODO/FIXME/HACK accumulation across `.ml`/`.mli` files, (4) size violations (files >300 lines without `@large-module`), (5) follow-up item count across `dev/status/*.md`. Writes report to `dev/health/YYYY-MM-DD-deep.md`. Health-scanner agent definition updated with Phase 1 (deterministic script) and Phase 2 (agentic steps: architecture drift, QC calibration, harness scaffolding review). Verify: `sh trading/devtools/checks/deep_scan.sh` from repo root produces `dev/health/YYYY-MM-DD-deep.md` with Metrics section.
+
+- [x] T3-A: QC calibration audit — Check 6 in `trading/devtools/checks/deep_scan.sh`. For each `dev/reviews/*.md`, extracts the most recent overall verdict (APPROVED/NEEDS_REWORK) via three patterns (`overall_qc:`, `Status:`, `## Verdict`), then: (a) flags features with reviews but no audit trail record in `dev/audit/`, (b) if `dune` is on PATH, runs `dune runtest` on each feature's test directories and flags mismatches (APPROVED + failing tests = regression; NEEDS_REWORK + passing tests = stale review). Feature-to-test-directory mapping covers screener, data-layer, portfolio-stops, simulation. Output appears in the deep scan report under `## QC Calibration Detail`. Verify: `eval $(opam env) && sh trading/devtools/checks/deep_scan.sh` — report includes `QC calibration findings` in Metrics section.
 
 ### T3-D: Audit trail
 
