@@ -50,6 +50,17 @@ if [ -z "${GH_TOKEN:-}" ]; then
   export GH_TOKEN
 fi
 
+# EODHD_API_KEY is optional; ops-data uses it for fetches (sector ETF bars,
+# symbol updates) but can still do a lot without it (scrape-source validation,
+# sector-data-plan execution, inventory rebuilds, coverage checks). Forward
+# explicitly so the orchestrator subprocess + downstream `docker exec -e ...`
+# all see the same value.
+if [ -n "${EODHD_API_KEY:-}" ]; then
+  export EODHD_API_KEY
+else
+  echo "NOTE: EODHD_API_KEY not set — ops-data will skip API-dependent fetches" >&2
+fi
+
 PROMPT="Run the daily development session for the Weinstein Trading System.
 Today's date is $DATE.${PLAN_FLAG}
 
