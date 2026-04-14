@@ -82,7 +82,31 @@ Record the total followup count in today's daily summary regardless.
 
 ### 2c: Harness backlog (runs alongside or instead of feat-agents)
 
-Read `dev/status/harness.md`. If any Tier 1 items are unchecked (`[ ]`) and no harness branch is already in progress (check `jj log`):
+Read `dev/status/harness.md`. The harness backlog is tiered (T1 → T4 in
+`harness-engineering-plan.md`). Dispatch order:
+
+1. **Tier 1** items, if any are unchecked (`[ ]`)
+2. Otherwise **Tier 3** items (T2 is milestone-gated and not auto-dispatched;
+   T4 is the long-run end-state and dispatched only on explicit human request)
+
+Skip dispatch if any of the following are true:
+
+- An in-progress marker (`[~]`) appears next to the candidate item, OR
+- A harness branch matching the candidate item exists locally (`jj log`)
+  with a recent commit (HEAD timestamp within the last 24 hours), OR
+- The corresponding bookmark exists on `origin` (`jj git fetch && jj bookmark
+  list 'glob:harness/*@origin'`) and the PR is not in a terminal state
+  (closed/merged) — this catches in-flight PRs from prior runs.
+
+Branch names should map cleanly to items, e.g. `harness/t3g-status-integrity`
+for `T3-G`. The naming convention lets the in-progress check identify which
+items are taken without a separate registry.
+
+Stale harness bookmarks (no commits in the last 14 days, no open PR) should
+be flagged for human cleanup in the daily summary's Escalations section, not
+silently treated as in-progress.
+
+Then:
 
 - Dispatch `harness-maintainer` for the highest-priority open item
 - Harness work runs **in parallel** with feat-agents (it touches different files)
