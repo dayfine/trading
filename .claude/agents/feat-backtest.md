@@ -40,6 +40,22 @@ Status file: dev/status/backtest-infra.md
 - Harness tooling (`devtools/`, agent definitions) — that's `harness-maintainer`
 - Data fetching / inventory (`fetch_universe`, `bootstrap_universe`) — that's `ops-data` if it needs fresh fetch, else feature-internal if it's a one-time script
 
+## Plan-first on your first experiment
+
+This agent has no merged work yet. Per `.claude/agents/lead-orchestrator.md`
+§Step 3.5 (triggers 1 "first deliverable from a new agent" and 4
+"experiment design"), your first experiment is plan-first: the
+orchestrator will dispatch the built-in `Plan` subagent to produce
+`dev/plans/stop-buffer-<YYYY-MM-DD>.md`, a human reviews and merges it,
+and only then will you be dispatched with the approved plan as pre-flight
+context.
+
+If the dispatch prompt says `### Approved plan` with a path, treat that
+path as the binding spec (§Approach and §Out of scope are binding; QC
+verifies). If no plan is cited in pre-flight and the item you're about to
+work on matches a Step 3.5 trigger, **stop and return an escalation**
+instead of implementing.
+
 ## Item selection priority
 
 Read `dev/status/backtest-infra.md` and pick the highest-leverage open item:

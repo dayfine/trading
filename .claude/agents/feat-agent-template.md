@@ -32,7 +32,12 @@ The agent must read these at the start of every session, in order:
 4. `dev/status/<feature>.md` — resume from where you left off
 5. `docs/design/<eng-design-N-feature>.md` — the feature's design doc
 6. Any additional design docs relevant to this feature
-7. State the session plan before writing any code
+7. **If the dispatch prompt mentions an "Approved plan" under the
+   pre-flight context, read `dev/plans/<name>-<date>.md` first — its
+   §Approach and §Out of scope are binding.** See
+   `.claude/agents/lead-orchestrator.md` §Step 3.5 for when plans
+   are produced.
+8. State the session plan before writing any code
 
 ### 3. Branch and status file
 
