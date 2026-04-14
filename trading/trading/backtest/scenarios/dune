@@ -1,0 +1,12 @@
+(executable
+ (name scenario_runner)
+ (libraries
+  core
+  core_unix
+  fpath
+  weinstein.data_source
+  trading.simulation
+  trading.simulation.types
+  backtest)
+ (preprocess
+  (pps ppx_sexp_conv)))
