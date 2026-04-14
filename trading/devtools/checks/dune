@@ -74,7 +74,9 @@
  (action
   (run sh %{dep:testing_only_check.sh})))
 
-; Agent definition compliance: every feat-*.md must have required sections
+; Agent definition compliance: every feat-*.md must have required sections.
+; Reaches .claude/agents/ at the repo root via repo_root() in _check_lib.sh,
+; which walks up from the sandboxed script's directory looking for .git.
 
 (rule
  (alias runtest)
