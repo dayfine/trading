@@ -1,34 +1,31 @@
 # Data Gaps — features blocked on missing data
 
-Last updated: 2026-04-14 (sharpened actionability per gap; scrape research moved into ops-data scope)
+Last updated: 2026-04-14 (ADL source validation complete; sector ETF bars refreshed)
 
 ## A-D Breadth (ADL)
 
-**Status**: Candidate sources identified; needs validation  
+**Status**: Validation complete (2026-04-14). No single source provides live absolute counts without registration. See `dev/notes/adl-validation.md`.  
 **Blocks**: Full macro analysis (currently passes `~ad_bars:[]`, degrades gracefully)  
 **Affects**: `Macro.analyze` — ADL indicators (`_ad_line_signal`, `_momentum_index_signal`) return zero weight when `ad_bars` is empty
 
 ### What we tried
 - EODHD `ADV.NYSE` / `DEC.NYSE`: "Ticker Not Found". Not available on this platform.
 
-### Candidate sources (ranked, 2026-04-10 research)
+### Source validation results (2026-04-14)
 
-1. **Yahoo Finance `C:ISSU` (NYSE) / `C:ISSQ` (NASDAQ)** — daily adv/dec/unchanged. Accessible via `yfinance` Python library or scraping. Free. **Needs validation**: does the symbol actually work? What historical coverage? What's the non-OCHLCV response format?
-2. **EODData.com `INDEX:ADRN`** — NYSE Advance-Decline Ratio, up to 30 years of EOD quotes, downloadable in multiple formats. Free/low-cost. **Needs validation**: is ADRN a ratio (adv/dec) or absolute counts? Scraper required.
-3. **Unicorn.us.com `advdec`** — comma-delimited historical A-D data for major indexes, free, computed from public sources. **Needs validation**: freshness, licence.
-4. **Compute from Russell 3000 universe** — count advancers/decliners across the cached universe each day. Tradeoffs: universe mismatch with official NYSE (no ETFs/ADRs/preferreds/CEFs), survivorship bias from current-constituents, but should correlate well. Fallback if scraper options fail. **Cost**: need Russell 3000 bars cached first (~3000 symbols × daily bars).
+Probe scripts under `dev/scripts/probes/`. Full writeup in `dev/notes/adl-validation.md`.
 
-### What's needed (orchestrator-actionable)
-- **ops-data**: write a probe script per candidate source under
-  `dev/scripts/probes/`, fetch 30 days of sample data, write findings
-  to `dev/notes/adl-validation.md` (parse-ability, historical depth,
-  rate limits, license). No EODHD key required for any of these
-  sources. **This is dispatchable today** — no human input needed.
-- After validation: write the production parser for the winning source,
-  add a fetch script alongside `fetch_symbols.exe`.
-- Once cached: feat-weinstein wires into `Weinstein_strategy.on_market_close`
-  (line ~288, currently hardcoded `~ad_bars:[]`). NOTE: feat-weinstein's
-  current scope is closed — surface as escalation if so.
+1. **Yahoo Finance `^ADV` / `^DECL` / `C:ISSU` / `C:ISSQ`** — **REJECTED**. All symbols return "No data found, symbol may be delisted" on Yahoo v8 chart API.
+2. **EODData.com `INDEX:ADRN`** — **VIABLE (ratio only)**. Public HTML page with OHLCV of the advance-decline ratio (2015-present). However, ADRN is a ratio, not absolute counts. Need to check if `INDEX:ADVN`/`INDEX:DECL` exist as separate symbols. **Requires EODData free-tier registration** (human action) for CSV/API access.
+3. **Unicorn.us.com `advdec`** — **DEAD since Feb 2020**. Site explicitly stopped updating. Historical archive (2002-2020) has excellent format: CSV with NYSE/AMEX/NASDAQ absolute counts. Useful for backtest backfill only.
+4. **Compute from Russell 3000 universe** — still viable as fallback. Tradeoffs unchanged.
+
+### What's needed (human input required)
+- **Human**: register for EODData free tier and check if `INDEX:ADVN`/`INDEX:DECL` exist as separate symbols with absolute counts (not just ratio)
+- **Human**: evaluate Pinnacle Data (recommended by Unicorn as successor) -- cost/license
+- **ops-data (after human input)**: write the production parser for the winning source, add a fetch script alongside `fetch_symbols.exe`
+- **ops-data (independent)**: optionally download Unicorn 2002-2020 archive for backtest backfill (~4,500 per-day files, trivially parseable)
+- **feat-weinstein (after data cached)**: wire into `Weinstein_strategy.on_market_close` (line ~288, currently hardcoded `~ad_bars:[]`)
 
 ### Impact of gap
 - Macro trend detection works but misses breadth divergence signals
@@ -45,19 +42,10 @@ Last updated: 2026-04-14 (sharpened actionability per gap; scrape research moved
 
 ### Three gaps (each with explicit ops-data dispatch criteria)
 
-1. **Sector ETF bars** — daily bars for XLK, XLF, XLE, XLV, XLI, XLP,
-   XLY, XLU, XLB, XLRE, XLC. **Dispatchable when EODHD_API_KEY is set
-   in the host env** (`[ -n "$EODHD_API_KEY" ]`). Skip and surface as
-   escalation only if truly absent. Fetch:
-   ```
-   docker exec -e EODHD_API_KEY trading-1-dev bash -c \
-     'cd /workspaces/trading-1/trading && eval $(opam env) && \
-      ./_build/default/analysis/scripts/fetch_symbols/fetch_symbols.exe \
-      --symbols XLK,XLF,XLE,XLV,XLI,XLP,XLY,XLU,XLB,XLRE,XLC \
-      --data-dir /workspaces/trading-1/data \
-      --api-key "$EODHD_API_KEY"'
-   ```
-   Then rebuild inventory with `build_inventory.exe`. Once cached, feed into `Sector.analyze ~sector_bars`.
+1. **Sector ETF bars** — **RESOLVED (2026-04-14)**. Daily bars cached for
+   all 11 SPDR sector ETFs (XLK, XLF, XLE, XLV, XLI, XLP, XLY, XLU,
+   XLB, XLRE, XLC) through 2026-04-14. Inventory rebuilt. Ready for
+   `Sector.analyze ~sector_bars`.
 
 2. **Instrument sector metadata** — `Instrument_info.sector` is empty
    for all symbols. **Dispatchable today** — the plan exists and
