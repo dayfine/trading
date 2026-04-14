@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-12
+## Last updated: 2026-04-14
 
 ## Status
 IN_PROGRESS
@@ -98,6 +98,20 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   pre-flight block that fast-fails if `claude` is missing, the
   lead-orchestrator agent file is missing, or its `## Allowed Tools` section
   no longer lists `Agent`. See `### run-sh hardening` in Completed.
+- **Orchestrator daily summary drifts against reality** — sections like
+  `## Integration Queue`, `## Recent Commits`, and `## Questions for You`
+  get copied forward from prior daily summaries rather than derived from
+  current state. Example: the 2026-04-14 12:35 run carried forward a "7
+  open PRs from 2026-04-11" list that had been stale for 3 days; several
+  questions referenced PRs long since merged.
+  Fix: add a deterministic reconciliation step to `lead-orchestrator.md`
+  Step 7 (Write daily summary) that queries the actual open-PR list
+  (via `gh pr list` or the GH API) before writing `## Integration Queue`,
+  and derives `## Recent Commits` from `jj log main@origin..main@origin`
+  since the last daily summary date. Without `gh` auth in the runtime
+  environment (see `dev/status/orchestrator-automation.md`), this part
+  needs to land together with the automation work. Source:
+  `dev/daily/2026-04-14.md` (refreshed end-of-day).
 
 ---
 
