@@ -34,6 +34,7 @@ _opam/
 # Agent runtime files (logs, lock files, worktrees)
 dev/logs/*.log
 dev/logs/*.running
+dev/logs/*.jsonl
 
 # Backtest equity curves (large, regenerable) — ** matches any depth
 dev/backtest/**/equity_curve.csv

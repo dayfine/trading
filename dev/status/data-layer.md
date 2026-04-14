@@ -87,10 +87,12 @@ All four items from `docs/design/eng-design-data-management.md` are implemented 
 **AAPL coverage verified:** inventory shows AAPL from 1980-12-12 to 2025-05-16, covering the 2017–2024 range required by T2-A golden scenarios.
 ## Known gaps
 
-**Macro data feeds** — required before `Macro.analyze` can run from real data; not needed for regression tests (construct `Macro.result` directly — see `docs/design/t2a-golden-scenarios.md`):
+**Macro data feeds** — data presence status as of 2026-04-14. Strategy-wiring track (`dev/status/strategy-wiring.md`) covers the remaining runtime composition work; data layer itself is complete for these feeds.
 
-- **Primary index bars** (`~index_bars`): EODHD symbols `GSPC.INDX` or `DJI.INDX`. `GSPCX` (cached at `data/G/X/GSPCX/`, daily from 1997) is a usable stand-in.
-- **NYSE A-D breadth** (`~ad_bars`): daily advancing/declining counts — not derivable from price bars. EODHD symbols likely `ADV.NYSE` / `DEC.NYSE`; verify. Requires a new parser (not OHLCV format).
-- **Global index bars** (`~global_index_bars`): FTSE 100 via `ISF.LSE` (iShares ETF proxy — EODHD does not carry `FTSE.INDX`), DAX (`GDAXI.INDX`), Nikkei 225 (`N225.INDX`). `IWM` (cached at `data/I/M/IWM/`) usable as interim US small-cap proxy.
-
-Until cached: call with `ad_bars:[]` and `global_index_bars:[]`; analyzer degrades gracefully.
+- **Primary index bars** (`~index_bars`): `GSPCX` cached at `data/G/X/GSPCX/` (daily from 1997). Wired via `runner.ml`. ✓
+- **NYSE A-D breadth** (`~ad_bars`): CACHED in two sources.
+  - Unicorn historical: `data/breadth/nyse_{advn,decln}.csv` (1965-03-01 → 2020-02-10). Wired via `Ad_bars.Unicorn.load`. ✓
+  - Synthetic post-2020: computed by `Synthetic_adl` module + `compute_synthetic_adl.exe` script; output convention `data/breadth/synthetic_nyse_{advn,decln}.csv`. Façade composition into `Ad_bars.load` is pending — tracked in `dev/status/strategy-wiring.md` Item 1.
+  - EODHD verified NOT a source: `ADV.NYSE`/`DEC.NYSE` return Ticker Not Found. Pinnacle Data evaluated ($39 one-time, 1940-present) but declined — synthetic-only chosen for live coverage.
+- **Sector ETF bars**: all 11 SPDRs cached. Wired via `Macro_inputs.spdr_sector_etfs` in `runner.ml`. ✓
+- **Global index bars** (`~global_index_bars`): FTSE proxy (`ISF.LSE`), DAX (`GDAXI.INDX`), Nikkei (`N225.INDX`) — data status per symbol needs to be re-checked at wiring time. Wiring is pending — tracked in `dev/status/strategy-wiring.md` Item 2 (needs `default_global_indices` constant + runner override).
