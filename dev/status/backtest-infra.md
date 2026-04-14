@@ -3,7 +3,7 @@
 ## Last updated: 2026-04-14
 
 ## Status
-IN_PROGRESS
+IN_PROGRESS — first experiment complete (hypothesis REJECTED on golden); framework formalization still open.
 
 ## Ownership
 `feat-backtest` agent — see `.claude/agents/feat-backtest.md`. Owns
@@ -56,20 +56,36 @@ None.
   memory scales ~linearly with N because each child reloads universe data.
 - Non-deterministic due to Hashtbl ordering (tracked, not fully fixed)
 
+## Completed
+
+- [x] **Stop-buffer tuning experiment** — full smoke + golden complete.
+  Smoke (recovery-2023, 1yr) looked strongly positive for wider buffers
+  (1.15 → +38.9%, Sharpe 1.78). **Golden (2018-2023, 6yr) reversed the
+  result**: 1.15 returned -7.1% with Sharpe -0.01; 1.02 control won
+  cleanly (+36.3%, Sharpe 0.36, lowest DD). Hypothesis REJECTED. Default
+  `initial_stop_buffer = 1.02` stays. Scenario files at
+  `trading/test_data/backtest_scenarios/experiments/stop-buffer/`. Report
+  at `dev/experiments/stop-buffer/report.md`. Outputs:
+  `dev/backtest/scenarios-2026-04-14-222425/` (smoke) and
+  `dev/backtest/scenarios-2026-04-14-225929/` (golden).
+
+## In progress
+None.
+
 ## Next Actions
 
-### Immediate: first experiment — stop buffer tuning
+### Stop-buffer follow-ups (pick one)
 
-The infrastructure above was built specifically to unblock this. Setup:
+The single-parameter fixed-buffer approach is brittle across regimes.
+Alternatives ranked by expected value:
 
-1. `trading/test_data/backtest_scenarios/experiments/stop-buffer/` with
-   ~5 scenario files differing only by `initial_stop_buffer` (e.g. 1.05,
-   1.08, 1.10, 1.12, 1.15; current default 1.08).
-2. Run via smoke period first for speed, then goldens for the winner.
-3. Compare `win_rate`, `avg_holding_days`, `max_drawdown`, `total_return`
-   across variants.
-4. Record findings in `dev/experiments/stop-buffer/` (directory does not
-   yet exist — see §Experiment framework below).
+1. **Support-floor-based stops** (Weinstein's actual prescription):
+   place stops at prior correction lows. Adapts to each stock's structure.
+2. **Regime-aware stops**: use `Macro.analyze` trend to pick buffer width
+   (tighter in bear, wider in bull). Testable via existing macro output.
+3. **Per-trade stop logging**: emit stop level + trigger type to
+   trades.csv so follow-up experiments can diagnose remaining stop-outs
+   at the per-trade level.
 
 ### Immediate: experiment framework
 
