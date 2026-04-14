@@ -84,6 +84,18 @@
  (action
   (run sh %{dep:agent_compliance_check.sh})))
 
+; Status file integrity: each dev/status/*.md must declare Status, Last updated,
+; and (for feature files) Interface stable. Invoked by health-scanner fast scan.
+; dev/status/ lives at the repo root (above trading/), outside the dune
+; workspace — the script uses repo_root (git rev-parse) from _check_lib.sh
+; to find it.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:status_file_integrity.sh})))
+
 ; Cyclomatic complexity: CC > 10 = warning (not failure); exits 0 always.
 ; To generate the per-function JSON for trend analysis, run:
 ;   cc_linter <trading-root> <path-to-dev/metrics/cc-YYYY-MM-DD.json>

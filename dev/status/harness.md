@@ -68,7 +68,7 @@ IN_PROGRESS
 - [x] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
 - [ ] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc)
 - [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
-- [ ] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries (part of T1-O fast scan)
+- [x] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries (part of T1-O fast scan). Done: see Completed section.
 - [ ] T3-G: `health-scanner` deep scan extension — followup-item count + CC trend analysis in weekly report (extends T1-Q CC linter output)
 - [ ] T3-G: Audit trail — include qc-behavioral quality score in `dev/audit/` records (extends T3-D)
 - [ ] T3-H: Commit-level QC mode — spawn `qc-structural` on individual commits (not whole branches) to catch violations earlier; low priority, adds cost; explore when golden scenarios (T1-N) are stable
@@ -182,6 +182,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ### T1-Q: Cyclomatic complexity linter
 
 - [x] T1-Q: CC linter — `trading/devtools/cc_linter/cc_linter.ml`; OCaml AST via `compiler-libs`; CC > 10 = warning (not failure); exits 0 always; optional JSON output to `dev/metrics/cc-YYYY-MM-DD.json`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest trading/devtools/checks/` — exits 0; prints OK or warning list.
+
+### T3-G: Status file integrity check
+
+- [x] T3-G: Status file integrity check — `trading/devtools/checks/status_file_integrity.sh` deterministically enforces the `dev/status/*.md` schema: `## Status` with a valid value (IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED), `## Last updated: YYYY-MM-DD`, and `## Interface stable` (YES|NO) for feature files. Exempt files: `harness.md` (orchestrator backlog, different shape) and `backtest-infra.md` (human-driven, uses `## Ownership`). Wired into `dune runtest` via `trading/devtools/checks/dune`; health-scanner fast scan Step 4 now references the script. Verify: `dune runtest devtools/checks/` — prints `OK: all dev/status/*.md files have required fields.`; removing an `## Interface stable` section from any feature status file fails the test.
 
 ### T3-B and T3-F
 
