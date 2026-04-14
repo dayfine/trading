@@ -1,6 +1,6 @@
 # Status: screener
 
-## Last updated: 2026-04-07
+## Last updated: 2026-04-14
 
 ## Status
 MERGED
@@ -82,12 +82,3 @@ existing `classify` stays as the cold-start entry point. See module comment in
 composite that's awkward for downstream consumers). Unblocks once the upstream
 data-fetching work (originally #250–#253) lands or is closed. Source:
 `dev/daily/2026-04-11.md`.
-
-## Recent Commits
-- screener/rs: Add Relative Strength (RS) analyzer
-- screener/volume-resistance: Add Resistance and Volume analysis modules
-- screener/stock-analysis: Add StockAnalysis module
-- screener/stock-screener: Add Screener module with cascade filter
-- screener/macro: Add Macro market analyzer
-- screener/sector: Add Sector analyzer
-- feat/screener: Refactor SMA, share impl with WMA

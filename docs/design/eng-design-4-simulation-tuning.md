@@ -185,3 +185,75 @@ val run : config:tuner_config -> symbols:string list ->
 | Strategy state in closure | Mutable ref in factory | Thread through simulator types | Minimal changes to existing simulator interface |
 | Grid search first | Exhaustive + simple | Bayesian from start | Simpler to implement and interpret. Upgrade path clear. |
 | Walk-forward validation | K-fold train/test split | In-sample only | Detects overfitting before applying config to live trading |
+
+---
+
+## 4.4 Backtest infrastructure
+
+Built atop the simulator (above) and consumed by the `feat-backtest` agent.
+Lives at `trading/trading/backtest/`.
+
+### Modules
+
+- **`Backtest.Summary`** (`lib/summary.{ml,mli}`) — typed run summary
+  (start/end dates, universe size, n_steps, initial/final cash,
+  n_round_trips, metric_set). `[@@deriving sexp_of]` for human-readable
+  output; custom converters preserve `%.2f` formatting on money fields
+  and the lowercased `(metric_name value)` shape on the metrics map.
+- **`Backtest.Runner`** (`lib/runner.{ml,mli}`) — `run_backtest`
+  orchestrates: load universe + AD bars + sector map, build a fresh
+  Weinstein strategy, run the simulator from `start_date - warmup` to
+  `end_date`, filter to trading days only, return a `result` (summary +
+  round_trips + filtered steps + the override sexps used).
+- **`Backtest.Result_writer`** (`lib/result_writer.{ml,mli}`) — `write`
+  emits `params.sexp`, `summary.sexp`, `trades.csv`, `equity_curve.csv`
+  into a caller-provided directory. Separated from Runner so callers
+  (CLI, scenario_runner) can run a backtest without writing anything.
+- **`bin/backtest_runner.ml`** — thin CLI wrapper. Parses
+  `--override '<sexp>'` flags (deep-merged into the default Weinstein
+  config), invokes `Backtest.Runner.run_backtest`, calls
+  `Backtest.Result_writer.write`.
+- **`scenarios/scenario.{ml,mli}`** — declarative scenario data model:
+  `range`, `period`, `expected`, `t = { name; description; period;
+  config_overrides; expected }`. Loaded from sexp files via
+  `[@@deriving sexp]` (with custom range converter to preserve the
+  `(min X) (max Y)` file format and `[@@sexp.allow_extra_fields]` for
+  tolerated info fields like `universe_size`).
+- **`scenarios/scenario_runner.ml`** — runs N scenarios in **parallel
+  child processes** via `Core_unix.fork`. Bounded pool (`--parallel N`,
+  default 4). Each child writes `actual.sexp` plus the standard
+  artefacts; parent reads back and prints the pass/fail table in
+  declaration order.
+
+### Config override mechanism
+
+`--override '((field value))'` partial sexps are deep-merged into the
+default `Weinstein_strategy.config` via
+`sexp_of_config → merge → config_of_sexp`. Generic — works for any
+nested config field without code changes. See `Backtest.Runner._merge_sexp`
+and `_apply_overrides`.
+
+### Scenario file format
+
+Files at `trading/test_data/backtest_scenarios/{goldens,smoke}/*.sexp`:
+
+```scheme
+((name "six-year-2018-2023")
+ (description "...")
+ (period ((start_date 2018-01-02) (end_date 2023-12-29)))
+ (universe_size 1654)         ; informational; tolerated by allow_extra_fields
+ (config_overrides ())        ; list of partial config sexps
+ (expected
+   ((total_return_pct ((min 30.0) (max 90.0)))
+    (total_trades     ((min 60)   (max 100)))
+    ...)))
+```
+
+Goldens are long-horizon regression scenarios (6-year runs); smoke are
+short-window sanity scenarios for fast iteration.
+
+### Owner
+
+`feat-backtest` agent (see `.claude/agents/feat-backtest.md`).
+Entry-point items live in `dev/status/backtest-infra.md` — flagship
+Immediate item is the stop-buffer tuning experiment.

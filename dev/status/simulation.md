@@ -103,13 +103,3 @@ Both Slice 2 (merged PRs #237, #240, #241, #242) and Slice 3 (feat/simulation br
 - Walk-forward backtest (M5): parameter tuner with validation period
 - Performance gate test (T2-B)
 
-## Recent Commits
-
-- #195 simulation: Add strategy_cadence to simulator dependencies
-- #196 simulation: Weinstein strategy skeleton (STRATEGY impl) — merged 2026-04-07
-- feat/simulation: Add Synthetic_source and Weinstein strategy smoke tests (pending PR)
-- feat/simulation: add ?portfolio_value optional param to STRATEGY interface (2026-04-09)
-- feat/simulation: bar accumulation, MA direction, and simulation date (2026-04-09)
-- feat/simulation: extend smoke tests with 2022-01-01 history start (2026-04-09)
-- feat/simulation: accumulate prior_stage per symbol for Stage1->Stage2 detection (2026-04-10)
-- feat/simulation: add breakout pattern smoke test with trade assertions (2026-04-10)
