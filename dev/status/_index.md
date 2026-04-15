@@ -14,7 +14,7 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | feat-backtest | — | Support-floor-based stops (Weinstein Ch. 7) |
-| [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | `fetch_finviz_sectors.exe` (Item 1) |
+| [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` against universe (Item 2) |
 | [strategy-wiring](strategy-wiring.md) | IN_PROGRESS | feat-weinstein | — | `Synthetic_adl` into `Ad_bars.load` façade (Item 1) |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | T3-E cost/token budget visibility |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Solve open blockers (GH Actions runner, gh-auth, triggers) |

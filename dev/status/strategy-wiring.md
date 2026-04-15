@@ -3,7 +3,9 @@
 ## Last updated: 2026-04-14
 
 ## Status
-IN_PROGRESS — ready for pickup
+IN_PROGRESS
+
+Ready for pickup.
 
 ## Ownership
 `feat-weinstein` agent — see `.claude/agents/feat-weinstein.md`. This
@@ -12,7 +14,9 @@ off cached data to macro inputs already declared in
 `Weinstein_strategy.config`. Base strategy code itself is unchanged.
 
 ## Interface stable
-YES — no new public types or module boundaries. Changes are confined to
+YES
+
+No new public types or module boundaries. Changes are confined to
 `Ad_bars.load` (façade composition) and a new `default_global_indices`
 constant in `Macro_inputs`.
 

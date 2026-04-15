@@ -17,6 +17,9 @@
 #   - harness.md         — orchestrator's own backlog (different shape)
 #   - backtest-infra.md  — human-driven infrastructure tracker (uses `## Ownership`)
 #
+# Skipped entirely (not status files — meta / index / notes):
+#   - any file whose basename starts with `_` (e.g. `_index.md`)
+#
 # This check runs as part of `dune runtest` and is invoked by the
 # `health-scanner` fast scan Step 4.
 #
@@ -78,6 +81,12 @@ _record_violation() {
 for status_file in "$STATUS_DIR"/*.md; do
   [ -f "$status_file" ] || continue
   basename=$(basename "$status_file")
+
+  # Skip meta / index files (basename starts with `_`) — they are not
+  # per-track status files and do not follow the schema.
+  case "$basename" in
+    _*) continue ;;
+  esac
 
   # 1. ## Last updated: YYYY-MM-DD
   last_updated=$(_last_updated_date "$status_file")
