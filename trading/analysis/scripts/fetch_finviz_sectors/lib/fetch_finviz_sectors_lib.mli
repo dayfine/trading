@@ -39,5 +39,8 @@ val run :
   force:bool ->
   ?fetch:fetch_fn ->
   ?symbols:string list ->
+  ?limit:int ->
   unit ->
   unit Deferred.t
+(** [limit] caps the number of symbols fetched after skip-filter / --force is
+    applied. Intended for dry-run or small test runs. *)

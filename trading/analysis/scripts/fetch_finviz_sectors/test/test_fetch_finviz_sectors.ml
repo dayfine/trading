@@ -46,15 +46,16 @@ let _sample_html_no_sector =
 
 (* --- parse_sector tests -------------------------------------------------- *)
 
+(* parse_sector normalizes Finviz labels to canonical GICS spellings. *)
 let test_parse_sector_aapl _ctx =
   assert_that
     (Fetch_finviz_sectors_lib.parse_sector _sample_html_aapl)
-    (is_some_and (equal_to "Technology"))
+    (is_some_and (equal_to "Information Technology"))
 
 let test_parse_sector_jpm _ctx =
   assert_that
     (Fetch_finviz_sectors_lib.parse_sector _sample_html_jpm)
-    (is_some_and (equal_to "Financial Services"))
+    (is_some_and (equal_to "Financials"))
 
 let test_parse_sector_missing _ctx =
   assert_that
