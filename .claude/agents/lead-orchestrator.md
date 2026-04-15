@@ -298,14 +298,14 @@ If no trigger fires, dispatch normally without this paragraph.
 Before spawning any subagent batch, sanity-check the budget situation:
 
 - The previous same-day run log (`dev/logs/<YYYY-MM-DD>-run<N-1>.jsonl` or the most recent date) is the best signal. If that run terminated with `"error":"rate_limit"` or `"terminal_reason"` other than `"completed"`, the 5-hour quota was hit last time. Assume it's still constrained until the next reset.
-- If the last run's total cost was ≥ $30 or output tokens ≥ 200k, the combined cost of today's full eligible set is likely similar.
+- Read `max_daily_cost_usd` from `dev/config/merge-policy.json` (default: 50.0). If the last run's total cost was >= 60% of that cap, or output tokens >= 200k, the combined cost of today's full eligible set is likely similar.
 
 When either of those is true, **reduce scope rather than spawn everything**:
 - Pick the 2 highest-priority tracks per `dev/status/_index.md` (skip MERGED, prefer tracks with open PRs awaiting follow-up > ready-to-pick-up > idle)
 - Defer the rest to the next run by leaving them idle in the index
-- Note the deferral in the daily summary's Escalations section so the human can see what was skipped
+- Note the deferral and the budget cap in the daily summary's Escalations section so the human can see what was skipped and why
 
-On an otherwise clean budget (last run completed, cost < $20), dispatching up to 2 subagents in parallel is fine. Never dispatch more than 2 at once.
+On an otherwise clean budget (last run completed, cost < 40% of `max_daily_cost_usd`), dispatching up to 2 subagents in parallel is fine. Never dispatch more than 2 at once.
 
 ## Step 4: Spawn feature agents as parallel subagents
 
@@ -622,6 +622,18 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
   (see dev/reviews/portfolio-stops.md)
 - simulation (Slice 2): APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
   (see dev/reviews/simulation.md)
+
+## Budget
+(Token and cost tracking for this orchestrator run)
+- Budget cap: $<max_daily_cost_usd from dev/config/merge-policy.json> (from merge-policy.json)
+- Subagents spawned: <N total>
+- Per-subagent breakdown:
+  | Agent | Model | Status | Est. tokens | Est. cost |
+  |-------|-------|--------|-------------|-----------|
+  | <name> | <model> | completed / killed (reason) | <if available> | <if available> |
+- Any subagent killed mid-flight: Yes/No — <reason: rate_limit / timeout / error>
+- Budget utilization: <total estimated cost> / $<cap> (<percentage>%)
+- Scope reduced due to budget: Yes/No — <deferred tracks if yes>
 
 ## Data Operations
 (Omit if ops-data did not run today)

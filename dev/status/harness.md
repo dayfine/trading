@@ -64,7 +64,7 @@ IN_PROGRESS
 - [x] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
 - [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)
 - [x] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` with `harness_gap` field on NEEDS_REWORK
-- [ ] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
+- [x] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
 - [x] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
 - [ ] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc)
 - [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
@@ -239,6 +239,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - [x] T3-B: AVR loop closure already in `lead-orchestrator` Step 5 — auto-dispatches QC for any READY_FOR_REVIEW feature in the same orchestrator run. Verify: grep "READY_FOR_REVIEW\|auto.*QC\|Step 5" in `lead-orchestrator.md`.
 - [x] qc-structural: P1/P2/P4 items updated to "verified by linter (H3)" — QC no longer manually re-scans these; linters are the deterministic gate. Verify: read `qc-structural.md` checklist — P1/P2/P4 items reference linter gates.
 - [x] T3-F: `docs/design/dependency-rules.md` created — R1–R6 rules with lifecycle states (`proposed` / `monitored` / `enforced`); R1, R4, R6 enforced via dune tests; R2, R3 monitored; R5 proposed. Verify: file exists; `dune runtest trading/devtools/checks/` enforces R1.
+
+### T3-E: Cost/token budget visibility
+
+- [x] T3-E: `max_daily_cost_usd` field added to `dev/config/merge-policy.json` (default: 50.0). Step 3.75 in `lead-orchestrator.md` now reads budget cap from merge-policy.json instead of using hardcoded $30 threshold; uses 60% of cap as the high-cost trigger and 40% as the clean-budget threshold. `## Budget` section added to Step 7 daily summary template — reports total subagents spawned, per-subagent breakdown (name, model, status, estimated tokens/cost), killed-mid-flight flag, budget utilization percentage, and whether scope was reduced. Verify: `jq .max_daily_cost_usd dev/config/merge-policy.json` returns 50; grep "Budget" in `.claude/agents/lead-orchestrator.md` shows the new section; grep "max_daily_cost_usd" in Step 3.75 shows the config reference.
 
 ### run-sh hardening
 
