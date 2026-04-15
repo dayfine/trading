@@ -19,8 +19,8 @@
 
     {!load} merges Unicorn and Synthetic series: for dates covered by Unicorn,
     Unicorn data is preferred (it is exchange-official). Synthetic fills the
-    tail from the first date after Unicorn's last date. The result is deduped
-    by date and sorted chronologically.
+    tail from the first date after Unicorn's last date. The result is deduped by
+    date and sorted chronologically.
 
     {1 Graceful degradation}
 
@@ -54,9 +54,9 @@ module Synthetic : sig
 
   val load : data_dir:string -> Macro.ad_bar list
   (** [load ~data_dir] reads [data_dir/breadth/synthetic_advn.csv] and
-      [data_dir/breadth/synthetic_decln.csv], joins on date, and returns
-      records sorted by date ascending. Missing files return [[]].
-      Malformed rows are silently skipped. *)
+      [data_dir/breadth/synthetic_decln.csv], joins on date, and returns records
+      sorted by date ascending. Missing files return [[]]. Malformed rows are
+      silently skipped. *)
 end
 
 val load : data_dir:string -> Macro.ad_bar list

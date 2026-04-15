@@ -39,10 +39,8 @@ let with_breadth_files ?(unicorn_advn = None) ?(unicorn_decln = None)
 (* ------------------------------------------------------------------ *)
 
 let test_unicorn_only _ =
-  with_breadth_files
-    ~unicorn_advn:(Some "19650301, 550\n19650302, 590\n")
-    ~unicorn_decln:(Some "19650301, 400\n19650302, 380\n")
-    (fun data_dir ->
+  with_breadth_files ~unicorn_advn:(Some "19650301, 550\n19650302, 590\n")
+    ~unicorn_decln:(Some "19650301, 400\n19650302, 380\n") (fun data_dir ->
       let result = Weinstein_strategy.Ad_bars.load ~data_dir in
       assert_that result
         (elements_are
@@ -68,10 +66,8 @@ let test_unicorn_only _ =
 (* ------------------------------------------------------------------ *)
 
 let test_synthetic_only _ =
-  with_breadth_files
-    ~synthetic_advn:(Some "20200301, 1200\n20200302, 1300\n")
-    ~synthetic_decln:(Some "20200301, 800\n20200302, 700\n")
-    (fun data_dir ->
+  with_breadth_files ~synthetic_advn:(Some "20200301, 1200\n20200302, 1300\n")
+    ~synthetic_decln:(Some "20200301, 800\n20200302, 700\n") (fun data_dir ->
       let result = Weinstein_strategy.Ad_bars.load ~data_dir in
       assert_that result
         (elements_are
@@ -97,17 +93,13 @@ let test_synthetic_only _ =
 (* ------------------------------------------------------------------ *)
 
 let test_compose_no_overlap _ =
-  with_breadth_files
-    ~unicorn_advn:(Some "20200206, 1404\n20200207, 1053\n")
+  with_breadth_files ~unicorn_advn:(Some "20200206, 1404\n20200207, 1053\n")
     ~unicorn_decln:(Some "20200206, 1500\n20200207, 1800\n")
     ~synthetic_advn:(Some "20200210, 1200\n20200211, 1300\n")
-    ~synthetic_decln:(Some "20200210, 800\n20200211, 700\n")
-    (fun data_dir ->
+    ~synthetic_decln:(Some "20200210, 800\n20200211, 700\n") (fun data_dir ->
       let result = Weinstein_strategy.Ad_bars.load ~data_dir in
       assert_that result (size_is 4);
-      let dates =
-        List.map result ~f:(fun (b : Macro.ad_bar) -> b.date)
-      in
+      let dates = List.map result ~f:(fun (b : Macro.ad_bar) -> b.date) in
       assert_that dates
         (equal_to
            [
@@ -125,11 +117,9 @@ let test_compose_unicorn_wins_on_overlap _ =
   with_breadth_files
     ~unicorn_advn:(Some "20200206, 1404\n20200207, 1053\n20200210, 1721\n")
     ~unicorn_decln:(Some "20200206, 1500\n20200207, 1800\n20200210, 1200\n")
-    (* Synthetic covers 2020-02-07 onwards — overlap on 02-07 and 02-10 *)
-    ~synthetic_advn:
-      (Some "20200207, 9999\n20200210, 8888\n20200211, 1300\n")
-    ~synthetic_decln:
-      (Some "20200207, 7777\n20200210, 6666\n20200211, 700\n")
+      (* Synthetic covers 2020-02-07 onwards — overlap on 02-07 and 02-10 *)
+    ~synthetic_advn:(Some "20200207, 9999\n20200210, 8888\n20200211, 1300\n")
+    ~synthetic_decln:(Some "20200207, 7777\n20200210, 6666\n20200211, 700\n")
     (fun data_dir ->
       let result = Weinstein_strategy.Ad_bars.load ~data_dir in
       assert_that result (size_is 4);
@@ -161,12 +151,10 @@ let test_compose_unicorn_wins_on_overlap _ =
 (* ------------------------------------------------------------------ *)
 
 let test_compose_result_is_sorted _ =
-  with_breadth_files
-    ~unicorn_advn:(Some "19650301, 550\n")
+  with_breadth_files ~unicorn_advn:(Some "19650301, 550\n")
     ~unicorn_decln:(Some "19650301, 400\n")
     ~synthetic_advn:(Some "20200301, 1200\n")
-    ~synthetic_decln:(Some "20200301, 800\n")
-    (fun data_dir ->
+    ~synthetic_decln:(Some "20200301, 800\n") (fun data_dir ->
       let result = Weinstein_strategy.Ad_bars.load ~data_dir in
       let is_sorted =
         List.is_sorted result ~compare:(fun (a : Macro.ad_bar) b ->
@@ -188,10 +176,8 @@ let test_compose_both_missing _ =
 (* ------------------------------------------------------------------ *)
 
 let test_synthetic_load_direct _ =
-  with_breadth_files
-    ~synthetic_advn:(Some "20200301, 1200\n20200302, 1300\n")
-    ~synthetic_decln:(Some "20200301, 800\n20200302, 700\n")
-    (fun data_dir ->
+  with_breadth_files ~synthetic_advn:(Some "20200301, 1200\n20200302, 1300\n")
+    ~synthetic_decln:(Some "20200301, 800\n20200302, 700\n") (fun data_dir ->
       let result = Weinstein_strategy.Ad_bars.Synthetic.load ~data_dir in
       assert_that result (size_is 2))
 
@@ -224,9 +210,7 @@ let test_load_real_data_composed _ =
   in
   assert_that is_sorted (equal_to true);
   (* No duplicates by date *)
-  let dates =
-    List.map result ~f:(fun (b : Macro.ad_bar) -> b.date)
-  in
+  let dates = List.map result ~f:(fun (b : Macro.ad_bar) -> b.date) in
   let unique_count =
     List.dedup_and_sort dates ~compare:Date.compare |> List.length
   in

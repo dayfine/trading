@@ -48,8 +48,8 @@ let _read_count_file path =
       tbl
     with _ -> tbl
 
-(** Join the two count tables on date, filtering out rows where both counts
-    are zero (placeholder rows). Returns sorted by date ascending. *)
+(** Join the two count tables on date, filtering out rows where both counts are
+    zero (placeholder rows). Returns sorted by date ascending. *)
 let _join_counts ~advn ~decln ~filter_zeros : Macro.ad_bar list =
   Hashtbl.fold advn ~init:[] ~f:(fun ~key:date ~data:advancing acc ->
       match Hashtbl.find decln date with
@@ -103,8 +103,8 @@ let _last_date bars =
   | Some (bar : Macro.ad_bar) -> Some bar.date
   | None -> None
 
-(** Compose Unicorn and Synthetic: Unicorn wins for dates it covers,
-    Synthetic fills everything after Unicorn's last date. *)
+(** Compose Unicorn and Synthetic: Unicorn wins for dates it covers, Synthetic
+    fills everything after Unicorn's last date. *)
 let _compose ~unicorn ~synthetic =
   match (unicorn, synthetic) with
   | [], s -> s
