@@ -17,6 +17,7 @@ type result = {
   round_trips : Metrics.trade_metrics list;
   steps : Trading_simulation_types.Simulator_types.step_result list;
   overrides : Sexp.t list;
+  stop_infos : Stop_log.stop_info list;
 }
 
 (* Trading-day filter *)
@@ -98,6 +99,11 @@ let _load_deps ~overrides =
   let config =
     {
       base_config with
+      indices =
+        {
+          primary = index_symbol;
+          global = Weinstein_strategy.Macro_inputs.default_global_indices;
+        };
       sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs;
     }
   in
@@ -105,8 +111,11 @@ let _load_deps ~overrides =
   let sector_etf_symbols =
     List.map config.sector_etfs ~f:(fun (sym, _) -> sym)
   in
+  let global_index_symbols =
+    List.map config.indices.global ~f:(fun (sym, _) -> sym)
+  in
   let all_symbols =
-    (index_symbol :: universe) @ sector_etf_symbols
+    (index_symbol :: universe) @ sector_etf_symbols @ global_index_symbols
     |> List.dedup_and_sort ~compare:String.compare
   in
   {
@@ -120,11 +129,12 @@ let _load_deps ~overrides =
 
 (* Simulation *)
 
-let _make_simulator deps ~start_date ~end_date =
+let _make_simulator deps ~stop_log ~start_date ~end_date =
   let strategy =
     Weinstein_strategy.make ~ad_bars:deps.ad_bars
       ~ticker_sectors:deps.ticker_sectors deps.config
   in
+  let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let metric_suite = Metric_computers.default_metric_suite () in
   let sim_deps =
@@ -155,8 +165,6 @@ let _run_simulator sim =
       failwith
         (sprintf "Backtest.Runner: simulation failed: %s" (Status.show e))
 
-(* run_backtest *)
-
 let run_backtest ~start_date ~end_date ?(overrides = []) () =
   let deps = _load_deps ~overrides in
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
@@ -166,7 +174,8 @@ let run_backtest ~start_date ~end_date ?(overrides = []) () =
     (Date.to_string start_date)
     (Date.to_string end_date)
     (Date.to_string warmup_start);
-  let sim = _make_simulator deps ~start_date ~end_date in
+  let stop_log = Stop_log.create () in
+  let sim = _make_simulator deps ~stop_log ~start_date ~end_date in
   let sim_result = _run_simulator sim in
   let steps =
     List.filter sim_result.steps
@@ -175,6 +184,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) () =
   in
   let final_value = (List.last_exn steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips steps in
+  let stop_infos = Stop_log.get_stop_infos stop_log in
   let summary : Summary.t =
     {
       start_date;
@@ -187,4 +197,4 @@ let run_backtest ~start_date ~end_date ?(overrides = []) () =
       metrics = sim_result.metrics;
     }
   in
-  { summary; round_trips; steps; overrides }
+  { summary; round_trips; steps; overrides; stop_infos }

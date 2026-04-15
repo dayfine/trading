@@ -11,6 +11,11 @@ type result = {
       (** Steps filtered to [start_date..end_date] on real trading days only *)
   overrides : Sexp.t list;
       (** The override sexps used for this run, echoed into params.sexp *)
+  stop_infos : Stop_log.stop_info list;
+      (** Per-position stop info captured from strategy transitions. Each entry
+          records the initial stop level, the stop level at exit, and the exit
+          trigger (stop-loss, take-profit, etc.). Keyed by position_id; joinable
+          with [round_trips] via symbol + entry_date. *)
 }
 
 val run_backtest :

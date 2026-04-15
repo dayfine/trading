@@ -41,17 +41,59 @@ let _write_params ~output_dir (result : Runner.result) =
   in
   Sexp.save_hum (output_dir ^ "/params.sexp") (Sexp.List with_overrides)
 
-let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list) =
+let _build_stop_index (stop_infos : Stop_log.stop_info list) =
+  List.fold stop_infos
+    ~init:(Map.empty (module String))
+    ~f:(fun acc (info : Stop_log.stop_info) ->
+      let existing = Map.find acc info.symbol |> Option.value ~default:[] in
+      Map.set acc ~key:info.symbol ~data:(existing @ [ info ]))
+
+let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
+  match trigger with
+  | Stop_loss _ -> "stop_loss"
+  | Take_profit _ -> "take_profit"
+  | Signal_reversal _ -> "signal_reversal"
+  | Time_expired _ -> "time_expired"
+  | Underperforming _ -> "underperforming"
+  | Portfolio_rebalancing -> "rebalancing"
+
+let _pop_stop_info stop_index ~symbol =
+  match Map.find !stop_index symbol with
+  | Some (info :: rest) ->
+      stop_index := Map.set !stop_index ~key:symbol ~data:rest;
+      Some info
+  | _ -> None
+
+let _fmt_float_opt = function Some s -> sprintf "%.2f" s | None -> ""
+
+let _stop_fields (info : Stop_log.stop_info option) =
+  match info with
+  | None -> ("", "", "")
+  | Some i ->
+      ( _fmt_float_opt i.entry_stop,
+        _fmt_float_opt i.exit_stop,
+        Option.value_map i.exit_trigger ~default:"" ~f:_exit_trigger_label )
+
+let _write_trade_row oc stop_index (t : Metrics.trade_metrics) =
+  let info = _pop_stop_info stop_index ~symbol:t.symbol in
+  let entry_stop, exit_stop, exit_trigger = _stop_fields info in
+  fprintf oc "%s,%s,%s,%d,%.2f,%.2f,%.0f,%.2f,%.2f,%s,%s,%s\n" t.symbol
+    (Date.to_string t.entry_date)
+    (Date.to_string t.exit_date)
+    t.days_held t.entry_price t.exit_price t.quantity t.pnl_dollars
+    t.pnl_percent entry_stop exit_stop exit_trigger
+
+let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
+    ~(stop_infos : Stop_log.stop_info list) =
   let path = output_dir ^ "/trades.csv" in
   let oc = Out_channel.create path in
-  fprintf oc
-    "symbol,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent\n";
-  List.iter round_trips ~f:(fun (t : Metrics.trade_metrics) ->
-      fprintf oc "%s,%s,%s,%d,%.2f,%.2f,%.0f,%.2f,%.2f\n" t.symbol
-        (Date.to_string t.entry_date)
-        (Date.to_string t.exit_date)
-        t.days_held t.entry_price t.exit_price t.quantity t.pnl_dollars
-        t.pnl_percent);
+  let header =
+    "symbol,entry_date,exit_date,days_held,entry_price,exit_price,"
+    ^ "quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger"
+  in
+  fprintf oc "%s\n" header;
+  let stop_index = ref (_build_stop_index stop_infos) in
+  List.iter round_trips ~f:(_write_trade_row oc stop_index);
   Out_channel.close oc
 
 let _write_equity_curve ~output_dir
@@ -69,5 +111,6 @@ let write ~output_dir (result : Runner.result) =
   Sexp.save_hum
     (output_dir ^ "/summary.sexp")
     (Summary.sexp_of_t result.summary);
-  _write_trades ~output_dir ~round_trips:result.round_trips;
+  _write_trades ~output_dir ~round_trips:result.round_trips
+    ~stop_infos:result.stop_infos;
   _write_equity_curve ~output_dir ~steps:result.steps

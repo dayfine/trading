@@ -1,0 +1,4 @@
+(test
+ (name test_stop_log)
+ (modules test_stop_log)
+ (libraries ounit2 core backtest trading.strategy status matchers))
