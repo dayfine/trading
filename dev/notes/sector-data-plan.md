@@ -4,6 +4,8 @@ Last updated: 2026-04-11
 
 **Supersedes**: the Wikipedia scrape plan in `fundamentals-requirements.md` (now marked deprecated).
 
+**Superseded for primary coverage (2026-04-14)**: this SSGA plan caps at ~492 S&P 500 constituents. For the ~5,000–8,000 coverage goal, the active tracked plan is the Finviz scrape in `dev/status/sector-data.md`. SSGA is retained here as an authoritative backup source for S&P 500 sector labels and validation cross-check; Phases 1–4 below are not being executed as the primary path.
+
 ## Why we reconsidered
 
 Three review points against the Wikipedia approach:
