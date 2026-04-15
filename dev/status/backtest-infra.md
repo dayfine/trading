@@ -79,6 +79,9 @@ None.
 ## In progress
 None.
 
+## Blocked on
+- **Support-floor-based stops experiment** (next in Next Actions) requires a new primitive in `weinstein/stops/` — stop placement by prior correction lows. Owned by feat-weinstein, not feat-backtest. Until that primitive ships, this experiment cannot run as a config-override variant. Orchestrator should dispatch feat-weinstein for the stops primitive first; feat-backtest then follows next run with the experiment.
+
 ## Next Actions
 
 ### Stop-buffer follow-ups (pick one)

@@ -206,13 +206,25 @@ feature work in the same session.
 
 ### 2e: Feature dependency rules
 
-| Feature | Agent | Can run when |
-|---------|-------|--------------|
-| weinstein (order_gen) | feat-weinstein | Always — no remaining blockers |
-| weinstein (Slice 2) | feat-weinstein | Always — no remaining blockers |
-| backtest-infra (experiments + tuning) | feat-backtest | Always — independent of feat-weinstein |
+Cross-track dependencies live in each status file's `## Blocked on` section. For every IN_PROGRESS track, read that section before dispatching:
 
-Run order: order_gen first (smaller, self-contained), then Slice 2, then backtest-infra. The backtest-infra track is independent of feat-weinstein's outputs and may run in parallel.
+- If the blocker names another track's work (e.g. "requires feat-weinstein to add `Stops.support_floor` first"), **do not dispatch this track's agent this run**. Instead:
+  1. Dispatch the upstream agent on the blocking item (the feat/ops/harness agent that owns the named work).
+  2. Skip the downstream agent this run — it will pick up next run once the upstream item lands.
+  3. Note the sequencing decision in the daily summary's §Dependency Unlocks section.
+- If `## Blocked on` says "None" or lists only external blockers (data purchases, human decisions), the track is eligible.
+
+This is the orchestrator's job — do not pass the coordination decision to the human unless the blocker itself is a human decision. Agents should not need to negotiate across tracks.
+
+Current tracks (as of status files at read time — re-read every run):
+
+| Track | Owner | Typical blockers |
+|-------|-------|------------------|
+| strategy-wiring | feat-weinstein | none — data is cached |
+| sector-data | ops-data | live HTTP runs that exceed agent session time are a human action item, not a blocker |
+| backtest-infra | feat-backtest | experiments that need new strategy primitives (e.g. support-floor stops) block on feat-weinstein |
+| harness | harness-maintainer | none between tracks |
+| orchestrator-automation | harness-adjacent | human-only (secrets, GitHub App) |
 
 Skip a track if its status file shows MERGED with no Blocking Refactors or Follow-up items, or APPROVED (awaiting human merge decision).
 
