@@ -198,20 +198,20 @@ let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols () =
     else
       let errors = ref [] in
       let success_count = ref 0 in
+      let total = List.length to_fetch in
       let%bind _results =
         Deferred.List.map ~how:`Sequential to_fetch ~f:(fun sym ->
-            let idx = !success_count + List.length !errors + 1 in
-            printf "  [%d/%d] %s ...\n%!" idx (List.length to_fetch) sym;
             fetch_one ~fetch ~rate_limit_rps sym >>| fun r ->
+            let idx = !success_count + List.length !errors + 1 in
             (match r.sector with
             | Some sector ->
                 Hashtbl.set existing ~key:r.symbol ~data:sector;
-                Int.incr success_count
-            | None -> (
+                Int.incr success_count;
+                printf "  [%d/%d] %s → %s\n%!" idx total sym sector
+            | None ->
                 errors := r.symbol :: !errors;
-                match r.error with
-                | Some e -> eprintf "  WARN [%s]: %s\n%!" r.symbol e
-                | None -> ()));
+                let msg = Option.value r.error ~default:"unknown error" in
+                eprintf "  [%d/%d] %s → WARN: %s\n%!" idx total sym msg);
             r)
       in
       let rows =
