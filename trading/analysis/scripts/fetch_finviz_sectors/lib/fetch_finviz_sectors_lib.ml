@@ -179,17 +179,22 @@ let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols () =
     let csv_path = _sectors_csv_path data_dir in
     let manifest_file = _manifest_path data_dir in
     let existing = load_existing_sectors csv_path in
-    let manifest = load_manifest manifest_file in
-    let can_resume =
-      (not force)
-      && Option.value_map manifest ~default:false ~f:(fun m ->
-          manifest_is_fresh m ~max_age_days:30)
-    in
+    (* The CSV is authoritative: always skip symbols that already have a
+       sector row, unless --force. Manifest age is informational, not a
+       gate on resume — a stale manifest with a valid CSV still means
+       the sectors we scraped before are still usable. *)
     let to_fetch =
-      if can_resume then
-        List.filter sym_list ~f:(fun sym -> not (Hashtbl.mem existing sym))
-      else sym_list
+      if force then sym_list
+      else List.filter sym_list ~f:(fun sym -> not (Hashtbl.mem existing sym))
     in
+    (match load_manifest manifest_file with
+    | Some m when not (manifest_is_fresh m ~max_age_days:30) ->
+        printf
+          "Note: manifest is older than 30 days (fetched_at=%s). Existing rows \
+           are still reused; pass --force to re-fetch everything.\n\
+           %!"
+          m.fetched_at
+    | _ -> ());
     printf "Universe: %d symbols, already cached: %d, to fetch: %d\n%!"
       (List.length sym_list) (Hashtbl.length existing) (List.length to_fetch);
     if List.is_empty to_fetch then (
@@ -199,6 +204,28 @@ let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols () =
       let errors = ref [] in
       let success_count = ref 0 in
       let total = List.length to_fetch in
+      let checkpoint_interval = 100 in
+      let write_checkpoint ~final () =
+        let rows =
+          Hashtbl.to_alist existing
+          |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+        in
+        (match write_sectors_csv ~data_dir rows with
+        | Ok () ->
+            if final then
+              printf "Wrote %d rows to %s\n%!" (List.length rows) csv_path
+        | Error e -> eprintf "ERROR writing CSV: %s\n%!" e);
+        let m =
+          {
+            fetched_at = Time_float_unix.to_string_utc (Time_float_unix.now ());
+            source = "finviz";
+            row_count = List.length rows;
+            rate_limit_rps;
+            errors = List.rev !errors;
+          }
+        in
+        save_manifest manifest_file m
+      in
       let%bind _results =
         Deferred.List.map ~how:`Sequential to_fetch ~f:(fun sym ->
             fetch_one ~fetch ~rate_limit_rps sym >>| fun r ->
@@ -212,34 +239,19 @@ let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols () =
                 errors := r.symbol :: !errors;
                 let msg = Option.value r.error ~default:"unknown error" in
                 eprintf "  [%d/%d] %s → WARN: %s\n%!" idx total sym msg);
+            if idx % checkpoint_interval = 0 then
+              write_checkpoint ~final:false ();
             r)
       in
-      let rows =
-        Hashtbl.to_alist existing
-        |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
-      in
-      (match write_sectors_csv ~data_dir rows with
-      | Ok () -> printf "Wrote %d rows to %s\n%!" (List.length rows) csv_path
-      | Error e -> eprintf "ERROR writing CSV: %s\n%!" e);
-      let total = List.length to_fetch in
+      write_checkpoint ~final:true ();
       let err_count = List.length !errors in
       let ok_count = !success_count in
       let success_pct =
         if total > 0 then Float.of_int ok_count /. Float.of_int total *. 100.0
         else 100.0
       in
-      let m =
-        {
-          fetched_at = Time_float_unix.to_string_utc (Time_float_unix.now ());
-          source = "finviz";
-          row_count = List.length rows;
-          rate_limit_rps;
-          errors = List.rev !errors;
-        }
-      in
-      save_manifest manifest_file m;
       printf "Done: %d/%d fetched (%.1f%%), %d errors, %d total rows.\n%!"
-        ok_count total success_pct err_count (List.length rows);
+        ok_count total success_pct err_count (Hashtbl.length existing);
       if Float.( < ) success_pct 80.0 then
         eprintf "WARNING: Success rate %.1f%% is below 80%% threshold.\n%!"
           success_pct;
