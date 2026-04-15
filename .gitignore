@@ -44,3 +44,7 @@ dev/backtest/**/steps.csv
 # jj conflict materialization directories (never commit these)
 .jjconflict-base-*/
 .jjconflict-side-*/
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
