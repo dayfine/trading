@@ -79,7 +79,7 @@ status to READY_FOR_REVIEW.
 - [ ] Every public function in every `.ml` is exported in the corresponding `.mli` with a doc comment
 - [ ] No function exceeds 50 lines
 - [ ] All configurable parameters routed through config record — no magic numbers
-- [ ] `dune build && dune runtest` passes with zero warnings
+- [ ] `dune build && dune runtest` passes with zero warnings **on a clean checkout of the branch** — not just on your local worktree. If you are running in `isolation: "worktree"` (the orchestrator default), your working copy already is a clean checkout, so the local pass is sufficient. If you are NOT in a worktree (rare, legacy runs), re-verify by checking that every module your branch references is either in your commits or already on `main@origin` — do not rely on files sitting in the shared working copy that you did not explicitly commit.
 - [ ] `dune fmt --check` passes (or: `dune fmt` produces no diff)
 - [ ] `Interface stable: YES` is set in `dev/status/<feature>.md` once `.mli` is finalized
 ```

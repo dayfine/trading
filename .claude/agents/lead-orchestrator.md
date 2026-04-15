@@ -293,9 +293,25 @@ If no trigger fires, dispatch normally without this paragraph.
 
 ---
 
+## Step 3.75: Budget check before parallel dispatch
+
+Before spawning any subagent batch, sanity-check the budget situation:
+
+- The previous same-day run log (`dev/logs/<YYYY-MM-DD>-run<N-1>.jsonl` or the most recent date) is the best signal. If that run terminated with `"error":"rate_limit"` or `"terminal_reason"` other than `"completed"`, the 5-hour quota was hit last time. Assume it's still constrained until the next reset.
+- If the last run's total cost was ≥ $30 or output tokens ≥ 200k, the combined cost of today's full eligible set is likely similar.
+
+When either of those is true, **reduce scope rather than spawn everything**:
+- Pick the 2 highest-priority tracks per `dev/status/_index.md` (skip MERGED, prefer tracks with open PRs awaiting follow-up > ready-to-pick-up > idle)
+- Defer the rest to the next run by leaving them idle in the index
+- Note the deferral in the daily summary's Escalations section so the human can see what was skipped
+
+On an otherwise clean budget (last run completed, cost < $20), dispatching up to 2 subagents in parallel is fine. Never dispatch more than 2 at once.
+
 ## Step 4: Spawn feature agents as parallel subagents
 
-For each feature that should run today, spawn it as a subagent using the Agent tool (no worktree isolation — agents work directly on their feature branch so Docker can see their changes). Run all eligible features in parallel (single message, multiple Agent tool calls).
+For each feature that should run today, spawn it as a subagent using the Agent tool with `isolation: "worktree"`. Each subagent works on its own git worktree so that (a) commits from one agent cannot pollute another agent's branch via the shared working copy, and (b) `jj new main@origin` inside a subagent produces a clean starting point.
+
+**Parallelism cap**: run at most **2 subagents in parallel** in a single Agent message. More than 2 Opus subagents in parallel reliably drains the 5-hour quota before PRs can be opened. If more than 2 features are eligible, batch into two messages: dispatch the higher-priority 2, await results, then dispatch the next 2.
 
 **Parallel write conflict policy**: parallel feat-agents must not write to any shared file.
 The files `dev/decisions.md`, `CLAUDE.md`, and `docs/design/*.md` are read-only during
@@ -332,6 +348,8 @@ Read these files first:
 6. dev/status/<feature>.md  ← pick up where you left off
 
 Your branch: feat/<feature>
+  # You are running in an isolated git worktree — your working copy
+  # is independent of other subagents' workspaces.
   jj git init --colocate 2>/dev/null || true
   jj git fetch
   jj new feat/<feature>@origin
@@ -347,7 +365,7 @@ Work using TDD (CLAUDE.md workflow):
 Build/test inside Docker:
   docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && <cmd>'
 
-COMMIT DISCIPLINE — this is critical for reviewability:
+COMMIT DISCIPLINE — this is critical for reviewability AND for surviving rate-limit kills:
   - Commit after each logical unit: one module, one interface, one test suite
   - Target 200–300 lines per commit (absolute max 400 including tests)
   - Never batch multiple modules into one commit
@@ -361,13 +379,21 @@ COMMIT DISCIPLINE — this is critical for reviewability:
       jj describe -m "commit message"
       jj bookmark set feat/<feature> -r @
       jj git push --bookmark feat/<feature>
-  - At session end, ALSO open the PR via jst (don't leave branches PR-less
-    for the human to chase down):
+  - **Open a DRAFT PR as soon as the first real commit is pushed** — do
+    not wait until session end. If the session is killed mid-flight
+    (rate-limit, timeout), at least the PR exists with whatever was
+    pushed. Use:
+      GH_TOKEN=$GH_TOKEN gh pr create --base main --head feat/<feature> \
+        --draft --title "feat(<area>): <one-line summary>" \
+        --body "WIP — opened early so work is not lost on kill."
+    Subsequent pushes update the PR automatically (same branch).
+  - At session end, mark the PR ready for review via jst:
       GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
     jst is on PATH in the orchestrator runtime (trading-devcontainer image
     + dev/run.sh assumes both). If GH_TOKEN isn't set, jst will fail with
-    a clear error and the branch is still pushed — the orchestrator can
-    then fall back to opening the PR manually in Step 7.
+    a clear error and the branch is still pushed — the draft PR is still
+    there. The orchestrator can then fall back to marking it ready in
+    Step 7.
 
 MAX ITERATIONS — build-fix cycles:
   - If you have attempted 3 consecutive build-fix cycles without passing
@@ -378,11 +404,13 @@ MAX ITERATIONS — build-fix cycles:
 Do as much meaningful work as you can in one session.
 Stop at a natural boundary (a passing build, a completed module).
 
-CRITICAL — before returning, do all of these:
-  1. Ensure dune build && dune runtest passes on your branch
+CRITICAL — before returning, do all of these (in this order, so a kill during the last step still leaves the PR open):
+  1. Ensure dune build && dune runtest passes **on a clean checkout** of your branch (your worktree is isolated, so this is the local state — but verify nothing relies on files from sibling subagents' workspaces; only content tracked in your commits should matter)
   2. All changes committed and pushed (nothing uncommitted)
-  3. Update dev/status/<feature>.md (status, interface-stable, completed, in-progress, next-steps, commits)
-  4. If all work is done and tests pass: set status to READY_FOR_REVIEW
+  3. Draft PR already open from first push (see commit discipline); if not, open it now via `gh pr create --draft`
+  4. Update dev/status/<feature>.md (status, interface-stable, completed, in-progress, next-steps, commits)
+  5. Update your row in dev/status/_index.md (Status, Owner, Open PR, Next task) — only touch your own row
+  6. If all work is done and tests pass: mark the PR ready for review via `jst submit` or `gh pr ready`, and set status to READY_FOR_REVIEW in the status file
 
 <FEATURE-SPECIFIC CONSTRAINT IF ANY>
 

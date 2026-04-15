@@ -29,10 +29,22 @@ done
 
 DATE="$(date +%Y-%m-%d)"
 LOG_DIR="$REPO_ROOT/dev/logs"
-mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/$DATE.log"
-JSONL_FILE="$LOG_DIR/$DATE.jsonl"
-SUMMARY_FILE="$REPO_ROOT/dev/daily/$DATE${PLAN_FLAG:+-plan}.md"
+DAILY_DIR="$REPO_ROOT/dev/daily"
+mkdir -p "$LOG_DIR" "$DAILY_DIR"
+
+# Pick a same-day run suffix so multiple runs on the same date don't
+# clobber one another. Plan-mode always writes to <date>-plan.md
+# (overwrites on rerun — planning is idempotent anyway).
+if [ -n "$PLAN_FLAG" ]; then
+  RUN_SUFFIX="-plan"
+else
+  N=1
+  while [ -f "$DAILY_DIR/$DATE-run$N.md" ]; do N=$((N+1)); done
+  RUN_SUFFIX="-run$N"
+fi
+LOG_FILE="$LOG_DIR/$DATE$RUN_SUFFIX.log"
+JSONL_FILE="$LOG_DIR/$DATE$RUN_SUFFIX.jsonl"
+SUMMARY_FILE="$DAILY_DIR/$DATE$RUN_SUFFIX.md"
 JQ_FILTER="$REPO_ROOT/dev/lib/format-event.jq"
 
 # GH_TOKEN is required so subagents (feat-*, harness-maintainer) can run
@@ -62,7 +74,9 @@ else
 fi
 
 PROMPT="Run the daily development session for the Weinstein Trading System.
-Today's date is $DATE.${PLAN_FLAG}
+Today's date is $DATE.
+Write the daily summary to: $SUMMARY_FILE
+(this is run suffix \"$RUN_SUFFIX\" — pass it through to any log / artifact paths you create so same-day reruns do not overwrite earlier ones).${PLAN_FLAG}
 
 Follow your instructions in .claude/agents/lead-orchestrator.md exactly."
 
