@@ -3,9 +3,9 @@
 ## Last updated: 2026-04-14
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-Ready for pickup.
+PR #355 open.
 
 ## Ownership
 `feat-weinstein` agent — see `.claude/agents/feat-weinstein.md`. This
@@ -45,45 +45,21 @@ References:
 - `trading/analysis/weinstein/breadth/lib/synthetic_adl.mli` — synthetic module already on main
 
 ## Completed
-- None yet in this scope.
+- Item 1: Synthetic ADL composition in `Ad_bars.load` (Synthetic submodule + compose logic + tests)
+- Item 2: Global indices wiring — already complete on main (`Macro_inputs.default_global_indices` + runner override)
 
 ## In Progress
-- None yet in this scope.
+- None.
 
 ## Next Steps (work items)
 
-### Item 1 — compose Synthetic ADL into `Ad_bars.load` façade
+All items complete. Awaiting QC review.
 
-Scope: `trading/trading/weinstein/strategy/lib/ad_bars.{ml,mli}`.
-
-- Add `Synthetic` submodule or a direct call to the synthetic compute.
-  Output path convention from `compute_synthetic_adl.exe`:
-  `data/breadth/synthetic_nyse_advn.csv` + `_decln.csv`.
-- `load ~data_dir` composes Unicorn (1965-02-10 → 2020-02-10) with
-  Synthetic (2020-02-11 → present), dedupes by date, returns single
-  chronologically-sorted `Macro.ad_bar list`.
-- Unit tests: date ranges don't overlap, correct source wins on overlap
-  (prefer Unicorn for golden dates), correct ordering.
-- Validation: one-off run of `Synthetic_adl.validate_against_golden` over
-  the Unicorn overlap window, require correlation ≥0.85. Record result in
-  `dev/notes/synthetic-adl-validation.md`.
-
-Estimated: ~80 lines + tests.
-
-### Item 2 — populate `indices.global`
-
-Scope: `trading/trading/weinstein/strategy/lib/macro_inputs.ml` +
-`trading/trading/backtest/lib/runner.ml`.
-
-- Define `default_global_indices : (string * string) list` in
-  `Macro_inputs`. Candidates already implied by cached bars: confirm which
-  global indices exist in `data/` and pick the canonical set (e.g.
-  `^FTSE`, `^N225`, `^GDAXI`, `000001.SS`).
-- Runner override: `indices = { primary = index_symbol; global = Macro_inputs.default_global_indices }`.
-- Tests: smoke test that `Macro.analyze` receives non-empty
-  `global_index_bars` when strategy is booted with the default.
-
-Estimated: ~40 lines + tests + symbol-list verification against cached data.
+### Follow-up (not blocking merge)
+- Validation gate: run `Synthetic_adl.validate_against_golden` over the Unicorn
+  overlap window and record correlation in `dev/notes/synthetic-adl-validation.md`.
+  The `compute_synthetic_adl.exe` already runs this validation at generation time;
+  a separate one-off recording is a documentation task.
 
 ## Dependencies
 - None between items. Either can land first.

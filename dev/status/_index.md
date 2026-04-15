@@ -15,7 +15,7 @@ Each row: one line; deeper task detail in the linked status file.
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | feat-backtest | — | Support-floor-based stops (Weinstein Ch. 7) |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` against universe (Item 2) |
-| [strategy-wiring](strategy-wiring.md) | IN_PROGRESS | feat-weinstein | — | `Synthetic_adl` into `Ad_bars.load` façade (Item 1) |
+| [strategy-wiring](strategy-wiring.md) | READY_FOR_REVIEW | feat-weinstein | #355 | Awaiting QC review |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | T3-A deep scan harness scaffolding review |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Solve open blockers (GH Actions runner, gh-auth, triggers) |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
