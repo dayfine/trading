@@ -1,6 +1,7 @@
 (tests
  (names
   test_ad_bars_unicorn
+  test_ad_bars_compose
   test_ad_bars_weekly_e2e
   test_bar_history
   test_macro_inputs
