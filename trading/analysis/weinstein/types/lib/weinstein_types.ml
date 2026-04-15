@@ -73,20 +73,29 @@ let gics_sector_to_string = function
   | Real_estate -> "Real Estate"
   | Communication_services -> "Communication Services"
 
+(* Also accepts Finviz's labels as aliases, so sectors.csv rows written
+   from the Finviz scraper (e.g. "Technology", "Financial", "Healthcare")
+   parse to the same gics_sector variants as canonical GICS spellings. *)
 let gics_sector_of_string_opt s =
   match String.lowercase s with
-  | "information technology" -> Some Information_technology
-  | "financials" -> Some Financials
-  | "health care" -> Some Health_care
+  | "information technology" | "technology" -> Some Information_technology
+  | "financials" | "financial" | "financial services" -> Some Financials
+  | "health care" | "healthcare" -> Some Health_care
   | "energy" -> Some Energy
   | "industrials" -> Some Industrials
-  | "consumer staples" -> Some Consumer_staples
-  | "consumer discretionary" -> Some Consumer_discretionary
+  | "consumer staples" | "consumer defensive" -> Some Consumer_staples
+  | "consumer discretionary" | "consumer cyclical" ->
+      Some Consumer_discretionary
   | "utilities" -> Some Utilities
-  | "materials" -> Some Materials
+  | "materials" | "basic materials" -> Some Materials
   | "real estate" -> Some Real_estate
   | "communication services" -> Some Communication_services
   | _ -> None
+
+let normalize_sector_name s =
+  match gics_sector_of_string_opt s with
+  | Some g -> gics_sector_to_string g
+  | None -> s
 
 type grade = A_plus | A | B | C | D | F [@@deriving show, eq, ord, sexp]
 

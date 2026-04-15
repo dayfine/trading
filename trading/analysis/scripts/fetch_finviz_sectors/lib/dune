@@ -8,6 +8,7 @@
   re
   status
   types
-  weinstein.data_source)
+  weinstein.data_source
+  weinstein.types)
  (preprocess
   (pps ppx_jane)))

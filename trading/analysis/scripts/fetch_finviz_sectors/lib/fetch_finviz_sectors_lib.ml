@@ -20,14 +20,18 @@ type fetch_fn = Uri.t -> string Status.status_or Deferred.t
 
 (* --- HTML parsing -------------------------------------------------------- *)
 
+(* Matches Finviz's current sector link: an anchor with the screener
+   filter query f=sec_<slug>, whose inner text is the sector display
+   name. Finviz's older snapshot-table layout with a td/b/a cell is
+   gone post-refactor. *)
 let _sector_re =
-  Re.compile
-    (Re.Perl.re ~opts:[ `Caseless; `Dotall ]
-       {|>Sector<[^>]*>.*?<td[^>]*><b><a[^>]*>([^<]+)</a>|})
+  Re.compile (Re.Perl.re ~opts:[ `Caseless ] {|f=sec_[a-z]+"[^>]*>([^<]+)<|})
 
 let parse_sector html =
   match Re.exec_opt _sector_re html with
-  | Some group -> Some (String.strip (Re.Group.get group 1))
+  | Some group ->
+      let raw = String.strip (Re.Group.get group 1) in
+      Some (Weinstein_types.normalize_sector_name raw)
   | None -> None
 
 (* --- Universe filtering -------------------------------------------------- *)
@@ -160,7 +164,8 @@ let fetch_one ~fetch ~rate_limit_rps symbol =
 
 (* --- Orchestration ------------------------------------------------------- *)
 
-let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols () =
+let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols
+    ?limit () =
   let%bind sym_list =
     match symbols with
     | Some s -> return s
@@ -184,8 +189,13 @@ let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols () =
        gate on resume — a stale manifest with a valid CSV still means
        the sectors we scraped before are still usable. *)
     let to_fetch =
-      if force then sym_list
-      else List.filter sym_list ~f:(fun sym -> not (Hashtbl.mem existing sym))
+      let filtered =
+        if force then sym_list
+        else List.filter sym_list ~f:(fun sym -> not (Hashtbl.mem existing sym))
+      in
+      match limit with
+      | Some n when n > 0 -> List.take filtered n
+      | _ -> filtered
     in
     (match load_manifest manifest_file with
     | Some m when not (manifest_is_fresh m ~max_age_days:30) ->

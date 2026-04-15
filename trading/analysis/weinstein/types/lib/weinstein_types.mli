@@ -107,5 +107,13 @@ val gics_sector_to_string : gics_sector -> string
     ["Information Technology"]). *)
 
 val gics_sector_of_string_opt : string -> gics_sector option
-(** Parse a sector name (case-insensitive). Returns [None] for unrecognized
-    names. *)
+(** Parse a sector name (case-insensitive). Also accepts Finviz's labels
+    ("Technology", "Financial", "Healthcare", "Basic Materials", "Consumer
+    Cyclical", "Consumer Defensive") as aliases, mapping them to the
+    corresponding GICS variant. Returns [None] for unrecognized names. *)
+
+val normalize_sector_name : string -> string
+(** Normalize [s] to the canonical GICS display spelling when recognized
+    (including via Finviz aliases). Unknown names are returned unchanged so no
+    data is dropped. Callers that need strictness should use
+    {!gics_sector_of_string_opt} directly. *)

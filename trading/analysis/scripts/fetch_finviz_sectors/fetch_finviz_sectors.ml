@@ -25,6 +25,11 @@ let command =
      and force =
        flag "force" no_arg
          ~doc:" Re-fetch all symbols even if manifest is fresh"
+     and limit =
+       flag "limit" (optional int)
+         ~doc:
+           "N Only fetch the first N symbols (after --force / skip filter); \
+            useful for dry-run / test runs"
      in
      let symbols =
        match symbols_flag with
@@ -38,6 +43,6 @@ let command =
      in
      fun () ->
        Fetch_finviz_sectors_lib.run ~data_dir ~rate_limit_rps:rate_limit ~force
-         ?symbols ())
+         ?symbols ?limit ())
 
 let () = Command_unix.run command
