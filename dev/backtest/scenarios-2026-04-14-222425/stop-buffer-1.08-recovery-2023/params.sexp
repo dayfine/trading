@@ -1,0 +1,5 @@
+((code_version dc4c91fcbf02138b4c76f0f083ca6d57ec918b6d)
+ (start_date 2023-01-02) (end_date 2023-12-31) (initial_cash 1000000.00)
+ (universe_size 1654) (data_dir /workspaces/trading-1/data)
+ (commission ((per_share 0.01) (minimum 1.00)))
+ (overrides (((initial_stop_buffer 1.08)))))

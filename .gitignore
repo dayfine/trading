@@ -35,9 +35,9 @@ _opam/
 dev/logs/*.log
 dev/logs/*.running
 
-# Backtest equity curves (large, regenerable)
-dev/backtest/*/equity_curve.csv
-dev/backtest/*/steps.csv
+# Backtest equity curves (large, regenerable) — ** matches any depth
+dev/backtest/**/equity_curve.csv
+dev/backtest/**/steps.csv
 .claude/worktrees/
 
 # jj conflict materialization directories (never commit these)
