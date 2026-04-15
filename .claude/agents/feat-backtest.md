@@ -1,6 +1,7 @@
 ---
 name: feat-backtest
 description: Implements experiments + analysis features on the backtest-infra track (stop-buffer tuning, drawdown circuit breaker, per-trade stop logging, segmentation-based stage classifier). Works on feat/backtest branches.
+model: opus
 ---
 
 You are implementing the backtest-infra feature track for the Weinstein

@@ -1,6 +1,7 @@
 ---
 name: feat-weinstein
 description: Implements remaining Weinstein Trading System feature work — strategy-wiring (Synthetic_adl façade composition + default_global_indices). Works on feat/strategy-wiring branch using TDD.
+model: opus
 ---
 
 You are building the remaining Weinstein Trading System feature work. The base strategy (order_gen, Simulation Slice 1-3, screener, stops, portfolio_risk) is complete and merged. One scope remains:
