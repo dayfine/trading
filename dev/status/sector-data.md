@@ -113,6 +113,41 @@ Estimate: ~250 lines OCaml + ~40 lines dune/tests.
 
 Estimate: ~20 lines of agent-def edits.
 
+### Item 4 — universe composition cleanup (drop mutual funds + noise)
+
+The current universe (derived from `sectors.csv` keys) carries symbols
+the Weinstein strategy will never trade: mutual funds (no intraday
+bars), extremely-low-volume ETFs (won't pass the volume filter
+anyway), ADRs / preferreds / warrants / units that are noise for a
+stage-analysis strategy. They inflate fetch / memory budgets and slow
+every simulation step linearly.
+
+Scope:
+- New `trading/analysis/scripts/universe_filter/universe_filter.ml`:
+  pure function `filter : Instrument_info.t list -> Instrument_info.t list`
+  applying rules by instrument type + exchange + symbol suffix +
+  (optional) average dollar-volume threshold.
+- Rule set (configurable, not hardcoded):
+  - Drop instrument types containing "Mutual Fund" / "Open-End Fund"
+  - Drop symbols matching patterns already in
+    `_is_likely_etf_or_index` in `fetch_finviz_sectors_lib` (suffixes
+    `.INDX`, `W`, `WS`, `-P*`, `.U`). Reuse or factor out shared logic.
+  - Optional: drop symbols with `avg_dollar_volume < $1M/day` when the
+    bars cache has enough history to compute it.
+- Wire into the `sectors.csv` rebuild path: filter the universe list
+  *before* passing it to the scraper, so we don't spend 1 req/sec on
+  tickers we'll throw away.
+- Hand-picked ETF allow-list kept outside the filter (SPY, QQQ, XL*
+  sector ETFs, a few large VTI/VOO/QQQ variants) so we don't lose the
+  sector-ETF inputs the strategy needs.
+
+Estimate: ~200 lines OCaml + ~60 lines tests + universe regen.
+
+Acceptance: rerunning the Finviz scraper on the filtered universe
+yields fewer errors (no more of the OTC "A*" junk that can't parse)
+and the resulting `sectors.csv` is smaller but still ≥5,000 rows of
+real common stock + ETFs.
+
 ## Not in scope
 - `Sector_map` loader changes — already works generically.
 - Weinstein strategy wiring — already consumes `ticker_sectors` via
