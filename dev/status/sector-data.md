@@ -1,9 +1,9 @@
 # Status: sector-data
 
-## Last updated: 2026-04-14
+## Last updated: 2026-04-15
 
 ## Status
-IN_PROGRESS — ready for pickup
+IN_PROGRESS — Item 1 complete (PR open), Items 2-3 pending
 
 ## Ownership
 `ops-data` agent — see `.claude/agents/ops-data.md`. Scope is data
@@ -60,9 +60,13 @@ EODHD stays available as a drop-in upgrade if Finviz becomes unstable.
 - Phase 0 validation on SSGA (2026-04-11) — confirmed the XLSX
   endpoint works but limited coverage. Kept as a backup source.
 - Existing `Sector_map.load` handles arbitrary-sized `sectors.csv`.
+- **Item 1 — `fetch_finviz_sectors.exe`** (2026-04-15) — implemented
+  and tested. 7 files, ~250 lines OCaml + ~170 lines tests. Uses
+  `cohttp-async` + `re` (regex) for HTML parsing. Builds and all 10
+  unit tests pass. Branch: `ops/sector-finviz-scraper`.
 
 ## In Progress
-- None yet.
+- None — waiting for Item 1 PR merge before Item 2 (one-shot run).
 
 ## Next Steps (work items — ops-data)
 

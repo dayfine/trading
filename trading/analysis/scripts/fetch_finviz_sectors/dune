@@ -1,0 +1,10 @@
+(executable
+ (name fetch_finviz_sectors)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  weinstein.data_source
+  fetch_finviz_sectors_lib)
+ (preprocess
+  (pps ppx_jane)))

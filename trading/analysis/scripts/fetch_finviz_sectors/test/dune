@@ -1,0 +1,13 @@
+(test
+ (name test_fetch_finviz_sectors)
+ (libraries
+  core
+  core_unix
+  async
+  ounit2
+  matchers
+  status
+  types
+  fetch_finviz_sectors_lib)
+ (preprocess
+  (pps ppx_jane)))
