@@ -1,0 +1,13 @@
+(library
+ (name fetch_finviz_sectors_lib)
+ (libraries
+  core
+  core_unix
+  async
+  cohttp-async
+  re
+  status
+  types
+  weinstein.data_source)
+ (preprocess
+  (pps ppx_jane)))
