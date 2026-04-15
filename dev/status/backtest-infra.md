@@ -3,7 +3,9 @@
 ## Last updated: 2026-04-14
 
 ## Status
-IN_PROGRESS — first experiment complete (hypothesis REJECTED on golden); framework formalization still open.
+IN_PROGRESS
+
+First experiment complete (stop-buffer hypothesis REJECTED on golden, see §Completed); framework formalization still open.
 
 ## Ownership
 `feat-backtest` agent — see `.claude/agents/feat-backtest.md`. Owns

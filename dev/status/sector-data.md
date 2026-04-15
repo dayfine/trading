@@ -3,7 +3,9 @@
 ## Last updated: 2026-04-15
 
 ## Status
-IN_PROGRESS — Item 1 complete (PR open), Items 2-3 pending
+IN_PROGRESS
+
+Item 1 merged (#349), Items 2-3 pending.
 
 ## Ownership
 `ops-data` agent — see `.claude/agents/ops-data.md`. Scope is data
@@ -14,7 +16,9 @@ consumes `data/sectors.csv` — it is format-agnostic and works with any
 row count, so no feature-code work is required to absorb a larger file.
 
 ## Interface stable
-YES — output file schema is fixed: `data/sectors.csv` with header
+YES
+
+Output file schema is fixed: `data/sectors.csv` with header
 `symbol,sector` and GICS sector names. New fetcher must write this exact
 schema so `Sector_map.load` keeps working unchanged.
 
