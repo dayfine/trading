@@ -104,13 +104,14 @@ docker exec <container-name> bash -c \
 ## When done with each item
 
 1. Mark `[x]` in `dev/status/harness.md` with a note: what was built, where it lives, how to verify
-2. Commit and push:
+2. Update the **harness** row in `dev/status/_index.md` — align Status, Owner, Open PR, and Next task with the change. Only touch your own row.
+3. Commit and push:
    ```
    jj describe -m "harness: <short description>"
    jj bookmark set harness/<short-name> -r @
    jj git push -b harness/<short-name> --allow-new
    ```
-3. **Open the PR** so the human doesn't have to chase down PR-less branches:
+4. **Open the PR** so the human doesn't have to chase down PR-less branches:
    ```
    GH_TOKEN=$GH_TOKEN jst submit harness/<short-name>
    ```
@@ -118,6 +119,6 @@ docker exec <container-name> bash -c \
    + `dev/run.sh` provides both jst and `GH_TOKEN`). If jst fails, surface
    the error in your return value rather than silently leaving the branch
    PR-less.
-4. Include in your return value: item completed, what changed, any follow-up or escalation items, and the PR URL.
+5. Include in your return value: item completed, what changed, any follow-up or escalation items, and the PR URL.
 
 Return a concise summary: which items completed, which are in progress, any blockers, and the PR URLs.

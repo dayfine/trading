@@ -521,6 +521,32 @@ Write the combined result to `dev/reviews/<feature>.md` (structural writes the b
 
 ---
 
+## Step 5.5: Reconcile `dev/status/_index.md`
+
+After all feature / harness / ops agents have returned and before the
+health-scanner fast scan, reconcile the status index so it reflects the
+state of the per-track status files. The index is the single-source
+view of all tracked work (Track | Status | Owner | Open PR(s) | Next
+task) — agents are expected to update their own row, but this step is
+the safety net.
+
+For each row in `dev/status/_index.md`:
+
+1. Read the corresponding `dev/status/<track>.md`.
+2. Compare against the row:
+   - **Status** — must match the `## Status` heading value (IN_PROGRESS / READY_FOR_REVIEW / MERGED / APPROVED / BLOCKED).
+   - **Owner** — must match `## Ownership` (or be `—` if the track has no active owner).
+   - **Open PR(s)** — cross-reference against `gh pr list` filtered to that track's branches; each currently-open PR targeting main that carries this track's work should appear.
+   - **Next task** — must be the top item from `## Next Steps` (or an equivalent synthesis of the most concrete pending item).
+3. If any cell drifts, fix it. Do not touch unrelated rows.
+4. Update the `Last updated:` line to today's date.
+
+If an IN_PROGRESS track has no Owner or no Next task, surface it in the
+daily summary's §Escalations as "unassigned work." Silent drift is the
+failure mode this step exists to prevent.
+
+---
+
 ## Step 6: Health scanner fast scan
 
 After all feature agents and QC have completed (or if no agents ran today), spawn a `health-scanner` subagent in fast mode:
