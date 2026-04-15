@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-14
+## Last updated: 2026-04-15
 
 ## Status
 IN_PROGRESS
@@ -70,6 +70,11 @@ None.
   at `dev/experiments/stop-buffer/report.md`. Outputs:
   `dev/backtest/scenarios-2026-04-14-222425/` (smoke) and
   `dev/backtest/scenarios-2026-04-14-225929/` (golden).
+- [x] **Per-trade stop logging** (#350, 2026-04-15) — `Stop_log`
+  observer + `Strategy_wrapper` capture stop levels and exit-trigger
+  type on each transition; `Result_writer` emits `entry_stop`,
+  `exit_stop`, `exit_trigger` columns in `trades.csv`. Unblocks
+  post-mortem of individual whipsaw exits.
 
 ## In progress
 None.
@@ -85,9 +90,9 @@ Alternatives ranked by expected value:
    place stops at prior correction lows. Adapts to each stock's structure.
 2. **Regime-aware stops**: use `Macro.analyze` trend to pick buffer width
    (tighter in bear, wider in bull). Testable via existing macro output.
-3. **Per-trade stop logging**: emit stop level + trigger type to
-   trades.csv so follow-up experiments can diagnose remaining stop-outs
-   at the per-trade level.
+
+Per-trade stop logging landed in #350 — now available as a diagnostic
+input for any of the above experiments.
 
 ### Immediate: experiment framework
 
@@ -109,8 +114,6 @@ is informed by actual needs.
 - **Drawdown circuit breaker** (Weinstein Ch. 7 — 20% threshold) — new
   feature, order_gen side. See
   `TODO(backtest-infra/drawdown-circuit-breaker)` when added.
-- **Per-trade stop logging** — augment `trades.csv` with the stop level
-  and which rule triggered. Enables post-mortem on whipsaws.
 - **Experiment framework formalization** — once 1-2 experiments show the
   shape.
 - **Token/cost tracking** (T3-E from harness.md) — unrelated to this track

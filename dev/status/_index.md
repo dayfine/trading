@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-14
+Last updated: 2026-04-15
 
 ## Active + complete tracks
 
