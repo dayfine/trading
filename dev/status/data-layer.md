@@ -24,32 +24,16 @@ YES
 - Add `get_daily_close` to `DATA_SOURCE` interface — needed by portfolio-stops for mid-week stop checks
 - ~~Universe cache writer~~: DONE — `analysis/scripts/fetch_universe/fetch_universe.exe` fetches from EODHD exchange-symbol-list, populates name/exchange. Sector/industry empty (fundamentals endpoint requires higher API tier). 24,529 Common Stock + ETF instruments.
 
-### Sector coverage expansion
+### Sector coverage expansion — tracked in dev/status/sector-data.md
 
-EODHD's fundamentals endpoint (which populates sector/industry) requires a
-higher API tier we're not on. The sector field is blank for most symbols in
-the inventory — only the manually-populated SPDR sector ETFs have labels,
-which is why `Sector_map` currently resolves via a composite key (see
-`dev/status/screener.md` §Followup — "Sector map key resolution").
+Expanding `data/sectors.csv` from 1,654 rows to ~5,000–8,000 is its own
+tracked unit. Owner: `ops-data`. Chosen path: Finviz scrape. Paid EODHD
+fundamentals and Yahoo summaryProfile remain fallbacks. SSGA SPDR holdings
+(`dev/notes/sector-data-plan.md`) is retained as an authoritative backup
+for S&P 500 validation but is too narrow to drive primary coverage.
 
-Alternatives worth evaluating:
-
-1. **Scrape Yahoo Finance** — the `summaryProfile` module on
-   `https://finance.yahoo.com/quote/<SYM>/profile/` has sector + industry.
-   Free, but rate-limited and terms-of-service grey-area.
-2. **Scrape Finviz** — `finviz.com/quote.ashx?t=<SYM>` has a compact stats
-   table including sector + industry + country. Historically stable layout.
-3. **Scrape Google Finance** — less structured; often pulls from Yahoo.
-4. **Paid tier on EODHD** — simplest; unclear cost vs value.
-5. **Upgrade to Polygon or IEX Cloud** for sector data — bigger migration.
-
-Recommended first pass: one-time Finviz scrape, cache the sector+industry
-mapping into `data/sectors.csv`, update `Sector_map.load` to use it. About
-8,000 common stocks; at 1 req/sec that's ~2 hours. Treat as a harness /
-ops-data task, not a runtime dependency.
-
-**Potential trading-behaviour impact.** Wider sector coverage changes which
-symbols pass the `Sector` screener filter. See
+**Potential trading-behaviour impact.** Wider sector coverage changes
+which symbols pass the `Sector` screener filter. See
 `dev/status/backtest-infra.md` §Potential experiments.
 
 ### Universe composition cleanup
