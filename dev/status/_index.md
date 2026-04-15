@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-15
+Last updated: 2026-04-14
 
 ## Active + complete tracks
 
@@ -16,7 +16,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | feat-backtest | — | Support-floor-based stops (Weinstein Ch. 7) |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` against universe (Item 2) |
 | [strategy-wiring](strategy-wiring.md) | IN_PROGRESS | feat-weinstein | — | `Synthetic_adl` into `Ad_bars.load` façade (Item 1) |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | T3-E cost/token budget visibility |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | T3-A deep scan harness scaffolding review |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Solve open blockers (GH Actions runner, gh-auth, triggers) |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
