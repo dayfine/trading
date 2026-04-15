@@ -132,3 +132,15 @@ When asked to fetch new symbols and update the inventory:
 ### Recommended next steps
 - <e.g. "Run fetch_universe.exe to populate sector metadata for universe.sexp">
 ```
+
+## Status file updates
+
+If your session advances a tracked data workstream (currently:
+`dev/status/sector-data.md`), at the end of the session update **both**:
+
+1. The relevant `dev/status/<track>.md` — Status, Completed, In Progress, Next Steps.
+2. `dev/status/_index.md` — the row for that track. Keep Status, Owner, Open PR, and Next task aligned with (1). Only touch your own row.
+
+Pure one-shot fetches that do not change a tracked workstream (e.g. a
+one-off symbol refresh) do not need index updates — write the Data
+Operations Report only.

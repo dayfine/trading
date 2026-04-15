@@ -88,4 +88,7 @@ If after **3 consecutive build-fix cycles** `dune build && dune runtest` is stil
 
 ## Status file updates
 
-Update `dev/status/strategy-wiring.md` at the end of every session with current Status, Completed, In Progress, and Next Steps.
+At the end of every session, update **both**:
+
+1. `dev/status/strategy-wiring.md` — current Status, Completed, In Progress, Next Steps.
+2. `dev/status/_index.md` — the row for this track. Keep Status, Owner, Open PR, and Next task aligned with (1). Only touch your own row.

@@ -122,6 +122,23 @@ the orchestrator does not act on this section)
 - `## Blocking Refactors` takes priority over feature work on the next run
 - `## Known gaps` is never empty-checked by automation; it is for human awareness only
 
+### 8. Index row update (required)
+
+At the end of every session, in addition to updating the track's own
+status file, update the corresponding row in `dev/status/_index.md`:
+
+- **Status** cell — mirrors the status file's `## Status`
+- **Owner** cell — this agent's name (usually unchanged)
+- **Open PR(s)** cell — PRs currently open against this track
+- **Next task** cell — the top-of-queue item from the status file's
+  `## Next Steps`
+
+Agents only touch their own row. Adding a new track to the system means
+creating the status file **and** adding a row to the index in the same
+commit. `lead-orchestrator` reconciles the index against all status
+files at end-of-run and flags drift, but agents should keep the row
+fresh so the index is usable between orchestrator runs.
+
 ---
 
 ## Architecture constraint
