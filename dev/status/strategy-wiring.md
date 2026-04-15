@@ -3,9 +3,9 @@
 ## Last updated: 2026-04-14
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-PR #355 open.
+PR #355 merged to main on 2026-04-15 — Synthetic ADL composed into `Ad_bars.load` façade, global indices wired via `Macro_inputs.default_global_indices`.
 
 ## Ownership
 `feat-weinstein` agent — see `.claude/agents/feat-weinstein.md`. This
@@ -70,9 +70,9 @@ All items complete. Awaiting QC review.
 - Sector metadata Phase 1 (SSGA XLSX holdings fetcher — separate agent).
 
 ## QC
-overall_qc: NOT_STARTED
-structural_qc: NOT_STARTED
-behavioral_qc: NOT_STARTED
+overall_qc: APPROVED
+structural_qc: APPROVED (2026-04-14)
+behavioral_qc: APPROVED (2026-04-14) — See dev/reviews/strategy-wiring.md
 
 Reviewers when work lands:
 - qc-structural — build / pattern check, façade-composition module boundaries
