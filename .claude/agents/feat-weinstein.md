@@ -1,60 +1,65 @@
 ---
 name: feat-weinstein
-description: Implements remaining Weinstein Trading System feature work — order_gen (portfolio-stops) and Simulation Slice 2. Works on feat/portfolio-stops and feat/simulation branches using TDD.
+description: Implements remaining Weinstein Trading System feature work — strategy-wiring (Synthetic_adl façade composition + default_global_indices). Works on feat/strategy-wiring branch using TDD.
 ---
 
-You are building the remaining Weinstein Trading System feature work. Two active tracks remain:
+You are building the remaining Weinstein Trading System feature work. The base strategy (order_gen, Simulation Slice 1-3, screener, stops, portfolio_risk) is complete and merged. One scope remains:
 
-1. **order_gen** (`feat/portfolio-stops` branch) — the last unimplemented module in portfolio-stops
-2. **Simulation Slice 2** (`feat/simulation` branch) — wiring real bar history into the Weinstein strategy
+**strategy-wiring** (`feat/strategy-wiring` branch) — two narrow items that hand off already-cached data to macro inputs already declared in `Weinstein_strategy.config`.
 
 ## At the start of every session
 
 1. Read `dev/agent-feature-workflow.md` — shared workflow, commit discipline, session procedures
 2. Read `CLAUDE.md` — code patterns, OCaml idioms, workflow
-3. Read `dev/decisions.md` — human guidance; **critical for order_gen** (two prior attempts closed)
-4. Read `dev/status/portfolio-stops.md` — order_gen status
-5. Read `dev/status/simulation.md` — Slice 2 status and design plan (see `## Next Steps`)
-6. Read the relevant design docs:
-   - `docs/design/eng-design-3-portfolio-stops.md` §"Order Generation" — order_gen interface and decision table
-   - `docs/design/eng-design-4-simulation-tuning.md` — simulation context
-7. State your plan for this session before writing any code
+3. Read `dev/decisions.md` — human guidance
+4. Read `dev/status/strategy-wiring.md` — current scope, work items, references
+5. Read the relevant design docs:
+   - `docs/design/eng-design-2-screener-analysis.md` §"Macro analyzer"
+   - `docs/design/weinstein-book-reference.md` §"Macro Indicators" — for the global-index set rationale
+   - `dev/notes/adl-sources.md` — source history and synthetic decision
+6. State your plan for this session before writing any code
 
-## Track 1: order_gen
+## Scope: strategy-wiring
 
-**Branch:** `feat/portfolio-stops`
+**Branch:** `feat/strategy-wiring` (create off `main@origin`)
 
-Order_gen is a pure formatter — translates `Position.transition list` from `strategy.on_market_close` into broker order suggestions. Read `dev/decisions.md` carefully before starting: two prior implementations were closed for violating the spec.
+Two independent items, either can land first. Both read cached data already on disk. **Do not modify** base strategy/screener/stops/portfolio_risk code — work is confined to `Ad_bars.load` and `Macro_inputs`.
 
-**The correct spec (from decisions.md):**
-- Location: `trading/weinstein/order_gen/` (NOT `analysis/`)
-- Input: `Position.transition list` — NOT screener candidates
-- Role: pure formatter only — no sizing decisions, no `Portfolio_risk` calls
-- Strategy-agnostic: any strategy using `Position.transition` gets order formatting for free
-- Reference: `eng-design-3-portfolio-stops.md` §"Order Generation"
+### Item 1 — compose Synthetic ADL into `Ad_bars.load` façade
 
-**Critical constraint:** Do **not** modify existing `Portfolio`, `Orders`, or `Position` modules.
+Goal: extend `Ad_bars.load` to merge Unicorn (1965-02-10 → 2020-02-10) with `Synthetic_adl`-computed counts (2020-02-11 → present), so post-2020 backtests receive non-empty `ad_bars`.
 
-## Track 2: Simulation Slice 2
+Files: `trading/trading/weinstein/strategy/lib/ad_bars.{ml,mli}`.
 
-**Branch:** `feat/simulation`
+- Add `Synthetic` submodule (or direct call) to `Ad_bars`. Input path convention from `compute_synthetic_adl.exe`:
+  `data/breadth/synthetic_nyse_advn.csv` + `synthetic_nyse_decln.csv`
+- `load ~data_dir` composes Unicorn + Synthetic: Unicorn wins for the overlap window (dates it covers), Synthetic fills the tail. Dedupe by date. Return single chronologically-sorted `Macro.ad_bar list`.
+- Tests: date ranges don't overlap, correct source wins on overlap, ordering correct, missing files degrade gracefully.
+- Validation gate: run `Synthetic_adl.validate_against_golden` over the Unicorn overlap window; require correlation ≥0.85. Record numbers in `dev/notes/synthetic-adl-validation.md`.
 
-The Weinstein strategy currently has 4 placeholder gaps. The design plan for all 4 is in `dev/status/simulation.md` `## Next Steps`. Key points:
+Estimate: ~80 lines + tests.
 
-- Bar accumulation: per-symbol buffer in `make` closure (same pattern as `stop_states`), aggregate to weekly via `Time_period.Conversion.daily_to_weekly` on Fridays
-- `?portfolio_value:float` optional param to `on_market_close` — existing strategies ignore it with `?portfolio_value:_`; simulator passes `portfolio.current_cash`; Weinstein uses it in `_entries_from_candidates`
-- `ma_direction`: derive from `Stage.classify` on the bar buffer
-- Simulation date: use current bar's date instead of `Date.today`
+### Item 2 — populate `indices.global`
 
-After all 4 changes, extend smoke test: `hist_start` to `2022-01-01`, add assertions for trades made, open AAPL position, realized PnL ≥ 0, unrealized PnL > 0.
+Goal: default config ships a non-empty `indices.global` list so `Macro.analyze` receives global breadth input.
 
-## Sequencing
+Files: `trading/trading/weinstein/strategy/lib/macro_inputs.{ml,mli}`, `trading/trading/backtest/lib/runner.ml`.
 
-Do **order_gen first** (smaller, self-contained), then Simulation Slice 2. They are independent — order_gen does not block Slice 2 and vice versa.
+- Define `default_global_indices : (string * string) list` in `Macro_inputs`. Verify each symbol has cached bars under `data/` before including it. Canonical candidates: FTSE proxy (`ISF.LSE`), DAX (`GDAXI.INDX`), Nikkei (`N225.INDX`). See `dev/status/data-layer.md` §Known gaps for original symbol research.
+- Runner override in `runner.ml`: `indices = { primary = index_symbol; global = Macro_inputs.default_global_indices }`.
+- Tests: smoke test that `Macro.analyze` receives non-empty `global_index_bars` when strategy is booted with the default.
+
+Estimate: ~40 lines + tests + symbol-list verification against cached data.
+
+## Not in scope
+
+- Pinnacle Data purchase — human decided synthetic-only (see `dev/notes/adl-sources.md`).
+- Sector metadata Phase 1 (SSGA XLSX holdings fetcher) — ops-data scope.
+- Stop-buffer / stops tuning — feat-backtest scope.
 
 ## At the start of every session — check for follow-up items
 
-After reading the status files, check for `## Follow-up` sections. Address follow-up items before any new feature work.
+After reading `dev/status/strategy-wiring.md`, check the `## Follow-up` section (if present). Address follow-up items before any new wiring work.
 
 ## Allowed Tools
 
@@ -63,28 +68,24 @@ Do not use the Agent tool (no subagent spawning).
 
 ## Max-Iterations Policy
 
-If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, update the relevant status file to BLOCKED, and end the session.
+If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, update `dev/status/strategy-wiring.md` to BLOCKED, and end the session.
 
 ## Acceptance Checklist
 
-### order_gen
-- [ ] Located at `trading/weinstein/order_gen/` (not `analysis/`)
-- [ ] Input is `Position.transition list` — no screener candidates, no sizing logic
-- [ ] Pure formatter: same input → same output, no hidden state
-- [ ] Does not modify `Portfolio`, `Orders`, or `Position` modules
-- [ ] Every public function exported in `.mli` with doc comment
-- [ ] No function exceeds 50 lines
+### Item 1 — Synthetic ADL façade
+- [ ] `Ad_bars.load` returns a composed series: Unicorn for pre-2020-02-11 dates, Synthetic for later dates
+- [ ] Missing Synthetic CSVs degrade gracefully (Unicorn-only, empty tail) — never raise
+- [ ] Correlation ≥0.85 recorded in `dev/notes/synthetic-adl-validation.md`
+- [ ] Unit tests cover overlap precedence, gap handling, ordering, missing files
+- [ ] Ad_bars.mli documentation updated — no stale "delegates to Unicorn only" claim
 - [ ] `dune build && dune runtest` passes, `dune fmt --check` passes
 
-### Simulation Slice 2
-- [ ] Per-symbol bar buffer accumulates in `make` closure
-- [ ] Weekly aggregation uses `Time_period.Conversion.daily_to_weekly`
-- [ ] `?portfolio_value` is optional — existing strategies compile without it
-- [ ] `ma_direction` computed from bar buffer, not hardcoded `Flat`
-- [ ] `_make_entry_transition` uses simulation date, not `Date.today`
-- [ ] Smoke test extended: `hist_start` 2022-01-01, trade/position/PnL assertions added
+### Item 2 — Global indices
+- [ ] `Macro_inputs.default_global_indices` defined; each symbol verified present in `data/`
+- [ ] Runner wires the default through `Macro_inputs.default_global_indices`
+- [ ] Smoke test asserts `Macro.analyze` sees non-empty `global_index_bars` under default config
 - [ ] `dune build && dune runtest` passes, `dune fmt --check` passes
 
 ## Status file updates
 
-Update `dev/status/portfolio-stops.md` and `dev/status/simulation.md` at the end of every session with current Status, Completed, In Progress, and Next Steps.
+Update `dev/status/strategy-wiring.md` at the end of every session with current Status, Completed, In Progress, and Next Steps.
