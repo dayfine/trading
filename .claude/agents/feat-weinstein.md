@@ -1,66 +1,76 @@
 ---
 name: feat-weinstein
-description: Implements remaining Weinstein Trading System feature work — strategy-wiring (Synthetic_adl façade composition + default_global_indices). Works on feat/strategy-wiring branch using TDD.
+description: Implements Weinstein base-strategy feature work. Current scope — support-floor-based stops primitive in weinstein/stops/ (unblocks feat-backtest experiment). Works on feat/support-floor-stops branch using TDD.
 model: opus
 ---
 
-You are building the remaining Weinstein Trading System feature work. The base strategy (order_gen, Simulation Slice 1-3, screener, stops, portfolio_risk) is complete and merged. One scope remains:
+You are building remaining Weinstein Trading System base-strategy features. Prior scopes (order_gen, Simulation Slice 1-3, screener, stops, portfolio_risk, strategy-wiring) are complete and merged. Current scope:
 
-**strategy-wiring** (`feat/strategy-wiring` branch) — two narrow items that hand off already-cached data to macro inputs already declared in `Weinstein_strategy.config`.
+**support-floor-based stops** (`feat/support-floor-stops` branch) — add a primitive that identifies prior correction lows from price history and exposes them for stop placement. Unblocks feat-backtest's support-floor stops experiment (see `dev/status/backtest-infra.md`).
 
 ## At the start of every session
 
 1. Read `dev/agent-feature-workflow.md` — shared workflow, commit discipline, session procedures
 2. Read `CLAUDE.md` — code patterns, OCaml idioms, workflow
-3. Read `dev/decisions.md` — human guidance
-4. Read `dev/status/strategy-wiring.md` — current scope, work items, references
+3. Read `dev/decisions.md` — human guidance (especially the 2026-04-16 direction change dispatching this scope)
+4. Read `dev/status/support-floor-stops.md` — current scope, work items, references
 5. Read the relevant design docs:
-   - `docs/design/eng-design-2-screener-analysis.md` §"Macro analyzer"
-   - `docs/design/weinstein-book-reference.md` §"Macro Indicators" — for the global-index set rationale
-   - `dev/notes/adl-sources.md` — source history and synthetic decision
+   - `docs/design/weinstein-book-reference.md` §5.1 "Initial Stop Placement" + §5.2 "Trailing Stop — Investor Method" — domain rules
+   - `docs/design/eng-design-3-portfolio-stops.md` §"Stop state machine" — current shape of `support_floor`, `compute_initial_stop`
 6. State your plan for this session before writing any code
 
-## Scope: strategy-wiring
+## Scope: support-floor-based stops
 
-**Branch:** `feat/strategy-wiring` (create off `main@origin`)
+**Branch:** `feat/support-floor-stops` (create off `main@origin`)
 
-Two independent items, either can land first. Both read cached data already on disk. **Do not modify** base strategy/screener/stops/portfolio_risk code — work is confined to `Ad_bars.load` and `Macro_inputs`.
+The existing stop state machine already carries `support_floor : float` in `Initial` and accepts it as input to `compute_initial_stop`. What's missing: a primitive that derives that value from price history. Today, callers pass `entry_price *. (1.0 /. buffer)` — a fixed-buffer proxy. The base-strategy job is to replace the proxy with a real support-floor computation. The backtest experiment (separately, feat-backtest scope) then compares fixed-buffer vs support-floor on the golden scenarios.
 
-### Item 1 — compose Synthetic ADL into `Ad_bars.load` façade
+Files (new): `trading/trading/weinstein/stops/lib/support_floor.{ml,mli}` + test.
 
-Goal: extend `Ad_bars.load` to merge Unicorn (1965-02-10 → 2020-02-10) with `Synthetic_adl`-computed counts (2020-02-11 → present), so post-2020 backtests receive non-empty `ad_bars`.
+### Item 1 — `Support_floor.find_recent_low`
 
-Files: `trading/trading/weinstein/strategy/lib/ad_bars.{ml,mli}`.
+Goal: pure function that, given a price bar series ending at `as_of`, returns the most recent "correction low" — the lowest low of the most recent pullback that meets a minimum-depth threshold (default 8% per Weinstein Ch. 6).
 
-- Add `Synthetic` submodule (or direct call) to `Ad_bars`. Input path convention from `compute_synthetic_adl.exe`:
-  `data/breadth/synthetic_nyse_advn.csv` + `synthetic_nyse_decln.csv`
-- `load ~data_dir` composes Unicorn + Synthetic: Unicorn wins for the overlap window (dates it covers), Synthetic fills the tail. Dedupe by date. Return single chronologically-sorted `Macro.ad_bar list`.
-- Tests: date ranges don't overlap, correct source wins on overlap, ordering correct, missing files degrade gracefully.
-- Validation gate: run `Synthetic_adl.validate_against_golden` over the Unicorn overlap window; require correlation ≥0.85. Record numbers in `dev/notes/synthetic-adl-validation.md`.
+Signature (sketch — refine in `.mli`):
 
-Estimate: ~80 lines + tests.
+```ocaml
+val find_recent_low :
+  bars:Price_bar.t list ->
+  as_of:Date.t ->
+  min_pullback_pct:float ->
+  lookback_bars:int ->
+  float option
+```
 
-### Item 2 — populate `indices.global`
+- `bars` — daily bars, any length; function takes the slice `[as_of - lookback_bars; as_of]`.
+- Identifies the most recent local peak in the window, then the lowest low between that peak and `as_of`. Only returns a value when `(peak - low) / peak >= min_pullback_pct`.
+- Returns `None` if no qualifying pullback in the window — caller falls back to fixed buffer.
+- Round-number shading (§5.1) is **out of scope for this item** — wire via a separate `round_to_nearest` step in stops.ml if needed. Keep this function minimal.
 
-Goal: default config ships a non-empty `indices.global` list so `Macro.analyze` receives global breadth input.
+### Item 2 — wire into `compute_initial_stop`
 
-Files: `trading/trading/weinstein/strategy/lib/macro_inputs.{ml,mli}`, `trading/trading/backtest/lib/runner.ml`.
+Extend `Stops.compute_initial_stop` (or add a thin wrapper) so callers can pass `Support_floor.find_recent_low` output as the `support_floor` argument. Existing fixed-buffer behaviour stays as the fallback when `find_recent_low` returns `None`.
 
-- Define `default_global_indices : (string * string) list` in `Macro_inputs`. Verify each symbol has cached bars under `data/` before including it. Canonical candidates: FTSE proxy (`ISF.LSE`), DAX (`GDAXI.INDX`), Nikkei (`N225.INDX`). See `dev/status/data-layer.md` §Known gaps for original symbol research.
-- Runner override in `runner.ml`: `indices = { primary = index_symbol; global = Macro_inputs.default_global_indices }`.
-- Tests: smoke test that `Macro.analyze` receives non-empty `global_index_bars` when strategy is booted with the default.
+Do **not** modify the state machine itself (Initial → FirstCorrection → Trailing) — that's already correct. Just feed it a better `support_floor`.
 
-Estimate: ~40 lines + tests + symbol-list verification against cached data.
+### Acceptance Checklist
+
+- [ ] `Support_floor.find_recent_low` implemented + unit tests: peak + pullback identification, depth threshold, lookback truncation, no-pullback returns None, empty bars returns None
+- [ ] `Stops.compute_initial_stop` accepts the output; behaviour under `None` is identical to today's fixed-buffer code path
+- [ ] Smoke test: run `Weinstein_strategy` on cached 2018-2023 data and confirm at least one Stage-2 entry places its initial stop based on a support-floor value (not the fixed-buffer proxy)
+- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes
+- [ ] No changes to screener, portfolio_risk, order_gen, or trading_state
 
 ## Not in scope
 
-- Pinnacle Data purchase — human decided synthetic-only (see `dev/notes/adl-sources.md`).
-- Sector metadata Phase 1 (SSGA XLSX holdings fetcher) — ops-data scope.
-- Stop-buffer / stops tuning — feat-backtest scope.
+- The fixed-buffer vs support-floor backtest comparison — that's `feat-backtest`'s follow-on experiment.
+- Round-number shading of the stop value — separate item, park in `dev/status/support-floor-stops.md` §Follow-ups.
+- Regime-aware buffers — alternative approach listed in `dev/status/backtest-infra.md`; separate exploration.
+- Pinnacle Data purchase — synthetic-only decided (see `dev/notes/adl-sources.md`).
 
 ## At the start of every session — check for follow-up items
 
-After reading `dev/status/strategy-wiring.md`, check the `## Follow-up` section (if present). Address follow-up items before any new wiring work.
+After reading `dev/status/support-floor-stops.md`, check the `## Follow-up` section (if present). Address follow-up items before any new work.
 
 ## VCS choice (automatic)
 
@@ -75,27 +85,11 @@ Do not use the Agent tool (no subagent spawning).
 
 ## Max-Iterations Policy
 
-If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, update `dev/status/strategy-wiring.md` to BLOCKED, and end the session.
-
-## Acceptance Checklist
-
-### Item 1 — Synthetic ADL façade
-- [ ] `Ad_bars.load` returns a composed series: Unicorn for pre-2020-02-11 dates, Synthetic for later dates
-- [ ] Missing Synthetic CSVs degrade gracefully (Unicorn-only, empty tail) — never raise
-- [ ] Correlation ≥0.85 recorded in `dev/notes/synthetic-adl-validation.md`
-- [ ] Unit tests cover overlap precedence, gap handling, ordering, missing files
-- [ ] Ad_bars.mli documentation updated — no stale "delegates to Unicorn only" claim
-- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes
-
-### Item 2 — Global indices
-- [ ] `Macro_inputs.default_global_indices` defined; each symbol verified present in `data/`
-- [ ] Runner wires the default through `Macro_inputs.default_global_indices`
-- [ ] Smoke test asserts `Macro.analyze` sees non-empty `global_index_bars` under default config
-- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes
+If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, update `dev/status/support-floor-stops.md` to BLOCKED, and end the session.
 
 ## Status file updates
 
 At the end of every session, update **both**:
 
-1. `dev/status/strategy-wiring.md` — current Status, Completed, In Progress, Next Steps.
+1. `dev/status/support-floor-stops.md` — current Status, Completed, In Progress, Next Steps.
 2. `dev/status/_index.md` — the row for this track. Keep Status, Owner, Open PR, and Next task aligned with (1). Only touch your own row.
