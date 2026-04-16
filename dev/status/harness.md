@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-14
+## Last updated: 2026-04-16
 
 ## Status
 IN_PROGRESS
@@ -59,7 +59,7 @@ IN_PROGRESS
 
 - [x] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations) — DONE: see completion note below
 - [x] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history) — DONE: see completion note below
-- [~] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
+- [x] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components) — DONE: Check 7 in `trading/devtools/checks/deep_scan.sh`; three heuristics (script not referenced, linter binary not wired, broken agent path ref); output under `## Harness Scaffolding` in `dev/health/YYYY-MM-DD-deep.md`. Verify: `sh trading/devtools/checks/deep_scan.sh` — report contains `## Harness Scaffolding` section.
 - [x] T3-A: `health-scanner` deep scan — feat-agent template compliance check (covered by T1-I: `agent_compliance_check.sh`)
 - [x] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
 - [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)

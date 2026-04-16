@@ -381,6 +381,12 @@ Writes to: `dev/health/<YYYY-MM-DD>-fast.md`. Agent definition: `.claude/agents/
   candidates for removal as model capability grows. Principle: *every harness
   component encodes an assumption about what the model cannot do on its own;*
   review those assumptions periodically.
+  **DONE (2026-04-16)**: Implemented as Check 7 in `trading/devtools/checks/deep_scan.sh`.
+  Three heuristics: H1 (shell script not referenced in dune/workflows/agents),
+  H2 (OCaml linter binary not wired into dune runtest), H3 (agent definition
+  references a harness script path that no longer exists). Output appended to
+  `dev/health/YYYY-MM-DD-deep.md` under `## Harness Scaffolding` — per-component
+  PASS/WARNING lines, no FAILs. See `dev/plans/t3a-harness-scaffolding-review-2026-04-16.md`.
 
 ### T3-B: AVR loop closure in `lead-orchestrator`
 
