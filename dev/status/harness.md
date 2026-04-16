@@ -59,7 +59,7 @@ IN_PROGRESS
 
 - [x] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations) — DONE: see completion note below
 - [x] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history) — DONE: see completion note below
-- [ ] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
+- [~] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components)
 - [x] T3-A: `health-scanner` deep scan — feat-agent template compliance check (covered by T1-I: `agent_compliance_check.sh`)
 - [x] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
 - [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)
