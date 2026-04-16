@@ -818,48 +818,7 @@ Count existing `dev/daily/${DATE}*.md` to pick the per-day session number N. Fir
 
 ---
 
-## Step 8: Push the daily summary branch and open its PR
-
-**GHA-only** (`$TRADING_IN_CONTAINER` set). In local runs, skip this step — the human reviews the file on disk and commits on their own cadence. In GHA the container dies at step exit, so an unpushed summary is lost. The workflow runtime no longer does this push for you (see PR #387); the orchestrator owns it.
-
-```bash
-# N = per-day session number from Step 7's filename.
-# Branch name mirrors the filename so the two counters stay in sync:
-#   dev/daily/${DATE}.md            → ops/daily-${DATE}
-#   dev/daily/${DATE}-runN.md       → ops/daily-${DATE}-runN
-DATE=$(date +%F)
-SUMMARY_FILE="$(ls -t dev/daily/${DATE}*.md | head -n 1)"
-BASENAME="$(basename "$SUMMARY_FILE" .md)"       # e.g. 2026-04-16 or 2026-04-16-run2
-BRANCH="ops/${BASENAME/#/daily-}"                # → ops/daily-2026-04-16[-runN]
-
-git config user.email "noreply@github.com"
-git config user.name "claude-orchestrator"
-
-jj bookmark set "$BRANCH" -r @
-jj git push -b "$BRANCH" --allow-new
-```
-
-Then open the PR via curl (the devcontainer has no `gh`):
-
-```bash
-export PR_TITLE="ops: daily orchestrator summary ${BASENAME}"
-export PR_BODY="Automated daily orchestrator run. See \`$SUMMARY_FILE\` for the full summary."
-export PR_BRANCH="$BRANCH"
-payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))')"
-curl -sSL -X POST \
-  -H "Authorization: Bearer ${GH_TOKEN}" \
-  -H "Accept: application/vnd.github+json" \
-  -d "$payload" \
-  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls"
-```
-
-If the PR already exists (re-run of the same session), a `422 A pull request already exists` is fine but noisy — detect it with a HEAD query before the POST.
-
-Flag in §Escalations if either the push or the PR-create fails: a summary without a PR is invisible to the human.
-
----
-
-## Step 8: Push the daily summary branch and open its PR
+## Step 8: Push the daily summary branch, open its PR, and auto-merge
 
 **GHA-only** (`$TRADING_IN_CONTAINER` set). In local runs, skip this step — the human reviews the file on disk and commits on their own cadence. In GHA the container dies at step exit, so an unpushed summary is lost. The workflow runtime no longer does this push for you (see PR #387); the orchestrator owns it.
 
@@ -886,17 +845,53 @@ Then open the PR via curl (the devcontainer has no `gh`):
 export PR_TITLE="ops: daily orchestrator summary ${BASENAME}"
 export PR_BODY="Automated daily orchestrator run. See \`$SUMMARY_FILE\` for the full summary."
 export PR_BRANCH="$BRANCH"
-payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))' )"
-curl -sSL -X POST \
+payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))')"
+CREATE_RESPONSE="$(curl -sSL -X POST \
   -H "Authorization: Bearer ${GH_TOKEN}" \
   -H "Accept: application/vnd.github+json" \
   -d "$payload" \
-  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls"
+  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls")"
+PR_NUMBER="$(printf '%s' "$CREATE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print(r.get("number",""))' 2>/dev/null || true)"
+
+# If PR already existed (422 A pull request already exists — same-session re-run),
+# look it up by branch so we still have a PR number for the auto-merge step.
+if [ -z "$PR_NUMBER" ]; then
+  OWNER="${GITHUB_REPOSITORY%/*}"
+  PR_NUMBER="$(curl -sSL \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls?head=${OWNER}:${BRANCH}&state=open" \
+    | python3 -c 'import json,sys;xs=json.load(sys.stdin);print(xs[0]["number"] if xs else "")')"
+fi
 ```
 
-If the PR already exists (re-run of the same session), a `422 A pull request already exists` is fine but noisy — detect it with a HEAD query before the POST.
-
 Flag in §Escalations if either the push or the PR-create fails: a summary without a PR is invisible to the human.
+
+### Step 8a: Auto-merge so the next run can see this summary
+
+The daily summary must land on `main` so **Step 1b of the next run** can read it — Step 1b reads `dev/daily/*.md` off the checked-out filesystem, which only reflects merged state. Leaving the summary PR open would block cross-run drift detection: the next run would read an older summary and miss the dispatch context.
+
+Summaries are observational (no code, no behavior changes), so auto-merging is low-risk. Use REST `PUT /merge`:
+
+```bash
+if [ -n "$PR_NUMBER" ]; then
+  MERGE_RESPONSE="$(curl -sSL -X PUT \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    -d '{"merge_method":"squash"}' \
+    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge")"
+  MERGED="$(printf '%s' "$MERGE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print("true" if r.get("merged") else "false")' 2>/dev/null || echo false)"
+  if [ "$MERGED" != "true" ]; then
+    # Branch protection (required CI checks, required reviews) or a transient
+    # conflict can block the merge. Surface as an escalation — do NOT retry in
+    # a loop; the next run will see the still-open summary PR and pick up from
+    # there once the human clears the block.
+    echo "AUTO_MERGE_FAILED pr=${PR_NUMBER} response=${MERGE_RESPONSE}"
+  fi
+fi
+```
+
+Flag in §Escalations when auto-merge fails: note the PR number and the GitHub response so the human can diagnose (most common cause: required status check that didn't run, or `main` branch-protection requiring a human reviewer).
 
 ---
 
