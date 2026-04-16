@@ -14,7 +14,7 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | READY_FOR_REVIEW | feat-backtest | feat/metrics-scenario-unrealized-pin | Pin per-scenario `unrealized_pnl` range (follow-up to merged #393). Still blocked on #382 for support-floor experiment |
-| [support-floor-stops](support-floor-stops.md) | READY_FOR_REVIEW | feat-weinstein | #382 | Merge #382 (overall_qc APPROVED this run) |
+| [support-floor-stops](support-floor-stops.md) | READY_FOR_REVIEW | feat-weinstein | #390 | Merge #390 (wrapper + wiring; PR A #382 already merged) |
 | [short-side-strategy](short-side-strategy.md) | PENDING | — | — | Blocked on PR A of support-floor split (`feat/support-floor-stops`) — primitive widening to long+short |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` + filter with updated default.sexp (Item 2) |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |

@@ -3,26 +3,24 @@
 ## Last updated: 2026-04-16
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
 ## Interface stable
-YES (primitive)
+YES
 
 ## Open PR
 - PR A (primitive, long + short) — #382 (see `feat/support-floor-stops`)
-- PR B (wrapper + strategy wiring, long side) — pending (stacked on PR A as `feat/support-floor-wiring`)
+- PR B (wrapper + strategy wiring, long side) — stacked on PR A (see `feat/support-floor-wiring`)
 
 ## Completed
 
 - `dev/plans/support-floor-stops-2026-04-16.md` — plan committed (first-deliverable plan-first trigger)
-- `Support_floor.find_recent_level` primitive (long + short) — implemented in `trading/trading/weinstein/stops/lib/support_floor.{ml,mli}` with 23 unit tests. Long returns the prior correction low (support floor); short returns the prior counter-rally high (resistance ceiling). Short-side lands with no caller yet; future short-side strategy will consume it.
-
-## In Progress (PR B)
-
-- `Weinstein_stops.compute_initial_stop_with_floor` wrapper — thread `~side` through to the primitive.
-- `Bar_history.daily_bars_for` helper.
-- Wire `compute_initial_stop_with_floor` into `Weinstein_strategy._make_entry_transition` (one call-site swap), long side only.
-- Backtest regression pin updates on 2018-2023 cached data.
+- `Support_floor.find_recent_level` primitive (long + short) — implemented in `trading/trading/weinstein/stops/lib/support_floor.{ml,mli}` with 23 unit tests covering long/short happy paths, depth thresholds, tie-breaking, lookback truncation, and degenerate inputs (empty, single bar, flat prices, zero lookback). Short-side symmetrically returns the prior counter-rally high (resistance ceiling) — lands with no caller yet; future short-side strategy will consume it.
+- `Weinstein_stops.compute_initial_stop_with_floor` wrapper — implemented in `weinstein_stops.{ml,mli}`; threads `~side` through to the primitive. 6 wrapper tests covering None-path parity with the fixed-buffer proxy (long + short) and Some-path using the identified level (long + short).
+- `stop_types.config` extended with `support_floor_lookback_bars : int` (default 90)
+- Wired `compute_initial_stop_with_floor` into `Weinstein_strategy._make_entry_transition` (one call-site swap) via `Bar_history.daily_bars_for` helper — long side only. Short-side wiring deferred (see `dev/status/short-side-strategy.md`).
+- Backtest regression pins updated on 2018-2023 cached data: 6YR round-trips 1W/6L → 4W/3L; COVID 0W/4L → 1W/3L; POS adds one sell — confirms the support-floor path fires on real entries (smoke check)
+- `dune build && dune runtest` green, `dune build @fmt` clean
 
 ## Ownership
 `feat-weinstein` agent — see `.claude/agents/feat-weinstein.md`. Dispatched per the 2026-04-16 direction change in `dev/decisions.md` to unblock feat-backtest's support-floor stops experiment (see `dev/status/backtest-infra.md` §Blocked on).
