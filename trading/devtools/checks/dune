@@ -109,9 +109,21 @@
 
 ; Cyclomatic complexity: CC > 10 = warning (not failure); exits 0 always.
 ; To generate the per-function JSON for trend analysis, run:
-;   cc_linter <trading-root> <path-to-dev/metrics/cc-YYYY-MM-DD.json>
+;   cc_linter <trading-root> dev/metrics/cc-latest.json
+; (deep_scan.sh writes to the same rolling file on each run.)
 
 (rule
  (alias runtest)
  (action
   (run %{exe:../cc_linter/cc_linter.exe} %{workspace_root})))
+
+; Deep scan Trends section (T3-G): structural smoke test.
+; Verifies deep_scan.sh contains the Check 8 Trends implementation
+; and that the most-recent deep scan report has ## Trends.
+; Does NOT run deep_scan.sh (weekly tool, not a per-PR gate).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:deep_scan_trends_check.sh})))

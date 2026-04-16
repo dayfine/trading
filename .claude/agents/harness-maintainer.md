@@ -94,7 +94,7 @@ The `health-scanner` agent (`.claude/agents/health-scanner.md`) is defined but t
 The health-scanner is read-only — it never modifies source or agent files. It writes findings to `dev/health/`. The fast scan runs post-orchestrator (after each lead-orchestrator run). Spec is in `docs/design/harness-engineering-plan.md` — extend it with the fast scan procedure if the spec is missing or incomplete. Then update the health-scanner agent definition to be self-sufficient: it should be able to run the fast scan without additional prompting.
 
 ### T1-Q: Cyclomatic complexity linter + QC quality score
-1. Extend `trading/devtools/fn_length_linter/fn_length_linter.ml` (already uses `compiler-libs`) to compute CC per function (branches in match/if/when + 1); CC > 10 = warning (not failure); output to `dev/metrics/cc-YYYY-MM-DD.json`
+1. Extend `trading/devtools/fn_length_linter/fn_length_linter.ml` (already uses `compiler-libs`) to compute CC per function (branches in match/if/when + 1); CC > 10 = warning (not failure); output to rolling `dev/metrics/cc-latest.json` (overwritten each deep-scan run; history in git log)
 2. Add `## Quality Score` (1–5 integer + one-sentence rationale) to `qc-behavioral.md` output format and checklist
 
 ## Verification
