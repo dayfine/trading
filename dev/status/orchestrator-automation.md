@@ -88,8 +88,18 @@ Six specific questions sent to the Claude Code guide. Results:
 
 The default `GITHUB_TOKEN` can push branches but won't trigger downstream
 workflows (CI won't run on `feat/*` branches created by the orchestrator's
-subagents). Need a **custom GitHub App** with `contents:write` so that pushes
-from the orchestrator re-trigger CI gates.
+subagents). Need a token whose pushes DO trigger downstream workflows.
+
+**Chosen approach: fine-grained Personal Access Token.** Simpler than a
+custom GitHub App for a single-developer setup; swap to an App later if
+the manual rotation burden (1 year expiration) becomes annoying.
+
+Setup steps (human, one-time):
+1. https://github.com/settings/tokens?type=beta → Generate new token
+2. Scope: `dayfine/trading` only
+3. Permissions: Contents R+W, Pull requests R+W
+4. Expiration: 1 year (set calendar reminder to rotate)
+5. Store as repo secret `BOT_GITHUB_TOKEN`
 
 ### 2. `docker exec <container-name>` in agent prompts
 
@@ -192,15 +202,10 @@ jobs:
       HOME: /home/opam
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/create-github-app-token@v2
-        id: app-token
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ steps.app-token.outputs.token }}
+          github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
           prompt: |
             Run the daily orchestrator session. Today is $(date +%Y-%m-%d).
             Read .claude/agents/lead-orchestrator.md and follow it.
@@ -220,10 +225,12 @@ jobs:
 ## Implementation sequencing
 
 1. Land #325 (publishes `trading-devcontainer:latest`) — **DONE**
-2. Create GitHub App via the action repo's [Quick Setup
-   Tool](https://github.com/anthropics/claude-code-action/blob/main/docs/create-app.html)
-   + set `APP_ID` / `APP_PRIVATE_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` repo
-   secrets (human, one-time)
+2. Human, one-time setup:
+   - Create fine-grained PAT at https://github.com/settings/tokens?type=beta
+     (scope: `dayfine/trading`, perms: Contents R+W + Pull requests R+W)
+     → store as repo secret `BOT_GITHUB_TOKEN`.
+   - Run `claude setup-token` on a subscription-authenticated machine
+     → store result as repo secret `CLAUDE_CODE_OAUTH_TOKEN`.
 3. Strip `docker exec` from agent prompts — add `dev/lib/run-in-env.sh`
    wrapper (see blocker §2), replace every hardcoded docker-exec +
    cd + opam-env prelude in the 7 agent definitions with a call to
