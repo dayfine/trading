@@ -87,6 +87,20 @@ jobs:
         id: today
         run: echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
+      - name: Colocate jj on the git checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          # actions/checkout@v4 produces a git-only tree. `jst submit`
+          # (stacked-PR tool used by feat-agents) requires .jj/, so we
+          # colocate jj on top of the existing git repo. This keeps git
+          # as the wire format (pushes, remotes, CI triggers) while
+          # giving agents the jj local-commit UX they use locally.
+          # Decided 2026-04-16 (see dev/decisions.md) — option (2) over
+          # adding gh CLI to the container.
+          jj git init --colocate
+          jj git fetch
+
       - name: Run lead-orchestrator
         uses: anthropics/claude-code-action@v1
         with:
