@@ -122,6 +122,60 @@ is informed by actual needs.
 - **Token/cost tracking** (T3-E from harness.md) — unrelated to this track
   but listed here historically.
 
+## Follow-up items (queued 2026-04-16)
+
+1. **Verify unrealized gain is meaningful in `summary.sexp`.** The
+   `UnrealizedPnl` metric is already emitted (from #304) and reads `0`
+   for the 2026-04-14 stop-buffer golden runs. That's suspicious for a
+   6-year simulation — either no positions are open at end-of-sim (by
+   coincidence? always?) or the computation has a bug. Read
+   `trading/simulation/lib/portfolio_state_computer.ml:23`
+   (`step.portfolio_value -. step.portfolio.current_cash`) and confirm
+   the final `step_result` actually carries open-position value. If the
+   metric is correct but simulations really do fully liquidate, add a
+   note to that effect — otherwise it looks like a logic gap every time
+   someone reads the summary.
+
+2. **Add annualized-return metric for apples-to-apples comparison
+   across scenarios.** CAGR already ships (compound annual growth rate
+   — strictly the annualized *compound* return). What we don't have is
+   a simple annualized simple-return variant, or a per-scenario
+   "annualized return" field in the summary table that's visible
+   without computation. Decide: (a) is CAGR enough and we just surface
+   it more prominently in the scenario-runner output, or (b) do we
+   need a second metric. Probably (a) — but pick consciously, document
+   the decision in Metric_types docstring, and close the ticket.
+
+3. **Rerun smoke + golden simulations once the Finviz sector mapping
+   is promoted.** The 2026-04-14 stop-buffer results were produced
+   against `data/sectors.csv` = 1,654 symbols. The live Finviz scrape
+   has that file at ~9,000 and the Item 4 universe filter
+   (#368) brings it back down to ~4,916 with different composition.
+   Screener behavior depends on sector-map coverage, so the baseline
+   and all published experiment deltas may shift. After #368 lands
+   and the filtered CSV is promoted: re-run `smoke/recovery-2023.sexp`
+   and all three `golden/six-year-2018-2023` buffer variants, compare
+   against the 2026-04-14 numbers in
+   `dev/experiments/stop-buffer/report.md`, update the report with a
+   post-sector-expansion addendum.
+
+4. **Consolidate "what data range do we have" into one document.**
+   Today it's scattered:
+   - Per-symbol price bar ranges live in `data/inventory.sexp` (fields
+     `first_date` / `last_date` per symbol).
+   - ADL Unicorn history documented in `dev/notes/adl-sources.md` as
+     1965-03-01 → 2020-02-10.
+   - Synthetic ADL coverage (post-2020-02-11) documented implicitly
+     in the composition rule in `trading/weinstein/strategy/lib/ad_bars.mli`.
+   - Sector ETFs cached in `data/<letter>/<XL...>/` but no aggregated
+     range.
+   - Global indices (FTSE/DAX/Nikkei) — per-symbol only.
+   Add `dev/notes/data-coverage.md` with a single table: dataset →
+   source → range → last refreshed. Written once, refreshed from
+   `data/inventory.sexp` by a small script run from the ops-data agent.
+   Makes it obvious at a glance when a backtest's requested window
+   exceeds available data for some input.
+
 ## Potential experiments (cross-functional — need feature work before runnable)
 
 These have trading-behaviour impact but require upstream feature work before
