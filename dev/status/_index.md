@@ -13,7 +13,8 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | feat-backtest | — | Support-floor-based stops (Weinstein Ch. 7) |
+| [backtest-infra](backtest-infra.md) | BLOCKED | feat-backtest | — | Waiting on support-floor-stops primitive (see row below) |
+| [support-floor-stops](support-floor-stops.md) | NOT_STARTED | feat-weinstein | — | Item 1 — `Support_floor.find_recent_low` primitive |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` + filter with updated default.sexp (Item 2) |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | T3-A deep scan harness scaffolding review |

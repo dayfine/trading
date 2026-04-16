@@ -43,6 +43,18 @@ _(None yet — system just initialized.)_
 
 ## Direction Changes
 
+### 2026-04-16 — Reopen feat-weinstein for support-floor-stops + close open escalations
+
+Decisions from the 2026-04-16-run1 orchestrator session (daily PR #375, §Escalations):
+
+- **Support-floor-based stops, cross-track dispatch** — choose **(a)**. Reopen `feat-weinstein` scope for the support-floor-stops primitive in `weinstein/stops/`. Agent definition at `.claude/agents/feat-weinstein.md` rewritten for this scope (`feat/support-floor-stops` branch). Status file at `dev/status/support-floor-stops.md`. Base-strategy-owned; `feat-backtest` picks up the experiment next run once the primitive lands. `dev/status/backtest-infra.md` §Blocked on updated to point at the new status file.
+
+- **GHA container tooling gap** — choose **(2)**. Workflow pre-step runs `jj git init --colocate && jj git fetch` so `jst submit` works from within the orchestrator container. Do not add `gh` CLI to the base image — `jj` + `jst` is the preferred path and aligns with local-dev tooling. Change lands in `.github/workflows/orchestrator.yml`.
+
+- **ADL live source** — **synthetic-only, confirmed.** No EODData registration, no Pinnacle evaluation. Synthetic ADL composed on top of Unicorn in `Ad_bars.load` (already shipped in strategy-wiring #355) is the permanent answer. Drop this from future escalations; update `dev/notes/adl-sources.md` to mark the decision final if it still reads as provisional.
+
+- **Stale remote branches** — pruned: `harness/dispatch-flow-revise`, `deps/opam-weekly`, `docs/backtest-data-followups`, `docs/decisions-update`, `dev/reviews/strategy-wiring-structural`, `dev/reviews/strategy-wiring-behavioral`. All were either already merged or had no open PR. Future orchestrator runs should only list branches with live PRs in §Integration Queue.
+
 ### 2026-04-14 — Backtest infrastructure has its own agent + Plan-first dispatch
 
 - **`feat-backtest` agent now owns the backtest-infra track.** Previously
