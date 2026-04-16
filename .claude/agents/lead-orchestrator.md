@@ -715,6 +715,51 @@ M? — <name> — requires: ...
 (Edit this section. Run dev/run.sh after editing to start the next session.)
 ```
 
+### Filename
+
+Count existing `dev/daily/${DATE}*.md` to pick the per-day session number N. First session of the day writes `dev/daily/${DATE}.md`; subsequent sessions write `dev/daily/${DATE}-runN.md` starting at `-run2`.
+
+---
+
+## Step 8: Push the daily summary branch and open its PR
+
+**GHA-only** (`$TRADING_IN_CONTAINER` set). In local runs, skip this step — the human reviews the file on disk and commits on their own cadence. In GHA the container dies at step exit, so an unpushed summary is lost. The workflow runtime no longer does this push for you (see PR #387); the orchestrator owns it.
+
+```bash
+# N = per-day session number from Step 7's filename.
+# Branch name mirrors the filename so the two counters stay in sync:
+#   dev/daily/${DATE}.md            → ops/daily-${DATE}
+#   dev/daily/${DATE}-runN.md       → ops/daily-${DATE}-runN
+DATE=$(date +%F)
+SUMMARY_FILE="$(ls -t dev/daily/${DATE}*.md | head -n 1)"
+BASENAME="$(basename "$SUMMARY_FILE" .md)"       # e.g. 2026-04-16 or 2026-04-16-run2
+BRANCH="ops/${BASENAME/#/daily-}"                # → ops/daily-2026-04-16[-runN]
+
+git config user.email "noreply@github.com"
+git config user.name "claude-orchestrator"
+
+jj bookmark set "$BRANCH" -r @
+jj git push -b "$BRANCH" --allow-new
+```
+
+Then open the PR via curl (the devcontainer has no `gh`):
+
+```bash
+export PR_TITLE="ops: daily orchestrator summary ${BASENAME}"
+export PR_BODY="Automated daily orchestrator run. See \`$SUMMARY_FILE\` for the full summary."
+export PR_BRANCH="$BRANCH"
+payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))')"
+curl -sSL -X POST \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  -d "$payload" \
+  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls"
+```
+
+If the PR already exists (re-run of the same session), a `422 A pull request already exists` is fine but noisy — detect it with a HEAD query before the POST.
+
+Flag in §Escalations if either the push or the PR-create fails: a summary without a PR is invisible to the human.
+
 ---
 
 ## Escalation policy
