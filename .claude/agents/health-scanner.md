@@ -124,7 +124,15 @@ Scan `dev/reviews/*.md` for NEEDS_REWORK findings that were subsequently re-revi
 
 **Step 8: Harness scaffolding review**
 
-Read `dev/status/harness.md` T1 Completed section. For each completed item, assess whether the verification step is still being exercised (e.g., the linter still runs, the compliance check still fires on violations). Flag any harness component whose underlying assumption may have been superseded.
+Check 7 in `trading/devtools/checks/deep_scan.sh` (already run in Phase 1) performs this check automatically and appends a `## Harness Scaffolding` section to the report. It covers three heuristics:
+
+- **H1** — shell scripts in `trading/devtools/checks/` not referenced in any dune file, GitHub workflow YAML, other script in the same directory, or any `.claude/agents/*.md`. Exempt: `_check_lib.sh`, `deep_scan.sh`, `write_audit.sh`.
+- **H2** — OCaml linter binaries (`fn_length_linter.exe`, `cc_linter.exe`, `nesting_linter.exe`) that are built but whose `%{exe:...}` reference does not appear in `trading/devtools/checks/dune`.
+- **H3** — `.claude/agents/*.md` files that reference a `devtools/checks/*.sh` path that no longer exists on disk.
+
+Output format: one line per component — `PASS: <name>` if referenced/wired, `WARNING: <name> — <reason>` if not. No FAILs (advisory only).
+
+If Phase 1 produced a `## Harness Scaffolding` section with WARNING lines, include those in the `## Warnings` section of this report. If all lines are PASS, record it as an Info item: "Harness scaffolding: all N components pass."
 
 **Step 9: Append agentic findings**
 
