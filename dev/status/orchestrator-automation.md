@@ -94,17 +94,58 @@ from the orchestrator re-trigger CI gates.
 ### 2. `docker exec <container-name>` in agent prompts
 
 Every feat-agent / QC-agent prompt template bakes in
-`docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && ...'`.
+`docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && ...'`.
 In the GHA runner the runner IS the container, so these commands fail. Needs
 a systematic refactor of the prompt templates in:
 
 - `.claude/agents/lead-orchestrator.md` Step 4 (feat-agent prompt template)
 - `.claude/agents/feat-weinstein.md` Verification section
+- `.claude/agents/feat-backtest.md`
 - `.claude/agents/harness-maintainer.md` Verification section
-- `.claude/agents/qc-structural.md`, `qc-behavioral.md` (if they reference it)
+- `.claude/agents/ops-data.md`
+- `.claude/agents/health-scanner.md`
+- `.claude/agents/qc-structural.md`
 
-Replace with a parameter or env var (`$TRADING_BASH_PREFIX`) that expands to
-`docker exec ...` locally and to the empty string in GHA.
+**Chosen approach: wrapper script**, not an env-var prefix. The env-var
+prefix (earlier plan) is fragile: it can't cleanly hold the `cd` +
+`eval $(opam env)` context, the single-quote shell wrapping changes
+between the two modes, and agents may "helpfully" expand or omit the
+prefix in ways that drift silently.
+
+New plan — add `dev/lib/run-in-env.sh`:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+TRADING_ROOT="/workspaces/trading-1/trading"
+if [ -z "${TRADING_IN_CONTAINER:-}" ]; then
+  exec docker exec -e EODHD_API_KEY trading-1-dev bash -c \
+    "cd $TRADING_ROOT && eval \$(opam env) && $*"
+else
+  cd "$TRADING_ROOT"
+  eval "$(opam env)"
+  exec "$@"
+fi
+```
+
+Every agent prompt replaces:
+
+```
+docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build'
+```
+
+with:
+
+```
+dev/lib/run-in-env.sh dune build
+```
+
+- `dev/run.sh` does not set `TRADING_IN_CONTAINER`; the script defaults
+  to the `docker exec` path.
+- The GHA workflow sets `TRADING_IN_CONTAINER=1` at the step level; the
+  script takes the native path.
+- Agents see one pattern across environments. Context-setting
+  (cd + opam env) is centralized in the script, not repeated per prompt.
 
 ### 3. Publish `trading-devcontainer` image to GHCR
 
@@ -183,9 +224,12 @@ jobs:
    Tool](https://github.com/anthropics/claude-code-action/blob/main/docs/create-app.html)
    + set `APP_ID` / `APP_PRIVATE_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` repo
    secrets (human, one-time)
-3. Strip `docker exec` from agent prompts — single PR, cross-cuts several
-   agent definitions but small diff. Introduce `$TRADING_BASH_PREFIX`
-   env var (empty in GHA, `docker exec trading-1-dev ` locally).
+3. Strip `docker exec` from agent prompts — add `dev/lib/run-in-env.sh`
+   wrapper (see blocker §2), replace every hardcoded docker-exec +
+   cd + opam-env prelude in the 7 agent definitions with a call to
+   the wrapper. Single PR, wide but mechanical diff. Works locally
+   (default: docker-exec path) and in GHA (when `TRADING_IN_CONTAINER=1`
+   is set at the job env level, takes native path).
 4. Add `.github/workflows/orchestrator.yml` with `workflow_dispatch` only
    (no cron yet) — dogfood manually. Include a post-step that parses
    the daily summary for §Escalations and fails the job if non-empty.
