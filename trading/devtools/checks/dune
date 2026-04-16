@@ -109,7 +109,8 @@
 
 ; Cyclomatic complexity: CC > 10 = warning (not failure); exits 0 always.
 ; To generate the per-function JSON for trend analysis, run:
-;   cc_linter <trading-root> <path-to-dev/metrics/cc-YYYY-MM-DD.json>
+;   cc_linter <trading-root> dev/metrics/cc-latest.json
+; (deep_scan.sh writes to the same rolling file on each run.)
 
 (rule
  (alias runtest)

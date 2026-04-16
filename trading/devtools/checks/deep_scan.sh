@@ -702,21 +702,20 @@ done
 if [ -z "$CC_LINTER_BIN" ]; then
   TRENDS_CONTENT="${TRENDS_CONTENT}cc_linter binary not available — run \`dune build\` first.\n\n"
 else
-  # Generate today's CC JSON
-  TODAY_CC_JSON="${METRICS_DIR}/cc-${TODAY}.json"
+  # Single rolling snapshot cc-latest.json (version-controlled; overwritten
+  # each run). Previous state comes from git HEAD so we don't accumulate
+  # one JSON per run in-tree.
+  TODAY_CC_JSON="${METRICS_DIR}/cc-latest.json"
+  PREV_CC_JSON="$(mktemp -t cc-prev-XXXXXX.json)"
+  trap 'rm -f "$PREV_CC_JSON"' EXIT
+  if ! git -C "$REPO_ROOT" show "HEAD:dev/metrics/cc-latest.json" >"$PREV_CC_JSON" 2>/dev/null; then
+    PREV_CC_JSON=""
+  fi
   "$CC_LINTER_BIN" "$TRADING_DIR" "$TODAY_CC_JSON" >/dev/null 2>&1 || true
 
   if [ ! -f "$TODAY_CC_JSON" ]; then
     TRENDS_CONTENT="${TRENDS_CONTENT}cc_linter failed to write JSON output.\n\n"
   else
-    # Find the most-recent previous cc-*.json (not today's)
-    PREV_CC_JSON=""
-    for f in $(ls -1 "${METRICS_DIR}"/cc-*.json 2>/dev/null | sort); do
-      case "$(basename "$f")" in
-        "cc-${TODAY}.json") continue ;;
-      esac
-      PREV_CC_JSON="$f"
-    done
 
     # Compute bucket distribution from a JSON file using python3.
     # Outputs three numbers on one line: "low mid high" where
@@ -754,7 +753,7 @@ PYEOF
     today_high="$(echo "$today_buckets" | awk '{print $3}')"
 
     if [ -n "$PREV_CC_JSON" ]; then
-      prev_date_cc="$(basename "$PREV_CC_JSON" .json | sed 's/^cc-//')"
+      prev_date_cc="$(git -C "$REPO_ROOT" log -1 --format='%h' -- dev/metrics/cc-latest.json 2>/dev/null || echo 'HEAD')"
       prev_buckets="$(_cc_buckets "$PREV_CC_JSON" 2>/dev/null || echo "? ? ?")"
       prev_low="$(echo "$prev_buckets" | awk '{print $1}')"
       prev_mid="$(echo "$prev_buckets" | awk '{print $2}')"
