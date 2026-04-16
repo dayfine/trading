@@ -1,6 +1,6 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-04-15
+## Last updated: 2026-04-16
 
 ## Status
 IN_PROGRESS
@@ -255,6 +255,85 @@ completes step 2:
   it — `harness-maintainer` track. Workflow file with `workflow_dispatch`-
   only trigger is safe to land before secrets exist; the first dispatch
   attempt will just fail authorization until the human finishes step 2.
+
+## Phase 2: adopt background execution
+
+Once Phase 1 (the manual `workflow_dispatch` path above) is reliably
+producing daily summary PRs, move from "orchestrator does one thing at
+a time" to "orchestrator fires independent work concurrently." Phase 2
+cuts wall-time by running scrapes, backtests, and some QC steps in
+parallel instead of serial.
+
+### Research findings (2026-04-16)
+
+From a Claude Code guide research session:
+
+- **`Agent` tool `run_in_background: true`** is documented in Claude
+  Code docs. Subagents run concurrently while the parent continues;
+  parent is notified on completion. Works with `isolation: "worktree"`.
+  Experimentally confirmed in this repo (earlier today we dispatched
+  parallel subagents via the non-background path; background mode is
+  the same tool shape with a flag).
+- **`Bash` tool `run_in_background`** is present in the in-harness tool
+  schema but **not documented in public Claude Code docs**. The
+  documented alternative is the **Monitor tool** (v2.1.98+), which
+  runs a script in background and streams stdout back line-by-line
+  so the agent can react mid-conversation.
+- **`anthropics/claude-code-action@v1` (GHA) background behavior:
+  UNKNOWN** — docs are silent on whether the action supports
+  background tool use or forces serial execution. Needs empirical
+  test on a dogfood run with `show_full_output: true`.
+
+### Three concrete wins (same pattern, same shape, both environments)
+
+1. **Scraper dispatches (ops-data).** The Finviz sector scrape is
+   ~2.2h; today it blocks a terminal. Background `Bash` + Monitor
+   tool lets the orchestrator kick it off and keep working.
+
+2. **Golden backtest re-runs (backtest-infra).** Three buffer
+   variants × ~40 min each. Today they serialize (~2h total). As
+   three background subagents with worktree isolation: ~40 min total.
+
+3. **QC pipeline cross-feature parallelism.** The current serial
+   gate is correct WITHIN a feature (qc-behavioral waits on
+   qc-structural APPROVED for the same feature). Across features,
+   QC for feature A can run in parallel with implementation for
+   feature B — that's the pattern background Agent dispatch enables.
+
+### Environment split (hypothesis — confirm before committing)
+
+| Env | Background `Bash` | Background `Agent` | Confidence |
+|---|---|---|---|
+| Local (`claude -p`) | Works (in tool schema; empirically used today) | Works (documented; empirically used today) | High |
+| GHA (`claude-code-action@v1`) | Unknown | Unknown | Zero |
+
+If GHA forces serial tool use, we fall back to the same env-split
+pattern used elsewhere: background locally, sequential in GHA. If
+GHA supports background execution, we get the wall-time wins in both.
+
+### Rollout sequence
+
+Test before commit — pattern is the same, feasibility differs by env.
+
+1. **Empirical test locally first.** Convert ONE existing slow op
+   (suggest Finviz scraper) to `Bash run_in_background: true` +
+   Monitor. Confirm: (a) the command runs, (b) the agent gets a
+   completion notification, (c) the agent can read the output after.
+   Document findings in `dev/notes/background-execution.md` (new file).
+2. **Empirical test in GHA.** Run the same op via the action with
+   `show_full_output: true` (landing in #371). Watch the log: does
+   the tool call return before the op completes, or does the action
+   block? Record the result.
+3. **Roll out based on findings.** For confirmed envs: update the
+   three concrete wins above (scraper → background; golden re-runs →
+   background subagents; QC cross-feature → background). For
+   unconfirmed envs: keep serial as today's behavior.
+
+### Prerequisites
+- Phase 1 stable (Phase 2 depends on being able to observe what the
+  orchestrator does in GHA — #371's `show_full_output: true` is the
+  enabler).
+- One successful daily-summary PR round-trip first.
 
 ## References
 
