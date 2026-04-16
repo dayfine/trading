@@ -1,6 +1,6 @@
 # Status: sector-data
 
-## Last updated: 2026-04-15
+## Last updated: 2026-04-16
 
 ## Status
 IN_PROGRESS
@@ -73,6 +73,28 @@ EODHD stays available as a drop-in upgrade if Finviz becomes unstable.
   `Symbol_pattern` / `Keep_allowlist` rules loaded from
   `dev/config/universe_filter/<name>.sexp`. 10 unit tests pass.
   Branch: `ops/universe-filter`.
+
+- **Item 4.1 — REIT / royalty trust rescue** (2026-04-16) — added
+  `Keep_if_sector` rule variant to `universe_filter_lib` and updated
+  `dev/config/universe_filter/default.sexp`. Real Estate, Energy, and
+  Materials are rescued before the `Name_pattern` fires, preventing 51
+  Real Estate REITs and ~5 royalty trusts from being dropped.
+  Branch: `ops/sector-filter-reit-rescue`. Files changed:
+  `trading/analysis/scripts/universe_filter/lib/universe_filter_lib.{ml,mli}`,
+  `trading/analysis/scripts/universe_filter/test/test_universe_filter.ml`,
+  `dev/config/universe_filter/default.sexp`.
+  19 unit tests pass (3 new: AAT rescued, AAAA still dropped, SPY still kept).
+
+  Expected before → after delta (based on iteration 2 dry-run counts):
+
+  | sector | before | after (iter 2) | after (4.1) | Δ (4.1) |
+  |---|---:|---:|---:|---:|
+  | Real Estate | 235 | 184 | 235 | **+51** |
+  | Energy | 214 | 213 | 214 | +1 |
+  | Materials | 251 | 250 | 251 | +1 |
+  | **total kept** | **9,041** | **4,916** | **~4,969** | **+53** |
+
+- **Item 4 (Iteration 1)** — original symbol-suffix rule-set (2026-04-14):
 
   Dry-run against `data/sectors.csv` (8,255 rows as of 2026-04-14):
 
@@ -210,14 +232,10 @@ the rule to exclude these.
 
 **Follow-up items:**
 
-- Item 4.1 — tighten `Trust` match so legitimate REITs and royalty
-  trusts are not swept up. Options: (a) add an REIT-sector allow-list
-  clause (preserve anything with `sector = "Real Estate"` regardless
-  of name), (b) change the regex from `\bTrust\b` to
-  `\b(ETF Trust|Unit Trust|Statutory Trust|ETF)\b` targeting the
-  fund-style Trust phrases only, (c) move `Trust` behind a second
-  filter that also checks `exchange ∈ {NYSE ARCA, BATS}`. Option (a)
-  is the cheapest and safest.
+- Item 4.1 — **DONE (2026-04-16)**. Added `Keep_if_sector` variant;
+  see Completed section above. Options (b) and (c) remain as future
+  refinements if stricter trust-phrase targeting is ever needed, but
+  option (a) is sufficient to eliminate the collateral damage.
 - Items 5-7 (original follow-ups from Iteration 1) remain open —
   industry_pattern, volume/market-cap gate, and the `warrant_len>3_endsW`
   cleanup are still relevant if we want to drive the filter beyond
