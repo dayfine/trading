@@ -1,17 +1,20 @@
-(** Tests for [Support_floor.find_recent_level].
+(** Tests for [Support_floor.find_recent_level] and the
+    [compute_initial_stop_with_floor] wrapper.
 
-    Scenarios cover peak/trough + counter-move identification, depth
+    Primitive scenarios cover peak/trough + counter-move identification, depth
     thresholding, lookback truncation, tie-breaking, and degenerate inputs
-    (empty, single bar, monotonic series, flat prices).
+    (empty, single bar, monotonic series, flat prices). Long and short sides are
+    covered symmetrically.
 
-    Long and short sides are covered symmetrically: long looks for a prior
-    correction low (support floor); short looks for a prior counter-rally high
-    (resistance ceiling). *)
+    Wrapper scenarios verify the [None] fallback path matches the pre-primitive
+    fixed-buffer proxy and the [Some] path uses the identified level as the stop
+    reference. *)
 
 open OUnit2
 open Core
 open Matchers
 open Trading_base.Types
+open Weinstein_stops
 module Support_floor = Weinstein_stops.Support_floor
 
 (* ---- Test helpers ---- *)
@@ -426,6 +429,153 @@ let test_zero_lookback_returns_none _ =
        ~side:Long ~min_pullback_pct:0.08 ~lookback_bars:0)
     is_none
 
+(* ==================================================================== *)
+(*            compute_initial_stop_with_floor wrapper tests             *)
+(* ==================================================================== *)
+
+let cfg = default_config
+
+(* Matches the proxy the strategy used before this primitive existed. *)
+let fallback_buffer = 1.02
+
+(* ---- None path: wrapper === pre-primitive direct call ---- *)
+
+let test_wrapper_empty_bars_matches_proxy _ =
+  (* No bars at all: primitive returns None, wrapper uses
+     entry_price *. fallback_buffer as reference_level. Compare against a
+     direct compute_initial_stop call with that same reference. *)
+  let entry_price = 100.0 in
+  let direct =
+    compute_initial_stop ~config:cfg ~side:Long
+      ~reference_level:(entry_price *. fallback_buffer)
+  in
+  let wrapped =
+    compute_initial_stop_with_floor ~config:cfg ~side:Long ~entry_price ~bars:[]
+      ~as_of:(Date.of_string "2024-01-05")
+      ~fallback_buffer
+  in
+  assert_that wrapped (equal_to (direct : stop_state))
+
+let test_wrapper_no_qualifying_pullback_matches_proxy _ =
+  (* Bars present but no qualifying pullback (flat series): fallback path. *)
+  let entry_price = 100.0 in
+  let bars =
+    [
+      make_bar ~date:"2024-01-01" ~high:101.0 ~low:99.0 ~close:100.0;
+      make_bar ~date:"2024-01-02" ~high:102.0 ~low:99.5 ~close:100.5;
+      make_bar ~date:"2024-01-03" ~high:102.0 ~low:100.0 ~close:101.0;
+    ]
+  in
+  let direct =
+    compute_initial_stop ~config:cfg ~side:Long
+      ~reference_level:(entry_price *. fallback_buffer)
+  in
+  let wrapped =
+    compute_initial_stop_with_floor ~config:cfg ~side:Long ~entry_price ~bars
+      ~as_of:(Date.of_string "2024-01-03")
+      ~fallback_buffer
+  in
+  assert_that wrapped (equal_to (direct : stop_state))
+
+let test_wrapper_short_no_qualifying_rally_falls_back _ =
+  (* Short side: bars present but no qualifying counter-rally. Falls back
+     to entry_price /. fallback_buffer (stop placed above entry). *)
+  let entry_price = 100.0 in
+  let bars =
+    [
+      make_bar ~date:"2024-01-01" ~high:101.0 ~low:99.0 ~close:100.0;
+      make_bar ~date:"2024-01-02" ~high:102.0 ~low:99.5 ~close:100.5;
+      make_bar ~date:"2024-01-03" ~high:102.0 ~low:100.0 ~close:101.0;
+    ]
+  in
+  let direct =
+    compute_initial_stop ~config:cfg ~side:Short
+      ~reference_level:(entry_price /. fallback_buffer)
+  in
+  let wrapped =
+    compute_initial_stop_with_floor ~config:cfg ~side:Short ~entry_price ~bars
+      ~as_of:(Date.of_string "2024-01-03")
+      ~fallback_buffer
+  in
+  assert_that wrapped (equal_to (direct : stop_state))
+
+(* ---- Some path: wrapper uses the support level as reference ---- *)
+
+let test_wrapper_long_uses_support_floor_when_available _ =
+  (* Clear peak + correction in recent bars — primitive returns Some 98.0.
+     Wrapper should build an Initial state with reference_level=98.0 (the
+     identified correction low), not entry_price*fallback_buffer. *)
+  let entry_price = 109.0 in
+  let bars =
+    [
+      make_bar ~date:"2024-01-01" ~high:102.0 ~low:100.0 ~close:101.0;
+      make_bar ~date:"2024-01-02" ~high:110.0 ~low:108.0 ~close:109.0;
+      make_bar ~date:"2024-01-03" ~high:101.0 ~low:99.0 ~close:100.0;
+      make_bar ~date:"2024-01-04" ~high:103.0 ~low:98.0 ~close:102.0;
+      make_bar ~date:"2024-01-05" ~high:109.0 ~low:105.0 ~close:108.0;
+    ]
+  in
+  let wrapped =
+    compute_initial_stop_with_floor ~config:cfg ~side:Long ~entry_price ~bars
+      ~as_of:(Date.of_string "2024-01-05")
+      ~fallback_buffer
+  in
+  assert_that wrapped
+    (matching ~msg:"Expected Initial state with support-floor reference"
+       (function
+         | Initial { reference_level; _ } -> Some reference_level | _ -> None)
+       (float_equal 98.0))
+
+let test_wrapper_short_uses_resistance_ceiling_when_available _ =
+  (* Mirror of the long support-floor test — short side picks up a rally
+     high of 102.0 from a recent trough. Wrapper should build an Initial
+     state with reference_level=102.0 (not entry_price/fallback_buffer). *)
+  let entry_price = 91.0 in
+  let bars =
+    [
+      make_bar ~date:"2024-01-01" ~high:100.0 ~low:99.0 ~close:99.5;
+      make_bar ~date:"2024-01-02" ~high:92.0 ~low:90.0 ~close:91.0;
+      make_bar ~date:"2024-01-03" ~high:100.0 ~low:98.0 ~close:99.0;
+      make_bar ~date:"2024-01-04" ~high:102.0 ~low:97.0 ~close:98.0;
+      make_bar ~date:"2024-01-05" ~high:95.0 ~low:92.0 ~close:93.0;
+    ]
+  in
+  let wrapped =
+    compute_initial_stop_with_floor ~config:cfg ~side:Short ~entry_price ~bars
+      ~as_of:(Date.of_string "2024-01-05")
+      ~fallback_buffer
+  in
+  assert_that wrapped
+    (matching ~msg:"Expected Initial state with resistance-ceiling reference"
+       (function
+         | Initial { reference_level; _ } -> Some reference_level | _ -> None)
+       (float_equal 102.0))
+
+let test_wrapper_support_floor_vs_proxy_differs _ =
+  (* Regression: same entry + same bars, compare support-floor path to the
+     naive proxy path. They MUST produce different stops, else the primitive
+     is inert. *)
+  let entry_price = 109.0 in
+  let bars =
+    [
+      make_bar ~date:"2024-01-01" ~high:102.0 ~low:100.0 ~close:101.0;
+      make_bar ~date:"2024-01-02" ~high:110.0 ~low:108.0 ~close:109.0;
+      make_bar ~date:"2024-01-03" ~high:101.0 ~low:99.0 ~close:100.0;
+      make_bar ~date:"2024-01-04" ~high:103.0 ~low:98.0 ~close:102.0;
+      make_bar ~date:"2024-01-05" ~high:109.0 ~low:105.0 ~close:108.0;
+    ]
+  in
+  let proxy =
+    compute_initial_stop ~config:cfg ~side:Long
+      ~reference_level:(entry_price *. fallback_buffer)
+  in
+  let wrapped =
+    compute_initial_stop_with_floor ~config:cfg ~side:Long ~entry_price ~bars
+      ~as_of:(Date.of_string "2024-01-05")
+      ~fallback_buffer
+  in
+  assert_that (equal_stop_state proxy wrapped) (equal_to false)
+
 let suite =
   "support_floor"
   >::: [
@@ -459,6 +609,20 @@ let suite =
          "flat_prices_short" >:: test_flat_prices_returns_none_short;
          "as_of_before_bars" >:: test_as_of_before_all_bars_returns_none;
          "zero_lookback" >:: test_zero_lookback_returns_none;
+         (* Wrapper: None path matches pre-primitive proxy *)
+         "wrapper_empty_bars_matches_proxy"
+         >:: test_wrapper_empty_bars_matches_proxy;
+         "wrapper_no_qualifying_pullback_matches_proxy"
+         >:: test_wrapper_no_qualifying_pullback_matches_proxy;
+         "wrapper_short_no_qualifying_rally_falls_back"
+         >:: test_wrapper_short_no_qualifying_rally_falls_back;
+         (* Wrapper: Some path uses identified level *)
+         "wrapper_long_uses_support_floor_when_available"
+         >:: test_wrapper_long_uses_support_floor_when_available;
+         "wrapper_short_uses_resistance_ceiling_when_available"
+         >:: test_wrapper_short_uses_resistance_ceiling_when_available;
+         "wrapper_support_floor_vs_proxy_differs"
+         >:: test_wrapper_support_floor_vs_proxy_differs;
        ]
 
 let () = run_test_tt_main suite
