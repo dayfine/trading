@@ -77,13 +77,22 @@ jobs:
           # Full history so jj can see main@origin and rebase properly.
           fetch-depth: 0
 
+      - name: Compute today's date
+        id: today
+        run: echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
       - name: Run lead-orchestrator
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          # show_full_output: true surfaces tool-call details in the workflow
+          # log so we can see what subagents (if any) were dispatched. The
+          # action's default (false) hides this "for security"; we accept the
+          # tradeoff because this repo is public and single-developer.
+          show_full_output: true
           prompt: |
-            Run the daily orchestrator session. Today is $(date +%Y-%m-%d).
+            Run the daily orchestrator session. Today is ${{ steps.today.outputs.date }}.
             Read .claude/agents/lead-orchestrator.md and follow it end to end.
           claude_args: |
             --agent lead-orchestrator
@@ -94,6 +103,7 @@ jobs:
         id: publish-summary
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        shell: bash
         run: |
           set -euo pipefail
           DATE="$(date +%F)"
@@ -144,6 +154,7 @@ jobs:
       - name: Fail on escalations
         env:
           SUMMARY: ${{ steps.publish-summary.outputs.summary_path }}
+        shell: bash
         run: |
           set -euo pipefail
           # Extract the ## Escalations section body (up to the next H2) and
