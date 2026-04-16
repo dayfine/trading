@@ -134,13 +134,31 @@ jobs:
           # Push a branch with everything the orchestrator changed in the
           # working copy. Subagents create their own feat/harness branches
           # separately; this branch is specifically for the daily summary
-          # file + any top-level status file ticks.
+          # file + any top-level status file ticks the orchestrator itself
+          # made.
+          #
+          # Uses plain git (not jj): actions/checkout@v4 produces a bare
+          # git checkout — there is no .jj/ dir — and `jj git init` would
+          # add complexity for no benefit. The local/GHA VCS split decided
+          # in #369 already says "GHA = git only"; this matches.
           BRANCH="ops/daily-${DATE}-run${GITHUB_RUN_NUMBER}"
-          jj bookmark set "$BRANCH" -r @
-          jj git push --bookmark "$BRANCH" --allow-new
+          git config user.email "noreply@github.com"
+          git config user.name "claude-orchestrator"
+          git switch -c "$BRANCH"
 
-          # Open a PR for human review. --fill would reuse the commit
-          # message; we'd rather give a predictable title.
+          # If the orchestrator didn't change anything in the top-level
+          # working copy (subagents made all the changes on their own
+          # branches), there's nothing to commit. That's a valid outcome.
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No top-level changes to commit (subagent work lives on other branches)."
+            echo "Skipping daily-summary branch + PR."
+            exit 0
+          fi
+          git add -A
+          git commit -m "ops: daily orchestrator summary ${DATE} (run ${GITHUB_RUN_NUMBER})"
+          git push origin "HEAD:refs/heads/${BRANCH}"
+
+          # Open a PR for human review.
           if gh pr view "$BRANCH" >/dev/null 2>&1; then
             echo "PR for $BRANCH already exists; skipping create."
           else
