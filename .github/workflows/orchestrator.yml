@@ -125,28 +125,26 @@ jobs:
             --allowedTools Agent,Bash,Read,Write,Edit,Glob,Grep
             --max-turns 200
 
-      - name: Push daily summary branch + open PR
+      - name: Locate daily summary (for escalations check)
         id: publish-summary
-        env:
-          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           DATE="$(date +%F)"
-
-          # Find the most recent daily summary the orchestrator just wrote.
-          # Prefer today's dated file (today.md or today-runN.md). Fall back
-          # to the most recently modified dev/daily/*.md if the orchestrator
-          # chose a different naming convention.
-          SUMMARY=""
-          for candidate in \
-            "dev/daily/${DATE}-run1.md" \
-            "dev/daily/${DATE}.md"; do
-            if [ -f "$candidate" ]; then
-              SUMMARY="$candidate"
-              break
-            fi
-          done
+          # lead-orchestrator now owns committing/pushing the daily summary
+          # branch and opening its PR (it runs with BOT_GITHUB_TOKEN via the
+          # claude-code-action and has jj + curl available inside the
+          # devcontainer). This step only locates the summary file on disk
+          # so the next step can scan it for escalations.
+          #
+          # Prior versions of this step also did `git switch -c ops/daily-*`
+          # + git push + PR create, which collided with the agent's own
+          # push once the agent gained that capability. See run
+          # 24526632726 for the post-mortem.
+          #
+          # Pick the newest dev/daily/${DATE}*.md — that's whatever the
+          # orchestrator wrote this session (runN.md or plain DATE.md).
+          SUMMARY="$(ls -t dev/daily/${DATE}*.md 2>/dev/null | head -n 1 || true)"
           if [ -z "$SUMMARY" ]; then
             SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | head -n 1 || true)"
           fi
@@ -156,58 +154,6 @@ jobs:
           fi
           echo "Using daily summary: $SUMMARY"
           echo "summary_path=$SUMMARY" >> "$GITHUB_OUTPUT"
-
-          # Push a branch with everything the orchestrator changed in the
-          # working copy. Subagents create their own feat/harness branches
-          # separately; this branch is specifically for the daily summary
-          # file + any top-level status file ticks the orchestrator itself
-          # made.
-          #
-          # Uses plain git (not jj): actions/checkout@v4 produces a bare
-          # git checkout — there is no .jj/ dir — and `jj git init` would
-          # add complexity for no benefit. The local/GHA VCS split decided
-          # in #369 already says "GHA = git only"; this matches.
-          BRANCH="ops/daily-${DATE}-run${GITHUB_RUN_NUMBER}"
-          git config user.email "noreply@github.com"
-          git config user.name "claude-orchestrator"
-          git switch -c "$BRANCH"
-
-          # If the orchestrator didn't change anything in the top-level
-          # working copy (subagents made all the changes on their own
-          # branches), there's nothing to commit. That's a valid outcome.
-          if git diff --quiet && git diff --cached --quiet; then
-            echo "No top-level changes to commit (subagent work lives on other branches)."
-            echo "Skipping daily-summary branch + PR."
-            exit 0
-          fi
-          git add -A
-          git commit -m "ops: daily orchestrator summary ${DATE} (run ${GITHUB_RUN_NUMBER})"
-          git push origin "HEAD:refs/heads/${BRANCH}"
-
-          # Open a PR for human review via REST (gh CLI is not in the
-          # devcontainer image — see PR #378 decision: "git is the wire
-          # format, jj handles local UX, no extra CLIs").
-          REPO="${GITHUB_REPOSITORY}"
-          API="https://api.github.com/repos/${REPO}/pulls"
-          existing="$(curl -sSL \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "${API}?head=${REPO%/*}:${BRANCH}&state=open" \
-            | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d[0]["html_url"] if d else "")')"
-          if [ -n "$existing" ]; then
-            echo "PR for $BRANCH already exists: $existing"
-          else
-            export PR_TITLE="ops: daily orchestrator summary ${DATE} (run ${GITHUB_RUN_NUMBER})"
-            export PR_BODY="Automated daily orchestrator run. See \`$SUMMARY\` for the full summary."
-            export PR_BRANCH="$BRANCH"
-            payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))')"
-            curl -sSL -X POST \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -d "$payload" \
-              "$API" \
-              | python3 -c 'import json,sys;d=json.load(sys.stdin);print("Created PR:",d.get("html_url") or d)'
-          fi
 
       - name: Fail on escalations
         env:
