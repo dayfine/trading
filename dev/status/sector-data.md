@@ -68,6 +68,66 @@ EODHD stays available as a drop-in upgrade if Finviz becomes unstable.
   and tested. 7 files, ~250 lines OCaml + ~170 lines tests. Uses
   `cohttp-async` + `re` (regex) for HTML parsing. Builds and all 10
   unit tests pass. Branch: `ops/sector-finviz-scraper`.
+- **Item 4 — universe_filter library + binary** (2026-04-14) —
+  `trading/analysis/scripts/universe_filter/` with
+  `Symbol_pattern` / `Keep_allowlist` rules loaded from
+  `dev/config/universe_filter/<name>.sexp`. 10 unit tests pass.
+  Branch: `ops/universe-filter`.
+
+  Dry-run against `data/sectors.csv` (8,255 rows as of 2026-04-14):
+
+  | rule | raw hits |
+  |---|---:|
+  | `suffix_units_.U` | 0 |
+  | `suffix_warrant_.W` | 0 |
+  | `suffix_warrant_.WS` | 0 |
+  | `preferred_-P` | 0 |
+  | `index_.INDX` | 0 |
+  | `warrant_len>3_endsW` | 12 |
+  | **total dropped** | **12** |
+
+  Sector breakdown before → after:
+
+  | sector | before | after | Δ |
+  |---|---:|---:|---:|
+  | Financials | 4,585 | 4,582 | -3 |
+  | Health Care | 886 | 886 | 0 |
+  | Information Technology | 593 | 590 | -3 |
+  | Industrials | 579 | 575 | -4 |
+  | Consumer Discretionary | 457 | 456 | -1 |
+  | Energy | 197 | 196 | -1 |
+  | others | unchanged | | |
+
+  **Finding — the default rule-set barely dents Financials.** The
+  exchange-suffix rules (`.U`, `.W`, `.WS`, `-P*`, `.INDX`) match
+  zero rows because Finviz already strips those forms before we
+  ingest. The `warrant_len>3_endsW` rule fires 12 times but on
+  legitimate common stocks (SCHW, PANW, SNOW, TROW, ACIW, CHRW,
+  DNOW, EZPW, HAYW, INSW, MATW, SKYW) — all real tickers, no
+  warrants. In the current source, that rule is a false-positive
+  trap rather than a useful filter.
+
+  The Financials bloat (4,585 rows, 55%) is almost entirely
+  **bond / fixed-income ETFs, leveraged / inverse ETFs, trust
+  preferreds, and closed-end funds** that Finviz classifies under
+  "Financial Services" → normalized to Financials. None of those
+  carry distinctive symbol-suffix markers; they look like ordinary
+  4-letter tickers (AAAU, AACB, AADR, ACEP, ACES, …).
+
+  **Follow-up items (new, add to "Next Steps"):**
+
+  - Item 5 — add an `Industry_pattern` rule variant so we can drop
+    e.g. "Exchange Traded Fund", "Shell Companies", "Asset
+    Management" subsets directly, using the Finviz industry cell
+    (requires extending the scrape to capture industry and
+    plumbing it through the CSV — currently we only store sector).
+  - Item 6 — optional volume / market-cap gate: drop symbols whose
+    cached bars show `avg_dollar_volume < $1M/day` or
+    `market_cap < $100M`. Needs the bars cache populated first.
+  - Item 7 — reconsider `warrant_len>3_endsW` — either remove it
+    or tighten to "ends-in-W AND not-in-known-common-stock-list".
+    Keeping it as-is would silently drop SCHW, SNOW, PANW from the
+    universe.
 
 ## In Progress
 - None — waiting for Item 1 PR merge before Item 2 (one-shot run).

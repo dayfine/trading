@@ -1,0 +1,5 @@
+(test
+ (name test_universe_filter)
+ (libraries core ounit2 matchers universe_filter_lib)
+ (preprocess
+  (pps ppx_jane)))
