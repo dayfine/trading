@@ -3,6 +3,7 @@ open Core
 open Weinstein_types
 open Trading_base.Types
 include Stop_types
+module Support_floor = Support_floor
 
 (* ---- Nudge functions ---- *)
 
