@@ -1,20 +1,21 @@
 (** universe_filter — apply a sexp-driven rule-set to [data/sectors.csv].
 
-    Reads an input CSV, applies rules from
+    Reads the input sectors CSV, joins it against [data/universe.sexp] to enrich
+    each row with instrument [name] + primary [exchange], applies rules from
     [dev/config/universe_filter/<name>.sexp], writes the kept rows to an output
     CSV (separate from input by default so a human can diff and promote). Prints
     a summary of rows in/out, per-rule drop counts, and before/after sector
     breakdown. [-dry-run] prints only.
 
-    Example: universe_filter -input data/sectors.csv \ -output
-    data/sectors.filtered.csv \ -config dev/config/universe_filter/default.sexp
-    \ -dry-run *)
+    If [-universe] is empty or missing, rows are loaded without enrichment —
+    useful for rule-sets that only need [symbol] + [sector]. *)
 
 open Core
 module U = Universe_filter_lib
 
 let _default_input = "data/sectors.csv"
 let _default_output = "data/sectors.filtered.csv"
+let _default_universe = "data/universe.sexp"
 let _default_config = "dev/config/universe_filter/default.sexp"
 
 let _print_breakdown label rows =
@@ -35,13 +36,21 @@ let _die msg =
   eprintf "ERROR: %s\n%!" msg;
   Stdlib.exit 1
 
-let _run ~input ~output ~config_path ~dry_run =
+let _load_rows ~input ~universe =
+  if String.is_empty universe then U.read_csv input
+  else U.load_rows_with_universe ~sectors_csv:input ~universe_sexp:universe
+
+let _run ~input ~output ~config_path ~universe ~dry_run =
   let cfg =
     match U.load_config config_path with Ok c -> c | Error e -> _die e
   in
-  let rows = match U.read_csv input with Ok r -> r | Error e -> _die e in
+  let rows =
+    match _load_rows ~input ~universe with Ok r -> r | Error e -> _die e
+  in
   let result = U.filter cfg rows in
   printf "Input:  %s (%d rows)\n" input (List.length rows);
+  printf "Universe: %s\n"
+    (if String.is_empty universe then "(none)" else universe);
   printf "Config: %s\n" config_path;
   _print_breakdown "BEFORE" rows;
   _print_rule_stats result;
@@ -70,9 +79,17 @@ let command =
          (optional_with_default _default_config string)
          ~doc:
            (Printf.sprintf "PATH Rule-set sexp (default: %s)" _default_config)
+     and universe =
+       flag "universe"
+         (optional_with_default _default_universe string)
+         ~doc:
+           (Printf.sprintf
+              "PATH universe.sexp for name/exchange join (default: %s; pass \
+               empty string to disable)"
+              _default_universe)
      and dry_run =
        flag "dry-run" no_arg ~doc:" Print stats only; do not write output"
      in
-     fun () -> _run ~input ~output ~config_path ~dry_run)
+     fun () -> _run ~input ~output ~config_path ~universe ~dry_run)
 
 let () = Command_unix.run command

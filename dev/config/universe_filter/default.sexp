@@ -1,32 +1,36 @@
 ; universe_filter default rule-set.
 ;
 ; Rules: evaluated in declaration order.
-;   - Symbol_pattern: Perl-style regex matched against the *symbol* column.
-;     A row whose symbol matches ANY Symbol_pattern is dropped, unless
-;     rescued by a Keep_allowlist.
-;   - Keep_allowlist: symbols in the list are preserved regardless.
+;   - Keep_allowlist: symbols in the list are preserved regardless of any drop
+;     rule. Rescue is final — cannot be overridden.
+;   - Symbol_pattern: Perl-style regex against [row.symbol]. Drops on match.
+;   - Name_pattern: Perl-style regex against [row.name] (joined from
+;     universe.sexp). Prepend [(?i)] for case-insensitive matching.
+;   - Exchange_equals: exact (case-sensitive) match against [row.exchange]
+;     (joined from universe.sexp).
 ;
-; Starting point based on dev/status/sector-data.md §Item 4:
-;   - exchange-suffix noise: .U (units), .W / .WS (warrants),
-;     -P* (preferreds), .INDX (indexes)
-;   - "length > 3 ending in W" as a tight warrant heuristic
-;   - allow-list for the sector/broad-market ETFs the Weinstein strategy
-;     depends on (so they survive any rule).
+; Iteration 2 (2026-04-16): the exchange-suffix rules (.U / .W / .WS / -P*
+; / .INDX) fired zero rows on Finviz-sourced sectors.csv (Finviz strips
+; these forms before we ingest), and the [warrant_len>3_endsW] heuristic
+; caught only 12 rows — all legitimate common stocks (SCHW, SNOW, PANW, …).
+; Replaced the symbol-suffix filters with name- and exchange-based filters
+; that use universe.sexp metadata:
+;   - Name_pattern drops "ETF" / "Fund" / "Trust" / "Notes" instruments
+;     (bond ETFs, leveraged / inverse ETFs, unit trusts, closed-end funds
+;     — the "Financials" bloat identified in Item 4).
+;   - Exchange_equals "NYSE ARCA" is a strong ETF signal (NYSE Arca is
+;     the primary US ETF listing venue).
 ;
-; Note: Finviz (our current sectors.csv source) appears to already strip
-; most of these exchange-suffix forms, so the suffix rules may hit zero
-; rows on the current file. That's expected and documented as a follow-up
-; in Item 4 §Completed. Keep the rules — they still guard against future
-; sources (EODHD, Yahoo) that emit raw exchange-suffix forms.
+; Symbols in the broad / sector-ETF allow-list are live on NYSE ARCA and
+; their names contain "ETF" / "Trust"; they are rescued first so neither
+; filter drops them.
 ((rules (
-  (Symbol_pattern (name "suffix_units_.U")     (pattern "\\.U$"))
-  (Symbol_pattern (name "suffix_warrant_.W")   (pattern "\\.W$"))
-  (Symbol_pattern (name "suffix_warrant_.WS")  (pattern "\\.WS$"))
-  (Symbol_pattern (name "preferred_-P")        (pattern "-P"))
-  (Symbol_pattern (name "index_.INDX")         (pattern "\\.INDX$"))
-  (Symbol_pattern (name "warrant_len>3_endsW") (pattern "^.{3,}W$"))
   (Keep_allowlist (name "sector_and_broad_ETFs")
                   (symbols (
                     SPY QQQ VOO VTI IWM DIA
                     XLK XLF XLE XLV XLI XLP XLY XLU XLB XLRE XLC
-                    QQQM FXAIX SWPPX))))))
+                    QQQM FXAIX SWPPX)))
+  (Name_pattern (name "etf_fund_trust_notes")
+                (pattern "(?i)(\\bETF\\b|\\bFund\\b|\\bTrust\\b|\\bNotes\\b)"))
+  (Exchange_equals (name "nyse_arca")
+                   (exchange "NYSE ARCA")))))

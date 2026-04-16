@@ -5,7 +5,9 @@ module U = Universe_filter_lib
 
 (* --- Helpers ------------------------------------------------------------- *)
 
-let row symbol sector : U.row = { symbol; sector }
+let row ?(name = "") ?(exchange = "") symbol sector : U.row =
+  { symbol; sector; name; exchange }
+
 let cfg_of_string s = s |> Sexp.of_string |> U.config_of_sexp
 
 (* --- filter tests -------------------------------------------------------- *)
@@ -51,6 +53,119 @@ let test_symbol_pattern_drops_matches _ctx =
          field (fun r -> r.U.rescued_by_allowlist) (equal_to 0);
        ])
 
+let test_name_pattern_drops_etf_fund_etc _ctx =
+  (* Case-sensitive match of "ETF" / "Fund" / "Trust" / "Notes" at word
+     boundaries. A common stock ("Apple Inc") must survive. *)
+  let cfg : U.config =
+    {
+      rules =
+        [
+          U.Name_pattern
+            {
+              name = "etf_fund_trust_notes";
+              pattern = "(\\bETF\\b|\\bFund\\b|\\bTrust\\b|\\bNotes\\b)";
+            };
+        ];
+    }
+  in
+  let rows =
+    [
+      row ~name:"Apple Inc" "AAPL" "IT";
+      row ~name:"SPDR S&P 500 ETF Trust" "SPY" "Financials";
+      row ~name:"Vanguard Total Stock Market Index Fund" "VTSAX" "Financials";
+      row ~name:"ProShares Trust II" "UCO" "Energy";
+      row ~name:"BlackRock Senior Floating Rate Notes" "XYZ" "Financials";
+    ]
+  in
+  let result = U.filter cfg rows in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun r -> r.U.kept)
+           (elements_are [ equal_to (row ~name:"Apple Inc" "AAPL" "IT") ]);
+         field (fun r -> r.U.dropped) (size_is 4);
+         field
+           (fun r -> r.U.rule_stats)
+           (elements_are
+              [
+                equal_to
+                  ({ rule_name = "etf_fund_trust_notes"; drop_count = 4 }
+                    : U.rule_stat);
+              ]);
+         field (fun r -> r.U.rescued_by_allowlist) (equal_to 0);
+       ])
+
+let test_name_pattern_case_insensitive _ctx =
+  (* [(?i)…] flag in the regex makes it case-insensitive — lowercase "etf"
+     should match uppercase "ETF" in the name and vice versa. *)
+  let cfg : U.config =
+    {
+      rules = [ U.Name_pattern { name = "etf_ci"; pattern = "(?i)\\bETF\\b" } ];
+    }
+  in
+  let rows =
+    [
+      row ~name:"SPDR S&P 500 ETF Trust" "SPY" "Financials";
+      row ~name:"iShares Core S&P 500 etf" "IVV" "Financials";
+      row ~name:"Apple Inc" "AAPL" "IT";
+    ]
+  in
+  let result = U.filter cfg rows in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.U.kept) (size_is 1);
+         field (fun r -> r.U.dropped) (size_is 2);
+         field
+           (fun r -> r.U.rule_stats)
+           (elements_are
+              [
+                equal_to
+                  ({ rule_name = "etf_ci"; drop_count = 2 } : U.rule_stat);
+              ]);
+       ])
+
+let test_exchange_equals_drops_nyse_arca _ctx =
+  (* Exchange_equals is exact-match; "NYSE ARCA" should drop only rows whose
+     exchange is exactly "NYSE ARCA", not NASDAQ / NYSE / NYSEARCA (one-word). *)
+  let cfg : U.config =
+    {
+      rules =
+        [ U.Exchange_equals { name = "nyse_arca"; exchange = "NYSE ARCA" } ];
+    }
+  in
+  let rows =
+    [
+      row ~exchange:"NYSE ARCA" "XLK" "IT";
+      row ~exchange:"NYSE ARCA" "XLF" "Financials";
+      row ~exchange:"NASDAQ" "AAPL" "IT";
+      row ~exchange:"NYSE" "JPM" "Financials";
+      row ~exchange:"NYSEARCA" "BAR" "Financials";
+      (* one-word variant — should NOT drop *)
+    ]
+  in
+  let result = U.filter cfg rows in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.U.kept) (size_is 3);
+         field
+           (fun r -> r.U.dropped)
+           (elements_are
+              [
+                equal_to (row ~exchange:"NYSE ARCA" "XLK" "IT");
+                equal_to (row ~exchange:"NYSE ARCA" "XLF" "Financials");
+              ]);
+         field
+           (fun r -> r.U.rule_stats)
+           (elements_are
+              [
+                equal_to
+                  ({ rule_name = "nyse_arca"; drop_count = 2 } : U.rule_stat);
+              ]);
+       ])
+
 let test_allowlist_rescues_match _ctx =
   (* The regex matches 'SPY', but the allow-list should preserve it.
      A different symbol 'ZZPY' that matches the same regex should still
@@ -85,9 +200,42 @@ let test_allowlist_rescues_match _ctx =
          field (fun r -> r.U.rescued_by_allowlist) (equal_to 1);
        ])
 
+let test_allowlist_rescues_from_exchange_rule _ctx =
+  (* SPY is listed on NYSE ARCA; an Exchange_equals "NYSE ARCA" rule would
+     drop it. The allow-list must rescue SPY regardless. *)
+  let cfg : U.config =
+    {
+      rules =
+        [
+          U.Keep_allowlist { name = "broad"; symbols = [ "SPY" ] };
+          U.Exchange_equals { name = "nyse_arca"; exchange = "NYSE ARCA" };
+        ];
+    }
+  in
+  let rows =
+    [
+      row ~exchange:"NYSE ARCA" "SPY" "Financials";
+      row ~exchange:"NYSE ARCA" "AAAA" "Financials";
+    ]
+  in
+  let result = U.filter cfg rows in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun r -> r.U.kept)
+           (elements_are
+              [ equal_to (row ~exchange:"NYSE ARCA" "SPY" "Financials") ]);
+         field
+           (fun r -> r.U.dropped)
+           (elements_are
+              [ equal_to (row ~exchange:"NYSE ARCA" "AAAA" "Financials") ]);
+         field (fun r -> r.U.rescued_by_allowlist) (equal_to 1);
+       ])
+
 let test_multiple_rules_independent_counts _ctx =
-  (* A row matching two patterns counts once in each rule's stat; the row
-     is still dropped once (appears in `dropped` exactly once). *)
+  (* A row matching two drop rules counts once in each rule's stat; the row
+     is still dropped once (appears in [dropped] exactly once). *)
   let cfg : U.config =
     {
       rules =
@@ -139,8 +287,8 @@ let test_stats_zero_for_nonmatching_rule _ctx =
 
 (* --- load_config tests --------------------------------------------------- *)
 
-let _write_tmp contents =
-  let tmp = Stdlib.Filename.temp_file "universe_filter_test" ".sexp" in
+let _write_tmp ?(suffix = ".sexp") contents =
+  let tmp = Stdlib.Filename.temp_file "universe_filter_test" suffix in
   Stdlib.Out_channel.with_open_text tmp (fun oc ->
       Stdlib.Out_channel.output_string oc contents);
   tmp
@@ -152,6 +300,8 @@ let test_load_config_ok _ctx =
     _write_tmp
       {|((rules (
   (Symbol_pattern (name "u") (pattern "\\.U$"))
+  (Name_pattern (name "etf") (pattern "\\bETF\\b"))
+  (Exchange_equals (name "arca") (exchange "NYSE ARCA"))
   (Keep_allowlist (name "broad") (symbols (SPY QQQ))))))|}
   in
   let result = U.load_config tmp in
@@ -159,7 +309,7 @@ let test_load_config_ok _ctx =
   match result with
   | Error e -> assert_failure ("expected Ok, got Error: " ^ e)
   | Ok cfg ->
-      assert_that cfg (field (fun c -> List.length c.U.rules) (equal_to 2))
+      assert_that cfg (field (fun c -> List.length c.U.rules) (equal_to 4))
 
 let test_load_config_missing_file _ctx =
   let result = U.load_config "/nonexistent/does-not-exist.sexp" in
@@ -184,17 +334,20 @@ let test_load_config_malformed _ctx =
 let test_default_shape_parses _ctx =
   let sample =
     {|((rules (
-        (Symbol_pattern (name "suffix_units_.U") (pattern "\\.U$"))
-        (Keep_allowlist (name "broad") (symbols (SPY QQQ))))))|}
+        (Keep_allowlist (name "broad") (symbols (SPY QQQ)))
+        (Name_pattern (name "fund_etf") (pattern "(?i)(\\bETF\\b|\\bFund\\b)"))
+        (Exchange_equals (name "nyse_arca") (exchange "NYSE ARCA")))))|}
   in
   let cfg = cfg_of_string sample in
-  assert_that cfg (field (fun c -> List.length c.U.rules) (equal_to 2))
+  assert_that cfg (field (fun c -> List.length c.U.rules) (equal_to 3))
 
 (* --- CSV roundtrip ------------------------------------------------------- *)
 
 let test_csv_roundtrip _ctx =
   let tmp_dir = Stdlib.Filename.temp_dir "universe_filter_csv" "" in
   let path = tmp_dir ^ "/test.csv" in
+  (* CSV only stores symbol + sector; enriched fields ([name], [exchange])
+     round-trip as empty strings. *)
   let rows = [ row "AAPL" "IT"; row "JPM" "Financials" ] in
   (match U.write_csv path rows with
   | Ok () -> ()
@@ -208,6 +361,91 @@ let test_csv_roundtrip _ctx =
   Stdlib.Sys.rmdir tmp_dir;
   assert_that loaded (elements_are (List.map rows ~f:equal_to))
 
+(* --- load_rows_with_universe (join) ------------------------------------- *)
+
+let test_join_enriches_rows _ctx =
+  let tmp_dir = Stdlib.Filename.temp_dir "universe_filter_join" "" in
+  let csv = tmp_dir ^ "/sectors.csv" in
+  let sexp = tmp_dir ^ "/universe.sexp" in
+  Stdlib.Out_channel.with_open_text csv (fun oc ->
+      Stdlib.Out_channel.output_string oc
+        "symbol,sector\nAAPL,IT\nSPY,Financials\n");
+  Stdlib.Out_channel.with_open_text sexp (fun oc ->
+      Stdlib.Out_channel.output_string oc
+        {|(
+  ((symbol AAPL) (name "Apple Inc") (sector IT) (industry "") (market_cap 0) (exchange NASDAQ))
+  ((symbol SPY) (name "SPDR S&P 500 ETF Trust") (sector Financials) (industry "") (market_cap 0) (exchange "NYSE ARCA"))
+)|});
+  let result = U.load_rows_with_universe ~sectors_csv:csv ~universe_sexp:sexp in
+  Stdlib.Sys.remove csv;
+  Stdlib.Sys.remove sexp;
+  Stdlib.Sys.rmdir tmp_dir;
+  match result with
+  | Error e -> assert_failure ("join failed: " ^ e)
+  | Ok rows ->
+      assert_that rows
+        (elements_are
+           [
+             equal_to
+               ({
+                  symbol = "AAPL";
+                  sector = "IT";
+                  name = "Apple Inc";
+                  exchange = "NASDAQ";
+                }
+                 : U.row);
+             equal_to
+               ({
+                  symbol = "SPY";
+                  sector = "Financials";
+                  name = "SPDR S&P 500 ETF Trust";
+                  exchange = "NYSE ARCA";
+                }
+                 : U.row);
+           ])
+
+let test_join_handles_missing_universe_symbols _ctx =
+  (* Rows whose symbol is absent from universe.sexp keep empty name/exchange —
+     no crash, no data loss. *)
+  let tmp_dir = Stdlib.Filename.temp_dir "universe_filter_join_missing" "" in
+  let csv = tmp_dir ^ "/sectors.csv" in
+  let sexp = tmp_dir ^ "/universe.sexp" in
+  Stdlib.Out_channel.with_open_text csv (fun oc ->
+      Stdlib.Out_channel.output_string oc
+        "symbol,sector\nAAPL,IT\nUNKNOWN,Financials\n");
+  Stdlib.Out_channel.with_open_text sexp (fun oc ->
+      Stdlib.Out_channel.output_string oc
+        {|(
+  ((symbol AAPL) (name "Apple Inc") (sector IT) (industry "") (market_cap 0) (exchange NASDAQ))
+)|});
+  let result = U.load_rows_with_universe ~sectors_csv:csv ~universe_sexp:sexp in
+  Stdlib.Sys.remove csv;
+  Stdlib.Sys.remove sexp;
+  Stdlib.Sys.rmdir tmp_dir;
+  match result with
+  | Error e -> assert_failure ("join failed: " ^ e)
+  | Ok rows ->
+      assert_that rows
+        (elements_are
+           [
+             equal_to
+               ({
+                  symbol = "AAPL";
+                  sector = "IT";
+                  name = "Apple Inc";
+                  exchange = "NASDAQ";
+                }
+                 : U.row);
+             equal_to
+               ({
+                  symbol = "UNKNOWN";
+                  sector = "Financials";
+                  name = "";
+                  exchange = "";
+                }
+                 : U.row);
+           ])
+
 (* --- Test runner --------------------------------------------------------- *)
 
 let () =
@@ -219,7 +457,15 @@ let () =
                   "empty config is no-op" >:: test_empty_config_is_noop;
                   "symbol pattern drops matches"
                   >:: test_symbol_pattern_drops_matches;
+                  "name pattern drops ETF/Fund/Trust/Notes"
+                  >:: test_name_pattern_drops_etf_fund_etc;
+                  "name pattern is case-insensitive with (?i) flag"
+                  >:: test_name_pattern_case_insensitive;
+                  "exchange_equals drops NYSE ARCA only"
+                  >:: test_exchange_equals_drops_nyse_arca;
                   "allowlist rescues match" >:: test_allowlist_rescues_match;
+                  "allowlist rescues even when exchange rule fires"
+                  >:: test_allowlist_rescues_from_exchange_rule;
                   "multiple rules independent counts"
                   >:: test_multiple_rules_independent_counts;
                   "stats show zero for nonmatching rule"
@@ -233,4 +479,11 @@ let () =
                   "default-sexp shape parses" >:: test_default_shape_parses;
                 ];
            "csv_io" >::: [ "roundtrip" >:: test_csv_roundtrip ];
+           "universe_join"
+           >::: [
+                  "enriches rows with name + exchange"
+                  >:: test_join_enriches_rows;
+                  "missing universe symbols use empty fields"
+                  >:: test_join_handles_missing_universe_symbols;
+                ];
          ])
