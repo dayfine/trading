@@ -64,7 +64,7 @@ Each feature follows this explicit sequence of deterministic nodes (D) and agent
 ```
 [D] preflight: inject context (assemble dune failure summary + last QC findings + open follow-ups)
  → [A] feat-agent: implement feature
- → [D] dune fmt --check
+ → [D] dune build @fmt
  → [D] dune build && dune runtest
  → [A] qc-structural: structural + mechanical review
  → [A] qc-behavioral: domain correctness review (only if structural APPROVED)
@@ -237,8 +237,7 @@ For each feature that will run today, assemble the pre-flight context package **
 
 ```bash
 # 1. Current test failures for this feature's test directory
-docker exec <container-name> bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest <feature-test-dir> 2>&1 || true'
+dev/lib/run-in-env.sh dune runtest <feature-test-dir> 2>&1 || true
 
 # 2. Last QC review findings (if any)
 # Read: dev/reviews/<feature>.md (if it exists)
@@ -375,8 +374,8 @@ Work using TDD (CLAUDE.md workflow):
   4. dune fmt
   5. Commit and push (see commit discipline below)
 
-Build/test inside Docker:
-  docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && <cmd>'
+Build/test:
+  dev/lib/run-in-env.sh <cmd>
 
 COMMIT DISCIPLINE — this is critical for reviewability AND for surviving rate-limit kills:
   - Commit after each logical unit: one module, one interface, one test suite
@@ -518,8 +517,8 @@ Branch: feat/<feature>
 
 Steps:
 1. jj git init --colocate 2>/dev/null || true && jj git fetch && jj new feat/<feature>@origin
-2. Run hard gates:
-   - dune fmt --check
+2. Run hard gates (via dev/lib/run-in-env.sh):
+   - dune build @fmt
    - dune build
    - dune runtest
 3. Read diff: jj diff --from main@origin --to feat/<feature>@origin

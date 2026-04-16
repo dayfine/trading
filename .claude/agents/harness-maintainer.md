@@ -94,12 +94,10 @@ The health-scanner is read-only — it never modifies source or agent files. It 
 ## Verification
 
 ```bash
-docker exec <container-name> bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune runtest'
+dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest
 
 # For agent definition compliance:
-docker exec <container-name> bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/devtools/checks/'
+dev/lib/run-in-env.sh dune runtest trading/devtools/checks/
 ```
 
 ## When done with each item

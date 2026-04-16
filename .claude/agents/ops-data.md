@@ -23,25 +23,21 @@ All scripts run inside Docker. Build the project first if executables are stale.
 ### Fetch symbols
 
 ```bash
-docker exec -e EODHD_API_KEY <container-name> bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && \
-   ./_build/default/analysis/scripts/fetch_symbols/fetch_symbols.exe \
-   --symbols AAPL,GSPCX \
-   --data-dir /workspaces/trading-1/data \
-   --api-key "$EODHD_API_KEY"'
+dev/lib/run-in-env.sh ./_build/default/analysis/scripts/fetch_symbols/fetch_symbols.exe \
+  --symbols AAPL,GSPCX \
+  --data-dir /workspaces/trading-1/data \
+  --api-key "$EODHD_API_KEY"
 ```
 
-`EODHD_API_KEY` must be set in the host environment. The `-e EODHD_API_KEY` flag forwards it into the container; the script receives it via `--api-key`. The key value is never hardcoded.
+`EODHD_API_KEY` must be set in the host environment. `run-in-env.sh` forwards it into the container automatically.
 
 Idempotent: re-running for a cached symbol appends only new bars. Omit `--symbols` to fetch all symbols in `universe.sexp`.
 
 ### Rebuild inventory
 
 ```bash
-docker exec <container-name> bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && \
-   ./_build/default/analysis/scripts/build_inventory/build_inventory.exe \
-   --data-dir /workspaces/trading-1/data'
+dev/lib/run-in-env.sh ./_build/default/analysis/scripts/build_inventory/build_inventory.exe \
+  --data-dir /workspaces/trading-1/data
 ```
 
 Walks `data/`, reads each `data.metadata.sexp`, writes `data/inventory.sexp`. Run after any fetch.
@@ -49,10 +45,8 @@ Walks `data/`, reads each `data.metadata.sexp`, writes `data/inventory.sexp`. Ru
 ### Bootstrap universe
 
 ```bash
-docker exec <container-name> bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && \
-   ./_build/default/analysis/scripts/bootstrap_universe/bootstrap_universe.exe \
-   --data-dir /workspaces/trading-1/data'
+dev/lib/run-in-env.sh ./_build/default/analysis/scripts/bootstrap_universe/bootstrap_universe.exe \
+  --data-dir /workspaces/trading-1/data
 ```
 
 Builds `data/universe.sexp` from the local inventory. Sector/industry fields will be empty (use `fetch_universe.exe` for full metadata from EODHD fundamentals).
@@ -63,7 +57,7 @@ Read `data/inventory.sexp` and report: which symbols are present, their date ran
 
 ## API key
 
-`EODHD_API_KEY` must be set in the host environment before any fetch. It is forwarded into the container via `docker exec -e EODHD_API_KEY` and passed as `--api-key "$EODHD_API_KEY"` — the OCaml script only accepts the flag, never reads env vars directly.
+`EODHD_API_KEY` must be set in the host environment before any fetch. `dev/lib/run-in-env.sh` forwards it into the container automatically; the OCaml script receives it via the `--api-key` flag and never reads env vars directly.
 
 If `EODHD_API_KEY` is not set in the host environment, **don't stop early**:
 - Many data gaps don't need EODHD (scrape-source validation for ADL,

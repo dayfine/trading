@@ -43,14 +43,9 @@ block APPROVED, but the orchestrator escalation policy should note it.
 Run each command and record PASS or FAIL with any error output:
 
 ```bash
-# Format check
-docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune fmt --check'
-
-# Build
-docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build'
-
-# Tests
-docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest'
+dev/lib/run-in-env.sh dune build @fmt
+dev/lib/run-in-env.sh dune build
+dev/lib/run-in-env.sh dune runtest
 ```
 
 If any of the three fail, the overall verdict is NEEDS_REWORK immediately. Proceed to fill in the remaining checklist items you can determine from static analysis, then write the output.
@@ -79,7 +74,7 @@ Do not use freeform narrative in the Status column — put detail in the Notes c
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| H1 | dune fmt --check | PASS/FAIL | |
+| H1 | dune build @fmt (format check) | PASS/FAIL | |
 | H2 | dune build | PASS/FAIL | |
 | H3 | dune runtest | PASS/FAIL | N tests, N passed, N failed |
 | P1 | Functions ≤ 50 lines — covered by fn_length_linter (dune runtest) | PASS/NA | If H3 passed, this is clean. If H3 failed, check fn_length_linter output. |
@@ -147,7 +142,7 @@ Return the overall verdict (APPROVED / NEEDS_REWORK) and a one-line summary of a
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| H1 | dune fmt --check | PASS | |
+| H1 | dune build @fmt | PASS | |
 | H2 | dune build | PASS | |
 | H3 | dune runtest | PASS | 42 tests, 42 passed, 0 failed |
 | P1 | Functions ≤ 50 lines (linter) | PASS | fn_length_linter passed as part of H3 |
