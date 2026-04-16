@@ -1,0 +1,177 @@
+# Daily orchestrator run on GitHub Actions.
+#
+# Runs `lead-orchestrator` via anthropics/claude-code-action inside the prebuilt
+# `trading-devcontainer` image (already has jj, jst, opam env baked in). The
+# orchestrator writes its daily summary to `dev/daily/<date>-runN.md` and
+# whatever subagent work it dispatched to branches + PRs. A post-step pushes
+# the daily summary branch, opens a PR, then fails the job if the summary has
+# any entries in the `## Escalations` section — that's our partial-failure
+# signal (see dev/status/orchestrator-automation.md § "Partial-failure
+# reporting").
+#
+# ----------------------------------------------------------------------------
+# SECRETS REQUIRED BEFORE THIS WORKFLOW CAN RUN
+# ----------------------------------------------------------------------------
+# The first `workflow_dispatch` run will fail at the "Run lead-orchestrator"
+# step until the human completes the following one-time setup (tracked in
+# dev/status/orchestrator-automation.md § "Implementation sequencing" step 2):
+#
+#   1. BOT_GITHUB_TOKEN — fine-grained Personal Access Token scoped to
+#      this repo only. Create at
+#      https://github.com/settings/tokens?type=beta
+#      Permissions: Contents R+W, Pull requests R+W. Expiration: 1 year
+#      (or whatever; set a calendar reminder to rotate).
+#      Store as repo secret `BOT_GITHUB_TOKEN`.
+#
+#      Why a PAT and not the default GITHUB_TOKEN: pushes using the built-in
+#      token do not trigger downstream workflows (GitHub safety feature),
+#      so CI would not re-run on branches this orchestrator pushes.
+#      PAT-issued pushes do trigger them.
+#
+#      Why a PAT and not a custom GitHub App: both work; an App auto-
+#      rotates short-lived tokens and is the Claude Code docs' recommended
+#      path, but requires one-time registration + install. For a single-
+#      developer setup the PAT is simpler. Swap to an App later if
+#      rotation burden hurts.
+#
+#   2. CLAUDE_CODE_OAUTH_TOKEN — generated on a subscription-authenticated
+#      machine via `claude setup-token`. The Pro/Max subscription's session
+#      limits act as the effective cost ceiling for this workflow.
+#
+# DO NOT enable the `schedule:` cron below until a successful manual
+# dogfood run via `workflow_dispatch` has been observed end-to-end.
+# ----------------------------------------------------------------------------
+name: Daily orchestrator
+
+on:
+  # workflow_dispatch only, for now. Flip on `schedule: cron: "0 14 * * *"`
+  # (07:00 Pacific) once a manual dogfood run succeeds end-to-end.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  orchestrator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-devcontainer:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      # See ci.yml for the rationale: the base image has USER opam, but
+      # Actions' post-step file bookkeeping needs root. HOME stays pointed at
+      # /home/opam so the opam switch is still discoverable.
+      options: --user 0
+    env:
+      HOME: /home/opam
+      # run-in-env.sh takes the native path (cd + opam env, no docker
+      # wrapping) when this is set. Agent prompts invoke the wrapper so they
+      # work identically in local-docker and in-container (GHA) environments.
+      TRADING_IN_CONTAINER: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so jj can see main@origin and rebase properly.
+          fetch-depth: 0
+
+      - name: Run lead-orchestrator
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          prompt: |
+            Run the daily orchestrator session. Today is $(date +%Y-%m-%d).
+            Read .claude/agents/lead-orchestrator.md and follow it end to end.
+          claude_args: |
+            --agent lead-orchestrator
+            --allowedTools Agent,Bash,Read,Write,Edit,Glob,Grep
+            --max-turns 200
+
+      - name: Push daily summary branch + open PR
+        id: publish-summary
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DATE="$(date +%F)"
+
+          # Find the most recent daily summary the orchestrator just wrote.
+          # Prefer today's dated file (today.md or today-runN.md). Fall back
+          # to the most recently modified dev/daily/*.md if the orchestrator
+          # chose a different naming convention.
+          SUMMARY=""
+          for candidate in \
+            "dev/daily/${DATE}-run1.md" \
+            "dev/daily/${DATE}.md"; do
+            if [ -f "$candidate" ]; then
+              SUMMARY="$candidate"
+              break
+            fi
+          done
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | head -n 1 || true)"
+          fi
+          if [ -z "$SUMMARY" ] || [ ! -f "$SUMMARY" ]; then
+            echo "::error::No daily summary file found under dev/daily/."
+            exit 1
+          fi
+          echo "Using daily summary: $SUMMARY"
+          echo "summary_path=$SUMMARY" >> "$GITHUB_OUTPUT"
+
+          # Push a branch with everything the orchestrator changed in the
+          # working copy. Subagents create their own feat/harness branches
+          # separately; this branch is specifically for the daily summary
+          # file + any top-level status file ticks.
+          BRANCH="ops/daily-${DATE}-run${GITHUB_RUN_NUMBER}"
+          jj bookmark set "$BRANCH" -r @
+          jj git push --bookmark "$BRANCH" --allow-new
+
+          # Open a PR for human review. --fill would reuse the commit
+          # message; we'd rather give a predictable title.
+          if gh pr view "$BRANCH" >/dev/null 2>&1; then
+            echo "PR for $BRANCH already exists; skipping create."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "ops: daily orchestrator summary ${DATE} (run ${GITHUB_RUN_NUMBER})" \
+              --body "Automated daily orchestrator run. See \`$SUMMARY\` for the full summary."
+          fi
+
+      - name: Fail on escalations
+        env:
+          SUMMARY: ${{ steps.publish-summary.outputs.summary_path }}
+        run: |
+          set -euo pipefail
+          # Extract the ## Escalations section body (up to the next H2) and
+          # count bullet lines that aren't the empty-case placeholder.
+          # Accepted empty-case forms across existing summaries:
+          #   - None
+          #   - None — ...
+          #   None — all PRs mergeable, no blockers...
+          #   (empty)
+          section="$(awk '
+            /^## Escalations/ { in_section=1; next }
+            /^## / && in_section { exit }
+            in_section { print }
+          ' "$SUMMARY")"
+
+          # Keep lines that look like bullet items (start with "- " or "* "),
+          # then drop the empty-case placeholder where the first word of the
+          # bullet content is literally "None" (covers "- None", "- None.",
+          # "- None — ...", "- None - ...", etc.).
+          escalations="$(printf '%s\n' "$section" \
+            | grep -E '^[[:space:]]*[-*][[:space:]]' \
+            | grep -Ev '^[[:space:]]*[-*][[:space:]]+None\b' \
+            || true)"
+
+          if [ -n "$escalations" ]; then
+            echo "::error::Daily summary has escalations; marking run as failed."
+            echo "Escalations found in $SUMMARY:"
+            printf '%s\n' "$escalations"
+            exit 1
+          fi
+          echo "No escalations in $SUMMARY — clean run."
