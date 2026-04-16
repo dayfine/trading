@@ -99,8 +99,13 @@ jobs:
           # giving agents the jj local-commit UX they use locally.
           # Decided 2026-04-16 (see dev/decisions.md) — option (2) over
           # adding gh CLI to the container.
+          #
+          # We skip `jj git fetch`: jj 0.39 shells to `git fetch --porcelain`
+          # which requires git >= 2.41, but the ubuntu-22.04 devcontainer base
+          # ships git 2.34. actions/checkout@v4 (fetch-depth: 0 above) already
+          # populated origin refs in .git/, and `jj git init --colocate`
+          # auto-imports them — so no remote fetch is needed here.
           jj git init --colocate
-          jj git fetch
 
       - name: Run lead-orchestrator
         uses: anthropics/claude-code-action@v1
