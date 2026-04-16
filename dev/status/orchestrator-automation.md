@@ -1,6 +1,6 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-04-14
+## Last updated: 2026-04-15
 
 ## Status
 IN_PROGRESS
@@ -20,9 +20,9 @@ Run the daily `lead-orchestrator` session automatically on GitHub Actions
 instead of requiring a human to fire `dev/run.sh` locally. The daily summary
 lands as a branch + PR for human review, same read-model as today.
 
-## Research done (2026-04-14)
+## Research done (2026-04-14 + 2026-04-15)
 
-Investigated via general-purpose research agent. Findings:
+Initial investigation (2026-04-14):
 
 - **Official action exists**: [`anthropics/claude-code-action@v1`](https://github.com/anthropics/claude-code-action).
   Supports `schedule:` cron + `workflow_dispatch:`, passes `--agent` and
@@ -37,6 +37,40 @@ Investigated via general-purpose research agent. Findings:
   + job `timeout-minutes` are the only guardrails. But using OAuth (Pro/Max)
   rather than pay-per-token API key means the subscription's session limits
   bound spend.
+
+### Follow-up research (2026-04-15)
+
+Six specific questions sent to the Claude Code guide. Results:
+
+- **Per-subagent `model:` frontmatter works under the Action.** Same keys
+  (`opus` / `sonnet` / `haiku`) we already pinned locally (#362). The
+  Action does NOT force a single model via `--model` in `claude_args`.
+  Per-agent routing is honored end-to-end.
+- **`CLAUDE_CODE_OAUTH_TOKEN` confirmed** as the correct secret name for
+  Pro/Max OAuth (vs `ANTHROPIC_API_KEY` for API-key billing). Generated
+  via `claude setup-token`. Docs don't publish a "CI disallowed in prod"
+  restriction — fine for personal / side-project use.
+- **GitHub App path is the recommended auth** for jj push + downstream-
+  CI triggering. The action repo ships an HTML [Quick Setup
+  Tool](https://github.com/anthropics/claude-code-action/blob/main/docs/create-app.html)
+  that automates the App-registration form. `actions/create-github-app-token@v2`
+  provides the tokens in-workflow. PAT also works but needs manual
+  rotation. SSH deploy key is not in official guidance.
+- **Rate-limit behavior at quota exhaustion: UNKNOWN.** The Action docs
+  don't specify whether mid-run quota exhaustion fails fast, hangs, or
+  retries. We have local evidence (2026-04-14 run killed with
+  `"error":"rate_limit"` message) that at least the `claude -p` process
+  exits with is_error=true when the 5-hour cap is hit, but how that
+  surfaces inside the Action wrapper is not documented. **Test this
+  empirically on first manual `workflow_dispatch` run.**
+- **Cost / token observability: UNKNOWN.** Action docs don't publish
+  structured outputs for token counts. Budget assertions would have to
+  parse free-form logs. **Gap; file an issue on action repo after v1.**
+- **Partial-failure signalling: UNKNOWN.** No documented "neutral /
+  soft-fail" status convention. Our orchestrator already writes findings
+  to the daily summary file; we'll handle this with a post-step that
+  greps `dev/daily/<date>-run*.md` for §Escalations and `exit 1` if
+  non-empty (plain GHA idiom).
 
 ## Decisions (2026-04-14)
 
@@ -144,14 +178,32 @@ jobs:
 
 ## Implementation sequencing
 
-1. Land #325 (publishes `trading-devcontainer:latest`)
-2. Create GitHub App + `CLAUDE_CODE_OAUTH_TOKEN` secret (human, one-time)
+1. Land #325 (publishes `trading-devcontainer:latest`) — **DONE**
+2. Create GitHub App via the action repo's [Quick Setup
+   Tool](https://github.com/anthropics/claude-code-action/blob/main/docs/create-app.html)
+   + set `APP_ID` / `APP_PRIVATE_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` repo
+   secrets (human, one-time)
 3. Strip `docker exec` from agent prompts — single PR, cross-cuts several
-   agent definitions but small diff
+   agent definitions but small diff. Introduce `$TRADING_BASH_PREFIX`
+   env var (empty in GHA, `docker exec trading-1-dev ` locally).
 4. Add `.github/workflows/orchestrator.yml` with `workflow_dispatch` only
-   (no cron yet) — dogfood manually
-5. Verify one successful manual run end-to-end, check cost + timing
-6. Enable nightly cron
+   (no cron yet) — dogfood manually. Include a post-step that parses
+   the daily summary for §Escalations and fails the job if non-empty.
+5. Verify one successful manual run end-to-end, check cost + timing.
+   **Also test rate-limit behavior** by artificially exhausting the
+   quota (run several full sessions locally same-day, then trigger the
+   Action). Record what happens — fail-fast, hang, or clean error —
+   and harden the workflow around it.
+6. Enable nightly cron once manual run is reliable.
+
+Parallel-trackable pieces an agent can pick up before the human
+completes step 2:
+- Step 3 (strip docker exec) — `harness-maintainer` track. Small diff,
+  no secrets needed.
+- Draft `.github/workflows/orchestrator.yml` as a PR without enabling
+  it — `harness-maintainer` track. Workflow file with `workflow_dispatch`-
+  only trigger is safe to land before secrets exist; the first dispatch
+  attempt will just fail authorization until the human finishes step 2.
 
 ## References
 
