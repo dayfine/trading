@@ -19,6 +19,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$REPO_ROOT/dev/lib/preflight.sh"
 . "$REPO_ROOT/dev/lib/heartbeat.sh"
 
+# Reap stale agent worktrees / jj workspaces > 7 days old. Cheap, runs
+# in under a second, prevents .claude/worktrees + .claude/jj-ws from
+# accumulating after agent sessions that didn't clean up after
+# themselves. Silent unless it actually removed something.
+"$REPO_ROOT/dev/lib/cleanup-stale-worktrees.sh" 2>&1 \
+  | grep -v "^no stale " || true
+
 PLAN_FLAG=""
 for arg in "$@"; do
   case "$arg" in

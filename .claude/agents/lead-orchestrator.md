@@ -317,13 +317,27 @@ When either of those is true, **reduce scope rather than spawn everything**:
 - Defer the rest to the next run by leaving them idle in the index
 - Note the deferral and the budget cap in the daily summary's Escalations section so the human can see what was skipped and why
 
-On an otherwise clean budget (last run completed, cost < 40% of `max_daily_cost_usd`), dispatching up to 2 subagents in parallel is fine. Never dispatch more than 2 at once.
+On an otherwise clean budget (last run completed, cost < 40% of `max_daily_cost_usd`), dispatch up to the environment-specific cap: **2 parallel locally, 1 sequentially in GHA**. Never exceed those numbers — see Step 4 for why the caps differ by environment. The cap covers throughput dispatch only; it is not sized for candidate-comparison runs (see Step 4).
 
-## Step 4: Spawn feature agents as parallel subagents
+## Step 4: Spawn feature agents
 
-For each feature that should run today, spawn it as a subagent using the Agent tool with `isolation: "worktree"`. Each subagent works on its own git worktree so that (a) commits from one agent cannot pollute another agent's branch via the shared working copy, and (b) `jj new main@origin` inside a subagent produces a clean starting point.
+Dispatch shape depends on environment. Inspect `$TRADING_IN_CONTAINER` (set by the GHA workflow; unset locally) and pick the matching path below.
 
-**Parallelism cap**: run at most **2 subagents in parallel** in a single Agent message. More than 2 Opus subagents in parallel reliably drains the 5-hour quota before PRs can be opened. If more than 2 features are eligible, batch into two messages: dispatch the higher-priority 2, await results, then dispatch the next 2.
+**Throughput vs candidate comparison.** The cap values below assume a *throughput* dispatch pattern — each subagent implements a different track. They do NOT cover "run N candidates against the same problem, pick best." That's a separate mode with its own cap logic; not supported by this orchestrator today.
+
+### Local (TRADING_IN_CONTAINER unset)
+
+- Use **jj** for VCS. No git worktree, no `isolation:` parameter on the Agent tool.
+- Cap: **2 parallel subagents** per Agent message. Each subagent creates its own jj workspace: `jj workspace add .claude/jj-ws/agent-<short-id> && cd .claude/jj-ws/agent-<short-id>`. Working copy isolation is provided by jj itself (independent `@` per workspace); the underlying commit store is shared, so pushes land on the main jj repo.
+- Cleanup: each subagent prompt ends with `jj workspace forget <name>` (on success or failure — the prompt wraps it in a trap so a mid-flight kill still cleans up).
+
+### GHA (TRADING_IN_CONTAINER=1)
+
+- Use **git** for VCS (no jj available in the container, and sequential dispatch makes isolation unnecessary anyway).
+- Cap: **1 subagent at a time**. Sequential only. No parallelism means no working-copy race; subagents run directly in the repo checkout. Each subagent does `git fetch origin && git checkout -b feat/<feature> origin/main`.
+- No cleanup step needed — sequential sessions don't leave stale branches beyond what's pushed to origin.
+
+Do NOT set `isolation: "worktree"` on the Agent tool in either path. Local uses `jj workspace add`; GHA doesn't need isolation at all. Mixing git-worktree with jj caused the 2026-04-15 "worktree has no .jj/" failure; mixing at all is the confusion source we're fixing.
 
 **Parallel write conflict policy**: parallel feat-agents must not write to any shared file.
 The files `dev/decisions.md`, `CLAUDE.md`, and `docs/design/*.md` are read-only during
@@ -360,12 +374,20 @@ Read these files first:
 6. dev/status/<feature>.md  ← pick up where you left off
 
 Your branch: feat/<feature>
-  # You are running in an isolated git worktree — your working copy
-  # is independent of other subagents' workspaces.
-  jj git init --colocate 2>/dev/null || true
+
+  # LOCAL path (TRADING_IN_CONTAINER unset) — isolated jj workspace:
+  WS_NAME="agent-<your-short-id>"
+  jj workspace add ".claude/jj-ws/$WS_NAME"
+  trap "cd /abs/repo/root && jj workspace forget \"$WS_NAME\" 2>/dev/null || true" EXIT
+  cd ".claude/jj-ws/$WS_NAME"
   jj git fetch
   jj new feat/<feature>@origin
   # If bookmark doesn't exist yet: jj bookmark create feat/<feature> -r @
+
+  # GHA path (TRADING_IN_CONTAINER=1) — plain git, sequential, no isolation:
+  #   git fetch origin
+  #   git checkout -b feat/<feature> origin/main
+  # No workspace / worktree cleanup required.
 
 Work using TDD (CLAUDE.md workflow):
   1. .mli interface + skeleton → dune build passes
