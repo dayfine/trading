@@ -18,7 +18,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [short-side-strategy](short-side-strategy.md) | PENDING | — | — | Blocked on PR A of support-floor split (`feat/support-floor-stops`) — primitive widening to long+short |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` + filter with updated default.sexp (Item 2) |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #383 (T3-G trend analysis) | T3-F architecture graph analyzer in health-scanner deep scan (next open T3) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #383 (T3-G trend analysis) | harness/orchestrator-idempotency (Step 1.5 + structured summary) in progress; T3-F architecture graph analyzer next |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Solve open blockers (BOT_GITHUB_TOKEN + CLAUDE_CODE_OAUTH_TOKEN setup; gh/jj availability in container) |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

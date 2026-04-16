@@ -42,6 +42,8 @@ Read the relevant design doc for this feature before reviewing any code. Do not 
 
 Use the structural QC agent's checklist (already in `dev/reviews/<feature>.md`) for the file list. Read the implementation files and their test files directly via the Read tool.
 
+Note: `dev/reviews/<feature>.md` starts with a `Reviewed SHA:` line pinned by qc-structural. This is an idempotency sentinel used by the orchestrator — do not remove or modify it.
+
 ### Step 3: Fill in the behavioral checklist
 
 Work through each item. Every claim must be traceable to a specific section of the authority document. Use Grep to find the implementation evidence.
@@ -124,7 +126,9 @@ APPROVED | NEEDS_REWORK
 
 ## Writing the review file
 
-Append your behavioral checklist to the existing `dev/reviews/<feature>.md` written by qc-structural. Use a new branch off `main@origin`:
+Append your behavioral checklist to the existing `dev/reviews/<feature>.md` written by qc-structural. The file already begins with a `Reviewed SHA:` line written by qc-structural — do not overwrite it or move it. Append only below the existing structural checklist content.
+
+Use a new branch off `main@origin`:
 
 ```bash
 jj new main@origin
