@@ -38,14 +38,15 @@
 #      machine via `claude setup-token`. The Pro/Max subscription's session
 #      limits act as the effective cost ceiling for this workflow.
 #
-# DO NOT enable the `schedule:` cron below until a successful manual
-# dogfood run via `workflow_dispatch` has been observed end-to-end.
 # ----------------------------------------------------------------------------
 name: Daily orchestrator
 
 on:
-  # workflow_dispatch only, for now. Flip on `schedule: cron: "0 14 * * *"`
-  # (07:00 Pacific) once a manual dogfood run succeeds end-to-end.
+  # 1:05 AM Pacific. GitHub cron is UTC-only, no DST awareness — this is
+  # set for UTC-7 (PDT). During PST months (roughly Nov–Mar) the run
+  # drifts to 12:05 AM PT. Acceptable for a daily cadence.
+  schedule:
+    - cron: "5 8 * * *"
   workflow_dispatch:
 
 permissions:
