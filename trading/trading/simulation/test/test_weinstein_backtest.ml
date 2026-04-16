@@ -114,20 +114,24 @@ let test_six_year_full_lifecycle _ =
   let final_value = (List.last_exn result.steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips result.steps in
   let summary = Metrics.compute_summary round_trips in
-  (* Pinned: 2187 steps, 7 buys, 7 sells, all 7 symbols traded *)
+  (* Pinned: 2187 steps, 7 buys, 7 sells, all 7 symbols traded. Stop
+     placement uses the support-floor primitive
+     ({!Weinstein_stops.compute_initial_stop_with_floor}); the tighter
+     initial stops flip more round-trips to winners vs the fixed-buffer
+     proxy (4W/3L vs the older 1W/6L). *)
   assert_that (List.length result.steps) (equal_to 2187);
   assert_that n_buys (equal_to 7);
   assert_that n_sells (equal_to 7);
   assert_that
     (_traded_symbols result.steps)
     (equal_to [ "AAPL"; "CVX"; "HD"; "JNJ"; "JPM"; "KO"; "MSFT" ]);
-  (* 7 completed round-trips with 1 winner, 6 losers *)
+  (* 7 completed round-trips: 4 winners, 3 losers under support-floor stops. *)
   assert_that (List.length round_trips) (equal_to 7);
   assert_that summary
     (is_some_and
-       (match_stats ~total_pnl:__ ~avg_holding_days:__ ~win_count:(equal_to 1)
-          ~loss_count:(equal_to 6) ~win_rate:__));
-  (* Final value ~$495k on $500k start — small loss from conservative sizing *)
+       (match_stats ~total_pnl:__ ~avg_holding_days:__ ~win_count:(equal_to 4)
+          ~loss_count:(equal_to 3) ~win_rate:__));
+  (* Final value ~$498k on $500k start — small loss from conservative sizing *)
   assert_that final_value
     (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
   (* Max drawdown under 10% *)
@@ -158,15 +162,16 @@ let test_entry_exit_cycle_around_covid _ =
   assert_that
     (_traded_symbols result.steps)
     (equal_to [ "AAPL"; "HD"; "JNJ"; "KO" ]);
-  (* All 4 round-trips are losses — COVID crash stops out every position *)
+  (* 4 round-trips: support-floor stops capture 1 winner pre-crash (JNJ)
+     before the remaining 3 are stopped out by the COVID-19 drawdown. *)
   assert_that (List.length round_trips) (equal_to 4);
   assert_that summary
     (is_some_and
        (match_stats
           ~total_pnl:(lt (module Float_ord) 0.0)
-          ~avg_holding_days:__ ~win_count:(equal_to 0) ~loss_count:(equal_to 4)
+          ~avg_holding_days:__ ~win_count:(equal_to 1) ~loss_count:(equal_to 3)
           ~win_rate:__));
-  (* Final value ~$496k — losses are small due to conservative sizing *)
+  (* Final value ~$498k — losses are small due to conservative sizing *)
   assert_that final_value
     (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
   (* Max drawdown under 12% even through COVID *)
@@ -185,10 +190,11 @@ let test_portfolio_value_stays_positive _ =
       ~start_date:(Date.of_string "2020-01-02")
       ~end_date:(Date.of_string "2021-12-31")
   in
-  (* Pinned: 729 steps, 2 buys (HD, KO), no sells — positions held to end *)
+  (* Pinned: 729 steps, 2 buys (HD, KO); under support-floor stops 1 sell
+     fires intra-backtest (vs 0 sells with the prior fixed-buffer proxy). *)
   assert_that (List.length result.steps) (equal_to 729);
   assert_that (_count_by_side result.steps Trading_base.Types.Buy) (equal_to 2);
-  assert_that (_count_by_side result.steps Trading_base.Types.Sell) (equal_to 0);
+  assert_that (_count_by_side result.steps Trading_base.Types.Sell) (equal_to 1);
   (* Every step has positive portfolio value *)
   let min_value = _min_portfolio_value result.steps in
   assert_that min_value (gt (module Float_ord) 0.0);
