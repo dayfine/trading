@@ -68,6 +68,160 @@ EODHD stays available as a drop-in upgrade if Finviz becomes unstable.
   and tested. 7 files, ~250 lines OCaml + ~170 lines tests. Uses
   `cohttp-async` + `re` (regex) for HTML parsing. Builds and all 10
   unit tests pass. Branch: `ops/sector-finviz-scraper`.
+- **Item 4 — universe_filter library + binary** (2026-04-14) —
+  `trading/analysis/scripts/universe_filter/` with
+  `Symbol_pattern` / `Keep_allowlist` rules loaded from
+  `dev/config/universe_filter/<name>.sexp`. 10 unit tests pass.
+  Branch: `ops/universe-filter`.
+
+  Dry-run against `data/sectors.csv` (8,255 rows as of 2026-04-14):
+
+  | rule | raw hits |
+  |---|---:|
+  | `suffix_units_.U` | 0 |
+  | `suffix_warrant_.W` | 0 |
+  | `suffix_warrant_.WS` | 0 |
+  | `preferred_-P` | 0 |
+  | `index_.INDX` | 0 |
+  | `warrant_len>3_endsW` | 12 |
+  | **total dropped** | **12** |
+
+  Sector breakdown before → after:
+
+  | sector | before | after | Δ |
+  |---|---:|---:|---:|
+  | Financials | 4,585 | 4,582 | -3 |
+  | Health Care | 886 | 886 | 0 |
+  | Information Technology | 593 | 590 | -3 |
+  | Industrials | 579 | 575 | -4 |
+  | Consumer Discretionary | 457 | 456 | -1 |
+  | Energy | 197 | 196 | -1 |
+  | others | unchanged | | |
+
+  **Finding — the default rule-set barely dents Financials.** The
+  exchange-suffix rules (`.U`, `.W`, `.WS`, `-P*`, `.INDX`) match
+  zero rows because Finviz already strips those forms before we
+  ingest. The `warrant_len>3_endsW` rule fires 12 times but on
+  legitimate common stocks (SCHW, PANW, SNOW, TROW, ACIW, CHRW,
+  DNOW, EZPW, HAYW, INSW, MATW, SKYW) — all real tickers, no
+  warrants. In the current source, that rule is a false-positive
+  trap rather than a useful filter.
+
+  The Financials bloat (4,585 rows, 55%) is almost entirely
+  **bond / fixed-income ETFs, leveraged / inverse ETFs, trust
+  preferreds, and closed-end funds** that Finviz classifies under
+  "Financial Services" → normalized to Financials. None of those
+  carry distinctive symbol-suffix markers; they look like ordinary
+  4-letter tickers (AAAU, AACB, AADR, ACEP, ACES, …).
+
+  **Follow-up items (new, add to "Next Steps"):**
+
+  - Item 5 — add an `Industry_pattern` rule variant so we can drop
+    e.g. "Exchange Traded Fund", "Shell Companies", "Asset
+    Management" subsets directly, using the Finviz industry cell
+    (requires extending the scrape to capture industry and
+    plumbing it through the CSV — currently we only store sector).
+  - Item 6 — optional volume / market-cap gate: drop symbols whose
+    cached bars show `avg_dollar_volume < $1M/day` or
+    `market_cap < $100M`. Needs the bars cache populated first.
+  - Item 7 — reconsider `warrant_len>3_endsW` — either remove it
+    or tighten to "ends-in-W AND not-in-known-common-stock-list".
+    Keeping it as-is would silently drop SCHW, SNOW, PANW from the
+    universe.
+
+### Iteration 2 — rule-set rewrite using universe.sexp metadata (2026-04-16)
+
+Root-cause fix for Item 4's Iteration 1 finding (the default rule-set
+dropped only 12 rows — all false positives):
+
+- Extended `row` with `name` + `exchange` fields, joined from
+  `data/universe.sexp` at load time (new
+  `load_rows_with_universe ~sectors_csv ~universe_sexp`).
+- Added `Name_pattern` (Perl regex over `row.name`, supports `(?i)`
+  leading flag for case-insensitive match) and `Exchange_equals`
+  (exact match on `row.exchange`) rule variants.
+- Replaced the default `default.sexp` with a three-rule set:
+  - `Keep_allowlist` — SPY QQQ VOO VTI IWM DIA, XL\* sector ETFs,
+    QQQM FXAIX SWPPX (listed first so rescue is final).
+  - `Name_pattern "(?i)(\bETF\b|\bFund\b|\bTrust\b|\bNotes\b)"` —
+    catches bond / leveraged / inverse ETFs, closed-end funds,
+    trust preferreds. Word-boundary anchors avoid matching "etfr" or
+    "fundamentals" embedded in other words.
+  - `Exchange_equals "NYSE ARCA"` — NYSE Arca is the primary US ETF
+    listing venue; this catches ETFs whose display name elides the
+    "ETF" token (e.g. "ProShares Ultra Silver", "ALPS Clean Energy").
+
+Dry-run against live `data/sectors.csv` (9,041 rows as of 2026-04-16):
+
+| rule | raw hits |
+|---|---:|
+| `etf_fund_trust_notes` (Name_pattern) | 3,864 |
+| `nyse_arca` (Exchange_equals) | 2,079 |
+| Rescued by allow-list | 16 |
+| **total dropped** | **4,125** |
+
+Sector breakdown before -> after:
+
+| sector | before | after | Δ |
+|---|---:|---:|---:|
+| Financials | 5,096 | 1,036 | **-4,060** |
+| Health Care | 959 | 959 | 0 |
+| Information Technology | 638 | 636 | -2 |
+| Industrials | 626 | 626 | 0 |
+| Consumer Discretionary | 482 | 482 | 0 |
+| Materials | 251 | 250 | -1 |
+| Real Estate | 235 | 184 | **-51** |
+| Communication Services | 221 | 221 | 0 |
+| Energy | 214 | 213 | -1 |
+| Consumer Staples | 213 | 213 | 0 |
+| Utilities | 106 | 106 | 0 |
+| **total** | **9,041** | **4,916** | **-4,125** |
+
+**Spot check — 5 dropped symbols (each shows name + exchange so the
+reader can sanity-check):**
+
+| symbol | name | exchange | rule that hit |
+|---|---|---|---|
+| AAAA | Amplius Aggressive Asset Allocation ETF | NYSE | `etf_fund_trust_notes` |
+| ABLS | Abacus FCF Small Cap Leaders ETF | NYSE | `etf_fund_trust_notes` |
+| AAPY | Kurv Yield Premium Strategy Apple (AAPL) ETF | BATS | `etf_fund_trust_notes` |
+| AGQ | ProShares Ultra Silver | NYSE ARCA | `nyse_arca` only |
+| ACES | ALPS Clean Energy | NYSE ARCA | `nyse_arca` only |
+
+**Spot check — 5 allow-list symbols preserved** (SPY, QQQ, XLK, XLF,
+XLE are all on NYSE ARCA with names containing ETF/Fund/Trust; the
+`Keep_allowlist` rescue prevents both drop rules from firing):
+
+| symbol | name | exchange |
+|---|---|---|
+| SPY | SPDR S&P 500 ETF Trust | NYSE ARCA |
+| QQQ | Invesco QQQ Trust | NASDAQ |
+| XLK | Technology Select Sector SPDR Fund | NYSE ARCA |
+| XLF | Financial Select Sector SPDR Fund | NYSE ARCA |
+| XLE | Energy Select Sector SPDR Fund | NYSE ARCA |
+
+**Known collateral damage** — 51 Real Estate rows are dropped because
+many legitimate REITs have "Trust" in their display name (AAT
+"American Assets Trust Inc", ABR "Arbor Realty Trust", AKR "Acadia
+Realty Trust", BRT "BRT Realty Trust", …). A small number of royalty
+trusts in Energy (MTR, NRT, PBT, PVL — ~4 rows) and Materials (MSB)
+also fall under the `Trust` keyword. Item 4.1 (below) tracks tightening
+the rule to exclude these.
+
+**Follow-up items:**
+
+- Item 4.1 — tighten `Trust` match so legitimate REITs and royalty
+  trusts are not swept up. Options: (a) add an REIT-sector allow-list
+  clause (preserve anything with `sector = "Real Estate"` regardless
+  of name), (b) change the regex from `\bTrust\b` to
+  `\b(ETF Trust|Unit Trust|Statutory Trust|ETF)\b` targeting the
+  fund-style Trust phrases only, (c) move `Trust` behind a second
+  filter that also checks `exchange ∈ {NYSE ARCA, BATS}`. Option (a)
+  is the cheapest and safest.
+- Items 5-7 (original follow-ups from Iteration 1) remain open —
+  industry_pattern, volume/market-cap gate, and the `warrant_len>3_endsW`
+  cleanup are still relevant if we want to drive the filter beyond
+  the name/exchange signal.
 
 ## In Progress
 - None — waiting for Item 1 PR merge before Item 2 (one-shot run).

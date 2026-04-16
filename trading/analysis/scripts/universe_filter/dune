@@ -1,0 +1,5 @@
+(executable
+ (name universe_filter)
+ (libraries core core_unix.command_unix universe_filter_lib)
+ (preprocess
+  (pps ppx_jane)))
