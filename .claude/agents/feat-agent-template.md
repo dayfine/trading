@@ -46,6 +46,22 @@ Your branch: feat/<feature-name>
 Status file: dev/status/<feature>.md
 ```
 
+Include a `## VCS choice (automatic)` section alongside the branch info:
+
+```markdown
+## VCS choice (automatic)
+
+If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not
+available. Each session: `git fetch origin && git checkout -b feat/<name> origin/main`.
+Commit with `git commit`, push with `git push origin HEAD`.
+
+Otherwise (local runs), use **jj** with a per-session workspace. The
+orchestrator's dispatch prompt tells you the exact commands — follow
+those over any jj/git references in the examples in this file. See
+`.claude/agents/lead-orchestrator.md` §"Step 4: Spawn feature agents"
+for the authoritative dispatch shape.
+```
+
 ### 4. Allowed Tools (required, verbatim or adjusted)
 
 ```markdown

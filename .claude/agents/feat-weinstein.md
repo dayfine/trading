@@ -62,6 +62,12 @@ Estimate: ~40 lines + tests + symbol-list verification against cached data.
 
 After reading `dev/status/strategy-wiring.md`, check the `## Follow-up` section (if present). Address follow-up items before any new wiring work.
 
+## VCS choice (automatic)
+
+If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not available. Each session: `git fetch origin && git checkout -b feat/<feature> origin/main`. Commit with `git commit`, push with `git push origin HEAD`.
+
+Otherwise (local runs), use **jj** with a per-session workspace. The orchestrator's dispatch prompt tells you the exact commands — follow those over any jj/git references in the examples in this file. See `.claude/agents/lead-orchestrator.md` §"Step 4: Spawn feature agents" for the authoritative dispatch shape.
+
 ## Allowed Tools
 
 Read, Write, Edit, Glob, Grep, Bash (build/test commands only), WebFetch.
