@@ -106,7 +106,7 @@ status to READY_FOR_REVIEW.
 - [ ] If experiment: scenario files parse via `Scenario.load` (run `dune build`)
 - [ ] If experiment: `dev/experiments/<name>/report.md` includes a comparative table + falsifiable conclusion
 - [ ] `dune build && dune runtest` passes with zero warnings
-- [ ] `dune fmt --check` passes (or: `dune fmt` produces no diff)
+- [ ] `dune build @fmt` passes (formatter in check mode; equivalent: `dune fmt` produces no diff)
 - [ ] `dev/status/backtest-infra.md` updated: tick off the item under the relevant subsection, add a Completed entry with what was built, where it lives, and how to verify
 - [ ] Trading-behaviour-impact items also link back to `## Potential experiments` if they originated there
 

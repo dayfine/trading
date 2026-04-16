@@ -79,13 +79,13 @@ If after **3 consecutive build-fix cycles** `dune build && dune runtest` is stil
 - [ ] Correlation ≥0.85 recorded in `dev/notes/synthetic-adl-validation.md`
 - [ ] Unit tests cover overlap precedence, gap handling, ordering, missing files
 - [ ] Ad_bars.mli documentation updated — no stale "delegates to Unicorn only" claim
-- [ ] `dune build && dune runtest` passes, `dune fmt --check` passes
+- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes
 
 ### Item 2 — Global indices
 - [ ] `Macro_inputs.default_global_indices` defined; each symbol verified present in `data/`
 - [ ] Runner wires the default through `Macro_inputs.default_global_indices`
 - [ ] Smoke test asserts `Macro.analyze` sees non-empty `global_index_bars` under default config
-- [ ] `dune build && dune runtest` passes, `dune fmt --check` passes
+- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes
 
 ## Status file updates
 

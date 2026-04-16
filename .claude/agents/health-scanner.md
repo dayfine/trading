@@ -34,8 +34,7 @@ cat /Users/difan/Projects/trading-1/dev/status/<feature>.md
 Run the full build and test suite on `main@origin` to confirm it is clean:
 
 ```bash
-docker exec trading-1-dev bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune runtest 2>&1; echo "EXIT:$?"'
+dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest 2>&1; echo "EXIT:$?"
 ```
 
 Report PASSING if exit code is 0. Report FAILING with full output if non-zero.
@@ -49,8 +48,7 @@ Check the most recent commit on `main` for newly introduced bare numeric literal
 jj log -r 'main@origin' --no-graph --template 'commit_id ++ "\n"' | head -1
 
 # Check if the linter is passing (this catches any violations in the full tree)
-docker exec trading-1-dev bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest devtools/checks/ 2>&1; echo "EXIT:$?"'
+dev/lib/run-in-env.sh dune runtest devtools/checks/ 2>&1; echo "EXIT:$?"
 ```
 
 If the linter fails, that is a critical finding (the gate should have caught it before merge).
@@ -71,9 +69,7 @@ The deterministic check is wired into `dune runtest` as
 linters. Invoke it directly to get the report:
 
 ```bash
-docker exec trading-1-dev bash -c \
-  'cd /workspaces/trading-1/trading && eval $(opam env) && \
-   sh devtools/checks/status_file_integrity.sh 2>&1; echo "EXIT:$?"'
+dev/lib/run-in-env.sh sh devtools/checks/status_file_integrity.sh 2>&1; echo "EXIT:$?"
 ```
 
 If exit code is non-zero, quote the FAIL lines verbatim into the report as
@@ -102,12 +98,7 @@ Run once per week. The deep scan has two phases: a deterministic script and agen
 Run the standalone deep scan script. This covers dead code detection, design doc drift, TODO/FIXME/HACK accumulation, size violations, and follow-up item counting. It writes the report to `dev/health/YYYY-MM-DD-deep.md`.
 
 ```bash
-# From the repo root (local):
-sh trading/devtools/checks/deep_scan.sh
-
-# From Docker:
-docker exec trading-1-dev bash -c \
-  'cd /workspaces/trading-1 && sh trading/devtools/checks/deep_scan.sh'
+dev/lib/run-in-env.sh sh ../devtools/checks/deep_scan.sh
 ```
 
 The script performs five checks:
