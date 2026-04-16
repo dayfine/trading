@@ -13,6 +13,7 @@ type rule =
   | Name_pattern of { name : string; pattern : string }
   | Exchange_equals of { name : string; exchange : string }
   | Keep_allowlist of { name : string; symbols : string list }
+  | Keep_if_sector of { name : string; sectors : string list }
 [@@deriving sexp]
 
 type config = { rules : rule list } [@@deriving sexp]
@@ -29,13 +30,18 @@ type filter_result = {
 (* --- Compiled rule-set ---------------------------------------------------- *)
 
 (* Internal representation: regexes compiled once up-front, allow-list flattened
-   into a set. Each drop rule keeps a closure that decides whether [row] matches.
-   Keeping the closure uniform across variants keeps the per-row loop simple. *)
+   into a set, sector rescue set flattened into a second set.  Each drop rule
+   keeps a closure that decides whether [row] matches.  Keeping the closure
+   uniform across variants keeps the per-row loop simple. *)
 type drop_rule_compiled = { name : string; matches : row -> bool }
 
 type compiled = {
   drop_rules : drop_rule_compiled list;
   allowlist : String.Hash_set.t;
+  sector_rescue : String.Hash_set.t;
+      (** Sectors collected from all [Keep_if_sector] rules. Rows whose sector
+          is a member are rescued from any drop rule — identical semantics to
+          [allowlist] but keyed on sector. *)
 }
 
 (* [Re.Perl] does not support inline flag groups like [(?i)…]. To keep the sexp
@@ -62,16 +68,19 @@ let _compile_drop_rule = function
       Some { name; matches = (fun row -> Re.execp re row.name) }
   | Exchange_equals { name; exchange } ->
       Some { name; matches = (fun row -> String.equal row.exchange exchange) }
-  | Keep_allowlist _ -> None
+  | Keep_allowlist _ | Keep_if_sector _ -> None
 
 let _compile (cfg : config) : compiled =
   let drop_rules = List.filter_map cfg.rules ~f:_compile_drop_rule in
   let allowlist = String.Hash_set.create () in
+  let sector_rescue = String.Hash_set.create () in
   List.iter cfg.rules ~f:(function
     | Keep_allowlist { symbols; _ } ->
         List.iter symbols ~f:(fun s -> Hash_set.add allowlist s)
+    | Keep_if_sector { sectors; _ } ->
+        List.iter sectors ~f:(fun s -> Hash_set.add sector_rescue s)
     | Symbol_pattern _ | Name_pattern _ | Exchange_equals _ -> ());
-  { drop_rules; allowlist }
+  { drop_rules; allowlist; sector_rescue }
 
 (* --- Core filter --------------------------------------------------------- *)
 
@@ -87,7 +96,7 @@ let _extract_drop_rule_name = function
   | Name_pattern { name; _ }
   | Exchange_equals { name; _ } ->
       Some name
-  | Keep_allowlist _ -> None
+  | Keep_allowlist _ | Keep_if_sector _ -> None
 
 let filter (cfg : config) (rows : row list) : filter_result =
   let c = _compile cfg in
@@ -101,7 +110,8 @@ let filter (cfg : config) (rows : row list) : filter_result =
           Hashtbl.update stats name ~f:(function None -> 1 | Some n -> n + 1));
       let would_drop = not (List.is_empty matched) in
       let on_allowlist = Hash_set.mem c.allowlist row.symbol in
-      if would_drop && on_allowlist then (
+      let sector_rescued = Hash_set.mem c.sector_rescue row.sector in
+      if would_drop && (on_allowlist || sector_rescued) then (
         Int.incr rescued;
         kept := row :: !kept)
       else if would_drop then dropped := row :: !dropped

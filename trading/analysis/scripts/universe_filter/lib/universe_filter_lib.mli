@@ -12,7 +12,11 @@
     sector, loaded by joining [data/sectors.csv] against [data/universe.sexp]
     (see {!load_rows_with_universe}). This lets rules target instrument names
     ("ETF" / "Fund" / "Trust" / "Notes") and primary exchange ("NYSE ARCA" ≈ ETF
-    listing venue), not just the symbol ticker. *)
+    listing venue), not just the symbol ticker.
+
+    Rescue rules — {!Keep_allowlist} preserves individual symbols; the newer
+    {!Keep_if_sector} preserves entire sectors (e.g. Real Estate) so that
+    legitimate REITs are not swept up by a name-pattern drop rule. *)
 
 type row = {
   symbol : string;
@@ -59,6 +63,19 @@ type rule =
           (** Symbols in this list are preserved even if a drop rule matches.
               Allow-list rescue is final — it cannot be overridden by any other
               rule. *)
+    }
+  | Keep_if_sector of {
+      name : string;
+      sectors : string list;
+          (** Rows whose [row.sector] is an exact (case-sensitive) member of
+              [sectors] are preserved even if a drop rule matches. Rescue is
+              final — identical semantics to {!Keep_allowlist} but keyed on
+              sector rather than individual symbol.
+
+              Typical use-case: preserve legitimate REITs and royalty trusts
+              (sector ["Real Estate"], ["Energy"], ["Materials"]) that would
+              otherwise be swept up by a {!Name_pattern} targeting the word
+              "Trust". *)
     }
 [@@deriving sexp]
 
