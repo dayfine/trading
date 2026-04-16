@@ -184,15 +184,29 @@ jobs:
           git commit -m "ops: daily orchestrator summary ${DATE} (run ${GITHUB_RUN_NUMBER})"
           git push origin "HEAD:refs/heads/${BRANCH}"
 
-          # Open a PR for human review.
-          if gh pr view "$BRANCH" >/dev/null 2>&1; then
-            echo "PR for $BRANCH already exists; skipping create."
+          # Open a PR for human review via REST (gh CLI is not in the
+          # devcontainer image — see PR #378 decision: "git is the wire
+          # format, jj handles local UX, no extra CLIs").
+          REPO="${GITHUB_REPOSITORY}"
+          API="https://api.github.com/repos/${REPO}/pulls"
+          existing="$(curl -sSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${API}?head=${REPO%/*}:${BRANCH}&state=open" \
+            | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d[0]["html_url"] if d else "")')"
+          if [ -n "$existing" ]; then
+            echo "PR for $BRANCH already exists: $existing"
           else
-            gh pr create \
-              --base main \
-              --head "$BRANCH" \
-              --title "ops: daily orchestrator summary ${DATE} (run ${GITHUB_RUN_NUMBER})" \
-              --body "Automated daily orchestrator run. See \`$SUMMARY\` for the full summary."
+            export PR_TITLE="ops: daily orchestrator summary ${DATE} (run ${GITHUB_RUN_NUMBER})"
+            export PR_BODY="Automated daily orchestrator run. See \`$SUMMARY\` for the full summary."
+            export PR_BRANCH="$BRANCH"
+            payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))')"
+            curl -sSL -X POST \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -d "$payload" \
+              "$API" \
+              | python3 -c 'import json,sys;d=json.load(sys.stdin);print("Created PR:",d.get("html_url") or d)'
           fi
 
       - name: Fail on escalations
