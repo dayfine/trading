@@ -15,6 +15,7 @@ Each row: one line; deeper task detail in the linked status file.
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | BLOCKED | feat-backtest | — | Waiting on support-floor-stops PR #382 to merge; then pick up fixed-buffer vs support-floor experiment |
 | [support-floor-stops](support-floor-stops.md) | READY_FOR_REVIEW | feat-weinstein | #382 | Merge #382 (overall_qc APPROVED this run) |
+| [short-side-strategy](short-side-strategy.md) | PENDING | — | — | Blocked on PR A of support-floor split (`feat/support-floor-stops`) — primitive widening to long+short |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` + filter with updated default.sexp (Item 2) |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | #383 (T3-G trend analysis) | T3-F architecture graph analyzer in health-scanner deep scan (next open T3) |
