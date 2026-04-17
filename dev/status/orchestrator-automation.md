@@ -352,6 +352,14 @@ Changes landed:
 
 Verify: `grep -n "Step 1.5\|Pending work\|Dispatched this run\|Reviewed SHA\|Run timestamp\|Run ID:" .claude/agents/lead-orchestrator.md` — all should match; `grep "Reviewed SHA" .claude/agents/qc-structural.md .claude/agents/qc-behavioral.md` — both should match.
 
+## Resolved escalations log
+
+### 2026-04-17
+
+- **§2 (orphan `dev/reviews/backtest-infra-behavioral@origin`)**: qc-behavioral agent pushed its review file as a separate branch to origin (instructions in `qc-behavioral.md` "Writing the review file" section told it to `jj git push`). Branch was deleted manually. Root cause fixed: both `qc-structural.md` and `qc-behavioral.md` now explicitly say "do NOT push" and instruct agents to write the file in-place for the orchestrator to read directly. See `harness/orchestrator-summary-cleanup-2026-04-17`.
+
+- **§3 (carried-forward `harness/t3g-trend-analysis@origin`, `ops/daily-2026-04-16-run4@origin`)**: both already gone (HTTP 404 on origin) before this run. Resolved by the originating session cleanup.
+
 ## References
 
 - Research transcript: research agent run 2026-04-14 (see Escalations in

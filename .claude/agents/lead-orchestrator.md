@@ -119,11 +119,19 @@ agents on tracks where work is in flight.
 
 ```bash
 # For each eligible track (substitute the actual branch pattern):
-GH_TOKEN=$GH_TOKEN gh pr list \
-  --state open \
-  --json number,headRefName,mergeable,statusCheckRollup \
-  --jq '.[] | select(.headRefName | startswith("feat/<track>"))' \
-  2>/dev/null
+# gh is not available in the devcontainer — use curl against the REST API.
+REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
+OWNER="${REPO%/*}"
+curl -sSL \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${REPO}/pulls?head=${OWNER}:feat/<track>&state=open" \
+  | python3 -c '
+import json,sys
+prs = json.load(sys.stdin)
+for pr in prs:
+    print(pr["number"], pr["head"]["ref"], pr["head"]["sha"])
+'
 ```
 
 **Decision rules per track:**
@@ -131,7 +139,7 @@ GH_TOKEN=$GH_TOKEN gh pr list \
 ```
 FOR each eligible track from Step 1:
   IF any open PRs found on feat/<track> or feat/<track>/* branches:
-    tip_sha = $(GH_TOKEN=$GH_TOKEN gh pr view <pr_number> --json headRefOid --jq .headRefOid)
+    tip_sha = (SHA from the curl output above for that PR)
     last_review_sha = (parse "Reviewed SHA:" line from dev/reviews/<track>.md, if it exists)
 
     IF track status is READY_FOR_REVIEW AND tip_sha != last_review_sha:
@@ -479,18 +487,18 @@ COMMIT DISCIPLINE — this is critical for reviewability AND for surviving rate-
   - **Open a DRAFT PR as soon as the first real commit is pushed** — do
     not wait until session end. If the session is killed mid-flight
     (rate-limit, timeout), at least the PR exists with whatever was
-    pushed. Use:
-      GH_TOKEN=$GH_TOKEN gh pr create --base main --head feat/<feature> \
-        --draft --title "feat(<area>): <one-line summary>" \
-        --body "WIP — opened early so work is not lost on kill."
+    pushed. Use jst to open the PR (jst is on PATH in trading-devcontainer):
+      GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
     Subsequent pushes update the PR automatically (same branch).
-  - At session end, mark the PR ready for review via jst:
+    If jst is not available, use the URL printed by `jj git push`:
+      remote: Create a pull request for '<branch>' on GitHub by visiting:
+      remote:      https://github.com/dayfine/trading/pull/new/<branch>
+  - At session end, mark the PR ready for review:
       GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
     jst is on PATH in the orchestrator runtime (trading-devcontainer image
-    + dev/run.sh assumes both). If GH_TOKEN isn't set, jst will fail with
-    a clear error and the branch is still pushed — the draft PR is still
-    there. The orchestrator can then fall back to marking it ready in
-    Step 7.
+    + dev/run.sh). If GH_TOKEN isn't set, jst will fail with a clear error
+    and the branch is still pushed — the orchestrator's Step 4.5 will
+    retry PR creation via the curl fallback.
 
 MAX ITERATIONS — build-fix cycles:
   - If you have attempted 3 consecutive build-fix cycles without passing
@@ -504,10 +512,10 @@ Stop at a natural boundary (a passing build, a completed module).
 CRITICAL — before returning, do all of these (in this order, so a kill during the last step still leaves the PR open):
   1. Ensure dune build && dune runtest passes **on a clean checkout** of your branch (your worktree is isolated, so this is the local state — but verify nothing relies on files from sibling subagents' workspaces; only content tracked in your commits should matter)
   2. All changes committed and pushed (nothing uncommitted)
-  3. Draft PR already open from first push (see commit discipline); if not, open it now via `gh pr create --draft`
+  3. Draft PR already open from first push (see commit discipline); if not, open it now via `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>`
   4. Update dev/status/<feature>.md (status, interface-stable, completed, in-progress, next-steps, commits)
   5. Do NOT edit dev/status/_index.md — I (the orchestrator) reconcile it in Step 5.5. Editing it from a feature PR collides with every sibling PR touching the same row. Exception: if this PR introduces a brand-new tracked work item (new status file), add the corresponding row to _index.md in this PR — I can't invent one.
-  6. If all work is done and tests pass: mark the PR ready for review via `jst submit` or `gh pr ready`, and set status to READY_FOR_REVIEW in the status file
+  6. If all work is done and tests pass: mark the PR ready for review via `GH_TOKEN=$GH_TOKEN jst submit feat/<feature>`, and set status to READY_FOR_REVIEW in the status file
 
 <FEATURE-SPECIFIC CONSTRAINT IF ANY>
 
@@ -570,15 +578,21 @@ Recovery flow:
 
 ```bash
 # For each branch the subagent reported pushing:
-GH_TOKEN=$GH_TOKEN gh api "repos/dayfine/trading/pulls?head=dayfine:<branch>&state=open" \
-  --jq 'length' \
-  | grep -q '^0$' && \
-  GH_TOKEN=$GH_TOKEN jst submit <branch>
+# gh is not available in the devcontainer — use curl against the REST API.
+REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
+OWNER="${REPO%/*}"
+PR_COUNT=$(curl -sSL \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${REPO}/pulls?head=${OWNER}:<branch>&state=open" \
+  | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
+[ "$PR_COUNT" -eq 0 ] && GH_TOKEN=$GH_TOKEN jst submit <branch>
 ```
 
 If jst still fails, surface the branch + jst error in the daily summary
-under §Escalations so the human can open the PR manually with one
-`gh pr create` call. Don't loop on it.
+under §Escalations with the GitHub PR-creation URL:
+  https://github.com/dayfine/trading/pull/new/<branch>
+so the human can open the PR manually with one click. Don't loop on it.
 
 This catches the "agent pushed branch but no PR" gap that would
 otherwise leave work invisible until the human reads the daily summary
@@ -679,7 +693,7 @@ For each row in `dev/status/_index.md`:
 2. Compare against the row:
    - **Status** — must match the `## Status` heading value (IN_PROGRESS / READY_FOR_REVIEW / MERGED / APPROVED / BLOCKED).
    - **Owner** — must match `## Ownership` (or be `—` if the track has no active owner).
-   - **Open PR(s)** — cross-reference against `gh pr list` filtered to that track's branches; each currently-open PR targeting main that carries this track's work should appear.
+   - **Open PR(s)** — cross-reference against the GitHub REST API (via `curl -sSL -H "Authorization: Bearer ${GH_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY:-dayfine/trading}/pulls?state=open"`) filtered to that track's branches; each currently-open PR targeting main that carries this track's work should appear.
    - **Next task** — must be the top item from `## Next Steps` (or an equivalent synthesis of the most concrete pending item).
 3. If any cell drifts, fix it. Do not touch unrelated rows.
 4. Update the `Last updated:` line to today's date.
