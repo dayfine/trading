@@ -21,14 +21,14 @@
 ;;   Consumer Discretionary:    28
 ;;   Consumer Staples:          24
 ;;   Energy:                    24
-;;   Financials:                32
+;;   Financials:                33
 ;;   Health Care:               32
 ;;   Industrials:               32
-;;   Information Technology:    36
+;;   Information Technology:    37
 ;;   Materials:                 22
 ;;   Real Estate:               22
 ;;   Utilities:                 28
-;;   Total:                    300
+;;   Total:                    302
 (Pinned (
   ;; Communication Services (20)
   ((symbol CHTR)   (sector "Communication Services"))
@@ -130,7 +130,7 @@
   ((symbol WMB)    (sector Energy))
   ((symbol XOM)    (sector Energy))
   ((symbol XEC)    (sector Energy))
-  ;; Financials (32)
+  ;; Financials (33)
   ((symbol AFL)    (sector Financials))
   ((symbol AIG)    (sector Financials))
   ((symbol ALL)    (sector Financials))
@@ -163,6 +163,7 @@
   ((symbol TRV)    (sector Financials))
   ((symbol USB)    (sector Financials))
   ((symbol V)      (sector Financials))
+  ((symbol WFC)    (sector Financials))
   ;; Health Care (32)
   ((symbol ABBV)   (sector "Health Care"))
   ((symbol ABT)    (sector "Health Care"))
@@ -229,7 +230,7 @@
   ((symbol UNP)    (sector Industrials))
   ((symbol UPS)    (sector Industrials))
   ((symbol WM)     (sector Industrials))
-  ;; Information Technology (36)
+  ;; Information Technology (37)
   ((symbol AAPL)   (sector "Information Technology"))
   ((symbol ACN)    (sector "Information Technology"))
   ((symbol ADBE)   (sector "Information Technology"))
@@ -261,6 +262,7 @@
   ((symbol NXPI)   (sector "Information Technology"))
   ((symbol ORCL)   (sector "Information Technology"))
   ((symbol PANW)   (sector "Information Technology"))
+  ((symbol PYPL)   (sector "Information Technology"))
   ((symbol QCOM)   (sector "Information Technology"))
   ((symbol SNPS)   (sector "Information Technology"))
   ((symbol STX)    (sector "Information Technology"))
