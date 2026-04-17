@@ -455,35 +455,21 @@ let test_join_handles_missing_universe_symbols _ctx =
 (* The default rule-set has a Name_pattern that catches "Trust" and would
    drop REITs like "American Assets Trust" (AAT).  A Keep_if_sector rule
    placed before or after the drop rule rescues them by sector. *)
-let test_keep_if_sector_rescues_reits _ctx =
-  (* Mirrors the real default.sexp pattern: allow-list + name-pattern +
-     sector-rescue.  AAT has "Trust" in its name → would be dropped by the
-     name_pattern, but Keep_if_sector("Real Estate") rescues it. *)
+
+(* AAT has "Trust" in its name; Keep_if_sector("Real Estate") rescues it. *)
+let test_keep_if_sector_rescues_reit_trust_name _ctx =
   let cfg : U.config =
     {
       rules =
         [
-          U.Keep_allowlist { name = "broad"; symbols = [ "SPY"; "QQQ" ] };
           U.Keep_if_sector { name = "reit_rescue"; sectors = [ "Real Estate" ] };
-          U.Name_pattern
-            {
-              name = "etf_fund_trust_notes";
-              pattern = "(?i)(\\bETF\\b|\\bFund\\b|\\bTrust\\b|\\bNotes\\b)";
-            };
+          U.Name_pattern { name = "trust"; pattern = "(?i)\\bTrust\\b" };
         ];
     }
   in
   let rows =
     [
-      (* REIT: name contains "Trust", sector "Real Estate" — must be kept *)
       row ~name:"American Assets Trust Inc" ~exchange:"NYSE" "AAT" "Real Estate";
-      (* ETF: name contains "ETF", sector "Financials" — must be dropped *)
-      row ~name:"Amplius Aggressive Asset Allocation ETF" ~exchange:"NYSE"
-        "AAAA" "Financials";
-      (* Allow-listed ETF: rescued by Keep_allowlist, not Keep_if_sector *)
-      row ~name:"SPDR S&P 500 ETF Trust" ~exchange:"NYSE ARCA" "SPY"
-        "Financials";
-      (* Plain common stock: not matching any rule — kept *)
       row ~name:"Apple Inc" ~exchange:"NASDAQ" "AAPL" "Information Technology";
     ]
   in
@@ -499,12 +485,39 @@ let test_keep_if_sector_rescues_reits _ctx =
                   (row ~name:"American Assets Trust Inc" ~exchange:"NYSE" "AAT"
                      "Real Estate");
                 equal_to
-                  (row ~name:"SPDR S&P 500 ETF Trust" ~exchange:"NYSE ARCA"
-                     "SPY" "Financials");
-                equal_to
                   (row ~name:"Apple Inc" ~exchange:"NASDAQ" "AAPL"
                      "Information Technology");
               ]);
+         field (fun r -> r.U.dropped) (elements_are []);
+         field (fun r -> r.U.rescued_by_allowlist) (equal_to 1);
+       ])
+
+(* ETF in "Financials" sector is not rescued by a Real-Estate-only rule. *)
+let test_keep_if_sector_drops_etf_not_in_rescue_sector _ctx =
+  let cfg : U.config =
+    {
+      rules =
+        [
+          U.Keep_if_sector { name = "reit_rescue"; sectors = [ "Real Estate" ] };
+          U.Name_pattern
+            {
+              name = "etf_fund_trust_notes";
+              pattern = "(?i)(\\bETF\\b|\\bFund\\b|\\bTrust\\b|\\bNotes\\b)";
+            };
+        ];
+    }
+  in
+  let rows =
+    [
+      row ~name:"Amplius Aggressive Asset Allocation ETF" ~exchange:"NYSE"
+        "AAAA" "Financials";
+    ]
+  in
+  let result = U.filter cfg rows in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.U.kept) (elements_are []);
          field
            (fun r -> r.U.dropped)
            (elements_are
@@ -513,15 +526,47 @@ let test_keep_if_sector_rescues_reits _ctx =
                   (row ~name:"Amplius Aggressive Asset Allocation ETF"
                      ~exchange:"NYSE" "AAAA" "Financials");
               ]);
-         (* AAT + SPY both rescued; drop_count is raw (before rescue) *)
+         field (fun r -> r.U.rescued_by_allowlist) (equal_to 0);
+       ])
+
+(* Verifies that drop_count is raw (before rescue) and both rescue paths —
+   Keep_allowlist and Keep_if_sector — each increment rescued_by_allowlist. *)
+let test_keep_if_sector_combined_rescue_counts _ctx =
+  let cfg : U.config =
+    {
+      rules =
+        [
+          U.Keep_allowlist { name = "broad"; symbols = [ "SPY" ] };
+          U.Keep_if_sector { name = "reit_rescue"; sectors = [ "Real Estate" ] };
+          U.Name_pattern
+            { name = "trust_etf"; pattern = "(?i)(\\bTrust\\b|\\bETF\\b)" };
+        ];
+    }
+  in
+  (* AAT: rescued by sector; SPY: rescued by allowlist; AAAA: dropped *)
+  let rows =
+    [
+      row ~name:"American Assets Trust Inc" ~exchange:"NYSE" "AAT" "Real Estate";
+      row ~name:"SPDR S&P 500 ETF Trust" ~exchange:"NYSE ARCA" "SPY"
+        "Financials";
+      row ~name:"Fake ETF" ~exchange:"NYSE" "AAAA" "Financials";
+    ]
+  in
+  let result = U.filter cfg rows in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.U.kept) (size_is 2);
+         field (fun r -> r.U.dropped) (size_is 1);
+         (* drop_count is raw: AAT + SPY + AAAA all matched before rescue *)
          field
            (fun r -> r.U.rule_stats)
            (elements_are
               [
                 equal_to
-                  ({ rule_name = "etf_fund_trust_notes"; drop_count = 3 }
-                    : U.rule_stat);
+                  ({ rule_name = "trust_etf"; drop_count = 3 } : U.rule_stat);
               ]);
+         (* 2 rescued: AAT via sector, SPY via allowlist *)
          field (fun r -> r.U.rescued_by_allowlist) (equal_to 2);
        ])
 
@@ -619,8 +664,12 @@ let () =
                   >:: test_multiple_rules_independent_counts;
                   "stats show zero for nonmatching rule"
                   >:: test_stats_zero_for_nonmatching_rule;
-                  "Keep_if_sector rescues REITs (AAT kept, AAAA dropped, SPY \
-                   kept)" >:: test_keep_if_sector_rescues_reits;
+                  "Keep_if_sector rescues REIT with Trust in name"
+                  >:: test_keep_if_sector_rescues_reit_trust_name;
+                  "Keep_if_sector does not rescue ETF in wrong sector"
+                  >:: test_keep_if_sector_drops_etf_not_in_rescue_sector;
+                  "Keep_if_sector combined: rescue counts and raw drop_count"
+                  >:: test_keep_if_sector_combined_rescue_counts;
                   "Keep_if_sector rescues multiple sectors"
                   >:: test_keep_if_sector_multiple_sectors;
                   "Keep_if_sector does not rescue unmatched sectors"
