@@ -506,7 +506,7 @@ CRITICAL — before returning, do all of these (in this order, so a kill during 
   2. All changes committed and pushed (nothing uncommitted)
   3. Draft PR already open from first push (see commit discipline); if not, open it now via `gh pr create --draft`
   4. Update dev/status/<feature>.md (status, interface-stable, completed, in-progress, next-steps, commits)
-  5. Update your row in dev/status/_index.md (Status, Owner, Open PR, Next task) — only touch your own row
+  5. Do NOT edit dev/status/_index.md — I (the orchestrator) reconcile it in Step 5.5. Editing it from a feature PR collides with every sibling PR touching the same row. Exception: if this PR introduces a brand-new tracked work item (new status file), add the corresponding row to _index.md in this PR — I can't invent one.
   6. If all work is done and tests pass: mark the PR ready for review via `jst submit` or `gh pr ready`, and set status to READY_FOR_REVIEW in the status file
 
 <FEATURE-SPECIFIC CONSTRAINT IF ANY>
@@ -663,8 +663,15 @@ After all feature / harness / ops agents have returned and before the
 health-scanner fast scan, reconcile the status index so it reflects the
 state of the per-track status files. The index is the single-source
 view of all tracked work (Track | Status | Owner | Open PR(s) | Next
-task) — agents are expected to update their own row, but this step is
-the safety net.
+task).
+
+**Agents do NOT edit `_index.md` in their PRs** — this step is the sole
+writer. Feature PRs that touched the index caused a merge conflict on
+every subsequent merge, so the contract is now: agents write their own
+`dev/status/<track>.md`, orchestrator mirrors into the index. The only
+exception is a PR that introduces a brand-new tracked work item; the
+new row must come in with the new status file because the orchestrator
+has no other signal to invent one.
 
 For each row in `dev/status/_index.md`:
 

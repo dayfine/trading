@@ -113,7 +113,7 @@ dev/lib/run-in-env.sh dune runtest trading/devtools/checks/
 ## When done with each item
 
 1. Mark `[x]` in `dev/status/harness.md` with a note: what was built, where it lives, how to verify
-2. Update the **harness** row in `dev/status/_index.md` — align Status, Owner, Open PR, and Next task with the change. Only touch your own row.
+2. **Do NOT edit `dev/status/_index.md`** — the orchestrator reconciles it in Step 5.5. Editing the index in a harness PR causes merge conflicts with every sibling PR that touches the same row. Only touch `dev/status/harness.md`. Exception: if this PR adds a brand-new tracked work item that needs a new row (rare), add the row here since the orchestrator can't invent one.
 3. Commit and push:
    ```
    jj describe -m "harness: <short description>"
