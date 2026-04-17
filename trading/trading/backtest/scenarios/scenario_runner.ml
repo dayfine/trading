@@ -13,6 +13,7 @@
     compute checks and print the table in declaration order. *)
 
 open Core
+module Scenario = Scenario_lib.Scenario
 
 (* Actual metrics extracted from a run — serialized so the parent process
    can read back each child's result. *)
@@ -24,6 +25,7 @@ type actual = {
   sharpe_ratio : float;
   max_drawdown_pct : float;
   avg_holding_days : float;
+  unrealized_pnl : float;
 }
 [@@deriving sexp]
 
@@ -39,6 +41,7 @@ let _actual_of_result (r : Backtest.Runner.result) =
     sharpe_ratio = get SharpeRatio;
     max_drawdown_pct = get MaxDrawdown;
     avg_holding_days = get AvgHoldingDays;
+    unrealized_pnl = get UnrealizedPnl;
   }
 
 (* Range checking *)
@@ -46,18 +49,23 @@ let _actual_of_result (r : Backtest.Runner.result) =
 type check = { name : string; value : float; range : Scenario.range; ok : bool }
 
 let _check_one name value (range : Scenario.range) =
-  let ok = Float.(value >= range.min_f && value <= range.max_f) in
+  let ok = Scenario.in_range range value in
   { name; value; range; ok }
 
 let _run_checks (a : actual) (e : Scenario.expected) =
-  [
-    _check_one "total_return_pct" a.total_return_pct e.total_return_pct;
-    _check_one "total_trades" a.total_trades e.total_trades;
-    _check_one "win_rate" a.win_rate e.win_rate;
-    _check_one "sharpe_ratio" a.sharpe_ratio e.sharpe_ratio;
-    _check_one "max_drawdown_pct" a.max_drawdown_pct e.max_drawdown_pct;
-    _check_one "avg_holding_days" a.avg_holding_days e.avg_holding_days;
-  ]
+  let base =
+    [
+      _check_one "total_return_pct" a.total_return_pct e.total_return_pct;
+      _check_one "total_trades" a.total_trades e.total_trades;
+      _check_one "win_rate" a.win_rate e.win_rate;
+      _check_one "sharpe_ratio" a.sharpe_ratio e.sharpe_ratio;
+      _check_one "max_drawdown_pct" a.max_drawdown_pct e.max_drawdown_pct;
+      _check_one "avg_holding_days" a.avg_holding_days e.avg_holding_days;
+    ]
+  in
+  match e.unrealized_pnl with
+  | None -> base
+  | Some range -> base @ [ _check_one "unrealized_pnl" a.unrealized_pnl range ]
 
 let _failure_message checks =
   List.filter checks ~f:(fun c -> not c.ok)

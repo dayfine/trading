@@ -1,0 +1,4 @@
+(test
+ (name test_scenario)
+ (modules test_scenario)
+ (libraries ounit2 core scenario_lib matchers))

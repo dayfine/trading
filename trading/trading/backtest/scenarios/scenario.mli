@@ -17,6 +17,12 @@ type expected = {
   sharpe_ratio : range;
   max_drawdown_pct : range;
   avg_holding_days : range;
+  unrealized_pnl : range option; [@sexp.option]
+      (** Dollar range for end-of-simulation unrealized P&L. [None] skips the
+          check — use for scenarios where no positions remain open at the end or
+          where the value is otherwise not meaningful to pin. Scenarios with
+          open positions should pin a non-zero range to guard against regression
+          to the UnrealizedPnl=0 bug (see PR #393). *)
 }
 [@@deriving sexp]
 
@@ -36,3 +42,6 @@ type t = {
 
 val load : string -> t
 (** Load and parse a scenario sexp file. Raises [Failure] on malformed input. *)
+
+val in_range : range -> float -> bool
+(** [in_range r v] is [true] iff [v] lies in the closed interval [r]. *)

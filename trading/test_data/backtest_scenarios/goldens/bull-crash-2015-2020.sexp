@@ -7,6 +7,11 @@
 ;;
 ;; Expected ranges are intentionally wider than observed values to absorb
 ;; non-determinism from Hashtbl iteration ordering (see PR #298).
+;;
+;; [unrealized_pnl] range is wide: the goal is to catch regression to
+;; exactly 0 (the bug PR #393 fixed). Ceiling is high because the final
+;; portfolio value is ~$4M on the 2026-04-13 baseline — position market
+;; value at end can realistically be a large fraction of that.
 ((name "bull-crash-2015-2020")
  (description "Strong bull market through the 2020 crash")
  (period ((start_date 2015-01-02) (end_date 2020-12-31)))
@@ -18,4 +23,5 @@
    (win_rate           ((min 25.0)  (max 45.0)))
    (sharpe_ratio       ((min 0.50)  (max 1.20)))
    (max_drawdown_pct   ((min 30.0)  (max 50.0)))
-   (avg_holding_days   ((min 35.0)  (max 65.0))))))
+   (avg_holding_days   ((min 35.0)  (max 65.0)))
+   (unrealized_pnl     ((min 1000.0) (max 8000000.0))))))

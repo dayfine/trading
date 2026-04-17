@@ -1,5 +1,13 @@
+(library
+ (name scenario_lib)
+ (modules scenario)
+ (libraries core)
+ (preprocess
+  (pps ppx_sexp_conv)))
+
 (executable
  (name scenario_runner)
+ (modules scenario_runner)
  (libraries
   core
   core_unix
@@ -7,6 +15,7 @@
   weinstein.data_source
   trading.simulation
   trading.simulation.types
-  backtest)
+  backtest
+  scenario_lib)
  (preprocess
   (pps ppx_sexp_conv)))

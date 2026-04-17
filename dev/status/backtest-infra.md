@@ -1,11 +1,11 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-16
+## Last updated: 2026-04-17
 
 ## Status
 READY_FOR_REVIEW
 
-UnrealizedPnl=0 bug fixed + CAGR annualized-return docstring clarified (follow-up items 1+2) on `feat/metrics-unrealized-fix`. First experiment (stop-buffer) complete and REJECTED on golden — see §Completed. Framework formalization still open; support-floor experiment still blocked on `feat-weinstein` #382.
+UnrealizedPnl=0 bug fixed + CAGR annualized-return docstring clarified via PR #393 (landed on main). Follow-up on `feat/metrics-scenario-unrealized-pin` now pins a per-scenario `unrealized_pnl` range so the regression-to-0 case fails loudly from the scenario runner instead of requiring a manual spot-check. First experiment (stop-buffer) complete and REJECTED on golden — see §Completed. Framework formalization still open; support-floor experiment still blocked on `feat-weinstein` #382.
 
 ## Ownership
 `feat-backtest` agent — see `.claude/agents/feat-backtest.md`. Owns
@@ -38,7 +38,9 @@ strategy code (currently complete).
   - Fixture files at `trading/test_data/backtest_scenarios/{goldens,smoke}/`
 
 ## Open PRs
-None.
+- `feat/metrics-scenario-unrealized-pin` — follow-up to PR #393 (now
+  merged) that pins `unrealized_pnl` as a per-scenario range check
+  (see §Completed). Branches off current `main`.
 
 ## Baseline results (2026-04-13, pre-experiments)
 
@@ -83,6 +85,27 @@ None.
   type on each transition; `Result_writer` emits `entry_stop`,
   `exit_stop`, `exit_trigger` columns in `trades.csv`. Unblocks
   post-mortem of individual whipsaw exits.
+- [x] **Pin `unrealized_pnl` per scenario** (2026-04-17,
+  `feat/metrics-scenario-unrealized-pin`, follow-up to merged PR #393)
+  — adds
+  `expected.unrealized_pnl : range option` via `[@sexp.option]` to
+  `Scenario.expected`, with the runner computing
+  `UnrealizedPnl` into the `actual` record and pattern-matching a 7th
+  range check. Scenarios that don't declare the field get `None` and
+  skip the check (preserves prior behaviour). Five scenarios now pin a
+  non-zero range (`min > 0`, intentionally wide to absorb the
+  universe-size flux tracked under follow-up #3): all three goldens
+  plus `bull-2019h2` and `recovery-2023` smokes. `crash-2020h1` is
+  intentionally left unpinned because a crash regime can plausibly
+  liquidate the whole portfolio. Also split the `scenarios/` dune into
+  a tiny `scenario_lib` library + executable so parsing/validation is
+  unit-testable without running a backtest. New test file
+  `trading/trading/backtest/scenarios/test/test_scenario.ml` covers
+  six cases (absent/present field parse, sexp round-trip, non-zero
+  range rejects 0, near-zero range accepts 0, all real scenario files
+  under `trading/test_data/backtest_scenarios/` parse and at least one
+  pins `min > 0`). Verify:
+  `dune runtest trading/backtest/scenarios/test` (6 tests).
 
 ## In progress
 None.

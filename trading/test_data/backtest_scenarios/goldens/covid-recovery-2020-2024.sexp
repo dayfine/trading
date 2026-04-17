@@ -7,6 +7,9 @@
 ;;
 ;; Expected ranges are intentionally wider than observed values to absorb
 ;; non-determinism from Hashtbl iteration ordering (see PR #298).
+;;
+;; [unrealized_pnl] range is wide: the goal is to catch regression to
+;; exactly 0 (the bug PR #393 fixed).
 ((name "covid-recovery-2020-2024")
  (description "COVID crash and recovery through 2024")
  (period ((start_date 2020-01-02) (end_date 2024-12-31)))
@@ -18,4 +21,5 @@
    (win_rate           ((min 40.0)  (max 55.0)))
    (sharpe_ratio       ((min 0.70)  (max 1.40)))
    (max_drawdown_pct   ((min 30.0)  (max 45.0)))
-   (avg_holding_days   ((min 25.0)  (max 45.0))))))
+   (avg_holding_days   ((min 25.0)  (max 45.0)))
+   (unrealized_pnl     ((min 1000.0) (max 3000000.0))))))
