@@ -26,10 +26,28 @@ type expected = {
 }
 [@@deriving sexp]
 
+val default_universe_path : string
+(** Default [universe_path] assigned to scenarios that omit the field. Relative
+    to [trading/test_data/backtest_scenarios/]. *)
+
 type t = {
   name : string;
   description : string;
   period : period;
+  universe_path : string; [@sexp.default default_universe_path]
+      (** Path to the universe file this scenario runs against, relative to
+          [trading/test_data/backtest_scenarios/].
+
+          Two tiers are supported:
+          - [universes/small.sexp] (default) — a pinned ~300-symbol curated
+            universe, committed to the repo. Fast, low memory, local-friendly.
+          - [universes/broad.sexp] — sentinel that defers to the full sector-map
+            loaded from [data/sectors.csv] (current behaviour). Intended for
+            nightly/GHA scale runs.
+
+          The runner loads the file, resolves it against the fixtures root, and
+          filters the loaded sector-map accordingly. See
+          [dev/plans/backtest-scale-optimization-2026-04-17.md] §Step 1. *)
   config_overrides : Sexp.t list;
       (** Partial config sexps deep-merged into the default Weinstein config, in
           order. Empty list means the default config. *)

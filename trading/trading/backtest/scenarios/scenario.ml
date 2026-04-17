@@ -46,10 +46,13 @@ type expected = {
 }
 [@@deriving sexp]
 
+let default_universe_path = "universes/small.sexp"
+
 type t = {
   name : string;
   description : string;
   period : period;
+  universe_path : string; [@sexp.default default_universe_path]
   config_overrides : Sexp.t list;
   expected : expected;
 }
