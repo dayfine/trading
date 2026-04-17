@@ -1,28 +1,36 @@
 ;; Golden scenario: 6-year run covering COVID crash and recovery.
 ;;
-;; Baseline observed on 2026-04-13 against 1,654 stocks:
-;;   final_portfolio_value 1569627.07
-;;   total_return_pct 57.0   total_trades 77   win_rate 28.57
-;;   sharpe_ratio 1.28       max_drawdown_pct 34.04   avg_holding_days 29.87
+;; Baseline re-pinned on 2026-04-18 post-PR #409 (`_held_symbols` now
+;; excludes Closed positions → symbols re-enter after stop-out). 302-symbol
+;; small universe (`universes/small.sexp`). Representative values:
+;;   final_portfolio_value ~1.84M        total_return_pct ~84
+;;   total_trades 19 (= n_round_trips)   win_rate ~33
+;;   sharpe_ratio ~0.66                  max_drawdown_pct ~24
+;;   avg_holding_days ~74                unrealized_pnl ~1.81M
 ;;
-;; Expected ranges are intentionally wider than observed values to absorb
-;; non-determinism from Hashtbl iteration ordering (see PR #298).
+;; Pre-#409 the count was 7 round-trips with total_return ~145 (most of
+;; the gain parked in stuck-open positions from 2018). Post-#409 the
+;; strategy cycles symbols, realizing profits and losses more frequently;
+;; total_return drops as realized losses accumulate — this is the true
+;; signal the strategy produces.
 ;;
-;; [unrealized_pnl] range is wide: the goal is to catch regression to
-;; exactly 0 (the bug PR #393 fixed). The universe has grown from 1,654 to
-;; ~10,472 stocks (follow-up #3), so the exact value at the upper end will
-;; shift when the goldens are rerun; pick a ceiling high enough to tolerate
-;; that without re-pinning per sector-map refresh.
+;; IMPORTANT: `total_trades` = `List.length round_trips` (completed
+;; buy→sell cycles), NOT `wincount + losscount`.
+;;
+;; Previous baseline (1,654 stocks, 2026-04-13) preserved in git history.
+;;
+;; [unrealized_pnl] range is wide: goal is to catch regression to exactly 0
+;; (PR #393's fix) while tolerating drift as the small universe is re-curated.
 ((name "six-year-2018-2023")
  (description "6-year run covering COVID crash and recovery")
  (period ((start_date 2018-01-02) (end_date 2023-12-29)))
- (universe_size 1654)
+ (universe_size 302)
  (config_overrides ())
  (expected
-  ((total_return_pct   ((min 30.0)  (max 90.0)))
-   (total_trades       ((min 60)    (max 100)))
-   (win_rate           ((min 22.0)  (max 40.0)))
-   (sharpe_ratio       ((min 0.80)  (max 1.80)))
-   (max_drawdown_pct   ((min 25.0)  (max 45.0)))
-   (avg_holding_days   ((min 20.0)  (max 45.0)))
-   (unrealized_pnl     ((min 1000.0) (max 3000000.0))))))
+  ((total_return_pct   ((min 50.0)  (max 180.0)))
+   (total_trades       ((min 12)    (max 30)))
+   (win_rate           ((min 28.0)  (max 42.0)))
+   (sharpe_ratio       ((min 0.30)  (max 1.30)))
+   (max_drawdown_pct   ((min 18.0)  (max 35.0)))
+   (avg_holding_days   ((min 55.0)  (max 100.0)))
+   (unrealized_pnl     ((min 1000.0) (max 4000000.0))))))

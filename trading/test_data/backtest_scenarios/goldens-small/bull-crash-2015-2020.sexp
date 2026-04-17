@@ -1,27 +1,36 @@
 ;; Golden scenario: strong bull market through 2020 crash.
 ;;
-;; Baseline observed on 2026-04-13 against 1,654 stocks:
-;;   final_portfolio_value 4054482.88
-;;   total_return_pct 305.0   total_trades 84   win_rate 33.33
-;;   sharpe_ratio 0.79        max_drawdown_pct 38.67   avg_holding_days 49.58
+;; Baseline re-pinned on 2026-04-18 post-PR #409 (`_held_symbols` now
+;; excludes Closed positions → symbols re-enter after stop-out). 302-symbol
+;; small universe (`universes/small.sexp`). Representative values:
+;;   final_portfolio_value ~4.39M        total_return_pct ~339
+;;   total_trades 15 (= n_round_trips)   win_rate ~37
+;;   sharpe_ratio ~1.04                  max_drawdown_pct ~37
+;;   avg_holding_days ~101               unrealized_pnl ~4.37M
 ;;
-;; Expected ranges are intentionally wider than observed values to absorb
-;; non-determinism from Hashtbl iteration ordering (see PR #298).
+;; Pre-#409 the count was 6 round-trips because once a symbol's position
+;; closed it was blacklisted from re-entry (bug). Post-#409, symbols cycle
+;; multiple times.
 ;;
-;; [unrealized_pnl] range is wide: the goal is to catch regression to
-;; exactly 0 (the bug PR #393 fixed). Ceiling is high because the final
-;; portfolio value is ~$4M on the 2026-04-13 baseline — position market
-;; value at end can realistically be a large fraction of that.
+;; IMPORTANT: `total_trades` = `List.length round_trips` (completed
+;; buy→sell cycles), NOT `wincount + losscount`.
+;;
+;; Previous baseline (1,654 stocks, 2026-04-13) preserved in git history.
+;; Ranges are wider than observed values to absorb Hashtbl iteration ordering
+;; noise (see PR #298).
+;;
+;; [unrealized_pnl] range is wide: goal is to catch regression to exactly 0
+;; (PR #393's fix).
 ((name "bull-crash-2015-2020")
  (description "Strong bull market through the 2020 crash")
  (period ((start_date 2015-01-02) (end_date 2020-12-31)))
- (universe_size 1654)
+ (universe_size 302)
  (config_overrides ())
  (expected
-  ((total_return_pct   ((min 200.0) (max 400.0)))
-   (total_trades       ((min 70)    (max 110)))
-   (win_rate           ((min 25.0)  (max 45.0)))
-   (sharpe_ratio       ((min 0.50)  (max 1.20)))
-   (max_drawdown_pct   ((min 30.0)  (max 50.0)))
-   (avg_holding_days   ((min 35.0)  (max 65.0)))
-   (unrealized_pnl     ((min 1000.0) (max 8000000.0))))))
+  ((total_return_pct   ((min 250.0) (max 400.0)))
+   (total_trades       ((min 10)    (max 25)))
+   (win_rate           ((min 28.0)  (max 45.0)))
+   (sharpe_ratio       ((min 0.60)  (max 1.40)))
+   (max_drawdown_pct   ((min 30.0)  (max 45.0)))
+   (avg_holding_days   ((min 80.0)  (max 140.0)))
+   (unrealized_pnl     ((min 1000.0) (max 6000000.0))))))
