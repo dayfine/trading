@@ -106,10 +106,12 @@ let test_all_scenario_files_parse _ =
         |> List.map ~f:(fun f -> Filename.concat dir f)
       in
       let files =
-        collect (Filename.concat root "goldens")
+        collect (Filename.concat root "goldens-small")
+        @ collect (Filename.concat root "goldens-broad")
         @ collect (Filename.concat root "smoke")
       in
-      (* Sanity: at least the three smokes and three goldens should be there. *)
+      (* Sanity: at least the three smokes + three goldens-small + some
+         goldens-broad should be there. *)
       assert_bool
         (sprintf "expected >=6 scenario files, found %d in %s"
            (List.length files) root)
