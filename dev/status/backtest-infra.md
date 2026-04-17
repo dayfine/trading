@@ -1,11 +1,11 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-15
+## Last updated: 2026-04-16
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-First experiment complete (stop-buffer hypothesis REJECTED on golden, see §Completed); framework formalization still open.
+UnrealizedPnl=0 bug fixed + CAGR annualized-return docstring clarified (follow-up items 1+2) on `feat/metrics-unrealized-fix`. First experiment (stop-buffer) complete and REJECTED on golden — see §Completed. Framework formalization still open; support-floor experiment still blocked on `feat-weinstein` #382.
 
 ## Ownership
 `feat-backtest` agent — see `.claude/agents/feat-backtest.md`. Owns
@@ -60,6 +60,14 @@ None.
 
 ## Completed
 
+- [x] **UnrealizedPnl=0 bug + annualized-return clarification**
+  (2026-04-16, `feat/metrics-unrealized-fix`) — see Follow-up items 1
+  and 2 for full root-cause writeup. Fix: `portfolio_state_computer.ml`
+  now tracks last mark-to-market step separately from last step, so
+  `UnrealizedPnl` no longer collapses to 0 when the sim ends on a
+  weekend. CAGR docstring clarified as the canonical annualized-return
+  metric. Verify: `dune runtest trading/simulation/test` (metrics
+  suite grew from 33 → 35 tests).
 - [x] **Stop-buffer tuning experiment** — full smoke + golden complete.
   Smoke (recovery-2023, 1yr) looked strongly positive for wider buffers
   (1.15 → +38.9%, Sharpe 1.78). **Golden (2018-2023, 6yr) reversed the
@@ -124,27 +132,35 @@ is informed by actual needs.
 
 ## Follow-up items (queued 2026-04-16)
 
-1. **Verify unrealized gain is meaningful in `summary.sexp`.** The
-   `UnrealizedPnl` metric is already emitted (from #304) and reads `0`
-   for the 2026-04-14 stop-buffer golden runs. That's suspicious for a
-   6-year simulation — either no positions are open at end-of-sim (by
-   coincidence? always?) or the computation has a bug. Read
-   `trading/simulation/lib/portfolio_state_computer.ml:23`
-   (`step.portfolio_value -. step.portfolio.current_cash`) and confirm
-   the final `step_result` actually carries open-position value. If the
-   metric is correct but simulations really do fully liquidate, add a
-   note to that effect — otherwise it looks like a logic gap every time
-   someone reads the summary.
+1. ~~**Verify unrealized gain is meaningful in `summary.sexp`.**~~ **[x]
+   RESOLVED 2026-04-16** — bug confirmed, fix landed on
+   `feat/metrics-unrealized-fix`. Root cause: the simulator produces a
+   `step_result` every calendar day, but `_compute_portfolio_value`
+   (at `trading/trading/simulation/lib/simulator.ml:123-134`) falls
+   back to `portfolio_value = current_cash` whenever any portfolio
+   position's price bar is missing for that date — including all
+   weekend/holiday steps. The portfolio-state computer was using the
+   absolute last step, which in 6-year backtests ending 2023-12-31
+   (Sunday) is 2023-12-30 (Saturday) — a non-trading day, hence
+   `portfolio_value == current_cash` and `UnrealizedPnl = 0` even with
+   `OpenPositionCount = 3`. Fix: track a `last_marked_step` alongside
+   `last_step`; `UnrealizedPnl` derives from the last mark-to-market
+   step (same heuristic as `Backtest.Runner._is_trading_day` at
+   `trading/trading/backtest/lib/runner.ml:28-36`); `OpenPositionCount`
+   still uses the absolute last step (positions are independent of
+   price-bar availability). Two new unit tests at
+   `trading/trading/simulation/test/test_metrics.ml` lock in the
+   behaviour. Verify: `dune runtest trading/simulation/test` → 35
+   metrics tests pass.
 
-2. **Add annualized-return metric for apples-to-apples comparison
-   across scenarios.** CAGR already ships (compound annual growth rate
-   — strictly the annualized *compound* return). What we don't have is
-   a simple annualized simple-return variant, or a per-scenario
-   "annualized return" field in the summary table that's visible
-   without computation. Decide: (a) is CAGR enough and we just surface
-   it more prominently in the scenario-runner output, or (b) do we
-   need a second metric. Probably (a) — but pick consciously, document
-   the decision in Metric_types docstring, and close the ticket.
+2. ~~**Add annualized-return metric for apples-to-apples comparison
+   across scenarios.**~~ **[x] RESOLVED 2026-04-16** — picked option
+   (a). CAGR already *is* the annualized-return metric — it's the
+   constant yearly rate that compounds initial to final portfolio
+   value over the backtest period. Clarified the docstring in
+   `trading/trading/simulation/lib/types/metric_types.ml:144-154` to
+   state this explicitly so future readers don't re-queue this. No
+   second metric added; no code behaviour change.
 
 3. **Rerun smoke + golden simulations once the Finviz sector mapping
    is promoted.** The 2026-04-14 stop-buffer results were produced

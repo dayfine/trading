@@ -145,7 +145,11 @@ let get_metric_info = function
       {
         display_name = "CAGR";
         description =
-          "Compound annual growth rate: annualized return as a percentage";
+          "Compound annual growth rate — this IS the annualized-return metric. \
+           Expressed as a percent, it is the constant yearly rate that \
+           compounds initial portfolio value to final portfolio value over the \
+           backtest period. Use this to compare scenarios of different lengths \
+           apples-to-apples.";
         unit = Percent;
       }
   | CalmarRatio ->
@@ -166,8 +170,12 @@ let get_metric_info = function
       {
         display_name = "Unrealized P&L";
         description =
-          "Total unrealized profit/loss at end of simulation: final value - \
-           initial cash - realized P&L";
+          "Total unrealized profit/loss at end of simulation: \
+           last-marked-to-market portfolio_value minus current_cash on that \
+           step. Computed from the most recent step whose portfolio_value \
+           actually reflects position mark-to-market — non-trading days \
+           (weekends, holidays, missing bars) are skipped because the \
+           simulator falls back to portfolio_value = cash on those days.";
         unit = Dollars;
       }
   | TradeFrequency ->
