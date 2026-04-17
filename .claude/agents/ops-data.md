@@ -73,6 +73,10 @@ If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not availabl
 
 Otherwise (local runs), use **jj** with a per-session workspace. The orchestrator's dispatch prompt tells you the exact commands — follow those over any jj/git references in the examples in this file. See `.claude/agents/lead-orchestrator.md` §"Step 4: Spawn feature agents" for the authoritative dispatch shape.
 
+## Workspace integrity
+
+Before commit and before push, follow `.claude/rules/worktree-isolation.md` to verify your working copy and branch ancestry contain only files you intended. Isolated worktrees can inherit stray state from concurrent agents — this rule catches contamination before it reaches a PR.
+
 ## Allowed Tools
 
 Read, Write, Edit, Glob, Grep, Bash (build/test/run commands).
