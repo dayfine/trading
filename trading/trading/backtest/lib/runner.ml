@@ -83,18 +83,21 @@ type _deps = {
   all_symbols : string list;
 }
 
+let _resolve_ticker_sectors ~data_dir sector_map_override =
+  match sector_map_override with
+  | Some tbl ->
+      eprintf "Using scenario-provided sector map (%d symbols)...\n%!"
+        (Hashtbl.length tbl);
+      tbl
+  | None ->
+      eprintf "Loading universe from sectors.csv...\n%!";
+      Sector_map.load ~data_dir
+
 let _load_deps ~overrides ~sector_map_override =
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
   let ticker_sectors =
-    match sector_map_override with
-    | Some tbl ->
-        eprintf "Using scenario-provided sector map (%d symbols)...\n%!"
-          (Hashtbl.length tbl);
-        tbl
-    | None ->
-        eprintf "Loading universe from sectors.csv...\n%!";
-        Sector_map.load ~data_dir:data_dir_fpath
+    _resolve_ticker_sectors ~data_dir:data_dir_fpath sector_map_override
   in
   let universe =
     Hashtbl.keys ticker_sectors |> List.sort ~compare:String.compare
