@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [backtest-infra](backtest-infra.md) | BLOCKED | feat-backtest | — | Waiting on support-floor-stops PR #382 to merge; then pick up fixed-buffer vs support-floor experiment |
+| [backtest-infra](backtest-infra.md) | READY_FOR_REVIEW | feat-backtest | feat/metrics-unrealized-fix | UnrealizedPnl=0 bug fix + CAGR/annualized-return docstring (follow-up items 1+2). Still blocked on #382 for support-floor experiment |
 | [support-floor-stops](support-floor-stops.md) | READY_FOR_REVIEW | feat-weinstein | #382 | Merge #382 (overall_qc APPROVED this run) |
 | [short-side-strategy](short-side-strategy.md) | PENDING | — | — | Blocked on PR A of support-floor split (`feat/support-floor-stops`) — primitive widening to long+short |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` + filter with updated default.sexp (Item 2) |

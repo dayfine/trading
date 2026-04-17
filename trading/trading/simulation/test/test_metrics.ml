@@ -582,6 +582,106 @@ let test_portfolio_state_with_trades _ =
     (is_some_and (float_equal 0.0));
   assert_that metrics (contains_entry UnrealizedPnl (float_equal 50.0))
 
+(** Build a portfolio with one open long position by applying a buy trade. *)
+let _portfolio_with_open_position ~symbol ~quantity ~price =
+  let base = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  let buy =
+    {
+      Trading_base.Types.id = "t1";
+      order_id = "o1";
+      symbol;
+      side = Buy;
+      quantity;
+      price;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  match Trading_portfolio.Portfolio.apply_single_trade base buy with
+  | Ok p -> p
+  | Error err ->
+      OUnit2.assert_failure
+        ("failed to build test portfolio: " ^ Status.show err)
+
+(** Reproduces the UnrealizedPnl=0 bug. The simulator produces a step every
+    calendar day. On the final day (often a weekend), price bars are missing, so
+    [_compute_portfolio_value] falls back to [portfolio_value = cash] even
+    though positions are open — leaving a spurious [UnrealizedPnl = 0] in the
+    summary. The computer must skip those steps and use the last real
+    mark-to-market step. *)
+let test_portfolio_state_skips_non_trading_final_step _ =
+  let config = make_config () in
+  let portfolio =
+    _portfolio_with_open_position ~symbol:"AAPL" ~quantity:10.0 ~price:100.0
+  in
+  let cash = portfolio.current_cash in
+  let mtm_value = cash +. (10.0 *. 105.0) in
+  let steps =
+    [
+      {
+        (* Trading day — position marked to market at $105: MTM = $1050. *)
+        date = date_of_string "2024-01-05";
+        portfolio;
+        portfolio_value = mtm_value;
+        trades = [];
+        orders_submitted = [];
+      };
+      {
+        (* Non-trading day — simulator fell back to cash. *)
+        date = date_of_string "2024-01-06";
+        portfolio;
+        portfolio_value = cash;
+        trades = [];
+        orders_submitted = [];
+      };
+    ]
+  in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that metrics
+    (map_includes
+       [
+         (* OpenPositionCount still comes from the absolute final step
+            (positions don't depend on price bars). *)
+         (OpenPositionCount, float_equal 1.0);
+         (* UnrealizedPnl derived from the last marked-to-market step. *)
+         (UnrealizedPnl, float_equal (mtm_value -. cash));
+       ])
+
+(** Guard: when every step is marked-to-market, the final step wins unchanged.
+*)
+let test_portfolio_state_uses_last_step_when_all_trading_days _ =
+  let config = make_config () in
+  let portfolio =
+    _portfolio_with_open_position ~symbol:"AAPL" ~quantity:10.0 ~price:100.0
+  in
+  let cash = portfolio.current_cash in
+  let steps =
+    [
+      {
+        date = date_of_string "2024-01-05";
+        portfolio;
+        portfolio_value = cash +. 500.0;
+        trades = [];
+        orders_submitted = [];
+      };
+      {
+        date = date_of_string "2024-01-06";
+        portfolio;
+        portfolio_value = cash +. 800.0;
+        trades = [];
+        orders_submitted = [];
+      };
+    ]
+  in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that metrics
+    (map_includes
+       [
+         (OpenPositionCount, float_equal 1.0); (UnrealizedPnl, float_equal 800.0);
+       ])
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -641,6 +741,10 @@ let suite =
          (* Portfolio state tests *)
          "portfolio state no steps" >:: test_portfolio_state_no_steps;
          "portfolio state with trades" >:: test_portfolio_state_with_trades;
+         "portfolio state skips non-trading final step"
+         >:: test_portfolio_state_skips_non_trading_final_step;
+         "portfolio state uses last step when all trading days"
+         >:: test_portfolio_state_uses_last_step_when_all_trading_days;
        ]
 
 let () = run_test_tt_main suite
