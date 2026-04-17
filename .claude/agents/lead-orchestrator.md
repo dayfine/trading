@@ -90,6 +90,69 @@ Read all of the following before doing anything else:
 
 Note: `dev/status/data-layer.md` and `dev/status/screener.md` are MERGED — skip unless reading for context.
 
+### Step 1b: Cross-reference last summary for drift detection
+
+After reading all status files, find the most recent daily summary (ignoring plan-mode files):
+
+```bash
+ls -t dev/daily/*.md | grep -v '\-plan\.md' | head -1
+```
+
+If a prior summary exists:
+
+1. Parse its `## Pending work` table (if present) — extract rows where State is `dispatched` or `awaiting merge`.
+2. For each such row, check the current `dev/status/<track>.md` state:
+   - If the summary says "dispatched, awaiting merge" but the status file still shows IN_PROGRESS with no newer commits since the summary date → **drift warning**: agent was dispatched but status file wasn't updated.
+   - If the summary says "awaiting merge" but the PR is now merged on `main@origin` → status is stale, not drift (normal lag); note it for the index reconciliation in Step 5.5.
+3. List any drift warnings in today's summary under `## Escalations` with the label `[drift]`.
+
+If no prior summary exists (first run), skip this step.
+
+---
+
+## Step 1.5: PR-open dispatch guard
+
+**Run this step after Step 1 and before Step 2.** For every track that Step 1
+identifies as eligible for dispatch (IN_PROGRESS or next-to-dispatch), check
+whether an open PR already exists on its branch. This prevents re-dispatching
+agents on tracks where work is in flight.
+
+```bash
+# For each eligible track (substitute the actual branch pattern):
+GH_TOKEN=$GH_TOKEN gh pr list \
+  --state open \
+  --json number,headRefName,mergeable,statusCheckRollup \
+  --jq '.[] | select(.headRefName | startswith("feat/<track>"))' \
+  2>/dev/null
+```
+
+**Decision rules per track:**
+
+```
+FOR each eligible track from Step 1:
+  IF any open PRs found on feat/<track> or feat/<track>/* branches:
+    tip_sha = $(GH_TOKEN=$GH_TOKEN gh pr view <pr_number> --json headRefOid --jq .headRefOid)
+    last_review_sha = (parse "Reviewed SHA:" line from dev/reviews/<track>.md, if it exists)
+
+    IF track status is READY_FOR_REVIEW AND tip_sha != last_review_sha:
+      → dispatch re-QC only (Step 5 pipeline); skip feat-agent dispatch
+      → note in summary: "re-QC only — new commits since last review (SHA changed)"
+    ELSE:
+      → SKIP dispatch entirely (feat-agent and QC)
+      → record reason in summary: "skipped — open PR #<N> in flight, no new commits"
+  ELSE (no open PRs):
+    → dispatch feat-agent normally (proceed to Step 2)
+```
+
+**ops-data sentinel check:** Before dispatching ops-data, compare the current
+content of `dev/notes/data-gaps.md` against what the prior daily summary
+recorded in its `## Data Operations` section. If unchanged, skip ops-data
+dispatch and note "ops-data skipped — data-gaps.md unchanged since last run"
+in the summary.
+
+**Summary of all tracks** — dispatched and skipped — goes in the
+`## Dispatched this run` table in Step 7 with the reason for each decision.
+
 ---
 
 ## Step 2: Check for maintenance work (before feature agents)
@@ -545,8 +608,15 @@ Steps:
    - dune runtest
 3. Read diff: jj diff --from main@origin --to feat/<feature>@origin
 4. Fill in your structural checklist (see your agent definition in .claude/agents/qc-structural.md)
+5. Capture the tip SHA of the branch being reviewed:
+     REVIEWED_SHA=$(jj log -r 'feat/<feature>@origin' -T 'commit_id' --no-graph)
+   Write this as the FIRST line of dev/reviews/<feature>.md:
+     Reviewed SHA: <sha>
+   This line enables idempotency: subsequent orchestrator runs compare this SHA to
+   the current tip SHA to decide whether re-QC is needed.
 
-Write dev/reviews/<feature>.md with the filled structural checklist.
+Write dev/reviews/<feature>.md with the Reviewed SHA line followed by the filled
+structural checklist.
 Return: APPROVED or NEEDS_REWORK, plus a one-line summary of any blockers.
 ```
 
@@ -566,6 +636,10 @@ Steps:
 2. Read the relevant eng-design-<N>-*.md for this feature
 3. Read the implementation files from the feature branch
 4. Fill in your behavioral checklist (see your agent definition in .claude/agents/qc-behavioral.md)
+
+The "Reviewed SHA:" line is already at the top of dev/reviews/<feature>.md (written
+by qc-structural). Do not overwrite it — append your section below the structural
+checklist.
 
 Append your behavioral checklist to: dev/reviews/<feature>.md
 Return: APPROVED or NEEDS_REWORK, plus a one-line summary of any domain findings.
@@ -632,30 +706,53 @@ If the health scanner reports FINDINGS, include the critical items in the daily 
 
 ## Step 7: Write the daily summary
 
-Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
+Determine the per-day session number N by counting existing `dev/daily/${DATE}*.md`
+files (ignoring `-plan.md` files). First session of the day writes
+`dev/daily/${DATE}.md`; subsequent sessions write `dev/daily/${DATE}-runN.md`
+starting at `-run2`.
+
+Write `dev/daily/<YYYY-MM-DD>[-runN].md`:
 
 ```markdown
 # Status — YYYY-MM-DD
+Run timestamp: <ISO 8601 timestamp, e.g. 2026-04-16T07:23:41Z>
+Run ID: <YYYY-MM-DD-run-N, e.g. 2026-04-16-run-1>
+
+## Pending work
+
+Parseable state table — one row per tracked non-MERGED track. "State" must be one of:
+`dispatched`, `skipped (in-flight)`, `skipped (no-change)`, `awaiting-merge`, `blocked`.
+
+| Track | State | Branch | PR | Next step |
+|-------|-------|--------|----|-----------|
+| <track> | dispatched | feat/<track> | #<N> | <one-liner> |
+| <track> | skipped (in-flight) | feat/<track> | #<N> | open PR in flight — no new commits |
+| <track> | awaiting-merge | feat/<track> | #<N> | QC APPROVED — awaiting human merge |
+| <track> | blocked | — | — | <blocker description> |
+
+## Dispatched this run
+
+One row per agent spawn (including skipped ones with reason). A subsequent run
+parses this table to detect redundant re-dispatch.
+
+| Track | Agent | Outcome | Notes |
+|-------|-------|---------|-------|
+| <track> | feat-<x> | completed | <brief outcome> |
+| <track> | qc-structural | APPROVED | |
+| <track> | qc-behavioral | APPROVED | Quality score: 4 |
+| <track> | — | skipped | open PR #<N> in flight, no new commits |
+| ops-data | ops-data | skipped | data-gaps.md unchanged since last run |
 
 ## Feature Progress
 
-### weinstein/order_gen  [STATUS]
+### <track> [STATUS]
 - Done today: ...
 - In progress: ...
 - Blocked: Yes/No — reason
-- Recent commits: ...
-
-### weinstein/simulation-slice-2  [STATUS]
-- Done today: ...
-- In progress: ...
-- Blocked: Yes/No — reason
-- Recent commits: ...
 
 ## QC Status
-- portfolio-stops (order_gen): APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
-  (see dev/reviews/portfolio-stops.md)
-- simulation (Slice 2): APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
-  (see dev/reviews/simulation.md)
+- <track>: APPROVED | NEEDS_REWORK (structural) | NEEDS_REWORK (behavioral) | PENDING | —
+  (see dev/reviews/<track>.md)
 
 ## Budget
 (Token and cost tracking for this orchestrator run)
@@ -688,8 +785,7 @@ Write `dev/daily/<YYYY-MM-DD>.md` (today's date):
 
 ## Follow-up Queue
 (Read from ## Follow-up sections in each status file — omit this section if all are empty)
-- portfolio-stops: <list items verbatim, or "none">
-- simulation: ...
+- <track>: <list items verbatim, or "none">
 
 ## Integration Queue
 (Features with overall_qc APPROVED — ready to merge to main pending your decision)
@@ -704,6 +800,7 @@ M? — <name> — requires: ...
 
 ## Escalations
 (List any escalation flags raised during this run — these require human decision)
+- [drift] <track>: summary said dispatched but status file unchanged — ...
 - ...
 
 ## Questions for You
@@ -721,7 +818,7 @@ Count existing `dev/daily/${DATE}*.md` to pick the per-day session number N. Fir
 
 ---
 
-## Step 8: Push the daily summary branch and open its PR
+## Step 8: Push the daily summary branch, open its PR, and auto-merge
 
 **GHA-only** (`$TRADING_IN_CONTAINER` set). In local runs, skip this step — the human reviews the file on disk and commits on their own cadence. In GHA the container dies at step exit, so an unpushed summary is lost. The workflow runtime no longer does this push for you (see PR #387); the orchestrator owns it.
 
@@ -731,7 +828,7 @@ Count existing `dev/daily/${DATE}*.md` to pick the per-day session number N. Fir
 #   dev/daily/${DATE}.md            → ops/daily-${DATE}
 #   dev/daily/${DATE}-runN.md       → ops/daily-${DATE}-runN
 DATE=$(date +%F)
-SUMMARY_FILE="$(ls -t dev/daily/${DATE}*.md | head -n 1)"
+SUMMARY_FILE="$(ls -t dev/daily/${DATE}*.md | grep -v '\-plan\.md' | head -n 1)"
 BASENAME="$(basename "$SUMMARY_FILE" .md)"       # e.g. 2026-04-16 or 2026-04-16-run2
 BRANCH="ops/${BASENAME/#/daily-}"                # → ops/daily-2026-04-16[-runN]
 
@@ -749,16 +846,52 @@ export PR_TITLE="ops: daily orchestrator summary ${BASENAME}"
 export PR_BODY="Automated daily orchestrator run. See \`$SUMMARY_FILE\` for the full summary."
 export PR_BRANCH="$BRANCH"
 payload="$(python3 -c 'import json,os;print(json.dumps({"title":os.environ["PR_TITLE"],"head":os.environ["PR_BRANCH"],"base":"main","body":os.environ["PR_BODY"]}))')"
-curl -sSL -X POST \
+CREATE_RESPONSE="$(curl -sSL -X POST \
   -H "Authorization: Bearer ${GH_TOKEN}" \
   -H "Accept: application/vnd.github+json" \
   -d "$payload" \
-  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls"
+  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls")"
+PR_NUMBER="$(printf '%s' "$CREATE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print(r.get("number",""))' 2>/dev/null || true)"
+
+# If PR already existed (422 A pull request already exists — same-session re-run),
+# look it up by branch so we still have a PR number for the auto-merge step.
+if [ -z "$PR_NUMBER" ]; then
+  OWNER="${GITHUB_REPOSITORY%/*}"
+  PR_NUMBER="$(curl -sSL \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls?head=${OWNER}:${BRANCH}&state=open" \
+    | python3 -c 'import json,sys;xs=json.load(sys.stdin);print(xs[0]["number"] if xs else "")')"
+fi
 ```
 
-If the PR already exists (re-run of the same session), a `422 A pull request already exists` is fine but noisy — detect it with a HEAD query before the POST.
-
 Flag in §Escalations if either the push or the PR-create fails: a summary without a PR is invisible to the human.
+
+### Step 8a: Auto-merge so the next run can see this summary
+
+The daily summary must land on `main` so **Step 1b of the next run** can read it — Step 1b reads `dev/daily/*.md` off the checked-out filesystem, which only reflects merged state. Leaving the summary PR open would block cross-run drift detection: the next run would read an older summary and miss the dispatch context.
+
+Summaries are observational (no code, no behavior changes), so auto-merging is low-risk. Use REST `PUT /merge`:
+
+```bash
+if [ -n "$PR_NUMBER" ]; then
+  MERGE_RESPONSE="$(curl -sSL -X PUT \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    -d '{"merge_method":"squash"}' \
+    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge")"
+  MERGED="$(printf '%s' "$MERGE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print("true" if r.get("merged") else "false")' 2>/dev/null || echo false)"
+  if [ "$MERGED" != "true" ]; then
+    # Branch protection (required CI checks, required reviews) or a transient
+    # conflict can block the merge. Surface as an escalation — do NOT retry in
+    # a loop; the next run will see the still-open summary PR and pick up from
+    # there once the human clears the block.
+    echo "AUTO_MERGE_FAILED pr=${PR_NUMBER} response=${MERGE_RESPONSE}"
+  fi
+fi
+```
+
+Flag in §Escalations when auto-merge fails: note the PR number and the GitHub response so the human can diagnose (most common cause: required status check that didn't run, or `main` branch-protection requiring a human reviewer).
 
 ---
 

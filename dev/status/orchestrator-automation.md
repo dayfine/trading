@@ -335,6 +335,23 @@ Test before commit — pattern is the same, feasibility differs by env.
   enabler).
 - One successful daily-summary PR round-trip first.
 
+## Completed work
+
+### Orchestrator idempotency — Step 1.5 dispatch guard + structured summary format
+
+**Status:** DONE (2026-04-16) — `harness/orchestrator-idempotency`
+
+Changes landed:
+- `.claude/agents/lead-orchestrator.md`:
+  - **Step 1b**: cross-reference last summary for drift detection (parse `## Pending work` table in prior run; flag tracks where status file hasn't advanced since dispatch)
+  - **Step 1.5**: PR-open dispatch guard — for each eligible track, query `gh pr list` for open PRs; skip feat-agent re-dispatch if PR is in-flight with no new commits; dispatch re-QC only if READY_FOR_REVIEW and SHA changed; include ops-data sentinel check against data-gaps.md content
+  - **Step 7**: restructured summary format — `Run timestamp:` + `Run ID:` header lines; `## Pending work` table (parseable: Track | State | Branch | PR | Next step); `## Dispatched this run` table (Track | Agent | Outcome | Notes); `[drift]` labels in Escalations section
+  - **Step 5**: qc-structural dispatch prompt now instructs SHA capture and `Reviewed SHA:` as first line of `dev/reviews/<feature>.md`; qc-behavioral dispatch updated to not overwrite the SHA line
+- `.claude/agents/qc-structural.md`: Step 5 added — SHA capture + write as first line of review file; `Writing the review file` section updated to require Reviewed SHA line first
+- `.claude/agents/qc-behavioral.md`: Step 2 note + writing section note — do not modify `Reviewed SHA:` line; append below existing structural checklist
+
+Verify: `grep -n "Step 1.5\|Pending work\|Dispatched this run\|Reviewed SHA\|Run timestamp\|Run ID:" .claude/agents/lead-orchestrator.md` — all should match; `grep "Reviewed SHA" .claude/agents/qc-structural.md .claude/agents/qc-behavioral.md` — both should match.
+
 ## References
 
 - Research transcript: research agent run 2026-04-14 (see Escalations in

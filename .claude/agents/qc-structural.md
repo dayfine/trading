@@ -67,6 +67,24 @@ jj diff --from main@origin --to feat/<feature-name>@origin
 
 Work through each item below. Use Grep and Glob to verify claims — do not guess.
 
+### Step 5: Pin the reviewed SHA
+
+After filling the checklist, capture the tip commit SHA of the feature branch:
+
+```bash
+REVIEWED_SHA=$(jj log -r 'feat/<feature-name>@origin' -T 'commit_id' --no-graph)
+```
+
+Write this as the **first line** of `dev/reviews/<feature>.md` before the checklist:
+
+```
+Reviewed SHA: <sha>
+```
+
+This line is the idempotency sentinel. The lead-orchestrator reads it in Step 1.5 to
+compare against the current tip SHA and skip re-QC when the branch hasn't advanced.
+Do not omit it even on NEEDS_REWORK — the orchestrator needs it regardless of verdict.
+
 ---
 
 ## Structural Checklist
@@ -116,7 +134,13 @@ APPROVED | NEEDS_REWORK
 
 ## Writing the review file
 
-Write `dev/reviews/<feature>.md` from a clean branch based on `main@origin` — never from the feature branch:
+Write `dev/reviews/<feature>.md` from a clean branch based on `main@origin` — never from the feature branch. The first line of the file must be the `Reviewed SHA:` line captured in Step 5:
+
+```
+Reviewed SHA: <sha captured in Step 5>
+```
+
+Then append the structural checklist below it.
 
 ```bash
 jj new main@origin
