@@ -1,6 +1,6 @@
 (library
  (name scenario_lib)
- (modules scenario)
+ (modules scenario universe_file)
  (libraries core)
  (preprocess
   (pps ppx_sexp_conv)))
