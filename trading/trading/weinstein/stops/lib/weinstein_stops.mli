@@ -14,6 +14,11 @@ open Trading_base.Types
 include module type of Stop_types
 (** @inline *)
 
+module Support_floor = Support_floor
+(** Derives the prior correction extreme from a bar history — correction low for
+    longs, counter-rally high for shorts. Feeds the [reference_level] argument
+    to {!compute_initial_stop}. See the module doc for algorithm details. *)
+
 (** {1 Core Functions} *)
 
 val compute_initial_stop :
