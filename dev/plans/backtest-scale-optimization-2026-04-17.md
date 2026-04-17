@@ -135,12 +135,19 @@ Steps 1 and 2 are independent — can parallelize. Step 3 gates on both.
 - Cross-scenario bar caching (shared immutable bars across parallel tunings). Useful but orthogonal.
 - Changing the sector-map refresh cadence. If inventory is the problem, separate discussion.
 
-## Open questions (answer before dispatching step 1)
+## Decisions (resolved 2026-04-17)
 
-1. **Small universe size.** 300 is an estimate. 100 feels too narrow to exercise sector concentration logic; 1000 defeats the purpose. Happy with 300?
-2. **Broad goldens cadence.** Nightly on GHA, or on-demand only? GHA runs cost time on every run.
-3. **Trace file retention.** Keep every run forever, last-N, or last-N-days? Cheap per file but accumulates.
-4. **Tier-3 migration.** Flag-gated rollout (Legacy default, Tiered opt-in) or cut over in one PR? Flag is safer but doubles maintenance until retired.
+1. **Small universe size: ~500 = S&P 500 constituents.** Natural cap on liquid US equities; covers every sector Weinstein cares about. Step 1 sources from cached data if present, otherwise fetches once and commits the sexp.
+2. **Broad goldens cadence: nightly on GHA only.** ≤3 scenarios. Not run by the local test target. Results posted as artifacts; escalate to daily summary on regression.
+3. **Trace retention:**
+   - Raw traces under `dev/backtest/traces/` are **run artifacts** — gitignored, ad-hoc for debugging.
+   - For pinned goldens, extend each scenario sexp with an `expected_phase_counts` schema (same pattern PR #395 used for `unrealized_pnl` range). Regression detection = "new trace diverges from pinned expected counts." Tolerance per-phase (e.g. `symbols_out ± 5%`, `elapsed_ms ± 50%` since CI runner timing is noisy).
+   - On-demand traces for iterative debugging just work — no retention policy needed.
+4. **Tier-3 migration: flag-gated with automated parity test.**
+   - Runner config: `loader_strategy = Legacy | Tiered`. Default `Legacy` at merge time.
+   - **Acceptance gate** = new test that runs one `golden-small` scenario twice (once each strategy) and diffs trade count, total P&L, final portfolio value, and each pinned metric within float ε. Merge blocked until parity holds.
+   - Once parity proven over a few weeks: flip default to `Tiered` in a tiny follow-up PR; retire `Legacy` in the one after.
+   - Rationale: flag doubles maintenance briefly, but "trading performance does not regress" is verifiable mechanically instead of by eyeball review.
 
 ## Success criteria
 
