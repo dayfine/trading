@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-17
+Last updated: 2026-04-17 (orchestrator run 1)
 
 ## Active + complete tracks
 
@@ -13,13 +13,13 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [backtest-infra](backtest-infra.md) | READY_FOR_REVIEW | feat-backtest | feat/metrics-scenario-unrealized-pin | Pin per-scenario `unrealized_pnl` range (follow-up to merged #393). Still blocked on #382 for support-floor experiment |
-| [backtest-scale](backtest-scale.md) | PENDING | feat-backtest | — | Blocked on PR #396 (plan merge) + step 2 tracing under backtest-infra. Target: tier-aware bar loader (Metadata/Summary/Full) |
-| [support-floor-stops](support-floor-stops.md) | READY_FOR_REVIEW | feat-weinstein | #390 | Merge #390 (wrapper + wiring; PR A #382 already merged) |
-| [short-side-strategy](short-side-strategy.md) | PENDING | — | — | Blocked on PR A of support-floor split (`feat/support-floor-stops`) — primitive widening to long+short |
+| [backtest-infra](backtest-infra.md) | READY_FOR_REVIEW | feat-backtest | #399 (feat/backtest-scenario-small-universe) | Step 2 — per-phase tracing (`dev/plans/backtest-scale-optimization-2026-04-17.md`) |
+| [backtest-scale](backtest-scale.md) | PENDING | feat-backtest | — | Blocked on step 2 tracing under backtest-infra. Target: tier-aware bar loader (Metadata/Summary/Full) |
+| [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
+| [short-side-strategy](short-side-strategy.md) | PENDING | — | — | Unblocked (PR A #382 merged); candidate owner `feat-weinstein` — wire screener candidate `side` + bearish-macro short branch |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` + filter with updated default.sexp (Item 2) |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #383 (T3-G trend analysis) | harness/orchestrator-idempotency (Step 1.5 + structured summary) in progress; T3-F architecture graph analyzer next |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | Fix `dev/lib/run-in-env.sh` GHA path bug (see 2026-04-17 Escalations); then T3-F architecture graph analyzer or deep-scan heuristic gap sub-item 2 |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Solve open blockers (BOT_GITHUB_TOKEN + CLAUDE_CODE_OAUTH_TOKEN setup; gh/jj availability in container) |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

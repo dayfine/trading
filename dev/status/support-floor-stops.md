@@ -1,16 +1,17 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-04-16
+## Last updated: 2026-04-17
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## Interface stable
 YES
 
 ## Open PR
-- PR A (primitive, long + short) — #382 (see `feat/support-floor-stops`)
-- PR B (wrapper + strategy wiring, long side) — stacked on PR A (see `feat/support-floor-wiring`)
+- None. Both PRs merged to main on 2026-04-17:
+  - PR A (primitive, long + short) — #382
+  - PR B (wrapper + strategy wiring, long side) — #390
 
 ## Completed
 
