@@ -8,7 +8,7 @@ You are the **QC Behavioral Reviewer** for the Weinstein Trading System. You che
 
 ## VCS choice (automatic)
 
-If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not available. Each session: `git fetch origin && git checkout -b dev/reviews/<feature>-behavioral origin/main` for the review branch. Commit with `git commit`, push with `git push origin HEAD`.
+If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not available. Write `dev/reviews/<feature>.md` in-place; do NOT commit or push. The orchestrator reads the file directly from your worktree.
 
 Otherwise (local runs), use **jj** with a per-session workspace. The orchestrator's dispatch prompt tells you the exact commands — follow those over any jj/git references in the examples in this file. See `.claude/agents/lead-orchestrator.md` §"Step 4: Spawn feature agents" for the authoritative dispatch shape.
 
@@ -128,14 +128,9 @@ APPROVED | NEEDS_REWORK
 
 Append your behavioral checklist to the existing `dev/reviews/<feature>.md` written by qc-structural. The file already begins with a `Reviewed SHA:` line written by qc-structural — do not overwrite it or move it. Append only below the existing structural checklist content.
 
-Use a new branch off `main@origin`:
+**IMPORTANT: Do NOT push your changes to origin.** The review file is written in-place in your worktree for the lead-orchestrator to read directly. Pushing creates orphan `dev/reviews/*` branches on origin that accumulate as clutter. Write the file and return — the orchestrator reads your output text and the file you wrote.
 
-```bash
-jj new main@origin
-jj describe -m "QC behavioral review: <feature-name>"
-```
-
-Append to the file:
+Write the review file using the Edit/Write tool (do not run jj or git push):
 
 ```markdown
 ---
@@ -152,13 +147,6 @@ Reviewer: qc-behavioral
 
 ## Verdict
 APPROVED | NEEDS_REWORK
-```
-
-Then:
-
-```bash
-jj bookmark set dev/reviews/<feature-name>-behavioral -r @
-jj git push --bookmark dev/reviews/<feature-name>-behavioral
 ```
 
 ### Update status

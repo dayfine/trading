@@ -7,11 +7,14 @@
 # Schema:
 #   All status files must declare:
 #     - `## Status` followed on the next non-empty line by one of:
-#       IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED
+#       IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED | PENDING
+#       PENDING = designed/specced but not yet dispatched to an agent
+#       BLOCKED = work started but blocked by a runtime dependency
 #     - `## Last updated: YYYY-MM-DD`
 #
 #   Feature status files must additionally declare:
-#     - `## Interface stable` followed on the next non-empty line by YES or NO
+#     - `## Interface stable` followed on the next non-empty line by YES, NO,
+#       or N/A (N/A is only valid when Status is PENDING — no code written yet)
 #
 # Exempt files (do not require `## Interface stable`):
 #   - harness.md         — orchestrator's own backlog (different shape)
@@ -33,7 +36,7 @@ set -e
 
 . "$(dirname "$0")/_check_lib.sh"
 
-VALID_STATUSES='IN_PROGRESS|READY_FOR_REVIEW|APPROVED|MERGED|BLOCKED'
+VALID_STATUSES='IN_PROGRESS|READY_FOR_REVIEW|APPROVED|MERGED|BLOCKED|PENDING'
 INTERFACE_EXEMPT='harness.md backtest-infra.md'
 VIOLATIONS=""
 
@@ -105,14 +108,20 @@ for status_file in "$STATUS_DIR"/*.md; do
   fi
 
   # 3. ## Interface stable (feature status files only)
+  # N/A is accepted when Status is PENDING (no code written yet).
   if _is_interface_exempt "$basename"; then
     :
   else
     interface_value=$(_value_after_heading "$status_file" "Interface stable")
     if [ -z "$interface_value" ]; then
       _record_violation "$basename: missing '## Interface stable' section (required for feature status files; add to $INTERFACE_EXEMPT to exempt)"
+    elif printf '%s' "$interface_value" | grep -qE '^N/A'; then
+      # N/A is only valid when the track is PENDING (not yet started).
+      if ! printf '%s' "$status_value" | grep -qE '^PENDING$'; then
+        _record_violation "$basename: '## Interface stable' is N/A but Status is '$status_value' (N/A only valid for PENDING tracks)"
+      fi
     elif ! printf '%s' "$interface_value" | grep -qE '^(YES|NO)$'; then
-      _record_violation "$basename: '## Interface stable' value '$interface_value' is not YES or NO"
+      _record_violation "$basename: '## Interface stable' value '$interface_value' is not YES, NO, or N/A (N/A only for PENDING)"
     fi
   fi
 done
@@ -121,8 +130,10 @@ if [ -n "$VIOLATIONS" ]; then
   echo "FAIL: status file integrity linter — malformed or missing fields in dev/status/:"
   printf '%b' "$VIOLATIONS"
   echo ""
-  echo "Schema: ## Status (valid value), ## Last updated: YYYY-MM-DD,"
-  echo "        ## Interface stable (YES|NO) — required except for: $INTERFACE_EXEMPT"
+  echo "Schema: ## Status (IN_PROGRESS|READY_FOR_REVIEW|APPROVED|MERGED|BLOCKED|PENDING),"
+  echo "        ## Last updated: YYYY-MM-DD,"
+  echo "        ## Interface stable (YES|NO|N/A) — required except for: $INTERFACE_EXEMPT"
+  echo "        (N/A for Interface stable only valid when Status is PENDING)"
   exit 1
 fi
 
