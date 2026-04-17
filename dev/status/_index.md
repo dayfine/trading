@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## Active + complete tracks
 
@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [backtest-infra](backtest-infra.md) | READY_FOR_REVIEW | feat-backtest | feat/metrics-unrealized-fix | UnrealizedPnl=0 bug fix + CAGR/annualized-return docstring (follow-up items 1+2). Still blocked on #382 for support-floor experiment |
+| [backtest-infra](backtest-infra.md) | READY_FOR_REVIEW | feat-backtest | feat/metrics-scenario-unrealized-pin | Pin per-scenario `unrealized_pnl` range (follow-up to merged #393). Still blocked on #382 for support-floor experiment |
 | [support-floor-stops](support-floor-stops.md) | READY_FOR_REVIEW | feat-weinstein | #382 | Merge #382 (overall_qc APPROVED this run) |
 | [short-side-strategy](short-side-strategy.md) | PENDING | — | — | Blocked on PR A of support-floor split (`feat/support-floor-stops`) — primitive widening to long+short |
 | [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | One-shot run of `fetch_finviz_sectors.exe` + filter with updated default.sexp (Item 2) |

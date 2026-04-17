@@ -42,6 +42,7 @@ type expected = {
   sharpe_ratio : range;
   max_drawdown_pct : range;
   avg_holding_days : range;
+  unrealized_pnl : range option; [@sexp.option]
 }
 [@@deriving sexp]
 
@@ -55,3 +56,4 @@ type t = {
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 
 let load path = t_of_sexp (Sexp.load_sexp path)
+let in_range (r : range) v = Float.(v >= r.min_f && v <= r.max_f)
