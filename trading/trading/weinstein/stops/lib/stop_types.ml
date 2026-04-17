@@ -34,6 +34,7 @@ type config = {
   ma_flat_threshold : float;
   trailing_stop_buffer_pct : float;
   tightened_stop_buffer_pct : float;
+  support_floor_lookback_bars : int;
 }
 [@@deriving show, eq, sexp]
 
@@ -45,4 +46,5 @@ let default_config =
     ma_flat_threshold = 0.002;
     trailing_stop_buffer_pct = 0.01;
     tightened_stop_buffer_pct = 0.005;
+    support_floor_lookback_bars = 90;
   }

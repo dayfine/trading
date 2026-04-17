@@ -65,6 +65,12 @@ type config = {
       (** Tighter buffer used in the Tightened state (default: 0.005 = 0.5%).
           Smaller than [trailing_stop_buffer_pct] to keep the stop close to
           market once tightening is triggered. *)
+  support_floor_lookback_bars : int;
+      (** Daily-bar lookback window for the support-floor primitive (default: 90
+          bars ≈ 4.5 months). Large enough to capture a recent correction,
+          narrow enough to avoid reaching into a prior regime. Used by
+          {!Weinstein_stops.compute_initial_stop_with_floor}; depth threshold is
+          shared with [min_correction_pct] (Weinstein's 8% rule). *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

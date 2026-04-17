@@ -28,3 +28,9 @@ val weekly_bars_for : t -> symbol:string -> n:int -> Types.Daily_price.t list
     are converted via {!Time_period.Conversion.daily_to_weekly} with
     [include_partial_week:true]. Returns the empty list if [symbol] has no
     accumulated bars, or all available weekly bars if fewer than [n] exist. *)
+
+val daily_bars_for : t -> symbol:string -> Types.Daily_price.t list
+(** Return the full accumulated daily bar history for [symbol] in chronological
+    order (oldest first). Returns the empty list if [symbol] has no accumulated
+    bars. Callers that need a bounded window should slice the result themselves
+    — the support-floor primitive in [weinstein_stops] is one such caller. *)

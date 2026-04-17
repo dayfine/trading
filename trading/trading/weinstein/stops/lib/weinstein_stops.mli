@@ -29,6 +29,35 @@ val compute_initial_stop :
     below it. For a short, [reference_level] is the resistance ceiling; the stop
     is placed just above it. A round-number nudge is applied in both cases. *)
 
+val compute_initial_stop_with_floor :
+  config:config ->
+  side:position_side ->
+  entry_price:float ->
+  bars:Types.Daily_price.t list ->
+  as_of:Core.Date.t ->
+  fallback_buffer:float ->
+  stop_state
+(** Compute the initial stop using a real support floor derived from bar
+    history, falling back to a fixed-buffer proxy when no qualifying correction
+    is found.
+
+    When {!Support_floor.find_recent_low} returns [Some floor] (using
+    [config.support_floor_lookback_bars] and [config.min_correction_pct]), that
+    value is used as the [reference_level]. Otherwise the function falls back to
+    [entry_price *. fallback_buffer] for a long, or
+    [entry_price /. fallback_buffer] for a short — behaviourally identical to
+    the caller's prior direct call to {!compute_initial_stop} with that proxy.
+
+    The returned state is always {!Initial}; the trailing state machine is
+    seeded elsewhere (see {!update}).
+
+    Typical use by callers:
+    - [entry_price]: the candidate's suggested entry (breakout price).
+    - [bars]: the accumulated daily bar history for the symbol.
+    - [as_of]: the entry date (usually today's market-close date).
+    - [fallback_buffer]: the same buffer the caller used before this primitive
+      existed — e.g. 1.02 for a 2% loose stop on the long side. *)
+
 val check_stop_hit :
   state:stop_state -> side:position_side -> bar:Types.Daily_price.t -> bool
 (** [true] if the bar's trigger price crossed the stop level.

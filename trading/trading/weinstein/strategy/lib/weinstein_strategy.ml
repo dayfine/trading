@@ -58,9 +58,16 @@ let _gen_position_id symbol =
 
 (** Try to build a CreateEntering transition for one screened candidate.
     Registers the initial stop state as a side effect. Returns None if the
-    candidate is un-sizeable (zero portfolio value or zero shares). *)
-let _make_entry_transition ~config ~stop_states ~portfolio_value ~current_date
-    (cand : Screener.scored_candidate) =
+    candidate is un-sizeable (zero portfolio value or zero shares).
+
+    The initial stop is derived via
+    {!Weinstein_stops.compute_initial_stop_with_floor}, which pulls the support
+    floor (prior correction low) from the candidate's accumulated bar history;
+    falls back to the fixed-buffer proxy
+    ([suggested_entry *. initial_stop_buffer]) when the lookback window holds no
+    qualifying correction. *)
+let _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
+    ~current_date (cand : Screener.scored_candidate) =
   let sizing =
     Portfolio_risk.compute_position_size ~config:config.portfolio_config
       ~portfolio_value ~entry_price:cand.suggested_entry
@@ -69,10 +76,14 @@ let _make_entry_transition ~config ~stop_states ~portfolio_value ~current_date
   if sizing.shares = 0 then None
   else
     let id = _gen_position_id cand.ticker in
+    let daily_bars =
+      Bar_history.daily_bars_for bar_history ~symbol:cand.ticker
+    in
     let initial_stop =
-      Weinstein_stops.compute_initial_stop ~config:config.stops_config
-        ~side:Trading_base.Types.Long
-        ~reference_level:(cand.suggested_stop *. config.initial_stop_buffer)
+      Weinstein_stops.compute_initial_stop_with_floor
+        ~config:config.stops_config ~side:Trading_base.Types.Long
+        ~entry_price:cand.suggested_entry ~bars:daily_bars ~as_of:current_date
+        ~fallback_buffer:config.initial_stop_buffer
     in
     stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
     let description =
@@ -110,13 +121,14 @@ let _held_symbols (portfolio : Portfolio_view.t) =
 
 (** Generate CreateEntering transitions for top screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds. *)
-let _entries_from_candidates ~config ~candidates ~stop_states
+let _entries_from_candidates ~config ~candidates ~stop_states ~bar_history
     ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
   let held = _held_symbols portfolio in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let remaining_cash = ref portfolio.cash in
   let make_entry =
-    _make_entry_transition ~config ~stop_states ~portfolio_value ~current_date
+    _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
+      ~current_date
   in
   candidates
   |> List.filter ~f:(fun (c : Screener.scored_candidate) ->
@@ -154,8 +166,8 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
       ~stocks ~held_tickers:(_held_symbols portfolio)
   in
   _entries_from_candidates ~config
-    ~candidates:screen_result.Screener.buy_candidates ~stop_states ~portfolio
-    ~get_price ~current_date
+    ~candidates:screen_result.Screener.buy_candidates ~stop_states ~bar_history
+    ~portfolio ~get_price ~current_date
 
 (* ------------------------------------------------------------------ *)
 (* make                                                                  *)

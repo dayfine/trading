@@ -26,3 +26,6 @@ let weekly_bars_for (t : t) ~symbol ~n =
   in
   let len = List.length weekly in
   if len <= n then weekly else List.drop weekly (len - n)
+
+let daily_bars_for (t : t) ~symbol =
+  Hashtbl.find t symbol |> Option.value ~default:[]

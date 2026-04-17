@@ -63,6 +63,27 @@ let compute_initial_stop ~config ~side ~reference_level =
   Initial
     { stop_level = nudge_round_number ~config ~side raw_stop; reference_level }
 
+(* Fallback reference when the bar history yields no qualifying counter-move.
+   Mirrors the pre-primitive caller behaviour: push the reference point into
+   the position's favour by the configured buffer. *)
+let _fallback_reference ~side ~entry_price ~fallback_buffer =
+  match side with
+  | Long -> entry_price *. fallback_buffer
+  | Short -> entry_price /. fallback_buffer
+
+let compute_initial_stop_with_floor ~config ~side ~entry_price ~bars ~as_of
+    ~fallback_buffer =
+  let reference_level =
+    match
+      Support_floor.find_recent_level ~bars ~as_of ~side
+        ~min_pullback_pct:config.min_correction_pct
+        ~lookback_bars:config.support_floor_lookback_bars
+    with
+    | Some level -> level
+    | None -> _fallback_reference ~side ~entry_price ~fallback_buffer
+  in
+  compute_initial_stop ~config ~side ~reference_level
+
 (* ---- Directional helpers ---- *)
 
 (* The bar's extreme price in the against-trend direction.
