@@ -138,22 +138,21 @@ the orchestrator does not act on this section)
 - `## Blocking Refactors` takes priority over feature work on the next run
 - `## Known gaps` is never empty-checked by automation; it is for human awareness only
 
-### 8. Index row update (required)
+### 8. Index row update — DO NOT EDIT `dev/status/_index.md` IN A FEATURE PR
 
-At the end of every session, in addition to updating the track's own
-status file, update the corresponding row in `dev/status/_index.md`:
+`dev/status/_index.md` is owned by the orchestrator. `lead-orchestrator`
+reconciles it in Step 5.5 against every `dev/status/*.md` at end-of-run.
 
-- **Status** cell — mirrors the status file's `## Status`
-- **Owner** cell — this agent's name (usually unchanged)
-- **Open PR(s)** cell — PRs currently open against this track
-- **Next task** cell — the top-of-queue item from the status file's
-  `## Next Steps`
+Feature PRs that also edit `_index.md` almost always collide with a
+sibling PR editing the same row, producing a merge conflict for every
+merge after the first. Don't cause that pain.
 
-Agents only touch their own row. Adding a new track to the system means
-creating the status file **and** adding a row to the index in the same
-commit. `lead-orchestrator` reconciles the index against all status
-files at end-of-run and flags drift, but agents should keep the row
-fresh so the index is usable between orchestrator runs.
+Only update your own `dev/status/<feature>.md`. The orchestrator will
+reflect it in the index on the next run.
+
+**Exception — adding a new track:** if this PR introduces a new track
+(new status file), add the corresponding row to `_index.md` in this PR
+too. The orchestrator won't know about the track otherwise.
 
 ---
 
