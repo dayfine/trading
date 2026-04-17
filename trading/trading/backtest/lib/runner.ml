@@ -83,11 +83,19 @@ type _deps = {
   all_symbols : string list;
 }
 
-let _load_deps ~overrides =
+let _load_deps ~overrides ~sector_map_override =
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
-  eprintf "Loading universe from sectors.csv...\n%!";
-  let ticker_sectors = Sector_map.load ~data_dir:data_dir_fpath in
+  let ticker_sectors =
+    match sector_map_override with
+    | Some tbl ->
+        eprintf "Using scenario-provided sector map (%d symbols)...\n%!"
+          (Hashtbl.length tbl);
+        tbl
+    | None ->
+        eprintf "Loading universe from sectors.csv...\n%!";
+        Sector_map.load ~data_dir:data_dir_fpath
+  in
   let universe =
     Hashtbl.keys ticker_sectors |> List.sort ~compare:String.compare
   in
@@ -165,8 +173,9 @@ let _run_simulator sim =
       failwith
         (sprintf "Backtest.Runner: simulation failed: %s" (Status.show e))
 
-let run_backtest ~start_date ~end_date ?(overrides = []) () =
-  let deps = _load_deps ~overrides in
+let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override ()
+    =
+  let deps = _load_deps ~overrides ~sector_map_override in
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length deps.all_symbols);
   let warmup_start = Date.add_days start_date (-warmup_days) in

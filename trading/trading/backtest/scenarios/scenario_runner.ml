@@ -20,6 +20,21 @@
 
 open Core
 module Scenario = Scenario_lib.Scenario
+module Universe_file = Scenario_lib.Universe_file
+
+(* Universe resolution *)
+
+let _fixtures_root () =
+  let root = Data_path.default_data_dir () |> Fpath.parent |> Fpath.to_string in
+  root ^ "trading/test_data/backtest_scenarios"
+
+let _sector_map_of_universe_file path =
+  (* Resolve the scenario's [universe_path] relative to the fixtures root,
+     load it, and return an optional sector-map for [Backtest.Runner] to use
+     as its universe. [None] means "use the full [data/sectors.csv]" (broad
+     tier / pre-migration behaviour). *)
+  let resolved = Filename.concat (_fixtures_root ()) path in
+  Universe_file.to_sector_map_override (Universe_file.load resolved)
 
 (* Actual metrics extracted from a run — serialized so the parent process
    can read back each child's result. *)
@@ -142,9 +157,11 @@ let _run_scenario_in_child ~output_root (s : Scenario.t) =
     (Date.to_string s.period.end_date);
   let scenario_dir = _scenario_dir ~output_root s in
   Core_unix.mkdir_p scenario_dir;
+  let sector_map_override = _sector_map_of_universe_file s.universe_path in
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
-      ~end_date:s.period.end_date ~overrides:s.config_overrides ()
+      ~end_date:s.period.end_date ~overrides:s.config_overrides
+      ?sector_map_override ()
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   let a = _actual_of_result result in
