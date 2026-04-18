@@ -6,7 +6,9 @@
   stock_analysis
   weinstein_types
   stage
+  rs
   types
+  trading.base
   core
   ounit2
   matchers))

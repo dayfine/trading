@@ -356,6 +356,67 @@ let test_candidate_grade_matches_score _ =
       in
       assert_that c.grade (equal_to (expected_grade : grade))
 
+(* ------------------------------------------------------------------ *)
+(* Candidate side: buy_candidates are Long, short_candidates are Short *)
+(* ------------------------------------------------------------------ *)
+
+let test_buy_candidates_are_long _ =
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  let stocks = [ make_analysis "G" prior bars ] in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  match result.buy_candidates with
+  | [] -> assert_failure "Expected a buy candidate"
+  | c :: _ -> assert_that c.side (equal_to Trading_base.Types.Long)
+
+let test_short_candidates_are_short _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let stocks = [ make_analysis "SHT" prior bars ] in
+  let sector_map =
+    sector_map_of [ ("SHT", make_sector ~rating:Weak "Energy") ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map ~stocks ~held_tickers:[]
+  in
+  match result.short_candidates with
+  | [] -> assert_failure "Expected a short candidate"
+  | c :: _ -> assert_that c.side (equal_to Trading_base.Types.Short)
+
+(* ------------------------------------------------------------------ *)
+(* Ch. 11 rule: positive RS blocks short candidates                   *)
+(* ------------------------------------------------------------------ *)
+
+let test_positive_rs_blocks_short _ =
+  (* Weinstein Ch. 11: "NEVER short a stock with strong RS, even if it breaks
+     down." The existing short-candidate test sees a None RS result (empty
+     benchmark_bars). Here we manually inject a positive RS onto an otherwise
+     eligible Stage-4 breakdown candidate and assert the screener now rejects
+     it entirely. *)
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let base = make_analysis "STRONG" prior bars in
+  let positive_rs : Rs.result =
+    {
+      current_rs = 1.2;
+      current_normalized = 10.0;
+      trend = Positive_rising;
+      history = [];
+    }
+  in
+  let with_positive_rs = { base with rs = Some positive_rs } in
+  let sector_map =
+    sector_map_of [ ("STRONG", make_sector ~rating:Weak "Energy") ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map
+      ~stocks:[ with_positive_rs ] ~held_tickers:[]
+  in
+  assert_that result.short_candidates is_empty
+
 let suite =
   "screener_tests"
   >::: [
@@ -381,6 +442,9 @@ let suite =
          >:: test_short_candidate_stop_above_entry;
          "test_candidate_grade_matches_score"
          >:: test_candidate_grade_matches_score;
+         "test_buy_candidates_are_long" >:: test_buy_candidates_are_long;
+         "test_short_candidates_are_short" >:: test_short_candidates_are_short;
+         "test_positive_rs_blocks_short" >:: test_positive_rs_blocks_short;
        ]
 
 let () = run_test_tt_main suite
