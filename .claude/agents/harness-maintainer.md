@@ -101,6 +101,49 @@ The health-scanner is read-only — it never modifies source or agent files. It 
 1. Extend `trading/devtools/fn_length_linter/fn_length_linter.ml` (already uses `compiler-libs`) to compute CC per function (branches in match/if/when + 1); CC > 10 = warning (not failure); output to rolling `dev/metrics/cc-latest.json` (overwritten each deep-scan run; history in git log)
 2. Add `## Quality Score` (1–5 integer + one-sentence rationale) to `qc-behavioral.md` output format and checklist
 
+## Periodic simplification of agent definitions
+
+Agent instructions (`.claude/agents/*.md`) accumulate. Every fix adds a
+rule; every edge case adds a paragraph. Past ~800 lines an agent file
+starts diluting attention — the agent reads the whole file every
+session, and what was a clear rule gets buried.
+
+**When to run a simplification pass:**
+
+- Any `.claude/agents/*.md` exceeds 800 lines of operational content
+  (check periodically; once a month at minimum).
+- After a sequence of ≥3 PRs that each added rules to the same agent —
+  the cumulative effect is usually worse than the sum.
+- When a real-run escalation traces back to the agent following
+  redundant / conflicting instructions (rules contradicting or
+  duplicating each other).
+
+**What to trim:**
+
+- **Redundant rules.** Same "don't do X" repeated across sections →
+  consolidate into one canonical statement in the most relevant section.
+- **Historical rationale.** Prose like "Prior pattern matched X but that
+  failed because..." explaining a now-fixed bug. Move to a companion doc
+  `docs/design/<agent>-rationale.md` if worth preserving, otherwise
+  delete — the current rule stands on its own.
+- **Verbose examples.** Code samples longer than ~15 lines that could be
+  a single rule sentence + a pointer to a reference doc.
+- **Dead sections.** Instructions for tools or workflows no longer in
+  use (e.g. legacy shell scripts the repo replaced with dune aliases).
+
+**What NOT to trim:**
+
+- Operational rules (do-this-when-that conditions).
+- Path conventions (bookmark names, file layouts, env-var usage).
+- Workspace-isolation / contamination guards.
+- Acceptance checklists and non-obvious gotchas.
+
+Treat this as a standalone harness task when triggered — branch
+`harness/simplify-<agent-name>`, one agent per PR. Target a 20–40%
+line reduction per pass; more is fine if operational meaning is
+preserved. Re-run the most recent orchestrator-plan mode or dispatch a
+smoke-test subagent after merging to verify no behavioral regression.
+
 ## Verification
 
 ```bash
