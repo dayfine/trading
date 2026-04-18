@@ -3,11 +3,23 @@
 ## Last updated: 2026-04-18
 
 ## Status
-IN_PROGRESS
+IN_PROGRESS — Items 1, 2, 4, 4.1 done. Only Item 3 (refresh cadence
+hook) remains.
 
-Item 1 merged (#349, 2026-04-15). Item 2 (one-shot fetch) is the
-current top-of-queue work item for `ops-data` — it is dispatch-eligible,
-not blocked. Item 3 follows.
+Item 1 merged (#349, 2026-04-15). Item 2 (one-shot fetch) ran locally
+on the operator's workstation and populated `data/sectors.csv`
+(~8,000+ symbols). **The full file is intentionally not checked into
+the repo due to size** — it lives out-of-tree alongside other
+operator-local data. `trading/test_data/sectors.csv` (8 rows) is what
+CI / GHA runs use.
+
+### This track does NOT gate GHA orchestrator dispatch.
+
+The GHA orchestrator runs point at `TRADING_DATA_DIR=${{ github.workspace }}/trading/test_data`
+(`.github/workflows/orchestrator.yml:92`), which consumes the in-tree
+fixture. The production `data/sectors.csv` is only consumed by real
+backtests on the operator's machine. Treat this track as operator-data
+work, not as a blocker on any automated pipeline.
 
 ## Ownership
 `ops-data` agent — see `.claude/agents/ops-data.md`. Scope is data
@@ -244,11 +256,10 @@ the rule to exclude these.
   the name/exchange signal.
 
 ## In Progress
-- Item 2 (one-shot `fetch_finviz_sectors.exe` run + commit expanded
-  `data/sectors.csv`) is ready to dispatch — Item 1 merged in #349 on
-  2026-04-15. Estimated ~2.2h of wall time at 1 req/sec; the run itself
-  is automatable (background `Bash` or a dedicated workflow), not a
-  human-gated blocker.
+- Item 3 — refresh cadence hook (ops-data preflight reads
+  `data/sectors.csv.manifest` at session start, warns / offers refresh
+  if >30 days stale). Small agent-definition edit (~20 lines). Not
+  blocking any downstream work.
 
 ## Next Steps (work items — ops-data)
 
@@ -275,13 +286,14 @@ Scope: `trading/analysis/scripts/fetch_finviz_sectors/`.
 
 Estimate: ~250 lines OCaml + ~40 lines dune/tests.
 
-### Item 2 — one-shot run + commit the expanded file
+### Item 2 — one-shot run — **DONE (2026-04-18, operator-local)**
 
-- Run the fetcher against the current universe.
-- Target: 5,000+ symbols with valid sector assignments.
-- Commit resulting `data/sectors.csv` + `data/sectors.csv.manifest`.
-- Run the existing backtest smoke test to confirm universe size bumps
-  from 1,654 to ≥5,000 and nothing breaks downstream.
+- Operator ran the fetcher locally against the current universe;
+  `data/sectors.csv` + manifest populated out-of-tree.
+- File is intentionally not checked into the repo due to size. CI and
+  GHA orchestrator use `trading/test_data/sectors.csv` instead.
+- Original acceptance (5,000+ symbols with valid sector assignments)
+  satisfied on the operator's workstation.
 
 ### Item 3 — refresh cadence hook
 
