@@ -70,7 +70,7 @@ let test_symbol_count _ =
   assert_that (Universe_file.symbol_count pinned) (is_some_and (equal_to 3));
   assert_that (Universe_file.symbol_count Full_sector_map) is_none
 
-let test_to_sector_map_override_full _ =
+let test_to_sector_map_override_full_is_none _ =
   assert_that
     (Universe_file.to_sector_map_override Universe_file.Full_sector_map)
     is_none
@@ -83,13 +83,19 @@ let test_to_sector_map_override_pinned _ =
         { symbol = "JPM"; sector = "Financials" };
       ]
   in
-  match Universe_file.to_sector_map_override uf with
-  | None -> assert_failure "Pinned should yield Some sector-map"
-  | Some tbl ->
-      assert_that (Hashtbl.length tbl) (equal_to 2);
-      assert_that (Hashtbl.find tbl "AAPL")
-        (is_some_and (equal_to "Information Technology"));
-      assert_that (Hashtbl.find tbl "JPM") (is_some_and (equal_to "Financials"))
+  assert_that
+    (Universe_file.to_sector_map_override uf)
+    (is_some_and
+       (all_of
+          [
+            field Hashtbl.length (equal_to 2);
+            field
+              (fun tbl -> Hashtbl.find tbl "AAPL")
+              (is_some_and (equal_to "Information Technology"));
+            field
+              (fun tbl -> Hashtbl.find tbl "JPM")
+              (is_some_and (equal_to "Financials"));
+          ]))
 
 (* The committed [universes/small.sexp] and [universes/broad.sexp] files must
    parse — this is the regression guard for the fixture itself. *)
@@ -142,8 +148,8 @@ let suite =
          "Full_sector_map parses" >:: test_full_sector_map_parses;
          "Pinned round-trips" >:: test_roundtrip_pinned;
          "symbol_count" >:: test_symbol_count;
-         "to_sector_map_override Full_sector_map"
-         >:: test_to_sector_map_override_full;
+         "to_sector_map_override Full_sector_map is_none"
+         >:: test_to_sector_map_override_full_is_none;
          "to_sector_map_override Pinned" >:: test_to_sector_map_override_pinned;
          "committed universes parse" >:: test_committed_universes_parse;
        ]
