@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-16
+## Last updated: 2026-04-18
 
 ## Status
 IN_PROGRESS
@@ -66,7 +66,7 @@ IN_PROGRESS
 - [x] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` with `harness_gap` field on NEEDS_REWORK
 - [x] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
 - [x] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
-- [ ] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc)
+- [x] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc) — DONE: see completion note below
 - [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
 - [x] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries (part of T1-O fast scan). Done: see Completed section.
 - [x] T3-G: `health-scanner` deep scan extension — followup-item count + CC trend analysis in weekly report (extends T1-Q CC linter output)
@@ -243,6 +243,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - [x] T3-B: AVR loop closure already in `lead-orchestrator` Step 5 — auto-dispatches QC for any READY_FOR_REVIEW feature in the same orchestrator run. Verify: grep "READY_FOR_REVIEW\|auto.*QC\|Step 5" in `lead-orchestrator.md`.
 - [x] qc-structural: P1/P2/P4 items updated to "verified by linter (H3)" — QC no longer manually re-scans these; linters are the deterministic gate. Verify: read `qc-structural.md` checklist — P1/P2/P4 items reference linter gates.
 - [x] T3-F: `docs/design/dependency-rules.md` created — R1–R6 rules with lifecycle states (`proposed` / `monitored` / `enforced`); R1, R4, R6 enforced via dune tests; R2, R3 monitored; R5 proposed. Verify: file exists; `dune runtest trading/devtools/checks/` enforces R1.
+- [x] T3-F: Architecture graph analyzer — Check 9 added to `trading/devtools/checks/deep_scan.sh`; grep-based MVP covering the two monitored rules: R2 (trading/trading/weinstein/ must not open analysis modules) and R3 (trading.simulation must not be a library dependency of live execution paths). Findings emitted under `## Architecture Graph` in `dev/health/YYYY-MM-DD-deep.md`; violations are INFO (monitored — human decides to promote to enforced). Companion smoke test at `trading/devtools/checks/deep_scan_arch_graph_check.sh` wired into `dune runtest`. Verify: `sh trading/devtools/checks/deep_scan.sh` — report contains `## Architecture Graph` with R2 and R3 sub-sections; `dune runtest devtools/checks/` — prints `OK: deep scan Architecture Graph section (T3-F) structural check passed.`
 
 ### T3-E: Cost/token budget visibility
 

@@ -127,3 +127,15 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:deep_scan_trends_check.sh})))
+
+; Deep scan Architecture Graph section (T3-F): structural smoke test.
+; Verifies deep_scan.sh contains the Check 9 Architecture Graph
+; implementation (R2 + R3 monitored rules) and that the most-recent
+; deep scan report has ## Architecture Graph.
+; Does NOT run deep_scan.sh (weekly tool, not a per-PR gate).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:deep_scan_arch_graph_check.sh})))
