@@ -1,4 +1,4 @@
-Reviewed SHA: cc4edca62e68cefb76f47ee60ad73368761ab92b
+Reviewed SHA: 0381bde82c8cf7b04ac9559407253efc68dc6fd4
 
 ## Structural Review @ cc4edca6 (PR #419 — phase-tracing slice)
 
@@ -55,6 +55,60 @@ Test count from targeted run (`dune runtest trading/backtest/test/`): 10 tests i
 APPROVED
 
 All structural checks pass. The Trace module is well-factored: public API is minimal (4 functions), internal helpers are properly prefixed, full `.mli` coverage, no magic numbers, all functions within the 50-line limit per the AST-based linter. The `?trace` threading in `runner.ml` is clean optional-parameter plumbing. 10 unit tests cover the full `Trace` API including sexp round-trip and `write` + mkdir-p. No core module modifications, no architecture boundary violations.
+
+---
+
+## Structural + Behavioral Re-verification @ 0381bde (PR #419, phase-tracing slice — refactor + fmt)
+
+Date: 2026-04-18 (run 4)
+Reviewer: lead-orchestrator (deterministic verification after two review-response commits)
+
+### Commits since the prior reviewed tip (`cc4edca6`)
+
+```
+73f74c2 Apply review: sentinel→option for Trace, drop to_string, simplify parsers
+0381bde Apply review: dune fmt
+```
+
+### Delta classification
+
+Per `git diff --stat cc4edca6..0381bde -- '*.ml' '*.mli'`:
+
+```
+trading/trading/backtest/lib/trace.ml       | 44 ++++----
+trading/trading/backtest/lib/trace.mli      | 32 +++----
+trading/trading/backtest/test/test_trace.ml | 29 +++----
+3 files changed, 41 insertions(+), 64 deletions(-)
+```
+
+**Net: -23 lines.** Pure refactor of the `Trace` instrumentation module. No new APIs, no removed public behavior, no changes to Weinstein strategy / screener / stops / macro / runner orchestration. The refactor swapped sentinel values for `option` types, dropped a `to_string` helper, simplified the `/proc/self/status` VmHWM parser. `0381bde` is whitespace-only.
+
+Because the Trace module is pure instrumentation plumbing (captured in cc4edca6 behavioral review as "no Weinstein domain logic; no tunable parameters; A1 compliant"), the behavioral axes (S/L/C/T) remain NA — and the refactor preserves both axes: no stage, stop, screener, or macro code was touched.
+
+### Hard gates on clean checkout of 0381bde
+
+- `dune build @fmt`: exit 0 (PASS — prior H1 FAIL at 73f74c2 is resolved)
+- `dune build`: exit 0 (PASS)
+- `dune runtest trading/`: exit 0 (PASS) — all 19 backtest tests green (10 `test_trace`, 3 `test_runner_filter`, 6 `test_stop_log`). Full trading-subtree runtest clean.
+
+### Structural Checklist (delta from cc4edca6)
+
+| # | Check | Prior | New | Notes |
+|---|-------|-------|-----|-------|
+| H1 | dune build @fmt | PASS | PASS | Fixed by `0381bde` after `73f74c2` introduced two fmt violations (pipe-chain in `trace.ml`, docstring wrap in `trace.mli`). Gate restored. |
+| H2 | dune build | PASS | PASS | |
+| H3 | dune runtest | PASS | PASS | |
+| P1 | fn_length_linter | PASS | PASS | Refactor shortens functions; no new over-limit functions. |
+| P4 | .mli coverage | PASS | PASS | `to_string` removed from both `.ml` and `.mli` in lockstep; new `option`-typed accessors all exported. |
+| All other items | PASS/NA | unchanged | Nothing touched outside `backtest/lib/trace.{ml,mli}` + `backtest/test/test_trace.ml`. |
+
+### Verdict
+
+**APPROVED — prior structural + behavioral APPROVED verdicts preserved.**
+
+overall_qc: APPROVED
+structural_qc: APPROVED (SHA 0381bde re-verification: refactor-only, all gates pass)
+behavioral_qc: APPROVED (SHA 0381bde re-verification: refactor-only, no Weinstein domain delta from cc4edca6)
 
 ---
 
