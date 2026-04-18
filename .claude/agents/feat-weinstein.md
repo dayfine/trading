@@ -89,7 +89,6 @@ If after **3 consecutive build-fix cycles** `dune build && dune runtest` is stil
 
 ## Status file updates
 
-At the end of every session, update **both**:
+At the end of every session, update `dev/status/support-floor-stops.md` — current Status, Completed, In Progress, Next Steps.
 
-1. `dev/status/support-floor-stops.md` — current Status, Completed, In Progress, Next Steps.
-2. `dev/status/_index.md` — the row for this track. Keep Status, Owner, Open PR, and Next task aligned with (1). Only touch your own row.
+**Do NOT edit `dev/status/_index.md`** — the orchestrator reconciles it in Step 5.5 against every `dev/status/*.md` at end-of-run. Editing the index from a feature PR causes merge conflicts with every sibling PR touching the same row (see `feat-agent-template.md` §8). Exception: if this PR introduces a brand-new tracked work item (new status file), add the row here since the orchestrator can't invent one.

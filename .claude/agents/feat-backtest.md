@@ -134,5 +134,5 @@ status to READY_FOR_REVIEW.
 1. Set the item's checkbox to `[x]` in `dev/status/backtest-infra.md`, with a one-line completion note (what was built, where, verify command).
 2. If the work is feature code that ships an interface change, update `## Interface stable` if needed.
 3. Set `## Status` to READY_FOR_REVIEW only if you've finished a complete deliverable; otherwise leave it as IN_PROGRESS with progress notes.
-4. Update the **backtest-infra** row in `dev/status/_index.md` — align Status, Owner, Open PR, and Next task with the changes above. Only touch your own row.
+4. **Do NOT edit `dev/status/_index.md`** — the orchestrator reconciles it in Step 5.5 against every `dev/status/*.md` at end-of-run. Editing the index from a feature PR causes merge conflicts with every sibling PR touching the same row (see `feat-agent-template.md` §8). Exception: if this PR introduces a brand-new tracked work item (new status file), add the row here since the orchestrator can't invent one.
 5. Push your branch via jj. The orchestrator picks up READY_FOR_REVIEW status files and dispatches QC.
