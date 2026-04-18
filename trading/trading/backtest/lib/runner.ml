@@ -27,10 +27,10 @@ type result = {
     [portfolio_value = cash] even when positions are open.
 
     Important: this heuristic exists only for mark-to-market aware consumers
-    such as [UnrealizedPnl] (see PR #393). It must NOT be applied to round-trip
-    extraction — round-trips are derived from position-state transitions
-    (fills), which are recorded independently of whether the portfolio's
-    mark-to-market view is populated that day. Applying this filter before
+    such as [UnrealizedPnl]. It must NOT be applied to round-trip extraction —
+    round-trips are derived from position-state transitions (fills), which are
+    recorded independently of whether the portfolio's mark-to-market view is
+    populated that day. Applying this filter before
     [Metrics.extract_round_trips] silently drops every trade whose entry *and*
     exit landed on steps where [portfolio_value ~ cash], which happens for
     instance when the only non-[Holding] positions are [Entering]/[Closed] (they
@@ -211,8 +211,9 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override ()
   in
   (* Steps on real trading days only — used for [UnrealizedPnl] consumers and
      anything else that needs a meaningful mark-to-market portfolio value.
-     See PR #393 context: the simulator reports [portfolio_value = cash] on
-     weekends/holidays even when positions are open. *)
+     Simulator reports [portfolio_value = cash] on weekends/holidays even
+     when positions are open, so filter them out before mark-to-market
+     consumers use the series. *)
   let steps = List.filter steps_in_range ~f:is_trading_day in
   let final_value = (List.last_exn steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips steps_in_range in

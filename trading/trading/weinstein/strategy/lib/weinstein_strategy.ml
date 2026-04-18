@@ -119,11 +119,10 @@ let _check_cash_and_deduct remaining_cash (trans : Position.transition) =
     trying to enter/exit). Closed positions are excluded — the strategy has no
     stake in them and must be free to re-enter the symbol.
 
-    Bug fix (2026-04-17): previously returned every position in the portfolio
-    regardless of state, including Closed. That permanently blacklisted every
-    symbol the strategy had ever traded from re-entry via both [held_tickers]
-    passed to the screener and the in-strategy candidate filter. See
-    [dev/notes/strategy-dispatch-trace-2026-04-17.md] / PR #408.
+    Bug fix: previously returned every position in the portfolio regardless of
+    state, including Closed. That permanently blacklisted every symbol the
+    strategy had ever traded from re-entry via both [held_tickers] passed to the
+    screener and the in-strategy candidate filter.
 
     The match is exhaustive so a future state addition forces a compile error
     here, where the keep/drop decision must be re-examined. *)

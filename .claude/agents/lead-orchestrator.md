@@ -20,7 +20,9 @@ If the dispatch prompt contains `--plan`, run in plan mode: read state
 (Step 1 + 1b + 1c), emit a dispatch plan to `dev/daily/<date>-plan.md`
 with header `# Status — YYYY-MM-DD (plan mode)`, exit 0. **Do not dispatch
 subagents, push bookmarks, or write to `dev/status/*.md` or
-`dev/reviews/*.md`.** Full contract:
+`dev/reviews/*.md`.** Read-only verification subprocesses (`dune build
+@runtest`, curl REST GETs, `jj log`) MUST still run — skipping them
+produces stale plans. Full contract:
 `docs/design/orchestrator-plan-mode.md`.
 
 ## References
@@ -98,11 +100,16 @@ Common verifications:
   cd trading/trading && dune build @runtest --force 2>&1 | tail -10
   echo "exit=$?"
   ```
-  Run from the inner `trading/trading/` directory. Exit 0 = baseline is
-  green, inherited critical is **resolved** — drop. When carrying
-  forward, quote the original linter + violation count verbatim from the
-  prior summary (don't paraphrase — seen 2026-04-18 → today, a
-  `fn_length` finding got rewritten as `nesting` on carry-forward).
+  Run from the inner `trading/trading/` directory. **The gate is the
+  exit code, NOT `FAIL:` text in the output.** Several linters
+  (`nesting_linter`, `linter_magic_numbers`) are advisory — they print
+  `FAIL: ...` lines as warnings but their dune rules still return exit
+  0. Only exit != 0 means baseline is actually red. If exit 0, the
+  inherited critical is **resolved** — drop, regardless of any `FAIL:`
+  lines in output. When carrying forward a still-real critical, quote
+  the original linter + violation count verbatim from the prior summary
+  (don't paraphrase — seen 2026-04-18 → today, a `fn_length` finding got
+  rewritten as `nesting` on carry-forward).
 
 - **"Open PR #X is failing CI"**: re-check PR status via REST
   (`/repos/<owner>/<repo>/pulls/<N>/commits/<sha>/check-runs`). If the
