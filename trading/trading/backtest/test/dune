@@ -1,4 +1,15 @@
-(test
- (name test_stop_log)
- (modules test_stop_log)
- (libraries ounit2 core backtest trading.strategy status matchers))
+(tests
+ (names test_stop_log test_runner_filter)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  backtest
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.simulation
+  trading.simulation.types
+  trading.strategy
+  status
+  matchers))
