@@ -34,3 +34,13 @@ val load : string -> t
 val symbol_count : t -> int option
 (** Number of pinned symbols, or [None] for [Full_sector_map] (count unknown at
     load time). *)
+
+val to_sector_map_override : t -> (string, string) Core.Hashtbl.t option
+(** Convert a universe file into the [sector_map_override] shape that
+    [Backtest.Runner.run_backtest] expects.
+
+    - [Pinned entries] → [Some tbl] where [tbl] maps symbol → sector. The runner
+      uses exactly this universe (one entry per key, sector is taken from the
+      entry and not from [data/sectors.csv]).
+    - [Full_sector_map] → [None]: runner falls back to [Sector_map.load] and
+      uses whatever is in [data/sectors.csv] (pre-migration behaviour). *)

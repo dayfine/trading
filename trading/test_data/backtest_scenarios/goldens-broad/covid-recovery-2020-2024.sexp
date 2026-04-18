@@ -1,3 +1,7 @@
+;; STATUS: SKIPPED — ranges stale (1,654-symbol era); re-pin pending a GHA
+;; workflow. Do not treat as a regression gate until re-pinned. See
+;; `dev/status/backtest-infra.md` follow-up.
+;;
 ;; Golden (broad): COVID crash and recovery through 2024, against the full
 ;; sector-map universe.
 ;;

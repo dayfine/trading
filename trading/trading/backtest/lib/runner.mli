@@ -22,6 +22,7 @@ val run_backtest :
   start_date:Date.t ->
   end_date:Date.t ->
   ?overrides:Sexp.t list ->
+  ?sector_map_override:(string, string) Core.Hashtbl.t ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -35,4 +36,10 @@ val run_backtest :
       Sexp.of_string "((initial_stop_buffer 1.08))";
       Sexp.of_string "((stage_config ((ma_period 40))))";
     ]
-    ]} *)
+    ]}
+
+    [sector_map_override], when passed, replaces the sector-map normally loaded
+    from [data/sectors.csv]. The backtest universe becomes exactly the keys of
+    this hashtable. This is the wiring point for scenario-level universe
+    selection (small / broad tiers). When [None] (the default), the runner falls
+    back to [Sector_map.load] — pre-migration behaviour. *)
