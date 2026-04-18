@@ -1,4 +1,68 @@
-Reviewed SHA: e59f8d2157cc5598ef03f96de03670a1afe27f5b
+Reviewed SHA: cc4edca62e68cefb76f47ee60ad73368761ab92b
+
+## Structural Review @ cc4edca6 (PR #419 — phase-tracing slice)
+
+Date: 2026-04-18
+Reviewer: qc-structural
+
+Branch: feat/backtest-phase-tracing
+PR: #419
+Staleness: branch is 1 commit behind main@origin (ops summary commit #422 landed on main after branch was pushed). Count is well under the 10-commit FLAG threshold.
+
+### Scope of diff vs. main@origin
+
+8 files changed, 546 insertions / 25 deletions:
+- `dev/backtest/traces/.gitkeep` — new placeholder directory
+- `dev/status/backtest-infra.md` — status update
+- `trading/trading/backtest/lib/trace.ml` — new module (126 lines)
+- `trading/trading/backtest/lib/trace.mli` — new interface (99 lines)
+- `trading/trading/backtest/lib/runner.ml` — add `?trace` parameter, instrument 5 phases
+- `trading/trading/backtest/lib/runner.mli` — document new `?trace` parameter
+- `trading/trading/backtest/test/dune` — add `test_trace` to test suite
+- `trading/trading/backtest/test/test_trace.ml` — 10 new unit tests (170 lines)
+
+No files outside `dev/` and `trading/trading/backtest/` were modified.
+
+### Hard gates
+
+- `dune build @fmt`: exit 0 (PASS)
+- `dune build`: exit 0 (PASS)
+- `dune runtest`: exit 0 (PASS)
+
+Note: the nesting_linter emits `FAIL:` advisory text for 49 functions in `analysis/scripts/universe_filter/` and `analysis/scripts/fetch_finviz_sectors/` — identical output confirmed on `origin/main`. The linter binary exits 0 regardless of advisory text (pre-existing baseline, not introduced by this PR). No new violations appear: `trace.ml` and `runner.ml` are not listed in the nesting_linter output.
+
+Test count from targeted run (`dune runtest trading/backtest/test/`): 10 tests in `test_trace.exe` (PASS), 3 tests in `test_runner_filter.exe` (PASS), 6 tests in `test_stop_log.exe` (PASS). All 19 backtest tests green.
+
+### Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | Exit 0. |
+| H2 | dune build | PASS | Exit 0. |
+| H3 | dune runtest | PASS | Exit 0. 19 backtest tests pass. Pre-existing nesting_linter advisory text (49 violations in analysis/scripts/) is identical to main@origin — not introduced by this PR. |
+| P1 | Functions ≤ 50 lines (fn_length_linter) | PASS | fn_length_linter reports "OK: no functions exceed 50 lines" for both `trace.ml` and `runner.ml`. H3 also passes the fn_length_linter dune rule. |
+| P2 | No magic numbers (linter_magic_numbers.sh) | PASS | linter_magic_numbers.sh reports clean for all lib/*.ml. Two numeric literals in trace.ml (`1024` on a `->` line, `1_000_000` on a `->` line) are both skipped by the linter's `->` rule and are unit-conversion constants (kB→MB, ns→ms), not tunable thresholds. |
+| P3 | All configurable thresholds/periods/weights in config record | NA | Trace module has no tunable parameters — it is pure instrumentation plumbing. No thresholds, periods, or weights introduced. |
+| P4 | .mli files cover all public symbols (linter_mli_coverage.sh) | PASS | `trace.mli` exports all public symbols: `Phase.t`, `Phase.to_string`, `phase_metrics`, `t`, `create`, `record`, `snapshot`, `write`. linter_mli_coverage.sh reports clean. |
+| P5 | Internal helpers prefixed with _ | PASS | All module-internal helpers in `trace.ml` are underscore-prefixed: `_parse_vmhwm_line`, `_scan_for_vmhwm`, `_status_path`, `_status_file_readable`, `_read_peak_rss_mb`, `_now_ms`, `_append_entry`, `_ensure_parent_dir`. Public API (`create`, `record`, `snapshot`, `write`) correctly lacks underscores and is fully exported in `.mli`. No violations. |
+| P6 | Tests use the matchers library (per CLAUDE.md) | PASS | `test_trace.ml` opens `Matchers` and uses `assert_that`, `equal_to`, `elements_are`, `all_of`, `field`, `size_is`, `ge (module Int_ord)` throughout. One `assert_failure` on an unmatched list pattern (line 122) is a valid OUnit2 error path, not an alternative assertion form — correct use. No `assert_bool` or `assert_equal` calls. |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | No files in `trading/trading/portfolio/`, `orders/`, `position/`, `strategy/`, or `engine/` were modified. |
+| A2 | No imports from analysis/ into trading/trading/ | PASS | `trace.ml` and `runner.ml` open only `Core` and `Trading_simulation`. The backtest `dune` library file has no analysis/ dependency. No `analysis/` imports added. |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | All OCaml changes are in `trading/trading/backtest/lib/` and `trading/trading/backtest/test/`. No modifications to modules outside the backtest feature boundary. |
+
+## Verdict
+
+APPROVED
+
+All structural checks pass. The Trace module is well-factored: public API is minimal (4 functions), internal helpers are properly prefixed, full `.mli` coverage, no magic numbers, all functions within the 50-line limit per the AST-based linter. The `?trace` threading in `runner.ml` is clean optional-parameter plumbing. 10 unit tests cover the full `Trace` API including sexp round-trip and `write` + mkdir-p. No core module modifications, no architecture boundary violations.
+
+---
+
+## Prior Review History (SHA e59f8d2 — PR #399, small-universe slice)
+
+The content below is the complete review history for PR #399 (`feat/backtest-scenario-small-universe`), which was the prior approved slice of the backtest-infra feature. It is preserved here for traceability. The active QC context is the structural review above (PR #419, SHA cc4edca6).
+
+---
 
 ## Structural Checklist — Initial Review (NEEDS_REWORK)
 
@@ -131,9 +195,7 @@ One FAIL (U6) blocks APPROVED per mechanical derivation. One FLAG (BC4) is advis
 - **Authority:** `dev/plans/backtest-scale-optimization-2026-04-17.md` §Step 1, bullet: "A handful of known historical cases (NVDA 2019, MSFT 2020, PYPL 2021, etc.) the backtest should exercise."
 - **Required fix:**
   1. Add `"PYPL"` and `"WFC"` to `pick.ml` `_known_cases` list. (The README already documents them; align the code with the README.)
-  2. Add the corresponding entries to the committed `small.sexp`:
-     - `((symbol PYPL) (sector Financials))` — noting PYPL is classified as Financials in SSGA's holdings (payment-processor)
-     - `((symbol WFC) (sector Financials))` — already trivially addable; Financials sector currently has 32 symbols, adding WFC is in-spec.
+  2. Add the corresponding entries to the committed `small.sexp`.
   3. Update the sector-count comment block at the top of `small.sexp` (line 19-31) to reflect the new total.
   4. If adding PYPL bumps a sector's count past 36 and the author prefers a strict cap, drop a less-load-bearing ticker to preserve the 300 target — but the plan says "~300" (bullet 3 of §Step 1), so 302 is fine.
 - **harness_gap:** `LINTER_CANDIDATE` — a golden-scenario-style fixture test could encode "small.sexp must contain every symbol in `pick.ml`'s `_known_cases`" as a deterministic check. Today `test_committed_universes_parse` (test_universe_file.ml:109-138) only verifies sector-count floor and symbol-count floor; it does not verify known-case coverage. Adding a cross-check (parse `pick.ml`'s `_known_cases` or hoist it into a shared module referenced by both script and test) would catch future omissions mechanically.
@@ -377,7 +439,7 @@ Re-review of PR #399 at rebased tip `e59f8d2` after two prior NEEDS_REWORK cycle
 | T4 | Tests assert domain outcomes | PASS | `test_weinstein_strategy.ml` `_held_symbols` tests (lines 487-517) assert the exact keep/drop decision: mixed-state portfolio returns `["AAPL"; "MSFT"; "GOOG"]` (Entering+Holding+Exiting) and drops "ZZZZ" (Closed); all-Closed portfolio returns `[]`. Not a "no error" assertion — the actual returned list is verified. |
 | U1 | Sector balance ≥10 symbols across each of 11 GICS sectors | PASS | Unchanged from prior review: 302 symbols committed; minimum sector count 20 (well above ≥10 floor). IT 37, Financials 33 (both bumped from the PYPL/WFC addition); other nine sectors unchanged. |
 | U2 | Sector tag present per-symbol in sexp format | PASS | Unchanged. Every entry in `small.sexp` has `((symbol <sym>) (sector <gics>))` form. |
-| U3 | ~300 pinned symbols target | PASS | 302 entries verified (`grep -c "^  ((symbol"` on the `small.sexp` file). Plan says "~300" — 302 is in-spec. |
+| U3 | ~300 pinned symbols target | PASS | 302 entries verified. Plan says "~300" — 302 is in-spec. |
 | U4 | Stage diversity via 2018-2023 cache sample | PASS | S&P-500-quality large-cap universe spanning six-year window that includes COVID-crash 2020 (Stage 4 across the board), 2021 rally (Stage 2→3), 2022 bear (Stage 4), 2023 rebuild (Stage 1→2). Temporal diversity satisfies plan's stage-coverage requirement. |
 | U5 | Liquidity floor (>$500M cap, >500k avg volume) | PASS (approximate) | All 302 names are S&P-500-equivalent large-caps; no microcaps or OTC tickers. Cap/volume data not filter-enforced deterministically but README.md flags this as a known limitation. |
 | **U6** | Known historical cases (NVDA 2019, MSFT 2020, PYPL 2021) | **PASS** | **Re-confirmed.** PYPL at `small.sexp:265` (Information Technology), WFC at `small.sexp:166` (Financials). Both in `pick.ml` `_known_cases` (WFC:53, PYPL:55). Script and fixture agree — a rerun of `pick.ml` would not drop them. |
@@ -407,4 +469,3 @@ Both prior NEEDS_REWORK blockers (U6 at 005a514, F1 at 8ccc8c8) are resolved; th
 overall_qc: **APPROVED**
 structural_qc: APPROVED (SHA e59f8d2)
 behavioral_qc: APPROVED (SHA e59f8d2)
-
