@@ -111,6 +111,16 @@ val default_config : universe:string list -> index_symbol:string -> config
 val name : string
 (** Strategy name, always ["Weinstein"]. *)
 
+val held_symbols : Trading_strategy.Portfolio_view.t -> string list
+(** Ticker symbols of positions the strategy is still holding (or still trying
+    to enter/exit). Closed positions are excluded — the strategy has no stake in
+    them and must be free to re-enter the symbol.
+
+    Used internally to (a) filter screener candidates and (b) populate
+    [held_tickers] passed to [Screener.screen]. Public because the result is a
+    natural query on strategy state and the behaviour (exclude [Closed]) is
+    worth pinning by direct unit test. *)
+
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->
