@@ -190,21 +190,36 @@ jobs:
             in_section { print }
           ' "$SUMMARY")"
 
-          # Gate only on lines tagged [critical]. The summary template uses
-          # severity tags — [critical], [medium], [info] — so "gate iff the
-          # author tagged it critical" is the cleanest contract. [medium]
-          # and [info] items surface for visibility without failing the run.
+          # Gate only on top-level bullets tagged [critical]. The summary
+          # template uses severity tags — [critical], [medium], [info] — so
+          # "gate iff the author tagged a top-level escalation critical" is
+          # the cleanest contract. [medium] and [info] items surface for
+          # visibility without failing the run.
           #
           # Prior pattern matched any `- ` bullet and caught sub-bullets of
           # medium items (e.g. "- (a) Reword the comment" under a [medium]
           # linter-fix suggestion), failing the job on cosmetic notes.
+          #
+          # Next iteration moved to grep -Ei '\[critical\]' — but that
+          # matches the literal string anywhere in the Escalations section,
+          # including inside prose describing mitigations (e.g. "cross-check
+          # `[critical]` claims against dune build @runtest" in a [medium]
+          # bullet, which failed run 24606800779 on 2026-04-18 despite zero
+          # actual critical items).
+          #
+          # Current pattern anchors to a top-level bullet start:
+          #   ^-[[:space:]]+(\*\*)?\[critical\]
+          # matches `- [critical] ...` and `- **[critical] ...`, which is
+          # how the summary template formats escalation bullets. Sub-bullets
+          # (indented) and prose containing the literal token `[critical]`
+          # are correctly ignored.
           #
           # Positive `[critical]` match means an untagged escalation does
           # NOT gate. That's intentional: tags are a contract, and forcing
           # authors to tag encourages them to think about severity. If an
           # escalation genuinely warrants gating, tag it.
           escalations="$(printf '%s\n' "$section" \
-            | grep -Ei '\[critical\]' \
+            | grep -E '^-[[:space:]]+(\*\*)?\[critical\]' \
             || true)"
 
           if [ -n "$escalations" ]; then
