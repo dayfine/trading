@@ -3,6 +3,11 @@ open Core
 open Matchers
 module Universe_file = Scenario_lib.Universe_file
 
+let when_pinned inner =
+  matching ~msg:"expected Pinned"
+    (function Universe_file.Pinned xs -> Some xs | _ -> None)
+    inner
+
 let test_pinned_parses _ =
   let sexp =
     Sexp.of_string
@@ -12,32 +17,25 @@ let test_pinned_parses _ =
       ((symbol JPM)  (sector Financials))))
   |}
   in
-  let uf = Universe_file.t_of_sexp sexp in
-  match uf with
-  | Universe_file.Full_sector_map -> assert_failure "expected Pinned"
-  | Pinned entries ->
-      assert_that entries
-        (elements_are
-           [
-             all_of
-               [
-                 field (fun e -> e.Universe_file.symbol) (equal_to "AAPL");
-                 field
-                   (fun e -> e.Universe_file.sector)
-                   (equal_to "Information Technology");
-               ];
-             all_of
-               [
-                 field (fun e -> e.Universe_file.symbol) (equal_to "JPM");
-                 field (fun e -> e.Universe_file.sector) (equal_to "Financials");
-               ];
-           ])
+  assert_that
+    (Universe_file.t_of_sexp sexp)
+    (when_pinned
+       (elements_are
+          [
+            equal_to
+              ({ symbol = "AAPL"; sector = "Information Technology" }
+                : Universe_file.pinned_entry);
+            equal_to
+              ({ symbol = "JPM"; sector = "Financials" }
+                : Universe_file.pinned_entry);
+          ]))
 
 let test_full_sector_map_parses _ =
-  let uf = Universe_file.t_of_sexp (Sexp.of_string "Full_sector_map") in
-  match uf with
-  | Universe_file.Full_sector_map -> ()
-  | Pinned _ -> assert_failure "expected Full_sector_map"
+  assert_that
+    (Universe_file.t_of_sexp (Sexp.of_string "Full_sector_map"))
+    (matching ~msg:"expected Full_sector_map"
+       (function Universe_file.Full_sector_map -> Some () | _ -> None)
+       (equal_to ()))
 
 let test_roundtrip_pinned _ =
   let original =
@@ -47,14 +45,18 @@ let test_roundtrip_pinned _ =
         { symbol = "JPM"; sector = "Financials" };
       ]
   in
-  let roundtripped =
-    Universe_file.t_of_sexp (Universe_file.sexp_of_t original)
-  in
-  match roundtripped with
-  | Pinned entries ->
-      assert_that (List.length entries) (equal_to 2);
-      assert_that (List.hd_exn entries).symbol (equal_to "AAPL")
-  | Full_sector_map -> assert_failure "expected Pinned after roundtrip"
+  assert_that
+    (Universe_file.t_of_sexp (Universe_file.sexp_of_t original))
+    (when_pinned
+       (elements_are
+          [
+            equal_to
+              ({ symbol = "AAPL"; sector = "Information Technology" }
+                : Universe_file.pinned_entry);
+            equal_to
+              ({ symbol = "JPM"; sector = "Financials" }
+                : Universe_file.pinned_entry);
+          ]))
 
 let test_symbol_count _ =
   let pinned =
@@ -85,36 +87,32 @@ let _universes_root () =
   in
   walk_up (Stdlib.Sys.getcwd ()) 10
 
+let _distinct_sector_count entries =
+  List.map entries ~f:(fun e -> e.Universe_file.sector)
+  |> List.dedup_and_sort ~compare:String.compare
+  |> List.length
+
 let test_committed_universes_parse _ =
   match _universes_root () with
   | None ->
       assert_failure
         (sprintf "universes/ dir not found from cwd=%s" (Stdlib.Sys.getcwd ()))
-  | Some root -> (
-      let small = Universe_file.load (Filename.concat root "small.sexp") in
-      let broad = Universe_file.load (Filename.concat root "broad.sexp") in
-      (* Small universe: at least 100 symbols, spanning multiple sectors. *)
-      (match small with
-      | Pinned entries ->
-          assert_bool
-            (sprintf
-               "small universe too small: %d (want >= 100 for sector diversity)"
-               (List.length entries))
-            (List.length entries >= 100);
-          let sectors =
-            List.map entries ~f:(fun e -> e.Universe_file.sector)
-            |> List.dedup_and_sort ~compare:String.compare
-          in
-          assert_bool
-            (sprintf "small universe has only %d distinct sectors"
-               (List.length sectors))
-            (List.length sectors >= 8)
-      | Full_sector_map ->
-          assert_failure "small.sexp should be Pinned, not Full_sector_map");
+  | Some root ->
+      (* Small universe: at least 100 symbols, spanning ≥8 sectors. *)
+      assert_that
+        (Universe_file.load (Filename.concat root "small.sexp"))
+        (when_pinned
+           (all_of
+              [
+                field List.length (ge (module Int_ord) 100);
+                field _distinct_sector_count (ge (module Int_ord) 8);
+              ]));
       (* Broad universe: the sentinel. *)
-      match broad with
-      | Full_sector_map -> ()
-      | Pinned _ -> assert_failure "broad.sexp should be Full_sector_map")
+      assert_that
+        (Universe_file.load (Filename.concat root "broad.sexp"))
+        (matching ~msg:"expected Full_sector_map"
+           (function Universe_file.Full_sector_map -> Some () | _ -> None)
+           (equal_to ()))
 
 let suite =
   "Universe_file"
