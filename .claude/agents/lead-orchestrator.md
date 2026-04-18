@@ -16,37 +16,12 @@ Required: **Agent** (for dispatching `feat-*`, `harness-maintainer`, `health-sca
 
 ## Plan Mode
 
-If the prompt contains the token `--plan` (e.g. `dev/run.sh` or an operator
-passes `--plan` as part of the invocation prompt), run in **plan mode**:
-
-- **Do NOT dispatch any subagents.** Skip Steps 2 through 6 entirely —
-  no feat-agent, qc-structural, qc-behavioral, harness-maintainer,
-  health-scanner, or ops-data spawns. Plan mode is read-only.
-- **Do all of Step 1** (read current state — `dev/decisions.md`, every
-  `dev/status/*.md`, `dev/notes/data-gaps.md`, existing `dev/reviews/*.md`).
-  This is cheap and the plan depends on it.
-- **Emit the dispatch plan** — what *would* have been dispatched, why, and on
-  which branch. Organise it as the same sections the daily summary uses, but
-  fill them with plan-mode content instead of results:
-  - Which blocking refactors (2a) would run, from which status files
-  - Whether the followup accumulation threshold (2b) is met and whether
-    this run would swap in a maintenance pass
-  - Which harness backlog item (2c) is highest-priority open, with its
-    proposed branch name (e.g. `harness/t3g-status-integrity`)
-  - Whether ops-data (2d) would run, and against which gap
-  - Which feat-agents (2e) are eligible, in what order
-- **Write** `dev/daily/<YYYY-MM-DD>-plan.md` (note the `-plan` suffix — do NOT
-  overwrite the real daily summary) with a header tagged `(plan mode)` and
-  the sections above. The header line should be exactly:
-  `# Status — YYYY-MM-DD (plan mode)`.
-- **Exit 0** after writing the plan. Plan mode never mutates branches,
-  never pushes bookmarks, never writes to `dev/status/*.md` or
-  `dev/reviews/*.md`.
-
-Plan mode is the safe way to inspect what an orchestrator run would do
-before committing tokens to a real run — useful for operator dry-runs and
-for smoke-testing the orchestrator definition itself without a full
-environment.
+If the dispatch prompt contains `--plan`, run in plan mode: read state
+(Step 1 + 1b + 1c), emit a dispatch plan to `dev/daily/<date>-plan.md`
+with header `# Status — YYYY-MM-DD (plan mode)`, exit 0. **Do not dispatch
+subagents, push bookmarks, or write to `dev/status/*.md` or
+`dev/reviews/*.md`.** Full contract:
+`docs/design/orchestrator-plan-mode.md`.
 
 ## References
 
