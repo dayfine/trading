@@ -1,7 +1,13 @@
 (** Scenario runner — runs one or more backtest scenarios and compares actual
     metrics against the [expected] ranges declared in each scenario file.
 
-    Usage: scenario_runner [--goldens | --smoke | --dir <path>] [--parallel N]
+    Usage: scenario_runner
+    [--goldens-small | --goldens-broad | --goldens | --smoke | --dir <path>]
+    [--parallel N]
+
+    [--goldens-small] — small-universe goldens (~300 symbols; local-friendly).
+    [--goldens-broad] — broad-universe goldens (full sector-map; nightly/GHA).
+    [--goldens] — alias for [--goldens-small] for backwards compat.
 
     Reads all *.sexp files from the selected directory, runs each via
     {!Backtest.Runner.run_backtest}, prints a pass/fail table, and writes
@@ -96,8 +102,11 @@ let _format_row (s : Scenario.t) (a : actual) checks =
 let _repo_root () =
   Data_path.default_data_dir () |> Fpath.parent |> Fpath.to_string
 
-let _goldens_dir () =
-  _repo_root () ^ "trading/test_data/backtest_scenarios/goldens"
+let _goldens_small_dir () =
+  _repo_root () ^ "trading/test_data/backtest_scenarios/goldens-small"
+
+let _goldens_broad_dir () =
+  _repo_root () ^ "trading/test_data/backtest_scenarios/goldens-broad"
 
 let _smoke_dir () = _repo_root () ^ "trading/test_data/backtest_scenarios/smoke"
 
@@ -216,16 +225,21 @@ let _default_parallel = 4
 
 let _usage () =
   eprintf
-    "Usage: scenario_runner [--goldens | --smoke | --dir <path>] [--parallel N]\n";
+    "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
+     --smoke | --dir <path>] [--parallel N]\n";
   Stdlib.exit 1
 
 let _parse_flag args =
   let rec loop args dir parallel =
     match args with
     | [] ->
-        let dir = Option.value dir ~default:(_goldens_dir ()) in
+        let dir = Option.value dir ~default:(_goldens_small_dir ()) in
         { dir; parallel = Option.value parallel ~default:_default_parallel }
-    | "--goldens" :: rest -> loop rest (Some (_goldens_dir ())) parallel
+    | "--goldens-small" :: rest ->
+        loop rest (Some (_goldens_small_dir ())) parallel
+    | "--goldens-broad" :: rest ->
+        loop rest (Some (_goldens_broad_dir ())) parallel
+    | "--goldens" :: rest -> loop rest (Some (_goldens_small_dir ())) parallel
     | "--smoke" :: rest -> loop rest (Some (_smoke_dir ())) parallel
     | "--dir" :: path :: rest -> loop rest (Some path) parallel
     | "--parallel" :: n :: rest -> loop rest dir (Some (Int.of_string n))

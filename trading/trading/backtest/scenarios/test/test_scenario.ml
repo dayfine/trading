@@ -106,10 +106,12 @@ let test_all_scenario_files_parse _ =
         |> List.map ~f:(fun f -> Filename.concat dir f)
       in
       let files =
-        collect (Filename.concat root "goldens")
+        collect (Filename.concat root "goldens-small")
+        @ collect (Filename.concat root "goldens-broad")
         @ collect (Filename.concat root "smoke")
       in
-      (* Sanity: at least the three smokes and three goldens should be there. *)
+      (* Sanity: at least the three smokes + three goldens-small + some
+         goldens-broad should be there. *)
       assert_bool
         (sprintf "expected >=6 scenario files, found %d in %s"
            (List.length files) root)
@@ -141,6 +143,44 @@ let test_near_zero_range_accepts_zero _ =
   assert_that (Scenario.in_range r 0.0) (equal_to true);
   assert_that (Scenario.in_range r 5000.0) (equal_to false)
 
+(* A scenario sexp that omits [universe_path] should receive the default,
+   preserving backward compatibility with pre-migration scenario files. *)
+let test_universe_path_absent_uses_default _ =
+  let s =
+    Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
+  in
+  assert_that s.universe_path (equal_to Scenario.default_universe_path)
+
+let _make_sexp_with_universe ~universe_path =
+  sprintf
+    {|
+  ((name "test-scenario")
+   (description "Unit-test fixture")
+   (period ((start_date 2023-01-02) (end_date 2023-12-31)))
+   (universe_path %S)
+   (config_overrides ())
+   (expected
+    (%s)))
+  |}
+    universe_path _base_expected_fields
+
+let test_universe_path_present _ =
+  let s =
+    Scenario.t_of_sexp
+      (Sexp.of_string
+         (_make_sexp_with_universe ~universe_path:"universes/broad.sexp"))
+  in
+  assert_that s.universe_path (equal_to "universes/broad.sexp")
+
+let test_universe_path_roundtrip _ =
+  let original =
+    Scenario.t_of_sexp
+      (Sexp.of_string
+         (_make_sexp_with_universe ~universe_path:"universes/custom.sexp"))
+  in
+  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
+  assert_that roundtripped.universe_path (equal_to "universes/custom.sexp")
+
 let suite =
   "Scenario"
   >::: [
@@ -150,6 +190,10 @@ let suite =
          "unrealized_pnl sexp round-trips" >:: test_unrealized_pnl_roundtrip;
          "non-zero range rejects zero" >:: test_non_zero_range_rejects_zero;
          "near-zero range accepts zero" >:: test_near_zero_range_accepts_zero;
+         "universe_path absent => default"
+         >:: test_universe_path_absent_uses_default;
+         "universe_path present => round-trips" >:: test_universe_path_present;
+         "universe_path sexp round-trips" >:: test_universe_path_roundtrip;
          "all scenario files parse" >:: test_all_scenario_files_parse;
        ]
 
