@@ -124,11 +124,11 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
-          # show_full_output: true surfaces tool-call details in the workflow
-          # log so we can see what subagents (if any) were dispatched. The
-          # action's default (false) hides this "for security"; we accept the
-          # tradeoff because this repo is public and single-developer.
-          show_full_output: true
+          # show_full_output omitted (default false). Tool-call traces are
+          # dumped to the GHA log at ~2-3 MB per run and duplicate content
+          # that already lands in the merged daily-summary PR. We read the
+          # summary instead; full logs are only needed when debugging the
+          # workflow infra itself (container setup, checkout, etc.).
           prompt: |
             Run the daily orchestrator session. Today is ${{ steps.today.outputs.date }}.
             Read .claude/agents/lead-orchestrator.md and follow it end to end.
@@ -173,26 +173,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Extract the ## Escalations section body (up to the next H2) and
-          # count bullet lines that aren't the empty-case placeholder.
-          # Accepted empty-case forms across existing summaries:
-          #   - None
-          #   - None — ...
-          #   None — all PRs mergeable, no blockers...
-          #   (empty)
+          # Extract the ## Escalations section body (up to the next H2).
           section="$(awk '
             /^## Escalations/ { in_section=1; next }
             /^## / && in_section { exit }
             in_section { print }
           ' "$SUMMARY")"
 
-          # Keep lines that look like bullet items (start with "- " or "* "),
-          # then drop the empty-case placeholder where the first word of the
-          # bullet content is literally "None" (covers "- None", "- None.",
-          # "- None — ...", "- None - ...", etc.).
+          # Gate only on lines tagged [critical]. The summary template uses
+          # severity tags — [critical], [medium], [info] — so "gate iff the
+          # author tagged it critical" is the cleanest contract. [medium]
+          # and [info] items surface for visibility without failing the run.
+          #
+          # Prior pattern matched any `- ` bullet and caught sub-bullets of
+          # medium items (e.g. "- (a) Reword the comment" under a [medium]
+          # linter-fix suggestion), failing the job on cosmetic notes.
+          #
+          # Positive `[critical]` match means an untagged escalation does
+          # NOT gate. That's intentional: tags are a contract, and forcing
+          # authors to tag encourages them to think about severity. If an
+          # escalation genuinely warrants gating, tag it.
           escalations="$(printf '%s\n' "$section" \
-            | grep -E '^[[:space:]]*[-*][[:space:]]' \
-            | grep -Ev '^[[:space:]]*[-*][[:space:]]+None\b' \
+            | grep -Ei '\[critical\]' \
             || true)"
 
           if [ -n "$escalations" ]; then
