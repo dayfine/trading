@@ -164,40 +164,97 @@ let fetch_one ~fetch ~rate_limit_rps symbol =
 
 (* --- Orchestration ------------------------------------------------------- *)
 
+let _resolve_symbols data_dir symbols =
+  match symbols with
+  | Some s -> return s
+  | None -> (
+      Universe.get_deferred data_dir >>| fun result ->
+      match result with
+      | Error e ->
+          eprintf "Error loading universe: %s\n%!" (Status.show e);
+          []
+      | Ok instruments -> filter_common_stocks instruments)
+
+let _select_to_fetch ~force ~limit ~existing sym_list =
+  let filtered =
+    if force then sym_list
+    else List.filter sym_list ~f:(fun sym -> not (Hashtbl.mem existing sym))
+  in
+  match limit with Some n when n > 0 -> List.take filtered n | _ -> filtered
+
+(* Flush the current state of [existing] to CSV and write a manifest.
+   Prints a confirmation line when [~final:true]. *)
+let _write_checkpoint ~data_dir ~rate_limit_rps ~errors ~existing ~final () =
+  let csv_path = _sectors_csv_path data_dir in
+  let manifest_file = _manifest_path data_dir in
+  let rows =
+    Hashtbl.to_alist existing
+    |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+  in
+  (match write_sectors_csv ~data_dir rows with
+  | Ok () ->
+      if final then printf "Wrote %d rows to %s\n%!" (List.length rows) csv_path
+  | Error e -> eprintf "ERROR writing CSV: %s\n%!" e);
+  let m =
+    {
+      fetched_at = Time_float_unix.to_string_utc (Time_float_unix.now ());
+      source = "finviz";
+      row_count = List.length rows;
+      rate_limit_rps;
+      errors = List.rev !errors;
+    }
+  in
+  save_manifest manifest_file m
+
+(* Fetch all [to_fetch] symbols sequentially, updating [existing] and
+   [errors]/[success_count] in place; checkpoint every 100 symbols. *)
+let _fetch_all ~fetch ~rate_limit_rps ~data_dir ~existing ~errors ~success_count
+    to_fetch =
+  let total = List.length to_fetch in
+  let checkpoint_interval = 100 in
+  Deferred.List.map ~how:`Sequential to_fetch ~f:(fun sym ->
+      fetch_one ~fetch ~rate_limit_rps sym >>| fun r ->
+      let idx = !success_count + List.length !errors + 1 in
+      (match r.sector with
+      | Some sector ->
+          Hashtbl.set existing ~key:r.symbol ~data:sector;
+          Int.incr success_count;
+          printf "  [%d/%d] %s → %s\n%!" idx total sym sector
+      | None ->
+          errors := r.symbol :: !errors;
+          let msg = Option.value r.error ~default:"unknown error" in
+          eprintf "  [%d/%d] %s → WARN: %s\n%!" idx total sym msg);
+      if idx % checkpoint_interval = 0 then
+        _write_checkpoint ~data_dir ~rate_limit_rps ~errors ~existing
+          ~final:false ();
+      r)
+
+let _log_summary ~total ~success_count ~errors ~existing =
+  let err_count = List.length !errors in
+  let ok_count = !success_count in
+  let success_pct =
+    if total > 0 then Float.of_int ok_count /. Float.of_int total *. 100.0
+    else 100.0
+  in
+  printf "Done: %d/%d fetched (%.1f%%), %d errors, %d total rows.\n%!" ok_count
+    total success_pct err_count (Hashtbl.length existing);
+  if Float.( < ) success_pct 80.0 then
+    eprintf "WARNING: Success rate %.1f%% is below 80%% threshold.\n%!"
+      success_pct
+
 let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols
     ?limit () =
-  let%bind sym_list =
-    match symbols with
-    | Some s -> return s
-    | None -> (
-        Universe.get_deferred data_dir >>| fun result ->
-        match result with
-        | Error e ->
-            eprintf "Error loading universe: %s\n%!" (Status.show e);
-            []
-        | Ok instruments -> filter_common_stocks instruments)
-  in
+  let%bind sym_list = _resolve_symbols data_dir symbols in
   if List.is_empty sym_list then (
     eprintf "No symbols to fetch.\n%!";
     return ())
   else
-    let csv_path = _sectors_csv_path data_dir in
-    let manifest_file = _manifest_path data_dir in
-    let existing = load_existing_sectors csv_path in
-    (* The CSV is authoritative: always skip symbols that already have a
-       sector row, unless --force. Manifest age is informational, not a
-       gate on resume — a stale manifest with a valid CSV still means
-       the sectors we scraped before are still usable. *)
-    let to_fetch =
-      let filtered =
-        if force then sym_list
-        else List.filter sym_list ~f:(fun sym -> not (Hashtbl.mem existing sym))
-      in
-      match limit with
-      | Some n when n > 0 -> List.take filtered n
-      | _ -> filtered
-    in
-    (match load_manifest manifest_file with
+    let existing = load_existing_sectors (_sectors_csv_path data_dir) in
+    let to_fetch = _select_to_fetch ~force ~limit ~existing sym_list in
+    (* The CSV is authoritative: skip symbols already cached, unless --force.
+       Manifest age is informational only — a stale manifest with a valid CSV
+       still means existing rows are usable. *)
+    (match load_manifest (_manifest_path data_dir) with
     | Some m when not (manifest_is_fresh m ~max_age_days:30) ->
         printf
           "Note: manifest is older than 30 days (fetched_at=%s). Existing rows \
@@ -213,56 +270,12 @@ let run ~data_dir ~rate_limit_rps ~force ?(fetch = _default_fetch) ?symbols
     else
       let errors = ref [] in
       let success_count = ref 0 in
-      let total = List.length to_fetch in
-      let checkpoint_interval = 100 in
-      let write_checkpoint ~final () =
-        let rows =
-          Hashtbl.to_alist existing
-          |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
-        in
-        (match write_sectors_csv ~data_dir rows with
-        | Ok () ->
-            if final then
-              printf "Wrote %d rows to %s\n%!" (List.length rows) csv_path
-        | Error e -> eprintf "ERROR writing CSV: %s\n%!" e);
-        let m =
-          {
-            fetched_at = Time_float_unix.to_string_utc (Time_float_unix.now ());
-            source = "finviz";
-            row_count = List.length rows;
-            rate_limit_rps;
-            errors = List.rev !errors;
-          }
-        in
-        save_manifest manifest_file m
-      in
       let%bind _results =
-        Deferred.List.map ~how:`Sequential to_fetch ~f:(fun sym ->
-            fetch_one ~fetch ~rate_limit_rps sym >>| fun r ->
-            let idx = !success_count + List.length !errors + 1 in
-            (match r.sector with
-            | Some sector ->
-                Hashtbl.set existing ~key:r.symbol ~data:sector;
-                Int.incr success_count;
-                printf "  [%d/%d] %s → %s\n%!" idx total sym sector
-            | None ->
-                errors := r.symbol :: !errors;
-                let msg = Option.value r.error ~default:"unknown error" in
-                eprintf "  [%d/%d] %s → WARN: %s\n%!" idx total sym msg);
-            if idx % checkpoint_interval = 0 then
-              write_checkpoint ~final:false ();
-            r)
+        _fetch_all ~fetch ~rate_limit_rps ~data_dir ~existing ~errors
+          ~success_count to_fetch
       in
-      write_checkpoint ~final:true ();
-      let err_count = List.length !errors in
-      let ok_count = !success_count in
-      let success_pct =
-        if total > 0 then Float.of_int ok_count /. Float.of_int total *. 100.0
-        else 100.0
-      in
-      printf "Done: %d/%d fetched (%.1f%%), %d errors, %d total rows.\n%!"
-        ok_count total success_pct err_count (Hashtbl.length existing);
-      if Float.( < ) success_pct 80.0 then
-        eprintf "WARNING: Success rate %.1f%% is below 80%% threshold.\n%!"
-          success_pct;
+      _write_checkpoint ~data_dir ~rate_limit_rps ~errors ~existing ~final:true
+        ();
+      _log_summary ~total:(List.length to_fetch) ~success_count ~errors
+        ~existing;
       return ()
