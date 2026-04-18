@@ -34,27 +34,27 @@ module Phase : sig
     | Fill
     | Teardown
   [@@deriving show, eq, sexp]
-
-  val to_string : t -> string
-  (** Short lowercase_snake name, suitable for filenames or log prefixes. *)
 end
 
 type phase_metrics = {
   phase : Phase.t;
   elapsed_ms : int;  (** Wall-clock elapsed, milliseconds. *)
-  symbols_in : int;
-      (** Symbol count entering the phase (e.g. universe size). Use 0 if N/A. *)
-  symbols_out : int;
-      (** Symbol count surviving the phase (e.g. screener hits). Use 0 if N/A.
-      *)
+  symbols_in : int option;
+      (** Symbol count entering the phase (e.g. universe size). [None] means the
+          caller did not measure this dimension for this phase — distinct from
+          [Some 0] (measured zero). *)
+  symbols_out : int option;
+      (** Symbol count surviving the phase (e.g. screener hits). [None] vs
+          [Some 0] semantics as for [symbols_in]. *)
   peak_rss_mb : int option;
       (** Best-effort peak resident set size in MB, read from
           [/proc/self/status] after the phase. [None] on platforms that don't
           expose it or when reading fails. *)
-  bar_loads : int;
-      (** Number of per-symbol bar loads attributed to this phase. Use 0 if N/A.
-          Exists primarily to distinguish cheap summary probes from full-history
-          loads once step 3 (tier-aware loader) lands. *)
+  bar_loads : int option;
+      (** Number of per-symbol bar loads attributed to this phase. [None] if the
+          phase doesn't load bars. Exists primarily to distinguish cheap summary
+          probes from full-history loads once step 3 (tier-aware loader) lands.
+      *)
 }
 [@@deriving show, eq, sexp]
 (** A single phase measurement. Emitted once per [record] call. *)
@@ -62,7 +62,9 @@ type phase_metrics = {
 (** {1 Collector} *)
 
 type t
-(** Mutable collector of phase metrics. One per backtest run. *)
+(** Mutable collector of phase metrics. One per backtest run. Not safe to share
+    across threads — the single-threaded backtest runner is the only expected
+    caller. *)
 
 val create : unit -> t
 (** Create a fresh collector with no recorded phases. *)
@@ -77,8 +79,8 @@ val record :
   'a
 (** [record ?trace phase f] runs [f ()] and, if [trace] is [Some _], appends a
     [phase_metrics] row with measured [elapsed_ms] and [peak_rss_mb]. The
-    optional [?symbols_in], [?symbols_out], [?bar_loads] are passed through
-    verbatim (default 0).
+    optional [?symbols_in], [?symbols_out], [?bar_loads] are stored as
+    [Some n] when passed and [None] when omitted.
 
     The [f ()] return value is always passed through, even when [trace] is
     [None] — so the caller can wrap any block unconditionally. *)

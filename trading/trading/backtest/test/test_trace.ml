@@ -2,15 +2,6 @@ open OUnit2
 open Core
 open Matchers
 
-let test_phase_to_string_stable _ =
-  assert_that
-    (Backtest.Trace.Phase.to_string Load_universe)
-    (equal_to "load_universe");
-  assert_that
-    (Backtest.Trace.Phase.to_string Stage_classify)
-    (equal_to "stage_classify");
-  assert_that (Backtest.Trace.Phase.to_string Teardown) (equal_to "teardown")
-
 let test_phase_sexp_round_trip _ =
   let all_phases : Backtest.Trace.Phase.t list =
     [
@@ -63,13 +54,13 @@ let test_record_appends_entry _ =
                (equal_to Backtest.Trace.Phase.Screener);
              field
                (fun (m : Backtest.Trace.phase_metrics) -> m.symbols_in)
-               (equal_to 100);
+               (equal_to (Some 100));
              field
                (fun (m : Backtest.Trace.phase_metrics) -> m.symbols_out)
-               (equal_to 20);
+               (equal_to (Some 20));
              field
                (fun (m : Backtest.Trace.phase_metrics) -> m.bar_loads)
-               (equal_to 5);
+               (equal_to (Some 5));
              field
                (fun (m : Backtest.Trace.phase_metrics) -> m.elapsed_ms)
                (ge (module Int_ord) 0);
@@ -116,11 +107,14 @@ let test_record_measures_elapsed _ =
           ()
         done)
   in
-  match Backtest.Trace.snapshot t with
-  | [ m ] -> assert_that m.elapsed_ms (ge (module Int_ord) 10)
-  | other ->
-      assert_failure
-        (Printf.sprintf "expected 1 entry, got %d" (List.length other))
+  assert_that
+    (Backtest.Trace.snapshot t)
+    (elements_are
+       [
+         field
+           (fun (m : Backtest.Trace.phase_metrics) -> m.elapsed_ms)
+           (ge (module Int_ord) 10);
+       ])
 
 let test_write_sexp_round_trip _ =
   let t = Backtest.Trace.create () in
@@ -153,7 +147,6 @@ let test_write_creates_parent_dir _ =
 let suite =
   "Trace"
   >::: [
-         "phase to_string is stable" >:: test_phase_to_string_stable;
          "phase sexp round-trip" >:: test_phase_sexp_round_trip;
          "record without trace is passthrough"
          >:: test_record_none_is_passthrough;

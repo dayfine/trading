@@ -16,28 +16,15 @@ module Phase = struct
     | Fill
     | Teardown
   [@@deriving show, eq, sexp]
-
-  let to_string = function
-    | Load_universe -> "load_universe"
-    | Load_bars -> "load_bars"
-    | Macro -> "macro"
-    | Sector_rank -> "sector_rank"
-    | Rs_rank -> "rs_rank"
-    | Stage_classify -> "stage_classify"
-    | Screener -> "screener"
-    | Stop_update -> "stop_update"
-    | Order_gen -> "order_gen"
-    | Fill -> "fill"
-    | Teardown -> "teardown"
 end
 
 type phase_metrics = {
   phase : Phase.t;
   elapsed_ms : int;
-  symbols_in : int;
-  symbols_out : int;
+  symbols_in : int option;
+  symbols_out : int option;
   peak_rss_mb : int option;
-  bar_loads : int;
+  bar_loads : int option;
 }
 [@@deriving show, eq, sexp]
 
@@ -48,14 +35,12 @@ let create () = { entries = [] }
 (** Parse a [VmHWM: 123456 kB] line. Returns MB or [None] if the line can't be
     parsed. *)
 let _parse_vmhwm_line line : int option =
-  let tail = String.drop_prefix line (String.length "VmHWM:") in
-  let tail =
-    String.strip tail
-    |> String.chop_suffix ~suffix:"kB"
-    |> Option.value ~default:(String.strip tail)
-    |> String.strip
-  in
-  Option.map (Int.of_string_opt tail) ~f:(fun kb -> kb / 1024)
+  String.drop_prefix line (String.length "VmHWM:")
+  |> String.strip
+  |> String.chop_suffix_if_exists ~suffix:"kB"
+  |> String.strip
+  |> Int.of_string_opt
+  |> Option.map ~f:(fun kb -> kb / 1024)
 
 (** Scan [ic] line-by-line for a [VmHWM:] entry. Returns [None] if no such line.
 *)
@@ -83,9 +68,6 @@ let _read_peak_rss_mb () : int option =
   if not (_status_file_readable ()) then None
   else try In_channel.with_file _status_path ~f:_scan_for_vmhwm with _ -> None
 
-let _now_ms () =
-  Time_ns.now () |> Time_ns.to_int_ns_since_epoch |> fun ns -> ns / 1_000_000
-
 let _append_entry t ~phase ~elapsed_ms ~symbols_in ~symbols_out ~bar_loads =
   let entry =
     {
@@ -99,14 +81,15 @@ let _append_entry t ~phase ~elapsed_ms ~symbols_in ~symbols_out ~bar_loads =
   in
   t.entries <- entry :: t.entries
 
-let record ?trace ?(symbols_in = 0) ?(symbols_out = 0) ?(bar_loads = 0) phase f
-    =
+let record ?trace ?symbols_in ?symbols_out ?bar_loads phase f =
   match trace with
   | None -> f ()
   | Some t ->
-      let start_ms = _now_ms () in
+      let start = Time_ns.now () in
       let result = f () in
-      let elapsed_ms = _now_ms () - start_ms in
+      let elapsed_ms =
+        Time_ns.diff (Time_ns.now ()) start |> Time_ns.Span.to_int_ms
+      in
       _append_entry t ~phase ~elapsed_ms ~symbols_in ~symbols_out ~bar_loads;
       result
 
