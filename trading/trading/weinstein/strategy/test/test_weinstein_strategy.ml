@@ -410,6 +410,113 @@ let test_strategy_empty_macro_config_queries_only_universe _ =
    reliable harness for comparing two macro-input scenarios. *)
 
 (* ------------------------------------------------------------------ *)
+(* held_symbols: excludes Closed positions                             *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a {!Trading_strategy.Position.t} directly at a given lifecycle state.
+    Bypasses the transition machinery — we are unit-testing a helper that
+    switches on [state], not the state machine itself. *)
+let make_pos_at_state ~symbol
+    ~(state : Trading_strategy.Position.position_state) :
+    Trading_strategy.Position.t =
+  {
+    id = symbol;
+    symbol;
+    side = Trading_base.Types.Long;
+    entry_reasoning = ManualDecision { description = "test" };
+    exit_reason = None;
+    state;
+    last_updated = Date.of_string "2024-01-05";
+    portfolio_lot_ids = [];
+  }
+
+let _sample_entering =
+  Trading_strategy.Position.Entering
+    {
+      target_quantity = 10.0;
+      entry_price = 100.0;
+      filled_quantity = 0.0;
+      created_date = Date.of_string "2024-01-05";
+    }
+
+let _sample_holding =
+  Trading_strategy.Position.Holding
+    {
+      quantity = 10.0;
+      entry_price = 100.0;
+      entry_date = Date.of_string "2024-01-05";
+      risk_params =
+        {
+          stop_loss_price = None;
+          take_profit_price = None;
+          max_hold_days = None;
+        };
+    }
+
+let _sample_exiting =
+  Trading_strategy.Position.Exiting
+    {
+      quantity = 10.0;
+      entry_price = 100.0;
+      entry_date = Date.of_string "2024-01-05";
+      target_quantity = 10.0;
+      exit_price = 110.0;
+      filled_quantity = 0.0;
+      started_date = Date.of_string "2024-01-10";
+    }
+
+let _sample_closed =
+  Trading_strategy.Position.Closed
+    {
+      quantity = 10.0;
+      entry_price = 100.0;
+      exit_price = 110.0;
+      gross_pnl = None;
+      entry_date = Date.of_string "2024-01-05";
+      exit_date = Date.of_string "2024-01-10";
+      days_held = 5;
+    }
+
+let _portfolio_of_positions positions : Trading_strategy.Portfolio_view.t =
+  let tbl =
+    List.fold positions ~init:String.Map.empty ~f:(fun acc p ->
+        Map.set acc ~key:p.Trading_strategy.Position.symbol ~data:p)
+  in
+  { cash = 100000.0; positions = tbl }
+
+let test_held_symbols_excludes_closed _ =
+  (* Mixed-state portfolio: Entering, Holding, Exiting are kept; Closed is
+     dropped. This is the core bug fix — before, Closed was retained, which
+     permanently blacklisted every symbol the strategy had ever traded. *)
+  let portfolio =
+    _portfolio_of_positions
+      [
+        make_pos_at_state ~symbol:"AAPL" ~state:_sample_entering;
+        make_pos_at_state ~symbol:"MSFT" ~state:_sample_holding;
+        make_pos_at_state ~symbol:"GOOG" ~state:_sample_exiting;
+        make_pos_at_state ~symbol:"ZZZZ" ~state:_sample_closed;
+      ]
+  in
+  let held = held_symbols portfolio in
+  assert_that
+    (List.sort held ~compare:String.compare)
+    (equal_to [ "AAPL"; "GOOG"; "MSFT" ])
+
+let test_held_symbols_empty_when_all_closed _ =
+  (* Regression guard: a portfolio with only Closed positions (e.g. end of a
+     long backtest where every entry has long since exited) must return no
+     held symbols — otherwise the strategy starves new entries. *)
+  let portfolio =
+    _portfolio_of_positions
+      [
+        make_pos_at_state ~symbol:"AAPL" ~state:_sample_closed;
+        make_pos_at_state ~symbol:"MSFT" ~state:_sample_closed;
+        make_pos_at_state ~symbol:"GOOG" ~state:_sample_closed;
+      ]
+  in
+  assert_that (held_symbols portfolio) is_empty
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -432,4 +539,8 @@ let () =
            >:: test_strategy_accumulates_configured_symbols;
            "strategy with empty macro config queries only universe + index"
            >:: test_strategy_empty_macro_config_queries_only_universe;
+           "held_symbols excludes Closed positions"
+           >:: test_held_symbols_excludes_closed;
+           "held_symbols empty when all positions Closed"
+           >:: test_held_symbols_empty_when_all_closed;
          ])

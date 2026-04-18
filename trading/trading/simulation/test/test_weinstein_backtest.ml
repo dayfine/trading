@@ -114,31 +114,33 @@ let test_six_year_full_lifecycle _ =
   let final_value = (List.last_exn result.steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips result.steps in
   let summary = Metrics.compute_summary round_trips in
-  (* Pinned: 2187 steps, 7 buys, 7 sells, all 7 symbols traded. Stop
-     placement uses the support-floor primitive
-     ({!Weinstein_stops.compute_initial_stop_with_floor}); the tighter
-     initial stops flip more round-trips to winners vs the fixed-buffer
-     proxy (4W/3L vs the older 1W/6L). *)
+  (* Pinned: 2187 steps, 23 buys, 21 sells, all 7 symbols traded. Counts
+     jumped from 7/7 → 23/21 after PR #409 fixed `_held_symbols` to
+     exclude Closed positions — symbols are re-entrable after exit, so
+     the same 7-symbol universe cycles multiple times over 6 years.
+     Stop placement uses the support-floor primitive
+     ({!Weinstein_stops.compute_initial_stop_with_floor}). *)
   assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 7);
-  assert_that n_sells (equal_to 7);
+  assert_that n_buys (equal_to 23);
+  assert_that n_sells (equal_to 21);
   assert_that
     (_traded_symbols result.steps)
     (equal_to [ "AAPL"; "CVX"; "HD"; "JNJ"; "JPM"; "KO"; "MSFT" ]);
-  (* 7 completed round-trips: 4 winners, 3 losers under support-floor stops. *)
-  assert_that (List.length round_trips) (equal_to 7);
+  (* 21 completed round-trips: 10 winners, 11 losers. *)
+  assert_that (List.length round_trips) (equal_to 21);
   assert_that summary
     (is_some_and
-       (match_stats ~total_pnl:__ ~avg_holding_days:__ ~win_count:(equal_to 4)
-          ~loss_count:(equal_to 3) ~win_rate:__));
+       (match_stats ~total_pnl:__ ~avg_holding_days:__ ~win_count:(equal_to 10)
+          ~loss_count:(equal_to 11) ~win_rate:__));
   (* Final value ~$498k on $500k start — small loss from conservative sizing *)
   assert_that final_value
     (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
-  (* Max drawdown under 10% *)
+  (* Max drawdown under 12% (was <10% pre-PR #409; re-entries after stops
+     add a few more pullbacks during the 2020 crash and 2022 correction). *)
   let max_drawdown_pct =
     (initial_cash -. _min_portfolio_value result.steps) /. initial_cash
   in
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.10)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.12)
 
 (* ------------------------------------------------------------------ *)
 (* Entry/exit cycle around COVID crash: 2019–mid 2020                   *)
@@ -155,21 +157,23 @@ let test_entry_exit_cycle_around_covid _ =
   let final_value = (List.last_exn result.steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips result.steps in
   let summary = Metrics.compute_summary round_trips in
-  (* Pinned: 545 steps, 4 buys/sells in AAPL HD JNJ KO *)
+  (* Pinned: 545 steps, 6 buys/sells across AAPL HD JNJ KO. Counts jumped
+     from 4/4 → 6/6 after PR #409 fixed `_held_symbols` to exclude
+     Closed positions — one or more symbols re-entered after initial
+     stop-out. *)
   assert_that (List.length result.steps) (equal_to 545);
-  assert_that n_buys (equal_to 4);
-  assert_that n_sells (equal_to 4);
+  assert_that n_buys (equal_to 6);
+  assert_that n_sells (equal_to 6);
   assert_that
     (_traded_symbols result.steps)
     (equal_to [ "AAPL"; "HD"; "JNJ"; "KO" ]);
-  (* 4 round-trips: support-floor stops capture 1 winner pre-crash (JNJ)
-     before the remaining 3 are stopped out by the COVID-19 drawdown. *)
-  assert_that (List.length round_trips) (equal_to 4);
+  (* 6 round-trips: 2 winners, 4 losers through the COVID-19 drawdown. *)
+  assert_that (List.length round_trips) (equal_to 6);
   assert_that summary
     (is_some_and
        (match_stats
           ~total_pnl:(lt (module Float_ord) 0.0)
-          ~avg_holding_days:__ ~win_count:(equal_to 1) ~loss_count:(equal_to 3)
+          ~avg_holding_days:__ ~win_count:(equal_to 2) ~loss_count:(equal_to 4)
           ~win_rate:__));
   (* Final value ~$498k — losses are small due to conservative sizing *)
   assert_that final_value

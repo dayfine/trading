@@ -82,6 +82,20 @@ strategy code (currently complete).
 
 ## Completed
 
+- [x] **Related fix: strategy `_held_symbols` no longer includes Closed
+  positions** (2026-04-17, `feat/weinstein-exclude-closed-from-held`).
+  `trading/trading/weinstein/strategy/lib/weinstein_strategy.ml:130`
+  previously returned every `portfolio.positions` entry regardless of
+  lifecycle state — including `Closed` — which permanently blacklisted
+  every symbol the strategy had ever traded from re-entry via both
+  `held_tickers` passed to `Screener.screen` and the in-strategy
+  candidate filter. Replaced with an exhaustive match that keeps
+  `Entering | Holding | Exiting` and drops `Closed`. Two unit tests
+  added (mixed-state + all-Closed). Unblocks meaningful backtests;
+  `test_weinstein_backtest` scenario counts now shift and will be
+  re-pinned on `feat/backtest-scenario-small-universe` (PR #399). See
+  `dev/notes/strategy-dispatch-trace-2026-04-17.md` / PR #408.
+
 - [x] **Two-tier universe for scenarios (Step 1 of scale-optimization
   plan #396)** (2026-04-17, `feat/backtest-scenario-small-universe`,
   PR #399). Adds a `universe_path : string` field to `Scenario.t`

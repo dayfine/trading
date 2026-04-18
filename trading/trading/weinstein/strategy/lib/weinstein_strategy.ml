@@ -115,15 +115,30 @@ let _check_cash_and_deduct remaining_cash (trans : Position.transition) =
         Some trans)
   | _ -> Some trans
 
-(** Collect ticker symbols of all held positions. *)
-let _held_symbols (portfolio : Portfolio_view.t) =
-  Map.data portfolio.positions |> List.map ~f:(fun (p : Position.t) -> p.symbol)
+(** Collect ticker symbols of positions the strategy is still holding (or still
+    trying to enter/exit). Closed positions are excluded — the strategy has no
+    stake in them and must be free to re-enter the symbol.
+
+    Bug fix (2026-04-17): previously returned every position in the portfolio
+    regardless of state, including Closed. That permanently blacklisted every
+    symbol the strategy had ever traded from re-entry via both [held_tickers]
+    passed to the screener and the in-strategy candidate filter. See
+    [dev/notes/strategy-dispatch-trace-2026-04-17.md] / PR #408.
+
+    The match is exhaustive so a future state addition forces a compile error
+    here, where the keep/drop decision must be re-examined. *)
+let held_symbols (portfolio : Portfolio_view.t) =
+  Map.data portfolio.positions
+  |> List.filter_map ~f:(fun (p : Position.t) ->
+      match p.state with
+      | Entering _ | Holding _ | Exiting _ -> Some p.symbol
+      | Closed _ -> None)
 
 (** Generate CreateEntering transitions for top screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds. *)
 let _entries_from_candidates ~config ~candidates ~stop_states ~bar_history
     ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
-  let held = _held_symbols portfolio in
+  let held = held_symbols portfolio in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let remaining_cash = ref portfolio.cash in
   let make_entry =
@@ -163,7 +178,7 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
   let stocks = List.filter_map config.universe ~f:_analyze_ticker in
   let screen_result =
     Screener.screen ~config:config.screening_config ~macro_trend ~sector_map
-      ~stocks ~held_tickers:(_held_symbols portfolio)
+      ~stocks ~held_tickers:(held_symbols portfolio)
   in
   _entries_from_candidates ~config
     ~candidates:screen_result.Screener.buy_candidates ~stop_states ~bar_history
