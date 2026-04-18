@@ -108,6 +108,49 @@ If a prior summary exists:
 
 If no prior summary exists (first run), skip this step.
 
+### Step 1c: Verify carried-forward `[critical]` escalations
+
+For each `[critical]` item in the prior summary's `## Escalations` section,
+**re-verify it is still real** before carrying it forward into today's
+escalations. A critical that was resolved between runs (by a merged PR,
+by a parallel fix, or by a false-positive measurement) must not leak into
+today's plan and cascade into contingent skips.
+
+Common verifications:
+
+- **"Main baseline is red"** / linter failing:
+  ```bash
+  cd trading/trading && dune build @runtest --force 2>&1 | tail -10
+  echo "exit=$?"
+  ```
+  Run from the inner `trading/trading/` directory (the dune project root).
+  Exit 0 = baseline is green, inherited critical is **resolved** — drop.
+  **Do NOT invoke linter binaries directly** (e.g. `nesting_linter.exe
+  <path>`) — path-substitution bugs cause false positives (seen
+  2026-04-18). The dune alias is the source of truth because CI uses it.
+
+- **"Open PR #X is failing CI"**: re-check PR status via REST
+  (`/repos/<owner>/<repo>/pulls/<N>/commits/<sha>/check-runs`). If the
+  latest CI on the PR's tip is green, the critical is resolved.
+
+- **"Track X is blocked on Y"**: re-read `dev/status/X.md` + `dev/status/Y.md`
+  to confirm Y is still unmet. If Y landed between runs, the block is lifted.
+
+**Outcomes:**
+
+- If verified still real: carry forward into today's `## Escalations` with
+  the same `[critical]` tag, optionally updating the diagnostic if context
+  changed.
+- If resolved: **do not carry forward**. Add a line to today's
+  `## Step 1b drift cross-reference` classifying the item as
+  "resolved between runs" so the audit trail exists.
+- If ambiguous (verification inconclusive): carry forward as `[info]` with
+  a note asking the human to verify, not as `[critical]`.
+
+This step exists because carrying a stale `[critical]` causes downstream
+plan logic to cascade (skip tracks, queue corrective dispatches, warn
+humans) — all on a false premise. Always verify before carrying.
+
 ---
 
 ## Step 1.5: PR-open dispatch guard
