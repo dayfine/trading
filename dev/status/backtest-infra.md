@@ -6,9 +6,9 @@
 APPROVED
 
 ## QC
-- structural_qc: APPROVED (re-review at e59f8d2, 2026-04-18)
-- behavioral_qc: APPROVED (re-review at e59f8d2, 2026-04-18) — both prior blockers (U6, F1) and BC4 advisory resolved; stacked `_held_symbols` strategy fix is domain-correct. See `dev/reviews/backtest-infra.md` §Behavioral Re-review @ e59f8d2.
-- overall_qc: APPROVED (re-review at e59f8d2)
+- structural_qc: APPROVED (re-verification at 0381bde, 2026-04-18 run 4) — refactor-only delta from cc4edca6 (trace.ml sentinel→option, dropped `to_string`, simplified parsers; -23 net lines); fmt violation at 73f74c2 fixed by 0381bde.
+- behavioral_qc: APPROVED (re-verification at 0381bde, 2026-04-18 run 4) — Trace is pure instrumentation plumbing; Weinstein domain axes remain NA; refactor preserves behavior.
+- overall_qc: APPROVED (re-verification at 0381bde)
 
 Step 1 of the scale-optimization plan (PR #396) complete on
 `feat/backtest-scenario-small-universe` (PR #399, ready for review):

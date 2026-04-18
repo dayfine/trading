@@ -1,4 +1,4 @@
-Reviewed SHA: 26ff33ede0f335bb4732234b1c0ddebcbdaa236c
+Reviewed SHA: 937ec9356832135c8c5a5412e33ef0be3f3533db
 
 ## Structural Checklist
 
@@ -70,3 +70,37 @@ Reviewer: qc-behavioral
 ## Verdict
 
 APPROVED
+
+---
+
+## Structural + Behavioral Re-verification @ 937ec93
+
+Date: 2026-04-18 (run 4)
+Reviewer: lead-orchestrator (deterministic verification — no fresh QC dispatch required)
+
+### Why re-verification (not fresh review)
+
+Branch tip advanced from `26ff33ede0f335bb4732234b1c0ddebcbdaa236c` (prior APPROVED) to `937ec9356832135c8c5a5412e33ef0be3f3533db`. The single new commit on the branch is `937ec93 Merge origin/main into feat/short-side-strategy`.
+
+### OCaml delta
+
+```
+git diff --stat 26ff33ede0..937ec93 -- '*.ml' '*.mli'
+# (empty — zero OCaml/MLI files changed)
+```
+
+No OCaml source or interface file changed between the two tips. The merge brought in only main-side infrastructure commits (orchestrator.yml, dev/ docs, CI workflow tweaks — see PRs #422 #423 #424 #425). None of those files are part of the short-side-strategy feature scope.
+
+### Hard gates on clean checkout of 937ec93
+
+- `dune build @fmt`: exit 0 (PASS)
+- `dune build`: exit 0 (PASS)
+- `dune runtest trading/`: exit 0 (PASS) — all 3 test_weinstein_backtest tests green; full trading-subtree runtest clean.
+
+### Verdict
+
+**APPROVED — prior structural + behavioral APPROVED verdicts preserved.**
+
+overall_qc: APPROVED
+structural_qc: APPROVED (SHA 937ec93 re-verification: zero OCaml delta from 26ff33ede0)
+behavioral_qc: APPROVED (SHA 937ec93 re-verification: zero OCaml delta from 26ff33ede0)
