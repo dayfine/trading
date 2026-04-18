@@ -1,11 +1,13 @@
 # Status: sector-data
 
-## Last updated: 2026-04-16
+## Last updated: 2026-04-18
 
 ## Status
 IN_PROGRESS
 
-Item 1 merged (#349), Items 2-3 pending.
+Item 1 merged (#349, 2026-04-15). Item 2 (one-shot fetch) is the
+current top-of-queue work item for `ops-data` — it is dispatch-eligible,
+not blocked. Item 3 follows.
 
 ## Ownership
 `ops-data` agent — see `.claude/agents/ops-data.md`. Scope is data
@@ -242,7 +244,11 @@ the rule to exclude these.
   the name/exchange signal.
 
 ## In Progress
-- None — waiting for Item 1 PR merge before Item 2 (one-shot run).
+- Item 2 (one-shot `fetch_finviz_sectors.exe` run + commit expanded
+  `data/sectors.csv`) is ready to dispatch — Item 1 merged in #349 on
+  2026-04-15. Estimated ~2.2h of wall time at 1 req/sec; the run itself
+  is automatable (background `Bash` or a dedicated workflow), not a
+  human-gated blocker.
 
 ## Next Steps (work items — ops-data)
 
