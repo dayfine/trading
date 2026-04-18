@@ -34,7 +34,9 @@ let test_phase_sexp_round_trip _ =
 
 let test_record_none_is_passthrough _ =
   (* When trace is None, record should still return f (). *)
-  let result = Backtest.Trace.record Backtest.Trace.Phase.Macro (fun () -> 42) in
+  let result =
+    Backtest.Trace.record Backtest.Trace.Phase.Macro (fun () -> 42)
+  in
   assert_that result (equal_to 42)
 
 let test_record_none_does_not_allocate_collector _ =
@@ -48,8 +50,7 @@ let test_record_appends_entry _ =
   let t = Backtest.Trace.create () in
   let _ =
     Backtest.Trace.record ~trace:t ~symbols_in:100 ~symbols_out:20 ~bar_loads:5
-      Backtest.Trace.Phase.Screener
-      (fun () -> "hello")
+      Backtest.Trace.Phase.Screener (fun () -> "hello")
   in
   assert_that
     (Backtest.Trace.snapshot t)
@@ -77,7 +78,9 @@ let test_record_appends_entry _ =
 
 let test_record_returns_f_value _ =
   let t = Backtest.Trace.create () in
-  let v = Backtest.Trace.record ~trace:t Backtest.Trace.Phase.Macro (fun () -> 7) in
+  let v =
+    Backtest.Trace.record ~trace:t Backtest.Trace.Phase.Macro (fun () -> 7)
+  in
   assert_that v (equal_to 7);
   assert_that (Backtest.Trace.snapshot t) (size_is 1)
 
@@ -108,9 +111,7 @@ let test_record_measures_elapsed _ =
     Backtest.Trace.record ~trace:t Backtest.Trace.Phase.Macro (fun () ->
         (* Busy-wait > 10ms. Avoids Unix.sleepf in test. *)
         let start = Time_ns.now () in
-        let stop =
-          Time_ns.add start (Time_ns.Span.of_int_ms 15)
-        in
+        let stop = Time_ns.add start (Time_ns.Span.of_int_ms 15) in
         while Time_ns.(now () < stop) do
           ()
         done)
@@ -125,13 +126,11 @@ let test_write_sexp_round_trip _ =
   let t = Backtest.Trace.create () in
   let _ =
     Backtest.Trace.record ~trace:t ~symbols_in:1_000 ~symbols_out:50
-      Backtest.Trace.Phase.Load_bars
-      (fun () -> ())
+      Backtest.Trace.Phase.Load_bars (fun () -> ())
   in
   let _ =
     Backtest.Trace.record ~trace:t ~symbols_in:50 ~symbols_out:3
-      Backtest.Trace.Phase.Screener
-      (fun () -> ())
+      Backtest.Trace.Phase.Screener (fun () -> ())
   in
   let original = Backtest.Trace.snapshot t in
   let dir = Core_unix.mkdtemp "/tmp/trace_test_" in

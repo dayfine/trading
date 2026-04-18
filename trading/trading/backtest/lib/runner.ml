@@ -103,11 +103,12 @@ let _resolve_ticker_sectors ~data_dir sector_map_override =
       eprintf "Loading universe from sectors.csv...\n%!";
       Sector_map.load ~data_dir
 
-let _load_deps ~overrides ~sector_map_override =
+let _load_deps ?trace ~overrides ~sector_map_override () =
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
   let ticker_sectors =
-    _resolve_ticker_sectors ~data_dir:data_dir_fpath sector_map_override
+    Trace.record ?trace Trace.Phase.Load_universe (fun () ->
+        _resolve_ticker_sectors ~data_dir:data_dir_fpath sector_map_override)
   in
   let universe =
     Hashtbl.keys ticker_sectors |> List.sort ~compare:String.compare
@@ -115,7 +116,10 @@ let _load_deps ~overrides ~sector_map_override =
   let universe_size = List.length universe in
   eprintf "Universe: %d stocks\n%!" universe_size;
   eprintf "Loading AD breadth bars...\n%!";
-  let ad_bars = Weinstein_strategy.Ad_bars.load ~data_dir in
+  let ad_bars =
+    Trace.record ?trace ~symbols_out:universe_size Trace.Phase.Macro (fun () ->
+        Weinstein_strategy.Ad_bars.load ~data_dir)
+  in
   let base_config = Weinstein_strategy.default_config ~universe ~index_symbol in
   let config =
     {
@@ -186,9 +190,9 @@ let _run_simulator sim =
       failwith
         (sprintf "Backtest.Runner: simulation failed: %s" (Status.show e))
 
-let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override ()
-    =
-  let deps = _load_deps ~overrides ~sector_map_override in
+let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
+    ?trace () =
+  let deps = _load_deps ?trace ~overrides ~sector_map_override () in
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length deps.all_symbols);
   let warmup_start = Date.add_days start_date (-warmup_days) in
@@ -197,8 +201,16 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override ()
     (Date.to_string end_date)
     (Date.to_string warmup_start);
   let stop_log = Stop_log.create () in
-  let sim = _make_simulator deps ~stop_log ~start_date ~end_date in
-  let sim_result = _run_simulator sim in
+  let n_all_symbols = List.length deps.all_symbols in
+  let sim =
+    Trace.record ?trace ~symbols_in:n_all_symbols ~symbols_out:n_all_symbols
+      Trace.Phase.Load_bars (fun () ->
+        _make_simulator deps ~stop_log ~start_date ~end_date)
+  in
+  let sim_result =
+    Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
+        _run_simulator sim)
+  in
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on
      these steps, so it must see *every* step where a trade fill happened —
@@ -216,8 +228,11 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override ()
      consumers use the series. *)
   let steps = List.filter steps_in_range ~f:is_trading_day in
   let final_value = (List.last_exn steps).portfolio_value in
-  let round_trips = Metrics.extract_round_trips steps_in_range in
-  let stop_infos = Stop_log.get_stop_infos stop_log in
+  let round_trips, stop_infos =
+    Trace.record ?trace Trace.Phase.Teardown (fun () ->
+        ( Metrics.extract_round_trips steps_in_range,
+          Stop_log.get_stop_infos stop_log ))
+  in
   let summary : Summary.t =
     {
       start_date;
