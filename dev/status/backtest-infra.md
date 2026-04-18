@@ -1,14 +1,14 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-17
+## Last updated: 2026-04-18
 
 ## Status
-READY_FOR_REVIEW
+APPROVED
 
 ## QC
-- structural_qc: APPROVED (re-review at 8ccc8c8, 2026-04-17)
-- behavioral_qc: NEEDS_REWORK (re-review at 8ccc8c8, 2026-04-17) — BC4 follow-up re-pin disagrees with committed evidence on `total_trades`; see `dev/reviews/backtest-infra.md` §Behavioral Re-review @ 8ccc8c8.
-- overall_qc: NEEDS_REWORK (re-review at 8ccc8c8)
+- structural_qc: APPROVED (re-review at e59f8d2, 2026-04-18)
+- behavioral_qc: APPROVED (re-review at e59f8d2, 2026-04-18) — both prior blockers (U6, F1) and BC4 advisory resolved; stacked `_held_symbols` strategy fix is domain-correct. See `dev/reviews/backtest-infra.md` §Behavioral Re-review @ e59f8d2.
+- overall_qc: APPROVED (re-review at e59f8d2)
 
 Step 1 of the scale-optimization plan (PR #396) complete on
 `feat/backtest-scenario-small-universe` (PR #399, ready for review):

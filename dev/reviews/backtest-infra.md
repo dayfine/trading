@@ -1,4 +1,4 @@
-Reviewed SHA: 8ccc8c870ccb3ed9b2cdd8c2a909e418d025ac17
+Reviewed SHA: e59f8d2157cc5598ef03f96de03670a1afe27f5b
 
 ## Structural Checklist — Initial Review (NEEDS_REWORK)
 
@@ -278,4 +278,133 @@ NEEDS_REWORK
   3. **Apply the same fix to `bull-crash-2015-2020.sexp` and `covid-recovery-2020-2024.sexp`**: their fixture headers cite trade counts of `251` and `253`, which almost certainly exhibit the same WinCount+LossCount-vs-post-start-round-trips conflation. Either commit evidence for those scenarios too, or include them in the re-measurement.
   4. **Also re-check the `total_return_pct` header baseline**: the fixture's `144.82` vs. evidence's `109.06` is a ~35% discrepancy; the range `[100, 190]` happens to bracket both, so this does not break the gate — but it indicates the header-comment baseline is not from the run whose evidence was committed. Align the header to whatever run is actually pinned-against, or recompute.
 - **harness_gap:** `LINTER_CANDIDATE` — a cross-check lint could, given any committed `dev/backtest/scenarios-<timestamp>/<scenario>/actual.sexp` plus the fixture of matching name, assert every numeric field in `actual` falls within the fixture's `expected` ranges. Running this as part of `dune runtest` (or a pre-merge CI check) would mechanically catch evidence-vs-fixture drift of exactly this kind. This is deterministic, scoped to data files, and doesn't require running the sim.
+
+---
+
+## Structural Re-review @ e59f8d2
+
+Date: 2026-04-18
+Reviewer: qc-structural
+
+Re-review of PR #399 (`feat/backtest-scenario-small-universe`) after the author rebased onto current `main@origin` (now includes PRs #404-#407 and #409) and pushed 7 new commits. Prior reviewed SHA: 8ccc8c8 (no longer exists post-rebase). New tip: `e59f8d2157cc5598ef03f96de03670a1afe27f5b`.
+
+### Commits since origin/main (c3f5c71), oldest-first
+
+1. `f67565b fix(strategy): exclude Closed positions from _held_symbols`
+2. `2ef63b7 feat(backtest): wire scenario universe_path into runner (step 1d)`
+3. `cbca55e status(backtest-infra): mark step 1 complete; unblock step 2 dispatch`
+4. `c435474 refactor(backtest): extract _resolve_ticker_sectors helper (qc rework)`
+5. `c3cf47f feat(scenarios): add PYPL + WFC to small-universe known cases (qc rework)`
+6. `b75eb5a feat(scenarios): re-pin goldens-small ranges from real runs; mark goldens-broad skipped (BC4)`
+7. `e59f8d2 test: review response (test_to_sector_map_override) + re-pin test_weinstein_backtest post-#409`
+
+### Hard gates
+
+- `dune build @fmt`: PASS (exit 0, warning-only root advisory)
+- `dune build`: PASS (exit 0)
+- `dune runtest trading/`: PASS (all trading sub-targets pass; 10 test executables, all OK)
+- `dune runtest` (full): pre-existing failures in `devtools/` — nesting_linter violations entirely in `analysis/scripts/universe_filter/` and `analysis/scripts/fetch_finviz_sectors/`; confirmed identical on `origin/main`. Not introduced by this PR.
+
+### BC4-F1 specific verification
+
+Prior failure: `goldens-small/six-year-2018-2023.sexp` had `total_trades ((min 200) (max 280))` vs. evidence `total_trades 10` — a ~24x mismatch.
+
+Current state:
+
+| Scenario | Evidence `total_trades` | Fixture range | Brackets? |
+|----------|------------------------|---------------|-----------|
+| six-year-2018-2023 | 20 (`2026-04-18-014341`) / 19 (`2026-04-18-012924`) | `[12, 30]` | PASS |
+| bull-crash-2015-2020 | 16 (`2026-04-18-014341`) / 15 (`2026-04-18-012924`) | `[10, 25]` | PASS |
+| covid-recovery-2020-2024 | 18 (`2026-04-18-014341`) / 21 (`2026-04-18-012924`) | `[12, 30]` | PASS |
+
+Evidence `params.sexp` for `2026-04-18-014341` runs shows `code_version c3cf47f` (302-symbol universe, matching fixture `universe_size 302`). Two independent runs committed, both bracketed. F1 is resolved.
+
+The `total_trades` semantics changed: the header comments now explicitly state "`total_trades = List.length round_trips` (completed buy→sell cycles), NOT `wincount + losscount`" — clarifying the prior ambiguity.
+
+### `runner.ml` / `runner.mli` wiring check
+
+`_resolve_ticker_sectors` (9 lines): pure Option dispatch — `Some tbl` returns the override, `None` falls through to `Sector_map.load`. No Weinstein domain logic. Underscore-prefixed, module-local. Within limit.
+
+`_load_deps` (44 lines): unchanged from prior approved rework — still within 50-line limit.
+
+`run_backtest` signature addition: `?sector_map_override:(string, string) Core.Hashtbl.t` optional parameter wired through to `_load_deps` and documented in `.mli`. Clean plumbing.
+
+`scenario_runner.ml` additions: `_fixtures_root` (3 lines) and `_sector_map_of_universe_file` (4 lines). Both underscore-prefixed, both within limit. The bridge from `s.universe_path` → `Universe_file.to_sector_map_override` → `?sector_map_override` in `run_backtest` is a straight data plumb; no Weinstein logic leaks.
+
+### Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | |
+| H2 | dune build | PASS | |
+| H3 | dune runtest | PASS | All 10 test executables in `trading/` pass. Full-repo `dune runtest` fails on pre-existing nesting_linter violations in `analysis/scripts/` (identical on `origin/main`); not attributable to this PR. |
+| P1 | Functions ≤ 50 lines (fn_length_linter) | PASS | New functions: `_resolve_ticker_sectors` (9L), `_load_deps` (44L), `_sector_map_of_universe_file` (4L), `to_sector_map_override` (7L), `_held_symbols` (6L). All within limit. fn_length_linter passes for `trading/` in H3. |
+| P2 | No magic numbers (linter_magic_numbers.sh) | PASS | No numeric literals in new OCaml source; only in fixture `.sexp` files (test data, not production code). |
+| P3 | All configurable thresholds/periods/weights in config record | NA | No new tunable runtime parameters introduced. `?sector_map_override` is a structural override (universe selection), not a Weinstein threshold. |
+| P4 | .mli files cover all public symbols (linter_mli_coverage.sh) | PASS | `universe_file.mli` exports all three public symbols: `t`, `load`, `symbol_count`, `to_sector_map_override`. `runner.mli` documents `run_backtest` including the new `?sector_map_override` param. `weinstein_strategy.mli` exports newly-exposed `_held_symbols` (intentional, for testing). linter_mli_coverage passes in H3. |
+| P5 | Internal helpers prefixed with _ | PASS | All module-local helpers (`_resolve_ticker_sectors`, `_load_deps`, `_sector_map_of_universe_file`, `_fixtures_root`, `_held_symbols`) are underscore-prefixed. `make_pos_at_state` in test file lacks prefix but follows pre-existing `make_*` convention in that test file — consistent with `make_bar`, `make_holding_pos` already present on main. Not a violation of P5 (applies to module impl helpers, not test builders). |
+| P6 | Tests use matchers library | PASS | `test_universe_file.ml` and `test_weinstein_strategy.ml` both `open Matchers` and use `assert_that` throughout. No `assert_bool` or raw `assert_equal` in new test code. |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | No modifications to `trading/trading/portfolio/`, `orders/`, `position/`, `strategy/`, or `engine/`. `weinstein_strategy.ml` is in `trading/trading/weinstein/strategy/`, not a core module. |
+| A2 | No imports from analysis/ into trading/trading/ | PASS | Diff adds no `open` or `require` referencing `analysis/` in any `trading/trading/` file. |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | All touched files are in `backtest/`, `weinstein/strategy/`, and fixture/status directories owned by this feature. The `weinstein_strategy.ml` change (`_held_symbols` bug fix) is correctly scoped — it's the `_held_symbols` fix (PR #409) that the backtest re-pin depends on, and it's contained to that function. |
+
+### Verdict
+
+APPROVED
+
+All structural checks pass. BC4-F1 is fully resolved: all three goldens-small scenarios have `total_trades` ranges that bracket both committed evidence runs with correct semantics (completed round-trips, not WinCount+LossCount). The `runner.ml` step-1d wiring is clean plumbing. All fn-length, mli-coverage, magic-number, and matchers-library checks pass.
+
+---
+
+## Behavioral Re-review @ e59f8d2
+
+Date: 2026-04-18
+Reviewer: qc-behavioral
+
+Re-review of PR #399 at rebased tip `e59f8d2` after two prior NEEDS_REWORK cycles (U6 at 005a514, F1 at 8ccc8c8). Authority document: `docs/design/weinstein-book-reference.md` (read). Plan: `dev/plans/backtest-scale-optimization-2026-04-17.md` §Step 1 (re-read for acceptance criteria). The PR remains fixture + plumbing work, now stacked on top of the `_held_symbols` strategy bug fix (`f67565b`, landed on PR #409). Weinstein rules (stage classifier, screener cascade, stops, macro) are not modified — the only strategy code change is `_held_symbols` flipping from "every position ever created" to "only Entering|Holding|Exiting" (the bug fix). S/L/C domain checks therefore remain largely NA; active checks are the U1-U6 acceptance spec, F1 (evidence-vs-fixture agreement), backward-compat migration gates, and the re-pins of `test_weinstein_backtest`.
+
+### Behavioral Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1 | Core module modification is strategy-agnostic | NA | Structural did not flag A1. `weinstein_strategy.ml` change is in the Weinstein module itself, not a core (Portfolio/Orders/Position/Strategy/Engine) module; no cross-strategy generalizability concern. |
+| S1-S4 | Stage 1-4 definitions match book | NA | No stage classifier code touched. |
+| S5 | Buy criteria: Stage 2 entry on breakout with volume | NA | Screener untouched. |
+| S6 | No buy signals in Stage 1/3/4 | NA | Screener untouched. The `_held_symbols` fix is strategy-layer, not screener-layer — it governs re-entry eligibility, not signal generation. Bearish-macro gate (`_run_screen` lines 221-222) is preserved. |
+| L1-L4 | Stop-loss rules | NA | No stop-loss code touched. |
+| C1-C3 | Screener cascade / macro / sector RS | NA | Screener untouched. `_held_symbols` feeds `held_tickers` into `Screener.screen` (weinstein_strategy.ml:181) — same channel as before, only the contents have changed (now correctly excludes Closed). |
+| T1-T3 | Stage/macro/stops test coverage | NA | Out of scope. |
+| T4 | Tests assert domain outcomes | PASS | `test_weinstein_strategy.ml` `_held_symbols` tests (lines 487-517) assert the exact keep/drop decision: mixed-state portfolio returns `["AAPL"; "MSFT"; "GOOG"]` (Entering+Holding+Exiting) and drops "ZZZZ" (Closed); all-Closed portfolio returns `[]`. Not a "no error" assertion — the actual returned list is verified. |
+| U1 | Sector balance ≥10 symbols across each of 11 GICS sectors | PASS | Unchanged from prior review: 302 symbols committed; minimum sector count 20 (well above ≥10 floor). IT 37, Financials 33 (both bumped from the PYPL/WFC addition); other nine sectors unchanged. |
+| U2 | Sector tag present per-symbol in sexp format | PASS | Unchanged. Every entry in `small.sexp` has `((symbol <sym>) (sector <gics>))` form. |
+| U3 | ~300 pinned symbols target | PASS | 302 entries verified (`grep -c "^  ((symbol"` on the `small.sexp` file). Plan says "~300" — 302 is in-spec. |
+| U4 | Stage diversity via 2018-2023 cache sample | PASS | S&P-500-quality large-cap universe spanning six-year window that includes COVID-crash 2020 (Stage 4 across the board), 2021 rally (Stage 2→3), 2022 bear (Stage 4), 2023 rebuild (Stage 1→2). Temporal diversity satisfies plan's stage-coverage requirement. |
+| U5 | Liquidity floor (>$500M cap, >500k avg volume) | PASS (approximate) | All 302 names are S&P-500-equivalent large-caps; no microcaps or OTC tickers. Cap/volume data not filter-enforced deterministically but README.md flags this as a known limitation. |
+| **U6** | Known historical cases (NVDA 2019, MSFT 2020, PYPL 2021) | **PASS** | **Re-confirmed.** PYPL at `small.sexp:265` (Information Technology), WFC at `small.sexp:166` (Financials). Both in `pick.ml` `_known_cases` (WFC:53, PYPL:55). Script and fixture agree — a rerun of `pick.ml` would not drop them. |
+| R1-R3 | Selection script reproducibility | PASS | Unchanged from prior review. |
+| I1-I3 | `to_sector_map_override` contract | PASS | Unchanged. Pure `Hashtbl.set` iteration from `Pinned` entries; no normalization; runner treats both override and `Sector_map.load` outputs interchangeably via `_resolve_ticker_sectors`. |
+| **F1** (prior blocker) | Re-pinned `total_trades` ranges bracket committed evidence | **PASS** | **Resolved.** Cross-checked each of three goldens-small fixtures against both committed evidence runs (`dev/backtest/scenarios-2026-04-18-012924/` and `scenarios-2026-04-18-014341/`): six-year-2018-2023 evidence {20, 19} ∈ [12, 30] ✓; bull-crash-2015-2020 {16, 15} ∈ [10, 25] ✓; covid-recovery-2020-2024 {18, 21} ∈ [12, 30] ✓. Also verified the other six metrics per scenario bracket correctly — every fixture bound holds for both evidence runs. `params.sexp` for the 2026-04-18-014341 runs shows `code_version c3cf47f` (the PYPL+WFC commit, giving 302-symbol universe matching fixture `universe_size 302`). Header comments now explicitly clarify the semantics: `total_trades = List.length round_trips` (completed buy→sell cycles), NOT `WinCount + LossCount`. The prior review's concern about WinCount+LossCount conflation is resolved by both the re-measurement and the explicit semantic note. |
+| B1 | Broad goldens retain pre-migration regression pins (as SKIPPED) | PASS | Each `goldens-broad/*.sexp` carries a `STATUS: SKIPPED` banner at the top with a pointer to `dev/status/backtest-infra.md` follow-up. Ranges are still the 1,654-symbol-era baseline; `universe_size` still `1654`. The contract is now explicit: broad goldens are not regression gates until re-pinned via the planned GHA workflow. Running `--goldens-broad` against today's 10,472-symbol universe would fail `total_trades [60, 100]`, but the contract documents that this is expected and local tests do not run these. |
+| B2 | 3 broad scenarios for scale regression axis | PASS | Six-year, bull-crash, covid-recovery — exactly matches plan §Step 1 "≤3 broad goldens." |
+| BC1-BC3 | Scenario schema round-trip + mixed-shape coexistence | PASS | Unchanged. `universe_path` has `@sexp.default` wiring; tests cover absent, present, and round-trip cases. |
+| **BC4** (prior advisory) | Runner behavior on legacy scenario — small-universe pins from real runs | **PASS** | **Resolved.** Small-universe goldens now pin against real 302-symbol small-universe runs per the evidence under `dev/backtest/scenarios-2026-04-18-*/`. Header baselines cite representative values (six-year ~84% return, bull-crash ~339%, covid ~8%) derived from these runs. Ranges are wide enough to absorb cross-run variance (confirmed by two independent evidence runs). The advisory from the first review ("small-universe ranges inherit broad-universe baselines") no longer applies. |
+| TEST1 | Tests cover new `Universe_file` module end to end | PASS | 7 tests remain. `test_to_sector_map_override_pinned` now consolidated to one `assert_that` with `all_of` + `field` composition (per `.claude/rules/test-patterns.md`); `test_to_sector_map_override_full` renamed to `_is_none` to reflect the matcher used. Style improvement, behavior-preserving. |
+| TEST2 | Committed `small.sexp` and `broad.sexp` parse in CI | PASS | Unchanged. |
+| **SF1** (new) | `_held_symbols` fix domain-correct for Weinstein re-entry semantics | PASS | `weinstein_strategy.ml:130-135`: explicit pattern match on `position_state` keeps `Entering \| Holding \| Exiting`, drops `Closed`. Per `weinstein-book-reference.md` §Buy Criteria and §Sell Criteria, a position that has been stopped out (entered `Closed`) is a distinct event from the next valid Stage 2 breakout on the same symbol — Weinstein explicitly endorses re-entry on re-setup (e.g., a symbol that stops out, bases again in Stage 1, and re-breaks out into Stage 2). The prior behavior (permanent blacklist of every symbol ever traded) would systematically starve the strategy over a multi-year backtest — a true semantic bug. The fix is the correct Weinstein behavior. The exhaustive match (no `_ ->` wildcard) forces a compile error if a future `position_state` variant is added, which is the correct defensive stance. |
+| **SF2** (new) | `test_weinstein_backtest.ml` re-pins domain-consistent with `_held_symbols` fix | PASS | Six-year test: 7 buys/7 sells/7 round-trips → 23 buys/21 sells/21 round-trips (10W/11L). 21 round-trips over 6 years on a 7-symbol universe implies ~3 cycles/symbol — plausible for a universe that includes AAPL, MSFT, HD, JNJ, JPM, KO, CVX across a window containing COVID-crash, 2021 rally, 2022 bear, 2023 recovery. Multiple Stage 2 → stop-out → Stage 1 rebase → Stage 2 re-entry cycles are exactly what the book predicts. COVID test (2019-mid 2020): 4/4/4 round-trips → 6/6/6 (2W/4L). +2 round-trips indicates one or more symbols re-entered after initial stop-out through the crash — the 2020 COVID drawdown is precisely the regime where stop-outs cluster. `max_dd` loosening `< 0.10` → `< 0.12` (+2 pct points) is consistent with the added re-entry exposure during the crash: each re-entry adds another drawdown opportunity before the next stop-out. Both scenarios still end near $498k on $500k initial, so the fix doesn't change the overall P&L magnitude — it just reveals more realistic trade flow. Re-pins are domain-coherent. |
+| **SF3** (new) | Strategy fix is scoped (no leakage into screener/stops) | PASS | The fix is a one-function change in `_held_symbols`; `.mli` now exports `_held_symbols` for tests (underscore-prefixed, test-only intent is clear). Nothing in the screener, stops, macro, or stage classifier changed. The two call sites (`weinstein_strategy.ml:141` in `_entries_from_candidates`, and `:181` in `_screen_universe → Screener.screen ~held_tickers`) both benefit from the fix without any local logic changes. Bug fix is minimal and correct. |
+
+### Quality Score
+
+5 — Exemplary. Both prior blockers (U6, F1) are cleanly resolved with evidence committed in the same diff that re-pins the fixtures; the BC4 advisory from the first round is also resolved as a side effect of the real-run re-pin. The stacked `_held_symbols` strategy fix is a genuine Weinstein-correctness improvement (not just a refactor that enables the re-pin) — it fixes a symbol-blacklist bug that would systematically degrade multi-year backtest behavior, and its domain reasoning is soundly reflected in the re-pinned `test_weinstein_backtest` counts (more round-trips, slightly worse max_dd, same end value). Header comments on every fixture now explicitly spell out the `total_trades = List.length round_trips` semantics, closing the ambiguity that caused the prior F1 failure. The `test_weinstein_strategy.ml` tests for `_held_symbols` are well-scoped (mixed-state coverage + all-Closed regression guard) and use the matchers library correctly. Test-code cleanup per `.claude/rules/test-patterns.md` (single `assert_that` + `all_of` + `field`) is applied. No behavioral gaps found.
+
+### Behavioral Verdict
+
+APPROVED
+
+Both prior NEEDS_REWORK blockers (U6 at 005a514, F1 at 8ccc8c8) are resolved; the BC4 advisory is also resolved. The stacked `_held_symbols` strategy fix is domain-correct per Weinstein's re-entry rules, and the `test_weinstein_backtest.ml` re-pin values are internally consistent with the fix.
+
+overall_qc: **APPROVED**
+structural_qc: APPROVED (SHA e59f8d2)
+behavioral_qc: APPROVED (SHA e59f8d2)
 
