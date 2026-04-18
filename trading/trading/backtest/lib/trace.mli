@@ -79,8 +79,8 @@ val record :
   'a
 (** [record ?trace phase f] runs [f ()] and, if [trace] is [Some _], appends a
     [phase_metrics] row with measured [elapsed_ms] and [peak_rss_mb]. The
-    optional [?symbols_in], [?symbols_out], [?bar_loads] are stored as
-    [Some n] when passed and [None] when omitted.
+    optional [?symbols_in], [?symbols_out], [?bar_loads] are stored as [Some n]
+    when passed and [None] when omitted.
 
     The [f ()] return value is always passed through, even when [trace] is
     [None] — so the caller can wrap any block unconditionally. *)

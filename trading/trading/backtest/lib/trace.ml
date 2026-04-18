@@ -38,8 +38,7 @@ let _parse_vmhwm_line line : int option =
   String.drop_prefix line (String.length "VmHWM:")
   |> String.strip
   |> String.chop_suffix_if_exists ~suffix:"kB"
-  |> String.strip
-  |> Int.of_string_opt
+  |> String.strip |> Int.of_string_opt
   |> Option.map ~f:(fun kb -> kb / 1024)
 
 (** Scan [ic] line-by-line for a [VmHWM:] entry. Returns [None] if no such line.
