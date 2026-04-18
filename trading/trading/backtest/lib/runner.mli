@@ -7,8 +7,14 @@ open Core
 type result = {
   summary : Summary.t;
   round_trips : Trading_simulation.Metrics.trade_metrics list;
+      (** Completed round-trips derived from *every* step in
+          [start_date..end_date] — the [is_trading_day] mark-to-market filter is
+          NOT applied here, since trade fills are recorded independently of
+          mark-to-market portfolio valuation. *)
   steps : Trading_simulation_types.Simulator_types.step_result list;
-      (** Steps filtered to [start_date..end_date] on real trading days only *)
+      (** Steps filtered to [start_date..end_date] on real trading days only.
+          Used for the equity curve and any downstream consumer that needs a
+          meaningful mark-to-market portfolio value per row. *)
   overrides : Sexp.t list;
       (** The override sexps used for this run, echoed into params.sexp *)
   stop_infos : Stop_log.stop_info list;
@@ -17,6 +23,20 @@ type result = {
           trigger (stop-loss, take-profit, etc.). Keyed by position_id; joinable
           with [round_trips] via symbol + entry_date. *)
 }
+
+val is_trading_day :
+  Trading_simulation_types.Simulator_types.step_result -> bool
+(** True if [step] represents a real trading day — i.e. the portfolio's
+    mark-to-market value materially differs from its cash balance when any
+    positions are open, or if no positions are open. On non-trading days
+    (weekends, holidays) the simulator has no price bars and reports
+    [portfolio_value = cash] even when positions exist.
+
+    This filter is appropriate for mark-to-market aware consumers (the equity
+    curve, [UnrealizedPnl]) but MUST NOT be applied before round-trip extraction
+    — doing so silently drops trades whose entry/exit steps had no
+    mark-to-market view. See PR #393 (filter introduction) and the trades.csv
+    fix note in [runner.ml]. *)
 
 val run_backtest :
   start_date:Date.t ->

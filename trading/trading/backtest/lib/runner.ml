@@ -24,9 +24,19 @@ type result = {
 
 (** True if [step] represents a real trading day. On non-trading days (weekends,
     holidays) the simulator has no price bars and reports
-    [portfolio_value = cash] even when positions are open. *)
-let _is_trading_day
-    (step : Trading_simulation_types.Simulator_types.step_result) =
+    [portfolio_value = cash] even when positions are open.
+
+    Important: this heuristic exists only for mark-to-market aware consumers
+    such as [UnrealizedPnl] (see PR #393). It must NOT be applied to round-trip
+    extraction — round-trips are derived from position-state transitions
+    (fills), which are recorded independently of whether the portfolio's
+    mark-to-market view is populated that day. Applying this filter before
+    [Metrics.extract_round_trips] silently drops every trade whose entry *and*
+    exit landed on steps where [portfolio_value ~ cash], which happens for
+    instance when the only non-[Holding] positions are [Entering]/[Closed] (they
+    contribute 0.0 to [Portfolio_view.portfolio_value]). *)
+let is_trading_day (step : Trading_simulation_types.Simulator_types.step_result)
+    =
   let has_positions =
     not (List.is_empty step.portfolio.Trading_portfolio.Portfolio.positions)
   in
@@ -189,13 +199,23 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override ()
   let stop_log = Stop_log.create () in
   let sim = _make_simulator deps ~stop_log ~start_date ~end_date in
   let sim_result = _run_simulator sim in
-  let steps =
+  (* Steps in the requested date range, all days included. Round-trip
+     extraction derives trades from position-state transitions recorded on
+     these steps, so it must see *every* step where a trade fill happened —
+     including days the [is_trading_day] mark-to-market heuristic would
+     otherwise discard. *)
+  let steps_in_range =
     List.filter sim_result.steps
       ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
-        Date.( >= ) s.date start_date && _is_trading_day s)
+        Date.( >= ) s.date start_date)
   in
+  (* Steps on real trading days only — used for [UnrealizedPnl] consumers and
+     anything else that needs a meaningful mark-to-market portfolio value.
+     See PR #393 context: the simulator reports [portfolio_value = cash] on
+     weekends/holidays even when positions are open. *)
+  let steps = List.filter steps_in_range ~f:is_trading_day in
   let final_value = (List.last_exn steps).portfolio_value in
-  let round_trips = Metrics.extract_round_trips steps in
+  let round_trips = Metrics.extract_round_trips steps_in_range in
   let stop_infos = Stop_log.get_stop_infos stop_log in
   let summary : Summary.t =
     {
