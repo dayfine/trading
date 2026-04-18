@@ -121,11 +121,12 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
      `trading/trading/backtest/` (added today via #315/#316) are
      invisible. Either generalise the check or add per-subsystem
      coverage.
-  2. **Status file template enforcement** — three status files
-     (`portfolio-stops.md`, `screener.md`, `simulation.md`) had stale
-     `## Recent Commits` sections in violation of the template's
-     "omit" rule. Stripped in this PR; deep scan should grep for the
-     forbidden heading and warn.
+  2. ~~**Status file template enforcement**~~ — DONE: Check 10 added to
+     `trading/devtools/checks/deep_scan.sh`; greps `dev/status/*.md` for
+     forbidden `## Recent Commits` heading; findings emitted under
+     `## Status File Template` in `dev/health/YYYY-MM-DD-deep.md`.
+     Smoke test: `trading/devtools/checks/deep_scan_recent_commits_check.sh`.
+     Zero current violations. Verify: `dune runtest devtools/checks/`.
   3. **Linter exception expiry** — `linter_exceptions.conf` entries
      with `review_at: <milestone>` (e.g. M5) are never re-surfaced
      when the milestone lands. Add a check that compares current
@@ -244,6 +245,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - [x] qc-structural: P1/P2/P4 items updated to "verified by linter (H3)" — QC no longer manually re-scans these; linters are the deterministic gate. Verify: read `qc-structural.md` checklist — P1/P2/P4 items reference linter gates.
 - [x] T3-F: `docs/design/dependency-rules.md` created — R1–R6 rules with lifecycle states (`proposed` / `monitored` / `enforced`); R1, R4, R6 enforced via dune tests; R2, R3 monitored; R5 proposed. Verify: file exists; `dune runtest trading/devtools/checks/` enforces R1.
 - [x] T3-F: Architecture graph analyzer — Check 9 added to `trading/devtools/checks/deep_scan.sh`; grep-based MVP covering the two monitored rules: R2 (trading/trading/weinstein/ must not open analysis modules) and R3 (trading.simulation must not be a library dependency of live execution paths). Findings emitted under `## Architecture Graph` in `dev/health/YYYY-MM-DD-deep.md`; violations are INFO (monitored — human decides to promote to enforced). Companion smoke test at `trading/devtools/checks/deep_scan_arch_graph_check.sh` wired into `dune runtest`. Verify: `sh trading/devtools/checks/deep_scan.sh` — report contains `## Architecture Graph` with R2 and R3 sub-sections; `dune runtest devtools/checks/` — prints `OK: deep scan Architecture Graph section (T3-F) structural check passed.`
+
+### Deep scan heuristic gap sub-item 2: Status file template enforcement
+
+- [x] Check 10 added to `trading/devtools/checks/deep_scan.sh` — greps `dev/status/*.md` for the forbidden `## Recent Commits` heading (anchored to line start) and emits findings under `## Status File Template` in `dev/health/YYYY-MM-DD-deep.md`. WARNING severity (easy fix: delete the section). Zero current violations (all three previously-offending files were already stripped). Smoke test: `trading/devtools/checks/deep_scan_recent_commits_check.sh` — verifies Check 10 logic markers are present in `deep_scan.sh` and that the most-recent deep scan report contains `## Status File Template`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest devtools/checks/` — prints `OK: deep scan Status File Template section (Recent Commits guard) structural check passed.`
 
 ### T3-E: Cost/token budget visibility
 

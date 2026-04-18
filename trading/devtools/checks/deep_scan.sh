@@ -1,7 +1,7 @@
 #!/bin/sh
 # Deep scan for health-scanner agent (T3-A).
 #
-# Runs weekly (not on every PR). Performs nine read-only analyses:
+# Runs weekly (not on every PR). Performs ten read-only analyses:
 #   1. Dead code detection — .ml files not referenced in any dune file
 #   2. Design doc drift — module structure vs eng-design docs
 #   3. TODO/FIXME/HACK accumulation
@@ -11,6 +11,7 @@
 #   7. Harness scaffolding review — flag unused or broken harness components
 #   8. Trends — followup-item delta + CC distribution delta (T3-G)
 #   9. Architecture graph — import edges vs dependency-rules.md (T3-F)
+#  10. Status file template enforcement — forbidden ## Recent Commits heading
 #
 # Output: dev/health/YYYY-MM-DD-deep.md
 #
@@ -950,6 +951,39 @@ else
 fi
 
 # ────────────────────────────────────────────────────────────────
+# Check 10: Status file template enforcement
+#
+# The dev/status/*.md template explicitly forbids a ## Recent Commits
+# section — that content drifts and belongs in git log, not a status file.
+# Any status file that still contains this heading is in violation.
+#
+# Findings are WARNINGs (template violation; easy fix: delete the section).
+# The check greps for the heading anchored to the start of the line so
+# it only fires on actual markdown headings, not inline mentions.
+# ────────────────────────────────────────────────────────────────
+
+RECENT_COMMITS_DETAILS=""
+RECENT_COMMITS_COUNT=0
+
+for status_file in "${REPO_ROOT}"/dev/status/*.md; do
+  [ -f "$status_file" ] || continue
+  # Grep for the forbidden heading at line start
+  matches="$(grep -n '^## Recent Commits' "$status_file" 2>/dev/null || true)"
+  if [ -n "$matches" ]; then
+    fname="$(basename "$status_file")"
+    while IFS= read -r match_line; do
+      [ -z "$match_line" ] && continue
+      RECENT_COMMITS_COUNT=$((RECENT_COMMITS_COUNT + 1))
+      lineno="$(echo "$match_line" | cut -d: -f1)"
+      add_warning "Status file template violation: \`dev/status/${fname}\` line ${lineno} contains forbidden '## Recent Commits' heading — delete this section"
+      RECENT_COMMITS_DETAILS="${RECENT_COMMITS_DETAILS}  - \`dev/status/${fname}\`: line ${lineno} — forbidden '## Recent Commits' heading\n"
+    done << RCEOF
+${matches}
+RCEOF
+  fi
+done
+
+# ────────────────────────────────────────────────────────────────
 # Generate report
 # ────────────────────────────────────────────────────────────────
 
@@ -999,6 +1033,7 @@ cat >> "$OUTPUT_FILE" <<METRICS_EOF
 - Open follow-up items: ${FOLLOWUP_COUNT} (maintenance threshold: 10)
 - QC calibration findings: ${QC_CAL_COUNT} (dune available: ${DUNE_AVAILABLE})
 - Architecture graph violations (monitored): ${ARCH_GRAPH_VIOLATION_COUNT}
+- Status file template violations (forbidden ## Recent Commits): ${RECENT_COMMITS_COUNT}
 METRICS_EOF
 
 # Append detail sections if non-empty
@@ -1022,6 +1057,19 @@ if [ -n "$SCAFFOLD_DETAILS" ]; then
   printf "Per-component audit (PASS = referenced/wired, WARNING = unused or broken reference):\n\n" >> "$OUTPUT_FILE"
   printf '%b' "$SCAFFOLD_DETAILS" >> "$OUTPUT_FILE"
 fi
+
+# Always emit the Status File Template section (Check 10).
+{
+  printf "\n## Status File Template\n\n"
+  printf "Checks dev/status/*.md for the forbidden '## Recent Commits' heading.\n"
+  printf "The template requires omitting this section (content drifts; use git log instead).\n\n"
+  if [ "$RECENT_COMMITS_COUNT" -eq 0 ]; then
+    printf "No violations found.\n"
+  else
+    printf "**${RECENT_COMMITS_COUNT} violation(s):**\n\n"
+    printf '%b' "$RECENT_COMMITS_DETAILS"
+  fi
+} >> "$OUTPUT_FILE"
 
 # Always emit the Architecture Graph section (Check 9).
 # Monitored-rule violations are INFO (not failures) — human decides to promote.
