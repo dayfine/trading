@@ -123,11 +123,11 @@ Common verifications:
   cd trading/trading && dune build @runtest --force 2>&1 | tail -10
   echo "exit=$?"
   ```
-  Run from the inner `trading/trading/` directory (the dune project root).
-  Exit 0 = baseline is green, inherited critical is **resolved** — drop.
-  **Do NOT invoke linter binaries directly** (e.g. `nesting_linter.exe
-  <path>`) — path-substitution bugs cause false positives (seen
-  2026-04-18). The dune alias is the source of truth because CI uses it.
+  Run from the inner `trading/trading/` directory. Exit 0 = baseline is
+  green, inherited critical is **resolved** — drop. When carrying
+  forward, quote the original linter + violation count verbatim from the
+  prior summary (don't paraphrase — seen 2026-04-18 → today, a
+  `fn_length` finding got rewritten as `nesting` on carry-forward).
 
 - **"Open PR #X is failing CI"**: re-check PR status via REST
   (`/repos/<owner>/<repo>/pulls/<N>/commits/<sha>/check-runs`). If the
