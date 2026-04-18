@@ -95,6 +95,16 @@ jobs:
         with:
           # Full history so jj can see main@origin and rebase properly.
           fetch-depth: 0
+          # Use the PAT so actions/checkout writes BOT_GITHUB_TOKEN into
+          # origin's http.extraheader. Subagent `jj git push` calls then
+          # authenticate as the PAT owner, which is what makes the
+          # downstream CI workflow fire on the pushed branch (GitHub
+          # suppresses workflow triggers for pushes authenticated with
+          # the ephemeral GITHUB_TOKEN — see the secrets block above for
+          # the full rationale). Without this override, checkout defaults
+          # to GITHUB_TOKEN and every subagent push ends up in "Action
+          # required" limbo instead of running CI.
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
 
       - name: Compute today's date
         id: today
