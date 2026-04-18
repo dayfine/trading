@@ -2,5 +2,7 @@
   "followup_threshold": 10,
   "maintenance_cycle_ratio": 3,
   "auto_merge_enabled": false,
-  "max_daily_cost_usd": 50.0
+  "max_daily_cost_usd": 50.0,
+  "target_utilization_low": 0.60,
+  "target_utilization_high": 0.80
 }
