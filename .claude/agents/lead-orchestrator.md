@@ -376,19 +376,69 @@ If no trigger fires, dispatch normally without this paragraph.
 
 ---
 
-## Step 3.75: Budget check before parallel dispatch
+## Step 3.75: Budget check and fill-window dispatch
 
-Before spawning any subagent batch, sanity-check the budget situation:
+**Target utilization:** 60–80% of `max_daily_cost_usd` per run (read from
+`dev/config/merge-policy.json`; defaults: `target_utilization_low = 0.60`,
+`target_utilization_high = 0.80`). Each GHA run fires inside a rolling
+5-hour Claude quota window shared across all runs in that window. Under-shooting
+wastes quota capacity; over-shooting risks hitting the rate limit mid-run.
 
-- The previous same-day run log (`dev/logs/<YYYY-MM-DD>-run<N-1>.jsonl` or the most recent date) is the best signal. If that run terminated with `"error":"rate_limit"` or `"terminal_reason"` other than `"completed"`, the 5-hour quota was hit last time. Assume it's still constrained until the next reset.
-- Read `max_daily_cost_usd` from `dev/config/merge-policy.json` (default: 50.0). If the last run's total cost was >= 60% of that cap, or output tokens >= 200k, the combined cost of today's full eligible set is likely similar.
+### Step 3.75a: Hard-stop check (rate-limit recovery)
 
-When either of those is true, **reduce scope rather than spawn everything**:
-- Pick the 2 highest-priority tracks per `dev/status/_index.md` (skip MERGED, prefer tracks with open PRs awaiting follow-up > ready-to-pick-up > idle)
-- Defer the rest to the next run by leaving them idle in the index
-- Note the deferral and the budget cap in the daily summary's Escalations section so the human can see what was skipped and why
+Check the previous run's exit state first:
 
-On an otherwise clean budget (last run completed, cost < 40% of `max_daily_cost_usd`), dispatch up to the environment-specific cap: **2 parallel locally, 1 sequentially in GHA**. Never exceed those numbers — see Step 4 for why the caps differ by environment. The cap covers throughput dispatch only; it is not sized for candidate-comparison runs (see Step 4).
+- If the prior run log (`dev/daily/<most-recent>.md`) shows `killed mid-flight:
+  Yes — rate_limit`, assume the 5-hour quota is still constrained. Dispatch
+  **at most 1 track** this run and skip Step 3.75b.
+- Otherwise proceed to Step 3.75b.
+
+### Step 3.75b: Initial dispatch sizing
+
+Read `max_daily_cost_usd` from `dev/config/merge-policy.json` (default: 50.0).
+Estimate total cost for the full eligible track set (rough: each feat-agent
+~$2–4, each QC pair ~$3, each harness item ~$1, health-scanner ~$0.25).
+
+- If estimated total < `target_utilization_low * max_daily_cost_usd`:
+  dispatch **all eligible tracks** up to the environment cap (see Step 4).
+- If estimated total is in the target band (60–80%): dispatch normally.
+- If estimated total > `target_utilization_high * max_daily_cost_usd`:
+  pick the highest-priority tracks until estimated cost crosses 60%, then stop.
+  Defer the rest; note in daily summary §Escalations what was deferred and why.
+
+**Do NOT use queue-depth reasoning to skip eligible tracks.** A track is
+either eligible (per Step 1.5 PR-open guard) or it is not. If it is eligible,
+dispatch it — open PRs in the human review queue are the human's throughput
+concern, not the orchestrator's. The orchestrator's job is to maximize
+useful work within the quota, not to manage reviewer load.
+
+### Step 3.75c: Fill-remaining-budget loop (post-initial-dispatch)
+
+After all initially-dispatched agents have returned and their costs are known,
+recheck utilization:
+
+```
+actual_cost = sum of all subagent estimated costs this run + orchestrator overhead (~$1)
+if actual_cost < target_utilization_low * max_daily_cost_usd:
+    for each remaining eligible track (ordered by priority):
+        if actual_cost + estimated_track_cost <= target_utilization_high * max_daily_cost_usd:
+            dispatch this track
+            actual_cost += estimated_track_cost
+        else:
+            break  # next track would breach the high-water mark
+```
+
+"Remaining eligible track" means: any track that was not dispatched in the
+initial batch and is not blocked by a hard dependency (Step 2e). Harness items
+and ops-data count as tracks for this loop.
+
+Log each fill-loop dispatch decision in `## Dispatched this run` with the note
+`(fill-loop dispatch — utilization was X% after initial batch)`.
+
+If after the fill loop utilization is still < 60% AND no eligible tracks remain,
+note it in the daily summary's `## Budget` section as:
+`Under-target: all eligible tracks dispatched; no remaining work this window.`
+This distinguishes "nothing to do" from "something was skipped."
 
 ## Step 4: Spawn feature agents
 
@@ -404,9 +454,20 @@ Dispatch shape depends on environment. Inspect `$TRADING_IN_CONTAINER` (set by t
 
 ### GHA (TRADING_IN_CONTAINER=1)
 
-- Use **git** for VCS (no jj available in the container, and sequential dispatch makes isolation unnecessary anyway).
-- Cap: **1 subagent at a time**. Sequential only. No parallelism means no working-copy race; subagents run directly in the repo checkout. Each subagent does `git fetch origin && git checkout -b feat/<feature> origin/main`.
-- No cleanup step needed — sequential sessions don't leave stale branches beyond what's pushed to origin.
+- Use **git** for VCS (jj is not available in the GHA container).
+- Cap: **2 parallel subagents** per Agent message batch. Each subagent works on a
+  separate branch (`git checkout -b feat/<feature> origin/main`) — branches are
+  independent so parallel runs do not collide on the working tree. The Agent tool
+  spawns them concurrently via a single message with multiple sub-items; each
+  subagent operates in its own subprocess with its own git working copy state.
+- If the Agent tool does not support concurrent spawning in the container runtime,
+  fall back to **3 sequential subagents** per run (dispatch the next one
+  immediately after the prior returns, without waiting for human review). 3
+  sequential agents can easily reach 60-80% of a $50 daily cap.
+- Each subagent does: `git fetch origin && git checkout -b <branch> origin/main`
+  at session start. No cleanup needed — pushed branches persist; stale local
+  state from a prior sequential agent does not carry over because each subagent
+  starts with a fresh checkout command.
 
 Do NOT set `isolation: "worktree"` on the Agent tool in either path. Local uses `jj workspace add`; GHA doesn't need isolation at all. Mixing git-worktree with jj caused the 2026-04-15 "worktree has no .jj/" failure; mixing at all is the confusion source we're fixing.
 
@@ -778,6 +839,7 @@ parses this table to detect redundant re-dispatch.
 ## Budget
 (Token and cost tracking for this orchestrator run)
 - Budget cap: $<max_daily_cost_usd from dev/config/merge-policy.json> (from merge-policy.json)
+- Target utilization: <target_utilization_low * 100>%–<target_utilization_high * 100>% (from merge-policy.json)
 - Subagents spawned: <N total>
 - Per-subagent breakdown:
   | Agent | Model | Status | Est. tokens | Est. cost |
@@ -785,6 +847,9 @@ parses this table to detect redundant re-dispatch.
   | <name> | <model> | completed / killed (reason) | <if available> | <if available> |
 - Any subagent killed mid-flight: Yes/No — <reason: rate_limit / timeout / error>
 - Budget utilization: <total estimated cost> / $<cap> (<percentage>%)
+- Utilization assessment: IN_TARGET (60–80%) | UNDER_TARGET (<60%) | OVER_TARGET (>80%)
+  - If UNDER_TARGET: state whether all eligible tracks were dispatched ("all-work-done") or whether tracks were skipped with reasons ("skipped: <list>"). A run below 50% with skipped tracks is an escalation item.
+  - If OVER_TARGET: flag in §Escalations — reduce scope on the next run.
 - Scope reduced due to budget: Yes/No — <deferred tracks if yes>
 
 ## Data Operations
