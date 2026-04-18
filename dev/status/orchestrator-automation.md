@@ -360,6 +360,22 @@ Verify: `grep -n "Step 1.5\|Pending work\|Dispatched this run\|Reviewed SHA\|Run
 
 - **§3 (carried-forward `harness/t3g-trend-analysis@origin`, `ops/daily-2026-04-16-run4@origin`)**: both already gone (HTTP 404 on origin) before this run. Resolved by the originating session cleanup.
 
+### 2026-04-18
+
+Retrospective close-out of `dev/daily/2026-04-18.md` run-1 escalations.
+Logged here so the next plan-mode run (once Step 1c verification is
+operational) has a clean reference instead of inheriting stale text.
+
+- **§1 `[critical]` Main baseline red — function-length linter (2 violations).** Accurately reported at the time (`run` in `fetch_finviz_sectors_lib.ml:167` was 102 lines; `test_keep_if_sector_rescues_reits` was 69 lines). **Resolved by PR #404** (merged 2026-04-17) which refactored both under the 50-line cap. Current main `dune build @runtest` exits 0. The 2026-04-18 run-2 nesting-linter numbers (49 fn + 6 file) are **not** a gate — nesting_linter prints FAIL lines but exits 0 per its `dune` rule (warnings-only). Later summaries that cited "nesting linter gating exit 1" conflated fn_length (real gate, fixed) with nesting (advisory, pre-existing).
+
+- **§2 `[medium]` `linter_magic_numbers.sh` comment-skip heuristic — root cause of #409 P2 NEEDS_REWORK.** The reviewer suggested three options (a) reword comment (b) relocate date (c) fix linter. **Partially resolved** — #409 was reviewed under option (a)/(b) but later commits (through #414) re-introduced date + PR-number tokens in new block comments (`weinstein_strategy.ml:122,126`, `runner.ml:30,214`). The linter still prints `FAIL:` lines for these but its dune rule returns exit 0, so CI stays green — it's advisory noise, not a gate. Stripped the offending tokens from the affected comments in this PR (dates/PR numbers dropped; `git blame` recovers the same info when needed). **The underlying linter weakness remains** (multi-line comment state tracking) — harness follow-up, non-blocking.
+
+- **§3 `[info]` Orchestrator under-utilized (~16% of $50 cap).** Non-actionable by design — queue-depth bound. Label was correct (`[info]`), carried because the pattern persists. Still current; still `[info]`. No action needed.
+
+- **§4 `[info]` #399 merge timing after re-QC.** **Resolved** — PR #399 merged 2026-04-18 on current tip.
+
+- **Retrospective-note addendum.** The 2026-04-17-plan.md run on 2026-04-18 propagated §1 as "nesting linter gating exit 1" — a **paraphrase** that changed the linter and gate semantics. Step 1c (PR #415) was introduced as the durable fix: verify carried-forward `[critical]` items before propagating, and quote the original finding verbatim rather than rewriting. The plan-mode verification gap (Step 1c currently skipped under "plan mode is read-only") is tracked separately.
+
 ## References
 
 - Research transcript: research agent run 2026-04-14 (see Escalations in

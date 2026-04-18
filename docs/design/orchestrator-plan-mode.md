@@ -7,15 +7,33 @@ When the dispatch prompt contains the token `--plan` (e.g. `dev/run.sh
 
 ## Contract
 
+"Read-only" means **no state-changing effects** (no subagent spawn, no
+branch push, no writes to `dev/status/*.md` / `dev/reviews/*.md` /
+source files). It does NOT mean "no subprocesses." Verification
+subprocesses that only read state — `dune build @runtest --force`, curl
+REST GETs against GitHub, `jj log`, `ls` — are pure observations and
+**MUST** run. Skipping them produces a plan built on yesterday's
+assumptions (see 2026-04-18 → 2026-04-17-plan for a case where skipping
+verification cascaded stale `[critical]`s through the whole plan).
+
 - **Do NOT dispatch any subagents.** Skip Steps 2 through 6 entirely — no
   feat-agent, qc-structural, qc-behavioral, harness-maintainer,
-  health-scanner, or ops-data spawns. Plan mode is read-only.
+  health-scanner, or ops-data spawns.
 - **Do all of Step 1** (read current state — `dev/decisions.md`, every
   `dev/status/*.md`, `dev/notes/data-gaps.md`, existing `dev/reviews/*.md`).
-  This is cheap and the plan depends on it.
+- **Do all of Step 1b + 1c** (drift cross-reference + carry-forward
+  verification). The verification commands listed in Step 1c are read-only
+  and must actually run — `dune build @runtest --force` exit code,
+  `curl .../pulls/<N>/commits/<sha>/check-runs`, etc. A plan that writes
+  "Plan mode: NOT executed. Assumption: <stale>" for a `[critical]` is a
+  broken plan.
+- **Do the Step 1.5 PR-open guard** including the live REST query for
+  each eligible track. Don't substitute `_index.md`-based speculation —
+  `_index.md` lags reality until Step 5.5 reconciles it, and a real run
+  would query PR state anyway.
 - **Emit the dispatch plan** — what would have been dispatched, why, and on
-  which branch. Organise as the same sections the daily summary uses, filled
-  with plan-mode content:
+  which branch. Organise as the same sections the daily summary uses,
+  filled with plan-mode content:
   - Which blocking refactors (2a) would run
   - Whether the followup accumulation threshold (2b) is met
   - Which harness backlog item (2c) is highest-priority open
