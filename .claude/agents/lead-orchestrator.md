@@ -152,6 +152,30 @@ FOR each eligible track from Step 1:
     → dispatch feat-agent normally (proceed to Step 2)
 ```
 
+**This guard is PER TRACK, not per agent.** An agent that owns multiple
+tracks (e.g. `feat-weinstein` owns `portfolio-stops`, `simulation`,
+`short-side-strategy`) can be dispatched independently on each. Only the
+specific track with an open PR skips. Do not cascade "agent X has an open
+PR on track A" into "skip track B also owned by agent X."
+
+**Not valid skip reasons** — do NOT use any of these to bypass a dispatch
+the above rules say should run:
+
+- "Main's CI is red / unrelated baseline breakage." The dispatched PR will
+  fail CI for the same reason main is red; that's a CI/baseline problem,
+  not a dispatch problem. The agent still produces useful work; the human
+  clears the red once and all PRs turn green together.
+- "Queue depth is high / human hasn't reviewed yet." Review pacing is a
+  human concern, not orchestrator judgment. See also PR #405.
+- "Another run might pick it up later." Defer only if explicitly blocked
+  per Step 1 dependency analysis.
+- "I'd rather wait until <unrelated PR> lands." If the track is
+  independent of that PR, dispatch it.
+
+If you find yourself writing a skip reason that doesn't match the rules
+above, the default is to dispatch. Surface any ambiguity as an
+`[info]`-tagged escalation for human review, don't silently skip.
+
 **ops-data sentinel check:** Before dispatching ops-data, compare the current
 content of `dev/notes/data-gaps.md` against what the prior daily summary
 recorded in its `## Data Operations` section. If unchanged, skip ops-data
@@ -816,6 +840,12 @@ Parseable state table — one row per tracked non-MERGED track. "State" must be 
 
 One row per agent spawn (including skipped ones with reason). A subsequent run
 parses this table to detect redundant re-dispatch.
+
+**Track column uses TRACK NAMES only** (e.g. `backtest-infra`,
+`short-side-strategy`, `harness`, `ops-data`), never agent names
+(`feat-backtest`, `feat-weinstein`). When you skip a track because its
+owner agent has an open PR on a DIFFERENT track, the Track column stays
+the track being skipped; put the cross-track reason in Notes.
 
 | Track | Agent | Outcome | Notes |
 |-------|-------|---------|-------|
