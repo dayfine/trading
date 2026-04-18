@@ -57,10 +57,10 @@ let _gen_position_id symbol =
   Printf.sprintf "%s-wein-%d" symbol !_position_counter
 
 (** Normalise (entry, stop) to the order [Portfolio_risk.compute_position_size]
-    expects: entry first, stop below. For longs that's the identity
-    (stop < entry); for shorts we swap (stop > entry → [max, min]). The result
-    has the same absolute risk per share, so [sizing.shares] is unchanged
-    between sides. *)
+    expects: entry first, stop below. For longs that's the identity (stop <
+    entry); for shorts we swap (stop > entry → [max, min]). The result has the
+    same absolute risk per share, so [sizing.shares] is unchanged between sides.
+*)
 let _normalised_entry_stop_for_sizing (cand : Screener.scored_candidate) =
   let open Trading_base.Types in
   match cand.side with
@@ -86,8 +86,8 @@ let _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
   in
   let sizing =
     Portfolio_risk.compute_position_size ~config:config.portfolio_config
-      ~portfolio_value ~entry_price:entry_for_sizing
-      ~stop_price:stop_for_sizing ()
+      ~portfolio_value ~entry_price:entry_for_sizing ~stop_price:stop_for_sizing
+      ()
   in
   if sizing.shares = 0 then None
   else
@@ -149,9 +149,12 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
-(** Generate CreateEntering transitions for top screener candidates. Tracks
-    remaining cash to avoid generating orders that exceed funds. *)
-let _entries_from_candidates ~config ~candidates ~stop_states ~bar_history
+(** Generate CreateEntering transitions for screener candidates. Tracks
+    remaining cash to avoid generating orders that exceed funds.
+
+    Public (see .mli) so callers running custom screening out-of-band can feed
+    candidates through the same entry pipeline the strategy uses. *)
+let entries_from_candidates ~config ~candidates ~stop_states ~bar_history
     ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
   let held = held_symbols portfolio in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
@@ -207,7 +210,7 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
     screen_result.Screener.buy_candidates
     @ screen_result.Screener.short_candidates
   in
-  _entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
+  entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
     ~bar_history ~portfolio ~get_price ~current_date
 
 (* ------------------------------------------------------------------ *)
@@ -229,12 +232,12 @@ let _all_accumulated_symbols ~(config : config) : string list =
   let global_symbols = List.map config.indices.global ~f:fst in
   (config.indices.primary :: config.universe) @ sector_symbols @ global_symbols
 
-(** Run the Friday macro + screener path and return entry transitions. Under
-    all macro regimes (Bullish, Neutral, Bearish) the screener is invoked;
+(** Run the Friday macro + screener path and return entry transitions. Under all
+    macro regimes (Bullish, Neutral, Bearish) the screener is invoked;
     macro-specific gating — longs blocked under Bearish, shorts blocked under
-    Bullish — happens inside the screener. Under Bearish this yields
-    short-side entries (Weinstein Ch. 11), where previously the branch returned
-    [] unconditionally. *)
+    Bullish — happens inside the screener. Under Bearish this yields short-side
+    entries (Weinstein Ch. 11), where previously the branch returned []
+    unconditionally. *)
 let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
     ~current_date ~index_bars =

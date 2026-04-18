@@ -320,8 +320,8 @@ let _long_candidate ~weights ~thresholds ~params ~min_grade (a, sector) =
     strength, even if it breaks down. Rejects candidates whose RS trend is
     positive ([Positive_rising], [Positive_flat], [Bullish_crossover]).
     [Negative_improving] stays eligible — the stock is still rated negative
-    overall and the scorer reflects the weaker signal. Absent RS data is
-    treated as not-strong (doesn't block shorts). *)
+    overall and the scorer reflects the weaker signal. Absent RS data is treated
+    as not-strong (doesn't block shorts). *)
 let _rs_blocks_short = function
   | Some { Rs.trend = Positive_rising | Positive_flat | Bullish_crossover; _ }
     ->

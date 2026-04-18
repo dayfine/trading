@@ -101,16 +101,16 @@ type scored_candidate = {
   analysis : Stock_analysis.t;
   sector : sector_context;
   side : Trading_base.Types.position_side;
-      (** Which side this candidate is for — [Long] for buy candidates,
-          [Short] for short candidates. Long candidates come from the
-          buy-cascade path; short candidates from the short-cascade path. *)
+      (** Which side this candidate is for — [Long] for buy candidates, [Short]
+          for short candidates. Long candidates come from the buy-cascade path;
+          short candidates from the short-cascade path. *)
   grade : Weinstein_types.grade;
   score : int;
   suggested_entry : float;
       (** Suggested buy-stop entry price (breakout_price + small buffer). *)
   suggested_stop : float;
-      (** Suggested initial stop-loss. For longs, below the prior base low;
-          for shorts, above the prior rally high. *)
+      (** Suggested initial stop-loss. For longs, below the prior base low; for
+          shorts, above the prior rally high. *)
   risk_pct : float;
       (** |suggested_entry - suggested_stop| / suggested_entry. *)
   swing_target : float option;
