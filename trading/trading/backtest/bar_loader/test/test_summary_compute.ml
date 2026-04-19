@@ -44,22 +44,19 @@ let _mk_ohlc_bar ~date ~o ~h ~l ~c : Types.Daily_price.t =
 
 (** {1 ma_30w tests} *)
 
-(** With 30 weekly bars, the MA equals the mean of their closes. We use a decade
-    of daily bars (~260 / year × 1 year = ~260), which [daily_to_weekly] reduces
-    to ~52 weekly bars — enough for 30w MA. *)
+(** With 30 weekly bars all having close = 100.0, the MA is exactly 100.0.
+    Confirms the wiring (daily→weekly + last-N + average) without depending on
+    weekday/weekend boundary arithmetic. *)
 let test_ma_30w_returns_mean _ =
   let config = Summary_compute.default_config in
-  (* 300 consecutive daily bars starting on a Monday → ~60 weekly bars after
-     aggregation, which is more than [ma_weeks = 30]. *)
+  (* Flat closes — every weekly aggregate equals 100.0, so the 30-week mean is
+     exactly 100.0. Tests the wiring (daily→weekly + last-N + average) without
+     asserting against weekday-vs-weekend boundary arithmetic. *)
   let start_date = Date.create_exn ~y:2023 ~m:Jan ~d:2 in
-  (* Monday *)
-  let bars = _linear_bars ~n:300 ~start_date ~base:100.0 ~step:1.0 in
-  let result = Summary_compute.ma_30w ~config bars in
-  (* Hand-check: the MA is the mean of the last 30 weekly last-bar closes. The
-     test doesn't need to compute the exact value — only that it's finite and
-     within the plausible range of the generated series. *)
-  assert_that result
-    (is_some_and (is_between (module Float_ord) ~low:100.0 ~high:400.0))
+  let bars = _linear_bars ~n:300 ~start_date ~base:100.0 ~step:0.0 in
+  assert_that
+    (Summary_compute.ma_30w ~config bars)
+    (is_some_and (float_equal 100.0))
 
 let test_ma_30w_none_when_too_short _ =
   let config = Summary_compute.default_config in

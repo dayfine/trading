@@ -9,6 +9,7 @@
   trading.simulation.data
   indicators.time_period
   indicators.relative_strength
+  indicators.atr
   weinstein.stage
   weinstein.types)
  (preprocess
