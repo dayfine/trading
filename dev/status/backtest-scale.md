@@ -5,15 +5,16 @@
 ## Status
 READY_FOR_REVIEW
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata tier) implemented and pushed on `feat/backtest-tiered-loader`; 3b (Summary) is the next increment.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata tier) and 3b (Summary tier) implemented; 3c (Full tier) is next.
 
 ## Interface stable
-PARTIAL — 3a landed
+PARTIAL — 3a + 3b landed
 
-`Bar_loader.create` / `promote` / `demote` / `tier_of` / `get_metadata` / `stats` signatures are stable. `get_summary` and `get_full` currently return `unit option` placeholders; their return type becomes `Summary.t option` / `Full.t option` in 3b / 3c respectively.
+`Bar_loader.create` / `promote` / `demote` / `tier_of` / `get_metadata` / `get_summary` / `stats` signatures are stable. `create` takes `?benchmark_symbol` / `?summary_config` optional args introduced with 3b. `get_full` still returns `unit option`; its return type becomes `Full.t option` in 3c.
 
 ## Open PR
 - feat/backtest-tiered-loader — 3a open at https://github.com/dayfine/trading/pull/new/feat/backtest-tiered-loader (draft, awaiting QC).
+- feat/backtest-tiered-loader-3b-summary — 3b stacked on 3a, PR #438 (draft, ready to flip to ready at end of session).
 
 ## Blocked on
 - None. Plan approved; 3a unblocked once #433 merges.
@@ -56,8 +57,8 @@ Build alongside existing `Bar_history` — don't modify it.
 
 | # | Name | Scope | Size est. |
 |---|---|---|---|
-| 3a | Metadata tier | `Bar_loader` types + Metadata loader + tests | ~180 |
-| 3b | Summary tier | `Summary.t` + summary_compute + promote/demote | ~220 |
+| 3a | Metadata tier | `Bar_loader` types + Metadata loader + tests | ~180 (done) |
+| 3b | Summary tier | `Summary.t` + summary_compute + promote/demote | ~480 (done) |
 | 3c | Full tier | `Full.t` + promotion/demotion semantics | ~150 |
 | 3d | Tracer phases | `Promote_summary`/`Promote_full`/`Demote` in `Trace.Phase.t` | ~120 |
 | 3e | Runner flag plumbing | `loader_strategy` on Runner + Scenario + CLI | ~150 |
@@ -80,11 +81,31 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Next Steps
 
-1. QC review of 3a (feat/backtest-tiered-loader head).
-2. Dispatch 3b — Summary tier. Adds `Summary.t`, `summary_compute.{ml,mli}` (30w MA, ATR, stage heuristic, RS line from bounded bar tail), extends `promote ~to_:Summary_tier` and `get_summary` to return `Summary.t option`. ~220 lines per plan §3b.
-3. Subsequent increments 3c–3g follow per plan §Dependency graph.
+1. QC review of 3a (feat/backtest-tiered-loader head) and 3b (stacked PR #438).
+2. Dispatch 3c — Full tier. Adds `Full.t` + promotion/demotion semantics (retain raw OHLCV for actively traded symbols). ~150 lines per plan §3c.
+3. Subsequent increments 3d–3g follow per plan §Dependency graph.
 
 ## Completed
+
+- **3b — Summary tier** (2026-04-19). Added `Summary.t` record
+  (ma_30w / atr_14 / rs_line / stage / as_of) + `summary_compute.{ml,mli}`
+  with pure helpers (30w MA on weekly-aggregated closes, ATR-14,
+  Mansfield normalized RS line, Weinstein stage heuristic, composed via
+  `compute_values`). `Bar_loader.promote ~to_:Summary_tier` auto-promotes
+  through Metadata, reads a bounded 250-day tail via `Csv_storage`
+  (bypassing `Price_cache` so raw bars don't leak into the shared cache),
+  computes scalars, then drops the bars — the memory footprint per
+  Summary-tier symbol is fixed at a handful of floats. Insufficient
+  history leaves the symbol at Metadata (no error surfaced). Benchmark
+  bars are lazy-loaded and cached on the loader itself. `demote
+  ~to_:Metadata_tier` drops Summary scalars; `demote ~to_:Summary_tier`
+  is a no-op in 3b (Full lands in 3c). `Summary_compute` is re-exported
+  from the top-level `Bar_loader` module for external callers and tests.
+  Also folds in the 3a docstring cleanup (module-level comment said
+  "raise [Failure]" but impl returned `Error Status.Unimplemented`).
+  - Files: `bar_loader/{bar_loader.mli,bar_loader.ml,summary_compute.mli,summary_compute.ml,dune}` +
+    `bar_loader/test/{dune,test_metadata.ml,test_summary_compute.ml,test_summary.ml}`.
+  - Verify: `dune build trading/backtest/bar_loader && dune runtest trading/backtest/bar_loader` — 7 Metadata + 11 Summary_compute + 8 Summary tests pass.
 
 - **3a — Metadata tier + types scaffold** (2026-04-19). New library at
   `trading/trading/backtest/bar_loader/`. Exposes the full
