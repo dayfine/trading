@@ -3,12 +3,11 @@
 ## Last updated: 2026-04-19
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-All items done. Item 3 (refresh cadence hook) completed 2026-04-19 on
-`ops/sector-data-item-3` (PR #436) — awaiting human merge. Flips to
-MERGED once #436 lands; the orchestrator reconciles `dev/status/_index.md`
-on that run.
+All items done. Item 3 (refresh cadence hook) merged 2026-04-19 as #436
+(commit 0831127). Item 1 merged earlier as #349 (2026-04-15). Item 2
+(one-shot fetch) is operator-local; see note below.
 
 Item 1 merged (#349, 2026-04-15). Item 2 (one-shot fetch) ran locally
 on the operator's workstation and populated `data/sectors.csv`
