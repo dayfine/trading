@@ -137,11 +137,11 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
      `## Status File Template` in `dev/health/YYYY-MM-DD-deep.md`.
      Smoke test: `trading/devtools/checks/deep_scan_recent_commits_check.sh`.
      Zero current violations. Verify: `dune runtest devtools/checks/`.
-  3. **Linter exception expiry** — `linter_exceptions.conf` entries
+  3. ~~**Linter exception expiry** — `linter_exceptions.conf` entries
      with `review_at: <milestone>` (e.g. M5) are never re-surfaced
      when the milestone lands. Add a check that compares current
      milestone in `weinstein-trading-system-v2.md` against the
-     `review_at:` values.
+     `review_at:` values.~~ — DONE: see Completed section below
   4. **Stale local jj bookmarks** — bookmarks left around after PRs
      merge accumulate. Surface them with
      `jj bookmark list 'glob:*'` filtered against origin.
@@ -259,6 +259,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ### Deep scan heuristic gap sub-item 2: Status file template enforcement
 
 - [x] Check 10 added to `trading/devtools/checks/deep_scan.sh` — greps `dev/status/*.md` for the forbidden `## Recent Commits` heading (anchored to line start) and emits findings under `## Status File Template` in `dev/health/YYYY-MM-DD-deep.md`. WARNING severity (easy fix: delete the section). Zero current violations (all three previously-offending files were already stripped). Smoke test: `trading/devtools/checks/deep_scan_recent_commits_check.sh` — verifies Check 10 logic markers are present in `deep_scan.sh` and that the most-recent deep scan report contains `## Status File Template`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest devtools/checks/` — prints `OK: deep scan Status File Template section (Recent Commits guard) structural check passed.`
+
+### Deep scan heuristic gap sub-item 3: Linter exception expiry
+
+- [x] Check 11 added to `trading/devtools/checks/deep_scan.sh` — reads `trading/devtools/checks/linter_exceptions.conf`, extracts each entry's `# review_at:` annotation, and surfaces entries whose review point has passed. Two comparison modes: milestone labels (M1-M7 extracted from annotation value, including descriptive phrases containing a milestone token; compared against current milestone from `docs/design/weinstein-trading-system-v2.md` — if doc has no current-milestone marker, emits a parse warning and surfaces all milestone-pinned entries for manual review); date strings (YYYY-MM-DD; compared to today). Entries with `review_at: never` are permanently exempt. Entries missing any `review_at:` annotation are flagged as policy violations (T1-K) in a separate "Missing review_at" sub-section. WARNING severity (not blocking). Findings emitted under `## Linter Exception Expiry` in `dev/health/YYYY-MM-DD-deep.md`. Smoke test: `trading/devtools/checks/deep_scan_linter_expiry_check.sh` — verifies Check 11 markers present in `deep_scan.sh` and most-recent deep scan report contains `## Linter Exception Expiry`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` — prints `OK: deep scan Linter Exception Expiry section (T1-K) structural check passed.`
 
 ### T3-E: Cost/token budget visibility
 
