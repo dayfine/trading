@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-19 (run-3 reconcile: #434/#435/#436 still awaiting merge; #438 and #439 both reworked and now APPROVED)
+Last updated: 2026-04-19 (run-4 reconcile: #434, #435, #436, #439, #444, #445, #446 all merged since run-3; #438 closed (split into #444+#445); #447 3c-Full-tier and #448 harness-retire-fast-scan dispatched this run)
 
 ## Active + complete tracks
 
@@ -14,12 +14,12 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | MERGED | — | — | — (#419 per-phase tracing merged 2026-04-19) |
-| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #434, #438 | #434 (3a) QC APPROVED awaiting human merge. Stacked #438 (3b Summary tier) re-QC APPROVED (quality 4) — D4 `rs_line` weekly aggregation fix landed at cbb07da7. Both awaiting human merge. Stack at cap (2); 3c blocked until one merges. |
+| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #447 | 3a (#434), 3b-i (#444), 3b-ii (#445) all merged 2026-04-19. #447 (3c Full tier) dispatched run-4, structural QC APPROVED, behavioral QC N/A (no strategy behavior change until 3g parity test). Next: 3d (tracer phases) after #447 lands. |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
 | [short-side-strategy](short-side-strategy.md) | MERGED | — | — | — (#420 merged 2026-04-19). Follow-ups carried to own tracks: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — (#408 + #409 both merged 2026-04-18) |
-| [sector-data](sector-data.md) | READY_FOR_REVIEW | ops-data | #436 | Item 3 (ops-data manifest preflight) implemented — awaiting human merge; track closes to MERGED on merge. GHA runs still use `trading/test_data/sectors.csv`. |
-| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #435, #439, open | #435/#439 await merge. New: deep_scan.sh decomposed into per-check scripts under deep_scan/; byte-identical output verified; smoke tests updated; PR open (harness/deep-scan-decompose). Next: T3-A+ (move deep-scan to weekly cron; retire inline fast-scan). |
+| [sector-data](sector-data.md) | MERGED | — | — | — (#436 merged 2026-04-19). GHA orchestrator runs continue to consume `trading/test_data/sectors.csv`. |
+| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #448 | #435, #439, #446 all merged 2026-04-19. #448 (T3-A+ sub-item 2: retire inline health-scanner fast scan; fold `dune runtest` + `status_file_integrity.sh` into orchestrator Step 6 deterministic checks) dispatched run-4. Next after #448 lands: T3-A+ sub-item 1 (weekly GHA cron for deep scan). |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog populates from `dev/health/*-deep.md` and `*-fast.md` via lead-orchestrator Step 2e. One dispatch per run, ≤200 LOC, no behavior change. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |

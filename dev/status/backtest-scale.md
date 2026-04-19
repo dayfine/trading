@@ -5,18 +5,18 @@
 ## Status
 READY_FOR_REVIEW
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata tier) implemented and pushed on `feat/backtest-tiered-loader`; 3b (Summary) is the next increment.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged as #434; 3b-i (Summary_compute) merged as #444; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) open at #447 (structural QC APPROVED). 3d (tracer phases) is the next increment after #447 lands.
 
 ## Interface stable
-PARTIAL — 3a landed
+NO
 
-`Bar_loader.create` / `promote` / `demote` / `tier_of` / `get_metadata` / `stats` signatures are stable. `get_summary` and `get_full` currently return `unit option` placeholders; their return type becomes `Summary.t option` / `Full.t option` in 3b / 3c respectively.
+All three tier getters will return their typed option once #447 lands: `get_metadata : Metadata.t option` (live since 3a), `get_summary : Summary.t option` (live since 3b-ii #445 merged), `get_full : Full.t option` (comes with 3c #447). Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gains optional `?full_config` in 3c. Interface flips to YES once #447 merges; remaining churn (3d-3g) is internal to the runner path and does not affect Bar_loader public surface.
 
 ## Open PR
-- feat/backtest-tiered-loader — 3a open at https://github.com/dayfine/trading/pull/new/feat/backtest-tiered-loader (draft, awaiting QC).
+- #447 — `feat/backtest-tiered-loader-3c-full-tier` — 3c Full tier + promotion semantics (draft, structural QC APPROVED, awaiting merge).
 
 ## Blocked on
-- None. Plan approved; 3a unblocked once #433 merges.
+- None. 3d depends on #447 merging.
 
 ## Goal
 
