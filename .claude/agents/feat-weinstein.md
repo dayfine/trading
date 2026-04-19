@@ -59,6 +59,7 @@ Do **not** modify the state machine itself (Initial → FirstCorrection → Trai
 - [ ] `Stops.compute_initial_stop` accepts the output; behaviour under `None` is identical to today's fixed-buffer code path
 - [ ] Smoke test: run `Weinstein_strategy` on cached 2018-2023 data and confirm at least one Stage-2 entry places its initial stop based on a support-floor value (not the fixed-buffer proxy)
 - [ ] `dune build && dune runtest` passes, `dune build @fmt` passes
+- [ ] PR diff respects `## PR sizing` rules from `feat-agent-template.md` (≤500 LOC, one new module per PR)
 - [ ] No changes to screener, portfolio_risk, order_gen, or trading_state
 
 ## Not in scope
