@@ -142,9 +142,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
      when the milestone lands. Add a check that compares current
      milestone in `weinstein-trading-system-v2.md` against the
      `review_at:` values.~~ — DONE: see Completed section below
-  4. **Stale local jj bookmarks** — bookmarks left around after PRs
+  4. [~] **Stale local jj bookmarks** — bookmarks left around after PRs
      merge accumulate. Surface them with
      `jj bookmark list 'glob:*'` filtered against origin.
+     IN_PROGRESS: branch `harness/deep-scan-stale-bookmarks`.
   Source: `dev/daily/2026-04-14.md` end-of-day audit.
 
 ---
