@@ -85,11 +85,20 @@ let atr_14 ~config (bars : Types.Daily_price.t list) : float option =
       Some (_average window)
 
 let rs_line ~(config : config) ~stock_bars ~benchmark_bars : float option =
+  (* Weinstein §4.4 prescribes a weekly RS line with a long-term (52-week)
+     Mansfield zero line. [Relative_strength.analyze] is documented as taking
+     weekly bars, and [rs_ma_period = 52] means "52 weekly bars ≈ one year".
+     Aggregate daily inputs to weekly first so [rs_ma_period] is interpreted
+     in weeks — feeding daily bars directly would collapse the zero-line
+     window to ~2.5 months and distort the normalization. *)
   let rs_config : Relative_strength.config =
     { rs_ma_period = config.rs_ma_period }
   in
+  let stock_weekly = _weekly_bars stock_bars in
+  let benchmark_weekly = _weekly_bars benchmark_bars in
   match
-    Relative_strength.analyze ~config:rs_config ~stock_bars ~benchmark_bars
+    Relative_strength.analyze ~config:rs_config ~stock_bars:stock_weekly
+      ~benchmark_bars:benchmark_weekly
   with
   | None -> None
   | Some history -> (

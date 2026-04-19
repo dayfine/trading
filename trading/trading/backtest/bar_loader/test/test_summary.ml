@@ -52,17 +52,16 @@ let _fresh_data_dir () =
   Fpath.v dir
 
 (** Summary-tier fixture: enough daily bars ending at [as_of] for the loader's
-    default 250-day tail + 30-week MA to resolve.
+    default 250-day tail + 30-week MA + 52-week RS window to resolve.
 
     The loader only looks at bars in [as_of - tail_days, as_of]. With
-    [tail_days = 250] (default) that's ~250 calendar days ≈ ~35 ISO weeks, which
-    is enough to produce [ma_30w] (needs 30 weekly bars) and [rs_line] (needs
-    [rs_ma_period = 52] aligned bars — the loader aligns daily bars directly, so
-    250 aligned bars is plenty). We make the history go a bit past [tail_days]
-    to exercise the windowing. *)
+    [tail_days = 250] the tail is ~250 calendar days ≈ ~36 ISO weeks (before
+    aggregation); to produce [rs_line] we need [rs_ma_period = 52] WEEKLY bars
+    after aggregation, so we configure the loader to fetch a larger tail via
+    [summary_config] and generate ~420 days (~60 weeks) of history. *)
 let _summary_fixture ?(stock_step = 1.0) ?(benchmark_step = 1.0) () =
   let as_of = Date.create_exn ~y:2023 ~m:Dec ~d:29 in
-  let history_days = 350 in
+  let history_days = 420 in
   let start_date = Date.add_days as_of (-history_days) in
   let data_dir = _fresh_data_dir () in
   let stock_bars =
@@ -75,8 +74,12 @@ let _summary_fixture ?(stock_step = 1.0) ?(benchmark_step = 1.0) () =
   _write_symbol ~data_dir ~symbol:"SPY" ~bars:benchmark_bars;
   let sector_map = String.Table.create () in
   Hashtbl.set sector_map ~key:"STOCK" ~data:"Tech";
+  let summary_config =
+    { Bar_loader.Summary_compute.default_config with tail_days = history_days }
+  in
   let loader =
-    Bar_loader.create ~data_dir ~sector_map ~universe:[ "STOCK" ] ()
+    Bar_loader.create ~data_dir ~sector_map ~universe:[ "STOCK" ]
+      ~summary_config ()
   in
   (loader, as_of)
 
