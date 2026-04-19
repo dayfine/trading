@@ -3,7 +3,9 @@
 ## Last updated: 2026-04-18
 
 ## Status
-IN_PROGRESS — Phase 1 live; Phase 2 (background execution) pending.
+IN_PROGRESS
+
+Phase 1 live; Phase 2 (background execution) pending.
 
 Phase 1 (scheduled daily orchestrator on GHA) has been producing daily
 summary PRs since 2026-04-16. See `.github/workflows/orchestrator.yml`

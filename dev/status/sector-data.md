@@ -3,8 +3,9 @@
 ## Last updated: 2026-04-18
 
 ## Status
-IN_PROGRESS — Items 1, 2, 4, 4.1 done. Only Item 3 (refresh cadence
-hook) remains.
+IN_PROGRESS
+
+Items 1, 2, 4, 4.1 done. Only Item 3 (refresh cadence hook) remains.
 
 Item 1 merged (#349, 2026-04-15). Item 2 (one-shot fetch) ran locally
 on the operator's workstation and populated `data/sectors.csv`

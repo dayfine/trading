@@ -1,9 +1,11 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-18
+## Last updated: 2026-04-19
 
 ## Status
-READY_FOR_REVIEW
+MERGED
+
+Step 1 (#399) + Step 2 (#419) both landed. Step 3 continues on the backtest-scale track.
 
 ## QC
 
@@ -82,20 +84,19 @@ strategy code (currently complete).
   - Fixture files at `trading/test_data/backtest_scenarios/{goldens,smoke}/`
 
 ## Open PRs
-- `feat/backtest-phase-tracing` — PR #419 (draft → ready 2026-04-18).
-  Step 2 of scale-optimization plan. See §Completed first entry.
-- `feat/metrics-scenario-unrealized-pin` — follow-up to PR #393 (now
-  merged) that pins `unrealized_pnl` as a per-scenario range check
-  (see §Completed). Branches off current `main`.
+None. Merged in main:
+- #399 Step 1 (two-tier universe) — 2026-04-17.
+- #393 unrealized_pnl pin fix — 2026-04-17.
+- #395 per-scenario `unrealized_pnl` range check — merged 2026-04-17.
+- #419 Step 2 (per-phase tracing) — 2026-04-19.
 
 ## Next Steps
 
-- **Step 3 (tier-aware bar loader)** is the unblock target for
-  everything under this PR. Separately tracked at
-  `dev/status/backtest-scale.md`; landing order: PR #419 merges →
-  Step 3 can A/B the Legacy vs Tiered loader against a traced Legacy
-  baseline. Do not pick up Step 3 from this track — it has its own
-  status file and branch (`feat/backtest-tiered-loader`).
+- **Step 3 (tier-aware bar loader)** now unblocked; separately tracked at
+  `dev/status/backtest-scale.md`. A/B the Legacy vs Tiered loader
+  against a traced Legacy baseline. Do not pick up Step 3 from this
+  track — it has its own status file and branch
+  (`feat/backtest-tiered-loader`).
 - **Per-bar phase instrumentation** (Sector_rank through Order_gen)
   can land as a follow-up without changing the trace sexp schema — the
   Phase variants are already defined. See §Follow-up item 6.

@@ -79,8 +79,8 @@ Probe scripts under `dev/scripts/probes/`. Full writeup in `dev/notes/adl-valida
 
 ## Global Index Bars
 
-**Status**: Cached and verified (2026-04-10)  
-**Blocks**: Strategy wiring only (data is available)  
+**Status**: Cached and wired into strategy (PR #355, 2026-04-12)  
+**Blocks**: None — data is fetched and consumed.  
 **Affects**: `Macro.analyze ~global_index_bars`
 
 ### Current state
@@ -89,11 +89,9 @@ Probe scripts under `dev/scripts/probes/`. Full writeup in `dev/notes/adl-valida
 - N225.INDX (Nikkei 225): cached, 1965-01-05 to 2026-04-10 — VERIFIED
 - **FTSE 100 via `ISF.LSE` (iShares Core FTSE 100 UCITS ETF)** — **DECISION: use as proxy** (2026-04-10). Physical-replication tracker, ~bps tracking error, functionally indistinguishable from the index at weekly cadence. `UKX.INDX` returned empty; `ISF.LSE` fetched successfully (6,552 bars, 2000-05-02 to 2026-04-10) — VERIFIED (2026-04-11).
 
-### What's needed (escalation territory)
-- **feat-weinstein**: wire cached global index bars into strategy
-  (currently passes `~global_index_bars:[]`). Feature work, not
-  ops-data. NOTE: feat-weinstein's current scope is closed — surface
-  as escalation when dispatched.
+### What's needed
+- Nothing. Strategy wiring landed via PR #355. Keep the cache fresh
+  via the weekly refresh — no outstanding data-gap action.
 
 ---
 
