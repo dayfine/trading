@@ -92,6 +92,7 @@ type scored_candidate = {
   ticker : string;
   analysis : Stock_analysis.t;
   sector : sector_context;
+  side : Trading_base.Types.position_side;
   grade : grade;
   score : int;
   suggested_entry : float;
@@ -274,10 +275,14 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
   let swing =
     if is_short then None else _swing_target ~breakout ~base_low_opt:base_low
   in
+  let side : Trading_base.Types.position_side =
+    if is_short then Short else Long
+  in
   {
     ticker = a.ticker;
     analysis = a;
     sector;
+    side;
     grade = _grade_of_score ~thresholds score;
     score;
     suggested_entry = entry;
@@ -311,11 +316,24 @@ let _long_candidate ~weights ~thresholds ~params ~min_grade (a, sector) =
     _score_and_build ~weights ~thresholds ~params ~min_grade ~is_short:false
       ~scorer:_score_long ~sector a
 
+(** Hard gate per Weinstein Ch. 11: never short a stock with strong relative
+    strength, even if it breaks down. Rejects candidates whose RS trend is
+    positive ([Positive_rising], [Positive_flat], [Bullish_crossover]).
+    [Negative_improving] stays eligible — the stock is still rated negative
+    overall and the scorer reflects the weaker signal. Absent RS data is treated
+    as not-strong (doesn't block shorts). *)
+let _rs_blocks_short = function
+  | Some { Rs.trend = Positive_rising | Positive_flat | Bullish_crossover; _ }
+    ->
+      true
+  | _ -> false
+
 (** Evaluate one (analysis, sector) pair as a short candidate. Bearish/Neutral
     only: grade must meet [min_grade]. *)
 let _short_candidate ~weights ~thresholds ~params ~min_grade (a, sector) =
   if equal_sector_rating sector.rating Strong then None
   else if not (Stock_analysis.is_breakdown_candidate a) then None
+  else if _rs_blocks_short a.Stock_analysis.rs then None
   else
     _score_and_build ~weights ~thresholds ~params ~min_grade ~is_short:true
       ~scorer:_score_short ~sector a

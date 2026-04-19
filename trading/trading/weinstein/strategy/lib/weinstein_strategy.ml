@@ -56,22 +56,38 @@ let _gen_position_id symbol =
   Int.incr _position_counter;
   Printf.sprintf "%s-wein-%d" symbol !_position_counter
 
+(** Normalise (entry, stop) to the order [Portfolio_risk.compute_position_size]
+    expects: entry first, stop below. For longs that's the identity (stop <
+    entry); for shorts we swap (stop > entry → [max, min]). The result has the
+    same absolute risk per share, so [sizing.shares] is unchanged between sides.
+*)
+let _normalised_entry_stop_for_sizing (cand : Screener.scored_candidate) =
+  let open Trading_base.Types in
+  match cand.side with
+  | Long -> (cand.suggested_entry, cand.suggested_stop)
+  | Short ->
+      ( Float.max cand.suggested_entry cand.suggested_stop,
+        Float.min cand.suggested_entry cand.suggested_stop )
+
 (** Try to build a CreateEntering transition for one screened candidate.
     Registers the initial stop state as a side effect. Returns None if the
     candidate is un-sizeable (zero portfolio value or zero shares).
 
     The initial stop is derived via
-    {!Weinstein_stops.compute_initial_stop_with_floor}, which pulls the support
-    floor (prior correction low) from the candidate's accumulated bar history;
-    falls back to the fixed-buffer proxy
-    ([suggested_entry *. initial_stop_buffer]) when the lookback window holds no
-    qualifying correction. *)
+    {!Weinstein_stops.compute_initial_stop_with_floor}, which — depending on
+    [cand.side] — pulls either the prior correction low (long) or the prior
+    counter-rally high (short) from the candidate's accumulated bar history;
+    falls back to the fixed-buffer proxy when the lookback window holds no
+    qualifying counter-move. *)
 let _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
     ~current_date (cand : Screener.scored_candidate) =
+  let entry_for_sizing, stop_for_sizing =
+    _normalised_entry_stop_for_sizing cand
+  in
   let sizing =
     Portfolio_risk.compute_position_size ~config:config.portfolio_config
-      ~portfolio_value ~entry_price:cand.suggested_entry
-      ~stop_price:cand.suggested_stop ()
+      ~portfolio_value ~entry_price:entry_for_sizing ~stop_price:stop_for_sizing
+      ()
   in
   if sizing.shares = 0 then None
   else
@@ -81,7 +97,7 @@ let _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
     in
     let initial_stop =
       Weinstein_stops.compute_initial_stop_with_floor
-        ~config:config.stops_config ~side:Trading_base.Types.Long
+        ~config:config.stops_config ~side:cand.side
         ~entry_price:cand.suggested_entry ~bars:daily_bars ~as_of:current_date
         ~fallback_buffer:config.initial_stop_buffer
     in
@@ -96,7 +112,7 @@ let _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
       Position.CreateEntering
         {
           symbol = cand.ticker;
-          side = Trading_base.Types.Long;
+          side = cand.side;
           target_quantity = Float.of_int sizing.shares;
           entry_price = cand.suggested_entry;
           reasoning;
@@ -133,9 +149,12 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
-(** Generate CreateEntering transitions for top screener candidates. Tracks
-    remaining cash to avoid generating orders that exceed funds. *)
-let _entries_from_candidates ~config ~candidates ~stop_states ~bar_history
+(** Generate CreateEntering transitions for screener candidates. Tracks
+    remaining cash to avoid generating orders that exceed funds.
+
+    Public (see .mli) so callers running custom screening out-of-band can feed
+    candidates through the same entry pipeline the strategy uses. *)
+let entries_from_candidates ~config ~candidates ~stop_states ~bar_history
     ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
   let held = held_symbols portfolio in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
@@ -150,7 +169,15 @@ let _entries_from_candidates ~config ~candidates ~stop_states ~bar_history
   |> List.filter_map ~f:make_entry
   |> List.filter_map ~f:(_check_cash_and_deduct remaining_cash)
 
-(** Screen the universe for buy candidates. Returns entry transitions. *)
+(** Screen the universe for both long and short candidates, returning a combined
+    transition list. Macro-trend gating lives in the screener itself:
+    [buy_candidates] are empty under [Bearish], [short_candidates] are empty
+    under [Bullish]. Concatenating the two lists gives the strategy-level
+    behaviour:
+
+    - [Bullish]: longs only — shorts are empty.
+    - [Neutral]: both — longs and shorts are both eligible.
+    - [Bearish]: shorts only — longs are empty. *)
 let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
     ~(portfolio : Portfolio_view.t) ~get_price ~bar_history ~prior_stages
     ~current_date =
@@ -179,9 +206,12 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
     Screener.screen ~config:config.screening_config ~macro_trend ~sector_map
       ~stocks ~held_tickers:(held_symbols portfolio)
   in
-  _entries_from_candidates ~config
-    ~candidates:screen_result.Screener.buy_candidates ~stop_states ~bar_history
-    ~portfolio ~get_price ~current_date
+  let combined_candidates =
+    screen_result.Screener.buy_candidates
+    @ screen_result.Screener.short_candidates
+  in
+  entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
+    ~bar_history ~portfolio ~get_price ~current_date
 
 (* ------------------------------------------------------------------ *)
 (* make                                                                  *)
@@ -202,8 +232,12 @@ let _all_accumulated_symbols ~(config : config) : string list =
   let global_symbols = List.map config.indices.global ~f:fst in
   (config.indices.primary :: config.universe) @ sector_symbols @ global_symbols
 
-(** Run the Friday macro + screener path and return entry transitions. Returns
-    [] if macro is Bearish (no new buys). *)
+(** Run the Friday macro + screener path and return entry transitions. Under all
+    macro regimes (Bullish, Neutral, Bearish) the screener is invoked;
+    macro-specific gating — longs blocked under Bearish, shorts blocked under
+    Bullish — happens inside the screener. Under Bearish this yields short-side
+    entries (Weinstein Ch. 11), where previously the branch returned []
+    unconditionally. *)
 let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
     ~current_date ~index_bars =
@@ -217,16 +251,14 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
       ~global_index_bars ~prior_stage:index_prior_stage ~prior:None
   in
   prior_macro := macro_result.trend;
-  if Weinstein_types.(equal_market_trend !prior_macro Bearish) then []
-  else
-    let sector_map =
-      Macro_inputs.build_sector_map ~stage_config:config.stage_config
-        ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
-        ~bar_history ~sector_prior_stages ~index_bars ~ticker_sectors
-    in
-    _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
-      ~sector_map ~stop_states ~portfolio ~get_price ~bar_history ~prior_stages
-      ~current_date
+  let sector_map =
+    Macro_inputs.build_sector_map ~stage_config:config.stage_config
+      ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
+      ~bar_history ~sector_prior_stages ~index_bars ~ticker_sectors
+  in
+  _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
+    ~sector_map ~stop_states ~portfolio ~get_price ~bar_history ~prior_stages
+    ~current_date
 
 let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price

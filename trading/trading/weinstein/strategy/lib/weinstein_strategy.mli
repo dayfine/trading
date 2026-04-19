@@ -121,6 +121,40 @@ val held_symbols : Trading_strategy.Portfolio_view.t -> string list
     natural query on strategy state and the behaviour (exclude [Closed]) is
     worth pinning by direct unit test. *)
 
+val entries_from_candidates :
+  config:config ->
+  candidates:Screener.scored_candidate list ->
+  stop_states:Weinstein_stops.stop_state String.Map.t ref ->
+  bar_history:Bar_history.t ->
+  portfolio:Trading_strategy.Portfolio_view.t ->
+  get_price:(string -> Types.Daily_price.t option) ->
+  current_date:Date.t ->
+  Trading_strategy.Position.transition list
+(** Generate [CreateEntering] transitions for a list of screener candidates.
+
+    For each candidate:
+    - Applies the Weinstein position sizer
+      ({!Weinstein.Portfolio_risk.compute_position_size}). Candidates whose
+      per-trade risk rounds to zero shares are dropped.
+    - Computes the initial stop via
+      {!Weinstein_stops.compute_initial_stop_with_floor}, threading [cand.side]:
+      longs get a stop below the prior correction low; shorts get a stop above
+      the prior rally high. Falls back to [config.initial_stop_buffer] when no
+      qualifying counter-move is in the lookback window.
+    - Emits a [CreateEntering] with [side = cand.side].
+
+    Side effect: seeds [stop_states] with the computed initial stop for each new
+    entry.
+
+    Cash tracking: each entry's [target_quantity * entry_price] is deducted from
+    [portfolio.cash]; candidates whose cost exceeds the remaining cash are
+    skipped. For short candidates this is conservative (shorts generate proceeds
+    rather than consume cash) but safe.
+
+    Public because it's a useful primitive for callers that want to run
+    screening out-of-band (e.g. custom universe loops) and feed candidates into
+    the strategy's entry pipeline. *)
+
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->

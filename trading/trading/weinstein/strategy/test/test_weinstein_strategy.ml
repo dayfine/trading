@@ -517,6 +517,135 @@ let test_held_symbols_empty_when_all_closed _ =
   assert_that (held_symbols portfolio) is_empty
 
 (* ------------------------------------------------------------------ *)
+(* entries_from_candidates: short-side entry                           *)
+(* ------------------------------------------------------------------ *)
+
+(** Minimal [Stock_analysis.t] fixture — only fields the entry pipeline reads.
+    The screener cascade itself is tested separately; here we inject a
+    [Screener.scored_candidate] directly into [entries_from_candidates] to
+    verify the downstream behaviour for shorts. *)
+let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
+  let open Weinstein_types in
+  let stub_stage : Stage.result =
+    {
+      stage = Stage4 { weeks_declining = 2 };
+      ma_value = entry *. 1.2;
+      ma_direction = Declining;
+      ma_slope_pct = -0.02;
+      transition =
+        Some (Stage3 { weeks_topping = 8 }, Stage4 { weeks_declining = 2 });
+      above_ma_count = 0;
+    }
+  in
+  let stub_analysis : Stock_analysis.t =
+    {
+      ticker;
+      stage = stub_stage;
+      rs = None;
+      volume = None;
+      breakout_price = Some entry;
+      resistance = None;
+      prior_stage = Some (Stage3 { weeks_topping = 8 });
+      as_of_date = Date.of_string "2024-01-05";
+    }
+  in
+  let stub_sector : Screener.sector_context =
+    { sector_name = "Energy"; rating = Weak; stage = stub_analysis.stage.stage }
+  in
+  {
+    Screener.ticker;
+    analysis = stub_analysis;
+    sector = stub_sector;
+    side;
+    grade;
+    score = 30;
+    suggested_entry = entry;
+    suggested_stop = stop;
+    risk_pct = Float.abs ((entry -. stop) /. entry);
+    swing_target = None;
+    rationale = [ "test" ];
+  }
+
+(** End-to-end slice from [Screener.scored_candidate] with [side = Short] to a
+    [CreateEntering] transition. Proves the entry pipeline now produces shorts —
+    prior to the short-side wiring this path was effectively unreachable because
+    [_make_entry_transition] hardcoded [Long]. *)
+let test_entries_from_candidates_emits_short _ =
+  let cfg = default_config ~universe:[ "XYZ" ] ~index_symbol:"GSPCX" in
+  let stop_states = ref String.Map.empty in
+  let bar_history = Bar_history.create () in
+  (* Short: entry 80, stop 88 (above entry). *)
+  let cand =
+    make_scored_candidate ~ticker:"XYZ" ~side:Trading_base.Types.Short
+      ~entry:80.0 ~stop:88.0 ~grade:Weinstein_types.C
+  in
+  let portfolio : Trading_strategy.Portfolio_view.t =
+    { cash = 100_000.0; positions = String.Map.empty }
+  in
+  let get_price = get_price_of [ ("XYZ", make_bar "2024-01-05" 80.0) ] in
+  let transitions =
+    entries_from_candidates ~config:cfg ~candidates:[ cand ] ~stop_states
+      ~bar_history ~portfolio ~get_price
+      ~current_date:(Date.of_string "2024-01-05")
+  in
+  assert_that transitions
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (t : Trading_strategy.Position.transition) -> t.position_id)
+               (matching
+                  (fun id ->
+                    if String.is_prefix id ~prefix:"XYZ-wein-" then Some ()
+                    else None)
+                  (equal_to ()));
+             field
+               (fun (t : Trading_strategy.Position.transition) -> t.kind)
+               (matching
+                  (function
+                    | Trading_strategy.Position.CreateEntering { side; _ } ->
+                        Some side
+                    | _ -> None)
+                  (equal_to Trading_base.Types.Short));
+           ];
+       ])
+
+(** Long-side parity: same pipeline with [side = Long] produces a Long
+    transition. Regression guard against accidentally crossing sides when
+    threading [cand.side]. *)
+let test_entries_from_candidates_emits_long _ =
+  let cfg = default_config ~universe:[ "XYZ" ] ~index_symbol:"GSPCX" in
+  let stop_states = ref String.Map.empty in
+  let bar_history = Bar_history.create () in
+  (* Long: entry 100, stop 92 (below entry). *)
+  let cand =
+    make_scored_candidate ~ticker:"XYZ" ~side:Trading_base.Types.Long
+      ~entry:100.0 ~stop:92.0 ~grade:Weinstein_types.C
+  in
+  let portfolio : Trading_strategy.Portfolio_view.t =
+    { cash = 100_000.0; positions = String.Map.empty }
+  in
+  let get_price = get_price_of [ ("XYZ", make_bar "2024-01-05" 100.0) ] in
+  let transitions =
+    entries_from_candidates ~config:cfg ~candidates:[ cand ] ~stop_states
+      ~bar_history ~portfolio ~get_price
+      ~current_date:(Date.of_string "2024-01-05")
+  in
+  assert_that transitions
+    (elements_are
+       [
+         field
+           (fun (t : Trading_strategy.Position.transition) -> t.kind)
+           (matching
+              (function
+                | Trading_strategy.Position.CreateEntering { side; _ } ->
+                    Some side
+                | _ -> None)
+              (equal_to Trading_base.Types.Long));
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -543,4 +672,8 @@ let () =
            >:: test_held_symbols_excludes_closed;
            "held_symbols empty when all positions Closed"
            >:: test_held_symbols_empty_when_all_closed;
+           "entries_from_candidates emits Short transition for Short candidate"
+           >:: test_entries_from_candidates_emits_short;
+           "entries_from_candidates emits Long transition for Long candidate"
+           >:: test_entries_from_candidates_emits_long;
          ])
