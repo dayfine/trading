@@ -1,7 +1,7 @@
 #!/bin/sh
 # Deep scan for health-scanner agent (T3-A).
 #
-# Runs weekly (not on every PR). Performs ten read-only analyses:
+# Runs weekly (not on every PR). Performs twelve read-only analyses:
 #   1. Dead code detection — .ml files not referenced in any dune file
 #   2. Design doc drift — module structure vs eng-design docs
 #   3. TODO/FIXME/HACK accumulation
@@ -12,6 +12,8 @@
 #   8. Trends — followup-item delta + CC distribution delta (T3-G)
 #   9. Architecture graph — import edges vs dependency-rules.md (T3-F)
 #  10. Status file template enforcement — forbidden ## Recent Commits heading
+#  11. Linter exception expiry — review_at annotations vs current milestone/date (T1-K)
+#  12. Stale local jj bookmarks — local refs no longer needed after PR merges
 #
 # Output: dev/health/YYYY-MM-DD-deep.md
 #
@@ -983,6 +985,137 @@ RCEOF
   fi
 done
 
+
+# ────────────────────────────────────────────────────────────────
+# --- Check 12 --- (harness gap sub-item 4: stale local jj bookmarks)
+# Check 12: Stale local jj bookmarks
+#
+# Local jj bookmarks that have no matching remote entry accumulate after
+# PRs merge and the local ref is never cleaned up. This check surfaces:
+#
+#   a) Local-only bookmarks -- exist locally but have no @origin counterpart.
+#      Protected prefixes (main, master, HEAD, trunk) are skipped.
+#      All others are candidates for cleanup.
+#
+#   b) Local bookmarks behind origin -- the bookmark exists on both local
+#      and origin, but the local commit is an ancestor of the origin commit.
+#
+# Local-ahead (unpushed work) and in-sync bookmarks are silently skipped.
+#
+# Severity: INFO (housekeeping; no false-positive FAILs).
+# Degrades gracefully when jj is absent or .jj/ does not exist.
+# Section "## Stale Local Bookmarks" is always emitted in the report.
+# ────────────────────────────────────────────────────────────────
+
+STALE_LOCAL_ONLY_DETAILS=""
+STALE_BEHIND_ORIGIN_DETAILS=""
+STALE_LOCAL_ONLY_COUNT=0
+STALE_BEHIND_COUNT=0
+JJ_AVAILABLE=false
+JJ_SKIP_REASON=""
+
+# Graceful degradation: jj and .jj/ must both be present.
+if ! command -v jj >/dev/null 2>&1; then
+  JJ_SKIP_REASON="jj not available on PATH"
+elif [ ! -d "${REPO_ROOT}/.jj" ]; then
+  JJ_SKIP_REASON=".jj/ directory not found (not a jj repository)"
+else
+  JJ_AVAILABLE=true
+fi
+
+if $JJ_AVAILABLE; then
+  # Enumerate bookmarks. Output format (colocated mode):
+  #   name: CHANGE_ID GIT_HASH description        <- local bookmark
+  #     @git: CHANGE_ID GIT_HASH description      <- git alias (indented, skip)
+  #   name@origin: CHANGE_ID GIT_HASH description <- remote tracking ref
+  #
+  # Parsing rules:
+  #   Local: non-indented line, name portion (before ": ") has no @.
+  #   Remote: line contains "@origin: ".
+  #   Skip: lines starting with whitespace.
+
+  JJ_RAW="$(jj bookmark list --all 'glob:*' 2>/dev/null || true)"
+
+  # Extract local bookmarks: non-indented lines whose name has no @.
+  LOCAL_MAP="$(printf '%s\n' "$JJ_RAW" \
+    | awk '
+      /^[^ \t]/ && !/^[^ \t]*@[^ \t]*:/ {
+        colon = index($0, ": ")
+        if (colon == 0) next
+        name = substr($0, 1, colon - 1)
+        rest = substr($0, colon + 2)
+        n = split(rest, tok, " ")
+        if (n >= 1) print name "=" tok[1]
+      }
+    ' 2>/dev/null || true)"
+
+  # Extract remote tracking entries: lines containing "@origin: ".
+  ORIGIN_MAP="$(printf '%s\n' "$JJ_RAW" \
+    | awk '
+      /@origin: / {
+        at_pos = index($0, "@origin: ")
+        name = substr($0, 1, at_pos - 1)
+        rest = substr($0, at_pos + 9)
+        n = split(rest, tok, " ")
+        if (n >= 1) print name "=" tok[1]
+      }
+    ' 2>/dev/null || true)"
+
+  # Protected bookmark names -- skip even if local-only.
+  _is_protected_bookmark() {
+    case "$1" in
+      main|master|HEAD|trunk) return 0 ;;
+    esac
+    return 1
+  }
+
+  # Process each local bookmark.
+  while IFS='=' read -r bm_name bm_commit; do
+    [ -z "$bm_name" ] && continue
+    _is_protected_bookmark "$bm_name" && continue
+
+    # Look for a matching origin entry.
+    origin_commit="$(printf '%s\n' "$ORIGIN_MAP" \
+      | awk -F'=' -v name="$bm_name" '$1 == name {print $2; exit}' 2>/dev/null || true)"
+
+    if [ -z "$origin_commit" ]; then
+      # Local-only bookmark -- no @origin tracking ref found.
+      STALE_LOCAL_ONLY_COUNT=$((STALE_LOCAL_ONLY_COUNT + 1))
+      desc="$(jj log -r "${bm_commit}" --no-graph \
+        -T 'description.first_line()' 2>/dev/null | head -1 || echo "(unknown)")"
+      STALE_LOCAL_ONLY_DETAILS="${STALE_LOCAL_ONLY_DETAILS}| \`${bm_name}\` | \`${bm_commit}\` | ${desc} |\n"
+    else
+      # Both local and origin exist -- check relative position.
+      if [ "$bm_commit" = "$origin_commit" ]; then
+        : # in-sync -- skip
+      else
+        # Check if local is behind origin: jj log on range local..origin;
+        # non-empty output means local is behind (is an ancestor of origin).
+        # Errors (unrelated histories) are skipped silently.
+        is_behind=false
+        range_out="$(jj log -r "${bm_commit}..${origin_commit}" \
+          --no-graph -T 'change_id' 2>/dev/null || true)"
+        if [ -n "$range_out" ]; then
+          is_behind=true
+        fi
+
+        if $is_behind; then
+          STALE_BEHIND_COUNT=$((STALE_BEHIND_COUNT + 1))
+          STALE_BEHIND_ORIGIN_DETAILS="${STALE_BEHIND_ORIGIN_DETAILS}| \`${bm_name}\` | \`${bm_commit}\` | \`${origin_commit}\` |\n"
+        fi
+        # Local-ahead (unpushed) or unrelated -> silently skip.
+      fi
+    fi
+  done << JJEOF
+$(printf '%s\n' "$LOCAL_MAP")
+JJEOF
+
+  STALE_TOTAL=$((STALE_LOCAL_ONLY_COUNT + STALE_BEHIND_COUNT))
+  if [ "$STALE_TOTAL" -gt 0 ]; then
+    add_info "Stale local jj bookmarks: ${STALE_LOCAL_ONLY_COUNT} local-only candidate(s), ${STALE_BEHIND_COUNT} behind-origin bookmark(s) -- see ## Stale Local Bookmarks"
+  fi
+fi
+
 # ────────────────────────────────────────────────────────────────
 # Check 11: Linter Exception Expiry vs milestone/date (T1-K)
 #
@@ -1185,6 +1318,7 @@ cat >> "$OUTPUT_FILE" <<METRICS_EOF
 - Architecture graph violations (monitored): ${ARCH_GRAPH_VIOLATION_COUNT}
 - Status file template violations (forbidden ## Recent Commits): ${RECENT_COMMITS_COUNT}
 - Linter exception expiry: ${EXPIRY_COUNT} expired/unknown, ${EXPIRY_MISSING_COUNT} missing review_at
+- Stale local jj bookmarks: local-only=${STALE_LOCAL_ONLY_COUNT} behind-origin=${STALE_BEHIND_COUNT} (jj available: ${JJ_AVAILABLE})
 METRICS_EOF
 
 # Append detail sections if non-empty
@@ -1219,6 +1353,39 @@ fi
   else
     printf "**${RECENT_COMMITS_COUNT} violation(s):**\n\n"
     printf '%b' "$RECENT_COMMITS_DETAILS"
+  fi
+} >> "$OUTPUT_FILE"
+
+# Always emit the Stale Local Bookmarks section (Check 12).
+{
+  printf "\n## Stale Local Bookmarks\n\n"
+  printf "Checks local jj bookmarks for refs no longer needed after PR merges.\n"
+  printf "Severity: INFO -- housekeeping only; no false-positive failures.\n\n"
+
+  if ! $JJ_AVAILABLE; then
+    printf "jj not available -- skipping stale bookmark check. (%s)\n" "$JJ_SKIP_REASON"
+  else
+    printf "### Local-only candidates\n\n"
+    printf "Bookmarks that exist locally but have no matching @origin entry.\n"
+    printf "Protected names (main, master, HEAD, trunk) are excluded.\n\n"
+    if [ "$STALE_LOCAL_ONLY_COUNT" -eq 0 ]; then
+      printf "No stale local bookmarks found.\n\n"
+    else
+      printf "| Name | Local commit | Last commit description |\n|---|---|---|\n"
+      printf '%b' "$STALE_LOCAL_ONLY_DETAILS"
+      printf "\n"
+    fi
+
+    printf "### Behind origin\n\n"
+    printf "Bookmarks where local commit is an ancestor of the origin commit\n"
+    printf "(origin has moved on -- usually means PR merged, local never refreshed).\n\n"
+    if [ "$STALE_BEHIND_COUNT" -eq 0 ]; then
+      printf "No stale local bookmarks found.\n\n"
+    else
+      printf "| Name | Local commit | Origin commit |\n|---|---|---|\n"
+      printf '%b' "$STALE_BEHIND_ORIGIN_DETAILS"
+      printf "\n"
+    fi
   fi
 } >> "$OUTPUT_FILE"
 
