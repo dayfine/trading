@@ -125,14 +125,14 @@ let test_rs_line_none_when_too_short _ =
     (Summary_compute.rs_line ~config ~stock_bars ~benchmark_bars)
     is_none
 
-(** The Mansfield zero-line should normalize against a window of ~1 YEAR
-    (52 weekly bars), not ~2.5 months (52 daily bars). This test pins the
+(** The Mansfield zero-line should normalize against a window of ~1 YEAR (52
+    weekly bars), not ~2.5 months (52 daily bars). This test pins the
     aggregation boundary: we construct a series where stock = benchmark for
-    every bar except the final week (where stock doubles). Under correct
-    weekly aggregation the 52-week MA averages 51 weeks of raw_rs=1.0 with 1
-    week of raw_rs=2.0 → MA = 53/52. Under the buggy daily path the 52-day
-    MA would include 7 elevated days → MA ≈ 59/52 ≈ 1.1346, yielding a
-    meaningfully different normalized value. *)
+    every bar except the final week (where stock doubles). Under correct weekly
+    aggregation the 52-week MA averages 51 weeks of raw_rs=1.0 with 1 week of
+    raw_rs=2.0 → MA = 53/52. Under the buggy daily path the 52-day MA would
+    include 7 elevated days → MA ≈ 59/52 ≈ 1.1346, yielding a meaningfully
+    different normalized value. *)
 let test_rs_line_uses_weekly_52_window _ =
   let config = { Summary_compute.default_config with rs_ma_period = 52 } in
   (* 420 consecutive daily bars starting on a Monday → aggregates to 60 weekly
@@ -230,8 +230,7 @@ let suite =
          "atr_14_none_when_too_short" >:: test_atr_14_none_when_too_short;
          "rs_line_flat_ratio" >:: test_rs_line_flat_ratio;
          "rs_line_none_when_too_short" >:: test_rs_line_none_when_too_short;
-         "rs_line_uses_weekly_52_window"
-         >:: test_rs_line_uses_weekly_52_window;
+         "rs_line_uses_weekly_52_window" >:: test_rs_line_uses_weekly_52_window;
          "stage_heuristic_some_on_sufficient_history"
          >:: test_stage_heuristic_some_on_sufficient_history;
          "stage_heuristic_none_on_short_history"

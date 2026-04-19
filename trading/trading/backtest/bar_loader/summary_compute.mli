@@ -61,8 +61,8 @@ val rs_line :
     daily bars; the helper aggregates each to weekly (last-bar-of-week) before
     invoking {!Relative_strength.analyze}, so [config.rs_ma_period] is
     interpreted in WEEKLY bars (see {!config} for the default). Returns [None]
-    when fewer than [config.rs_ma_period] aligned weekly bars are available.
-    The value is [raw_rs / MA(raw_rs)] — values above 1.0 mean the stock is
+    when fewer than [config.rs_ma_period] aligned weekly bars are available. The
+    value is [raw_rs / MA(raw_rs)] — values above 1.0 mean the stock is
     outperforming its own recent baseline. *)
 
 val stage_heuristic :
