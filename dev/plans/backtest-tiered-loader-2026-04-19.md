@@ -414,6 +414,12 @@ with other agents).
 Runner, we want the trace to already distinguish promote vs demote vs load.
 Otherwise the first A/B run gives us undifferentiated numbers.
 
+**Acceptance (added via §Resolutions #5):** run `scenario_runner
+--parallel 3` on a scenario set with trace enabled and `loader_strategy
+= Tiered`; assert 3 distinct `trace-<scenario>.sexp` files appear in the
+scenario output dir, each carrying per-phase data. Confirms per-child
+Bar_loader + trace files don't collide under fork-based parallelism.
+
 ### 3e — Runner + scenario plumbing for `loader_strategy` flag
 
 **Scope:** add the `Legacy | Tiered` switch to `Backtest.Runner.run_backtest`
@@ -619,38 +625,51 @@ Status / docs:
    and the nightly comparison in 3h. If RSS granularity proves too noisy,
    fall back to object-count heuristics (`Bar_loader.stats`).
 
-## Open questions (to call out in PR description for human review)
+## Resolutions (human review, 2026-04-19)
 
-1. **Parity threshold ε — exact value?** Plan proposes $0.01 on
-   `portfolio_value` diffs. Is that too loose (hides real differences) or
-   too tight (flakes)? Need empirical data from 3g implementation.
+All 6 open questions resolved. Decisions below are the contract for 3a–3h.
 
-2. **Scenario selection for broad A/B (3h).** Status file mentions "a few
-   weeks of nightly runs" but doesn't name the scenarios. Proposal: all
-   `goldens-broad/*.sexp`. Confirm with human.
+1. **Parity threshold ε** — RESOLVED. Softer than the original $0.01
+   proposal. Float reordering alone can produce sub-dollar diffs on a
+   40-min / ~50-trade smoke run. Final contract for 3g:
+   - **Zero trade-count diff** is the hard gate. Any missing or extra
+     trade fails parity.
+   - **Portfolio-value diff** tolerance: `max($1.00, 0.001% of final
+     portfolio_value)`. Tighten empirically once 3g has a few runs of
+     baseline wobble data; keep the softer bound during the 3h ramp.
 
-3. **Should 3f refactor `Screener.screen` to accept summaries natively?** The
-   plan currently goes with an adapter (build synthetic `Stock_analysis.t`
-   from `Summary.t`). Native-summary screener is cleaner but widens the
-   blast radius. Defer or do in 3f?
+2. **Broad A/B scenarios for 3h** — RESOLVED. Start with **2-3 scenarios
+   covering different regimes** (one bull, one bear, one choppy) — not
+   the full `goldens-broad/*.sexp` set. Nominal picks: `six-year`
+   (2018-2023 mixed), `bull-crash` (2015-2020, bullish → crash),
+   `covid-recovery` (2020-2024, whipsaw). Wall time ~90 min vs ~hours
+   for full suite. Add more scenarios only if the first few show
+   regime-dependent parity gaps.
 
-4. **`Bar_loader` lives in `trading/trading/backtest/bar_loader/`** — should
-   it be a sibling of `lib/` and `scenarios/`, or inside `lib/` itself? Plan
-   proposes sibling (own dune library) so test binaries have a clean boundary.
-   Confirm.
+3. **Native-summary `Screener.screen` refactor** — RESOLVED. Adapter
+   only for 3f (build synthetic `Stock_analysis.t` from `Summary.t`).
+   **Native-summary refactor is explicitly deferred** to a post-merge
+   follow-up PR, and only revisited if the adapter's CPU overhead turns
+   out non-trivial during 3f profiling. Blast-radius argument wins.
 
-5. **Is `--parallel N` in scenario_runner compatible with per-run
-   Bar_loader?** Each child process gets its own Bar_loader instance
-   (fork-based), which is fine. But if the shadow screener writes any shared
-   state (trace file), we need per-child trace files. Probably a non-issue
-   with current trace output-per-run design; verify during 3d implementation.
+4. **`Bar_loader` module placement** — RESOLVED. **Sibling library** at
+   `trading/trading/backtest/bar_loader/`, own dune library. Independent
+   tests, clean import boundary; 3a/3b/3c land without coupling to
+   `backtest_runner_lib`.
 
-6. **Full→Metadata demotion semantics: full drop or keep Summary?** Plan
-   says Full→Summary→Metadata. Summary is cheap; keeping it means a
-   re-promotion to Full skips the summary recompute. But if the position
-   closed on a Friday after a 6-month run, the summary scalars are stale.
-   Proposal: Full demote lands at Metadata (full drop), rebuild Summary on
-   next promote. Confirms simplest correctness. Document in 3c.
+5. **`--parallel N` × Bar_loader compatibility** — RESOLVED. Not an
+   open question; **promoted to a 3d acceptance check**. Test contract:
+   run `scenario_runner --parallel 3` on a scenario set with trace
+   enabled and `loader_strategy = Tiered`; assert 3 distinct
+   `trace-<scenario>.sexp` files appear in the scenario output dir,
+   each with per-phase data. Add to 3d's §Acceptance.
+
+6. **Full→Metadata demotion** — RESOLVED. **Full demote lands at
+   Metadata** (full drop, rebuild Summary on next promote). Correctness
+   simpler; summary recompute is cheap (<5 ms per symbol per §3b). The
+   re-promote-within-run case (exit then re-enter) is rare; if 3f
+   profiling shows it matters, add a keep-Summary optimization then.
+   Document in 3c.
 
 ## Acceptance criteria (plan-level)
 

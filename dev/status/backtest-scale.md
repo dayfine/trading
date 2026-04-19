@@ -3,17 +3,20 @@
 ## Last updated: 2026-04-19
 
 ## Status
-READY_FOR_REVIEW — detailed implementation plan at `dev/plans/backtest-tiered-loader-2026-04-19.md`. Awaiting human review before 3a implementation is dispatched.
+APPROVED
+
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a dispatches on next orchestrator run.
 
 ## Interface stable
-N/A — implementation not yet started; plan decomposes Step 3 into 8 increments (3a–3h) each with its own interface.
+NO
+
+Implementation not yet started; plan decomposes Step 3 into 8 increments (3a–3h) each with its own interface. `Bar_loader` types stabilize incrementally as 3a/3b/3c land.
 
 ## Open PR
-—
+- #433 (feat/backtest-tiered-loader) — plan PR, approved, awaiting merge.
 
 ## Blocked on
-- Human review of `dev/plans/backtest-tiered-loader-2026-04-19.md` — §Open questions need resolution before 3f implementation (parity ε, shadow-screener refactor scope, broad-scenario selection).
-- PR #396 (parent plan) merged; PR #419 (Step 2 tracing) merged 2026-04-19 — A/B trace infrastructure available for 3d/3g/3h.
+- None. Plan approved; 3a unblocked once #433 merges.
 
 ## Goal
 
