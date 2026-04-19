@@ -108,6 +108,7 @@ status to READY_FOR_REVIEW.
 
 - [ ] If feature: every public function in every `.ml` is exported in the corresponding `.mli` with a doc comment
 - [ ] If feature: no function exceeds 50 lines
+- [ ] PR diff respects the template's `## PR sizing` rules (≤500 LOC, one new module per PR; status / plan / fixtures don't count)
 - [ ] All configurable parameters routed through config record — no magic numbers
 - [ ] If experiment: scenario files parse via `Scenario.load` (run `dune build`)
 - [ ] If experiment: `dev/experiments/<name>/report.md` includes a comparative table + falsifiable conclusion

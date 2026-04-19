@@ -85,6 +85,48 @@ looping — diminishing returns set in quickly and looping wastes budget.
 ### 6. Acceptance Checklist (required, feature-specific items)
 
 ```markdown
+## PR sizing
+
+Prefer **one new module per PR** — the unit is `(module.ml, module.mli,
+test/test_module.ml)` plus its `dune` entry. Three to four files,
+typically 200–500 LOC. This is the "small CL" discipline from
+https://google.github.io/eng-practices/review/developer/small-cls.html
+applied to OCaml: a module is the natural reviewable unit because its
+`.mli` is the contract, the `.ml` is the implementation against that
+contract, and the test pins the observable behavior — reviewing them
+together is high-signal; reviewing them apart is low-signal.
+
+**Rules:**
+
+- **One new module ⇒ one PR.** If your work introduces a new
+  `.ml` + `.mli` pair, that pair (plus its tests + dune entry) is the
+  PR. Wiring that consumes the new module belongs in a separate PR
+  stacked on top.
+- **Multiple new modules ⇒ stacked PRs.** Each module gets its own
+  branch + PR; second module's branch bases off the first module's
+  branch. Use `jst submit` so the stack is reviewable in order.
+- **Hard cap: ~500 LOC per PR.** If your draft commit exceeds 500
+  LOC, stop and look for a module boundary you crossed. Almost always
+  the right split is "the new module" vs "the wiring that consumes it."
+  Status-file edits, plan files, and test fixtures don't count toward
+  the cap — they're context, not implementation.
+- **Pre-PR self-check:** before pushing, run `jj diff --stat`. If
+  output crosses two new-module boundaries (or one new module + its
+  consumer wiring), split before pushing — not after review asks for
+  it. Splitting after a PR opens means re-doing CI, re-running QC,
+  and re-anchoring reviewer context; splitting before is a 10-minute
+  `jj` rearrange.
+- **Does not apply to:** small bug fixes (a 50-LOC patch touching one
+  module is a single PR by definition), single-file refactors, or
+  status-file-only updates. Apply when introducing new modules or
+  meaningfully extending existing ones.
+
+If your plan-file decomposition (per `dev/plans/*.md`) names increments
+that are 800+ LOC, that's a smell — the increment crosses a module
+boundary that should be its own increment. Surface it in the dispatch
+prompt's `## Plan context` so the orchestrator can re-decompose, or
+split it inline yourself if obvious.
+
 ## Acceptance Checklist
 
 QC agents will verify all of the following. Satisfy every item before setting
@@ -94,6 +136,7 @@ status to READY_FOR_REVIEW.
 - [ ] <...>
 - [ ] Every public function in every `.ml` is exported in the corresponding `.mli` with a doc comment
 - [ ] No function exceeds 50 lines
+- [ ] PR diff respects `## PR sizing` rules (≤500 LOC, one new module per PR; status / plan / fixtures don't count)
 - [ ] All configurable parameters routed through config record — no magic numbers
 - [ ] `dune build && dune runtest` passes with zero warnings **on a clean checkout of the branch** — not just on your local worktree. If you are running in `isolation: "worktree"` (the orchestrator default), your working copy is usually but not always a clean checkout — follow `.claude/rules/worktree-isolation.md` to verify (`jj diff --stat` pre-commit, branch ancestry check pre-push, PR file list post-push). If you are NOT in a worktree (rare, legacy runs), re-verify by checking that every module your branch references is either in your commits or already on `main@origin` — do not rely on files sitting in the shared working copy that you did not explicitly commit.
 - [ ] `dune build @fmt` passes (formatter in check mode; equivalent: `dune fmt` produces no diff)
