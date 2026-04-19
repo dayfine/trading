@@ -5,6 +5,25 @@ open Core
 open Matchers
 module Bar_loader = Bar_loader
 
+(* Re-declare records here with [@@deriving test_matcher] so ppx_test_matcher
+   generates exhaustive [match_<name>] helpers. The [type x = Module.x = { ... }]
+   form keeps the test type identical to the production type. *)
+type metadata = Bar_loader.Metadata.t = {
+  symbol : string;
+  sector : string;
+  last_close : float;
+  avg_vol_30d : float option;
+  market_cap : float option;
+}
+[@@deriving test_matcher]
+
+type stats_counts = Bar_loader.stats_counts = {
+  metadata : int;
+  summary : int;
+  full : int;
+}
+[@@deriving test_matcher]
+
 (** {1 Fixture helpers}
 
     Each test builds its own temp data dir with a handful of synthetic CSVs so
@@ -67,7 +86,7 @@ let _fixture ~n_symbols ~sector_map_entries =
   let sector_map = String.Table.create () in
   List.iter sector_map_entries ~f:(fun (sym, sec) ->
       Hashtbl.set sector_map ~key:sym ~data:sec);
-  let loader = Bar_loader.create ~data_dir ~sector_map ~universe:symbols in
+  let loader = Bar_loader.create ~data_dir ~sector_map ~universe:symbols () in
   (loader, symbols)
 
 (** {1 Tests} *)
@@ -75,12 +94,8 @@ let _fixture ~n_symbols ~sector_map_entries =
 let test_create_empty _ =
   let loader, _ = _fixture ~n_symbols:0 ~sector_map_entries:[] in
   assert_that (Bar_loader.stats loader)
-    (all_of
-       [
-         field (fun s -> s.Bar_loader.metadata) (equal_to 0);
-         field (fun s -> s.Bar_loader.summary) (equal_to 0);
-         field (fun s -> s.Bar_loader.full) (equal_to 0);
-       ]);
+    (match_stats_counts ~metadata:(equal_to 0) ~summary:(equal_to 0)
+       ~full:(equal_to 0));
   assert_that (Bar_loader.tier_of loader ~symbol:"S01") is_none;
   assert_that (Bar_loader.get_metadata loader ~symbol:"S01") is_none
 
@@ -95,12 +110,8 @@ let test_promote_10_symbols_stats _ =
   in
   assert_that result is_ok;
   assert_that (Bar_loader.stats loader)
-    (all_of
-       [
-         field (fun s -> s.Bar_loader.metadata) (equal_to 10);
-         field (fun s -> s.Bar_loader.summary) (equal_to 0);
-         field (fun s -> s.Bar_loader.full) (equal_to 0);
-       ])
+    (match_stats_counts ~metadata:(equal_to 10) ~summary:(equal_to 0)
+       ~full:(equal_to 0))
 
 let test_get_metadata_returns_data _ =
   let loader, symbols =
@@ -114,27 +125,15 @@ let test_get_metadata_returns_data _ =
   assert_that
     (Bar_loader.get_metadata loader ~symbol:"S01")
     (is_some_and
-       (all_of
-          [
-            field (fun m -> m.Bar_loader.Metadata.symbol) (equal_to "S01");
-            field (fun m -> m.Bar_loader.Metadata.sector) (equal_to "Tech");
-            field
-              (fun m -> m.Bar_loader.Metadata.last_close)
-              (float_equal 100.0);
-            field (fun m -> m.Bar_loader.Metadata.avg_vol_30d) is_none;
-            field (fun m -> m.Bar_loader.Metadata.market_cap) is_none;
-          ]));
+       (match_metadata ~symbol:(equal_to "S01") ~sector:(equal_to "Tech")
+          ~last_close:(float_equal 100.0) ~avg_vol_30d:is_none
+          ~market_cap:is_none));
   (* S02: no sector entry — should be "" (plan: loader does not synthesize). *)
   assert_that
     (Bar_loader.get_metadata loader ~symbol:"S02")
     (is_some_and
-       (all_of
-          [
-            field (fun m -> m.Bar_loader.Metadata.sector) (equal_to "");
-            field
-              (fun m -> m.Bar_loader.Metadata.last_close)
-              (float_equal 101.0);
-          ]));
+       (match_metadata ~symbol:__ ~sector:(equal_to "")
+          ~last_close:(float_equal 101.0) ~avg_vol_30d:__ ~market_cap:__));
   assert_that
     (Bar_loader.tier_of loader ~symbol:"S01")
     (is_some_and (equal_to Bar_loader.Metadata_tier))
@@ -166,20 +165,41 @@ let test_promote_missing_symbol_errors _ =
   (* The failed symbol was not inserted. *)
   assert_that (Bar_loader.tier_of loader ~symbol:"NOPE") is_none;
   assert_that (Bar_loader.stats loader)
-    (field (fun s -> s.Bar_loader.metadata) (equal_to 0))
+    (match_stats_counts ~metadata:(equal_to 0) ~summary:__ ~full:__)
 
-let test_higher_tier_promotions_unimplemented _ =
+let test_full_promotion_unimplemented _ =
   let loader, symbols = _fixture ~n_symbols:2 ~sector_map_entries:[] in
-  let summary_result =
-    Bar_loader.promote loader ~symbols ~to_:Summary_tier ~as_of:_as_of
-  in
-  assert_that summary_result (is_error_with Unimplemented);
   let full_result =
     Bar_loader.promote loader ~symbols ~to_:Full_tier ~as_of:_as_of
   in
   assert_that full_result (is_error_with Unimplemented)
 
-let test_summary_full_getters_return_none _ =
+(** Symmetry counterpart to [test_full_promotion_unimplemented]: the supported
+    higher tier (Summary) must NOT return Unimplemented from this same call
+    surface. End-to-end Summary behaviour with full benchmark data is in
+    [test_summary.ml]; here the fixture has no benchmark series, so the call may
+    legitimately fail with NotFound — what we pin is only that the failure code
+    is *not* Unimplemented. *)
+let test_summary_promotion_supported _ =
+  let loader, symbols =
+    _fixture ~n_symbols:1 ~sector_map_entries:[ ("S01", "Tech") ]
+  in
+  let summary_result =
+    Bar_loader.promote loader ~symbols ~to_:Summary_tier ~as_of:_as_of
+  in
+  match summary_result with
+  | Ok () -> ()
+  | Error (err : Status.t) ->
+      if Status.equal_code err.code Status.Unimplemented then
+        assert_failure
+          (Printf.sprintf
+             "Summary_tier must be implemented, got Unimplemented: %s"
+             err.message)
+
+let test_summary_getter_none_on_metadata_only _ =
+  (* After Metadata-only promotion the Summary getter must be [None] — the
+     entry exists at Metadata tier but no Summary scalars have been computed
+     yet. Full-tier getter is permanently [None] until 3c. *)
   let loader, symbols =
     _fixture ~n_symbols:2 ~sector_map_entries:[ ("S01", "Tech") ]
   in
@@ -198,10 +218,10 @@ let suite =
          "get_metadata_returns_data" >:: test_get_metadata_returns_data;
          "promote_is_idempotent" >:: test_promote_is_idempotent;
          "promote_missing_symbol_errors" >:: test_promote_missing_symbol_errors;
-         "higher_tier_promotions_unimplemented"
-         >:: test_higher_tier_promotions_unimplemented;
-         "summary_full_getters_return_none"
-         >:: test_summary_full_getters_return_none;
+         "full_promotion_unimplemented" >:: test_full_promotion_unimplemented;
+         "summary_promotion_supported" >:: test_summary_promotion_supported;
+         "summary_getter_none_on_metadata_only"
+         >:: test_summary_getter_none_on_metadata_only;
        ]
 
 let () = run_test_tt_main suite
