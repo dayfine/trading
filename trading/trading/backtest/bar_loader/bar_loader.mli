@@ -22,6 +22,11 @@
 
 open Core
 
+module Summary_compute = Summary_compute
+(** Pure compute helpers used by the Summary tier. Re-exported so callers and
+    tests can reach the compute layer through the library's main module without
+    depending on the internal module directly. *)
+
 (** {1 Tier tag} *)
 
 (** Discrete ordering of tiers by information content: [Metadata_tier] <

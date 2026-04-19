@@ -1,6 +1,6 @@
 (tests
- (names test_metadata)
- (modules test_metadata)
+ (names test_metadata test_summary_compute)
+ (modules test_metadata test_summary_compute)
  (libraries
   ounit2
   core
@@ -9,4 +9,5 @@
   status
   trading.backtest.bar_loader
   types
+  weinstein.types
   matchers))
