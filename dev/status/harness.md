@@ -137,11 +137,11 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
      `## Status File Template` in `dev/health/YYYY-MM-DD-deep.md`.
      Smoke test: `trading/devtools/checks/deep_scan_recent_commits_check.sh`.
      Zero current violations. Verify: `dune runtest devtools/checks/`.
-  3. **Linter exception expiry** — `linter_exceptions.conf` entries
+  3. ~~**Linter exception expiry** — `linter_exceptions.conf` entries
      with `review_at: <milestone>` (e.g. M5) are never re-surfaced
      when the milestone lands. Add a check that compares current
      milestone in `weinstein-trading-system-v2.md` against the
-     `review_at:` values.
+     `review_at:` values.~~ — DONE: see Completed section below
   4. **Stale local jj bookmarks** — bookmarks left around after PRs
      merge accumulate. Surface them with
      `jj bookmark list 'glob:*'` filtered against origin.
