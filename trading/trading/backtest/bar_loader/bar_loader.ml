@@ -2,6 +2,7 @@
 
 open Core
 module Price_cache = Trading_simulation_data.Price_cache
+module Summary_compute = Summary_compute
 
 type tier = Metadata_tier | Summary_tier | Full_tier
 [@@deriving show, eq, sexp]

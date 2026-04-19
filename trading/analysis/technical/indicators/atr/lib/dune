@@ -1,0 +1,4 @@
+(library
+ (name atr)
+ (public_name indicators.atr)
+ (libraries core types))

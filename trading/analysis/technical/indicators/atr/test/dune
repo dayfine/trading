@@ -1,0 +1,4 @@
+(tests
+ (names test_atr)
+ (modules test_atr)
+ (libraries atr ounit2 types core matchers))

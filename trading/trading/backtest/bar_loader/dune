@@ -1,6 +1,16 @@
 (library
  (public_name trading.backtest.bar_loader)
  (name bar_loader)
- (libraries core fpath status types trading.simulation.data)
+ (libraries
+  core
+  fpath
+  status
+  types
+  trading.simulation.data
+  indicators.time_period
+  indicators.relative_strength
+  indicators.atr
+  weinstein.stage
+  weinstein.types)
  (preprocess
   (pps ppx_let ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
