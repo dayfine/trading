@@ -163,3 +163,14 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:deep_scan_linter_expiry_check.sh})))
+
+; Deep scan Stale Local Bookmarks section (harness gap sub-item 4): structural smoke test.
+; Verifies deep_scan.sh contains the Check 12 stale-bookmark detection markers
+; and that the most-recent deep scan report has ## Stale Local Bookmarks.
+; Does NOT run deep_scan.sh (weekly tool, not a per-PR gate).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:deep_scan_stale_bookmarks_check.sh})))
