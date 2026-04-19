@@ -5,18 +5,18 @@
 ## Status
 READY_FOR_REVIEW
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged as #434; 3b-i (Summary_compute) merged as #444; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) open at #447 (structural QC APPROVED). 3d (tracer phases) is the next increment after #447 lands.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) at #447 (draft, based on main). 3d (tracer phases) is the next increment.
 
 ## Interface stable
 NO
 
-All three tier getters will return their typed option once #447 lands: `get_metadata : Metadata.t option` (live since 3a), `get_summary : Summary.t option` (live since 3b-ii #445 merged), `get_full : Full.t option` (comes with 3c #447). Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gains optional `?full_config` in 3c. Interface flips to YES once #447 merges; remaining churn (3d-3g) is internal to the runner path and does not affect Bar_loader public surface.
+All three tier getters now return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c. Remaining churn will come from 3d (tracer phase plumbing may add an optional trace arg to `create`), 3e (runner wiring), and 3f (tiered runner path).
 
 ## Open PR
-- #447 — `feat/backtest-tiered-loader-3c-full-tier` — 3c Full tier + promotion semantics (draft, structural QC APPROVED, awaiting merge).
+- #447 — feat/backtest-tiered-loader-3c-full-tier — 3c based on main (draft, awaiting QC).
 
 ## Blocked on
-- None. 3d depends on #447 merging.
+- None. 3d depends on 3c merging.
 
 ## Goal
 
@@ -80,11 +80,43 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Next Steps
 
-1. QC review of 3a (feat/backtest-tiered-loader head).
-2. Dispatch 3b — Summary tier. Adds `Summary.t`, `summary_compute.{ml,mli}` (30w MA, ATR, stage heuristic, RS line from bounded bar tail), extends `promote ~to_:Summary_tier` and `get_summary` to return `Summary.t option`. ~220 lines per plan §3b.
-3. Subsequent increments 3c–3g follow per plan §Dependency graph.
+1. QC review of 3c (feat/backtest-tiered-loader-3c-full-tier head).
+2. Dispatch 3d — tracer phases. Extends `Trace.Phase.t` with `Promote_summary`, `Promote_full`, `Demote`; plumbs trace emission through `Bar_loader.promote` / `demote`. Acceptance: run `scenario_runner --parallel 3` with trace enabled under a `Tiered` loader_strategy and confirm 3 distinct `trace-<scenario>.sexp` files appear with per-phase data. ~120 lines per plan §3d.
+3. Subsequent increments 3e–3g follow per plan §Dependency graph.
 
 ## Completed
+
+- **3c — Full tier + promotion semantics** (2026-04-19). Adds
+  `Full.t = { symbol; bars; as_of }` and a thin `Full_compute` pure
+  module mirroring `Summary_compute`'s shape. `promote ~to_:Full_tier`
+  cascades through Summary (→ Metadata), then loads a bounded OHLCV
+  tail (`full_config.tail_days = 1800` default, ~7 years) via the
+  shared `_load_bars_tail` helper — now parameterized on `tail_days`
+  so Summary's 250-day window and Full's 1800-day window share the
+  same CSV path. `get_full` returns `Full.t option`. Demotion
+  semantics per plan §Resolutions #6: Full → Summary keeps Summary
+  scalars and drops bars; Full → Metadata drops both higher tiers.
+  `Types.Daily_price.t` has no sexp converters, so `Full.t` derives
+  `show, eq` only (documented in the mli). `Bar_history`,
+  `Weinstein_strategy`, `Simulator`, `Price_cache`, and `Screener`
+  untouched (plan §Out of scope).
+  - Files: `bar_loader/{bar_loader.mli,bar_loader.ml,full_compute.mli,full_compute.ml}`
+    + `bar_loader/test/{dune,test_full.ml,test_metadata.ml}` (dropped
+    the now-obsolete `full_promotion_unimplemented` test on metadata).
+  - Verify: `dev/lib/run-in-env.sh dune build trading/backtest/bar_loader && dev/lib/run-in-env.sh dune runtest trading/backtest/bar_loader --force` — 7 Metadata + 12 Summary_compute + 8 Summary + 8 Full = 35 tests pass.
+
+- **3b-ii — Summary tier wiring + integration tests** (2026-04-19).
+  Wires `Summary_compute` (from 3b-i) into `Bar_loader`. Adds
+  `Summary.t` record on per-symbol entries. `promote ~to_:Summary_tier`
+  auto-promotes through Metadata, reads a bounded 250-day daily-bar
+  tail via `Csv_storage` (bypassing `Price_cache` so raw bars don't
+  leak into the shared cache), computes scalars via
+  `Summary_compute.compute_values`, then drops the bars. Benchmark
+  bars lazy-loaded and cached on the loader. `get_summary` returns
+  `Summary.t option`. Insufficient history leaves the symbol at
+  Metadata tier. Demote to Metadata drops Summary scalars.
+
+- **3b-i — Summary_compute pure indicator helpers** (merged, PR #444).
 
 - **3a — Metadata tier + types scaffold** (2026-04-19). New library at
   `trading/trading/backtest/bar_loader/`. Exposes the full
@@ -94,19 +126,15 @@ Build alongside existing `Bar_history` — don't modify it.
   consumer needs them (plan §Risks #4). `promote ~to_:Metadata_tier`
   reads the last bar ≤ `as_of` via the existing `Price_cache` and
   joins a caller-supplied sector table — idempotent, surfaces
-  per-symbol errors without inserting failed symbols. Higher-tier
-  promotes return `Status.Unimplemented`. `Bar_history`,
-  `Weinstein_strategy`, `Simulator`, `Price_cache`, and `Screener`
-  untouched (plan §Out of scope).
+  per-symbol errors without inserting failed symbols.
   - Files: `bar_loader/{dune,bar_loader.mli,bar_loader.ml}` +
     `bar_loader/test/{dune,test_metadata.ml}`.
-  - Verify: `dev/lib/run-in-env.sh dune build trading/backtest/bar_loader && dev/lib/run-in-env.sh dune runtest trading/backtest/bar_loader/test` — 7 tests pass.
 
 ## QC
 
-overall_qc: PENDING (3a ready for review)
-structural_qc: PENDING (3a)
-behavioral_qc: N/A (3a — no strategy behavior change; parity test arrives with 3g)
+overall_qc: APPROVED (3c — structural + behavioral, 2026-04-19)
+structural_qc: APPROVED (3c, 2026-04-19 — dev/reviews/backtest-scale-3c.md)
+behavioral_qc: APPROVED (3c, 2026-04-19 — data-loading increment; no strategy behavior change; tier-shape + demote/promote invariants verified against plan §Resolutions #6. Parity acceptance gate arrives with 3g — dev/reviews/backtest-scale-3c.md)
 
 Reviewers when work lands:
 - qc-structural — module boundaries between tiers; `Bar_history` untouched; parity test runs both strategies.
