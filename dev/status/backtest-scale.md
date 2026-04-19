@@ -8,9 +8,9 @@ READY_FOR_REVIEW
 Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata tier) and 3b (Summary tier) implemented; 3c (Full tier) is next.
 
 ## Interface stable
-PARTIAL — 3a + 3b landed
+NO
 
-`Bar_loader.create` / `promote` / `demote` / `tier_of` / `get_metadata` / `get_summary` / `stats` signatures are stable. `create` takes `?benchmark_symbol` / `?summary_config` optional args introduced with 3b. `get_full` still returns `unit option`; its return type becomes `Full.t option` in 3c.
+3a and 3b have landed (Metadata + Summary tiers). `Bar_loader.create` / `promote` / `demote` / `tier_of` / `get_metadata` / `get_summary` / `stats` signatures are stable; `create` takes `?benchmark_symbol` / `?summary_config` optional args introduced with 3b. `get_full` still returns `unit option` and becomes `Full.t option` in 3c, so the full `Bar_loader` interface is not yet frozen.
 
 ## Open PR
 - feat/backtest-tiered-loader — 3a open at https://github.com/dayfine/trading/pull/new/feat/backtest-tiered-loader (draft, awaiting QC).
