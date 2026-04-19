@@ -67,7 +67,7 @@ let _fixture ~n_symbols ~sector_map_entries =
   let sector_map = String.Table.create () in
   List.iter sector_map_entries ~f:(fun (sym, sec) ->
       Hashtbl.set sector_map ~key:sym ~data:sec);
-  let loader = Bar_loader.create ~data_dir ~sector_map ~universe:symbols in
+  let loader = Bar_loader.create ~data_dir ~sector_map ~universe:symbols () in
   (loader, symbols)
 
 (** {1 Tests} *)
@@ -168,18 +168,17 @@ let test_promote_missing_symbol_errors _ =
   assert_that (Bar_loader.stats loader)
     (field (fun s -> s.Bar_loader.metadata) (equal_to 0))
 
-let test_higher_tier_promotions_unimplemented _ =
+let test_full_promotion_unimplemented _ =
   let loader, symbols = _fixture ~n_symbols:2 ~sector_map_entries:[] in
-  let summary_result =
-    Bar_loader.promote loader ~symbols ~to_:Summary_tier ~as_of:_as_of
-  in
-  assert_that summary_result (is_error_with Unimplemented);
   let full_result =
     Bar_loader.promote loader ~symbols ~to_:Full_tier ~as_of:_as_of
   in
   assert_that full_result (is_error_with Unimplemented)
 
-let test_summary_full_getters_return_none _ =
+let test_summary_getter_none_on_metadata_only _ =
+  (* After Metadata-only promotion the Summary getter must be [None] — the
+     entry exists at Metadata tier but no Summary scalars have been computed
+     yet. Full-tier getter is permanently [None] until 3c. *)
   let loader, symbols =
     _fixture ~n_symbols:2 ~sector_map_entries:[ ("S01", "Tech") ]
   in
@@ -198,10 +197,9 @@ let suite =
          "get_metadata_returns_data" >:: test_get_metadata_returns_data;
          "promote_is_idempotent" >:: test_promote_is_idempotent;
          "promote_missing_symbol_errors" >:: test_promote_missing_symbol_errors;
-         "higher_tier_promotions_unimplemented"
-         >:: test_higher_tier_promotions_unimplemented;
-         "summary_full_getters_return_none"
-         >:: test_summary_full_getters_return_none;
+         "full_promotion_unimplemented" >:: test_full_promotion_unimplemented;
+         "summary_getter_none_on_metadata_only"
+         >:: test_summary_getter_none_on_metadata_only;
        ]
 
 let () = run_test_tt_main suite

@@ -45,8 +45,7 @@ let _true_range_series (bars : Types.Daily_price.t list) : float list =
   | [] | [ _ ] -> []
   | first :: rest ->
       let _, trs =
-        List.fold rest
-          ~init:(first.Types.Daily_price.close_price, [])
+        List.fold rest ~init:(first.Types.Daily_price.close_price, [])
           ~f:(fun (prev_close, acc) bar ->
             let tr = _true_range ~prev_close bar in
             (bar.Types.Daily_price.close_price, tr :: acc))
@@ -65,7 +64,9 @@ let ma_30w ~config (bars : Types.Daily_price.t list) : float option =
   let n = List.length weekly in
   if n < config.ma_weeks then None
   else
-    let last_n = List.sub weekly ~pos:(n - config.ma_weeks) ~len:config.ma_weeks in
+    let last_n =
+      List.sub weekly ~pos:(n - config.ma_weeks) ~len:config.ma_weeks
+    in
     let closes =
       List.map last_n ~f:(fun b -> b.Types.Daily_price.adjusted_close)
     in
@@ -78,7 +79,9 @@ let atr_14 ~config (bars : Types.Daily_price.t list) : float option =
     let n = List.length tr_series in
     if n < config.atr_days then None
     else
-      let window = List.sub tr_series ~pos:(n - config.atr_days) ~len:config.atr_days in
+      let window =
+        List.sub tr_series ~pos:(n - config.atr_days) ~len:config.atr_days
+      in
       Some (_average window)
 
 let rs_line ~(config : config) ~stock_bars ~benchmark_bars : float option =

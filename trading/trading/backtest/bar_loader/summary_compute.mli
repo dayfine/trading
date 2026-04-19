@@ -33,9 +33,9 @@ val default_config : config
 
 (** {1 Indicator primitives}
 
-    Each helper returns [None] when there are not enough bars to produce a
-    valid result — summary loaders treat [None] as "insufficient history;
-    leave this symbol at its current tier". *)
+    Each helper returns [None] when there are not enough bars to produce a valid
+    result — summary loaders treat [None] as "insufficient history; leave this
+    symbol at its current tier". *)
 
 val ma_30w : config:config -> Types.Daily_price.t list -> float option
 (** [ma_30w ~config bars] aggregates [bars] to weekly (last-bar-of-week) and
@@ -47,8 +47,8 @@ val atr_14 : config:config -> Types.Daily_price.t list -> float option
 (** [atr_14 ~config bars] returns the Average True Range over the most recent
     [config.atr_days] bars. True range for bar [i] is
     [max (high - low, |high - prev_close|, |low - prev_close|)]. The first bar
-    has no prior close and is skipped. Returns [None] when there are fewer
-    than [config.atr_days + 1] bars. *)
+    has no prior close and is skipped. Returns [None] when there are fewer than
+    [config.atr_days + 1] bars. *)
 
 val rs_line :
   config:config ->
@@ -58,18 +58,16 @@ val rs_line :
 (** [rs_line ~config ~stock_bars ~benchmark_bars] returns the latest Mansfield
     normalized RS value for the stock against the benchmark, or [None] when
     there are fewer than [config.rs_ma_period] aligned bars. The value is
-    [raw_rs / MA(raw_rs)] — values above 1.0 mean the stock is outperforming
-    its own recent baseline. *)
+    [raw_rs / MA(raw_rs)] — values above 1.0 mean the stock is outperforming its
+    own recent baseline. *)
 
 val stage_heuristic :
-  config:config ->
-  Types.Daily_price.t list ->
-  Weinstein_types.stage option
+  config:config -> Types.Daily_price.t list -> Weinstein_types.stage option
 (** [stage_heuristic ~config bars] runs the {!Stage.classify} one-shot
     classifier on weekly-aggregated bars and returns the resulting stage.
     Returns [None] when aggregation yields fewer than [config.ma_weeks] weekly
-    bars (i.e. {!Stage.classify} would emit a degenerate Stage1 placeholder —
-    we surface that as "no heuristic available" instead). *)
+    bars (i.e. {!Stage.classify} would emit a degenerate Stage1 placeholder — we
+    surface that as "no heuristic available" instead). *)
 
 (** {1 Summary composition} *)
 
@@ -92,5 +90,5 @@ val compute_values :
   summary_values option
 (** [compute_values ~config ~stock_bars ~benchmark_bars ~as_of] runs all four
     helpers and assembles a {!summary_values}. Returns [None] when any helper
-    returns [None] — the caller should leave the symbol at Metadata tier in
-    that case. *)
+    returns [None] — the caller should leave the symbol at Metadata tier in that
+    case. *)

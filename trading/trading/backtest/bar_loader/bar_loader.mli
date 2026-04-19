@@ -8,17 +8,16 @@
     - {b Metadata} — last-bar scalars (last close, sector, optional cap and
       average volume). One record for {e every} universe symbol.
     - {b Summary} — sector-ranked subset; indicator scalars (30w MA, RS line,
-      stage heuristic, ATR) computed from a bounded tail of bars; raw bars
-      dropped.
+      stage heuristic, ATR) computed from a bounded tail of daily bars. The raw
+      bars are dropped once the scalars are extracted, which is the core memory
+      win over holding full OHLCV history.
     - {b Full} — raw OHLCV history for symbols actively considered for entry or
-      currently held.
+      currently held. Added in 3c.
 
-    This increment (3a) implements {b Metadata only}. The [tier] variant already
-    exposes all three tags so later increments extend the loader without churn
-    in the variant. [Summary.t] and [Full.t] submodules and their promotion
-    semantics are added in 3b / 3c. In 3a, [promote ~to_:Summary_tier] and
-    [promote ~to_:Full_tier] raise [Failure]; [get_summary] and [get_full]
-    always return [None]. *)
+    As of 3b, this module implements Metadata and Summary tiers. The [tier]
+    variant already exposes all three tags so 3c extends the loader without
+    churn to the variant. [promote ~to_:Full_tier] returns
+    [Error Status.Unimplemented] until 3c; [get_full] always returns [None]. *)
 
 open Core
 
@@ -49,6 +48,25 @@ module Metadata : sig
   [@@deriving show, eq, sexp]
 end
 
+module Summary : sig
+  type t = {
+    symbol : string;
+    ma_30w : float;  (** 30-week simple MA of weekly-aggregated closes. *)
+    atr_14 : float;  (** Average True Range over the last 14 daily bars. *)
+    rs_line : float;
+        (** Latest Mansfield normalized RS value ([raw_rs / MA(raw_rs)]). Values
+            above 1.0 indicate the stock is outperforming its own recent
+            baseline. *)
+    stage : Weinstein_types.stage;
+        (** Weinstein stage heuristic from the one-shot classifier. *)
+    as_of : Date.t;  (** Date of the last bar used to derive the scalars. *)
+  }
+  [@@deriving show, eq, sexp]
+  (** Indicator scalars derived from a bounded tail of daily bars. Raw bars are
+      dropped once this record is constructed — the memory footprint per symbol
+      is fixed at a handful of floats rather than the full history. *)
+end
+
 (** {1 Loader} *)
 
 type t
@@ -64,13 +82,25 @@ val create :
   data_dir:Fpath.t ->
   sector_map:string String.Table.t ->
   universe:string list ->
+  ?benchmark_symbol:string ->
+  ?summary_config:Summary_compute.config ->
+  unit ->
   t
-(** [create ~data_dir ~sector_map ~universe] returns a fresh loader. [universe]
-    is the full set of symbols the backtest may promote; it is recorded but does
-    {b not} load any bars (Metadata-tier loads happen in [promote]).
-    [sector_map] is a symbol → sector lookup; symbols missing from the map get
-    [sector = ""] on promotion. [data_dir] is forwarded to an internal
-    [Price_cache] used on demand. *)
+(** [create ~data_dir ~sector_map ~universe ?benchmark_symbol ?summary_config
+     ()] returns a fresh loader. [universe] is the full set of symbols the
+    backtest may promote; it is recorded but does {b not} load any bars
+    (Metadata-tier loads happen in [promote]). [sector_map] is a symbol → sector
+    lookup; symbols missing from the map get [sector = ""] on promotion.
+    [data_dir] is forwarded to an internal [Price_cache] used for Metadata-tier
+    last-close lookups.
+
+    [benchmark_symbol] is the ticker used to align bars when computing the
+    Summary-tier RS line (typically ["SPY"] or ["^GSPC"]). Default: ["SPY"]. Its
+    bars are loaded on first Summary promotion and cached inside the loader.
+
+    [summary_config] controls the windows used to compute Summary scalars (see
+    {!Summary_compute.default_config}). Default:
+    {!Summary_compute.default_config}. *)
 
 val promote :
   t ->
@@ -82,22 +112,31 @@ val promote :
     [to_], loading whatever data that tier needs. Idempotent: a symbol already
     at tier [>= to_] is unchanged.
 
-    In this increment only [to_ = Metadata_tier] is implemented — passing
-    [Summary_tier] or [Full_tier] returns an [Error] with a
-    [Status.Unimplemented] code. Subsequent increments (3b, 3c) add those
-    branches.
+    Tier-specific load behaviour:
+    - [Metadata_tier]: reads the last bar on or before [as_of] from the shared
+      [Price_cache].
+    - [Summary_tier]: auto-promotes through Metadata first, then reads a bounded
+      tail ([summary_config.tail_days] of daily bars ending at [as_of]) directly
+      from CSV storage — bypassing [Price_cache] so the raw bars are never
+      retained. The benchmark symbol's tail is loaded once and cached for
+      subsequent Summary promotions in the same session. A symbol whose history
+      is too short to produce all Summary scalars is left at Metadata tier (not
+      an error — the caller should retry later or leave the symbol where it is).
+    - [Full_tier]: returns [Error Status.Unimplemented] until 3c.
 
     Returns the first per-symbol error encountered (if any). A symbol that fails
     to load is {e not} added to the loader. *)
 
 val demote : t -> symbols:string list -> to_:tier -> unit
 (** [demote t ~symbols ~to_] tiers each symbol down, freeing higher-tier data. A
-    symbol currently at tier [<= to_] is unchanged. Calling with
-    [to_ = Metadata_tier] fully drops any Summary / Full caches.
+    symbol currently at tier [<= to_] is unchanged.
 
-    In 3a, since promote only reaches Metadata, [demote] is effectively a no-op
-    — included for API completeness so 3b / 3c extend the behaviour without a
-    signature change. *)
+    - [to_ = Metadata_tier] drops Summary scalars (and Full bars, in 3c).
+    - [to_ = Summary_tier] drops only Full bars (no-op for Summary-only
+      symbols).
+
+    Callers assume demotion is free: there is no reload cost. Re-promoting the
+    same symbols back up requires fetching bars again. *)
 
 val tier_of : t -> symbol:string -> tier option
 (** [tier_of t ~symbol] returns the current tier of [symbol], or [None] if the
@@ -107,14 +146,14 @@ val get_metadata : t -> symbol:string -> Metadata.t option
 (** [get_metadata t ~symbol] returns the Metadata record for [symbol] when it
     has been promoted at least to Metadata tier, otherwise [None]. *)
 
-val get_summary : t -> symbol:string -> unit option
-(** Placeholder for 3b. Always returns [None] in this increment; the return type
-    is [unit option] to keep the interface signature stable until 3b introduces
-    [Summary.t]. *)
+val get_summary : t -> symbol:string -> Summary.t option
+(** [get_summary t ~symbol] returns the Summary record for [symbol] when it has
+    been promoted to Summary tier or higher, otherwise [None]. *)
 
 val get_full : t -> symbol:string -> unit option
-(** Placeholder for 3c. Always returns [None] in this increment; same stability
-    rationale as [get_summary]. *)
+(** Placeholder for 3c. Always returns [None] in this increment; the return type
+    is [unit option] to keep the interface signature stable until 3c introduces
+    [Full.t]. *)
 
 val stats : t -> stats_counts
 (** [stats t] returns the current per-tier symbol counts. The sum of the three
