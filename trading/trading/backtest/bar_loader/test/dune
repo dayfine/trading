@@ -1,6 +1,6 @@
 (tests
- (names test_metadata test_summary_compute)
- (modules test_metadata test_summary_compute)
+ (names test_metadata test_summary_compute test_summary)
+ (modules test_metadata test_summary_compute test_summary)
  (libraries
   ounit2
   core
@@ -10,4 +10,6 @@
   trading.backtest.bar_loader
   types
   weinstein.types
-  matchers))
+  matchers)
+ (preprocess
+  (pps ppx_test_matcher)))

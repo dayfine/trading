@@ -7,9 +7,11 @@
   status
   types
   trading.simulation.data
+  csv
   indicators.time_period
   indicators.relative_strength
   indicators.atr
+  indicators.sma
   weinstein.stage
   weinstein.types)
  (preprocess
