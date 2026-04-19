@@ -891,6 +891,59 @@ Write the combined result to `dev/reviews/<feature>.md` (structural writes the b
 - Structural NEEDS_REWORK → `overall_qc: NEEDS_REWORK (structural)`, behavioral not run
 - Structural APPROVED + Behavioral NEEDS_REWORK → `overall_qc: NEEDS_REWORK (behavioral)`
 
+### Stage 3: Flip the PR from draft to ready-for-review
+
+**When to run:** only if `overall_qc: APPROVED`. Do not flip a PR that is
+still in NEEDS_REWORK — the draft flag correctly signals "not ready."
+
+`feat-*` agents open PRs as drafts by convention. Once QC APPROVES, the PR
+is ready for human merge — but nothing flips the GitHub `isDraft` flag back,
+so the PR cosmetically looks un-reviewed (`gh pr list` default filter
+excludes drafts). That confused human reviewers in run-4: QC had APPROVED
+#447 but the PR remained draft.
+
+GitHub's REST API does not expose a draft→ready endpoint. Use the GraphQL
+`markPullRequestReadyForReview` mutation, which takes the PR's node ID
+(distinct from the integer number). The pattern:
+
+```bash
+PR_NUMBER="<the PR number from Stage 1/2 QC output>"
+REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
+
+# 1. Look up the PR's GraphQL node_id via REST (cheap).
+NODE_ID="$(curl -sSL \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["node_id"])')"
+
+# 2. Flip draft → ready via GraphQL mutation.
+cat > /tmp/ready_mutation.json <<EOF
+{"query":"mutation { markPullRequestReadyForReview(input: {pullRequestId: \"${NODE_ID}\"}) { pullRequest { isDraft } } }"}
+EOF
+FLIP_RESPONSE="$(curl -sSL -X POST \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d @/tmp/ready_mutation.json \
+  "https://api.github.com/graphql")"
+FLIPPED="$(printf '%s' "$FLIP_RESPONSE" \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); pr=d.get("data",{}).get("markPullRequestReadyForReview",{}).get("pullRequest"); print("true" if pr is not None and pr.get("isDraft") is False else "false")' 2>/dev/null || echo false)"
+
+if [ "$FLIPPED" != "true" ]; then
+  # Not a gating failure — the PR merges fine either way. Surface as [info]
+  # so a human can flip it manually (or notice that the mutation's scope /
+  # payload shape changed).
+  echo "DRAFT_FLIP_FAILED pr=${PR_NUMBER} response=${FLIP_RESPONSE}"
+fi
+```
+
+Log the outcome in `## Dispatched this run` with the QC row, e.g.
+`flipped draft→ready` or `draft-flip failed: <reason>`. The GH token
+already scoped for PR writes (BOT_GITHUB_TOKEN) is sufficient — no new
+token scopes needed. If the PR was already ready-for-review (e.g. the
+agent didn't open as draft), the mutation is a no-op and returns
+`isDraft: false` — same branch works.
+
 ---
 
 ## Step 5.5: Reconcile `dev/status/_index.md`
