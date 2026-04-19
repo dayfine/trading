@@ -5,18 +5,18 @@
 ## Status
 READY_FOR_REVIEW
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) at #447 (awaiting merge; QC APPROVED run-4). 3d (tracer phases) is the next increment.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447. 3d (tracer phases) ready for review. 3e (runner + scenario plumbing for `loader_strategy`) is the next increment.
 
 ## Interface stable
 NO
 
-All three tier getters now return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c. Remaining churn will come from 3d (tracer phase plumbing may add an optional trace arg to `create`), 3e (runner wiring), and 3f (tiered runner path).
+All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- #447 — feat/backtest-tiered-loader-3c-full-tier — 3c based on main, QC APPROVED run-4, awaiting human merge.
+- feat/backtest-tiered-loader-3d-tracer-phases — 3d based on main; tier-op tracer phases + callback hook. Ready for QC.
 
 ## Blocked on
-- None. 3d depends on 3c merging.
+- None. 3e depends on 3d merging.
 
 ## Goal
 
@@ -80,11 +80,32 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Next Steps
 
-1. QC review of 3c (feat/backtest-tiered-loader-3c-full-tier head).
-2. Dispatch 3d — tracer phases. Extends `Trace.Phase.t` with `Promote_summary`, `Promote_full`, `Demote`; plumbs trace emission through `Bar_loader.promote` / `demote`. Acceptance: run `scenario_runner --parallel 3` with trace enabled under a `Tiered` loader_strategy and confirm 3 distinct `trace-<scenario>.sexp` files appear with per-phase data. ~120 lines per plan §3d.
-3. Subsequent increments 3e–3g follow per plan §Dependency graph.
+1. QC review of 3d (feat/backtest-tiered-loader-3d-tracer-phases head).
+2. Dispatch 3e — runner + scenario plumbing for `loader_strategy`. Adds the `Legacy | Tiered` switch to `Backtest.Runner.run_backtest` and `Scenario.t`; default `Legacy` with Tiered branch still placeholder. ~150 lines per plan §3e.
+3. Subsequent increments 3f–3g follow per plan §Dependency graph. 3g (parity test) is the merge gate.
 
 ## Completed
+
+- **3d — Tracer phases for tier operations** (2026-04-19). Adds three
+  `Backtest.Trace.Phase.t` variants (`Promote_summary`, `Promote_full`,
+  `Demote`) and wires `Bar_loader.promote` / `Bar_loader.demote` to emit
+  them via a narrow callback hook (`trace_hook`) registered on
+  `Bar_loader.create`. The callback carries a `Bar_loader.tier_op` tag
+  + batch size; the runner (3e) will map `tier_op` to the matching
+  `Trace.Phase.t` and forward to `Trace.record`. Shape rationale: keeping
+  `bar_loader` independent of the `backtest` library avoids the cycle
+  that would arise once 3f makes the runner depend on `Bar_loader`.
+  Metadata promotion is deliberately silent (owned by the runner's outer
+  `Load_bars` phase wrapper); Summary/Full promotes emit one record
+  each per `promote` call; `demote` always emits regardless of target
+  tier. When no hook is registered the wrappers short-circuit through
+  a single `Option` match — observable behaviour is identical to the
+  pre-hook version, satisfying the 3g parity gate precondition.
+  - Files: `bar_loader/{bar_loader.mli,bar_loader.ml}` +
+    `bar_loader/test/{dune,test_trace_integration.ml}` +
+    `lib/{trace.ml,trace.mli}` + `test/test_trace.ml` (extended sexp
+    round-trip to cover the 3 new variants).
+  - Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest trading/backtest/bar_loader trading/backtest/test --force` — 42 bar_loader tests (35 existing + 7 new trace-integration) + 9 trace tests pass.
 
 - **3c — Full tier + promotion semantics** (2026-04-19). Adds
   `Full.t = { symbol; bars; as_of }` and a thin `Full_compute` pure

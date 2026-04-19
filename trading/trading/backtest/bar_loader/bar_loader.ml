@@ -39,6 +39,13 @@ end
 type stats_counts = { metadata : int; summary : int; full : int }
 [@@deriving show, eq, sexp]
 
+type tier_op = Promote_to_summary | Promote_to_full | Demote_op
+[@@deriving show, eq]
+
+type trace_hook = {
+  record : 'a. tier_op:tier_op -> symbols:int -> (unit -> 'a) -> 'a;
+}
+
 type entry = {
   tier : tier;
   metadata : Metadata.t option;
@@ -63,6 +70,11 @@ type t = {
   benchmark_symbol : string;
   summary_config : Summary_compute.config;
   full_config : Full_compute.config;
+  trace_hook : trace_hook option;
+      (** When [Some _], [promote] / [demote] wrap their per-call body with the
+          hook. When [None], the wrappers short-circuit and produce behaviour
+          identical to the pre-hook version — critical for the acceptance
+          guarantee that an un-traced run is behaviourally unchanged. *)
   mutable benchmark_bars : Types.Daily_price.t list option;
       (** Lazily loaded on the first Summary promotion. Benchmark bars are read
           via [Csv_storage] directly (bypassing [Price_cache]) so they don't
@@ -73,7 +85,7 @@ type t = {
 let create ~data_dir ~sector_map ~universe:_
     ?(benchmark_symbol = _default_benchmark_symbol)
     ?(summary_config = Summary_compute.default_config)
-    ?(full_config = Full_compute.default_config) () =
+    ?(full_config = Full_compute.default_config) ?trace_hook () =
   (* [universe] is accepted in the signature so 3b/3c/3f can drive tier-wide
      operations ("promote every universe symbol to Metadata on startup")
      without a signature churn. Not consumed yet. *)
@@ -85,6 +97,7 @@ let create ~data_dir ~sector_map ~universe:_
     benchmark_symbol;
     summary_config;
     full_config;
+    trace_hook;
     benchmark_bars = None;
   }
 
@@ -296,17 +309,38 @@ let _promote_fold ~f symbols =
       | Error err -> Stop (Error err))
     ~finish:(fun () -> Ok ())
 
+(** [_maybe_trace t ~tier_op ~symbols f] routes [f] through [t.trace_hook] when
+    one is registered, and runs [f ()] directly otherwise. The [None] branch is
+    a plain pass-through so the un-traced code path has zero observable overhead
+    beyond a single [Option] match. *)
+let _maybe_trace t ~tier_op ~symbols f =
+  match t.trace_hook with
+  | None -> f ()
+  | Some hook -> hook.record ~tier_op ~symbols f
+
 let promote t ~symbols ~to_ ~as_of =
+  let batch_size = List.length symbols in
+  let run_metadata () =
+    _promote_fold symbols ~f:(fun ~symbol ->
+        _promote_one_to_metadata t ~symbol ~as_of)
+  in
+  let run_summary () =
+    _promote_fold symbols ~f:(fun ~symbol ->
+        _promote_one_to_summary t ~symbol ~as_of)
+  in
+  let run_full () =
+    _promote_fold symbols ~f:(fun ~symbol ->
+        _promote_one_to_full t ~symbol ~as_of)
+  in
   match to_ with
   | Metadata_tier ->
-      _promote_fold symbols ~f:(fun ~symbol ->
-          _promote_one_to_metadata t ~symbol ~as_of)
+      (* Metadata promotion is the legacy [Load_bars] path — not traced as a
+         tier-op. The runner wraps the outer Load_bars phase. *)
+      run_metadata ()
   | Summary_tier ->
-      _promote_fold symbols ~f:(fun ~symbol ->
-          _promote_one_to_summary t ~symbol ~as_of)
+      _maybe_trace t ~tier_op:Promote_to_summary ~symbols:batch_size run_summary
   | Full_tier ->
-      _promote_fold symbols ~f:(fun ~symbol ->
-          _promote_one_to_full t ~symbol ~as_of)
+      _maybe_trace t ~tier_op:Promote_to_full ~symbols:batch_size run_full
 
 (** [_demote_one] drops higher-tier data from an existing entry. The caller
     guarantees the entry exists; tier-of-target is enforced here (a symbol at
@@ -335,7 +369,10 @@ let _demote_one t ~symbol ~to_ =
       Hashtbl.set t.entries ~key:symbol ~data:new_entry
 
 let demote t ~symbols ~to_ =
-  List.iter symbols ~f:(fun symbol -> _demote_one t ~symbol ~to_)
+  let run () =
+    List.iter symbols ~f:(fun symbol -> _demote_one t ~symbol ~to_)
+  in
+  _maybe_trace t ~tier_op:Demote_op ~symbols:(List.length symbols) run
 
 let stats t =
   Hashtbl.fold t.entries ~init:{ metadata = 0; summary = 0; full = 0 }

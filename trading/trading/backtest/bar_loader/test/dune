@@ -1,6 +1,16 @@
 (tests
- (names test_metadata test_summary_compute test_summary test_full)
- (modules test_metadata test_summary_compute test_summary test_full)
+ (names
+  test_metadata
+  test_summary_compute
+  test_summary
+  test_full
+  test_trace_integration)
+ (modules
+  test_metadata
+  test_summary_compute
+  test_summary
+  test_full
+  test_trace_integration)
  (libraries
   ounit2
   core
@@ -8,6 +18,8 @@
   fpath
   status
   trading.backtest.bar_loader
+  backtest
+  csv
   types
   weinstein.types
   matchers)
