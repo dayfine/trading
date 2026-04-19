@@ -23,41 +23,42 @@ set -e
 . "$(dirname "$0")/_check_lib.sh"
 
 REPO_ROOT="$(repo_root)"
-DEEP_SCAN="${REPO_ROOT}/trading/devtools/checks/deep_scan.sh"
-[ -f "$DEEP_SCAN" ] || die "deep_scan_trends_check: $DEEP_SCAN does not exist"
+DEEP_SCAN_DIR="${REPO_ROOT}/trading/devtools/checks/deep_scan"
+CHECK_08="${DEEP_SCAN_DIR}/check_08_trends.sh"
+[ -f "$CHECK_08" ] || die "deep_scan_trends_check: $CHECK_08 does not exist"
 
 fail() {
   echo "FAIL: deep_scan_trends_check — $1" >&2
   exit 1
 }
 
-# ── Part 1: structural check of deep_scan.sh ─────────────────────
+# ── Part 1: structural check of check_08_trends.sh ───────────────
 
 # Check 8 header
-grep -qF 'Check 8: Trends' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing 'Check 8: Trends' header"
+grep -qF 'Check 8: Trends' "$CHECK_08" \
+  || fail "check_08_trends.sh missing 'Check 8: Trends' header"
 
 # Followup delta sub-section markers
-grep -qF 'Followup items — now vs previous deep scan' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing '### Followup items — now vs previous deep scan'"
-grep -qF 'FOLLOWUP_PER_FILE' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing FOLLOWUP_PER_FILE accumulator"
-grep -qF 'PREV_DEEP' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing PREV_DEEP baseline detection"
+grep -qF 'Followup items — now vs previous deep scan' "$CHECK_08" \
+  || fail "check_08_trends.sh missing '### Followup items — now vs previous deep scan'"
+grep -qF 'FOLLOWUP_PER_FILE' "$CHECK_08" \
+  || fail "check_08_trends.sh missing FOLLOWUP_PER_FILE accumulator"
+grep -qF 'PREV_DEEP' "$CHECK_08" \
+  || fail "check_08_trends.sh missing PREV_DEEP baseline detection"
 
 # CC distribution sub-section markers
-grep -qF 'CC distribution — now vs previous snapshot' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing '### CC distribution — now vs previous snapshot'"
-grep -qF 'CC_LINTER_BIN' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing CC_LINTER_BIN path detection"
-grep -qF 'today_buckets' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing today_buckets computation"
-grep -qF 'Top-5 highest-CC' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing top-5 highest-CC output"
+grep -qF 'CC distribution — now vs previous snapshot' "$CHECK_08" \
+  || fail "check_08_trends.sh missing '### CC distribution — now vs previous snapshot'"
+grep -qF 'CC_LINTER_BIN' "$CHECK_08" \
+  || fail "check_08_trends.sh missing CC_LINTER_BIN path detection"
+grep -qF 'today_buckets' "$CHECK_08" \
+  || fail "check_08_trends.sh missing today_buckets computation"
+grep -qF 'Top-5 highest-CC' "$CHECK_08" \
+  || fail "check_08_trends.sh missing top-5 highest-CC output"
 
 # Report emits ## Trends section
-grep -qF '## Trends' "$DEEP_SCAN" \
-  || fail "deep_scan.sh does not emit '## Trends' section in report"
+grep -qF '## Trends' "$CHECK_08" \
+  || fail "check_08_trends.sh does not emit '## Trends' section in report"
 
 # ── Part 2: most-recent deep report has ## Trends ────────────────
 

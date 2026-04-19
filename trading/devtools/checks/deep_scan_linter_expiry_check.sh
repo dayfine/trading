@@ -22,38 +22,39 @@ set -e
 . "$(dirname "$0")/_check_lib.sh"
 
 REPO_ROOT="$(repo_root)"
-DEEP_SCAN="${REPO_ROOT}/trading/devtools/checks/deep_scan.sh"
-[ -f "$DEEP_SCAN" ] || die "deep_scan_linter_expiry_check: $DEEP_SCAN does not exist"
+DEEP_SCAN_DIR="${REPO_ROOT}/trading/devtools/checks/deep_scan"
+CHECK_11="${DEEP_SCAN_DIR}/check_11_linter_expiry.sh"
+[ -f "$CHECK_11" ] || die "deep_scan_linter_expiry_check: $CHECK_11 does not exist"
 
 fail() {
   echo "FAIL: deep_scan_linter_expiry_check — $1" >&2
   exit 1
 }
 
-# ── Part 1: structural check of deep_scan.sh ─────────────────────
+# ── Part 1: structural check of check_11_linter_expiry.sh ────────
 
 # Check 11 header
-grep -qF 'Check 11: Linter Exception Expiry' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing 'Check 11: Linter Exception Expiry' header"
+grep -qF 'Check 11: Linter Exception Expiry' "$CHECK_11" \
+  || fail "check_11_linter_expiry.sh missing 'Check 11: Linter Exception Expiry' header"
 
 # Reads linter_exceptions.conf
-grep -qF 'linter_exceptions.conf' "$DEEP_SCAN" \
-  || fail "deep_scan.sh does not reference linter_exceptions.conf"
+grep -qF 'linter_exceptions.conf' "$CHECK_11" \
+  || fail "check_11_linter_expiry.sh does not reference linter_exceptions.conf"
 
 # Detects review_at annotation
-grep -qF 'review_at:' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing review_at detection logic"
+grep -qF 'review_at:' "$CHECK_11" \
+  || fail "check_11_linter_expiry.sh missing review_at detection logic"
 
 # Accumulator variables for expiry tracking
-grep -qF 'EXPIRY_COUNT' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing EXPIRY_COUNT accumulator"
+grep -qF 'EXPIRY_COUNT' "$CHECK_11" \
+  || fail "check_11_linter_expiry.sh missing EXPIRY_COUNT accumulator"
 
-grep -qF 'EXPIRY_MISSING_COUNT' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing EXPIRY_MISSING_COUNT accumulator (missing review_at tracking)"
+grep -qF 'EXPIRY_MISSING_COUNT' "$CHECK_11" \
+  || fail "check_11_linter_expiry.sh missing EXPIRY_MISSING_COUNT accumulator (missing review_at tracking)"
 
 # Report emits ## Linter Exception Expiry section
-grep -qF '## Linter Exception Expiry' "$DEEP_SCAN" \
-  || fail "deep_scan.sh does not emit '## Linter Exception Expiry' section in report"
+grep -qF '## Linter Exception Expiry' "$CHECK_11" \
+  || fail "check_11_linter_expiry.sh does not emit '## Linter Exception Expiry' section in report"
 
 # ── Part 2: most-recent deep report has ## Linter Exception Expiry ──
 
