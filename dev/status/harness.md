@@ -142,10 +142,17 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
      when the milestone lands. Add a check that compares current
      milestone in `weinstein-trading-system-v2.md` against the
      `review_at:` values.~~ — DONE: see Completed section below
-  4. [~] **Stale local jj bookmarks** — bookmarks left around after PRs
-     merge accumulate. Surface them with
-     `jj bookmark list 'glob:*'` filtered against origin.
-     IN_PROGRESS: branch `harness/deep-scan-stale-bookmarks`.
+  4. ~~**Stale local jj bookmarks**~~ — DONE: Check 12 added to
+     `trading/devtools/checks/deep_scan.sh`; enumerates local jj bookmarks
+     via `jj bookmark list --all 'glob:*'`, classifies as (a) local-only
+     (no @origin entry) or (b) behind origin (local is ancestor of remote).
+     Findings emitted under `## Stale Local Bookmarks` in
+     `dev/health/YYYY-MM-DD-deep.md`. Protected names (main/master/HEAD/trunk)
+     excluded. Severity: INFO. Degrades gracefully if jj absent.
+     Smoke test: `trading/devtools/checks/deep_scan_stale_bookmarks_check.sh`.
+     Verify: `dune runtest devtools/checks/` — prints OK; run
+     `sh trading/devtools/checks/deep_scan.sh` — report contains
+     `## Stale Local Bookmarks`.
   Source: `dev/daily/2026-04-14.md` end-of-day audit.
 
 ---
