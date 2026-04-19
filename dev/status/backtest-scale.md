@@ -3,17 +3,17 @@
 ## Last updated: 2026-04-19
 
 ## Status
-APPROVED
+READY_FOR_REVIEW
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a dispatches on next orchestrator run.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata tier) implemented and pushed on `feat/backtest-tiered-loader`; 3b (Summary) is the next increment.
 
 ## Interface stable
-NO
+PARTIAL — 3a landed
 
-Implementation not yet started; plan decomposes Step 3 into 8 increments (3a–3h) each with its own interface. `Bar_loader` types stabilize incrementally as 3a/3b/3c land.
+`Bar_loader.create` / `promote` / `demote` / `tier_of` / `get_metadata` / `stats` signatures are stable. `get_summary` and `get_full` currently return `unit option` placeholders; their return type becomes `Summary.t option` / `Full.t option` in 3b / 3c respectively.
 
 ## Open PR
-- #433 (feat/backtest-tiered-loader) — plan PR, approved, awaiting merge.
+- feat/backtest-tiered-loader — 3a open at https://github.com/dayfine/trading/pull/new/feat/backtest-tiered-loader (draft, awaiting QC).
 
 ## Blocked on
 - None. Plan approved; 3a unblocked once #433 merges.
@@ -80,15 +80,33 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Next Steps
 
-1. Human reviews `dev/plans/backtest-tiered-loader-2026-04-19.md` and resolves §Open questions (ε threshold, scenario selection, screener-refactor scope, module placement, demotion semantics).
-2. On approval, orchestrator dispatches `feat-backtest` to implement 3a.
-3. Each subsequent GHA run picks up the next increment.
+1. QC review of 3a (feat/backtest-tiered-loader head).
+2. Dispatch 3b — Summary tier. Adds `Summary.t`, `summary_compute.{ml,mli}` (30w MA, ATR, stage heuristic, RS line from bounded bar tail), extends `promote ~to_:Summary_tier` and `get_summary` to return `Summary.t option`. ~220 lines per plan §3b.
+3. Subsequent increments 3c–3g follow per plan §Dependency graph.
+
+## Completed
+
+- **3a — Metadata tier + types scaffold** (2026-04-19). New library at
+  `trading/trading/backtest/bar_loader/`. Exposes the full
+  `Metadata_tier | Summary_tier | Full_tier` variant up front so
+  3b/3c don't churn it. `Metadata.t` carries sector + last_close;
+  `market_cap` and `avg_vol_30d` stay `float option = None` until a
+  consumer needs them (plan §Risks #4). `promote ~to_:Metadata_tier`
+  reads the last bar ≤ `as_of` via the existing `Price_cache` and
+  joins a caller-supplied sector table — idempotent, surfaces
+  per-symbol errors without inserting failed symbols. Higher-tier
+  promotes return `Status.Unimplemented`. `Bar_history`,
+  `Weinstein_strategy`, `Simulator`, `Price_cache`, and `Screener`
+  untouched (plan §Out of scope).
+  - Files: `bar_loader/{dune,bar_loader.mli,bar_loader.ml}` +
+    `bar_loader/test/{dune,test_metadata.ml}`.
+  - Verify: `dev/lib/run-in-env.sh dune build trading/backtest/bar_loader && dev/lib/run-in-env.sh dune runtest trading/backtest/bar_loader/test` — 7 tests pass.
 
 ## QC
 
-overall_qc: PENDING
-structural_qc: PENDING
-behavioral_qc: PENDING
+overall_qc: PENDING (3a ready for review)
+structural_qc: PENDING (3a)
+behavioral_qc: N/A (3a — no strategy behavior change; parity test arrives with 3g)
 
 Reviewers when work lands:
 - qc-structural — module boundaries between tiers; `Bar_history` untouched; parity test runs both strategies.
