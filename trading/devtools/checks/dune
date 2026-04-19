@@ -151,3 +151,15 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:deep_scan_recent_commits_check.sh})))
+
+; Deep scan Linter Exception Expiry section (harness gap sub-item 3, T1-K):
+; structural smoke test. Verifies deep_scan.sh contains the Check 11
+; implementation (review_at expiry detection against milestones/dates) and
+; that the most-recent deep scan report has ## Linter Exception Expiry.
+; Does NOT run deep_scan.sh (weekly tool, not a per-PR gate).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:deep_scan_linter_expiry_check.sh})))
