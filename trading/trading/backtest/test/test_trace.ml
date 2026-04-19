@@ -30,7 +30,7 @@ let test_record_none_is_passthrough _ =
   in
   assert_that result (equal_to 42)
 
-let test_record_none_does_not_allocate_collector _ =
+let test_record_without_trace_leaves_other_collectors_empty _ =
   (* Record with ?trace=None — snapshot of a fresh collector remains empty. *)
   let t = Backtest.Trace.create () in
   let _ = Backtest.Trace.record Backtest.Trace.Phase.Macro (fun () -> ()) in
@@ -132,10 +132,7 @@ let test_write_sexp_round_trip _ =
   Backtest.Trace.write ~out_path original;
   let sexp = Sexp.load_sexp out_path in
   let parsed = List.t_of_sexp Backtest.Trace.phase_metrics_of_sexp sexp in
-  assert_that parsed
-    (elements_are
-       (List.map original ~f:(fun m ->
-            equal_to m ~cmp:Backtest.Trace.equal_phase_metrics)))
+  assert_that parsed (elements_are (List.map original ~f:(fun m -> equal_to m)))
 
 let test_write_creates_parent_dir _ =
   let root = Core_unix.mkdtemp "/tmp/trace_test_" in
@@ -150,8 +147,8 @@ let suite =
          "phase sexp round-trip" >:: test_phase_sexp_round_trip;
          "record without trace is passthrough"
          >:: test_record_none_is_passthrough;
-         "record without trace does not touch other collector"
-         >:: test_record_none_does_not_allocate_collector;
+         "record without trace leaves other collectors empty"
+         >:: test_record_without_trace_leaves_other_collectors_empty;
          "record appends entry" >:: test_record_appends_entry;
          "record returns f value" >:: test_record_returns_f_value;
          "snapshot is in insertion order" >:: test_record_order_is_insertion;

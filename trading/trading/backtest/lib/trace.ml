@@ -23,7 +23,7 @@ type phase_metrics = {
   elapsed_ms : int;
   symbols_in : int option;
   symbols_out : int option;
-  peak_rss_mb : int option;
+  peak_rss_kb : int option;
   bar_loads : int option;
 }
 [@@deriving show, eq, sexp]
@@ -32,14 +32,15 @@ type t = { mutable entries : phase_metrics list }
 
 let create () = { entries = [] }
 
-(** Parse a [VmHWM: 123456 kB] line. Returns MB or [None] if the line can't be
-    parsed. *)
+(** Parse a [VmHWM: 123456 kB] line. Returns kB (native unit from
+    [/proc/self/status]; do not pre-divide by 1024 to MB — short-lived or small
+    processes would integer-truncate to 0 MB and hide real regressions). [None]
+    if the line can't be parsed. *)
 let _parse_vmhwm_line line : int option =
   String.drop_prefix line (String.length "VmHWM:")
   |> String.strip
   |> String.chop_suffix_if_exists ~suffix:"kB"
   |> String.strip |> Int.of_string_opt
-  |> Option.map ~f:(fun kb -> kb / 1024)
 
 (** Scan [ic] line-by-line for a [VmHWM:] entry. Returns [None] if no such line.
 *)
@@ -60,10 +61,11 @@ let _status_file_readable () =
   | `Yes -> true
   | `No | `Unknown -> false
 
-(** Read peak RSS (in MB) from [/proc/self/status]. Returns [None] if the file
-    isn't available or can't be parsed — typical on macOS/BSD. Uses VmHWM which
-    is the "high water mark" (peak resident size). *)
-let _read_peak_rss_mb () : int option =
+(** Read peak RSS (in kB — native unit from VmHWM) from [/proc/self/status].
+    Returns [None] if the file isn't available or can't be parsed — typical on
+    macOS/BSD. Uses VmHWM which is the "high water mark" (peak resident size).
+*)
+let _read_peak_rss_kb () : int option =
   if not (_status_file_readable ()) then None
   else try In_channel.with_file _status_path ~f:_scan_for_vmhwm with _ -> None
 
@@ -74,7 +76,7 @@ let _append_entry t ~phase ~elapsed_ms ~symbols_in ~symbols_out ~bar_loads =
       elapsed_ms;
       symbols_in;
       symbols_out;
-      peak_rss_mb = _read_peak_rss_mb ();
+      peak_rss_kb = _read_peak_rss_kb ();
       bar_loads;
     }
   in

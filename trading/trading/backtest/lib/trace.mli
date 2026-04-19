@@ -46,10 +46,12 @@ type phase_metrics = {
   symbols_out : int option;
       (** Symbol count surviving the phase (e.g. screener hits). [None] vs
           [Some 0] semantics as for [symbols_in]. *)
-  peak_rss_mb : int option;
-      (** Best-effort peak resident set size in MB, read from
-          [/proc/self/status] after the phase. [None] on platforms that don't
-          expose it or when reading fails. *)
+  peak_rss_kb : int option;
+      (** Best-effort peak resident set size in kB, read from
+          [/proc/self/status] (VmHWM) after the phase. Kept in kB rather than MB
+          so short-lived or small processes don't integer-truncate to 0 and hide
+          real regressions. [None] on platforms that don't expose it or when
+          reading fails. *)
   bar_loads : int option;
       (** Number of per-symbol bar loads attributed to this phase. [None] if the
           phase doesn't load bars. Exists primarily to distinguish cheap summary
@@ -78,7 +80,7 @@ val record :
   (unit -> 'a) ->
   'a
 (** [record ?trace phase f] runs [f ()] and, if [trace] is [Some _], appends a
-    [phase_metrics] row with measured [elapsed_ms] and [peak_rss_mb]. The
+    [phase_metrics] row with measured [elapsed_ms] and [peak_rss_kb]. The
     optional [?symbols_in], [?symbols_out], [?bar_loads] are stored as [Some n]
     when passed and [None] when omitted.
 
