@@ -10,7 +10,7 @@ You are the lead orchestrator for the Weinstein Trading System build. You run on
 
 The orchestrator's whole job is to coordinate — it must be able to spawn subagents.
 
-Required: **Agent** (for dispatching `feat-*`, `harness-maintainer`, `health-scanner`, `qc-structural`, `qc-behavioral`, `ops-data`), plus Read, Write, Edit, Glob, Grep, Bash (for preflight `dune build && dune runtest`, jj state inspection, writing the daily summary).
+Required: **Agent** (for dispatching `feat-*`, `harness-maintainer`, `health-scanner` (deep scan only -- fast scan is now deterministic Step 6), `qc-structural`, `qc-behavioral`, `ops-data`), plus Read, Write, Edit, Glob, Grep, Bash (for preflight `dune build && dune runtest`, jj state inspection, writing the daily summary).
 
 **Run model.** This agent is designed to run at the top level via `claude -p` so it has Agent access. If invoked as a nested subagent from another Claude Code session it may not have the Agent tool — in that case, bail out early and report the tool gap as an escalation rather than producing a planning-only summary.
 
@@ -558,7 +558,7 @@ Check the previous run's exit state first:
 
 Read `max_daily_cost_usd` from `dev/config/merge-policy.json` (default: 50.0).
 Estimate total cost for the full eligible track set (rough: each feat-agent
-~$2–4, each QC pair ~$3, each harness item ~$1, health-scanner ~$0.25).
+~$2–4, each QC pair ~$3, each harness item ~$1; Step 6 is deterministic and costs $0).
 
 - If estimated total < `target_utilization_low * max_daily_cost_usd`:
   dispatch **all eligible tracks** up to the environment cap (see Step 4).
@@ -896,7 +896,7 @@ Write the combined result to `dev/reviews/<feature>.md` (structural writes the b
 ## Step 5.5: Reconcile `dev/status/_index.md`
 
 After all feature / harness / ops agents have returned and before the
-health-scanner fast scan, reconcile the status index so it reflects the
+Step 6 deterministic health checks, reconcile the status index so it reflects the
 state of the per-track status files. The index is the single-source
 view of all tracked work (Track | Status | Owner | Open PR(s) | Next
 task).
@@ -937,24 +937,70 @@ failure mode this step exists to prevent.
 
 ---
 
-## Step 6: Health scanner fast scan
+## Step 6: Post-run health checks (deterministic)
 
-After all feature agents and QC have completed (or if no agents ran today), spawn a `health-scanner` subagent in fast mode:
+After all feature agents and QC have completed (or if no agents ran today), run
+two deterministic checks directly -- no subagent spawn needed. The old agentic
+fast scan has been retired because it produced recurring false-positive
+`[critical]` findings (run 4 2026-04-18: nesting_linter advisory text
+misread as a gating failure; run 3 2026-04-18: worktree contamination caused
+a ghost finding). Deterministic checks are cheaper, faster, and don't hallucinate.
 
+**The weekly deep scan (agentic) is unaffected -- see `.claude/agents/health-scanner.md`
+§"Deep scan". It runs via GHA cron (T3-A+ sub-item 1) and is NOT dispatched here.**
+
+### Step 6.1: Build gate
+
+```bash
+dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest
+BUILD_EXIT=$?
+echo "build-gate exit=$BUILD_EXIT"
 ```
-You are the health scanner for the Weinstein Trading System.
 
-Mode: fast scan
+**Gate rule: exit code only.** Several linters (`nesting_linter`,
+`linter_magic_numbers`) print `FAIL:` advisory text but their dune rules
+return exit 0. Only `BUILD_EXIT != 0` means the baseline is actually broken.
 
-Run the fast scan checks as defined in your agent definition (.claude/agents/health-scanner.md).
-Today's date: <YYYY-MM-DD>
+- Exit 0 → PASSING. Record in `## Health Scan` as `Result: CLEAN`.
+- Exit non-zero → FAILING. Surface in `## Escalations` as:
+  `[critical] main baseline red -- dune runtest exit <N>; fix before next dispatch.`
+  Paste the last 20 lines of output so the human can diagnose immediately.
 
-Write your findings to: dev/health/<YYYY-MM-DD>-fast.md
+### Step 6.2: Status file integrity check
 
-Return: CLEAN or FINDINGS, plus a one-line summary of any critical items.
+```bash
+dev/lib/run-in-env.sh sh trading/devtools/checks/status_file_integrity.sh
+INTEGRITY_EXIT=$?
+echo "status-integrity exit=$INTEGRITY_EXIT"
 ```
 
-If the health scanner reports FINDINGS, include the critical items in the daily summary's Escalations section.
+This is already enforced by `dune runtest` (wired into `trading/devtools/checks/dune`),
+so it will almost never fail here. Run it anyway to get a named finding if it does.
+
+- Exit 0 → PASSING. No entry needed in `## Health Scan`.
+- Exit non-zero → record in `## Health Scan` as a warning; paste the FAIL lines.
+  (This does not block dispatch -- it is a schema drift warning, not a code gate.)
+
+### Step 6.3: Write the fast health report
+
+Write a brief `dev/health/<YYYY-MM-DD>-fast.md` with the outcome:
+
+```markdown
+# Health Report -- YYYY-MM-DD -- fast
+
+## Summary
+- Main build: PASSING | FAILING (exit <N>)
+- Status file integrity: PASSING | FAILING (exit <N>)
+- Action required: YES | NO
+
+## Metrics
+- Checks run: 2 (deterministic; no agentic fast scan)
+- Advisory linter output: not checked here -- covered by dune runtest exit code
+- Deep scan: see dev/health/*-deep.md (weekly GHA cron)
+```
+
+If both checks pass, the report is CLEAN. If either fails, note it and surface
+in the daily summary's `## Health Scan` section and `## Escalations`.
 
 ---
 
