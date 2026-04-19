@@ -353,14 +353,21 @@ This is the one gate the human never delegates.
 Two modes — **fast** (runs after every orchestrator run) and **deep** (runs
 weekly). Does NOT make changes — only reports findings.
 
-**Fast scan** (post-run, lightweight, ~1 minute):
-1. **Stale review check**: any `dev/status/*.md` with Status `READY_FOR_REVIEW` and no `dev/reviews/<feature>.md` updated today
-2. **Main build health**: `dune build && dune runtest` on current `main`; report FAILING if non-zero exit
-3. **New magic numbers**: run `dune runtest devtools/checks/` — flag if linter fails (would mean a violation slipped through the gate)
-4. **Status file integrity**: verify each `dev/status/*.md` has `## Status`, `## Last updated`, and `## Interface stable` fields with valid values
-5. **Linter exceptions past review date**: scan `trading/devtools/checks/linter_exceptions.conf` for `# review_at:` entries whose date has passed
+**Fast scan — DEPRECATED (2026-04-19).** The agentic fast scan produced
+recurring false-positive `[critical]` findings (2026-04-18 run 4: nesting_linter
+advisory text misread as gating; run 3: worktree contamination ghost). The two
+load-bearing checks have been folded into a deterministic Step 6 in
+`lead-orchestrator.md`:
+1. `dune build && dune runtest` exit code (the only real gate; advisory FAIL: text is not a failure)
+2. `status_file_integrity.sh` (already enforced by dune runtest; named for diagnostics)
 
-Writes to: `dev/health/<YYYY-MM-DD>-fast.md`. Agent definition: `.claude/agents/health-scanner.md`.
+The remaining advisory checks (stale review, linter exception review date) are
+low-value per-run signals. They belong in the weekly deep scan, not a per-run blocker.
+Step 6 still writes `dev/health/<YYYY-MM-DD>-fast.md` for human visibility, but it is
+machine-generated from the two deterministic results, not an agentic summary.
+
+Source: 2026-04-18 run-4 postmortem + 2026-04-19 planning discussion.
+Implemented: `lead-orchestrator.md` Step 6 (see `harness/retire-inline-fast-scan` PR).
 
 **Deep scan** (weekly, writes to `dev/health/YYYY-MM-DD.md`):
 - **Dead code**: OCaml unused-variable warnings, functions in `.ml` not exported
