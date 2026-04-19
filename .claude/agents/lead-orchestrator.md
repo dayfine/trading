@@ -163,19 +163,61 @@ for pr in prs:
 
 ```
 FOR each eligible track from Step 1:
-  IF any open PRs found on feat/<track> or feat/<track>/* branches:
-    tip_sha = (SHA from the curl output above for that PR)
+  open_prs = (open PRs on feat/<track> or feat/<track>/*)
+  N = len(open_prs)
+
+  IF N == 0:
+    → dispatch feat-agent normally (proceed to Step 2)
+
+  IF N > 0 (work in flight):
+    tip_sha = (SHA of the newest-by-created-at open PR)
     last_review_sha = (parse "Reviewed SHA:" line from dev/reviews/<track>.md, if it exists)
 
-    IF track status is READY_FOR_REVIEW AND tip_sha != last_review_sha:
-      → dispatch re-QC only (Step 5 pipeline); skip feat-agent dispatch
-      → note in summary: "re-QC only — new commits since last review (SHA changed)"
+    # First: handle QC on any READY_FOR_REVIEW PR with new commits.
+    IF tip PR status is READY_FOR_REVIEW AND tip_sha != last_review_sha:
+      → dispatch re-QC only (Step 5 pipeline)
+      → note: "re-QC — new commits on PR #<N_tip>"
+
+    # Second: decide whether to stack additional work ahead.
+    # Stacked dispatch = new feat-agent work on top of the existing open PR(s),
+    # producing a stacked PR via `jst submit`. Only enabled for plan-first tracks
+    # so "what's next" is unambiguous (next unstarted increment from the plan).
+    stack_eligible =
+      - track has a merged plan at dev/plans/<track>-*.md,
+      - plan has explicit un-implemented increments (not yet landed on main),
+      - N < 2 (cap: at most one root PR + one stacked follow-up),
+      - root PR (oldest open PR on the track) is not stale:
+          - age < 3 days (older signals review bottleneck; stop stacking),
+          - last CI check is not "failure",
+          - no `changes_requested` review outstanding.
+
+    IF stack_eligible:
+      → dispatch feat-agent in "continue-from-plan" mode:
+          inject `## Plan context` with the path to the plan,
+          the already-landed increments (root PR's diff summary),
+          and "pick the next un-implemented increment".
+      → agent opens a stacked PR via `jst submit` on
+        feat/<track>/<increment-slug>.
+      → note in summary: "stacked dispatch — increment <X> (depth 2/2)".
     ELSE:
-      → SKIP dispatch entirely (feat-agent and QC)
-      → record reason in summary: "skipped — open PR #<N> in flight, no new commits"
-  ELSE (no open PRs):
-    → dispatch feat-agent normally (proceed to Step 2)
+      → SKIP feat-agent dispatch (keep any re-QC dispatched above).
+      → record reason: one of
+          "skipped — open PR #<N> in flight, no new commits"          (non-plan-first)
+          "skipped — depth cap reached (<N> open PRs on track)"       (cap hit)
+          "skipped — root PR stale (age/CI/review; see <reason>)"     (escape hatch)
+          "skipped — no un-implemented increments in plan"            (plan complete)
 ```
+
+**Per-track override.** A plan file may declare `## Max stacked PRs: <K>`
+(default 2) to widen or narrow the cap for that specific track. Bug-fix
+chains and hot-path refactors may set higher; risky refactors may set 1.
+
+**Observability.** When the cap is hit *and* the root PR is less than 3 days
+old (i.e., stacking would be safe but the cap says stop), log as `[info]`
+escalation "track <X> hitting stack cap with fresh root PR — consider raising
+`Max stacked PRs`". When the root PR is stale (review bottleneck), log as
+`[info]` "track <X> root PR #<N> open > 3 days — stacked dispatch paused".
+These keep review queue backup visible without surprising the human.
 
 **This guard is PER TRACK, not per agent.** An agent that owns multiple
 tracks (e.g. `feat-weinstein` owns `portfolio-stops`, `simulation`,

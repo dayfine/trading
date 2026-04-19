@@ -329,6 +329,20 @@ From a Claude Code guide research session:
    QC for feature A can run in parallel with implementation for
    feature B — that's the pattern background Agent dispatch enables.
 
+4. **Stacked dispatch per track (Step 1.5 cap=2).** Today Step 1.5
+   hard-skips feat-agent re-dispatch whenever any open PR exists on
+   the track. For plan-first tracks with explicit un-implemented
+   increments, the next run is blocked on human review of the first
+   PR — forcing a serial one-PR-per-run pace per track. Relax to a
+   depth cap (default 2) so the orchestrator can produce the next
+   increment's PR on top of the first, stacked via `jst submit`.
+   Escape hatches: age > 3 days, CI failure, or `changes_requested`
+   review on the root PR all pause stacking. Plan files may override
+   the cap per-track via `## Max stacked PRs: <K>`. Pairs with win #3
+   (cross-feature QC parallelism): once the stacked second PR opens,
+   its QC can run while the first PR awaits human merge. See Step 1.5
+   in `.claude/agents/lead-orchestrator.md` for the full contract.
+
 ### Environment split (hypothesis — confirm before committing)
 
 | Env | Background `Bash` | Background `Agent` | Confidence |
