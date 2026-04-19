@@ -12,9 +12,48 @@ You own the full data infrastructure stack: if a required data source lacks a pa
 
 1. Read your invocation to understand what's needed (symbols to fetch, coverage check, inventory refresh, etc.)
 2. Read `dev/notes/data-gaps.md` to understand known data gaps (ADL, sector metadata, global indices) and their resolution status
-3. Read `data/inventory.sexp` to understand current coverage — or summarize from the output of `build_inventory.exe` if the sexp is large
-4. Build the project if needed: `dune build`
-5. Report current data state before taking any action
+3. Check sector manifest freshness (see "Sector manifest preflight" below)
+4. Read `data/inventory.sexp` to understand current coverage — or summarize from the output of `build_inventory.exe` if the sexp is large
+5. Build the project if needed: `dune build`
+6. Report current data state before taking any action
+
+### Sector manifest preflight
+
+Run this check after step 2, before any fetch work:
+
+1. If `data/sectors.csv.manifest` does not exist, print:
+   `[sector-data] manifest missing -- run fetch_finviz_sectors.exe to populate`
+2. If it exists, parse `fetched_at` (ISO 8601 UTC string in the sexp field).
+   Compute age in days: `(now_epoch - fetched_at_epoch) / 86400`.
+3. If age > 30 days, print a WARN:
+   `[sector-data] WARN: manifest is <N>d old (fetched <date>) -- consider running fetch_finviz_sectors.exe`
+4. Otherwise print:
+   `[sector-data] manifest OK -- fetched <date> (<N>d ago)`
+
+The manifest sexp shape (written by `fetch_finviz_sectors.exe`):
+
+    (fetched_at "2026-04-18T20:00:00Z")
+    (source finviz)
+    (row_count 9041)
+    (rate_limit_rps 1.0)
+    (errors 0)
+
+Shell snippet to compute age and print the appropriate message:
+
+    MANIFEST=data/sectors.csv.manifest
+    if [ ! -f "$MANIFEST" ]; then
+      echo "[sector-data] manifest missing -- run fetch_finviz_sectors.exe to populate"
+    else
+      FETCHED=$(grep -oP '(?<=fetched_at ").*(?=")' "$MANIFEST")
+      FETCHED_EPOCH=$(date -d "$FETCHED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$FETCHED" +%s)
+      NOW_EPOCH=$(date +%s)
+      AGE_DAYS=$(( (NOW_EPOCH - FETCHED_EPOCH) / 86400 ))
+      if [ "$AGE_DAYS" -gt 30 ]; then
+        echo "[sector-data] WARN: manifest is ${AGE_DAYS}d old (fetched $FETCHED) -- consider running fetch_finviz_sectors.exe"
+      else
+        echo "[sector-data] manifest OK -- fetched $FETCHED (${AGE_DAYS}d ago)"
+      fi
+    fi
 
 ## Data scripts
 

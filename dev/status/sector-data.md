@@ -1,11 +1,14 @@
 # Status: sector-data
 
-## Last updated: 2026-04-18
+## Last updated: 2026-04-19
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-Items 1, 2, 4, 4.1 done. Only Item 3 (refresh cadence hook) remains.
+All items done. Item 3 (refresh cadence hook) completed 2026-04-19 on
+`ops/sector-data-item-3` (PR #436) — awaiting human merge. Flips to
+MERGED once #436 lands; the orchestrator reconciles `dev/status/_index.md`
+on that run.
 
 Item 1 merged (#349, 2026-04-15). Item 2 (one-shot fetch) ran locally
 on the operator's workstation and populated `data/sectors.csv`
@@ -166,6 +169,16 @@ EODHD stays available as a drop-in upgrade if Finviz becomes unstable.
     Keeping it as-is would silently drop SCHW, SNOW, PANW from the
     universe.
 
+- **Item 3 — refresh cadence hook** (2026-04-19) — added "Sector manifest
+  preflight" section to `.claude/agents/ops-data.md`. Future ops-data
+  sessions check `data/sectors.csv.manifest` freshness at startup: missing
+  manifest prints a populate reminder; age >30 days prints a WARN with the
+  `fetch_finviz_sectors.exe` command; otherwise prints an OK line. Shell
+  snippet included for direct copy-paste in the agent runbook. Branch:
+  `ops/sector-data-item-3`.
+  Verification: read `.claude/agents/ops-data.md` §"Sector manifest
+  preflight" and confirm the four-step check and shell snippet are present.
+
 ### Iteration 2 — rule-set rewrite using universe.sexp metadata (2026-04-16)
 
 Root-cause fix for Item 4's Iteration 1 finding (the default rule-set
@@ -257,10 +270,7 @@ the rule to exclude these.
   the name/exchange signal.
 
 ## In Progress
-- Item 3 — refresh cadence hook (ops-data preflight reads
-  `data/sectors.csv.manifest` at session start, warns / offers refresh
-  if >30 days stale). Small agent-definition edit (~20 lines). Not
-  blocking any downstream work.
+- (none — all items complete)
 
 ## Next Steps (work items — ops-data)
 
