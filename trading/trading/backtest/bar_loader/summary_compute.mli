@@ -18,8 +18,9 @@ type config = {
   ma_weeks : int;  (** Weeks in the Weinstein MA. Default: 30. *)
   atr_days : int;  (** Lookback days for ATR. Default: 14. *)
   rs_ma_period : int;
-      (** Mansfield RS zero-line MA length in aligned bars. Default: 52 (~one
-          year weekly, or ~52 trading days if daily). *)
+      (** Mansfield RS zero-line MA length in WEEKLY bars. [rs_line] aggregates
+          daily input to weekly before normalizing, so [52] means "52 weekly
+          bars ≈ one year" per Weinstein §4.4. Default: 52. *)
   tail_days : int;
       (** Upper bound on the daily-bar tail the Summary loader fetches per
           symbol. Must be large enough to cover the longest indicator window
@@ -56,10 +57,13 @@ val rs_line :
   benchmark_bars:Types.Daily_price.t list ->
   float option
 (** [rs_line ~config ~stock_bars ~benchmark_bars] returns the latest Mansfield
-    normalized RS value for the stock against the benchmark, or [None] when
-    there are fewer than [config.rs_ma_period] aligned bars. The value is
-    [raw_rs / MA(raw_rs)] — values above 1.0 mean the stock is outperforming its
-    own recent baseline. *)
+    normalized RS value for the stock against the benchmark. Both inputs are
+    daily bars; the helper aggregates each to weekly (last-bar-of-week) before
+    invoking {!Relative_strength.analyze}, so [config.rs_ma_period] is
+    interpreted in WEEKLY bars (see {!config} for the default). Returns [None]
+    when fewer than [config.rs_ma_period] aligned weekly bars are available.
+    The value is [raw_rs / MA(raw_rs)] — values above 1.0 mean the stock is
+    outperforming its own recent baseline. *)
 
 val stage_heuristic :
   config:config -> Types.Daily_price.t list -> Weinstein_types.stage option
