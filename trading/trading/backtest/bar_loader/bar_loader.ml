@@ -3,6 +3,7 @@
 open Core
 module Price_cache = Trading_simulation_data.Price_cache
 module Summary_compute = Summary_compute
+module Full_compute = Full_compute
 
 type tier = Metadata_tier | Summary_tier | Full_tier
 [@@deriving show, eq, sexp]
@@ -30,6 +31,11 @@ module Summary = struct
   [@@deriving show, eq, sexp]
 end
 
+module Full = struct
+  type t = { symbol : string; bars : Types.Daily_price.t list; as_of : Date.t }
+  [@@deriving show, eq]
+end
+
 type stats_counts = { metadata : int; summary : int; full : int }
 [@@deriving show, eq, sexp]
 
@@ -37,11 +43,12 @@ type entry = {
   tier : tier;
   metadata : Metadata.t option;
   summary : Summary.t option;
+  full : Full.t option;
 }
 (** Per-symbol entry. Held in a mutable hashtable keyed on symbol. [tier] is the
     highest tier this symbol has been promoted to; the tier-specific data fields
     are populated at and below that tier. [summary] is [None] for Metadata-only
-    entries. Full-tier data will live in a separate field added in 3c. *)
+    entries. [full] is [None] for everything below Full tier. *)
 
 (** [_default_benchmark_symbol] is the canonical RS benchmark used by the
     backtest runner. Bar_loader doesn't care which ticker it is, but keeping a
@@ -55,6 +62,7 @@ type t = {
   data_dir : Fpath.t;
   benchmark_symbol : string;
   summary_config : Summary_compute.config;
+  full_config : Full_compute.config;
   mutable benchmark_bars : Types.Daily_price.t list option;
       (** Lazily loaded on the first Summary promotion. Benchmark bars are read
           via [Csv_storage] directly (bypassing [Price_cache]) so they don't
@@ -64,7 +72,8 @@ type t = {
 
 let create ~data_dir ~sector_map ~universe:_
     ?(benchmark_symbol = _default_benchmark_symbol)
-    ?(summary_config = Summary_compute.default_config) () =
+    ?(summary_config = Summary_compute.default_config)
+    ?(full_config = Full_compute.default_config) () =
   (* [universe] is accepted in the signature so 3b/3c/3f can drive tier-wide
      operations ("promote every universe symbol to Metadata on startup")
      without a signature churn. Not consumed yet. *)
@@ -75,6 +84,7 @@ let create ~data_dir ~sector_map ~universe:_
     data_dir;
     benchmark_symbol;
     summary_config;
+    full_config;
     benchmark_bars = None;
   }
 
@@ -87,7 +97,8 @@ let get_metadata t ~symbol =
 let get_summary t ~symbol =
   Option.bind (Hashtbl.find t.entries symbol) ~f:(fun e -> e.summary)
 
-let get_full _t ~symbol:_ = None
+let get_full t ~symbol =
+  Option.bind (Hashtbl.find t.entries symbol) ~f:(fun e -> e.full)
 
 (** [_tier_rank] encodes the Metadata < Summary < Full ordering used for
     idempotent promotion: a symbol at tier [>= to_] is left alone. *)
@@ -139,7 +150,13 @@ let _promote_one_to_metadata t ~symbol ~as_of : (unit, Status.t) Result.t =
   else
     let%map.Result metadata = _load_metadata t ~symbol ~as_of in
     Hashtbl.set t.entries ~key:symbol
-      ~data:{ tier = Metadata_tier; metadata = Some metadata; summary = None }
+      ~data:
+        {
+          tier = Metadata_tier;
+          metadata = Some metadata;
+          summary = None;
+          full = None;
+        }
 
 (** [_load_bars_tail] reads the most recent [tail_days] daily bars for [symbol]
     ending on or before [as_of], {e bypassing} [Price_cache]. Summary promotion
@@ -147,18 +164,21 @@ let _promote_one_to_metadata t ~symbol ~as_of : (unit, Status.t) Result.t =
     [Price_cache] prevents the raw history from leaking into the shared cache
     and surviving past the promotion.
 
-    Performance note: this is one CSV read + parse per Summary promotion. In the
-    planned cascade (Metadata → Summary only on sector-ranked subset, ~2k
-    symbols) the call count stays bounded; the bottleneck is not expected here.
-    If the cascade ever pre-promotes the whole inventory (~10k) it becomes one
-    to monitor — wire trace phase [Promote_summary] (3d) to measure first before
-    optimising. *)
-let _load_bars_tail t ~symbol ~as_of :
+    Parameterized on [tail_days] so Full-tier promotion (which wants a larger
+    window for complete strategy analysis) can reuse the same CSV path without
+    duplicating the load logic.
+
+    Performance note: this is one CSV read + parse per promote. In the planned
+    cascade (Metadata → Summary only on sector-ranked subset, ~2k symbols; Full
+    on ~200 candidates) the call count stays bounded; the bottleneck is not
+    expected here. Wire trace phase [Promote_summary]/[Promote_full] (3d) to
+    measure first before optimising. *)
+let _load_bars_tail t ~symbol ~as_of ~tail_days :
     (Types.Daily_price.t list, Status.t) Result.t =
   let%bind.Result storage =
     Csv.Csv_storage.create ~data_dir:t.data_dir symbol
   in
-  let start_date = Date.add_days as_of (-t.summary_config.tail_days) in
+  let start_date = Date.add_days as_of (-tail_days) in
   Csv.Csv_storage.get storage ~start_date ~end_date:as_of ()
 
 (** [_benchmark_bars_for] returns the bounded-tail bars for the benchmark
@@ -174,7 +194,10 @@ let _load_bars_tail t ~symbol ~as_of :
 let _benchmark_bars_for t ~as_of : (Types.Daily_price.t list, Status.t) Result.t
     =
   let load () =
-    let%map.Result bars = _load_bars_tail t ~symbol:t.benchmark_symbol ~as_of in
+    let%map.Result bars =
+      _load_bars_tail t ~symbol:t.benchmark_symbol ~as_of
+        ~tail_days:t.summary_config.tail_days
+    in
     t.benchmark_bars <- Some bars;
     bars
   in
@@ -210,6 +233,7 @@ let _write_summary_entry t ~symbol (values : Summary_compute.summary_values) =
         tier = Summary_tier;
         metadata = existing_metadata;
         summary = Some summary;
+        full = None;
       }
 
 (** [_promote_one_to_summary] auto-promotes through Metadata first, then fetches
@@ -221,21 +245,48 @@ let _promote_one_to_summary t ~symbol ~as_of : (unit, Status.t) Result.t =
   if _already_at_or_above t ~symbol Summary_tier then Ok ()
   else
     let%bind.Result () = _promote_one_to_metadata t ~symbol ~as_of in
-    let%bind.Result stock_bars = _load_bars_tail t ~symbol ~as_of in
+    let%bind.Result stock_bars =
+      _load_bars_tail t ~symbol ~as_of ~tail_days:t.summary_config.tail_days
+    in
     let%map.Result benchmark_bars = _benchmark_bars_for t ~as_of in
     Summary_compute.compute_values ~config:t.summary_config ~stock_bars
       ~benchmark_bars ~as_of
     |> Option.iter ~f:(fun values -> _write_summary_entry t ~symbol values)
 
-let _unimplemented_tier tier : Status.t =
-  {
-    code = Status.Unimplemented;
-    message =
-      Printf.sprintf
-        "Bar_loader.promote: tier %s not yet implemented (Full_tier lands in \
-         3c)"
-        (show_tier tier);
-  }
+(** [_write_full_entry] is the no-Result tail of [_promote_one_to_full]: builds
+    the [Full.t] from freshly-loaded bars, joins with any existing metadata /
+    summary, and overwrites the entry. Pure side-effect — extracted so the
+    caller's main flow stays a flat let%bind chain. *)
+let _write_full_entry t ~symbol (values : Full_compute.full_values) =
+  let existing = Hashtbl.find t.entries symbol in
+  let existing_metadata = Option.bind existing ~f:(fun e -> e.metadata) in
+  let existing_summary = Option.bind existing ~f:(fun e -> e.summary) in
+  let full : Full.t = { symbol; bars = values.bars; as_of = values.as_of } in
+  Hashtbl.set t.entries ~key:symbol
+    ~data:
+      {
+        tier = Full_tier;
+        metadata = existing_metadata;
+        summary = existing_summary;
+        full = Some full;
+      }
+
+(** [_promote_one_to_full] auto-promotes through Summary first (which itself
+    cascades through Metadata). If the Summary promote leaves the symbol below
+    Summary tier (insufficient history), Full promotion is skipped — the symbol
+    stays at whatever lower tier it reached. Otherwise we load the full OHLCV
+    tail and retain the raw bars on the entry. *)
+let _promote_one_to_full t ~symbol ~as_of : (unit, Status.t) Result.t =
+  if _already_at_or_above t ~symbol Full_tier then Ok ()
+  else
+    let%bind.Result () = _promote_one_to_summary t ~symbol ~as_of in
+    if not (_already_at_or_above t ~symbol Summary_tier) then Ok ()
+    else
+      let%map.Result bars =
+        _load_bars_tail t ~symbol ~as_of ~tail_days:t.full_config.tail_days
+      in
+      Full_compute.compute_values ~bars
+      |> Option.iter ~f:(fun values -> _write_full_entry t ~symbol values)
 
 let _promote_fold ~f symbols =
   List.fold_until symbols ~init:()
@@ -253,7 +304,9 @@ let promote t ~symbols ~to_ ~as_of =
   | Summary_tier ->
       _promote_fold symbols ~f:(fun ~symbol ->
           _promote_one_to_summary t ~symbol ~as_of)
-  | Full_tier -> Error (_unimplemented_tier to_)
+  | Full_tier ->
+      _promote_fold symbols ~f:(fun ~symbol ->
+          _promote_one_to_full t ~symbol ~as_of)
 
 (** [_demote_one] drops higher-tier data from an existing entry. The caller
     guarantees the entry exists; tier-of-target is enforced here (a symbol at
@@ -265,11 +318,15 @@ let _demote_one t ~symbol ~to_ =
   | Some entry ->
       let new_entry =
         match to_ with
-        | Metadata_tier -> { entry with tier = Metadata_tier; summary = None }
+        | Metadata_tier ->
+            (* Drop both Summary scalars and Full bars. Per plan §Resolutions
+               #6: Full → Metadata is a full drop; re-promotion recomputes
+               Summary. *)
+            { entry with tier = Metadata_tier; summary = None; full = None }
         | Summary_tier ->
-            (* In 3b the only higher tier is Summary itself; Full tier lands
-               in 3c and will drop the raw bars here. Keep [summary] as-is. *)
-            { entry with tier = Summary_tier }
+            (* Drop Full bars, keep Summary scalars. Cheap reversal for
+               "candidate no longer held but may re-enter soon". *)
+            { entry with tier = Summary_tier; full = None }
         | Full_tier ->
             (* Demoting "to Full" is degenerate — Full is the top tier, so
                there's nothing higher to drop. Preserve entry as-is. *)

@@ -12,12 +12,14 @@
       bars are dropped once the scalars are extracted, which is the core memory
       win over holding full OHLCV history.
     - {b Full} — raw OHLCV history for symbols actively considered for entry or
-      currently held. Added in 3c.
+      currently held. Full-tier promotions load a bounded tail of daily bars and
+      retain them in the loader's own cache; demotion drops the bars.
 
-    As of 3b, this module implements Metadata and Summary tiers. The [tier]
-    variant already exposes all three tags so 3c extends the loader without
-    churn to the variant. [promote ~to_:Full_tier] returns
-    [Error Status.Unimplemented] until 3c; [get_full] always returns [None]. *)
+    As of 3c, the loader implements all three tiers. Full-tier promotion
+    auto-promotes through Metadata and Summary first; demotion of a Full-tier
+    symbol to Summary drops the raw bars (and keeps the Summary scalars), and
+    demotion to Metadata drops both (per plan §Resolutions #6: Full → Metadata
+    is a full drop; re-promotion recomputes). *)
 
 open Core
 
@@ -27,6 +29,10 @@ module Summary_compute = Summary_compute
 (** Pure compute helpers used by the Summary tier. Re-exported so callers and
     tests can reach the compute layer through the library's main module without
     depending on the internal module directly. *)
+
+module Full_compute = Full_compute
+(** Pure compute helpers used by the Full tier. Re-exported for the same reason
+    as {!Summary_compute}. *)
 
 (** {1 Tier tag} *)
 
@@ -74,6 +80,25 @@ module Summary : sig
       is fixed at a handful of floats rather than the full history. *)
 end
 
+module Full : sig
+  type t = {
+    symbol : string;
+    bars : Types.Daily_price.t list;
+        (** OHLCV history loaded from CSV, covering
+            [[as_of - full_config.tail_days, as_of]]. Ordered ascending by date.
+        *)
+    as_of : Date.t;  (** Date of the last bar in [bars]. *)
+  }
+  [@@deriving show, eq]
+  (** Complete-history tier data for symbols under active consideration. Unlike
+      {!Summary.t}, the raw bars are retained so callers can drive the full
+      Weinstein analysis pipeline (daily price path, weekly aggregation,
+      breakout detection). Memory cost is proportional to [List.length bars];
+      callers control the fleet size via {!promote} / {!demote}.
+      [Types.Daily_price.t] has no sexp converters, so this record omits [sexp]
+      — use [show] for test/debug output. *)
+end
+
 (** {1 Loader} *)
 
 type t
@@ -91,13 +116,14 @@ val create :
   universe:string list ->
   ?benchmark_symbol:string ->
   ?summary_config:Summary_compute.config ->
+  ?full_config:Full_compute.config ->
   unit ->
   t
 (** [create ~data_dir ~sector_map ~universe ?benchmark_symbol ?summary_config
-     ()] returns a fresh loader. [universe] is the full set of symbols the
-    backtest may promote; it is recorded but does {b not} load any bars
-    (Metadata-tier loads happen in [promote]). [sector_map] is a symbol → sector
-    lookup; symbols missing from the map get [sector = ""] on promotion.
+     ?full_config ()] returns a fresh loader. [universe] is the full set of
+    symbols the backtest may promote; it is recorded but does {b not} load any
+    bars (Metadata-tier loads happen in [promote]). [sector_map] is a symbol →
+    sector lookup; symbols missing from the map get [sector = ""] on promotion.
     [data_dir] is forwarded to an internal [Price_cache] used for Metadata-tier
     last-close lookups.
 
@@ -107,7 +133,11 @@ val create :
 
     [summary_config] controls the windows used to compute Summary scalars (see
     {!Summary_compute.default_config}). Default:
-    {!Summary_compute.default_config}. *)
+    {!Summary_compute.default_config}.
+
+    [full_config] controls the length of the OHLCV tail fetched on Full-tier
+    promotion (see {!Full_compute.default_config}). Default:
+    {!Full_compute.default_config}. *)
 
 val promote :
   t ->
@@ -129,7 +159,11 @@ val promote :
       subsequent Summary promotions in the same session. A symbol whose history
       is too short to produce all Summary scalars is left at Metadata tier (not
       an error — the caller should retry later or leave the symbol where it is).
-    - [Full_tier]: returns [Error Status.Unimplemented] until 3c.
+    - [Full_tier]: auto-promotes through Metadata and Summary first, then reads
+      a bounded OHLCV tail ([full_config.tail_days]) and retains the raw bars on
+      the entry. A symbol that could not be promoted to Summary (insufficient
+      history) is left at whatever lower tier it reached — Full promotion is
+      skipped, not erroring.
 
     Returns the first per-symbol error encountered (if any). A symbol that fails
     to load is {e not} added to the loader. *)
@@ -138,8 +172,8 @@ val demote : t -> symbols:string list -> to_:tier -> unit
 (** [demote t ~symbols ~to_] tiers each symbol down, freeing higher-tier data. A
     symbol currently at tier [<= to_] is unchanged.
 
-    - [to_ = Metadata_tier] drops Summary scalars (and Full bars, in 3c).
-    - [to_ = Summary_tier] drops only Full bars (no-op for Summary-only
+    - [to_ = Metadata_tier] drops Summary scalars {e and} any Full-tier bars.
+    - [to_ = Summary_tier] drops only Full-tier bars (no-op for Summary-only
       symbols).
 
     Callers assume demotion is free: there is no reload cost. Re-promoting the
@@ -157,10 +191,9 @@ val get_summary : t -> symbol:string -> Summary.t option
 (** [get_summary t ~symbol] returns the Summary record for [symbol] when it has
     been promoted to Summary tier or higher, otherwise [None]. *)
 
-val get_full : t -> symbol:string -> unit option
-(** Placeholder for 3c. Always returns [None] in this increment; the return type
-    is [unit option] to keep the interface signature stable until 3c introduces
-    [Full.t]. *)
+val get_full : t -> symbol:string -> Full.t option
+(** [get_full t ~symbol] returns the Full-tier record for [symbol] when it has
+    been promoted to Full tier, otherwise [None]. *)
 
 val stats : t -> stats_counts
 (** [stats t] returns the current per-tier symbol counts. The sum of the three

@@ -5,7 +5,7 @@
 ## Status
 READY_FOR_REVIEW
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) at #447 (draft, based on main). 3d (tracer phases) is the next increment.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) at #447 (awaiting merge; QC APPROVED run-4). 3d (tracer phases) is the next increment.
 
 ## Interface stable
 NO
@@ -13,7 +13,7 @@ NO
 All three tier getters now return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c. Remaining churn will come from 3d (tracer phase plumbing may add an optional trace arg to `create`), 3e (runner wiring), and 3f (tiered runner path).
 
 ## Open PR
-- #447 — feat/backtest-tiered-loader-3c-full-tier — 3c based on main (draft, awaiting QC).
+- #447 — feat/backtest-tiered-loader-3c-full-tier — 3c based on main, QC APPROVED run-4, awaiting human merge.
 
 ## Blocked on
 - None. 3d depends on 3c merging.
