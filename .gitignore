@@ -28,8 +28,15 @@ setup.log
 # Local OPAM switch
 _opam/
 
-# Local data directory
-/data
+# Local data directory — large OHLCV bars + generated universe
+# artifacts are regenerated from EODHD / Finviz and not checked in.
+# Exceptions: the sector-map snapshot + its metadata ARE committed so
+# broad-universe goldens and the pick_small_universe regeneration path
+# are reproducible without API keys. See data/sectors.meta.sexp for the
+# refresh protocol.
+/data/*
+!/data/sectors.csv
+!/data/sectors.meta.sexp
 
 # Agent runtime files (logs, lock files, worktrees)
 dev/logs/*.log
