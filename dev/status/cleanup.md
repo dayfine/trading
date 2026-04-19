@@ -19,7 +19,7 @@ Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here 
 
 ## Completed
 
-- [x] fn_length / file_length: weinstein_strategy.ml — added @large-module annotation; file length linter now passes. (source: 2026-04-19-fast.md, branch: cleanup/weinstein-strategy-320-lines, 2026-04-19)
+- [x] fn_length / file_length: weinstein_strategy.ml — added @large-module annotation; file length linter now passes. (source: 2026-04-19-fast.md, PR #453, 2026-04-19)
 
 ## Out of scope
 

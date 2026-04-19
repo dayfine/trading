@@ -136,6 +136,10 @@ overall_qc: APPROVED (3c — structural + behavioral, 2026-04-19)
 structural_qc: APPROVED (3c, 2026-04-19 — dev/reviews/backtest-scale-3c.md)
 behavioral_qc: APPROVED (3c, 2026-04-19 — data-loading increment; no strategy behavior change; tier-shape + demote/promote invariants verified against plan §Resolutions #6. Parity acceptance gate arrives with 3g — dev/reviews/backtest-scale-3c.md)
 
+structural_qc: APPROVED (3d, 2026-04-19 — dev/reviews/backtest-scale-3d.md)
+behavioral_qc: APPROVED (3d, 2026-04-19 — infrastructure-only tracer hook; no Weinstein domain logic touched; no-trace path observably silent for all three tier operations, verified by test_no_hook_promote_is_silent — dev/reviews/backtest-scale-3d.md)
+overall_qc: APPROVED (3d — structural + behavioral, 2026-04-19)
+
 Reviewers when work lands:
 - qc-structural — module boundaries between tiers; `Bar_history` untouched; parity test runs both strategies.
 - qc-behavioral — does strategy output (trades, metrics) actually match Legacy within ε? Any regression is a behavior bug, not a perf win.
