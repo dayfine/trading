@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-18
+## Last updated: 2026-04-19
 
 ## Status
 IN_PROGRESS
@@ -112,6 +112,14 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   environment (see `dev/status/orchestrator-automation.md`), this part
   needs to land together with the automation work. Source:
   `dev/daily/2026-04-14.md` (refreshed end-of-day).
+- **Same-day summary consolidation** — multi-run days produce
+  `2026-04-18.md`, `-run2.md`, `-run3.md`, `-run4.md` with no
+  end-of-day roll-up. A plan-mode reader has to stitch four files to
+  answer "what happened today." Low severity. Fix sketch: add a
+  `dev/lib/consolidate_day.sh` that merges all `${DATE}*.md` (non-plan)
+  into `${DATE}-summary.md` with deduped §Dispatched + merged
+  §Escalations; wire into `lead-orchestrator` Step 8 post-merge when
+  `N >= 3`. Source: 2026-04-18 plan-mode audit.
 - **Deep scan heuristic gaps** — `trading/devtools/checks/deep_scan.sh`
   (T3-A, see #331) is missing several useful checks. Today's manual
   audit found four real issues the script didn't surface:

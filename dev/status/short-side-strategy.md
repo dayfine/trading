@@ -1,18 +1,22 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-18
+## Last updated: 2026-04-19
 
 ## Status
-READY_FOR_REVIEW (MVP slice)
+MERGED
+
+MVP slice landed via #420 on 2026-04-19; follow-ups tracked below.
 
 ## Interface stable
-YES — `Screener.scored_candidate.side` and public `Weinstein_strategy.entries_from_candidates` signature landed.
+YES
 
-## Open PR
+`Screener.scored_candidate.side` and public `Weinstein_strategy.entries_from_candidates` signature landed in main.
+
+## Merged PR
 - #420 (feat/short-side-strategy) — MVP vertical slice: side through screener → strategy → order_generator, with Ch.11 RS hard gate and unit tests for Short + Long entry transitions.
 
 ## Blocked on
-- None. Ready for QC. Pre-existing main-baseline nesting-linter red is unrelated to this scope (same failures on `feat/short-side-strategy` branch point as on `main`; no new failures introduced).
+- None.
 
 ## Goal
 
@@ -64,10 +68,8 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
 `feat-weinstein` agent (dispatched 2026-04-18).
 
 ## QC
-overall_qc: PENDING
-structural_qc: PENDING
-behavioral_qc: PENDING
+overall_qc: APPROVED (merged)
+structural_qc: APPROVED
+behavioral_qc: APPROVED
 
-Reviewers when work lands:
-- qc-structural — side parameterisation clean through screener → strategy → order_generator; no hardcoded Long remaining.
-- qc-behavioral — Ch. 11 rules encoded faithfully (Stage 4 + negative RS + bearish macro); no shorting Stage 2 stocks. The Ch.11 hard RS gate is tested (`test_positive_rs_blocks_short`).
+Review artifacts (run-4): side parameterisation clean through screener → strategy → order_generator; no hardcoded Long remaining. Ch.11 hard RS gate tested via `test_positive_rs_blocks_short`.

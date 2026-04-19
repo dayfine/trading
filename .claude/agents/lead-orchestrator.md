@@ -800,13 +800,24 @@ has no other signal to invent one.
 For each row in `dev/status/_index.md`:
 
 1. Read the corresponding `dev/status/<track>.md`.
-2. Compare against the row:
-   - **Status** — must match the `## Status` heading value (IN_PROGRESS / READY_FOR_REVIEW / MERGED / APPROVED / BLOCKED).
+2. **Merge-watch first.** Before trusting the status file's `## Status`
+   heading, cross-reference the GH API for every PR the row/file
+   references. If a referenced PR has state `closed` + `merged: true` on
+   `main`, treat that track as `MERGED` regardless of what the local
+   status file still says — per-track files are stale between runs
+   because feature PRs merge without touching them. In that case:
+   - Flip the per-track `## Status` to `MERGED` (and update its
+     `## Last updated:`) so the next run doesn't need to re-discover.
+   - Move any still-relevant follow-ups from `## Follow-ups` to a child
+     track's status file if one exists; otherwise leave them in place
+     and note "follow-ups carry over" in the row's next-task cell.
+3. Compare against the row:
+   - **Status** — must match the (possibly just-updated) `## Status` heading value (IN_PROGRESS / READY_FOR_REVIEW / MERGED / APPROVED / BLOCKED).
    - **Owner** — must match `## Ownership` (or be `—` if the track has no active owner).
-   - **Open PR(s)** — cross-reference against the GitHub REST API (via `curl -sSL -H "Authorization: Bearer ${GH_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY:-dayfine/trading}/pulls?state=open"`) filtered to that track's branches; each currently-open PR targeting main that carries this track's work should appear.
-   - **Next task** — must be the top item from `## Next Steps` (or an equivalent synthesis of the most concrete pending item).
-3. If any cell drifts, fix it. Do not touch unrelated rows.
-4. Update the `Last updated:` line to today's date.
+   - **Open PR(s)** — cross-reference against the GitHub REST API (via `curl -sSL -H "Authorization: Bearer ${GH_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY:-dayfine/trading}/pulls?state=open"`) filtered to that track's branches; each currently-open PR targeting main that carries this track's work should appear. Merged PRs must not appear in this column.
+   - **Next task** — must be the top item from `## Next Steps` (or an equivalent synthesis of the most concrete pending item). For MERGED rows, use `—` plus a short parenthetical noting the merge date + PR number.
+4. If any cell drifts, fix it. Do not touch unrelated rows.
+5. Update the `Last updated:` line to today's date **at the end of Step 5.5**, not earlier — the timestamp must reflect the reconcile, not whatever the last feature agent happened to write.
 
 If an IN_PROGRESS track has no Owner or no Next task, surface it in the
 daily summary's §Escalations as "unassigned work." Silent drift is the

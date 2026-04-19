@@ -1,6 +1,6 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-17
+## Last updated: 2026-04-19
 
 ## Status
 PENDING
@@ -12,8 +12,8 @@ N/A — not started
 —
 
 ## Blocked on
-- PR #396 (plan) reviewed + merged — decisions locked there, including flag-gated rollout with automated parity test as acceptance gate.
-- Step 2 tracing (tracked under `backtest-infra.md`) — needed for A/B empiricism on the Legacy vs Tiered cutover.
+- None. PR #396 (plan) merged; #419 (Step 2 tracing) merged 2026-04-19
+  — A/B empiricism on Legacy vs Tiered cutover now has a trace schema.
 
 ## Goal
 
