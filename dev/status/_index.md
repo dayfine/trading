@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-19 (run-2 reconcile: #434/#435/#436 still awaiting merge; stacked #438 + new #439 opened and NEEDS_REWORK)
+Last updated: 2026-04-19 (run-3 reconcile: #434/#435/#436 still awaiting merge; #438 and #439 both reworked and now APPROVED)
 
 ## Active + complete tracks
 
@@ -14,12 +14,12 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | MERGED | — | — | — (#419 per-phase tracing merged 2026-04-19) |
-| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #434, #438 | #434 (3a) QC APPROVED awaiting human merge. Stacked #438 (3b Summary tier) NEEDS_REWORK (behavioral, quality 3) — `rs_line` feeds daily bars to `Relative_strength.analyze`, must aggregate to weekly first; next run reworks + re-QCs. |
+| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #434, #438 | #434 (3a) QC APPROVED awaiting human merge. Stacked #438 (3b Summary tier) re-QC APPROVED (quality 4) — D4 `rs_line` weekly aggregation fix landed at cbb07da7. Both awaiting human merge. Stack at cap (2); 3c blocked until one merges. |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
 | [short-side-strategy](short-side-strategy.md) | MERGED | — | — | — (#420 merged 2026-04-19). Follow-ups carried to own tracks: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — (#408 + #409 both merged 2026-04-18) |
 | [sector-data](sector-data.md) | READY_FOR_REVIEW | ops-data | #436 | Item 3 (ops-data manifest preflight) implemented — awaiting human merge; track closes to MERGED on merge. GHA runs still use `trading/test_data/sectors.csv`. |
-| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #435, #439 | #435 (Check 11 linter-exception expiry) QC APPROVED awaiting human merge. #439 (stale local jj bookmarks) NEEDS_REWORK (structural) — header count not bumped ten→eleven and also collides with #435 on "Check 11"; whoever merges second renumbers. Next after #439 reworked: T3-A+ (move deep-scan to weekly cron; retire inline fast-scan). |
+| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #435, #439 | #435 (Check 11 linter-exception expiry) QC APPROVED awaiting human merge. #439 (stale local jj bookmarks) re-QC APPROVED (quality 4) at ae19e3a — header count ten→eleven fix landed. Both await human merge; Check 11 numbering collision between #435 and #439 still resolves at merge time (second merger renumbers to Check 12). Next: T3-A+ (move deep-scan to weekly cron; retire inline fast-scan). |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
