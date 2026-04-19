@@ -21,6 +21,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | READY_FOR_REVIEW | ops-data | #436 | Item 3 (ops-data manifest preflight) implemented — awaiting human merge; track closes to MERGED on merge. GHA runs still use `trading/test_data/sectors.csv`. |
 | [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #435, #439 | #435 (Check 11 linter-exception expiry) QC APPROVED awaiting human merge. #439 (stale local jj bookmarks) re-QC APPROVED (quality 4) at ae19e3a — header count ten→eleven fix landed. Both await human merge; Check 11 numbering collision between #435 and #439 still resolves at merge time (second merger renumbers to Check 12). Next: T3-A+ (move deep-scan to weekly cron; retire inline fast-scan). |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog populates from `dev/health/*-deep.md` and `*-fast.md` via lead-orchestrator Step 2e. One dispatch per run, ≤200 LOC, no behavior change. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |

@@ -62,6 +62,7 @@ Read all of the following before doing anything else:
 - `dev/status/backtest-infra.md` — experiments + strategy-tuning track (feat-backtest)
 - `dev/notes/data-gaps.md` — known data gaps (ADL, sectors, global indices)
 - `dev/status/harness.md` — harness backlog
+- `dev/status/cleanup.md` — code-health backlog (Step 2e dispatches from this)
 - `dev/status/orchestrator-automation.md` — your own automation roadmap; read for context, not for dispatch
 - Any `dev/reviews/*.md` that exist
 
@@ -367,7 +368,76 @@ When done:
 ops-data runs **before** feature agents — resolved data gaps may unblock
 feature work in the same session.
 
-### 2e: Feature dependency rules
+### 2e: Code-health backlog refresh + dispatch
+
+Maintenance dispatch for small mechanical fix-ups (function-length, magic
+numbers, expired linter exceptions, dead code, doc-comment gaps). Closes the
+loop between `health-scanner` (which finds problems) and a writer agent
+(which fixes them). Without this step, scan findings accumulate in
+`dev/health/*.md` with no consumer.
+
+Run AFTER 2c (harness backlog) and 2d (ops-data) but BEFORE Step 4 feature
+dispatches.
+
+**Step 2e.1 — Refresh backlog from latest health scans.**
+
+```bash
+LATEST_DEEP="$(ls -t dev/health/*-deep.md 2>/dev/null | head -1)"
+LATEST_FAST="$(ls -t dev/health/*-fast*.md 2>/dev/null | head -1)"
+```
+
+For each finding tagged `[medium]` or `[high]` (skip `[info]` and `[low]`)
+in either file, check whether `dev/status/cleanup.md` §Backlog already has a
+matching entry (key on file path + finding type). If not, append:
+
+```
+- [ ] <finding type>: <file path> — <one-line context> (source: <basename of source file>)
+```
+
+Example: `- [ ] fn_length: trading/trading/weinstein/strategy/lib/weinstein_strategy.ml — module 320 lines, soft limit 300 (source: 2026-04-19-fast.md)`
+
+Do NOT delete or modify existing entries — `code-health` agent owns lifecycle (`[ ]` → `[~]` → `[x]`).
+
+**Step 2e.2 — Dispatch one cleanup item per run.**
+
+Pick the top `[ ]` item from `dev/status/cleanup.md` §Backlog. Dispatch
+`code-health`:
+
+```
+You are the code-health cleanup agent for the Weinstein Trading System.
+
+## Task
+Address this finding from the latest health scan:
+
+  <paste the full Backlog entry verbatim>
+
+Source report: dev/health/<source-file>
+
+## Constraints
+- ≤200 LOC diff (status/fixture files don't count)
+- Single concern; one finding only
+- No behavior change — `dune runtest` exit code identical, no test newly passes/fails
+- Branch: cleanup/<short-slug>
+- Flip the Backlog entry to `[~]` and push that edit before any code change
+
+Read your full agent definition in .claude/agents/code-health.md for scope, branch convention, and acceptance checklist.
+
+When done, push the branch and return: branch name, tip commit, finding source, before/after linter delta on the touched files, any related findings logged into dev/status/cleanup.md §Backlog.
+```
+
+**Cap: one `code-health` dispatch per run.** Cleanup is fill-window work,
+not the main thrust — it must not crowd out feat-agents or harness dispatches.
+If §Backlog is empty AND health scans surface no new `[medium]`/`[high]`
+findings, skip 2e entirely (record "no cleanup work this run" in §Dispatched).
+
+**Skip 2e when:**
+- `dev/status/cleanup.md` §Backlog is empty AND no new findings.
+- Already in stack-cap zone for the orchestrator's overall dispatch budget.
+- Most recent `code-health` dispatch is still in flight on a `cleanup/*`
+  branch with an open PR (depth-cap 1 for cleanup, distinct from feat-agent
+  cap-2).
+
+### 2f: Feature dependency rules
 
 Cross-track dependencies live in each status file's `## Blocked on` section. For every IN_PROGRESS track, read that section before dispatching:
 
@@ -520,7 +590,7 @@ if actual_cost < target_utilization_low * max_daily_cost_usd:
 ```
 
 "Remaining eligible track" means: any track that was not dispatched in the
-initial batch and is not blocked by a hard dependency (Step 2e). Harness items
+initial batch and is not blocked by a hard dependency (Step 2f). Harness items
 and ops-data count as tracks for this loop.
 
 Log each fill-loop dispatch decision in `## Dispatched this run` with the note
