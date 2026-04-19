@@ -20,11 +20,11 @@ end
 type stats_counts = { metadata : int; summary : int; full : int }
 [@@deriving show, eq, sexp]
 
+type entry = { tier : tier; metadata : Metadata.t option }
 (** Per-symbol entry. Held in a mutable hashtable keyed on symbol. The [tier]
     field reflects the highest tier this symbol has been promoted to; the
     tier-specific data fields are [Some _] at that tier and below. In 3a only
     [metadata] is ever populated. *)
-type entry = { tier : tier; metadata : Metadata.t option }
 
 type t = {
   sector_map : string String.Table.t;
@@ -59,9 +59,9 @@ let _tier_rank = function
   | Full_tier -> 2
 
 (** [_load_metadata] reads the last bar on or before [as_of] from the shared
-    [Price_cache] and joins the sector table. Market cap and average volume
-    are [None] on this increment — wired when the first consumer needs them
-    (§Risks #4 of the plan). *)
+    [Price_cache] and joins the sector table. Market cap and average volume are
+    [None] on this increment — wired when the first consumer needs them (§Risks
+    #4 of the plan). *)
 let _load_metadata t ~symbol ~as_of : (Metadata.t, Status.t) Result.t =
   match Price_cache.get_prices t.price_cache ~symbol ~end_date:as_of () with
   | Error err -> Error err
@@ -85,8 +85,8 @@ let _load_metadata t ~symbol ~as_of : (Metadata.t, Status.t) Result.t =
         }
 
 (** [_promote_one_to_metadata] is idempotent: if the symbol is already at
-    Metadata or higher, it's a no-op. Otherwise it runs the metadata load
-    and inserts the entry. *)
+    Metadata or higher, it's a no-op. Otherwise it runs the metadata load and
+    inserts the entry. *)
 let _promote_one_to_metadata t ~symbol ~as_of : (unit, Status.t) Result.t =
   match Hashtbl.find t.entries symbol with
   | Some entry when _tier_rank entry.tier >= _tier_rank Metadata_tier -> Ok ()
@@ -123,8 +123,7 @@ let demote _t ~symbols:_ ~to_:_ =
   ()
 
 let stats t =
-  Hashtbl.fold t.entries
-    ~init:{ metadata = 0; summary = 0; full = 0 }
+  Hashtbl.fold t.entries ~init:{ metadata = 0; summary = 0; full = 0 }
     ~f:(fun ~key:_ ~data acc ->
       match data.tier with
       | Metadata_tier -> { acc with metadata = acc.metadata + 1 }

@@ -1,0 +1,12 @@
+(tests
+ (names test_metadata)
+ (modules test_metadata)
+ (libraries
+  ounit2
+  core
+  core_unix.filename_unix
+  fpath
+  status
+  trading.backtest.bar_loader
+  types
+  matchers))
