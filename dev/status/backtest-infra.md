@@ -3,22 +3,46 @@
 ## Last updated: 2026-04-18
 
 ## Status
-APPROVED
+READY_FOR_REVIEW
 
 ## QC
+
+Step 1 (PR #399, merged) — overall_qc APPROVED at e59f8d2 (both prior blockers U6/F1 and the BC4 advisory resolved; `_held_symbols` strategy fix domain-correct).
+
+Step 2 (PR #419, ready for review):
 - structural_qc: APPROVED (re-verification at 0381bde, 2026-04-18 run 4) — refactor-only delta from cc4edca6 (trace.ml sentinel→option, dropped `to_string`, simplified parsers; -23 net lines); fmt violation at 73f74c2 fixed by 0381bde.
 - behavioral_qc: APPROVED (re-verification at 0381bde, 2026-04-18 run 4) — Trace is pure instrumentation plumbing; Weinstein domain axes remain NA; refactor preserves behavior.
 - overall_qc: APPROVED (re-verification at 0381bde)
 
-Step 1 of the scale-optimization plan (PR #396) complete on
-`feat/backtest-scenario-small-universe` (PR #399, ready for review):
-two-tier universe for scenarios. Small-universe pinned at 300 symbols
-across all 11 GICS sectors; broad-universe sentinel falls back to the
-full `data/sectors.csv` for nightly/GHA scale runs. Goldens reorganised
-into `goldens-small/` + `goldens-broad/`. `Backtest.Runner` now accepts
-a `sector_map_override`, wired through `Scenario_runner`. This unblocks
-step 2 (per-phase tracing) under this track and the parallel
-backtest-scale Step 3 work.
+Step 2 of the scale-optimization plan complete on
+`feat/backtest-phase-tracing` (PR #419). Adds a `Backtest.Trace` module
+(`trading/trading/backtest/lib/trace.{ml,mli}`) with `Phase.t` (11
+variants), a `phase_metrics` record, `record : ?trace -> Phase.t ->
+(unit -> 'a) -> 'a`, and `write : out_path -> metrics -> unit`.
+`Runner.run_backtest` gains an optional `?trace` argument (default off)
+and instruments 5 coarse phases at the runner level: Load_universe,
+Macro, Load_bars, Fill, Teardown. Finer-grained wraps for the per-bar
+strategy phases (Sector_rank / Rs_rank / Stage_classify / Screener /
+Stop_update / Order_gen) require strategy-level instrumentation and are
+deferred (see §Follow-up). Step 2 unblocks the separately-tracked Step
+3 tier-aware bar loader (`dev/status/backtest-scale.md`) by giving A/B
+measurements a commit-stable sexp output format.
+
+Step 1 (merged via PR #399) delivered the two-tier universe for
+scenarios. Small-universe pinned at 300 symbols across all 11 GICS
+sectors; broad-universe sentinel falls back to the full
+`data/sectors.csv`. Goldens reorganised
+
+**Environment note (2026-04-18):** the GHA `dev/lib/run-in-env.sh dune
+build @runtest` target fails because the nesting linter reports 49
+pre-existing violations (universe_filter, fetch_finviz_sectors, ad_bars)
+— none introduced by this PR. `trading/backtest/lib/trace.ml` and
+`trading/backtest/lib/runner.ml` are clean under the linter. The
+pre-flight context said main exits 0; in this container it doesn't. The
+PR's own targeted test command `dune runtest trading/backtest/test/`
+passes with 0 warnings and all 19 cases green (10 new Trace tests + 6
+Stop_log + 3 Runner_filter). Flagging for QC to confirm this is the
+same pre-existing state seen elsewhere and not a regression.
 
 Earlier on 2026-04-17 the per-scenario `unrealized_pnl` range pin landed
 (feat/metrics-scenario-unrealized-pin, follow-up to merged #393). Before
@@ -58,9 +82,23 @@ strategy code (currently complete).
   - Fixture files at `trading/test_data/backtest_scenarios/{goldens,smoke}/`
 
 ## Open PRs
+- `feat/backtest-phase-tracing` — PR #419 (draft → ready 2026-04-18).
+  Step 2 of scale-optimization plan. See §Completed first entry.
 - `feat/metrics-scenario-unrealized-pin` — follow-up to PR #393 (now
   merged) that pins `unrealized_pnl` as a per-scenario range check
   (see §Completed). Branches off current `main`.
+
+## Next Steps
+
+- **Step 3 (tier-aware bar loader)** is the unblock target for
+  everything under this PR. Separately tracked at
+  `dev/status/backtest-scale.md`; landing order: PR #419 merges →
+  Step 3 can A/B the Legacy vs Tiered loader against a traced Legacy
+  baseline. Do not pick up Step 3 from this track — it has its own
+  status file and branch (`feat/backtest-tiered-loader`).
+- **Per-bar phase instrumentation** (Sector_rank through Order_gen)
+  can land as a follow-up without changing the trace sexp schema — the
+  Phase variants are already defined. See §Follow-up item 6.
 
 ## Baseline results (2026-04-13, pre-experiments)
 
@@ -81,6 +119,37 @@ strategy code (currently complete).
 - Non-deterministic due to Hashtbl ordering (tracked, not fully fixed)
 
 ## Completed
+
+- [x] **Per-phase tracing (Step 2 of scale-optimization plan #396)**
+  (2026-04-18, `feat/backtest-phase-tracing`, PR #419). New
+  `Backtest.Trace` module (`trading/trading/backtest/lib/trace.{ml,mli}`)
+  gives every backtest run a commit-stable phase-metrics sexp. Key shape:
+  `Phase.t` has 11 variants (Load_universe / Load_bars / Macro /
+  Sector_rank / Rs_rank / Stage_classify / Screener / Stop_update /
+  Order_gen / Fill / Teardown); `record ?trace ?symbols_in ?symbols_out
+  ?bar_loads phase f` runs `f ()` and appends one `phase_metrics` record
+  with wall-clock elapsed_ms and best-effort peak_rss_mb (VmHWM from
+  /proc/self/status). `?trace=None` is a no-op — callers wrap blocks
+  unconditionally. `write ~out_path` emits a single sexp per run via
+  `[@@deriving sexp]`, creating parent directories.
+  `Runner.run_backtest` gains an optional `?trace` parameter and
+  instruments 5 coarse phases at the runner level (Load_universe, Macro,
+  Load_bars, Fill, Teardown — the first two inside `_load_deps`, the
+  next two around `_make_simulator` and `_run_simulator`, Teardown
+  around round-trip extraction + stop_infos gather). The 6 per-bar
+  phases (Sector_rank through Order_gen) remain defined but not wired —
+  they require strategy-level instrumentation inside `Simulator.run`
+  and are a deliberate follow-up so Step 2 doesn't couple to a refactor
+  of the simulator internals (see §Follow-up item 6). Output directory
+  placeholder at `dev/backtest/traces/.gitkeep`. Ten OUnit2 cases under
+  `trading/trading/backtest/test/test_trace.ml` cover `Phase.to_string`,
+  sexp round-trip for all variants, `record` with ?trace=None
+  passthrough, record with ?trace=Some recording (phase, counts,
+  elapsed_ms >= 0), insertion order preservation, real elapsed
+  measurement via busy-wait, and `write` + load_sexp round-trip with
+  mkdir-p of a nested parent directory. Verify:
+  `dev/lib/run-in-env.sh dune runtest trading/backtest/test/` (10 new
+  tests).
 
 - [x] **Related fix: strategy `_held_symbols` no longer includes Closed
   positions** (2026-04-17, `feat/weinstein-exclude-closed-from-held`).
@@ -280,6 +349,21 @@ is informed by actual needs.
    `data/inventory.sexp` by a small script run from the ops-data agent.
    Makes it obvious at a glance when a backtest's requested window
    exceeds available data for some input.
+
+6. **Per-bar phase instrumentation (follow-up to PR #419).** The
+   `Backtest.Trace` module (Step 2 of the scale-optimization plan)
+   defines 11 `Phase.t` variants but the runner only wraps 5 coarse
+   phases (Load_universe, Macro, Load_bars, Fill, Teardown). The
+   remaining 6 (Sector_rank, Rs_rank, Stage_classify, Screener,
+   Stop_update, Order_gen) are per-bar strategy phases that happen
+   inside `Simulator.run` → `Weinstein_strategy.on_market_close`; wrapping
+   them requires a small cross-cut inside the strategy or a tap point on
+   the simulator's per-step callback. Deferred to keep PR #419 focused.
+   Suggested approach: extend `Strategy_wrapper.wrap` with an optional
+   `?trace` and have it wrap the strategy's `on_market_close` at the
+   inner function boundaries where the screener cascade and stop update
+   run. Trace sexp schema does not change — just more entries per run.
+   Unblocks: detailed A/B of the Legacy vs Tiered bar loader (Step 3).
 
 ## Potential experiments (cross-functional — need feature work before runnable)
 

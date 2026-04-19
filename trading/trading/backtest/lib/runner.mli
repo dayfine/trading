@@ -43,6 +43,7 @@ val run_backtest :
   end_date:Date.t ->
   ?overrides:Sexp.t list ->
   ?sector_map_override:(string, string) Core.Hashtbl.t ->
+  ?trace:Trace.t ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -62,4 +63,18 @@ val run_backtest :
     from [data/sectors.csv]. The backtest universe becomes exactly the keys of
     this hashtable. This is the wiring point for scenario-level universe
     selection (small / broad tiers). When [None] (the default), the runner falls
-    back to [Sector_map.load] — pre-migration behaviour. *)
+    back to [Sector_map.load] — pre-migration behaviour.
+
+    [trace], when passed, instruments the run with per-phase timing and memory
+    measurements via {!Trace.record}. Wraps these coarse phases at the runner
+    level:
+    - [Load_universe] — resolving the sector map
+    - [Macro] — loading AD breadth bars
+    - [Load_bars] — creating the simulator (allocates per-symbol bar loaders)
+    - [Fill] — running the simulator main loop (all per-bar strategy work)
+    - [Teardown] — extracting round-trips and gathering stop infos
+
+    Finer-grained wrap points for the per-bar phases inside [Simulator.run]
+    (Sector_rank / Rs_rank / Stage_classify / Screener / Stop_update /
+    Order_gen) require strategy-level instrumentation and are tracked as a
+    follow-up. When [trace] is omitted, instrumentation is a no-op. *)

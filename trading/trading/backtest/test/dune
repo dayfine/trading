@@ -1,8 +1,11 @@
 (tests
- (names test_stop_log test_runner_filter)
+ (names test_stop_log test_runner_filter test_trace)
  (libraries
   ounit2
   core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
   core_unix.time_ns_unix
   backtest
   trading.base
