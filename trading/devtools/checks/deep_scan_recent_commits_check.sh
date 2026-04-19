@@ -23,31 +23,32 @@ set -e
 . "$(dirname "$0")/_check_lib.sh"
 
 REPO_ROOT="$(repo_root)"
-DEEP_SCAN="${REPO_ROOT}/trading/devtools/checks/deep_scan.sh"
-[ -f "$DEEP_SCAN" ] || die "deep_scan_recent_commits_check: $DEEP_SCAN does not exist"
+DEEP_SCAN_DIR="${REPO_ROOT}/trading/devtools/checks/deep_scan"
+CHECK_10="${DEEP_SCAN_DIR}/check_10_status_template.sh"
+[ -f "$CHECK_10" ] || die "deep_scan_recent_commits_check: $CHECK_10 does not exist"
 
 fail() {
   echo "FAIL: deep_scan_recent_commits_check — $1" >&2
   exit 1
 }
 
-# ── Part 1: structural check of deep_scan.sh ─────────────────────
+# ── Part 1: structural check of check_10_status_template.sh ──────
 
 # Check 10 header
-grep -qF 'Check 10: Status file template enforcement' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing 'Check 10: Status file template enforcement' header"
+grep -qF 'Check 10: Status file template enforcement' "$CHECK_10" \
+  || fail "check_10_status_template.sh missing 'Check 10: Status file template enforcement' header"
 
 # Detection logic: grep for the forbidden heading
-grep -qF "grep -n '^## Recent Commits'" "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing grep for '^## Recent Commits' forbidden heading detection"
+grep -qF "grep -n '^## Recent Commits'" "$CHECK_10" \
+  || fail "check_10_status_template.sh missing grep for '^## Recent Commits' forbidden heading detection"
 
 # Accumulator variable
-grep -qF 'RECENT_COMMITS_COUNT' "$DEEP_SCAN" \
-  || fail "deep_scan.sh missing RECENT_COMMITS_COUNT accumulator"
+grep -qF 'RECENT_COMMITS_COUNT' "$CHECK_10" \
+  || fail "check_10_status_template.sh missing RECENT_COMMITS_COUNT accumulator"
 
 # Report emits ## Status File Template section
-grep -qF '## Status File Template' "$DEEP_SCAN" \
-  || fail "deep_scan.sh does not emit '## Status File Template' section in report"
+grep -qF '## Status File Template' "$CHECK_10" \
+  || fail "check_10_status_template.sh does not emit '## Status File Template' section in report"
 
 # ── Part 2: most-recent deep report has ## Status File Template ──
 
