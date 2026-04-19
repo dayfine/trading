@@ -309,6 +309,15 @@ From a Claude Code guide research session:
 1. **Scraper dispatches (ops-data).** The Finviz sector scrape is
    ~2.2h; today it blocks a terminal. Background `Bash` + Monitor
    tool lets the orchestrator kick it off and keep working.
+   **EODHD bulk refresh is the same pattern, different source** —
+   weekly full-universe pull (~10k symbols) drives sector-data Item 3
+   and ops-data preflight cadence. Wire as a **separate weekly GHA
+   workflow** (not the daily orchestrator: different cadence, different
+   blast radius, different failure mode). `EODHD_API_KEY` is in the
+   repo secrets (added 2026-04-19). Rollout: adapt
+   `.github/workflows/orchestrator.yml` into a stripped-down
+   `.github/workflows/ops-data-weekly.yml` that dispatches only the
+   `ops-data` agent with the secret injected; PR summary on completion.
 
 2. **Golden backtest re-runs (backtest-infra).** Three buffer
    variants × ~40 min each. Today they serialize (~2h total). As
