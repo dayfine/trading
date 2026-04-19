@@ -1,9 +1,17 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-04-16
+## Last updated: 2026-04-18
 
 ## Status
-IN_PROGRESS
+IN_PROGRESS — Phase 1 live; Phase 2 (background execution) pending.
+
+Phase 1 (scheduled daily orchestrator on GHA) has been producing daily
+summary PRs since 2026-04-16. See `.github/workflows/orchestrator.yml`
+and daily summary PRs #422/#423/#427 etc. All five §Open blockers below
+are resolved — section retained as the implementation record.
+
+## Blocked on
+- None. Phase 2 items are scoped-work, not blockers.
 
 ## Interface stable
 NO
@@ -82,9 +90,13 @@ Six specific questions sent to the Claude Code guide. Results:
 | Container | Reuse `trading-devcontainer` image (already needed for jj, jst, opam env) |
 | Cost ceiling | Rely on **subscription-based caps via OAuth token**, not per-run API budget |
 
-## Open blockers (must solve before v1)
+## Phase 1 blockers — RESOLVED (2026-04-18)
 
-### 1. GitHub token for jj push
+All five items below are done. Retained as implementation record so
+future maintainers can see what the v1 gating set was and how each was
+addressed.
+
+### 1. GitHub token for jj push — DONE
 
 The default `GITHUB_TOKEN` can push branches but won't trigger downstream
 workflows (CI won't run on `feat/*` branches created by the orchestrator's
@@ -101,7 +113,11 @@ Setup steps (human, one-time):
 4. Expiration: 1 year (set calendar reminder to rotate)
 5. Store as repo secret `BOT_GITHUB_TOKEN`
 
-### 2. `docker exec <container-name>` in agent prompts
+**Resolved:** `BOT_GITHUB_TOKEN` is configured; `actions/checkout@v4`
+uses it (`orchestrator.yml:107`, landed in PR #424) so subagent pushes
+authenticate as the PAT owner and trigger downstream CI.
+
+### 2. `docker exec <container-name>` in agent prompts — DONE
 
 Every feat-agent / QC-agent prompt template bakes in
 `docker exec <container-name> bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && ...'`.
@@ -157,24 +173,39 @@ dev/lib/run-in-env.sh dune build
 - Agents see one pattern across environments. Context-setting
   (cd + opam env) is centralized in the script, not repeated per prompt.
 
-### 3. Publish `trading-devcontainer` image to GHCR
+**Resolved:** `dev/lib/run-in-env.sh` landed; workflow sets
+`TRADING_IN_CONTAINER=1` (`orchestrator.yml:86`) so agents take the
+native path when running in GHA.
+
+### 3. Publish `trading-devcontainer` image to GHCR — DONE
 
 See [#325](https://github.com/dayfine/trading/pull/325) — already adds
 publishing for `trading-devcontainer:latest`. Orchestrator workflow will
 reference this image via `container:`.
 
-### 4. Subscription OAuth token
+**Resolved:** #325 merged; workflow pulls
+`ghcr.io/dayfine/trading-devcontainer:latest` (`orchestrator.yml:73`).
+
+### 4. Subscription OAuth token — DONE
 
 Create `CLAUDE_CODE_OAUTH_TOKEN` GitHub repo secret (one-time setup).
 The OAuth token gives us subscription-based rate-limits as the effective
 cost ceiling. Document the setup in `dev/config/README.md`.
 
-### 5. Partial-failure reporting
+**Resolved:** `CLAUDE_CODE_OAUTH_TOKEN` is configured and consumed by
+`anthropics/claude-code-action@v1` (`orchestrator.yml:135`).
+
+### 5. Partial-failure reporting — DONE
 
 The orchestrator returns 0 even when some subagents fail (by design — it
 writes findings to the daily summary). For GHA to surface a yellow/red run,
 add a post-step that parses `dev/daily/<date>.md` for the Escalations
 section and fails the job if it's non-empty.
+
+**Resolved:** `Fail on escalations` step in `orchestrator.yml:180-231`
+greps the daily summary's §Escalations for top-level `[critical]`
+bullets and exits 1 if any match. Anchoring was tightened in PR #425
+after two regressions (see that PR for the pattern history).
 
 ## Recommended workflow sketch (not for commit)
 
@@ -224,37 +255,24 @@ jobs:
 
 ## Implementation sequencing
 
-1. Land #325 (publishes `trading-devcontainer:latest`) — **DONE**
-2. Human, one-time setup:
-   - Create fine-grained PAT at https://github.com/settings/tokens?type=beta
-     (scope: `dayfine/trading`, perms: Contents R+W + Pull requests R+W)
-     → store as repo secret `BOT_GITHUB_TOKEN`.
-   - Run `claude setup-token` on a subscription-authenticated machine
-     → store result as repo secret `CLAUDE_CODE_OAUTH_TOKEN`.
-3. Strip `docker exec` from agent prompts — add `dev/lib/run-in-env.sh`
-   wrapper (see blocker §2), replace every hardcoded docker-exec +
-   cd + opam-env prelude in the 7 agent definitions with a call to
-   the wrapper. Single PR, wide but mechanical diff. Works locally
-   (default: docker-exec path) and in GHA (when `TRADING_IN_CONTAINER=1`
-   is set at the job env level, takes native path).
-4. Add `.github/workflows/orchestrator.yml` with `workflow_dispatch` only
-   (no cron yet) — dogfood manually. Include a post-step that parses
-   the daily summary for §Escalations and fails the job if non-empty.
-5. Verify one successful manual run end-to-end, check cost + timing.
-   **Also test rate-limit behavior** by artificially exhausting the
-   quota (run several full sessions locally same-day, then trigger the
-   Action). Record what happens — fail-fast, hang, or clean error —
-   and harden the workflow around it.
-6. Enable nightly cron once manual run is reliable.
+All Phase 1 steps below are complete. Retained as implementation record.
 
-Parallel-trackable pieces an agent can pick up before the human
-completes step 2:
-- Step 3 (strip docker exec) — `harness-maintainer` track. Small diff,
-  no secrets needed.
-- Draft `.github/workflows/orchestrator.yml` as a PR without enabling
-  it — `harness-maintainer` track. Workflow file with `workflow_dispatch`-
-  only trigger is safe to land before secrets exist; the first dispatch
-  attempt will just fail authorization until the human finishes step 2.
+1. Land #325 (publishes `trading-devcontainer:latest`) — **DONE**
+2. Human, one-time setup — **DONE**: `BOT_GITHUB_TOKEN` and
+   `CLAUDE_CODE_OAUTH_TOKEN` repo secrets configured.
+3. Strip `docker exec` from agent prompts — **DONE**: `dev/lib/run-in-env.sh`
+   wrapper landed; workflow sets `TRADING_IN_CONTAINER=1` so agents
+   take the native path in GHA.
+4. Add `.github/workflows/orchestrator.yml` with `workflow_dispatch` —
+   **DONE**: escalations post-step included (`Fail on escalations`).
+5. Verify manual run end-to-end — **DONE**: first successful run
+   observed 2026-04-16; rate-limit behavior empirically exercised
+   during subsequent runs.
+6. Enable cron — **DONE**: three daily runs at `:17` past the hour
+   (UTC 08/14/19), see `orchestrator.yml:50-53`.
+
+(Parallel-trackable pieces for pre-secrets work — historical, all
+landed with Phase 1.)
 
 ## Phase 2: adopt background execution
 

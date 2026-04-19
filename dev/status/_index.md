@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-18 (orchestrator run 4)
+Last updated: 2026-04-18 (post-run-4 status refresh)
 
 ## Active + complete tracks
 
@@ -18,9 +18,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
 | [short-side-strategy](short-side-strategy.md) | APPROVED | feat-weinstein | #420 (feat/short-side-strategy) | QC APPROVED at tip 937ec93 (re-verified run 4 — merge-only, zero OCaml delta). Awaiting human merge. Follow-ups: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — (#408 + #409 both merged 2026-04-18) |
-| [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | Item 2 (one-shot `fetch_finviz_sectors.exe` + filter with updated default.sexp) — requires 2.2h human-driven fetch |
+| [sector-data](sector-data.md) | IN_PROGRESS | ops-data | — | Items 1/2/4/4.1 DONE (Item 2 ran locally 2026-04-18; full sectors.csv intentionally out-of-tree). Only Item 3 (ops-data preflight cadence hook, ~20 lines) remains. Does NOT gate GHA runs — they use `trading/test_data/sectors.csv`. |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | #421 (harness/deep-scan-recent-commits-guard) | Deep-scan Recent Commits guard (Check 10 + smoke test) — awaiting review. Next: deep-scan heuristic gaps sub-items 3 (linter exception expiry vs milestone) and 4 (stale local jj bookmarks). |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Solve open blockers (BOT_GITHUB_TOKEN + CLAUDE_CODE_OAUTH_TOKEN setup; gh/jj availability in container) |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |
