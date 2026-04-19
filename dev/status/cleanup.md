@@ -17,11 +17,9 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
-- [ ] fn_length / file_length: trading/trading/weinstein/strategy/lib/weinstein_strategy.ml — module 320 lines, soft limit 300. Either annotate with `(* @large-module: <reason> *)` at the top (acceptable if the module is a cohesive whole and no obvious split exists) or extract a sub-module (e.g., stage-transition helpers or risk helpers) to drop back below 300. (source: 2026-04-19-fast.md)
-
 ## Completed
 
-- (none yet)
+- [x] fn_length / file_length: weinstein_strategy.ml — added @large-module annotation; file length linter now passes. (source: 2026-04-19-fast.md, branch: cleanup/weinstein-strategy-320-lines, 2026-04-19)
 
 ## Out of scope
 

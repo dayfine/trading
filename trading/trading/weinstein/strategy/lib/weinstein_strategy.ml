@@ -1,3 +1,7 @@
+(* @large-module: strategy composition point — wires screener, macro, stops,
+   bar history, and portfolio into one cohesive weekly cadence; splitting any
+   of these concerns into a sibling module would create artificial boundaries
+   between tightly coupled wiring logic. *)
 open Core
 open Trading_strategy
 module Bar_history = Bar_history
