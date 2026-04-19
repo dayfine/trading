@@ -167,19 +167,12 @@ let test_promote_missing_symbol_errors _ =
   assert_that (Bar_loader.stats loader)
     (match_stats_counts ~metadata:(equal_to 0) ~summary:__ ~full:__)
 
-let test_full_promotion_unimplemented _ =
-  let loader, symbols = _fixture ~n_symbols:2 ~sector_map_entries:[] in
-  let full_result =
-    Bar_loader.promote loader ~symbols ~to_:Full_tier ~as_of:_as_of
-  in
-  assert_that full_result (is_error_with Unimplemented)
-
-(** Symmetry counterpart to [test_full_promotion_unimplemented]: the supported
-    higher tier (Summary) must NOT return Unimplemented from this same call
-    surface. End-to-end Summary behaviour with full benchmark data is in
-    [test_summary.ml]; here the fixture has no benchmark series, so the call may
-    legitimately fail with NotFound — what we pin is only that the failure code
-    is *not* Unimplemented. *)
+(** Sanity guard: the supported higher tier (Summary) must NOT return
+    [Unimplemented] from this call surface. End-to-end Summary behaviour with
+    full benchmark data is in [test_summary.ml]; Full-tier semantics are in
+    [test_full.ml]. Here the fixture has no benchmark series, so the call may
+    legitimately fail with [NotFound] — what we pin is only that the failure
+    code is *not* [Unimplemented]. *)
 let test_summary_promotion_supported _ =
   let loader, symbols =
     _fixture ~n_symbols:1 ~sector_map_entries:[ ("S01", "Tech") ]
@@ -197,9 +190,9 @@ let test_summary_promotion_supported _ =
              err.message)
 
 let test_summary_getter_none_on_metadata_only _ =
-  (* After Metadata-only promotion the Summary getter must be [None] — the
-     entry exists at Metadata tier but no Summary scalars have been computed
-     yet. Full-tier getter is permanently [None] until 3c. *)
+  (* After Metadata-only promotion the Summary / Full getters must both be
+     [None] — the entry exists at Metadata tier but no higher-tier data has
+     been computed yet. Full-tier promotion semantics live in [test_full.ml]. *)
   let loader, symbols =
     _fixture ~n_symbols:2 ~sector_map_entries:[ ("S01", "Tech") ]
   in
@@ -218,7 +211,6 @@ let suite =
          "get_metadata_returns_data" >:: test_get_metadata_returns_data;
          "promote_is_idempotent" >:: test_promote_is_idempotent;
          "promote_missing_symbol_errors" >:: test_promote_missing_symbol_errors;
-         "full_promotion_unimplemented" >:: test_full_promotion_unimplemented;
          "summary_promotion_supported" >:: test_summary_promotion_supported;
          "summary_getter_none_on_metadata_only"
          >:: test_summary_getter_none_on_metadata_only;

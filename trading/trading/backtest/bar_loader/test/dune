@@ -1,6 +1,6 @@
 (tests
- (names test_metadata test_summary_compute test_summary)
- (modules test_metadata test_summary_compute test_summary)
+ (names test_metadata test_summary_compute test_summary test_full)
+ (modules test_metadata test_summary_compute test_summary test_full)
  (libraries
   ounit2
   core
