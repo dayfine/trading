@@ -103,6 +103,14 @@ let _last_date bars =
   | Some (bar : Macro.ad_bar) -> Some bar.date
   | None -> None
 
+(** [_splice_after u cutoff s] appends every [s] bar strictly after [cutoff] to
+    [u]. Extracted from [_compose] so the outer match doesn't nest. *)
+let _splice_after u cutoff s =
+  let tail =
+    List.filter s ~f:(fun (bar : Macro.ad_bar) -> Date.( > ) bar.date cutoff)
+  in
+  u @ tail
+
 (** Compose Unicorn and Synthetic: Unicorn wins for dates it covers, Synthetic
     fills everything after Unicorn's last date. *)
 let _compose ~unicorn ~synthetic =
@@ -112,12 +120,7 @@ let _compose ~unicorn ~synthetic =
   | u, s -> (
       match _last_date u with
       | None -> s
-      | Some cutoff ->
-          let tail =
-            List.filter s ~f:(fun (bar : Macro.ad_bar) ->
-                Date.( > ) bar.date cutoff)
-          in
-          u @ tail)
+      | Some cutoff -> _splice_after u cutoff s)
 
 let load ~data_dir =
   let unicorn = Unicorn.load ~data_dir in

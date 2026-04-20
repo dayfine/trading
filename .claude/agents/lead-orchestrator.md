@@ -102,15 +102,16 @@ Common verifications:
   echo "exit=$?"
   ```
   Run from the inner `trading/trading/` directory. **The gate is the
-  exit code, NOT `FAIL:` text in the output.** Several linters
-  (`nesting_linter`, `linter_magic_numbers`) are advisory — they print
-  `FAIL: ...` lines as warnings but their dune rules still return exit
-  0. Only exit != 0 means baseline is actually red. If exit 0, the
-  inherited critical is **resolved** — drop, regardless of any `FAIL:`
-  lines in output. When carrying forward a still-real critical, quote
-  the original linter + violation count verbatim from the prior summary
-  (don't paraphrase — seen 2026-04-18 → today, a `fn_length` finding got
-  rewritten as `nesting` on carry-forward).
+  exit code, NOT `FAIL:` text in the output.** Some linters are advisory
+  (e.g. the CC linter writes a JSON metric and never fails), but both
+  `nesting_linter` and `linter_magic_numbers` DO exit 1 on violations —
+  empirically verified in run 24644964113 on 2026-04-20. Previously this
+  doc claimed they were advisory; the claim was wrong. If exit 0, the
+  inherited critical is resolved — drop. When carrying forward a
+  still-real critical, quote the original linter + violation count
+  verbatim from the prior summary (don't paraphrase — seen 2026-04-18 →
+  today, a `fn_length` finding got rewritten as `nesting` on
+  carry-forward).
 
 - **"Open PR #X is failing CI"**: re-check PR status via REST
   (`/repos/<owner>/<repo>/pulls/<N>/commits/<sha>/check-runs`). If the
@@ -1049,9 +1050,12 @@ BUILD_EXIT=$?
 echo "build-gate exit=$BUILD_EXIT"
 ```
 
-**Gate rule: exit code only.** Several linters (`nesting_linter`,
-`linter_magic_numbers`) print `FAIL:` advisory text but their dune rules
-return exit 0. Only `BUILD_EXIT != 0` means the baseline is actually broken.
+**Gate rule: exit code only.** Look at `BUILD_EXIT`, not at `FAIL:` text
+in stdout — some linters print advisory text without exiting non-zero
+(e.g. CC linter writes a metrics JSON and always exits 0). But
+`nesting_linter` and `linter_magic_numbers` DO exit 1 on violations
+(verified run 24644964113 on 2026-04-20 — prior "advisory" claim in
+this doc was wrong). Trust only `BUILD_EXIT`.
 
 - Exit 0 → PASSING. Record in `## Health Scan` as `Result: CLEAN`.
 - Exit non-zero → FAILING. Surface in `## Escalations` as:
