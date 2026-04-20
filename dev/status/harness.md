@@ -1,9 +1,12 @@
 # Status: harness
 
-## Last updated: 2026-04-19
+## Last updated: 2026-04-20
 
 ## Status
 IN_PROGRESS
+
+## structural_qc: APPROVED (2026-04-20)
+Branch: harness/deep-scan-drift-coverage. SHA: f0c402a620247a9423a9982c4300222cf2cd644a. See dev/reviews/harness.md.
 
 ## CI
 
@@ -127,12 +130,16 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - **Deep scan heuristic gaps** — `trading/devtools/checks/deep_scan.sh`
   (T3-A, see #331) is missing several useful checks. Today's manual
   audit found four real issues the script didn't surface:
-  1. **Drift coverage too narrow** — only checks `analysis/weinstein/`,
-     `trading/weinstein/`, `analysis/weinstein/data_source/` against
-     specific eng-design docs. New subsystems like
-     `trading/trading/backtest/` (added today via #315/#316) are
-     invisible. Either generalise the check or add per-subsystem
-     coverage.
+  1. ~~**Drift coverage too narrow**~~ — DONE: `trading/trading/backtest/`
+     coverage added to `trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh`;
+     checks top-level subdirs of `trading/trading/backtest/` against
+     `dev/plans/backtest-scale-optimization-2026-04-17.md`. Smoke test:
+     `trading/devtools/checks/deep_scan_drift_coverage_check.sh`. Wired into
+     `dune runtest` via `trading/devtools/checks/dune`. Current finding:
+     `trading/trading/backtest/bin/` not mentioned in plan (WARNING).
+     Verify: `dune runtest devtools/checks/` — prints OK; run
+     `sh trading/devtools/checks/deep_scan.sh` — report has
+     `Design doc drift items: 1` for `backtest/bin/`. See Completed section.
   2. ~~**Status file template enforcement**~~ — DONE: Check 10 added to
      `trading/devtools/checks/deep_scan.sh`; greps `dev/status/*.md` for
      forbidden `## Recent Commits` heading; findings emitted under
@@ -287,3 +294,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - [x] `dev/run.sh` pre-flight — fast-fails at the shell (not inside the orchestrator) if `claude` isn't on PATH, `.claude/agents/lead-orchestrator.md` is missing, or its `## Allowed Tools` section no longer lists `Agent`. Each failure prints `FAIL: <what>` to stderr and exits 1. Block is placed immediately after `REPO_ROOT=...` and uses only POSIX-compatible constructs (works with `set -euo pipefail`). Verify: `sh -n dev/run.sh` passes syntax check; temporarily rename `.claude/agents/lead-orchestrator.md` and re-run `dev/run.sh` — it exits 1 with a clear `FAIL:` message.
 - [x] `dev/config/merge-policy.json` — default merge-policy config committed with inline defaults (`followup_threshold: 10`, `maintenance_cycle_ratio: 3`, `auto_merge_enabled: false`). Matches the inline defaults previously embedded in `lead-orchestrator.md` Step 2b — now visible and tweakable without editing the agent definition. Intent documented in `dev/config/README.md`. Verify: `jq . dev/config/merge-policy.json` parses cleanly.
 - [x] Orchestrator `## Plan Mode` — added to `.claude/agents/lead-orchestrator.md`; triggered by a `--plan` token in the prompt, short-circuits Steps 2–6, writes `dev/daily/<YYYY-MM-DD>-plan.md` with `(plan mode)` marker, never mutates branches or status files. Structural smoke test at `trading/devtools/checks/orchestrator_plan_check.sh` wired into `dune runtest` — grep-asserts the required Plan Mode contract pieces in the agent definition. Does NOT invoke `claude -p` from dune runtest (credentials/network/flakiness). Verify: `dune runtest trading/devtools/checks/` — prints `OK: lead-orchestrator plan mode contract present.`
+
+### Deep scan heuristic gap sub-item 1: Drift coverage extension (backtest)
+
+- [x] `trading/trading/backtest/` subsystem added to `trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh` — checks top-level subdirectories of `trading/trading/backtest/` against `dev/plans/backtest-scale-optimization-2026-04-17.md` using the same heuristic as the existing Weinstein subsystem checks (grep for dir name in plan doc; missing = WARNING). Plan document is the active backtest design spec. Current live finding: `trading/trading/backtest/bin/` is not mentioned in the plan (expected — runner binary added post-plan). Smoke test: `trading/devtools/checks/deep_scan_drift_coverage_check.sh` — verifies BACKTEST_PLAN, BACKTEST_DIR, and the plan filename markers are present in `check_02`, and that the most-recent deep scan report references drift. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `sh trading/devtools/checks/deep_scan_drift_coverage_check.sh` — prints OK; `sh trading/devtools/checks/deep_scan.sh` — report shows `Design doc drift items: 1` and warns about `backtest/bin/`.

@@ -1,11 +1,13 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-19
+## Last updated: 2026-04-20
 
 ## Status
 READY_FOR_REVIEW
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447. 3d (tracer phases) ready for review. 3e (runner + scenario plumbing for `loader_strategy`) is the next increment.
+structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
+
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447. 3d (tracer phases) ready for review. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e`. 3f (tiered runner path) is the next increment.
 
 ## Interface stable
 NO
@@ -14,9 +16,10 @@ All three tier getters return their proper typed option: `get_metadata : Metadat
 
 ## Open PR
 - feat/backtest-tiered-loader-3d-tracer-phases — 3d based on main; tier-op tracer phases + callback hook. Ready for QC.
+- feat/backtest-scale-3e — 3e based on main; runner + scenario plumbing for `loader_strategy`. Ready for QC.
 
 ## Blocked on
-- None. 3e depends on 3d merging.
+- None. 3f depends on 3e merging.
 
 ## Goal
 
@@ -81,10 +84,34 @@ Build alongside existing `Bar_history` — don't modify it.
 ## Next Steps
 
 1. QC review of 3d (feat/backtest-tiered-loader-3d-tracer-phases head).
-2. Dispatch 3e — runner + scenario plumbing for `loader_strategy`. Adds the `Legacy | Tiered` switch to `Backtest.Runner.run_backtest` and `Scenario.t`; default `Legacy` with Tiered branch still placeholder. ~150 lines per plan §3e.
-3. Subsequent increments 3f–3g follow per plan §Dependency graph. 3g (parity test) is the merge gate.
+2. QC review of 3e (feat/backtest-scale-3e head).
+3. Dispatch 3f — tiered runner path. Implements the `Loader_strategy.Tiered` branch in `Backtest.Runner._run_tiered_backtest`, wires the screener to drive `Bar_loader.promote`/`demote`, and emits the tracer phases added in 3d. ~300 lines per plan §3f.
+4. Subsequent increment 3g (parity acceptance test) is the merge gate.
 
 ## Completed
+
+- **3e — Runner + scenario plumbing for `loader_strategy`** (2026-04-20).
+  Adds a tiny `Loader_strategy.t = Legacy | Tiered` library at
+  `trading/trading/backtest/loader_strategy/` (kept standalone so both
+  `backtest` and `scenario_lib` can depend on it without cycles).
+  `Backtest.Runner.run_backtest` gains
+  `?loader_strategy:Loader_strategy.t` (default `Legacy`); the `Tiered`
+  branch raises `Failure` with a clear pointer to 3f so absence of an
+  implementation surfaces loudly. `Scenario.t` gains optional
+  `loader_strategy : Loader_strategy.t option` ([@sexp.option]) so
+  individual scenario `.sexp` files can opt in; `scenario_runner`
+  forwards the field through `?loader_strategy`. CLI flag
+  `--loader-strategy {legacy|tiered}` added to `bin/backtest_runner`
+  via a new `_extract_flags` helper. Two new sexp round-trip tests
+  in `test_scenario.ml` (absent => `None`; `Tiered` round-trips).
+  No scenario file in the repo sets the new field today, so
+  observable behaviour is unchanged for the merge.
+  - Files: `backtest/loader_strategy/{dune,loader_strategy.mli,loader_strategy.ml}`
+    + `backtest/lib/{dune,runner.mli,runner.ml}`
+    + `backtest/scenarios/{dune,scenario.mli,scenario.ml,scenario_runner.ml}`
+    + `backtest/scenarios/test/{dune,test_scenario.ml}`
+    + `backtest/bin/{dune,backtest_runner.ml}`.
+  - Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest trading/backtest --force` — 11 scenario tests (9 existing + 2 new) + 3 runner_filter tests pass.
 
 - **3d — Tracer phases for tier operations** (2026-04-19). Adds three
   `Backtest.Trace.Phase.t` variants (`Promote_summary`, `Promote_full`,
@@ -160,6 +187,10 @@ behavioral_qc: APPROVED (3c, 2026-04-19 — data-loading increment; no strategy 
 structural_qc: APPROVED (3d, 2026-04-19 — dev/reviews/backtest-scale-3d.md)
 behavioral_qc: APPROVED (3d, 2026-04-19 — infrastructure-only tracer hook; no Weinstein domain logic touched; no-trace path observably silent for all three tier operations, verified by test_no_hook_promote_is_silent — dev/reviews/backtest-scale-3d.md)
 overall_qc: APPROVED (3d — structural + behavioral, 2026-04-19)
+
+structural_qc: APPROVED (3e, 2026-04-20 — dev/reviews/backtest-scale.md)
+behavioral_qc: APPROVED (3e, 2026-04-20 — plumbing-only PR; Legacy path byte-identical to pre-PR, Tiered branch raises loudly without silent fallback, CLI/scenario defaults flow to Legacy, sexp.option preserves backward-compat with all existing scenario files (none set the new field). Quality score 5/5. — dev/reviews/backtest-scale.md)
+overall_qc: APPROVED (3e — structural + behavioral, 2026-04-20)
 
 Reviewers when work lands:
 - qc-structural — module boundaries between tiers; `Bar_history` untouched; parity test runs both strategies.
