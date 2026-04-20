@@ -209,6 +209,40 @@ FOR each eligible track from Step 1:
           "skipped — no un-implemented increments in plan"            (plan complete)
 ```
 
+**Fresh stacks (N == 0 on a plan-first track).** The logic above handles
+the "stack ON TOP of an existing open PR" case. For plan-first tracks where
+no PR is currently open (all prior increments merged), evaluate a **fresh
+stacked dispatch** of the next TWO increments:
+
+```
+IF N == 0 AND track has a merged plan with ≥2 un-implemented increments remaining:
+  fresh_stack_eligible =
+    - both next increments are documented in the plan file with clear scope,
+    - increment N+1 doesn't hard-depend on increment N having LANDED (only
+      that N's branch exists); plan §Resolutions typically documents this.
+      If N+1 needs the N branch's code but not its merge, fresh-stack is OK.
+    - budget headroom confirmed via Step 3.75's dispatch-sizing check.
+
+  IF fresh_stack_eligible:
+    → dispatch feat-agent for increment N (against main).
+    → dispatch a SECOND feat-agent for increment N+1 stacked on N's branch
+      via jst; the second agent's prompt includes
+      "Base your work on the tip of feat/<track>-<slug-N>,
+       not main. Your PR will stack on N's."
+    → note: "fresh-stack dispatch — increments <N> + <N+1>".
+  ELSE:
+    → dispatch only increment N normally.
+```
+
+Typical example: after 3d (tracer phases) merged, 3e (Runner flag plumbing)
+and 3f (Tiered runner path) can both dispatch in the same run. 3f consumes
+the flag that 3e adds — stacking is correct. If 3f turns out to conflict
+with review feedback on 3e, rework 3f after 3e lands.
+
+This is what turns "plan-first = one PR per run" into "plan-first = two PRs
+per run when budget allows." Pairs with the existing depth-2 cap on
+already-stacked branches.
+
 **Per-track override.** A plan file may declare `## Max stacked PRs: <K>`
 (default 2) to widen or narrow the cap for that specific track. Bug-fix
 chains and hot-path refactors may set higher; risky refactors may set 1.
@@ -308,7 +342,12 @@ silently treated as in-progress.
 
 Then:
 
-- Dispatch `harness-maintainer` for the highest-priority open item
+- **Dispatch up to 2 harness items per run**, not just one. Harness items are
+  small, low-risk (doc / script / linter config), and touch disjoint files
+  (`harness/<slugA>` ≠ `harness/<slugB>`), so running two in parallel costs
+  little and doubles the throughput for an under-utilized budget. Pick the top
+  two independent items by tier (T1 > T3), skipping any with in-progress
+  markers or open PRs per the skip rules above.
 - Harness work runs **in parallel** with feat-agents (it touches different files)
 - If there are only harness items and no feature work ready, harness fills the session
 
