@@ -1118,8 +1118,21 @@ this doc was wrong). Trust only `BUILD_EXIT`.
 
 - Exit 0 → PASSING. Record in `## Health Scan` as `Result: CLEAN`.
 - Exit non-zero → FAILING. Surface in `## Escalations` as:
-  `[critical] main baseline red -- dune runtest exit <N>; fix before next dispatch.`
-  Paste the last 20 lines of output so the human can diagnose immediately.
+
+  ```
+  [critical] Main baseline RED — dune runtest exit <N>. Evidence:
+  <paste the last ~20 lines of output, including failing rule name and exit code>
+  ```
+
+  **The pasted output is mandatory.** A `[critical]` that asserts the build or a
+  specific linter is RED must include verbatim terminal output from this run's
+  invocation — not a quote from a prior run, not a `dev/status/` entry, not a
+  paraphrase. If you cannot paste the output (e.g. the check timed out), emit
+  `[info]` asking the human to verify, not `[critical]`. This rule exists because
+  a stale-status citation in a `[critical]` can cascade into spurious track skips
+  and "Fail on escalations" gate failures on false premises — observed in GHA run
+  24688901975 (2026-04-20), where the agent quoted a pre-#461 status entry as
+  current fact. See: https://github.com/dayfine/trading/actions/runs/24688901975
 
 ### Step 6.2: Status file integrity check
 
@@ -1283,6 +1296,27 @@ M? — <name> — requires: ...
 
 ## Escalations
 (List any escalation flags raised during this run — these require human decision)
+
+**Live-evidence rule for `[critical]` build/linter assertions:** Before writing
+a `[critical]` line that claims `dune build`, `dune runtest`, or a named linter
+is RED on main, you MUST have run the check in this session and must paste the
+tail of the output (last ~20 lines, including the failing rule name and exit code)
+into the escalation body:
+
+    [critical] Main baseline RED on `dune runtest trading/devtools --force`. Evidence:
+      ```
+      OK: nesting linter ...
+      FAIL: magic_numbers — <filename>:<line>: ...
+      ...
+      exit=1
+      ```
+
+Citing a stale `dev/status/*.md` entry or a prior-run escalation is not
+evidence. If the check passes, the escalation does not go in — re-verify by
+running the check before writing the line. `[high]` / `[medium]` / `[info]`
+escalations are not subject to this rule (they are observations, not blocking
+assertions that trigger the "Fail on escalations" GHA gate).
+
 - [drift] <track>: summary said dispatched but status file unchanged — ...
 - ...
 

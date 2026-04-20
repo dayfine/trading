@@ -19,7 +19,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [short-side-strategy](short-side-strategy.md) | MERGED | — | — | — (#420 merged 2026-04-19). Follow-ups carried to own tracks: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — (#408 + #409 both merged 2026-04-18) |
 | [sector-data](sector-data.md) | MERGED | — | — | — (#436 merged 2026-04-19). GHA orchestrator runs continue to consume `trading/test_data/sectors.csv`. |
-| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #473 | #473 (T3-F rule promotion path — auto-generate dune checks from declared rules) APPROVED this run (structural). Reviewed SHA c251b3c. PRs #464 (T3-G quality-score) and #467 (T3-J consolidation) merged 2026-04-20. Remaining open after #473 lands: T3-C superseded cleanup, T3-H commit-level QC, T1-N golden scenarios (blocked on data purchase), Tier 4 end-state. |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #473, #480 | #480 open (live-evidence rule for [critical] escalations + stale nesting-linter follow-up cleared). #473 (T3-F rule promotion) APPROVED awaiting merge. |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog remains empty (no new medium/high findings from latest deep scan or today's fast-run5). No code-health dispatch this run. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
