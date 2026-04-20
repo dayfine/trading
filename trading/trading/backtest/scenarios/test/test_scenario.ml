@@ -181,6 +181,42 @@ let test_universe_path_roundtrip _ =
   let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
   assert_that roundtripped.universe_path (equal_to "universes/custom.sexp")
 
+(* A scenario sexp that omits [loader_strategy] should round-trip with
+   [loader_strategy = None], preserving backward compat with all existing
+   scenario files that pre-date increment 3e. *)
+let test_loader_strategy_field_absent _ =
+  let s =
+    Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
+  in
+  assert_that s.loader_strategy is_none
+
+let _make_sexp_with_loader_strategy ~loader_strategy =
+  sprintf
+    {|
+  ((name "test-scenario")
+   (description "Unit-test fixture")
+   (period ((start_date 2023-01-02) (end_date 2023-12-31)))
+   (config_overrides ())
+   (loader_strategy %s)
+   (expected
+    (%s)))
+  |}
+    loader_strategy _base_expected_fields
+
+(* When [loader_strategy = Tiered] is present, the value must round-trip
+   through [sexp_of_t] / [t_of_sexp] unchanged. *)
+let test_loader_strategy_tiered_roundtrip _ =
+  let original =
+    Scenario.t_of_sexp
+      (Sexp.of_string
+         (_make_sexp_with_loader_strategy ~loader_strategy:"Tiered"))
+  in
+  assert_that original.loader_strategy
+    (is_some_and (equal_to Loader_strategy.Tiered));
+  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
+  assert_that roundtripped.loader_strategy
+    (is_some_and (equal_to Loader_strategy.Tiered))
+
 let suite =
   "Scenario"
   >::: [
@@ -194,6 +230,9 @@ let suite =
          >:: test_universe_path_absent_uses_default;
          "universe_path present => round-trips" >:: test_universe_path_present;
          "universe_path sexp round-trips" >:: test_universe_path_roundtrip;
+         "loader_strategy absent => None" >:: test_loader_strategy_field_absent;
+         "loader_strategy=Tiered round-trips"
+         >:: test_loader_strategy_tiered_roundtrip;
          "all scenario files parse" >:: test_all_scenario_files_parse;
        ]
 

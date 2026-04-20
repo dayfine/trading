@@ -16,8 +16,8 @@ type t =
           behaviour. *)
   | Tiered
       (** New path: [Bar_loader] keeps the working set bounded by tiering
-          symbols across Metadata / Summary / Full and promoting/demoting
-          on demand. Not yet wired through the runner — see 3f. *)
+          symbols across Metadata / Summary / Full and promoting/demoting on
+          demand. Not yet wired through the runner — see 3f. *)
 [@@deriving sexp, show, eq]
 
 val to_string : t -> string

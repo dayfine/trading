@@ -161,7 +161,7 @@ let _run_scenario_in_child ~output_root (s : Scenario.t) =
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
-      ?sector_map_override ()
+      ?sector_map_override ?loader_strategy:s.loader_strategy ()
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   let a = _actual_of_result result in
