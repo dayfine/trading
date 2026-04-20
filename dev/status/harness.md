@@ -77,7 +77,7 @@ Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. 
 - [x] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
 - [x] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
 - [x] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc) — DONE: see completion note below
-- [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
+- [~] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
 - [x] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries (part of T1-O fast scan). Done: see Completed section.
 - [x] T3-G: `health-scanner` deep scan extension — followup-item count + CC trend analysis in weekly report (extends T1-Q CC linter output)
 - [x] T3-G: Audit trail — include qc-behavioral quality score in `dev/audit/` records (extends T3-D)
