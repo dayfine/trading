@@ -7,7 +7,7 @@ READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f (tiered runner path) is the next increment.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f split into two parts: 3f-part1 (shadow_screener adapter) shipped as draft #463 on `feat/backtest-scale-3f`; 3f-part2 (runner integration / `_run_tiered_backtest`) deferred to a follow-up increment due to concurrent-agent workspace contention consuming iteration budget during this session.
 
 ## Interface stable
 NO
@@ -17,9 +17,10 @@ All three tier getters return their proper typed option: `get_metadata : Metadat
 ## Open PR
 - feat/backtest-tiered-loader-3d-tracer-phases — 3d based on main; tier-op tracer phases + callback hook. Ready for QC.
 - feat/backtest-scale-3e — 3e based on main; runner + scenario plumbing for `loader_strategy`. Ready for QC.
+- feat/backtest-scale-3f — 3f-part1 (draft #463) based on main; shadow_screener adapter only. Runner integration (`_run_tiered_backtest`) deferred to a follow-up PR. Ready for QC on the adapter scope.
 
 ## Blocked on
-- None. 3f depends on 3e merging.
+- None. 3f-part2 (runner integration) depends on 3e merging; shadow_screener adapter (3f-part1, #463) is independently reviewable.
 
 ## Goal
 
@@ -85,10 +86,40 @@ Build alongside existing `Bar_history` — don't modify it.
 
 1. QC review of 3d (feat/backtest-tiered-loader-3d-tracer-phases head).
 2. QC review of 3e (feat/backtest-scale-3e head).
-3. Dispatch 3f — tiered runner path. Implements the `Loader_strategy.Tiered` branch in `Backtest.Runner._run_tiered_backtest`, wires the screener to drive `Bar_loader.promote`/`demote`, and emits the tracer phases added in 3d. ~300 lines per plan §3f.
-4. Subsequent increment 3g (parity acceptance test) is the merge gate.
+3. QC review of 3f-part1 (feat/backtest-scale-3f head, PR #463) — shadow_screener adapter in isolation.
+4. Dispatch 3f-part2 — runner integration (`_run_tiered_backtest`). Implements the `Loader_strategy.Tiered` branch in `Backtest.Runner`, wires the screener to drive `Bar_loader.promote`/`demote` on Friday cadence, and emits the tracer phases added in 3d. Uses the `Shadow_screener` adapter landed in 3f-part1. Target ~200-250 lines per plan §3f Commit 2.
+5. Subsequent increment 3g (parity acceptance test) is the merge gate.
 
 ## Completed
+
+- **3f-part1 — Shadow screener adapter** (2026-04-20).
+  Pure adapter at `trading/trading/backtest/bar_loader/shadow_screener.ml{,i}`
+  that synthesizes `Stock_analysis.t` stubs from `Bar_loader.Summary.t`
+  values and drives the existing `Screener.screen` without changing its
+  signature (plan §Open questions, adapter decision). Synthesis rules
+  per plan §3f Commit 1: `Stage.result` reconstructed from
+  `Summary.stage` + `Summary.ma_30w` with a conservative `ma_direction`
+  proxy (Rising for Stage2 / Declining for Stage4 / Flat otherwise);
+  `Rs.result` from `Summary.rs_line` thresholded at 1.0 (Mansfield
+  normalization) into `Positive_rising` / `Negative_declining`;
+  `Volume.result` set to `Adequate 1.5` for Stage2/4 (the floor that
+  satisfies `is_breakout_candidate`) and `None` otherwise;
+  `Resistance.result = None`; `breakout_price = None` (Screener
+  falls back to `ma_value * (1 + breakout_fallback_pct)`). Prior-stage
+  tracking is caller-managed via a `(string, stage) Hashtbl.t` — same
+  mechanism as `_screen_universe` in `weinstein_strategy.ml`. Known
+  divergences from Legacy documented on the .mli: missing volume
+  contribution lowers scores ~20-30 pts (C becomes functional floor),
+  missing resistance bonus, no RS `Bullish_crossover` / `Bearish_crossover`.
+  3g parity test will quantify whether the divergence is within ε.
+  Re-exported through `Bar_loader.Shadow_screener`.
+  - Files: `bar_loader/{dune,bar_loader.mli,bar_loader.ml,shadow_screener.mli,shadow_screener.ml}`
+    + `bar_loader/test/{dune,test_shadow_screener.ml}`.
+  - Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest trading/backtest/bar_loader --force` — 17 shadow_screener tests (9 synthesize_analysis + 8 screen-cascade) + 42 pre-existing bar_loader tests pass; `dune build @fmt` clean.
+  - Note: 3f Commit 2 (`_run_tiered_backtest` runner integration) was planned to
+    ship in the same PR but was deferred due to concurrent-agent workspace
+    contention (sibling agent racing on git HEAD) that exhausted the
+    Max-Iterations Policy budget. Follow-up increment tracked in §Next Steps.
 
 - **3e — Runner + scenario plumbing for `loader_strategy`** (2026-04-20).
   Adds a tiny `Loader_strategy.t = Legacy | Tiered` library at

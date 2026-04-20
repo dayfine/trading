@@ -4,13 +4,15 @@
   test_summary_compute
   test_summary
   test_full
-  test_trace_integration)
+  test_trace_integration
+  test_shadow_screener)
  (modules
   test_metadata
   test_summary_compute
   test_summary
   test_full
-  test_trace_integration)
+  test_trace_integration
+  test_shadow_screener)
  (libraries
   ounit2
   core
@@ -22,6 +24,11 @@
   csv
   types
   weinstein.types
+  weinstein.screener
+  weinstein.stock_analysis
+  weinstein.rs
+  weinstein.volume
+  trading.base
   matchers)
  (preprocess
   (pps ppx_test_matcher)))

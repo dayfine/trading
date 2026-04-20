@@ -34,6 +34,11 @@ module Full_compute = Full_compute
 (** Pure compute helpers used by the Full tier. Re-exported for the same reason
     as {!Summary_compute}. *)
 
+module Shadow_screener = Shadow_screener
+(** Adapter that drives the existing [Screener.screen] from Summary-tier scalars
+    — the shadow screener the Tiered runner path uses on Fridays. Re-exported so
+    the Tiered runner can reach it through the library's main module. *)
+
 (** {1 Tier tag} *)
 
 (** Discrete ordering of tiers by information content: [Metadata_tier] <
