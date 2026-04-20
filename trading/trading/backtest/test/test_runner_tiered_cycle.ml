@@ -101,108 +101,63 @@ let _wrapper_config ~loader ~universe ~primary_index :
     primary_index;
   }
 
+let _friday = Date.create_exn ~y:2024 ~m:Jan ~d:5
+(* 2024-01-05 is a Friday. *)
+
+let _tuesday = Date.create_exn ~y:2024 ~m:Jan ~d:9
+(* 2024-01-09 is a Tuesday. *)
+
+let _primary_index = "SPY.INDX"
+
+type _wrapper_under_test = {
+  wrapper : (module Strategy_interface.STRATEGY);
+  trace : Backtest.Trace.t;
+  transitions_ref : Position.transition list ref;
+}
+(** Wrapper handle returned by [_setup]: the instantiated strategy module, the
+    trace collector, and the mutable transitions ref the caller can update
+    between calls to script inner-strategy output. *)
+
+(** Single-line setup for a wrapper-under-test. [universe] defaults to
+    [["AAA"]]; the primary index is always prepended to the loader universe.
+    Tests that need to script inner-strategy transitions mutate
+    [out.transitions_ref] between [on_market_close] calls. *)
+let _setup ?(universe = [ "AAA" ]) () : _wrapper_under_test =
+  let loader, trace = _make_loader ~universe:(_primary_index :: universe) in
+  let transitions_ref = ref [] in
+  let stub = _stub_strategy ~transitions_ref in
+  let config =
+    _wrapper_config ~loader ~universe ~primary_index:_primary_index
+  in
+  let wrapper = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
+  { wrapper; trace; transitions_ref }
+
 let _phases_from trace =
   Backtest.Trace.snapshot trace
   |> List.map ~f:(fun (m : Backtest.Trace.phase_metrics) -> m.phase)
 
-let _friday = Date.create_exn ~y:2024 ~m:Jan ~d:5 (* 2024-01-05 is a Friday *)
-let _tuesday = Date.create_exn ~y:2024 ~m:Jan ~d:9
-(* 2024-01-09 is a Tuesday *)
+(** [_count_phase trace phase] — number of times [phase] appears in [trace]'s
+    recorded phase sequence. Preferred over [List.exists] so assertions can pin
+    exact counts rather than "at least one" (which hides a wrapper that fires
+    twice when it should fire once). *)
+let _count_phase trace phase =
+  List.count (_phases_from trace) ~f:(Backtest.Trace.Phase.equal phase)
 
-(* -------------------------------------------------------------------- *)
-(* 1. Friday cadence isolation                                          *)
-(* -------------------------------------------------------------------- *)
-
-(** On a Friday call, the wrapper issues a [Promote_to_summary] tier-op for the
-    universe. No promote is issued on a non-Friday call. Held only to the "at
-    least one Summary promote on Friday; zero Summary promotes off- Friday"
-    contract because the rest of the Full-promote path depends on shadow
-    screener output which requires real bars. *)
-let test_friday_triggers_summary_promote _ =
-  let universe = [ "AAA"; "BBB" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, trace = _make_loader ~universe:(primary_index :: universe) in
-  let transitions_ref = ref [] in
-  let stub = _stub_strategy ~transitions_ref in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
-  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
-  let _ =
+(** [_call w ~date ~portfolio] drives the wrapper's [on_market_close] against
+    the configured date and portfolio. Asserts the call returned [Ok] before
+    returning — a silent [Error] here would let downstream trace assertions pass
+    vacuously. *)
+let _call (w : _wrapper_under_test) ~date ~portfolio =
+  let (module W) = w.wrapper in
+  let result =
     W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_friday)
-      ~get_indicator:_no_indicator ~portfolio:_empty_portfolio
+      ~get_price:(_make_get_price ~primary_index:_primary_index ~date)
+      ~get_indicator:_no_indicator ~portfolio
   in
-  let phases = _phases_from trace in
-  assert_that
-    (List.exists phases ~f:(fun p ->
-         Backtest.Trace.Phase.equal p Backtest.Trace.Phase.Promote_summary))
-    (equal_to true)
-
-let test_non_friday_skips_summary_promote _ =
-  let universe = [ "AAA"; "BBB" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, trace = _make_loader ~universe:(primary_index :: universe) in
-  let transitions_ref = ref [] in
-  let stub = _stub_strategy ~transitions_ref in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
-  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
-  let _ =
-    W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
-      ~get_indicator:_no_indicator ~portfolio:_empty_portfolio
-  in
-  let phases = _phases_from trace in
-  assert_that
-    (List.exists phases ~f:(fun p ->
-         Backtest.Trace.Phase.equal p Backtest.Trace.Phase.Promote_summary))
-    (equal_to false)
+  assert_that result is_ok
 
 (* -------------------------------------------------------------------- *)
-(* 2. Per-CreateEntering promote to Full                                *)
-(* -------------------------------------------------------------------- *)
-
-(** A [CreateEntering] transition emitted by the inner strategy triggers a
-    Full-tier promote for the entering symbol on every call, regardless of
-    day-of-week. *)
-let test_create_entering_promotes_to_full _ =
-  let universe = [ "AAA" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, trace = _make_loader ~universe:(primary_index :: universe) in
-  let transitions_ref =
-    ref
-      [
-        {
-          Position.position_id = "pos-1";
-          date = _tuesday;
-          kind =
-            CreateEntering
-              {
-                symbol = "AAA";
-                side = Position.Long;
-                target_quantity = 10.0;
-                entry_price = 100.0;
-                reasoning =
-                  Position.TechnicalSignal
-                    { indicator = "Stub"; description = "test" };
-              };
-        };
-      ]
-  in
-  let stub = _stub_strategy ~transitions_ref in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
-  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
-  let _ =
-    W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
-      ~get_indicator:_no_indicator ~portfolio:_empty_portfolio
-  in
-  let phases = _phases_from trace in
-  assert_that
-    (List.exists phases ~f:(fun p ->
-         Backtest.Trace.Phase.equal p Backtest.Trace.Phase.Promote_full))
-    (equal_to true)
-
-(* -------------------------------------------------------------------- *)
-(* 3. Per-Closed demote                                                 *)
+(* Position fixtures                                                    *)
 (* -------------------------------------------------------------------- *)
 
 let _closed_position ~id ~symbol : Position.t =
@@ -253,57 +208,101 @@ let _holding_position ~id ~symbol : Position.t =
     portfolio_lot_ids = [];
   }
 
+let _portfolio_of_positions positions : Portfolio_view.t =
+  { cash = 0.0; positions = String.Map.of_alist_exn positions }
+
+let _create_entering ~position_id ~symbol : Position.transition =
+  {
+    position_id;
+    date = _tuesday;
+    kind =
+      CreateEntering
+        {
+          symbol;
+          side = Position.Long;
+          target_quantity = 10.0;
+          entry_price = 100.0;
+          reasoning =
+            Position.TechnicalSignal
+              { indicator = "Stub"; description = "test" };
+        };
+  }
+
+(* -------------------------------------------------------------------- *)
+(* 1. Friday cadence isolation                                          *)
+(* -------------------------------------------------------------------- *)
+
+(** On a Friday call, the wrapper issues a [Promote_to_summary] tier-op for the
+    universe. Pinned to exactly one Summary promote per call so a wrapper that
+    re-fires on the same Friday would fail. *)
+let test_friday_triggers_summary_promote _ =
+  let w = _setup ~universe:[ "AAA"; "BBB" ] () in
+  _call w ~date:_friday ~portfolio:_empty_portfolio;
+  assert_that
+    (_count_phase w.trace Backtest.Trace.Phase.Promote_summary)
+    (equal_to 1)
+
+let test_non_friday_skips_summary_promote _ =
+  let w = _setup ~universe:[ "AAA"; "BBB" ] () in
+  _call w ~date:_tuesday ~portfolio:_empty_portfolio;
+  assert_that
+    (_count_phase w.trace Backtest.Trace.Phase.Promote_summary)
+    (equal_to 0)
+
+(* -------------------------------------------------------------------- *)
+(* 2. Per-CreateEntering promote to Full                                *)
+(* -------------------------------------------------------------------- *)
+
+(** A single [CreateEntering] transition triggers exactly one Full-tier promote
+    on every call, regardless of day-of-week. *)
+let test_create_entering_promotes_to_full _ =
+  let w = _setup () in
+  w.transitions_ref := [ _create_entering ~position_id:"pos-1" ~symbol:"AAA" ];
+  _call w ~date:_tuesday ~portfolio:_empty_portfolio;
+  assert_that
+    (_count_phase w.trace Backtest.Trace.Phase.Promote_full)
+    (equal_to 1)
+
+(** Multi-symbol CreateEntering batch: the wrapper issues one Full-tier promote
+    for the whole batch rather than one per symbol, and the trace records it as
+    a single phase event. Pins the "one promote call covers all entering
+    symbols" contract the wrapper relies on to keep the trace signal meaningful.
+*)
+let test_multi_symbol_create_entering_single_promote _ =
+  let w = _setup ~universe:[ "AAA"; "BBB" ] () in
+  w.transitions_ref :=
+    [
+      _create_entering ~position_id:"pos-1" ~symbol:"AAA";
+      _create_entering ~position_id:"pos-2" ~symbol:"BBB";
+    ];
+  _call w ~date:_tuesday ~portfolio:_empty_portfolio;
+  assert_that
+    (_count_phase w.trace Backtest.Trace.Phase.Promote_full)
+    (equal_to 1)
+
+(* -------------------------------------------------------------------- *)
+(* 3. Per-Closed demote                                                 *)
+(* -------------------------------------------------------------------- *)
+
 (** A position that transitioned from [Holding] to [Closed] between calls
     triggers a Demote tier-op on the next call. The wrapper detects the
     transition via its own [prior_positions] memo — keyed by position_id — so
     the first call with a Holding position doesn't issue a demote, and the
     second call with the same id now in [Closed] does. *)
 let test_newly_closed_position_triggers_demote _ =
-  let universe = [ "AAA" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, trace = _make_loader ~universe:(primary_index :: universe) in
-  let transitions_ref = ref [] in
-  let stub = _stub_strategy ~transitions_ref in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
-  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
-  (* Step 1: position is Holding. No demote should happen. *)
-  let holding_portfolio : Portfolio_view.t =
-    {
-      cash = 0.0;
-      positions =
-        String.Map.of_alist_exn
-          [ ("pos-1", _holding_position ~id:"pos-1" ~symbol:"AAA") ];
-    }
+  let w = _setup () in
+  let holding_portfolio =
+    _portfolio_of_positions
+      [ ("pos-1", _holding_position ~id:"pos-1" ~symbol:"AAA") ]
   in
-  let _ =
-    W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
-      ~get_indicator:_no_indicator ~portfolio:holding_portfolio
+  _call w ~date:_tuesday ~portfolio:holding_portfolio;
+  assert_that (_count_phase w.trace Backtest.Trace.Phase.Demote) (equal_to 0);
+  let closed_portfolio =
+    _portfolio_of_positions
+      [ ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA") ]
   in
-  let phases_after_step_1 = _phases_from trace in
-  assert_that
-    (List.exists phases_after_step_1 ~f:(fun p ->
-         Backtest.Trace.Phase.equal p Backtest.Trace.Phase.Demote))
-    (equal_to false);
-  (* Step 2: same position_id now in Closed. Demote fires. *)
-  let closed_portfolio : Portfolio_view.t =
-    {
-      cash = 0.0;
-      positions =
-        String.Map.of_alist_exn
-          [ ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA") ];
-    }
-  in
-  let _ =
-    W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
-      ~get_indicator:_no_indicator ~portfolio:closed_portfolio
-  in
-  let phases_after_step_2 = _phases_from trace in
-  assert_that
-    (List.exists phases_after_step_2 ~f:(fun p ->
-         Backtest.Trace.Phase.equal p Backtest.Trace.Phase.Demote))
-    (equal_to true)
+  _call w ~date:_tuesday ~portfolio:closed_portfolio;
+  assert_that (_count_phase w.trace Backtest.Trace.Phase.Demote) (equal_to 1)
 
 (** A position that is [Closed] on the very first call is still treated as
     "newly closed" and issues a demote — the wrapper has no prior memo to
@@ -311,110 +310,86 @@ let test_newly_closed_position_triggers_demote _ =
     so no one "optimizes" the prior-memo lookup to drop symbols that arrive
     already-Closed. *)
 let test_closed_on_first_call_triggers_demote _ =
-  let universe = [ "AAA" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, trace = _make_loader ~universe:(primary_index :: universe) in
-  let transitions_ref = ref [] in
-  let stub = _stub_strategy ~transitions_ref in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
-  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
-  let closed_portfolio : Portfolio_view.t =
-    {
-      cash = 0.0;
-      positions =
-        String.Map.of_alist_exn
-          [ ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA") ];
-    }
+  let w = _setup () in
+  let closed_portfolio =
+    _portfolio_of_positions
+      [ ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA") ]
   in
-  let _ =
-    W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
-      ~get_indicator:_no_indicator ~portfolio:closed_portfolio
-  in
-  let phases = _phases_from trace in
-  assert_that
-    (List.exists phases ~f:(fun p ->
-         Backtest.Trace.Phase.equal p Backtest.Trace.Phase.Demote))
-    (equal_to true)
+  _call w ~date:_tuesday ~portfolio:closed_portfolio;
+  assert_that (_count_phase w.trace Backtest.Trace.Phase.Demote) (equal_to 1)
 
 (** A position that was already [Closed] on the previous call does NOT issue a
     second demote — idempotency across successive calls. *)
 let test_already_closed_not_re_demoted _ =
-  let universe = [ "AAA" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, trace = _make_loader ~universe:(primary_index :: universe) in
-  let transitions_ref = ref [] in
-  let stub = _stub_strategy ~transitions_ref in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
-  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
-  let closed_portfolio : Portfolio_view.t =
-    {
-      cash = 0.0;
-      positions =
-        String.Map.of_alist_exn
-          [ ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA") ];
-    }
+  let w = _setup () in
+  let closed_portfolio =
+    _portfolio_of_positions
+      [ ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA") ]
   in
-  let _ =
-    W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
-      ~get_indicator:_no_indicator ~portfolio:closed_portfolio
+  _call w ~date:_tuesday ~portfolio:closed_portfolio;
+  _call w ~date:_tuesday ~portfolio:closed_portfolio;
+  assert_that (_count_phase w.trace Backtest.Trace.Phase.Demote) (equal_to 1)
+
+(** A symbol that cycles [Closed → fresh Entering under a new position_id]
+    demotes exactly once for the first id and promotes exactly once for the
+    second. This is the reason [_is_newly_closed] keys on position_id rather
+    than symbol — a same-symbol second entry under a new id must not share the
+    "already demoted" memo of the prior id. *)
+let test_symbol_recycle_under_new_position_id _ =
+  let w = _setup () in
+  (* Step 1: position AAA/pos-1 is Closed — demote fires for the first id. *)
+  let closed_portfolio =
+    _portfolio_of_positions
+      [ ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA") ]
   in
-  (* Second call with same Closed position. *)
-  let _ =
-    W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
-      ~get_indicator:_no_indicator ~portfolio:closed_portfolio
+  _call w ~date:_tuesday ~portfolio:closed_portfolio;
+  (* Step 2: AAA re-enters under pos-2 (Holding). No new demote; one
+     Full-promote for the new entry. *)
+  w.transitions_ref := [ _create_entering ~position_id:"pos-2" ~symbol:"AAA" ];
+  let recycled_portfolio =
+    _portfolio_of_positions
+      [
+        ("pos-1", _closed_position ~id:"pos-1" ~symbol:"AAA");
+        ("pos-2", _holding_position ~id:"pos-2" ~symbol:"AAA");
+      ]
   in
-  let demote_count =
-    List.count (_phases_from trace) ~f:(fun p ->
-        Backtest.Trace.Phase.equal p Backtest.Trace.Phase.Demote)
-  in
-  assert_that demote_count (equal_to 1)
+  _call w ~date:_tuesday ~portfolio:recycled_portfolio;
+  assert_that (_count_phase w.trace Backtest.Trace.Phase.Demote) (equal_to 1);
+  assert_that
+    (_count_phase w.trace Backtest.Trace.Phase.Promote_full)
+    (equal_to 1)
 
 (* -------------------------------------------------------------------- *)
 (* 4. Pass-through                                                      *)
 (* -------------------------------------------------------------------- *)
 
 (** The wrapper delegates transitions unchanged from the inner strategy — the
-    simulator sees exactly what the inner strategy returned. This is the "purely
-    additive" half of the contract. *)
+    simulator sees exactly what the inner strategy returned. Identity, not just
+    count, is pinned: a wrapper that dropped one transition and invented another
+    with the same count would fail this test. *)
 let test_inner_transitions_pass_through _ =
-  let universe = [ "AAA" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, _trace = _make_loader ~universe:(primary_index :: universe) in
+  let w = _setup () in
   let inner_transitions =
-    [
-      {
-        Position.position_id = "pos-1";
-        date = _tuesday;
-        kind =
-          CreateEntering
-            {
-              symbol = "AAA";
-              side = Position.Long;
-              target_quantity = 5.0;
-              entry_price = 50.0;
-              reasoning =
-                Position.TechnicalSignal
-                  { indicator = "Stub"; description = "test" };
-            };
-      };
-    ]
+    [ _create_entering ~position_id:"pos-1" ~symbol:"AAA" ]
   in
-  let transitions_ref = ref inner_transitions in
-  let stub = _stub_strategy ~transitions_ref in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
-  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
+  w.transitions_ref := inner_transitions;
+  let (module W) = w.wrapper in
   let result =
     W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_tuesday)
+      ~get_price:(_make_get_price ~primary_index:_primary_index ~date:_tuesday)
       ~get_indicator:_no_indicator ~portfolio:_empty_portfolio
   in
-  match result with
-  | Error err -> assert_failure ("unexpected error: " ^ Status.show err)
-  | Ok { transitions } ->
-      assert_that transitions (size_is (List.length inner_transitions))
+  let expected_ids =
+    List.map inner_transitions ~f:(fun (t : Position.transition) ->
+        t.position_id)
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun { Strategy_interface.transitions } ->
+            List.map transitions ~f:(fun (t : Position.transition) ->
+                t.position_id))
+          (equal_to expected_ids)))
 
 (** An error returned by the inner strategy bubbles up unchanged and no tier
     bookkeeping happens. The tier ops that {e would} have fired are
@@ -422,27 +397,26 @@ let test_inner_transitions_pass_through _ =
     no-op contract. *)
 let test_inner_error_skips_tier_bookkeeping _ =
   let universe = [ "AAA" ] in
-  let primary_index = "SPY.INDX" in
-  let loader, trace = _make_loader ~universe:(primary_index :: universe) in
+  let loader, trace = _make_loader ~universe:(_primary_index :: universe) in
   let module Failing = struct
     let name = "Failing"
 
     let on_market_close ~get_price:_ ~get_indicator:_ ~portfolio:_ =
       Error (Status.invalid_argument_error "test error")
   end in
-  let config = _wrapper_config ~loader ~universe ~primary_index in
+  let config =
+    _wrapper_config ~loader ~universe ~primary_index:_primary_index
+  in
   let (module W) =
     Backtest.Tiered_strategy_wrapper.wrap ~config (module Failing)
   in
   let result =
     W.on_market_close
-      ~get_price:(_make_get_price ~primary_index ~date:_friday)
+      ~get_price:(_make_get_price ~primary_index:_primary_index ~date:_friday)
       ~get_indicator:_no_indicator ~portfolio:_empty_portfolio
   in
   assert_that result is_error;
-  (* Trace must be empty — no Summary promote, no Full promote, no Demote. *)
-  let phases = _phases_from trace in
-  assert_that phases (size_is 0)
+  assert_that (_phases_from trace) (size_is 0)
 
 let suite =
   "Runner_tiered_cycle"
@@ -453,12 +427,16 @@ let suite =
          >:: test_non_friday_skips_summary_promote;
          "CreateEntering transition promotes symbol to Full"
          >:: test_create_entering_promotes_to_full;
+         "Multi-symbol CreateEntering → single Full-tier promote"
+         >:: test_multi_symbol_create_entering_single_promote;
          "Newly-Closed position triggers Demote"
          >:: test_newly_closed_position_triggers_demote;
          "Closed on first call triggers Demote"
          >:: test_closed_on_first_call_triggers_demote;
          "Already-Closed position not re-demoted"
          >:: test_already_closed_not_re_demoted;
+         "Symbol recycles under a new position_id — one demote + one promote"
+         >:: test_symbol_recycle_under_new_position_id;
          "Inner strategy transitions pass through unchanged"
          >:: test_inner_transitions_pass_through;
          "Inner strategy error skips tier bookkeeping"
