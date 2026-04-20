@@ -3,7 +3,8 @@
   test_stop_log
   test_runner_filter
   test_trace
-  test_runner_tiered_skeleton)
+  test_runner_tiered_skeleton
+  test_runner_tiered_cycle)
  (libraries
   ounit2
   core
@@ -20,5 +21,6 @@
   trading.simulation
   trading.simulation.types
   trading.strategy
+  weinstein.screener
   status
   matchers))

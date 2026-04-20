@@ -95,9 +95,13 @@ val run_backtest :
     [loader_strategy] selects how universe bars are loaded:
     - [Legacy] (default) — current production path: simulator materializes all
       universe bars up-front via per-symbol bar loaders.
-    - [Tiered] — partial implementation as of 3f-part2. Runs the
-      [Bar_loader.create] + bulk Metadata-tier promotion inside [Load_bars] so
-      the [Promote_*]/[Demote] phases are emitted on the trace, then raises
-      [Failure] at the simulator-cycle step that 3f-part3 will fill in. Callers
-      that pass [Tiered] today see a clear pointer to the unfinished step;
-      [Legacy] remains byte-identical to the pre-flag runner. *)
+    - [Tiered] — end-to-end as of 3f-part3. Builds a [Bar_loader] with a
+      [trace_hook] bridging [Bar_loader.tier_op] onto [Trace.Phase.t], bulk-
+      promotes the universe to Metadata under [Load_bars], then runs the
+      simulator with a [Tiered_strategy_wrapper]-wrapped Weinstein strategy. The
+      wrapper drives Friday Summary-promote + Shadow_screener + Full-
+      promote-top-N, per-[CreateEntering] Full promote, and per-newly-[Closed]
+      Metadata demote. Transitions the simulator observes are unchanged from
+      Legacy — the wrapper is purely additive. The 3g parity gate will lock in
+      byte-identical behaviour between Legacy and Tiered on the same scenarios.
+*)
