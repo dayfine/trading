@@ -114,9 +114,13 @@ let test_synthesize_stage1_has_no_volume_and_no_resistance _ =
     Shadow_screener.synthesize_analysis ~summary ~ticker:"STOCK"
       ~prior_stage:None ~as_of:_as_of
   in
-  assert_that analysis.volume is_none;
-  assert_that analysis.resistance is_none;
-  assert_that analysis.breakout_price is_none
+  assert_that analysis
+    (all_of
+       [
+         field (fun (a : Stock_analysis.t) -> a.volume) is_none;
+         field (fun (a : Stock_analysis.t) -> a.resistance) is_none;
+         field (fun (a : Stock_analysis.t) -> a.breakout_price) is_none;
+       ])
 
 let test_synthesize_stage2_gets_adequate_volume_floor _ =
   let summary =
@@ -126,13 +130,18 @@ let test_synthesize_stage2_gets_adequate_volume_floor _ =
     Shadow_screener.synthesize_analysis ~summary ~ticker:"STOCK"
       ~prior_stage:None ~as_of:_as_of
   in
-  assert_that analysis.volume
-    (is_some_and
-       (field
-          (fun (v : Volume.result) -> v.confirmation)
-          (equal_to (Weinstein_types.Adequate 1.5))));
-  assert_that analysis.resistance is_none;
-  assert_that analysis.breakout_price is_none
+  assert_that analysis
+    (all_of
+       [
+         field
+           (fun (a : Stock_analysis.t) -> a.volume)
+           (is_some_and
+              (field
+                 (fun (v : Volume.result) -> v.confirmation)
+                 (equal_to (Weinstein_types.Adequate 1.5))));
+         field (fun (a : Stock_analysis.t) -> a.resistance) is_none;
+         field (fun (a : Stock_analysis.t) -> a.breakout_price) is_none;
+       ])
 
 let test_screen_empty_summaries_returns_empty_result _ =
   let prior_stages = Hashtbl.create (module String) in
