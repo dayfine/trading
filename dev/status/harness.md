@@ -8,6 +8,9 @@ IN_PROGRESS
 ## structural_qc: APPROVED (2026-04-20)
 Branch: harness/deep-scan-drift-coverage. SHA: f0c402a620247a9423a9982c4300222cf2cd644a. See dev/reviews/harness.md.
 
+## structural_qc (consolidate_day, PR #467): APPROVED (2026-04-20)
+Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. See dev/reviews/harness.md §"Structural Checklist — consolidate_day (PR #467)".
+
 ## CI
 
 - CI is now live (#270, #271) — `dune build && dune runtest && dune build @fmt` gates on every PR

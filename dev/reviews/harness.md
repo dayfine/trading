@@ -39,3 +39,53 @@ Reviewed SHA: 43a1f48ff04e6e6a8b9927f2d79650830709a525
 APPROVED
 
 Behavioral review: N/A — harness/orchestrator-plumbing PR; no domain logic.
+
+---
+
+## Structural Checklist — consolidate_day (PR #467)
+
+Reviewed SHA (consolidate_day): 6f2255639cb326745aad06f755de1839a9fe3847
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | Exit 0; no formatting diff |
+| H2 | dune build | PASS | Exit 0; no compilation errors |
+| H3 | dune runtest | PASS | Exit 0; all tests passed. No OCaml files changed in this PR. |
+| P1 | Functions ≤ 50 lines (fn_length_linter) | NA | No OCaml files changed; shell script only |
+| P2 | No magic numbers (linter_magic_numbers.sh) | NA | No OCaml files changed; shell script only |
+| P3 | All configurable thresholds in config record | NA | No domain logic; consolidation script with no tunable parameters |
+| P4 | .mli files cover all public symbols (linter_mli_coverage.sh) | NA | No OCaml files changed |
+| P5 | Internal helpers prefixed with _ | PASS | Shell helper functions `extract_section` and `run_label` are not prefixed with _ but are local helpers defined inside the script body; no exported symbols. No violation — the _ prefix convention applies to OCaml module-level helpers. |
+| P6 | Tests use the matchers library | NA | No OCaml test files; shell smoke test only |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | NA | No OCaml files touched |
+| A2 | No imports from analysis/ into trading/trading/ | NA | Shell script with no library imports |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | `.claude/agents/lead-orchestrator.md` (Step 8b addition), `dev/status/harness.md` (follow-up bullet flip + Completed entry) are both in-scope for this task. No unrelated modules touched. |
+
+## Harness-specific checks
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| SH1 | `set -euo pipefail` near top of script body | PASS | `set -eu` on line 15 of `dev/lib/consolidate_day.sh`. Note: `pipefail` is absent — the script uses `#!/bin/sh` (POSIX, not bash) and `pipefail` is a bash extension. `set -eu` is the correct POSIX equivalent. Smoke test uses `set -e` consistent with all sibling check scripts. |
+| SH2 | Variables quoted on error paths | PASS | All `$DATE`, `$OUTPUT`, `$DAILY_DIR`, `$f`, `$LAST_FILE` references on error paths are double-quoted. No unquoted expansions in command positions on error branches. |
+| SH3 | Date validation anchored with ^ and $ | PASS | `grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'` — anchored at both ends on line 24 |
+| SH5 | No `overall_qc` grep used | NA | This script does not reference `overall_qc` — not applicable |
+| SH6 | No `overall_qc` grep used | NA | This script does not reference `overall_qc` — not applicable |
+| SH7 | Explicit exit codes on all error paths | PASS | Four `exit 1` calls: missing date arg (line 21), malformed date (line 26), missing .git root (line 41), no input files (line 76). `set -eu` catches unexpected failures. |
+| SH-PORTABILITY | bash -n and dash -n both pass | PASS | `bash -n dev/lib/consolidate_day.sh` → OK; `dash -n dev/lib/consolidate_day.sh` → OK. Same for `trading/devtools/checks/consolidate_day_check.sh`. Script uses `#!/bin/sh` and is POSIX-clean. |
+| SH-SMOKE-WIRING | Smoke test wired into dune runtest | PASS | `trading/devtools/checks/dune` has a new `(rule (alias runtest) (deps _check_lib.sh) (action (run sh %{dep:consolidate_day_check.sh})))` entry at line 190–198, consistent with sibling smoke tests. `consolidate_day.sh` itself is reached via `repo_root` (escaping dune sandbox), which is the same pattern used by `orchestrator_plan_check.sh` and other checks that read files outside the dune dependency graph. |
+| SH-STEP8B | Step 8b wiring in lead-orchestrator.md | PASS | New `### Step 8b` section added after existing Step 8 merge-policy block; does not alter Step 8 PR-creation flow. Guard `[ "$_N" -ge 3 ]` is clear. git-mode branch (`TRADING_IN_CONTAINER`) amend path is explicit and includes fallback `git commit` if amend fails on an empty state. |
+| SH-IDEMPOTENT | Output file is overwritten, not appended | PASS | Final write on line 381: `} > "$OUTPUT"` — redirection truncates and overwrites. Re-run test (assertion 6 in smoke test) explicitly verifies identical output on second run. |
+| SH-SORT-V | sort -V used for numeric suffix ordering | PASS | Line 65: `done \| sort -V >> "$TMP_INPUTS"` — version-sort ensures `run10` > `run9` rather than lexicographic order. The run-1 base file is pre-pended before the sort loop, so ordering is: `${DATE}.md` first, then `-run2`, `-run3`, ..., `-runN` in numeric order. |
+| SH-CONFLICT-DEDUP | Conflicting Outcomes for same (Track, Agent) get (run-N) suffix | PASS | awk dedup logic (lines ~155–185): when `key_ta` is already in `ta_seen` with a different outcome, `needs_suffix[key_ta]` is set and the Notes field of the new row gets `(run-N)` appended. The END block back-patches the first occurrence of that pair to also carry its run label. Covered by smoke test assertion 3 (NEEDS_REWORK row from run-2 and APPROVED row from run-3 for `feat-alpha / qc-structural` both appear in output). |
+
+## Observations (non-blocking FYIs)
+
+- **FYI — Line count vs spec target**: `dev/lib/consolidate_day.sh` is 384 lines; `trading/devtools/checks/consolidate_day_check.sh` is 208 lines; combined 592 lines exceeds the "≤ 250 combined if possible" guideline. However, the extra lines are substantively justified: the main script implements 7 distinct section handlers (Pending, Dispatched dedup, QC latest-per-track, Budget summed, Escalations dedup, Integration Queue, Per-run links) each with their own awk programs; the smoke test covers 9 assertions including idempotency and 3 error cases. No padding or dead code observed. Verdict: over-budget on line count but proportional to feature scope; not a FAIL.
+
+- **FYI — Smoke test deps declaration**: the dune rule for `consolidate_day_check.sh` declares only `_check_lib.sh` as a `%{dep:...}`, not `consolidate_day.sh` itself. This is intentional and consistent with the established pattern — `repo_root` escapes the sandbox to reach `dev/lib/` directly. The implication is that dune will not automatically re-run the smoke test if only `consolidate_day.sh` changes without `consolidate_day_check.sh` also changing. This is the same trade-off accepted for `orchestrator_plan_check.sh`. Non-blocking; already an accepted harness convention.
+
+## Verdict
+
+APPROVED
+
+Behavioral review: N/A — harness/orchestrator-plumbing PR; no domain logic.
