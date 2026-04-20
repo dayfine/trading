@@ -343,34 +343,61 @@ From a Claude Code guide research session:
    its QC can run while the first PR awaits human merge. See Step 1.5
    in `.claude/agents/lead-orchestrator.md` for the full contract.
 
-### Environment split (hypothesis — confirm before committing)
+### Environment split (CONFIRMED 2026-04-20)
 
 | Env | Background `Bash` | Background `Agent` | Confidence |
 |---|---|---|---|
-| Local (`claude -p`) | Works (in tool schema; empirically used today) | Works (documented; empirically used today) | High |
-| GHA (`claude-code-action@v1`) | Unknown | Unknown | Zero |
+| Local (`claude -p`) | Works (in tool schema; empirically used 2026-04-19) | Works (documented; empirically used 2026-04-19) | High |
+| GHA (`claude-code-action@v1`) | UNTESTED (defer with `Bash`; use `Agent` path below) | **Works** — run 24644964113 confirmed the `Agent` tool returns control immediately with `run_in_background: true`; foreground dispatch in the same message runs in parallel | High |
 
-If GHA forces serial tool use, we fall back to the same env-split
-pattern used elsewhere: background locally, sequential in GHA. If
-GHA supports background execution, we get the wall-time wins in both.
+Empirical test (24644964113, 2026-04-20): orchestrator dispatched
+feat-backtest 3e in BG, harness-maintainer foreground in the same
+message — both ran concurrently; BG completed ~21 min later via
+notification. See run-1 summary §Escalations for full write-up.
+
+### BG-owns-branch convention (CONSTRAINT from 2026-04-20 test)
+
+GHA runners share one working tree across all subagents (isolated
+worktrees aren't set up in this codepath yet — see jj workspace
+integrity discussions in daily summaries). When a BG-dispatched agent
+runs `git checkout <its branch>`, the orchestrator cannot safely run
+commands that touch the working tree until the BG agent finishes. A
+foreground agent that writes to files the BG agent's checkout also
+touches will clobber or be clobbered.
+
+**Rule:** a BG-dispatched agent owns a branch the orchestrator will
+NOT touch for the remainder of the run. Concrete:
+
+- Feature agents dispatched in BG are fine — they branch off `main`,
+  the orchestrator doesn't touch feature-branch files directly.
+- QC agents should NOT run in BG against the same branch a feat-agent
+  is BG-writing to. They share the working tree.
+- The orchestrator should avoid writing to `dev/reviews/<track>.md`
+  while a BG feat-agent for that track is still running.
+- Foreground parallel dispatch in the SAME message (not BG) works
+  fine if the foreground agent's branch touches disjoint files from
+  the BG agent's branch — confirmed in the 2026-04-20 test
+  (harness-maintainer ran alongside BG feat-backtest on disjoint
+  file sets).
+
+Longer-term fix: per-agent isolated worktrees in the GHA path (same
+pattern `isolation: "worktree"` provides locally). Until then, the
+convention above is the cheap mitigation.
 
 ### Rollout sequence
 
-Test before commit — pattern is the same, feasibility differs by env.
-
-1. **Empirical test locally first.** Convert ONE existing slow op
-   (suggest Finviz scraper) to `Bash run_in_background: true` +
-   Monitor. Confirm: (a) the command runs, (b) the agent gets a
-   completion notification, (c) the agent can read the output after.
-   Document findings in `dev/notes/background-execution.md` (new file).
-2. **Empirical test in GHA.** Run the same op via the action with
-   `show_full_output: true` (landing in #371). Watch the log: does
-   the tool call return before the op completes, or does the action
-   block? Record the result.
-3. **Roll out based on findings.** For confirmed envs: update the
-   three concrete wins above (scraper → background; golden re-runs →
-   background subagents; QC cross-feature → background). For
-   unconfirmed envs: keep serial as today's behavior.
+1. ~~**Empirical test locally first.**~~ DONE — multiple BG dispatches
+   via `Agent({..., run_in_background: true})` during the 2026-04-19
+   session (split agent, decompose agent, 3c plan agent). All returned
+   immediately; notifications on completion; output readable after.
+2. ~~**Empirical test in GHA.**~~ DONE (run 24644964113, 2026-04-20).
+   `show_full_output: true` on `ci/phase2-empirical-test` branch +
+   prompt instructing BG dispatch on first feat-agent spawn. Log shows
+   `Agent` tool returned `agentId` immediately; harness-maintainer
+   dispatched foreground in the same message and ran in parallel;
+   BG agent finished ~21 min later via notification.
+3. **Roll out.** Apply the three concrete wins above. Respect the
+   BG-owns-branch convention (above) until isolated worktrees land.
 
 ### Prerequisites
 - Phase 1 stable (Phase 2 depends on being able to observe what the
