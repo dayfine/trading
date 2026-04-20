@@ -7,9 +7,7 @@ READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-behavioral_qc (3f-part3): APPROVED (2026-04-20) — feat/backtest-scale-3f-part3 SHA d493f2a9da4d7f5cc5cd6715878bfd2e8872c5bc. Wrapper is purely additive tier bookkeeping; inner Weinstein strategy untouched (adapter-only per plan Resolutions #3); Legacy path byte-identical. See dev/reviews/backtest-scale.md §"Behavioral QC — backtest-scale 3f-part3".
-
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466. 3f-part3 (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote) ready for review on `feat/backtest-scale-3f-part3` (#474). Next outstanding increment is 3g (parity gate).
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466. 3f-part3 (originally PR #474, 1070/86 LoC) was split into two stacked PRs to keep each reviewable slice small: 3f-part3a (refactor-only Tiered_runner extraction, ~152/78 LoC) on `feat/backtest-scale-3f-part3a`; 3f-part3b (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote via a new `Tiered_strategy_wrapper`, stacked on part3a) on `feat/backtest-scale-3f-part3b`. #474 closed in favour of the stack. Next outstanding increment is 3g (parity gate).
 
 ## Interface stable
 NO
@@ -17,13 +15,11 @@ NO
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- feat/backtest-tiered-loader-3d-tracer-phases — 3d based on main; tier-op tracer phases + callback hook. Ready for QC.
-- feat/backtest-scale-3e — 3e based on main; runner + scenario plumbing for `loader_strategy`. Ready for QC.
-- feat/backtest-scale-3f — 3f-part1 (#463) based on main; shadow_screener adapter only. QC APPROVED.
-- feat/backtest-scale-3f-part2 — 3f-part2 (DRAFT #466) stacked on feat/backtest-scale-3f; tiered runner skeleton (Bar_loader create + bulk Metadata promote + trace bridge, raises at simulator-cycle step). Ready for QC on the skeleton scope.
+- feat/backtest-scale-3f-part3a — 3f-part3a based on main; refactor-only extraction of `Tiered_runner` module out of `runner.ml` (byte-identical behaviour — the Tiered path still raises at the simulator-cycle step). Ready for QC.
+- feat/backtest-scale-3f-part3b — 3f-part3b stacked on `feat/backtest-scale-3f-part3a`; flips `Tiered_runner`'s simulator-cycle `failwith` to a real `Simulator.run` driven by `Weinstein_strategy` wrapped in a new `Tiered_strategy_wrapper`. Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote. Ready for QC.
 
 ## Blocked on
-- None. 3f-part3 (Friday cycle + per-transition promote/demote) is the next outstanding increment; depends on 3f-part2 merging.
+- None. 3g (parity acceptance test) is the next outstanding increment; depends on 3f-part3b merging.
 
 ## Goal
 
@@ -91,10 +87,88 @@ Build alongside existing `Bar_history` — don't modify it.
 2. QC review of 3e (feat/backtest-scale-3e head).
 3. QC review of 3f-part1 (feat/backtest-scale-3f head, PR #463) — shadow_screener adapter in isolation.
 4. QC review of 3f-part2 (feat/backtest-scale-3f-part2 head, PR #466) — tiered runner skeleton (Bar_loader create + bulk Metadata promote + trace bridge + failwith at simulator-cycle step).
-5. Dispatch 3f-part3 — Friday cycle + per-transition promote/demote. On each Friday (per `Weinstein_strategy` cadence): promote universe to Summary, run `Shadow_screener.screen`, promote top candidates to Full, feed into `Weinstein_strategy.entries_from_candidates`. On `Entering` transition: promote to Full. On `Closed` transition: demote to Metadata. Will likely require a thin wrapper that runs the Weinstein strategy with `universe=[]` so its in-strategy screener no-ops, then injects screener-sourced candidates via `entries_from_candidates`. Target ~300 lines per plan §3f Commit 2 (after the skeleton).
-6. Subsequent increment 3g (parity acceptance test) is the merge gate; cannot run until 3f-part3 lands.
+5. QC review of 3f-part3a (feat/backtest-scale-3f-part3a head) — refactor-only extraction of `Tiered_runner`. Byte-identical behaviour; the Tiered path still raises at the simulator-cycle step.
+6. QC review of 3f-part3b (feat/backtest-scale-3f-part3b head, stacked on 3f-part3a) — flips the `failwith` to a real `Simulator.run`, adds `Tiered_strategy_wrapper`, Friday cycle, per-transition promote/demote, and the 8-test `test_runner_tiered_cycle` suite.
+7. Dispatch 3g (parity acceptance test) — merge gate on `smoke/tiered-loader-parity.sexp`. Runs both `loader_strategy = Legacy` and `Tiered` paths on a shared scenario and asserts trade count / total P&L / final portfolio value / pinned metrics match within float ε. Cannot run until 3f-part3b lands.
 
 ## Completed
+
+- **3f-part3 — Tiered runner Friday cycle + per-transition promote/demote**
+  (2026-04-20). Completes the Tiered path first opened in 3f-part2 by
+  replacing the simulator-cycle `failwith` with a live `Simulator.run`
+  driven by the Weinstein strategy wrapped in a new
+  `Tiered_strategy_wrapper`. The wrapper sits between the simulator and
+  `Weinstein_strategy` and layers tier-bookkeeping on top of the
+  unchanged inner strategy per plan §3f Commit 2:
+  1. **Friday cycle** — on each bar where the primary-index date is a
+     Friday (same heuristic as `Weinstein_strategy._is_screening_day`),
+     promote the full universe to `Summary_tier`, harvest the summary
+     values from the loader, run `Bar_loader.Shadow_screener.screen`
+     over them (sector map empty — Neutral default per adapter
+     contract; `macro_trend` = `Neutral` for now), then promote the top
+     `max_buy_candidates + max_short_candidates` (= `full_candidate_limit`)
+     to `Full_tier`. The inner Weinstein strategy still runs its own
+     screener on the `universe=full_list` it received at construction —
+     that's fine because the inner screener sees cached bar history for
+     Full-tier symbols; non-Full symbols stay absent from its Stage2/4
+     promotions.
+  2. **Per-`CreateEntering` transition** — each new entering position
+     triggers a `Full_tier` promote on that symbol so the simulator has
+     OHLCV for the stop state machine on the next bar.
+  3. **Per newly-`Closed` transition** — the wrapper holds a snapshot of
+     prior-step position states keyed by `position_id` (not symbol —
+     the same symbol can cycle `Closed` → fresh `Entering` under a new
+     id), and on each step computes the symbols that transitioned into
+     `Closed` since the previous call, then demotes them to
+     `Metadata_tier`. Idempotent: a symbol already at Metadata is a
+     no-op.
+  The wrapper also records every transition via `Stop_log.record_transitions`
+  and uses a wrapper-local `prior_stages` Hashtbl for the Shadow_screener
+  so its stage-transition detection stays independent from the inner
+  strategy's own `prior_stages` closure (otherwise the two shadows fight
+  over writes).
+
+  **File-length split and PR split.** To keep `runner.ml` under the
+  300-line soft limit, the Tiered-path plumbing was extracted into a new
+  `tiered_runner.ml{,i}` module. `Runner._run_tiered_backtest` now
+  builds a `Tiered_runner.input` record from `_deps` and delegates to
+  `Tiered_runner.run`, which returns the same `(sim_result, stop_log)`
+  shape the Legacy path produces. `Runner.tier_op_to_phase` is re-exported
+  as `Tiered_runner.tier_op_to_phase` so existing tests that asserted on
+  the public mapping still pass unchanged. The original PR (#474) was
+  then split into two reviewable slices:
+
+  - **3f-part3a** (`feat/backtest-scale-3f-part3a`) — refactor-only
+    extraction of `Tiered_runner`. The Tiered path still raises at the
+    simulator-cycle step; observable behaviour is byte-identical to
+    the post-#466 main.
+  - **3f-part3b** (`feat/backtest-scale-3f-part3b`, stacked on
+    part3a) — adds `Tiered_strategy_wrapper`, flips the `failwith` to
+    a live `Simulator.run`, wires the Friday cycle + per-transition
+    promote/demote, and ships the 8-test `test_runner_tiered_cycle`
+    suite.
+
+  **Legacy parity preserved.** The Legacy path is untouched; all
+  additions are guarded behind `loader_strategy = Tiered`. 3g (parity
+  acceptance test) can now run — it is the next merge gate.
+
+  - Files: `backtest/lib/{dune,runner.mli,runner.ml,tiered_runner.mli,tiered_runner.ml,tiered_strategy_wrapper.mli,tiered_strategy_wrapper.ml}` +
+    `backtest/test/{dune,test_runner_tiered_cycle.ml}`.
+  - Tests: 8 new `test_runner_tiered_cycle` tests covering Friday-cadence
+    Summary+Full promotion, non-Friday no-op, `CreateEntering` → Full
+    promote (incl. multi-symbol), newly-`Closed` → Metadata demote
+    (incl. symbol re-entering under a new position id, incl. idempotency
+    across repeated calls), pass-through of inner-strategy `Ok` output,
+    and error-path skip (inner `Error` does not trigger any loader
+    bookkeeping). Each test builds a small temp-dir Bar_loader seeded
+    with synthetic CSVs and a stub `STRATEGY` module that emits
+    scripted transitions.
+  - Verify:
+    `dev/lib/run-in-env.sh dune build &&
+     dev/lib/run-in-env.sh dune runtest trading/backtest --force` —
+    31 tests pass (3 runner_filter + 5 runner_tiered_skeleton +
+    8 runner_tiered_cycle + 6 stop_log + 9 trace); all linters clean;
+    `dune fmt` produces no diff.
 
 - **3f-part2 — Tiered runner skeleton** (2026-04-20).
   Implements the pre-simulator portion of the Tiered `Loader_strategy`
