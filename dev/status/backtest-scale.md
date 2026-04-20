@@ -7,7 +7,7 @@ READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f was split into three stacked parts to respect the ~400-line per-PR budget: 3f-part1 (shadow_screener adapter) shipped as draft #463 on `feat/backtest-scale-3f` (QC APPROVED); 3f-part2 (tiered runner skeleton — Bar_loader create + bulk Metadata promote + trace bridge, raises at simulator-cycle step) shipped as DRAFT #466 on `feat/backtest-scale-3f-part2`; 3f-part3 (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote) ready for review on `feat/backtest-scale-3f-part3`. Next outstanding increment is 3g (parity gate).
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f was split into three stacked parts to respect the ~400-line per-PR budget: 3f-part1 (shadow_screener adapter) shipped as draft #463 on `feat/backtest-scale-3f` (QC APPROVED); 3f-part2 (tiered runner skeleton — Bar_loader create + bulk Metadata promote + trace bridge, raises at simulator-cycle step) shipped as DRAFT #466 on `feat/backtest-scale-3f-part2`; 3f-part3 (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote) ready for review on `feat/backtest-scale-3f-part3` (#474). Next outstanding increment is 3g (parity gate).
 
 ## Interface stable
 NO
@@ -19,7 +19,7 @@ All three tier getters return their proper typed option: `get_metadata : Metadat
 - feat/backtest-scale-3e — 3e based on main; runner + scenario plumbing for `loader_strategy`. Ready for QC.
 - feat/backtest-scale-3f — 3f-part1 (#463) based on main; shadow_screener adapter only. QC APPROVED.
 - feat/backtest-scale-3f-part2 — 3f-part2 (DRAFT #466) stacked on feat/backtest-scale-3f; tiered runner skeleton (Bar_loader create + bulk Metadata promote + trace bridge, raises at simulator-cycle step). Ready for QC on the skeleton scope.
-- feat/backtest-scale-3f-part3 — 3f-part3 based on main (post 3f-part2 merge as #466); Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote via a thin `Tiered_strategy_wrapper` atop the existing `Weinstein_strategy`. Ready for QC.
+- feat/backtest-scale-3f-part3 — 3f-part3 (#474) based on main (post 3f-part2 merge as #466); Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote via a thin `Tiered_strategy_wrapper` atop the existing `Weinstein_strategy`. Ready for QC.
 
 ## Blocked on
 - None. 3g (parity acceptance test) is the next outstanding increment; depends on 3f-part3 merging.
