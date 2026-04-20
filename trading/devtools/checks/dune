@@ -196,3 +196,23 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:consolidate_day_check.sh})))
+
+; Rule promotion check (T3-F): verify every Lifecycle: enforced rule in
+; docs/design/dependency-rules.md has a corresponding check script that
+; exists on disk and is referenced by this dune file.
+; Degrades gracefully if the doc is absent (prints WARNING, exits 0).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:rule_promotion_check.sh})))
+
+; Self-test for rule_promotion_check.sh: exercises pass, fail (missing script),
+; fail (missing dune wiring), and implicit-enforcement cases in isolation.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:rule_promotion_self_test.sh})))
