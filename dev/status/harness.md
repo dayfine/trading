@@ -100,10 +100,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - **`.claude/worktrees/` gitignore gap** — `EnterWorktree` creates git worktrees
   jj can't track. Either ignore the directory or teach jj to ignore the paths.
   Source: `dev/daily/2026-04-11.md`.
-- **Pre-existing nesting linter failures** — `fetch_universe.ml:main`,
-  `test_data_loader.ml:load_daily_bars`, `weinstein_strategy.ml` exceed the
-  nesting threshold. Grandfathered via `linter_exceptions.conf` or refactor.
-  Source: `dev/daily/2026-04-11.md`.
+- ~~**Pre-existing nesting linter failures**~~ — DONE (#461): `atr.ml` + `ad_bars.ml` refactored; `analysis/scripts/universe_filter` and `analysis/scripts/fetch_finviz_sectors` grandfathered in `linter_exceptions.conf`; `weinstein_strategy.ml` annotated `@large-module` (#453). `dune runtest devtools/checks` → `OK: nesting linter — all 832 functions within limits.` (verified 2026-04-20). `fetch_universe.ml`, `test_data_loader.ml`, `weinstein_strategy.ml` all clean.
 - ~~**Orchestrator runner semantics**~~ — RESOLVED: `dev/run.sh` now has a
   pre-flight block that fast-fails if `claude` is missing, the
   lead-orchestrator agent file is missing, or its `## Allowed Tools` section
