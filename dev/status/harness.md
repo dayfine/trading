@@ -77,7 +77,7 @@ Branch: harness/deep-scan-drift-coverage. SHA: f0c402a620247a9423a9982c4300222cf
 - [ ] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically
 - [x] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries (part of T1-O fast scan). Done: see Completed section.
 - [x] T3-G: `health-scanner` deep scan extension — followup-item count + CC trend analysis in weekly report (extends T1-Q CC linter output)
-- [ ] T3-G: Audit trail — include qc-behavioral quality score in `dev/audit/` records (extends T3-D)
+- [~] T3-G: Audit trail — include qc-behavioral quality score in `dev/audit/` records (extends T3-D)
 - [ ] T3-H: Commit-level QC mode — spawn `qc-structural` on individual commits (not whole branches) to catch violations earlier; low priority, adds cost; explore when golden scenarios (T1-N) are stable
 
 ## Tier 4 — Continuous development loop (target end state)
