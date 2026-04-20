@@ -141,6 +141,7 @@ status to READY_FOR_REVIEW.
 - [ ] `dune build && dune runtest` passes with zero warnings **on a clean checkout of the branch** — not just on your local worktree. If you are running in `isolation: "worktree"` (the orchestrator default), your working copy is usually but not always a clean checkout — follow `.claude/rules/worktree-isolation.md` to verify (`jj diff --stat` pre-commit, branch ancestry check pre-push, PR file list post-push). If you are NOT in a worktree (rare, legacy runs), re-verify by checking that every module your branch references is either in your commits or already on `main@origin` — do not rely on files sitting in the shared working copy that you did not explicitly commit.
 - [ ] `dune build @fmt` passes (formatter in check mode; equivalent: `dune fmt` produces no diff)
 - [ ] `Interface stable: YES` is set in `dev/status/<feature>.md` once `.mli` is finalized
+- [ ] **PR description is non-empty.** `jst submit` does NOT populate the PR body from commit messages — the body field stays empty unless you write it explicitly. After `jst submit`, run `gh pr edit <N> --body-file <path>` (or `curl PATCH /pulls/<N> -d '{"body":"..."}'`) to set the body. The description should mirror the extended commit message: what changed, why, test plan. Bodies matter for reviewers scanning `gh pr list` and for future archaeology. Empty-body PRs were an observed gap — see run-5 on 2026-04-19.
 ```
 
 ### 7. Status file format (required, feature-specific fields)

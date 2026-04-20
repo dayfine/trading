@@ -1062,7 +1062,25 @@ in the daily summary's `## Health Scan` section and `## Escalations`.
 Determine the per-day session number N by counting existing `dev/daily/${DATE}*.md`
 files (ignoring `-plan.md` files). First session of the day writes
 `dev/daily/${DATE}.md`; subsequent sessions write `dev/daily/${DATE}-runN.md`
-starting at `-run2`.
+**starting at `-run2` and incrementing monotonically** — N is the next unused
+integer, not 1.
+
+```bash
+DATE=$(date +%F)
+EXISTING_COUNT=$(ls dev/daily/${DATE}*.md 2>/dev/null | grep -v '\-plan\.md' | wc -l | tr -d ' ')
+N=$((EXISTING_COUNT + 1))
+if [ "$N" -eq 1 ]; then
+  SUMMARY_FILE="dev/daily/${DATE}.md"
+else
+  SUMMARY_FILE="dev/daily/${DATE}-run${N}.md"
+fi
+```
+
+If `${DATE}.md` / `run2` / `run3` / `run4` already exist, the next session
+writes `run5`, NOT `run1`. The `-run1` suffix is never valid — the first
+run uses the un-suffixed filename. If you find yourself writing a `-run1`
+suffix "to avoid collision with existing files", re-read this step: the
+right answer is `-run(count+1)`.
 
 Write `dev/daily/<YYYY-MM-DD>[-runN].md`:
 

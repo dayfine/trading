@@ -116,6 +116,7 @@ status to READY_FOR_REVIEW.
 - [ ] `dune build @fmt` passes (formatter in check mode; equivalent: `dune fmt` produces no diff)
 - [ ] `dev/status/backtest-infra.md` updated: tick off the item under the relevant subsection, add a Completed entry with what was built, where it lives, and how to verify
 - [ ] Trading-behaviour-impact items also link back to `## Potential experiments` if they originated there
+- [ ] PR body is non-empty — after `jst submit`, write the PR description (what/why/test plan) via `gh pr edit <N> --body-file <path>`. `jst submit` does not populate the body.
 
 ## Architecture constraint
 
