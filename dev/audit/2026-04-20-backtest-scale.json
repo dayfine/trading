@@ -1,0 +1,17 @@
+{
+  "date": "2026-04-20",
+  "feature": "backtest-scale",
+  "branch": "feat/backtest-scale-3f",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "3f-part1 shadow screener adapter; plan-faithful adapter route; Legacy untouched; 3f-part2 runner integration deferred due to git HEAD contention during dispatch"
+}
