@@ -1,4 +1,9 @@
-Reviewed SHA: ffb17c4720c17c5552356d9cb1d77a23ad899b39
+Reviewed SHA: d493f2a9da4d7f5cc5cd6715878bfd2e8872c5bc
+
+Header updated (run-6, orchestrator housekeeping) to point at the latest
+open-PR review section (3f-part3 at line 124 onward, Reviewed SHA
+d493f2a9..., APPROVED structural + behavioral run-5). Prior sections
+(3f-part1 at SHA ffb17c47... and earlier) remain below as history.
 
 ## Structural Checklist — backtest-scale 3f-part1 (shadow screener adapter, re-review)
 
