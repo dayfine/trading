@@ -236,9 +236,9 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     | Loader_strategy.Tiered ->
         failwith
           "Backtest.Runner: Tiered loader_strategy not yet implemented (lands \
-           in increment 3f of dev/plans/backtest-tiered-loader-2026-04-19.md). \
-           Pass loader_strategy=Legacy or omit the argument to use the \
-           existing path."
+           in increment 3f of the backtest-tiered-loader plan). Pass \
+           loader_strategy=Legacy or omit the argument to use the existing \
+           path."
   in
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on
