@@ -217,6 +217,85 @@ let _run_legacy ~deps ~start_date ~end_date ?trace () =
   in
   (sim_result, stop_log)
 
+(* Tiered loader_strategy path (3f-part2 — skeleton).
+
+   Implements the pre-simulator setup per plan §3f:
+     1. Build a [Bar_loader] over the full universe + ancillary symbols with a
+        [trace_hook] that bridges [Bar_loader.tier_op] onto [Trace.Phase.t]
+        (Promote_to_summary → Promote_summary, Promote_to_full → Promote_full,
+        Demote_op → Demote). This keeps [bar_loader] independent of the
+        [backtest] library (plan §3d shape).
+     2. Promote every symbol up to [Metadata_tier] under a single outer
+        [Load_bars] wrap. Metadata promotion is silent in the tracer hook (3d
+        decision) — the outer wrap is the attribution point.
+
+   The per-Friday Summary promote → Shadow_screener → Full promote cycle and
+   the per-transition promote/demote bookkeeping arrive in 3f-part3. Until
+   then this function raises [Failure] at the simulator-cycle step with a
+   pointer to the unfinished work, so scenarios that opt into [Tiered] surface
+   the incomplete contract loudly. *)
+
+let _map_tier_op_to_phase (op : Bar_loader.tier_op) : Trace.Phase.t =
+  match op with
+  | Promote_to_summary -> Trace.Phase.Promote_summary
+  | Promote_to_full -> Trace.Phase.Promote_full
+  | Demote_op -> Trace.Phase.Demote
+
+let _make_trace_hook ?trace () : Bar_loader.trace_hook =
+  let record :
+      'a. tier_op:Bar_loader.tier_op -> symbols:int -> (unit -> 'a) -> 'a =
+   fun ~tier_op ~symbols f ->
+    let phase = _map_tier_op_to_phase tier_op in
+    Trace.record ?trace ~symbols_in:symbols phase f
+  in
+  { record }
+
+let _create_bar_loader deps ?trace () =
+  let trace_hook = _make_trace_hook ?trace () in
+  Bar_loader.create ~data_dir:deps.data_dir_fpath
+    ~sector_map:deps.ticker_sectors ~universe:deps.all_symbols ~trace_hook ()
+
+let _promote_universe_metadata loader deps ~as_of =
+  match
+    Bar_loader.promote loader ~symbols:deps.all_symbols
+      ~to_:Bar_loader.Metadata_tier ~as_of
+  with
+  | Ok () -> ()
+  | Error e ->
+      (* Partial load is acceptable — per [promote] contract a failed symbol
+         is simply absent from [entries]. But a hard load error indicates a
+         broken data directory, which we surface rather than silently miss.
+         The Legacy path does not have this gate so parity holds: a broken
+         data dir fails at the same logical moment in both strategies. *)
+      failwith
+        (sprintf
+           "Backtest.Runner: Tiered loader failed during Metadata promote: %s"
+           (Status.show e))
+
+let _run_tiered_backtest ~deps ~start_date:_ ~end_date ?trace () =
+  let loader = _create_bar_loader deps ?trace () in
+  (* Bulk-promote at the backtest end date. The Metadata-tier semantics are
+     "last close on or before as_of" — for the pre-simulator bootstrap this is
+     the most information-rich snapshot the loader can hold without walking
+     the timeline. 3f-part3 will re-promote per-symbol at each simulator step
+     [as_of = current bar date]. *)
+  let as_of = end_date in
+  let n_all_symbols = List.length deps.all_symbols in
+  Trace.record ?trace ~symbols_in:n_all_symbols ~symbols_out:n_all_symbols
+    Trace.Phase.Load_bars (fun () ->
+      _promote_universe_metadata loader deps ~as_of);
+  let stats = Bar_loader.stats loader in
+  eprintf
+    "Tiered loader: Metadata=%d Summary=%d Full=%d after bulk Metadata promote\n\
+     %!"
+    stats.metadata stats.summary stats.full;
+  failwith
+    "Backtest.Runner: Tiered loader_strategy simulator-cycle step not yet \
+     implemented (lands in 3f-part3 of the backtest-tiered-loader plan). The \
+     pre-simulator Metadata promote succeeded and emitted its Load_bars trace \
+     phase, so the trace up to this point is usable for debugging. Pass \
+     loader_strategy=Legacy or omit the argument to run the existing path."
+
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?trace ?(loader_strategy = Loader_strategy.Legacy) () =
   let deps = _load_deps ?trace ~overrides ~sector_map_override () in
@@ -234,11 +313,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     | Loader_strategy.Legacy ->
         _run_legacy ~deps ~start_date ~end_date ?trace ()
     | Loader_strategy.Tiered ->
-        failwith
-          "Backtest.Runner: Tiered loader_strategy not yet implemented (lands \
-           in increment 3f of the backtest-tiered-loader plan). Pass \
-           loader_strategy=Legacy or omit the argument to use the existing \
-           path."
+        _run_tiered_backtest ~deps ~start_date ~end_date ?trace ()
   in
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on

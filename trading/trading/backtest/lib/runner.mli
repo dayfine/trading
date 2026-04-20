@@ -83,8 +83,9 @@ val run_backtest :
     [loader_strategy] selects how universe bars are loaded:
     - [Legacy] (default) — current production path: simulator materializes all
       universe bars up-front via per-symbol bar loaders.
-    - [Tiered] — placeholder. The actual Tiered execution path lands in
-      increment 3f of [dev/plans/backtest-tiered-loader-2026-04-19.md]; calling
-      [run_backtest] with [Tiered] today raises [Failure] with a clear message
-      so the absence of an implementation surfaces loudly rather than silently
-      falling back to [Legacy]. *)
+    - [Tiered] — partial implementation as of 3f-part2. Runs the
+      [Bar_loader.create] + bulk Metadata-tier promotion inside [Load_bars] so
+      the [Promote_*]/[Demote] phases are emitted on the trace, then raises
+      [Failure] at the simulator-cycle step that 3f-part3 will fill in. Callers
+      that pass [Tiered] today see a clear pointer to the unfinished step;
+      [Legacy] remains byte-identical to the pre-flag runner. *)
