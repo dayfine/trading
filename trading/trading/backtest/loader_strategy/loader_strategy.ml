@@ -2,8 +2,6 @@ open Core
 
 type t = Legacy | Tiered [@@deriving sexp, show, eq]
 
-let to_string = function Legacy -> "legacy" | Tiered -> "tiered"
-
 let of_string s =
   match String.lowercase s with
   | "legacy" -> Legacy

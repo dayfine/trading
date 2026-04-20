@@ -228,7 +228,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     (Date.to_string start_date)
     (Date.to_string end_date)
     (Date.to_string warmup_start)
-    (Loader_strategy.to_string loader_strategy);
+    (Loader_strategy.show loader_strategy);
   let sim_result, stop_log =
     match loader_strategy with
     | Loader_strategy.Legacy ->

@@ -20,10 +20,8 @@ type t =
           demand. Not yet wired through the runner — see 3f. *)
 [@@deriving sexp, show, eq]
 
-val to_string : t -> string
-(** Lowercase string form ([Legacy] -> ["legacy"], [Tiered] -> ["tiered"]).
-    Stable, used by CLI flag parsing. *)
-
 val of_string : string -> t
-(** Inverse of {!to_string}. Accepts ["legacy"] / ["tiered"] (case-insensitive).
-    Raises [Failure] on any other input. *)
+(** Accepts ["legacy"] / ["tiered"] (case-insensitive). Raises [Failure] on any
+    other input. Used by the [--loader-strategy] CLI flag parser in
+    [backtest_runner]. For the reverse direction (value → string, e.g. for log
+    formatting) use the ppx-derived [show] / [pp]. *)
