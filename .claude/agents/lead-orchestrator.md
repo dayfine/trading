@@ -1317,6 +1317,43 @@ fi
 
 Flag in §Escalations when auto-merge fails: note the PR number and the GitHub response so the human can diagnose (most common cause: required status check that didn't run, or `main` branch-protection requiring a human reviewer).
 
+### Step 8b: Consolidated summary (N >= 3)
+
+When this is the third or later run of the day (N >= 3), generate a same-day
+consolidated summary and include it in the summary PR before pushing.
+
+**Why amend into the same PR rather than a separate branch:** the consolidated
+summary is a view over the same day's runs -- it belongs with the run-N summary
+rather than requiring a separate PR lifecycle. Including it in the same commit
+keeps Step 8's PR flow unchanged and avoids a second round of auto-merge.
+
+```bash
+# N was computed by Step 7 (basename suffix: run-2 -> N=2, no suffix -> N=1).
+# Re-derive N from the BASENAME set at the top of Step 8.
+if echo "$BASENAME" | grep -qE '\-run[0-9]+$'; then
+  _N="${BASENAME##*-run}"
+else
+  _N=1
+fi
+
+if [ "$_N" -ge 3 ]; then
+  # Run consolidation -- writes dev/daily/${DATE}-summary.md
+  sh dev/lib/consolidate_day.sh "$DATE" 2>&1 \
+    || echo "WARN: consolidate_day.sh failed -- summary not included in PR"
+  # The output file will be auto-snapshotted by jj into @ before the push;
+  # in git-mode (GHA) we must add it explicitly.
+  if [ -n "${TRADING_IN_CONTAINER:-}" ]; then
+    git add "dev/daily/${DATE}-summary.md" 2>/dev/null || true
+    git commit --amend --no-edit 2>/dev/null \
+      || git commit -m "ops: add consolidated summary ${DATE}"
+  fi
+fi
+```
+
+If `consolidate_day.sh` fails (malformed files, missing sections), it warns to
+stderr and the per-run files remain intact -- no data loss. Do not block the
+summary PR on a consolidation failure.
+
 ---
 
 ## Escalation policy
