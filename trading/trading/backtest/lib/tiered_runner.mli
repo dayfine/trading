@@ -4,14 +4,19 @@
     the Legacy vs Tiered paths are obviously parallel at the module boundary.
     The public entry point is {!run} — everything else is private to the module.
 
-    This extraction (3f-part3a) is a refactor-only slice: the body of [run] is
-    byte-identical in observable behaviour to the previous inline
-    [Runner._run_tiered_backtest] — it bulk-promotes to Metadata under a
-    [Load_bars] trace wrap and then raises [Failure] at the simulator-cycle
-    step. The real Friday Summary-promote / Shadow_screener / Full-promote cycle
-    and the per-transition promote/demote bookkeeping land in 3f-part3b via a
-    [Tiered_strategy_wrapper] atop [Weinstein_strategy]. See
-    [dev/plans/backtest-tiered-loader-2026-04-19.md]. *)
+    Flow per plan §3f-part3 (see
+    [dev/plans/backtest-tiered-loader-2026-04- 19.md]):
+
+    1. Build a [Bar_loader] over the runner-provided universe with a
+    [trace_hook] that bridges [Bar_loader.tier_op] onto [Trace.Phase.t]. 2.
+    Bulk-promote the universe to [Metadata_tier] under a [Load_bars] wrap. 3.
+    Drive the simulator with a [Tiered_strategy_wrapper]-wrapped Weinstein
+    strategy. The wrapper adds Friday Summary-promote + Shadow_screener +
+    Full-promote-top-N, per-[CreateEntering] Full promote, and
+    per-newly-[Closed] Metadata demote.
+
+    The simulator transitions are byte-identical to the Legacy path — the
+    wrapper is purely additive. The 3g parity gate locks this in. *)
 
 open Core
 
@@ -24,9 +29,7 @@ type input = {
 }
 (** Minimal [_deps] subset Tiered_runner needs. Kept as a plain record so
     [Runner] can build it without threading its private [_deps] type through the
-    public surface. [ad_bars] and [config] are unused in 3f-part3a (the
-    simulator cycle is still [failwith]'d) but part of the stable shape — they
-    get threaded into the inner Weinstein strategy once 3f-part3b lands. *)
+    public surface. *)
 
 val tier_op_to_phase : Bar_loader.tier_op -> Trace.Phase.t
 (** Map a [Bar_loader.tier_op] (the library-internal tier-op tag) onto the
@@ -48,13 +51,12 @@ val run :
     runs the Tiered simulator cycle and returns [(sim_result, stop_log)] — the
     same shape [Runner] expects from the Legacy path.
 
-    In 3f-part3a this function only performs the pre-simulator bootstrap —
-    builds a [Bar_loader] with a [trace_hook] bridging [tier_op] → phase,
-    bulk-promotes [input.all_symbols] to Metadata under a [Load_bars] trace
-    wrap, and then raises [Failure] at the simulator-cycle step. The
-    [warmup_days], [initial_cash], and [commission] arguments are accepted as
-    part of the stable interface but unused until 3f-part3b drops the [failwith]
-    and wires a real [Simulator.run] through a [Tiered_strategy_wrapper].
+    Internally:
+    - Builds a [Bar_loader] with a trace_hook bridging [tier_op] → phase.
+    - Bulk-promotes [input.all_symbols] to Metadata under a [Load_bars] trace
+      wrap.
+    - Constructs a Weinstein strategy wrapped by [Tiered_strategy_wrapper] and
+      runs [Simulator.run] under a [Fill] trace wrap.
 
-    Raises [Failure] on any of: loader bulk-promote hard error, the intentional
-    simulator-cycle step placeholder. *)
+    Raises [Failure] if the loader's bulk promote fails with a hard data error,
+    or if [Simulator.create] / [Simulator.run] errors. *)

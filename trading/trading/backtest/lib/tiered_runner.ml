@@ -1,6 +1,7 @@
 (** Tiered loader_strategy path — see [tiered_runner.mli]. *)
 
 open Core
+open Trading_simulation
 
 type input = {
   data_dir_fpath : Fpath.t;
@@ -45,14 +46,68 @@ let _promote_universe_metadata loader (input : input) ~as_of =
            "Backtest.Tiered_runner: loader failed during Metadata promote: %s"
            (Status.show e))
 
-let run ~(input : input) ~start_date:_ ~end_date ~warmup_days:_ ~initial_cash:_
-    ~commission:_ ?trace () =
+(** [_full_candidate_limit config] caps how many Shadow_screener candidates the
+    Tiered wrapper promotes to Full on a single Friday. Matches the inner
+    screener's own post-rank cut so we don't Full-promote more than the strategy
+    would consider. *)
+let _full_candidate_limit (config : Weinstein_strategy.config) =
+  config.screening_config.max_buy_candidates
+  + config.screening_config.max_short_candidates
+
+let _make_wrapper_config (input : input) ~loader ~stop_log :
+    Tiered_strategy_wrapper.config =
+  {
+    bar_loader = loader;
+    universe = input.all_symbols;
+    screening_config = input.config.screening_config;
+    full_candidate_limit = _full_candidate_limit input.config;
+    stop_log;
+    primary_index = input.config.indices.primary;
+  }
+
+let _make_simulator (input : input) ~loader ~stop_log ~start_date ~end_date
+    ~warmup_days ~initial_cash ~commission =
+  let inner_strategy =
+    Weinstein_strategy.make ~ad_bars:input.ad_bars
+      ~ticker_sectors:input.ticker_sectors input.config
+  in
+  let wrapper_config = _make_wrapper_config input ~loader ~stop_log in
+  let strategy =
+    Tiered_strategy_wrapper.wrap ~config:wrapper_config inner_strategy
+  in
+  let warmup_start = Date.add_days start_date (-warmup_days) in
+  let metric_suite = Metric_computers.default_metric_suite () in
+  let sim_deps =
+    Simulator.create_deps ~symbols:input.all_symbols
+      ~data_dir:input.data_dir_fpath ~strategy ~commission ~metric_suite ()
+  in
+  let sim_config =
+    Simulator.
+      {
+        start_date = warmup_start;
+        end_date;
+        initial_cash;
+        commission;
+        strategy_cadence = Types.Cadence.Daily;
+      }
+  in
+  match Simulator.create ~config:sim_config ~deps:sim_deps with
+  | Ok s -> s
+  | Error e ->
+      failwith
+        (sprintf "Backtest.Tiered_runner: failed to create simulator: %s"
+           (Status.show e))
+
+let _run_simulator sim =
+  match Simulator.run sim with
+  | Ok r -> r
+  | Error e ->
+      failwith
+        (sprintf "Backtest.Tiered_runner: simulation failed: %s" (Status.show e))
+
+let run ~input ~start_date ~end_date ~warmup_days ~initial_cash ~commission
+    ?trace () =
   let loader = _create_bar_loader input ?trace () in
-  (* Bulk-promote at the backtest end date. The Metadata-tier semantics are
-     "last close on or before as_of" — for the pre-simulator bootstrap this
-     is the most information-rich snapshot the loader can hold without
-     walking the timeline. 3f-part3b will re-promote per-symbol at each
-     simulator step [as_of = current bar date]. *)
   let as_of = end_date in
   let n_all_symbols = List.length input.all_symbols in
   Trace.record ?trace ~symbols_in:n_all_symbols ~symbols_out:n_all_symbols
@@ -63,9 +118,17 @@ let run ~(input : input) ~start_date:_ ~end_date ~warmup_days:_ ~initial_cash:_
     "Tiered loader: Metadata=%d Summary=%d Full=%d after bulk Metadata promote\n\
      %!"
     stats.metadata stats.summary stats.full;
-  failwith
-    "Backtest.Tiered_runner: simulator-cycle step not yet implemented (lands \
-     in 3f-part3b of the backtest-tiered-loader plan). The pre-simulator \
-     Metadata promote succeeded and emitted its Load_bars trace phase, so the \
-     trace up to this point is usable for debugging. Pass \
-     loader_strategy=Legacy or omit the argument to run the existing path."
+  let stop_log = Stop_log.create () in
+  let sim =
+    _make_simulator input ~loader ~stop_log ~start_date ~end_date ~warmup_days
+      ~initial_cash ~commission
+  in
+  let sim_result =
+    Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
+        _run_simulator sim)
+  in
+  let final_stats = Bar_loader.stats loader in
+  eprintf
+    "Tiered loader: Metadata=%d Summary=%d Full=%d at end of simulator run\n%!"
+    final_stats.metadata final_stats.summary final_stats.full;
+  (sim_result, stop_log)
