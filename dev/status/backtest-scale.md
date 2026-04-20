@@ -7,7 +7,7 @@ READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f split into two parts: 3f-part1 (shadow_screener adapter) shipped as draft #463 on `feat/backtest-scale-3f`; 3f-part2 (runner integration / `_run_tiered_backtest`) deferred to a follow-up increment due to concurrent-agent workspace contention consuming iteration budget during this session.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f was split into three stacked parts to respect the ~400-line per-PR budget: 3f-part1 (shadow_screener adapter) shipped as draft #463 on `feat/backtest-scale-3f` (QC APPROVED); 3f-part2 (tiered runner skeleton — Bar_loader create + bulk Metadata promote + trace bridge, raises at simulator-cycle step) shipped as DRAFT #466 on `feat/backtest-scale-3f-part2`; 3f-part3 (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote) is the next outstanding increment before 3g (parity gate).
 
 ## Interface stable
 NO
@@ -17,10 +17,11 @@ All three tier getters return their proper typed option: `get_metadata : Metadat
 ## Open PR
 - feat/backtest-tiered-loader-3d-tracer-phases — 3d based on main; tier-op tracer phases + callback hook. Ready for QC.
 - feat/backtest-scale-3e — 3e based on main; runner + scenario plumbing for `loader_strategy`. Ready for QC.
-- feat/backtest-scale-3f — 3f-part1 (draft #463) based on main; shadow_screener adapter only. Runner integration (`_run_tiered_backtest`) deferred to a follow-up PR. Ready for QC on the adapter scope.
+- feat/backtest-scale-3f — 3f-part1 (#463) based on main; shadow_screener adapter only. QC APPROVED.
+- feat/backtest-scale-3f-part2 — 3f-part2 (DRAFT #466) stacked on feat/backtest-scale-3f; tiered runner skeleton (Bar_loader create + bulk Metadata promote + trace bridge, raises at simulator-cycle step). Ready for QC on the skeleton scope.
 
 ## Blocked on
-- None. 3f-part2 (runner integration) depends on 3e merging; shadow_screener adapter (3f-part1, #463) is independently reviewable.
+- None. 3f-part3 (Friday cycle + per-transition promote/demote) is the next outstanding increment; depends on 3f-part2 merging.
 
 ## Goal
 
@@ -87,10 +88,55 @@ Build alongside existing `Bar_history` — don't modify it.
 1. QC review of 3d (feat/backtest-tiered-loader-3d-tracer-phases head).
 2. QC review of 3e (feat/backtest-scale-3e head).
 3. QC review of 3f-part1 (feat/backtest-scale-3f head, PR #463) — shadow_screener adapter in isolation.
-4. Dispatch 3f-part2 — runner integration (`_run_tiered_backtest`). Implements the `Loader_strategy.Tiered` branch in `Backtest.Runner`, wires the screener to drive `Bar_loader.promote`/`demote` on Friday cadence, and emits the tracer phases added in 3d. Uses the `Shadow_screener` adapter landed in 3f-part1. Target ~200-250 lines per plan §3f Commit 2.
-5. Subsequent increment 3g (parity acceptance test) is the merge gate.
+4. QC review of 3f-part2 (feat/backtest-scale-3f-part2 head, PR #466) — tiered runner skeleton (Bar_loader create + bulk Metadata promote + trace bridge + failwith at simulator-cycle step).
+5. Dispatch 3f-part3 — Friday cycle + per-transition promote/demote. On each Friday (per `Weinstein_strategy` cadence): promote universe to Summary, run `Shadow_screener.screen`, promote top candidates to Full, feed into `Weinstein_strategy.entries_from_candidates`. On `Entering` transition: promote to Full. On `Closed` transition: demote to Metadata. Will likely require a thin wrapper that runs the Weinstein strategy with `universe=[]` so its in-strategy screener no-ops, then injects screener-sourced candidates via `entries_from_candidates`. Target ~300 lines per plan §3f Commit 2 (after the skeleton).
+6. Subsequent increment 3g (parity acceptance test) is the merge gate; cannot run until 3f-part3 lands.
 
 ## Completed
+
+- **3f-part2 — Tiered runner skeleton** (2026-04-20).
+  Implements the pre-simulator portion of the Tiered `Loader_strategy`
+  path in `Backtest.Runner` and stacks on 3f-part1 (#463). Under
+  `loader_strategy = Tiered`, `run_backtest` now:
+  1. Builds a `Bar_loader` over `deps.all_symbols` (universe + primary
+     index + sector ETFs + global indices) with a `trace_hook` that
+     bridges `Bar_loader.tier_op` onto `Backtest.Trace.Phase.t` via a
+     new public helper `Runner.tier_op_to_phase`
+     (`Promote_to_summary → Promote_summary`, `Promote_to_full →
+     Promote_full`, `Demote_op → Demote`). Keeps `bar_loader`
+     independent of the `backtest` library as called out in plan §3d —
+     the mapping lives on the runner side, not the loader side.
+  2. Promotes every symbol to `Metadata_tier` under a single outer
+     `Load_bars` wrap at `end_date`. Metadata promote is silent in the
+     tracer hook (3d decision) — the outer wrap is the attribution
+     point for memory/timing.
+  3. Raises `Failure` at the simulator-cycle step with a pointer to
+     3f-part3 so scenarios that opt into `Tiered` surface the
+     incomplete contract loudly rather than silently falling back.
+  Legacy path is byte-identical to pre-PR (3g parity gate
+  precondition). Test module `test_runner_tiered_skeleton.ml` pins the
+  observable contract with 5 tests: three unit tests for the
+  `tier_op_to_phase` mapping (one per variant so a future rename/
+  re-order fails loudly), plus two end-to-end tests that build a
+  `Bar_loader` with a test-local `trace_hook` (shaped identically to
+  the runner's internal one) and assert the right `Trace.Phase.t`
+  row lands in the attached trace collector on both Summary promote
+  and Demote paths.
+  - **Split boundary:** 3f-part3 ships the Friday Summary-promote →
+    `Shadow_screener.screen` → Full-promote cycle plus per-transition
+    promote/demote bookkeeping, plus the thin strategy wrapper that
+    makes the inner `Weinstein_strategy` skip its own universe
+    screening (pass `universe=[]`) and consume screener-sourced
+    candidates via `Weinstein_strategy.entries_from_candidates`. 3g
+    (parity test) cannot run until 3f-part3 lands — the Tiered path
+    still raises after Metadata promote.
+  - Files:
+    `backtest/lib/{dune,runner.mli,runner.ml}` +
+    `backtest/test/{dune,test_runner_tiered_skeleton.ml}`.
+  - Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh
+    dune runtest trading/backtest --force` — 23 tests
+    (3 runner_filter + 5 runner_tiered_skeleton + 6 stop_log +
+    9 trace) + all bar_loader sub-suites pass. `dune fmt` clean.
 
 - **3f-part1 — Shadow screener adapter** (2026-04-20).
   Pure adapter at `trading/trading/backtest/bar_loader/shadow_screener.ml{,i}`

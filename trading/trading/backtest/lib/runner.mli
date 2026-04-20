@@ -24,6 +24,18 @@ type result = {
           with [round_trips] via symbol + entry_date. *)
 }
 
+val tier_op_to_phase : Bar_loader.tier_op -> Trace.Phase.t
+(** Map a [Bar_loader.tier_op] (the library-internal tier-op tag) onto the
+    corresponding [Trace.Phase.t] emitted by the Tiered runner path:
+
+    - [Promote_to_summary] → [Promote_summary]
+    - [Promote_to_full] → [Promote_full]
+    - [Demote_op] → [Demote]
+
+    Exposed so the Tiered runner's trace bridging is observable from unit tests
+    without reaching into private helpers. Pure — depends only on the input
+    variant. *)
+
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
 (** True if [step] represents a real trading day — i.e. the portfolio's
@@ -83,8 +95,9 @@ val run_backtest :
     [loader_strategy] selects how universe bars are loaded:
     - [Legacy] (default) — current production path: simulator materializes all
       universe bars up-front via per-symbol bar loaders.
-    - [Tiered] — placeholder. The actual Tiered execution path lands in
-      increment 3f of [dev/plans/backtest-tiered-loader-2026-04-19.md]; calling
-      [run_backtest] with [Tiered] today raises [Failure] with a clear message
-      so the absence of an implementation surfaces loudly rather than silently
-      falling back to [Legacy]. *)
+    - [Tiered] — partial implementation as of 3f-part2. Runs the
+      [Bar_loader.create] + bulk Metadata-tier promotion inside [Load_bars] so
+      the [Promote_*]/[Demote] phases are emitted on the trace, then raises
+      [Failure] at the simulator-cycle step that 3f-part3 will fill in. Callers
+      that pass [Tiered] today see a clear pointer to the unfinished step;
+      [Legacy] remains byte-identical to the pre-flag runner. *)
