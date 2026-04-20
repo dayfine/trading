@@ -1,10 +1,15 @@
 (** Backtest runner CLI — thin wrapper around the {!Backtest} library.
 
-    Usage: backtest_runner <start_date> [end_date] [--override '<sexp>']
+    Usage: backtest_runner <start_date> \[end_date\] \[--override '<sexp>'\]
+    \[--loader-strategy legacy\|tiered\]
 
     - start_date: required (e.g. 2018-01-02)
     - end_date: optional, defaults to today
     - --override: partial config sexp, deep-merged into the default. Can repeat.
+    - --loader-strategy: which bar-loader execution strategy to use. Defaults to
+      [legacy] (current production path). [tiered] currently raises a [Failure]
+      in the runner since the implementation lands in increment 3f of
+      [dev/plans/backtest-tiered-loader-2026-04-19.md].
 
     Example:
     {[
@@ -19,27 +24,42 @@
 
 open Core
 
-(** Split argv (excluding argv[0]) into positional args and override sexps. *)
-let _extract_overrides argv =
-  let rec loop args positional overrides =
+(** Split argv (excluding argv[0]) into positional args, override sexps, and the
+    optional [--loader-strategy] flag value. *)
+let _extract_flags argv =
+  let rec loop args positional overrides loader_strategy =
     match args with
-    | [] -> (List.rev positional, List.rev overrides)
+    | [] -> (List.rev positional, List.rev overrides, loader_strategy)
     | "--override" :: sexp_str :: rest ->
-        loop rest positional (Sexp.of_string sexp_str :: overrides)
+        loop rest positional
+          (Sexp.of_string sexp_str :: overrides)
+          loader_strategy
     | "--override" :: [] ->
         eprintf "Error: --override requires a sexp argument\n";
         Stdlib.exit 1
-    | arg :: rest -> loop rest (arg :: positional) overrides
+    | "--loader-strategy" :: value :: rest ->
+        let parsed =
+          try Loader_strategy.of_string value
+          with Failure msg ->
+            eprintf "Error: %s\n" msg;
+            Stdlib.exit 1
+        in
+        loop rest positional overrides (Some parsed)
+    | "--loader-strategy" :: [] ->
+        eprintf "Error: --loader-strategy requires a value (legacy or tiered)\n";
+        Stdlib.exit 1
+    | arg :: rest -> loop rest (arg :: positional) overrides loader_strategy
   in
-  loop (Array.to_list argv |> List.tl_exn) [] []
+  loop (Array.to_list argv |> List.tl_exn) [] [] None
 
 let _parse_args () =
   let argv = Sys.get_argv () in
   if Array.length argv < 2 then (
     eprintf
-      "Usage: backtest_runner <start_date> [end_date] [--override '<sexp>']\n";
+      "Usage: backtest_runner <start_date> [end_date] [--override '<sexp>'] \
+       [--loader-strategy legacy|tiered]\n";
     Stdlib.exit 1);
-  let positional, overrides = _extract_overrides argv in
+  let positional, overrides, loader_strategy = _extract_flags argv in
   let start_str, end_str =
     match positional with
     | [] ->
@@ -57,7 +77,7 @@ let _parse_args () =
     | Some s -> Date.of_string s
     | None -> Date.today ~zone:Time_float.Zone.utc
   in
-  (start_date, end_date, overrides)
+  (start_date, end_date, overrides, loader_strategy)
 
 let _make_output_dir () =
   let data_dir_fpath = Data_path.default_data_dir () in
@@ -73,9 +93,10 @@ let _make_output_dir () =
   path
 
 let () =
-  let start_date, end_date, overrides = _parse_args () in
+  let start_date, end_date, overrides, loader_strategy = _parse_args () in
   let result =
-    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides ()
+    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
+      ?loader_strategy ()
   in
   let output_dir = _make_output_dir () in
   eprintf "Writing output to %s/\n%!" output_dir;

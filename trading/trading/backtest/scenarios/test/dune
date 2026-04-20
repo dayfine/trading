@@ -1,4 +1,9 @@
 (tests
  (names test_scenario test_universe_file)
  (modules test_scenario test_universe_file)
- (libraries ounit2 core scenario_lib matchers))
+ (libraries
+  ounit2
+  core
+  scenario_lib
+  trading.backtest.loader_strategy
+  matchers))

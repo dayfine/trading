@@ -1,3 +1,9 @@
 (executable
  (name backtest_runner)
- (libraries core core_unix fpath weinstein.data_source backtest))
+ (libraries
+  core
+  core_unix
+  fpath
+  weinstein.data_source
+  trading.backtest.loader_strategy
+  backtest))

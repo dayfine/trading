@@ -1,0 +1,6 @@
+(library
+ (public_name trading.backtest.loader_strategy)
+ (name loader_strategy)
+ (libraries core)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))

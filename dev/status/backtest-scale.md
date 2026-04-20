@@ -7,7 +7,7 @@ READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447. 3d (tracer phases) ready for review. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e`. 3f (tiered runner path) is the next increment.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f (tiered runner path) is the next increment.
 
 ## Interface stable
 NO

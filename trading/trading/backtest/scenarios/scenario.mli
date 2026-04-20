@@ -51,6 +51,18 @@ type t = {
   config_overrides : Sexp.t list;
       (** Partial config sexps deep-merged into the default Weinstein config, in
           order. Empty list means the default config. *)
+  loader_strategy : Loader_strategy.t option; [@sexp.option]
+      (** Selects the bar-loader execution strategy used for this scenario:
+          - [None] (default) — Runner falls back to its own default
+            ([Loader_strategy.Legacy] today). Pre-3e scenario files have no
+            field and continue to behave exactly as before.
+          - [Some Legacy] — explicit opt-in to the legacy path. Useful for
+            scenarios that should pin the legacy behaviour even after the global
+            default flips.
+          - [Some Tiered] — opt-in to the tiered loader. Today this raises
+            inside the runner since the implementation lands in increment 3f of
+            [dev/plans/backtest-tiered-loader-2026-04-19.md]; once available,
+            scenarios will use this to exercise it. *)
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
