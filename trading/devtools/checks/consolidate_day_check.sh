@@ -185,11 +185,14 @@ grep -q "${DATE}-run3.md" "$OUTPUT" \
 grep -q "Total subagents spawned: 6" "$OUTPUT" \
   || fail "output total subagents should be 6 (3 runs × 2 each)"
 
-# 6. Idempotency — re-run should overwrite without error and produce same output
-FIRST_OUTPUT="$(cat "$OUTPUT")"
+# 6. Idempotency — re-run should overwrite without error and produce same output.
+#    Strip the "Generated:" line: the script stamps wall-clock UTC, so two
+#    invocations that straddle a second boundary would always diff there even
+#    though the rest of the output is deterministic.
+FIRST_OUTPUT="$(grep -v '^Generated: ' "$OUTPUT")"
 CONSOLIDATE_DAY_DIR="$TMP_DIR" sh "$SCRIPT" "$DATE" \
   || fail "consolidate_day.sh idempotent re-run exited non-zero"
-SECOND_OUTPUT="$(cat "$OUTPUT")"
+SECOND_OUTPUT="$(grep -v '^Generated: ' "$OUTPUT")"
 [ "$FIRST_OUTPUT" = "$SECOND_OUTPUT" ] \
   || fail "output is not idempotent — re-run produced different content"
 
