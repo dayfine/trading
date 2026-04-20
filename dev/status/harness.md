@@ -122,14 +122,12 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   environment (see `dev/status/orchestrator-automation.md`), this part
   needs to land together with the automation work. Source:
   `dev/daily/2026-04-14.md` (refreshed end-of-day).
-- **Same-day summary consolidation** — multi-run days produce
-  `2026-04-18.md`, `-run2.md`, `-run3.md`, `-run4.md` with no
-  end-of-day roll-up. A plan-mode reader has to stitch four files to
-  answer "what happened today." Low severity. Fix sketch: add a
-  `dev/lib/consolidate_day.sh` that merges all `${DATE}*.md` (non-plan)
-  into `${DATE}-summary.md` with deduped §Dispatched + merged
-  §Escalations; wire into `lead-orchestrator` Step 8 post-merge when
-  `N >= 3`. Source: 2026-04-18 plan-mode audit.
+- ~~**Same-day summary consolidation**~~ — DONE (#467): `dev/lib/consolidate_day.sh` added;
+  merges all `${DATE}*.md` (non-plan) into `${DATE}-summary.md` with deduped
+  §Dispatched, merged §Escalations (with "(seen in: run-N)" suffix), summed §Budget,
+  latest §QC per track, and per-run links. Wired into `lead-orchestrator` Step 8b
+  (runs post-auto-merge when N >= 3). Smoke test: `trading/devtools/checks/consolidate_day_check.sh`.
+  Source: 2026-04-18 plan-mode audit.
 - **Deep scan heuristic gaps** — `trading/devtools/checks/deep_scan.sh`
   (T3-A, see #331) is missing several useful checks. Today's manual
   audit found four real issues the script didn't surface:
@@ -301,6 +299,22 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 - [x] `dev/run.sh` pre-flight — fast-fails at the shell (not inside the orchestrator) if `claude` isn't on PATH, `.claude/agents/lead-orchestrator.md` is missing, or its `## Allowed Tools` section no longer lists `Agent`. Each failure prints `FAIL: <what>` to stderr and exits 1. Block is placed immediately after `REPO_ROOT=...` and uses only POSIX-compatible constructs (works with `set -euo pipefail`). Verify: `sh -n dev/run.sh` passes syntax check; temporarily rename `.claude/agents/lead-orchestrator.md` and re-run `dev/run.sh` — it exits 1 with a clear `FAIL:` message.
 - [x] `dev/config/merge-policy.json` — default merge-policy config committed with inline defaults (`followup_threshold: 10`, `maintenance_cycle_ratio: 3`, `auto_merge_enabled: false`). Matches the inline defaults previously embedded in `lead-orchestrator.md` Step 2b — now visible and tweakable without editing the agent definition. Intent documented in `dev/config/README.md`. Verify: `jq . dev/config/merge-policy.json` parses cleanly.
 - [x] Orchestrator `## Plan Mode` — added to `.claude/agents/lead-orchestrator.md`; triggered by a `--plan` token in the prompt, short-circuits Steps 2–6, writes `dev/daily/<YYYY-MM-DD>-plan.md` with `(plan mode)` marker, never mutates branches or status files. Structural smoke test at `trading/devtools/checks/orchestrator_plan_check.sh` wired into `dune runtest` — grep-asserts the required Plan Mode contract pieces in the agent definition. Does NOT invoke `claude -p` from dune runtest (credentials/network/flakiness). Verify: `dune runtest trading/devtools/checks/` — prints `OK: lead-orchestrator plan mode contract present.`
+
+### Same-day summary consolidation
+
+- [x] `dev/lib/consolidate_day.sh` — merges all `${DATE}*.md` (non-plan) in `dev/daily/` into
+  `${DATE}-summary.md`. Sections: Pending work (last run), Dispatched (deduped union — same
+  (Track, Agent, Outcome) appears once; conflicting Outcomes get "(run-N)" suffix), QC per track
+  (latest per track), Budget (summed subagents + per-run utilization), Escalations (deduped union
+  with "(seen in: run-N, run-M)" suffix), Integration Queue (last run), Per-run links. Idempotent;
+  graceful on malformed sections (warns to stderr, continues). PR #467.
+  Wired into `lead-orchestrator.md` Step 8b — runs after auto-merge when N >= 3; consolidated
+  file committed into the same ops/daily-${DATE}-runN branch.
+  Smoke test: `trading/devtools/checks/consolidate_day_check.sh` (9 assertions: run header,
+  escalation dedup, distinct-outcome preservation, per-run links, budget sum, idempotency,
+  error cases for missing arg / malformed date / no files).
+  Verify: `dune runtest devtools/checks/` — prints `OK: consolidate_day_check — all assertions passed.`;
+  `sh dev/lib/consolidate_day.sh 2026-04-20` with three 2026-04-20 daily files present.
 
 ### Deep scan heuristic gap sub-item 1: Drift coverage extension (backtest)
 

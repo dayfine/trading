@@ -186,3 +186,13 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:deep_scan_drift_coverage_check.sh})))
+
+; Same-day summary consolidation smoke test: generates a 3-run fixture in /tmp/,
+; runs dev/lib/consolidate_day.sh, and verifies deduped output sections.
+; Does NOT touch real dev/daily/ files.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:consolidate_day_check.sh})))
