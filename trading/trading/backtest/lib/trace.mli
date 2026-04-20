@@ -33,6 +33,19 @@ module Phase : sig
     | Order_gen
     | Fill
     | Teardown
+    | Promote_summary
+        (** A batch of symbols promoted up to Summary tier by
+            [Bar_loader.promote]. One record is emitted per [promote] call when
+            a trace is attached to the loader. *)
+    | Promote_full
+        (** A batch of symbols promoted up to Full tier by [Bar_loader.promote].
+            One record is emitted per [promote] call when a trace is attached to
+            the loader. *)
+    | Demote
+        (** A batch of symbols demoted by [Bar_loader.demote]. One record is
+            emitted per [demote] call regardless of the target tier — the
+            target-tier dimension is carried in logs/scenario metadata, not in
+            the phase tag. *)
   [@@deriving show, eq, sexp]
 end
 

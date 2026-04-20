@@ -110,6 +110,30 @@ type stats_counts = { metadata : int; summary : int; full : int }
 [@@deriving show, eq, sexp]
 (** Current per-tier symbol counts; used by tracer / parity harness. *)
 
+(** {1 Tracer hook} *)
+
+(** Which bar_loader operation produced a trace event. Kept distinct from
+    [Backtest.Trace.Phase.t] so [bar_loader] stays independent of the [backtest]
+    library — the latter depends on [bar_loader] in 3e (tiered runner path) and
+    a reverse edge would cycle. Callers route these to the matching
+    [Trace.Phase.t] variants (typically [Promote_summary], [Promote_full],
+    [Demote]). *)
+type tier_op = Promote_to_summary | Promote_to_full | Demote_op
+[@@deriving show, eq]
+
+type trace_hook = {
+  record : 'a. tier_op:tier_op -> symbols:int -> (unit -> 'a) -> 'a;
+}
+(** Callback invoked once per [promote] / [demote] batch when the loader was
+    constructed with [?trace_hook = Some _]. The wrapper shape
+    ([(unit -> 'a) -> 'a]) matches [Trace.record] so a tracer-wrapping caller
+    can time the inner work exactly once without measuring overhead elsewhere.
+
+    [symbols] is the count of symbols in the batch — forwarded by conventional
+    callers as [symbols_in] on the emitted phase metric. The wrapped thunk's
+    return value is passed through unchanged, so the bar_loader implementation
+    can wrap its internal per-tier work transparently. *)
+
 val create :
   data_dir:Fpath.t ->
   sector_map:string String.Table.t ->
@@ -117,15 +141,16 @@ val create :
   ?benchmark_symbol:string ->
   ?summary_config:Summary_compute.config ->
   ?full_config:Full_compute.config ->
+  ?trace_hook:trace_hook ->
   unit ->
   t
 (** [create ~data_dir ~sector_map ~universe ?benchmark_symbol ?summary_config
-     ?full_config ()] returns a fresh loader. [universe] is the full set of
-    symbols the backtest may promote; it is recorded but does {b not} load any
-    bars (Metadata-tier loads happen in [promote]). [sector_map] is a symbol →
-    sector lookup; symbols missing from the map get [sector = ""] on promotion.
-    [data_dir] is forwarded to an internal [Price_cache] used for Metadata-tier
-    last-close lookups.
+     ?full_config ?trace_hook ()] returns a fresh loader. [universe] is the full
+    set of symbols the backtest may promote; it is recorded but does {b not}
+    load any bars (Metadata-tier loads happen in [promote]). [sector_map] is a
+    symbol → sector lookup; symbols missing from the map get [sector = ""] on
+    promotion. [data_dir] is forwarded to an internal [Price_cache] used for
+    Metadata-tier last-close lookups.
 
     [benchmark_symbol] is the ticker used to align bars when computing the
     Summary-tier RS line (typically ["SPY"] or ["^GSPC"]). Default: ["SPY"]. Its
@@ -137,7 +162,12 @@ val create :
 
     [full_config] controls the length of the OHLCV tail fetched on Full-tier
     promotion (see {!Full_compute.default_config}). Default:
-    {!Full_compute.default_config}. *)
+    {!Full_compute.default_config}.
+
+    [trace_hook] registers a tracer callback. When omitted, [promote] and
+    [demote] do no tracing work at all — the implementation short-circuits
+    before entering the hook and produces observable behaviour identical to the
+    pre-hook version. *)
 
 val promote :
   t ->
@@ -166,7 +196,13 @@ val promote :
       skipped, not erroring.
 
     Returns the first per-symbol error encountered (if any). A symbol that fails
-    to load is {e not} added to the loader. *)
+    to load is {e not} added to the loader.
+
+    Tracing: when [trace_hook] was provided to [create] and [to_] is
+    [Summary_tier] or [Full_tier], the loader calls the hook once per [promote]
+    invocation with the appropriate [tier_op] and [symbols] batch size.
+    Promotions to [Metadata_tier] are not traced — they are driven by the legacy
+    [Load_bars] phase, not a tier-specific operation. *)
 
 val demote : t -> symbols:string list -> to_:tier -> unit
 (** [demote t ~symbols ~to_] tiers each symbol down, freeing higher-tier data. A
@@ -175,6 +211,11 @@ val demote : t -> symbols:string list -> to_:tier -> unit
     - [to_ = Metadata_tier] drops Summary scalars {e and} any Full-tier bars.
     - [to_ = Summary_tier] drops only Full-tier bars (no-op for Summary-only
       symbols).
+
+    Tracing: when [trace_hook] was provided to [create], the loader calls the
+    hook once per [demote] invocation with [tier_op = Demote_op] and [symbols]
+    equal to the input list length (not the count of symbols that actually
+    changed tier — the batch size is the interesting dimension for the tracer).
 
     Callers assume demotion is free: there is no reload cost. Re-promoting the
     same symbols back up requires fetching bars again. *)
