@@ -102,6 +102,12 @@ Put the authority document reference in the Notes column for every non-NA item.
 
 (Does not affect verdict. Tracked for quality trends over time.)
 
+**Output contract:** The integer must appear on the first non-blank line after the
+`## Quality Score` heading, formatted as `N — <rationale>` (bare digit, not bold).
+Example: `4 — Clean implementation with minor style nits.`
+The `record_qc_audit.sh` script reads this line to populate `dev/audit/` records.
+Use `## Quality Score` (level-2 heading) — not `### Quality Score` — for new reviews.
+
 ## Verdict
 
 APPROVED | NEEDS_REWORK

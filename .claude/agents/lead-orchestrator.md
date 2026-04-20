@@ -984,6 +984,65 @@ token scopes needed. If the PR was already ready-for-review (e.g. the
 agent didn't open as draft), the mutation is a no-op and returns
 `isDraft: false` — same branch works.
 
+### Stage 4: Write audit record (T3-G)
+
+**When to run:** after both QC stages complete (or after Stage 1 if behavioral
+was not run). Runs for both APPROVED and NEEDS_REWORK outcomes.
+
+Call `trading/devtools/checks/record_qc_audit.sh` to extract verdicts and
+quality score from `dev/reviews/<feature>.md` and write the structured audit
+record to `dev/audit/YYYY-MM-DD-<feature>.json`:
+
+```bash
+DATE="$(date +%Y-%m-%d)"
+FEATURE="<feature>"
+BRANCH="feat/<feature>"   # or harness/<name> for harness work
+
+bash trading/devtools/checks/record_qc_audit.sh "$FEATURE" "$BRANCH" "$DATE"
+```
+
+The script extracts from `dev/reviews/<feature>.md`:
+- **Structural verdict**: `structural_qc: APPROVED|NEEDS_REWORK` field, or the
+  first `## Verdict` block (bare or `**bold**` format); defaults to SKIPPED.
+- **Behavioral verdict**: `behavioral_qc: APPROVED|NEEDS_REWORK` field, or the
+  last `## Verdict` block; defaults to SKIPPED.
+- **Overall verdict**: `overall_qc: APPROVED|NEEDS_REWORK` field; derived from
+  structural+behavioral if not present.
+- **Quality score**: The integer on the first non-blank line after
+  `## Quality Score` or `### Quality Score`. The line may start with a bare
+  digit (`5 — rationale`) or bold digit (`**5 — rationale`). The LAST such
+  section wins (behavioral score takes precedence). Defaults to `null` if no
+  quality score section is present (pre-T1-Q reviews).
+
+**Grep pattern (for manual extraction if needed):**
+```bash
+# Quality score integer from last Quality Score section:
+awk '
+  /^## Quality Score|^### Quality Score/ { in_qs=1; next }
+  in_qs && /^[[:space:]]*$/ { next }
+  in_qs { line=$0; gsub(/^\*\*/, "", line); if (line ~ /^[1-5]/) last=substr(line,1,1); in_qs=0 }
+  END { if (last != "") print last }
+' dev/reviews/<feature>.md
+```
+
+**Fallback** — if `record_qc_audit.sh` fails (missing review file, no verdict),
+call `write_audit.sh` directly with explicit flags:
+```bash
+bash trading/devtools/checks/write_audit.sh \
+  --date "$DATE" \
+  --feature "$FEATURE" \
+  --branch "$BRANCH" \
+  --structural APPROVED \
+  --behavioral APPROVED \
+  --overall APPROVED \
+  --quality-score 4        # omit if behavioral did not run
+```
+
+Log the outcome in `## Dispatched this run` with a note like
+`audit written: dev/audit/<DATE>-<feature>.json (quality_score=4)` or
+`audit write failed: <reason>`. Audit write failure is [info]-severity —
+it does not block the QC pipeline.
+
 ---
 
 ## Step 5.5: Reconcile `dev/status/_index.md`
