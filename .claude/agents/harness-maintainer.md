@@ -171,6 +171,15 @@ dev/lib/run-in-env.sh dune runtest trading/devtools/checks/
    + `dev/run.sh` provides both jst and `GH_TOKEN`). If jst fails, surface
    the error in your return value rather than silently leaving the branch
    PR-less.
-5. Include in your return value: item completed, what changed, any follow-up or escalation items, and the PR URL.
+5. **Set the PR body.** `jst submit` creates the PR but leaves `body: ""`.
+   Write the PR description immediately after submit so reviewers see
+   what/why without diffing:
+   ```
+   # Write a pr-body.md locally — short description, what changed, verify command.
+   GH_TOKEN=$GH_TOKEN gh pr edit <N> --body-file pr-body.md
+   ```
+   Empty-body PRs were observed in run-5 on 2026-04-19 (#451, #452) —
+   don't repeat.
+6. Include in your return value: item completed, what changed, any follow-up or escalation items, and the PR URL.
 
 Return a concise summary: which items completed, which are in progress, any blockers, and the PR URLs.
