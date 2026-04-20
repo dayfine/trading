@@ -91,11 +91,21 @@ jobs:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
 
           BRANCH="ops/health-deep-${DATE}"
           REPORT="dev/health/${DATE}-deep.md"
+
+          # Inside containers run as --user 0, git warns about "dubious
+          # ownership" on repos not owned by root; the claude-code-action
+          # step above also seems to leave cwd in a state where `git config`
+          # fails with "fatal: not in a git directory" (observed in run
+          # 24676096493 on 2026-04-20). Re-add the workspace as a safe
+          # directory explicitly so the git commands below work from this
+          # step regardless of what the action did upstream.
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 
           # Stage and commit whatever the agent wrote (partial reports are
           # valuable too, hence `if: always()` above).
