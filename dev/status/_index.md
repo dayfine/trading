@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-19 (run-4 reconcile: #434, #435, #436, #439, #444, #445, #446 all merged since run-3; #438 closed (split into #444+#445); #447 3c-Full-tier and #448 harness-retire-fast-scan dispatched this run)
+Last updated: 2026-04-19 (run-5 reconcile: #447 3c Full tier, #448 retire inline fast scan, #449 run-4 summary, #450 draft→ready flip all merged since run-4; #451 harness weekly-deep-scan-cron, #452 backtest-scale 3d tracer phases (QC APPROVED), #453 cleanup weinstein_strategy @large-module all dispatched this run)
 
 ## Active + complete tracks
 
@@ -14,14 +14,14 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | MERGED | — | — | — (#419 per-phase tracing merged 2026-04-19) |
-| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #447 | 3a (#434), 3b-i (#444), 3b-ii (#445) all merged 2026-04-19. #447 (3c Full tier) dispatched run-4, structural QC APPROVED, behavioral QC N/A (no strategy behavior change until 3g parity test). Next: 3d (tracer phases) after #447 lands. |
+| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #452 | #447 (3c Full tier) merged 2026-04-19. #452 (3d tracer phases) dispatched run-5, structural + behavioral QC APPROVED (quality 5). Next: 3e (runner + scenario `loader_strategy` plumbing, ~150 LOC) after #452 lands. |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
 | [short-side-strategy](short-side-strategy.md) | MERGED | — | — | — (#420 merged 2026-04-19). Follow-ups carried to own tracks: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — (#408 + #409 both merged 2026-04-18) |
 | [sector-data](sector-data.md) | MERGED | — | — | — (#436 merged 2026-04-19). GHA orchestrator runs continue to consume `trading/test_data/sectors.csv`. |
-| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #448 | #435, #439, #446 all merged 2026-04-19. #448 (T3-A+ sub-item 2: retire inline health-scanner fast scan; fold `dune runtest` + `status_file_integrity.sh` into orchestrator Step 6 deterministic checks) dispatched run-4. Next after #448 lands: T3-A+ sub-item 1 (weekly GHA cron for deep scan). |
+| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #451 | #448 (T3-A+ sub-item 2) merged 2026-04-19. #451 (T3-A+ sub-item 1: weekly GHA cron `.github/workflows/health-deep-weekly.yml` dispatching `health-scanner` in deep mode on Mondays 15:17 UTC; PR opens advisory, no auto-merge) dispatched run-5. After #451 lands: remaining open T3 items are advisory (T3-C, T3-F rule-promotion, T3-G audit-trail quality score, T3-H commit-level QC) + Tier 4 end-state. |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog populates from `dev/health/*-deep.md` and `*-fast.md` via lead-orchestrator Step 2e. One dispatch per run, ≤200 LOC, no behavior change. |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #453 | #453 (annotate `weinstein_strategy.ml` as `@large-module` — 320 lines → 324 lines with annotation; file-length linter now OK) dispatched run-5. Backlog empty after this PR merges; next run will re-scan fast-health for a new finding. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |
