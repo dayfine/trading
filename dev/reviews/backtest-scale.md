@@ -75,3 +75,46 @@ These are deliberate, acknowledged gaps. The 3g parity test will quantify whethe
 APPROVED
 
 All applicable checks PASS. No FAIL items. The shadow screener faithfully implements the plan's §3f adapter-route preference and preserves Weinstein cascade gates end-to-end; documented score-depression gaps are acceptable for 3f-part1 and covered by the upcoming 3g parity test.
+
+---
+
+Reviewed SHA (3f-part2): 224031672d29434d178eba1111c8f6e6497b2a7d
+
+## Structural Checklist — 3f-part2 (tiered runner skeleton)
+
+Scope: stacked on `feat/backtest-scale-3f` (3f-part1, SHA `ffb17c4720`, already APPROVED).
+3f-part2 delta covers: `backtest/lib/{dune,runner.mli,runner.ml}` + `backtest/test/{dune,test_runner_tiered_skeleton.ml}` + `dev/status/backtest-scale.md`.
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | Exit 0; only pre-existing dune-project warning (no .dune-project at repo root — pre-existing, not introduced by this PR) |
+| H2 | dune build | PASS | Exit 0; clean |
+| H3 | dune runtest | PASS | All suites pass including 5 new tests in test_runner_tiered_skeleton; 0 failed |
+| P1 | Functions ≤ 50 lines (fn_length_linter via H3) | PASS | Largest new function `_run_tiered_backtest` is 23 lines (275-297); `_promote_universe_metadata` is 16 lines; all others ≤ 8 lines. fn_length_linter passed as part of H3. |
+| P2 | No magic numbers (linter_magic_numbers.sh via H3) | PASS | No numeric literals in new code. linter passed as part of H3. |
+| P3 | All configurable thresholds/periods/weights in config record | NA | No tunable parameters introduced. `Metadata_tier` is a tier tag, not a domain threshold. |
+| P4 | .mli files cover all public symbols (linter_mli_coverage.sh via H3) | PASS | New public symbol `tier_op_to_phase` declared and documented in `runner.mli:27-37`. All pre-existing public symbols unchanged. linter passed as part of H3. |
+| P5 | Internal helpers prefixed with _ | PASS | New helpers: `_make_trace_hook`, `_create_bar_loader`, `_promote_universe_metadata`, `_run_tiered_backtest` — all underscore-prefixed. `tier_op_to_phase` is intentionally public (in .mli) and correctly not prefixed. |
+| P6 | Tests use the matchers library (per CLAUDE.md) | PASS | All 5 tests use `assert_that` with `equal_to` or `elements_are`. No nested `assert_that`. One `assert_that` per value. `elements_are` used for list assertions on `phases`. No `assert_bool` or manual match+assert_failure. Test helper `_make_trace_hook_for_test` is underscore-prefixed. |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | Zero diff in any of those modules. Only files changed: `backtest/lib/{dune,runner.mli,runner.ml}`, `backtest/test/{dune,test_runner_tiered_skeleton.ml}`, `dev/status/backtest-scale.md`. |
+| A2 | No imports from analysis/ into trading/trading/ | PASS | `runner.ml` new imports: `Bar_loader` (via `trading.backtest.bar_loader` in dune). `bar_loader/dune` confirmed: depends only on `weinstein.*`, `indicators.*`, `trading.simulation.data` — no `analysis.*` module names in any dune file in the diff. |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | Scope-boundary files (Bar_history, simulator internals, Price_cache, Weinstein_strategy core, Screener.screen signature) show empty diff against main. All changes are directly inside `backtest/` sub-tree. |
+
+## Staleness Check
+
+Branch is 1 commit behind `main@origin` (a harness maintenance commit). Delta is minimal; no staleness FLAG needed (threshold is >10).
+
+## Specific Contract Checks (per dispatch brief)
+
+- **Cycle risk**: `bar_loader/dune` lists only `core`, `fpath`, `status`, `types`, `trading.simulation.data`, `csv`, `indicators.*`, `weinstein.*` — no `backtest` or `backtest.lib` dependency. No cycle introduced.
+- **Legacy byte-identical**: `_run_legacy` (runner.ml:217-218 end boundary, starting at ~193) is entirely absent from the diff. The only change touching `run_backtest`'s dispatch is replacing the old 5-line `failwith` in the `Tiered` branch with `_run_tiered_backtest ~deps ~start_date ~end_date ?trace ()`. `_run_legacy` is byte-identical to pre-PR.
+- **Skeleton raises loudly**: `_run_tiered_backtest` raises `Failure` with message: "Backtest.Runner: Tiered loader_strategy simulator-cycle step not yet implemented (lands in 3f-part3 of the backtest-tiered-loader plan)..." — clear pointer to 3f-part3. No silent fallback to Legacy.
+- **Metadata promote up front**: `_run_tiered_backtest` wraps `_promote_universe_metadata loader deps ~as_of` inside `Trace.record ... Trace.Phase.Load_bars` — correct single outer attribution. `_promote_universe_metadata` calls `Bar_loader.promote ~symbols:deps.all_symbols ~to_:Bar_loader.Metadata_tier ~as_of`. Universe is `deps.all_symbols` (all universe + ancillary symbols).
+- **Trace phase mapping**: `tier_op_to_phase` is exported from `runner.mli`. Tests cover all 3 variants: `test_tier_op_to_phase_promote_summary`, `test_tier_op_to_phase_promote_full`, `test_tier_op_to_phase_demote` — one test per variant so a future rename/reorder fails loudly at compile time (exhaustive match) and at test time (value mismatch).
+- **Test patterns (P6)**: All 5 tests use `assert_that` + `equal_to` / `elements_are`. No nested `assert_that`. Correct composition — consistent with `.claude/rules/test-patterns.md` and the rework applied in #463.
+
+## Verdict
+
+APPROVED
+
+All hard gates pass. All structural checklist items are PASS or NA. No FAILs. All dispatch-brief contract checks verified: no cycle, Legacy byte-identical, Tiered path raises loudly at simulator-cycle step, Metadata promote wrapped in Load_bars, tier_op_to_phase has per-variant unit tests, test patterns conform to matchers rules.

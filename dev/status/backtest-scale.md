@@ -188,6 +188,7 @@ structural_qc: APPROVED (3d, 2026-04-19 — dev/reviews/backtest-scale-3d.md)
 behavioral_qc: APPROVED (3d, 2026-04-19 — infrastructure-only tracer hook; no Weinstein domain logic touched; no-trace path observably silent for all three tier operations, verified by test_no_hook_promote_is_silent — dev/reviews/backtest-scale-3d.md)
 overall_qc: APPROVED (3d — structural + behavioral, 2026-04-19)
 
+structural_qc: APPROVED (3f-part2, 2026-04-20 — SHA 224031672d29434d178eba1111c8f6e6497b2a7d; dev/reviews/backtest-scale.md §3f-part2). All hard gates pass. Behavioral QC not blocked.
 structural_qc: APPROVED (3e, 2026-04-20 — dev/reviews/backtest-scale.md)
 behavioral_qc: APPROVED (3e, 2026-04-20 — plumbing-only PR; Legacy path byte-identical to pre-PR, Tiered branch raises loudly without silent fallback, CLI/scenario defaults flow to Legacy, sexp.option preserves backward-compat with all existing scenario files (none set the new field). Quality score 5/5. — dev/reviews/backtest-scale.md)
 overall_qc: APPROVED (3e — structural + behavioral, 2026-04-20)

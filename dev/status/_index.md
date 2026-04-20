@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-20 (run-2 reconcile: #458, #459, #460, #461, #462 all merged since run-1. New dispatches this run: #463 backtest-scale 3f-part1 shadow_screener adapter — overall_qc APPROVED (structural + behavioral quality 4/5) after one rework cycle on P6; #464 harness T3-G audit quality-score wiring — qc-structural APPROVED, behavioral N/A. Both awaiting human merge.)
+Last updated: 2026-04-20 (run-3 reconcile: #463 and #464 still awaiting human merge since run-2 (no new commits, CI green). New dispatches this run: #466 backtest-scale 3f-part2 tiered runner path skeleton stacked on #463 — overall_qc APPROVED (structural + behavioral quality 4/5) with an explicit split to 3f-part3; #467 harness consolidate_day.sh + Step 8b wiring — qc-structural APPROVED, behavioral N/A. Both drafts flipped to ready-for-review.)
 
 ## Active + complete tracks
 
@@ -14,12 +14,12 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | MERGED | — | — | — (#419 per-phase tracing merged 2026-04-19) |
-| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #463 | #459 (3e) + #462 (3e runner date-token fix) merged 2026-04-20. #463 (3f-part1 shadow_screener adapter, ~300 LOC inc. tests) dispatched run-2, structural + behavioral QC APPROVED (quality 4/5) after one P6 rework cycle on test composition. Next after #463 lands: 3f-part2 — runner integration (`_run_tiered_backtest` + flag branching in `run_backtest`), consuming the `Shadow_screener.screen` entry point this PR adds. Then 3g is the merge gate. |
+| [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #463, #466 | #463 (3f-part1 shadow_screener adapter) unchanged since run-2 — APPROVED, awaiting human merge. #466 (3f-part2 tiered runner path skeleton, stacked on #463) dispatched run-3, overall_qc APPROVED (quality 4/5), draft flipped to ready. Ships steps 1-2 of plan §3f (Bar_loader build + Metadata promote under Load_bars); raises loudly at simulator cycle with a pointer to 3f-part3. Next: 3f-part3 — Friday Summary-promote → Shadow_screener.screen → Full-promote cycle + per-transition promote/demote. Then 3g (parity acceptance test) is the merge gate. |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
 | [short-side-strategy](short-side-strategy.md) | MERGED | — | — | — (#420 merged 2026-04-19). Follow-ups carried to own tracks: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — (#408 + #409 both merged 2026-04-18) |
 | [sector-data](sector-data.md) | MERGED | — | — | — (#436 merged 2026-04-19). GHA orchestrator runs continue to consume `trading/test_data/sectors.csv`. |
-| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #464 | #458 + #461 merged 2026-04-20. #464 (T3-G — audit trail quality-score wiring via new `record_qc_audit.sh` + Step 5 Stage 4 in lead-orchestrator.md + qc-behavioral output contract) dispatched run-2, qc-structural APPROVED, behavioral N/A. Remaining open: advisory T3 items (T3-C, T3-F rule-promotion, T3-H commit-level QC) + Tier 4 end-state. |
+| [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #464, #467 | #464 (T3-G audit trail quality-score wiring) unchanged since run-2 — qc-structural APPROVED, awaiting human merge. #467 (Same-day summary consolidation — `dev/lib/consolidate_day.sh` + Step 8b wiring into lead-orchestrator) dispatched run-3, qc-structural APPROVED, behavioral N/A, draft flipped to ready. Remaining open: advisory T3 items (T3-C superseded, T3-F rule-promotion, T3-H commit-level QC) + Tier 4 end-state. |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #453 + #457 + #461 (baseline nesting-linter cleanup, orchestrator-authored) merged 2026-04-20. Backlog currently empty — run-2 deep scan shows 0 critical, 5 warnings (all low-severity: design doc drift, followup accumulation at 18, milestone-pinned linter exceptions unknown). No code-health dispatch this run. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
