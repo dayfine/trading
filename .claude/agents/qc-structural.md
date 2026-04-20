@@ -106,7 +106,7 @@ Do not use freeform narrative in the Status column — put detail in the Notes c
 | P3 | All configurable thresholds/periods/weights in config record | PASS/FAIL/NA | Broader than P2: verify new tunable values have config fields, not just that literals are absent |
 | P4 | .mli files cover all public symbols — covered by linter_mli_coverage.sh (dune runtest) | PASS/NA | If H3 passed, this is clean. If H3 failed, check mli_coverage linter output. |
 | P5 | Internal helpers prefixed with _ | PASS/FAIL/NA | List violations if any |
-| P6 | Tests use the matchers library (per CLAUDE.md) | PASS/FAIL/NA | |
+| P6 | Tests conform to `.claude/rules/test-patterns.md` (presence + conformance) | PASS/FAIL/NA | Load the rules file and apply three greppable sub-rules to every test file in the diff. Sub-rule 1: `List\.exists .* equal_to (true\|false)` in test files → FAIL (use `List.count + equal_to N`). Sub-rule 2: `let _ = .*on_market_close\b` or `let _ = .*\.run\b` in test files → FAIL (Result must be asserted, e.g. `assert_that result is_ok`). Sub-rule 3: `match .* with` followed by `\| Error .* -> assert_failure` or bare `\| Ok .* ->` without `assert_that`/`is_ok_and_holds` in test files → FAIL (use `is_ok_and_holds`). A file with `open Matchers` that still contains any of the three patterns is a FAIL, not a PASS. |
 | A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) — FLAG if any found | PASS/FLAG/NA | FLAG does not block approval; it routes to qc-behavioral for generalizability judgment |
 | A2 | No imports from analysis/ into trading/trading/ | PASS/FAIL/NA | |
 | A3 | No unnecessary modifications to existing (non-feature) modules | PASS/FAIL/NA | |
