@@ -7,7 +7,9 @@ READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452. 3e (runner + scenario plumbing for `loader_strategy`) ready for review on `feat/backtest-scale-3e` (#459, rebased onto main post-#457). 3f was split into three stacked parts to respect the ~400-line per-PR budget: 3f-part1 (shadow_screener adapter) shipped as draft #463 on `feat/backtest-scale-3f` (QC APPROVED); 3f-part2 (tiered runner skeleton — Bar_loader create + bulk Metadata promote + trace bridge, raises at simulator-cycle step) shipped as DRAFT #466 on `feat/backtest-scale-3f-part2`; 3f-part3 (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote) is the next outstanding increment before 3g (parity gate).
+behavioral_qc (3f-part3): APPROVED (2026-04-20) — feat/backtest-scale-3f-part3 SHA d493f2a9da4d7f5cc5cd6715878bfd2e8872c5bc. Wrapper is purely additive tier bookkeeping; inner Weinstein strategy untouched (adapter-only per plan Resolutions #3); Legacy path byte-identical. See dev/reviews/backtest-scale.md §"Behavioral QC — backtest-scale 3f-part3".
+
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466. 3f-part3 (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote) ready for review on `feat/backtest-scale-3f-part3` (#474). Next outstanding increment is 3g (parity gate).
 
 ## Interface stable
 NO

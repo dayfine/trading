@@ -1,9 +1,9 @@
 {
   "date": "2026-04-20",
   "feature": "harness",
-  "branch": "harness/audit-quality-score-wiring",
+  "branch": "harness/t3f-rule-promotion",
   "structural_qc": "APPROVED",
-  "behavioral_qc": "SKIPPED",
+  "behavioral_qc": "APPROVED",
   "overall_qc": "APPROVED",
   "harness_gap": "",
   "quality_score": null,
@@ -13,5 +13,5 @@
     "FLAG": 0
   },
   "consecutive_rework_count": 0,
-  "notes": "T3-G audit trail quality score wiring; record_qc_audit.sh added; Step 5 Stage 4 documented; qc-behavioral output contract formalized"
+  "notes": ""
 }
