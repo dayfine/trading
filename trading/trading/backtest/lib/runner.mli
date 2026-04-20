@@ -24,6 +24,18 @@ type result = {
           with [round_trips] via symbol + entry_date. *)
 }
 
+val tier_op_to_phase : Bar_loader.tier_op -> Trace.Phase.t
+(** Map a [Bar_loader.tier_op] (the library-internal tier-op tag) onto the
+    corresponding [Trace.Phase.t] emitted by the Tiered runner path:
+
+    - [Promote_to_summary] → [Promote_summary]
+    - [Promote_to_full] → [Promote_full]
+    - [Demote_op] → [Demote]
+
+    Exposed so the Tiered runner's trace bridging is observable from unit tests
+    without reaching into private helpers. Pure — depends only on the input
+    variant. *)
+
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
 (** True if [step] represents a real trading day — i.e. the portfolio's

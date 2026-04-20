@@ -235,7 +235,7 @@ let _run_legacy ~deps ~start_date ~end_date ?trace () =
    pointer to the unfinished work, so scenarios that opt into [Tiered] surface
    the incomplete contract loudly. *)
 
-let _map_tier_op_to_phase (op : Bar_loader.tier_op) : Trace.Phase.t =
+let tier_op_to_phase (op : Bar_loader.tier_op) : Trace.Phase.t =
   match op with
   | Promote_to_summary -> Trace.Phase.Promote_summary
   | Promote_to_full -> Trace.Phase.Promote_full
@@ -245,7 +245,7 @@ let _make_trace_hook ?trace () : Bar_loader.trace_hook =
   let record :
       'a. tier_op:Bar_loader.tier_op -> symbols:int -> (unit -> 'a) -> 'a =
    fun ~tier_op ~symbols f ->
-    let phase = _map_tier_op_to_phase tier_op in
+    let phase = tier_op_to_phase tier_op in
     Trace.record ?trace ~symbols_in:symbols phase f
   in
   { record }

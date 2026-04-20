@@ -1,5 +1,9 @@
 (tests
- (names test_stop_log test_runner_filter test_trace)
+ (names
+  test_stop_log
+  test_runner_filter
+  test_trace
+  test_runner_tiered_skeleton)
  (libraries
   ounit2
   core
@@ -7,7 +11,9 @@
   core_unix.filename_unix
   core_unix.sys_unix
   core_unix.time_ns_unix
+  fpath
   backtest
+  trading.backtest.bar_loader
   trading.base
   trading.engine
   trading.portfolio
