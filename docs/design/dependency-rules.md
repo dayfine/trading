@@ -27,7 +27,7 @@ implements it. Exceptions are maintained in
 
 | Field | Value |
 |---|---|
-| State | `enforced` |
+| Lifecycle | `enforced` |
 | Check | `trading/devtools/checks/arch_layer_test.sh` |
 | Scope | All `dune` files under `trading/analysis/` |
 
@@ -49,8 +49,8 @@ the analysis/trading boundary and is listed in `linter_exceptions.conf`.
 
 | Field | Value |
 |---|---|
-| State | `monitored` |
-| Check | None yet (health-scanner scans for violations) |
+| Lifecycle | `monitored` |
+| Check | `none` |
 
 The trading-side Weinstein modules (`trading/trading/weinstein/stops/` and
 `trading/trading/weinstein/trading_state/`) implement the trailing stop state
@@ -69,8 +69,8 @@ analysis implementation details.
 
 | Field | Value |
 |---|---|
-| State | `monitored` |
-| Check | None yet (health-scanner scans for violations) |
+| Lifecycle | `monitored` |
+| Check | `none` |
 
 The simulator (`trading.simulation`) wraps the full analysis-to-order pipeline
 for backtesting. It must not be a dependency of any live execution module —
@@ -85,8 +85,8 @@ production.
 
 | Field | Value |
 |---|---|
-| State | `enforced` (by dune structure — the library has no weinstein deps) |
-| Check | Implicit: `weinstein.types` dune file lists only `core` as a dependency |
+| Lifecycle | `enforced` |
+| Check | `implicit (dune structure: weinstein.types lists only core)` |
 
 `weinstein.types` defines the shared data types (stage variants, analysis
 result records, config, etc.) used by all other Weinstein analysis modules.
@@ -102,8 +102,8 @@ violation.
 
 | Field | Value |
 |---|---|
-| State | `proposed` |
-| Check | None yet |
+| Lifecycle | `proposed` |
+| Check | `none` |
 
 Analysis modules should not call concrete data-layer implementations directly
 (e.g., constructing an EODHD client inline, or reading from CSV storage
@@ -122,8 +122,8 @@ Promote to `monitored` once all analysis modules have been audited.
 
 | Field | Value |
 |---|---|
-| State | `enforced` (by dune structure) |
-| Check | Implicit: `trading.base` dune file lists only `core` |
+| Lifecycle | `enforced` |
+| Check | `implicit (dune structure: trading.base lists only core)` |
 
 `trading.base` defines primitive trading types (`symbol`, `price`, `quantity`,
 `side`, `order_type`, `trade`). These are the foundation of the entire trading
