@@ -76,5 +76,24 @@ if [ -f "$DESIGN_1" ]; then
   done
 fi
 
+# backtest-scale-optimization plan covers trading/trading/backtest/ subsystems
+# TRADING_DIR = <repo_root>/trading ; backtest lives at trading/trading/backtest
+# relative to repo root, so the full path is TRADING_DIR/trading/backtest.
+BACKTEST_PLAN="${REPO_ROOT}/dev/plans/backtest-scale-optimization-2026-04-17.md"
+BACKTEST_DIR="${TRADING_DIR}/trading/backtest"
+if [ -f "$BACKTEST_PLAN" ] && [ -d "$BACKTEST_DIR" ]; then
+  for d in "${BACKTEST_DIR}"/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    case "$name" in
+      _build|test|.formatted) continue ;;
+    esac
+    if ! grep -qi "$name" "$BACKTEST_PLAN" 2>/dev/null; then
+      DRIFT_COUNT=$((DRIFT_COUNT + 1))
+      add_warning "Design doc drift: \`trading/trading/backtest/${name}/\` exists on disk but not mentioned in \`backtest-scale-optimization-2026-04-17.md\`"
+    fi
+  done
+fi
+
 add_metric DRIFT_COUNT "$DRIFT_COUNT"
 flush_findings

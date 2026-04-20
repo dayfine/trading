@@ -174,3 +174,15 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:deep_scan_stale_bookmarks_check.sh})))
+
+; Deep scan drift coverage extension (harness gap sub-item 1): structural smoke test.
+; Verifies check_02_design_doc_drift.sh contains the backtest subsystem drift
+; check (trading/trading/backtest/ vs backtest-scale-optimization-2026-04-17.md)
+; and that the most-recent deep scan report has a drift metrics entry.
+; Does NOT run deep_scan.sh (weekly tool, not a per-PR gate).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:deep_scan_drift_coverage_check.sh})))
