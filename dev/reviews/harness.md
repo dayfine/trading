@@ -1,42 +1,34 @@
-Reviewed SHA: ff97df57b34904f109d8d4fa5aaf20207f446f3b
+Reviewed SHA: f0c402a620247a9423a9982c4300222cf2cd644a
 
 ## Structural Checklist
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
 | H1 | dune build @fmt (format check) | PASS | Exit 0; no formatting diff |
-| H2 | dune build | PASS | Exit 0; all shell scripts and dune stanzas valid |
-| H3 | dune runtest | FAIL | Full-repo exit code 1. Pre-existing baseline failures on `origin/main` (fn_length_linter: `runner.ml:193 run_backtest 56 lines`; nesting_linter: 49 functions in `analysis/scripts/`; file_length_linter: `weinstein_strategy.ml 320 lines`; magic_numbers: `weinstein_strategy.ml` and `trace.ml`). All failing files are unchanged by this PR (zero diff for all flagged paths vs origin/main). New smoke test `deep_scan_linter_expiry_check.sh` passes when invoked directly (exit 0, "OK: deep scan Linter Exception Expiry section (T1-K) structural check passed."). Scaffolding audit in deep scan report shows `PASS: deep_scan_linter_expiry_check.sh — referenced`. |
+| H2 | dune build | PASS | Exit 0; no compilation errors |
+| H3 | dune runtest | FAIL | Full-repo exit code 1. Pre-existing baseline failures — nesting_linter: 51 functions in `analysis/scripts/universe_filter/` and `analysis/scripts/fetch_finviz_sectors/` plus `trading/weinstein/strategy/lib/ad_bars.ml` and `analysis/technical/indicators/atr/lib/atr.ml`. All failing paths are unchanged by this PR (zero diff for all flagged paths vs origin/main). New smoke test `deep_scan_drift_coverage_check.sh` passes when invoked directly (exit 0, "OK: deep scan drift coverage extension (backtest subsystem, harness gap sub-item 1) structural check passed."). |
 | P1 | Functions ≤ 50 lines — covered by fn_length_linter (dune runtest) | NA | No OCaml files changed in this PR. All changes are shell scripts and dune stanzas. |
 | P2 | No magic numbers — covered by linter_magic_numbers.sh (dune runtest) | NA | No OCaml files changed in this PR. |
 | P3 | All configurable thresholds/periods/weights in config record | NA | No domain logic or tunable parameters introduced. Shell-only harness change. |
 | P4 | .mli files cover all public symbols — covered by linter_mli_coverage.sh (dune runtest) | NA | No OCaml files changed in this PR. |
-| P5 | Internal helpers prefixed with _ | PASS | `_milestone_num()` shell function in `deep_scan.sh` correctly prefixed with underscore. No other new internal helpers. |
-| P6 | Tests use the matchers library (per CLAUDE.md) | NA | No OCaml test files changed. Smoke test is a shell script, not an OCaml test. |
-| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | Zero diff in any of the core trading modules. |
+| P5 | Internal helpers prefixed with _ | NA | No new OCaml helper functions. Shell `fail()` local to smoke test is a terminal error handler, not an internal helper in the OCaml sense. |
+| P6 | Tests use the matchers library (per CLAUDE.md) | NA | No OCaml test files changed. Smoke test is a shell script. |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | Zero diff in any core trading modules. Changed files: `dev/health/2026-04-20-deep.md`, `dev/metrics/cc-latest.json`, `dev/status/harness.md`, `trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh`, `trading/devtools/checks/deep_scan_drift_coverage_check.sh`, `trading/devtools/checks/dune`. |
 | A2 | No imports from analysis/ into trading/trading/ | PASS | No OCaml files changed; no new imports introduced. |
-| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | Changed files: `dev/health/2026-04-19-deep.md` (generated report — expected), `dev/metrics/cc-latest.json` (CC snapshot update — expected side effect of running deep_scan.sh), `dev/status/harness.md` (appropriate status update), `trading/devtools/checks/deep_scan.sh` (feature target), `trading/devtools/checks/deep_scan_linter_expiry_check.sh` (new smoke test), `trading/devtools/checks/dune` (wiring). No existing check blocks modified; Check 11 appended after Check 10. |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | `check_02_design_doc_drift.sh`: new stanza appended after the existing three (weinstein_strategy, weinstein_portfolio, data_source) without touching prior blocks. `dune`: one stanza added at end. `dev/status/harness.md`: sub-item 1 struck through and completion entry added to Completed section — appropriate and scoped. |
 
 ## Scope Verification
 
-- **Check 11 implementation**: `deep_scan.sh` adds a well-delimited block after Check 10 with clear `# Check 11: Linter Exception Expiry` header. Block reads `linter_exceptions.conf`, processes each active entry, handles milestone (M1-M7) and date (YYYY-MM-DD) comparison modes, emits `[MANUAL REVIEW]` when current milestone cannot be parsed (fallback clearly labeled), and always emits `## Linter Exception Expiry` section in the report.
-- **Deep scan end-to-end**: Ran successfully (exit 0). Report at `dev/health/2026-04-19-deep.md` contains `## Linter Exception Expiry` at line 155.
-- **Milestone fallback**: `weinstein-trading-system-v2.md` has no `Current milestone:` marker; the script correctly falls back to "MANUAL REVIEW" with a clear parse warning in the report. This is documented intentional behaviour per scope context.
-- **Smoke test**: `deep_scan_linter_expiry_check.sh` verifies (1) Check 11 structural markers in `deep_scan.sh` and (2) most-recent `dev/health/*-deep.md` contains `## Linter Exception Expiry`. Both assertions run. Exit 0 confirmed.
-- **Dune wiring**: `trading/devtools/checks/dune` adds a new `(rule (alias runtest) ...)` stanza for `deep_scan_linter_expiry_check.sh` with `_check_lib.sh` as a dep, matching the pattern used for `deep_scan_recent_commits_check.sh` (Check 10).
-- **Status file**: `dev/status/harness.md` sub-item 3 under "Deep scan heuristic gaps" is struck through (`~~**Linter exception expiry**...~~`) and a completion note is added under Completed section.
-- **No scope creep**: Zero diff in any OCaml source, feature modules, or unrelated devtools scripts.
+- **4th subsystem entry shape**: The new backtest stanza in `check_02_design_doc_drift.sh` (lines 79–96) follows the same pattern as the existing three — PLAN/DIR variables, `if [ -f ] && [ -d ]` guard, for-loop over subdirs, `_build|test|.formatted` skip cases, `grep -qi` against plan doc, `add_warning` on miss. Shape is consistent.
+- **Smoke test pattern**: `deep_scan_drift_coverage_check.sh` sources `_check_lib.sh`, uses `repo_root` and `die` from it (both defined in `_check_lib.sh`), verifies BACKTEST_PLAN, BACKTEST_DIR, plan filename, and subsystem path markers in `check_02`, then checks the most-recent deep report for "Design doc drift". Matches the pattern of sibling smoke tests (`deep_scan_stale_bookmarks_check.sh`, `deep_scan_linter_expiry_check.sh`).
+- **Dune wiring**: `trading/devtools/checks/dune` adds `(rule (alias runtest) (deps _check_lib.sh) (action (run sh %{dep:deep_scan_drift_coverage_check.sh})))` — identical shape to adjacent stanzas. `_check_lib.sh` correctly listed in `deps` (required since the script sources it at runtime).
+- **Part 2 check semantics**: The OR condition `grep -qF 'Design doc drift' "$LATEST_DEEP" || grep -qF 'DRIFT_COUNT' "$CHECK_02"` is permissive: the second arm is always true (DRIFT_COUNT is always in check_02), making the Part 2 check structurally weak — it would pass even if the health report had no drift section at all. However, since the deep report `dev/health/2026-04-20-deep.md` does contain "Design doc drift" (2 occurrences), the first arm is satisfied, and the check is working as intended in this state.
+- **Sub-item 1 status update**: `dev/status/harness.md` line 130 strikes through the sub-item header with `~~**Drift coverage too narrow**~~`; a separate "### Deep scan heuristic gap sub-item 1" entry is added to the Completed section at line 295 with a full verification recipe. Shape matches sub-items 2, 3, 4 (all previously marked DONE).
+- **H3 pre-existing failures**: All nesting_linter failures are in `analysis/scripts/` paths unchanged by this PR. The pre-flight context explicitly flags these as unrelated baseline noise.
 
 ## Notes on H3 (pre-existing failures)
 
-The `dune runtest` exit code 1 is caused entirely by pre-existing linter violations that exist on `origin/main` and are unchanged by this PR:
-
-1. `fn_length_linter`: `trading/trading/backtest/lib/runner.ml:193 run_backtest` — 56 lines. File exists on `origin/main` (248 lines), zero diff in this PR.
-2. `nesting_linter`: 49 functions in `analysis/scripts/universe_filter/` and `analysis/scripts/fetch_finviz_sectors/`. All pre-existing.
-3. `file_length_linter`: `trading/trading/weinstein/strategy/lib/weinstein_strategy.ml` — 320 lines. Exists on `origin/main` (320 lines), zero diff in this PR.
-4. `magic_numbers`: `weinstein_strategy.ml` (literal `11`) and `trace.ml` (literal `1024`). Both pre-existing on `origin/main`.
-
-None of these were introduced by this PR. The new smoke test passes cleanly in isolation.
+The `dune runtest` exit code 1 is caused entirely by pre-existing nesting_linter violations that exist on `origin/main` and are unchanged by this PR. All 51 flagged functions are in `analysis/scripts/universe_filter/`, `analysis/scripts/fetch_finviz_sectors/`, `trading/weinstein/strategy/lib/ad_bars.ml`, and `analysis/technical/indicators/atr/lib/atr.ml`. None were introduced by this PR.
 
 ## Verdict
 
@@ -102,4 +94,3 @@ Weinstein domain axes are N/A — this is a harness/health-scanner policy change
 APPROVED
 
 (All applicable checks PASS; all Weinstein domain axes N/A for this harness-only shell change.)
-
