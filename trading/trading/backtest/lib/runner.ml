@@ -203,16 +203,7 @@ let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     metrics = sim_result.Trading_simulation_types.Simulator_types.metrics;
   }
 
-let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
-    ?trace () =
-  let deps = _load_deps ?trace ~overrides ~sector_map_override () in
-  eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
-    (List.length deps.all_symbols);
-  let warmup_start = Date.add_days start_date (-warmup_days) in
-  eprintf "Running backtest (%s to %s, warmup from %s)...\n%!"
-    (Date.to_string start_date)
-    (Date.to_string end_date)
-    (Date.to_string warmup_start);
+let _run_legacy ~deps ~start_date ~end_date ?trace () =
   let stop_log = Stop_log.create () in
   let n_all_symbols = List.length deps.all_symbols in
   let sim =
@@ -223,6 +214,32 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
         _run_simulator sim)
+  in
+  (sim_result, stop_log)
+
+let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
+    ?trace ?(loader_strategy = Loader_strategy.Legacy) () =
+  let deps = _load_deps ?trace ~overrides ~sector_map_override () in
+  eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
+    (List.length deps.all_symbols);
+  let warmup_start = Date.add_days start_date (-warmup_days) in
+  eprintf
+    "Running backtest (%s to %s, warmup from %s, loader_strategy=%s)...\n%!"
+    (Date.to_string start_date)
+    (Date.to_string end_date)
+    (Date.to_string warmup_start)
+    (Loader_strategy.to_string loader_strategy);
+  let sim_result, stop_log =
+    match loader_strategy with
+    | Loader_strategy.Legacy ->
+        _run_legacy ~deps ~start_date ~end_date ?trace ()
+    | Loader_strategy.Tiered ->
+        failwith
+          "Backtest.Runner: Tiered loader_strategy not yet implemented (lands \
+           in increment 3f of \
+           dev/plans/backtest-tiered-loader-2026-04-19.md). Pass \
+           loader_strategy=Legacy or omit the argument to use the existing \
+           path."
   in
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on

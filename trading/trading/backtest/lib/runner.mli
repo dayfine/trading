@@ -44,6 +44,7 @@ val run_backtest :
   ?overrides:Sexp.t list ->
   ?sector_map_override:(string, string) Core.Hashtbl.t ->
   ?trace:Trace.t ->
+  ?loader_strategy:Loader_strategy.t ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -77,4 +78,13 @@ val run_backtest :
     Finer-grained wrap points for the per-bar phases inside [Simulator.run]
     (Sector_rank / Rs_rank / Stage_classify / Screener / Stop_update /
     Order_gen) require strategy-level instrumentation and are tracked as a
-    follow-up. When [trace] is omitted, instrumentation is a no-op. *)
+    follow-up. When [trace] is omitted, instrumentation is a no-op.
+
+    [loader_strategy] selects how universe bars are loaded:
+    - [Legacy] (default) — current production path: simulator materializes all
+      universe bars up-front via per-symbol bar loaders.
+    - [Tiered] — placeholder. The actual Tiered execution path lands in
+      increment 3f of [dev/plans/backtest-tiered-loader-2026-04-19.md]; calling
+      [run_backtest] with [Tiered] today raises [Failure] with a clear message
+      so the absence of an implementation surfaces loudly rather than silently
+      falling back to [Legacy]. *)
