@@ -35,10 +35,10 @@ type t = { mutable entries : phase_metrics list }
 
 let create () = { entries = [] }
 
-(** Parse a [VmHWM: 123456 kB] line. Returns kB (native unit from
-    [/proc/self/status]; do not pre-divide by 1024 to MB — short-lived or small
-    processes would integer-truncate to 0 MB and hide real regressions). [None]
-    if the line can't be parsed. *)
+(** Parse a [VmHWM: NNNN kB] line. Returns kB (native unit from
+    [/proc/self/status]; do not pre-divide to MB — short-lived or small
+    processes would integer-truncate to zero MB and hide real regressions).
+    [None] if the line can't be parsed. *)
 let _parse_vmhwm_line line : int option =
   String.drop_prefix line (String.length "VmHWM:")
   |> String.strip

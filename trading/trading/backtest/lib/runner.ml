@@ -190,6 +190,19 @@ let _run_simulator sim =
       failwith
         (sprintf "Backtest.Runner: simulation failed: %s" (Status.show e))
 
+let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
+    ~sim_result : Summary.t =
+  {
+    start_date;
+    end_date;
+    universe_size = deps.universe_size;
+    n_steps = List.length steps;
+    initial_cash;
+    final_portfolio_value = final_value;
+    n_round_trips = List.length round_trips;
+    metrics = sim_result.Trading_simulation_types.Simulator_types.metrics;
+  }
+
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?trace () =
   let deps = _load_deps ?trace ~overrides ~sector_map_override () in
@@ -233,16 +246,8 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         ( Metrics.extract_round_trips steps_in_range,
           Stop_log.get_stop_infos stop_log ))
   in
-  let summary : Summary.t =
-    {
-      start_date;
-      end_date;
-      universe_size = deps.universe_size;
-      n_steps = List.length steps;
-      initial_cash;
-      final_portfolio_value = final_value;
-      n_round_trips = List.length round_trips;
-      metrics = sim_result.metrics;
-    }
+  let summary =
+    _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
+      ~sim_result
   in
   { summary; round_trips; steps; overrides; stop_infos }

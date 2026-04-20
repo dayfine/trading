@@ -240,8 +240,8 @@ let _all_accumulated_symbols ~(config : config) : string list =
     macro regimes (Bullish, Neutral, Bearish) the screener is invoked;
     macro-specific gating — longs blocked under Bearish, shorts blocked under
     Bullish — happens inside the screener. Under Bearish this yields short-side
-    entries (Weinstein Ch. 11), where previously the branch returned []
-    unconditionally. *)
+    entries (per the bear-market shorting chapter), where previously the branch
+    returned [] unconditionally. *)
 let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
     ~current_date ~index_bars =
