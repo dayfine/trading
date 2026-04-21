@@ -5,8 +5,10 @@
 ## Status
 IN_PROGRESS
 
-## structural_qc (gha-cost-tracking, PR #483): NEEDS_REWORK (2026-04-21)
-Branch: harness/gha-cost-tracking. SHA: d1ba14a3cf90ce16d819b9f2db937ab6e7b78d6d. See dev/reviews/harness.md §"Structural Checklist — harness gha-cost-tracking (PR #483)". Bash-only syntax in new POSIX-sh scripts (`#!/usr/bin/env bash` shebang, `set -euo pipefail`, `${BASH_SOURCE[0]}`, `<<<` here-string, `[[ ]]`, and bash arrays in `budget_rollup{,_check}.sh`). Dune invokes these with `/bin/sh`. Fix: rewrite both scripts to POSIX sh. Behavioral QC skipped per Step 5 policy.
+## structural_qc (gha-cost-tracking, PR #483): APPROVED (2026-04-21 run-2, re-review after rework)
+Branch: harness/gha-cost-tracking. SHA: 792b5b0901c963a021526e53223f6adaef65dcdf. See dev/reviews/harness.md §"Structural Checklist — harness gha-cost-tracking (PR #483, re-review after POSIX-sh rework)". All 13 checklist items PASS or NA; H3 now PASSES after POSIX-sh fixes (shebang `#!/bin/sh`, `set -eu`, bash array → tmpfile + xargs, `${BASH_SOURCE[0]}` → `repo_root` helper, `<<<` → `< /dev/null`). Behavioral review N/A (harness/utility-script PR — no domain logic). Mergeable_state "dirty" is a status-file conflict with #485 (docs-only), not a QC failure — resolved at merge time.
+
+**Prior review (historical):** structural_qc NEEDS_REWORK at SHA d1ba14a3 (2026-04-21 run-1). Original review body retained at top of dev/reviews/harness.md.
 
 ## structural_qc: APPROVED (2026-04-20)
 Branch: harness/deep-scan-drift-coverage. SHA: f0c402a620247a9423a9982c4300222cf2cd644a. See dev/reviews/harness.md.

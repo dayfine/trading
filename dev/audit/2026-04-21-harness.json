@@ -2,16 +2,16 @@
   "date": "2026-04-21",
   "feature": "harness",
   "branch": "harness/gha-cost-tracking",
-  "structural_qc": "NEEDS_REWORK",
+  "structural_qc": "APPROVED",
   "behavioral_qc": "SKIPPED",
-  "overall_qc": "NEEDS_REWORK",
-  "harness_gap": "POSIX shell portability lint check absent — no existing dune rule validates that scripts under trading/devtools/checks/ (which dune invokes with /bin/sh) use POSIX-compatible shebang, set options, conditionals, here-docs, and array syntax. Candidate: a new shellcheck-style linter or a dash -n smoke gate wired into dune runtest.",
-  "quality_score": null,
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
   "findings_count": {
     "PASS": 0,
     "FAIL": 0,
     "FLAG": 0
   },
-  "consecutive_rework_count": 1,
-  "notes": "Structural NEEDS_REWORK on bash-only syntax in new POSIX-sh scripts: #!/usr/bin/env bash shebang, set -euo pipefail, ${BASH_SOURCE[0]}, <<< here-string, [[ ]] conditional, and bash arrays in budget_rollup{,_check}.sh. Behavioral skipped per Step 5 policy (structural gate)."
+  "consecutive_rework_count": 0,
+  "notes": "Re-review 2026-04-21 run-2 after POSIX-sh rework at tip 792b5b09. All 13 structural items PASS/NA; H3 now green. Behavioral SKIPPED (harness/utility-script — no domain logic). Quality Score 4/5 (docked one point because the original bash-only syntax was an avoidable oversight given the established #!/bin/sh + set -eu pattern in the codebase). Prior run-1 review at d1ba14a3 was NEEDS_REWORK (consecutive_rework_count=1); rework resolved in a single iteration. Auto-extractor (record_qc_audit.sh) read the re-review's `## Verdict APPROVED` line as behavioral_qc=APPROVED — same extraction ambiguity flagged in 2026-04-21 run-1; manually corrected here to SKIPPED."
 }
