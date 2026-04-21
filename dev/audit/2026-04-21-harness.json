@@ -1,0 +1,17 @@
+{
+  "date": "2026-04-21",
+  "feature": "harness",
+  "branch": "harness/gha-cost-tracking",
+  "structural_qc": "NEEDS_REWORK",
+  "behavioral_qc": "SKIPPED",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "POSIX shell portability lint check absent — no existing dune rule validates that scripts under trading/devtools/checks/ (which dune invokes with /bin/sh) use POSIX-compatible shebang, set options, conditionals, here-docs, and array syntax. Candidate: a new shellcheck-style linter or a dash -n smoke gate wired into dune runtest.",
+  "quality_score": null,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "Structural NEEDS_REWORK on bash-only syntax in new POSIX-sh scripts: #!/usr/bin/env bash shebang, set -euo pipefail, ${BASH_SOURCE[0]}, <<< here-string, [[ ]] conditional, and bash arrays in budget_rollup{,_check}.sh. Behavioral skipped per Step 5 policy (structural gate)."
+}
