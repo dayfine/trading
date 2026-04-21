@@ -130,6 +130,14 @@ Common verifications:
   "resolved between runs" so the audit trail exists.
 - If ambiguous (verification inconclusive): carry forward as `[info]` with
   a note asking the human to verify, not as `[critical]`.
+- **If no still-real `[critical]` items exist** (the normal case when main
+  is green and prior criticals were resolved): do NOT emit any `[critical]`
+  line for this. Either write nothing under `## Escalations` for Step 1c,
+  or at most write one `[info]` line:
+  `[info] Carried-forward verification: no still-real [critical] items; main green (exit 0 on <sha>).`
+  **A "nothing wrong" verification result must never be tagged `[critical]`.**
+  The `[critical]` tag triggers the "Fail on escalations" GHA gate — a
+  green-verified state must never fire that gate.
 
 This step exists because carrying a stale `[critical]` causes downstream
 plan logic to cascade (skip tracks, queue corrective dispatches, warn
@@ -334,7 +342,7 @@ FOR each track with N > 0 open PRs:
   IF tip_sha != last_review_sha: CONDITION_1 = FAIL
 ```
 
-**Condition 2 — No dev/status/*.md file modified since the prior summary's timestamp.**
+**Condition 2 — No dev/status/*.md file modified since the prior summary's timestamp (excluding orchestrator summary commits).**
 
 ```bash
 # Get the timestamp of the most recent prior summary (today or most recent)
@@ -342,14 +350,20 @@ PREV_SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | grep -v '\-plan\.md' | head -
 PREV_TS="$(date -r "$PREV_SUMMARY" +%s 2>/dev/null || stat -f %m "$PREV_SUMMARY")"
 PREV_ISO="$(date -r "$PREV_SUMMARY" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -d "@$PREV_TS" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null)"
 
-# Check for any status file changes since that timestamp
-STATUS_CHANGED="$(git log --since="$PREV_ISO" --name-only --pretty="" -- dev/status/ | grep -c '.' || true)"
+# Check for any status file changes since that timestamp,
+# EXCLUDING commits whose subject is an orchestrator summary (those are the prior
+# run's own output landing on main via auto-merge — not new drift).
+STATUS_CHANGED="$(git log --since="$PREV_ISO" --name-only --pretty="%s" -- dev/status/ \
+  | grep -v '^ops: daily orchestrator summary ' \
+  | grep -c '\.' || true)"
 if [ "${STATUS_CHANGED:-0}" -gt 0 ]; then
   CONDITION_2=FAIL
 fi
 ```
 
-If any `dev/status/*.md` was committed after the prior summary, Condition 2 fails. This catches: new features picked up, status transitions (IN_PROGRESS → READY_FOR_REVIEW), new follow-up items added.
+If any `dev/status/*.md` was committed after the prior summary — by a non-summary commit — Condition 2 fails. This catches: new features picked up, status transitions (IN_PROGRESS → READY_FOR_REVIEW), new follow-up items added.
+
+**Exemption:** commits whose subject line matches `ops: daily orchestrator summary ` are the prior run's own output auto-merging to main (Step 8a). These commits update `dev/status/_index.md` and sometimes `dev/status/harness.md` as part of the orchestrator's Step 5.5 reconciliation. They do not represent new track drift — the run that generated them already evaluated all tracks. Exempting them prevents a prior run's auto-merge from falsely tripping Condition 2 on the next run.
 
 **Condition 3 — Step 1b drift cross-reference emitted no `[drift]` warnings.**
 
