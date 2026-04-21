@@ -1,4 +1,107 @@
-Reviewed SHA: 43a1f48ff04e6e6a8b9927f2d79650830709a525
+Reviewed SHA: d1ba14a3cf90ce16d819b9f2db937ab6e7b78d6d
+
+## Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | No format violations |
+| H2 | dune build | PASS | Clean build |
+| H3 | dune runtest | FAIL | budget_rollup_check.sh fails: shell incompatibility (see NEEDS_REWORK) |
+| P1 | Functions ≤ 50 lines (linter) | NA | No OCaml source functions in feature code paths |
+| P2 | No magic numbers (linter) | NA | Harness track; no domain logic |
+| P3 | Config completeness | NA | Harness track; no trading configuration |
+| P4 | .mli coverage (linter) | NA | No OCaml modules in feature code paths |
+| P5 | Internal helpers prefixed with _ | NA | No OCaml internal functions in feature code paths |
+| P6 | Tests conform to test-patterns.md | NA | No OCaml tests in feature code paths |
+| A1 | Core module modifications | NA | No Portfolio/Orders/Position/Strategy/Engine touched |
+| A2 | No analysis/ → trading/ imports | NA | Harness track; no such imports |
+| A3 | No unnecessary existing module modifications | PASS | Only devtools/checks/ (harness infrastructure) modified |
+
+## Observations on Shell Scripts and Workflow YAML
+
+### CRITICAL: H3 Test Failure — Shell Compatibility
+
+The new test script `trading/devtools/checks/budget_rollup_check.sh` (153 lines) is wired into dune runtest on line 224–228 of `trading/devtools/checks/dune`:
+```
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:budget_rollup_check.sh})))
+```
+
+The script runs with `sh`, but line 15 uses `set -euo pipefail` (a bash-specific option):
+```
+set -euo pipefail
+```
+
+When dune executes `sh budget_rollup_check.sh`, the shell rejects the `-o` flag with: `set: Illegal option -o pipefail`. This causes `dune runtest` to fail.
+
+All other check scripts in the same file (`rule_promotion_check.sh`, `rule_promotion_self_test.sh`) follow the established pattern:
+- Shebang: `#!/bin/sh` (not `#!/usr/bin/env bash`)
+- Use: `set -e` (POSIX standard, not bash-specific `set -euo pipefail`)
+- Array syntax: not used (bash-ism)
+- Conditional syntax: `[ ... ]` not `[[ ... ]]` (bash-ism)
+
+### GHA Workflow "Capture run cost" Step
+
+The new step in `.github/workflows/orchestrator.yml` (lines 155–251):
+- ✅ Correct `if: always()` placement — runs even if orchestrator fails, capturing partial-run cost
+- ✅ Correct step ID reference: `steps.run-orchestrator.outputs.execution_file`
+- ✅ JSON parsing logic (Python) looks safe — guards against missing/malformed files with fallback to `null`
+- ✅ No hardcoded secrets exposed; uses standard GitHub context variables
+
+### Configuration and Documentation
+
+- ✅ `dev/config/merge-policy.json`: valid JSON; model_prices block well-structured with three models (opus, sonnet, haiku) and pricing in per-million-token format
+- ✅ `dev/status/cost-tracking.md`: clear status file; conforms to schema (Status: IN_PROGRESS, Interface stable: NO); documents limitations (per-subagent breakdown not available from action)
+- ✅ `lead-orchestrator.md` Step 3.75b: removed hardcoded `~$2–4` estimate; now references model_prices block for cost calculation
+- ✅ `lead-orchestrator.md` Step 7 "Budget" section: extended to read budget JSON if present, falls back to estimates; documentation is clear and self-consistent
+
+### Sample Budget File
+
+The file `dev/budget/2026-04-20-run1.json` is a valid example record with correct schema: `run_id`, `timestamp`, `commit_sha`, `measurement_source`, `fallback_branch`, `notes`, `subagents` array, and `totals` object with `total_cost_usd`.
+
+### Stale-branch preflight
+
+Branch is 2 commits behind `origin/main` — within acceptable range. No FLAG needed.
+
+## Verdict
+
+NEEDS_REWORK
+
+## NEEDS_REWORK Items
+
+### H3: Shell incompatibility in budget_rollup_check.sh
+
+- Finding: The test script `trading/devtools/checks/budget_rollup_check.sh` uses bash-specific syntax but is invoked with `sh` by dune (line 228 of `trading/devtools/checks/dune`). Specific violations detected:
+  1. Line 15: `set -euo pipefail` — the `-o pipefail` option is bash-only; POSIX sh rejects it with `set: Illegal option -o pipefail`
+  2. Line 51: `<<< ""` (here-string) — bash-only syntax; causes `Syntax error: redirection unexpected` in POSIX sh
+- Location: `trading/devtools/checks/budget_rollup_check.sh` (lines 15, 51); `trading/devtools/checks/dune` (line 228)
+- Required fix: Rewrite `budget_rollup_check.sh` to conform to POSIX sh standards, matching the established pattern in the codebase:
+  1. Change shebang from `#!/usr/bin/env bash` to `#!/bin/sh`
+  2. Replace `set -euo pipefail` with `set -e` (POSIX standard)
+  3. Replace here-string `bash "$ROLLUP" <<< ""` (line 51) with a POSIX alternative: either `echo "" | bash "$ROLLUP"` or `bash "$ROLLUP" < /dev/null`
+  4. Verify all other bash-isms are removed
+  5. Test locally: `sh trading/devtools/checks/budget_rollup_check.sh` should pass without errors
+- harness_gap: LINTER_CANDIDATE — This could be caught by a pre-commit hook that runs `shellcheck -x -S warning` on all `*.sh` files under `trading/devtools/checks/` and `dev/lib/`, or by a dune rule that verifies shebang matches invocation method. However, the fix is deterministic and required for this PR.
+
+---
+
+## Quality Score: 2/5
+
+**Rationale:**
+- Architecture and design are sound: the workflow capture step is well-structured, the configuration is clean, the documentation is thorough.
+- The cost-tracking design correctly identifies its limitations (per-subagent breakdown not available from action output; documented in dev/status/cost-tracking.md).
+- However, the test script has a critical blocker: it does not conform to the established shell pattern used throughout the harness infrastructure. This causes `dune runtest` to fail immediately, making the PR unsuitable for merge until the shell compatibility issue is fixed.
+- No behavioral review needed for this harness PR (shell scripts and YAML configuration only — no domain logic).
+
+**Recommendation:** Fix the shell compatibility issue in budget_rollup_check.sh and re-run tests. Once H3 passes, this PR is structurally sound and ready for merge.
+
+---
+
+## Prior reviews (archive — deep-scan-drift-coverage + consolidate_day; both merged)
+
 
 ## Structural Checklist
 

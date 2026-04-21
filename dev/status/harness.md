@@ -1,9 +1,12 @@
 # Status: harness
 
-## Last updated: 2026-04-20
+## Last updated: 2026-04-21
 
 ## Status
 IN_PROGRESS
+
+## structural_qc (gha-cost-tracking, PR #483): NEEDS_REWORK (2026-04-21)
+Branch: harness/gha-cost-tracking. SHA: d1ba14a3cf90ce16d819b9f2db937ab6e7b78d6d. See dev/reviews/harness.md §"Structural Checklist — harness gha-cost-tracking (PR #483)". Bash-only syntax in new POSIX-sh scripts (`#!/usr/bin/env bash` shebang, `set -euo pipefail`, `${BASH_SOURCE[0]}`, `<<<` here-string, `[[ ]]`, and bash arrays in `budget_rollup{,_check}.sh`). Dune invokes these with `/bin/sh`. Fix: rewrite both scripts to POSIX sh. Behavioral QC skipped per Step 5 policy.
 
 ## structural_qc: APPROVED (2026-04-20)
 Branch: harness/deep-scan-drift-coverage. SHA: f0c402a620247a9423a9982c4300222cf2cd644a. See dev/reviews/harness.md.
