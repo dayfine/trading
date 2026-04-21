@@ -1,4 +1,4 @@
-Reviewed SHA: 6d690819c7a7d361f6c2d0c5bec5870b9d4ea589
+Reviewed SHA: db925c5a4c56fc852436da27cc1a8a770d30df62
 
 ## Structural Checklist — backtest-scale 3g (parity acceptance test)
 
@@ -271,3 +271,50 @@ Reviewer: qc-behavioral
 APPROVED
 
 All Contract Pinning (CP1-CP4) and applicable Behavioral (A1/S*/L*/C*/T*) checks are PASS or NA. The dispatch brief's five behavioral checks (G1-G7) all PASS on the literal contract, with two FLAGs (G4, G5) documenting a real merge-gate semantic gap that must be resolved before the post-merge default flip. The test faithfully implements what plan §3g specified to implement; the fact that the Tiered tiering is degenerate on this scenario is a known-and-escalated upstream issue (status file follow-up #2), not a defect in this PR's scope. Flagged items are non-blocking for the 3g merge but form a hard pre-requisite for the 3h nightly A/B and the subsequent default-flip PR — any future work on those should first fix the SPY/GSPC.INDX benchmark_symbol divergence and verify that Summary > 0 / Full > 0 on the same parity scenario before treating this gate as honest proof of Tiered correctness.
+
+---
+
+## Behavioral Checklist — backtest-scale 3g re-review (PR #484 at tip db925c5a, F2 partial fix)
+
+Date: 2026-04-21 (run-4)
+Reviewer: qc-behavioral
+Scope: Incremental re-review of single commit `db925c5a` "Apply review: thread primary index as benchmark_symbol to Tiered Bar_loader (F2 partial)" on top of previously-APPROVED 3g tip `6d690819`. Diff is a single file, +7/-1:
+
+```
+trading/trading/backtest/lib/tiered_runner.ml | 8 +++++++-
+```
+
+The one substantive line change: `Bar_loader.create` call now passes `~benchmark_symbol:input.config.indices.primary` where previously it was omitted (so defaulted to `"SPY"`). The other 6 added lines are a justifying comment.
+
+### Narrow re-review focus (per dispatch brief)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| R1 | The F2/G5 FLAG's identified root cause (benchmark_symbol default="SPY" vs Runner's primary="GSPC.INDX") is now addressed in the literal-mechanism sense | PASS | `trading/trading/backtest/lib/tiered_runner.ml:38` now forwards `input.config.indices.primary` as `~benchmark_symbol`. `Runner._build_deps` (runner.ml:127-129) sets `config.indices.primary = index_symbol = "GSPC.INDX"` (runner.ml:6). The Tiered loader therefore asks for `GSPC.INDX` bars — which ARE present in the parity scenario fixtures and are included in the loader's universe via `all_symbols` (runner.ml:142-145). This closes the exact divergence G5 called out as the primary root cause. |
+| R2 | The 3g parity acceptance semantics are preserved (Legacy byte-identical; Tiered still produces the same observable output as Legacy) | PASS | Legacy path is untouched: `trading/trading/backtest/lib/runner.ml` is not in this commit's file list. Tiered path's only change is the benchmark_symbol kwarg on `Bar_loader.create` — no change to what transitions the inner strategy sees, no change to simulator wiring, no change to the wrapper's Friday cycle logic. Parity must still hold: the inner Weinstein strategy reads from `Simulator.create_deps`'s pre-loaded bar cache, and that cache is fed from `all_symbols` (unchanged). If anything, Summary/Full tier activity may now start exercising real code paths, but that can only subtract from inertness, not add to output divergence. (Mentioned by the author in the commit msg: "Parity test still passes".) |
+| R3 | The commit does not introduce any new Weinstein-domain behavior change outside the benchmark_symbol threading | PASS | Single-line functional change. No new config keys, no new cascade paths, no new transition logic. `_make_wrapper_config` (tiered_runner.ml:63-72) is unchanged — it already plumbed `primary_index` to the wrapper. The new code plumbs the SAME symbol to the Bar_loader, matching what the strategy already sees. Consistent, non-invasive. |
+| R4 | F2/G5's full behavioral claim ("Tiered tiering mechanism is observationally active on the parity scenario") is now satisfied | **FAIL (remains PARTIAL)** | Per the commit message itself: "after this fix, the parity test still logs `Tiered loader: Summary=0 Full=0` at end of run". Root cause is now narrower — `benchmark_symbol` is correct — but some other sub-computation inside `Summary_compute.compute_values` (one of ma_30w / atr_14 / rs_line / stage_heuristic, per the commit author's diagnosis) is still returning `None` for every universe symbol on every Friday, so `_promote_one_to_summary` still returns `Error` for every symbol and `_swallow_err` still eats it. The Tiered wrapper therefore **remains observationally inert on this scenario**. The merge-gate semantic gap that G5 described is NOT fully closed — only one necessary-but-insufficient prerequisite was delivered. See "Remaining gap" below. This is PARTIAL per the commit title's own self-description, not a regression. |
+| R5 | The commit's claim ("F2 partial") is honestly scoped — nothing is claimed that isn't delivered | PASS | Commit title literally says "(F2 partial)". Commit body documents the remaining gap ("Summary=0 Full=0 at end of run, meaning one of Summary_compute.compute_values internal calls … still returns None") and defers the deeper debugging to a follow-up. No overclaim. Consistent with the project's feedback-loop convention (stacked commits on top of original PR for review response). |
+
+### Remaining gap (what R4 means for downstream PRs)
+
+After this fix, G5's two-sentence FLAG should read: "benchmark_symbol divergence: **fixed**. Root cause of Summary=0/Full=0: **narrowed to one of ma_30w / atr_14 / rs_line / stage_heuristic inside Summary_compute**. Tiered tiering mechanism remains observationally inert on the parity scenario." The post-merge default-flip PR's pre-requisites list should update to:
+- ~~Fix SPY/GSPC.INDX benchmark_symbol divergence~~ — **done in db925c5a**.
+- Identify which Summary_compute sub-call is returning None for all symbols on the parity scenario and fix it.
+- Verify `Summary > 0 || Full > 0` at end of a Tiered parity run before treating this gate as honest proof of Tiered correctness.
+
+The LINTER_CANDIDATE suggestion in the prior review (F5: "assert `final_stats.summary > 0 || final_stats.full > 0` on a Tiered parity run") should still be deferred until the deeper Summary_compute gap is fixed — otherwise the linter would false-fail on this very PR's successor.
+
+### What did NOT change in this re-review
+
+CP1-CP4 (Contract Pinning) and all A1/S*/L*/C*/T* rows from the prior 3g run-1 review still apply. No new `.mli` surfaces were added, no new tests were added or removed, no PR-body claims about tests have changed (PR body hasn't been edited in a way that would require CP2 re-verification). The commit is purely a one-line argument threading to an existing API. If it were any smaller it would be a whitespace change.
+
+## Quality Score
+
+3 — The commit does what it says on the tin: threads the correct benchmark_symbol through a seam that was hardcoded-defaulting to "SPY" and was therefore guaranteed to miss on the parity fixture. The author's own commit message honestly names the partial-ness and identifies the next layer of the onion (Summary_compute internals). The behavioral impact is a genuine improvement — one of the two documented follow-up items (status file #2) is now closed — but the user-facing symptom G5 flagged (Summary=0/Full=0, tiered mechanism observationally inert) persists, so the 3g merge-gate's semantic gap is reduced but not eliminated. Quality Score holds at 3 rather than moving up because (a) the partialness means the F2 FLAG itself only *degrades* to a narrower FLAG rather than resolving, and (b) the residual work needed for the default-flip pre-requisite is non-trivial (requires isolating which of four Summary_compute calls is returning None). Not lower than 3 because the fix is clean, minimal, well-commented, and explicitly scoped.
+
+## Verdict
+
+APPROVED
+
+The dispatch-brief scope was narrow: verify the F2 fix is appropriately addressed (or note the remaining gap) and confirm parity semantics are preserved. The answer is: the benchmark_symbol-divergence portion of F2 is now fixed; parity semantics are preserved; the residual observational-inertness symptom persists and is honestly documented by the author. No new FAIL rows. The prior APPROVED verdict (Quality Score 3) stands, with the F2 FLAG downgraded from "benchmark_symbol mismatch" to "unknown Summary_compute sub-call returns None for all symbols" — strictly a narrower and better-understood flag than before.
