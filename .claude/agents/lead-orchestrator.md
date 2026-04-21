@@ -290,6 +290,154 @@ in the summary.
 
 ---
 
+## Step 0.5: Saturated-queue fast-exit check
+
+**Runs after Steps 1, 1b, 1c, and 1.5 (all state-collection is complete). Runs before Step 2 (any dispatch).** This is a read-only, sub-minute check. If all four conditions below hold, write a minimal no-op daily summary and exit — no subagents are dispatched.
+
+**Motivation:** when the review queue is fully saturated (all PRs are under human review with no new commits, no status drift), a full orchestrator pass dispatches nothing useful yet costs 10–15 minutes and non-trivial quota. This step detects that state and exits early.
+
+**Escape hatch — first run of the day:** If no prior summary exists for today AND the most recent summary (from any prior day) is more than 24 hours old, skip this check entirely and proceed to Step 2. The first run of a given day always does a full pass so the consolidation script has a non-empty base to merge.
+
+```bash
+# Find the most recent non-plan summary for today
+DATE=$(date +%F)
+PRIOR_TODAY="$(ls -t dev/daily/${DATE}*.md 2>/dev/null | grep -v '\-plan\.md' | head -1)"
+if [ -z "$PRIOR_TODAY" ]; then
+  # No prior summary today — check if there's a recent one from yesterday
+  MOST_RECENT="$(ls -t dev/daily/*.md 2>/dev/null | grep -v '\-plan\.md' | head -1)"
+  if [ -z "$MOST_RECENT" ]; then
+    # No prior summaries at all → full pass
+    SATURATED_CHECK_SKIP="first_run_ever"
+  else
+    HOURS_AGO=$(( ( $(date +%s) - $(date -r "$MOST_RECENT" +%s 2>/dev/null || stat -f %m "$MOST_RECENT") ) / 3600 ))
+    if [ "$HOURS_AGO" -ge 24 ]; then
+      SATURATED_CHECK_SKIP="first_run_day"
+    fi
+  fi
+fi
+```
+
+If `$SATURATED_CHECK_SKIP` is set, skip to Step 2.
+
+### Four conditions for no-op exit
+
+Evaluate all four. If ANY fails, proceed to Step 2 normally.
+
+**Condition 1 — All open PRs have tip_SHA == Reviewed_SHA (no unreviewed commits).**
+
+From Step 1.5 you already have, for each track: the list of open PRs and their tip SHAs, and the `Reviewed SHA:` line from `dev/reviews/<track>.md`. Check if, for every track with an open PR, `tip_sha == last_review_sha`. If any track has `tip_sha != last_review_sha` (new commits since last QC, or no review yet), Condition 1 fails.
+
+```
+FOR each track with N > 0 open PRs:
+  tip_sha = SHA of newest open PR
+  last_review_sha = "Reviewed SHA:" line from dev/reviews/<track>.md (or "" if absent)
+  IF tip_sha != last_review_sha: CONDITION_1 = FAIL
+```
+
+**Condition 2 — No dev/status/*.md file modified since the prior summary's timestamp.**
+
+```bash
+# Get the timestamp of the most recent prior summary (today or most recent)
+PREV_SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | grep -v '\-plan\.md' | head -1)"
+PREV_TS="$(date -r "$PREV_SUMMARY" +%s 2>/dev/null || stat -f %m "$PREV_SUMMARY")"
+PREV_ISO="$(date -r "$PREV_SUMMARY" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -d "@$PREV_TS" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null)"
+
+# Check for any status file changes since that timestamp
+STATUS_CHANGED="$(git log --since="$PREV_ISO" --name-only --pretty="" -- dev/status/ | grep -c '.' || true)"
+if [ "${STATUS_CHANGED:-0}" -gt 0 ]; then
+  CONDITION_2=FAIL
+fi
+```
+
+If any `dev/status/*.md` was committed after the prior summary, Condition 2 fails. This catches: new features picked up, status transitions (IN_PROGRESS → READY_FOR_REVIEW), new follow-up items added.
+
+**Condition 3 — Step 1b drift cross-reference emitted no `[drift]` warnings.**
+
+You computed this in Step 1b. If any `[drift]` warning was emitted, Condition 3 fails. (If Step 1b was skipped because no prior summary existed, Condition 3 trivially fails → full pass; this is covered by the first-run escape hatch above.)
+
+**Condition 4 — Harness and cleanup backlogs unchanged since prior summary.**
+
+```bash
+# Check for harness.md or cleanup.md changes since prior summary
+BACKLOG_CHANGED="$(git log --since="$PREV_ISO" --name-only --pretty="" -- dev/status/harness.md dev/status/cleanup.md | grep -c '.' || true)"
+if [ "${BACKLOG_CHANGED:-0}" -gt 0 ]; then
+  CONDITION_4=FAIL
+fi
+```
+
+If `dev/status/harness.md` or `dev/status/cleanup.md` gained new `[ ]` items since the prior summary, Condition 4 fails.
+
+### No-op exit procedure
+
+If all four conditions pass, write the minimal daily summary and exit:
+
+```bash
+# Compute run number (same logic as Step 7)
+RUN_COUNT=$(ls dev/daily/${DATE}*.md 2>/dev/null | grep -v '\-plan\.md' | wc -l | tr -d ' ')
+N=$(( RUN_COUNT + 1 ))
+if [ "$N" -eq 1 ]; then
+  FILENAME="dev/daily/${DATE}.md"
+else
+  FILENAME="dev/daily/${DATE}-run${N}.md"
+fi
+```
+
+Write `$FILENAME` with these sections (carry the prior summary's Integration Queue and QC Status forward verbatim):
+
+```markdown
+# Status — <DATE> [run N]
+
+**Run ID:** <DATE>-run<N>
+**Generated:** <timestamp>
+**Mode:** NO-OP (saturated-queue fast-exit)
+
+## Saturated-queue check result
+
+All four conditions passed — no dispatch this run:
+
+- **Condition 1** PASS — all open PRs: tip_SHA == Reviewed_SHA (no unreviewed commits)
+- **Condition 2** PASS — no dev/status/*.md changes since prior summary (<PREV_ISO>)
+- **Condition 3** PASS — no [drift] warnings from Step 1b
+- **Condition 4** PASS — harness.md and cleanup.md unchanged since prior summary
+
+No-op run: review queue stable, no new status drift; exiting before dispatch.
+
+## Dispatched this run
+
+(none — no-op run)
+
+## QC Status
+
+(carried forward from prior summary — no change)
+<paste QC status table from prior summary>
+
+## Budget
+
+Subagents dispatched: 0
+Estimated cost this run: ~$0 (orchestrator state-read only)
+Budget utilization: negligible
+
+## Escalations
+
+(none — no-op run; prior escalations carried forward)
+<paste any [critical] escalations from prior summary that were still-real per Step 1c>
+
+## Integration Queue
+
+(carried forward from prior summary)
+<paste Integration Queue from prior summary>
+
+## Per-run links
+
+- [run N] <FILENAME>
+```
+
+Then proceed directly to Step 8 (push the daily summary PR). Skip Steps 2–7 entirely.
+
+**Important:** the no-op summary still acts as the idempotency sentinel for the next run's "previous timestamp" lookup. The next run reads this file's timestamp as `PREV_ISO` for Condition 2 and Condition 4. Do not skip writing it.
+
+---
+
 ## Step 2: Check for maintenance work (before feature agents)
 
 ### 2a: Blocking refactors (immediate — runs before any feat-agent)
