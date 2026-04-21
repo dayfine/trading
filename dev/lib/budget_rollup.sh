@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # budget_rollup.sh DATE_RANGE
 #
 # Reads dev/budget/*.json for the given date range and emits a markdown table
@@ -13,9 +13,9 @@
 #   0 — success (zero records is not an error; table is emitted empty)
 #   1 — argument error
 
-set -euo pipefail
+set -eu
 
-REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 BUDGET_DIR="${REPO_ROOT}/dev/budget"
 
 # --- Argument parsing ---
@@ -56,26 +56,31 @@ if [ ! -d "$BUDGET_DIR" ]; then
   exit 0
 fi
 
-MATCHED_FILES=()
+MATCHED_TMPFILE="$(mktemp)"
+trap 'rm -f "$MATCHED_TMPFILE"' EXIT
 for f in "${BUDGET_DIR}"/*.json; do
   [ -f "$f" ] || continue
   BASENAME="$(basename "$f" .json)"
   # Filenames are <YYYY-MM-DD>-run<N>; extract the date portion
   FILE_DATE="${BASENAME%-run*}"
-  if [[ "$FILE_DATE" < "$START_DATE" ]] || [[ "$FILE_DATE" > "$END_DATE" ]]; then
+  if [ "$FILE_DATE" \< "$START_DATE" ] || [ "$FILE_DATE" \> "$END_DATE" ]; then
     continue
   fi
-  MATCHED_FILES+=("$f")
+  printf '%s\n' "$f" >> "$MATCHED_TMPFILE"
 done
 
-if [ "${#MATCHED_FILES[@]}" -eq 0 ]; then
+if [ ! -s "$MATCHED_TMPFILE" ]; then
   echo "No budget records found for range ${START_DATE} to ${END_DATE}."
+  rm -f "$MATCHED_TMPFILE"
   exit 0
 fi
 
 # --- Parse and emit markdown table ---
+# Pass matched file paths as arguments by reading tmpfile with xargs.
 
-python3 - "${MATCHED_FILES[@]}" <<'PYEOF'
+PYEOF_SCRIPT="$(mktemp)"
+trap 'rm -f "$MATCHED_TMPFILE" "$PYEOF_SCRIPT"' EXIT
+cat > "$PYEOF_SCRIPT" <<'PYEOF'
 import json
 import sys
 import os
@@ -144,3 +149,4 @@ print(f"> Prices from `dev/config/merge-policy.json` model_prices block.")
 print(f"> Per-subagent breakdown not available (fallback 1b); totals are measured from")
 print(f"> claude-code-action execution_file. See dev/status/cost-tracking.md.")
 PYEOF
+xargs python3 "$PYEOF_SCRIPT" < "$MATCHED_TMPFILE"

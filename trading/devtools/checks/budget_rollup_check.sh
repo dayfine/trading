@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Smoke test for dev/lib/budget_rollup.sh
 #
 # Uses temp-dir fixtures so it does not touch real dev/budget/ data.
@@ -12,10 +12,10 @@
 #   5. Invalid date argument exits 1
 #   6. Zero records in range exits 0
 
-set -euo pipefail
+set -eu
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-ROLLUP="$REPO_ROOT/dev/lib/budget_rollup.sh"
+. "$(dirname "$0")/_check_lib.sh"
+ROLLUP="$(repo_root)/dev/lib/budget_rollup.sh"
 PASS=0
 FAIL=0
 
@@ -48,7 +48,7 @@ trap 'rm -rf "$TMPDIR1"' EXIT
 
 _make_record "$TMPDIR1" "2026-04-21-run1" "1.50" "sonnet"
 
-OUTPUT="$(REPO_ROOT_OVERRIDE="$TMPDIR1" bash "$ROLLUP" <<< "" 2>/dev/null || true)"
+OUTPUT="$(REPO_ROOT_OVERRIDE="$TMPDIR1" bash "$ROLLUP" < /dev/null 2>/dev/null || true)"
 # Override: temporarily swap BUDGET_DIR by patching via env var — script uses REPO_ROOT
 # We can't override easily without a second wrapper; instead call directly with modified REPO_ROOT.
 # Trick: create a fake REPO_ROOT with the right structure.
