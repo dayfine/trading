@@ -1,6 +1,63 @@
-Reviewed SHA: d1ba14a3cf90ce16d819b9f2db937ab6e7b78d6d
+Reviewed SHA: 792b5b0901c963a021526e53223f6adaef65dcdf
 
-## Structural Checklist
+## Structural Checklist — harness gha-cost-tracking (PR #483, re-review after POSIX-sh rework)
+
+Reviewed SHA: 792b5b0901c963a021526e53223f6adaef65dcdf (re-review of PR #483 at tip after 2026-04-21 POSIX-sh rework applied by harness-maintainer)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | Exit 0; no format violations |
+| H2 | dune build | PASS | Exit 0; clean build |
+| H3 | dune runtest | PASS | Exit 0; **FIXED** — prior failure (`set: Illegal option -o pipefail` when dune invoked via `/bin/sh`) resolved by POSIX-sh rework. All dune tests pass including the new `budget_rollup_check.sh` smoke test (8/8 assertions) |
+| P1 | Functions ≤ 50 lines | NA | No OCaml files changed; shell scripts only |
+| P2 | No magic numbers | NA | No OCaml files changed |
+| P3 | Config completeness | NA | No domain logic |
+| P4 | .mli coverage | NA | No OCaml modules touched |
+| P5 | Internal helpers prefixed with _ | NA | No OCaml internal functions; shell helpers `_repo_root`, `_extract_verdict` etc. correctly prefixed |
+| P6 | Tests conform to test-patterns.md | NA | No OCaml tests |
+| A1 | Core module modifications | NA | No Portfolio/Orders/Position/Strategy/Engine touched |
+| A2 | No analysis/ → trading/ imports | NA | Shell scripts, no imports |
+| A3 | No unnecessary existing module modifications | PASS | Only `trading/devtools/checks/budget_rollup_check.sh` + `dev/lib/budget_rollup.sh` changed in this commit (`git diff --name-only HEAD~1 HEAD` confirms — exactly two files) |
+
+## POSIX-sh conformance verification
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| SH-SHEBANG | `#!/bin/sh` on both scripts | PASS | Shebang updated from `#!/usr/bin/env bash` to `#!/bin/sh` on both files |
+| SH-SET | POSIX `set -eu` (no `pipefail`) | PASS | `set -eu` replaces prior `set -euo pipefail`; matches sibling `dev/lib/consolidate_day.sh` pattern |
+| SH-BASHN | `bash -n` clean | PASS | `bash -n trading/devtools/checks/budget_rollup_check.sh` → exit 0; `bash -n dev/lib/budget_rollup.sh` → exit 0 |
+| SH-DASHN | `dash -n` clean | PASS | `dash -n ...` on both scripts → exit 0 (dash available at `/usr/bin/dash`) |
+| SH-SH-DIRECT | `sh budget_rollup_check.sh` passes | PASS | Direct invocation: all 8 smoke-test assertions pass |
+| SH-HERE-STRING | `<<< ""` replaced | PASS | Replaced with `< /dev/null` for POSIX stdin redirection |
+| SH-ARRAYS | bash arrays replaced | PASS | `MATCHED_FILES=()` / `MATCHED_FILES+=()` / `"${MATCHED_FILES[@]}"` replaced with tmpfile approach: matched paths written one-per-line to `$MATCHED_TMPFILE`, then `xargs python3 "$PYEOF_SCRIPT" < "$MATCHED_TMPFILE"` injects them as positional arguments. Semantically equivalent; handles filenames without spaces correctly (as did the prior array). The Python heredoc was extracted to a separate tempfile so `xargs` can combine script + file list cleanly |
+| SH-BASH-SOURCE | `${BASH_SOURCE[0]}` replaced | PASS | Replaced with sourced `_check_lib.sh`'s `repo_root()` helper — the established pattern in this directory, handles both direct-run and dune-sandboxed invocation |
+| SH-CONDITIONALS | `[[ ]]` replaced | PASS | No `[[ ]]` remaining; POSIX `[ ]` used throughout |
+| SH-LOGIC-PRESERVED | Rollup semantics identical | PASS | All changes are syntactic (shell compatibility); no change to which JSON files are read, how totals are summed, or output schema. Verified by diff review |
+
+## Diff scope
+
+- `trading/devtools/checks/budget_rollup_check.sh`: +10 −5 (shebang, set, repo_root refactor, here-string → /dev/null)
+- `dev/lib/budget_rollup.sh`: +22 −8 (shebang, set, array → tmpfile+xargs, extracted PYEOF tempfile)
+- Total: 32 LOC across 2 files; within the 40 LOC rework budget. No scope creep (`git diff --name-only HEAD~1 HEAD` returns exactly those 2 paths).
+
+## FYIs (non-blocking)
+
+- **mergeable_state: "dirty"** — GitHub reports the PR as unmergeable-by-fast-forward. This is a docs-file conflict with PR #485 (run-1 daily summary, merged during run-2): both PRs touched `dev/status/_index.md` and `dev/status/harness.md`. Resolve at merge time with a trivial manual merge (#485's rows are stale relative to this PR's updates; use this PR's rows). Not a QC failure.
+- **harness_gap reiterated:** a POSIX-sh portability lint (`dash -n` or `shellcheck` wired into `dune runtest` for scripts under `trading/devtools/checks/` and `dev/lib/`) would have caught the original bug at commit time. Carried into `dev/audit/2026-04-21-harness.json` as a `harness_gap` candidate-linter the prior run; cleared this run but still worth a future harness dispatch.
+
+## Verdict
+
+APPROVED
+
+Behavioral review: N/A — harness/utility-script PR; no domain logic. Prior NEEDS_REWORK verdict at SHA d1ba14a3 (below in archive) is superseded.
+
+## Quality Score
+
+4 — The rework was cleanly scoped (exactly the required files, exactly the required changes), semantics-preserving (tmpfile+xargs idiom is the canonical POSIX substitute for the bash-array+expansion pattern), and verified with the fuller test battery this time (`bash -n` + `dash -n` + direct `sh` invocation, not just `dune runtest`). Docked one point because the original PR should have passed POSIX-sh checks in the first pass — the established codebase pattern (`dev/lib/consolidate_day.sh`, sibling check scripts) is explicit about `#!/bin/sh` + `set -eu`, so the original bash-only syntax represents an avoidable oversight.
+
+---
+
+## Structural Checklist (prior review — NEEDS_REWORK at d1ba14a3, 2026-04-21 run-1)
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
