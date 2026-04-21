@@ -4,7 +4,8 @@
   test_runner_filter
   test_trace
   test_runner_tiered_skeleton
-  test_runner_tiered_cycle)
+  test_runner_tiered_cycle
+  test_tiered_loader_parity)
  (libraries
   ounit2
   core
@@ -15,6 +16,9 @@
   fpath
   backtest
   trading.backtest.bar_loader
+  trading.backtest.loader_strategy
+  scenario_lib
+  weinstein.data_source
   trading.base
   trading.engine
   trading.portfolio

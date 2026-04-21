@@ -1,13 +1,13 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-20
+## Last updated: 2026-04-21
 
 ## Status
 READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466. 3f-part3 (originally PR #474, 1070/86 LoC) was split into two stacked PRs to keep each reviewable slice small: 3f-part3a (refactor-only Tiered_runner extraction, ~152/78 LoC) on `feat/backtest-scale-3f-part3a`; 3f-part3b (Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote via a new `Tiered_strategy_wrapper`, stacked on part3a) on `feat/backtest-scale-3f-part3b`. #474 closed in favour of the stack. Next outstanding increment is 3g (parity gate).
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478. 3g (parity acceptance test) on `feat/backtest-scale-3g` — ready for review.
 
 ## Interface stable
 NO
@@ -15,11 +15,10 @@ NO
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- feat/backtest-scale-3f-part3a — 3f-part3a based on main; refactor-only extraction of `Tiered_runner` module out of `runner.ml` (byte-identical behaviour — the Tiered path still raises at the simulator-cycle step). Ready for QC.
-- feat/backtest-scale-3f-part3b — 3f-part3b stacked on `feat/backtest-scale-3f-part3a`; flips `Tiered_runner`'s simulator-cycle `failwith` to a real `Simulator.run` driven by `Weinstein_strategy` wrapped in a new `Tiered_strategy_wrapper`. Friday Summary-promote → Shadow_screener → Full-promote cycle + per-transition promote/demote. Ready for QC.
+- feat/backtest-scale-3g — 3g parity acceptance test (merge gate). Runs `smoke/tiered-loader-parity.sexp` under both `Loader_strategy.Legacy` and `Loader_strategy.Tiered`, asserts `summary.n_round_trips` matches exactly, `summary.final_portfolio_value` matches within $0.01, sampled `steps[].portfolio_value` (indices 0, n/4, n/2, 3n/4, n-1) matches within $0.01, and every pinned metric falls inside its declared range for both strategies. Ships a 7-symbol pinned universe (`universes/parity-7sym.sexp`) + synthetic OHLCV fixtures for the 14 macro symbols (11 SPDR ETFs + GDAXI.INDX + N225.INDX + ISF.LSE) whose CSVs were absent from checked-in `test_data/`. Ready for QC.
 
 ## Blocked on
-- None. 3g (parity acceptance test) is the next outstanding increment; depends on 3f-part3b merging.
+- None. 3g is ready for review; 3h (nightly A/B comparison) follows after merge.
 
 ## Goal
 
@@ -83,15 +82,100 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Next Steps
 
-1. QC review of 3d (feat/backtest-tiered-loader-3d-tracer-phases head).
-2. QC review of 3e (feat/backtest-scale-3e head).
-3. QC review of 3f-part1 (feat/backtest-scale-3f head, PR #463) — shadow_screener adapter in isolation.
-4. QC review of 3f-part2 (feat/backtest-scale-3f-part2 head, PR #466) — tiered runner skeleton (Bar_loader create + bulk Metadata promote + trace bridge + failwith at simulator-cycle step).
-5. QC review of 3f-part3a (feat/backtest-scale-3f-part3a head) — refactor-only extraction of `Tiered_runner`. Byte-identical behaviour; the Tiered path still raises at the simulator-cycle step.
-6. QC review of 3f-part3b (feat/backtest-scale-3f-part3b head, stacked on 3f-part3a) — flips the `failwith` to a real `Simulator.run`, adds `Tiered_strategy_wrapper`, Friday cycle, per-transition promote/demote, and the 8-test `test_runner_tiered_cycle` suite.
-7. Dispatch 3g (parity acceptance test) — merge gate on `smoke/tiered-loader-parity.sexp`. Runs both `loader_strategy = Legacy` and `Tiered` paths on a shared scenario and asserts trade count / total P&L / final portfolio value / pinned metrics match within float ε. Cannot run until 3f-part3b lands.
+1. QC review of 3g (feat/backtest-scale-3g head) — parity acceptance test (merge gate).
+2. Post-merge: flip default `loader_strategy` from `Legacy` to `Tiered` in a tiny follow-up PR.
+3. Post-Tiered-default: retire `Legacy` codepath (`_run_legacy` in `runner.ml`) — tracked as 3h-precursor.
+4. Dispatch 3h (nightly A/B comparison) — GHA workflow + compare script emitting day-by-day divergence chart.
+
+## Follow-up / escalation
+
+- **`Tiered_runner._promote_universe_metadata` is strictly intolerant of missing CSVs.**
+  Surfaced by the 3g parity scenario: Legacy's `Simulator` silently
+  skips any symbol whose `data.csv` is absent, while
+  `_promote_universe_metadata` (`tiered_runner.ml:34-47`) turns the
+  first `Bar_loader.promote` `Error` into a hard `failwith`. The
+  comment on the `failwith` claims "The Legacy path fails at the same
+  logical moment" — that is empirically wrong for the Simulator-level
+  loader. This is not fixed in 3g (the parity scope forbids strategy
+  code changes); instead the scenario ships synthetic OHLCV fixtures
+  for the 14 macro symbols (11 SPDR ETFs + GDAXI.INDX + N225.INDX +
+  ISF.LSE) so both paths see identical data and the test exercises
+  real strategy divergence. Proposed follow-up: either (a) soften the
+  `failwith` to a per-symbol `continuing` log (matches
+  `Tiered_strategy_wrapper`'s own runtime tolerance) or (b) keep the
+  strict check but expose it as a user-facing pre-flight error with
+  the full missing-symbol list. Feat-backtest owns this decision.
+
+- **`Bar_loader.create` defaults `benchmark_symbol = "SPY"` but the
+  Runner's primary index is `GSPC.INDX`.**
+  The Tiered path currently logs per-symbol `Bar_loader.promote`
+  errors for SPY on every Summary promote because the Runner never
+  provides an SPY CSV. Legacy uses `GSPC.INDX` directly as its
+  benchmark. This is a separate low-severity divergence from the
+  missing-CSV hard-fail issue above: it doesn't block the parity
+  scenario (RS computation in the Tiered shadow-screener degrades to
+  no-RS, which is one of the known divergences the 3f-part1 .mli
+  documents), but it does mean the Tiered loader's RS line is
+  computed against "no benchmark" rather than against `GSPC.INDX`.
+  Proposed follow-up: thread `config.indices.primary` from
+  `Weinstein_strategy.config` through `Tiered_runner._create_bar_loader`
+  to `Bar_loader.create ~benchmark_symbol:_`.
 
 ## Completed
+
+- **3g — Parity acceptance test (merge gate)** (2026-04-21). New
+  test binary at `trading/trading/backtest/test/test_tiered_loader_parity.ml`
+  runs the same scenario twice — once under `Loader_strategy.Legacy`,
+  once under `Loader_strategy.Tiered` — and asserts observably
+  identical output across the four dimensions the plan §3g pins:
+  1. `summary.n_round_trips` matches exactly (hard fail on any diff).
+  2. `summary.final_portfolio_value` matches within $0.01.
+  3. Sampled `steps[].portfolio_value` at indices
+     `[0; n/4; n/2; 3n/4; n-1]` match within $0.01 per step (step
+     date also must match exactly).
+  4. Every pinned metric in the scenario's `expected` record
+     (`total_return_pct`, `total_trades`, `win_rate`, `sharpe_ratio`,
+     `max_drawdown_pct`, `avg_holding_days`) falls inside its
+     declared range for BOTH strategies.
+  Scenario at `trading/test_data/backtest_scenarios/smoke/tiered-loader-parity.sexp`:
+  6-month window (2019-06-03 → 2019-12-31) over a 7-symbol universe
+  pinned by `universes/parity-7sym.sexp` (AAPL, MSFT, JPM, JNJ, CVX,
+  KO, HD — the intersection of `universes/small.sexp` with checked-in
+  test_data/ price CSVs). `loader_strategy` absent from the scenario;
+  the test binary drives both values explicitly in two passes.
+  Three test cases: `test_legacy_runs_ok` (non-empty steps sanity),
+  `test_tiered_runs_ok` (same for Tiered), and
+  `test_parity_legacy_vs_tiered` (the four-dimensional parity check).
+  **Committed fixtures.** 14 synthetic OHLCV CSVs for the macro
+  symbols the Runner's `_load_deps` unconditionally adds to
+  `all_symbols` — 11 SPDR sector ETFs (XLK, XLF, XLE, XLV, XLI,
+  XLP, XLY, XLU, XLB, XLRE, XLC) + GDAXI.INDX + N225.INDX +
+  ISF.LSE. Each spans 2018-10-01 → 2020-01-03 (covers the 210-day
+  warmup before scenario start); deterministic 100.00 baseline +
+  0.01/day drift so Weinstein's MA slope is consistently positive.
+  Both strategies see identical macro inputs — parity assertions
+  still hold. ~280 KB total fixture data.
+  **Why synthetic data rather than opt-out overrides.** Attempted
+  first to zero out `sector_etfs` + `indices.global` via
+  `config_overrides`, but `Runner._merge_sexp` treats empty-list
+  overlays as empty-record merges, so list-typed fields can't be
+  cleared that way. Without macro CSVs,
+  `Tiered_runner._promote_universe_metadata` hard-`failwith`s on
+  the first missing symbol (see §Follow-up for the underlying
+  tolerance divergence) and the test never exercises any strategy
+  code. Shipping identical synthetic fixtures to both paths keeps
+  the test's merge-gate purpose intact.
+  - Files:
+    `trading/test_data/backtest_scenarios/smoke/tiered-loader-parity.sexp`
+    + `trading/test_data/backtest_scenarios/universes/parity-7sym.sexp`
+    + `trading/trading/backtest/test/{dune,test_tiered_loader_parity.ml}`
+    + 14 × `trading/test_data/<first>/<last>/<symbol>/data.csv`
+    for the macro symbols listed above.
+  - Verify:
+    `dev/lib/run-in-env.sh dune build &&
+     dev/lib/run-in-env.sh dune runtest trading/backtest/test --force` —
+    3 parity tests pass (+ 33 pre-existing backtest tests); full-workspace
+    `dune runtest` passes; `dune build @fmt` clean.
 
 - **3f-part3 — Tiered runner Friday cycle + per-transition promote/demote**
   (2026-04-20). Completes the Tiered path first opened in 3f-part2 by
