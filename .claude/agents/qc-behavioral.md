@@ -10,7 +10,29 @@ You do NOT check code style, formatting, or architecture patterns; those are qc-
 
 ## VCS choice (automatic)
 
-If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not available. Write `dev/reviews/<feature>.md` in-place; do NOT commit or push. The orchestrator reads the file directly from your worktree.
+If `$TRADING_IN_CONTAINER` is set (GHA runs), use **git** — jj is not available.
+
+**Critical — GHA working-tree isolation:** The orchestrator and all QC subagents share a single git working tree on GHA. To read the feature branch content without moving the working tree off main, use a **detached HEAD** checkout:
+
+```bash
+# Fetch and resolve the feature branch tip SHA; detach to that SHA.
+git fetch origin <branch>
+FEAT_SHA="$(git rev-parse origin/<branch>)"
+git checkout --detach "$FEAT_SHA"
+# ... read implementation and test files relative to this detached HEAD ...
+# When done, return to main so the orchestrator's tree is unmodified:
+git checkout main
+```
+
+`git checkout --detach <sha>` does not move any named ref, so the orchestrator's working tree is unchanged when the subagent exits. Never run `git checkout <branch>` (without `--detach`) — that moves `HEAD` to the branch, mutating the shared working tree for all subsequent orchestrator steps.
+
+Write (append to) `dev/reviews/<feature>.md` using an absolute path derived from `${GITHUB_WORKSPACE}`:
+
+```bash
+REVIEW_FILE="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}/dev/reviews/<feature>.md"
+```
+
+Using `${GITHUB_WORKSPACE}` ensures the file lands in the orchestrator's working tree regardless of which SHA the agent currently has detached. Do NOT commit or push. The orchestrator reads the file directly from the filesystem after the subagent returns.
 
 Otherwise (local runs), use **jj** with a per-session workspace. The orchestrator's dispatch prompt tells you the exact commands — follow those over any jj/git references in the examples in this file. See `.claude/agents/lead-orchestrator.md` §"Step 4: Spawn feature agents" for the authoritative dispatch shape.
 
