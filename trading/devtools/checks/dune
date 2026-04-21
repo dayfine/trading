@@ -216,3 +216,13 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:rule_promotion_self_test.sh})))
+
+; Budget rollup smoke test: uses temp-dir fixtures to verify dev/lib/budget_rollup.sh
+; handles single records, multi-record sums, date range filtering, missing dir,
+; invalid dates, and empty-range cases. Does NOT touch real dev/budget/ data.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:budget_rollup_check.sh})))

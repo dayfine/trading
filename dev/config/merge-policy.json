@@ -4,5 +4,30 @@
   "auto_merge_enabled": false,
   "max_daily_cost_usd": 50.0,
   "target_utilization_low": 0.60,
-  "target_utilization_high": 0.80
+  "target_utilization_high": 0.80,
+  "model_prices": {
+    "_source": "https://claude.com/pricing — verified 2026-04-20",
+    "_note": "Prices in USD per million tokens (MTok). cache_write is 5-minute TTL.",
+    "opus": {
+      "model_id": "claude-opus-4-5",
+      "input_per_mtok": 5.00,
+      "output_per_mtok": 25.00,
+      "cache_read_per_mtok": 0.50,
+      "cache_write_5m_per_mtok": 6.25
+    },
+    "sonnet": {
+      "model_id": "claude-sonnet-4-6",
+      "input_per_mtok": 3.00,
+      "output_per_mtok": 15.00,
+      "cache_read_per_mtok": 0.30,
+      "cache_write_5m_per_mtok": 3.75
+    },
+    "haiku": {
+      "model_id": "claude-haiku-4-5",
+      "input_per_mtok": 1.00,
+      "output_per_mtok": 5.00,
+      "cache_read_per_mtok": 0.10,
+      "cache_write_5m_per_mtok": 1.25
+    }
+  }
 }
