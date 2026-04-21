@@ -28,8 +28,14 @@ let _make_trace_hook ?trace () : Bar_loader.trace_hook =
 
 let _create_bar_loader (input : input) ?trace () =
   let trace_hook = _make_trace_hook ?trace () in
+  (* Benchmark must match the Runner's primary index so Summary-tier RS line
+     computation can find the benchmark's bars. Bar_loader's default "SPY" is
+     not present in the parity fixtures (GSPC.INDX is the primary), so without
+     this threading every Summary promote fails silently and the Friday cycle
+     is a no-op on the parity scenario. *)
   Bar_loader.create ~data_dir:input.data_dir_fpath
-    ~sector_map:input.ticker_sectors ~universe:input.all_symbols ~trace_hook ()
+    ~sector_map:input.ticker_sectors ~universe:input.all_symbols
+    ~benchmark_symbol:input.config.indices.primary ~trace_hook ()
 
 let _promote_universe_metadata loader (input : input) ~as_of =
   match
