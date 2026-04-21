@@ -133,6 +133,7 @@ jobs:
           jj git init --colocate
 
       - name: Run lead-orchestrator
+        id: run-orchestrator
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -149,6 +150,105 @@ jobs:
             --agent lead-orchestrator
             --allowedTools Agent,Bash,Read,Write,Edit,Glob,Grep
             --max-turns 200
+
+      - name: Capture run cost from execution file
+        # Fallback branch 1b: claude-code-action@v1 exposes an execution_file
+        # output (path to claude-execution-output.json) containing the full SDK
+        # message array. The result message includes total_cost_usd — the total
+        # cost for the entire orchestrator run including all internally-spawned
+        # subagents (Agent tool calls). Per-subagent breakdown is not available
+        # from the action; subagents are internal to the single Claude Code process.
+        #
+        # We parse total_cost_usd and write a structured budget record to
+        # dev/budget/<date>-run<N>.json. The orchestrator's Step 7 reads this file
+        # (if present) and emits measured cost in its ## Budget section.
+        #
+        # The step runs `if: always()` so it captures cost even when the
+        # orchestrator exits non-zero (rate-limit, timeout) — partial-run cost
+        # is still valuable for budget tracking.
+        if: always()
+        env:
+          DATE: ${{ steps.today.outputs.date }}
+          EXECUTION_FILE: ${{ steps.run-orchestrator.outputs.execution_file }}
+          COMMIT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BUDGET_DIR="dev/budget"
+          mkdir -p "$BUDGET_DIR"
+
+          # Determine run number: count existing budget files for today.
+          EXISTING=$(ls "${BUDGET_DIR}/${DATE}"*.json 2>/dev/null | wc -l | tr -d ' ')
+          RUN_N=$((EXISTING + 1))
+          OUT_FILE="${BUDGET_DIR}/${DATE}-run${RUN_N}.json"
+          RUN_ID="${DATE}-run${RUN_N}"
+
+          # Parse total_cost_usd from the execution file.
+          # The execution file is a JSON array of SDK messages; the last element
+          # with type="result" carries total_cost_usd (float, USD).
+          TOTAL_COST="null"
+          if [ -n "${EXECUTION_FILE:-}" ] && [ -f "${EXECUTION_FILE}" ]; then
+            TOTAL_COST="$(python3 -c "
+          import json, sys
+          data = json.load(open('${EXECUTION_FILE}'))
+          # data is an array; find the last result message
+          for msg in reversed(data if isinstance(data, list) else [data]):
+              if isinstance(msg, dict) and msg.get('type') == 'result':
+                  cost = msg.get('total_cost_usd')
+                  if cost is not None:
+                      print(cost)
+                      sys.exit(0)
+          print('null')
+          " 2>/dev/null || echo "null")"
+          else
+            echo "execution_file output not available (${EXECUTION_FILE:-empty}); recording null cost."
+          fi
+
+          TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          python3 - <<PYEOF
+          import json, os
+          data = {
+            "run_id": os.environ["RUN_ID"] if False else "${RUN_ID}",
+            "timestamp": "${TIMESTAMP}",
+            "commit_sha": "${COMMIT_SHA}",
+            "measurement_source": "claude-code-action execution_file (total_cost_usd from SDKResultMessage)",
+            "fallback_branch": "1b",
+            "notes": (
+              "total_cost_usd covers entire orchestrator run including all "
+              "internally-spawned subagents (Agent tool calls). Per-subagent "
+              "breakdown not available from action output — see "
+              "dev/status/cost-tracking.md for limitation details."
+            ),
+            "subagents": [
+              {
+                "name": "orchestrator-total",
+                "model": "sonnet",
+                "input_tokens": None,
+                "output_tokens": None,
+                "cache_read_input_tokens": None,
+                "cache_creation_input_tokens": None,
+                "estimated_cost_usd": None,
+                "note": (
+                  "Per-subagent breakdown not available from claude-code-action. "
+                  "total_cost_usd in totals covers all spawned subagents."
+                )
+              }
+            ],
+            "totals": {
+              "input_tokens": None,
+              "output_tokens": None,
+              "cache_read_input_tokens": None,
+              "cache_creation_input_tokens": None,
+              "total_cost_usd": ${TOTAL_COST},
+              "measurement": "measured from claude-code-action execution_file total_cost_usd"
+            }
+          }
+          with open("${OUT_FILE}", "w") as f:
+              json.dump(data, f, indent=2)
+          print(f"Budget record written: ${OUT_FILE} (total_cost_usd=${TOTAL_COST})")
+          PYEOF
 
       - name: Locate daily summary (for escalations check)
         id: publish-summary

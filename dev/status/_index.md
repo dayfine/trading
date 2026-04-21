@@ -21,7 +21,8 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | MERGED | — | — | — (#436 merged 2026-04-19). GHA orchestrator runs continue to consume `trading/test_data/sectors.csv`. |
 | [harness](harness.md) | READY_FOR_REVIEW | harness-maintainer | #483 | #483 (gha-cost-tracking) APPROVED after POSIX-sh rework — new tip `792b5b09`, 32 LOC diff across `budget_rollup.sh` + `budget_rollup_check.sh` (shebang, `set -eu`, array → tmpfile+xargs, `${BASH_SOURCE[0]}` → `repo_root`, `<<<` → `< /dev/null`). `dash -n` + `bash -n` both clean; smoke-test 8/8 assertions. Behavioral N/A. Mergeable_state "dirty" = docs-file conflict with #485 (resolve at merge). Awaiting human merge. |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog remains empty (no new medium/high findings from latest deep scan). No code-health dispatch this run. |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog remains empty (no new medium/high findings from latest deep scan or today's fast-run5). No code-health dispatch this run. |
+| [cost-tracking](cost-tracking.md) | IN_PROGRESS | harness-maintainer | — | GHA cost capture step + budget_rollup.sh landed (harness/gha-cost-tracking). Next: verify measured total_cost_usd on next GHA run; compare costs pre/post #481/#482. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |

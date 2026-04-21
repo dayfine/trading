@@ -745,8 +745,14 @@ Check the previous run's exit state first:
 ### Step 3.75b: Initial dispatch sizing
 
 Read `max_daily_cost_usd` from `dev/config/merge-policy.json` (default: 50.0).
-Estimate total cost for the full eligible track set (rough: each feat-agent
-~$2–4, each QC pair ~$3, each harness item ~$1; Step 6 is deterministic and costs $0).
+
+**Cost reference:** Actual measured costs live in `dev/budget/<date>-run<N>.json`
+(written by the GHA "Capture run cost" step post-run). For pre-dispatch estimation,
+use the `model_prices` block in `merge-policy.json` with rough token estimates
+(feat-agent ~500K input / 50K output; QC pair ~200K input / 20K output; harness ~100K).
+Do NOT use hardcoded dollar amounts — derive from the pricing table.
+
+Estimate total cost for the full eligible track set using model_prices from merge-policy.json.
 
 - If estimated total < `target_utilization_low * max_daily_cost_usd`:
   dispatch **all eligible tracks** up to the environment cap (see Step 4).
@@ -1398,13 +1404,27 @@ the track being skipped; put the cross-track reason in Notes.
 (Token and cost tracking for this orchestrator run)
 - Budget cap: $<max_daily_cost_usd from dev/config/merge-policy.json> (from merge-policy.json)
 - Target utilization: <target_utilization_low * 100>%–<target_utilization_high * 100>% (from merge-policy.json)
-- Subagents spawned: <N total>
+- Subagents spawned: <N total> (measured)
 - Per-subagent breakdown:
   | Agent | Model | Status | Est. tokens | Est. cost |
   |-------|-------|--------|-------------|-----------|
   | <name> | <model> | completed / killed (reason) | <if available> | <if available> |
 - Any subagent killed mid-flight: Yes/No — <reason: rate_limit / timeout / error>
-- Budget utilization: <total estimated cost> / $<cap> (<percentage>%)
+
+**Measured cost (from GHA execution file):** Check if `dev/budget/<today>-run<N>.json`
+exists (written by the GHA "Capture run cost" step after this run ends). If it exists:
+  - Total (measured from API usage): $<total_cost_usd from JSON> / $<cap> (<pct>%)
+  - Measurement: `total_cost_usd` from `claude-code-action` execution_file — covers all
+    subagents spawned by this orchestrator (Agent tool calls included)
+  - Per-subagent breakdown: not available from action output (see dev/status/cost-tracking.md)
+  - Cache utilization: not available (token counts not surfaced by action)
+  - Orchestrator overhead (estimated): ~$1.00 (included in measured total above)
+
+If the budget JSON does not yet exist (GHA step runs after the orchestrator exits, so
+it won't be present during this session), use estimated costs derived from model_prices
+in merge-policy.json with rough token estimates. Tag it "estimated" not "measured":
+  - Total (estimated): $<sum of estimated subagent costs + ~$1 overhead> / $<cap> (<pct>%)
+
 - Utilization assessment: IN_TARGET (60–80%) | UNDER_TARGET (<60%) | OVER_TARGET (>80%)
   - If UNDER_TARGET: state whether all eligible tracks were dispatched ("all-work-done") or whether tracks were skipped with reasons ("skipped: <list>"). A run below 50% with skipped tracks is an escalation item.
   - If OVER_TARGET: flag in §Escalations — reduce scope on the next run.
