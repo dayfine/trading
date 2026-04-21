@@ -1,4 +1,4 @@
-Reviewed SHA: 792b5b0901c963a021526e53223f6adaef65dcdf
+Reviewed SHA: a3075010d3a0a1e8ea89d2cc983965320bd1415b
 
 ## Structural Checklist — harness gha-cost-tracking (PR #483, re-review after POSIX-sh rework)
 
@@ -199,6 +199,52 @@ NEEDS_REWORK
 APPROVED
 
 Behavioral review: N/A — harness/orchestrator-plumbing PR; no domain logic.
+
+---
+
+## Structural Checklist — harness gha-cost-tracking re-review (PR #483 at tip a3075010d3a0a1e8ea89d2cc983965320bd1415b, post-rebase)
+
+**Context:** This PR was previously APPROVED at SHA `792b5b09` (2026-04-21 run-2) after a POSIX-sh rework. The branch has since been rebased — the new tip is `a3075010d3a0` (2026-04-21 run-4), and it is 8 commits ahead and 3 behind the prior Reviewed SHA (force-push + main advanced during the window). This re-review confirms that all POSIX-sh fixes from the prior APPROVED review have survived the rebase and all hard gates remain passing.
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | Exit 0; no format violations |
+| H2 | dune build | PASS | Exit 0; clean build |
+| H3 | dune runtest | PASS | Exit 0; all tests pass including smoke test `budget_rollup_check.sh` (8/8 assertions) |
+| P1 | Functions ≤ 50 lines | NA | No OCaml files changed; shell scripts only |
+| P2 | No magic numbers | NA | No OCaml files changed |
+| P3 | Config completeness | NA | No domain logic |
+| P4 | .mli coverage | NA | No OCaml modules touched |
+| P5 | Internal helpers prefixed with _ | NA | No OCaml internal functions; shell helpers correctly prefixed |
+| P6 | Tests conform to test-patterns.md | NA | No OCaml tests |
+| A1 | Core module modifications | NA | No Portfolio/Orders/Position/Strategy/Engine touched |
+| A2 | No analysis/ → trading/ imports | NA | Shell scripts, no imports |
+| A3 | No unnecessary existing module modifications | PASS | Only expected files changed; no scope creep |
+
+## POSIX-sh Conformance Verification (Post-Rebase)
+
+All POSIX-sh fixes from the prior APPROVED review are **confirmed intact**:
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| SH-SHEBANG | `#!/bin/sh` on both scripts | PASS | Both scripts retain shebang `#!/bin/sh` (not bash) |
+| SH-SET | POSIX `set -eu` (no `pipefail`) | PASS | Both scripts use `set -eu`; `pipefail` not present |
+| SH-BASHN | `bash -n` clean | PASS | Both scripts pass `bash -n` syntax check without errors |
+| SH-DASHN | `dash -n` clean | PASS | Both scripts pass `dash -n` syntax check without errors |
+| SH-HERE-STRING | `<<< ""` replaced | PASS | No bash here-strings present; POSIX stdin redirection used |
+| SH-ARRAYS | bash arrays replaced | PASS | Tmpfile+xargs idiom intact; no bash array syntax |
+| SH-BASH-SOURCE | `${BASH_SOURCE[0]}` replaced | PASS | Uses `$(dirname "$0")` and sourced `_check_lib.sh` helpers |
+| SH-CONDITIONALS | `[[ ]]` replaced | PASS | Only POSIX `[ ]` conditionals present |
+
+## Diff Scope (Post-Rebase)
+
+10 files changed: `.claude/agents/lead-orchestrator.md`, `.github/workflows/orchestrator.yml`, `dev/budget/2026-04-20-run1.json`, `dev/config/merge-policy.json`, `dev/lib/budget_rollup.sh`, `dev/status/_index.md`, `dev/status/cost-tracking.md`, `dev/status/harness.md`, `trading/devtools/checks/budget_rollup_check.sh`, `trading/devtools/checks/dune` — consistent with prior review scope.
+
+## Verdict
+
+APPROVED
+
+No structural regressions detected post-rebase. All POSIX-sh fixes are intact. Hard gates all pass (H1/H2/H3). Scope unchanged from prior review.
 
 ---
 
