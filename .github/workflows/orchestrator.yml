@@ -167,11 +167,20 @@ jobs:
           # push once the agent gained that capability. See run
           # 24526632726 for the post-mortem.
           #
-          # Pick the newest dev/daily/${DATE}*.md — that's whatever the
-          # orchestrator wrote this session (runN.md or plain DATE.md).
-          SUMMARY="$(ls -t dev/daily/${DATE}*.md 2>/dev/null | head -n 1 || true)"
+          # Pick the newest per-run summary for today: either the plain
+          # dev/daily/${DATE}.md or a dev/daily/${DATE}-runN.md. We
+          # deliberately exclude dev/daily/${DATE}-summary.md (the
+          # consolidated multi-run rollup the orchestrator also writes),
+          # because it concatenates Escalations sections from prior runs.
+          # Matching it here would re-surface already-resolved `[critical]`
+          # bullets from earlier runs on the same day and fail the gate on
+          # a clean run. See run 24745079773 (2026-04-21) for the
+          # post-mortem: run-4's own summary was clean, but the `ls -t`
+          # glob picked up the consolidated summary (written 8s later),
+          # which still carried `[critical]` bullets from runs 1/2/3.
+          SUMMARY="$(ls -t dev/daily/${DATE}.md dev/daily/${DATE}-run*.md 2>/dev/null | head -n 1 || true)"
           if [ -z "$SUMMARY" ]; then
-            SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | head -n 1 || true)"
+            SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | grep -v -- '-summary\.md$' | head -n 1 || true)"
           fi
           if [ -z "$SUMMARY" ] || [ ! -f "$SUMMARY" ]; then
             echo "::error::No daily summary file found under dev/daily/."
