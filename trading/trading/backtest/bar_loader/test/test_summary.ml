@@ -87,9 +87,9 @@ let _fresh_data_dir () =
 
     The loader only looks at bars in [as_of - tail_days, as_of]. With
     [tail_days = 420] the tail is ~420 calendar days ≈ ~60 ISO weeks after
-    daily→weekly aggregation, which covers [rs_ma_period = 52] WEEKLY bars
-    with headroom. We still pass an explicit [summary_config] override here
-    so the fixture continues to work even if the production default shifts. *)
+    daily→weekly aggregation, which covers [rs_ma_period = 52] WEEKLY bars with
+    headroom. We still pass an explicit [summary_config] override here so the
+    fixture continues to work even if the production default shifts. *)
 let _summary_fixture ?(stock_step = 1.0) ?(benchmark_step = 1.0) () =
   let as_of = Date.create_exn ~y:2023 ~m:Dec ~d:29 in
   let history_days = 420 in
