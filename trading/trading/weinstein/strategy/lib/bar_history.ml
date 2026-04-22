@@ -31,19 +31,18 @@ let daily_bars_for (t : t) ~symbol =
   Hashtbl.find t symbol |> Option.value ~default:[]
 
 let _last_date_of (bars : Types.Daily_price.t list) : Date.t option =
-  match List.last bars with
-  | None -> None
-  | Some b -> Some b.Types.Daily_price.date
+  Option.map (List.last bars) ~f:(fun b -> b.Types.Daily_price.date)
+
+let _bars_strictly_after ~last_date bars =
+  List.filter bars ~f:(fun b -> Date.( > ) b.Types.Daily_price.date last_date)
+
+let _pick_new_bars ~existing bars =
+  match _last_date_of existing with
+  | None -> bars
+  | Some last_date -> _bars_strictly_after ~last_date bars
 
 let seed (t : t) ~symbol ~(bars : Types.Daily_price.t list) =
   let existing = Hashtbl.find t symbol |> Option.value ~default:[] in
-  let new_bars =
-    match _last_date_of existing with
-    | None -> bars
-    | Some last_date ->
-        List.filter bars ~f:(fun b ->
-            Date.( > ) b.Types.Daily_price.date last_date)
-  in
-  match new_bars with
-  | [] -> ()
-  | _ :: _ -> Hashtbl.set t ~key:symbol ~data:(existing @ new_bars)
+  let new_bars = _pick_new_bars ~existing bars in
+  if not (List.is_empty new_bars) then
+    Hashtbl.set t ~key:symbol ~data:(existing @ new_bars)

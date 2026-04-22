@@ -1,24 +1,30 @@
 (** Tests for [Backtest.Tiered_strategy_wrapper] — the piece that turns the
-    3f-part2 skeleton into a full Tiered simulator cycle.
+    3f-part2 skeleton into a full Tiered simulator cycle, extended by the
+    2026-04-22 strategy↔bar_loader integration to also throttle the inner
+    strategy's [get_price] view and seed [Bar_history] on Full promotion.
 
-    3f-part3 ships the wrapper that observes each [on_market_close] call and
-    drives [Bar_loader] tier transitions. The observable contracts we pin here:
+    Observable contracts pinned here:
 
     1. On a Friday call, the wrapper promotes the universe to [Summary_tier] and
     (if the shadow screener admits candidates) further promotes them to
-    [Full_tier]. On a non-Friday call, no Summary / Full promote is issued.
-    Friday detection reads the primary index bar's day-of-week. 2. On a
-    [CreateEntering] transition the wrapper promotes that symbol to [Full_tier]
-    regardless of cadence. 3. When a portfolio's position transitions to
-    [Closed] between calls, the wrapper demotes that symbol to [Metadata_tier]
-    on the next call. 4. The wrapper is {b purely additive}: the inner
-    strategy's transitions flow through unchanged, and errors from the inner
-    strategy bypass all tier bookkeeping.
+    [Full_tier]. On a non-Friday call, no Summary / Full promote is issued. The
+    Friday cycle fires {b before} the inner strategy — so the wrapper's
+    Full-tier promotions (and the seeded [Bar_history] bars) are visible to the
+    inner screener on the same day. 2. On a [CreateEntering] transition the
+    wrapper promotes that symbol to [Full_tier] regardless of cadence. Runs
+    post-inner. 3. When a portfolio's position transitions to [Closed] between
+    calls, the wrapper demotes that symbol to [Metadata_tier] on the next call.
+    4. The wrapper is {b purely additive}: the inner strategy's transitions flow
+    through unchanged. 5. The inner strategy's view of [get_price] is throttled
+    — symbols not in [always_loaded_symbols], not at [Full_tier], and not
+    currently held in the portfolio resolve to [None]. Symbols in any of those
+    three categories pass through unchanged. [Bar_history.accumulate] silently
+    skips [None] returns, which is the core memory win.
 
     These tests drive the wrapper directly with a stub [STRATEGY] module and a
     synthetic [Bar_loader] rooted in a temp data dir — no production data
     required. The full [run_backtest ~loader_strategy:Tiered] acceptance test
-    lands in 3g alongside the Legacy-vs-Tiered parity gate. *)
+    lives at [test_tiered_loader_parity.ml]. *)
 
 open OUnit2
 open Core
@@ -90,13 +96,16 @@ let _empty_portfolio : Portfolio_view.t =
 
 let _screening_config : Screener.config = Screener.default_config
 
-let _wrapper_config ~loader ~universe ~primary_index :
-    Backtest.Tiered_strategy_wrapper.config =
+let _wrapper_config ~loader ~bar_history ~universe ~primary_index
+    ?(always_loaded = []) () : Backtest.Tiered_strategy_wrapper.config =
   {
     bar_loader = loader;
+    bar_history;
     universe;
+    always_loaded_symbols = String.Set.of_list (primary_index :: always_loaded);
     screening_config = _screening_config;
     full_candidate_limit = 5;
+    seed_warmup_start = Date.create_exn ~y:2023 ~m:Jan ~d:1;
     stop_log = Backtest.Stop_log.create ();
     primary_index;
   }
@@ -124,10 +133,12 @@ type _wrapper_under_test = {
     [out.transitions_ref] between [on_market_close] calls. *)
 let _setup ?(universe = [ "AAA" ]) () : _wrapper_under_test =
   let loader, trace = _make_loader ~universe:(_primary_index :: universe) in
+  let bar_history = Weinstein_strategy.Bar_history.create () in
   let transitions_ref = ref [] in
   let stub = _stub_strategy ~transitions_ref in
   let config =
-    _wrapper_config ~loader ~universe ~primary_index:_primary_index
+    _wrapper_config ~loader ~bar_history ~universe ~primary_index:_primary_index
+      ()
   in
   let wrapper = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
   { wrapper; trace; transitions_ref }
@@ -391,13 +402,18 @@ let test_inner_transitions_pass_through _ =
                 t.position_id))
           (equal_to expected_ids)))
 
-(** An error returned by the inner strategy bubbles up unchanged and no tier
-    bookkeeping happens. The tier ops that {e would} have fired are
-    side-effectful, so asserting an empty trace is the cleanest way to check the
-    no-op contract. *)
-let test_inner_error_skips_tier_bookkeeping _ =
+(** An error returned by the inner strategy bubbles up unchanged and no
+    {b post-inner} tier bookkeeping happens — the wrapper's Demote /
+    per-[CreateEntering] Full-promote paths rely on the inner having returned
+    [Ok]. The Friday cycle runs {b before} inner (so its Full-tier promotions
+    are visible to the inner screener same-day), so on a Friday call with a
+    failing inner we still see the pre-inner promote — that's the contract.
+    Running this test on a non-Friday pins the pure no-op contract for the
+    post-inner path. *)
+let test_inner_error_skips_post_inner_tier_bookkeeping _ =
   let universe = [ "AAA" ] in
   let loader, trace = _make_loader ~universe:(_primary_index :: universe) in
+  let bar_history = Weinstein_strategy.Bar_history.create () in
   let module Failing = struct
     let name = "Failing"
 
@@ -405,18 +421,146 @@ let test_inner_error_skips_tier_bookkeeping _ =
       Error (Status.invalid_argument_error "test error")
   end in
   let config =
-    _wrapper_config ~loader ~universe ~primary_index:_primary_index
+    _wrapper_config ~loader ~bar_history ~universe ~primary_index:_primary_index
+      ()
   in
   let (module W) =
     Backtest.Tiered_strategy_wrapper.wrap ~config (module Failing)
   in
   let result =
     W.on_market_close
-      ~get_price:(_make_get_price ~primary_index:_primary_index ~date:_friday)
+      ~get_price:(_make_get_price ~primary_index:_primary_index ~date:_tuesday)
       ~get_indicator:_no_indicator ~portfolio:_empty_portfolio
   in
   assert_that result is_error;
   assert_that (_phases_from trace) (size_is 0)
+
+(* -------------------------------------------------------------------- *)
+(* 5. get_price throttle                                                *)
+(* -------------------------------------------------------------------- *)
+
+(** Stub STRATEGY module that captures which symbols the wrapper's throttled
+    [get_price'] resolves and what it returns, then emits no transitions. *)
+let _probe_strategy ~probe_symbols ~out =
+  let module Probe = struct
+    let name = "Probe"
+
+    let on_market_close ~get_price ~get_indicator:_ ~portfolio:_ =
+      out :=
+        List.map probe_symbols ~f:(fun sym ->
+            (sym, Option.is_some (get_price sym)));
+      Ok { Strategy_interface.transitions = [] }
+  end in
+  (module Probe : Strategy_interface.STRATEGY)
+
+(** Build a [get_price] closure that returns a daily bar with the given date for
+    every symbol in [symbols_with_bars]. Used so the throttle's pass-through
+    path has something concrete to return when it elects to forward the outer
+    [get_price]. *)
+let _get_price_for_all ~symbols_with_bars ~date :
+    Strategy_interface.get_price_fn =
+  let bar : Types.Daily_price.t =
+    {
+      date;
+      open_price = 100.0;
+      high_price = 100.0;
+      low_price = 100.0;
+      close_price = 100.0;
+      adjusted_close = 100.0;
+      volume = 0;
+    }
+  in
+  let set = String.Set.of_list symbols_with_bars in
+  fun sym -> if Set.mem set sym then Some bar else None
+
+let _run_probe ~universe ~probe_symbols ~always_loaded ~date ~portfolio =
+  let loader, _trace = _make_loader ~universe:(_primary_index :: universe) in
+  let bar_history = Weinstein_strategy.Bar_history.create () in
+  let out = ref [] in
+  let probe = _probe_strategy ~probe_symbols ~out in
+  let config =
+    _wrapper_config ~loader ~bar_history ~universe ~primary_index:_primary_index
+      ~always_loaded ()
+  in
+  let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config probe in
+  let result =
+    W.on_market_close
+      ~get_price:
+        (_get_price_for_all
+           ~symbols_with_bars:(_primary_index :: probe_symbols)
+           ~date)
+      ~get_indicator:_no_indicator ~portfolio
+  in
+  assert_that result is_ok;
+  (loader, !out)
+
+(** Primary index always passes through. Used by the wrapper itself for
+    day-of-week detection and forwarded by the throttle so the inner strategy's
+    macro pipeline and sector-map builder keep working. *)
+let test_throttle_passes_primary_index _ =
+  let _loader, results =
+    _run_probe ~universe:[ "AAA" ] ~probe_symbols:[ _primary_index ]
+      ~always_loaded:[] ~date:_tuesday ~portfolio:_empty_portfolio
+  in
+  assert_that results
+    (elements_are [ equal_to ((_primary_index, true) : string * bool) ])
+
+(** Symbols in [always_loaded_symbols] (sector ETFs, global indices) pass
+    through regardless of tier or held status. *)
+let test_throttle_passes_always_loaded _ =
+  let _loader, results =
+    _run_probe ~universe:[ "AAA"; "XLF"; "XLK" ] ~probe_symbols:[ "XLF"; "XLK" ]
+      ~always_loaded:[ "XLF"; "XLK" ] ~date:_tuesday ~portfolio:_empty_portfolio
+  in
+  assert_that results
+    (elements_are
+       [
+         equal_to (("XLF", true) : string * bool);
+         equal_to (("XLK", true) : string * bool);
+       ])
+
+(** Symbols that are in the universe but not at Full tier, not held, and not
+    always-loaded resolve to [None] — the core memory win. *)
+let test_throttle_blocks_metadata_universe _ =
+  let _loader, results =
+    _run_probe ~universe:[ "AAA"; "BBB" ] ~probe_symbols:[ "AAA"; "BBB" ]
+      ~always_loaded:[] ~date:_tuesday ~portfolio:_empty_portfolio
+  in
+  assert_that results
+    (elements_are
+       [
+         equal_to (("AAA", false) : string * bool);
+         equal_to (("BBB", false) : string * bool);
+       ])
+
+(** A symbol held in the portfolio passes through even if the loader has it at
+    Metadata tier (the defensive path — in practice held positions are also at
+    Full because we promote on CreateEntering). *)
+let test_throttle_passes_held_position _ =
+  let holding_portfolio =
+    _portfolio_of_positions
+      [ ("pos-1", _holding_position ~id:"pos-1" ~symbol:"AAA") ]
+  in
+  let _loader, results =
+    _run_probe ~universe:[ "AAA"; "BBB" ] ~probe_symbols:[ "AAA"; "BBB" ]
+      ~always_loaded:[] ~date:_tuesday ~portfolio:holding_portfolio
+  in
+  assert_that results
+    (elements_are
+       [
+         equal_to (("AAA", true) : string * bool);
+         equal_to (("BBB", false) : string * bool);
+       ])
+
+(** An unknown symbol (not in universe, not in always_loaded, not held) resolves
+    to [None]. This is the "don't accumulate random stuff" guarantee. *)
+let test_throttle_blocks_unknown_symbol _ =
+  let _loader, results =
+    _run_probe ~universe:[ "AAA" ] ~probe_symbols:[ "ZZZ" ] ~always_loaded:[]
+      ~date:_tuesday ~portfolio:_empty_portfolio
+  in
+  assert_that results
+    (elements_are [ equal_to (("ZZZ", false) : string * bool) ])
 
 let suite =
   "Runner_tiered_cycle"
@@ -439,8 +583,18 @@ let suite =
          >:: test_symbol_recycle_under_new_position_id;
          "Inner strategy transitions pass through unchanged"
          >:: test_inner_transitions_pass_through;
-         "Inner strategy error skips tier bookkeeping"
-         >:: test_inner_error_skips_tier_bookkeeping;
+         "Inner strategy error skips post-inner tier bookkeeping"
+         >:: test_inner_error_skips_post_inner_tier_bookkeeping;
+         "get_price throttle passes primary index"
+         >:: test_throttle_passes_primary_index;
+         "get_price throttle passes always-loaded symbols"
+         >:: test_throttle_passes_always_loaded;
+         "get_price throttle blocks metadata-tier universe symbols"
+         >:: test_throttle_blocks_metadata_universe;
+         "get_price throttle passes held position (even at metadata tier)"
+         >:: test_throttle_passes_held_position;
+         "get_price throttle blocks unknown symbol"
+         >:: test_throttle_blocks_unknown_symbol;
        ]
 
 let () = run_test_tt_main suite

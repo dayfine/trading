@@ -298,12 +298,14 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(ticker_sectors = Hashtbl.create (module String)) config =
+    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_history config =
   let stop_states = ref initial_stop_states in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
-  let bar_history = Bar_history.create () in
+  let bar_history =
+    match bar_history with Some h -> h | None -> Bar_history.create ()
+  in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
