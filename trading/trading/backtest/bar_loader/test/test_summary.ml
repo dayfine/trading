@@ -114,6 +114,44 @@ let _summary_fixture ?(stock_step = 1.0) ?(benchmark_step = 1.0) () =
   in
   (loader, as_of)
 
+(** Default-config fixture: exactly [default_config.tail_days] daily bars of
+    history — the realistic input shape the runner produces on the first Friday
+    of a backtest. This fixture does NOT override [tail_days], so it pins the
+    contract "with defaults only, a stock that has exactly [tail_days] worth of
+    bars must promote to Summary tier".
+
+    This is the regression fixture for the F2 follow-up (see
+    [dev/reviews/backtest-scale.md]): before the fix, the default
+    [tail_days = 250] is too short for [rs_ma_period = 52] weekly bars (~36
+    weekly bars aggregate from 250 calendar days, below the 52-bar Mansfield
+    zero-line threshold), so [rs_line] returns [None] and the symbol never
+    reaches Summary tier. *)
+let _default_config_fixture () =
+  let as_of = Date.create_exn ~y:2023 ~m:Dec ~d:29 in
+  (* Use [default_config.tail_days] bars so the CSV tail is exactly what the
+     loader will read back. If we wrote FEWER than [tail_days] calendar days of
+     bars the test would also fail (not enough input), so sizing it to the
+     default is the honest reproduction of the runner path. *)
+  let history_days = Bar_loader.Summary_compute.default_config.tail_days in
+  let start_date = Date.add_days as_of (-history_days) in
+  let data_dir = _fresh_data_dir () in
+  let stock_bars =
+    _daily_series ~start_date ~n:history_days ~base:100.0 ~step:1.0
+  in
+  let benchmark_bars =
+    _daily_series ~start_date ~n:history_days ~base:100.0 ~step:1.0
+  in
+  _write_symbol ~data_dir ~symbol:"STOCK" ~bars:stock_bars;
+  _write_symbol ~data_dir ~symbol:"SPY" ~bars:benchmark_bars;
+  let sector_map = String.Table.create () in
+  Hashtbl.set sector_map ~key:"STOCK" ~data:"Tech";
+  (* Intentionally NO [summary_config] override — the point of this fixture is
+     to exercise the defaults. *)
+  let loader =
+    Bar_loader.create ~data_dir ~sector_map ~universe:[ "STOCK" ] ()
+  in
+  (loader, as_of)
+
 (** Short-history fixture: 10 daily bars — not enough for any Summary indicator.
     Used to verify "insufficient history leaves symbol at Metadata". *)
 let _short_fixture () =
@@ -256,6 +294,40 @@ let test_get_summary_none_for_unknown_symbol _ =
   assert_that (Bar_loader.get_summary loader ~symbol:"NOPE") is_none;
   assert_that (Bar_loader.tier_of loader ~symbol:"NOPE") is_none
 
+(** Regression for the F2 follow-up (see [dev/reviews/backtest-scale.md]): with
+    the default summary config and exactly [default_config.tail_days] daily
+    bars available, a Summary promotion must succeed.
+
+    Before the fix, [default_config.tail_days = 250] is too short for
+    [rs_ma_period = 52] (weekly): 250 daily bars aggregate to ~36 weekly bars
+    (strictly below the 52-bar Mansfield zero-line threshold), so
+    [Relative_strength.analyze] returns [None], [Summary_compute.rs_line]
+    returns [None], [Summary_compute.compute_values] returns [None], and the
+    symbol is left at Metadata tier. This silently broke the Tiered runner's
+    parity with Legacy because no universe symbol ever reached Summary (and
+    therefore no symbol ever reached Full) on the parity scenario.
+
+    The fix is to bump [default_config.tail_days] so it covers
+    [max(ma_weeks, rs_ma_period)] weekly bars plus warmup. *)
+let test_promote_to_summary_with_default_config _ =
+  let loader, as_of = _default_config_fixture () in
+  let result =
+    Bar_loader.promote loader ~symbols:[ "STOCK" ] ~to_:Summary_tier ~as_of
+  in
+  assert_that result is_ok;
+  (* The critical observation: tier advances past Metadata. If [tail_days] is
+     too short, tier stays at Metadata_tier and this assertion fails loudly. *)
+  assert_that
+    (Bar_loader.tier_of loader ~symbol:"STOCK")
+    (is_some_and (equal_to Bar_loader.Summary_tier));
+  assert_that
+    (Bar_loader.get_summary loader ~symbol:"STOCK")
+    (is_some_and
+       (* Stock and benchmark move in lockstep → normalized RS = 1.0. *)
+       (match_summary ~symbol:(equal_to "STOCK") ~as_of:(equal_to as_of)
+          ~ma_30w:(is_between (module Float_ord) ~low:100.0 ~high:800.0)
+          ~atr_14:(float_equal 1.0) ~rs_line:(float_equal 1.0) ~stage:__))
+
 let suite =
   "Bar_loader.Summary"
   >::: [
@@ -273,6 +345,8 @@ let suite =
          >:: test_demote_summary_to_summary_is_noop;
          "get_summary_none_for_unknown_symbol"
          >:: test_get_summary_none_for_unknown_symbol;
+         "promote_to_summary_with_default_config"
+         >:: test_promote_to_summary_with_default_config;
        ]
 
 let () = run_test_tt_main suite
