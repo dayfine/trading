@@ -1,0 +1,17 @@
+{
+  "date": "2026-04-22",
+  "feature": "harness",
+  "branch": "harness/posix-sh-linter",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "SKIPPED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": null,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "POSIX-sh portability linter: dash -n over 40 sh scripts. Behavioral NA (harness utility, no domain logic)."
+}

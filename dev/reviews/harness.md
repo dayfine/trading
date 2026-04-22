@@ -1,4 +1,44 @@
-Reviewed SHA: a3075010d3a0a1e8ea89d2cc983965320bd1415b
+Reviewed SHA: 1bb26c522a89fe82b6170f72939e9a2da4dd77e5
+
+## Structural Checklist — harness POSIX shell portability linter (PR #493, 2026-04-22)
+
+Reviewed SHA: 1bb26c522a89fe82b6170f72939e9a2da4dd77e5 (tip of harness/posix-sh-linter)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | Exit 0; no format violations |
+| H2 | dune build | PASS | Exit 0; clean build |
+| H3 | dune runtest | PASS | Exit 0; new `posix_sh_check` and `posix_sh_check_test` alias stanzas both pass |
+| P1 | Functions ≤ 50 lines | NA | Shell scripts only, no OCaml |
+| P2 | No magic numbers | NA | No OCaml files |
+| P3 | Config completeness | NA | No domain logic |
+| P4 | .mli coverage | NA | No OCaml modules touched |
+| P5 | Internal helpers prefixed with _ | NA | Shell helpers; linter scope does not introduce new OCaml |
+| P6 | Tests conform to test-patterns.md | NA | Shell-based smoke test, not OCaml tests |
+| A1 | Core module modifications | PASS | No Portfolio/Orders/Position/Strategy/Engine touched |
+| A2 | No analysis/ → trading/ imports | PASS | Shell scripts, no imports |
+| A3 | No unnecessary existing module modifications | PASS | `trading/devtools/checks/dune` extended with two alias runtest stanzas; no other existing files changed |
+
+### Scope verification
+
+| Concern | Evidence |
+|---------|----------|
+| dash -n over all #!/bin/sh scripts | `posix_sh_check.sh` walks `trading/devtools/checks/`, `trading/devtools/checks/deep_scan/`, `dev/lib/` and skips `#!/usr/bin/env bash` shebangs |
+| Bad-fixture catches parse-time bash-isms | 3-assertion smoke test: bad fixture FAIL, clean fixture OK, bash-exempt OK — verified locally |
+| Wired into `dune runtest` | `trading/devtools/checks/dune` — both stanzas run in `(alias runtest)` |
+| 40 scripts covered at tip | Verified by running the linter against the repo: 0 violations |
+
+### Verdict
+
+**APPROVED** — POSIX-sh linter correctly gates the parse-time bash-ism class that caused the PR #483 rework cycle. Scope is contained to `trading/devtools/checks/`; no core module impact. Behavioral QC not required (harness utility, no domain logic).
+
+### Quality Score
+
+**4 — strong structural quality**
+
+Focused single-concern change, new test provides evidence, catches the specific failure mode that motivated the work (bash array / heredoc parse-time errors). The linter correctly handles bash-exempt shebangs so pre-existing bash scripts aren't flagged.
+
+---
 
 ## Structural Checklist — harness gha-cost-tracking (PR #483, re-review after POSIX-sh rework)
 

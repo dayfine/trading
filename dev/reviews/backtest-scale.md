@@ -1,4 +1,88 @@
-Reviewed SHA: db925c5a4c56fc852436da27cc1a8a770d30df62
+Reviewed SHA: 1a12da8c877385549e385b77d68d0c460a38f6f4
+
+## Structural Checklist — backtest-scale F2 (Summary-tier default tail_days fix)
+
+Scope: Fix for residual gap flagged during 3g behavioral QC (2026-04-21 run-4). `Summary_compute.default_config.tail_days = 250` is below the minimum needed for the 52-weekly-bar Mansfield RS window; bumped to 420 to ensure ~60 weekly bars after daily→weekly aggregation. Updated both `summary_compute.ml` and `summary_compute.mli` with the fix and expanded documentation explaining the binding constraint. Added regression test `test_promote_to_summary_with_default_config` to pin the contract "with defaults only, a stock with exactly `default_config.tail_days` of history must promote to Summary tier". Total diff: 156 insertions, 9 deletions across 4 files. All parity assertions now hold for the right reason: Tiered loader reports `Summary=19 Full=3` at sim-run end (was 0/0 before).
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | Exit 0; only pre-existing dune-project warning |
+| H2 | dune build | PASS | Exit 0; clean |
+| H3 | dune runtest | PASS | All 42 tests pass in full workspace: backtest suite (59 tests including new test_summary.ml regression test), all green. Parity tests report `Tiered loader: Metadata=0 Summary=19 Full=3 at end of simulator run` (was 0/0 before fix). |
+| P1 | Functions ≤ 50 lines (fn_length_linter via H3) | PASS | fn_length_linter passed as part of H3. All functions in summary_compute.ml are ≤ 25 lines (ma_30w 14 lines, atr_14 3 lines, rs_line 10 lines, stage_heuristic 14 lines, compute_values 5 lines). New fixture `_default_config_fixture` 23 lines; new test `test_promote_to_summary_with_default_config` 18 lines. |
+| P2 | No magic numbers (linter_magic_numbers.sh via H3) | PASS | linter_magic_numbers.sh passed as part of H3. The sole numeric constant `tail_days = 420` is a config field (not a magic number), documented in the `.mli` as binding to `rs_ma_period * 7` calendar days plus buffer. |
+| P3 | All configurable thresholds/periods/weights in config record | PASS | `tail_days = 420` is a field of the `config` record (type defined in summary_compute.mli). Callers override via optional `?summary_config` parameter to `Bar_loader.create`. Doc comment in .mli explains the binding constraint clearly: "must be large enough to cover the longest indicator window plus warmup AFTER daily→weekly aggregation ... binding constraint is [rs_ma_period] weekly bars, which requires ~[rs_ma_period] × 7 calendar days ... Default: 420 (~60 weekly bars, covering the default [rs_ma_period = 52] with headroom)". |
+| P4 | .mli files cover all public symbols | PASS | summary_compute.mli documents config record (all fields), default_config binding, and all public functions (ma_30w, atr_14, rs_line, stage_heuristic, compute_values). Summary_compute.ml implementation matches. No new public symbols added; only config value changed. |
+| P5 | Internal helpers prefixed with _ | PASS | New fixture `_default_config_fixture` correctly prefixed. Test function `test_promote_to_summary_with_default_config` correctly unprefixed. All existing helpers in test_summary.ml keep their _ prefix (_mk_bar, _daily_series, _ok_or_fail, _write_symbol, _fresh_data_dir, _summary_fixture, _short_fixture). |
+| P6 | Tests conform to test-patterns.md | PASS | File opens `Matchers` at line 11. New test `test_promote_to_summary_with_default_config` uses `assert_that` with matcher combinators: lines 327-332 use `is_ok`, `is_some_and`, `equal_to`, `match_summary`, `float_equal`, `is_between`. No List.exists with true/false; no bare `let _ = ...run` or `let _ = ...on_market_close` without assertion; no manual match with assert_failure (instead uses matchers). No nested `assert_that` inside callbacks. P6 PASS. |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | Zero diffs in any of those modules. Only files touched: summary_compute.{ml,mli}, test_summary.ml (all under backtest/bar_loader/), and dev/status/backtest-scale.md. No modifications to core strategy, portfolio, or order modules. |
+| A2 | No imports from analysis/ into trading/trading/ | PASS | summary_compute.ml imports only Core and Time_period, Relative_strength (both within trading/ tree). test_summary.ml imports from bar_loader (same package), Types, Csv, Matchers — no analysis/ imports. |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | Only summary_compute.ml and .mli modified within the feature scope (both part of bar_loader package being extended). test_summary.ml extended with one new fixture + one new test, no modifications to existing test signatures. dev/status/backtest-scale.md updated with F2 completion entry (documentation update, not a module). |
+
+## Verdict
+
+APPROVED
+
+All hard gates (H1, H2, H3) pass. All applicable checklist items are PASS or NA. No FAILs. The fix directly addresses the F2 residual gap: bumped `default_config.tail_days` from 250 to 420 to ensure the Mansfield RS window (52 weekly bars) is satisfied after daily→weekly aggregation. Updated documentation in .mli clearly explains the binding constraint. New regression test pins the contract and fails loudly if anyone reduces `tail_days` below the threshold again. All parity assertions now hold for the correct reason: Tiered loader promotes 19 symbols to Summary tier and 3 to Full tier (up from 0/0). No structural violations.
+
+---
+
+# Behavioral QC — backtest-scale F2 (Summary-tier default tail_days fix)
+Date: 2026-04-22
+Reviewer: qc-behavioral
+
+## Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new .mli docstrings has an identified test that pins it | PASS | `summary_compute.mli` was updated (not newly created). Two `tail_days`-related claims added: (a) "must be large enough to cover the longest indicator window plus warmup AFTER daily→weekly aggregation" — pinned by `test_promote_to_summary_with_default_config` (test_summary.ml L312-329), which writes exactly `default_config.tail_days` bars and asserts promotion to `Summary_tier` + `get_summary` returns `Some _`; (b) "binding constraint is `rs_ma_period` weekly bars, which requires ~`rs_ma_period` × 7 calendar days of daily input plus a buffer" — also pinned by the same test since a reduction of `tail_days` below ~364 would fail it loudly. `test_promote_summary_insufficient_history_stays_at_metadata` pins the complementary "insufficient history → Metadata tier" behavior (L216-233). |
+| CP2 | Each claim in PR body "What it does" / commit message sections has a corresponding test/observable in the committed artifact | PASS | Commit `8dcdbf6` ("fix(bar_loader): bump default Summary tail_days from 250 to 420") advertises: (a) before/after observable "Metadata=22 Summary=0 Full=0" → "Metadata=0 Summary=19 Full=3" — empirically verified by running `dune runtest trading/backtest --force` which emits EXACTLY those strings from the Tiered loader; (b) "Parity still holds ($0.01 equity, $0.01 step-sample, exact round-trip count)" — verified by `test_tiered_loader_parity.ml`'s `_assert_trade_count_match` + `_assert_final_value_match` + `_assert_step_samples_match` passing in the same run. Commit `7386110` ("test(bar_loader): regression test for F2") claims "250 calendar days aggregate to ~36 weekly bars, strictly below the 52-bar Mansfield zero-line threshold" — that claim is what `test_promote_to_summary_with_default_config` exercises at the new default (420 passes) and would fail at the old (250). |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size_is | NA | No pass-through semantics in this feature. The Summary-tier promote is a transform (daily bars → scalars); the relevant identity check is "same symbol still in Metadata record after promote" (test_promote_to_summary_auto_promotes_metadata L192-204), which uses `match_metadata ~symbol:(equal_to "STOCK") ~sector:(equal_to "Tech") ...` — whole-record match on non-NA fields, not just size. |
+| CP4 | Each guard called out explicitly in code docstrings has a test exercising the guarded-against scenario | PASS | The `.ml` comment on `default_config` (L13-21 of summary_compute.ml) calls out two guards: (a) "Below that threshold [rs_line] returns None and [compute_values] returns None via its Option monadic chain" — exercised by `test_promote_summary_insufficient_history_stays_at_metadata` (10 bars, well below any threshold → stays Metadata); (b) "silently leaves callers at the prior tier — the F2 regression the parity test was quietly masking before the bump" — the positive guard is exercised by the new `test_promote_to_summary_with_default_config` (default config, exactly `tail_days` bars → MUST reach Summary). Both sides of the threshold are pinned. |
+
+## Behavioral Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1 | Core module modification is strategy-agnostic | NA | qc-structural A1 was PASS — no core module (Portfolio/Orders/Position/Strategy/Engine) was modified. Only `backtest/bar_loader/` is touched. Nothing to evaluate for leaked strategy-specific logic. |
+| S1 | Stage 1 definition matches book | NA | No stage-classifier logic changed; `Stage.classify` is invoked unchanged via `stage_heuristic`. |
+| S2 | Stage 2 definition matches book | NA | Same as S1. |
+| S3 | Stage 3 definition matches book | NA | Same as S1. |
+| S4 | Stage 4 definition matches book | NA | Same as S1. |
+| S5 | Buy criteria: Stage 2 entry on breakout with volume | NA | No screener / buy-criteria logic changed. |
+| S6 | No buy signals in Stage 1/3/4 | NA | Same as S5. |
+| L1 | Initial stop below base | NA | Stops untouched. |
+| L2 | Trailing stop never lowered | NA | Same. |
+| L3 | Stop triggers on weekly close | NA | Same. |
+| L4 | Stop state machine transitions | NA | Same. |
+| C1 | Screener cascade order | NA | No screener code changed. Side-effect: the fix RESTORES the screener's input (Summary rows) that was previously starved, but the cascade logic itself is untouched. |
+| C2 | Bearish macro blocks all buys | NA | Same as C1. |
+| C3 | Sector RS vs. market, not absolute | NA | Same as C1. |
+| D1 | Mansfield RS uses weekly bars with 52-week zero line (weinstein-book-reference.md §4.4) | PASS | Book §4.4 prescribes "computed weekly, same day each week, preferably Friday" with the Mansfield zero line = "RS divided by its own long-term average". `rs_line` in `summary_compute.ml` (L58-83) aggregates both stock and benchmark to weekly via `Time_period.Conversion.daily_to_weekly` BEFORE invoking `Relative_strength.analyze`, and passes `rs_ma_period = 52` (weekly bars). The `default_config.tail_days = 420` produces ~60 weekly bars after aggregation, which covers the 52-bar Mansfield window with ~15% headroom for holiday gaps and partial-week edge. Empirically, the default-config test (`test_promote_to_summary_with_default_config`) passes with `rs_line = 1.0` (stock and benchmark move identically) — confirming `Relative_strength.analyze` returns `Some _` at the new default. |
+| D2 | No other Summary-tier indicator is under-served by the new `tail_days` default | PASS | Walked the four `compute_values` dependencies: `ma_30w` needs 30 weekly bars (~210 days); `atr_14` needs 14+1 daily bars; `stage_heuristic` needs 30 weekly bars (same as `ma_30w`); `rs_line` needs 52 weekly bars (~364 days). 420 calendar days → ~60 weekly bars is the TIGHTEST binding at 52 — the other three clear by a wide margin (30w MA: 60 >> 30; ATR: 420 >> 15; stage: 60 >> 30). The `.mli` doc correctly identifies `rs_ma_period * 7` as the binding. |
+| D3 | Fix does not alter strategy output (Legacy is untouched; Tiered parity holds) | PASS | Legacy path does not use `Summary_compute` at all — its loader is `Bar_history`-based, not tier-based. Tiered path's output CHANGES in the sense that `Summary_compute` now returns `Some _` instead of `None` for the 19 eligible universe symbols, but the parity test (`test_tiered_loader_parity`) still asserts trade-count exact match, final-value within $0.01, and sampled step values within $0.01 between Legacy and Tiered — all PASS per qc-structural's H3 run and my independent rerun. This proves the Tiered path now produces the SAME observable trade decisions as Legacy, confirming the Shadow_screener cascade + promote/demote bookkeeping are wired correctly. |
+| D4 | Documentation truthfulness: `.mli` binding claim matches `.ml` code behavior | PASS | `.mli` L27-31: "binding constraint is [rs_ma_period] weekly bars, which requires ~[rs_ma_period] × 7 calendar days of daily input plus a buffer". Traced the Option chain in `compute_values` (L102-109 of `.ml`): the four `%bind` steps fail in order ma_30w → atr_14 → rs_line → stage_heuristic. Of these, only `rs_line` enforces the 52-weekly-bar floor; the other three need at most 30 weekly bars or 15 daily bars. So the binding claim is true on this code path. No other indicator (e.g. a hidden warmup requirement in `Atr.atr` or `Stage.classify`) is tighter. |
+| T1 | Tests cover all 4 stage transitions | NA | No stage-transition logic changed. |
+| T2 | Bearish macro → zero buy candidates test | NA | No macro logic changed. |
+| T3 | Stop trailing tests | NA | No stop logic changed. |
+| T4 | Tests assert domain outcomes, not just "no error" | PASS | `test_promote_to_summary_with_default_config` asserts (a) `tier_of loader = Some Summary_tier` — the DOMAIN outcome (promotion succeeded, not just "no exception"); (b) `get_summary` returns `Some _` with `match_summary` pinning `symbol`, `as_of`, `ma_30w ∈ [100.0, 800.0]`, `atr_14 = 1.0`, `rs_line = 1.0` — all field values, not placeholders. `test_promote_summary_insufficient_history_stays_at_metadata` asserts `tier_of = Some Metadata_tier` AND `get_summary = None` — the contrapositive domain outcome. Empirically, the parity test further asserts all 19 Summary-eligible symbols reach Summary and 3 reach Full via observable loader stats. |
+| T5 | Cost-impact check: the 1.68× per-symbol CSV read from bumping tail_days 250 → 420 does not affect the working-set memory budget | PASS | Summary tier carries four scalars per symbol (ma_30w, atr_14, rs_line, stage) — zero daily bars retained. The momentary read-then-discard cost grows from 250 → 420 rows per symbol per Friday, but the steady-state memory is unchanged. Plan `backtest-tiered-loader-2026-04-19.md` §3b budget (~90 lines of compute + scalar-only Summary.t) is unaffected. Not a regression. |
+
+## Quality Score
+
+4 — Precise, minimal, well-documented fix. `.mli` docstring now carries the binding constraint explicitly; the regression test pins the default-config contract so no one can silently regress `tail_days` again; PR body and commit messages are fully truthful about the empirical before/after. The only reason this isn't a 5 is that `_default_config_fixture` could in theory be merged with `_summary_fixture` via an optional `?summary_config` parameter (minor DRY nit) — but the explicit comment "Intentionally NO [summary_config] override — the point of this fixture is to exercise the defaults" justifies keeping them separate for clarity.
+
+(Calibration note: last run's 3g re-review was Quality Score 3. This F2 closure is a strictly tighter, better-documented change — single-file config bump with authoritative docstring + regression test + empirical verification — which is why it scores higher.)
+
+## Verdict
+
+APPROVED
+
+All 4 CP rows are PASS or NA with justified NA. All 4 domain rows (D1–D4) are PASS with authority-document traceability. All applicable T rows are PASS. Non-applicable behavioral rows (S*/L*/C*, T1–T3) are correctly NA for a pure data-loading config change. No FAILs.
+
+---
+
+Prior reviews:
 
 ## Structural Checklist — backtest-scale 3g (parity acceptance test)
 
