@@ -179,7 +179,9 @@ jobs:
           mkdir -p "$BUDGET_DIR"
 
           # Determine run number: count existing budget files for today.
-          EXISTING=$(ls "${BUDGET_DIR}/${DATE}"*.json 2>/dev/null | wc -l | tr -d ' ')
+          # `find` exits 0 on zero matches (unlike `ls` under `set -o pipefail`),
+          # so this works on today's first run when dev/budget/<date>*.json is empty.
+          EXISTING=$(find "$BUDGET_DIR" -maxdepth 1 -name "${DATE}*.json" 2>/dev/null | wc -l | tr -d ' ')
           RUN_N=$((EXISTING + 1))
           OUT_FILE="${BUDGET_DIR}/${DATE}-run${RUN_N}.json"
           RUN_ID="${DATE}-run${RUN_N}"
@@ -206,6 +208,11 @@ jobs:
           fi
 
           TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Belt-and-suspenders: TOTAL_COST is initialized to "null" above and
+          # reassigned by the python3 -c block, but if any future edit leaves it
+          # as an empty string the heredoc below would emit `"total_cost_usd": ,`
+          # and crash Python at parse time. Coerce to "null" if empty.
+          TOTAL_COST="${TOTAL_COST:-null}"
 
           python3 - <<PYEOF
           import json, os
