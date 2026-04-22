@@ -151,6 +151,93 @@ let test_weekly_bars_for_returns_all_if_fewer_than_n _ =
   assert_that (Bar_history.weekly_bars_for t ~symbol:"AAPL" ~n:100) (size_is 1)
 
 (* ------------------------------------------------------------------ *)
+(* seed                                                                 *)
+(* ------------------------------------------------------------------ *)
+
+let test_seed_empty_history_ingests_bars _ =
+  let t = Bar_history.create () in
+  let bars =
+    [
+      make_bar "2024-01-08" 180.0;
+      make_bar "2024-01-09" 181.0;
+      make_bar "2024-01-10" 182.0;
+    ]
+  in
+  Bar_history.seed t ~symbol:"AAPL" ~bars;
+  let daily = Bar_history.daily_bars_for t ~symbol:"AAPL" in
+  assert_that daily (size_is 3)
+
+let test_seed_skips_older_than_last_bar _ =
+  let t = Bar_history.create () in
+  (* Seed with Jan 15. *)
+  Bar_history.seed t ~symbol:"AAPL" ~bars:[ make_bar "2024-01-15" 185.0 ];
+  (* Second seed with earlier + equal-date bars is ignored. *)
+  Bar_history.seed t ~symbol:"AAPL"
+    ~bars:[ make_bar "2024-01-08" 180.0; make_bar "2024-01-15" 190.0 ];
+  let daily = Bar_history.daily_bars_for t ~symbol:"AAPL" in
+  assert_that daily
+    (elements_are
+       [ field (fun b -> b.Types.Daily_price.close_price) (float_equal 185.0) ])
+
+let test_seed_appends_strictly_later_bars _ =
+  let t = Bar_history.create () in
+  Bar_history.seed t ~symbol:"AAPL" ~bars:[ make_bar "2024-01-08" 180.0 ];
+  Bar_history.seed t ~symbol:"AAPL"
+    ~bars:
+      [
+        make_bar "2024-01-08" 999.0 (* ignored: equal date *);
+        make_bar "2024-01-09" 181.0 (* kept *);
+        make_bar "2024-01-10" 182.0 (* kept *);
+      ];
+  let daily = Bar_history.daily_bars_for t ~symbol:"AAPL" in
+  assert_that daily
+    (elements_are
+       [
+         field (fun b -> b.Types.Daily_price.close_price) (float_equal 180.0);
+         field (fun b -> b.Types.Daily_price.close_price) (float_equal 181.0);
+         field (fun b -> b.Types.Daily_price.close_price) (float_equal 182.0);
+       ])
+
+let test_seed_idempotent _ =
+  let t = Bar_history.create () in
+  let bars = [ make_bar "2024-01-08" 180.0; make_bar "2024-01-09" 181.0 ] in
+  Bar_history.seed t ~symbol:"AAPL" ~bars;
+  Bar_history.seed t ~symbol:"AAPL" ~bars;
+  Bar_history.seed t ~symbol:"AAPL" ~bars;
+  let daily = Bar_history.daily_bars_for t ~symbol:"AAPL" in
+  assert_that daily (size_is 2)
+
+let test_seed_is_per_symbol _ =
+  let t = Bar_history.create () in
+  Bar_history.seed t ~symbol:"AAPL" ~bars:[ make_bar "2024-01-08" 180.0 ];
+  Bar_history.seed t ~symbol:"MSFT"
+    ~bars:[ make_bar "2024-01-08" 400.0; make_bar "2024-01-09" 401.0 ];
+  assert_that (Bar_history.daily_bars_for t ~symbol:"AAPL") (size_is 1);
+  assert_that (Bar_history.daily_bars_for t ~symbol:"MSFT") (size_is 2);
+  assert_that (Bar_history.daily_bars_for t ~symbol:"GOOG") is_empty
+
+let test_seed_then_accumulate_continues_cleanly _ =
+  (* Contract: after seed, accumulate still appends only bars strictly later
+     than the seeded tail's last date. Simulates the Tiered path's usage: seed
+     from loader on Full promote, then the simulator calls accumulate on
+     subsequent days. *)
+  let t = Bar_history.create () in
+  Bar_history.seed t ~symbol:"AAPL"
+    ~bars:[ make_bar "2024-01-08" 180.0; make_bar "2024-01-09" 181.0 ];
+  let later = make_bar "2024-01-10" 182.0 in
+  Bar_history.accumulate t
+    ~get_price:(single_symbol_get_price ~symbol:"AAPL" ~bar:later)
+    ~symbols:[ "AAPL" ];
+  let daily = Bar_history.daily_bars_for t ~symbol:"AAPL" in
+  assert_that daily (size_is 3);
+  (* And an accumulate of an older bar still gets rejected. *)
+  let older = make_bar "2024-01-05" 179.0 in
+  Bar_history.accumulate t
+    ~get_price:(single_symbol_get_price ~symbol:"AAPL" ~bar:older)
+    ~symbols:[ "AAPL" ];
+  assert_that (Bar_history.daily_bars_for t ~symbol:"AAPL") (size_is 3)
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -170,4 +257,15 @@ let () =
            "weekly_bars_for respects n" >:: test_weekly_bars_for_respects_n;
            "weekly_bars_for returns all if fewer than n"
            >:: test_weekly_bars_for_returns_all_if_fewer_than_n;
+           "seed empty history ingests bars"
+           >:: test_seed_empty_history_ingests_bars;
+           "seed skips bars older or equal to last-bar date"
+           >:: test_seed_skips_older_than_last_bar;
+           "seed appends strictly later bars"
+           >:: test_seed_appends_strictly_later_bars;
+           "seed is idempotent when called with same bars"
+           >:: test_seed_idempotent;
+           "seed is per-symbol" >:: test_seed_is_per_symbol;
+           "seed then accumulate continues cleanly"
+           >:: test_seed_then_accumulate_continues_cleanly;
          ])
