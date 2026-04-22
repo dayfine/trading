@@ -178,13 +178,17 @@ jobs:
           BUDGET_DIR="dev/budget"
           mkdir -p "$BUDGET_DIR"
 
-          # Determine run number: count existing budget files for today.
-          # `find` exits 0 on zero matches (unlike `ls` under `set -o pipefail`),
-          # so this works on today's first run when dev/budget/<date>*.json is empty.
-          EXISTING=$(find "$BUDGET_DIR" -maxdepth 1 -name "${DATE}*.json" 2>/dev/null | wc -l | tr -d ' ')
-          RUN_N=$((EXISTING + 1))
-          OUT_FILE="${BUDGET_DIR}/${DATE}-run${RUN_N}.json"
-          RUN_ID="${DATE}-run${RUN_N}"
+          # File naming: include github.run_id so concurrent or fast-successive
+          # runs never collide on the same filename. Earlier design used a
+          # RUN_N counter derived from `find dev/budget/${DATE}*.json` on main,
+          # but prior-run PRs may not have auto-merged yet when the next run
+          # starts — every run saw main with 0 files, picked run1, and
+          # clobbered each other's branch on force-push. See runs
+          # 24762831070 / 24774046357 / 24788029614 (2026-04-22) for the
+          # post-mortem: $6.29 and $2.69 measurements lost to overwrite
+          # before this fix.
+          OUT_FILE="${BUDGET_DIR}/${DATE}-${GITHUB_RUN_ID}.json"
+          RUN_ID="${DATE}-${GITHUB_RUN_ID}"
 
           # Parse total_cost_usd from the execution file.
           # The execution file is a JSON array of SDK messages; the last element
@@ -306,21 +310,42 @@ jobs:
           git commit -m "ops(budget): record ${BASENAME} (\$${TOTAL_COST})"
           git push origin "$BRANCH"
 
-          # Create PR + enable auto-merge. Same pattern the lead-orchestrator
-          # uses for ops/daily-* summary PRs. Auto-merge requires repo-level
-          # auto-merge setting to be on (it is, per existing summary PRs).
-          gh pr create \
-            --title "ops(budget): ${BASENAME} (\$${TOTAL_COST})" \
-            --body "Measured GHA orchestrator run cost for \`${BASENAME}\`.
+          # Create PR via curl REST (the devcontainer image does not ship
+          # `gh` CLI — see run 24762831070 post-mortem where both `gh pr
+          # create` and `gh pr merge --auto` died with "gh: command not
+          # found" and the budget branch sat orphaned without a PR).
+          BODY=$(printf 'Measured GHA orchestrator run cost for `%s`.\n\n`total_cost_usd`: $%s (from `claude-code-action` execution_file, fallback branch 1b — see `dev/status/cost-tracking.md`).\n\nAuto-merge: ops category, single-file additive change.' "$BASENAME" "$TOTAL_COST")
 
-          \`total_cost_usd\`: \$${TOTAL_COST} (from \`claude-code-action\` execution_file, fallback branch 1b — see \`dev/status/cost-tracking.md\`).
+          PR_JSON=$(curl -s -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/pulls" \
+            -d "$(jq -n \
+              --arg title "ops(budget): ${BASENAME} (\$${TOTAL_COST})" \
+              --arg head "${BRANCH}" \
+              --arg base "main" \
+              --arg body "${BODY}" \
+              '{title: $title, head: $head, base: $base, body: $body, draft: false}')")
 
-          Auto-merge: ops category, single-file additive change." \
-            --head "$BRANCH" \
-            --base main \
-            || true
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.number // empty')
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::Failed to create budget PR. API response:"
+            echo "$PR_JSON" | jq -r '.message // .' || true
+            exit 0
+          fi
+          echo "Opened budget PR #${PR_NUMBER}"
 
-          gh pr merge --auto --squash --delete-branch "$BRANCH" || true
+          # Enable auto-merge via GraphQL. Auto-merge requires the repo-level
+          # setting to be on (it is, per existing ops/daily-* summary PRs).
+          PR_NODE_ID=$(echo "$PR_JSON" | jq -r '.node_id')
+          curl -s -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/graphql" \
+            -d "$(jq -n \
+              --arg id "$PR_NODE_ID" \
+              '{query: "mutation($id: ID!) { enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: SQUASH }) { pullRequest { number } } }", variables: { id: $id }}')" \
+            > /dev/null || echo "::warning::Failed to enable auto-merge on PR #${PR_NUMBER}; human merge required."
 
       - name: Locate daily summary (for escalations check)
         id: publish-summary
