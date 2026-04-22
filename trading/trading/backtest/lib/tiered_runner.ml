@@ -37,20 +37,74 @@ let _create_bar_loader (input : input) ?trace () =
     ~sector_map:input.ticker_sectors ~universe:input.all_symbols
     ~benchmark_symbol:input.config.indices.primary ~trace_hook ()
 
-let _promote_universe_metadata loader (input : input) ~as_of =
+(** Max per-symbol Metadata-promote failure messages to emit on stderr before
+    collapsing into a summary count. A universe where every symbol fails (e.g. a
+    misconfigured [data_dir]) would otherwise spam N lines; capping here keeps
+    logs useful without hiding the "many failures" signal. *)
+let _max_logged_metadata_failures = 10
+
+(** [_promote_one_metadata] single-symbol Metadata promote, returning either
+    [None] on success or [Some (symbol, status)] on failure. Extracted so the
+    outer loop in [promote_universe_metadata] stays a flat [List.filter_map]. *)
+let _promote_one_metadata loader ~as_of symbol =
   match
-    Bar_loader.promote loader ~symbols:input.all_symbols
-      ~to_:Bar_loader.Metadata_tier ~as_of
+    Bar_loader.promote loader ~symbols:[ symbol ] ~to_:Bar_loader.Metadata_tier
+      ~as_of
   with
-  | Ok () -> ()
-  | Error e ->
-      (* A partial load is acceptable per [promote]'s contract, but a hard
-         load error indicates a broken data directory — surface rather than
-         silently miss. The Legacy path fails at the same logical moment. *)
-      failwith
-        (sprintf
-           "Backtest.Tiered_runner: loader failed during Metadata promote: %s"
-           (Status.show e))
+  | Ok () -> None
+  | Error e -> Some (symbol, e)
+
+(** [_log_metadata_failure (symbol, e)] — single-failure stderr line with the
+    "continuing" marker that ops uses to distinguish tolerated missing-CSV
+    failures from genuine bugs. *)
+let _log_metadata_failure (symbol, e) =
+  eprintf
+    "Tiered_runner: metadata promote failed for %s: %s (continuing; \
+     Legacy-equivalent missing-CSV tolerance)\n\
+     %!"
+    symbol (Status.show e)
+
+(** [_log_metadata_failures failures ~n_total] — logs the first
+    [_max_logged_metadata_failures] per-symbol messages, an ellipsis if the list
+    exceeded the cap, and a "[n_failed] of [n_total]" summary line when any
+    symbol failed. Side-effectful; no-op when [failures] is empty. *)
+let _log_metadata_failures failures ~n_total =
+  let n_failed = List.length failures in
+  List.take failures _max_logged_metadata_failures
+  |> List.iter ~f:_log_metadata_failure;
+  if n_failed > _max_logged_metadata_failures then
+    eprintf "Tiered_runner: ... and %d more metadata promote failures\n%!"
+      (n_failed - _max_logged_metadata_failures);
+  if n_failed > 0 then
+    eprintf "Tiered_runner: %d of %d symbols failed metadata promote\n%!"
+      n_failed n_total
+
+(** Bulk-promote [input.all_symbols] to [Metadata_tier], tolerating per-symbol
+    load failures to match Legacy's silent missing-CSV behaviour.
+
+    [Bar_loader.promote]'s contract (see the docstring in [bar_loader.mli] on
+    [val promote]) returns the first per-symbol error encountered, e.g. a single
+    missing CSV causes [Error]. The Legacy path's simulator silently skips any
+    symbol whose [data.csv] is absent, so a [failwith] here would introduce a
+    real divergence: identical fixtures + identical universe would give Tiered a
+    raise on first missing CSV while Legacy runs the backtest without that
+    symbol.
+
+    Implementation: iterate per-symbol with single-symbol [promote] calls so we
+    can collect {e every} failure rather than stopping at the first. The
+    Metadata tier does not fire the trace hook (see the [promote] match arm for
+    [Metadata_tier] in [bar_loader.ml]), so per-symbol batching is
+    observationally equivalent to the batch call at the tier / trace layer.
+
+    Never raises on per-symbol failure. Never raises if every symbol fails, e.g.
+    a misconfigured [data_dir] — the symmetry with Legacy (which would simply
+    produce an empty backtest in that case) is the whole point. Callers can
+    still observe the tier counts via [Bar_loader.stats] after return. *)
+let promote_universe_metadata loader (input : input) ~as_of =
+  let failures =
+    List.filter_map input.all_symbols ~f:(_promote_one_metadata loader ~as_of)
+  in
+  _log_metadata_failures failures ~n_total:(List.length input.all_symbols)
 
 (** [_full_candidate_limit config] caps how many Shadow_screener candidates the
     Tiered wrapper promotes to Full on a single Friday. Matches the inner
@@ -118,7 +172,7 @@ let run ~input ~start_date ~end_date ~warmup_days ~initial_cash ~commission
   let n_all_symbols = List.length input.all_symbols in
   Trace.record ?trace ~symbols_in:n_all_symbols ~symbols_out:n_all_symbols
     Trace.Phase.Load_bars (fun () ->
-      _promote_universe_metadata loader input ~as_of);
+      promote_universe_metadata loader input ~as_of);
   let stats = Bar_loader.stats loader in
   eprintf
     "Tiered loader: Metadata=%d Summary=%d Full=%d after bulk Metadata promote\n\

@@ -37,6 +37,24 @@ val tier_op_to_phase : Bar_loader.tier_op -> Trace.Phase.t
     the trace bridging is observable from unit tests without reaching into
     private helpers. Pure — depends only on the input variant. *)
 
+val promote_universe_metadata :
+  Bar_loader.t -> input -> as_of:Core.Date.t -> unit
+(** Bulk-promote [input.all_symbols] to [Metadata_tier], tolerating per-symbol
+    load failures so that a universe entry whose [data.csv] is absent does not
+    abort the Tiered run. This matches the Legacy path's silent missing-CSV
+    behaviour — a key parity property the nightly A/B compare does not verify
+    (its fixtures are complete) but which must hold for real data directories.
+
+    Per-symbol failures are logged to stderr (capped to avoid spam on a
+    misconfigured [data_dir]); the function never raises on load errors, even if
+    every symbol fails. Symbols that successfully promoted remain queryable at
+    [Metadata_tier]; failed symbols are absent from the loader entirely (per
+    [Bar_loader.promote]'s contract — see the [val promote] docstring in
+    [bar_loader.mli]).
+
+    Exposed so a regression test can pin the "single missing CSV does not raise"
+    contract without spinning up a full simulator. *)
+
 val run :
   input:input ->
   start_date:Core.Date.t ->

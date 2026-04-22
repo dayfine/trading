@@ -7,7 +7,7 @@ IN_PROGRESS
 
 structural_qc: APPROVED (2026-04-22 run-2) — feat/backtest-scale-3h; merged as #496. See dev/reviews/backtest-scale-3h.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478; F2 (Summary tail_days fix) merged as #492; 3g (parity acceptance test) merged as #484; **3h (nightly A/B comparison) merged as #496 on 2026-04-22**; **workflow activated as `.github/workflows/tiered-loader-ab.yml` via #498 (2026-04-22)** — first nightly run fires at 04:17 UTC tonight. Next merge-gate increment: flip `loader_strategy` default Legacy→Tiered (~20-line PR) after a few nights of clean nightly A/B data confirms parity + savings.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478; F2 (Summary tail_days fix) merged as #492; 3g (parity acceptance test) merged as #484; **3h (nightly A/B comparison) merged as #496 on 2026-04-22**; **workflow activated as `.github/workflows/tiered-loader-ab.yml` via #498 (2026-04-22)** — first nightly run fires at 04:17 UTC tonight. **Missing-CSV tolerance fix (2026-04-22) — see §Follow-up / escalation:** `Tiered_runner._promote_universe_metadata` softened from `failwith`-on-first-error to per-symbol `continuing` log, matching Legacy's silent missing-CSV behaviour. Branch `feat/backtest-scale-tiered-missing-csv-tolerance`. Next merge-gate increment: flip `loader_strategy` default Legacy→Tiered (~20-line PR) after a few nights of clean nightly A/B data confirms parity + savings.
 
 ## Interface stable
 NO
@@ -119,22 +119,22 @@ Build alongside existing `Bar_history` — don't modify it.
   bars after aggregation). Branch `feat/backtest-scale-f2`, see
   §Completed.
 
-- **`Tiered_runner._promote_universe_metadata` is strictly intolerant of missing CSVs.**
-  Surfaced by the 3g parity scenario: Legacy's `Simulator` silently
-  skips any symbol whose `data.csv` is absent, while
-  `_promote_universe_metadata` (`tiered_runner.ml:34-47`) turns the
-  first `Bar_loader.promote` `Error` into a hard `failwith`. The
-  comment on the `failwith` claims "The Legacy path fails at the same
-  logical moment" — that is empirically wrong for the Simulator-level
-  loader. This is not fixed in 3g (the parity scope forbids strategy
-  code changes); instead the scenario ships synthetic OHLCV fixtures
-  for the 14 macro symbols (11 SPDR ETFs + GDAXI.INDX + N225.INDX +
-  ISF.LSE) so both paths see identical data and the test exercises
-  real strategy divergence. Proposed follow-up: either (a) soften the
-  `failwith` to a per-symbol `continuing` log (matches
-  `Tiered_strategy_wrapper`'s own runtime tolerance) or (b) keep the
-  strict check but expose it as a user-facing pre-flight error with
-  the full missing-symbol list. Feat-backtest owns this decision.
+- ~~**`Tiered_runner._promote_universe_metadata` is strictly intolerant of missing CSVs.**~~
+  **[x] RESOLVED 2026-04-22** — picked option (a) (soften to per-symbol
+  `continuing` log). Branch `feat/backtest-scale-tiered-missing-csv-tolerance`.
+  `_promote_universe_metadata` rewritten as a per-symbol
+  `List.filter_map` over `Bar_loader.promote` that collects all failures,
+  never raises (even when every symbol fails — symmetry with Legacy's
+  empty-backtest behaviour). Logs capped at first 10 per-symbol lines plus
+  a summary count (`N of M symbols failed metadata promote`). Function is
+  also exposed in the `.mli` as `promote_universe_metadata` (dropped the
+  leading underscore) so the regression test can pin the contract without
+  spinning up a full simulator. Regression test in new file
+  `trading/trading/backtest/test/test_runner_tiered_metadata_tolerance.ml`
+  with three cases: (i) partial missing — HAVE reaches Metadata, MISSING1
+  / MISSING2 not tracked, no raise; (ii) all missing — no raise, loader
+  empty; (iii) all present — all 3 reach Metadata. Closes the parity gap
+  the nightly A/B (which uses complete fixtures) wouldn't catch.
 
 - **`Bar_loader.create` defaults `benchmark_symbol = "SPY"` but the
   Runner's primary index is `GSPC.INDX`.**
