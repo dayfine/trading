@@ -7,7 +7,7 @@ READY_FOR_REVIEW
 
 structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478. 3g (parity acceptance test) on `feat/backtest-scale-3g` — ready for review.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478; F2 (Summary tail_days fix) merged as #492. 3g (parity acceptance test) merged earlier in the sequence; 3h (nightly A/B comparison) on `feat/backtest-scale-3h` — ready for review.
 
 ## Interface stable
 NO
@@ -15,10 +15,35 @@ NO
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- feat/backtest-scale-3g — 3g parity acceptance test (merge gate). Runs `smoke/tiered-loader-parity.sexp` under both `Loader_strategy.Legacy` and `Loader_strategy.Tiered`, asserts `summary.n_round_trips` matches exactly, `summary.final_portfolio_value` matches within $0.01, sampled `steps[].portfolio_value` (indices 0, n/4, n/2, 3n/4, n-1) matches within $0.01, and every pinned metric falls inside its declared range for both strategies. Ships a 7-symbol pinned universe (`universes/parity-7sym.sexp`) + synthetic OHLCV fixtures for the 14 macro symbols (11 SPDR ETFs + GDAXI.INDX + N225.INDX + ISF.LSE) whose CSVs were absent from checked-in `test_data/`. Ready for QC.
+- feat/backtest-scale-3h — 3h nightly A/B trace comparison. Ships
+  `dev/scripts/tiered_loader_ab_compare.sh` (POSIX sh) + staged GHA
+  workflow at `dev/ci-staging/tiered-loader-ab.yml`. The script runs a
+  single scenario twice under `--loader-strategy legacy` and
+  `--loader-strategy tiered` via `backtest_runner.exe` and diffs the
+  resulting `trades.csv` / `summary.sexp` output trees. Hard gate on
+  trade-count diff; warn annotation on portfolio-value drift above
+  `max($1.00, 0.001% of legacy_pv)` per plan §Resolutions #1. Workflow
+  runs the compare against 3 broad goldens (bull-crash-2015-2020,
+  covid-recovery-2020-2024, six-year-2018-2023) nightly at 04:17 UTC,
+  uploads all output trees as a 30-day artefact. POSIX-sh linter
+  extended to scan `dev/scripts/` so the new script is covered by the
+  `dash -n` gate. Smoke-verified on `smoke/tiered-loader-parity.sexp`:
+  both strategies produce 3 trades / identical $1,096,397.65 final PV
+  (PV delta $0.00, within $10.96 warn threshold). Ready for QC.
 
 ## Blocked on
-- None. 3g is ready for review; 3h (nightly A/B comparison) follows after merge.
+- **`.github/workflows/tiered-loader-ab.yml` manual install required at merge.**
+  The feat-backtest agent's GitHub token lacks the `workflow` scope, so
+  `.github/workflows/*.yml` paths are rejected by the remote with
+  "refusing to allow a Personal Access Token to create or update
+  workflow ... without `workflow` scope". The workflow content ships
+  in this PR as `dev/ci-staging/tiered-loader-ab.yml`; at merge time (or
+  as a tiny follow-up PR from a human or workflow-scoped agent) run
+  `git mv dev/ci-staging/tiered-loader-ab.yml .github/workflows/tiered-loader-ab.yml`
+  to activate the nightly schedule. Until then, the script
+  (`dev/scripts/tiered_loader_ab_compare.sh`) is fully functional and
+  can be invoked manually via `sh dev/scripts/tiered_loader_ab_compare.sh
+  <scenario> <out>`.
 
 ## Goal
 
@@ -82,10 +107,17 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Next Steps
 
-1. QC review of 3g (feat/backtest-scale-3g head) — parity acceptance test (merge gate).
-2. Post-merge: flip default `loader_strategy` from `Legacy` to `Tiered` in a tiny follow-up PR.
-3. Post-Tiered-default: retire `Legacy` codepath (`_run_legacy` in `runner.ml`) — tracked as 3h-precursor.
-4. Dispatch 3h (nightly A/B comparison) — GHA workflow + compare script emitting day-by-day divergence chart.
+1. QC review of 3h (`feat/backtest-scale-3h` head) — nightly A/B compare
+   script + staged GHA workflow. Verify parity contract (hard gate on
+   trade-count; warn on PV drift) and the `dev/ci-staging/` → `.github/workflows/` install path.
+2. Human or workflow-scoped agent: rename
+   `dev/ci-staging/tiered-loader-ab.yml` → `.github/workflows/tiered-loader-ab.yml`
+   so the nightly cron activates. Can fold into the 3h merge, or ship as
+   a separate 1-line PR immediately after.
+3. Post-merge: flip default `loader_strategy` from `Legacy` to `Tiered`
+   in a tiny follow-up PR after a few weeks of nightly A/B data
+   confirms parity + savings.
+4. Post-Tiered-default: retire `Legacy` codepath (`_run_legacy` in `runner.ml`).
 
 ## Follow-up / escalation
 
@@ -136,6 +168,57 @@ Build alongside existing `Bar_history` — don't modify it.
   to `Bar_loader.create ~benchmark_symbol:_`.
 
 ## Completed
+
+- **3h — Nightly A/B trace comparison** (2026-04-22). Ships the
+  nightly-advisory A/B comparison surface called out by plan §3h: a
+  POSIX-sh compare script plus a staged GHA workflow that exercises it
+  against the 3 broad goldens.
+  **Compare script.** `dev/scripts/tiered_loader_ab_compare.sh` takes a
+  scenario sexp + output dir, extracts `start_date` / `end_date` via
+  `grep`+`sed`, and runs `trading/backtest/bin/backtest_runner.exe`
+  twice — once with `--loader-strategy legacy`, once with
+  `--loader-strategy tiered`. The runner's
+  `Output written to: <path>/` stderr line pins each run's output dir
+  so we don't race on a shared `dev/backtest/` listing. Outputs are
+  copied into stable `<out>/legacy/` and `<out>/tiered/` trees.
+  Parity comparison uses plan §Resolutions #1:
+    - **Hard gate (exit 1):** trade-count diff != 0, or either side's
+      `trades.csv` absent. Surfaces as a `::error::` GHA annotation.
+    - **Warn gate (exit 0, ::warning::):** final-PV delta above
+      `max($1.00, 0.001% * legacy_pv)`. Drift is a signal to
+      investigate, not a regression.
+  Universe / config_overrides are ignored — broad goldens already
+  default to the full sector-map, which is `backtest_runner`'s own
+  no-override behaviour.
+  **Workflow.** `tiered-loader-ab.yml` (staged at
+  `dev/ci-staging/tiered-loader-ab.yml` pending manual rename, see
+  §Blocked on) runs the compare against
+  `bull-crash-2015-2020.sexp`, `covid-recovery-2020-2024.sexp`, and
+  `six-year-2018-2023.sexp` from
+  `trading/test_data/backtest_scenarios/goldens-broad/` nightly at
+  04:17 UTC. Each scenario step sets `continue-on-error: true` so all
+  three runs execute even if one fails; an aggregate step re-surfaces
+  any failure as the job exit status. All output trees + diff.txt +
+  per-run stdout/stderr logs upload as a 30-day workflow artefact.
+  **POSIX-sh linter scope.** `posix_sh_check.sh` now scans
+  `dev/scripts/` in addition to `dev/lib/` so the new script is
+  covered by the `dash -n` parse gate landed in #493. Clean-count
+  increments from 41 to 42.
+  **Verification.** Smoke run on `smoke/tiered-loader-parity.sexp`
+  (6-month 7-symbol window) reports
+  `Legacy trades: 3, Tiered trades: 3, legacy PV $1,096,397.65,
+  tiered PV $1,096,397.65, PV delta $0.00 within warn threshold
+  $10.96`, confirming both strategies produce identical output under
+  the parity scenario that 3g pins.
+  - Files: `dev/scripts/tiered_loader_ab_compare.sh`,
+    `dev/ci-staging/tiered-loader-ab.yml` (staged — see §Blocked on),
+    `trading/devtools/checks/posix_sh_check.sh` (scope extension).
+  - Verify:
+    `dash -n dev/scripts/tiered_loader_ab_compare.sh` (parse-only);
+    `dev/lib/run-in-env.sh dune runtest trading/devtools/checks` —
+    prints `OK: posix-sh linter -- 42 scripts clean.`; full
+    `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest`
+    green.
 
 - **F2 — Summary-tier default tail_days fix** (2026-04-22). Closes the
   residual gap the 3g behavioral QC flagged: under the Tiered path the

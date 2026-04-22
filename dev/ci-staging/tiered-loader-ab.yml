@@ -1,0 +1,146 @@
+# Nightly A/B comparison: Loader_strategy.Legacy vs Loader_strategy.Tiered.
+#
+# Runs 2-3 broad goldens under both loader strategies, diffs their output, and
+# uploads each scenario's `legacy/` + `tiered/` output trees as workflow
+# artefacts. Gates on the plan's hard parity contract only — a trade-count
+# difference fails the job; a portfolio-value drift above the warn threshold
+# surfaces as a GHA annotation but does not fail.
+#
+# References:
+# - dev/plans/backtest-tiered-loader-2026-04-19.md §3h — scope + file layout.
+# - dev/plans/backtest-tiered-loader-2026-04-19.md §Resolutions #1 — parity
+#   threshold ($1.00 or 0.001% of legacy_pv, whichever is larger).
+# - dev/plans/backtest-tiered-loader-2026-04-19.md §Resolutions #2 — broad
+#   scenarios covering different regimes (bull, crash, recovery).
+#
+# Design notes:
+# - Nightly cadence, not per-PR: broad scenarios take minutes each, so wiring
+#   this into CI would lengthen every PR run. Run as an advisory signal
+#   instead.
+# - Scenarios loop in a single job sequentially. Parallelism would let each
+#   backtest fight for memory headroom on ubuntu-latest; the Tiered path is
+#   specifically designed to reduce memory, so serializing keeps the signal
+#   clean.
+# - Artefacts include the raw output trees (summary.sexp, trades.csv,
+#   equity_curve.csv, params.sexp) plus the script's diff.txt. Traces (the
+#   `Backtest.Trace` sexps) are not emitted by `backtest_runner` today —
+#   if/when that CLI grows a `--trace` flag, flip the artefact list to pull
+#   those in as well.
+
+name: Nightly tiered-loader A/B
+
+on:
+  schedule:
+    # 04:17 UTC daily — runs after the 03:17 UTC orchestrator slot so we
+    # don't queue behind a long orchestrator run. Minute :17 avoids the
+    # top-of-hour GHA scheduler load.
+    - cron: "17 4 * * *"
+  # Manual dispatch for on-demand runs (e.g. verifying a flip-default PR).
+  workflow_dispatch:
+
+concurrency:
+  group: tiered-loader-ab
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ab-compare:
+    runs-on: ubuntu-latest
+    # Broad scenarios are minutes each; budget enough for all 3 under both
+    # strategies (~6 runs × ~15 min worst case). Increase if scenarios
+    # timeout here before finishing.
+    timeout-minutes: 180
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      # Same as ci.yml: point data-dependent paths at in-repo test fixtures.
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    defaults:
+      run:
+        shell: sh
+        working-directory: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backtest_runner
+        shell: bash
+        run: |
+          eval $(opam env)
+          cd trading
+          dune build trading/backtest/bin/backtest_runner.exe
+
+      - name: Run A/B compare (bull-crash-2015-2020)
+        id: bull_crash
+        shell: bash
+        continue-on-error: true
+        run: |
+          eval $(opam env)
+          mkdir -p "$GITHUB_WORKSPACE/artefacts/bull-crash-2015-2020"
+          sh dev/scripts/tiered_loader_ab_compare.sh \
+            "$GITHUB_WORKSPACE/trading/test_data/backtest_scenarios/goldens-broad/bull-crash-2015-2020.sexp" \
+            "$GITHUB_WORKSPACE/artefacts/bull-crash-2015-2020"
+
+      - name: Run A/B compare (covid-recovery-2020-2024)
+        id: covid_recovery
+        shell: bash
+        continue-on-error: true
+        run: |
+          eval $(opam env)
+          mkdir -p "$GITHUB_WORKSPACE/artefacts/covid-recovery-2020-2024"
+          sh dev/scripts/tiered_loader_ab_compare.sh \
+            "$GITHUB_WORKSPACE/trading/test_data/backtest_scenarios/goldens-broad/covid-recovery-2020-2024.sexp" \
+            "$GITHUB_WORKSPACE/artefacts/covid-recovery-2020-2024"
+
+      - name: Run A/B compare (six-year-2018-2023)
+        id: six_year
+        shell: bash
+        continue-on-error: true
+        run: |
+          eval $(opam env)
+          mkdir -p "$GITHUB_WORKSPACE/artefacts/six-year-2018-2023"
+          sh dev/scripts/tiered_loader_ab_compare.sh \
+            "$GITHUB_WORKSPACE/trading/test_data/backtest_scenarios/goldens-broad/six-year-2018-2023.sexp" \
+            "$GITHUB_WORKSPACE/artefacts/six-year-2018-2023"
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiered-loader-ab-${{ github.run_id }}
+          # Include the legacy/ and tiered/ output trees + diff.txt per
+          # scenario. The raw backtest output is ~a few MB per scenario so
+          # the total artefact stays well under GHA's 500MB cap.
+          path: artefacts/
+          # 30-day retention is enough to correlate a regression with the
+          # commit that introduced it; we don't need long-term storage
+          # since each nightly run produces a fresh artefact.
+          retention-days: 30
+
+      - name: Aggregate parity result
+        shell: bash
+        env:
+          BULL_CRASH_OUTCOME: ${{ steps.bull_crash.outcome }}
+          COVID_RECOVERY_OUTCOME: ${{ steps.covid_recovery.outcome }}
+          SIX_YEAR_OUTCOME: ${{ steps.six_year.outcome }}
+        run: |
+          # Each scenario step sets continue-on-error:true so artefact upload
+          # always runs. This step re-surfaces any hard parity fail as a
+          # single aggregated job failure so the scheduled-run status is
+          # meaningful.
+          rc=0
+          echo "Scenario bull-crash-2015-2020:      ${BULL_CRASH_OUTCOME}"
+          echo "Scenario covid-recovery-2020-2024:  ${COVID_RECOVERY_OUTCOME}"
+          echo "Scenario six-year-2018-2023:        ${SIX_YEAR_OUTCOME}"
+          for outcome in "$BULL_CRASH_OUTCOME" "$COVID_RECOVERY_OUTCOME" "$SIX_YEAR_OUTCOME"; do
+            if [ "$outcome" = "failure" ]; then
+              rc=1
+            fi
+          done
+          exit $rc

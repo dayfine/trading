@@ -17,6 +17,10 @@
 #     trading/devtools/checks/*.sh            (gate scripts, must be POSIX sh)
 #     trading/devtools/checks/deep_scan/*.sh  (deep scan per-check scripts)
 #     dev/lib/*.sh                            (shared lib scripts)
+#     dev/scripts/*.sh                        (one-off dev scripts — e.g.
+#                                             the tiered-loader A/B compare
+#                                             script invoked by the nightly
+#                                             tiered-loader-ab.yml workflow)
 #   EXCLUDED:
 #     Scripts with explicit bash shebang (#!/bin/bash or #!/usr/bin/env bash)
 #     -- those scripts intentionally use bash features and are out of scope.
@@ -49,7 +53,8 @@ if [ -n "${POSIX_SH_CHECK_SCAN_DIRS:-}" ]; then
 else
   SCAN_DIRS="${TRADING_DIR}/devtools/checks
 ${TRADING_DIR}/devtools/checks/deep_scan
-${REPO_ROOT}/dev/lib"
+${REPO_ROOT}/dev/lib
+${REPO_ROOT}/dev/scripts"
 fi
 
 CLEAN_COUNT=0
