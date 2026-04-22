@@ -257,6 +257,71 @@ jobs:
           print(f"Budget record written: ${OUT_FILE} (total_cost_usd=${TOTAL_COST})")
           PYEOF
 
+          # Expose the written path so the commit step can find it deterministically.
+          echo "out_file=${OUT_FILE}" >> "$GITHUB_OUTPUT"
+        id: capture-cost
+
+      - name: Commit budget record (auto-merge PR)
+        # The cost-capture step above writes the budget JSON to the runner's
+        # ephemeral workspace. Without this step the file evaporates when the
+        # job terminates, which is why `dev/budget/` only ever contained the
+        # hand-seeded sample record from #483's initial PR. This step opens a
+        # tiny auto-merging PR carrying the JSON — same pattern the
+        # lead-orchestrator uses for `ops/daily-*` summary PRs.
+        if: always() && steps.capture-cost.outputs.out_file != ''
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          OUT_FILE: ${{ steps.capture-cost.outputs.out_file }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$OUT_FILE" ]; then
+            echo "Budget record $OUT_FILE not present; skipping."
+            exit 0
+          fi
+
+          BASENAME="$(basename "$OUT_FILE" .json)"
+          BRANCH="ops/budget-${BASENAME}"
+          # Single-line python3 to sidestep the indented-heredoc trap (a
+          # multi-line python3 -c "..." inside a YAML block keeps the YAML
+          # indentation as leading whitespace — illegal at Python's top level).
+          TOTAL_COST="$(python3 -c "import json; d=json.load(open('${OUT_FILE}')); v=d.get('totals',{}).get('total_cost_usd'); print('null' if v is None else f'{v:.4f}')")"
+
+          # safe.directory: inside the container we run as --user 0 on a
+          # workspace that actions/checkout initialized as a non-root user.
+          # Without this, git refuses to operate on the repo.
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          git config user.email "bot@github-actions"
+          git config user.name "GitHub Actions Bot"
+
+          git checkout -b "$BRANCH"
+          git add "$OUT_FILE"
+          if git diff --cached --quiet; then
+            echo "No diff to commit (file may already be on main); skipping."
+            exit 0
+          fi
+          git commit -m "ops(budget): record ${BASENAME} (\$${TOTAL_COST})"
+          git push origin "$BRANCH"
+
+          # Create PR + enable auto-merge. Same pattern the lead-orchestrator
+          # uses for ops/daily-* summary PRs. Auto-merge requires repo-level
+          # auto-merge setting to be on (it is, per existing summary PRs).
+          gh pr create \
+            --title "ops(budget): ${BASENAME} (\$${TOTAL_COST})" \
+            --body "Measured GHA orchestrator run cost for \`${BASENAME}\`.
+
+          \`total_cost_usd\`: \$${TOTAL_COST} (from \`claude-code-action\` execution_file, fallback branch 1b — see \`dev/status/cost-tracking.md\`).
+
+          Auto-merge: ops category, single-file additive change." \
+            --head "$BRANCH" \
+            --base main \
+            || true
+
+          gh pr merge --auto --squash --delete-branch "$BRANCH" || true
+
       - name: Locate daily summary (for escalations check)
         id: publish-summary
         shell: bash
