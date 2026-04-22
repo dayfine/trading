@@ -114,28 +114,50 @@ let _full_candidate_limit (config : Weinstein_strategy.config) =
   config.screening_config.max_buy_candidates
   + config.screening_config.max_short_candidates
 
-let _make_wrapper_config (input : input) ~loader ~stop_log :
-    Tiered_strategy_wrapper.config =
+(** [_always_loaded_symbols config] — the symbols whose [get_price] is passed
+    through unconditionally by the Tiered wrapper's throttle: the primary index
+    (day-of-week detection + benchmark), every sector ETF (sector map
+    construction on Fridays), and every global index (global consensus
+    indicator). At most a dozen symbols — none contribute meaningful memory
+    pressure. *)
+let _always_loaded_symbols (config : Weinstein_strategy.config) =
+  let sector_etf_symbols = List.map config.sector_etfs ~f:fst in
+  let global_index_symbols = List.map config.indices.global ~f:fst in
+  String.Set.of_list
+    ((config.indices.primary :: sector_etf_symbols) @ global_index_symbols)
+
+let _make_wrapper_config (input : input) ~loader ~bar_history ~warmup_start
+    ~stop_log : Tiered_strategy_wrapper.config =
   {
     bar_loader = loader;
+    bar_history;
     universe = input.all_symbols;
+    always_loaded_symbols = _always_loaded_symbols input.config;
     screening_config = input.config.screening_config;
     full_candidate_limit = _full_candidate_limit input.config;
+    seed_warmup_start = warmup_start;
     stop_log;
     primary_index = input.config.indices.primary;
   }
 
 let _make_simulator (input : input) ~loader ~stop_log ~start_date ~end_date
     ~warmup_days ~initial_cash ~commission =
+  (* Allocate a shared Bar_history — passed to the inner strategy (so it reads
+     from and writes into this buffer instead of a fresh one) and to the
+     wrapper (so the wrapper can seed it from loader Full bars on promotion).
+     This is the integration seam Option b-seed relies on. *)
+  let bar_history = Weinstein_strategy.Bar_history.create () in
+  let warmup_start = Date.add_days start_date (-warmup_days) in
   let inner_strategy =
     Weinstein_strategy.make ~ad_bars:input.ad_bars
-      ~ticker_sectors:input.ticker_sectors input.config
+      ~ticker_sectors:input.ticker_sectors ~bar_history input.config
   in
-  let wrapper_config = _make_wrapper_config input ~loader ~stop_log in
+  let wrapper_config =
+    _make_wrapper_config input ~loader ~bar_history ~warmup_start ~stop_log
+  in
   let strategy =
     Tiered_strategy_wrapper.wrap ~config:wrapper_config inner_strategy
   in
-  let warmup_start = Date.add_days start_date (-warmup_days) in
   let metric_suite = Metric_computers.default_metric_suite () in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols

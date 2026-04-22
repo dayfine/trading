@@ -159,6 +159,7 @@ val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->
   ?ticker_sectors:(string, string) Hashtbl.t ->
+  ?bar_history:Bar_history.t ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -179,4 +180,11 @@ val make :
       Stock ticker → GICS sector name hashtable, typically loaded via
       {!Sector_map.load}. Used to expand the ETF-level sector analysis to
       individual stock tickers in the screener. Default: empty table (sector
-      gate degrades to Neutral for all tickers). *)
+      gate degrades to Neutral for all tickers).
+    @param bar_history
+      Optional shared [Bar_history.t]. When provided, the strategy reads from
+      and writes into the caller's buffer instead of allocating a fresh one.
+      Used by the Tiered backtest path so the [Tiered_strategy_wrapper] can
+      [Bar_history.seed] from [Bar_loader.get_full] after Full-tier promotions
+      and have those bars visible to the strategy's own readers. Default: a
+      fresh empty [Bar_history.t] (the pre-existing behaviour). *)

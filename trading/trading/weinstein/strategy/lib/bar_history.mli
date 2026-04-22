@@ -34,3 +34,25 @@ val daily_bars_for : t -> symbol:string -> Types.Daily_price.t list
     order (oldest first). Returns the empty list if [symbol] has no accumulated
     bars. Callers that need a bounded window should slice the result themselves
     — the support-floor primitive in [weinstein_stops] is one such caller. *)
+
+val seed : t -> symbol:string -> bars:Types.Daily_price.t list -> unit
+(** [seed t ~symbol ~bars] merges [bars] into [symbol]'s accumulated history.
+    [bars] must already be in chronological order (oldest first) — the caller is
+    responsible for ordering (typical sources like [Bar_loader.Full.t.bars] and
+    CSV storage are ascending by date already).
+
+    Merge semantics match {!accumulate}: bars whose date is strictly later than
+    [symbol]'s current last-bar date are appended; older or equal-dated bars are
+    silently dropped. When [symbol] has no prior history, [bars] becomes the
+    whole history (duplicate-date entries inside [bars] are {b not} deduplicated
+    — the caller must supply clean data).
+
+    Idempotent: calling [seed] twice with the same [bars] is equivalent to
+    calling it once.
+
+    Motivating use case: the Tiered backtest path throttles [accumulate] so
+    [Bar_history] doesn't grow for every universe symbol. When a symbol is
+    promoted to [Bar_loader.Full_tier], the loader holds a bounded OHLCV tail
+    for it; [seed] ingests that tail into the strategy's [Bar_history] so
+    readers ([_screen_universe], [Stops_runner], [_make_entry_transition]) see
+    bars without further change to the strategy code. *)

@@ -1,13 +1,26 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-22
+## Last updated: 2026-04-22 (run 2)
 
 ## Status
 IN_PROGRESS
 
+**Strategy ↔ bar_loader integration (2026-04-22)** — open on
+`feat/backtest-scale-strategy-bar-loader-integration`. Flips Tiered
+from "bookkeeping-only" (PV deltas $0.00 on all 3 broad goldens per
+run 24761375492) to "actually throttles Bar_history + consumes Full
+bars". Parity test (`test_tiered_loader_parity`) still green — trade
+count identical, final PV within $0.01, sampled step PVs within $0.01
+per step. Tier stats at end of parity sim: `Metadata=0 Summary=0
+Full=22`. Resolution chosen: Option b-seed from
+`dev/plans/backtest-tiered-strategy-integration-2026-04-22.md`. Broad
+A/B not run locally (~40min per scenario × 3 × 2 = 4 hours); nightly
+workflow (`.github/workflows/tiered-loader-ab.yml`) provides first
+empirical signal.
+
 structural_qc: APPROVED (2026-04-22 run-2) — feat/backtest-scale-3h; merged as #496. See dev/reviews/backtest-scale-3h.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478; F2 (Summary tail_days fix) merged as #492; 3g (parity acceptance test) merged as #484; **3h (nightly A/B comparison) merged as #496 on 2026-04-22**; **workflow activated as `.github/workflows/tiered-loader-ab.yml` via #498 (2026-04-22)** — first nightly run fires at 04:17 UTC tonight. **Missing-CSV tolerance fix (2026-04-22) — see §Follow-up / escalation:** `Tiered_runner._promote_universe_metadata` softened from `failwith`-on-first-error to per-symbol `continuing` log, matching Legacy's silent missing-CSV behaviour. Branch `feat/backtest-scale-tiered-missing-csv-tolerance`. Next merge-gate increment: flip `loader_strategy` default Legacy→Tiered (~20-line PR) after a few nights of clean nightly A/B data confirms parity + savings.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478; F2 (Summary tail_days fix) merged as #492; 3g (parity acceptance test) merged as #484; **3h (nightly A/B comparison) merged as #496 on 2026-04-22**; **workflow activated as `.github/workflows/tiered-loader-ab.yml` via #498 (2026-04-22)** — first nightly run fires at 04:17 UTC tonight. **Missing-CSV tolerance fix (2026-04-22) — see §Follow-up / escalation:** `Tiered_runner._promote_universe_metadata` softened from `failwith`-on-first-error to per-symbol `continuing` log, matching Legacy's silent missing-CSV behaviour. Branch `feat/backtest-scale-tiered-missing-csv-tolerance`. **Next merge-gate: strategy↔bar_loader integration** (`feat/backtest-scale-strategy-bar-loader-integration`) — flips Tiered from no-op bookkeeping to actual Bar_history throttling + Full-tier bar consumption. After that lands + a few nightly A/B runs: flip `loader_strategy` default Legacy→Tiered (~20-line PR).
 
 ## Interface stable
 NO
@@ -15,7 +28,14 @@ NO
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- None. 3h (#496) + workflow activation (#498) both merged 2026-04-22.
+- `feat/backtest-scale-strategy-bar-loader-integration` — strategy ↔
+  bar_loader integration (2026-04-22). Makes Tiered actually exercise
+  Bar_loader's Summary / Full tiers + throttle Bar_history. Before this
+  PR: Legacy vs Tiered produces bit-identical output ($0.00 PV deltas).
+  After: Tiered accumulates bars only for always-loaded + Full + held
+  symbols, seeds Bar_history from loader Full bars on promote, runs the
+  shadow screener pre-inner so Full promotions are visible to the inner
+  screener same-day. Parity test still green.
 
 ## Blocked on
 - **Next increment (flip `loader_strategy` default Legacy→Tiered) is
