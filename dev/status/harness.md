@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-21
+## Last updated: 2026-04-22
 
 ## Status
 IN_PROGRESS
@@ -166,6 +166,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
      `sh trading/devtools/checks/deep_scan.sh` — report contains
      `## Stale Local Bookmarks`.
   Source: `dev/daily/2026-04-14.md` end-of-day audit.
+- ~~**POSIX shell portability linter**~~ — DONE (harness/posix-sh-linter): `trading/devtools/checks/posix_sh_check.sh` runs `dash -n` over all #!/bin/sh scripts in `trading/devtools/checks/`, `trading/devtools/checks/deep_scan/`, and `dev/lib/`. Scripts with `#!/usr/bin/env bash` shebang are exempt. Smoke test: `trading/devtools/checks/posix_sh_check_test.sh`. Wired into `dune runtest`. Verify: `dune runtest devtools/checks/` — prints `OK: posix-sh linter -- N scripts clean.` Pre-existing violations found: `dev/lib/cleanup-stale-worktrees.sh` and `dev/run.sh` use `#!/usr/bin/env bash` and are exempt (intentionally bash). Source: run-4 daily summary follow-up.
 
 ---
 
@@ -323,3 +324,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ### Deep scan heuristic gap sub-item 1: Drift coverage extension (backtest)
 
 - [x] `trading/trading/backtest/` subsystem added to `trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh` — checks top-level subdirectories of `trading/trading/backtest/` against `dev/plans/backtest-scale-optimization-2026-04-17.md` using the same heuristic as the existing Weinstein subsystem checks (grep for dir name in plan doc; missing = WARNING). Plan document is the active backtest design spec. Current live finding: `trading/trading/backtest/bin/` is not mentioned in the plan (expected — runner binary added post-plan). Smoke test: `trading/devtools/checks/deep_scan_drift_coverage_check.sh` — verifies BACKTEST_PLAN, BACKTEST_DIR, and the plan filename markers are present in `check_02`, and that the most-recent deep scan report references drift. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `sh trading/devtools/checks/deep_scan_drift_coverage_check.sh` — prints OK; `sh trading/devtools/checks/deep_scan.sh` — report shows `Design doc drift items: 1` and warns about `backtest/bin/`.
+
+### POSIX shell portability linter
+
+- [x] POSIX shell portability linter — `trading/devtools/checks/posix_sh_check.sh`; runs `dash -n` (syntax-only parse) over all #!/bin/sh scripts in `trading/devtools/checks/`, `trading/devtools/checks/deep_scan/`, and `dev/lib/`. Scripts with `#!/usr/bin/env bash` or `#!/bin/bash` shebang are exempt. Approach: `dash` is pre-installed in the devcontainer base image; `shellcheck` is not. Catches parse-time bash-isms: bash arrays `arr=(...)`, here-strings `<<<`, and process substitution `<(...)` — exactly the class that caused rework on PR #483. Smoke test: `trading/devtools/checks/posix_sh_check_test.sh` (3 assertions: bad-fixture FAIL, clean-fixture OK, bash-exempt OK). Both wired into `dune runtest` via `trading/devtools/checks/dune`. Pre-existing violations found at survey time: `dev/lib/cleanup-stale-worktrees.sh` and `dev/run.sh` have `#!/usr/bin/env bash` and are correctly exempt (intentionally bash). Follow-up: add shellcheck to the devcontainer image for richer coverage of runtime bash-isms ([[ ]], mapfile, ${BASH_SOURCE[0]}). Verify: `dune runtest devtools/checks/` — prints `OK: posix-sh linter -- N scripts clean.` and `OK: posix_sh_check_test -- all 3 assertions passed.`; `sh trading/devtools/checks/posix_sh_check.sh` from repo root.
