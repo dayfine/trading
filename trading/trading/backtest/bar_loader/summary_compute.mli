@@ -24,13 +24,17 @@ type config = {
   tail_days : int;
       (** Upper bound on the daily-bar tail the Summary loader fetches per
           symbol. Must be large enough to cover the longest indicator window
-          plus warmup. Default: 250 (~ [ma_weeks] × 7 + ATR warmup). *)
+          plus warmup AFTER daily→weekly aggregation. The binding constraint is
+          [rs_ma_period] weekly bars, which requires ~[rs_ma_period] × 7
+          calendar days of daily input plus a buffer for market-holiday gaps and
+          partial-week aggregation edge. Default: 420 (~60 weekly bars, covering
+          the default [rs_ma_period = 52] with headroom). *)
 }
 [@@deriving sexp, show, eq]
 
 val default_config : config
 (** Sensible defaults for Weinstein-style analysis:
-    [{ ma_weeks = 30; atr_days = 14; rs_ma_period = 52; tail_days = 250 }]. *)
+    [{ ma_weeks = 30; atr_days = 14; rs_ma_period = 52; tail_days = 420 }]. *)
 
 (** {1 Indicator primitives}
 

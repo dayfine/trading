@@ -10,8 +10,17 @@ type config = {
 }
 [@@deriving sexp, show, eq]
 
+(** [default_config.tail_days] must cover the longest indicator window after
+    daily→weekly aggregation. The Mansfield RS line uses [rs_ma_period = 52]
+    WEEKLY bars, which requires ~52 × 7 = 364 calendar days of daily input at a
+    minimum; we pad to 420 (~60 weekly bars) so market-holiday gaps and the
+    aggregation's partial-week edge don't trip the [n < rs_ma_period] threshold
+    inside [Relative_strength.analyze]. Below that threshold [rs_line] returns
+    [None] and [compute_values] returns [None] via its Option monadic chain,
+    which silently leaves callers at the prior tier — the F2 regression the
+    parity test was quietly masking before the bump. *)
 let default_config =
-  { ma_weeks = 30; atr_days = 14; rs_ma_period = 52; tail_days = 250 }
+  { ma_weeks = 30; atr_days = 14; rs_ma_period = 52; tail_days = 420 }
 
 type summary_values = {
   ma_30w : float;

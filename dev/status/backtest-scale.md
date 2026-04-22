@@ -1,6 +1,6 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-21
+## Last updated: 2026-04-22
 
 ## Status
 READY_FOR_REVIEW
@@ -89,6 +89,20 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Follow-up / escalation
 
+- **F2 (CLOSED 2026-04-22) — Summary_compute default tail_days too short.**
+  The 3g QC behavioral review flagged that parity was holding for the
+  wrong reason: Tiered reported `Summary=0 Full=0` on every Friday
+  because `Summary_compute.compute_values` returned `None` for every
+  universe symbol. Root cause: `default_config.tail_days = 250` is below
+  `rs_ma_period * 7 = 364` calendar days, so 250 days of daily bars
+  aggregate to only ~36 weekly bars — strictly under the 52-bar
+  Mansfield zero-line threshold that `Relative_strength.analyze` checks.
+  `rs_line` returns `None`, `compute_values` short-circuits on the first
+  `None` in its Option chain, and the symbol stays at Metadata. Fixed
+  by bumping `default_config.tail_days` from 250 to 420 (~60 weekly
+  bars after aggregation). Branch `feat/backtest-scale-f2`, see
+  §Completed.
+
 - **`Tiered_runner._promote_universe_metadata` is strictly intolerant of missing CSVs.**
   Surfaced by the 3g parity scenario: Legacy's `Simulator` silently
   skips any symbol whose `data.csv` is absent, while
@@ -122,6 +136,52 @@ Build alongside existing `Bar_history` — don't modify it.
   to `Bar_loader.create ~benchmark_symbol:_`.
 
 ## Completed
+
+- **F2 — Summary-tier default tail_days fix** (2026-04-22). Closes the
+  residual gap the 3g behavioral QC flagged: under the Tiered path the
+  parity test was reporting `Tiered loader: Metadata=22 Summary=0
+  Full=0 at end of simulator run`, meaning the Shadow_screener pipeline
+  and per-transition promote/demote bookkeeping never saw any real
+  data. Parity held only because both paths fell through to the
+  simulator's pre-loaded bar cache.
+  **Diagnosis.** `Summary_compute.default_config.tail_days = 250` is
+  below the minimum needed for the 52-weekly-bar Mansfield RS window.
+  250 calendar days of daily input aggregate to ~36 weekly bars via
+  `Time_period.Conversion.daily_to_weekly` — strictly under the 52-bar
+  threshold `Relative_strength.analyze` checks with `n < rs_ma_period`.
+  `rs_line` returns `None`, `compute_values` short-circuits on the
+  first `None` in its Option monadic chain, and the symbol is left at
+  its prior tier (Metadata after the auto-promote cascade). Neither
+  the Shadow_screener cascade nor the Summary→Full pipeline sees any
+  input.
+  **Fix.** Bump `default_config.tail_days` from 250 to 420 (~60 weekly
+  bars after aggregation, covering `rs_ma_period = 52` with headroom
+  for market-holiday gaps and partial-week edges). Updated both
+  `summary_compute.ml`'s `default_config` binding and the
+  `summary_compute.mli` doc comment to spell out that the binding
+  constraint is `rs_ma_period * 7` calendar days, not the 30-week MA
+  (which only needs ~210 days). No strategy / screener / runner code
+  touched — fix is scoped to `bar_loader/summary_compute.ml`.
+  **Verification.** The parity scenario now reports
+  `Tiered loader: Metadata=0 Summary=19 Full=3 at end of simulator
+  run`, meaning all 19 symbols with sufficient history reach Summary
+  and the Shadow_screener's top-3 candidates reach Full tier. All
+  three parity assertions (round-trip count exact, final value within
+  $0.01, sampled step values within $0.01) still hold — now for the
+  right reason. Added a regression test
+  `test_promote_to_summary_with_default_config` that pins the contract
+  "with defaults only, a stock with exactly `default_config.tail_days`
+  of history must promote to Summary tier" — it fails loudly if
+  anyone ever reduces `tail_days` below the RS threshold again.
+  - Files: `trading/backtest/bar_loader/{summary_compute.ml,summary_compute.mli,test/test_summary.ml}`.
+  - Verify:
+    `dev/lib/run-in-env.sh dune build &&
+     dev/lib/run-in-env.sh dune runtest trading/backtest --force` —
+    3 parity tests (test_tiered_loader_parity) pass with Tiered loader
+    reporting `Summary=19 Full=3` at sim-run end (was 0/0 before);
+    9 test_summary tests pass (was 8 before — 1 new regression test);
+    all other backtest tests still green; full-workspace `dune runtest`
+    passes; `dune build @fmt` clean.
 
 - **3g — Parity acceptance test (merge gate)** (2026-04-21). New
   test binary at `trading/trading/backtest/test/test_tiered_loader_parity.ml`
