@@ -83,13 +83,13 @@ let _fresh_data_dir () =
   Fpath.v dir
 
 (** Summary-tier fixture: enough daily bars ending at [as_of] for the loader's
-    default 250-day tail + 30-week MA + 52-week RS window to resolve.
+    default [tail_days] + 30-week MA + 52-week RS window to resolve.
 
     The loader only looks at bars in [as_of - tail_days, as_of]. With
-    [tail_days = 250] the tail is ~250 calendar days ≈ ~36 ISO weeks (before
-    aggregation); to produce [rs_line] we need [rs_ma_period = 52] WEEKLY bars
-    after aggregation, so we configure the loader to fetch a larger tail via
-    [summary_config] and generate ~420 days (~60 weeks) of history. *)
+    [tail_days = 420] the tail is ~420 calendar days ≈ ~60 ISO weeks after
+    daily→weekly aggregation, which covers [rs_ma_period = 52] WEEKLY bars
+    with headroom. We still pass an explicit [summary_config] override here
+    so the fixture continues to work even if the production default shifts. *)
 let _summary_fixture ?(stock_step = 1.0) ?(benchmark_step = 1.0) () =
   let as_of = Date.create_exn ~y:2023 ~m:Dec ~d:29 in
   let history_days = 420 in
@@ -295,8 +295,8 @@ let test_get_summary_none_for_unknown_symbol _ =
   assert_that (Bar_loader.tier_of loader ~symbol:"NOPE") is_none
 
 (** Regression for the F2 follow-up (see [dev/reviews/backtest-scale.md]): with
-    the default summary config and exactly [default_config.tail_days] daily
-    bars available, a Summary promotion must succeed.
+    the default summary config and exactly [default_config.tail_days] daily bars
+    available, a Summary promotion must succeed.
 
     Before the fix, [default_config.tail_days = 250] is too short for
     [rs_ma_period = 52] (weekly): 250 daily bars aggregate to ~36 weekly bars
