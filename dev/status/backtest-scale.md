@@ -1,13 +1,13 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-22
+## Last updated: 2026-04-22 (run-3 reconcile: #496 + #498 both merged; nightly A/B workflow live)
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
-structural_qc: APPROVED (2026-04-20) — feat/backtest-scale-3e SHA c51d42bee97618ab3b67679943094fc20baa66d3. All hard gates pass. See dev/reviews/backtest-scale.md.
+structural_qc: APPROVED (2026-04-22 run-2) — feat/backtest-scale-3h; merged as #496. See dev/reviews/backtest-scale-3h.md.
 
-Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478; F2 (Summary tail_days fix) merged as #492. 3g (parity acceptance test) merged earlier in the sequence; 3h (nightly A/B comparison) on `feat/backtest-scale-3h` — ready for review.
+Plan `dev/plans/backtest-tiered-loader-2026-04-19.md` reviewed + open questions resolved (2026-04-19). 3a (Metadata) merged; 3b-i (Summary_compute) merged; 3b-ii (Summary tier wiring) merged as #445; 3c (Full tier) merged as #447; 3d (tracer phases) merged as #452; 3e (runner + scenario plumbing for `loader_strategy`) merged as #459; 3f-part1 (shadow_screener adapter) merged as #463; 3f-part2 (tiered runner skeleton) merged as #466; 3f-part3a (refactor-only Tiered_runner extraction) merged as #477; 3f-part3b (Tiered runner Friday cycle + per-transition promote/demote) merged as #478; F2 (Summary tail_days fix) merged as #492; 3g (parity acceptance test) merged as #484; **3h (nightly A/B comparison) merged as #496 on 2026-04-22**; **workflow activated as `.github/workflows/tiered-loader-ab.yml` via #498 (2026-04-22)** — first nightly run fires at 04:17 UTC tonight. Next merge-gate increment: flip `loader_strategy` default Legacy→Tiered (~20-line PR) after a few nights of clean nightly A/B data confirms parity + savings.
 
 ## Interface stable
 NO
@@ -15,35 +15,19 @@ NO
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- feat/backtest-scale-3h — 3h nightly A/B trace comparison. Ships
-  `dev/scripts/tiered_loader_ab_compare.sh` (POSIX sh) + staged GHA
-  workflow at `dev/ci-staging/tiered-loader-ab.yml`. The script runs a
-  single scenario twice under `--loader-strategy legacy` and
-  `--loader-strategy tiered` via `backtest_runner.exe` and diffs the
-  resulting `trades.csv` / `summary.sexp` output trees. Hard gate on
-  trade-count diff; warn annotation on portfolio-value drift above
-  `max($1.00, 0.001% of legacy_pv)` per plan §Resolutions #1. Workflow
-  runs the compare against 3 broad goldens (bull-crash-2015-2020,
-  covid-recovery-2020-2024, six-year-2018-2023) nightly at 04:17 UTC,
-  uploads all output trees as a 30-day artefact. POSIX-sh linter
-  extended to scan `dev/scripts/` so the new script is covered by the
-  `dash -n` gate. Smoke-verified on `smoke/tiered-loader-parity.sexp`:
-  both strategies produce 3 trades / identical $1,096,397.65 final PV
-  (PV delta $0.00, within $10.96 warn threshold). Ready for QC.
+- None. 3h (#496) + workflow activation (#498) both merged 2026-04-22.
 
 ## Blocked on
-- **`.github/workflows/tiered-loader-ab.yml` manual install required at merge.**
-  The feat-backtest agent's GitHub token lacks the `workflow` scope, so
-  `.github/workflows/*.yml` paths are rejected by the remote with
-  "refusing to allow a Personal Access Token to create or update
-  workflow ... without `workflow` scope". The workflow content ships
-  in this PR as `dev/ci-staging/tiered-loader-ab.yml`; at merge time (or
-  as a tiny follow-up PR from a human or workflow-scoped agent) run
-  `git mv dev/ci-staging/tiered-loader-ab.yml .github/workflows/tiered-loader-ab.yml`
-  to activate the nightly schedule. Until then, the script
-  (`dev/scripts/tiered_loader_ab_compare.sh`) is fully functional and
-  can be invoked manually via `sh dev/scripts/tiered_loader_ab_compare.sh
-  <scenario> <out>`.
+- **Next increment (flip `loader_strategy` default Legacy→Tiered) is
+  gated on empirical nightly A/B data.** The tiered-loader-ab workflow
+  fires at 04:17 UTC on the nightly cron; the first run lands tonight.
+  Waiting for a few nights of clean runs (trade-count parity hard gate
+  + PV drift inside the warn threshold) before flipping the default is
+  a conservative safety policy — the parity test (#484) already pins
+  identical output per-bar on the smoke scenario, but the broad golden
+  scenarios exercise a much wider strategy surface. Holds rather than
+  dispatches this run; re-evaluate after ~3 consecutive clean nightly
+  runs.
 
 ## Goal
 
