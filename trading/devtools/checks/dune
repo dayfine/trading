@@ -226,3 +226,26 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:budget_rollup_check.sh})))
+
+; POSIX shell portability linter: runs `dash -n` over #!/bin/sh scripts in
+; trading/devtools/checks/, trading/devtools/checks/deep_scan/, and dev/lib/.
+; Scripts with #!/usr/bin/env bash shebang are exempt (intentionally bash).
+; Catches parse-time bash-isms: arrays arr=(...), here-strings <<<, process
+; substitution <(...). Introduced to prevent the class of rework that hit
+; PR #483 (bash-isms in scripts expected to run under sh in GHA devcontainer).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:posix_sh_check.sh})))
+
+; Smoke test for posix_sh_check.sh: verifies the linter exits non-zero on a
+; known-bad bash-array fixture, exits 0 on a clean POSIX sh script, and exits 0
+; on a !/usr/bin/env bash script (exemption check).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:posix_sh_check_test.sh})))
