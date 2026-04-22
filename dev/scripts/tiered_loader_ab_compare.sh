@@ -121,15 +121,34 @@ _scenario_end() {
 # directory per run so this is race-free as long as the two invocations are
 # at least 1 second apart (enforced by the wall-clock gap between two full
 # backtest runs).
+#
+# Peak RSS capture: when GNU time (/usr/bin/time) is available, wraps the
+# dune exec and writes the run's maximum resident set size to
+# $log_path.peak_rss_kb (integer, kilobytes). When absent, writes the string
+# "UNAVAILABLE" instead — the comparison path treats that like any other
+# missing value and emits an annotation without failing the job. We probe
+# /usr/bin/time once at module load (see _have_gnu_time below) to avoid
+# per-run fork overhead.
 _run_backtest() {
   strategy="$1"
   log_path="$2"
+  peak_rss_path="$log_path.peak_rss_kb"
   set +e
-  (
-    cd "$DUNE_ROOT"
-    dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
-      "$START_DATE" "$END_DATE" --loader-strategy "$strategy"
-  ) >"$log_path.stdout" 2>"$log_path.stderr"
+  if [ "$_HAVE_GNU_TIME" = "1" ]; then
+    (
+      cd "$DUNE_ROOT"
+      /usr/bin/time -o "$peak_rss_path" -f '%M' \
+        dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
+          "$START_DATE" "$END_DATE" --loader-strategy "$strategy"
+    ) >"$log_path.stdout" 2>"$log_path.stderr"
+  else
+    (
+      cd "$DUNE_ROOT"
+      dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
+        "$START_DATE" "$END_DATE" --loader-strategy "$strategy"
+    ) >"$log_path.stdout" 2>"$log_path.stderr"
+    printf 'UNAVAILABLE\n' >"$peak_rss_path"
+  fi
   rc=$?
   set -e
   cat "$log_path.stdout" >"$log_path"
@@ -149,6 +168,15 @@ _run_backtest() {
   fi
   printf '%s\n' "$output_dir"
 }
+
+# Peak-RSS tooling probe. /usr/bin/time -f '%M' is a GNU-time extension; the
+# shell builtin `time` has no -f / -o flags. We require the binary at the
+# canonical path — probing $(command -v time) would pick up the builtin.
+if [ -x /usr/bin/time ]; then
+  _HAVE_GNU_TIME=1
+else
+  _HAVE_GNU_TIME=0
+fi
 
 # Count data rows (excluding header) in trades.csv. Returns [MISSING] if
 # the file is absent.
@@ -252,6 +280,12 @@ TIERED_TRADES=$(_trade_count "$TIERED_DIR/trades.csv")
 LEGACY_PV=$(_final_portfolio_value "$LEGACY_DIR/summary.sexp")
 TIERED_PV=$(_final_portfolio_value "$TIERED_DIR/summary.sexp")
 
+# Peak-RSS read (written by _run_backtest via /usr/bin/time -f '%M'). When
+# GNU time is unavailable the file contains "UNAVAILABLE" — treat that as a
+# soft signal, no gating. Values from /usr/bin/time -f '%M' are in kilobytes.
+LEGACY_RSS=$(head -1 "$OUT_DIR_ABS/legacy.log.peak_rss_kb" 2>/dev/null || echo UNAVAILABLE)
+TIERED_RSS=$(head -1 "$OUT_DIR_ABS/tiered.log.peak_rss_kb" 2>/dev/null || echo UNAVAILABLE)
+
 DIFF_FILE="$OUT_DIR_ABS/diff.txt"
 {
   printf 'Scenario       : %s\n' "$SCENARIO_NAME"
@@ -260,6 +294,8 @@ DIFF_FILE="$OUT_DIR_ABS/diff.txt"
   printf 'Tiered trades  : %s\n' "$TIERED_TRADES"
   printf 'Legacy final PV: %s\n' "$LEGACY_PV"
   printf 'Tiered final PV: %s\n' "$TIERED_PV"
+  printf 'Legacy peak RSS: %s KB\n' "$LEGACY_RSS"
+  printf 'Tiered peak RSS: %s KB\n' "$TIERED_RSS"
 } | tee "$DIFF_FILE"
 
 # Hard gate: trades.csv must exist on both sides.
@@ -300,6 +336,31 @@ if _gt "$PV_DELTA" "$PV_WARN"; then
     >>"$DIFF_FILE"
 else
   printf 'OK: PV drift within threshold\n' | tee -a "$DIFF_FILE"
+fi
+
+# Observational: peak RSS comparison. This is the whole point of Tiered —
+# `Bar_history` should grow for only `full_candidate_limit + held_positions`
+# symbols instead of the full universe. Not a gate: we report the delta and
+# the Tiered/Legacy ratio as a `::notice::` annotation so post-merge we can
+# eyeball whether the expected ~30× reduction is materializing on broad
+# goldens. Gating would require calibrated thresholds per scenario, which
+# we don't have yet.
+if [ "$LEGACY_RSS" = "UNAVAILABLE" ] || [ "$TIERED_RSS" = "UNAVAILABLE" ]; then
+  printf 'RSS            : UNAVAILABLE (/usr/bin/time not installed in container)\n' \
+    | tee -a "$DIFF_FILE"
+elif ! echo "$LEGACY_RSS$TIERED_RSS" | grep -qE '^[0-9]+[0-9]+$'; then
+  printf 'RSS            : MALFORMED (legacy=%s tiered=%s)\n' "$LEGACY_RSS" "$TIERED_RSS" \
+    | tee -a "$DIFF_FILE"
+else
+  # Ratio = tiered / legacy, formatted to 3 decimal places. <1.0 is a win.
+  RSS_RATIO=$(awk -v t="$TIERED_RSS" -v l="$LEGACY_RSS" 'BEGIN {
+    if (l == 0) { printf "n/a (legacy=0)"; exit }
+    printf "%.3f", t / l
+  }')
+  printf 'Peak RSS ratio : %s (tiered/legacy; <1.0 is a memory win)\n' "$RSS_RATIO" \
+    | tee -a "$DIFF_FILE"
+  printf '::notice::A/B compare %s — peak RSS legacy=%s KB tiered=%s KB ratio=%s\n' \
+    "$SCENARIO_NAME" "$LEGACY_RSS" "$TIERED_RSS" "$RSS_RATIO"
 fi
 
 printf 'OK: trade-count parity holds for %s\n' "$SCENARIO_NAME"
