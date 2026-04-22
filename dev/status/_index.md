@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-22 run-3 (orchestrator reconcile post-prior-run merge wave: PR #496 3h nightly A/B compare merged 03:38Z; PR #498 activated tiered-loader-ab workflow via `git mv` to `.github/workflows/` at 03:41Z; PR #499 orchestrator cost-capture post-run commit + auto-merge at 03:50Z; all human-merged between run-2 and this run. Run-3: no dispatches — queue fully saturated, next backtest-scale increment gated on empirical nightly A/B data (first nightly fires 04:17Z tonight). Main baseline green (build + runtest + status-integrity all exit 0).)
+Last updated: 2026-04-22 run-5 (orchestrator detected status-file integrity drift introduced by run-3's `dev/status/backtest-scale.md` `## Last updated:` line — the parenthetical comment after the date violated the YYYY-MM-DD schema enforced by `status_file_integrity.sh`, which is wired into `dune runtest`. Inline fix scrubbed the parenthetical; main re-verified green (`dune runtest --force` exit 0, integrity check OK, no `FAIL:` lines). Otherwise queue state unchanged since run-4: 0 open PRs, no dispatches; backtest-scale flip-default still gated on empirical nightly A/B data.)
 
 ## Active + complete tracks
 

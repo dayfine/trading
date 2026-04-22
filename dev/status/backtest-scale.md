@@ -1,6 +1,6 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-22 (run-3 reconcile: #496 + #498 both merged; nightly A/B workflow live)
+## Last updated: 2026-04-22
 
 ## Status
 IN_PROGRESS
