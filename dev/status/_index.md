@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-22 (orchestrator reconcile post-dispatch: PR #492 feat/backtest-scale-f2 closes F2 root cause — `Summary_compute.compute_values` was returning `None` because `tail_days` default was 250 but Mansfield RS needs 52 weeks × 7 = 420 calendar days; bumped default to 420, added regression test. PR #493 harness/posix-sh-linter adds `dash -n` gate over 40 #!/bin/sh scripts. Both PRs APPROVED by QC and awaiting human merge. Main baseline green.)
+Last updated: 2026-04-22 run-2 (orchestrator reconcile post-dispatch: PR #492 F2 tail_days fix merged at 01:04Z; PR #493 POSIX-sh linter merged at 01:04Z; PR #495 cost-capture new-day fix merged at 01:46Z (human-driven CI fix). This run dispatched feat-backtest on 3h nightly A/B trace comparison — PR #496 open, QC APPROVED (structural + behavioral, quality 5/5), awaiting human merge. Main baseline green.)
 
 ## Active + complete tracks
 
@@ -14,15 +14,15 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | MERGED | — | — | — (#419 per-phase tracing merged 2026-04-19) |
-| [backtest-scale](backtest-scale.md) | IN_PROGRESS | feat-backtest | #492 | PR #492 awaiting-merge — F2 full closure (`tail_days` 250→420 so 52-week Mansfield RS window is reachable; Summary tier now populates for all 19 of 22 universe symbols). Next after merge: real-data fixtures to replace synthetic 100.00+drift macro CSVs, then 3h (nightly A/B comparison), then flip Tiered to default closing the M5 track. |
+| [backtest-scale](backtest-scale.md) | IN_PROGRESS | feat-backtest | #496 | PR #496 awaiting-merge — 3h nightly A/B trace comparison (GHA workflow + POSIX-sh compare script; workflow staged in `dev/ci-staging/` pending human `git mv` at merge due to bot token lacking `workflow` scope). 3g parity test (#484) and F2 tail_days fix (#492) both merged 2026-04-22. Post-merge: human activates workflow via 1-line `git mv`; then flip `loader_strategy` default Legacy→Tiered; then retire Legacy codepath. |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
 | [short-side-strategy](short-side-strategy.md) | MERGED | — | — | — (#420 merged 2026-04-19). Follow-ups carried to own tracks: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — (#408 + #409 both merged 2026-04-18) |
 | [sector-data](sector-data.md) | MERGED | — | — | — (#436 merged 2026-04-19). GHA orchestrator runs continue to consume `trading/test_data/sectors.csv`. |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #493 | PR #493 awaiting-merge — POSIX-sh portability linter (`dash -n` gate over 40 #!/bin/sh scripts, bash-exempt shebangs honored). Recent wave merged 2026-04-21: #473 T3-F, #480 live-evidence, #482 Haiku swap, #483 gha-cost-tracking, #488 orchestrator self-sabotage fixes, #490 consolidated-summary exclusion. |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | No open harness PR. Recent merges: #493 POSIX-sh linter (today), #495 cost-capture new-day fix (today, human). Backlog remains saturated — T1 done; T2 milestone-gated; T3-C superseded; T3-H low-priority. Stale follow-up `.claude/worktrees/` already resolved (present in `.gitignore` line 49). |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog remains empty (no new medium/high findings from latest deep scan or today's fast-run5). No code-health dispatch this run. |
-| [cost-tracking](cost-tracking.md) | IN_PROGRESS | harness-maintainer | — | GHA cost capture step + budget_rollup.sh landed (harness/gha-cost-tracking). Next: verify measured total_cost_usd on next GHA run; compare costs pre/post #481/#482. |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog remains empty (no new medium/high findings from latest deep scan or today's fast health check). No code-health dispatch this run. |
+| [cost-tracking](cost-tracking.md) | IN_PROGRESS | harness-maintainer | — | GHA cost capture step landed (#483). Cost-capture new-day bug fixed today via #495 (human-driven). Next: verify measured `total_cost_usd` on next full-pass GHA run; compare costs pre/post #481/#482/#495. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |
