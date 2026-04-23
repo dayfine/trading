@@ -142,13 +142,13 @@ jobs:
           fi
 
           # Open the PR via GH REST API (claude-code-action does not open PRs).
+          # Use python3 for JSON build — devcontainer image lacks jq (see
+          # orchestrator.yml's budget step, where the same bug surfaced in
+          # run 24856066811 and was fixed in #510).
+          PR_PAYLOAD=$(TITLE="ops: weekly deep health scan ${DATE}" HEAD="${BRANCH}" BASE="main" BODY="${BODY}" \
+            python3 -c 'import json,os; print(json.dumps({"title":os.environ["TITLE"],"head":os.environ["HEAD"],"base":os.environ["BASE"],"body":os.environ["BODY"],"draft":False}))')
           curl -s -X POST \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${REPO}/pulls" \
-            -d "$(jq -n \
-              --arg title "ops: weekly deep health scan ${DATE}" \
-              --arg head "${BRANCH}" \
-              --arg base "main" \
-              --arg body "${BODY}" \
-              '{title: $title, head: $head, base: $base, body: $body, draft: false}')"
+            -d "$PR_PAYLOAD"
