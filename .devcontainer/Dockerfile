@@ -117,6 +117,17 @@ RUN opam install --yes \
     uri yojson
 
 # -----------------------------------------------------------------------------
+# memtrace — Jane Street's Gc.Memprof-based statistical OCaml allocation
+# profiler. Build-time dep of [trading/backtest/bin/backtest_runner.exe], gated
+# behind the [--memtrace <path>] CLI flag (default off, zero overhead when
+# unused). Workstream B7 of [dev/plans/backtest-perf-2026-04-24.md] — the
+# missing per-callsite attribution piece for the +95% Tiered RSS investigation.
+# Kept on its own RUN line so version drift on memtrace doesn't invalidate the
+# (much larger) main opam-install layer cache above.
+# -----------------------------------------------------------------------------
+RUN opam install --yes memtrace
+
+# -----------------------------------------------------------------------------
 # ocamlformat — pinned to match trading/.ocamlformat (version = 0.29.0). The
 # CI fmt gate runs `dune fmt --check`, which fails if the formatter version
 # drifts. Pin here so the image cannot silently upgrade and break CI.
