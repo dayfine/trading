@@ -17,11 +17,14 @@
     exercises the runner's pre-simulator paths without dragging in a broad
     universe.
 
-    [bar_history_max_lookback_days] is config-only in C1: setting it must NOT
-    change observable strategy behaviour. The wiring lives in PR 3 of
-    [dev/plans/bar-history-trim-2026-04-24.md]. The test here pins the no-op-now
-    contract so a future change can flip the test in the same PR that flips the
-    runtime behaviour. *)
+    [bar_history_max_lookback_days] became live in PR 3 of
+    [dev/plans/bar-history-trim-2026-04-24.md]: setting it to [Some n] now
+    triggers a per-day [Bar_history.trim_before] inside the strategy. The parity
+    contract here ([Some 365] == [None]) survives the wiring because every
+    production reader caps at <= 365 calendar days (see
+    [dev/notes/bar-history-readers-2026-04-24.md]). If this assertion ever
+    breaks, a reader has started to reach past 365 days and either the audit is
+    stale or the default needs to grow. *)
 
 open OUnit2
 open Core
@@ -141,11 +144,12 @@ let test_override_universe_cap _ =
 (* Runner integration: each toggle drives the right code path            *)
 (* -------------------------------------------------------------------- *)
 
-(** [bar_history_max_lookback_days = Some n] must NOT change observable
-    behaviour in C1 — the strategy doesn't yet read the field. Pin trade count
-    and final portfolio value against the baseline so a future runtime wiring
-    forces this test to be updated in the same PR. *)
-let test_bar_history_lookback_is_no_op_in_c1 _ =
+(** [bar_history_max_lookback_days = Some 365] must produce bit-identical output
+    (trade count + final portfolio value) vs the unset baseline. After PR 3's
+    wiring, the field actually trims [Bar_history] every day; this test pins the
+    parity contract that gives the audit (every reader <= 365 days) its teeth.
+*)
+let test_bar_history_lookback_some_365_preserves_baseline _ =
   let s = _load_scenario () in
   let baseline = _run s ~overrides:[] in
   let with_lookback =
@@ -220,8 +224,9 @@ let suite =
          >:: test_override_skip_sector_etf_load;
          "override: universe_cap round-trips through sexp"
          >:: test_override_universe_cap;
-         "bar_history_max_lookback_days is a no-op in C1 (deferred wiring)"
-         >:: test_bar_history_lookback_is_no_op_in_c1;
+         "bar_history_max_lookback_days = Some 365 preserves Legacy baseline \
+          bit-identically"
+         >:: test_bar_history_lookback_some_365_preserves_baseline;
          "universe_cap = Some 3 truncates 7-symbol universe to 3"
          >:: test_universe_cap_truncates_universe;
          "universe_cap above universe size is a no-op"
