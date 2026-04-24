@@ -92,10 +92,46 @@ type config = {
   lookback_bars : int;
       (** Number of weekly bars to pass to stage/macro analysers (default: 52).
           Must be >= 30 (one MA period). *)
+  bar_history_max_lookback_days : int option;
+      (** Hypothesis-testing field (perf workstream C1). When [Some n], strategy
+          callers can use this as the upper bound on Bar_history retention (drop
+          bars older than [as_of - n] days). [None] (default) preserves current
+          behaviour — Bar_history grows unbounded for the run. The strategy
+          itself does NOT yet call [Bar_history.trim_before] on this field;
+          wiring is deferred to PR 3 of the Bar_history trim sequence (see
+          [dev/plans/bar-history-trim-2026-04-24.md]). C1 only ships the field
+          so downstream PRs and the [--override] mechanism can use it. *)
+  skip_ad_breadth : bool;
+      (** Hypothesis-testing field (perf workstream C1). When [true], the runner
+          does NOT call [Weinstein_strategy.Ad_bars.load]; macro indicators that
+          depend on AD-breadth fall through to a degraded mode (treat AD-breadth
+          as constant). Default [false] — current behaviour. Used for hypothesis
+          tests like H3 (does AD-breadth load dominate RSS at 10K-symbol
+          scale?). NOT safe to flip on in production. *)
+  skip_sector_etf_load : bool;
+      (** Hypothesis-testing field (perf workstream C1). When [true], the runner
+          clears [sector_etfs] before strategy construction so sector-ETF bars
+          are not loaded. Sector classification falls back to whatever
+          [Sector_map] alone provides. Default [false] — current behaviour. Used
+          for hypothesis tests like H4 (are sector ETF + index loads bounded?).
+          NOT safe to flip on in production. *)
+  universe_cap : int option;
+      (** Hypothesis-testing field (perf workstream C1). When [Some n], the
+          runner truncates the loaded universe to the first [n] symbols (after
+          the existing [String.compare] sort) before strategy construction.
+          [None] (default) uses the full universe. Used for hypothesis tests
+          like H5 (how does RSS scale with universe size?). NOT safe to flip on
+          in production. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
-    backtesting. *)
+    backtesting.
+
+    The four hypothesis-testing fields ([bar_history_max_lookback_days],
+    [skip_ad_breadth], [skip_sector_etf_load], [universe_cap]) all default to
+    behaviour-preserving values. Setting any of them changes runner / strategy
+    behaviour and is intended for perf measurement A/Bs only — see the H-series
+    in [dev/plans/backtest-perf-2026-04-24.md]. *)
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. The resulting config has

@@ -1,3 +1,10 @@
+(* @large-module: backtest orchestration covers config-override deep-merge,
+   universe + sector-map resolution, AD-breadth + sector-ETF loading (each
+   gated by hypothesis-testing toggles in [Weinstein_strategy.config]), and
+   the Legacy/Tiered loader-strategy split. Splitting any of these would
+   either duplicate the small helpers or leak the [_deps] record's shape
+   across modules; the Tiered path already lives in [tiered_runner.ml] for
+   the same reason. *)
 open Core
 open Trading_simulation
 
@@ -103,6 +110,80 @@ let _resolve_ticker_sectors ~data_dir sector_map_override =
       eprintf "Loading universe from sectors.csv...\n%!";
       Sector_map.load ~data_dir
 
+(** Apply [config.universe_cap] to the (sorted) universe + sector map.
+
+    [universe_cap = Some n] truncates the universe to the first [n] symbols
+    after the existing [String.compare] sort and rebuilds [ticker_sectors] with
+    only the kept symbols. Hypothesis-testing field — see [config] doc. [None]
+    (default) returns the inputs unchanged. *)
+let _apply_universe_cap ~ticker_sectors ~universe ~cap =
+  match cap with
+  | None -> (ticker_sectors, universe)
+  | Some n when n >= List.length universe -> (ticker_sectors, universe)
+  | Some n ->
+      let kept = List.take universe n in
+      let kept_set = String.Set.of_list kept in
+      let trimmed = Hashtbl.create (module String) in
+      Hashtbl.iteri ticker_sectors ~f:(fun ~key ~data ->
+          if Set.mem kept_set key then Hashtbl.set trimmed ~key ~data);
+      eprintf
+        "universe_cap = Some %d: truncated universe from %d to %d symbols\n%!" n
+        (List.length universe) (List.length kept);
+      (trimmed, kept)
+
+(** Load AD breadth bars unless [config.skip_ad_breadth = true]. The skip path
+    short-circuits to the same [[]] value [Ad_bars.load] returns when the
+    underlying CSVs are absent, so downstream macro readers experience the same
+    degraded mode. Hypothesis-testing flag — see [config] doc. *)
+let _load_ad_bars ?trace ~data_dir ~universe_size
+    ~(config : Weinstein_strategy.config) () =
+  if config.skip_ad_breadth then (
+    eprintf "skip_ad_breadth = true: AD breadth bars NOT loaded (degraded)\n%!";
+    [])
+  else (
+    eprintf "Loading AD breadth bars...\n%!";
+    Trace.record ?trace ~symbols_out:universe_size Trace.Phase.Macro (fun () ->
+        Weinstein_strategy.Ad_bars.load ~data_dir))
+
+(** Honor [config.skip_sector_etf_load] by clearing [config.sector_etfs] so no
+    sector-ETF bars are loaded downstream. Hypothesis-testing flag — see
+    [config] doc. *)
+let _maybe_clear_sector_etfs (config : Weinstein_strategy.config) =
+  if config.skip_sector_etf_load then (
+    eprintf "skip_sector_etf_load = true: sector ETFs NOT loaded (degraded)\n%!";
+    { config with sector_etfs = [] })
+  else config
+
+(** Build the runner's base config: defaults + the canonical macro pipeline
+    (full SPDR sector ETF list + global indices). Returns a config that still
+    has the C1 hypothesis-testing toggles at their defaults; [_load_deps]
+    threads [overrides] through this and then honors any toggles set there. *)
+let _runner_base_config ~universe =
+  let cfg = Weinstein_strategy.default_config ~universe ~index_symbol in
+  {
+    cfg with
+    indices =
+      {
+        primary = index_symbol;
+        global = Weinstein_strategy.Macro_inputs.default_global_indices;
+      };
+    sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs;
+  }
+
+(** Union of all symbols the runner needs bar data for: primary index, the
+    (post-cap) universe, and every sector ETF + global index that survived the
+    [skip_sector_etf_load] toggle. Deduped + sorted so callers can rely on a
+    stable order. *)
+let _all_runner_symbols ~(config : Weinstein_strategy.config) ~universe =
+  let sector_etf_symbols =
+    List.map config.sector_etfs ~f:(fun (sym, _) -> sym)
+  in
+  let global_index_symbols =
+    List.map config.indices.global ~f:(fun (sym, _) -> sym)
+  in
+  (index_symbol :: universe) @ sector_etf_symbols @ global_index_symbols
+  |> List.dedup_and_sort ~compare:String.compare
+
 let _load_deps ?trace ~overrides ~sector_map_override () =
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
@@ -113,36 +194,18 @@ let _load_deps ?trace ~overrides ~sector_map_override () =
   let universe =
     Hashtbl.keys ticker_sectors |> List.sort ~compare:String.compare
   in
+  (* Build the base config + apply overrides FIRST so the hypothesis-testing
+     toggles are populated before we use them to gate AD-breadth +
+     sector-ETF loads and to apply the universe cap. *)
+  let config = _apply_overrides (_runner_base_config ~universe) overrides in
+  let ticker_sectors, universe =
+    _apply_universe_cap ~ticker_sectors ~universe ~cap:config.universe_cap
+  in
   let universe_size = List.length universe in
   eprintf "Universe: %d stocks\n%!" universe_size;
-  eprintf "Loading AD breadth bars...\n%!";
-  let ad_bars =
-    Trace.record ?trace ~symbols_out:universe_size Trace.Phase.Macro (fun () ->
-        Weinstein_strategy.Ad_bars.load ~data_dir)
-  in
-  let base_config = Weinstein_strategy.default_config ~universe ~index_symbol in
-  let config =
-    {
-      base_config with
-      indices =
-        {
-          primary = index_symbol;
-          global = Weinstein_strategy.Macro_inputs.default_global_indices;
-        };
-      sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs;
-    }
-  in
-  let config = _apply_overrides config overrides in
-  let sector_etf_symbols =
-    List.map config.sector_etfs ~f:(fun (sym, _) -> sym)
-  in
-  let global_index_symbols =
-    List.map config.indices.global ~f:(fun (sym, _) -> sym)
-  in
-  let all_symbols =
-    (index_symbol :: universe) @ sector_etf_symbols @ global_index_symbols
-    |> List.dedup_and_sort ~compare:String.compare
-  in
+  let config = _maybe_clear_sector_etfs { config with universe } in
+  let ad_bars = _load_ad_bars ?trace ~data_dir ~universe_size ~config () in
+  let all_symbols = _all_runner_symbols ~config ~universe in
   {
     data_dir_fpath;
     ticker_sectors;
