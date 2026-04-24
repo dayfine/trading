@@ -31,6 +31,10 @@ type config = {
   stops_config : Weinstein_stops.config;
   initial_stop_buffer : float;
   lookback_bars : int;
+  bar_history_max_lookback_days : int option;
+  skip_ad_breadth : bool;
+  skip_sector_etf_load : bool;
+  universe_cap : int option;
 }
 [@@deriving sexp]
 
@@ -46,6 +50,10 @@ let default_config ~universe ~index_symbol =
     stops_config = Weinstein_stops.default_config;
     initial_stop_buffer = 1.02;
     lookback_bars = 52;
+    bar_history_max_lookback_days = None;
+    skip_ad_breadth = false;
+    skip_sector_etf_load = false;
+    universe_cap = None;
   }
 
 let name = "Weinstein"

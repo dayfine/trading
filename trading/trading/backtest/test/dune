@@ -6,6 +6,7 @@
   test_runner_tiered_skeleton
   test_runner_tiered_cycle
   test_runner_tiered_metadata_tolerance
+  test_runner_hypothesis_overrides
   test_tiered_loader_parity)
  (libraries
   ounit2
