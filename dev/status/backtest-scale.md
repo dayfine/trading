@@ -221,6 +221,43 @@ Build alongside existing `Bar_history` — don't modify it.
 
 ## Follow-up / escalation
 
+- **AD-breadth + inventory loading saturate memory at ≥10K-symbol
+  universes; Tier 3's bar_loader savings only realize at small
+  universes (2026-04-24).** Local A/B on `goldens-small/bull-crash-2015-2020.sexp`
+  with `TRADING_DATA_DIR` pointed at the real `data/sectors.csv` (10472
+  symbols + 4 index/sector ETFs = 10476 total) OOM-killed BOTH
+  strategies inside the dev container's 7.75 GB limit before the
+  backtest loop started:
+  - **Legacy peak RSS:** 7,679,768 KB (~7.68 GB) → SIGKILL
+  - **Tiered peak RSS:** 7,772,432 KB (~7.77 GB) → SIGKILL (+92 MB)
+  Last log line for both: `Loading universe from sectors.csv... |
+  Universe: 10472 stocks | Loading AD breadth bars... | Total symbols
+  (universe + index + sector ETFs): 10476 | Running backtest (...,
+  loader_strategy=...)`. Tiered also: `Tiered loader: Metadata=4643
+  Summary=0 Full=0 after bulk Metadata promote` — only metadata loaded
+  before OOM. The shared `Loading universe from sectors.csv` and
+  `Loading AD breadth bars` paths run before any tier-aware throttling
+  kicks in, so Tier 3's `Bar_history` / `Full.t.bars` accounting (the
+  "29 MB vs 7 GB" target in § Goal) never gets the chance to apply at
+  10K-symbol scale. Goal-statement footnote needed: the design's memory
+  budget is a Bar_loader-only accounting and assumes upstream loading
+  is bounded by something else (universe scoping, lazy load, or a
+  separate Tier 4 that lazy-loads AD breadth itself).
+  
+  **What this does NOT change:** the Tiered flip is still safe at the
+  universe sizes the system actually backtests today (302-symbol
+  goldens-small, 7-symbol CI fixture both fit comfortably). The flip
+  PR can proceed once one or two confirming nightlies land.
+  
+  **What this DOES change:** the design claim "Memory budget becomes
+  ~29 MB vs today's >7 GB" can't be cited as accomplished without
+  scoping. New work needed (out of this track or a sibling): instrument
+  AD-breadth + inventory-load phases for memory attribution; either
+  scope the universe upstream of those calls or convert them to lazy /
+  streamed loaders. Tracked here pending a decision on whether this
+  becomes its own track (suggest: `dev/status/backtest-perf.md` for
+  CPU + memory continuous monitoring + AD/inventory profiling).
+
 - **Broad-universe goldens are testing on a 7-symbol fixture (2026-04-24).**
   `trading/test_data/sectors.csv` has 8 lines (~7 tickers); the broad
   scenarios under `trading/test_data/backtest_scenarios/goldens-broad/`
