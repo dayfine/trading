@@ -55,6 +55,7 @@ RUN sudo apt-get update && sudo apt-get install -y \
     autoconf \
     automake \
     libtool \
+    time \
     && sudo rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
