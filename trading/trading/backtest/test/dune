@@ -7,7 +7,8 @@
   test_runner_tiered_cycle
   test_runner_tiered_metadata_tolerance
   test_runner_hypothesis_overrides
-  test_tiered_loader_parity)
+  test_tiered_loader_parity
+  test_backtest_runner_args)
  (libraries
   ounit2
   core
@@ -19,6 +20,7 @@
   backtest
   trading.backtest.bar_loader
   trading.backtest.loader_strategy
+  trading.backtest.runner_args
   scenario_lib
   weinstein.data_source
   trading.base
