@@ -74,30 +74,61 @@ Reference: `dev/notes/memory-profiling-framework-2026-04-24.md`
 captures the existing-vs-missing analysis. Steps below pick the
 6-step sketch from that note and concretize it.
 
-- **B1.** Wrap `Tiered_runner.promote_universe_metadata` in a new
-  `Trace.Phase.Promote_metadata` variant. Closes the documented
-  trace hole. Tiny: ~30 LOC + new variant in `trace.mli`.
-- **B2.** Add `Gc.stat` snapshot to `phase_metrics`: new fields
-  `live_words : int option`, `heap_words : int option`,
-  `allocated_bytes : float option` (cumulative). All optional so
-  legacy traces deserialize. ~50 LOC.
-- **B3.** Add flush-on-error to `Trace.t`: write
+- **B1 [DONE, #534].** Wrap `Tiered_runner.promote_universe_metadata`
+  in a new `Trace.Phase.Promote_metadata` variant. Closes the
+  documented trace hole.
+- **~~B2.~~ ~~Add `Gc.stat` snapshot to `phase_metrics`.~~**
+  **CANCELLED 2026-04-24** — superseded by B7 (memtrace). Memtrace
+  gives per-callsite allocation attribution at higher resolution
+  than aggregate Gc.stat-per-phase, with no manual instrumentation
+  cost. Don't ship.
+- **B3 [in flight].** Add flush-on-error to `Trace.t`: write
   `dev/backtest/traces/<id>.sexp` after every `Trace.record` call,
   not at end-of-run. Cost: more I/O per phase. Benefit: SIGKILL'd
   OOM runs leave the smoking-gun phase recorded. ~40 LOC.
-- **B4.** Add `--trace` flag to `backtest_runner.exe` (currently
-  only `scenario_runner.exe` enables tracing). ~20 LOC.
-- **B5.** Split `Macro` (= AD-breadth load) into sub-phases:
-  `Macro_load_advances`, `Macro_load_declines`,
-  `Macro_compute_breadth`. Reveals what's really happening inside
-  the monolithic `Weinstein_strategy.Ad_bars.load`. ~80 LOC.
+- **B4 [DONE, #533].** Add `--trace` flag to `backtest_runner.exe`
+  (previously only `scenario_runner.exe` enabled tracing).
+- **B5 [DEFERRED].** Split `Macro` (= AD-breadth load) into
+  sub-phases: `Macro_load_advances`, `Macro_load_declines`,
+  `Macro_compute_breadth`. Partially superseded by B7 — memtrace
+  shows AD-breadth's allocation pattern at callsite granularity
+  without needing per-sub-phase wrapping. Defer indefinitely; pick
+  up only if memtrace data points at AD-breadth as the dominant
+  allocator AND the wrapping would add operational value (e.g.,
+  CI failure-on-regression by sub-phase RSS).
 - **B6 (optional).** Background sampler thread reading
   `/proc/self/statm` at 100ms for honest peak-during-phase numbers
   (current `peak_rss_kb` reads VmHWM AFTER the phase, so transient
-  spikes are hidden). Only worth it if B1+B2+B3 don't explain a
-  given OOM. ~120 LOC.
+  spikes are hidden). Only worth it if B7 (memtrace) data leaves a
+  question about transient vs sustained peaks. Likely never needed.
+  ~120 LOC.
+- **B7 [NEW, prioritized].** Adopt
+  [`memtrace`](https://github.com/janestreet/memtrace) — Jane Street's
+  OCaml memory profiler using `Gc.Memprof` statistical sampling.
+  Per-callsite allocation traces in `.ctf` format consumable by
+  `memtrace_viewer` (separate package; produces flamegraphs +
+  allocation tables). Adoption shape: add `memtrace` opam dep,
+  gate `Memtrace.start_tracing` on either an env var
+  (`MEMTRACE_OUT=/path/to/trace.ctf`) or a `--memtrace <path>` flag
+  on `backtest_runner.exe`. Default off; zero overhead when
+  unused. Once the dep is in, `dev/scripts/run_perf_hypothesis.sh`
+  (C2) gains a third output file per run (`<side>.memtrace.ctf`).
+  ~50 LOC integration + opam dep + Dockerfile add. **First real
+  use:** run the 292-symbol scoped A/B from `h1-result-2026-04-24.md`
+  with memtrace on; the resulting `.ctf` shows exactly which
+  callsite allocates the missing ~1.8 GB / ~3.6 GB.
 
-Estimated total: ~250 LOC across 5–6 PRs.
+  **Why it supersedes B2/B5:** B2 + B5 together would have given
+  per-phase Gc.stat + a 3-way Macro split (~5 fields per phase ×
+  ~14 phases × 1500 days = ~100K aggregate data points).
+  Memtrace gives per-allocation samples (~1e-5 sampling rate
+  default = ~10K samples per backtest) with full call stacks. The
+  attribution resolution is higher AND the data volume is lower.
+  Maintenance cost (one opam dep) is far less than B2's ongoing
+  responsibility for the Gc.stat schema.
+
+Estimated total post-revision: ~150 LOC across 3 PRs (B3 in
+flight, B7 new, B6 optional/skip).
 
 ### Workstream C — Hypothesis-testing harness + broader goldens
 
@@ -189,23 +220,40 @@ fields:
 
 Add a row to `dev/status/_index.md` once the status file lands.
 
-## Workstream order (once started)
+## Workstream order (revised 2026-04-24 post-memtrace)
 
-Suggested order to unblock the most measurement value soonest:
-1. **A1** (gate; no PR — wait for #522 image rebuild)
-2. **C1** (config overrides for H-series)
-3. **B1 + B4** (Metadata-promote phase + `--trace` flag) — minimum
-   to get phase-level measurement on `backtest_runner.exe`
-4. **A2** (CSV aggregation in CI) — start collecting nightly data
-5. **B3** (flush-on-error) — needed to investigate OOMs
-6. **C2** (hypothesis-test harness) — formalize the manual
-   one-shot reports we've been writing today into reproducible
-   experiment dirs
-7. **B2 + B5** — refine attribution
-8. **C3 + C4** — broader fixtures + bear scenarios
+Status of completed steps in **bold**.
 
-Workstreams A and B can proceed in parallel after #522 image
-rebuild. C1 must happen before any H-series test can run.
+1. **A1 [DONE]** (#522 image rebuild — `/usr/bin/time` available; A/B
+   workflow now reports numeric peak RSS).
+2. **C1 [DONE, #528]** (config overrides for H-series).
+3. **B1 [DONE, #534] + B4 [DONE, #533]** (Metadata-promote phase +
+   `--trace` flag) — phase-level tracing on `backtest_runner.exe`
+   is live.
+4. **B3 [in flight] + C2 [in flight]** — flush-on-error +
+   hypothesis-test harness (parallel agents). After both land, the
+   profiling tool stack is feature-complete for non-allocation
+   data.
+5. **B7 [next]** — adopt memtrace. Once the dep is in,
+   `run_perf_hypothesis.sh` (C2) gains a `<side>.memtrace.ctf`
+   output per run. **THIS** is the missing piece for the +95%
+   Tiered RSS investigation.
+6. **A2** — CSV aggregation in CI for continuous monitoring.
+7. **First real H-series measurements using memtrace data:**
+   - **H3** (skip_ad_breadth on broad universe) — does AD-breadth
+     dominate at scale? Memtrace shows the answer directly.
+   - **H2** (Full.t.bars duplication accounts for Tiered's
+     residual after H1 was disproved). Memtrace shows what's
+     duplicated.
+   - **H5** (RSS scales linearly with universe size). Memtrace +
+     `universe_cap` overrides give the curve.
+8. **C3 + C4** — broader fixtures + bear scenarios. Likely needed
+   to validate H3 at production scale.
+
+Workstreams can proceed in parallel where files don't conflict.
+B3 + C2 are running concurrently right now.
+
+**~~B2.~~ ~~B5.~~** Cancelled / deferred — see Workstream B above.
 
 ## Acceptance per PR
 
@@ -215,6 +263,9 @@ Acceptance Checklist) applies. Per-workstream additions:
   showing the new CSV row landed in main.
 - **B**: any B1–B6 PR must include a sample trace sexp on a known
   scenario showing the new field/phase populated.
+- **B7**: must include a sample `.ctf` file showing memtrace captured
+  allocations on a small backtest, plus a `memtrace_viewer` screenshot
+  or text summary identifying at least the top-3 allocators.
 - **C**: any C1–C5 PR must include a `dev/experiments/perf/<id>/`
   directory exercising the new override / fixture.
 
