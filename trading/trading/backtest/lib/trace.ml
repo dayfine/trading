@@ -18,6 +18,7 @@ module Phase = struct
     | Promote_summary
     | Promote_full
     | Demote
+    | Promote_metadata
   [@@deriving show, eq, sexp]
 end
 
