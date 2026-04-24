@@ -35,6 +35,26 @@ val daily_bars_for : t -> symbol:string -> Types.Daily_price.t list
     bars. Callers that need a bounded window should slice the result themselves
     — the support-floor primitive in [weinstein_stops] is one such caller. *)
 
+val trim_before : t -> as_of:Date.t -> max_lookback_days:int -> unit
+(** [trim_before t ~as_of ~max_lookback_days] drops, for every symbol in [t],
+    bars whose date is strictly older than [as_of] minus [max_lookback_days]
+    days. Bars whose date equals or exceeds the cutoff are retained.
+
+    Idempotent: calling twice with the same [as_of] / [max_lookback_days] is
+    equivalent to calling once. Calling with an [as_of] in the future relative
+    to the held bars is a no-op (cutoff is older than every bar; nothing drops).
+    Calling with [max_lookback_days = 0] drops every bar whose date is strictly
+    less than [as_of] — i.e., keeps only [as_of]'s bar if present.
+
+    Raises [Invalid_argument] if [max_lookback_days < 0].
+
+    Motivation: per-symbol bar buffers grow monotonically via [accumulate] and
+    [seed], but strategy readers (52-week RS line, 30-week MA, ATR) only need a
+    bounded recent window. Periodically calling [trim_before] caps the buffer's
+    working set at [max_lookback_days] days per symbol. See
+    [dev/plans/bar-history-trim-2026-04-24.md] for the motivating measurement.
+*)
+
 val seed : t -> symbol:string -> bars:Types.Daily_price.t list -> unit
 (** [seed t ~symbol ~bars] merges [bars] into [symbol]'s accumulated history.
     [bars] must already be in chronological order (oldest first) — the caller is

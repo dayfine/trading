@@ -41,6 +41,18 @@ let _pick_new_bars ~existing bars =
   | None -> bars
   | Some last_date -> _bars_strictly_after ~last_date bars
 
+let _drop_bars_before ~cutoff bars =
+  List.drop_while bars ~f:(fun b -> Date.( < ) b.Types.Daily_price.date cutoff)
+
+let trim_before (t : t) ~(as_of : Date.t) ~(max_lookback_days : int) =
+  if max_lookback_days < 0 then
+    invalid_arg
+      (Printf.sprintf
+         "Bar_history.trim_before: max_lookback_days must be >= 0, got %d"
+         max_lookback_days);
+  let cutoff = Date.add_days as_of (-max_lookback_days) in
+  Hashtbl.map_inplace t ~f:(fun bars -> _drop_bars_before ~cutoff bars)
+
 let seed (t : t) ~symbol ~(bars : Types.Daily_price.t list) =
   let existing = Hashtbl.find t symbol |> Option.value ~default:[] in
   let new_bars = _pick_new_bars ~existing bars in
