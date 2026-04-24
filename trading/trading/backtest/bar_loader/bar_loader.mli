@@ -196,9 +196,14 @@ val promote :
       an error — the caller should retry later or leave the symbol where it is).
     - [Full_tier]: auto-promotes through Metadata and Summary first, then reads
       a bounded OHLCV tail ([full_config.tail_days]) and retains the raw bars on
-      the entry. A symbol that could not be promoted to Summary (insufficient
-      history) is left at whatever lower tier it reached — Full promotion is
-      skipped, not erroring.
+      the entry. Summary scalar resolution is best-effort — a symbol whose
+      history is too short to resolve all Summary scalars (ma_30w, rs_line,
+      etc.) is still promoted to Full as long as the underlying CSV has at least
+      one bar; the resulting Full entry has [summary = None]. This decoupling
+      matches the strategy-side invariant that [Bar_history] tracks raw bars and
+      lets per-indicator math degrade gracefully when a window is too short —
+      rather than the previous behaviour of silently blocking [Bar_history]
+      population whenever Summary couldn't compute.
 
     Returns the first per-symbol error encountered (if any). A symbol that fails
     to load is {e not} added to the loader.

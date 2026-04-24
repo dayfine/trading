@@ -239,28 +239,33 @@ let _create_entering ~position_id ~symbol : Position.transition =
 (* 1. Friday cadence isolation                                          *)
 (* -------------------------------------------------------------------- *)
 
-(** On a Friday call, the wrapper issues a [Promote_to_summary] tier-op per
+(** On a Friday call, the wrapper issues a [Promote_to_full] tier-op per
     universe symbol. Per-symbol promotion (rather than a batch
-    [Bar_loader.promote ~symbols:t.universe ~to_:Summary_tier ~as_of] call) is
+    [Bar_loader.promote ~symbols:t.universe ~to_:Full_tier ~as_of] call) is
     load-bearing for parity on broad universes — see [_promote_each_to] in the
     .ml — because batched [Bar_loader.promote] short-circuits on the first
     per-symbol error. The test pins the per-symbol expectation: with two
-    universe symbols, two Promote_to_summary tier-ops fire. (The 2-symbol
-    universe is also extended to include the primary index in the loader, but
-    the primary index is promoted to Metadata before the wrapper runs and is not
-    in [t.universe], so it doesn't add Summary tier-ops here.) *)
-let test_friday_triggers_summary_promote _ =
+    universe symbols, two Promote_to_full tier-ops fire. (The 2-symbol universe
+    is also extended to include the primary index in the loader, but the primary
+    index is promoted to Metadata before the wrapper runs and is not in
+    [t.universe], so it doesn't add Full tier-ops here.)
+
+    Note: prior to the bull-crash A/B parity fix this function went through an
+    intermediate Summary promote pass; with the fix [_run_friday_cycle] drives
+    Full directly so [Bar_history] gets populated even for symbols that don't
+    yet have enough weekly bars to resolve Summary scalars. *)
+let test_friday_triggers_full_promote _ =
   let w = _setup ~universe:[ "AAA"; "BBB" ] () in
   _call w ~date:_friday ~portfolio:_empty_portfolio;
   assert_that
-    (_count_phase w.trace Backtest.Trace.Phase.Promote_summary)
+    (_count_phase w.trace Backtest.Trace.Phase.Promote_full)
     (equal_to 2)
 
-let test_non_friday_skips_summary_promote _ =
+let test_non_friday_skips_full_promote _ =
   let w = _setup ~universe:[ "AAA"; "BBB" ] () in
   _call w ~date:_tuesday ~portfolio:_empty_portfolio;
   assert_that
-    (_count_phase w.trace Backtest.Trace.Phase.Promote_summary)
+    (_count_phase w.trace Backtest.Trace.Phase.Promote_full)
     (equal_to 0)
 
 (* -------------------------------------------------------------------- *)
@@ -568,10 +573,10 @@ let test_throttle_blocks_unknown_symbol _ =
 let suite =
   "Runner_tiered_cycle"
   >::: [
-         "Friday call triggers Summary promote"
-         >:: test_friday_triggers_summary_promote;
-         "Non-Friday call skips Summary promote"
-         >:: test_non_friday_skips_summary_promote;
+         "Friday call triggers Full promote"
+         >:: test_friday_triggers_full_promote;
+         "Non-Friday call skips Full promote"
+         >:: test_non_friday_skips_full_promote;
          "CreateEntering transition promotes symbol to Full"
          >:: test_create_entering_promotes_to_full;
          "Multi-symbol CreateEntering → per-symbol Full-tier promote"
