@@ -106,14 +106,6 @@ let promote_universe_metadata loader (input : input) ~as_of =
   in
   _log_metadata_failures failures ~n_total:(List.length input.all_symbols)
 
-(** [_full_candidate_limit config] caps how many Shadow_screener candidates the
-    Tiered wrapper promotes to Full on a single Friday. Matches the inner
-    screener's own post-rank cut so we don't Full-promote more than the strategy
-    would consider. *)
-let _full_candidate_limit (config : Weinstein_strategy.config) =
-  config.screening_config.max_buy_candidates
-  + config.screening_config.max_short_candidates
-
 (** [_always_loaded_symbols config] — the symbols whose [get_price] is passed
     through unconditionally by the Tiered wrapper's throttle: the primary index
     (day-of-week detection + benchmark), every sector ETF (sector map
@@ -133,8 +125,6 @@ let _make_wrapper_config (input : input) ~loader ~bar_history ~warmup_start
     bar_history;
     universe = input.all_symbols;
     always_loaded_symbols = _always_loaded_symbols input.config;
-    screening_config = input.config.screening_config;
-    full_candidate_limit = _full_candidate_limit input.config;
     seed_warmup_start = warmup_start;
     stop_log;
     primary_index = input.config.indices.primary;
