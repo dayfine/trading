@@ -94,8 +94,6 @@ let _no_indicator : Strategy_interface.get_indicator_fn = fun _ _ _ _ -> None
 let _empty_portfolio : Portfolio_view.t =
   { cash = 0.0; positions = String.Map.empty }
 
-let _screening_config : Screener.config = Screener.default_config
-
 let _wrapper_config ~loader ~bar_history ~universe ~primary_index
     ?(always_loaded = []) () : Backtest.Tiered_strategy_wrapper.config =
   {
@@ -103,8 +101,6 @@ let _wrapper_config ~loader ~bar_history ~universe ~primary_index
     bar_history;
     universe;
     always_loaded_symbols = String.Set.of_list (primary_index :: always_loaded);
-    screening_config = _screening_config;
-    full_candidate_limit = 5;
     seed_warmup_start = Date.create_exn ~y:2023 ~m:Jan ~d:1;
     stop_log = Backtest.Stop_log.create ();
     primary_index;
@@ -243,15 +239,22 @@ let _create_entering ~position_id ~symbol : Position.transition =
 (* 1. Friday cadence isolation                                          *)
 (* -------------------------------------------------------------------- *)
 
-(** On a Friday call, the wrapper issues a [Promote_to_summary] tier-op for the
-    universe. Pinned to exactly one Summary promote per call so a wrapper that
-    re-fires on the same Friday would fail. *)
+(** On a Friday call, the wrapper issues a [Promote_to_summary] tier-op per
+    universe symbol. Per-symbol promotion (rather than a batch
+    [Bar_loader.promote ~symbols:t.universe ~to_:Summary_tier ~as_of] call) is
+    load-bearing for parity on broad universes — see [_promote_each_to] in the
+    .ml — because batched [Bar_loader.promote] short-circuits on the first
+    per-symbol error. The test pins the per-symbol expectation: with two
+    universe symbols, two Promote_to_summary tier-ops fire. (The 2-symbol
+    universe is also extended to include the primary index in the loader, but
+    the primary index is promoted to Metadata before the wrapper runs and is not
+    in [t.universe], so it doesn't add Summary tier-ops here.) *)
 let test_friday_triggers_summary_promote _ =
   let w = _setup ~universe:[ "AAA"; "BBB" ] () in
   _call w ~date:_friday ~portfolio:_empty_portfolio;
   assert_that
     (_count_phase w.trace Backtest.Trace.Phase.Promote_summary)
-    (equal_to 1)
+    (equal_to 2)
 
 let test_non_friday_skips_summary_promote _ =
   let w = _setup ~universe:[ "AAA"; "BBB" ] () in
@@ -275,11 +278,11 @@ let test_create_entering_promotes_to_full _ =
     (equal_to 1)
 
 (** Multi-symbol CreateEntering batch: the wrapper issues one Full-tier promote
-    for the whole batch rather than one per symbol, and the trace records it as
-    a single phase event. Pins the "one promote call covers all entering
-    symbols" contract the wrapper relies on to keep the trace signal meaningful.
-*)
-let test_multi_symbol_create_entering_single_promote _ =
+    {b per symbol} (not one for the whole batch) so a single missing-CSV symbol
+    can't short-circuit the rest of the batch (see [_promote_each_to] in the
+    .ml). With two distinct CreateEntering transitions, two Promote_to_full
+    tier-ops fire — pinned exactly. *)
+let test_multi_symbol_create_entering_per_symbol_promote _ =
   let w = _setup ~universe:[ "AAA"; "BBB" ] () in
   w.transitions_ref :=
     [
@@ -289,7 +292,7 @@ let test_multi_symbol_create_entering_single_promote _ =
   _call w ~date:_tuesday ~portfolio:_empty_portfolio;
   assert_that
     (_count_phase w.trace Backtest.Trace.Phase.Promote_full)
-    (equal_to 1)
+    (equal_to 2)
 
 (* -------------------------------------------------------------------- *)
 (* 3. Per-Closed demote                                                 *)
@@ -571,8 +574,8 @@ let suite =
          >:: test_non_friday_skips_summary_promote;
          "CreateEntering transition promotes symbol to Full"
          >:: test_create_entering_promotes_to_full;
-         "Multi-symbol CreateEntering → single Full-tier promote"
-         >:: test_multi_symbol_create_entering_single_promote;
+         "Multi-symbol CreateEntering → per-symbol Full-tier promote"
+         >:: test_multi_symbol_create_entering_per_symbol_promote;
          "Newly-Closed position triggers Demote"
          >:: test_newly_closed_position_triggers_demote;
          "Closed on first call triggers Demote"

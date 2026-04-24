@@ -4,9 +4,11 @@
     Step 3f-part3 of the backtest-tiered-loader plan
     (dev/plans/backtest-tiered-loader-2026-04-19.md §3f), extended on 2026-04-22
     by the strategy↔bar_loader integration
-    (dev/plans/backtest-tiered-strategy-integration-2026-04-22.md) to make
-    Tiered actually throttle [Bar_history] growth and consume
-    [Bar_loader.Full_tier] bars. The wrapper now sits on two seams:
+    (dev/plans/backtest-tiered-strategy-integration-2026-04-22.md) and revised
+    on 2026-04-23 to fix bull-crash A/B parity by promoting every Summary-tier
+    symbol to Full each Friday (rather than only the [Shadow_screener]'s top-N
+    picks; see [_run_friday_cycle] note in the .ml). The wrapper now sits on two
+    seams:
 
     {1 Tier bookkeeping}
 
@@ -14,11 +16,14 @@
 
     - On Fridays (weekly cadence, detected via the primary index bar's
       day-of-week): {b before} delegating to the inner strategy, promote every
-      universe symbol to [Summary_tier], run the [Shadow_screener] cascade on
-      the resulting summaries, promote the top-[full_candidate_limit] candidates
-      to [Full_tier], and seed [bar_history] with each newly-promoted symbol's
-      [Full.t.bars] so the inner strategy's screener sees the same history it
-      would have accumulated under the Legacy path.
+      universe symbol to [Summary_tier], then promote {e every} Summary-tier
+      symbol to [Full_tier], and seed [bar_history] with each newly-promoted
+      symbol's [Full.t.bars] so the inner strategy's screener sees the same
+      history it would have accumulated under the Legacy path. Promoting every
+      Summary symbol (rather than a screener-cascade-filtered subset) is
+      load-bearing for parity: inner's [_screen_universe] only analyzes symbols
+      with bars in [Bar_history], so any candidate Legacy would have considered
+      must reach Full first.
     - On any [CreateEntering] transition emitted by the wrapped strategy:
       promote the entering symbol to [Full_tier] and seed [bar_history] with its
       [Full.t.bars]. Ensures Full-tier OHLCV is available the first time stops /
@@ -65,15 +70,6 @@ type config = {
           structurally required every day for day-of-week detection, the sector
           map, and the macro global-consensus indicator. At most a dozen
           symbols. *)
-  screening_config : Screener.config;
-      (** Cascade config forwarded verbatim to [Shadow_screener.screen]. *)
-  full_candidate_limit : int;
-      (** Maximum number of Shadow_screener buy + short candidates to promote to
-          Full tier on a single Friday. Protects against a runaway promotion
-          batch when the shadow cascade admits many candidates. Typical values
-          track
-          [screening_config.max_buy_candidates +
-           screening_config.max_short_candidates]. *)
   seed_warmup_start : Core.Date.t;
       (** Earliest date the wrapper includes when seeding [bar_history] from
           loader [Full.t.bars]. Match the Runner's [warmup_start]
@@ -106,17 +102,16 @@ val wrap :
 
     The returned module's [on_market_close]: 1. If today is a Friday (per the
     primary index bar's day-of-week): promotes [config.universe] to Summary,
-    runs [Shadow_screener.screen] over the summaries, promotes the
-    top-[config.full_candidate_limit] buy+short candidates to Full, and seeds
-    [config.bar_history] with the newly-Full symbols' [Full.t.bars]. 2.
-    Constructs a throttled [get_price'] that returns [None] for any symbol that
-    is (a) not in [config.always_loaded_symbols], (b) not currently at
-    [Full_tier], and (c) not currently held in the portfolio. Delegates to
-    [inner.on_market_close] with [get_price']. 3. Records the resulting
-    transitions to [config.stop_log]. 4. Demotes any symbols whose positions
-    transitioned to [Closed] since the previous call. 5. Promotes any
-    [CreateEntering] transition's symbol to [Full_tier] and seeds
-    [config.bar_history] with its bars.
+    then promotes every Summary-tier symbol to Full, and seeds
+    [config.bar_history] with each Full symbol's [Full.t.bars]. 2. Constructs a
+    throttled [get_price'] that returns [None] for any symbol that is (a) not in
+    [config.always_loaded_symbols], (b) not currently at [Full_tier], and (c)
+    not currently held in the portfolio. Delegates to [inner.on_market_close]
+    with [get_price']. 3. Records the resulting transitions to
+    [config.stop_log]. 4. Demotes any symbols whose positions transitioned to
+    [Closed] since the previous call. 5. Promotes any [CreateEntering]
+    transition's symbol to [Full_tier] and seeds [config.bar_history] with its
+    bars.
 
     The transition list returned to the simulator is unchanged — the tier
     bookkeeping does not emit transitions.

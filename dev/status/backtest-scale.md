@@ -3,20 +3,77 @@
 ## Last updated: 2026-04-23
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-**Strategy ↔ bar_loader integration (2026-04-22)** — open on
-`feat/backtest-scale-strategy-bar-loader-integration`. Flips Tiered
-from "bookkeeping-only" (PV deltas $0.00 on all 3 broad goldens per
-run 24761375492) to "actually throttles Bar_history + consumes Full
-bars". Parity test (`test_tiered_loader_parity`) still green — trade
-count identical, final PV within $0.01, sampled step PVs within $0.01
-per step. Tier stats at end of parity sim: `Metadata=0 Summary=0
-Full=22`. Resolution chosen: Option b-seed from
+**Bull-crash A/B parity fix (2026-04-23)** — open on
+`feat/backtest-bull-crash-parity`. Resolves the post-#507
+Tiered/Legacy divergence on `bull-crash-2015-2020`
+(nightly A/B run 24818087082: $20709.16 PV drift on bull-crash, $0.00
+on the other two scenarios). Two coupled bugs:
+
+1. **`_friday_promote_set` capped Full-promotions at
+   `max_buy_candidates + max_short_candidates` (~30) via
+   `Shadow_screener.screen` ranking.** The inner Weinstein screener's
+   `_screen_universe` only analyzes symbols with bars in `Bar_history`,
+   and `Bar_history` only grows for Full-tier symbols. So inner saw
+   only ~30 candidates per Friday vs Legacy's full universe scan. On
+   broad universes the divergence was a $20k PV drift; on the
+   small-universe variant (used as a local repro because broad takes
+   ~7 hours) it was a 7x trade-count divergence (Legacy 696 trades vs
+   Tiered 101 trades over 6 years).
+2. **`Bar_loader.promote ~symbols:[...]` short-circuits on the FIRST
+   per-symbol error.** Used to batch-promote the universe to Summary
+   from `_run_friday_cycle`, this meant one missing CSV near the start
+   of the alphabet silently dropped every later symbol — a steady
+   decline in Tiered's effective candidate pool over time.
+
+Fix in `tiered_strategy_wrapper.ml`:
+- Drop the `Shadow_screener.screen` call from `_run_friday_cycle`.
+  Promote every Summary-tier symbol to Full each Friday and seed
+  `Bar_history` from the loader's `Full.t.bars`.
+- Switch all Friday and per-CreateEntering promotions in the wrapper
+  from batch `Bar_loader.promote` to a per-symbol helper
+  (`_promote_each_to`) that mirrors the same per-symbol-tolerance
+  pattern `Tiered_runner.promote_universe_metadata` already uses for
+  Metadata.
+
+Local A/B verification (small-universe `bull-crash-2015-2020.sexp`,
+302 symbols, 6 years, ~7 minutes per run × 2):
+
+| State | Legacy trades | Tiered trades | Legacy return | Tiered return |
+|---|---|---|---|---|
+| Pre-fix (post-#507) | 696 | 101 | 301.7% | 73.4% |
+| Drop-cap (shadow) | 690 | 339 | 338.3% | 79.8% |
+| **+ per-symbol promote** | **694** | **470** | **340.2%** | **334.5%** |
+
+Return delta closed from 228 percentage points to 5.7. Trade-count
+delta closed from -85% to -32%. Bar_history seeding contract
+(parity test, 7 symbols, 6 months) still bit-identical: same final
+PV, same step PVs at sampled indices.
+
+Residual ~32% trade-count gap on small-universe is plausibly the
+shadow→inner ranking divergence becoming inert at small-universe
+scale — inner now sees the full Summary set (152 of 302 symbols)
+and re-ranks with full data, but the remaining gap suggests there
+may be a third-order effect (e.g., Bar_history seed timing for
+CreateEntering vs Friday-cycle promotion order). Worth tracking but
+not blocking — broad-universe nightly will reveal whether the gap is
+small enough at scale. Update on broad-universe A/B pending nightly
+workflow run.
+
+**Strategy ↔ bar_loader integration (2026-04-22, MERGED as #507)** —
+flipped Tiered from "bookkeeping-only" (PV deltas $0.00 on all 3
+broad goldens per run 24761375492) to "actually throttles
+Bar_history + consumes Full bars". Parity test
+(`test_tiered_loader_parity`) green — trade count identical, final
+PV within $0.01, sampled step PVs within $0.01 per step. Tier stats
+at end of parity sim: `Metadata=0 Summary=0 Full=22`. Resolution
+chosen: Option b-seed from
 `dev/plans/backtest-tiered-strategy-integration-2026-04-22.md`. Broad
 A/B not run locally (~40min per scenario × 3 × 2 = 4 hours); nightly
-workflow (`.github/workflows/tiered-loader-ab.yml`) provides first
-empirical signal.
+workflow (`.github/workflows/tiered-loader-ab.yml`) provided the
+post-merge empirical signal that surfaced the bull-crash divergence
+fixed above.
 
 structural_qc: APPROVED (2026-04-22 run-2) — feat/backtest-scale-3h; merged as #496. See dev/reviews/backtest-scale-3h.md.
 
@@ -28,26 +85,21 @@ NO
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- `feat/backtest-scale-strategy-bar-loader-integration` — strategy ↔
-  bar_loader integration (2026-04-22). Makes Tiered actually exercise
-  Bar_loader's Summary / Full tiers + throttle Bar_history. Before this
-  PR: Legacy vs Tiered produces bit-identical output ($0.00 PV deltas).
-  After: Tiered accumulates bars only for always-loaded + Full + held
-  symbols, seeds Bar_history from loader Full bars on promote, runs the
-  shadow screener pre-inner so Full promotions are visible to the inner
-  screener same-day. Parity test still green.
+- `feat/backtest-bull-crash-parity` — bull-crash A/B parity fix
+  (2026-04-23). Closes the post-#507 PV drift on broad-bull-crash by
+  promoting every Summary-tier symbol to Full each Friday (rather than
+  only the shadow screener's top-N) and switching the wrapper's
+  promotions to per-symbol calls (so a single missing CSV no longer
+  short-circuits the rest of the batch). See §Status for the local A/B
+  evidence table.
 
 ## Blocked on
-- **Next increment (flip `loader_strategy` default Legacy→Tiered) is
-  gated on empirical nightly A/B data.** The tiered-loader-ab workflow
-  fires at 04:17 UTC on the nightly cron; the first run lands tonight.
-  Waiting for a few nights of clean runs (trade-count parity hard gate
-  + PV drift inside the warn threshold) before flipping the default is
-  a conservative safety policy — the parity test (#484) already pins
-  identical output per-bar on the smoke scenario, but the broad golden
-  scenarios exercise a much wider strategy surface. Holds rather than
-  dispatches this run; re-evaluate after ~3 consecutive clean nightly
-  runs.
+- **Final flip (`loader_strategy` default Legacy→Tiered) is still
+  gated on a clean broad-universe nightly A/B run after this fix
+  lands.** Local repro confirms the fix moves bull-crash from a
+  228-percentage-point return divergence to ~5.7pp on the
+  small-universe variant; the broad-universe verification needs a
+  nightly run (~7 hours of compute) post-merge.
 
 ## Goal
 
