@@ -6,6 +6,7 @@ type t = {
   overrides : Sexp.t list;
   loader_strategy : Loader_strategy.t option;
   trace_path : string option;
+  memtrace_path : string option;
 }
 
 type acc = {
@@ -13,13 +14,20 @@ type acc = {
   overrides : Sexp.t list;
   loader_strategy : Loader_strategy.t option;
   trace_path : string option;
+  memtrace_path : string option;
 }
 (** Accumulator for [_extract_flags]. Carries every flag the parser recognises
     plus the running list of positional args. Kept private so callers see the
     immutable {!t} only. *)
 
 let _empty_acc =
-  { positional = []; overrides = []; loader_strategy = None; trace_path = None }
+  {
+    positional = [];
+    overrides = [];
+    loader_strategy = None;
+    trace_path = None;
+    memtrace_path = None;
+  }
 
 let _err msg = Error (Status.invalid_argument_error msg)
 
@@ -54,6 +62,9 @@ let rec _extract_flags args (acc : acc) =
   | "--trace" :: value :: rest ->
       _extract_flags rest { acc with trace_path = Some value }
   | [ "--trace" ] -> _err "--trace requires a path argument"
+  | "--memtrace" :: value :: rest ->
+      _extract_flags rest { acc with memtrace_path = Some value }
+  | [ "--memtrace" ] -> _err "--memtrace requires a path argument"
   | arg :: rest ->
       _extract_flags rest { acc with positional = arg :: acc.positional }
 
@@ -75,4 +86,5 @@ let parse args =
               overrides = acc.overrides;
               loader_strategy = acc.loader_strategy;
               trace_path = acc.trace_path;
+              memtrace_path = acc.memtrace_path;
             }))

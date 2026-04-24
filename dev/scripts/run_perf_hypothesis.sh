@@ -43,7 +43,11 @@
 #   legacy.peak_rss_kb       integer kB from /usr/bin/time -f '%M', or
 #                            "UNAVAILABLE" if /usr/bin/time is missing
 #   legacy.trace.sexp        per-phase metrics from --trace
-#   tiered.{log,peak_rss_kb,trace.sexp}
+#   legacy.memtrace.ctf      per-callsite allocation trace from --memtrace
+#                            (Memtrace / Gc.Memprof binary format; consumed
+#                            by `memtrace_viewer` — install separately via
+#                            `opam install memtrace_viewer`)
+#   tiered.{log,peak_rss_kb,trace.sexp,memtrace.ctf}
 #                            same for the Tiered run
 #   report.md                auto-generated comparative table
 #   repro.sh                 single-shot regeneration command
@@ -163,6 +167,7 @@ _run_backtest() {
   log_path="${out_prefix}.log"
   peak_rss_path="${out_prefix}.peak_rss_kb"
   trace_path="${out_prefix}.trace.sexp"
+  memtrace_path="${out_prefix}.memtrace.ctf"
 
   set +e
   if [ -n "$OVERRIDE_SEXP" ] && [ "$_HAVE_GNU_TIME" = "1" ]; then
@@ -173,6 +178,7 @@ _run_backtest() {
           "$START_DATE" "$END_DATE" \
           --loader-strategy "$strategy" \
           --trace "$trace_path" \
+          --memtrace "$memtrace_path" \
           --override "$OVERRIDE_SEXP"
     ) >"$log_path" 2>&1
   elif [ -n "$OVERRIDE_SEXP" ]; then
@@ -182,6 +188,7 @@ _run_backtest() {
         "$START_DATE" "$END_DATE" \
         --loader-strategy "$strategy" \
         --trace "$trace_path" \
+        --memtrace "$memtrace_path" \
         --override "$OVERRIDE_SEXP"
     ) >"$log_path" 2>&1
     printf 'UNAVAILABLE\n' >"$peak_rss_path"
@@ -192,7 +199,8 @@ _run_backtest() {
         dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
           "$START_DATE" "$END_DATE" \
           --loader-strategy "$strategy" \
-          --trace "$trace_path"
+          --trace "$trace_path" \
+          --memtrace "$memtrace_path"
     ) >"$log_path" 2>&1
   else
     (
@@ -200,7 +208,8 @@ _run_backtest() {
       dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
         "$START_DATE" "$END_DATE" \
         --loader-strategy "$strategy" \
-        --trace "$trace_path"
+        --trace "$trace_path" \
+        --memtrace "$memtrace_path"
     ) >"$log_path" 2>&1
     printf 'UNAVAILABLE\n' >"$peak_rss_path"
   fi
@@ -213,6 +222,8 @@ _run_backtest() {
 
   [ -f "$trace_path" ] \
     || _die "trace sexp not produced for $strategy run — see $log_path"
+  [ -f "$memtrace_path" ] \
+    || _die "memtrace .ctf not produced for $strategy run — see $log_path"
 }
 
 # -----------------------------------------------------------------------------
@@ -258,6 +269,14 @@ REPRO_PATH="$OUT_DIR/repro.sh"
   printf '# Hypothesis : %s\n' "$HYPOTHESIS_ID"
   printf '# Scenario   : %s\n' "$SCENARIO_PATH"
   printf '# Override   : %s\n' "${OVERRIDE_SEXP:-(none)}"
+  printf '#\n'
+  printf '# To inspect the memtrace .ctf files, install memtrace_viewer on the\n'
+  printf '# host (Memtrace ships the writer; the viewer is a separate package):\n'
+  printf '#   opam install memtrace_viewer\n'
+  printf '#   memtrace_viewer dev/experiments/perf/%s/legacy.memtrace.ctf\n' \
+    "$HYPOTHESIS_ID"
+  printf '#   memtrace_viewer dev/experiments/perf/%s/tiered.memtrace.ctf\n' \
+    "$HYPOTHESIS_ID"
   printf 'set -eu\n'
   printf 'cd "$(dirname "$0")/../../.."\n'
   if [ -n "$OVERRIDE_SEXP" ]; then

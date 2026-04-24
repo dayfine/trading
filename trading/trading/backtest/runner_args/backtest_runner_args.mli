@@ -24,6 +24,15 @@ type t = {
           {!Backtest.Trace.t}, threads it through
           [Backtest.Runner.run_backtest ~trace], and writes the trace sexp at
           [path] after the result is written. *)
+  memtrace_path : string option;
+      (** [None] when [--memtrace] was not passed (no memtrace .ctf file
+          written, zero memprof overhead). [Some path] when [--memtrace <path>]
+          was passed; the runner calls [Memtrace.start_tracing] before invoking
+          the backtest, producing a [.ctf] file at [path] consumable by
+          [memtrace_viewer]. The tracer auto-stops at process exit via an
+          [at_exit] hook registered by [Memtrace] itself. Workstream B7 of
+          [dev/plans/backtest-perf-2026-04-24.md] — per-callsite allocation
+          attribution. *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 
