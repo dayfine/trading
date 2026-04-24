@@ -37,7 +37,16 @@ The agent must read these at the start of every session, in order:
    §Approach and §Out of scope are binding.** See
    `.claude/agents/lead-orchestrator.md` §Step 3.5 for when plans
    are produced.
-8. State the session plan before writing any code
+8. **If the dispatch prompt contains a `## Rework mode` block, this is
+   an intra-run rework dispatch — not a fresh session.** The branch
+   already exists, QC flagged findings, and you must address the items
+   listed in the pasted `dev/reviews/<feature>.md` content. Follow the
+   rework-mode rules exactly: address every checked-fail item, no new
+   scope, use `fix(review): ` commit subjects, do not open a new PR or
+   flip the draft flag. See `.claude/agents/lead-orchestrator.md`
+   §Step 5a (rework decision) and §Step 4 "Rework Mode prompt" for the
+   full contract.
+9. State the session plan before writing any code
 
 ### 3. Branch and status file
 

@@ -40,14 +40,18 @@ Each feature follows this explicit sequence of deterministic nodes (D) and agent
 
 ```
 [D] preflight: inject context (assemble dune failure summary + last QC findings + open follow-ups)
- → [A] feat-agent: implement feature
- → [D] dune build @fmt
- → [D] dune build && dune runtest
- → [A] qc-structural: structural + mechanical review
- → [A] qc-behavioral: domain correctness review (only if structural APPROVED)
+ → [A] feat-agent: implement feature ←──────────────────────────────┐
+ → [D] dune build @fmt                                              │
+ → [D] dune build && dune runtest                                   │
+ → [A] qc-structural: structural + mechanical review                │
+ → [A] qc-behavioral: domain correctness review (only if APPROVED)  │
+ → [D] rework decision (Step 5a) ───── NEEDS_REWORK + cap not hit ──┘
+ │                             └────── APPROVED or cap hit ────────→
  → [D] gate suite: arch layer test + golden scenarios (M4+) + perf gate (M5+)
  → [D] merge decision: auto-merge if all pass, or HOLD + escalate
 ```
+
+**Dev → review loop is intra-run.** A NEEDS_REWORK verdict from either QC stage re-dispatches the feat-agent in the same run with a `## Rework mode` prompt (Step 4) — up to an iteration cap (default 2 per track per run). Past the cap, the PR stays draft and the track escalates for the next run. The loop exists because qc-behavioral's check surface is growing: waiting a full scheduler interval per mechanical finding would starve throughput. See Step 5a for the decision logic and budget guard.
 
 Deterministic nodes between agent steps are not token-consuming calls — run them directly. Only spawn an agent when the deterministic nodes cannot do the work.
 
@@ -994,6 +998,73 @@ the blocking refactor item as complete (check the box).
 Return: what changed, what quality metric improved, any surprises.
 ```
 
+### Rework Mode prompt (use instead of the normal brief when QC returned NEEDS_REWORK this run)
+
+Dispatched by Step 5a after a NEEDS_REWORK verdict. The feat-agent's normal first-time brief is replaced by this block — the agent is not starting fresh, it is addressing findings on an existing branch.
+
+```
+You are reworking the <FEATURE> track in response to QC findings from THIS run.
+The branch already exists and has the implementation you submitted; QC flagged
+issues that must be addressed before the PR can be approved.
+
+## Rework mode
+
+### Iteration
+Rework iteration <N> of <REWORK_CAP>. If you return with findings still unaddressed,
+the orchestrator will cap the loop and the PR will stay draft until the next run.
+
+### QC findings to address
+<paste the full contents of dev/reviews/<feature>.md — both structural and
+ behavioral sections. Do NOT summarize; the agent needs the exact checklist items
+ and line references.>
+
+### Scope discipline (critical)
+- Address every checked-fail item in the review file. No more, no less.
+- Do NOT introduce new features, new modules, or refactor unrelated code — those
+  belong in a separate PR / next run.
+- If a finding is ambiguous or you disagree with it, do NOT silently skip it.
+  Leave a brief note in your return value ("finding X: ambiguous because Y — did
+  not change code") so the orchestrator can surface it for human review.
+- If addressing a finding would require a cross-cutting change (touching > 3
+  files outside the reworked module), STOP and return with a note — cross-cutting
+  rework is a design issue, not an implementation miss.
+
+### Commit discipline
+- Use commit subject prefix `fix(review): ` so the audit trail is greppable.
+  Example: `fix(review): address QC rework iteration 1 — stage classifier .mli docs + magic-number extraction`.
+- Each fix commit should be small and targeted. Do not squash unrelated fixes.
+- Push after every commit (same discipline as normal dispatch).
+
+### Branch
+Your branch: feat/<feature> (already exists — do not recreate).
+<paste the same LOCAL / GHA checkout block as the normal prompt>
+
+### What you should NOT do in Rework mode
+- Open a new PR — the existing draft PR gets updated automatically by the push.
+- Mark the PR ready-for-review — Step 5 will flip the draft flag if the next QC
+  pass APPROVES.
+- Edit dev/status/_index.md.
+- Touch tracks other than <FEATURE>.
+
+### Acceptance check before returning
+- `dune build && dune runtest` passes clean on your branch.
+- `dune build @fmt` passes.
+- Every checked-fail item in dev/reviews/<feature>.md has either a code change
+  addressing it OR a note in your return value explaining why you did not change
+  code.
+
+Return: a short list of which findings you addressed (one line per finding) and
+any findings you did not address with reasons. Do not re-summarize the entire
+implementation — the orchestrator already has that context.
+```
+
+**Notes for the orchestrator when dispatching Rework mode:**
+
+- Use the same subagent isolation model as the normal dispatch (jj workspace locally, plain git in GHA).
+- Re-use the same branch `feat/<feature>` — the rework dispatches push additional commits on top of the existing PR, so the draft PR updates in place.
+- After the feat-agent returns, **re-run Step 5's QC pipeline on the new tip SHA** (Stage 1 + Stage 2 + Combined result). Stage 4 (audit) writes a fresh record with the new iteration number.
+- Then loop back to Step 5a for the next decision.
+
 ---
 
 ## Step 4.5: PR-creation fallback (deterministic — runs after each subagent returns)
@@ -1210,6 +1281,101 @@ Log the outcome in `## Dispatched this run` with a note like
 `audit written: dev/audit/<DATE>-<feature>.json (quality_score=4)` or
 `audit write failed: <reason>`. Audit write failure is [info]-severity —
 it does not block the QC pipeline.
+
+---
+
+## Step 5a: Rework decision (intra-run dev → review loop)
+
+**When to run:** after Step 5 completes all four stages for a track (structural → behavioral → draft-flip → audit). Stage 3's existing guard already skips the draft→ready flip on NEEDS_REWORK, so Step 5a only has to decide whether to re-dispatch the feat-agent or exit the loop.
+
+**Why this exists.** Without this step, a NEEDS_REWORK verdict waits until the next scheduled orchestrator run before the feat-agent sees it, even when the finding is mechanical (missing `.mli` doc, magic number, test gap). As qc-behavioral's check surface grows, inter-run-only rework starves throughput: a single magic-number finding would cost a full scheduler interval. Intra-run rework closes the loop.
+
+### Decision logic (per track)
+
+Maintain an in-memory counter `rework_count[<track>]` for the current run (starts at 0 on first QC of the track this run). After the QC pipeline completes for a track:
+
+```
+IF overall_qc == APPROVED:
+  → proceed to Stage 3 (draft flip) + gate suite + merge decision
+  → rework_count[<track>] plays no further role
+
+ELIF overall_qc == NEEDS_REWORK:
+  rework_count[<track>] += 1
+
+  # Cap check (default 2; per-track override via plan file ## Max rework iterations: <K>)
+  IF rework_count[<track>] >= REWORK_CAP:
+    → escalate (see "Cap hit" below), do NOT re-dispatch this run
+    → record in audit: overall_qc stays NEEDS_REWORK, rework_iterations=<count>
+
+  # Budget guard — do NOT re-dispatch if it pushes the run over budget.
+  est_rework_cost = average feat-agent + qc-structural + qc-behavioral dispatch cost
+                    (from dev/audit/*.json rolling mean; default $1.50 if no history)
+  IF (spent_usd + est_rework_cost) > max_daily_cost_usd * target_utilization_high:
+    → escalate as "budget-hold — rework deferred to next run", do NOT re-dispatch
+    → record in audit: rework_deferred: budget
+
+  ELSE:
+    → re-dispatch feat-agent with ## Rework mode prompt (see Step 4)
+    → after feat-agent returns, re-run Step 5 QC pipeline for this track
+    → loop back to this decision
+```
+
+**Defaults** (read from `dev/config/merge-policy.json`; hardcoded fallback if absent):
+
+- `rework_cap_per_run`: 2 (feat-agent is re-dispatched at most 2 times per track per run; total QC spawns per track can reach 3)
+- `rework_est_cost_usd`: 1.50 (approximate cost of one feat-agent + QC pair; refined from audit history)
+- `rework_per_track_override`: read from plan file's `## Max rework iterations: <K>` line if present
+
+### Cap hit / budget deferral
+
+When a track exits the loop without APPROVED:
+
+1. **Leave the PR as draft.** Do not run Stage 3 (draft→ready flip). The draft flag correctly signals "not ready for human review."
+2. **Write the audit record** (Stage 4 already ran; this is in addition): include `rework_iterations: <count>`, `rework_outcome: cap_hit | budget_hold`, and the last QC verdict summary.
+3. **Surface in `## Escalations`** in today's summary:
+   ```
+   [rework-cap] <track>: reached <K> rework iterations; still NEEDS_REWORK (<structural|behavioral>). PR stays draft. Last finding: <one-line summary>. Next run will re-dispatch with findings in pre-flight context.
+   ```
+   Or for budget deferral:
+   ```
+   [rework-budget] <track>: rework iteration <K> deferred — would push run over budget target. PR stays draft. Next run will pick up.
+   ```
+4. **3+ consecutive-run escalation still applies** (see §Escalation triggers). A track that hits the cap or budget-deferral on the same finding across 3 consecutive runs is a design problem, not an implementation problem — escalate for human review.
+
+### What the feat-agent sees on re-dispatch
+
+The `## Rework mode` prompt block (defined in Step 4) replaces the normal first-time brief. It contains:
+
+- The full `dev/reviews/<track>.md` contents (both structural and behavioral findings).
+- The iteration number (`rework iteration 1 of 2`) so the agent knows how much headroom is left.
+- An explicit instruction: "Address every checked-fail item in the review file. Do not introduce new scope. Commit with `fix(review): address QC rework iteration <N>` so the audit trail is greppable."
+
+### Ordering with other Step 5 stages
+
+Step 5's existing stages run in their current order for every QC pass (including rework iterations):
+
+```
+Stage 1 (structural) → Stage 2 (behavioral, conditional) → Combined result
+                                   │
+                   Stage 3 (draft→ready flip; no-op on NEEDS_REWORK)
+                                   │
+                   Stage 4 (audit record — always writes)
+                                   │
+                           Step 5a decision
+                              /         \
+                       APPROVED        NEEDS_REWORK
+                          │              /       \
+                     gate suite     cap/budget   under cap
+                     + merge           │            │
+                     decision     escalate     re-dispatch feat-agent
+                                  (PR stays    (Step 4 Rework Mode)
+                                    draft)           │
+                                                     └──→ back to Stage 1
+```
+
+- Stage 3 (draft→ready flip) already guards on `overall_qc: APPROVED` (existing behavior) — it is a no-op on NEEDS_REWORK and does not need to move.
+- Stage 4 (audit) runs after every QC pass, so each rework iteration's verdict is recorded with its iteration number.
+- The loop re-enters at Stage 1 so both structural and behavioral checks get a fresh look at the rework commits.
 
 ---
 
@@ -1634,7 +1800,7 @@ summary PR on a consolidation failure.
 ## Escalation policy
 
 Pause automation and flag for human review in the daily summary when:
-- Any QC NEEDS_REWORK on the same feature for 3+ consecutive runs (design problem, not an implementation problem)
+- Any QC NEEDS_REWORK on the same feature for 3+ consecutive runs (design problem, not an implementation problem). With intra-run rework (Step 5a) this now means 3+ consecutive runs where the track exits Step 5a via `cap_hit` or `budget_hold` without reaching APPROVED — a single run already absorbs up to `rework_cap_per_run` iterations.
 - A feat-agent proposes modifying an existing core module (Portfolio, Orders, Position, Strategy, Engine) rather than building alongside
 - A behavioral QC finding indicates a requirement is ambiguous or missing from the design doc
 - A new architectural decision is needed not covered by existing design docs
