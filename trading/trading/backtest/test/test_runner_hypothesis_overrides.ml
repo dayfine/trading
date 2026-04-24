@@ -1,6 +1,7 @@
-(** Tests for the perf workstream C1 hypothesis-toggle config fields:
+(** Tests for the perf workstream hypothesis-toggle config fields:
     [bar_history_max_lookback_days], [skip_ad_breadth], [skip_sector_etf_load],
-    and [universe_cap].
+    [universe_cap] (all C1, PR #528), and [full_compute_tail_days] (H2,
+    extending the C1 surface).
 
     These fields land in [Weinstein_strategy.config] together; their unifying
     contract is "default value = current behaviour, set via [--override]". Tests
@@ -21,7 +22,11 @@
     change observable strategy behaviour. The wiring lives in PR 3 of
     [dev/plans/bar-history-trim-2026-04-24.md]. The test here pins the no-op-now
     contract so a future change can flip the test in the same PR that flips the
-    runtime behaviour. *)
+    runtime behaviour.
+
+    [full_compute_tail_days] only affects the Tiered loader_strategy path
+    (Legacy doesn't use [Full_compute] at all). The Tiered smoke test uses the
+    parity fixture under [Loader_strategy.Tiered] to drive the new code path. *)
 
 open OUnit2
 open Core
@@ -107,6 +112,9 @@ let test_default_preserves_current_behaviour _ =
            (fun (c : Weinstein_strategy.config) -> c.skip_sector_etf_load)
            (equal_to false);
          field (fun (c : Weinstein_strategy.config) -> c.universe_cap) is_none;
+         field
+           (fun (c : Weinstein_strategy.config) -> c.full_compute_tail_days)
+           is_none;
        ])
 
 let test_override_bar_history_max_lookback_days _ =
@@ -207,6 +215,65 @@ let test_skip_sector_etf_load_runs_to_completion _ =
   in
   assert_that (List.length result.steps) (gt (module Int_ord) 0)
 
+(* -------------------------------------------------------------------- *)
+(* full_compute_tail_days (H2) — Tiered loader_strategy path             *)
+(* -------------------------------------------------------------------- *)
+
+(** Sexp round-trip: an override sexp parses [full_compute_tail_days = Some 50]
+    correctly so [--override '((full_compute_tail_days (50)))'] lands the value
+    into the running config. *)
+let test_override_full_compute_tail_days _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string "((full_compute_tail_days (50)))")
+  in
+  assert_that merged.full_compute_tail_days (is_some_and (equal_to 50))
+
+(** Run the parity scenario under the Tiered loader_strategy. Mirrors [_run] but
+    flips the strategy — the Tiered path is where [full_compute_tail_days]
+    actually has an effect, since it threads into [Bar_loader.create]'s
+    [?full_config] parameter. *)
+let _run_tiered (s : Scenario.t) ~overrides =
+  let sector_map_override = _sector_map_override s in
+  Backtest.Runner.run_backtest ~start_date:s.period.start_date
+    ~end_date:s.period.end_date ~overrides ?sector_map_override
+    ~loader_strategy:Loader_strategy.Tiered ()
+
+(** [full_compute_tail_days = None] (the default) must produce identical output
+    to a backtest with no override at all. Pins the parity invariant: the
+    override only kicks in when explicitly set, so existing parity tests + any
+    A/B baseline run with [None] is bit-identical to pre-change behaviour. *)
+let test_full_compute_tail_days_none_matches_no_override _ =
+  let s = _load_scenario () in
+  let baseline = _run_tiered s ~overrides:[] in
+  let with_none =
+    _run_tiered s ~overrides:[ Sexp.of_string "((full_compute_tail_days ()))" ]
+  in
+  assert_that with_none.summary
+    (all_of
+       [
+         field
+           (fun (sm : Backtest.Summary.t) -> sm.n_round_trips)
+           (equal_to baseline.summary.n_round_trips);
+         field
+           (fun (sm : Backtest.Summary.t) -> sm.final_portfolio_value)
+           (float_equal ~epsilon:0.01 baseline.summary.final_portfolio_value);
+       ])
+
+(** [full_compute_tail_days = Some 50] must run to completion under the Tiered
+    loader. We do NOT pin PV or trade count — this is degraded mode (capping
+    [Full_compute.tail_days] at 50 starves Bar_history of the ~250-day MA
+    history it needs, so the strategy is expected to make different decisions).
+    The contract this test pins is: the Tiered runner doesn't crash when the
+    override is set to an unusually small value. *)
+let test_full_compute_tail_days_50_runs_to_completion _ =
+  let s = _load_scenario () in
+  let result =
+    _run_tiered s
+      ~overrides:[ Sexp.of_string "((full_compute_tail_days (50)))" ]
+  in
+  assert_that (List.length result.steps) (gt (module Int_ord) 0)
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -230,6 +297,12 @@ let suite =
          >:: test_skip_ad_breadth_runs_to_completion;
          "skip_sector_etf_load = true runs to completion (degraded mode)"
          >:: test_skip_sector_etf_load_runs_to_completion;
+         "override: full_compute_tail_days round-trips through sexp"
+         >:: test_override_full_compute_tail_days;
+         "full_compute_tail_days = None matches no-override baseline (Tiered)"
+         >:: test_full_compute_tail_days_none_matches_no_override;
+         "full_compute_tail_days = Some 50 runs to completion (Tiered)"
+         >:: test_full_compute_tail_days_50_runs_to_completion;
        ]
 
 let () = run_test_tt_main suite

@@ -122,16 +122,34 @@ type config = {
           [None] (default) uses the full universe. Used for hypothesis tests
           like H5 (how does RSS scale with universe size?). NOT safe to flip on
           in production. *)
+  full_compute_tail_days : int option;
+      (** Hypothesis-testing field (perf workstream H2). When [Some n], the
+          Tiered loader's [Bar_loader.Full_compute.tail_days] is set to [n]
+          instead of the default. Caps the bar count retained per Full-tier
+          symbol. Lower values = less memory but possibly different strategy
+          behaviour, since [Stops_runner] / [Weinstein_stops] read bars from
+          [Bar_history], which is seeded from [Full.t.bars] on Full promotion.
+
+          [None] (default) uses [Full_compute.default_config.tail_days] (1800).
+          The Legacy [loader_strategy] does not use [Full_compute] at all, so
+          the override is a no-op on that path.
+
+          Hypothesis-testing only — like the other hypothesis toggles. Setting
+          this is expected to change strategy outputs at scale (PnL, trade
+          count). Use for A/B vs the [None] baseline only when measuring memory
+          attribution. NOT safe to flip on in production. See H2 in
+          [dev/plans/backtest-perf-2026-04-24.md]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
     backtesting.
 
-    The four hypothesis-testing fields ([bar_history_max_lookback_days],
-    [skip_ad_breadth], [skip_sector_etf_load], [universe_cap]) all default to
-    behaviour-preserving values. Setting any of them changes runner / strategy
-    behaviour and is intended for perf measurement A/Bs only — see the H-series
-    in [dev/plans/backtest-perf-2026-04-24.md]. *)
+    The five hypothesis-testing fields ([bar_history_max_lookback_days],
+    [skip_ad_breadth], [skip_sector_etf_load], [universe_cap],
+    [full_compute_tail_days]) all default to behaviour-preserving values.
+    Setting any of them changes runner / strategy behaviour and is intended for
+    perf measurement A/Bs only — see the H-series in
+    [dev/plans/backtest-perf-2026-04-24.md]. *)
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. The resulting config has
