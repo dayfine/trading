@@ -321,6 +321,51 @@ Build alongside existing `Bar_history` — don't modify it.
     on 292-symbol; the GHA verification on 7-symbol is insufficient
     coverage.
 
+  **RSS regression diagnosis: Bar_history is append-only, never
+  trimmed.** From `bar_history.mli`:
+
+  > `accumulate` ... pull today's bar via [get_price] and append it
+  > to the buffer — but only if the bar's date is strictly later than
+  > the last recorded bar.
+  >
+  > `daily_bars_for` ... Return the **full** accumulated daily bar
+  > history for [symbol] in chronological order ... Callers that need
+  > a bounded window should slice the result themselves.
+
+  `Bar_history` is `Daily_price.t list Hashtbl.M(String).t` — a
+  hashmap from symbol to **append-only** bar list. No max-age trim,
+  no rolling window, no LRU eviction, no `trim_before` function
+  exists. Over 6 years × 292 symbols × 1510 trading days × ~64 bytes
+  per `Daily_price.t`: roughly **30 MB minimum** at the OCaml-record
+  level, multiplied by GC overhead and Hashtbl slack to easily reach
+  hundreds of MB. Both Legacy and Tiered keep this state forever
+  within a run. Strategy readers (52-week RS line, 30-week MA, ATR)
+  only need ≤365 days of history; the older bars are dead weight.
+
+  **Why Tiered shows MORE RSS than Legacy** despite both having the
+  same Bar_history growth pattern: Tiered post-#519 carries TWO
+  parallel caches per Full-tier symbol —
+  `Bar_history` (1510 bars after 6 years, never trimmed) PLUS
+  `Full.t.bars` (bounded at `Full_compute.tail_days` ≈ 250 bars).
+  Per the design intent, `Full.t.bars` is the bounded cache, but
+  `Bar_history` was never converted to a windowed view; it's the
+  same monotonic append-only list Legacy uses. So Tiered pays for
+  Legacy's cache shape PLUS its own bounded one. End-of-run state
+  for the 292-symbol scenario per the Tiered log: `Metadata=5
+  Summary=0 Full=302 at end of simulator run` — 302 symbols ×
+  (1510 + 250) bars each.
+
+  **Suggested fix (sequenced, NOT in this doc PR — see
+  `dev/plans/bar-history-trim-2026-04-24.md`):** add
+  `Bar_history.trim_before : t -> as_of:Date.t ->
+  max_lookback_days:int -> unit` and call it once per backtest day
+  with `max_lookback_days` derived from the longest-window strategy
+  reader (52 weeks × 7 days = 364 days). With a 365-day window the
+  per-symbol Bar_history caps at ~365 daily bars vs current ~1510
+  after 6 years — a ~4× reduction independent of the Tiered flip.
+  Both Legacy and Tiered benefit. Plan + start tracked in
+  `dev/plans/bar-history-trim-2026-04-24.md`.
+
 - **Broad-universe goldens are testing on a 7-symbol fixture (2026-04-24).**
   `trading/test_data/sectors.csv` has 8 lines (~7 tickers); the broad
   scenarios under `trading/test_data/backtest_scenarios/goldens-broad/`
