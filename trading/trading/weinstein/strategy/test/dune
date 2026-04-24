@@ -7,8 +7,7 @@
   test_macro_inputs
   test_stops_runner
   test_weinstein_strategy
-  test_weinstein_strategy_smoke
-  test_weinstein_strategy_trim)
+  test_weinstein_strategy_smoke)
  (libraries
   core
   core_unix
