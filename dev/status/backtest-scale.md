@@ -258,6 +258,69 @@ Build alongside existing `Bar_history` — don't modify it.
   becomes its own track (suggest: `dev/status/backtest-perf.md` for
   CPU + memory continuous monitoring + AD/inventory profiling).
 
+  **Scoped re-run (2026-04-24, 292-symbol universe via filtered
+  `sectors.csv` at `/tmp/data-small-302`).** Both ran to completion
+  (no OOM at this scope). But two unexpected results:
+
+  | | Legacy | Tiered | Δ |
+  |---|---|---|---|
+  | Peak RSS | 1,871,240 KB (~1.87 GB) | **3,652,852 KB (~3.65 GB)** | **+95% more** |
+  | Final PV | $1,873,648.70 | $2,670,361.59 | **+$796,712.89** |
+  | Round trips | 608 | 613 | +5 |
+  | Total PnL | -$80,956.12 (losing) | +$184,640.50 (winning) | flipped sign |
+  | Sharpe | 0.66 | 0.92 | +0.26 |
+  | Max DD | 33.62% | 33.34% | -0.28pp |
+
+  (1) **RSS regression.** Tiered uses ~1.78 GB more than Legacy at
+  this scope — opposite of the design hypothesis. Tiered's `Bar_history`
+  grows to universe size monotonically (per #519's docstring trade-off),
+  AND the loader keeps `Full.t.bars` bounded by `Full_compute.tail_days`
+  per Full-tier symbol. With 302 symbols going to Full at end-of-run
+  (`Tiered loader: Metadata=5 Summary=0 Full=302 at end of simulator
+  run`), the duplicated `Bar_history` + `Full.t.bars` may explain the
+  delta. Worth attributing exactly.
+
+  (2) **PV diverges by $796,713 — a parity break.** #519 verified
+  $0.0000 PV delta on the GHA `tiered-loader-ab` 7-symbol fixture and
+  on the goldens-broad scenarios; the agent's report explicitly noted
+  "302-symbol small-universe verification was not run as a separate
+  test". This run is the first 302-symbol verification post-#519 and
+  it's NOT bit-identical. Possible causes:
+  - Real Tiered bug at 292-symbol scale that the 7-symbol fixture
+    didn't expose (the seed-timing fix in #519 may have a different
+    boundary than tested);
+  - Synthesized data dir at `/tmp/data-small-302` may be missing
+    supporting fixtures (the symlink loop only linked top-level
+    `*.csv` files; ad_breadth subdirs / sector_etf paths might
+    resolve differently between Legacy and Tiered);
+  - Universe membership artifact: filtered sectors.csv has 292
+    symbols (9 of small.sexp's 302 weren't in the full sector map),
+    which may exercise different code paths.
+  
+  Repro: build `/tmp/data-small-302` per the synthesis script in this
+  doc's git history (filter `data/sectors.csv` to symbols in
+  `universes/small.sexp`, symlink per-letter dirs); then
+  ```
+  TRADING_DATA_DIR=/tmp/data-small-302 \
+    /usr/bin/time -o legacy.rss -f '%M' \
+    dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
+    2015-01-02 2020-12-31 --loader-strategy legacy
+  TRADING_DATA_DIR=/tmp/data-small-302 \
+    /usr/bin/time -o tiered.rss -f '%M' \
+    dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
+    2015-01-02 2020-12-31 --loader-strategy tiered
+  ```
+  
+  **Action required before flipping `loader_strategy` default:**
+  diagnose the 292-symbol PV divergence. Either:
+  - It's a fixture artifact (synthesized data dir is incomplete) →
+    rebuild a complete fixture and re-test; if still bit-identical,
+    Tiered flip is fine.
+  - It's a real Tiered bug → fix before flipping. The gate stated at
+    the top of this doc ("PV drift inside warn threshold") is broken
+    on 292-symbol; the GHA verification on 7-symbol is insufficient
+    coverage.
+
 - **Broad-universe goldens are testing on a 7-symbol fixture (2026-04-24).**
   `trading/test_data/sectors.csv` has 8 lines (~7 tickers); the broad
   scenarios under `trading/test_data/backtest_scenarios/goldens-broad/`
