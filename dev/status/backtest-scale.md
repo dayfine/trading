@@ -139,6 +139,13 @@ All three tier getters return their proper typed option: `get_metadata : Metadat
 - This doc PR (#521) — narrative update reflecting #519's actual root
   cause; supersedes the speculative seed-timing hypothesis that PR
   #518 had landed in the docs while #519 was being investigated.
+- **PR #525** — `feat(weinstein/strategy): add Bar_history.trim_before
+  primitive (no callers)`. PR 1 of the multi-PR sequence in
+  `dev/plans/bar-history-trim-2026-04-24.md`. Adds the pure-dead-code
+  primitive `Bar_history.trim_before` plus 6 unit tests. No callers
+  wired. Foundation for the RSS-regression fix tracked in § Follow-up;
+  PR 3 wires it into the strategy behind a config flag, PR 4 measures
+  the savings, PR 5 flips the default.
 
 ## Blocked on
 - **Final flip (`loader_strategy` default Legacy→Tiered)** — gate
