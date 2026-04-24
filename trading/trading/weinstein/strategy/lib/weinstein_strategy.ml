@@ -272,43 +272,17 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~sector_map ~stop_states ~portfolio ~get_price ~bar_history ~prior_stages
     ~current_date
 
-(* See dev/plans/bar-history-trim-2026-04-24.md PR 3 (this wiring) and
-   dev/notes/bar-history-readers-2026-04-24.md (audit). *)
-
-(** Apply [config.bar_history_max_lookback_days] to [bar_history], if set.
-    Called after [accumulate] (so today's bar is retained) and before any reader
-    (so they observe the trimmed state). [None] is a no-op — preserves the
-    pre-trim, append-only behaviour bit-for-bit. With [Some n], drops bars whose
-    date is older than [trim_as_of - n] for every symbol; idempotent across
-    replayed days, so the simulator's per-day cadence is safe.
-
-    [trim_as_of] must be the simulated date — never [Date.today] — otherwise on
-    sim days where the primary index lacks a bar (weekend / holiday / missing
-    data), trimming with the real-world date would drop every historical bar.
-    [None] for [trim_as_of] therefore skips the trim on those days; the next
-    valid sim day picks up the work, which is fine because [trim_before] is
-    idempotent. *)
-let _maybe_trim_bar_history ~(config : config) ~bar_history ~trim_as_of =
-  match (config.bar_history_max_lookback_days, trim_as_of) with
-  | None, _ | _, None -> ()
-  | Some max_lookback_days, Some as_of ->
-      Bar_history.trim_before bar_history ~as_of ~max_lookback_days
-
 let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
     ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let all_symbols = _all_accumulated_symbols ~config in
   Bar_history.accumulate bar_history ~get_price ~symbols:all_symbols;
-  let primary_index_bar = get_price config.indices.primary in
   let current_date =
-    match primary_index_bar with
+    match get_price config.indices.primary with
     | Some bar -> bar.Types.Daily_price.date
     | None -> Date.today ~zone:Time_float.Zone.utc
   in
-  _maybe_trim_bar_history ~config ~bar_history
-    ~trim_as_of:
-      (Option.map primary_index_bar ~f:(fun b -> b.Types.Daily_price.date));
   let exit_transitions, adjust_transitions =
     Stops_runner.update ~stops_config:config.stops_config
       ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
