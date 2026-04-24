@@ -258,6 +258,114 @@ Build alongside existing `Bar_history` — don't modify it.
   becomes its own track (suggest: `dev/status/backtest-perf.md` for
   CPU + memory continuous monitoring + AD/inventory profiling).
 
+  **Scoped re-run (2026-04-24, 292-symbol universe via filtered
+  `sectors.csv` at `/tmp/data-small-302`).** Both ran to completion
+  (no OOM at this scope). But two unexpected results:
+
+  | | Legacy | Tiered | Δ |
+  |---|---|---|---|
+  | Peak RSS | 1,871,240 KB (~1.87 GB) | **3,652,852 KB (~3.65 GB)** | **+95% more** |
+  | Final PV | $1,873,648.70 | $2,670,361.59 | **+$796,712.89** |
+  | Round trips | 608 | 613 | +5 |
+  | Total PnL | -$80,956.12 (losing) | +$184,640.50 (winning) | flipped sign |
+  | Sharpe | 0.66 | 0.92 | +0.26 |
+  | Max DD | 33.62% | 33.34% | -0.28pp |
+
+  (1) **RSS regression.** Tiered uses ~1.78 GB more than Legacy at
+  this scope — opposite of the design hypothesis. Tiered's `Bar_history`
+  grows to universe size monotonically (per #519's docstring trade-off),
+  AND the loader keeps `Full.t.bars` bounded by `Full_compute.tail_days`
+  per Full-tier symbol. With 302 symbols going to Full at end-of-run
+  (`Tiered loader: Metadata=5 Summary=0 Full=302 at end of simulator
+  run`), the duplicated `Bar_history` + `Full.t.bars` may explain the
+  delta. Worth attributing exactly.
+
+  (2) **PV diverges by $796,713 — a parity break.** #519 verified
+  $0.0000 PV delta on the GHA `tiered-loader-ab` 7-symbol fixture and
+  on the goldens-broad scenarios; the agent's report explicitly noted
+  "302-symbol small-universe verification was not run as a separate
+  test". This run is the first 302-symbol verification post-#519 and
+  it's NOT bit-identical. Possible causes:
+  - Real Tiered bug at 292-symbol scale that the 7-symbol fixture
+    didn't expose (the seed-timing fix in #519 may have a different
+    boundary than tested);
+  - Synthesized data dir at `/tmp/data-small-302` may be missing
+    supporting fixtures (the symlink loop only linked top-level
+    `*.csv` files; ad_breadth subdirs / sector_etf paths might
+    resolve differently between Legacy and Tiered);
+  - Universe membership artifact: filtered sectors.csv has 292
+    symbols (9 of small.sexp's 302 weren't in the full sector map),
+    which may exercise different code paths.
+  
+  Repro: build `/tmp/data-small-302` per the synthesis script in this
+  doc's git history (filter `data/sectors.csv` to symbols in
+  `universes/small.sexp`, symlink per-letter dirs); then
+  ```
+  TRADING_DATA_DIR=/tmp/data-small-302 \
+    /usr/bin/time -o legacy.rss -f '%M' \
+    dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
+    2015-01-02 2020-12-31 --loader-strategy legacy
+  TRADING_DATA_DIR=/tmp/data-small-302 \
+    /usr/bin/time -o tiered.rss -f '%M' \
+    dune exec --no-build -- trading/backtest/bin/backtest_runner.exe \
+    2015-01-02 2020-12-31 --loader-strategy tiered
+  ```
+  
+  **Action required before flipping `loader_strategy` default:**
+  diagnose the 292-symbol PV divergence. Either:
+  - It's a fixture artifact (synthesized data dir is incomplete) →
+    rebuild a complete fixture and re-test; if still bit-identical,
+    Tiered flip is fine.
+  - It's a real Tiered bug → fix before flipping. The gate stated at
+    the top of this doc ("PV drift inside warn threshold") is broken
+    on 292-symbol; the GHA verification on 7-symbol is insufficient
+    coverage.
+
+  **RSS regression diagnosis: Bar_history is append-only, never
+  trimmed.** From `bar_history.mli`:
+
+  > `accumulate` ... pull today's bar via [get_price] and append it
+  > to the buffer — but only if the bar's date is strictly later than
+  > the last recorded bar.
+  >
+  > `daily_bars_for` ... Return the **full** accumulated daily bar
+  > history for [symbol] in chronological order ... Callers that need
+  > a bounded window should slice the result themselves.
+
+  `Bar_history` is `Daily_price.t list Hashtbl.M(String).t` — a
+  hashmap from symbol to **append-only** bar list. No max-age trim,
+  no rolling window, no LRU eviction, no `trim_before` function
+  exists. Over 6 years × 292 symbols × 1510 trading days × ~64 bytes
+  per `Daily_price.t`: roughly **30 MB minimum** at the OCaml-record
+  level, multiplied by GC overhead and Hashtbl slack to easily reach
+  hundreds of MB. Both Legacy and Tiered keep this state forever
+  within a run. Strategy readers (52-week RS line, 30-week MA, ATR)
+  only need ≤365 days of history; the older bars are dead weight.
+
+  **Why Tiered shows MORE RSS than Legacy** despite both having the
+  same Bar_history growth pattern: Tiered post-#519 carries TWO
+  parallel caches per Full-tier symbol —
+  `Bar_history` (1510 bars after 6 years, never trimmed) PLUS
+  `Full.t.bars` (bounded at `Full_compute.tail_days` ≈ 250 bars).
+  Per the design intent, `Full.t.bars` is the bounded cache, but
+  `Bar_history` was never converted to a windowed view; it's the
+  same monotonic append-only list Legacy uses. So Tiered pays for
+  Legacy's cache shape PLUS its own bounded one. End-of-run state
+  for the 292-symbol scenario per the Tiered log: `Metadata=5
+  Summary=0 Full=302 at end of simulator run` — 302 symbols ×
+  (1510 + 250) bars each.
+
+  **Suggested fix (sequenced, NOT in this doc PR — see
+  `dev/plans/bar-history-trim-2026-04-24.md`):** add
+  `Bar_history.trim_before : t -> as_of:Date.t ->
+  max_lookback_days:int -> unit` and call it once per backtest day
+  with `max_lookback_days` derived from the longest-window strategy
+  reader (52 weeks × 7 days = 364 days). With a 365-day window the
+  per-symbol Bar_history caps at ~365 daily bars vs current ~1510
+  after 6 years — a ~4× reduction independent of the Tiered flip.
+  Both Legacy and Tiered benefit. Plan + start tracked in
+  `dev/plans/bar-history-trim-2026-04-24.md`.
+
 - **Broad-universe goldens are testing on a 7-symbol fixture (2026-04-24).**
   `trading/test_data/sectors.csv` has 8 lines (~7 tickers); the broad
   scenarios under `trading/test_data/backtest_scenarios/goldens-broad/`
