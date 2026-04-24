@@ -60,15 +60,20 @@ let _sector_map_override (s : Scenario.t) =
 (* Run both strategies                                                   *)
 (* -------------------------------------------------------------------- *)
 
-(** Run the scenario under the given [loader_strategy]. Assert [Ok] loudly — any
-    [Failure] raised by the Tiered path means 3f-part3b's simulator-cycle is
-    incomplete for this scenario shape, which is a real bug and not a parity
-    concern. *)
-let _run (s : Scenario.t) ~loader_strategy =
+(** Run the scenario under the given [loader_strategy], optionally appending
+    [extra_overrides] to the scenario's own [config_overrides]. The Legacy/
+    Tiered parity contract holds for any override set — extras are how the same
+    parity assertions are reused under
+    [bar_history_max_lookback_days = Some 365] (PR 3 of the trim plan). Assert
+    [Ok] loudly — any [Failure] raised by the Tiered path means 3f-part3b's
+    simulator-cycle is incomplete for this scenario shape, which is a real bug
+    and not a parity concern. *)
+let _run (s : Scenario.t) ~loader_strategy ?(extra_overrides = []) () =
   let sector_map_override = _sector_map_override s in
   try
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
-      ~end_date:s.period.end_date ~overrides:s.config_overrides
+      ~end_date:s.period.end_date
+      ~overrides:(s.config_overrides @ extra_overrides)
       ?sector_map_override ~loader_strategy ()
   with e ->
     OUnit2.assert_failure
@@ -171,20 +176,43 @@ let _assert_metrics_in_range ~label (r : Backtest.Runner.result)
 
 let test_legacy_runs_ok _ =
   let s = _load_scenario () in
-  let legacy = _run s ~loader_strategy:Loader_strategy.Legacy in
+  let legacy = _run s ~loader_strategy:Loader_strategy.Legacy () in
   (* Non-empty steps is the minimum bar — a zero-step run means we loaded no
      data at all and every parity diff below is meaningless. *)
   assert_that (List.length legacy.steps) (gt (module Int_ord) 0)
 
 let test_tiered_runs_ok _ =
   let s = _load_scenario () in
-  let tiered = _run s ~loader_strategy:Loader_strategy.Tiered in
+  let tiered = _run s ~loader_strategy:Loader_strategy.Tiered () in
   assert_that (List.length tiered.steps) (gt (module Int_ord) 0)
 
 let test_parity_legacy_vs_tiered _ =
   let s = _load_scenario () in
-  let legacy = _run s ~loader_strategy:Loader_strategy.Legacy in
-  let tiered = _run s ~loader_strategy:Loader_strategy.Tiered in
+  let legacy = _run s ~loader_strategy:Loader_strategy.Legacy () in
+  let tiered = _run s ~loader_strategy:Loader_strategy.Tiered () in
+  _assert_trade_count_match ~legacy ~tiered;
+  _assert_final_value_match ~legacy ~tiered;
+  _assert_step_samples_match ~legacy ~tiered;
+  _assert_metrics_in_range ~label:"legacy" legacy s.expected;
+  _assert_metrics_in_range ~label:"tiered" tiered s.expected
+
+(** Parity with the trim wired ON ([bar_history_max_lookback_days = Some 365]).
+    Same merge-gate guarantees as [test_parity_legacy_vs_tiered] — Legacy and
+    Tiered must produce identical trade counts, equity curve samples, and final
+    portfolio value — but with the rolling-window trim applied each strategy
+    day. PR 3 of [dev/plans/bar-history-trim-2026-04-24.md] requires this to
+    pass before the trim default can flip in PR 5. *)
+let test_parity_legacy_vs_tiered_with_trim _ =
+  let s = _load_scenario () in
+  let extra_overrides =
+    [ Sexp.of_string "((bar_history_max_lookback_days (365)))" ]
+  in
+  let legacy =
+    _run s ~loader_strategy:Loader_strategy.Legacy ~extra_overrides ()
+  in
+  let tiered =
+    _run s ~loader_strategy:Loader_strategy.Tiered ~extra_overrides ()
+  in
   _assert_trade_count_match ~legacy ~tiered;
   _assert_final_value_match ~legacy ~tiered;
   _assert_step_samples_match ~legacy ~tiered;
@@ -198,6 +226,8 @@ let suite =
          "tiered path runs successfully" >:: test_tiered_runs_ok;
          "legacy vs tiered: trades + final value + step samples + metrics"
          >:: test_parity_legacy_vs_tiered;
+         "legacy vs tiered with bar_history_max_lookback_days = Some 365"
+         >:: test_parity_legacy_vs_tiered_with_trim;
        ]
 
 let () = run_test_tt_main suite
