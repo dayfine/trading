@@ -46,6 +46,15 @@ module Phase : sig
             emitted per [demote] call regardless of the target tier — the
             target-tier dimension is carried in logs/scenario metadata, not in
             the phase tag. *)
+    | Promote_metadata
+        (** A bulk Metadata-tier promote of the universe at the start of a
+            Tiered backtest. One record per
+            [Tiered_runner.promote_universe_metadata] call (typically once per
+            backtest). [symbols_in] is the universe size; per-symbol
+            Metadata-promote calls fire {e inside} this wrap but do not
+            themselves emit trace records — only this bulk wrap does. So this
+            single record is the canonical observable for the Metadata-promote
+            phase, not a per-symbol breakdown. *)
   [@@deriving show, eq, sexp]
 end
 

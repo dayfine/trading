@@ -9,10 +9,10 @@
 
     1. Build a [Bar_loader] over the runner-provided universe with a
     [trace_hook] that bridges [Bar_loader.tier_op] onto [Trace.Phase.t]. 2.
-    Bulk-promote the universe to [Metadata_tier] under a [Load_bars] wrap. 3.
-    Drive the simulator with a [Tiered_strategy_wrapper]-wrapped Weinstein
-    strategy. The wrapper adds Friday Summary-promote + Shadow_screener +
-    Full-promote-top-N, per-[CreateEntering] Full promote, and
+    Bulk-promote the universe to [Metadata_tier] under a [Promote_metadata]
+    trace wrap. 3. Drive the simulator with a [Tiered_strategy_wrapper]-wrapped
+    Weinstein strategy. The wrapper adds Friday Summary-promote +
+    Shadow_screener + Full-promote-top-N, per-[CreateEntering] Full promote, and
     per-newly-[Closed] Metadata demote.
 
     The simulator transitions are byte-identical to the Legacy path — the
@@ -38,7 +38,7 @@ val tier_op_to_phase : Bar_loader.tier_op -> Trace.Phase.t
     private helpers. Pure — depends only on the input variant. *)
 
 val promote_universe_metadata :
-  Bar_loader.t -> input -> as_of:Core.Date.t -> unit
+  ?trace:Trace.t -> Bar_loader.t -> input -> as_of:Core.Date.t -> unit
 (** Bulk-promote [input.all_symbols] to [Metadata_tier], tolerating per-symbol
     load failures so that a universe entry whose [data.csv] is absent does not
     abort the Tiered run. This matches the Legacy path's silent missing-CSV
@@ -51,6 +51,13 @@ val promote_universe_metadata :
     [Metadata_tier]; failed symbols are absent from the loader entirely (per
     [Bar_loader.promote]'s contract — see the [val promote] docstring in
     [bar_loader.mli]).
+
+    When [?trace] is supplied the bulk phase is recorded as a single
+    [Trace.Phase.Promote_metadata] entry with [symbols_in] = universe size.
+    Per-symbol promotes inside the wrap do {e not} emit individual trace records
+    — the [Bar_loader] tier-op trace hook fires only for Summary / Full /
+    Demote, so this bulk wrap is the canonical observable for Metadata-promote
+    cost.
 
     Exposed so a regression test can pin the "single missing CSV does not raise"
     contract without spinning up a full simulator. *)
@@ -71,8 +78,8 @@ val run :
 
     Internally:
     - Builds a [Bar_loader] with a trace_hook bridging [tier_op] → phase.
-    - Bulk-promotes [input.all_symbols] to Metadata under a [Load_bars] trace
-      wrap.
+    - Bulk-promotes [input.all_symbols] to Metadata under a [Promote_metadata]
+      trace wrap (see {!promote_universe_metadata}).
     - Constructs a Weinstein strategy wrapped by [Tiered_strategy_wrapper] and
       runs [Simulator.run] under a [Fill] trace wrap.
 

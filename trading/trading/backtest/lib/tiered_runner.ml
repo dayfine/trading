@@ -91,20 +91,27 @@ let _log_metadata_failures failures ~n_total =
     symbol.
 
     Implementation: iterate per-symbol with single-symbol [promote] calls so we
-    can collect {e every} failure rather than stopping at the first. The
-    Metadata tier does not fire the trace hook (see the [promote] match arm for
-    [Metadata_tier] in [bar_loader.ml]), so per-symbol batching is
-    observationally equivalent to the batch call at the tier / trace layer.
+    can collect {e every} failure rather than stopping at the first. Per-symbol
+    Metadata promotes do not fire the [Bar_loader] trace hook (see the [promote]
+    match arm for [Metadata_tier] in [bar_loader.ml]), so the per-symbol detail
+    is invisible at the tier-op layer. The bulk phase as a whole is, however,
+    traced here as [Trace.Phase.Promote_metadata] when [?trace] is supplied —
+    that single record is the canonical observable for Metadata-promote elapsed
+    time + peak RSS.
 
     Never raises on per-symbol failure. Never raises if every symbol fails, e.g.
     a misconfigured [data_dir] — the symmetry with Legacy (which would simply
     produce an empty backtest in that case) is the whole point. Callers can
     still observe the tier counts via [Bar_loader.stats] after return. *)
-let promote_universe_metadata loader (input : input) ~as_of =
-  let failures =
-    List.filter_map input.all_symbols ~f:(_promote_one_metadata loader ~as_of)
-  in
-  _log_metadata_failures failures ~n_total:(List.length input.all_symbols)
+let promote_universe_metadata ?trace loader (input : input) ~as_of =
+  let n_total = List.length input.all_symbols in
+  Trace.record ?trace ~symbols_in:n_total Trace.Phase.Promote_metadata
+    (fun () ->
+      let failures =
+        List.filter_map input.all_symbols
+          ~f:(_promote_one_metadata loader ~as_of)
+      in
+      _log_metadata_failures failures ~n_total)
 
 (** [_always_loaded_symbols config] — the symbols whose [get_price] is passed
     through unconditionally by the Tiered wrapper's throttle: the primary index
@@ -182,9 +189,7 @@ let run ~input ~start_date ~end_date ~warmup_days ~initial_cash ~commission
   let loader = _create_bar_loader input ?trace () in
   let as_of = end_date in
   let n_all_symbols = List.length input.all_symbols in
-  Trace.record ?trace ~symbols_in:n_all_symbols ~symbols_out:n_all_symbols
-    Trace.Phase.Load_bars (fun () ->
-      promote_universe_metadata loader input ~as_of);
+  promote_universe_metadata ?trace loader input ~as_of;
   let stats = Bar_loader.stats loader in
   eprintf
     "Tiered loader: Metadata=%d Summary=%d Full=%d after bulk Metadata promote\n\

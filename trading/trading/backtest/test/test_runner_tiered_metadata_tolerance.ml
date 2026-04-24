@@ -143,6 +143,58 @@ let test_all_present_promotes_all _ =
   assert_that stats.summary (equal_to 0);
   assert_that stats.full (equal_to 0)
 
+(** When a [Trace.t] is attached, [promote_universe_metadata] emits exactly one
+    [Promote_metadata] record with [symbols_in] = universe size. Pins the trace
+    bridging added in workstream B1 of [dev/plans/backtest-perf-2026-04-24.md]:
+    before this PR the bulk Metadata-promote phase was unobservable in traces
+    (was implicitly under [Load_bars] at the runner level), and a 10K-symbol OOM
+    inside this function therefore left no smoking-gun phase record. *)
+let test_attached_trace_records_promote_metadata_phase _ =
+  let tmp_dir = Filename_unix.temp_dir "tiered_metadata_tolerance_" "" in
+  let data_dir = Fpath.v tmp_dir in
+  _write_symbol ~data_dir ~symbol:"AAA";
+  _write_symbol ~data_dir ~symbol:"BBB";
+  let all_symbols = [ "AAA"; "BBB"; "MISSING" ] in
+  let loader = _make_loader ~data_dir ~all_symbols in
+  let input = _make_input ~data_dir ~all_symbols in
+  let trace = Backtest.Trace.create () in
+  Backtest.Tiered_runner.promote_universe_metadata ~trace loader input
+    ~as_of:_as_of;
+  assert_that
+    (Backtest.Trace.snapshot trace)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (m : Backtest.Trace.phase_metrics) -> m.phase)
+               (equal_to Backtest.Trace.Phase.Promote_metadata);
+             field
+               (fun (m : Backtest.Trace.phase_metrics) -> m.symbols_in)
+               (equal_to (Some 3));
+             field
+               (fun (m : Backtest.Trace.phase_metrics) -> m.elapsed_ms)
+               (ge (module Int_ord) 0);
+           ];
+       ])
+
+(** Without a [Trace.t] attached, behaviour is unchanged and no record is
+    emitted on a sibling collector. Guards against accidentally making the trace
+    required. *)
+let test_no_trace_attached_is_passthrough _ =
+  let tmp_dir = Filename_unix.temp_dir "tiered_metadata_tolerance_" "" in
+  let data_dir = Fpath.v tmp_dir in
+  _write_symbol ~data_dir ~symbol:"AAA";
+  let all_symbols = [ "AAA" ] in
+  let loader = _make_loader ~data_dir ~all_symbols in
+  let input = _make_input ~data_dir ~all_symbols in
+  let sibling_trace = Backtest.Trace.create () in
+  (* Call WITHOUT ?trace. The sibling collector must remain empty. *)
+  Backtest.Tiered_runner.promote_universe_metadata loader input ~as_of:_as_of;
+  assert_that (Backtest.Trace.snapshot sibling_trace) (size_is 0);
+  let stats = Bar_loader.stats loader in
+  assert_that stats.metadata (equal_to 1)
+
 let suite =
   "Runner_tiered_metadata_tolerance"
   >::: [
@@ -153,6 +205,10 @@ let suite =
          >:: test_all_missing_does_not_raise;
          "all present: promotes all symbols to Metadata"
          >:: test_all_present_promotes_all;
+         "attached trace records one Promote_metadata phase"
+         >:: test_attached_trace_records_promote_metadata_phase;
+         "omitted trace is passthrough"
+         >:: test_no_trace_attached_is_passthrough;
        ]
 
 let () = run_test_tt_main suite
