@@ -286,21 +286,43 @@ let _write_full_entry t ~symbol (values : Full_compute.full_values) =
       }
 
 (** [_promote_one_to_full] auto-promotes through Summary first (which itself
-    cascades through Metadata). If the Summary promote leaves the symbol below
-    Summary tier (insufficient history), Full promotion is skipped — the symbol
-    stays at whatever lower tier it reached. Otherwise we load the full OHLCV
-    tail and retain the raw bars on the entry. *)
+    cascades through Metadata).
+
+    Summary scalar resolution is best-effort: a symbol whose history is too
+    short to resolve [ma_30w] / [rs_line] / [stage] stays at Metadata after the
+    Summary attempt — but we still proceed to load the Full OHLCV tail and write
+    a Full entry. The resulting Full-tier entry has [summary = None]; consumers
+    that want indicator scalars must check [get_summary] for [Some _].
+
+    Rationale: the Tiered backtest pipeline gates [Bar_history] population on
+    Full-tier promotion (see [Tiered_strategy_wrapper._throttled_get_price]). If
+    we required Summary scalars before allowing Full, then a small-fixture
+    backtest with insufficient warmup would leave [Bar_history] permanently
+    empty — even though the strategy can perfectly well screen with the
+    available bars (the strategy has its own per-indicator None handling). This
+    was the actual root cause of the residual bull-crash A/B parity gap: on the
+    small CI fixture (CSV starts well after the simulator's warmup start),
+    Summary required [rs_ma_period] weekly bars before any universe symbol could
+    reach Full. Tiered ran with empty [Bar_history] until the Summary RS window
+    resolved, while Legacy's [Bar_history.accumulate] (which has no
+    minimum-history requirement) populated history day-by-day from
+    [warmup_start]. Result: Tiered missed every entry between the simulator's
+    [start_date] and the first day Summary resolved — observed as a multi-
+    trade, ~five-figure portfolio-value drift on the bull-crash scenario.
+
+    The minimal load requirement for Full is [Metadata succeeded] +
+    [_load_bars_tail returned at least one bar]. Both are checks the
+    Metadata-cascade and the [Csv.Csv_storage.get] return path already enforce —
+    no extra gate here. *)
 let _promote_one_to_full t ~symbol ~as_of : (unit, Status.t) Result.t =
   if _already_at_or_above t ~symbol Full_tier then Ok ()
   else
     let%bind.Result () = _promote_one_to_summary t ~symbol ~as_of in
-    if not (_already_at_or_above t ~symbol Summary_tier) then Ok ()
-    else
-      let%map.Result bars =
-        _load_bars_tail t ~symbol ~as_of ~tail_days:t.full_config.tail_days
-      in
-      Full_compute.compute_values ~bars
-      |> Option.iter ~f:(fun values -> _write_full_entry t ~symbol values)
+    let%map.Result bars =
+      _load_bars_tail t ~symbol ~as_of ~tail_days:t.full_config.tail_days
+    in
+    Full_compute.compute_values ~bars
+    |> Option.iter ~f:(fun values -> _write_full_entry t ~symbol values)
 
 let _promote_fold ~f symbols =
   List.fold_until symbols ~init:()

@@ -43,30 +43,6 @@ let _current_date ~(get_price : Strategy_interface.get_price_fn) ~primary_index
   | Some bar -> bar.Types.Daily_price.date
   | None -> Date.today ~zone:Time_float.Zone.utc
 
-(** [_summary_values_of s] projects a [Bar_loader.Summary.t] onto the
-    [summary_values] record the [Shadow_screener] consumes. Separated out so
-    [_summaries_for] stays a flat filter_map over the loader state. *)
-let _summary_values_of (s : Bar_loader.Summary.t) :
-    Bar_loader.Summary_compute.summary_values =
-  {
-    ma_30w = s.ma_30w;
-    atr_14 = s.atr_14;
-    rs_line = s.rs_line;
-    stage = s.stage;
-    as_of = s.as_of;
-  }
-
-(** [_summaries_for t ~universe] extracts [(symbol, summary_values)] pairs for
-    every symbol in [universe] that the loader has at Summary tier or higher.
-    Symbols at Metadata tier (insufficient history for the tail window) or
-    absent from the loader are silently dropped — the [Shadow_screener] only
-    wants the ones it can actually score. *)
-let _summaries_for (bar_loader : Bar_loader.t) ~universe :
-    (string * Bar_loader.Summary_compute.summary_values) list =
-  List.filter_map universe ~f:(fun symbol ->
-      Bar_loader.get_summary bar_loader ~symbol
-      |> Option.map ~f:(fun s -> (symbol, _summary_values_of s)))
-
 (** [_swallow_err ~ctx result] logs a promote failure to stderr and returns
     unit. A single symbol's load failure must not abort the backtest — the
     loader contract says failed symbols are simply absent from [entries]. *)
@@ -134,69 +110,62 @@ let _seed_from_full t ~symbols =
   let cutoff = t.seed_warmup_start in
   List.iter symbols ~f:(_seed_one_symbol t ~cutoff)
 
-(** [_promote_summary_to_full] promotes every Summary-tier symbol in [summaries]
-    to Full tier and seeds [bar_history] with each symbol's [Full.t.bars].
-    Idempotent for symbols already at Full.
+(** [_promote_universe_to_full] promotes every universe symbol in [symbols] to
+    Full tier and seeds [bar_history] with each symbol's [Full.t.bars].
+    Idempotent for symbols already at Full; per-symbol failures (missing CSV)
+    are logged + swallowed via [_promote_each_to].
 
-    Rationale (revised in the bull-crash A/B parity fix): the earlier design
-    routed promotions through [Shadow_screener.screen] and capped at
-    [full_candidate_limit] (matching the screener's
-    [max_buy_candidates + max_short_candidates] default). That filtered the
-    candidate pool the inner Weinstein screener saw, because inner's
-    [_screen_universe] only analyzes symbols with bars in [Bar_history], and
-    [Bar_history] only grows for Full-tier (and always-loaded) symbols. With
-    fewer candidates than Legacy, inner picked DIFFERENT trades — observed as a
-    portfolio-value drift on bull-crash broad goldens (above the warn threshold)
-    and a multi-fold trade-count divergence on the small-universe variant.
+    Promotes directly to Full rather than gating on Summary. The underlying
+    [Bar_loader._promote_one_to_full] treats Summary scalar resolution as
+    best-effort — Full promotion succeeds as long as the CSV has at least one
+    bar (which implies Metadata succeeded). [Bar_history] gets seeded with
+    whatever bars the loader has, matching Legacy's "use whatever bars
+    [accumulate] has at this point" invariant. The strategy's per-indicator math
+    (Stage classifier, Stock_analysis) already handles short-history inputs by
+    returning [None] / skipping the symbol — which is the same behaviour Legacy
+    exhibits.
 
-    Solution: promote every Summary-tier symbol to Full so inner sees the same
-    candidate pool Legacy would have seen via [Bar_history.accumulate] over the
-    warmup window. Inner then re-screens with full [Stock_analysis] (real volume
-    / RS / resistance) and ranks via the standard [Screener] cascade, producing
-    Legacy-equivalent picks.
-
-    Memory cost: [Bar_history] grows monotonically to the Summary-tier count
-    over the simulation (typically a fraction of universe — symbols need
-    [Summary_compute.tail_days] of history to reach Summary, so newcomers join
-    over time). For the broad-universe goldens this stays well below the full
-    universe size, retaining most of the Tiered memory win on days when
-    [Summary] hasn't yet warmed up to the full universe. The [Full.t.bars] cache
-    stays bounded by [Full_compute.tail_days], independent of Bar_history. *)
-let _promote_summary_to_full t ~summaries ~as_of =
-  let symbols = List.map summaries ~f:fst in
+    Memory cost: [Bar_history] grows monotonically to the universe size over the
+    simulation (one entry per symbol that has had a successful Metadata promote
+    at least once). The [Full.t.bars] cache stays bounded by
+    [Full_compute.tail_days], independent of [Bar_history]. *)
+let _promote_universe_to_full t ~symbols ~as_of =
   if not (List.is_empty symbols) then (
     _promote_each_to t ~symbols ~to_:Full_tier ~as_of
-      ~ctx:"promote Summary to Full";
+      ~ctx:"promote universe to Full";
     _seed_from_full t ~symbols)
 
-(** [_run_friday_cycle] is the Summary-promote → Full-promote-all-Summary
-    pipeline. Called once per Friday via the wrapper's [on_market_close],
-    {b before} delegating to the inner strategy so the Full-tier bars + seeded
-    [bar_history] are visible to the inner screener's [_screen_universe] on the
-    same day.
+(** [_run_friday_cycle] promotes every universe symbol to Full and seeds
+    [bar_history] from each symbol's [Full.t.bars]. Called once per Friday via
+    the wrapper's [on_market_close], {b before} delegating to the inner strategy
+    so the Full-tier bars + seeded [bar_history] are visible to the inner
+    screener's [_screen_universe] on the same day.
 
-    Note: an earlier version of this function ran [Shadow_screener.screen] and
-    only Full-promoted shadow's top-N picks, capped at [full_candidate_limit].
-    That caused parity divergence when shadow's filter was stricter than
-    Legacy's (shadow's RS gate rejects rs_line below the Mansfield zero line
-    even for improving stocks Legacy admits) or when shadow's score ranking
-    missed candidates Legacy would rank higher (shadow has no resistance bonus,
-    no volume bonus granularity, no RS crossover bonus). Now we promote ALL
-    Summary-tier symbols and let inner's screener re-rank with full data. The
-    per-Friday wrapper no longer needs prior-stage tracking — inner's own
-    [prior_stages] handles it once Bar_history is populated. *)
+    Parity-fix history (most recent first):
+
+    - {b Pass 3 (this fix)}: drop the intermediate Summary promote pass and
+      promote universe symbols straight to Full.
+      [Bar_loader.promote ~to_:Full_tier] auto-cascades through Metadata →
+      Summary → Full and (after the loader change paired with this fix) treats
+      Summary scalar resolution as best-effort. The wrapper now drives Full
+      directly and lets the loader's cascade handle the rest. Closes the
+      bull-crash residual divergence on the small CI fixture (pre-fix: Tiered
+      missed the early entry batch entirely because the Summary tier's RS window
+      — [rs_ma_period] weekly bars — hadn't resolved yet, leaving [Bar_history]
+      empty for the universe).
+
+    - {b Pass 2 (PR five-one-seven)}: dropped the [Shadow_screener] filter from
+      the promote step (it was pre-filtering candidates against Legacy's
+      screener cascade, capping at [full_candidate_limit]) and replaced it with
+      "promote every Summary-tier symbol to Full". Closed broad-goldens
+      multi-fold trade-count divergence; left small-fixture residual that Pass 3
+      closes.
+
+    - {b Pass 1 (pre-PR five-one-seven)}: original Shadow_screener-driven design
+      (now removed). The shadow's stricter RS gate and missing screener bonuses
+      produced a different candidate set than Legacy. *)
 let _run_friday_cycle t ~as_of =
-  (* Step 1: promote every universe symbol to Summary. Per promote contract,
-     symbols with insufficient history stay at Metadata — no error surface.
-     Uses per-symbol promotion so one missing CSV doesn't skip the rest of
-     the batch (see [_promote_each_to] docstring for the detailed rationale). *)
-  _promote_each_to t ~symbols:t.universe ~to_:Summary_tier ~as_of
-    ~ctx:"promote universe to Summary";
-  (* Step 2: promote ALL Summary-tier symbols to Full tier and seed
-     [bar_history] from each Full.t.bars. Inner sees the same candidate pool
-     Legacy would. *)
-  let summaries = _summaries_for t.bar_loader ~universe:t.universe in
-  _promote_summary_to_full t ~summaries ~as_of
+  _promote_universe_to_full t ~symbols:t.universe ~as_of
 
 (** [_promote_new_entries] promotes every symbol referenced by a
     [CreateEntering] transition to Full tier and seeds [bar_history] from the
