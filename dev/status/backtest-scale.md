@@ -5,11 +5,23 @@
 ## Status
 READY_FOR_REVIEW
 
-**Bull-crash A/B parity fix (2026-04-23)** — open on
-`feat/backtest-bull-crash-parity`. Resolves the post-#507
-Tiered/Legacy divergence on `bull-crash-2015-2020`
-(nightly A/B run 24818087082: $20709.16 PV drift on bull-crash, $0.00
-on the other two scenarios). Two coupled bugs:
+**Seed-timing fix (2026-04-23, PR #519)** — open on
+`feat/backtest-tiered-seed-timing`. Closes the residual ~$20k bull-crash
+PV drift that remained after #517: `Bar_loader._promote_one_to_full` now
+treats Summary scalar resolution as best-effort (Full proceeds as long
+as Metadata succeeded + at least one bar loaded), and the Tiered
+wrapper's `_run_friday_cycle` drives Full directly (instead of the
+prior Summary-promote → Full-promote-all-Summary cascade). Verified on
+the GHA `tiered-loader-ab` workflow_dispatch (run 24870169890) — all
+three broad goldens (`bull-crash-2015-2020`, `covid-recovery-2020-2024`,
+`six-year-2018-2023`) report PV delta $0.0000 between Legacy and Tiered;
+trade lists bit-identical. Final merge-gate before flipping
+`loader_strategy` default Legacy→Tiered.
+
+**Bull-crash A/B parity fix (#517, MERGED 2026-04-23)** — resolved the
+worst of the post-#507 Tiered/Legacy divergence on
+`bull-crash-2015-2020` (nightly A/B run 24818087082: $20709.16 PV drift
+on bull-crash, $0.00 on the other two scenarios). Two coupled bugs:
 
 1. **`_friday_promote_set` capped Full-promotions at
    `max_buy_candidates + max_short_candidates` (~30) via
@@ -51,15 +63,13 @@ delta closed from -85% to -32%. Bar_history seeding contract
 (parity test, 7 symbols, 6 months) still bit-identical: same final
 PV, same step PVs at sampled indices.
 
-Residual ~32% trade-count gap on small-universe is plausibly the
-shadow→inner ranking divergence becoming inert at small-universe
-scale — inner now sees the full Summary set (152 of 302 symbols)
-and re-ranks with full data, but the remaining gap suggests there
-may be a third-order effect (e.g., Bar_history seed timing for
-CreateEntering vs Friday-cycle promotion order). Worth tracking but
-not blocking — broad-universe nightly will reveal whether the gap is
-small enough at scale. Update on broad-universe A/B pending nightly
-workflow run.
+Residual ~32% trade-count gap on small-universe was the seed-timing
+issue closed by PR #519 (above): the Summary tier required 52 weekly
+bars before any symbol could be promoted to Full / seeded into
+`Bar_history`, so symbols with insufficient warmup history were
+invisible to the inner screener until the RS window resolved (~12
+months). PR #519 makes Full-tier promotion succeed even when Summary
+returns `None`, restoring Legacy parity.
 
 **Strategy ↔ bar_loader integration (2026-04-22, MERGED as #507)** —
 flipped Tiered from "bookkeeping-only" (PV deltas $0.00 on all 3
@@ -85,21 +95,21 @@ NO
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
 ## Open PR
-- `feat/backtest-bull-crash-parity` — bull-crash A/B parity fix
-  (2026-04-23). Closes the post-#507 PV drift on broad-bull-crash by
-  promoting every Summary-tier symbol to Full each Friday (rather than
-  only the shadow screener's top-N) and switching the wrapper's
-  promotions to per-symbol calls (so a single missing CSV no longer
-  short-circuits the rest of the batch). See §Status for the local A/B
-  evidence table.
+- **#519 — `feat/backtest-tiered-seed-timing`** — seed-timing fix
+  (2026-04-23). Closes the residual bull-crash A/B parity gap that
+  remained after #517: `Bar_loader._promote_one_to_full` now treats
+  Summary scalar resolution as best-effort, and the Tiered wrapper's
+  `_run_friday_cycle` drives Full directly rather than going through
+  Summary first. Verified on GHA workflow_dispatch (run 24870169890)
+  with PV delta $0.0000 on all three broad goldens. This is the final
+  merge-gate before flipping `loader_strategy` default Legacy→Tiered.
 
 ## Blocked on
-- **Final flip (`loader_strategy` default Legacy→Tiered) is still
-  gated on a clean broad-universe nightly A/B run after this fix
-  lands.** Local repro confirms the fix moves bull-crash from a
-  228-percentage-point return divergence to ~5.7pp on the
-  small-universe variant; the broad-universe verification needs a
-  nightly run (~7 hours of compute) post-merge.
+- **Final flip (`loader_strategy` default Legacy→Tiered)** — gated on
+  PR #519 merging. Once merged, the next nightly `tiered-loader-ab`
+  cron should also report $0.0000 PV deltas (the workflow_dispatch on
+  the PR branch already confirmed this on x86_64 GHA). After 1-2
+  successful nightly runs, ship the ~20-line flip-default PR.
 
 ## Goal
 
