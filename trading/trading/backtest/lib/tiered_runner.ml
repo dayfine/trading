@@ -26,8 +26,28 @@ let _make_trace_hook ?trace () : Bar_loader.trace_hook =
   in
   { record }
 
+(** Build the [Full_compute.config] passed to [Bar_loader.create].
+
+    When [config.full_compute_tail_days = Some n], override the default
+    [tail_days] (currently 1800) with [n]. Lower values cap the bar count
+    retained per Full-tier symbol, reducing the per-symbol memory cost of
+    [Full.t.bars] but possibly changing strategy behaviour (Bar_history is
+    seeded from [Full.t.bars] on promotion). Hypothesis-testing only — see the
+    H2 row in [dev/plans/backtest-perf-2026-04-24.md].
+
+    When [None] (default), returns [Full_compute.default_config] unchanged so
+    the Tiered path's per-symbol bar retention is byte-identical to the
+    pre-override behaviour. The parity test ([test_tiered_loader_parity]) relies
+    on this default-path identity. *)
+let _resolve_full_config (config : Weinstein_strategy.config) :
+    Bar_loader.Full_compute.config =
+  match config.full_compute_tail_days with
+  | None -> Bar_loader.Full_compute.default_config
+  | Some n -> { Bar_loader.Full_compute.tail_days = n }
+
 let _create_bar_loader (input : input) ?trace () =
   let trace_hook = _make_trace_hook ?trace () in
+  let full_config = _resolve_full_config input.config in
   (* Benchmark must match the Runner's primary index so Summary-tier RS line
      computation can find the benchmark's bars. Bar_loader's default "SPY" is
      not present in the parity fixtures (GSPC.INDX is the primary), so without
@@ -35,7 +55,7 @@ let _create_bar_loader (input : input) ?trace () =
      is a no-op on the parity scenario. *)
   Bar_loader.create ~data_dir:input.data_dir_fpath
     ~sector_map:input.ticker_sectors ~universe:input.all_symbols
-    ~benchmark_symbol:input.config.indices.primary ~trace_hook ()
+    ~benchmark_symbol:input.config.indices.primary ~full_config ~trace_hook ()
 
 (** Max per-symbol Metadata-promote failure messages to emit on stderr before
     collapsing into a summary count. A universe where every symbol fails (e.g. a

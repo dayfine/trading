@@ -35,6 +35,7 @@ type config = {
   skip_ad_breadth : bool;
   skip_sector_etf_load : bool;
   universe_cap : int option;
+  full_compute_tail_days : int option;
 }
 [@@deriving sexp]
 
@@ -54,6 +55,7 @@ let default_config ~universe ~index_symbol =
     skip_ad_breadth = false;
     skip_sector_etf_load = false;
     universe_cap = None;
+    full_compute_tail_days = None;
   }
 
 let name = "Weinstein"
