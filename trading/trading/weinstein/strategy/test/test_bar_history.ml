@@ -238,6 +238,128 @@ let test_seed_then_accumulate_continues_cleanly _ =
   assert_that (Bar_history.daily_bars_for t ~symbol:"AAPL") (size_is 3)
 
 (* ------------------------------------------------------------------ *)
+(* trim_before                                                          *)
+(* ------------------------------------------------------------------ *)
+
+let test_trim_before_empty_buffer_is_noop _ =
+  let t = Bar_history.create () in
+  Bar_history.trim_before t
+    ~as_of:(Date.of_string "2024-06-01")
+    ~max_lookback_days:30;
+  assert_that (Bar_history.daily_bars_for t ~symbol:"AAPL") is_empty
+
+let test_trim_before_then_accumulate_appends_new_bar _ =
+  (* Seed buffer with bars spanning Jan-Jun, trim to last 30 days as of Jun 1,
+     then accumulate a Jun 5 bar. Final buffer holds bars >= May 2 plus Jun 5. *)
+  let t = Bar_history.create () in
+  let dates =
+    [
+      "2024-01-08";
+      "2024-02-08";
+      "2024-04-08";
+      "2024-05-08";
+      "2024-05-25";
+      "2024-06-01";
+    ]
+  in
+  let bars = List.map dates ~f:(fun d -> make_bar d 100.0) in
+  Bar_history.seed t ~symbol:"AAPL" ~bars;
+  Bar_history.trim_before t
+    ~as_of:(Date.of_string "2024-06-01")
+    ~max_lookback_days:30;
+  (* Cutoff = May 2; keep bars >= May 2: May 8, May 25, Jun 1. *)
+  let later = make_bar "2024-06-05" 105.0 in
+  Bar_history.accumulate t
+    ~get_price:(single_symbol_get_price ~symbol:"AAPL" ~bar:later)
+    ~symbols:[ "AAPL" ];
+  let daily = Bar_history.daily_bars_for t ~symbol:"AAPL" in
+  assert_that daily
+    (elements_are
+       [
+         field
+           (fun b -> b.Types.Daily_price.date)
+           (equal_to (Date.of_string "2024-05-08"));
+         field
+           (fun b -> b.Types.Daily_price.date)
+           (equal_to (Date.of_string "2024-05-25"));
+         field
+           (fun b -> b.Types.Daily_price.date)
+           (equal_to (Date.of_string "2024-06-01"));
+         field
+           (fun b -> b.Types.Daily_price.date)
+           (equal_to (Date.of_string "2024-06-05"));
+       ])
+
+let test_trim_before_is_idempotent _ =
+  (* Two calls with the same as_of / max_lookback_days produce the same buffer
+     state as a single call. *)
+  let t_once = Bar_history.create () in
+  let t_twice = Bar_history.create () in
+  let bars =
+    [
+      make_bar "2024-01-08" 100.0;
+      make_bar "2024-03-08" 105.0;
+      make_bar "2024-05-25" 110.0;
+      make_bar "2024-06-01" 115.0;
+    ]
+  in
+  Bar_history.seed t_once ~symbol:"AAPL" ~bars;
+  Bar_history.seed t_twice ~symbol:"AAPL" ~bars;
+  let as_of = Date.of_string "2024-06-01" in
+  Bar_history.trim_before t_once ~as_of ~max_lookback_days:30;
+  Bar_history.trim_before t_twice ~as_of ~max_lookback_days:30;
+  Bar_history.trim_before t_twice ~as_of ~max_lookback_days:30;
+  assert_that
+    (Bar_history.daily_bars_for t_twice ~symbol:"AAPL")
+    (equal_to (Bar_history.daily_bars_for t_once ~symbol:"AAPL"))
+
+let test_trim_before_with_as_of_before_oldest_bar_is_noop _ =
+  (* If the cutoff lies before every held bar, nothing drops. *)
+  let t = Bar_history.create () in
+  let bars = [ make_bar "2024-05-01" 100.0; make_bar "2024-05-15" 105.0 ] in
+  Bar_history.seed t ~symbol:"AAPL" ~bars;
+  Bar_history.trim_before t
+    ~as_of:(Date.of_string "2024-04-01")
+    ~max_lookback_days:7;
+  let daily = Bar_history.daily_bars_for t ~symbol:"AAPL" in
+  assert_that daily (size_is 2)
+
+let test_trim_before_zero_lookback_keeps_only_as_of_bar _ =
+  (* max_lookback_days = 0 → cutoff = as_of, so bars strictly older than as_of
+     drop and only as_of (or later) remain. *)
+  let t = Bar_history.create () in
+  let bars =
+    [
+      make_bar "2024-05-01" 100.0;
+      make_bar "2024-05-15" 105.0;
+      make_bar "2024-06-01" 110.0;
+    ]
+  in
+  Bar_history.seed t ~symbol:"AAPL" ~bars;
+  Bar_history.trim_before t
+    ~as_of:(Date.of_string "2024-06-01")
+    ~max_lookback_days:0;
+  assert_that
+    (Bar_history.daily_bars_for t ~symbol:"AAPL")
+    (elements_are
+       [
+         field
+           (fun b -> b.Types.Daily_price.date)
+           (equal_to (Date.of_string "2024-06-01"));
+       ])
+
+let test_trim_before_negative_lookback_raises _ =
+  let t = Bar_history.create () in
+  Bar_history.seed t ~symbol:"AAPL" ~bars:[ make_bar "2024-05-01" 100.0 ];
+  assert_raises
+    (Invalid_argument
+       "Bar_history.trim_before: max_lookback_days must be >= 0, got -1")
+    (fun () ->
+      Bar_history.trim_before t
+        ~as_of:(Date.of_string "2024-06-01")
+        ~max_lookback_days:(-1))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -268,4 +390,15 @@ let () =
            "seed is per-symbol" >:: test_seed_is_per_symbol;
            "seed then accumulate continues cleanly"
            >:: test_seed_then_accumulate_continues_cleanly;
+           "trim_before on empty buffer is no-op"
+           >:: test_trim_before_empty_buffer_is_noop;
+           "trim_before then accumulate appends new bar"
+           >:: test_trim_before_then_accumulate_appends_new_bar;
+           "trim_before is idempotent" >:: test_trim_before_is_idempotent;
+           "trim_before with as_of before oldest bar is no-op"
+           >:: test_trim_before_with_as_of_before_oldest_bar_is_noop;
+           "trim_before with max_lookback_days = 0 keeps only as_of bar"
+           >:: test_trim_before_zero_lookback_keeps_only_as_of_bar;
+           "trim_before with negative lookback raises Invalid_argument"
+           >:: test_trim_before_negative_lookback_raises;
          ])
