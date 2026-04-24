@@ -90,8 +90,26 @@ type t
     across threads — the single-threaded backtest runner is the only expected
     caller. *)
 
-val create : unit -> t
-(** Create a fresh collector with no recorded phases. *)
+val create : ?flush_path:string -> unit -> t
+(** Create a fresh collector with no recorded phases.
+
+    When [?flush_path] is [Some path], every subsequent {!record} call rewrites
+    the file at [path] with the cumulative trace sexp (same format as {!write}).
+    This ensures a partial trace survives a SIGKILL'd run (e.g. an OOM
+    mid-backtest) — the smoking-gun phase is on disk by the time the process
+    dies. The write is atomic via a [<path>.tmp] sibling + [Core_unix.rename],
+    so a kill mid-flush leaves either the previous valid trace or the new one —
+    never a truncated file. Parent directories are created on the first flush.
+
+    Cost: one full sexp rewrite per [record] call. For a typical backtest (~5–20
+    phases per call × ~1500 days = ~30K records, low single-digit MB final size)
+    this is cheap relative to the work being measured. If profiling shows flush
+    dominates wall-time the implementation can switch to append-only without an
+    API change.
+
+    Without [?flush_path], the collector is in-memory only and behaves
+    identically to the pre-flush version — the caller is expected to call
+    {!write} explicitly at end-of-run to persist. *)
 
 val record :
   ?trace:t ->

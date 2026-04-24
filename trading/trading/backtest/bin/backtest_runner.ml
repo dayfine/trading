@@ -11,13 +11,16 @@
       in the runner since the implementation lands in increment 3f of
       [dev/plans/backtest-tiered-loader-2026-04-19.md].
     - --trace: when given, instruments the run with per-phase timing + memory
-      measurements via {!Backtest.Trace} and writes the trace sexp at [<path>]
-      after the result is written. Without this flag, no trace is captured (the
-      default code path is unchanged). The output sexp is a list of
+      measurements via {!Backtest.Trace} and writes the trace sexp at [<path>],
+      atomically flushed after every recorded phase. So a SIGKILL'd run (e.g.
+      OOM mid-backtest) leaves the smoking-gun phase on disk — not just the
+      end-of-run trace. Without this flag, no trace is captured (the default
+      code path is unchanged). The output sexp is a list of
       [Backtest.Trace.phase_metrics] records, parseable via
       [Backtest.Trace.phase_metrics_of_sexp]. Workstream B4 of
       [dev/plans/backtest-perf-2026-04-24.md] — closes the gap that previously
-      forced trace capture through [scenario_runner.exe] only.
+      forced trace capture through [scenario_runner.exe] only. Workstream B3
+      (flush-on-record) makes mid-run kills observable.
 
     Example:
     {[
@@ -78,21 +81,19 @@ let _make_output_dir () =
   Core_unix.mkdir_p path;
   path
 
-(** Write the captured trace sexp at [path] and report the location on stderr.
-    Pulled out of [main] to keep the side-effect explicit at the call site. *)
-let _write_trace ~path ~trace =
-  let metrics = Backtest.Trace.snapshot trace in
-  Backtest.Trace.write ~out_path:path metrics;
-  eprintf "Trace written to: %s\n%!" path
-
 let () =
   let start_date, end_date, overrides, loader_strategy, trace_path =
     _parse_args ()
   in
-  (* When [--trace <path>] is passed, pre-allocate a [Trace.t] so the runner
-     records into it; otherwise [trace = None] and tracing is a no-op (the
-     default code path is unchanged). *)
-  let trace = Option.map trace_path ~f:(fun _ -> Backtest.Trace.create ()) in
+  (* When [--trace <path>] is passed, pre-allocate a [Trace.t] with [flush_path]
+     so the runner records into it AND atomically rewrites the file after every
+     phase. This way a SIGKILL'd run (OOM, etc.) still leaves the most recent
+     entries on disk. Without [--trace], [trace = None] and tracing is a no-op
+     (the default code path is unchanged). *)
+  let trace =
+    Option.map trace_path ~f:(fun path ->
+        Backtest.Trace.create ~flush_path:path ())
+  in
   let result =
     Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
       ?loader_strategy ?trace ()
@@ -101,8 +102,11 @@ let () =
   eprintf "Writing output to %s/\n%!" output_dir;
   Backtest.Result_writer.write ~output_dir result;
   eprintf "Output written to: %s/\n%!" output_dir;
-  Option.iter (Option.both trace_path trace) ~f:(fun (path, trace) ->
-      _write_trace ~path ~trace);
+  (* No explicit [Trace.write] needed: when [flush_path] is set, the file is
+     already current as of the most recent [Trace.record] call. Just announce
+     the path so users can find it. *)
+  Option.iter trace_path ~f:(fun path ->
+      eprintf "Trace written to: %s\n%!" path);
   Out_channel.output_string stdout
     (Sexp.to_string_hum (Backtest.Summary.sexp_of_t result.summary));
   Out_channel.newline stdout

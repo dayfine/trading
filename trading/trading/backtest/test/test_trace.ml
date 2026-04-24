@@ -145,6 +145,86 @@ let test_write_creates_parent_dir _ =
   Backtest.Trace.write ~out_path [];
   assert_that (Sys_unix.file_exists_exn out_path) (equal_to true)
 
+(** {1 Flush-on-record (B3)}
+
+    These tests cover [?flush_path]: every [record] call rewrites the file.
+    Critical for SIGKILL'd OOM runs — without flush-on-record, only end-of-run
+    [Trace.write] persists, so a killed mid-run produces no observable trace. *)
+
+(** Load a trace file written by [?flush_path] and parse back to a list of
+    [phase_metrics]. Sharing this helper keeps the assertions symmetric across
+    the three flush tests below. *)
+let _load_trace_file path : Backtest.Trace.phase_metrics list =
+  Sexp.load_sexp path |> List.t_of_sexp Backtest.Trace.phase_metrics_of_sexp
+
+let test_flush_path_writes_after_first_record _ =
+  let dir = Core_unix.mkdtemp "/tmp/trace_test_" in
+  let path = Filename.concat dir "flush.sexp" in
+  let t = Backtest.Trace.create ~flush_path:path () in
+  let _ =
+    Backtest.Trace.record ~trace:t Backtest.Trace.Phase.Load_universe (fun () ->
+        ())
+  in
+  (* File exists and parses as a 1-entry trace whose phase matches. *)
+  assert_that (_load_trace_file path)
+    (elements_are
+       [
+         field
+           (fun (m : Backtest.Trace.phase_metrics) -> m.phase)
+           (equal_to Backtest.Trace.Phase.Load_universe);
+       ])
+
+let test_flush_path_is_incremental _ =
+  let dir = Core_unix.mkdtemp "/tmp/trace_test_" in
+  let path = Filename.concat dir "flush.sexp" in
+  let t = Backtest.Trace.create ~flush_path:path () in
+  let phases : Backtest.Trace.Phase.t list = [ Macro; Load_bars; Screener ] in
+  List.iter phases ~f:(fun phase ->
+      let _ = Backtest.Trace.record ~trace:t phase (fun () -> ()) in
+      ());
+  (* After 3 records, the file holds all 3 entries — not just the last. *)
+  assert_that
+    (_load_trace_file path
+    |> List.map ~f:(fun (m : Backtest.Trace.phase_metrics) -> m.phase))
+    (elements_are
+       [
+         equal_to Backtest.Trace.Phase.Macro;
+         equal_to Backtest.Trace.Phase.Load_bars;
+         equal_to Backtest.Trace.Phase.Screener;
+       ])
+
+let test_flush_path_leaves_no_tmp_artifact _ =
+  let dir = Core_unix.mkdtemp "/tmp/trace_test_" in
+  let path = Filename.concat dir "flush.sexp" in
+  let t = Backtest.Trace.create ~flush_path:path () in
+  let _ =
+    Backtest.Trace.record ~trace:t Backtest.Trace.Phase.Macro (fun () -> ())
+  in
+  (* The atomic-write dance writes [path ^ ".tmp"] then renames. After a
+     successful flush, no [.tmp] sibling should remain. *)
+  assert_that (Sys_unix.file_exists_exn (path ^ ".tmp")) (equal_to false)
+
+let test_create_without_flush_path_writes_no_file _ =
+  let dir = Core_unix.mkdtemp "/tmp/trace_test_" in
+  let path = Filename.concat dir "should-not-exist.sexp" in
+  (* No [?flush_path] — pre-flush behaviour preserved. *)
+  let t = Backtest.Trace.create () in
+  let _ =
+    Backtest.Trace.record ~trace:t Backtest.Trace.Phase.Macro (fun () -> ())
+  in
+  assert_that (Sys_unix.file_exists_exn path) (equal_to false)
+
+let test_flush_path_creates_parent_dir _ =
+  let root = Core_unix.mkdtemp "/tmp/trace_test_" in
+  (* Nest the flush target under an unmade directory. The first flush should
+     create the parents (mkdir -p) — same contract as {!Backtest.Trace.write}. *)
+  let path = Filename.concat root "a/b/c/flush.sexp" in
+  let t = Backtest.Trace.create ~flush_path:path () in
+  let _ =
+    Backtest.Trace.record ~trace:t Backtest.Trace.Phase.Macro (fun () -> ())
+  in
+  assert_that (Sys_unix.file_exists_exn path) (equal_to true)
+
 let suite =
   "Trace"
   >::: [
@@ -159,6 +239,16 @@ let suite =
          "record measures elapsed ms" >:: test_record_measures_elapsed;
          "write round-trips via sexp" >:: test_write_sexp_round_trip;
          "write creates parent dir" >:: test_write_creates_parent_dir;
+         "flush_path writes after first record"
+         >:: test_flush_path_writes_after_first_record;
+         "flush_path is incremental across records"
+         >:: test_flush_path_is_incremental;
+         "flush_path leaves no .tmp artifact after success"
+         >:: test_flush_path_leaves_no_tmp_artifact;
+         "create without flush_path writes no file"
+         >:: test_create_without_flush_path_writes_no_file;
+         "flush_path creates parent dir on first flush"
+         >:: test_flush_path_creates_parent_dir;
        ]
 
 let () = run_test_tt_main suite

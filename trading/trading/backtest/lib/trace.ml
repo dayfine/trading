@@ -32,9 +32,14 @@ type phase_metrics = {
 }
 [@@deriving show, eq, sexp]
 
-type t = { mutable entries : phase_metrics list }
+type t = {
+  mutable entries : phase_metrics list;
+  flush_path : string option;
+      (** When [Some path], every {!record} call atomically rewrites the trace
+          file at [path]. See [trace.mli] for rationale. *)
+}
 
-let create () = { entries = [] }
+let create ?flush_path () = { entries = []; flush_path }
 
 (** Parse a [VmHWM: NNNN kB] line. Returns kB (native unit from
     [/proc/self/status]; do not pre-divide to MB — short-lived or small
@@ -73,6 +78,31 @@ let _read_peak_rss_kb () : int option =
   if not (_status_file_readable ()) then None
   else try In_channel.with_file _status_path ~f:_scan_for_vmhwm with _ -> None
 
+let _ensure_parent_dir path =
+  let dir = Filename.dirname path in
+  if not (String.equal dir "" || String.equal dir ".") then
+    (* core_unix provides mkdir_p via Core_unix *)
+    Core_unix.mkdir_p dir
+
+(** Atomically write [metrics] as a sexp at [path]. Writes to [path ^ ".tmp"]
+    first, then renames; a SIGKILL between open and rename leaves the previous
+    valid file untouched, never a truncated one. *)
+let _atomic_write_sexp ~path metrics =
+  _ensure_parent_dir path;
+  let sexp = [%sexp_of: phase_metrics list] metrics in
+  let tmp_path = path ^ ".tmp" in
+  Out_channel.with_file tmp_path ~f:(fun oc ->
+      Out_channel.output_string oc (Sexp.to_string_hum sexp);
+      Out_channel.output_char oc '\n');
+  Core_unix.rename ~src:tmp_path ~dst:path
+
+(** Flush the cumulative trace to [t.flush_path] if a path is configured. No-op
+    when [flush_path = None] — keeps the in-memory-only path zero-cost. *)
+let _flush_if_needed t =
+  match t.flush_path with
+  | None -> ()
+  | Some path -> _atomic_write_sexp ~path (List.rev t.entries)
+
 let _append_entry t ~phase ~elapsed_ms ~symbols_in ~symbols_out ~bar_loads =
   let entry =
     {
@@ -84,7 +114,8 @@ let _append_entry t ~phase ~elapsed_ms ~symbols_in ~symbols_out ~bar_loads =
       bar_loads;
     }
   in
-  t.entries <- entry :: t.entries
+  t.entries <- entry :: t.entries;
+  _flush_if_needed t
 
 let record ?trace ?symbols_in ?symbols_out ?bar_loads phase f =
   match trace with
@@ -99,16 +130,4 @@ let record ?trace ?symbols_in ?symbols_out ?bar_loads phase f =
       result
 
 let snapshot t = List.rev t.entries
-
-let _ensure_parent_dir path =
-  let dir = Filename.dirname path in
-  if not (String.equal dir "" || String.equal dir ".") then
-    (* core_unix provides mkdir_p via Core_unix *)
-    Core_unix.mkdir_p dir
-
-let write ~out_path metrics =
-  _ensure_parent_dir out_path;
-  let sexp = [%sexp_of: phase_metrics list] metrics in
-  Out_channel.with_file out_path ~f:(fun oc ->
-      Out_channel.output_string oc (Sexp.to_string_hum sexp);
-      Out_channel.output_char oc '\n')
+let write ~out_path metrics = _atomic_write_sexp ~path:out_path metrics
