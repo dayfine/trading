@@ -1,12 +1,44 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-23
+## Last updated: 2026-04-24
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
-**Bull-crash A/B parity fix (2026-04-23)** — open on
-`feat/backtest-bull-crash-parity`. Resolves the post-#507
+**Post-#517 state (2026-04-24)** — #517 merged at 00:54Z but **the
+Tiered-flip merge gate is not closed**. Manually dispatched
+`tiered-loader-ab` (run 24867554026) post-merge: bull-crash PV delta is
+**identical to the cent ($20709.16)** vs the pre-#517 baseline. Two
+independent issues surfaced and neither is closed by #517:
+
+1. **Seed-timing residual (the real gate-blocker).** The agent who
+   shipped #517 self-flagged a residual ~32% trade-count gap on
+   small-universe; same gap shows on the 7-symbol CI fixture as $20709
+   PV drift. Hypothesis (per #517 author): in `_run_friday_cycle`,
+   every Summary→Full promote pair-fires with `_seed_from_full` BEFORE
+   inner runs — so inner sees populated `Bar_history`. But in
+   `_promote_new_entries` (`CreateEntering` path), the promote+seed
+   fires AFTER inner has decided to enter — i.e., on the entry tick the
+   inner saw an empty (or thin) `Bar_history` for that symbol, while
+   Legacy's day-by-day `Bar_history.accumulate` had the full prefix.
+   Downstream consumers (`Stops_runner._compute_ma`,
+   `_make_entry_transition`, `_screen_universe`) then see different
+   inputs and emit different entries / stops / sizes. **In flight on a
+   feat-backtest agent.** See § Open work below.
+
+2. **Broad-universe CI fixture is 7 symbols, not 1654** (separate bug,
+   tracked in § Follow-up). `trading/test_data/sectors.csv` has 8 lines;
+   `goldens-broad/*.sexp` resolve through the `Full_sector_map` sentinel
+   to whatever the local fixture contains. So the "broad" nightly is
+   testing on a 7-symbol slice and produces 14 trades in ~5s, not the
+   1654-symbol / 70–110-trade run the scenario header claims. The
+   scenario file's own header even says `STATUS: SKIPPED — ranges stale`.
+   The seed-timing fix should close this 7-symbol drift too (same root
+   cause), but the broad-universe gate itself is testing the wrong
+   thing until the fixture is rebuilt.
+
+**Bull-crash A/B parity fix (2026-04-23, MERGED as #517)** — was on
+`feat/backtest-bull-crash-parity`. Resolved one part of the post-#507
 Tiered/Legacy divergence on `bull-crash-2015-2020`
 (nightly A/B run 24818087082: $20709.16 PV drift on bull-crash, $0.00
 on the other two scenarios). Two coupled bugs:
@@ -51,15 +83,13 @@ delta closed from -85% to -32%. Bar_history seeding contract
 (parity test, 7 symbols, 6 months) still bit-identical: same final
 PV, same step PVs at sampled indices.
 
-Residual ~32% trade-count gap on small-universe is plausibly the
-shadow→inner ranking divergence becoming inert at small-universe
-scale — inner now sees the full Summary set (152 of 302 symbols)
-and re-ranks with full data, but the remaining gap suggests there
-may be a third-order effect (e.g., Bar_history seed timing for
-CreateEntering vs Friday-cycle promotion order). Worth tracking but
-not blocking — broad-universe nightly will reveal whether the gap is
-small enough at scale. Update on broad-universe A/B pending nightly
-workflow run.
+Residual ~32% trade-count gap on small-universe was self-flagged in
+#517's PR description as a third-order effect (Bar_history seed timing
+for CreateEntering vs Friday-cycle promotion order). The 2026-04-24
+post-merge nightly confirmed it: same $20709.16 cent-precision drift
+on the 7-symbol CI fixture, same direction (Tiered ~2.08% under
+Legacy). The seed-timing residual is the real merge-gate blocker, now
+in flight (see § Open work).
 
 **Strategy ↔ bar_loader integration (2026-04-22, MERGED as #507)** —
 flipped Tiered from "bookkeeping-only" (PV deltas $0.00 on all 3
@@ -84,22 +114,23 @@ NO
 
 All three tier getters return their proper typed option: `get_metadata : Metadata.t option`, `get_summary : Summary.t option`, `get_full : Full.t option`. Core `Bar_loader.create` / `promote` / `demote` / `tier_of` / `stats` signatures remain stable; `create` gained optional `?full_config` in 3c and `?trace_hook` in 3d. Remaining churn will come from 3e (runner wiring) and 3f (tiered runner path).
 
-## Open PR
-- `feat/backtest-bull-crash-parity` — bull-crash A/B parity fix
-  (2026-04-23). Closes the post-#507 PV drift on broad-bull-crash by
-  promoting every Summary-tier symbol to Full each Friday (rather than
-  only the shadow screener's top-N) and switching the wrapper's
-  promotions to per-symbol calls (so a single missing CSV no longer
-  short-circuits the rest of the batch). See §Status for the local A/B
-  evidence table.
+## Open work
+- **Seed-timing residual (in flight on a feat-backtest agent,
+  2026-04-24).** Working branch TBD (`feat/backtest-tiered-seed-timing`
+  or similar). Hypothesis: `_promote_new_entries` runs after inner
+  decides on `CreateEntering`, so on the entry tick inner saw an empty
+  `Bar_history` for the new symbol; Legacy had the full prefix. Fast
+  repro path: 7-symbol CI fixture (`goldens-broad/bull-crash-2015-2020.sexp`
+  via `dev/scripts/tiered_loader_ab_compare.sh`) reproduces the
+  $20709.16 / cent-precision drift in ~5s per side. See § Follow-up
+  for the broad-fixture rebuild that should track separately.
 
 ## Blocked on
-- **Final flip (`loader_strategy` default Legacy→Tiered) is still
-  gated on a clean broad-universe nightly A/B run after this fix
-  lands.** Local repro confirms the fix moves bull-crash from a
-  228-percentage-point return divergence to ~5.7pp on the
-  small-universe variant; the broad-universe verification needs a
-  nightly run (~7 hours of compute) post-merge.
+- **Final flip (`loader_strategy` default Legacy→Tiered)** gated on:
+  (1) seed-timing residual closing (in flight, see § Open work) — must
+  drop bull-crash drift from $20709 to ~$0 on the 7-symbol fixture and
+  close the trade-count gap on the 302-symbol small-universe; (2) one
+  clean nightly A/B run after the fix lands.
 
 ## Goal
 
@@ -176,6 +207,33 @@ Build alongside existing `Bar_history` — don't modify it.
 4. Post-Tiered-default: retire `Legacy` codepath (`_run_legacy` in `runner.ml`).
 
 ## Follow-up / escalation
+
+- **Broad-universe goldens are testing on a 7-symbol fixture (2026-04-24).**
+  `trading/test_data/sectors.csv` has 8 lines (~7 tickers); the broad
+  scenarios under `trading/test_data/backtest_scenarios/goldens-broad/`
+  declare `universe_path "universes/broad.sexp"` which is the
+  `Full_sector_map` sentinel — i.e., "use whatever is in
+  `${TRADING_DATA_DIR}/sectors.csv`". In CI that's the 7-symbol slice.
+  The scenario file headers explicitly say `STATUS: SKIPPED — ranges
+  stale (1,654-symbol era); re-pin pending a GHA workflow.` Effect:
+  the nightly `tiered-loader-ab` workflow runs each scenario in ~5s
+  with 14 trades, not 1654 symbols × 6 years × 70–110 trades. Until
+  this is rebuilt, the only honest broad-universe coverage is the
+  302-symbol small-universe goldens (~7min × 2 per A/B locally). Two
+  shapes of fix: (a) ship a real broad sector map + matching CSVs as a
+  CI fixture (download or commit; non-trivial size), or (b) treat the
+  302-symbol goldens-small as the broad gate and retire `goldens-broad/`.
+  Decide after the seed-timing fix lands. Tracked here because Tiered
+  flip readiness practically depends on what we use as the gate.
+
+- **Reciprocal short-side practical block.** Per memory note
+  `project_short_side_reprioritize.md` (2026-04-?): the three
+  `short-side-strategy.md` § Follow-ups (bear-window backtest
+  regression, full short cascade, Ch.11 spot-check) are gated on the
+  Tiered flip landing — not by hard interface coupling but because they
+  need broad-universe scale to be feasible. Update
+  `dev/status/short-side-strategy.md` to flip Status off MERGED once
+  the Tiered flip lands so the orchestrator picks them up.
 
 - **F2 (CLOSED 2026-04-22) — Summary_compute default tail_days too short.**
   The 3g QC behavioral review flagged that parity was holding for the

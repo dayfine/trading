@@ -1,11 +1,19 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-19
+## Last updated: 2026-04-24
 
 ## Status
 MERGED
 
 MVP slice landed via #420 on 2026-04-19; follow-ups tracked below.
+
+**Reactivation cue (2026-04-24):** flip Status back to IN_PROGRESS
+once the Tiered loader flip in `backtest-scale.md` lands. The three
+§ Follow-ups below practically require broad-universe backtest scale
+to be feasible (bear-window regression test, full short cascade
+tuning, Ch.11 spot-check on real data). They're not hard-blocked at
+the API level; the orchestrator should pick them up as soon as the
+scale work is unblocked.
 
 ## Interface stable
 YES
@@ -16,7 +24,10 @@ YES
 - #420 (feat/short-side-strategy) — MVP vertical slice: side through screener → strategy → order_generator, with Ch.11 RS hard gate and unit tests for Short + Long entry transitions.
 
 ## Blocked on
-- None.
+- No hard interface block. Practical block: the three § Follow-ups
+  need broad-universe Tiered-loader backtest scale to be feasible.
+  Tracked in `backtest-scale.md` § Follow-up "Reciprocal short-side
+  practical block".
 
 ## Goal
 

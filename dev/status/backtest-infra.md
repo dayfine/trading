@@ -99,7 +99,10 @@ None. Merged in main:
   (`feat/backtest-tiered-loader`).
 - **Per-bar phase instrumentation** (Sector_rank through Order_gen)
   can land as a follow-up without changing the trace sexp schema — the
-  Phase variants are already defined. See §Follow-up item 6.
+  Phase variants are already defined. See §Follow-up item 6. Practical
+  prerequisite: the Tiered loader flip (`backtest-scale.md`) — per-bar
+  tracing is most valuable once broad-universe runs are cheap enough
+  to iterate on. Pick this up once the Tiered flip lands.
 
 ## Baseline results (2026-04-13, pre-experiments)
 
