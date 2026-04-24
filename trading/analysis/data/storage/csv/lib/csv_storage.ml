@@ -173,23 +173,55 @@ let _in_date_range ~start_date ~end_date (price : Types.Daily_price.t) =
   in
   after_start && before_end
 
+(* Streaming reader: parse one line at a time and only retain rows that fall
+   within the requested date range. Avoids materializing the full file
+   contents (lines list) or the full parsed-prices list, which previously
+   dominated allocation churn during repeated reads of large symbol CSVs. *)
+let _stream_in_range_prices chan ~start_date ~end_date =
+  let result = ref [] in
+  let error = ref None in
+  let rec loop () =
+    match !error with
+    | Some _ -> ()
+    | None -> (
+        match In_channel.input_line chan with
+        | None -> ()
+        | Some line ->
+            (match Parser.parse_line line with
+            | Ok price ->
+                if _in_date_range ~start_date ~end_date price then
+                  result := price :: !result
+            | Error msg -> error := Some (Status.invalid_argument_error msg));
+            loop ())
+  in
+  loop ();
+  match !error with Some err -> Error err | None -> Ok (List.rev !result)
+
+let _read_streaming t ~start_date ~end_date =
+  In_channel.with_file t.path ~f:(fun chan ->
+      (* An empty file (no header) matches the legacy `Parser.parse_lines []`
+         behavior, which raised "Empty file". *)
+      match In_channel.input_line chan with
+      | None -> Status.error_invalid_argument "Empty file"
+      | Some _header -> _stream_in_range_prices chan ~start_date ~end_date)
+
 let get t ?start_date ?end_date () =
   let open Result.Let_syntax in
-  (* Check if file exists before trying to read *)
-  let%bind lines =
+  let%bind () =
     match Sys_unix.file_exists t.path with
-    | `Yes -> (
-        try Ok (In_channel.read_lines t.path)
-        with Sys_error msg -> Status.error_not_found msg)
+    | `Yes -> Ok ()
     | `No | `Unknown ->
         Status.error_not_found (Printf.sprintf "Data file not found: %s" t.path)
   in
-  let%bind prices = Parser.parse_lines lines in
+  let%bind prices =
+    try _read_streaming t ~start_date ~end_date
+    with Sys_error msg -> Status.error_not_found msg
+  in
   match (start_date, end_date) with
   | Some start, Some end_ when Date.compare start end_ > 0 ->
       Status.error_invalid_argument
         "start_date must be before or equal to end_date"
-  | _ -> Ok (List.filter prices ~f:(_in_date_range ~start_date ~end_date))
+  | _ -> Ok prices
 
 let save t ?(override = false) prices =
   let open Result.Let_syntax in

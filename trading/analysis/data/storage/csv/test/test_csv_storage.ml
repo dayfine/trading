@@ -243,6 +243,56 @@ let test_empty_list_after_write_without_override _ =
       String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
     prices saved_prices
 
+(* Streaming-refactor coverage: confirm filtering happens during the per-line
+   read (not as a post-pass over the full price list). *)
+
+let test_stream_start_date_only_filter _ =
+  let storage = create ~data_dir:test_dir "STREAM1" |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  let start_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21 in
+  let filtered = get storage ~start_date () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    (List.drop prices 2) filtered
+
+let test_stream_bad_line_propagates_error _ =
+  let storage = create ~data_dir:test_dir "STREAM2" |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  (* Corrupt the file: append a malformed row after the valid data. The
+     streaming reader should still surface the parse error. *)
+  let path =
+    Fpath.(test_dir / "S" / "2" / "STREAM2" / "data.csv") |> Fpath.to_string
+  in
+  let oc = Stdlib.open_out_gen [ Open_append ] 0o666 path in
+  Out_channel.output_string oc "not,enough,columns\n";
+  Out_channel.close oc;
+  match get storage () with
+  | Ok _ -> assert_failure "Expected parse error from corrupted CSV row"
+  | Error status ->
+      assert_equal ~printer:Status.show status
+        (Status.invalid_argument_error
+           "Expected 7 columns, line: not,enough,columns")
+
+let test_stream_header_only_returns_empty _ =
+  let storage = create ~data_dir:test_dir "STREAM3" |> ok_or_failwith_status in
+  (* `save` with an empty list is a no-op (see
+     test_empty_list_after_write_with_override), so write the header-only file
+     by hand to exercise the header-only branch directly. `create` has already
+     made the symbol directory. *)
+  let path =
+    Fpath.(test_dir / "S" / "3" / "STREAM3" / "data.csv") |> Fpath.to_string
+  in
+  let oc = Stdlib.open_out path in
+  Out_channel.output_string oc
+    "date,open,high,low,close,adjusted_close,volume\n";
+  Out_channel.close oc;
+  let result = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    [] result
+
 let suite =
   "CSV Storage tests"
   >::: [
@@ -264,6 +314,12 @@ let suite =
          >:: test_empty_list_after_write_with_override;
          "test_empty_list_after_write_without_override"
          >:: test_empty_list_after_write_without_override;
+         "test_stream_start_date_only_filter"
+         >:: test_stream_start_date_only_filter;
+         "test_stream_bad_line_propagates_error"
+         >:: test_stream_bad_line_propagates_error;
+         "test_stream_header_only_returns_empty"
+         >:: test_stream_header_only_returns_empty;
        ]
 
 let () =
