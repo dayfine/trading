@@ -371,7 +371,24 @@ Build alongside existing `Bar_history` — don't modify it.
   per-symbol Bar_history caps at ~365 daily bars vs current ~1510
   after 6 years — a ~4× reduction independent of the Tiered flip.
   Both Legacy and Tiered benefit. Plan + start tracked in
-  `dev/plans/bar-history-trim-2026-04-24.md`.
+  `dev/plans/bar-history-trim-2026-04-24.md`. Primitive PR open as
+  #525 (dead code, no callers); follow-on PRs wire it in behind a
+  config flag, measure, then flip default.
+
+  **Tier still helps — independent of the trim fix.** The +95% Tiered
+  RSS regression measured here is attributable to the missing
+  Bar_history trim, not to a Tier design flaw. Tier 3's
+  `Full.t.bars` cache IS already bounded (`Full_compute.tail_days` ≈
+  250 bars per Full-tier symbol); that bound is real and provides
+  meaningful OHLCV cache reduction vs Legacy's per-symbol bar
+  storage. Once the Bar_history trim lands and both strategies cap
+  Bar_history at ~365 days × symbols, expected Tiered overhead
+  reduces to a modest ~250 bars × Full-symbol-count for the bounded
+  loader cache — likely <10% above Legacy on small universes, and
+  the gap inverts in Tiered's favor on broad universes once the
+  AD-breadth + inventory-loading paths are also bounded
+  (comprehensive measurement plan at
+  `dev/plans/backtest-perf-2026-04-24.md`).
 
 - **Broad-universe goldens are testing on a 7-symbol fixture (2026-04-24).**
   `trading/test_data/sectors.csv` has 8 lines (~7 tickers); the broad
