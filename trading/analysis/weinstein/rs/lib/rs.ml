@@ -175,6 +175,23 @@ let analyze_with_callbacks ~config ~get_stock_close ~get_benchmark_close
       Some (_result_of_history ~trend_lookback ~flat_threshold history)
 
 (* ------------------------------------------------------------------ *)
+(* Callback bundle — used by panel-backed callers                       *)
+(*                                                                      *)
+(* PR-D introduces this record so that callers like                     *)
+(* [Stock_analysis.analyze_with_callbacks] can thread Rs's callbacks    *)
+(* through their own callback bundles uniformly. The bar-list           *)
+(* [callbacks_from_bars] constructor centralises the wrapper plumbing   *)
+(* (date-align two bar lists once, build three index closures) into one *)
+(* place.                                                               *)
+(* ------------------------------------------------------------------ *)
+
+type callbacks = {
+  get_stock_close : week_offset:int -> float option;
+  get_benchmark_close : week_offset:int -> float option;
+  get_date : week_offset:int -> Date.t option;
+}
+
+(* ------------------------------------------------------------------ *)
 (* Bar-list wrapper — preserves the existing API                        *)
 (*                                                                      *)
 (* Aligns the two bar lists once (using                                 *)
@@ -211,27 +228,32 @@ let _align_bars_for_wrapper ~stock_bars ~benchmark_bars :
 (** Build a triple of callbacks indexed against [aligned] in chronological
     order: [week_offset:0] returns the newest entry; [week_offset:k] returns [k]
     weeks back; offsets past the array's depth return [None]. *)
-let _make_callbacks_from_aligned (aligned : (Date.t * float * float) array) =
+let _make_callbacks_from_aligned (aligned : (Date.t * float * float) array) :
+    callbacks =
   let n = Array.length aligned in
   let get ~week_offset =
     let idx = n - 1 - week_offset in
     if idx < 0 || idx >= n then None else Some aligned.(idx)
   in
-  let get_stock_close ~week_offset =
-    Option.map (get ~week_offset) ~f:(fun (_, sc, _) -> sc)
-  in
-  let get_benchmark_close ~week_offset =
-    Option.map (get ~week_offset) ~f:(fun (_, _, bc) -> bc)
-  in
-  let get_date ~week_offset =
-    Option.map (get ~week_offset) ~f:(fun (d, _, _) -> d)
-  in
-  (get_stock_close, get_benchmark_close, get_date)
+  {
+    get_stock_close =
+      (fun ~week_offset ->
+        Option.map (get ~week_offset) ~f:(fun (_, sc, _) -> sc));
+    get_benchmark_close =
+      (fun ~week_offset ->
+        Option.map (get ~week_offset) ~f:(fun (_, _, bc) -> bc));
+    get_date =
+      (fun ~week_offset ->
+        Option.map (get ~week_offset) ~f:(fun (d, _, _) -> d));
+  }
 
-let analyze ~config ~stock_bars ~benchmark_bars : result option =
+let callbacks_from_bars ~stock_bars ~benchmark_bars : callbacks =
   let aligned = _align_bars_for_wrapper ~stock_bars ~benchmark_bars in
   let aligned_arr = Array.of_list aligned in
-  let get_stock_close, get_benchmark_close, get_date =
-    _make_callbacks_from_aligned aligned_arr
+  _make_callbacks_from_aligned aligned_arr
+
+let analyze ~config ~stock_bars ~benchmark_bars : result option =
+  let { get_stock_close; get_benchmark_close; get_date } =
+    callbacks_from_bars ~stock_bars ~benchmark_bars
   in
   analyze_with_callbacks ~config ~get_stock_close ~get_benchmark_close ~get_date

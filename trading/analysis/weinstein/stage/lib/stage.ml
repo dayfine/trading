@@ -350,6 +350,23 @@ let classify_with_callbacks ~config ~get_ma ~get_close ~prior_stage : result =
       _classify_signals ~config ~get_ma ~get_close ~prior_stage ~current_ma
 
 (* ------------------------------------------------------------------ *)
+(* Callback bundle — used by panel-backed callers                       *)
+(*                                                                      *)
+(* PR-D introduces this record so that callers like                     *)
+(* [Stock_analysis.analyze_with_callbacks] can thread Stage's callbacks *)
+(* through their own callback bundles uniformly. The bar-list           *)
+(* [callbacks_from_bars] constructor centralises the wrapper plumbing   *)
+(* (precompute MA series + index closures over arrays) into one place,  *)
+(* eliminating duplication across [classify] and any wrapper that wants *)
+(* to delegate to [classify_with_callbacks].                            *)
+(* ------------------------------------------------------------------ *)
+
+type callbacks = {
+  get_ma : week_offset:int -> float option;
+  get_close : week_offset:int -> float option;
+}
+
+(* ------------------------------------------------------------------ *)
 (* Bar-list wrapper — preserves the existing API                        *)
 (*                                                                      *)
 (* The wrapper precomputes the full MA series + closes once, then       *)
@@ -379,14 +396,20 @@ let _make_get_close_from_bars (bars : Daily_price.t array) :
     if idx < 0 || idx >= n then None
     else Some bars.(idx).Daily_price.adjusted_close
 
-let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
+let callbacks_from_bars ~config ~(bars : Daily_price.t list) : callbacks =
   let ma_series =
     _compute_ma ~period:config.ma_period ~ma_type:config.ma_type bars
   in
-  if List.is_empty ma_series then _stage1_default_result
-  else
-    let ma_values = List.map ma_series ~f:snd |> Array.of_list in
-    let bar_array = Array.of_list bars in
-    let get_ma = _make_get_ma_from_array ma_values in
-    let get_close = _make_get_close_from_bars bar_array in
-    classify_with_callbacks ~config ~get_ma ~get_close ~prior_stage
+  let ma_values = List.map ma_series ~f:snd |> Array.of_list in
+  let bar_array = Array.of_list bars in
+  {
+    get_ma = _make_get_ma_from_array ma_values;
+    get_close = _make_get_close_from_bars bar_array;
+  }
+
+let classify ~config ~(bars : Daily_price.t list) ~prior_stage : result =
+  let { get_ma; get_close } = callbacks_from_bars ~config ~bars in
+  (* The original wrapper short-circuited on an empty MA series; the callback
+     entry already does that via [get_ma ~week_offset:0 = None], so this is
+     equivalent and keeps a single early-return. *)
+  classify_with_callbacks ~config ~get_ma ~get_close ~prior_stage

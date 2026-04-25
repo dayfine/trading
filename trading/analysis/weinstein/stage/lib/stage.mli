@@ -80,6 +80,28 @@ val classify :
     [get_ma]/[get_close] closures that index the resulting arrays. Behaviour is
     bit-identical to the callback API for the same underlying bars. *)
 
+type callbacks = {
+  get_ma : week_offset:int -> float option;
+      (** MA value at [week_offset] weeks back (offset 0 = current week). *)
+  get_close : week_offset:int -> float option;
+      (** Bar adjusted close at [week_offset] weeks back. *)
+}
+(** Bundle of indicator callbacks consumed by {!classify_with_callbacks}.
+
+    Higher-level callback APIs (e.g. {!Stock_analysis.analyze_with_callbacks})
+    embed this record so they can thread Stage's callbacks through one nested
+    bundle rather than re-exposing the individual closures at every layer. *)
+
+val callbacks_from_bars :
+  config:config -> bars:Types.Daily_price.t list -> callbacks
+(** [callbacks_from_bars ~config ~bars] precomputes the MA series from [bars]
+    and returns a {!callbacks} record whose closures index the resulting arrays.
+    The constructor [{ classify }] uses internally; exposed for callers that
+    already hold a [bars] list and want to delegate to
+    {!classify_with_callbacks} via the same plumbing. Behaviour matches
+    {!classify}: an empty MA series produces a [get_ma ~week_offset:0 = None],
+    which the callback entry handles by returning the Stage1 default result. *)
+
 val classify_with_callbacks :
   config:config ->
   get_ma:(week_offset:int -> float option) ->

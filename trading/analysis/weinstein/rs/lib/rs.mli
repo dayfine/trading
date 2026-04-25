@@ -68,6 +68,30 @@ val analyze :
     aligned arrays. Behaviour is bit-identical to the callback API for the same
     underlying aligned series. *)
 
+type callbacks = {
+  get_stock_close : week_offset:int -> float option;
+      (** Stock weekly adjusted close at [week_offset] weeks back. *)
+  get_benchmark_close : week_offset:int -> float option;
+      (** Benchmark weekly adjusted close at [week_offset] weeks back. *)
+  get_date : week_offset:int -> Core.Date.t option;
+      (** Calendar date for the aligned [week_offset]. *)
+}
+(** Bundle of indicator callbacks consumed by {!analyze_with_callbacks}.
+
+    All three closures must be date-aligned: at any [week_offset:k], they refer
+    to the same week. {!callbacks_from_bars} guarantees this for the bar-list
+    path; panel-backed callers are responsible for the alignment. *)
+
+val callbacks_from_bars :
+  stock_bars:Daily_price.t list ->
+  benchmark_bars:Daily_price.t list ->
+  callbacks
+(** [callbacks_from_bars ~stock_bars ~benchmark_bars] joins the two lists on
+    date and returns a {!callbacks} record whose closures index the resulting
+    aligned triples. The constructor [{ analyze }] uses internally; exposed for
+    callers (e.g. {!Stock_analysis.analyze}) that already hold both bar lists
+    and want to delegate to {!analyze_with_callbacks} via the same plumbing. *)
+
 val analyze_with_callbacks :
   config:config ->
   get_stock_close:(week_offset:int -> float option) ->
