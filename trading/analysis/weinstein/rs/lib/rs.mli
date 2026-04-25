@@ -60,4 +60,49 @@ val analyze :
 
     Returns [None] when there are fewer than [rs_ma_period] aligned bars.
 
-    Pure function. *)
+    Pure function.
+
+    Implementation note: this is a thin wrapper over {!analyze_with_callbacks}.
+    It first joins the two bar lists on date, then builds [get_stock_close],
+    [get_benchmark_close], and [get_date] closures that index the resulting
+    aligned arrays. Behaviour is bit-identical to the callback API for the same
+    underlying aligned series. *)
+
+val analyze_with_callbacks :
+  config:config ->
+  get_stock_close:(week_offset:int -> float option) ->
+  get_benchmark_close:(week_offset:int -> float option) ->
+  get_date:(week_offset:int -> Core.Date.t option) ->
+  result option
+(** [analyze_with_callbacks ~config ~get_stock_close ~get_benchmark_close
+     ~get_date] is the indicator-callback shape of {!analyze}. Used by
+    panel-backed callers that read aligned weekly closes via the strategy's
+    [get_indicator_fn] / panel views rather than walking [Daily_price.t list]s.
+
+    @param config Same configuration as {!analyze}.
+    @param get_stock_close
+      Returns the stock's weekly adjusted close at [week_offset] weeks back from
+      the current week ([week_offset:0] = current week, [1] = previous, etc.).
+      Returns [None] for offsets where no stock bar is available (warmup or out
+      of range).
+    @param get_benchmark_close
+      Returns the benchmark's weekly adjusted close at [week_offset]. Same
+      indexing as [get_stock_close]. Returns [None] for offsets where no
+      benchmark bar is available.
+    @param get_date
+      Returns the calendar date corresponding to [week_offset]. Same indexing as
+      the close callbacks; the caller is responsible for ensuring all three
+      callbacks return values for the same set of offsets (i.e., the panel
+      caller has already aligned the two series so that
+      [get_stock_close ~week_offset:k] and [get_benchmark_close ~week_offset:k]
+      correspond to the same week's [get_date ~week_offset:k]). Used to populate
+      [raw_rs.date] in the returned [history].
+
+    Walk semantics: walks back from [week_offset:0] until any of the three
+    callbacks returns [None], yielding the depth [n] of aligned weekly data.
+    Returns [None] if [n < rs_ma_period].
+
+    Pure function: same callback outputs always produce the same result. The
+    wrapper {!analyze} guarantees byte-identical results for any
+    [(stock_bars, benchmark_bars)] input by constructing callbacks that index
+    the same date-aligned series the bar-list path computes internally. *)
