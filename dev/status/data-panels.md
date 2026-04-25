@@ -5,7 +5,7 @@
 ## Status
 IN_PROGRESS
 
-Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 in progress on `feat/panels-stage02-no-bar-history`: foundation (Bar_panels reader + adjusted_close panel + 14 tests) committed; six-reader-site migration + Bar_history deletion + Tiered_runner panel build + parity gate strengthening still TODO. Scope re-estimated at ~1500 LOC, not the 400 LOC the plan §Stage 2 row claims.
+Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation (Bar_panels reader + adjusted_close panel) MERGED as #558. Stage 2 PR-B (Stage.classify reshape) on `feat/panels-stage02-pr-b-stage-classify` READY_FOR_REVIEW: adds `classify_with_callbacks ~get_ma ~get_close` callback-shape API; existing `classify ~bars` becomes a thin wrapper preserving byte-identical behavior; 6 new parity tests cover all four Stage variants + late-Stage-2 + insufficient-data cases.
 
 ## Interface stable
 NO
@@ -40,7 +40,16 @@ reader audit) carry forward.
 - **PR #554** merged 2026-04-25 (plan ratified).
 - **PR #555** (Stage 0 spike) merged 2026-04-25. Implements `Symbol_index`, `Ohlcv_panels`, `Ema_kernel`, `Panel_snapshot` under `trading/trading/data_panel/`. 20 tests pass; EMA parity bit-identical at N=100 T=252 P=50; snapshot round-trip bit-identical. QC structural + behavioral both APPROVED.
 - **PR #557** (Stage 1) merged 2026-04-25.
-- **`feat/panels-stage02-no-bar-history`** (Stage 2, IN_PROGRESS — foundation only):
+- **PR #558** (Stage 2 foundation) merged 2026-04-25. Adds `Bar_panels` reader + `adjusted_close` panel.
+- **`feat/panels-stage02-pr-b-stage-classify`** (Stage 2 PR-B, READY_FOR_REVIEW) — first callee reshape (PR-B in the eight-PR A–H sequence per plan).
+  - Adds `Stage.classify_with_callbacks ~get_ma:(week_offset:int -> float option) ~get_close:(week_offset:int -> float option)` — the indicator-callback shape of `Stage.classify`. `week_offset:0` = current week, `1` = previous, etc.; `None` = warmup or out-of-range.
+  - Reshapes Stage's internal helpers (`_compute_ma_slope_callback`, `_count_above_ma_callback`, `_is_late_stage2_callback`, `_ma_depth`, `_largest_defined_offset`) to read MA / close via callbacks.
+  - Existing `Stage.classify ~bars` is now a thin wrapper that precomputes the MA series + closes once into arrays, builds `get_ma`/`get_close` closures over those arrays, and delegates to `classify_with_callbacks`. Behaviour is byte-identical for all bar-list callers; nothing in the call graph (`weinstein_strategy.ml`, screener cascade, etc.) needs to change.
+  - Six new parity tests in `test_stage.ml` covering Stage1/Stage2/Stage3/Stage4 on 100-bar synthetic series + late-Stage-2 deceleration + insufficient-data early-return. Each test builds external `get_ma`/`get_close` callbacks with the same indexing rules the wrapper uses internally and asserts `Stage.result` is bit-identical between the bar-list and callback paths (via structural `equal_to` over float fields, so any drift fails).
+  - Verify: `cd trading/trading && dune build && dune runtest analysis/weinstein/stage/test` (18 tests, all OK). Full `dune runtest` passes; only the two pre-existing linter failures (csv_storage.ml nesting, tiered_runner.ml magic numbers) remain — both unrelated to this PR.
+  - File length: stage.ml grows from 295 to ~390 lines and now carries `(* @large-module: ... *)` opt-in (rationale: the module holds two parallel entry points sharing one set of stage-selection helpers; splitting would cut bidirectional dependencies).
+  - PRs C–G follow the same recipe for Rs, Stock_analysis, Sector, Macro, Stops. PR-H finally ports the six `Bar_history` reader sites to use the new callback APIs and deletes `Bar_history`.
+- **`feat/panels-stage02-no-bar-history`** (Stage 2 foundation, MERGED #558):
   - Adds `Bar_panels` reader module (`trading/trading/data_panel/bar_panels.{ml,mli}`) — backs the strategy's bar-list reads with `Ohlcv_panels` slices. API mirrors `Bar_history`: `daily_bars_for ~symbol ~as_of_day`, `weekly_bars_for ~symbol ~n ~as_of_day`, `low_window ~symbol ~as_of_day ~len` (the support-floor primitive — returns a zero-copy `Bigarray.Array1.sub` over the Low panel row).
   - Adds `adjusted_close` panel to `Ohlcv_panels` (a Stage 2 prerequisite missed by Stage 0/1 — without it, panel-reconstructed `Daily_price.t` records would silently use raw close in indicator math, breaking parity for stocks with dividends or splits).
   - 14 new `bar_panels_test.ml` cases — calendar-mismatch rejection, daily-bars truncation, NaN-cell skip, weekly aggregation, low_window zero-copy slice, underflow/unknown-symbol/zero-len → None.

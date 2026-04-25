@@ -73,7 +73,50 @@ val classify :
       uses the long-term MA trend as a heuristic instead.
 
     Pure function: same [bars] and [prior_stage] always produce the same
-    [result]. *)
+    [result].
+
+    Implementation note: this is a thin wrapper over {!classify_with_callbacks}.
+    It precomputes the full MA series from [bars] and builds
+    [get_ma]/[get_close] closures that index the resulting arrays. Behaviour is
+    bit-identical to the callback API for the same underlying bars. *)
+
+val classify_with_callbacks :
+  config:config ->
+  get_ma:(week_offset:int -> float option) ->
+  get_close:(week_offset:int -> float option) ->
+  prior_stage:Weinstein_types.stage option ->
+  result
+(** [classify_with_callbacks ~config ~get_ma ~get_close ~prior_stage] is the
+    indicator-callback shape of {!classify}. Used by panel-backed callers that
+    read indicator values via {!Strategy_interface.get_indicator_fn} rather than
+    walking a [Daily_price.t list].
+
+    @param config Classification parameters (same as {!classify}).
+    @param get_ma
+      Returns the configured moving-average value at [week_offset] weeks back
+      from the current week ([week_offset:0] = current week, [1] = previous,
+      etc.). Returns [None] for offsets where the MA is not yet available
+      (warmup) or out of range. [get_ma ~week_offset:0] returning [None]
+      triggers the Stage1 default-result early-return (matches the "empty MA
+      series" branch in {!classify}).
+    @param get_close
+      Returns the bar close (adjusted for splits/dividends in panel-backed
+      callers) at [week_offset] weeks back. Used by the [above_ma_count]
+      computation to determine whether price is above the MA. [None] = no bar at
+      that offset (treated as not-above and stops the count walk).
+    @param prior_stage Same as {!classify}.
+
+    Pure function: same callback outputs and [prior_stage] always produce the
+    same [result]. The wrapper {!classify} guarantees byte-identical results for
+    any [bars] input by constructing callbacks that index the same pre-computed
+    MA series.
+
+    Walk-back semantics for the lookback MA: when
+    [get_ma ~week_offset:slope_lookback] returns [None] (not enough MA history),
+    this function walks down through smaller offsets
+    [slope_lookback - 1, slope_lookback - 2, ...] until it finds a defined MA.
+    This mirrors the [List.hd_exn ma_series] fallback in {!classify} when
+    [n <= slope_lookback]. *)
 
 (** {2 Followup / Known Improvements}
 
