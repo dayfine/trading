@@ -100,4 +100,11 @@ val run_backtest :
       [Bar_loader] then bulk-promotes the universe to Metadata under a
       [Promote_metadata] trace wrap (no [Load_bars] phase emitted on this path);
       per-bar tier transitions emit [Promote_summary] / [Promote_full] /
-      [Demote] records via the loader's tier-op trace hook. *)
+      [Demote] records via the loader's tier-op trace hook.
+    - [Panel] — Stage 1 of the columnar data-shape redesign (see
+      {!Panel_runner}). Reuses the Tiered execution flow and additionally builds
+      [Ohlcv_panels] + [Indicator_panels] over the universe + a per-tick
+      panel-backed [get_indicator_fn]. [Bar_history] stays alive in this stage;
+      the Weinstein strategy does not yet consume the panel-backed
+      [get_indicator] so behaviour is identical to Tiered (parity gate locked in
+      [test_panel_loader_parity]). *)

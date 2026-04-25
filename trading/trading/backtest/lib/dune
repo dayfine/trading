@@ -7,6 +7,7 @@
   weinstein.data_source
   trading.backtest.bar_loader
   trading.backtest.loader_strategy
+  trading.data_panel
   trading.base
   trading.engine
   trading.simulation

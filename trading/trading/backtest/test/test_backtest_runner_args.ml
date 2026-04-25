@@ -71,6 +71,16 @@ let test_loader_strategy_tiered _ =
           (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
           (equal_to (Some Loader_strategy.Tiered))))
 
+let test_loader_strategy_panel _ =
+  let result =
+    Backtest_runner_args.parse [ "2018-01-02"; "--loader-strategy"; "panel" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
+          (equal_to (Some Loader_strategy.Panel))))
+
 let test_trace_flag _ =
   let result =
     Backtest_runner_args.parse [ "2018-01-02"; "--trace"; "/tmp/run.sexp" ]
@@ -254,6 +264,7 @@ let suite =
          "start and end date" >:: test_start_and_end_date;
          "--loader-strategy legacy" >:: test_loader_strategy_legacy;
          "--loader-strategy tiered" >:: test_loader_strategy_tiered;
+         "--loader-strategy panel" >:: test_loader_strategy_panel;
          "--trace flag captures path" >:: test_trace_flag;
          "no --trace yields trace_path = None" >:: test_trace_default_is_none;
          "--trace composes with other flags" >:: test_trace_with_other_flags;

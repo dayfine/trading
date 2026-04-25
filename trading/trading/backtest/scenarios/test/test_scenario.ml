@@ -217,6 +217,21 @@ let test_loader_strategy_tiered_roundtrip _ =
   assert_that roundtripped.loader_strategy
     (is_some_and (equal_to Loader_strategy.Tiered))
 
+(* Panel was added in Stage 1 of the columnar redesign (see
+   [dev/plans/columnar-data-shape-2026-04-25.md]). Same round-trip contract
+   as Tiered. *)
+let test_loader_strategy_panel_roundtrip _ =
+  let original =
+    Scenario.t_of_sexp
+      (Sexp.of_string
+         (_make_sexp_with_loader_strategy ~loader_strategy:"Panel"))
+  in
+  assert_that original.loader_strategy
+    (is_some_and (equal_to Loader_strategy.Panel));
+  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
+  assert_that roundtripped.loader_strategy
+    (is_some_and (equal_to Loader_strategy.Panel))
+
 let suite =
   "Scenario"
   >::: [
@@ -233,6 +248,8 @@ let suite =
          "loader_strategy absent => None" >:: test_loader_strategy_field_absent;
          "loader_strategy=Tiered round-trips"
          >:: test_loader_strategy_tiered_roundtrip;
+         "loader_strategy=Panel round-trips"
+         >:: test_loader_strategy_panel_roundtrip;
          "all scenario files parse" >:: test_all_scenario_files_parse;
        ]
 
