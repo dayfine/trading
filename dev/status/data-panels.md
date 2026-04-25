@@ -1,11 +1,11 @@
 # Status: data-panels
 
-## Last updated: 2026-04-25 (PR-E pushed)
+## Last updated: 2026-04-25
 
 ## Status
 READY_FOR_REVIEW
 
-Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation (Bar_panels reader + adjusted_close panel) MERGED as #558. Stage 2 PR-B (Stage.classify reshape) MERGED as #559. Stage 2 PR-C (Rs.analyze reshape) MERGED as #560. Stage 2 PR-D (Stock_analysis.analyze reshape) MERGED as #561. Stage 2 PR-E (Sector.analyze reshape) on `feat/panels-stage02-pr-e-sector-analyze` READY_FOR_REVIEW as PR #562: adds `analyze_with_callbacks ~callbacks` plus `Sector.callbacks` bundle wrapping `Stage.callbacks` + `Rs.callbacks`; the wrapper `analyze ~sector_bars ~benchmark_bars` builds the bundle via `callbacks_from_bars` and delegates. Sector itself reads no bar fields — it's a thin combinator over Stage.classify_with_callbacks and Rs.analyze_with_callbacks. 4 new parity tests cover high-confidence Stage2 + strong RS, low-confidence Stage4, mixed-stage constituents, and insufficient bars; each runs both entry points over the same input and asserts bit-identical `Sector.result` records via composed matchers. Net diff: 4 files, 257+/11-.
+Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PR-B (Stage.classify reshape) MERGED as #559. Stage 2 PR-C (Rs.analyze reshape) MERGED as #560. Stage 2 PR-D (Stock_analysis.analyze reshape) MERGED as #561. Stage 2 PR-E (Sector.analyze reshape) MERGED as #562. Stage 2 PR-F (Macro.analyze reshape) on `feat/panels-stage02-pr-f-macro-analyze` READY_FOR_REVIEW: adds `Macro.analyze_with_callbacks ~callbacks ~prior_stage ~prior` plus `Macro.callbacks` bundle that threads `Stage.callbacks` for the primary index, `(string * Stage.callbacks) list` for global indices, and three offset-indexed callbacks (`get_index_close`, `get_cumulative_ad`, `get_ad_momentum_ma`). Bar-list `Macro.analyze` is now a wrapper that pre-computes the cumulative A-D float array and the momentum MA scalar via `callbacks_from_bars` and delegates. Module split: `macro.ml` (orchestrator + bar-list wrapper plumbing, 187 lines) + new `macro_indicators.ml` (per-indicator helpers, 277 lines), keeping each file under the 300-line limit. 5 new parity tests cover bullish (Stage2 + positive A-D divergence), bearish (Stage4 + negative A-D), neutral-flat-no-AD, insufficient bars, and partial-global-indices (mixed regimes); each asserts bit-identical `Macro.result` via composed matchers (Stage float fields, indicator-by-indicator readings, structural equal_to over rationale / trend / confidence). Net diff: 7 files, 696+/221-.
 
 ## Interface stable
 NO
