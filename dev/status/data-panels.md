@@ -3,7 +3,7 @@
 ## Last updated: 2026-04-25
 
 ## Status
-PENDING
+IN_PROGRESS — Stage 0 spike implemented and pushed; awaiting human review of spike result before Stages 1+ are unblocked.
 
 ## Interface stable
 N/A — pre-implementation
@@ -36,12 +36,13 @@ reader audit) carry forward.
 ## Open work
 
 - **PR #554** (this plan, doc-only) — open for human review.
+- **`feat/panels-stage00-spike`** (Stage 0 spike) — pushed; PR open for review. Implements `Symbol_index`, `Ohlcv_panels`, `Ema_kernel`, `Panel_snapshot` under `trading/trading/data_panel/`. 20 tests pass; EMA parity bit-identical at N=100 T=252 P=50; snapshot round-trip bit-identical for single + multi-panel cases. RSS gate (≤50% of scalar at N=300 T=6y on bull-crash goldens) is NOT measured at Stage 0 by design — that's a follow-up sweep run once Stages 1+ wire panels into the runner.
 
 ## Five-stage phasing (from the plan)
 
 | Stage | Owner | Scope | Branch | LOC |
 |---|---|---|---|---|
-| 0 | feat-backtest | Spike: `Symbol_index`, OHLCV panels, EMA kernel, parity test, snapshot serialization | `feat/panels-stage00-spike` | ~450 |
+| 0 | feat-backtest | Spike: `Symbol_index`, OHLCV panels, EMA kernel, parity test, snapshot serialization — **IN_PROGRESS** | `feat/panels-stage00-spike` | ~700 (incl. tests) |
 | 1 | feat-backtest | Panel-backed `get_indicator` for EMA/SMA/ATR/RSI; Bar_history kept alive | `feat/panels-stage01-get-indicator` | ~500 |
 | 2 | feat-backtest | Replace 6 Bar_history reader sites with panel views; delete Bar_history | `feat/panels-stage02-no-bar-history` | ~400 |
 | 3 | feat-backtest | Collapse Bar_loader tier system + Friday cycle | `feat/panels-stage03-tier-collapse` | ~400 |
@@ -63,6 +64,38 @@ If Stage 0 spike fails any of these, abort migration and revisit:
   bull-crash goldens (target gain ≥ 30%)
 - Snapshot serialization round-trip: bit-identical values, load wall
   < 100 ms at N=1000 T=3y
+
+### Stage 0 result (2026-04-25, branch `feat/panels-stage00-spike`)
+
+- **EMA parity: PASSED — bit-identical (max_ulp=0, max_abs=0.0)** at
+  N=100 symbols × T=252 days × period=50 against a scalar reference
+  using the same expression form (warmup = left-to-right `+.`
+  accumulation; recurrence = bind `new_v` and `prev` to locals before
+  the multiply-add).
+  - Surprise observation: an earlier reference variant that inlined
+    `data.(t)` and `out.(t-1)` directly into the multiply-add drifted
+    by 1–6 ULP over compounded 1y. The OCaml compiler schedules
+    instructions differently when reads aren't bound to named locals,
+    and IEEE 754 multiplication isn't associative. **For Stage 1+
+    indicator ports, ensure the kernel and any reference comparator
+    use identical expression form** — specifically, named locals for
+    each panel read before the arithmetic. Documented inline in
+    `ema_kernel_test.ml` and the kernel's `.mli`.
+- **Snapshot round-trip: PASSED — bit-identical** on single-panel
+  (3×5 Float64) and multi-panel (2×4, three panels including NaN +
+  inf cells) cases. Format is `[int64-LE header_len][sexp header][page-aligned float64 panels]`;
+  load uses `Caml_unix.map_file` so it is mmap-backed and effectively
+  O(milliseconds). Wall-clock measurement at N=1000 T=3y is deferred
+  to Stage 1+ alongside the RSS sweep.
+- **RSS gate: NOT measured at Stage 0**. The dispatch explicitly
+  scoped this out — RSS measurement against the bull-crash N=300 T=6y
+  goldens needs the perf-sweep harness wired in, which only happens
+  when Stages 1+ start consuming panels in the runner. That sweep is
+  the post-merge follow-up.
+- **Verify**: `cd trading/trading && dune build data_panel/ &&
+  for t in symbol_index ohlcv_panels ema_kernel panel_snapshot; do
+  ../_build/default/trading/data_panel/test/${t}_test.exe; done`
+  (20 tests, all OK).
 
 ## Memory targets (from plan §Memory expectations)
 
