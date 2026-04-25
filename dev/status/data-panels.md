@@ -3,9 +3,9 @@
 ## Last updated: 2026-04-25
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
-Stage 0 MERGED as #555 (2026-04-25). Stage 1 on `feat/panels-stage01-get-indicator` (PR #557). Stages 2-5 still gated on human green-light per plan §Decision point.
+Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 in progress on `feat/panels-stage02-no-bar-history`: foundation (Bar_panels reader + adjusted_close panel + 14 tests) committed; six-reader-site migration + Bar_history deletion + Tiered_runner panel build + parity gate strengthening still TODO. Scope re-estimated at ~1500 LOC, not the 400 LOC the plan §Stage 2 row claims.
 
 ## Interface stable
 NO
@@ -39,7 +39,21 @@ reader audit) carry forward.
 
 - **PR #554** merged 2026-04-25 (plan ratified).
 - **PR #555** (Stage 0 spike) merged 2026-04-25. Implements `Symbol_index`, `Ohlcv_panels`, `Ema_kernel`, `Panel_snapshot` under `trading/trading/data_panel/`. 20 tests pass; EMA parity bit-identical at N=100 T=252 P=50; snapshot round-trip bit-identical. QC structural + behavioral both APPROVED.
-- **`feat/panels-stage01-get-indicator`** (Stage 1, READY_FOR_REVIEW). Adds:
+- **PR #557** (Stage 1) merged 2026-04-25.
+- **`feat/panels-stage02-no-bar-history`** (Stage 2, IN_PROGRESS — foundation only):
+  - Adds `Bar_panels` reader module (`trading/trading/data_panel/bar_panels.{ml,mli}`) — backs the strategy's bar-list reads with `Ohlcv_panels` slices. API mirrors `Bar_history`: `daily_bars_for ~symbol ~as_of_day`, `weekly_bars_for ~symbol ~n ~as_of_day`, `low_window ~symbol ~as_of_day ~len` (the support-floor primitive — returns a zero-copy `Bigarray.Array1.sub` over the Low panel row).
+  - Adds `adjusted_close` panel to `Ohlcv_panels` (a Stage 2 prerequisite missed by Stage 0/1 — without it, panel-reconstructed `Daily_price.t` records would silently use raw close in indicator math, breaking parity for stocks with dividends or splits).
+  - 14 new `bar_panels_test.ml` cases — calendar-mismatch rejection, daily-bars truncation, NaN-cell skip, weekly aggregation, low_window zero-copy slice, underflow/unknown-symbol/zero-len → None.
+  - Verify: `dune runtest data_panel` (60 tests, including 14 new); full `dune runtest` passes.
+  - **Stage 2 dispatch deviation**: the dispatch read Stage 2 as a 6-reader-site swap from `Bar_history.weekly_bars_for sym` to a single `get_indicator_fn` MA read. The actual code shape is different — every reader site consumes `Daily_price.t list` (passed into `Stage.classify`, `Sector.analyze`, `Macro.analyze`, `Stock_analysis.analyze`, `Weinstein_stops.compute_initial_stop_with_floor` — none of which take MA values directly). Replacing list reads with single-value MA reads requires reshaping all of those callees, which crosses the line into Stage 4 territory. The pragmatic Stage 2 path is: keep callees list-shaped; back the lists with on-the-fly panel reconstruction via `Bar_panels`. This still eliminates the parallel `Bar_history` cache (the +95% Tiered RSS gap source) and lands the structural memory win.
+- **Stage 2 work remaining** (estimated ~1100 LOC across follow-up sessions):
+  - Update `Panel_runner` and `Tiered_runner` to build a `Bar_panels.t` (the latter requires also building `Ohlcv_panels` in the Tiered path, since today's Tiered loader doesn't use panels).
+  - Change `Weinstein_strategy.make` from `?bar_history` to `?bar_panels`. Internal calls switch from `Bar_history.weekly_bars_for` → `Bar_panels.weekly_bars_for ~as_of_day`. Today's `as_of_day` is derived from the strategy wrapper's calendar lookup (Panel_strategy_wrapper already does this; need to plumb it into the inner strategy).
+  - Migrate 6 reader sites: `macro_inputs.ml:28,39` (build_global_index_bars, _sector_context_for), `stops_runner.ml:11` (_compute_ma), `weinstein_strategy.ml:110,220,314` (entry initial-stop floor, screen-universe stage analysis, primary-index Friday detection).
+  - Delete `Bar_history` module + tests + the `Tiered_strategy_wrapper.bar_history` field + `_seed_from_full` + `_run_friday_cycle` seed step (the Friday cycle's only purpose was Bar_history seeding; with panels pre-loaded, the seed is dead code).
+  - Update test fixtures: `test_weinstein_strategy.ml`, `test_stops_runner.ml`, `test_macro_inputs.ml`, `test_runner_tiered_cycle.ml`, `test_bar_history.ml` (delete the last; the others swap `Bar_history.create ()` for synthetic `Bar_panels.t` fixtures).
+  - Strengthen `test_panel_loader_parity`: full `round_trips` list bit-identity + per-step PV match across multiple scenarios. Today's gate is "vacuous" per QC behavioral pre-flag because the strategy doesn't yet read from panels.
+- **`feat/panels-stage01-get-indicator`** (Stage 1, MERGED #557). Adds:
   - `Sma_kernel`, `Atr_kernel` (Wilder), `Rsi_kernel` (Wilder), each with bit-identical scalar parity tests (max_ulp=0 at N=50–100 T=252).
   - `Indicator_spec` (hashable {name; period; cadence}) and `Indicator_panels` registry. Owns output panels + RSI scratch (avg_gain/avg_loss). Validates spec at create (Daily-only, period ≥ 1, name in {EMA,SMA,ATR,RSI}). `advance_all` dispatches per registered kernel.
   - `Get_indicator_adapter.make` produces the strategy's `get_indicator_fn` closure backed by panel reads (returns `None` for unknown symbols, unregistered specs, or NaN cells).
