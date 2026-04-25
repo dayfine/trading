@@ -194,10 +194,17 @@ let _stage_short_signal ~w ~(a : Stock_analysis.t) =
   | _ -> []
 
 (** Reduce a list of (points, label) signals to (total_score, rationale list).
-    Zero-point entries are dropped from both the total and the rationale. *)
+    Zero-point entries are dropped from both the total and the rationale. Was:
+    List.filter materialised a [non_zero] intermediate, then List.sum walked it
+    once for points and List.map walked it again for labels — three list
+    traversals and two intermediate lists per call. Now: a single
+    List.fold_right accumulates both the total score and the rationale list in
+    one pass with no intermediate. fold_right preserves the original signal
+    order in the rationale, matching the prior List.map behaviour. Called twice
+    per scored candidate (long + short). *)
 let _tally signals =
-  let non_zero = List.filter signals ~f:(fun (pts, _) -> pts <> 0) in
-  (List.sum (module Int) non_zero ~f:fst, List.map non_zero ~f:snd)
+  List.fold_right signals ~init:(0, []) ~f:(fun (pts, label) (sum, labels) ->
+      if pts = 0 then (sum, labels) else (sum + pts, label :: labels))
 
 (* ------------------------------------------------------------------ *)
 (* Scoring                                                              *)
@@ -431,12 +438,14 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   let buys_active =
     match macro_trend with Bullish | Neutral -> true | Bearish -> false
   in
+  (* Was: chained filter |> map allocated two lists (one for the held-set
+     filter, one for the (analysis, sector) pairs). Now: single-pass
+     filter_map keeps only one output list. Runs every Friday over the full
+     screened universe (potentially thousands of symbols). *)
   let candidates =
-    stocks
-    |> List.filter ~f:(fun (a : Stock_analysis.t) ->
-        not (Set.mem held_set a.ticker))
-    |> List.map ~f:(fun (a : Stock_analysis.t) ->
-        (a, _resolve_sector ~sector_map a.ticker))
+    List.filter_map stocks ~f:(fun (a : Stock_analysis.t) ->
+        if Set.mem held_set a.ticker then None
+        else Some (a, _resolve_sector ~sector_map a.ticker))
   in
   let buy_candidates =
     _evaluate_longs ~weights ~thresholds:grade_thresholds

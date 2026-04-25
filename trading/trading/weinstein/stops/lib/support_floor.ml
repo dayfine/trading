@@ -1,21 +1,37 @@
 open Core
 open Trading_base.Types
 
-(* Bars eligible for the window: those dated on or before [as_of]. *)
-let _eligible ~bars ~as_of =
-  List.filter bars ~f:(fun (b : Types.Daily_price.t) ->
-      Date.( <= ) b.date as_of)
+(* Single-pass collector: walks [bars] once accumulating eligible bars
+   (date <= as_of) into a reversed list and counting them. The reversed
+   layout means the trailing [lookback_bars] of the original chronological
+   sequence is the [List.take lookback_bars] prefix of the reversed list. *)
+let _collect_eligible_rev ~bars ~as_of =
+  List.fold bars ~init:([], 0) ~f:(fun (acc, n) (b : Types.Daily_price.t) ->
+      if Date.( <= ) b.date as_of then (b :: acc, n + 1) else (acc, n))
 
-(* Trailing [lookback_bars] of [eligible]. Assumes chronological order. *)
-let _trim_to_lookback eligible lookback_bars =
-  let n = List.length eligible in
-  if n <= lookback_bars then eligible else List.drop eligible (n - lookback_bars)
+(* Trim a reversed eligible list (newest first) to the trailing [lookback_bars]
+   and restore chronological order. *)
+let _trim_rev_to_lookback eligible_rev ~n_eligible ~lookback_bars =
+  let truncated =
+    if n_eligible <= lookback_bars then eligible_rev
+    else List.take eligible_rev lookback_bars
+  in
+  List.rev truncated
 
 (* Bars in the window dated on or before [as_of], trimmed to the trailing
-   [lookback_bars]. Assumes [bars] is chronological (oldest first). *)
+   [lookback_bars]. Assumes [bars] is chronological (oldest first).
+
+   Was: List.filter allocated an [eligible] intermediate, then List.length
+   measured it (O(n) spine walk), then List.drop allocated a suffix copy —
+   three list traversals and two intermediate lists per call. Now: a single
+   fold accumulates eligible bars (reversed) with a count, then we either
+   reverse-the-whole-thing or take-then-reverse the trailing window. One
+   call per held position per stop adjustment day. *)
 let _window ~bars ~as_of ~lookback_bars =
   if lookback_bars <= 0 then []
-  else _trim_to_lookback (_eligible ~bars ~as_of) lookback_bars
+  else
+    let eligible_rev, n_eligible = _collect_eligible_rev ~bars ~as_of in
+    _trim_rev_to_lookback eligible_rev ~n_eligible ~lookback_bars
 
 (* Anchor extreme for the given side:
    Long  → highest [high_price] (the peak from which price fell).

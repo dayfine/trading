@@ -163,25 +163,45 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
+(** Try to convert a single screener candidate to a kept transition. Returns
+    [None] when the ticker is already held, when sizing rejects it, or when cash
+    is insufficient. *)
+let _candidate_to_transition ~held_set ~make_entry ~remaining_cash
+    (c : Screener.scored_candidate) =
+  if Set.mem held_set c.ticker then None
+  else Option.bind (make_entry c) ~f:(_check_cash_and_deduct remaining_cash)
+
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
     Public (see .mli) so callers running custom screening out-of-band can feed
-    candidates through the same entry pipeline the strategy uses. *)
+    candidates through the same entry pipeline the strategy uses.
+
+    Was: chained [List.filter |> List.filter_map |> List.filter_map] over
+    [candidates] — three list traversals each allocating a fresh intermediate
+    list. Now: one [List.fold] walks [candidates] once, calls
+    [_candidate_to_transition] per element, and accumulates a single reversed
+    output list. The cash-deduction side effect on [remaining_cash] runs in the
+    same order it did before — every successful entry decrements
+    [remaining_cash] before the next candidate is considered — so we preserve
+    the "first-come keeps cash" tie-break. Per the perf followup notes under
+    dev/notes/: List.filter was the top allocator on the strategy hot path. *)
 let entries_from_candidates ~config ~candidates ~stop_states ~bar_history
     ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
-  let held = held_symbols portfolio in
+  let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let remaining_cash = ref portfolio.cash in
   let make_entry =
     _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
       ~current_date
   in
-  candidates
-  |> List.filter ~f:(fun (c : Screener.scored_candidate) ->
-      not (List.mem held c.ticker ~equal:String.equal))
-  |> List.filter_map ~f:make_entry
-  |> List.filter_map ~f:(_check_cash_and_deduct remaining_cash)
+  List.fold candidates ~init:[] ~f:(fun acc c ->
+      match
+        _candidate_to_transition ~held_set ~make_entry ~remaining_cash c
+      with
+      | None -> acc
+      | Some kept -> kept :: acc)
+  |> List.rev
 
 (** Screen the universe for both long and short candidates, returning a combined
     transition list. Macro-trend gating lives in the screener itself:
