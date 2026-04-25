@@ -15,13 +15,22 @@ type t =
           loaders. Memory grows with universe size; current production
           behaviour. *)
   | Tiered
-      (** New path: [Bar_loader] keeps the working set bounded by tiering
+      (** Tiered path: [Bar_loader] keeps the working set bounded by tiering
           symbols across Metadata / Summary / Full and promoting/demoting on
-          demand. Not yet wired through the runner — see 3f. *)
+          demand. *)
+  | Panel
+      (** Stage 1 of the columnar data-shape redesign (see
+          [dev/plans/columnar-data-shape-2026-04-25.md]). The Tiered execution
+          path is reused; in addition the runner builds [Ohlcv_panels] +
+          [Indicator_panels] over the universe and supplies the strategy with a
+          panel-backed [get_indicator_fn]. [Bar_history] stays alive in this
+          stage; the change is opt-in and behaviourally equivalent to [Tiered]
+          on the indicators ported so far (EMA / SMA / ATR / RSI), since the
+          Weinstein strategy does not yet consume [get_indicator]. *)
 [@@deriving sexp, show, eq]
 
 val of_string : string -> t
-(** Accepts ["legacy"] / ["tiered"] (case-insensitive). Raises [Failure] on any
-    other input. Used by the [--loader-strategy] CLI flag parser in
-    [backtest_runner]. For the reverse direction (value → string, e.g. for log
-    formatting) use the ppx-derived [show] / [pp]. *)
+(** Accepts ["legacy"] / ["tiered"] / ["panel"] (case-insensitive). Raises
+    [Failure] on any other input. Used by the [--loader-strategy] CLI flag
+    parser in [backtest_runner]. For the reverse direction (value → string, e.g.
+    for log formatting) use the ppx-derived [show] / [pp]. *)

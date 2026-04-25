@@ -302,6 +302,14 @@ let _run_tiered_backtest ~deps ~start_date ~end_date ?trace () =
     ~input:(_tiered_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace ()
 
+(* Panel loader_strategy path — Stage 1 of the columnar data-shape redesign.
+   Plan lives under dev/plans/. Delegates to [Panel_runner], which builds
+   OHLCV + Indicator panels alongside reusing the Tiered execution flow. *)
+let _run_panel_backtest ~deps ~start_date ~end_date ?trace () =
+  Panel_runner.run
+    ~input:(_tiered_input_of_deps deps)
+    ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace ()
+
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?trace ?(loader_strategy = Loader_strategy.Legacy) () =
   let deps = _load_deps ?trace ~overrides ~sector_map_override () in
@@ -320,6 +328,8 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         _run_legacy ~deps ~start_date ~end_date ?trace ()
     | Loader_strategy.Tiered ->
         _run_tiered_backtest ~deps ~start_date ~end_date ?trace ()
+    | Loader_strategy.Panel ->
+        _run_panel_backtest ~deps ~start_date ~end_date ?trace ()
   in
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on

@@ -99,3 +99,51 @@ let load_from_csv symbol_index ~data_dir ~start_date ~n_days =
               symbol)
   in
   match result with Ok () -> Ok t | Error err -> Error err
+
+(* Build a [Date.t -> column] lookup from the calendar. The calendar is small
+   (typically a few thousand entries for multi-year backtests), so a Hashtbl
+   keyed on Date.t makes the per-bar resolution O(1). On duplicate dates in
+   the calendar (shouldn't happen but be defensive) keep the first
+   occurrence. *)
+let _calendar_index calendar =
+  let tbl = Hashtbl.create (module Date) in
+  Array.iteri calendar ~f:(fun i d ->
+      Hashtbl.add tbl ~key:d ~data:i |> (ignore : [ `Ok | `Duplicate ] -> unit));
+  tbl
+
+let _early_start_date = Date.create_exn ~y:1900 ~m:Month.Jan ~d:1
+
+(* Read every bar by passing a very early start_date; the calendar then
+   filters which bars actually land in the panels. *)
+let _load_one_symbol_calendar t ~row ~calendar_idx ~data_dir symbol =
+  let path = _csv_path_for ~data_dir symbol in
+  match Sys_unix.file_exists path with
+  | `No | `Unknown -> Ok () (* tolerate missing CSV: row stays NaN *)
+  | `Yes -> (
+      match Csv_storage.create ~data_dir symbol with
+      | Error err -> Error err
+      | Ok storage -> (
+          match Csv_storage.get storage ~start_date:_early_start_date () with
+          | Error err ->
+              if Status.equal_code err.code Status.NotFound then Ok ()
+              else Error err
+          | Ok prices ->
+              List.iter prices ~f:(fun (price : Types.Daily_price.t) ->
+                  match Hashtbl.find calendar_idx price.date with
+                  | None -> () (* date not in calendar: skip *)
+                  | Some day -> write_row t ~symbol_index:row ~day price);
+              Ok ()))
+
+let load_from_csv_calendar symbol_index ~data_dir ~calendar =
+  let n_days = Array.length calendar in
+  let t = create symbol_index ~n_days in
+  let calendar_idx = _calendar_index calendar in
+  let universe = Symbol_index.symbols symbol_index in
+  let result =
+    List.foldi universe ~init:(Ok ()) ~f:(fun row acc symbol ->
+        match acc with
+        | Error _ as e -> e
+        | Ok () ->
+            _load_one_symbol_calendar t ~row ~calendar_idx ~data_dir symbol)
+  in
+  match result with Ok () -> Ok t | Error err -> Error err

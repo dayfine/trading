@@ -3,10 +3,12 @@
 ## Last updated: 2026-04-25
 
 ## Status
-IN_PROGRESS — Stage 0 spike MERGED as #555 (2026-04-25). Stages 1-5 blocked on human green-light per plan §Decision point.
+READY_FOR_REVIEW
+
+Stage 0 MERGED as #555 (2026-04-25). Stage 1 on `feat/panels-stage01-get-indicator` (PR #557). Stages 2-5 still gated on human green-light per plan §Decision point.
 
 ## Interface stable
-N/A — pre-implementation
+NO
 
 ## Goal
 
@@ -37,6 +39,15 @@ reader audit) carry forward.
 
 - **PR #554** merged 2026-04-25 (plan ratified).
 - **PR #555** (Stage 0 spike) merged 2026-04-25. Implements `Symbol_index`, `Ohlcv_panels`, `Ema_kernel`, `Panel_snapshot` under `trading/trading/data_panel/`. 20 tests pass; EMA parity bit-identical at N=100 T=252 P=50; snapshot round-trip bit-identical. QC structural + behavioral both APPROVED.
+- **`feat/panels-stage01-get-indicator`** (Stage 1, READY_FOR_REVIEW). Adds:
+  - `Sma_kernel`, `Atr_kernel` (Wilder), `Rsi_kernel` (Wilder), each with bit-identical scalar parity tests (max_ulp=0 at N=50–100 T=252).
+  - `Indicator_spec` (hashable {name; period; cadence}) and `Indicator_panels` registry. Owns output panels + RSI scratch (avg_gain/avg_loss). Validates spec at create (Daily-only, period ≥ 1, name in {EMA,SMA,ATR,RSI}). `advance_all` dispatches per registered kernel.
+  - `Get_indicator_adapter.make` produces the strategy's `get_indicator_fn` closure backed by panel reads (returns `None` for unknown symbols, unregistered specs, or NaN cells).
+  - `Ohlcv_panels.load_from_csv_calendar` — calendar-aware loader that aligns CSV bars by date column. Dedicated test fixtures: two symbols with different start dates against a 5-day calendar, plus dates-outside-calendar and missing-CSV cases.
+  - `Loader_strategy.t` extended with `Panel`. New `Panel_runner` reuses Tiered execution + builds OHLCV panels (calendar-aware), Indicator_panels registry (default specs EMA-50 / SMA-50 / ATR-14 / RSI-14, daily), wraps strategy via `Panel_strategy_wrapper` which intercepts `on_market_close`, advances panels to today's column, and substitutes a panel-backed `get_indicator`.
+  - Integration parity gate `test_panel_loader_parity`: Tiered vs Panel on the 7-symbol bull-2019h2 fixture — n_round_trips, final PV, and step-sample PVs identical to ≤ $0.01.
+  - `Bar_history` left alive per Stage 1 invariant — Stage 2 deletes it.
+- **Verify** (Stage 1): `TRADING_DATA_DIR=$PWD/trading/test_data dune build && TRADING_DATA_DIR=$PWD/trading/test_data dune runtest data_panel/ backtest/test`. 46 data_panel tests + 13 backtest/test tests pass.
 
 ### Stage 1 pre-flags (from QC behavioral, non-blocking)
 
