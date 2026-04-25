@@ -50,6 +50,14 @@ type result = {
   rationale : string list;
 }
 
+type callbacks = {
+  index_stage : Stage.callbacks;
+  get_index_close : week_offset:int -> float option;
+  get_cumulative_ad : week_offset:int -> float option;
+  get_ad_momentum_ma : week_offset:int -> float option;
+  global_index_stages : (string * Stage.callbacks) list;
+}
+
 let default_indicator_weights =
   {
     w_index_stage = 3.0;

@@ -4,7 +4,7 @@ open Weinstein_types
 include Macro_types
 
 (* ------------------------------------------------------------------ *)
-(* Internal helpers                                                     *)
+(* Internal helpers — confidence + trend                                *)
 (* ------------------------------------------------------------------ *)
 
 (** Compute composite confidence from weighted indicator readings.
@@ -35,241 +35,153 @@ let _classify_trend ~bullish_threshold ~bearish_threshold confidence :
   else if Float.(confidence < bearish_threshold) then Bearish
   else Neutral
 
-let _stage1_detail transition =
-  match transition with
-  | Some (Stage4 _, _) -> (`Neutral, "Index entering Stage 1 base after Stage 4")
-  | _ -> (`Neutral, "Index in Stage 1 base")
-
-let _stage3_detail transition =
-  match transition with
-  | Some (Stage2 _, Stage3 _) ->
-      (`Bearish, "Index entering Stage 3 top — caution")
-  | _ -> (`Bearish, "Index in Stage 3 top")
-
-(** Analyze index stage signal. *)
-let _index_stage_signal ~weight (stage_result : Stage.result) :
-    indicator_reading =
-  let signal, detail =
-    match stage_result.stage with
-    | Stage2 { late = false; _ } -> (`Bullish, "Index in Stage 2 (advancing)")
-    | Stage2 { late = true; _ } ->
-        (`Neutral, "Index in late Stage 2 (decelerating)")
-    | Stage1 _ -> _stage1_detail stage_result.transition
-    | Stage4 _ -> (`Bearish, "Index in Stage 4 (declining)")
-    | Stage3 _ -> _stage3_detail stage_result.transition
-  in
-  { name = "Index Stage"; signal; weight; detail }
-
-(** Build cumulative A-D line from daily advance/decline bars. *)
-let _build_cum_ad ad_bars =
-  List.fold ad_bars ~init:[] ~f:(fun acc bar ->
-      let net = bar.advancing - bar.declining in
-      let prev = Option.value (List.hd acc) ~default:0 in
-      (prev + net) :: acc)
-  |> List.rev
-
-(** Compute A-D divergence signal given a pre-built cumulative A-D list. *)
-let _ad_divergence_signal ~ad_min_bars ~ad_line_lookback ~cum_ad
-    ~(index_bars : Daily_price.t list) =
-  let n_ad = List.length cum_ad in
-  let n_idx = List.length index_bars in
-  let lookback = min ad_line_lookback (min n_ad n_idx) in
-  if lookback < ad_min_bars then (`Neutral, "Insufficient A-D data")
-  else
-    let ad_recent = List.last_exn cum_ad in
-    let ad_prior = List.nth_exn cum_ad (n_ad - lookback) in
-    let idx_recent = (List.last_exn index_bars).Daily_price.adjusted_close in
-    let idx_prior =
-      (List.nth_exn index_bars (n_idx - lookback)).Daily_price.adjusted_close
-    in
-    let ad_rising = ad_recent > ad_prior in
-    let idx_rising = Float.(idx_recent > idx_prior) in
-    match (idx_rising, ad_rising) with
-    | true, true -> (`Bullish, "A-D line confirming index advance")
-    | false, false -> (`Bearish, "A-D line confirming index decline")
-    | true, false ->
-        (`Bearish, "A-D line diverging bearishly (index up, A-D down)")
-    | false, true ->
-        (`Bullish, "A-D line diverging bullishly (index down, A-D up)")
-
-(** Compute A-D cumulative line and detect divergence vs index. *)
-let _ad_line_signal ~weight ~ad_min_bars ~ad_line_lookback ~ad_bars
-    ~(index_bars : Daily_price.t list) : indicator_reading =
-  if List.is_empty ad_bars || List.is_empty index_bars then
-    { name = "A-D Line"; signal = `Neutral; weight; detail = "No A-D data" }
-  else
-    let cum_ad = _build_cum_ad ad_bars in
-    let signal, detail =
-      _ad_divergence_signal ~ad_min_bars ~ad_line_lookback ~cum_ad ~index_bars
-    in
-    { name = "A-D Line"; signal; weight; detail }
-
-(** Compute simple moving average of the A-D net series. *)
-let _compute_momentum_ma ~momentum_period ~ad_bars =
-  let nets = List.map ad_bars ~f:(fun b -> b.advancing - b.declining) in
-  let period = min momentum_period (List.length nets) in
-  let recent_nets =
-    List.rev nets |> (fun l -> List.sub l ~pos:0 ~len:period) |> List.rev
-  in
-  let sum = List.sum (module Int) recent_nets ~f:Fn.id in
-  Float.of_int sum /. Float.of_int period
-
-(** Signal zero-line crossing of the A-D momentum MA. *)
-let _momentum_index_signal ~weight ~momentum_period ~ad_bars : indicator_reading
-    =
-  if List.is_empty ad_bars then
-    {
-      name = "Momentum Index";
-      signal = `Neutral;
-      weight;
-      detail = "No A-D data";
-    }
-  else
-    let ma = _compute_momentum_ma ~momentum_period ~ad_bars in
-    let signal, detail =
-      if Float.(ma > 0.0) then
-        (`Bullish, Printf.sprintf "Momentum index positive (%.1f)" ma)
-      else (`Bearish, Printf.sprintf "Momentum index negative (%.1f)" ma)
-    in
-    { name = "Momentum Index"; signal; weight; detail }
-
-(** Compute NH-NL proxy signal from index price trend. *)
-let _nh_nl_trend_signal ~nh_nl_lookback ~nh_nl_up_threshold
-    ~nh_nl_down_threshold ~(index_bars : Daily_price.t list) =
-  let n = List.length index_bars in
-  let lookback = min nh_nl_lookback (n - 1) in
-  let recent = (List.last_exn index_bars).Daily_price.adjusted_close in
-  let prior =
-    (List.nth_exn index_bars (n - 1 - lookback)).Daily_price.adjusted_close
-  in
-  if Float.(recent > prior *. nh_nl_up_threshold) then
-    (`Bullish, "Index trending higher over 3 months (NH-NL proxy positive)")
-  else if Float.(recent < prior *. nh_nl_down_threshold) then
-    (`Bearish, "Index trending lower over 3 months (NH-NL proxy negative)")
-  else (`Neutral, "Index flat over 3 months (NH-NL proxy neutral)")
-
-(** Check NH-NL indicator: ratio of new highs to (new highs + new lows). *)
-let _nh_nl_signal ~weight ~nh_nl_min_bars ~nh_nl_lookback ~nh_nl_up_threshold
-    ~nh_nl_down_threshold ~(index_bars : Daily_price.t list) : indicator_reading
-    =
-  (* We don't have NH-NL data directly; approximate using index MA slope as proxy *)
-  if List.length index_bars < nh_nl_min_bars then
-    { name = "NH-NL"; signal = `Neutral; weight; detail = "Insufficient data" }
-  else
-    let signal, detail =
-      _nh_nl_trend_signal ~nh_nl_lookback ~nh_nl_up_threshold
-        ~nh_nl_down_threshold ~index_bars
-    in
-    { name = "NH-NL"; signal; weight; detail }
-
-(** Classify each global index and compute the consensus signal. *)
-let _global_consensus_signal ~stage_config ~global_consensus_threshold
-    ~global_index_bars =
-  let classify_index bars =
-    let result = Stage.classify ~config:stage_config ~bars ~prior_stage:None in
-    match result.stage with
-    | Stage2 _ -> `Bullish
-    | Stage4 _ -> `Bearish
-    | _ -> `Neutral
-  in
-  let signals =
-    List.map global_index_bars ~f:(fun (_, bars) -> classify_index bars)
-  in
-  let bullish_count =
-    List.count signals ~f:(fun s ->
-        match s with `Bullish -> true | _ -> false)
-  in
-  let bearish_count =
-    List.count signals ~f:(fun s ->
-        match s with `Bearish -> true | _ -> false)
-  in
-  let total = List.length signals in
-  let bullish_frac = Float.of_int bullish_count /. Float.of_int total in
-  let bearish_frac = Float.of_int bearish_count /. Float.of_int total in
-  if Float.(bullish_frac > global_consensus_threshold) then
-    ( `Bullish,
-      Printf.sprintf "Global consensus bullish (%d/%d markets Stage2)"
-        bullish_count total )
-  else if Float.(bearish_frac > global_consensus_threshold) then
-    ( `Bearish,
-      Printf.sprintf "Global consensus bearish (%d/%d markets Stage4)"
-        bearish_count total )
-  else
-    ( `Neutral,
-      Printf.sprintf "Global markets mixed (%d bullish, %d bearish)"
-        bullish_count bearish_count )
-
-(** Check global index consensus: majority of world indices in bullish stages.
-*)
-let _global_signal ~weight ~stage_config ~global_consensus_threshold
-    ~(global_index_bars : (string * Daily_price.t list) list) :
-    indicator_reading =
-  if List.is_empty global_index_bars then
-    {
-      name = "Global Markets";
-      signal = `Neutral;
-      weight;
-      detail = "No global data";
-    }
-  else
-    let signal, detail =
-      _global_consensus_signal ~stage_config ~global_consensus_threshold
-        ~global_index_bars
-    in
-    { name = "Global Markets"; signal; weight; detail }
-
-(* ------------------------------------------------------------------ *)
-(* Main function                                                        *)
-(* ------------------------------------------------------------------ *)
-
-let _build_indicators ~config ~index_stage ~ad_bars ~index_bars
-    ~global_index_bars =
-  let { stage_config; indicator_weights = iw; indicator_thresholds = it; _ } =
-    config
-  in
-  [
-    _index_stage_signal ~weight:iw.w_index_stage index_stage;
-    _ad_line_signal ~weight:iw.w_ad_line ~ad_min_bars:it.ad_min_bars
-      ~ad_line_lookback:it.ad_line_lookback ~ad_bars ~index_bars;
-    _momentum_index_signal ~weight:iw.w_momentum_index
-      ~momentum_period:it.momentum_period ~ad_bars;
-    _nh_nl_signal ~weight:iw.w_nh_nl ~nh_nl_min_bars:it.nh_nl_min_bars
-      ~nh_nl_lookback:it.nh_nl_lookback
-      ~nh_nl_up_threshold:it.nh_nl_up_threshold
-      ~nh_nl_down_threshold:it.nh_nl_down_threshold ~index_bars;
-    _global_signal ~weight:iw.w_global ~stage_config
-      ~global_consensus_threshold:it.global_consensus_threshold
-      ~global_index_bars;
-  ]
-
-let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
-    : result =
-  let { stage_config; bullish_threshold; bearish_threshold; _ } = config in
-  let index_stage =
-    Stage.classify ~config:stage_config ~bars:index_bars ~prior_stage
-  in
-  let indicators =
-    _build_indicators ~config ~index_stage ~ad_bars ~index_bars
-      ~global_index_bars
-  in
-  let confidence = _compute_confidence indicators in
-  let trend =
-    _classify_trend ~bullish_threshold ~bearish_threshold confidence
-  in
-  let regime_changed =
-    match prior with
-    | None -> false
-    | Some p -> not (equal_market_trend trend p.trend)
-  in
-  let rationale =
+(** Build the rationale list from indicator readings and regime-change flag. *)
+let _build_rationale ~indicators ~regime_changed ~trend : string list =
+  let per_indicator =
     List.filter_map indicators ~f:(fun r ->
         match r.signal with
         | `Neutral -> None
         | `Bullish -> Some (Printf.sprintf "[Bullish] %s: %s" r.name r.detail)
         | `Bearish -> Some (Printf.sprintf "[Bearish] %s: %s" r.name r.detail))
-    @
+  in
+  let regime_line =
     if regime_changed then
       [ Printf.sprintf "Regime change: %s" (show_market_trend trend) ]
     else []
   in
+  per_indicator @ regime_line
+
+(** Detect whether [trend] differs from the prior result's trend. *)
+let _regime_changed_of ~trend ~prior =
+  match prior with
+  | None -> false
+  | Some p -> not (equal_market_trend trend p.trend)
+
+(* ------------------------------------------------------------------ *)
+(* Main function — callback shape                                       *)
+(* ------------------------------------------------------------------ *)
+
+let analyze_with_callbacks ~config ~(callbacks : callbacks) ~prior_stage ~prior
+    : result =
+  let { stage_config; bullish_threshold; bearish_threshold; _ } = config in
+  let index_stage =
+    Stage.classify_with_callbacks ~config:stage_config
+      ~get_ma:callbacks.index_stage.get_ma
+      ~get_close:callbacks.index_stage.get_close ~prior_stage
+  in
+  let indicators =
+    Macro_indicators.build_indicators_from_callbacks ~config ~index_stage
+      ~callbacks
+  in
+  let confidence = _compute_confidence indicators in
+  let trend =
+    _classify_trend ~bullish_threshold ~bearish_threshold confidence
+  in
+  let regime_changed = _regime_changed_of ~trend ~prior in
+  let rationale = _build_rationale ~indicators ~regime_changed ~trend in
   { index_stage; indicators; trend; confidence; regime_changed; rationale }
+
+(* ------------------------------------------------------------------ *)
+(* Bar-list wrapper — preserves the existing API                        *)
+(*                                                                      *)
+(* The wrapper precomputes the cumulative A-D float array and the       *)
+(* momentum-MA scalar once, then builds index closures for the          *)
+(* primary-index closes, the global-index Stage callbacks, and the      *)
+(* nested {!Stage.callbacks} for the primary index. Behaviour is        *)
+(* bit-identical to the bar-list path: the same MA, cumulative A-D,     *)
+(* momentum scalar, and index closes feed every signal.                 *)
+(* ------------------------------------------------------------------ *)
+
+(** Build the cumulative A-D float array from a list of A-D bars (oldest first).
+    Index [i] holds the running sum of [advancing - declining] over bars [0..i].
+    The float conversion happens at the boundary so the callback's contract
+    returns floats while the underlying arithmetic is integer (matching the
+    bar-list path's [int] fold). *)
+let _build_cumulative_ad_array (ad_bars : ad_bar list) : float array =
+  let _, rev_acc =
+    List.fold ad_bars ~init:(0, []) ~f:(fun (running, acc) bar ->
+        let running = running + bar.advancing - bar.declining in
+        (running, running :: acc))
+  in
+  rev_acc |> List.rev |> Array.of_list |> Array.map ~f:Float.of_int
+
+(** Compute the A-D momentum MA scalar from a list of A-D bars. Returns the
+    simple mean of the most recent [min momentum_period n] net values. Matches
+    the bar-list [_compute_momentum_ma] expression form: take the last [period]
+    elements, sum them as ints, divide as float. [None] when [ad_bars] is empty.
+*)
+let _compute_momentum_ma_scalar ~momentum_period (ad_bars : ad_bar list) :
+    float option =
+  if List.is_empty ad_bars then None
+  else
+    let nets = List.map ad_bars ~f:(fun b -> b.advancing - b.declining) in
+    let n = List.length nets in
+    let period = min momentum_period n in
+    let recent_nets =
+      List.rev nets |> (fun l -> List.sub l ~pos:0 ~len:period) |> List.rev
+    in
+    let sum = List.sum (module Int) recent_nets ~f:Fn.id in
+    Some (Float.of_int sum /. Float.of_int period)
+
+(** Build a [week_offset]-indexed float lookup over a chronologically-ordered
+    [float array]. [week_offset:0] returns the newest entry; offsets past the
+    array's depth return [None]. *)
+let _make_get_from_float_array (arr : float array) :
+    week_offset:int -> float option =
+  let n = Array.length arr in
+  fun ~week_offset ->
+    let idx = n - 1 - week_offset in
+    if idx < 0 || idx >= n then None else Some arr.(idx)
+
+(** Build [get_index_close] over [Daily_price.t array]. *)
+let _make_get_index_close_from_bars (bars : Daily_price.t array) :
+    week_offset:int -> float option =
+  let n = Array.length bars in
+  fun ~week_offset ->
+    let idx = n - 1 - week_offset in
+    if idx < 0 || idx >= n then None
+    else Some bars.(idx).Daily_price.adjusted_close
+
+(** Build the [get_ad_momentum_ma] closure: the precomputed scalar at offset 0,
+    [None] for any other offset (callers only read offset 0). *)
+let _make_get_ad_momentum_ma (ma : float option) :
+    week_offset:int -> float option =
+ fun ~week_offset -> if week_offset = 0 then ma else None
+
+(** Build per-global-index Stage callbacks from a list of [(name, bars)] pairs.
+*)
+let _global_index_callbacks ~stage_config
+    (global_index_bars : (string * Daily_price.t list) list) :
+    (string * Stage.callbacks) list =
+  List.map global_index_bars ~f:(fun (name, bars) ->
+      (name, Stage.callbacks_from_bars ~config:stage_config ~bars))
+
+let callbacks_from_bars ~(config : config) ~(index_bars : Daily_price.t list)
+    ~(ad_bars : ad_bar list)
+    ~(global_index_bars : (string * Daily_price.t list) list) : callbacks =
+  let index_stage =
+    Stage.callbacks_from_bars ~config:config.stage_config ~bars:index_bars
+  in
+  let index_arr = Array.of_list index_bars in
+  let cum_ad_arr = _build_cumulative_ad_array ad_bars in
+  let ma_scalar =
+    _compute_momentum_ma_scalar
+      ~momentum_period:config.indicator_thresholds.momentum_period ad_bars
+  in
+  let global_index_stages =
+    _global_index_callbacks ~stage_config:config.stage_config global_index_bars
+  in
+  {
+    index_stage;
+    get_index_close = _make_get_index_close_from_bars index_arr;
+    get_cumulative_ad = _make_get_from_float_array cum_ad_arr;
+    get_ad_momentum_ma = _make_get_ad_momentum_ma ma_scalar;
+    global_index_stages;
+  }
+
+let analyze ~config ~index_bars ~ad_bars ~global_index_bars ~prior_stage ~prior
+    : result =
+  let callbacks =
+    callbacks_from_bars ~config ~index_bars ~ad_bars ~global_index_bars
+  in
+  analyze_with_callbacks ~config ~callbacks ~prior_stage ~prior

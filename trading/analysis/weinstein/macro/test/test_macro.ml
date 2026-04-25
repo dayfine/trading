@@ -314,6 +314,147 @@ let test_pure_same_inputs _ =
   assert_that r1.trend (equal_to (r2.trend : market_trend));
   assert_that r1.confidence (float_equal r2.confidence)
 
+(* ------------------------------------------------------------------ *)
+(* Parity: analyze (bar-list) vs analyze_with_callbacks                *)
+(*                                                                      *)
+(* Builds the {!callbacks} record externally over the same bars the   *)
+(* wrapper would compute internally, then asserts that the two entry   *)
+(* points produce bit-identical [result] records. Each scenario hits   *)
+(* a different regime: bullish (Stage2 + positive A-D divergence),     *)
+(* bearish (Stage4 + negative A-D divergence), neutral (flat),         *)
+(* insufficient bars, and partial global-index data.                   *)
+(* ------------------------------------------------------------------ *)
+
+(** Bit-identity matcher for {!Stage.result}. Float fields use [equal_to]
+    (Poly.equal — structural equality) so any drift fails. *)
+let stage_result_is_bit_identical (expected : Stage.result) :
+    Stage.result matcher =
+  all_of
+    [
+      field (fun (r : Stage.result) -> r.stage) (equal_to expected.stage);
+      field
+        (fun (r : Stage.result) -> r.ma_value)
+        (equal_to (expected.ma_value : float));
+      field
+        (fun (r : Stage.result) -> r.ma_direction)
+        (equal_to expected.ma_direction);
+      field
+        (fun (r : Stage.result) -> r.ma_slope_pct)
+        (equal_to (expected.ma_slope_pct : float));
+      field
+        (fun (r : Stage.result) -> r.transition)
+        (equal_to expected.transition);
+      field
+        (fun (r : Stage.result) -> r.above_ma_count)
+        (equal_to expected.above_ma_count);
+    ]
+
+(** Bit-identity matcher for one {!Macro.indicator_reading}. The closed-set
+    [signal] variant, [name], [weight], and [detail] string are all checked. Any
+    drift in float arithmetic that flips a signal or changes a printed detail
+    (e.g. [Printf.sprintf "%.1f"] of the momentum MA) will surface here. *)
+let indicator_reading_is_bit_identical (expected : indicator_reading) :
+    indicator_reading matcher =
+  all_of
+    [
+      field (fun (r : indicator_reading) -> r.name) (equal_to expected.name);
+      field (fun (r : indicator_reading) -> r.signal) (equal_to expected.signal);
+      field
+        (fun (r : indicator_reading) -> r.weight)
+        (equal_to (expected.weight : float));
+      field (fun (r : indicator_reading) -> r.detail) (equal_to expected.detail);
+    ]
+
+(** Bit-identity matcher for {!Macro.result}. The composite trend / confidence /
+    regime_changed / rationale plus the nested Stage result and
+    indicator-by-indicator readings are all checked. *)
+let result_is_bit_identical (expected : Macro.result) : Macro.result matcher =
+  all_of
+    [
+      field
+        (fun (r : Macro.result) -> r.index_stage)
+        (stage_result_is_bit_identical expected.index_stage);
+      field
+        (fun (r : Macro.result) -> r.indicators)
+        (elements_are
+           (List.map expected.indicators ~f:indicator_reading_is_bit_identical));
+      field
+        (fun (r : Macro.result) -> r.trend)
+        (equal_to (expected.trend : market_trend));
+      field
+        (fun (r : Macro.result) -> r.confidence)
+        (equal_to (expected.confidence : float));
+      field
+        (fun (r : Macro.result) -> r.regime_changed)
+        (equal_to expected.regime_changed);
+      field
+        (fun (r : Macro.result) -> r.rationale)
+        (equal_to expected.rationale);
+    ]
+
+(** Run both [analyze] and [analyze_with_callbacks] over the same input and
+    assert their results are bit-equal. The callback bundle is built externally
+    via {!Macro.callbacks_from_bars} (the same constructor the wrapper uses
+    internally, but we exercise it through the public API). *)
+let assert_parity ~index_bars ?(ad_bars = []) ?(global_index_bars = [])
+    ?(prior_stage = None) ?(prior = None) () =
+  let callbacks =
+    Macro.callbacks_from_bars ~config:cfg ~index_bars ~ad_bars
+      ~global_index_bars
+  in
+  let from_bars =
+    analyze ~config:cfg ~index_bars ~ad_bars ~global_index_bars ~prior_stage
+      ~prior
+  in
+  let from_callbacks =
+    analyze_with_callbacks ~config:cfg ~callbacks ~prior_stage ~prior
+  in
+  assert_that from_callbacks (result_is_bit_identical from_bars)
+
+(** Bullish macro: rising primary index + positive A-D divergence (advancing >
+    declining). Exercises the [Bullish] composite trend through the callback
+    path. *)
+let test_parity_bullish_stage2_positive_ad _ =
+  let index = rising_bars ~n:60 100.0 200.0 in
+  let ad = ad_bars ~n:200 ~advancing:2000 ~declining:1000 in
+  assert_parity ~index_bars:index ~ad_bars:ad ()
+
+(** Bearish macro: declining primary index + negative A-D divergence. Hits the
+    [Bearish] composite trend. *)
+let test_parity_bearish_stage4_negative_ad _ =
+  let index =
+    List.init 60 ~f:(fun i -> 200.0 -. (Float.of_int i *. 1.5)) |> weekly_bars
+  in
+  let ad = ad_bars ~n:60 ~advancing:800 ~declining:1500 in
+  assert_parity ~index_bars:index ~ad_bars:ad ()
+
+(** Neutral macro: flat index, no A-D, no global. The all-Neutral indicators
+    branch yields confidence = 0.5 → Neutral trend. *)
+let test_parity_neutral_flat_no_ad _ =
+  let index = flat_bars ~n:40 100.0 in
+  assert_parity ~index_bars:index ()
+
+(** Insufficient bars: too-short index list (fewer than [stage_config.ma_period]
+    bars and fewer than [nh_nl_min_bars]). Exercises the early-return /
+    "Insufficient data" branches in the NH-NL signal and the Stage1 default. *)
+let test_parity_insufficient_bars _ =
+  let index = List.init 5 ~f:(Fn.const 100.0) |> weekly_bars in
+  assert_parity ~index_bars:index ()
+
+(** Partial global-index data: 3 global indices with mixed regimes (one rising,
+    one declining, one flat). Exercises the per-index [Stage.classify] loop and
+    the consensus aggregation through the callback path. *)
+let test_parity_partial_global_indices _ =
+  let index = rising_bars ~n:60 100.0 150.0 in
+  let ad = ad_bars ~n:60 ~advancing:1500 ~declining:1000 in
+  let rising = rising_bars ~n:60 100.0 180.0 in
+  let declining =
+    List.init 60 ~f:(fun i -> 200.0 -. Float.of_int i) |> weekly_bars
+  in
+  let flat = flat_bars ~n:60 100.0 in
+  let global = [ ("DAX", rising); ("FTSE", declining); ("Nikkei", flat) ] in
+  assert_parity ~index_bars:index ~ad_bars:ad ~global_index_bars:global ()
+
 let suite =
   "macro_tests"
   >::: [
@@ -338,6 +479,14 @@ let suite =
          "test_index_stage_indicator_present"
          >:: test_index_stage_indicator_present;
          "test_pure_same_inputs" >:: test_pure_same_inputs;
+         "test_parity_bullish_stage2_positive_ad"
+         >:: test_parity_bullish_stage2_positive_ad;
+         "test_parity_bearish_stage4_negative_ad"
+         >:: test_parity_bearish_stage4_negative_ad;
+         "test_parity_neutral_flat_no_ad" >:: test_parity_neutral_flat_no_ad;
+         "test_parity_insufficient_bars" >:: test_parity_insufficient_bars;
+         "test_parity_partial_global_indices"
+         >:: test_parity_partial_global_indices;
        ]
 
 let () = run_test_tt_main suite

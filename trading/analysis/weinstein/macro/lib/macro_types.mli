@@ -54,6 +54,18 @@ type result = {
   rationale : string list;
 }
 
+type callbacks = {
+  index_stage : Stage.callbacks;
+  get_index_close : week_offset:int -> float option;
+  get_cumulative_ad : week_offset:int -> float option;
+  get_ad_momentum_ma : week_offset:int -> float option;
+  global_index_stages : (string * Stage.callbacks) list;
+}
+(** Bundle of indicator callbacks consumed by [Macro.analyze_with_callbacks].
+    Exposed at the [Macro_types] level so that the per-indicator helpers
+    (defined in [Macro_indicators]) and the bar-list wrapper (defined in
+    [Macro]) can share the type without circular references. *)
+
 val default_indicator_weights : indicator_weights
 val default_indicator_thresholds : indicator_thresholds
 val default_config : config
