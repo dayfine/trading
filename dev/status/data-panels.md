@@ -5,7 +5,7 @@
 ## Status
 IN_PROGRESS
 
-Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation (Bar_panels reader + adjusted_close panel) MERGED as #558. Stage 2 PR-B (Stage.classify reshape) on `feat/panels-stage02-pr-b-stage-classify` READY_FOR_REVIEW: adds `classify_with_callbacks ~get_ma ~get_close` callback-shape API; existing `classify ~bars` becomes a thin wrapper preserving byte-identical behavior; 6 new parity tests cover all four Stage variants + late-Stage-2 + insufficient-data cases.
+Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation (Bar_panels reader + adjusted_close panel) MERGED as #558. Stage 2 PR-B (Stage.classify reshape) MERGED as #559. Stage 2 PR-C (Rs.analyze reshape) on `feat/panels-stage02-pr-c-rs-analyze` READY_FOR_REVIEW: adds `analyze_with_callbacks ~get_stock_close ~get_benchmark_close ~get_date` callback-shape API; existing `analyze ~stock_bars ~benchmark_bars` becomes a thin wrapper preserving byte-identical behavior; 6 new parity tests cover positive/negative/near-zero/crossover/insufficient-data/exact-minimum cases.
 
 ## Interface stable
 NO
@@ -41,7 +41,18 @@ reader audit) carry forward.
 - **PR #555** (Stage 0 spike) merged 2026-04-25. Implements `Symbol_index`, `Ohlcv_panels`, `Ema_kernel`, `Panel_snapshot` under `trading/trading/data_panel/`. 20 tests pass; EMA parity bit-identical at N=100 T=252 P=50; snapshot round-trip bit-identical. QC structural + behavioral both APPROVED.
 - **PR #557** (Stage 1) merged 2026-04-25.
 - **PR #558** (Stage 2 foundation) merged 2026-04-25. Adds `Bar_panels` reader + `adjusted_close` panel.
-- **`feat/panels-stage02-pr-b-stage-classify`** (Stage 2 PR-B, READY_FOR_REVIEW) — first callee reshape (PR-B in the eight-PR A–H sequence per plan).
+- **`feat/panels-stage02-pr-c-rs-analyze`** (Stage 2 PR-C, READY_FOR_REVIEW) — second callee reshape.
+  - Adds `Rs.analyze_with_callbacks ~get_stock_close:(week_offset:int -> float option) ~get_benchmark_close:(week_offset:int -> float option) ~get_date:(week_offset:int -> Core.Date.t option)` — the indicator-callback shape of `Rs.analyze`. `week_offset:0` = current week, `1` = previous, etc.; `None` = warmup or out-of-range. The walk stops at the first offset where any of the three callbacks returns `None`, yielding the depth of aligned weekly data the caller has already produced. Returns `None` if depth `< rs_ma_period`.
+  - The three callbacks reflect the fact that `Rs.result.history : raw_rs list` carries per-point dates downstream (consumed by sector / stock_analysis / screener tests). The callback shape preserves dates rather than dropping them; the panel-backed caller is responsible for date-aligning the two close series so that the same `week_offset:k` resolves consistently across all three callbacks.
+  - Reshapes Rs's internals: a shared `_history_of_aligned ~rs_ma_period (date, sc, bc) list -> raw_rs list option` runs the same `Sma.calculate_sma` kernel `Relative_strength.analyze` uses (so float arithmetic is the same source kernel — bit-identical raw RS / normalized values). Trend classification is unchanged.
+  - Existing `Rs.analyze ~stock_bars ~benchmark_bars` is now a thin wrapper that joins the two bar lists on date once, builds three closures over the resulting aligned arrays, and delegates to `analyze_with_callbacks`. Behaviour is byte-identical for all bar-list callers; nothing in the call graph (`weinstein_strategy.ml`, `sector.ml`, `stock_analysis.ml`, screener cascade) needs to change.
+  - Six new parity tests in `test_rs.ml` covering positive RS (stock outperforms), negative RS (stock underperforms), near-zero (identical series), bullish crossover, insufficient-data early-return (`n < rs_ma_period`), and exact-minimum (`n = rs_ma_period`). Each test builds external `get_*` callbacks with the same indexing rules the wrapper uses internally and asserts `Rs.result` is bit-identical via structural `equal_to` over float fields and per-element `raw_rs` comparison through `elements_are` (so any ULP drift in `rs_value`, `rs_normalized`, or any date mismatch fails the test).
+  - Verify: `cd trading/trading && TRADING_DATA_DIR=/workspaces/trading-1/trading/test_data dune build && dune runtest analysis/weinstein/rs/test` (15 tests, all OK — 9 original + 6 parity). Full `dune runtest` passes; only the two pre-existing linter failures (`csv_storage.ml` nesting, `tiered_runner.ml` magic numbers) remain — both unrelated.
+  - LOC: rs.ml grows from 85 to 237 lines; rs.mli from 64 to 108. No `@large-module:` opt-in needed.
+  - PR is bookmarked at `feat/panels-stage02-pr-c-rs-analyze`.
+  - PRs D–G follow the same recipe for Stock_analysis, Sector, Macro, Stops. PR-H finally ports the six `Bar_history` reader sites to use the new callback APIs and deletes `Bar_history`.
+
+- **`feat/panels-stage02-pr-b-stage-classify`** (Stage 2 PR-B, MERGED #559) — first callee reshape (PR-B in the eight-PR A–H sequence per plan).
   - Adds `Stage.classify_with_callbacks ~get_ma:(week_offset:int -> float option) ~get_close:(week_offset:int -> float option)` — the indicator-callback shape of `Stage.classify`. `week_offset:0` = current week, `1` = previous, etc.; `None` = warmup or out-of-range.
   - Reshapes Stage's internal helpers (`_compute_ma_slope_callback`, `_count_above_ma_callback`, `_is_late_stage2_callback`, `_ma_depth`, `_largest_defined_offset`) to read MA / close via callbacks.
   - Existing `Stage.classify ~bars` is now a thin wrapper that precomputes the MA series + closes once into arrays, builds `get_ma`/`get_close` closures over those arrays, and delegates to `classify_with_callbacks`. Behaviour is byte-identical for all bar-list callers; nothing in the call graph (`weinstein_strategy.ml`, screener cascade, etc.) needs to change.

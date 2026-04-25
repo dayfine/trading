@@ -187,6 +187,157 @@ let test_stock_falling_benchmark_rising _ =
     (analyze ~config:cfg ~stock_bars:stock ~benchmark_bars:benchmark)
     (is_some_and (field (fun r -> r.trend) (equal_to Negative_declining)))
 
+(* ------------------------------------------------------------------ *)
+(* Parity: analyze (bar-list) vs analyze_with_callbacks                *)
+(*                                                                      *)
+(* Builds [get_stock_close] / [get_benchmark_close] / [get_date]       *)
+(* callbacks externally over the same date-aligned series the wrapper  *)
+(* would compute internally, then asserts that the two entry points    *)
+(* produce bit-identical [result] records. Each scenario hits a        *)
+(* different RS regime (positive, negative, near-zero, crossover) plus *)
+(* the insufficient-data early-return.                                 *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a [get_*] closure over a precomputed array, indexed in chronological
+    order (oldest at index 0, newest at the end). [week_offset:0] returns the
+    newest entry; offsets past the array's depth return [None]. Mirrors the
+    indexing rules the wrapper uses internally. *)
+let make_indexed (arr : 'a array) ~week_offset : 'a option =
+  let n = Array.length arr in
+  let idx = n - 1 - week_offset in
+  if idx < 0 || idx >= n then None else Some arr.(idx)
+
+(** Date.t Map of benchmark adjusted_close values, keyed on bar date. *)
+let bench_map_of_bars (benchmark_bars : Daily_price.t list) =
+  List.fold benchmark_bars ~init:Date.Map.empty ~f:(fun m b ->
+      Map.set m ~key:b.Daily_price.date ~data:b.Daily_price.adjusted_close)
+
+(** Build aligned (date, stock_close, bench_close) triples from the same join
+    the wrapper uses, oldest first. *)
+let aligned_triples ~stock_bars ~benchmark_bars =
+  let bench_map = bench_map_of_bars benchmark_bars in
+  List.filter_map stock_bars ~f:(fun bar ->
+      Map.find bench_map bar.Daily_price.date
+      |> Option.map ~f:(fun bench_close ->
+          (bar.Daily_price.date, bar.Daily_price.adjusted_close, bench_close)))
+
+(** Bit-identity matcher for [Rs.result]. Float fields use [equal_to] with
+    [Poly.equal] (structural equality) so any drift — even a single ULP — fails
+    the test. The [history] list is compared element-wise on every field. *)
+let raw_rs_is_bit_identical (expected : raw_rs) : raw_rs matcher =
+  all_of
+    [
+      field
+        (fun (r : raw_rs) -> r.Relative_strength.date)
+        (equal_to expected.Relative_strength.date);
+      field
+        (fun (r : raw_rs) -> r.Relative_strength.rs_value)
+        (equal_to (expected.Relative_strength.rs_value : float));
+      field
+        (fun (r : raw_rs) -> r.Relative_strength.rs_normalized)
+        (equal_to (expected.Relative_strength.rs_normalized : float));
+    ]
+
+let result_is_bit_identical (expected : Rs.result) : Rs.result matcher =
+  all_of
+    [
+      field
+        (fun (r : Rs.result) -> r.current_rs)
+        (equal_to (expected.current_rs : float));
+      field
+        (fun (r : Rs.result) -> r.current_normalized)
+        (equal_to (expected.current_normalized : float));
+      field (fun (r : Rs.result) -> r.trend) (equal_to expected.trend);
+      field
+        (fun (r : Rs.result) -> r.history)
+        (elements_are (List.map expected.history ~f:raw_rs_is_bit_identical));
+    ]
+
+(** Run both [Rs.analyze] and [Rs.analyze_with_callbacks] over the same input
+    and assert the results match bit-for-bit. *)
+let assert_parity ?(config = cfg) ~stock_bars ~benchmark_bars () =
+  let aligned = aligned_triples ~stock_bars ~benchmark_bars |> Array.of_list in
+  let stock_arr = Array.map aligned ~f:(fun (_, sc, _) -> sc) in
+  let bench_arr = Array.map aligned ~f:(fun (_, _, bc) -> bc) in
+  let date_arr = Array.map aligned ~f:(fun (d, _, _) -> d) in
+  let from_bars = analyze ~config ~stock_bars ~benchmark_bars in
+  let from_callbacks =
+    analyze_with_callbacks ~config ~get_stock_close:(make_indexed stock_arr)
+      ~get_benchmark_close:(make_indexed bench_arr)
+      ~get_date:(make_indexed date_arr)
+  in
+  match (from_bars, from_callbacks) with
+  | None, None -> ()
+  | Some bars_result, Some cb_result ->
+      assert_that cb_result (result_is_bit_identical bars_result)
+  | None, Some _ ->
+      assert_failure "bar-list returned None but callbacks returned Some"
+  | Some _, None ->
+      assert_failure "bar-list returned Some but callbacks returned None"
+
+(** Positive RS: stock outperforms benchmark consistently across 100 weeks. *)
+let test_parity_positive_rs _ =
+  let n = 100 in
+  let stock =
+    List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 2.0)) |> weekly_bars
+  in
+  let bench =
+    List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 1.0)) |> weekly_bars
+  in
+  assert_parity ~stock_bars:stock ~benchmark_bars:bench ()
+
+(** Negative RS: stock underperforms benchmark across 100 weeks. *)
+let test_parity_negative_rs _ =
+  let n = 100 in
+  let stock =
+    List.init n ~f:(fun i ->
+        100.0 *. (1.0 -. (Float.of_int i *. 0.30 /. Float.of_int (n - 1))))
+    |> weekly_bars
+  in
+  let bench =
+    List.init n ~f:(fun i ->
+        100.0 *. (1.0 +. (Float.of_int i *. 0.20 /. Float.of_int (n - 1))))
+    |> weekly_bars
+  in
+  assert_parity ~stock_bars:stock ~benchmark_bars:bench ()
+
+(** Near-zero RS movement: stock and benchmark move identically. *)
+let test_parity_near_zero_rs _ =
+  let n = 80 in
+  let stock = const_bars ~n 100.0 in
+  let bench = const_bars ~n 100.0 in
+  assert_parity ~stock_bars:stock ~benchmark_bars:bench ()
+
+(** Bullish crossover: stock underperforms then outperforms. *)
+let test_parity_crossover _ =
+  let n = 80 in
+  let stock =
+    List.init n ~f:(fun i ->
+        if i < 60 then 50.0 else 100.0 +. (Float.of_int (i - 60) *. 5.0))
+    |> weekly_bars
+  in
+  let bench = const_bars ~n 100.0 in
+  assert_parity ~stock_bars:stock ~benchmark_bars:bench ()
+
+(** Insufficient data: fewer aligned bars than [rs_ma_period]. Both paths take
+    the [None] early-return. *)
+let test_parity_insufficient_data _ =
+  let stock = const_bars ~n:30 100.0 in
+  let bench = const_bars ~n:30 100.0 in
+  assert_parity ~stock_bars:stock ~benchmark_bars:bench ()
+
+(** Exact-minimum data: aligned bars equal [rs_ma_period]. Edge of the
+    [n < rs_ma_period] guard. *)
+let test_parity_exact_minimum_data _ =
+  let n = 52 in
+  let stock =
+    List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 0.5)) |> weekly_bars
+  in
+  let bench =
+    List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 0.4)) |> weekly_bars
+  in
+  assert_parity ~stock_bars:stock ~benchmark_bars:bench ()
+
 let suite =
   "rs_tests"
   >::: [
@@ -201,6 +352,12 @@ let suite =
          "bullish_crossover" >:: test_bullish_crossover;
          "flat_threshold_configurable" >:: test_flat_threshold_configurable;
          "pure_same_inputs_same_output" >:: test_pure_same_inputs_same_output;
+         "parity_positive_rs" >:: test_parity_positive_rs;
+         "parity_negative_rs" >:: test_parity_negative_rs;
+         "parity_near_zero_rs" >:: test_parity_near_zero_rs;
+         "parity_crossover" >:: test_parity_crossover;
+         "parity_insufficient_data" >:: test_parity_insufficient_data;
+         "parity_exact_minimum_data" >:: test_parity_exact_minimum_data;
        ]
 
 let () = run_test_tt_main suite
