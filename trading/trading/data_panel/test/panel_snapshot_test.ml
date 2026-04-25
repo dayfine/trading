@@ -97,6 +97,25 @@ let test_multi_panel_round_trip _ =
          field (fun (ps, _) -> _bit_identical p3 ps.(2)) (equal_to true);
        ])
 
+(* Dump-twice byte-equality: a panel + same-symbol-index dumped twice to
+   different paths must produce byte-identical files. Required for
+   reproducible golden fixtures across machines. *)
+let test_dump_twice_byte_identical _ =
+  let idx = _make_idx [ "AAPL"; "MSFT" ] in
+  let panel =
+    _make_panel ~n_rows:2 ~n_cols:6 ~fill:(fun r c ->
+        if r = 0 && c = 1 then Float.nan else Float.of_int ((r * 10) + c) +. 0.5)
+  in
+  let path_a = _tmp_path () in
+  let path_b = _tmp_path () in
+  Panel_snapshot.dump ~path:path_a idx ~panels:[| panel |]
+    ~panel_names:[ "close" ];
+  Panel_snapshot.dump ~path:path_b idx ~panels:[| panel |]
+    ~panel_names:[ "close" ];
+  let bytes_a = In_channel.read_all path_a in
+  let bytes_b = In_channel.read_all path_b in
+  assert_that bytes_a (equal_to bytes_b)
+
 let test_dump_rejects_shape_mismatch _ =
   let idx = _make_idx [ "S1"; "S2" ] in
   let p1 = _make_panel ~n_rows:2 ~n_cols:3 ~fill:(fun _ _ -> 0.0) in
@@ -121,6 +140,7 @@ let suite =
   >::: [
          "test_single_panel_round_trip" >:: test_single_panel_round_trip;
          "test_multi_panel_round_trip" >:: test_multi_panel_round_trip;
+         "test_dump_twice_byte_identical" >:: test_dump_twice_byte_identical;
          "test_dump_rejects_shape_mismatch" >:: test_dump_rejects_shape_mismatch;
          "test_dump_rejects_name_count_mismatch"
          >:: test_dump_rejects_name_count_mismatch;
