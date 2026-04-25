@@ -46,7 +46,8 @@ type callbacks = { stage : Stage.callbacks; rs : Rs.callbacks }
 let callbacks_from_bars ~(config : config) ~(sector_bars : Daily_price.t list)
     ~(benchmark_bars : Daily_price.t list) : callbacks =
   {
-    stage = Stage.callbacks_from_bars ~config:config.stage_config ~bars:sector_bars;
+    stage =
+      Stage.callbacks_from_bars ~config:config.stage_config ~bars:sector_bars;
     rs = Rs.callbacks_from_bars ~stock_bars:sector_bars ~benchmark_bars;
   }
 
@@ -119,8 +120,8 @@ let _rating_of_confidence ~config ~confidence : Screener.sector_rating =
 (* ------------------------------------------------------------------ *)
 
 let analyze_with_callbacks ~(config : config) ~sector_name
-    ~(callbacks : callbacks)
-    ~(constituent_analyses : Stock_analysis.t list) ~prior_stage : result =
+    ~(callbacks : callbacks) ~(constituent_analyses : Stock_analysis.t list)
+    ~prior_stage : result =
   let stage =
     Stage.classify_with_callbacks ~config:config.stage_config
       ~get_ma:callbacks.stage.get_ma ~get_close:callbacks.stage.get_close

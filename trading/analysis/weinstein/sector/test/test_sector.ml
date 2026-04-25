@@ -180,8 +180,7 @@ let stage_result_is_bit_identical (expected : Stage.result) :
     field-by-field — any drift in the delegated [Stage.classify_with_callbacks]
     or [Rs.analyze_with_callbacks] paths will surface as a Stage / RS field
     mismatch. *)
-let result_is_bit_identical (expected : Sector.result) : Sector.result matcher
-    =
+let result_is_bit_identical (expected : Sector.result) : Sector.result matcher =
   all_of
     [
       field

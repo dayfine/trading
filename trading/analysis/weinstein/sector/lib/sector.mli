@@ -60,12 +60,12 @@ type callbacks = {
 }
 (** Bundle of indicator callbacks consumed by {!analyze_with_callbacks}.
 
-    Sector analysis itself does not read bar fields directly — it only
-    delegates to {!Stage.classify_with_callbacks} and
-    {!Rs.analyze_with_callbacks}. The bundle therefore wraps just those two
-    nested callback records. The constituent-breadth and confidence
-    computations operate on the already-computed
-    [constituent_analyses : Stock_analysis.t list] and need no callbacks. *)
+    Sector analysis itself does not read bar fields directly — it only delegates
+    to {!Stage.classify_with_callbacks} and {!Rs.analyze_with_callbacks}. The
+    bundle therefore wraps just those two nested callback records. The
+    constituent-breadth and confidence computations operate on the
+    already-computed [constituent_analyses : Stock_analysis.t list] and need no
+    callbacks. *)
 
 val callbacks_from_bars :
   config:config ->
@@ -74,8 +74,8 @@ val callbacks_from_bars :
   callbacks
 (** [callbacks_from_bars ~config ~sector_bars ~benchmark_bars] builds a
     {!callbacks} record by delegating to {!Stage.callbacks_from_bars} (using
-    [sector_bars]) and {!Rs.callbacks_from_bars} (using
-    [stock_bars=sector_bars] and [benchmark_bars]).
+    [sector_bars]) and {!Rs.callbacks_from_bars} (using [stock_bars=sector_bars]
+    and [benchmark_bars]).
 
     Used internally by {!analyze}; exposed for callers (e.g. tests or future
     panel adapters that already hold both bar lists) that want to delegate to
@@ -116,24 +116,23 @@ val analyze_with_callbacks :
 (** [analyze_with_callbacks ~config ~sector_name ~callbacks
      ~constituent_analyses ~prior_stage] is the indicator-callback shape of
     {!analyze}. Used by panel-backed callers that read indicator values via
-    panel views rather than walking [Daily_price.t list]s for the sector's
-    Stage / RS sub-analyses.
+    panel views rather than walking [Daily_price.t list]s for the sector's Stage
+    / RS sub-analyses.
 
     @param config Same configuration as {!analyze}.
     @param sector_name Same as {!analyze}.
     @param callbacks
       Bundle of indicator callbacks. [callbacks.stage] backs
-      {!Stage.classify_with_callbacks} for the sector index;
-      [callbacks.rs] backs {!Rs.analyze_with_callbacks} for sector-vs-benchmark
-      RS.
+      {!Stage.classify_with_callbacks} for the sector index; [callbacks.rs]
+      backs {!Rs.analyze_with_callbacks} for sector-vs-benchmark RS.
     @param constituent_analyses Same as {!analyze}.
     @param prior_stage Same as {!analyze}.
 
     Pure function: same callback outputs and same [constituent_analyses] /
     [prior_stage] always produce the same [result]. The wrapper {!analyze}
     guarantees byte-identical results for any [(sector_bars, benchmark_bars)]
-    input by constructing callbacks that index the same pre-computed series
-    the bar-list path computes internally. *)
+    input by constructing callbacks that index the same pre-computed series the
+    bar-list path computes internally. *)
 
 val sector_context_of : result -> Screener.sector_context
 (** [sector_context_of result] converts a sector [result] into the
