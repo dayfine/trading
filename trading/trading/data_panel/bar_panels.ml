@@ -88,18 +88,13 @@ let weekly_bars_for t ~symbol ~n ~as_of_day =
     if len <= n then weekly else List.drop weekly (len - n)
 
 let low_window t ~symbol ~as_of_day ~len =
-  if len <= 0 then None
+  let n = n_days t in
+  let pos = as_of_day - len + 1 in
+  if len <= 0 || pos < 0 || as_of_day >= n then None
   else
-    match _row_for t symbol with
-    | None -> None
-    | Some row ->
-        let n = n_days t in
-        let pos = as_of_day - len + 1 in
-        if pos < 0 || as_of_day >= n then None
-        else
-          let low_p = Ohlcv_panels.low t.ohlcv in
-          (* Slice row [row] over columns [pos..as_of_day]. C-layout:
-             [BA2.slice_left] returns the row as a 1D Array1; we then sub the
-             window. Both operations are zero-copy. *)
-          let row_view = BA2.slice_left low_p row in
-          Some (BA1.sub row_view pos len)
+    (* Slice row over columns [pos..as_of_day]. [BA2.slice_left] returns the
+       row as a 1D Array1; [BA1.sub] then narrows to the window. Both
+       operations are zero-copy. *)
+    Option.map (_row_for t symbol) ~f:(fun row ->
+        let row_view = BA2.slice_left (Ohlcv_panels.low t.ohlcv) row in
+        BA1.sub row_view pos len)
