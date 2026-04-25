@@ -1,5 +1,9 @@
 (tests
- (names test_weinstein_stops regression_test test_support_floor)
+ (names
+  test_weinstein_stops
+  regression_test
+  test_support_floor
+  test_weinstein_stops_callbacks_parity)
  (libraries
   weinstein_trading.stops
   weinstein.types

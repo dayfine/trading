@@ -41,7 +41,7 @@ val compute_initial_stop_with_floor :
     history, falling back to a fixed-buffer proxy when no qualifying correction
     is found.
 
-    When {!Support_floor.find_recent_low} returns [Some floor] (using
+    When {!Support_floor.find_recent_level} returns [Some floor] (using
     [config.support_floor_lookback_bars] and [config.min_correction_pct]), that
     value is used as the [reference_level]. Otherwise the function falls back to
     [entry_price *. fallback_buffer] for a long, or
@@ -56,7 +56,54 @@ val compute_initial_stop_with_floor :
     - [bars]: the accumulated daily bar history for the symbol.
     - [as_of]: the entry date (usually today's market-close date).
     - [fallback_buffer]: the same buffer the caller used before this primitive
-      existed — e.g. 1.02 for a 2% loose stop on the long side. *)
+      existed — e.g. 1.02 for a 2% loose stop on the long side.
+
+    Implementation note: this is a thin wrapper over
+    {!compute_initial_stop_with_floor_with_callbacks}. It builds a {!callbacks}
+    record via {!callbacks_from_bars} (which applies [as_of] filtering and
+    [config.support_floor_lookback_bars] truncation up-front) and threads it
+    through. Behaviour is bit-identical to the callback API for the same
+    underlying bar inputs. *)
+
+(** {1 Callback API} *)
+
+type callbacks = Support_floor.callbacks
+(** Bundle of bar-field callbacks for the support-floor lookup, re-exported from
+    {!Support_floor.callbacks}. The bundle exposes a {b pre-windowed} view of
+    the daily bars: [as_of] filtering and lookback truncation are applied at
+    construction time, leaving a contiguous, cap-trimmed window that the
+    algorithm scans by day offset alone. Day offset [0] is the most recent bar;
+    offset [n_days - 1] is the oldest. See {!Support_floor.callbacks} for
+    field-level documentation. *)
+
+val callbacks_from_bars :
+  config:config ->
+  bars:Types.Daily_price.t list ->
+  as_of:Core.Date.t ->
+  callbacks
+(** [callbacks_from_bars ~config ~bars ~as_of] constructs a callback bundle by
+    delegating to {!Support_floor.callbacks_from_bars} with
+    [lookback_bars = config.support_floor_lookback_bars]. Used internally by
+    {!compute_initial_stop_with_floor}; exposed so panel-backed callers and
+    tests can build the bundle the same way the wrapper does. *)
+
+val compute_initial_stop_with_floor_with_callbacks :
+  config:config ->
+  side:position_side ->
+  entry_price:float ->
+  callbacks:callbacks ->
+  fallback_buffer:float ->
+  stop_state
+(** [compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
+     ~callbacks ~fallback_buffer] is the indicator-callback shape of
+    {!compute_initial_stop_with_floor}. [bars] and [as_of] are baked into the
+    [callbacks] bundle and no longer parameters here.
+
+    Pure function: same callback outputs and inputs always produce the same
+    [stop_state]. The wrapper {!compute_initial_stop_with_floor} guarantees
+    byte-identical results for any bar-list inputs by constructing callbacks
+    that index the same precomputed window the bar-list path used to walk
+    inline. *)
 
 val check_stop_hit :
   state:stop_state -> side:position_side -> bar:Types.Daily_price.t -> bool

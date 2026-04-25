@@ -71,18 +71,29 @@ let _fallback_reference ~side ~entry_price ~fallback_buffer =
   | Long -> entry_price *. fallback_buffer
   | Short -> entry_price /. fallback_buffer
 
-let compute_initial_stop_with_floor ~config ~side ~entry_price ~bars ~as_of
-    ~fallback_buffer =
+type callbacks = Support_floor.callbacks
+
+let callbacks_from_bars ~config ~bars ~as_of =
+  Support_floor.callbacks_from_bars ~bars ~as_of
+    ~lookback_bars:config.support_floor_lookback_bars
+
+let compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
+    ~callbacks ~fallback_buffer =
   let reference_level =
     match
-      Support_floor.find_recent_level ~bars ~as_of ~side
+      Support_floor.find_recent_level_with_callbacks ~callbacks ~side
         ~min_pullback_pct:config.min_correction_pct
-        ~lookback_bars:config.support_floor_lookback_bars
     with
     | Some level -> level
     | None -> _fallback_reference ~side ~entry_price ~fallback_buffer
   in
   compute_initial_stop ~config ~side ~reference_level
+
+let compute_initial_stop_with_floor ~config ~side ~entry_price ~bars ~as_of
+    ~fallback_buffer =
+  let callbacks = callbacks_from_bars ~config ~bars ~as_of in
+  compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
+    ~callbacks ~fallback_buffer
 
 (* ---- Directional helpers ---- *)
 
