@@ -202,6 +202,129 @@ let test_above_ma_count_all_above _ =
   (* In a strong uptrend, all confirm_weeks bars should be above MA *)
   assert_that result.above_ma_count (gt (module Int_ord) 0)
 
+(* ------------------------------------------------------------------ *)
+(* Parity: classify (bar-list) vs classify_with_callbacks              *)
+(*                                                                      *)
+(* Builds [get_ma] / [get_close] callbacks externally over the same    *)
+(* MA series the wrapper would compute internally, then asserts that   *)
+(* the two entry points produce bit-identical [result] records.        *)
+(* Each scenario hits a different Stage variant (Stage1/2/3/4) plus    *)
+(* the late-Stage-2 deceleration case.                                 *)
+(* ------------------------------------------------------------------ *)
+
+(** Compute MA values externally using the same indicator module the wrapper
+    delegates to. Returns an array of MA values aligned to the last bar of each
+    rolling window (oldest at index 0, newest at the end). *)
+let compute_ma_values (config : Stage.config) (bars : Daily_price.t list) :
+    float array =
+  let data =
+    List.map bars ~f:(fun b ->
+        Indicator_types.
+          { date = b.Daily_price.date; value = b.Daily_price.adjusted_close })
+  in
+  let result =
+    match config.ma_type with
+    | Sma -> Sma.calculate_sma data config.ma_period
+    | Wma -> Sma.calculate_weighted_ma data config.ma_period
+    | Ema -> Ema.calculate_ema data config.ma_period
+  in
+  List.map result ~f:(fun iv -> iv.Indicator_types.value) |> Array.of_list
+
+(** Build a [get_ma] closure from a precomputed MA-value array. Mirrors the
+    indexing rules the wrapper uses internally: [week_offset:0] = newest. *)
+let make_get_ma (ma_values : float array) ~week_offset =
+  let n = Array.length ma_values in
+  let idx = n - 1 - week_offset in
+  if idx < 0 || idx >= n then None else Some ma_values.(idx)
+
+(** Build a [get_close] closure from a bar list. Reads [adjusted_close] (matches
+    the field [_compute_ma] uses inside the wrapper). *)
+let make_get_close (bars : Daily_price.t array) ~week_offset =
+  let n = Array.length bars in
+  let idx = n - 1 - week_offset in
+  if idx < 0 || idx >= n then None
+  else Some bars.(idx).Daily_price.adjusted_close
+
+(** Bit-identity matcher for [Stage.result]. Float fields use [equal_to] with
+    [Poly.equal] (structural equality) so any drift — even a single ULP — fails
+    the test. Variant fields use [equal_to] (their derived equality handlers
+    from [@@deriving eq]). *)
+let result_is_bit_identical (expected : Stage.result) : Stage.result matcher =
+  all_of
+    [
+      field (fun (r : Stage.result) -> r.stage) (equal_to expected.stage);
+      field
+        (fun (r : Stage.result) -> r.ma_value)
+        (equal_to (expected.ma_value : float));
+      field
+        (fun (r : Stage.result) -> r.ma_direction)
+        (equal_to expected.ma_direction);
+      field
+        (fun (r : Stage.result) -> r.ma_slope_pct)
+        (equal_to (expected.ma_slope_pct : float));
+      field
+        (fun (r : Stage.result) -> r.transition)
+        (equal_to expected.transition);
+      field
+        (fun (r : Stage.result) -> r.above_ma_count)
+        (equal_to expected.above_ma_count);
+    ]
+
+(** Run both [classify] and [classify_with_callbacks] over the same [bars] and
+    assert the results are bit-equal. *)
+let assert_parity ?(prior_stage = None) bars =
+  let bars_arr = Array.of_list bars in
+  let ma_values = compute_ma_values cfg bars in
+  let from_bars = classify ~config:cfg ~bars ~prior_stage in
+  let from_callbacks =
+    classify_with_callbacks ~config:cfg ~get_ma:(make_get_ma ma_values)
+      ~get_close:(make_get_close bars_arr) ~prior_stage
+  in
+  assert_that from_callbacks (result_is_bit_identical from_bars)
+
+(** Stage 2: 100-bar rising series, no prior stage. *)
+let test_parity_stage2_rising _ =
+  let bars = rising_bars ~n:100 50.0 200.0 in
+  assert_parity bars
+
+(** Stage 4: 100-bar declining series, no prior stage. *)
+let test_parity_stage4_declining _ =
+  let bars = declining_bars ~n:100 200.0 50.0 in
+  assert_parity bars
+
+(** Stage 1: rising-then-flat (so MA flattens with prior Stage 4 → Stage 1). *)
+let test_parity_stage1_flat_after_decline _ =
+  let declining = List.init 30 ~f:(fun i -> 200.0 -. (Float.of_int i *. 2.0)) in
+  let flat = List.init 70 ~f:(fun _ -> 140.0) in
+  let bars = declining @ flat |> bars_of_prices in
+  let prior = Some (Stage4 { weeks_declining = 10 }) in
+  assert_parity ~prior_stage:prior bars
+
+(** Stage 3: rising-then-flat with prior Stage 2. *)
+let test_parity_stage3_flat_after_advance _ =
+  let rising = List.init 30 ~f:(fun i -> 50.0 +. (Float.of_int i *. 2.0)) in
+  let flat = List.init 70 ~f:(fun _ -> 110.0) in
+  let bars = rising @ flat |> bars_of_prices in
+  let prior = Some (Stage2 { weeks_advancing = 10; late = false }) in
+  assert_parity ~prior_stage:prior bars
+
+(** Late Stage 2: a strong rise that decelerates so [is_late = true] should
+    fire. *)
+let test_parity_late_stage2 _ =
+  let strong_rise =
+    List.init 50 ~f:(fun i -> 50.0 +. (Float.of_int i *. 3.0))
+  in
+  let weakening = List.init 50 ~f:(fun i -> 200.0 +. (Float.of_int i *. 0.1)) in
+  let bars = strong_rise @ weakening |> bars_of_prices in
+  let prior = Some (Stage2 { weeks_advancing = 20; late = false }) in
+  assert_parity ~prior_stage:prior bars
+
+(** Insufficient data: fewer bars than [ma_period] → both paths take the
+    [_stage1_default_result] early-return. *)
+let test_parity_insufficient_data _ =
+  let bars = List.init 10 ~f:(fun _ -> 50.0) |> bars_of_prices in
+  assert_parity bars
+
 let suite =
   "stage_tests"
   >::: [
@@ -221,6 +344,14 @@ let suite =
          "test_ma_direction_flat_for_constant_series"
          >:: test_ma_direction_flat_for_constant_series;
          "test_above_ma_count_all_above" >:: test_above_ma_count_all_above;
+         "test_parity_stage2_rising" >:: test_parity_stage2_rising;
+         "test_parity_stage4_declining" >:: test_parity_stage4_declining;
+         "test_parity_stage1_flat_after_decline"
+         >:: test_parity_stage1_flat_after_decline;
+         "test_parity_stage3_flat_after_advance"
+         >:: test_parity_stage3_flat_after_advance;
+         "test_parity_late_stage2" >:: test_parity_late_stage2;
+         "test_parity_insufficient_data" >:: test_parity_insufficient_data;
        ]
 
 let () = run_test_tt_main suite

@@ -1,3 +1,11 @@
 (test
  (name test_stage)
- (libraries weinstein.stage weinstein.types core ounit2 matchers))
+ (libraries
+  weinstein.stage
+  weinstein.types
+  indicators.sma
+  indicators.ema
+  indicators.types
+  core
+  ounit2
+  matchers))
