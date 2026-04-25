@@ -2,11 +2,36 @@
 
 ## Status
 
-**Pre-design proposal.** Supersedes
-`dev/plans/incremental-summary-state-2026-04-25.md` (PR #551 merged
-2026-04-25) if accepted. Nothing has been built yet; the only sunk cost
-in the older plan is the plan document itself plus the empty
-`dev/status/incremental-indicators.md` track row in #552.
+**Ratified 2026-04-25.** Supersedes
+`dev/plans/incremental-summary-state-2026-04-25.md` (marked SUPERSEDED;
+PR #551 stays as historical record). Nothing has been built; no sunk
+cost beyond plan documents.
+
+## Decisions ratified (from §Decision items, 2026-04-25)
+
+1. **Direction.** Pursue columnar redesign. Skip
+   incremental-indicators as a separate workstream; reuse pieces of
+   that plan (functor signatures, parity-test functor, indicator
+   porting order) at the kernel level inside this plan's stages.
+2. **Stage 0 scope.** EMA panel + parity test **AND** OHLCV panel
+   snapshot serialization (mmap-friendly dump/load). Conservative —
+   verifies the cold-start story before committing to later stages.
+3. **Storage backend: Bigarray.** Owl reconsiderable later if the
+   screener cascade wants `Owl_dataframe`. Migration cost is low
+   because Owl `Dense.Ndarray.D` is itself Bigarray-backed (zero-copy
+   reinterpret); panels live behind opaque types in `data_panel/` so
+   call sites are insulated. No pre-layering — YAGNI.
+4. **Owner / track.** All five stages owned by `feat-backtest`,
+   tracked in this repo as the new `data-panels` status track (sibling
+   to `backtest-perf`). The `incremental-indicators` status track is
+   removed.
+5. **Live-mode handling.** Stage 5 (panel rebuild on universe change)
+   deferred until live mode lands. Backtest-only universe is fixed at
+   construction; not exercised.
+6. **Disposition of #551.** Mark plan SUPERSEDED at top; do not
+   delete (preserves the path-not-taken reasoning + the
+   indicator-by-indicator audit, which is reused here).
+   `dev/status/incremental-indicators.md` is removed.
 
 ## The lacuna in the original design
 
@@ -319,20 +344,32 @@ load is a tier-2 optimization later.
 Five stages, each independently mergeable, each with a parity gate
 against the existing scalar implementation. Total ~2000 LOC.
 
-### Stage 0: spike + benchmark (~300 LOC, 1–2 days)
+### Stage 0: spike + benchmark + snapshot serialization (~450 LOC, 2–3 days)
+
+Per ratified decision: include OHLCV panel snapshot serialization in
+the spike. Verifies the cold-start story (mmap-load a panel dump in
+~milliseconds) before committing to later stages.
 
 Build:
 - `trading/trading/data_panel/` new top-level module
 - `Symbol_index`, `Ohlcv_panels` (5 Bigarrays + load-from-CSV)
 - One indicator: `EMA_kernel` + parity-test against
   `Analysis_indicators.EMA.calculate_ema`
+- `Panel_snapshot` — write a panel + symbol_index to a single
+  on-disk file (header sexp + raw Bigarray bytes via
+  `Unix.write_bigstring`); load via `Bigarray.Genarray.map_file`
 
-Gate: byte-identical EMA values on a 100-symbol 1y test fixture; RSS
-< 50% of current scalar implementation at N=300 T=6y on bull-crash
-goldens.
+Gate:
+- Byte-identical EMA values on a 100-symbol 1y test fixture (or ≤ 1
+  ULP drift compounded over 1y, with end-to-end PV unchanged)
+- RSS < 50% of current scalar implementation at N=300 T=6y on
+  bull-crash goldens
+- Snapshot round-trip: dump → load → values bit-identical to the
+  original panel; load wall < 100 ms at N=1000 T=3y
 
-Decision point: if parity gate fails (FP drift > 1 ULP) or RSS gain
-< 30%, abort the migration and revisit.
+Decision point: if parity gate fails (FP drift > 1 ULP and end-to-end
+PV moves) or RSS gain < 30% or snapshot round-trip is lossy, abort
+the migration and revisit.
 
 ### Stage 1: panel-backed `get_indicator` (~500 LOC, 2–3 days)
 
@@ -490,28 +527,17 @@ to point at the new plan, or rename it to `data-panels`.
 
 ## Decision items for the human
 
-1. **Direction**: pursue the columnar redesign instead of the
-   incremental-indicators plan? Or keep incremental as the near-term
-   fix and treat columnar as a Phase 2?
+All ratified 2026-04-25; see Decisions section above. Kept here for
+audit trail.
 
-2. **Scope of the spike (Stage 0)**: 1 indicator (EMA) is enough to
-   prove the parity story; should we also build the OHLCV panel
-   serialization (mmap snapshot for warmup) to test the cold-start
-   story at the same time?
-
-3. **Bigarray vs Owl**: confirm Bigarray. Owl revisitable if
-   dataframe ergonomics later become important.
-
-4. **Migration sequencing**: 5 stages spread across feat-backtest as
-   single owner, or split (stages 0–3 to feat-backtest, stage 4 to
-   feat-weinstein since it touches weinstein/* indicator modules)?
-
-5. **Live-mode handling**: defer stage 5 until live mode lands, or
-   implement up front to keep the panel design honest about the
-   hard case?
-
-6. **What to do with #551's plan**: mark superseded? Delete? Keep as
-   historical record showing the path-not-taken?
+1. ~~Direction: columnar vs incremental?~~ → Columnar.
+2. ~~Stage-0 spike scope?~~ → Include snapshot serialization.
+3. ~~Bigarray vs Owl?~~ → Bigarray; Owl-migration is layered + cheap if
+   later needed.
+4. ~~Owner / sequencing?~~ → All feat-backtest; new `data-panels`
+   status track.
+5. ~~Live-mode handling?~~ → Defer Stage 5 until live mode lands.
+6. ~~#551's plan?~~ → SUPERSEDED, kept as historical record.
 
 ## What's NOT in this plan
 
