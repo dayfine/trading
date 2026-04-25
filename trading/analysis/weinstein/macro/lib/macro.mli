@@ -129,4 +129,96 @@ val analyze :
       Prior week's macro result (for regime_changed detection). [None] on first
       call.
 
-    Pure function. *)
+    Pure function.
+
+    Implementation note: this is a thin wrapper over {!analyze_with_callbacks}.
+    It builds a {!callbacks} record via {!callbacks_from_bars} (which
+    precomputes the cumulative A-D line, the momentum-MA scalar, and
+    per-global-index {!Stage.callbacks}) and threads it through. Behaviour is
+    bit-identical to the callback API for the same underlying bar lists. *)
+
+type callbacks = {
+  index_stage : Stage.callbacks;
+      (** Stage callbacks for the primary index. Threaded into
+          {!Stage.classify_with_callbacks} to compute [index_stage]. *)
+  get_index_close : week_offset:int -> float option;
+      (** Primary-index adjusted close at [week_offset] weeks back (offset 0 =
+          current week). Used by the A-D divergence and NH-NL proxy comparisons
+          (which read close at offset 0 and at the lookback offset). [None] = no
+          bar at that offset (warmup or out of range). *)
+  get_cumulative_ad : week_offset:int -> float option;
+      (** Cumulative A-D line value at [week_offset] weeks back. The cumulative
+          series is [sum_{i <= k} (advancing_i - declining_i)] stored as a float
+          for the panel-shaped layout (the bar-list constructor folds the same
+          int sum and converts at the boundary). [None] = no A-D bar at that
+          offset. *)
+  get_ad_momentum_ma : week_offset:int -> float option;
+      (** A-D momentum MA at [week_offset] weeks back. The MA is the simple mean
+          of the most recent [min momentum_period n] A-D net values (advancing −
+          declining) ending at [week_offset]. Only [week_offset:0] is consumed
+          by {!analyze_with_callbacks}; higher offsets are permitted to return
+          [None]. *)
+  global_index_stages : (string * Stage.callbacks) list;
+      (** Per-global-index Stage callbacks, as [(name, callbacks)] pairs. The
+          list shape mirrors [global_index_bars] in the bar-list API:
+          {!analyze_with_callbacks} iterates each entry, classifies its stage
+          via {!Stage.classify_with_callbacks}, and aggregates the consensus
+          signal. May be empty when no global breadth data is available. *)
+}
+(** Bundle of indicator callbacks consumed by {!analyze_with_callbacks}.
+
+    Macro analysis reads:
+    - The primary index Stage (via the nested {!index_stage} callbacks).
+    - Two index-close samples (recent + lookback) for A-D divergence and the
+      NH-NL proxy.
+    - Two cumulative A-D samples (recent + lookback) for the divergence check,
+      plus the depth of the cumulative series (walked by probing
+      {!get_cumulative_ad} until [None]).
+    - The momentum MA scalar at offset 0.
+    - One Stage classification per entry in {!global_index_stages}. *)
+
+val callbacks_from_bars :
+  config:config ->
+  index_bars:Daily_price.t list ->
+  ad_bars:ad_bar list ->
+  global_index_bars:(string * Daily_price.t list) list ->
+  callbacks
+(** [callbacks_from_bars ~config ~index_bars ~ad_bars ~global_index_bars] builds
+    a {!callbacks} record:
+
+    - {!index_stage} delegates to {!Stage.callbacks_from_bars} over
+      [index_bars].
+    - {!get_index_close} reads [index_bars] adjusted_close at the matching
+      offset.
+    - {!get_cumulative_ad} indexes a precomputed cumulative-A-D float array
+      built by folding [ad_bars] once.
+    - {!get_ad_momentum_ma} returns the precomputed scalar MA at offset 0
+      ([None] otherwise, and [None] when [ad_bars] is empty).
+    - {!global_index_stages} pairs each [(name, bars)] in [global_index_bars]
+      with [Stage.callbacks_from_bars ~config:config.stage_config ~bars].
+
+    Used internally by {!analyze}; exposed so that callers (e.g. tests or future
+    panel-backed paths) can build the bundle the same way the wrapper does. *)
+
+val analyze_with_callbacks :
+  config:config ->
+  callbacks:callbacks ->
+  prior_stage:Weinstein_types.stage option ->
+  prior:result option ->
+  result
+(** [analyze_with_callbacks ~config ~callbacks ~prior_stage ~prior] is the
+    indicator-callback shape of {!analyze}. Used by panel-backed callers that
+    read indicator values via the strategy's panel views rather than walking bar
+    lists.
+
+    @param config Same configuration as {!analyze}.
+    @param callbacks
+      Bundle of indicator callbacks. See the {!callbacks} record for the
+      contract on each closure.
+    @param prior_stage Same as {!analyze}.
+    @param prior Same as {!analyze}.
+
+    Pure function: same callback outputs and inputs always produce the same
+    [result]. The wrapper {!analyze} guarantees byte-identical results for any
+    bar-list inputs by constructing callbacks that index the same precomputed
+    series the bar-list path used to walk inline. *)
