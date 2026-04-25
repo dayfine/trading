@@ -8,6 +8,7 @@
   core_unix.sys_unix
   csv
   fpath
+  indicators.time_period
   status
   trading.strategy
   types

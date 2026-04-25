@@ -13,6 +13,7 @@ type t = {
   low : panel;
   close : panel;
   volume : panel;
+  adjusted_close : panel;
 }
 
 let _make_nan_panel ~n_rows ~n_cols : panel =
@@ -35,6 +36,7 @@ let create symbol_index ~n_days =
     low = _make_nan_panel ~n_rows ~n_cols;
     close = _make_nan_panel ~n_rows ~n_cols;
     volume = _make_nan_panel ~n_rows ~n_cols;
+    adjusted_close = _make_nan_panel ~n_rows ~n_cols;
   }
 
 let n t = t.n_rows
@@ -45,6 +47,7 @@ let high t = t.high
 let low t = t.low
 let close t = t.close
 let volume t = t.volume
+let adjusted_close t = t.adjusted_close
 
 let _check_bounds t ~symbol_index ~day =
   if symbol_index < 0 || symbol_index >= t.n_rows then
@@ -63,7 +66,8 @@ let write_row t ~symbol_index ~day (price : Types.Daily_price.t) =
   BA2.unsafe_set t.high symbol_index day price.high_price;
   BA2.unsafe_set t.low symbol_index day price.low_price;
   BA2.unsafe_set t.close symbol_index day price.close_price;
-  BA2.unsafe_set t.volume symbol_index day (Float.of_int price.volume)
+  BA2.unsafe_set t.volume symbol_index day (Float.of_int price.volume);
+  BA2.unsafe_set t.adjusted_close symbol_index day price.adjusted_close
 
 let _csv_path_for ~data_dir symbol =
   let symbol_dir = Csv_storage.symbol_data_dir ~data_dir symbol in

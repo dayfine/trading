@@ -1,13 +1,22 @@
-(** Five [N x T] Bigarray panels — one per OHLCV field — stored in C-layout
-    Float64. [N] is the universe size from a [Symbol_index]; [T] is the number
-    of trading days in the backtest range. Volume is stored as a float for
-    layout uniformity (volume × 8 B); precision is sufficient for any realistic
-    share count.
+(** Six [N x T] Bigarray panels — one per OHLCV+adjusted_close field — stored in
+    C-layout Float64. [N] is the universe size from a [Symbol_index]; [T] is the
+    number of trading days in the backtest range. Volume is stored as a float
+    for layout uniformity (volume × 8 B); precision is sufficient for any
+    realistic share count.
+
+    [adjusted_close] is carried as a separate panel because downstream
+    indicators (Stage classifier MA, RS line, Macro analyzer) read
+    [Daily_price.adjusted_close] rather than the raw close — for stocks with
+    dividends or splits the two diverge, and using raw close in indicator math
+    silently changes behaviour. Stage 1's spike landed without the adjusted
+    panel because the EMA kernel parity test used a synthetic feed where
+    adjclose = close; Stage 2 adds it as a prerequisite for Bar_panels-backed
+    bar reconstruction.
 
     Layout choice (separate panels per field) is deliberate: cross-section reads
     ("today's close for all symbols") become a single panel column (stride [N]),
     and per-symbol window reads ("last 90 lows for one symbol") become a single
-    panel row slice (stride [1]). A combined [N x T x 5] layout would force one
+    panel row slice (stride [1]). A combined [N x T x 6] layout would force one
     of the two patterns to be strided.
 
     All cells are initialized to [Float.nan]. Cells for missing bars (symbol
@@ -51,10 +60,17 @@ val volume :
   t -> (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array2.t
 (** Volume panel (float64). Shape [N x T]. *)
 
+val adjusted_close :
+  t -> (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array2.t
+(** Adjusted-close panel (float64). Shape [N x T]. Carries
+    [Daily_price.adjusted_close] for indicators that read the dividend-and-
+    split-adjusted close (Stage classifier MA, RS line, Macro). *)
+
 val write_row : t -> symbol_index:int -> day:int -> Types.Daily_price.t -> unit
-(** [write_row t ~symbol_index ~day price] writes the OHLCV fields of [price]
-    into row [symbol_index] / column [day] across all five panels. Bounds-
-    checked (raises [Invalid_argument] if either index is out of range). *)
+(** [write_row t ~symbol_index ~day price] writes the OHLCV+adjusted_close
+    fields of [price] into row [symbol_index] / column [day] across all six
+    panels. Bounds-checked (raises [Invalid_argument] if either index is out of
+    range). *)
 
 val load_from_csv :
   Symbol_index.t ->

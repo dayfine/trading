@@ -9,7 +9,8 @@
   rsi_kernel_test
   indicator_panels_test
   get_indicator_adapter_test
-  calendar_aware_load_test)
+  calendar_aware_load_test
+  bar_panels_test)
  (libraries
   bigarray
   ounit2
