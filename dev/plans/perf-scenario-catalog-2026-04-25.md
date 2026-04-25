@@ -1,20 +1,43 @@
-# Plan: perf scenario catalog + release-gate strategy (2026-04-25)
+# Plan: scenario catalog + release-gate strategy (2026-04-25)
+
+## Scope: TWO regression dimensions
+
+This catalog tracks BOTH:
+
+1. **Trading-performance metrics** — return %, Sharpe ratio, win rate,
+   max drawdown, trade count, P&L. The existing `goldens-small/*.sexp`
+   already pin these as `expected` ranges. This catches strategy
+   regressions: "did we just ship code that changes Sharpe by 0.2?"
+
+2. **Infra-performance profile** — peak RSS, wall-time, per-phase
+   allocation breakdown, memtrace .ctf. This catches infra
+   regressions: "did we just ship code that doubles peak memory at
+   N=1000 stocks?"
+
+A single scenario run produces BOTH outputs. Same .sexp file, two
+pass-criteria sections. The existing trading-metric ranges in
+`goldens-small/*.sexp` are unchanged; new infra-metric ranges go in a
+sibling block.
 
 ## Why
 
 Today's sweep harness (#547) produces a one-shot N×T complexity matrix
 on demand. That's good for hypothesis testing but doesn't track perf
 regressions over time, and doesn't define what "production-ready" looks
-like for a release. This plan structures both:
+like for a release. This plan structures both dimensions:
 
-1. **Continuous perf coverage in GHA** — a tiered set of scenarios
-   that run on different cadences (push / nightly / weekly / release).
+1. **Continuous regression coverage in GHA** — a tiered set of
+   scenarios that run on different cadences (push / nightly / weekly /
+   release). Each cell catches BOTH trading and infra regressions.
 2. **Release-gate strategy** — a top-tier scenario suite that defines
-   "ship-ready" for major/minor versions, with explicit memory + wall-time
-   budgets at decade-long scale on 5000+ stocks.
+   "ship-ready" for major/minor versions, with explicit budgets on
+   trading metrics, peak RSS, AND wall-time at decade-long scale on
+   5000+ stocks.
 
 Both feed off the same scenario catalog under
 `trading/test_data/backtest_scenarios/perf-catalog/` (proposed).
+Existing `goldens-small/*` and `goldens-broad/*` get migrated /
+re-tagged into this catalog rather than living as parallel worlds.
 
 ## Proposed scenario catalog
 
@@ -86,22 +109,53 @@ that they exist and are formally checked at tag time.
 
 ## Cataloging mechanics
 
-Each scenario file gets a header tag declaring its tier:
+Each scenario file gets a header tag declaring its tier + criteria for
+BOTH dimensions. The infra-perf criteria are NEW; the trading-metric
+criteria already exist in the `(expected ...)` block of every
+goldens-small/* file.
 
 ```
 ;; PERF-CATALOG: tier=2 cadence=nightly id=t2-300-1y
-;; Pass criteria:
-;;   RSS_kb_max: 1200000
-;;   wall_seconds_max: 90
+;;
+;; Trading-perf criteria — strategy correctness; same as today's
+;; goldens-small (expected) ranges. Tightened over time as the
+;; strategy stabilizes.
+((expected
+  ((total_return_pct   ((min 250.0) (max 400.0)))
+   (total_trades       ((min 10)    (max 25)))
+   (sharpe_ratio       ((min 0.60)  (max 1.40)))
+   (max_drawdown_pct   ((min 30.0)  (max 45.0)))
+   ...)))
+;;
+;; Infra-perf criteria — peak RSS + wall-time on this machine class
+;; (assume GHA `ubuntu-latest` / 8 GB / 4 vCPU). Loose initially;
+;; tightened only after enough runs to set a real threshold.
+;; Both Legacy AND Tiered must pass — separate budgets per strategy.
+((perf_expected
+  ((legacy_peak_rss_mb_max 1500)
+   (tiered_peak_rss_mb_max 3000)
+   (legacy_wall_seconds_max 90)
+   (tiered_wall_seconds_max 130))))
 ```
 
 A small OCaml helper (`dev/scripts/perf_catalog_check.ml` —
 not committed yet, sketched here) reads these headers + the latest
-sweep run output and emits a pass/fail report. Wired into the
-respective workflows.
+sweep run output (per-cell `peak_rss_kb`, `trace.sexp` for wall-time,
+`log` for trading metrics) and emits a pass/fail report covering
+BOTH criteria sections. Wired into the respective workflows.
 
 The headers + pass criteria evolve as the codebase improves. They're
 auditable in git history; no dashboard needed yet.
+
+**Failure semantics:**
+
+- Trading-criterion fail = strategy regression. Build red. Almost
+  always a real bug or a known intentional change that needs a
+  ranges update in the same commit.
+- Infra-criterion fail = perf regression. Build red BUT with an
+  override path: a `perf_acknowledged` annotation in the commit
+  message acknowledges the regression and bumps the baseline.
+  Forces visibility without forcing a fix on every commit.
 
 ## Implementation sequence
 
