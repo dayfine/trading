@@ -1,11 +1,16 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-19
+## Last updated: 2026-04-23
 
 ## Status
-MERGED
+READY_FOR_REVIEW
 
 Step 1 (#399) + Step 2 (#419) both landed. Step 3 continues on the backtest-scale track.
+
+Perf-sweep harness extension (this PR) — produces (N × T × strategy)
+complexity-analysis matrix on top of the existing C2 perf harness.
+Unblocks scaling investigations after H1/H2/H3/H7/GC tuning all
+disproved at a single (N=292, T=6y) datapoint.
 
 ## QC
 
@@ -123,6 +128,32 @@ None. Merged in main:
 - Non-deterministic due to Hashtbl ordering (tracked, not fully fixed)
 
 ## Completed
+
+- [x] **Perf-sweep harness extension** (2026-04-23,
+  `feat/backtest-perf-sweep-harness`). Wraps the existing C2 perf harness
+  in a (N × T × strategy) sweep so future scaling investigations can read
+  the slope of RSS / wall-time vs. universe size and run length, rather
+  than rerunning a single-point hypothesis test for each variation. Four
+  perf-sweep scenario sexps under
+  `trading/test_data/backtest_scenarios/perf-sweep/{bull-3m,bull-6m,bull-1y,bull-3y}.sexp`
+  use the broad universe sentinel so `--override '((universe_cap (N)))'`
+  actually constrains the loaded set. Driver
+  `dev/scripts/run_perf_sweep.sh` walks an 8-cell matrix (N=100/300/500/1000
+  at T=1y plus T=3m/6m/3y at N=300 plus the 1000×3y worst corner), each
+  cell × 2 strategies; skip-on-resume keys off non-empty
+  `<strategy>.peak_rss_kb`; per-cell `timeout 1200` so a stuck cell
+  doesn't hang the whole sweep. Aggregator
+  `dev/scripts/perf_sweep_report.py` emits an RSS matrix, an N-sweep
+  complexity table at fixed T=1y, a T-sweep complexity table at fixed
+  N=300, a wall-time matrix, and a failure-section listing any cells
+  that errored. Coarse linear-extreme-fit slope rows give the curve
+  shape (sub-linear / linear / super-linear) without over-engineering
+  the analysis. .gitignore extended with an explicit
+  `dev/experiments/perf/sweep-*/` documentation pattern (already covered
+  by the wildcard above). No production code touched. Verify:
+  `bash -n dev/scripts/run_perf_sweep.sh`,
+  `python3 -m py_compile dev/scripts/perf_sweep_report.py`,
+  `dune build && dune runtest` (all green).
 
 - [x] **Per-phase tracing (Step 2 of scale-optimization plan #396)**
   (2026-04-18, `feat/backtest-phase-tracing`, PR #419). New

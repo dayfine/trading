@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [backtest-infra](backtest-infra.md) | MERGED | — | — | — (#419 per-phase tracing merged 2026-04-19) |
+| [backtest-infra](backtest-infra.md) | READY_FOR_REVIEW | feat-backtest | feat/backtest-perf-sweep-harness (PR pending push) | Perf-sweep harness extension — (N × T × strategy) complexity-analysis matrix on top of the existing C2 harness. 4 perf-sweep scenarios + bash sweep driver + Python aggregator. Lead session runs the actual sweep post-merge. |
 | [backtest-scale](backtest-scale.md) | READY_FOR_REVIEW | feat-backtest | #521 (status doc, this PR) | #517 + #519 closed the post-#507 Tiered/Legacy A/B parity gaps. Verified on GHA `tiered-loader-ab` workflow_dispatch (run 24870169890): PV delta $0.0000 on all three broad goldens, trade lists bit-identical. #521 is the doc-only update reflecting #519's actual root cause (Summary tier's 52-weekly-bar RS-window gate, not the CreateEntering-timing hypothesis originally posited). Next: optional 1-2 confirming scheduled nightlies → flip `loader_strategy` default Legacy→Tiered (~20-line PR). 7-symbol CI fixture rebuild remains a separate follow-up tracked in `backtest-scale.md` § Follow-up. |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — (PRs #382 primitive + #390 wiring both merged 2026-04-17) |
 | [short-side-strategy](short-side-strategy.md) | MERGED | — | — | — (#420 merged 2026-04-19). Follow-ups carried to own tracks: bear-window backtest regression, full short cascade, Ch.11 behavioural spot-check. |
