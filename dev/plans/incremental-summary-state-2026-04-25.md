@@ -1,5 +1,16 @@
 # Plan: incremental Summary state — push-based per-tick indicators (2026-04-25)
 
+> **SUPERSEDED 2026-04-25** by
+> `dev/plans/columnar-data-shape-2026-04-25.md` (PR #554). The
+> columnar redesign collapses the same memory cost more
+> structurally — Bar_history and the tier system both disappear,
+> rather than the tier concept being re-aimed. Reusable pieces of
+> this plan (the `INDICATOR` functor signature, the parity-test
+> functor, the indicator-by-indicator porting order, the audit of
+> Bar_history reader sites) carry forward into the columnar plan's
+> stages. This document is preserved as historical record showing
+> the path-not-taken and the indicator audit it captured.
+
 ## Goal
 
 Replace the current "load full bar history → compute Summary scalars

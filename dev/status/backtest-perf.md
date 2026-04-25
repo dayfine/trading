@@ -46,9 +46,10 @@ mechanics + release-gate procedure.
 4. Define tier 3 (weekly, 4 cells) + sibling weekly workflow.
    ~80 LOC YAML.
 5. Tier 4 (release-gate, 5000-stock decade-long) — gated on the
-   incremental-indicators refactor (`dev/status/incremental-indicators.md`)
-   landing first. Current Tiered would extrapolate to ~31 GB at
-   5000×10y; need the refactor to fit in 8 GB ceiling.
+   `data-panels` refactor (`dev/status/data-panels.md`) landing
+   stages 0-3 at minimum. Current Tiered would extrapolate to
+   ~31 GB at 5000×10y; columnar projects to ~1.2 GB, well under
+   the 8 GB ceiling.
 
 ## Ownership
 
@@ -62,8 +63,8 @@ generators.
 
 ## Blocked on
 
-- **Tier 4 release-gate scenarios** are blocked on the
-  incremental-indicators refactor landing. Tiers 1-3 can proceed
+- **Tier 4 release-gate scenarios** are blocked on the `data-panels`
+  refactor (stages 0-3 at minimum) landing. Tiers 1-3 can proceed
   independently.
 
 ## Decision items (need human or QC sign-off)
@@ -74,8 +75,9 @@ Carried verbatim from `dev/plans/perf-scenario-catalog-2026-04-25.md`:
    release ≤8h) the right budget?
 2. Tier 4 pass criteria — what RSS / wall budget defines a passing
    release? Today's bull-crash 1000-symbol Tiered = 3.7 GB; 5000
-   stocks would extrapolate to ~31 GB Tiered. Either widen the
-   gate or invest in the incremental refactor.
+   stocks would extrapolate to ~31 GB Tiered. The `data-panels`
+   refactor (PR #554) projects ~1.2 GB at the same scale, so
+   tier-4 criteria can stay tight (~8 GB ceiling) once it lands.
 3. Should `perf_catalog_check` fail builds or annotate-only?
    Initial: annotate-only.
 4. Tracking format: CSV in repo (auditable, grows) vs external store.
@@ -86,7 +88,7 @@ Carried verbatim from `dev/plans/perf-scenario-catalog-2026-04-25.md`:
 - Plan: `dev/plans/perf-scenario-catalog-2026-04-25.md`
 - Existing perf harness: `dev/scripts/run_perf_hypothesis.sh` (#537),
   `dev/scripts/run_perf_sweep.sh` (#547)
-- Sibling track: `dev/status/incremental-indicators.md` — tier 4
-  blocker
+- Sibling track: `dev/status/data-panels.md` — tier 4 blocker
+  (supersedes the older `incremental-indicators` track)
 - Predecessor: `dev/status/backtest-infra.md` (MERGED) for the
   experiments/analysis side this builds on
