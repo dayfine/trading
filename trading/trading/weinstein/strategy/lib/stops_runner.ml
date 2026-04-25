@@ -5,10 +5,10 @@ open Trading_strategy
     history. Reads and updates [prior_stages] so Stage1->Stage2 transition
     detection works across calls. Returns [(Flat, close_price)] when there
     aren't enough bars yet for the MA. *)
-let _compute_ma ~(stage_config : Stage.config) ~lookback_bars ~bar_history
+let _compute_ma ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
     ~prior_stages ~symbol ~fallback_price =
   let weekly =
-    Bar_history.weekly_bars_for bar_history ~symbol ~n:lookback_bars
+    Bar_reader.weekly_bars_for bar_reader ~symbol ~n:lookback_bars ~as_of
   in
   if List.length weekly < stage_config.ma_period then
     (Weinstein_types.Flat, fallback_price)
@@ -55,10 +55,10 @@ let _make_adjust_transition ~(pos : Position.t) ~current_date
     adjust_transition option). *)
 let _handle_stop ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
     ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
-    ~bar_history ~prior_stages =
+    ~bar_reader ~as_of ~prior_stages =
   let current_date = bar.Types.Daily_price.date in
   let ma_direction, ma_value =
-    _compute_ma ~stage_config ~lookback_bars ~bar_history ~prior_stages
+    _compute_ma ~stage_config ~lookback_bars ~bar_reader ~as_of ~prior_stages
       ~symbol:ticker ~fallback_price:bar.Types.Daily_price.close_price
   in
   let new_state, event =
@@ -80,7 +80,8 @@ let _handle_stop ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
 (** Process stop for one position; returns updated (exits, adjusts) accumulator.
 *)
 let _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
-    ~get_price ~bar_history ~prior_stages (pos : Position.t) (exits, adjusts) =
+    ~get_price ~bar_reader ~as_of ~prior_stages (pos : Position.t)
+    (exits, adjusts) =
   let ticker = pos.symbol in
   match
     (Position.get_state pos, Map.find !stop_states ticker, get_price ticker)
@@ -89,7 +90,7 @@ let _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
       match
         _handle_stop ~stops_config ~stage_config ~lookback_bars ~pos
           ~risk_params:h.risk_params ~state ~bar ~stop_states ~ticker
-          ~bar_history ~prior_stages
+          ~bar_reader ~as_of ~prior_stages
       with
       | Some exit_tr, _ -> (exit_tr :: exits, adjusts)
       | _, Some adj_tr -> (exits, adj_tr :: adjusts)
@@ -97,7 +98,7 @@ let _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
   | _ -> (exits, adjusts)
 
 let update ~stops_config ~stage_config ~lookback_bars ~positions ~get_price
-    ~stop_states ~bar_history ~prior_stages =
+    ~stop_states ~bar_reader ~as_of ~prior_stages =
   Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
       _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
-        ~get_price ~bar_history ~prior_stages pos acc)
+        ~get_price ~bar_reader ~as_of ~prior_stages pos acc)

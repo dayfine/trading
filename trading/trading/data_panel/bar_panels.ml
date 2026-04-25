@@ -4,7 +4,11 @@ open Core
 module BA1 = Bigarray.Array1
 module BA2 = Bigarray.Array2
 
-type t = { ohlcv : Ohlcv_panels.t; calendar : Date.t array }
+type t = {
+  ohlcv : Ohlcv_panels.t;
+  calendar : Date.t array;
+  date_to_col : (Date.t, int) Hashtbl.t;
+}
 
 let _calendar_len_mismatch ~calendar ~ohlcv =
   let n_cal = Array.length calendar in
@@ -17,13 +21,22 @@ let _calendar_len_mismatch ~calendar ~ohlcv =
          n_cal n_panel)
   else None
 
+let _build_date_to_col calendar =
+  let tbl = Hashtbl.create (module Date) in
+  Array.iteri calendar ~f:(fun i d ->
+      Hashtbl.add tbl ~key:d ~data:i |> (ignore : [ `Ok | `Duplicate ] -> unit));
+  tbl
+
 let create ~ohlcv ~calendar =
   match _calendar_len_mismatch ~calendar ~ohlcv with
   | Some msg -> Error (Status.invalid_argument_error msg)
-  | None -> Ok { ohlcv; calendar }
+  | None ->
+      let date_to_col = _build_date_to_col calendar in
+      Ok { ohlcv; calendar; date_to_col }
 
 let symbol_index t = Ohlcv_panels.symbol_index t.ohlcv
 let n_days t = Array.length t.calendar
+let column_of_date t date = Hashtbl.find t.date_to_col date
 
 let _check_as_of t ~as_of_day =
   let n = n_days t in

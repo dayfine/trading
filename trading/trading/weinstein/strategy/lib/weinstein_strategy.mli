@@ -39,6 +39,10 @@ module Ad_bars = Ad_bars
 module Bar_history = Bar_history
 (** Per-symbol daily bar buffer. See {!Bar_history}. *)
 
+module Bar_reader = Bar_reader
+(** Bar source abstraction backing {!Bar_history} and panel-backed reads. See
+    {!Bar_reader}. *)
+
 module Stops_runner = Stops_runner
 (** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
 *)
@@ -179,7 +183,7 @@ val entries_from_candidates :
   config:config ->
   candidates:Screener.scored_candidate list ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
-  bar_history:Bar_history.t ->
+  bar_reader:Bar_reader.t ->
   portfolio:Trading_strategy.Portfolio_view.t ->
   get_price:(string -> Types.Daily_price.t option) ->
   current_date:Date.t ->
@@ -214,6 +218,7 @@ val make :
   ?ad_bars:Macro.ad_bar list ->
   ?ticker_sectors:(string, string) Hashtbl.t ->
   ?bar_history:Bar_history.t ->
+  ?bar_panels:Data_panel.Bar_panels.t ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -241,4 +246,12 @@ val make :
       Used by the Tiered backtest path so the [Tiered_strategy_wrapper] can
       [Bar_history.seed] from [Bar_loader.get_full] after Full-tier promotions
       and have those bars visible to the strategy's own readers. Default: a
-      fresh empty [Bar_history.t] (the pre-existing behaviour). *)
+      fresh empty [Bar_history.t] (the pre-existing behaviour).
+    @param bar_panels
+      Optional [Bar_panels.t] (panel-backed bar reader). When provided, takes
+      precedence over [bar_history] — the strategy reads from panel columns via
+      {!Bar_reader.of_panels} instead of the parallel Hashtbl cache. Used by the
+      Panel backtest path. Stage 2 of the columnar-data-shape plan (see
+      [dev/plans/columnar-data-shape-2026-04-25.md]) replaces [Bar_history] with
+      this; until Stage 2 ships, both backends are supported and a parity test
+      pins their behaviour as bit-identical. *)

@@ -63,6 +63,16 @@ let _build_indicators ~ohlcv ~n_days =
 
 let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_history
     ~warmup_start ~ohlcv ~indicators ~calendar =
+  (* Stage 2: do NOT pass [~bar_panels] yet. The strategy still uses
+     [Bar_history] under both Panel and Tiered modes; the only Panel-vs-Tiered
+     difference today is the panel-backed [get_indicator] (which the strategy
+     does not yet consume). Wiring [Bar_panels] in here would change Panel-mode
+     trade count vs Tiered because [Bar_panels] is fully populated up-front
+     while [Bar_history] under Tiered is incrementally seeded by the Friday
+     full-tier promote cycle. The reader-site parity test
+     [test_panels_reader_parity] exercises the [?bar_panels] swap directly with
+     identical bars from both backends; the runner-level swap will land in a
+     follow-up PR that also collapses the Tiered cycle (Stage 3). *)
   let inner_strategy =
     Weinstein_strategy.make ~ad_bars:input.ad_bars
       ~ticker_sectors:input.ticker_sectors ~bar_history input.config
