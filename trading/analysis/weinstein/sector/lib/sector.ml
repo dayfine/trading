@@ -1,4 +1,5 @@
 open Core
+open Types
 open Weinstein_types
 
 type config = {
@@ -35,6 +36,19 @@ type result = {
   bullish_constituent_pct : float;
   rationale : string list;
 }
+
+(* ------------------------------------------------------------------ *)
+(* Callback bundle — used by panel-backed callers                       *)
+(* ------------------------------------------------------------------ *)
+
+type callbacks = { stage : Stage.callbacks; rs : Rs.callbacks }
+
+let callbacks_from_bars ~(config : config) ~(sector_bars : Daily_price.t list)
+    ~(benchmark_bars : Daily_price.t list) : callbacks =
+  {
+    stage = Stage.callbacks_from_bars ~config:config.stage_config ~bars:sector_bars;
+    rs = Rs.callbacks_from_bars ~stock_bars:sector_bars ~benchmark_bars;
+  }
 
 (* ------------------------------------------------------------------ *)
 (* Internal helpers                                                     *)
@@ -95,25 +109,32 @@ let _build_rationale ~stage ~rs ~constituent_pct ~rating : string list =
   let rating_msg = Printf.sprintf "Rating: %s" (_rating_string rating) in
   [ stage_msg; rs_msg; breadth_msg; rating_msg ]
 
+let _rating_of_confidence ~config ~confidence : Screener.sector_rating =
+  if Float.(confidence >= config.strong_confidence) then Screener.Strong
+  else if Float.(confidence <= config.weak_confidence) then Screener.Weak
+  else Screener.Neutral
+
 (* ------------------------------------------------------------------ *)
-(* Main function                                                        *)
+(* Main function — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
 
-let analyze ~config ~sector_name ~sector_bars ~benchmark_bars
-    ~constituent_analyses ~prior_stage : result =
+let analyze_with_callbacks ~(config : config) ~sector_name
+    ~(callbacks : callbacks)
+    ~(constituent_analyses : Stock_analysis.t list) ~prior_stage : result =
   let stage =
-    Stage.classify ~config:config.stage_config ~bars:sector_bars ~prior_stage
+    Stage.classify_with_callbacks ~config:config.stage_config
+      ~get_ma:callbacks.stage.get_ma ~get_close:callbacks.stage.get_close
+      ~prior_stage
   in
   let rs =
-    Rs.analyze ~config:config.rs_config ~stock_bars:sector_bars ~benchmark_bars
+    Rs.analyze_with_callbacks ~config:config.rs_config
+      ~get_stock_close:callbacks.rs.get_stock_close
+      ~get_benchmark_close:callbacks.rs.get_benchmark_close
+      ~get_date:callbacks.rs.get_date
   in
   let constituent_pct = _bullish_constituent_pct constituent_analyses in
   let confidence = _sector_confidence ~config ~stage ~rs ~constituent_pct in
-  let rating =
-    if Float.(confidence >= config.strong_confidence) then Screener.Strong
-    else if Float.(confidence <= config.weak_confidence) then Screener.Weak
-    else Screener.Neutral
-  in
+  let rating = _rating_of_confidence ~config ~confidence in
   let rationale = _build_rationale ~stage ~rs ~constituent_pct ~rating in
   {
     sector_name;
@@ -124,6 +145,16 @@ let analyze ~config ~sector_name ~sector_bars ~benchmark_bars
     bullish_constituent_pct = constituent_pct;
     rationale;
   }
+
+(* ------------------------------------------------------------------ *)
+(* Bar-list wrapper — preserves the existing API                        *)
+(* ------------------------------------------------------------------ *)
+
+let analyze ~(config : config) ~sector_name ~sector_bars ~benchmark_bars
+    ~constituent_analyses ~prior_stage : result =
+  let callbacks = callbacks_from_bars ~config ~sector_bars ~benchmark_bars in
+  analyze_with_callbacks ~config ~sector_name ~callbacks ~constituent_analyses
+    ~prior_stage
 
 let sector_context_of (r : result) : Screener.sector_context =
   {
