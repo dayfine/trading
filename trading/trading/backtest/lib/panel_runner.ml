@@ -61,15 +61,8 @@ let _build_indicators ~ohlcv ~n_days =
   let symbol_index = Ohlcv_panels.symbol_index ohlcv in
   Indicator_panels.create ~symbol_index ~n_days ~specs:_default_specs
 
-let _make_simulator (input : Tiered_runner.input) ~loader ~stop_log ~start_date
-    ~end_date ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators
-    ~calendar =
-  (* Reuse the Tiered seam so [Bar_history] stays alive and behaves
-     identically. The Panel wrapper sits OUTSIDE the Tiered wrapper so it
-     intercepts [on_market_close] last and gets to substitute the
-     get_indicator. *)
-  let bar_history = Bar_history.create () in
-  let warmup_start = Date.add_days start_date (-warmup_days) in
+let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_history
+    ~warmup_start ~ohlcv ~indicators ~calendar =
   let inner_strategy =
     Weinstein_strategy.make ~ad_bars:input.ad_bars
       ~ticker_sectors:input.ticker_sectors ~bar_history input.config
@@ -102,13 +95,22 @@ let _make_simulator (input : Tiered_runner.input) ~loader ~stop_log ~start_date
       universe = input.all_symbols;
     }
   in
+  Panel_strategy_wrapper.wrap ~config:panel_config tiered_strategy
+
+let _make_simulator (input : Tiered_runner.input) ~loader ~stop_log ~start_date
+    ~end_date ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators
+    ~calendar =
+  let bar_history = Bar_history.create () in
+  let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy =
-    Panel_strategy_wrapper.wrap ~config:panel_config tiered_strategy
+    _build_strategy input ~loader ~stop_log ~bar_history ~warmup_start ~ohlcv
+      ~indicators ~calendar
   in
-  let metric_suite = Metric_computers.default_metric_suite () in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
-      ~data_dir:input.data_dir_fpath ~strategy ~commission ~metric_suite ()
+      ~data_dir:input.data_dir_fpath ~strategy ~commission
+      ~metric_suite:(Metric_computers.default_metric_suite ())
+      ()
   in
   let sim_config =
     Simulator.

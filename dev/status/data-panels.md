@@ -3,10 +3,12 @@
 ## Last updated: 2026-04-25
 
 ## Status
-IN_PROGRESS — Stage 0 MERGED as #555 (2026-04-25). **Stage 1 READY_FOR_REVIEW** on `feat/panels-stage01-get-indicator` (this branch). Stages 2-5 still gated on human green-light per plan §Decision point.
+READY_FOR_REVIEW
+
+Stage 0 MERGED as #555 (2026-04-25). Stage 1 on `feat/panels-stage01-get-indicator` (PR #557). Stages 2-5 still gated on human green-light per plan §Decision point.
 
 ## Interface stable
-N/A — pre-implementation
+NO
 
 ## Goal
 

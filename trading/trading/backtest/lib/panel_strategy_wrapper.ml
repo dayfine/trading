@@ -30,42 +30,42 @@ let _today_date_opt ~(get_price : Strategy_interface.get_price_fn)
   Option.map (get_price primary_index) ~f:(fun bar ->
       bar.Types.Daily_price.date)
 
+let _write_symbol_bar ~ohlcv ~symbol_index ~get_price ~day sym =
+  match Symbol_index.to_row symbol_index sym with
+  | None -> () (* symbol not in panel universe — skip *)
+  | Some row -> (
+      match get_price sym with
+      | None -> ()
+      | Some bar -> Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day bar)
+
 let _write_today_bars ~ohlcv ~symbol_index ~get_price ~universe ~day =
-  List.iter universe ~f:(fun sym ->
-      match Symbol_index.to_row symbol_index sym with
-      | None -> () (* symbol not in panel universe — skip *)
-      | Some row -> (
-          match get_price sym with
-          | None -> ()
-          | Some bar -> Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day bar))
+  List.iter universe ~f:(_write_symbol_bar ~ohlcv ~symbol_index ~get_price ~day)
+
+let _advance_panels_and_run ~(config : config)
+    ~(module_ : (module Strategy_interface.STRATEGY)) ~get_price ~portfolio ~day
+    =
+  let (module S) = module_ in
+  let symbol_index = Ohlcv_panels.symbol_index config.ohlcv in
+  _write_today_bars ~ohlcv:config.ohlcv ~symbol_index ~get_price
+    ~universe:config.universe ~day;
+  Indicator_panels.advance_all config.indicators ~ohlcv:config.ohlcv ~t:day;
+  let get_indicator = Get_indicator_adapter.make config.indicators ~t:day in
+  S.on_market_close ~get_price ~get_indicator ~portfolio
 
 let _on_market_close ~(config : config)
     ~(inner_module : (module Strategy_interface.STRATEGY)) ~get_price
     ~get_indicator ~portfolio =
   let (module S) = inner_module in
   let calendar_idx = _calendar_index config.calendar in
-  let symbol_index = Ohlcv_panels.symbol_index config.ohlcv in
   let today = _today_date_opt ~get_price ~primary_index:config.primary_index in
-  match today with
+  let day_opt = Option.bind today ~f:(Hashtbl.find calendar_idx) in
+  match day_opt with
   | None ->
-      (* No primary-index bar today — pass the simulator's original
-         [get_indicator] through unchanged. *)
+      (* No primary-index bar today, or date out of calendar — pass through. *)
       S.on_market_close ~get_price ~get_indicator ~portfolio
-  | Some date -> (
-      match Hashtbl.find calendar_idx date with
-      | None ->
-          (* Date not in calendar (out of range) — pass through. *)
-          S.on_market_close ~get_price ~get_indicator ~portfolio
-      | Some day ->
-          _write_today_bars ~ohlcv:config.ohlcv ~symbol_index ~get_price
-            ~universe:config.universe ~day;
-          Indicator_panels.advance_all config.indicators ~ohlcv:config.ohlcv
-            ~t:day;
-          let panel_get_indicator =
-            Get_indicator_adapter.make config.indicators ~t:day
-          in
-          S.on_market_close ~get_price ~get_indicator:panel_get_indicator
-            ~portfolio)
+  | Some day ->
+      _advance_panels_and_run ~config ~module_:inner_module ~get_price
+        ~portfolio ~day
 
 let wrap ~config (module S : Strategy_interface.STRATEGY) =
   let inner_module = (module S : Strategy_interface.STRATEGY) in

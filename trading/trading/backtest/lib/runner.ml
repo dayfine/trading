@@ -302,10 +302,9 @@ let _run_tiered_backtest ~deps ~start_date ~end_date ?trace () =
     ~input:(_tiered_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace ()
 
-(* Panel loader_strategy path — Stage 1 of the columnar data-shape redesign
-   (see [dev/plans/columnar-data-shape-2026-04-25.md]). Delegates to
-   [Panel_runner], which builds OHLCV + Indicator panels alongside reusing the
-   Tiered execution flow. *)
+(* Panel loader_strategy path — Stage 1 of the columnar data-shape redesign.
+   Plan lives under dev/plans/. Delegates to [Panel_runner], which builds
+   OHLCV + Indicator panels alongside reusing the Tiered execution flow. *)
 let _run_panel_backtest ~deps ~start_date ~end_date ?trace () =
   Panel_runner.run
     ~input:(_tiered_input_of_deps deps)
