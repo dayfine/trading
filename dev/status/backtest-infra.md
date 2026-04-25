@@ -1,16 +1,16 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-23
+## Last updated: 2026-04-25
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-Step 1 (#399) + Step 2 (#419) both landed. Step 3 continues on the backtest-scale track.
-
-Perf-sweep harness extension (this PR) — produces (N × T × strategy)
-complexity-analysis matrix on top of the existing C2 perf harness.
-Unblocks scaling investigations after H1/H2/H3/H7/GC tuning all
-disproved at a single (N=292, T=6y) datapoint.
+Step 1 (#399) + Step 2 (#419) landed long ago. Step 3 continued on
+the backtest-scale track. The perf-sweep harness extension (#547)
+landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
+moved to its own track at `dev/status/backtest-perf.md`. The 12-step
+incremental-indicators refactor (the follow-on architecture for
+Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
 ## QC
 
