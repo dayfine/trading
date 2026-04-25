@@ -58,6 +58,30 @@ let _find_peak_volume_idx ~lookback (bars : Daily_price.t list) : int option =
     in
     Some (start + max_vol_idx)
 
+(** Tail-recursive scan returning the max [high_price] across the slice
+    [\[base_start, base_end\)] of [bars]. Returns [None] when the slice is empty
+    (no bars fall in the index range).
+
+    Was: List.sub allocated a [base_bars] sub-list, then List.map allocated a
+    fresh float list of [high_price]s, then List.max_elt walked it — three
+    traversals and two intermediate lists per call. Now: one walk, no
+    intermediate. Runs once per universe symbol per Friday screen. *)
+let _scan_max_high (bars : Daily_price.t list) ~base_start ~base_end :
+    float option =
+  let rec loop i best = function
+    | [] -> best
+    | _ when i >= base_end -> best
+    | _ :: rest when i < base_start -> loop (i + 1) best rest
+    | (b : Daily_price.t) :: rest ->
+        let best' =
+          match best with
+          | None -> Some b.high_price
+          | Some best -> Some (Float.max best b.high_price)
+        in
+        loop (i + 1) best' rest
+  in
+  loop 0 None bars
+
 (** Estimate the breakout price: highest high in the prior base region.
 
     The base region is [base_lookback_weeks] bars back, excluding the most
@@ -69,12 +93,7 @@ let _estimate_breakout_price ~base_lookback_weeks ~base_end_offset_weeks
   let base_start = max 0 (n - base_lookback_weeks) in
   let base_end = max 0 (n - base_end_offset_weeks) in
   if base_end <= base_start then None
-  else
-    let base_bars =
-      List.sub bars ~pos:base_start ~len:(base_end - base_start)
-    in
-    List.map base_bars ~f:(fun b -> b.Daily_price.high_price)
-    |> List.max_elt ~compare:Float.compare
+  else _scan_max_high bars ~base_start ~base_end
 
 let analyze ~(config : config) ~ticker ~bars ~benchmark_bars ~prior_stage
     ~as_of_date : t =
