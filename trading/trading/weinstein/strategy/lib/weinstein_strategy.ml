@@ -5,6 +5,7 @@
 open Core
 open Trading_strategy
 module Bar_history = Bar_history
+module Bar_reader = Bar_reader
 module Stops_runner = Stops_runner
 
 module Ad_bars = Ad_bars
@@ -93,7 +94,7 @@ let _normalised_entry_stop_for_sizing (cand : Screener.scored_candidate) =
     counter-rally high (short) from the candidate's accumulated bar history;
     falls back to the fixed-buffer proxy when the lookback window holds no
     qualifying counter-move. *)
-let _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
+let _make_entry_transition ~config ~stop_states ~bar_reader ~portfolio_value
     ~current_date (cand : Screener.scored_candidate) =
   let entry_for_sizing, stop_for_sizing =
     _normalised_entry_stop_for_sizing cand
@@ -107,7 +108,8 @@ let _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
   else
     let id = _gen_position_id cand.ticker in
     let daily_bars =
-      Bar_history.daily_bars_for bar_history ~symbol:cand.ticker
+      Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker
+        ~as_of:current_date
     in
     let initial_stop =
       Weinstein_stops.compute_initial_stop_with_floor
@@ -186,13 +188,13 @@ let _candidate_to_transition ~held_set ~make_entry ~remaining_cash
     [remaining_cash] before the next candidate is considered — so we preserve
     the "first-come keeps cash" tie-break. Per the perf followup notes under
     dev/notes/: List.filter was the top allocator on the strategy hot path. *)
-let entries_from_candidates ~config ~candidates ~stop_states ~bar_history
+let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
     ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let remaining_cash = ref portfolio.cash in
   let make_entry =
-    _make_entry_transition ~config ~stop_states ~bar_history ~portfolio_value
+    _make_entry_transition ~config ~stop_states ~bar_reader ~portfolio_value
       ~current_date
   in
   List.fold candidates ~init:[] ~f:(fun acc c ->
@@ -213,12 +215,12 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_history
     - [Neutral]: both — longs and shorts are both eligible.
     - [Bearish]: shorts only — longs are empty. *)
 let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
-    ~(portfolio : Portfolio_view.t) ~get_price ~bar_history ~prior_stages
+    ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
     ~current_date =
   let _analyze_ticker ticker =
     let bars =
-      Bar_history.weekly_bars_for bar_history ~symbol:ticker
-        ~n:config.lookback_bars
+      Bar_reader.weekly_bars_for bar_reader ~symbol:ticker
+        ~n:config.lookback_bars ~as_of:current_date
     in
     if List.is_empty bars then None
     else
@@ -245,7 +247,7 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
     @ screen_result.Screener.short_candidates
   in
   entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
-    ~bar_history ~portfolio ~get_price ~current_date
+    ~bar_reader ~portfolio ~get_price ~current_date
 
 (* ------------------------------------------------------------------ *)
 (* make                                                                  *)
@@ -272,13 +274,14 @@ let _all_accumulated_symbols ~(config : config) : string list =
     Bullish — happens inside the screener. Under Bearish this yields short-side
     entries (per the bear-market shorting chapter), where previously the branch
     returned [] unconditionally. *)
-let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
+let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
     ~current_date ~index_bars =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
   let global_index_bars =
     Macro_inputs.build_global_index_bars ~lookback_bars:config.lookback_bars
-      ~global_index_symbols:config.indices.global ~bar_history
+      ~global_index_symbols:config.indices.global ~bar_reader
+      ~as_of:current_date
   in
   let macro_result =
     Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars
@@ -288,18 +291,19 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
   let sector_map =
     Macro_inputs.build_sector_map ~stage_config:config.stage_config
       ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
-      ~bar_history ~sector_prior_stages ~index_bars ~ticker_sectors
+      ~bar_reader ~as_of:current_date ~sector_prior_stages ~index_bars
+      ~ticker_sectors
   in
   _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
-    ~sector_map ~stop_states ~portfolio ~get_price ~bar_history ~prior_stages
+    ~sector_map ~stop_states ~portfolio ~get_price ~bar_reader ~prior_stages
     ~current_date
 
-let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
+let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
     ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let all_symbols = _all_accumulated_symbols ~config in
-  Bar_history.accumulate bar_history ~get_price ~symbols:all_symbols;
+  Bar_reader.accumulate bar_reader ~get_price ~symbols:all_symbols;
   let current_date =
     match get_price config.indices.primary with
     | Some bar -> bar.Types.Daily_price.date
@@ -308,16 +312,17 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
   let exit_transitions, adjust_transitions =
     Stops_runner.update ~stops_config:config.stops_config
       ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-      ~positions ~get_price ~stop_states ~bar_history ~prior_stages
+      ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
+      ~prior_stages
   in
   let index_bars =
-    Bar_history.weekly_bars_for bar_history ~symbol:config.indices.primary
-      ~n:config.lookback_bars
+    Bar_reader.weekly_bars_for bar_reader ~symbol:config.indices.primary
+      ~n:config.lookback_bars ~as_of:current_date
   in
   let entry_transitions =
     if not (_is_screening_day index_bars) then []
     else
-      _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
+      _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
         ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
         ~current_date ~index_bars
   in
@@ -328,13 +333,17 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_history
     }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_history config =
+    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_history ?bar_panels
+    config =
   let stop_states = ref initial_stop_states in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
-  let bar_history =
-    match bar_history with Some h -> h | None -> Bar_history.create ()
+  let bar_reader =
+    match (bar_panels, bar_history) with
+    | Some p, _ -> Bar_reader.of_panels p
+    | None, Some h -> Bar_reader.of_history h
+    | None, None -> Bar_reader.of_history (Bar_history.create ())
   in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
@@ -351,6 +360,6 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
 
     let on_market_close =
       _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states ~prior_macro
-        ~bar_history ~prior_stages ~sector_prior_stages ~ticker_sectors
+        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
   end in
   (module M : Strategy_interface.STRATEGY)

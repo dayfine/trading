@@ -15,7 +15,8 @@ val update :
   positions:Position.t Map.M(String).t ->
   get_price:Strategy_interface.get_price_fn ->
   stop_states:Weinstein_stops.stop_state Map.M(String).t ref ->
-  bar_history:Bar_history.t ->
+  bar_reader:Bar_reader.t ->
+  as_of:Date.t ->
   prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
   Position.transition list * Position.transition list
 (** [update] folds over every held position and advances its stop state. For

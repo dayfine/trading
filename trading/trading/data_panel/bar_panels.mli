@@ -41,6 +41,13 @@ val symbol_index : t -> Symbol_index.t
 val n_days : t -> int
 (** [n_days t] returns the calendar length. *)
 
+val column_of_date : t -> Core.Date.t -> int option
+(** [column_of_date t date] returns the panel column index for [date], or [None]
+    if [date] does not appear in the underlying calendar. O(1) lookup via an
+    internal hashtable built at [create] time. The strategy uses this to resolve
+    "today's date" (read from the primary index bar) into the [as_of_day]
+    argument the bar readers want. *)
+
 val daily_bars_for :
   t -> symbol:string -> as_of_day:int -> Types.Daily_price.t list
 (** [daily_bars_for t ~symbol ~as_of_day] returns the symbol's daily bars from

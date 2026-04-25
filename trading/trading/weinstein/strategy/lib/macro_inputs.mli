@@ -27,19 +27,25 @@ val default_global_indices : (string * string) list
 val build_global_index_bars :
   lookback_bars:int ->
   global_index_symbols:(string * string) list ->
-  bar_history:Bar_history.t ->
+  bar_reader:Bar_reader.t ->
+  as_of:Date.t ->
   (string * Types.Daily_price.t list) list
 (** [build_global_index_bars] returns the [(label, weekly_bars)] list consumed
     by {!Macro.analyze} for the global-consensus indicator. Each entry is
     produced by converting the accumulated daily bars for that symbol to weekly
     bars (most recent [lookback_bars] weeks). Indices with no accumulated bars
-    are silently dropped so that Macro sees only usable inputs. *)
+    are silently dropped so that Macro sees only usable inputs.
+
+    [as_of] is forwarded to {!Bar_reader.weekly_bars_for}. For the panels
+    backend it is the date used to resolve the panel column; for the history
+    backend it is ignored. *)
 
 val build_sector_map :
   stage_config:Stage.config ->
   lookback_bars:int ->
   sector_etfs:(string * string) list ->
-  bar_history:Bar_history.t ->
+  bar_reader:Bar_reader.t ->
+  as_of:Date.t ->
   sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
   index_bars:Types.Daily_price.t list ->
   ticker_sectors:(string, string) Hashtbl.t ->

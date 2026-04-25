@@ -573,7 +573,7 @@ let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
 let test_entries_from_candidates_emits_short _ =
   let cfg = default_config ~universe:[ "XYZ" ] ~index_symbol:"GSPCX" in
   let stop_states = ref String.Map.empty in
-  let bar_history = Bar_history.create () in
+  let bar_reader = Bar_reader.of_history (Bar_history.create ()) in
   (* Short: entry 80, stop 88 (above entry). *)
   let cand =
     make_scored_candidate ~ticker:"XYZ" ~side:Trading_base.Types.Short
@@ -585,7 +585,7 @@ let test_entries_from_candidates_emits_short _ =
   let get_price = get_price_of [ ("XYZ", make_bar "2024-01-05" 80.0) ] in
   let transitions =
     entries_from_candidates ~config:cfg ~candidates:[ cand ] ~stop_states
-      ~bar_history ~portfolio ~get_price
+      ~bar_reader ~portfolio ~get_price
       ~current_date:(Date.of_string "2024-01-05")
   in
   assert_that transitions
@@ -617,7 +617,7 @@ let test_entries_from_candidates_emits_short _ =
 let test_entries_from_candidates_emits_long _ =
   let cfg = default_config ~universe:[ "XYZ" ] ~index_symbol:"GSPCX" in
   let stop_states = ref String.Map.empty in
-  let bar_history = Bar_history.create () in
+  let bar_reader = Bar_reader.of_history (Bar_history.create ()) in
   (* Long: entry 100, stop 92 (below entry). *)
   let cand =
     make_scored_candidate ~ticker:"XYZ" ~side:Trading_base.Types.Long
@@ -629,7 +629,7 @@ let test_entries_from_candidates_emits_long _ =
   let get_price = get_price_of [ ("XYZ", make_bar "2024-01-05" 100.0) ] in
   let transitions =
     entries_from_candidates ~config:cfg ~candidates:[ cand ] ~stop_states
-      ~bar_history ~portfolio ~get_price
+      ~bar_reader ~portfolio ~get_price
       ~current_date:(Date.of_string "2024-01-05")
   in
   assert_that transitions

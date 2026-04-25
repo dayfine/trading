@@ -86,7 +86,9 @@ let test_build_global_index_bars_empty _ =
   let t = Bar_history.create () in
   let result =
     Macro_inputs.build_global_index_bars ~lookback_bars:52
-      ~global_index_symbols:Macro_inputs.default_global_indices ~bar_history:t
+      ~global_index_symbols:Macro_inputs.default_global_indices
+      ~bar_reader:(Bar_reader.of_history t)
+      ~as_of:(Date.of_string "2024-12-31")
   in
   assert_that result is_empty
 
@@ -101,7 +103,9 @@ let test_build_global_index_bars_drops_symbols_without_bars _ =
   let t = seed_bar_history ~symbol:"GDAXI.INDX" ~bars in
   let result =
     Macro_inputs.build_global_index_bars ~lookback_bars:52
-      ~global_index_symbols:Macro_inputs.default_global_indices ~bar_history:t
+      ~global_index_symbols:Macro_inputs.default_global_indices
+      ~bar_reader:(Bar_reader.of_history t)
+      ~as_of:(Date.of_string "2024-12-31")
   in
   assert_that result (elements_are [ field fst (equal_to "DAX") ])
 
@@ -119,7 +123,9 @@ let test_build_sector_map_empty_bar_history _ =
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52 ~sector_etfs:Macro_inputs.spdr_sector_etfs
-      ~bar_history:t ~sector_prior_stages ~index_bars:[]
+      ~bar_reader:(Bar_reader.of_history t)
+      ~as_of:(Date.of_string "2024-12-31")
+      ~sector_prior_stages ~index_bars:[]
       ~ticker_sectors:(Hashtbl.create (module String))
   in
   assert_that (Hashtbl.to_alist result) is_empty
@@ -142,7 +148,9 @@ let test_build_sector_map_drops_etfs_with_insufficient_bars _ =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_history:t ~sector_prior_stages ~index_bars
+      ~bar_reader:(Bar_reader.of_history t)
+      ~as_of:(Date.of_string "2024-12-31")
+      ~sector_prior_stages ~index_bars
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)
@@ -162,7 +170,9 @@ let test_build_sector_map_drops_etfs_when_index_bars_empty _ =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_history:t ~sector_prior_stages ~index_bars:[]
+      ~bar_reader:(Bar_reader.of_history t)
+      ~as_of:(Date.of_string "2024-12-31")
+      ~sector_prior_stages ~index_bars:[]
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)
@@ -189,7 +199,9 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_history:t ~sector_prior_stages ~index_bars
+      ~bar_reader:(Bar_reader.of_history t)
+      ~as_of:(Date.of_string "2024-12-31")
+      ~sector_prior_stages ~index_bars
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)
