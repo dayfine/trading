@@ -9,7 +9,8 @@
   csv
   fpath
   status
+  trading.strategy
   types
   unix)
  (preprocess
-  (pps ppx_sexp_conv ppx_let)))
+  (pps ppx_compare ppx_deriving.eq ppx_hash ppx_let ppx_sexp_conv)))

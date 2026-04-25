@@ -68,10 +68,33 @@ val load_from_csv :
     panels.
 
     Bars are aligned by trading-day position relative to the symbol's first
-    available bar at-or-after [start_date]. This is the simplest alignment the
-    spike needs; calendar-aware alignment (handling per-symbol holidays or IPO
-    dates) is Stage 1+ work.
+    available bar at-or-after [start_date]. This was the simplest alignment the
+    Stage 0 spike needed; symbols with different start dates will misalign.
+    Stage 1+ callers should prefer {!load_from_csv_calendar} which aligns rows
+    by date.
 
     Missing symbols (file not found) are tolerated: their rows stay NaN and a
     non-fatal note is silently skipped (the spike doesn't need to surface
     these). Other errors (parse failures, etc.) are returned. *)
+
+val load_from_csv_calendar :
+  Symbol_index.t ->
+  data_dir:Fpath.t ->
+  calendar:Core.Date.t array ->
+  (t, Status.t) Result.t
+(** [load_from_csv_calendar idx ~data_dir ~calendar] loads each universe
+    symbol's CSV and aligns its bars to the supplied trading calendar.
+
+    [calendar] is the universe's trading-day axis: [calendar.(t)] is the date at
+    panel column [t]. [n_days] of the resulting panels equals
+    [Array.length calendar].
+
+    Alignment contract: for each bar in a symbol's CSV with date [D], the bar's
+    OHLCV fields are written to column [t] iff [calendar.(t) = D]. Bars whose
+    date is not in the calendar are ignored. Calendar dates with no matching bar
+    leave the corresponding cells as NaN (the symbol either didn't trade that
+    day, hadn't IPO'd, or was suspended).
+
+    Missing symbol CSVs are tolerated (row stays all-NaN). Empty calendar is
+    allowed (yields zero-column panels). Other errors (parse failures, etc.) are
+    returned. *)
