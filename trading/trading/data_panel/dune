@@ -1,0 +1,15 @@
+(library
+ (name data_panel)
+ (public_name trading.data_panel)
+ (libraries
+  bigarray
+  core
+  core_unix
+  core_unix.sys_unix
+  csv
+  fpath
+  status
+  types
+  unix)
+ (preprocess
+  (pps ppx_sexp_conv ppx_let)))

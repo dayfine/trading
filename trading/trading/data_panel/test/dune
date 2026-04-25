@@ -1,0 +1,19 @@
+(tests
+ (names
+  symbol_index_test
+  ohlcv_panels_test
+  ema_kernel_test
+  panel_snapshot_test)
+ (libraries
+  bigarray
+  ounit2
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  csv
+  fpath
+  matchers
+  status
+  trading.data_panel
+  types))
