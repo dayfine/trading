@@ -3,7 +3,7 @@
 ## Last updated: 2026-04-25
 
 ## Status
-IN_PROGRESS — Stage 0 spike implemented and pushed; awaiting human review of spike result before Stages 1+ are unblocked.
+IN_PROGRESS — Stage 0 spike MERGED as #555 (2026-04-25). Stages 1-5 blocked on human green-light per plan §Decision point.
 
 ## Interface stable
 N/A — pre-implementation
@@ -35,14 +35,29 @@ reader audit) carry forward.
 
 ## Open work
 
-- **PR #554** (this plan, doc-only) — open for human review.
-- **`feat/panels-stage00-spike`** (Stage 0 spike) — pushed; PR open for review. Implements `Symbol_index`, `Ohlcv_panels`, `Ema_kernel`, `Panel_snapshot` under `trading/trading/data_panel/`. 20 tests pass; EMA parity bit-identical at N=100 T=252 P=50; snapshot round-trip bit-identical for single + multi-panel cases. RSS gate (≤50% of scalar at N=300 T=6y on bull-crash goldens) is NOT measured at Stage 0 by design — that's a follow-up sweep run once Stages 1+ wire panels into the runner.
+- **PR #554** merged 2026-04-25 (plan ratified).
+- **PR #555** (Stage 0 spike) merged 2026-04-25. Implements `Symbol_index`, `Ohlcv_panels`, `Ema_kernel`, `Panel_snapshot` under `trading/trading/data_panel/`. 20 tests pass; EMA parity bit-identical at N=100 T=252 P=50; snapshot round-trip bit-identical. QC structural + behavioral both APPROVED.
+
+### Stage 1 pre-flags (from QC behavioral, non-blocking)
+
+To address before / during Stage 1:
+1. `Ohlcv_panels.load_from_csv` is not calendar-aware — must resolve before Stage 4 (weekly cadence) but Stage 1 can specify the contract.
+2. `Panel_snapshot` dump-twice byte-equality is not tested — needed for reproducible golden fixtures; add the test in Stage 1.
+3. Unrounded EMA values will flow into `stage.ml` once Stage 4 wires the kernel — add a boundary golden-parity check (current `Ema.calculate_ema` rounds output to 2 decimals via TA-Lib FFI; downstream callers (`stage.ml` slope/above-MA, `above_30w_ema`) appear insensitive but verify before Stage 4).
+
+### RSS / memory gate
+
+RSS gate (≤50% of scalar at N=300 T=6y on bull-crash goldens) is NOT measured at Stage 0 by design — that's a follow-up sweep run once Stages 1+ wire panels into the runner.
+
+### Awaiting human
+
+Per plan §Decision point: "if parity gate fails (FP drift > 1 ULP and end-to-end PV moves) or RSS gain < 30% or snapshot round-trip is lossy, abort the migration and revisit." Parity gate held bit-identical; snapshot round-trip is bit-exact; RSS gate deferred to post-Stage-1. **Recommendation: green-light Stage 1.**
 
 ## Five-stage phasing (from the plan)
 
 | Stage | Owner | Scope | Branch | LOC |
 |---|---|---|---|---|
-| 0 | feat-backtest | Spike: `Symbol_index`, OHLCV panels, EMA kernel, parity test, snapshot serialization — **IN_PROGRESS** | `feat/panels-stage00-spike` | ~700 (incl. tests) |
+| 0 | feat-backtest | Spike: `Symbol_index`, OHLCV panels, EMA kernel, parity test, snapshot serialization — **MERGED #555** | `feat/panels-stage00-spike` | ~700 (incl. tests) |
 | 1 | feat-backtest | Panel-backed `get_indicator` for EMA/SMA/ATR/RSI; Bar_history kept alive | `feat/panels-stage01-get-indicator` | ~500 |
 | 2 | feat-backtest | Replace 6 Bar_history reader sites with panel views; delete Bar_history | `feat/panels-stage02-no-bar-history` | ~400 |
 | 3 | feat-backtest | Collapse Bar_loader tier system + Friday cycle | `feat/panels-stage03-tier-collapse` | ~400 |
