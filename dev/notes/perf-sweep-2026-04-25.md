@@ -121,15 +121,71 @@ means longer backtests are cheap.
 - The "broad" CI fixture (separate issue per backtest-scale.md
   follow-up).
 
-## Open question: extrapolated savings vs verified
+## VERIFIED (extrapolation was wrong — refactors had ~0% effect on this scenario)
 
-Direct A/B verification on the exact PR #524 scenario (N=292, T=6y on
-`/tmp/data-small-302`) is in flight at time of writing. Will append
-the actual numbers when complete.
+Direct A/B on PR #524's exact scenario (N=292, T=6y on `/tmp/data-small-302`),
+post-refactor (post-#543 + post-#548):
 
-If verified: shipping the Tiered flip default Legacy → Tiered becomes
-realistic — both strategies are now well-behaved at production-scale
-universes after the refactors.
+| | Pre-refactor (PR #524) | Post-refactor (verify) | Δ |
+|---|---|---|---|
+| Legacy | 1,871,240 KB | **1,871,788 KB** | +548 KB (+0%, noise) |
+| Tiered | 3,652,852 KB | **3,743,716 KB** | +90,864 KB (+2.5%, noise) |
+
+**The refactors did NOT meaningfully reduce RSS on PR #524's exact
+scenario.** The +95% Tiered RSS gap and Legacy's 1.87 GB peak are both
+unchanged. The earlier extrapolation from sweep data was wrong by ~2.6×.
+
+## Why the sweep numbers were so different
+
+Sweep at N=300 T=3y on broad sectors.csv: Legacy = 625 MB / Tiered = 1263 MB.
+Verify at N=292 T=6y on /tmp/data-small-302: Legacy = 1872 MB / Tiered = 3744 MB.
+
+3× the RSS at 2× the time on essentially the same N. Linear T extrapolation
+predicted ~720 MB Legacy. Actual is 1.87 GB — 2.6× higher.
+
+Three possible reasons (need investigation):
+
+1. **Different data setup.** Sweep used full `data/` with `universe_cap=300`
+   override. Verify used filtered `/tmp/data-small-302/` (sectors.csv with
+   only 292 entries). Both should yield 292-symbol universe but may exercise
+   different code paths.
+
+2. **Different scenario shape.** Sweep used synthetic `bull-3y.sexp`
+   (2018-01-02 → 2021-01-02). Verify used `bull-crash-2015-2020.sexp`
+   (real bull-crash including the 2020 COVID drawdown). Bull-crash has
+   far more strategy activity (608 round-trips Legacy / 613 Tiered)
+   than the synthetic 2018-uptrend (probably <100 trades).
+
+3. **Bar densities differ.** The CSV files for the symbols in the 292-symbol
+   universe span 1980-2026 (46 years of data per symbol). The synthetic
+   sweep scenarios may load shorter slices. Each symbol's full CSV must be
+   parsed regardless of `tail_days` in the older code paths.
+
+The cleanest test would be to re-run the sweep cells using the
+goldens-small bull-crash scenario specifically. Tomorrow's investigation
+target.
+
+## Conclusion
+
+- **Complexity slopes from the sweep are still valid for that setup.**
+  Linear in N, sub-linear in T — those shape findings hold.
+- **Absolute RSS depends heavily on scenario specifics.** The bull-crash
+  + filtered-sectors-csv setup retains 2.6× more memory than synthetic
+  uptrend + capped-broad-sector-map, even though both touch ~292 symbols
+  for 1-3 years.
+- **The +95% Tiered RSS gap on production-shaped scenarios remains.** None
+  of today's 6 attempts (H1, H2, H3, H7, GC tuning, List.filter refactor)
+  meaningfully moved the needle on the bull-crash 2015-2020 baseline.
+- **Workstream exhausted today.** The investigative pipeline is in place;
+  the next step is a different angle on the bull-crash retention pattern
+  specifically. Two candidates for tomorrow:
+  - Re-run the sweep with bull-crash 2015-2020 as the base scenario
+    (vary universe_cap on the same scenario file) to establish whether
+    the gap grows linearly or has a step function around the
+    bull-crash 2020 COVID period
+  - Open the post-refactor verify .ctf in memtrace_viewer (requires
+    `opam install memtrace_viewer` on host) to find what's really
+    retained at peak in the bull-crash run
 
 ## Failures
 
