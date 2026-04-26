@@ -1,0 +1,9 @@
+; Smoke test: cc_linter must never overwrite positional .ml arguments.
+; Regression guard for the 2026-04-25 incident where the second positional
+; arg was treated as the JSON output path and clobbered with JSON content.
+
+(test
+ (name test_no_overwrite)
+ (libraries unix)
+ (deps
+  (file ../cc_linter.exe)))
