@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-22
+## Last updated: 2026-04-25
 
 ## Status
 IN_PROGRESS
@@ -167,6 +167,18 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
      `## Stale Local Bookmarks`.
   Source: `dev/daily/2026-04-14.md` end-of-day audit.
 - ~~**POSIX shell portability linter**~~ — DONE (harness/posix-sh-linter): `trading/devtools/checks/posix_sh_check.sh` runs `dash -n` over all #!/bin/sh scripts in `trading/devtools/checks/`, `trading/devtools/checks/deep_scan/`, and `dev/lib/`. Scripts with `#!/usr/bin/env bash` shebang are exempt. Smoke test: `trading/devtools/checks/posix_sh_check_test.sh`. Wired into `dune runtest`. Verify: `dune runtest devtools/checks/` — prints `OK: posix-sh linter -- N scripts clean.` Pre-existing violations found: `dev/lib/cleanup-stale-worktrees.sh` and `dev/run.sh` use `#!/usr/bin/env bash` and are exempt (intentionally bash). Source: run-4 daily summary follow-up.
+- **`cc_linter.exe` overwrites its first `.ml` argument with the JSON report** —
+  `trading/devtools/cc_linter/cc_linter.ml`. When invoked with multiple `.ml`
+  paths (e.g. `cc_linter.exe a.ml b.ml`), the tool writes its JSON output INTO
+  `a.ml`, destroying the source file. Hit during data-panels Stage 3 PR 3.1
+  (2026-04-25) — agent ran `cc_linter.exe trading/backtest/lib/panel_runner.ml
+  trading/backtest/test/test_panel_loader_parity.ml` and `panel_runner.ml`
+  was clobbered with the JSON report; restored from a saved copy.
+  Fix: route JSON output to a flag (`--out path` or stdout when no path given)
+  and never to a positional `.ml` argument. Add a smoke test that invokes the
+  linter on two paths in a tmpdir and asserts both files are byte-identical
+  before and after. Source: data-panels Stage 3 PR 3.1 dispatch transcript
+  (agent a2800bc7).
 
 ---
 
