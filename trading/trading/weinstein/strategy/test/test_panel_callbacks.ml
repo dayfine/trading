@@ -216,14 +216,12 @@ let test_stock_analysis_callbacks_parity _ =
   in
   let bar_list_result =
     Stock_analysis.analyze_with_callbacks ~config ~ticker:"AAPL"
-      ~callbacks:bar_cbs ~bars_for_volume_resistance:stock_bars
-      ~prior_stage:None
+      ~callbacks:bar_cbs ~prior_stage:None
       ~as_of_date:(Date.of_string "2025-02-21")
   in
   let panel_result =
     Stock_analysis.analyze_with_callbacks ~config ~ticker:"AAPL"
-      ~callbacks:panel_cbs ~bars_for_volume_resistance:stock_bars
-      ~prior_stage:None
+      ~callbacks:panel_cbs ~prior_stage:None
       ~as_of_date:(Date.of_string "2025-02-21")
   in
   assert_that panel_result
@@ -401,6 +399,93 @@ let test_support_floor_callbacks_parity _ =
       assert_failure
         (Printf.sprintf "bar-list returned None; panel returned Some %f" r)
 
+(* Volume parity: weekly bars run through Volume.analyze_breakout via both the
+   bar-list and panel callback paths. *)
+let test_volume_callbacks_parity _ =
+  let bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2024-01-05")
+      ~n:8 ~start_price:100.0 ~step:1.0
+  in
+  let panels = panels_of_symbols [ ("AAPL", bars) ] in
+  let n = Bar_panels.n_days panels in
+  let view =
+    Bar_panels.weekly_view_for panels ~symbol:"AAPL" ~n:8 ~as_of_day:(n - 1)
+  in
+  let bar_cbs = Volume.callbacks_from_bars ~bars in
+  let panel_cbs =
+    Panel_callbacks.volume_callbacks_of_weekly_view ~weekly:view
+  in
+  let config = Volume.default_config in
+  (* Read at event_offset:0 (newest bar). Both paths must agree. *)
+  let bar_result =
+    Volume.analyze_breakout_with_callbacks ~config ~callbacks:bar_cbs
+      ~event_offset:0
+  in
+  let panel_result =
+    Volume.analyze_breakout_with_callbacks ~config ~callbacks:panel_cbs
+      ~event_offset:0
+  in
+  match (bar_result, panel_result) with
+  | None, None -> ()
+  | Some r1, Some r2 ->
+      assert_that r2
+        (all_of
+           [
+             field
+               (fun (r : Volume.result) -> r.event_volume)
+               (equal_to (r1.event_volume : int));
+             field
+               (fun (r : Volume.result) -> r.avg_volume)
+               (float_equal r1.avg_volume);
+             field
+               (fun (r : Volume.result) -> r.volume_ratio)
+               (float_equal r1.volume_ratio);
+           ])
+  | _ -> assert_failure "Volume parity: one path returned None"
+
+(* Resistance parity: weekly bars run through Resistance.analyze via both
+   the bar-list and panel callback paths. *)
+let test_resistance_callbacks_parity _ =
+  let bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2024-01-05")
+      ~n:30 ~start_price:50.0 ~step:1.0
+  in
+  let panels = panels_of_symbols [ ("AAPL", bars) ] in
+  let n = Bar_panels.n_days panels in
+  let view =
+    Bar_panels.weekly_view_for panels ~symbol:"AAPL" ~n:30 ~as_of_day:(n - 1)
+  in
+  let bar_cbs = Resistance.callbacks_from_bars ~bars in
+  let panel_cbs =
+    Panel_callbacks.resistance_callbacks_of_weekly_view ~weekly:view
+  in
+  let config = Resistance.default_config in
+  let breakout_price = 65.0 in
+  let as_of_date = Date.of_string "2025-02-21" in
+  let bar_result =
+    Resistance.analyze_with_callbacks ~config ~callbacks:bar_cbs ~breakout_price
+      ~as_of_date
+  in
+  let panel_result =
+    Resistance.analyze_with_callbacks ~config ~callbacks:panel_cbs
+      ~breakout_price ~as_of_date
+  in
+  assert_that panel_result
+    (all_of
+       [
+         field
+           (fun (r : Resistance.result) -> r.quality)
+           (equal_to bar_result.quality);
+         field
+           (fun (r : Resistance.result) -> r.breakout_price)
+           (float_equal bar_result.breakout_price);
+         field
+           (fun (r : Resistance.result) -> List.length r.zones_above)
+           (equal_to (List.length bar_result.zones_above));
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -411,6 +496,8 @@ let suite =
          "Macro parity" >:: test_macro_callbacks_parity;
          "Weinstein_stops.Support_floor parity"
          >:: test_support_floor_callbacks_parity;
+         "Volume parity" >:: test_volume_callbacks_parity;
+         "Resistance parity" >:: test_resistance_callbacks_parity;
        ]
 
 let () = run_test_tt_main suite

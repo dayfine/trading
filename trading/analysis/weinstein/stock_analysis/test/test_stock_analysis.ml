@@ -251,8 +251,8 @@ let assert_parity ~bars ~benchmark_bars ?(prior_stage = None) () =
       ~as_of_date:as_of
   in
   let from_callbacks =
-    analyze_with_callbacks ~config:cfg ~ticker:"X" ~callbacks
-      ~bars_for_volume_resistance:bars ~prior_stage ~as_of_date:as_of
+    analyze_with_callbacks ~config:cfg ~ticker:"X" ~callbacks ~prior_stage
+      ~as_of_date:as_of
   in
   assert_that from_callbacks (result_is_bit_identical from_bars)
 

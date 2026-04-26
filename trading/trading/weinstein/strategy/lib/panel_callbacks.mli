@@ -15,11 +15,10 @@
     [callbacks_from_bars] for the same underlying bars, so the strategy can swap
     call sites one-for-one with no behavioural change.
 
-    {b Out of scope (PR-B)}: {!Volume.analyze_breakout} and
-    {!Resistance.analyze} still consume {!Daily_price.t list}. The
-    {!stock_analysis_callbacks_of_weekly_views} return value pairs with the
-    bar-list still required by those callees as [bars_for_volume_resistance];
-    PR-B reshapes Volume + Resistance and drops the parameter. *)
+    Stage 4 PR-B: {!Volume.analyze_breakout} and {!Resistance.analyze} now also
+    consume callback bundles, so {!stock_analysis_callbacks_of_weekly_views}
+    builds the full {!Stock_analysis.callbacks} record from a weekly view alone
+    — no transitional [bars_for_volume_resistance] parameter remains. *)
 
 val stage_callbacks_of_weekly_view :
   config:Stage.config ->
@@ -38,6 +37,21 @@ val rs_callbacks_of_weekly_views :
     bundle by date-aligning the two views (same join-on-date semantics as
     {!Rs.callbacks_from_bars}) and indexing the resulting aligned arrays. *)
 
+val volume_callbacks_of_weekly_view :
+  weekly:Data_panel.Bar_panels.weekly_view -> Volume.callbacks
+(** [volume_callbacks_of_weekly_view ~weekly] builds a {!Volume.callbacks}
+    bundle backed by the view's [volumes] array (the same encoding
+    {!Volume.callbacks_from_bars} produces). [week_offset:0] is the newest
+    weekly bar; offsets past the view's depth return [None]. *)
+
+val resistance_callbacks_of_weekly_view :
+  weekly:Data_panel.Bar_panels.weekly_view -> Resistance.callbacks
+(** [resistance_callbacks_of_weekly_view ~weekly] builds a
+    {!Resistance.callbacks} bundle backed by the view's [highs], [lows], and
+    [dates] arrays. The bar-offset indexing matches
+    {!Resistance.callbacks_from_bars}: offset 0 is the newest bar; offsets past
+    [n_bars] return [None]. *)
+
 val stock_analysis_callbacks_of_weekly_views :
   config:Stock_analysis.config ->
   stock:Data_panel.Bar_panels.weekly_view ->
@@ -46,14 +60,12 @@ val stock_analysis_callbacks_of_weekly_views :
 (** [stock_analysis_callbacks_of_weekly_views ~config ~stock ~benchmark] builds
     a {!Stock_analysis.callbacks} bundle indexing the stock's [highs] and
     [volumes] arrays for the breakout / peak-volume scans, and threading nested
-    {!Stage.callbacks} (over [stock]) and {!Rs.callbacks} (over [stock]
-    + [benchmark]) through the bundle.
+    {!Stage.callbacks} (over [stock]), {!Rs.callbacks} (over [stock] +
+    [benchmark]), {!Volume.callbacks} (over [stock]), and
+    {!Resistance.callbacks} (over [stock]) through the bundle.
 
-    Note: {!Stock_analysis.analyze_with_callbacks} also takes
-    [bars_for_volume_resistance : Types.Daily_price.t list] for the not-yet-
-    reshaped Volume / Resistance callees. PR-A callers reconstruct that bar list
-    via {!Bar_panels.weekly_bars_for}; PR-B reshapes those callees and drops the
-    parameter. *)
+    As of Stage 4 PR-B, no {!Daily_price.t list} is materialised — every
+    sub-callee consumes a callback bundle. *)
 
 val sector_callbacks_of_weekly_views :
   config:Sector.config ->

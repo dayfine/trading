@@ -146,6 +146,95 @@ let test_pure_same_inputs_same_output _ =
   assert_that r1.quality (equal_to (r2.quality : overhead_quality));
   assert_that r1.zones_above (size_is (List.length r2.zones_above))
 
+(* ------------------------------------------------------------------ *)
+(* Parity: analyze (bar-list) vs analyze_with_callbacks                *)
+(*                                                                    *)
+(* Builds a {!callbacks} record externally via the public               *)
+(* {!callbacks_from_bars} and asserts the two entry points produce      *)
+(* bit-identical results. Each scenario hits a different quality bucket *)
+(* (Virgin / Clean / Moderate / Heavy) plus the chart-window edge.      *)
+(* ------------------------------------------------------------------ *)
+
+(** Bit-identity matcher for {!resistance_zone}. All fields use [equal_to]
+    (Poly.equal — structural equality) so any drift fails. *)
+let zone_is_bit_identical (expected : resistance_zone) : resistance_zone matcher
+    =
+  all_of
+    [
+      field
+        (fun (z : resistance_zone) -> z.price_low)
+        (equal_to (expected.price_low : float));
+      field
+        (fun (z : resistance_zone) -> z.price_high)
+        (equal_to (expected.price_high : float));
+      field
+        (fun (z : resistance_zone) -> z.weeks_of_trading)
+        (equal_to (expected.weeks_of_trading : int));
+      field
+        (fun (z : resistance_zone) -> z.age_years)
+        (equal_to (expected.age_years : float));
+    ]
+
+(** Bit-identity matcher for {!result}. *)
+let result_is_bit_identical (expected : result) : result matcher =
+  all_of
+    [
+      field (fun (r : result) -> r.quality) (equal_to expected.quality);
+      field
+        (fun (r : result) -> r.breakout_price)
+        (equal_to (expected.breakout_price : float));
+      field
+        (fun (r : result) -> r.zones_above)
+        (elements_are (List.map expected.zones_above ~f:zone_is_bit_identical));
+      field
+        (fun (r : result) -> r.nearest_zone)
+        (match expected.nearest_zone with
+        | None -> is_none
+        | Some z -> is_some_and (zone_is_bit_identical z));
+    ]
+
+(** Run both [analyze] and [analyze_with_callbacks] over the same input and
+    assert the results are bit-equal. The callback bundle is built externally
+    via the public {!callbacks_from_bars}. *)
+let assert_parity ?(config = cfg) ~bars ~breakout_price () =
+  let bar_result = analyze ~config ~bars ~breakout_price ~as_of_date:as_of in
+  let callbacks = callbacks_from_bars ~bars in
+  let callback_result =
+    analyze_with_callbacks ~config ~callbacks ~breakout_price ~as_of_date:as_of
+  in
+  assert_that callback_result (result_is_bit_identical bar_result)
+
+let test_parity_virgin_no_history _ =
+  assert_parity ~bars:[] ~breakout_price:50.0 ()
+
+let test_parity_clean_overhead _ =
+  let bars =
+    [
+      make_bar ~low:40.0 ~high:48.0 45.0;
+      make_bar ~low:42.0 ~high:49.0 47.0;
+      make_bar ~low:49.0 ~high:53.0 51.0;
+    ]
+  in
+  assert_parity ~bars ~breakout_price:50.0 ()
+
+let test_parity_heavy_resistance _ =
+  let bars = List.init 10 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
+  assert_parity ~bars ~breakout_price:50.0 ()
+
+let test_parity_moderate_resistance _ =
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
+  assert_parity ~bars ~breakout_price:50.0 ()
+
+let test_parity_chart_window_filtering _ =
+  let small_cfg =
+    { cfg with chart_lookback_bars = 5; virgin_lookback_bars = 15 }
+  in
+  let bars =
+    List.init 10 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0)
+    @ List.init 5 ~f:(fun _ -> make_bar ~high:48.0 45.0)
+  in
+  assert_parity ~config:small_cfg ~bars ~breakout_price:50.0 ()
+
 let suite =
   "resistance_tests"
   >::: [
@@ -160,6 +249,12 @@ let suite =
          >:: test_old_bars_outside_chart_window_excluded;
          "test_pure_same_inputs_same_output"
          >:: test_pure_same_inputs_same_output;
+         "test_parity_virgin_no_history" >:: test_parity_virgin_no_history;
+         "test_parity_clean_overhead" >:: test_parity_clean_overhead;
+         "test_parity_heavy_resistance" >:: test_parity_heavy_resistance;
+         "test_parity_moderate_resistance" >:: test_parity_moderate_resistance;
+         "test_parity_chart_window_filtering"
+         >:: test_parity_chart_window_filtering;
        ]
 
 let () = run_test_tt_main suite

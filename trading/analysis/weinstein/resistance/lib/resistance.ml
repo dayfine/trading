@@ -50,71 +50,128 @@ type result = {
 }
 
 (* ------------------------------------------------------------------ *)
+(* Callback bundle and constructor from a bar list                      *)
+(* ------------------------------------------------------------------ *)
+
+type callbacks = {
+  get_high : bar_offset:int -> float option;
+  get_low : bar_offset:int -> float option;
+  get_date : bar_offset:int -> Date.t option;
+  n_bars : int;
+}
+
+(** Build a [bar_offset]-indexed closure over a chronologically-ordered
+    [Daily_price.t array]. [bar_offset:0] returns the newest bar's value;
+    offsets past available depth return [None]. *)
+let _make_lookup (arr : Daily_price.t array) (f : Daily_price.t -> 'a) :
+    bar_offset:int -> 'a option =
+  let n = Array.length arr in
+  fun ~bar_offset ->
+    let idx = n - 1 - bar_offset in
+    if idx < 0 || idx >= n then None else Some (f arr.(idx))
+
+let callbacks_from_bars ~(bars : Daily_price.t list) : callbacks =
+  let arr = Array.of_list bars in
+  {
+    get_high = _make_lookup arr (fun b -> b.Daily_price.high_price);
+    get_low = _make_lookup arr (fun b -> b.Daily_price.low_price);
+    get_date = _make_lookup arr (fun b -> b.Daily_price.date);
+    n_bars = Array.length arr;
+  }
+
+(* ------------------------------------------------------------------ *)
 (* Helpers                                                              *)
 (* ------------------------------------------------------------------ *)
 
 let days_per_year = 365.25
 
-let _take_last n lst =
-  let len = List.length lst in
-  if len <= n then lst else List.drop lst (len - n)
-
 let _age_years date as_of_date : float =
   Float.of_int (Date.diff as_of_date date) /. days_per_year
 
-(** Bucket index for a bar in the congestion-band grid rooted at
+(** Bucket index for a (high, low) pair in the congestion-band grid rooted at
     [breakout_price]. Index 0 covers the first band above [breakout_price],
     index 1 the next, etc. *)
-let _bucket_idx ~breakout_price ~band_size bar =
-  let mid = (bar.Daily_price.high_price +. bar.Daily_price.low_price) /. 2.0 in
+let _bucket_idx ~breakout_price ~band_size ~high ~low =
+  let mid = (high +. low) /. 2.0 in
   let offset = Float.((mid - breakout_price) /. band_size) in
   Int.of_float (Float.round_down offset)
 
-(** Prepend bar [b] to the list at bucket [bkt] in [tbl], creating it if absent.
-*)
-let _prepend_to_bucket tbl bkt b =
-  Hashtbl.update tbl bkt ~f:(function None -> [ b ] | Some bs -> b :: bs)
+type _bucket_agg = { count : int; most_recent : Date.t }
+(** Aggregate state per bucket while walking offsets: count of bars in the
+    bucket and the most recent date among them. *)
 
-(** Group above-breakout bars into a hash table keyed by bucket index. Bars
-    whose midpoint falls below [breakout_price] (bucket < 0) are discarded. *)
-let _group_by_bucket ~breakout_price ~band_size bars =
-  let tbl = Hashtbl.create (module Int) in
-  List.iter bars ~f:(fun b ->
-      if Float.(b.Daily_price.high_price > breakout_price) then
-        let bkt = _bucket_idx ~breakout_price ~band_size b in
-        if bkt >= 0 then _prepend_to_bucket tbl bkt b);
-  tbl
-
-(** Convert a single bucket's bars into a [resistance_zone]. *)
-let _zone_of_bucket ~breakout_price ~band_size ~as_of_date bkt bkt_bars =
-  let price_low = breakout_price +. (Float.of_int bkt *. band_size) in
-  let most_recent_date =
-    List.map bkt_bars ~f:(fun b -> b.Daily_price.date)
-    |> List.max_elt ~compare:Date.compare
-    |> Option.value_exn
+(** Merge a fresh [date] into an existing bucket aggregate, keeping the larger
+    of the prior [most_recent] and the new [date]. *)
+let _merge_into_agg ~date (agg : _bucket_agg) : _bucket_agg =
+  let most_recent =
+    if Date.compare date agg.most_recent > 0 then date else agg.most_recent
   in
+  { count = agg.count + 1; most_recent }
+
+(** Update [tbl] with a single bar at [bar_offset], counting towards bucket
+    [bkt] when [high > breakout_price] and [bkt >= 0]. The closures
+    [get_high]/[get_low]/[get_date] are read once per offset. *)
+let _accumulate_bucket tbl ~bkt ~date =
+  Hashtbl.update tbl bkt ~f:(function
+    | None -> { count = 1; most_recent = date }
+    | Some agg -> _merge_into_agg ~date agg)
+
+(** Try to read (high, low, date) at [bar_offset]. All three must be defined;
+    any missing field skips the offset (treated as "no bar"). *)
+let _read_offset (cb : callbacks) ~bar_offset : (float * float * Date.t) option
+    =
+  match
+    (cb.get_high ~bar_offset, cb.get_low ~bar_offset, cb.get_date ~bar_offset)
+  with
+  | Some h, Some l, Some d -> Some (h, l, d)
+  | _ -> None
+
+(** Walk offsets [0 .. limit - 1] and accumulate above-breakout bars into the
+    bucket table. Skips offsets where any of [get_high]/[get_low]/[get_date] is
+    undefined; matches the bar-list path's "missing bar = no contribution"
+    semantics. *)
+let _accumulate_chart tbl ~callbacks ~breakout_price ~band_size ~limit =
+  for off = 0 to limit - 1 do
+    match _read_offset callbacks ~bar_offset:off with
+    | None -> ()
+    | Some (h, l, d) ->
+        if Float.(h > breakout_price) then
+          let bkt = _bucket_idx ~breakout_price ~band_size ~high:h ~low:l in
+          if bkt >= 0 then _accumulate_bucket tbl ~bkt ~date:d
+  done
+
+(** Convert one bucket entry [(bkt, agg)] into a {!resistance_zone}. *)
+let _zone_of_agg ~breakout_price ~band_size ~as_of_date ~bkt ~agg =
+  let price_low = breakout_price +. (Float.of_int bkt *. band_size) in
   {
     price_low;
     price_high = price_low +. band_size;
-    weeks_of_trading = List.length bkt_bars;
-    age_years = _age_years most_recent_date as_of_date;
+    weeks_of_trading = agg.count;
+    age_years = _age_years agg.most_recent as_of_date;
   }
 
 (* ------------------------------------------------------------------ *)
 (* Core analysis functions                                              *)
 (* ------------------------------------------------------------------ *)
 
-let _find_zones ~bars ~breakout_price ~band_pct ~as_of_date =
+let _find_zones ~callbacks ~breakout_price ~band_pct ~as_of_date ~limit =
   let band_size = breakout_price *. band_pct in
-  let grouped = _group_by_bucket ~breakout_price ~band_size bars in
-  Hashtbl.fold grouped ~init:[] ~f:(fun ~key:bkt ~data:bkt_bars acc ->
-      _zone_of_bucket ~breakout_price ~band_size ~as_of_date bkt bkt_bars :: acc)
+  let tbl = Hashtbl.create (module Int) in
+  _accumulate_chart tbl ~callbacks ~breakout_price ~band_size ~limit;
+  Hashtbl.fold tbl ~init:[] ~f:(fun ~key:bkt ~data:agg acc ->
+      _zone_of_agg ~breakout_price ~band_size ~as_of_date ~bkt ~agg :: acc)
   |> List.sort ~compare:(fun a b -> Float.compare a.price_low b.price_low)
 
-let _is_virgin_territory ~virgin_bars breakout_price =
-  not
-    (List.exists virgin_bars ~f:(fun b ->
-         Float.(b.Daily_price.high_price > breakout_price)))
+(** True when no bar at offsets [0..limit-1] has [high > breakout_price]. *)
+let _is_virgin_territory ~callbacks ~breakout_price ~limit =
+  let rec loop off =
+    if off >= limit then true
+    else
+      match callbacks.get_high ~bar_offset:off with
+      | None -> loop (off + 1)
+      | Some h -> if Float.(h > breakout_price) then false else loop (off + 1)
+  in
+  loop 0
 
 let _grade_zones ~config zones =
   let max_bars =
@@ -126,8 +183,9 @@ let _grade_zones ~config zones =
   else if max_bars >= config.moderate_resistance_bars then Moderate_resistance
   else Clean
 
-let _classify_quality ~config ~virgin_bars ~zones breakout_price =
-  if _is_virgin_territory ~virgin_bars breakout_price then Virgin_territory
+let _classify_quality ~config ~callbacks ~zones ~virgin_limit breakout_price =
+  if _is_virgin_territory ~callbacks ~breakout_price ~limit:virgin_limit then
+    Virgin_territory
   else if List.is_empty zones then Clean
   else _grade_zones ~config zones
 
@@ -135,14 +193,20 @@ let _classify_quality ~config ~virgin_bars ~zones breakout_price =
 (* Public interface                                                     *)
 (* ------------------------------------------------------------------ *)
 
-let analyze ~config ~bars ~breakout_price ~as_of_date =
-  let virgin_bars = _take_last config.virgin_lookback_bars bars in
-  let chart_bars = _take_last config.chart_lookback_bars bars in
+let analyze_with_callbacks ~(config : config) ~(callbacks : callbacks)
+    ~breakout_price ~as_of_date =
+  let virgin_limit = min config.virgin_lookback_bars callbacks.n_bars in
+  let chart_limit = min config.chart_lookback_bars callbacks.n_bars in
   let zones_above =
-    _find_zones ~bars:chart_bars ~breakout_price
-      ~band_pct:config.congestion_band_pct ~as_of_date
+    _find_zones ~callbacks ~breakout_price ~band_pct:config.congestion_band_pct
+      ~as_of_date ~limit:chart_limit
   in
   let quality =
-    _classify_quality ~config ~virgin_bars ~zones:zones_above breakout_price
+    _classify_quality ~config ~callbacks ~zones:zones_above ~virgin_limit
+      breakout_price
   in
   { quality; breakout_price; zones_above; nearest_zone = List.hd zones_above }
+
+let analyze ~config ~bars ~breakout_price ~as_of_date =
+  let callbacks = callbacks_from_bars ~bars in
+  analyze_with_callbacks ~config ~callbacks ~breakout_price ~as_of_date

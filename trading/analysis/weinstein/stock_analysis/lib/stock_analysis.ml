@@ -5,9 +5,10 @@ open Weinstein_types
 (* @large-module: Stock_analysis holds two parallel entry points sharing the
    same Stage / RS / Volume / Resistance composition — the bar-list [analyze]
    (legacy) and the indicator-callback [analyze_with_callbacks] (panel-backed).
-   The callback path threads {!Stage.callbacks} and {!Rs.callbacks} through a
-   nested {!callbacks} record; the bar-list wrapper builds those bundles via
-   {!Stage.callbacks_from_bars} and {!Rs.callbacks_from_bars}. *)
+   The callback path threads {!Stage.callbacks}, {!Rs.callbacks},
+   {!Volume.callbacks}, and {!Resistance.callbacks} through a nested
+   {!callbacks} record; the bar-list wrapper builds those bundles via the
+   corresponding [*.callbacks_from_bars] constructors. *)
 
 type config = {
   stage : Stage.config;
@@ -61,6 +62,8 @@ type callbacks = {
           window. *)
   stage : Stage.callbacks;  (** Nested Stage callbacks. *)
   rs : Rs.callbacks;  (** Nested RS callbacks. *)
+  volume : Volume.callbacks;  (** Nested Volume callbacks. *)
+  resistance : Resistance.callbacks;  (** Nested Resistance callbacks. *)
 }
 
 (* ------------------------------------------------------------------ *)
@@ -173,46 +176,35 @@ let callbacks_from_bars ~(config : config) ~(bars : Daily_price.t list)
     get_volume = _make_get_volume_from_bars bars_arr;
     stage = Stage.callbacks_from_bars ~config:config.stage ~bars;
     rs = Rs.callbacks_from_bars ~stock_bars:bars ~benchmark_bars;
+    volume = Volume.callbacks_from_bars ~bars;
+    resistance = Resistance.callbacks_from_bars ~bars;
   }
 
 (* ------------------------------------------------------------------ *)
-(* Volume confirmation from a peak offset                               *)
-(*                                                                      *)
-(* Volume.analyze_breakout still consumes a [Daily_price.t list] and a  *)
-(* 0-based [event_idx] (not a week_offset). In PR-D we keep that shape  *)
-(* intact (PRs E/F/G or a sibling will reshape Volume separately) by    *)
-(* converting the callback-shaped [peak_offset] back into the          *)
-(* [event_idx] [Volume.analyze_breakout] expects, against the same      *)
-(* [bars_for_volume_resistance] list the wrapper threads through.       *)
+(* Volume / Resistance via callbacks                                    *)
 (* ------------------------------------------------------------------ *)
 
-(** Convert [peak_offset] (week-offset from newest) into the [event_idx]
-    [Volume.analyze_breakout] expects (0-based index into [bars]). *)
-let _volume_event_idx ~bars_len ~peak_offset : int = bars_len - 1 - peak_offset
-
-let _volume_result ~(config : config) ~bars ~peak_offset_opt :
-    Volume.result option =
+let _volume_result ~(config : config) ~(volume_callbacks : Volume.callbacks)
+    ~peak_offset_opt : Volume.result option =
   match peak_offset_opt with
   | None -> None
   | Some peak_offset ->
-      let event_idx =
-        _volume_event_idx ~bars_len:(List.length bars) ~peak_offset
-      in
-      Volume.analyze_breakout ~config:config.volume ~bars ~event_idx
+      Volume.analyze_breakout_with_callbacks ~config:config.volume
+        ~callbacks:volume_callbacks ~event_offset:peak_offset
 
-let _resistance_result ~(config : config) ~bars ~as_of_date ~breakout_price :
+let _resistance_result ~(config : config)
+    ~(resistance_callbacks : Resistance.callbacks) ~as_of_date ~breakout_price :
     Resistance.result option =
   Option.map breakout_price ~f:(fun bp ->
-      Resistance.analyze ~config:config.resistance ~bars ~breakout_price:bp
-        ~as_of_date)
+      Resistance.analyze_with_callbacks ~config:config.resistance
+        ~callbacks:resistance_callbacks ~breakout_price:bp ~as_of_date)
 
 (* ------------------------------------------------------------------ *)
 (* Main analyzer — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
 
 let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
-    ~(bars_for_volume_resistance : Daily_price.t list) ~prior_stage ~as_of_date
-    : t =
+    ~prior_stage ~as_of_date : t =
   let stage_result =
     Stage.classify_with_callbacks ~config:config.stage
       ~get_ma:callbacks.stage.get_ma ~get_close:callbacks.stage.get_close
@@ -234,11 +226,11 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
       ~lookback:config.breakout_event_lookback
   in
   let volume_result =
-    _volume_result ~config ~bars:bars_for_volume_resistance ~peak_offset_opt
+    _volume_result ~config ~volume_callbacks:callbacks.volume ~peak_offset_opt
   in
   let resistance_result =
-    _resistance_result ~config ~bars:bars_for_volume_resistance ~as_of_date
-      ~breakout_price
+    _resistance_result ~config ~resistance_callbacks:callbacks.resistance
+      ~as_of_date ~breakout_price
   in
   {
     ticker;
@@ -258,8 +250,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
 let analyze ~(config : config) ~ticker ~bars ~benchmark_bars ~prior_stage
     ~as_of_date : t =
   let callbacks = callbacks_from_bars ~config ~bars ~benchmark_bars in
-  analyze_with_callbacks ~config ~ticker ~callbacks
-    ~bars_for_volume_resistance:bars ~prior_stage ~as_of_date
+  analyze_with_callbacks ~config ~ticker ~callbacks ~prior_stage ~as_of_date
 
 (* ------------------------------------------------------------------ *)
 (* Candidate predicates                                                 *)
