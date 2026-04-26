@@ -456,6 +456,27 @@ spike fails the gate, abort migration and memtrace per plan §R1.
 
 Branch: `feat/panels-stage04-weekly-and-callbacks`.
 
+### Stage 4.5: lazy-tier cascade in `_screen_universe` (~1,000 LOC, 2-3 PRs)
+
+**Added 2026-04-26 post-Stage-4** based on the post-PR-D RSS matrix
+finding (`dev/notes/panels-rss-matrix-2026-04-26.md`). The matrix
+shows `RSS ≈ 86 + 5.12·N + 0.22·N·(T−1)` — dominated by N. Code
+inspection confirms `_screen_universe` runs full per-symbol heavy work
+(`Stock_analysis.analyze_with_callbacks`, Volume / Resistance kernels)
+for every loaded symbol on every Friday, regardless of macro / sector
+regime. The screener cascade gates *after* per-symbol analysis is
+complete — no early exit. Restructure to a two-phase cascade:
+
+1. Cheap stage-classify (Phase 1, all N).
+2. Filter survivors by stage + sector RS.
+3. Full Stock_analysis only for survivors.
+
+Expected: drop `β` from 5.12 MB/symbol toward ≤1.5 MB/symbol.
+
+Plan: `dev/plans/panels-stage045-lazy-tier-cascade-2026-04-26.md`.
+
+Branch family: `feat/panels-stage045-pr-{a,b,c}-...`.
+
 ### Stage 5: live-mode universe-rebalance (~150 LOC, 1 day)
 
 Implement panel-rebuild on universe change. Backtest never exercises
