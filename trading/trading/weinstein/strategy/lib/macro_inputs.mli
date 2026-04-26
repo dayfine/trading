@@ -2,8 +2,15 @@
     history. Isolates data plumbing from the {!Weinstein_strategy} orchestrator
     so the strategy module focuses on transitions, stops, and screening cadence.
 
+    Stage 4 PR-A: the strategy's hot-path entry points
+    ({!build_global_index_views}, {!build_sector_map}) take and return
+    panel-shaped {!Bar_panels.weekly_view} values rather than
+    {!Daily_price.t list}, eliminating the per-tick list allocation. The legacy
+    bar-list assembly {!build_global_index_bars} survives for callers that
+    haven't switched.
+
     All functions are side-effectful only on their explicitly-passed state
-    (notably [sector_prior_stages]). The underlying bar_history is read-only. *)
+    (notably [sector_prior_stages]). The underlying bar source is read-only. *)
 
 open Core
 
@@ -24,21 +31,32 @@ val default_global_indices : (string * string) list
     physical-replication tracker with negligible tracking error at weekly
     cadence. *)
 
+val build_global_index_views :
+  lookback_bars:int ->
+  global_index_symbols:(string * string) list ->
+  bar_reader:Bar_reader.t ->
+  as_of:Date.t ->
+  (string * Data_panel.Bar_panels.weekly_view) list
+(** [build_global_index_views] returns the [(label, weekly_view)] list consumed
+    by the macro callback bundle constructor for the global-consensus indicator.
+    Each entry is the panel weekly view of the most recent [lookback_bars]
+    weeks. Indices with no resident bars are silently dropped so that the macro
+    callback sees only usable inputs.
+
+    Stage 4 PR-A: production hot path. No [Daily_price.t list] is materialised.
+*)
+
 val build_global_index_bars :
   lookback_bars:int ->
   global_index_symbols:(string * string) list ->
   bar_reader:Bar_reader.t ->
   as_of:Date.t ->
   (string * Types.Daily_price.t list) list
-(** [build_global_index_bars] returns the [(label, weekly_bars)] list consumed
-    by {!Macro.analyze} for the global-consensus indicator. Each entry is
-    produced by converting the accumulated daily bars for that symbol to weekly
-    bars (most recent [lookback_bars] weeks). Indices with no accumulated bars
-    are silently dropped so that Macro sees only usable inputs.
-
-    [as_of] is forwarded to {!Bar_reader.weekly_bars_for}. For the panels
-    backend it is the date used to resolve the panel column; for the history
-    backend it is ignored. *)
+(** [build_global_index_bars] is the bar-list shape of
+    {!build_global_index_views}, retained for callers that build
+    {!Macro.callbacks} via {!Macro.callbacks_from_bars}. The strategy's hot path
+    uses {!build_global_index_views}; this is for tests and bar-list-shaped
+    fixtures. *)
 
 val build_sector_map :
   stage_config:Stage.config ->
@@ -47,20 +65,21 @@ val build_sector_map :
   bar_reader:Bar_reader.t ->
   as_of:Date.t ->
   sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
-  index_bars:Types.Daily_price.t list ->
+  index_view:Data_panel.Bar_panels.weekly_view ->
   ticker_sectors:(string, string) Hashtbl.t ->
   (string, Screener.sector_context) Hashtbl.t
 (** [build_sector_map] returns a map keyed by stock ticker (e.g. ["AAPL"]). Each
-    entry is the {!Screener.sector_context} produced by {!Sector.analyze} on the
-    corresponding sector ETF's accumulated weekly bars.
+    entry is the {!Screener.sector_context} produced by
+    {!Sector.analyze_with_callbacks} via panel-shaped callbacks built from
+    [bar_reader] (sector ETF view) and [index_view] (benchmark view).
 
     The expansion from ETF-level to ticker-level uses [ticker_sectors], a
     ticker→sector-name hashtable typically loaded from [sectors.csv] via
     {!Sector_map.load}. Tickers whose sector name does not match any ETF in
     [sector_etfs] are omitted (the screener defaults them to Neutral).
 
-    ETFs with fewer than [stage_config.ma_period] bars are skipped. An empty
-    [index_bars] also skips analysis.
+    ETFs with fewer than [stage_config.ma_period] weekly bars are skipped. An
+    empty [index_view] also skips analysis.
 
     [sector_prior_stages] is read and updated in place so that Stage1->Stage2
     transitions are detected across screening days — the caller owns this

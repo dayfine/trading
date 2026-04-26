@@ -211,6 +211,157 @@ let test_low_window_zero_len _ =
     (Bar_panels.low_window bar_panels ~symbol:"AAPL" ~as_of_day:4 ~len:0)
     is_none
 
+(* ------------------------------------------------------------------ *)
+(* weekly_view_for / daily_view_for                                     *)
+(* ------------------------------------------------------------------ *)
+
+(* Build a 10-day panel spanning two ISO weeks (Jan 1–5 and Jan 8–12 of 2024).
+   AAPL trades all 10 days; this exercises weekly aggregation across two
+   buckets. *)
+let _build_two_week_panels () =
+  let idx = _make_idx [ "AAPL" ] in
+  let dates =
+    [|
+      "2024-01-01";
+      "2024-01-02";
+      "2024-01-03";
+      "2024-01-04";
+      "2024-01-05";
+      "2024-01-08";
+      "2024-01-09";
+      "2024-01-10";
+      "2024-01-11";
+      "2024-01-12";
+    |]
+  in
+  let calendar = _make_calendar dates in
+  let panels = Ohlcv_panels.create idx ~n_days:(Array.length calendar) in
+  Array.iteri dates ~f:(fun i d ->
+      let base = Float.of_int (100 + i) in
+      Ohlcv_panels.write_row panels ~symbol_index:0 ~day:i
+        (_make_price ~date_str:d ~o:base ~h:(base +. 1.0) ~l:(base -. 1.0)
+           ~c:base
+           ~v:(1_000 + (i * 100))
+           ()));
+  match Bar_panels.create ~ohlcv:panels ~calendar with
+  | Ok t -> t
+  | Error err ->
+      assert_failure
+        (Printf.sprintf "Bar_panels.create failed: %s" err.Status.message)
+
+let test_weekly_view_aggregates_two_weeks _ =
+  let bar_panels = _build_two_week_panels () in
+  let view =
+    Bar_panels.weekly_view_for bar_panels ~symbol:"AAPL" ~n:5 ~as_of_day:9
+  in
+  (* Week 1: Jan 1 (Mon)..Jan 5 (Fri); Week 2: Jan 8 (Mon)..Jan 12 (Fri). *)
+  assert_that view
+    (all_of
+       [
+         field (fun (v : Bar_panels.weekly_view) -> v.n) (equal_to 2);
+         field
+           (fun (v : Bar_panels.weekly_view) -> Array.to_list v.dates)
+           (elements_are
+              [
+                equal_to (Date.of_string "2024-01-05");
+                equal_to (Date.of_string "2024-01-12");
+              ]);
+         field
+           (fun (v : Bar_panels.weekly_view) -> Array.to_list v.closes)
+           (elements_are [ float_equal 104.0; float_equal 109.0 ]);
+         field
+           (fun (v : Bar_panels.weekly_view) -> Array.to_list v.highs)
+           (elements_are [ float_equal 105.0; float_equal 110.0 ]);
+         field
+           (fun (v : Bar_panels.weekly_view) -> Array.to_list v.lows)
+           (elements_are [ float_equal 99.0; float_equal 104.0 ]);
+       ])
+
+let test_weekly_view_truncates_to_n _ =
+  let bar_panels = _build_two_week_panels () in
+  let view =
+    Bar_panels.weekly_view_for bar_panels ~symbol:"AAPL" ~n:1 ~as_of_day:9
+  in
+  assert_that view
+    (all_of
+       [
+         field (fun (v : Bar_panels.weekly_view) -> v.n) (equal_to 1);
+         field
+           (fun (v : Bar_panels.weekly_view) -> Array.to_list v.dates)
+           (elements_are [ equal_to (Date.of_string "2024-01-12") ]);
+       ])
+
+let test_weekly_view_unknown_symbol _ =
+  let bar_panels = _build_two_week_panels () in
+  let view =
+    Bar_panels.weekly_view_for bar_panels ~symbol:"UNKNOWN" ~n:5 ~as_of_day:9
+  in
+  assert_that view
+    (field (fun (v : Bar_panels.weekly_view) -> v.n) (equal_to 0))
+
+let test_daily_view_lookback _ =
+  let bar_panels = _build_two_week_panels () in
+  let view =
+    Bar_panels.daily_view_for bar_panels ~symbol:"AAPL" ~as_of_day:9 ~lookback:3
+  in
+  (* Last 3 trading days: Jan 10, 11, 12 -> closes 107, 108, 109. *)
+  assert_that view
+    (all_of
+       [
+         field (fun (v : Bar_panels.daily_view) -> v.n_days) (equal_to 3);
+         field
+           (fun (v : Bar_panels.daily_view) -> Array.to_list v.closes)
+           (elements_are
+              [ float_equal 107.0; float_equal 108.0; float_equal 109.0 ]);
+         field
+           (fun (v : Bar_panels.daily_view) -> Array.to_list v.dates)
+           (elements_are
+              [
+                equal_to (Date.of_string "2024-01-10");
+                equal_to (Date.of_string "2024-01-11");
+                equal_to (Date.of_string "2024-01-12");
+              ]);
+       ])
+
+let test_daily_view_lookback_zero _ =
+  let bar_panels = _build_two_week_panels () in
+  let view =
+    Bar_panels.daily_view_for bar_panels ~symbol:"AAPL" ~as_of_day:9 ~lookback:0
+  in
+  assert_that view
+    (field (fun (v : Bar_panels.daily_view) -> v.n_days) (equal_to 0))
+
+let test_daily_view_unknown_symbol _ =
+  let bar_panels = _build_two_week_panels () in
+  let view =
+    Bar_panels.daily_view_for bar_panels ~symbol:"UNKNOWN" ~as_of_day:9
+      ~lookback:5
+  in
+  assert_that view
+    (field (fun (v : Bar_panels.daily_view) -> v.n_days) (equal_to 0))
+
+(* Daily view skips NaN cells so MSFT (which is missing Jan 4) sees 4 entries
+   when reading back through the full window. *)
+let test_daily_view_skips_nan_cells _ =
+  let bar_panels = _build_test_panels () in
+  let view =
+    Bar_panels.daily_view_for bar_panels ~symbol:"MSFT" ~as_of_day:4 ~lookback:5
+  in
+  assert_that view
+    (all_of
+       [
+         field (fun (v : Bar_panels.daily_view) -> v.n_days) (equal_to 4);
+         field
+           (fun (v : Bar_panels.daily_view) -> Array.to_list v.closes)
+           (elements_are
+              [
+                float_equal 200.5;
+                float_equal 201.5;
+                float_equal 203.5;
+                float_equal 204.5;
+              ]);
+       ])
+
 let suite =
   "Bar_panels"
   >::: [
@@ -234,6 +385,14 @@ let suite =
          >:: test_low_window_returns_none_when_window_underflows;
          "low_window unknown symbol" >:: test_low_window_unknown_symbol;
          "low_window zero len" >:: test_low_window_zero_len;
+         "weekly_view aggregates two weeks"
+         >:: test_weekly_view_aggregates_two_weeks;
+         "weekly_view truncates to n" >:: test_weekly_view_truncates_to_n;
+         "weekly_view unknown symbol" >:: test_weekly_view_unknown_symbol;
+         "daily_view lookback" >:: test_daily_view_lookback;
+         "daily_view lookback zero" >:: test_daily_view_lookback_zero;
+         "daily_view unknown symbol" >:: test_daily_view_unknown_symbol;
+         "daily_view skips NaN cells" >:: test_daily_view_skips_nan_cells;
        ]
 
 let () = run_test_tt_main suite

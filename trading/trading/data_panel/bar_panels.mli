@@ -86,3 +86,75 @@ val low_window :
     when [len <= 0]. The returned [Bigarray.Array1.t] aliases the panel — no
     copy. Reads of the slice see live updates if the panel is mutated, but the
     strategy never writes to [Low]. *)
+
+(** {1 Float-array views (Stage 4 PR-A)}
+
+    The [weekly_view] / [daily_view] primitives produce float-array snapshots of
+    panel cells without ever materializing a [Daily_price.t list]. They are the
+    primitive that lets strategy call sites build callback bundles (Stage / Rs /
+    Sector / Macro / Stops support-floor) directly from panels, skipping the
+    [Daily_price.t list] intermediate that {!daily_bars_for}/{!weekly_bars_for}
+    go through.
+
+    Use the *_view variants in production hot paths; use
+    {!daily_bars_for}/{!weekly_bars_for} when the consumer truly needs the
+    [Daily_price.t list] shape (notably {!Volume.analyze_breakout} and
+    {!Resistance.analyze}, which still consume bar lists pending PR-B). *)
+
+type weekly_view = {
+  closes : float array;
+      (** Adjusted close per weekly bar (chronological, oldest at index 0). *)
+  highs : float array;  (** Max high within each weekly bucket. *)
+  lows : float array;  (** Min low within each weekly bucket. *)
+  volumes : float array;
+      (** Sum of daily volumes within each weekly bucket. Stored as float to
+          align with the panel layout; consumers that need int can round-nearest
+          and convert. *)
+  dates : Core.Date.t array;
+      (** Date of the last trading day in each weekly bucket (Friday for
+          complete weeks). *)
+  n : int;  (** Length of every array. *)
+}
+(** Float-array view of weekly-aggregated bars for one symbol.
+
+    Aggregation semantics match {!Time_period.Conversion.daily_to_weekly} with
+    [include_partial_week:true]: weeks are ISO weeks (Monday–Sunday); the
+    aggregate's date is the latest trading day in the week (typically Friday);
+    the trailing partial week is retained. *)
+
+val weekly_view_for :
+  t -> symbol:string -> n:int -> as_of_day:int -> weekly_view
+(** [weekly_view_for t ~symbol ~n ~as_of_day] returns a {!weekly_view} for the
+    most recent [n] weeks ending at [as_of_day], walking the underlying panel
+    columns directly without producing a [Daily_price.t list].
+
+    Returns the empty view ([n=0], all arrays empty) when [symbol] is unknown or
+    when no resident bars are found. Returns up to [n] weekly entries (fewer if
+    [as_of_day] is early in the backtest). Raises [Invalid_argument] if
+    [as_of_day] is out of range. *)
+
+type daily_view = {
+  highs : float array;
+      (** Daily high prices, oldest at index 0, newest at index [n_days - 1]. *)
+  lows : float array;  (** Daily low prices, same indexing as [highs]. *)
+  closes : float array;  (** Daily adjusted closes, same indexing. *)
+  dates : Core.Date.t array;  (** Daily dates, same indexing. *)
+  n_days : int;  (** Length of every array. *)
+}
+(** Float-array view of daily bars for one symbol within a lookback window.
+
+    Used by {!Weinstein_stops.compute_initial_stop_with_floor} via the
+    support-floor callbacks. The lookback windowing is applied at construction
+    time, so the consumer scans [0..n_days-1] without further bounds checks. *)
+
+val daily_view_for :
+  t -> symbol:string -> as_of_day:int -> lookback:int -> daily_view
+(** [daily_view_for t ~symbol ~as_of_day ~lookback] returns a {!daily_view} of
+    the most recent [lookback] trading days ending at [as_of_day]. Cells where
+    the close panel is NaN are skipped (matching {!daily_bars_for}). The
+    resulting window is contiguous and pre-trimmed to at most [lookback]
+    entries.
+
+    Returns the empty view ([n_days=0], all arrays empty) when [symbol] is
+    unknown, when [lookback <= 0], or when no resident bars are found. Raises
+    [Invalid_argument] if [as_of_day] is out of range. *)

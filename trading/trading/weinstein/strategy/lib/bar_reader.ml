@@ -42,3 +42,30 @@ let weekly_bars_for t ~symbol ~n ~as_of =
   match Bar_panels.column_of_date t as_of with
   | None -> []
   | Some as_of_day -> Bar_panels.weekly_bars_for t ~symbol ~n ~as_of_day
+
+(* Float-array views: same calendar-fallback semantics as the bar-list reads.
+   Returning the empty view (n=0 / n_days=0) when [as_of] is not in the
+   calendar matches the empty-list contract callers already tolerate. *)
+
+let _empty_weekly_view : Bar_panels.weekly_view =
+  {
+    closes = [||];
+    highs = [||];
+    lows = [||];
+    volumes = [||];
+    dates = [||];
+    n = 0;
+  }
+
+let _empty_daily_view : Bar_panels.daily_view =
+  { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
+
+let weekly_view_for t ~symbol ~n ~as_of =
+  match Bar_panels.column_of_date t as_of with
+  | None -> _empty_weekly_view
+  | Some as_of_day -> Bar_panels.weekly_view_for t ~symbol ~n ~as_of_day
+
+let daily_view_for t ~symbol ~as_of ~lookback =
+  match Bar_panels.column_of_date t as_of with
+  | None -> _empty_daily_view
+  | Some as_of_day -> Bar_panels.daily_view_for t ~symbol ~as_of_day ~lookback

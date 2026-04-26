@@ -47,3 +47,30 @@ val weekly_bars_for :
 
     Returns the empty list when the symbol has no resident bars or [as_of] is
     out of the panel calendar. *)
+
+(** {1 Float-array views (Stage 4 PR-A)}
+
+    Pass-throughs to the underlying {!Data_panel.Bar_panels} float-array
+    primitives. Use these in production hot paths to avoid materialising a
+    {!Types.Daily_price.t list} per call site per tick. *)
+
+val weekly_view_for :
+  t ->
+  symbol:string ->
+  n:int ->
+  as_of:Date.t ->
+  Data_panel.Bar_panels.weekly_view
+(** [weekly_view_for t ~symbol ~n ~as_of] returns the panel weekly view of the
+    most recent [n] weeks ending at [as_of]. Maps [as_of] to a panel column via
+    {!Data_panel.Bar_panels.column_of_date}; returns the empty view when [as_of]
+    is not in the calendar. *)
+
+val daily_view_for :
+  t ->
+  symbol:string ->
+  as_of:Date.t ->
+  lookback:int ->
+  Data_panel.Bar_panels.daily_view
+(** [daily_view_for t ~symbol ~as_of ~lookback] returns the panel daily view of
+    the most recent [lookback] days ending at [as_of]. Same calendar- fallback
+    semantics as {!weekly_view_for}. *)
