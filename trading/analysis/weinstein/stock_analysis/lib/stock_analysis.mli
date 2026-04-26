@@ -58,18 +58,21 @@ type callbacks = {
   rs : Rs.callbacks;
       (** Nested RS callbacks. {!Rs.callbacks_from_bars} or a panel adapter
           constructs this. *)
+  volume : Volume.callbacks;
+      (** Nested Volume callbacks. {!Volume.callbacks_from_bars} or a panel
+          adapter constructs this. *)
+  resistance : Resistance.callbacks;
+      (** Nested Resistance callbacks. {!Resistance.callbacks_from_bars} or a
+          panel adapter constructs this. *)
 }
 (** Bundle of indicator callbacks consumed by {!analyze_with_callbacks}.
 
     Threads the per-callee callback bundles ({!Stage.callbacks},
-    {!Rs.callbacks}) through one nested record so that panel-backed callers
-    don't have to re-expose those individual closures at every layer.
-
-    Volume and Resistance are intentionally NOT in this record: their
-    consumption shape (bar lists with positional [event_idx]) hasn't been
-    reshaped yet. {!analyze_with_callbacks} accepts them via a separate
-    [bars_for_volume_resistance] parameter that PRs E/F/G or a follow-up will
-    eventually replace with their own callback bundles. *)
+    {!Rs.callbacks}, {!Volume.callbacks}, {!Resistance.callbacks}) through one
+    nested record so that panel-backed callers don't have to re-expose those
+    individual closures at every layer. As of Stage 4 PR-B, every sub-callee
+    consumes callbacks rather than {!Daily_price.t list} — the strategy hot path
+    no longer materialises bar lists. *)
 
 val callbacks_from_bars :
   config:config ->
@@ -78,10 +81,11 @@ val callbacks_from_bars :
   callbacks
 (** [callbacks_from_bars ~config ~bars ~benchmark_bars] builds a {!callbacks}
     record by precomputing [bars]'s high/volume index closures and delegating
-    nested bundles to {!Stage.callbacks_from_bars} and
-    {!Rs.callbacks_from_bars}. The constructor [{ analyze }] uses internally;
-    exposed for callers (e.g. tests, future panel adapters) that already hold
-    bar lists and want to delegate to {!analyze_with_callbacks}. *)
+    nested bundles to {!Stage.callbacks_from_bars}, {!Rs.callbacks_from_bars},
+    {!Volume.callbacks_from_bars}, and {!Resistance.callbacks_from_bars}. The
+    constructor [{ analyze }] uses internally; exposed for callers (e.g. tests,
+    future panel adapters) that already hold bar lists and want to delegate to
+    {!analyze_with_callbacks}. *)
 
 val analyze :
   config:config ->
@@ -102,47 +106,36 @@ val analyze :
     Pure function.
 
     Implementation note: this is a thin wrapper over {!analyze_with_callbacks}.
-    It builds a {!callbacks} record via {!callbacks_from_bars} and threads
-    [bars] through as the [bars_for_volume_resistance] argument. Behaviour is
-    bit-identical to the callback API for the same underlying [bars]. *)
+    It builds a {!callbacks} record via {!callbacks_from_bars} and delegates.
+    Behaviour is bit-identical to the callback API for the same underlying
+    [bars]. *)
 
 val analyze_with_callbacks :
   config:config ->
   ticker:string ->
   callbacks:callbacks ->
-  bars_for_volume_resistance:Daily_price.t list ->
   prior_stage:Weinstein_types.stage option ->
   as_of_date:Core.Date.t ->
   t
-(** [analyze_with_callbacks ~config ~ticker ~callbacks
-     ~bars_for_volume_resistance ~prior_stage ~as_of_date] is the
-    indicator-callback shape of {!analyze}. Used by panel-backed callers that
-    read indicator values via the strategy's [get_indicator_fn] / panel views
-    rather than walking [Daily_price.t list]s for the Stage / RS / breakout-
-    price / peak-volume scans.
+(** [analyze_with_callbacks ~config ~ticker ~callbacks ~prior_stage ~as_of_date]
+    is the indicator-callback shape of {!analyze}. Used by panel-backed callers
+    that read indicator values via the strategy's [get_indicator_fn] / panel
+    views rather than walking {!Daily_price.t list}s for any sub-analysis.
 
     @param config Same configuration as {!analyze}.
     @param callbacks
       Bundle of indicator callbacks. [callbacks.get_high] and
       [callbacks.get_volume] back the breakout-price scan (over the prior-base
       window) and the peak-volume scan (over the recent window).
-      [callbacks.stage] / [callbacks.rs] thread through to the corresponding
-      callees.
-    @param bars_for_volume_resistance
-      Bar list still required by {!Volume.analyze_breakout} and
-      {!Resistance.analyze} (whose consumption shape hasn't been reshaped yet).
-      PR-D scope explicitly defers Volume / Resistance reshape; PRs E/F/G or a
-      follow-up will replace this parameter with their own callback bundles.
-      Until then, panel-backed callers reconstruct just enough bars from panels
-      to feed Volume / Resistance.
+      [callbacks.stage] / [callbacks.rs] / [callbacks.volume] /
+      [callbacks.resistance] thread through to the corresponding callees.
     @param prior_stage Same as {!analyze}.
     @param as_of_date Same as {!analyze}.
 
-    Pure function: same callback outputs and same [bars_for_volume_resistance]
-    always produce the same result. The wrapper {!analyze} guarantees
-    byte-identical results for any [(bars, benchmark_bars)] input by
-    constructing callbacks that index the same pre-computed series the bar-list
-    path computes internally. *)
+    Pure function: same callback outputs always produce the same result. The
+    wrapper {!analyze} guarantees byte-identical results for any
+    [(bars, benchmark_bars)] input by constructing callbacks that index the same
+    pre-computed series the bar-list path computes internally. *)
 
 val is_breakout_candidate : t -> bool
 (** [is_breakout_candidate analysis] returns true if the stock shows a potential

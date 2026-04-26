@@ -117,7 +117,38 @@ let rs_callbacks_of_weekly_views ~(stock : Bar_panels.weekly_view)
   }
 
 (* ------------------------------------------------------------------ *)
-(* Stock_analysis — bundle of high/volume + nested Stage/Rs             *)
+(* Volume — week-offset indexing over the view's [volumes] array        *)
+(* ------------------------------------------------------------------ *)
+
+let volume_callbacks_of_weekly_view ~(weekly : Bar_panels.weekly_view) :
+    Volume.callbacks =
+  { get_volume = _get_from_float_array weekly.volumes }
+
+(* ------------------------------------------------------------------ *)
+(* Resistance — bar-offset indexing over highs / lows / dates           *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a [bar_offset]-indexed lookup over a generic array; offset 0 is the
+    newest entry. Mirrors {!_get_from_float_array} but parameterised over
+    closure name (Resistance uses [bar_offset], Stage / Stock_analysis use
+    [week_offset]). *)
+let _get_by_bar_offset (arr : 'a array) : bar_offset:int -> 'a option =
+  let n = Array.length arr in
+  fun ~bar_offset ->
+    let idx = n - 1 - bar_offset in
+    if idx < 0 || idx >= n then None else Some arr.(idx)
+
+let resistance_callbacks_of_weekly_view ~(weekly : Bar_panels.weekly_view) :
+    Resistance.callbacks =
+  {
+    get_high = _get_by_bar_offset weekly.highs;
+    get_low = _get_by_bar_offset weekly.lows;
+    get_date = _get_by_bar_offset weekly.dates;
+    n_bars = weekly.n;
+  }
+
+(* ------------------------------------------------------------------ *)
+(* Stock_analysis — bundle of high/volume + nested Stage/Rs/Volume/Resistance *)
 (* ------------------------------------------------------------------ *)
 
 let stock_analysis_callbacks_of_weekly_views ~(config : Stock_analysis.config)
@@ -128,6 +159,8 @@ let stock_analysis_callbacks_of_weekly_views ~(config : Stock_analysis.config)
     get_volume = _get_from_float_array stock.volumes;
     stage = stage_callbacks_of_weekly_view ~config:config.stage ~weekly:stock;
     rs = rs_callbacks_of_weekly_views ~stock ~benchmark;
+    volume = volume_callbacks_of_weekly_view ~weekly:stock;
+    resistance = resistance_callbacks_of_weekly_view ~weekly:stock;
   }
 
 (* ------------------------------------------------------------------ *)

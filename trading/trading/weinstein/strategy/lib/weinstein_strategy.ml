@@ -227,9 +227,9 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
 
     Stage 4 PR-A: per-ticker analysis goes through panel-shaped Stage / Rs
     callbacks (no [Daily_price.t list] for those scans). Volume + Resistance in
-    [Stock_analysis] still consume a bar list — that reshape is deferred to
-    PR-B; the bar list is built on-demand here from
-    [Bar_reader.weekly_bars_for]. *)
+    [Stock_analysis] (Stage, Rs, breakout-price scan, peak-volume scan, Volume,
+    Resistance) reads through the panel-shaped callbacks below without
+    allocating any [Daily_price.t list]. *)
 let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
     ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
     ~current_date =
@@ -245,14 +245,6 @@ let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
         else stock_view.dates.(stock_view.n - 1)
       in
       let prior_stage = Hashtbl.find prior_stages ticker in
-      (* PR-B carry-over: Volume + Resistance still consume a [Daily_price.t]
-         list. Build it on-demand here; the rest of Stock_analysis (Stage,
-         Rs, breakout-price scan, peak-volume scan) reads through the
-         panel-shaped callbacks above without allocating. *)
-      let bars_for_volume_resistance =
-        Bar_reader.weekly_bars_for bar_reader ~symbol:ticker
-          ~n:config.lookback_bars ~as_of:current_date
-      in
       let callbacks =
         Panel_callbacks.stock_analysis_callbacks_of_weekly_views
           ~config:Stock_analysis.default_config ~stock:stock_view
@@ -260,8 +252,8 @@ let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
       in
       let result =
         Stock_analysis.analyze_with_callbacks
-          ~config:Stock_analysis.default_config ~ticker ~callbacks
-          ~bars_for_volume_resistance ~prior_stage ~as_of_date
+          ~config:Stock_analysis.default_config ~ticker ~callbacks ~prior_stage
+          ~as_of_date
       in
       Hashtbl.set prior_stages ~key:ticker ~data:result.stage.stage;
       Some result

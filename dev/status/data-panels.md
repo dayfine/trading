@@ -5,26 +5,41 @@
 ## Status
 IN_PROGRESS
 
-Stage 4 PR-A IN_PROGRESS on `feat/panels-stage04-pr-a-callback-wiring` — the load-bearing callback-rewiring PR. Drops `Daily_price.t list` materialisation at every strategy call site (Macro / Sector / Stage / Stops support-floor / Stock_analysis Stage+Rs branches). Volume + Resistance reshape deferred to PR-B.
+Stage 4 PR-B IN_PROGRESS on `feat/panels-stage04-pr-b-volume-resistance-callbacks` — drops the residual `bars_for_volume_resistance : Daily_price.t list` parameter from `Stock_analysis.analyze_with_callbacks`. The strategy's hot path no longer materialises any `Daily_price.t list` per-symbol per-Friday.
 
-**Stage 4 PR-A scope**:
-- New `Bar_panels.weekly_view` / `Bar_panels.daily_view` types: float-array snapshots over panel cells with no `Daily_price.t list` intermediate. Plus `weekly_view_for` / `daily_view_for` constructors.
-- New `Weinstein_strategy.Panel_callbacks` module: builds Stage / Rs / Stock_analysis / Sector / Macro / Weinstein_stops.Support_floor callback bundles directly from views. Bit-identical to the bar-list `callbacks_from_bars` paths (parity-tested via `test_panel_callbacks.ml`, 6 tests).
-- Strategy call sites switched: `_compute_ma`, `_make_entry_transition`, `_screen_universe`, `_run_screen`, `_on_market_close`, `Macro_inputs.build_global_index_views`, `Macro_inputs.build_sector_map`. The screening-day check now reads the index weekly_view directly.
-- Pre-flag carry-overs preserved: PR-F (Macro int-then-float fold) — `_build_cumulative_ad_array` still folds running sum as int and converts at the array boundary. PR-H QC (`Bar_reader.accumulate`) — already removed in PR 3.2; nothing to verify.
+**Stage 4 PR-B scope**:
+- `Volume.analyze_breakout_with_callbacks ~callbacks ~event_offset` — new callback-shaped entry point. `Volume.callbacks = { get_volume : week_offset:int -> float option }`. Indices match the panel layout (`week_offset:0` = newest). Existing bar-list `analyze_breakout` is now a thin wrapper that converts `event_idx` ↔ `event_offset` and delegates.
+- `Resistance.analyze_with_callbacks ~callbacks ~breakout_price ~as_of_date` — new callback-shaped entry point. `Resistance.callbacks = { get_high; get_low; get_date; n_bars }` indexed by `bar_offset:0..n_bars-1`. The virgin / chart window walks bound by `min lookback n_bars`. Bucket aggregation uses a running max date to mirror the bar-list path's `max(dates)` per bucket.
+- `Stock_analysis.callbacks` gains `volume : Volume.callbacks` and `resistance : Resistance.callbacks` fields. `analyze_with_callbacks` drops the `bars_for_volume_resistance : Daily_price.t list` parameter. The bar-list wrapper `analyze ~bars` builds the new bundle via `Volume.callbacks_from_bars` + `Resistance.callbacks_from_bars` — bit-identical for any input.
+- `Panel_callbacks.volume_callbacks_of_weekly_view` and `Panel_callbacks.resistance_callbacks_of_weekly_view` — index directly into the `Bar_panels.weekly_view` float arrays (`volumes` / `highs` / `lows` / `dates`). `stock_analysis_callbacks_of_weekly_views` now wraps both new constructors in addition to the existing Stage / Rs ones, returning the full `Stock_analysis.callbacks` bundle from a weekly view alone — no bar list needed.
+- `Weinstein_strategy._screen_universe` drops the `bars_for_volume_resistance = Bar_reader.weekly_bars_for ...` line and the `bars_for_volume_resistance:` argument to `Stock_analysis.analyze_with_callbacks`. The per-Friday allocation source is gone.
 
-**Out of scope (PR-B/C/D)**:
-- `Volume.analyze_breakout` + `Resistance.analyze` reshape (PR-B): `Stock_analysis.analyze_with_callbacks` still takes `bars_for_volume_resistance`; PR-A builds it on-demand from `Bar_reader.weekly_bars_for` only when a candidate stock makes it past the per-symbol allocation guard. Eliminating this allocation drops the residual.
+**Parity gates green**:
+- `test_panel_loader_parity` (load-bearing): 2 round_trips goldens still bit-equal.
+- `test_volume.ml`: 12 pre-existing + 5 new parity tests (Strong / Adequate / Weak / Insufficient-history / event-at-max-index) — total 17, all OK.
+- `test_resistance.ml`: 9 pre-existing + 5 new parity tests (Virgin / Clean / Heavy / Moderate / chart-window-filtering) — total 14, all OK.
+- `test_stock_analysis.ml`: 8 pre-existing + 8 PR-D parity tests — total 16, all OK with the new bundle shape (drop `bars_for_volume_resistance` arg).
+- `test_panel_callbacks.ml`: 6 PR-A parity + 2 new (Volume / Resistance) — total 8, all OK.
+- All `weinstein/strategy/test` suites green except the pre-existing flaky `test_ad_bars_weekly_e2e` (fails on main too — unrelated).
+
+**Out of scope (PR-C/D)**:
 - `Ohlcv_weekly_panels` + Friday rollup (PR-C).
 - Port stage classifier / volume / resistance to indicator kernels (PR-D).
+- RSS spike re-run on `bull-crash-292x6y` to measure peak RSS post-A+B (separate dispatch — local devcontainer wall budget).
 
-**Expected memory impact**: PR-A drops the dominant per-tick `Daily_price.t list` allocation (universe-wide, every Friday). Plan target: peak RSS on `bull-crash-292x6y` reduces from 3.47 GB toward the projected ≤ 800 MB. Spike re-run scheduled per `dev/notes/panels-rss-spike-2026-04-25.md` §"Next spike". Not measured in this PR (devcontainer wall budget); QC / follow-up dispatches the spike.
+**Expected memory impact**: PR-B eliminates the last per-tick `Daily_price.t list` allocation in the hot path. Combined with PR-A, peak RSS on `bull-crash-292x6y` should drop from 3.47 GB toward the projected ≤ 800 MB. Measurement deferred to a separate spike-rerun dispatch.
 
-**LOC delta**: +650 lines modified, +865 lines new. Bulk of new lines is tests (398 + 416 = 814 LOC). Production source delta ~700 LOC (250 panel_callbacks, 250 bar_panels extensions, 200 strategy rewiring). Function-length ceiling 32 lines (under 50-line hard limit).
+**LOC delta**: ~340 lines production source (volume +56, resistance +69, stock_analysis +13, panel_callbacks +28, weinstein_strategy -16); ~245 lines tests (volume +60, resistance +95, panel_callbacks +90). Function-length ceiling under 50-line hard limit; nesting linter — only the pre-existing `macro_callbacks_of_weekly_views` (max=6) remains, no new nesting violations.
 
-**Verify**: `cd trading && eval $(opam env) && TRADING_DATA_DIR=$PWD/test_data dune build && dune runtest trading/data_panel trading/weinstein/strategy trading/backtest/test trading/simulation`. All test suites green: 21 `bar_panels_test` (was 14 + 7 new), 6 new `test_panel_callbacks` parity, 2 `test_panel_loader_parity` (load-bearing gate), 15 `test_weinstein_strategy`, 5 `test_weinstein_strategy_smoke`, 3 `test_weinstein_backtest` (simulation).
+**Verify**: `cd trading && eval $(opam env) && TRADING_DATA_DIR=/workspaces/trading-1/.claude/worktrees/agent-a1d76d23ee489a1e4/trading/test_data dune build && dune runtest`. All suites green; only pre-existing nesting linter violations on `analysis/scripts/universe_filter`, `fetch_finviz_sectors`, `ppx_test_matcher` remain (also fail on main).
 
-PR-A is bookmarked at `feat/panels-stage04-pr-a-callback-wiring`. Plan: `dev/plans/panels-stage04-pr-a-2026-04-26.md`.
+PR-B is bookmarked at `feat/panels-stage04-pr-b-volume-resistance-callbacks`. Plan: `dev/plans/panels-stage04-pr-b-2026-04-26.md`.
+
+---
+
+**Prior status (Stage 4 PR-A, MERGED #584)**:
+
+Stage 4 PR-A merged 2026-04-26 as #584. Drops `Daily_price.t list` materialisation at every strategy call site except Volume + Resistance (deferred to PR-B above). Adds `Bar_panels.weekly_view` / `daily_view` types, `Weinstein_strategy.Panel_callbacks` module with constructors for Stage / Rs / Sector / Macro / Stops support-floor / Stock_analysis Stage+Rs callbacks. Plan: `dev/plans/panels-stage04-pr-a-2026-04-26.md`.
 
 ---
 

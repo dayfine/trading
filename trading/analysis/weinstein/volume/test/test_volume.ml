@@ -124,6 +124,72 @@ let test_average_volume_takes_last_n _ =
 let test_average_volume_empty _ =
   assert_that (average_volume ~bars:[] ~n:3) (float_equal 0.0)
 
+(* ------------------------------------------------------------------ *)
+(* Parity: analyze_breakout (bar-list) vs analyze_breakout_with_callbacks *)
+(*                                                                    *)
+(* Builds a {!callbacks} record externally via the public               *)
+(* {!callbacks_from_bars} and asserts that the two entry points produce *)
+(* bit-identical results. Each scenario hits a different regime: strong *)
+(* / adequate / weak confirmation, and the insufficient-history guard.  *)
+(* ------------------------------------------------------------------ *)
+
+(** Bit-identity matcher for {!result}. *)
+let result_is_bit_identical (expected : result) : result matcher =
+  all_of
+    [
+      field
+        (fun (r : result) -> r.confirmation)
+        (equal_to expected.confirmation);
+      field
+        (fun (r : result) -> r.event_volume)
+        (equal_to (expected.event_volume : int));
+      field
+        (fun (r : result) -> r.avg_volume)
+        (equal_to (expected.avg_volume : float));
+      field
+        (fun (r : result) -> r.volume_ratio)
+        (equal_to (expected.volume_ratio : float));
+    ]
+
+(** Run both [analyze_breakout] and [analyze_breakout_with_callbacks] over the
+    same input and assert the results are bit-equal. The callback bundle is
+    built externally via the public {!callbacks_from_bars}. *)
+let assert_parity ~bars ~event_idx () =
+  let bar_result = analyze_breakout ~config:cfg ~bars ~event_idx in
+  let callbacks = callbacks_from_bars ~bars in
+  let event_offset = List.length bars - 1 - event_idx in
+  let callback_result =
+    analyze_breakout_with_callbacks ~config:cfg ~callbacks ~event_offset
+  in
+  match (bar_result, callback_result) with
+  | None, None -> ()
+  | Some r1, Some r2 -> assert_that r2 (result_is_bit_identical r1)
+  | _ -> assert_failure "Volume parity: one path returned None"
+
+let test_parity_strong_breakout _ =
+  let bars = build_bars ~baseline_vol:1000 ~n:4 ~event_vol:2500 in
+  assert_parity ~bars ~event_idx:4 ()
+
+let test_parity_adequate_breakout _ =
+  let bars = build_bars ~baseline_vol:1000 ~n:4 ~event_vol:1700 in
+  assert_parity ~bars ~event_idx:4 ()
+
+let test_parity_weak_breakout _ =
+  let bars = build_bars ~baseline_vol:1000 ~n:4 ~event_vol:1100 in
+  assert_parity ~bars ~event_idx:4 ()
+
+let test_parity_insufficient_history _ =
+  let bars = build_bars ~baseline_vol:1000 ~n:2 ~event_vol:3000 in
+  assert_parity ~bars ~event_idx:2 ()
+
+let test_parity_event_at_max_index _ =
+  (* Larger window — event at the last bar, 4 prior. *)
+  let bars =
+    List.init 6 ~f:(fun i ->
+        if i = 5 then make_bar 5000 else make_bar (1000 + (i * 100)))
+  in
+  assert_parity ~bars ~event_idx:5 ()
+
 let suite =
   "volume_tests"
   >::: [
@@ -143,6 +209,11 @@ let suite =
          "test_average_volume_basic" >:: test_average_volume_basic;
          "test_average_volume_takes_last_n" >:: test_average_volume_takes_last_n;
          "test_average_volume_empty" >:: test_average_volume_empty;
+         "test_parity_strong_breakout" >:: test_parity_strong_breakout;
+         "test_parity_adequate_breakout" >:: test_parity_adequate_breakout;
+         "test_parity_weak_breakout" >:: test_parity_weak_breakout;
+         "test_parity_insufficient_history" >:: test_parity_insufficient_history;
+         "test_parity_event_at_max_index" >:: test_parity_event_at_max_index;
        ]
 
 let () = run_test_tt_main suite

@@ -71,6 +71,28 @@ type result = {
 }
 (** Result of resistance analysis at a given breakout price. *)
 
+type callbacks = {
+  get_high : bar_offset:int -> float option;
+      (** Bar high at [bar_offset] bars back from the newest bar. [bar_offset:0]
+          is the newest bar; offsets past available depth return [None]. *)
+  get_low : bar_offset:int -> float option;
+      (** Bar low at [bar_offset] bars back. *)
+  get_date : bar_offset:int -> Core.Date.t option;
+      (** Bar date at [bar_offset] bars back. Used for [age_years]. *)
+  n_bars : int;
+      (** Total number of bars in the underlying source — i.e. the largest
+          [bar_offset] for which any of the above closures returns [Some]. Used
+          by the analyzer to bound the virgin / chart window walks. *)
+}
+(** Bundle of indicator callbacks consumed by {!analyze_with_callbacks}. The
+    panel-backed adapter and {!callbacks_from_bars} both produce this shape. *)
+
+val callbacks_from_bars : bars:Daily_price.t list -> callbacks
+(** [callbacks_from_bars ~bars] precomputes [bar_offset]-indexed closures over
+    [bars] (newest bar at offset 0). Constructor used internally by {!analyze};
+    exposed for tests / panel adapters that already hold a [Daily_price.t list].
+*)
+
 val analyze :
   config:config ->
   bars:Daily_price.t list ->
@@ -87,4 +109,31 @@ val analyze :
     @param breakout_price The price level to grade resistance above.
     @param as_of_date Reference date used to compute [age_years] for each zone.
 
-    Pure function: same inputs always produce the same output. *)
+    Pure function: same inputs always produce the same output.
+
+    Implementation note: this is a thin wrapper over {!analyze_with_callbacks}.
+    It builds a {!callbacks} record via {!callbacks_from_bars} and delegates.
+    Behaviour is bit-identical to the callback API for the same underlying
+    [bars]. *)
+
+val analyze_with_callbacks :
+  config:config ->
+  callbacks:callbacks ->
+  breakout_price:float ->
+  as_of_date:Core.Date.t ->
+  result
+(** [analyze_with_callbacks ~config ~callbacks ~breakout_price ~as_of_date] is
+    the indicator-callback shape of {!analyze}. Used by panel-backed callers
+    that read bar fields via per-cell closures rather than walking a
+    {!Daily_price.t list}.
+
+    Walks two bar windows back from the newest bar (offset 0):
+    - the [config.virgin_lookback_bars] tail for the virgin-territory check,
+    - the [config.chart_lookback_bars] tail for zone density analysis.
+
+    The walks read [callbacks.get_high], [callbacks.get_low], and
+    [callbacks.get_date] at offsets [0 .. min (n_bars - 1) (lookback - 1)]. The
+    smaller of [n_bars] and the configured lookback bounds the walk; offsets
+    past [n_bars] are treated as missing.
+
+    Pure function: same callback outputs always produce the same result. *)
