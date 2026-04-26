@@ -3,10 +3,12 @@
 ## Last updated: 2026-04-26
 
 ## Status
-IN_PROGRESS — Steps 1+2 done on `feat/backtest-perf-tier1-catalog`; PR open for review. The `perf-tier1.yml` workflow file is **held out of this PR** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker.
+IN_PROGRESS
+
+Steps 1+2 done on `feat/backtest-perf-tier1-catalog`; PR open for review. The `perf-tier1.yml` workflow file is **held out of this PR** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker.
 
 ## Interface stable
-N/A
+NO
 
 ## Goal
 
