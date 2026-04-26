@@ -1,0 +1,17 @@
+{
+  "date": "2026-04-26",
+  "feature": "data-panels",
+  "branch": "feat/panels-stage03-pr-d-delete-legacy",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
