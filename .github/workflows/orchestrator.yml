@@ -265,13 +265,23 @@ jobs:
           echo "out_file=${OUT_FILE}" >> "$GITHUB_OUTPUT"
         id: capture-cost
 
-      - name: Commit budget record (auto-merge PR)
-        # The cost-capture step above writes the budget JSON to the runner's
-        # ephemeral workspace. Without this step the file evaporates when the
-        # job terminates, which is why `dev/budget/` only ever contained the
-        # hand-seeded sample record from #483's initial PR. This step opens a
-        # tiny auto-merging PR carrying the JSON — same pattern the
-        # lead-orchestrator uses for `ops/daily-*` summary PRs.
+      - name: Bundle budget into daily summary and auto-merge
+        # The cost-capture step writes dev/budget/<date>-<run_id>.json.
+        # This step adds it onto the ops/daily-* branch the lead-orchestrator
+        # already pushed, then auto-merges that PR — eliminating the separate
+        # ops/budget-* PR that previously sat open waiting for auto-merge.
+        #
+        # Why consolidate: the orphan ops/budget-* PR could fall behind main if
+        # ops/daily-* merged first and main moved (e.g. #577 needed manual
+        # rebase). Bundling into the same PR removes that race entirely.
+        #
+        # Fail-mode: if the orchestrator step failed and no ops/daily-* branch
+        # was pushed, PR_NUMBER lookup returns empty. This step detects that
+        # case, commits the budget JSON to a standalone ops/budget-* branch as
+        # a fallback (same behaviour as the deleted "Commit budget record" step),
+        # and annotates ::warning:: so the human is aware a separate merge is
+        # needed. It does NOT open a PR for the fallback branch — the annotation
+        # is the signal; human merges directly.
         if: always() && steps.capture-cost.outputs.out_file != ''
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
@@ -287,66 +297,100 @@ jobs:
             exit 0
           fi
 
-          BASENAME="$(basename "$OUT_FILE" .json)"
-          BRANCH="ops/budget-${BASENAME}"
-          # Single-line python3 to sidestep the indented-heredoc trap (a
-          # multi-line python3 -c "..." inside a YAML block keeps the YAML
-          # indentation as leading whitespace — illegal at Python's top level).
+          BUDGET_BASENAME="$(basename "$OUT_FILE" .json)"
           TOTAL_COST="$(python3 -c "import json; d=json.load(open('${OUT_FILE}')); v=d.get('totals',{}).get('total_cost_usd'); print('null' if v is None else f'{v:.4f}')")"
 
           # safe.directory: inside the container we run as --user 0 on a
           # workspace that actions/checkout initialized as a non-root user.
-          # Without this, git refuses to operate on the repo.
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
           git config user.email "bot@github-actions"
           git config user.name "GitHub Actions Bot"
 
-          git checkout -b "$BRANCH"
-          git add "$OUT_FILE"
-          if git diff --cached --quiet; then
-            echo "No diff to commit (file may already be on main); skipping."
-            exit 0
-          fi
-          git commit -m "ops(budget): record ${BASENAME} (\$${TOTAL_COST})"
-          git push origin "$BRANCH"
-
-          # Create PR via curl REST (the devcontainer image does not ship
-          # `gh` CLI — see run 24762831070 post-mortem where both `gh pr
-          # create` and `gh pr merge --auto` died with "gh: command not
-          # found" and the budget branch sat orphaned without a PR).
-          #
-          # Use python3 for JSON build/parse, not jq — the devcontainer
-          # image also lacks jq (see run 24856066811 post-mortem where the
-          # first curl-based attempt died with "jq: command not found").
-          BODY=$(printf 'Measured GHA orchestrator run cost for `%s`.\n\n`total_cost_usd`: $%s (from `claude-code-action` execution_file, fallback branch 1b — see `dev/status/cost-tracking.md`).\n\nAuto-merge: ops category, single-file additive change.' "$BASENAME" "$TOTAL_COST")
-
-          PR_PAYLOAD=$(TITLE="ops(budget): ${BASENAME} (\$${TOTAL_COST})" HEAD="${BRANCH}" BASE="main" BODY="${BODY}" \
-            python3 -c 'import json,os; print(json.dumps({"title":os.environ["TITLE"],"head":os.environ["HEAD"],"base":os.environ["BASE"],"body":os.environ["BODY"],"draft":False}))')
-
-          PR_JSON=$(curl -s -X POST \
+          # ---------------------------------------------------------------
+          # Locate the ops/daily-* PR that lead-orchestrator opened.
+          # The branch name is ops/daily-${DATE}[-runN] — look up any open
+          # PR whose head branch starts with ops/daily-$(date +%F).
+          # ---------------------------------------------------------------
+          DATE="$(date +%F)"
+          OWNER="${REPO%/*}"
+          DAILY_PR_NUMBER="$(curl -sSL \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${REPO}/pulls" \
-            -d "$PR_PAYLOAD")
+            "https://api.github.com/repos/${REPO}/pulls?state=open&base=main&per_page=20" \
+            | python3 -c "
+          import json, sys, os
+          prs = json.load(sys.stdin)
+          date = os.environ['DATE']
+          prefix = f'ops/daily-{date}'
+          matches = [p for p in prs if p.get('head',{}).get('ref','').startswith(prefix)]
+          print(matches[0]['number'] if matches else '')
+          " DATE="$DATE" 2>/dev/null || true)"
 
-          PR_NUMBER=$(echo "$PR_JSON" | python3 -c 'import json,sys; d=json.load(sys.stdin); n=d.get("number"); print("" if n is None else n)')
-          if [ -z "$PR_NUMBER" ]; then
-            echo "::warning::Failed to create budget PR. API response:"
-            echo "$PR_JSON" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message", d))' || true
+          DAILY_BRANCH="$(curl -sSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/pulls?state=open&base=main&per_page=20" \
+            | python3 -c "
+          import json, sys, os
+          prs = json.load(sys.stdin)
+          date = os.environ['DATE']
+          prefix = f'ops/daily-{date}'
+          matches = [p for p in prs if p.get('head',{}).get('ref','').startswith(prefix)]
+          print(matches[0]['head']['ref'] if matches else '')
+          " DATE="$DATE" 2>/dev/null || true)"
+
+          if [ -z "$DAILY_PR_NUMBER" ] || [ -z "$DAILY_BRANCH" ]; then
+            echo "::warning::No open ops/daily-${DATE} PR found. lead-orchestrator may have failed or already merged. Committing budget JSON to fallback branch ops/budget-${BUDGET_BASENAME} — human merge required."
+            git checkout -b "ops/budget-${BUDGET_BASENAME}"
+            git add "$OUT_FILE"
+            if git diff --cached --quiet; then
+              echo "Budget already on main; nothing to commit."
+              exit 0
+            fi
+            git commit -m "ops(budget): record ${BUDGET_BASENAME} (\$${TOTAL_COST})"
+            git push origin "ops/budget-${BUDGET_BASENAME}"
+            echo "Fallback branch pushed. PR not opened — human should merge ops/budget-${BUDGET_BASENAME} directly."
             exit 0
           fi
-          echo "Opened budget PR #${PR_NUMBER}"
 
-          # Enable auto-merge via GraphQL. Auto-merge requires the repo-level
-          # setting to be on (it is, per existing ops/daily-* summary PRs).
-          PR_NODE_ID=$(echo "$PR_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["node_id"])')
-          GQL_PAYLOAD=$(NODE_ID="$PR_NODE_ID" python3 -c 'import json,os; print(json.dumps({"query":"mutation($id: ID!) { enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: SQUASH }) { pullRequest { number } } }","variables":{"id":os.environ["NODE_ID"]}}))')
-          curl -s -X POST \
+          echo "Found ops/daily-* PR #${DAILY_PR_NUMBER} on branch ${DAILY_BRANCH}; bundling budget JSON."
+
+          # ---------------------------------------------------------------
+          # Add the budget JSON onto the daily summary branch.
+          # ---------------------------------------------------------------
+          git fetch origin "${DAILY_BRANCH}"
+          git checkout "${DAILY_BRANCH}"
+          git add "$OUT_FILE"
+          if git diff --cached --quiet; then
+            echo "Budget JSON already on branch (re-run?); skipping add."
+          else
+            git commit -m "ops(budget): bundle ${BUDGET_BASENAME} (\$${TOTAL_COST}) into daily summary"
+            git push origin "${DAILY_BRANCH}"
+            echo "Budget JSON committed and pushed to ${DAILY_BRANCH}."
+          fi
+
+          # ---------------------------------------------------------------
+          # Auto-merge the daily summary PR (now contains daily MD + budget
+          # JSON) via REST PUT /merge. REST is simpler than GraphQL
+          # enablePullRequestAutoMerge and does not require a CI green gate,
+          # which is appropriate here: ops/daily-* PRs are observational
+          # (no code, no behavior changes) and the budget JSON is additive.
+          # The lead-orchestrator Step 8a previously owned this merge; it
+          # now defers to this step so the merge happens after the budget
+          # JSON is bundled.
+          # ---------------------------------------------------------------
+          MERGE_RESPONSE="$(curl -sSL -X PUT \
             -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/graphql" \
-            -d "$GQL_PAYLOAD" \
-            > /dev/null || echo "::warning::Failed to enable auto-merge on PR #${PR_NUMBER}; human merge required."
+            -H "Accept: application/vnd.github+json" \
+            -d '{"merge_method":"squash"}' \
+            "https://api.github.com/repos/${REPO}/pulls/${DAILY_PR_NUMBER}/merge")"
+          MERGED="$(printf '%s' "$MERGE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print("true" if r.get("merged") else "false")' 2>/dev/null || echo false)"
+          if [ "$MERGED" = "true" ]; then
+            echo "Auto-merged PR #${DAILY_PR_NUMBER} (daily summary + budget JSON)."
+          else
+            echo "::warning::Auto-merge failed for PR #${DAILY_PR_NUMBER}. Response: ${MERGE_RESPONSE}"
+            echo "Human merge required for the daily summary PR. Budget JSON is already on the branch."
+          fi
 
       - name: Locate daily summary (for escalations check)
         id: publish-summary

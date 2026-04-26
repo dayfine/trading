@@ -1732,31 +1732,25 @@ fi
 
 Flag in §Escalations if either the push or the PR-create fails: a summary without a PR is invisible to the human.
 
-### Step 8a: Auto-merge so the next run can see this summary
+### Step 8a: Note on auto-merge ownership
 
-The daily summary must land on `main` so **Step 1b of the next run** can read it — Step 1b reads `dev/daily/*.md` off the checked-out filesystem, which only reflects merged state. Leaving the summary PR open would block cross-run drift detection: the next run would read an older summary and miss the dispatch context.
+**The workflow's "Bundle budget into daily summary and auto-merge" GHA step is
+the merge owner for this PR — do not auto-merge here.**
 
-Summaries are observational (no code, no behavior changes), so auto-merging is low-risk. Use REST `PUT /merge`:
+That step runs after `capture-cost` writes `dev/budget/<date>-<run_id>.json`,
+amends the same `ops/daily-*` branch with the budget JSON, and then calls
+REST `PUT /merge` to merge the combined PR. Merging here (before the budget
+JSON lands) would leave the budget file uncommitted.
 
-```bash
-if [ -n "$PR_NUMBER" ]; then
-  MERGE_RESPONSE="$(curl -sSL -X PUT \
-    -H "Authorization: Bearer ${GH_TOKEN}" \
-    -H "Accept: application/vnd.github+json" \
-    -d '{"merge_method":"squash"}' \
-    "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge")"
-  MERGED="$(printf '%s' "$MERGE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print("true" if r.get("merged") else "false")' 2>/dev/null || echo false)"
-  if [ "$MERGED" != "true" ]; then
-    # Branch protection (required CI checks, required reviews) or a transient
-    # conflict can block the merge. Surface as an escalation — do NOT retry in
-    # a loop; the next run will see the still-open summary PR and pick up from
-    # there once the human clears the block.
-    echo "AUTO_MERGE_FAILED pr=${PR_NUMBER} response=${MERGE_RESPONSE}"
-  fi
-fi
-```
+If you need to surface a merge failure in §Escalations, wait until the GHA
+step has had a chance to run; a merge failure there will appear as a
+`::warning::` in the workflow log and the PR will stay open for human review.
 
-Flag in §Escalations when auto-merge fails: note the PR number and the GitHub response so the human can diagnose (most common cause: required status check that didn't run, or `main` branch-protection requiring a human reviewer).
+The daily summary must eventually land on `main` so Step 1b of the next run
+can read it (Step 1b reads `dev/daily/*.md` off the checked-out filesystem,
+which only reflects merged state). If the GHA bundling step fails and the PR
+stays open, the next run's Step 1b will read an older summary — this is
+acceptable for one run but should be escalated if it persists.
 
 ### Step 8b: Consolidated summary (N >= 3)
 
