@@ -7,6 +7,9 @@
    the same reason. *)
 open Core
 open Trading_simulation
+module Symbol_index = Data_panel.Symbol_index
+module Ohlcv_panels = Data_panel.Ohlcv_panels
+module Bar_panels = Data_panel.Bar_panels
 
 (* Configuration constants *)
 
@@ -217,10 +220,54 @@ let _load_deps ?trace ~overrides ~sector_map_override () =
 
 (* Simulation *)
 
+(** With [Bar_history] deleted, the strategy reads OHLCV bars from
+    {!Data_panel.Bar_panels}. The Legacy runner builds the panels at
+    simulator-construction time so the strategy has a working bar source.
+    Symmetric with [Tiered_runner._build_bar_panels] / [Panel_runner]. *)
+let _build_legacy_calendar ~start ~end_ : Date.t array =
+  let rec loop d acc =
+    if Date.( > ) d end_ then List.rev acc
+    else
+      let dow = Date.day_of_week d in
+      let is_weekend =
+        Day_of_week.equal dow Day_of_week.Sat
+        || Day_of_week.equal dow Day_of_week.Sun
+      in
+      let acc' = if is_weekend then acc else d :: acc in
+      loop (Date.add_days d 1) acc'
+  in
+  Array.of_list (loop start [])
+
+let _build_legacy_bar_panels (deps : _deps) ~start_date ~end_date =
+  let warmup_start = Date.add_days start_date (-warmup_days) in
+  let calendar = _build_legacy_calendar ~start:warmup_start ~end_:end_date in
+  let symbol_index =
+    match Symbol_index.create ~universe:deps.all_symbols with
+    | Ok t -> t
+    | Error err ->
+        failwithf "Backtest.Runner: Symbol_index.create failed: %s"
+          err.Status.message ()
+  in
+  let ohlcv =
+    match
+      Ohlcv_panels.load_from_csv_calendar symbol_index
+        ~data_dir:deps.data_dir_fpath ~calendar
+    with
+    | Ok t -> t
+    | Error err ->
+        failwithf "Backtest.Runner: Ohlcv_panels.load_from_csv_calendar: %s"
+          (Status.show err) ()
+  in
+  match Bar_panels.create ~ohlcv ~calendar with
+  | Ok p -> p
+  | Error err ->
+      failwithf "Backtest.Runner: Bar_panels.create: %s" err.Status.message ()
+
 let _make_simulator deps ~stop_log ~start_date ~end_date =
+  let bar_panels = _build_legacy_bar_panels deps ~start_date ~end_date in
   let strategy =
     Weinstein_strategy.make ~ad_bars:deps.ad_bars
-      ~ticker_sectors:deps.ticker_sectors deps.config
+      ~ticker_sectors:deps.ticker_sectors ~bar_panels deps.config
   in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let warmup_start = Date.add_days start_date (-warmup_days) in

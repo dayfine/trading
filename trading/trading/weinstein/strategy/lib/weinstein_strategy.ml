@@ -1,10 +1,9 @@
 (* @large-module: strategy composition point — wires screener, macro, stops,
-   bar history, and portfolio into one cohesive weekly cadence; splitting any
+   bar panels, and portfolio into one cohesive weekly cadence; splitting any
    of these concerns into a sibling module would create artificial boundaries
    between tightly coupled wiring logic. *)
 open Core
 open Trading_strategy
-module Bar_history = Bar_history
 module Bar_reader = Bar_reader
 module Stops_runner = Stops_runner
 
@@ -261,13 +260,6 @@ let _is_screening_day index_bars =
       Date.day_of_week bar.Types.Daily_price.date
       |> Day_of_week.equal Day_of_week.Fri
 
-(** Collect every symbol the strategy needs bar history for: universe tickers,
-    the primary index, each sector ETF, and each global index. *)
-let _all_accumulated_symbols ~(config : config) : string list =
-  let sector_symbols = List.map config.sector_etfs ~f:fst in
-  let global_symbols = List.map config.indices.global ~f:fst in
-  (config.indices.primary :: config.universe) @ sector_symbols @ global_symbols
-
 (** Run the Friday macro + screener path and return entry transitions. Under all
     macro regimes (Bullish, Neutral, Bearish) the screener is invoked;
     macro-specific gating — longs blocked under Bearish, shorts blocked under
@@ -302,8 +294,6 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
     ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
-  let all_symbols = _all_accumulated_symbols ~config in
-  Bar_reader.accumulate bar_reader ~get_price ~symbols:all_symbols;
   let current_date =
     match get_price config.indices.primary with
     | Some bar -> bar.Types.Daily_price.date
@@ -333,17 +323,15 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_history ?bar_panels
-    config =
+    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels config =
   let stop_states = ref initial_stop_states in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
   let bar_reader =
-    match (bar_panels, bar_history) with
-    | Some p, _ -> Bar_reader.of_panels p
-    | None, Some h -> Bar_reader.of_history h
-    | None, None -> Bar_reader.of_history (Bar_history.create ())
+    match bar_panels with
+    | Some p -> Bar_reader.of_panels p
+    | None -> Bar_reader.empty ()
   in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)

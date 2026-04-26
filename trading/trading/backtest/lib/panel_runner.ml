@@ -7,7 +7,6 @@ module Ohlcv_panels = Data_panel.Ohlcv_panels
 module Bar_panels = Data_panel.Bar_panels
 module Indicator_panels = Data_panel.Indicator_panels
 module Indicator_spec = Data_panel.Indicator_spec
-module Bar_history = Weinstein_strategy.Bar_history
 
 (* Stage 1 default indicator specs. Daily cadence only; weekly cadence and
    additional indicators (Stage, Volume, Resistance, RS) land in Stage 4. *)
@@ -62,26 +61,20 @@ let _build_indicators ~ohlcv ~n_days =
   let symbol_index = Ohlcv_panels.symbol_index ohlcv in
   Indicator_panels.create ~symbol_index ~n_days ~specs:_default_specs
 
-let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_history
-    ~bar_panels ~warmup_start ~ohlcv ~indicators ~calendar =
-  (* Stage 3 PR 3.1: pass [~bar_panels] through to the inner Weinstein strategy
-     so Panel mode reads bars from the panel columns instead of the parallel
-     [Bar_history] cache. [Weinstein_strategy.make] gives [bar_panels]
-     precedence over [bar_history]; the [Tiered_strategy_wrapper] is still
-     constructed with a [bar_history] handle but its Friday-cycle seeding is
-     no-op-equivalent now (the inner strategy never reads from it).
-     Behavioural consequence: Panel-mode round_trips diverge from Tiered-mode
-     round_trips by design — see the data-panels Stage 3 plan under dev/plans.
-     [Bar_panels] is fully populated from CSV up-front; [Bar_history] under
-     Tiered is incrementally seeded by the Friday Full-tier promote cycle, so
-     not-yet-promoted symbols return [[]] from [Bar_history] but a meaningful
-     bar slice from [Bar_panels]. Same strategy + same data -> different trade
-     decisions because the bar visibility timing differs. The Panel-mode
-     parity gate is now [test_panel_round_trips_golden] (sexp-equality against
-     a checked-in golden), not a Tiered-vs-Panel comparison. *)
+let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_panels
+    ~ohlcv ~indicators ~calendar =
+  (* Stage 3 PR 3.2: the inner Weinstein strategy reads bars from
+     {!Data_panel.Bar_panels} (populated up-front from CSV at runner start).
+     The parallel [Bar_history] cache and its Friday-cycle seed step have
+     been deleted. Panel-mode and Tiered-mode round_trips diverge by design:
+     [Bar_panels] is fully populated up-front; under Tiered, individual
+     symbols only become readable to the strategy after their Friday
+     promote. This is the load-bearing reason Panel-mode parity is pinned
+     by [test_panel_round_trips_golden] (sexp-equality against a checked-in
+     golden) rather than by a Tiered-vs-Panel comparison. *)
   let inner_strategy =
     Weinstein_strategy.make ~ad_bars:input.ad_bars
-      ~ticker_sectors:input.ticker_sectors ~bar_history ~bar_panels input.config
+      ~ticker_sectors:input.ticker_sectors ~bar_panels input.config
   in
   let always_loaded =
     String.Set.of_list
@@ -91,10 +84,8 @@ let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_history
   let tiered_config : Tiered_strategy_wrapper.config =
     {
       bar_loader = loader;
-      bar_history;
       universe = input.all_symbols;
       always_loaded_symbols = always_loaded;
-      seed_warmup_start = warmup_start;
       stop_log;
       primary_index = input.config.indices.primary;
     }
@@ -116,11 +107,10 @@ let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_history
 let _make_simulator (input : Tiered_runner.input) ~loader ~stop_log ~start_date
     ~end_date ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators
     ~calendar ~bar_panels =
-  let bar_history = Bar_history.create () in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy =
-    _build_strategy input ~loader ~stop_log ~bar_history ~bar_panels
-      ~warmup_start ~ohlcv ~indicators ~calendar
+    _build_strategy input ~loader ~stop_log ~bar_panels ~ohlcv ~indicators
+      ~calendar
   in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols

@@ -12,16 +12,9 @@ open OUnit2
 open Core
 open Matchers
 open Trading_simulation
-
-(* Re-declare summary_stats for exhaustive ppx-generated matcher. *)
-type stats = Trading_simulation.Metrics.summary_stats = {
-  total_pnl : float;
-  avg_holding_days : float;
-  win_count : int;
-  loss_count : int;
-  win_rate : float;
-}
-[@@deriving test_matcher]
+module Symbol_index = Data_panel.Symbol_index
+module Ohlcv_panels = Data_panel.Ohlcv_panels
+module Bar_panels = Data_panel.Bar_panels
 
 (* ------------------------------------------------------------------ *)
 (* Constants                                                            *)
@@ -47,8 +40,50 @@ let conservative_portfolio_config =
 (* Helpers                                                              *)
 (* ------------------------------------------------------------------ *)
 
-(** Build a Weinstein strategy configured for the 7-stock universe. *)
-let _make_strategy () =
+(** Build the panel-backed bar reader for the universe + the requested date
+    range. Stage 3 PR 3.2 deleted [Bar_history]; the strategy reads bars from
+    [Bar_panels] now, so these integration tests must construct one before
+    calling [Weinstein_strategy.make]. *)
+let _build_calendar ~start ~end_ : Date.t array =
+  let rec loop d acc =
+    if Date.( > ) d end_ then List.rev acc
+    else
+      let dow = Date.day_of_week d in
+      let is_weekend =
+        Day_of_week.equal dow Day_of_week.Sat
+        || Day_of_week.equal dow Day_of_week.Sun
+      in
+      let acc' = if is_weekend then acc else d :: acc in
+      loop (Date.add_days d 1) acc'
+  in
+  Array.of_list (loop start [])
+
+let _build_bar_panels ~start_date ~end_date =
+  let calendar = _build_calendar ~start:start_date ~end_:end_date in
+  let symbol_index =
+    match Symbol_index.create ~universe:all_symbols with
+    | Ok t -> t
+    | Error err -> assert_failure ("Symbol_index.create: " ^ err.Status.message)
+  in
+  let ohlcv =
+    match
+      Ohlcv_panels.load_from_csv_calendar symbol_index
+        ~data_dir:(Fpath.v data_dir) ~calendar
+    with
+    | Ok t -> t
+    | Error err ->
+        assert_failure
+          ("Ohlcv_panels.load_from_csv_calendar: " ^ Status.show err)
+  in
+  match Bar_panels.create ~ohlcv ~calendar with
+  | Ok p -> p
+  | Error err -> assert_failure ("Bar_panels.create: " ^ err.Status.message)
+
+(** Build a Weinstein strategy configured for the 7-stock universe. The
+    [bar_panels] handle threads the panel-backed bar reader into the strategy so
+    its [Stage]/[RS]/[Stock_analysis]/[Stops_runner] reads have a populated
+    source. *)
+let _make_strategy ~bar_panels =
   let ad_bars = Weinstein_strategy.Ad_bars.load ~data_dir in
   let ticker_sectors =
     Sector_map.load ~data_dir:(Data_path.default_data_dir ())
@@ -57,11 +92,12 @@ let _make_strategy () =
   let config =
     { base_config with portfolio_config = conservative_portfolio_config }
   in
-  Weinstein_strategy.make ~ad_bars ~ticker_sectors config
+  Weinstein_strategy.make ~ad_bars ~ticker_sectors ~bar_panels config
 
 (** Create simulator deps and config, then run the simulation. *)
 let _run_backtest ~start_date ~end_date =
-  let strategy = _make_strategy () in
+  let bar_panels = _build_bar_panels ~start_date ~end_date in
+  let strategy = _make_strategy ~bar_panels in
   let deps =
     Simulator.create_deps ~symbols:all_symbols ~data_dir:(Fpath.v data_dir)
       ~strategy ~commission:sample_commission ()
@@ -113,34 +149,48 @@ let test_six_year_full_lifecycle _ =
   let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
   let final_value = (List.last_exn result.steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips result.steps in
-  let summary = Metrics.compute_summary round_trips in
-  (* Pinned: 2187 steps, 23 buys, 21 sells, all 7 symbols traded. Counts
-     jumped from 7/7 → 23/21 after PR #409 fixed `_held_symbols` to
-     exclude Closed positions — symbols are re-entrable after exit, so
-     the same 7-symbol universe cycles multiple times over 6 years.
-     Stop placement uses the support-floor primitive
-     ({!Weinstein_stops.compute_initial_stop_with_floor}). *)
-  assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 23);
-  assert_that n_sells (equal_to 21);
-  assert_that
-    (_traded_symbols result.steps)
-    (equal_to [ "AAPL"; "CVX"; "HD"; "JNJ"; "JPM"; "KO"; "MSFT" ]);
-  (* 21 completed round-trips: 10 winners, 11 losers. *)
-  assert_that (List.length round_trips) (equal_to 21);
-  assert_that summary
-    (is_some_and
-       (match_stats ~total_pnl:__ ~avg_holding_days:__ ~win_count:(equal_to 10)
-          ~loss_count:(equal_to 11) ~win_rate:__));
-  (* Final value ~$498k on $500k start — small loss from conservative sizing *)
-  assert_that final_value
-    (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
-  (* Max drawdown under 12% (was <10% pre-PR #409; re-entries after stops
-     add a few more pullbacks during the 2020 crash and 2022 correction). *)
+  let symbols = _traded_symbols result.steps in
+  let stats = Metrics.compute_summary round_trips in
   let max_drawdown_pct =
     (initial_cash -. _min_portfolio_value result.steps) /. initial_cash
   in
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.12)
+  (* Stage 3 PR 3.2 (post-rework): pin the deterministic post-3.2 values.
+     With [Bar_history] deleted, panel-backed reads make bars visible
+     up-front rather than via the pre-3.2 incremental cache. The trade
+     counts shifted from the buggy pre-3.2 numbers (23/21 with 10W/11L)
+     to the correct post-3.2 numbers captured below. The exact set of
+     traded tickers, win/loss split, and a tight final-value band
+     guarantee the strategy path is reproducible end-to-end. *)
+  assert_that (List.length result.steps) (equal_to 2187);
+  assert_that n_buys (equal_to 36);
+  assert_that n_sells (equal_to 33);
+  assert_that symbols
+    (elements_are
+       [
+         equal_to "AAPL";
+         equal_to "CVX";
+         equal_to "HD";
+         equal_to "JNJ";
+         equal_to "JPM";
+         equal_to "KO";
+         equal_to "MSFT";
+       ]);
+  assert_that (List.length round_trips) (equal_to 33);
+  assert_that stats
+    (is_some_and
+       (all_of
+          [
+            field (fun s -> s.Metrics.win_count) (equal_to 16);
+            field (fun s -> s.Metrics.loss_count) (equal_to 17);
+          ]));
+  (* Final value pinned within ±$3K of the captured post-3.2 value
+     ($506,694.70). Tight band catches drift in the screener cascade or
+     stop-loss path. *)
+  assert_that final_value
+    (is_between (module Float_ord) ~low:503_694.70 ~high:509_694.70);
+  (* Max drawdown captured at 14.4778%; pin upper bound at captured + 1pp
+     slack to catch regressions while tolerating tiny float drift. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.155)
 
 (* ------------------------------------------------------------------ *)
 (* Entry/exit cycle around COVID crash: 2019–mid 2020                   *)
@@ -156,33 +206,34 @@ let test_entry_exit_cycle_around_covid _ =
   let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
   let final_value = (List.last_exn result.steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips result.steps in
-  let summary = Metrics.compute_summary round_trips in
-  (* Pinned: 545 steps, 6 buys/sells across AAPL HD JNJ KO. Counts jumped
-     from 4/4 → 6/6 after PR #409 fixed `_held_symbols` to exclude
-     Closed positions — one or more symbols re-entered after initial
-     stop-out. *)
-  assert_that (List.length result.steps) (equal_to 545);
-  assert_that n_buys (equal_to 6);
-  assert_that n_sells (equal_to 6);
-  assert_that
-    (_traded_symbols result.steps)
-    (equal_to [ "AAPL"; "HD"; "JNJ"; "KO" ]);
-  (* 6 round-trips: 2 winners, 4 losers through the COVID-19 drawdown. *)
-  assert_that (List.length round_trips) (equal_to 6);
-  assert_that summary
-    (is_some_and
-       (match_stats
-          ~total_pnl:(lt (module Float_ord) 0.0)
-          ~avg_holding_days:__ ~win_count:(equal_to 2) ~loss_count:(equal_to 4)
-          ~win_rate:__));
-  (* Final value ~$498k — losses are small due to conservative sizing *)
-  assert_that final_value
-    (is_between (module Float_ord) ~low:490_000.0 ~high:500_000.0);
-  (* Max drawdown under 12% even through COVID *)
+  let symbols = _traded_symbols result.steps in
+  let stats = Metrics.compute_summary round_trips in
   let max_drawdown_pct =
     (initial_cash -. _min_portfolio_value result.steps) /. initial_cash
   in
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.12)
+  (* Stage 3 PR 3.2 (post-rework): pinned post-3.2 deterministic values.
+     Pre-3.2 was 6 buys / 6 sells; post-3.2 the cycle yields 11 buys / 10
+     sells across {AAPL, HD, JNJ, KO} with 4W/6L and final ≈ $512,025. *)
+  assert_that (List.length result.steps) (equal_to 545);
+  assert_that n_buys (equal_to 11);
+  assert_that n_sells (equal_to 10);
+  assert_that symbols
+    (elements_are
+       [ equal_to "AAPL"; equal_to "HD"; equal_to "JNJ"; equal_to "KO" ]);
+  assert_that (List.length round_trips) (equal_to 10);
+  assert_that stats
+    (is_some_and
+       (all_of
+          [
+            field (fun s -> s.Metrics.win_count) (equal_to 4);
+            field (fun s -> s.Metrics.loss_count) (equal_to 6);
+          ]));
+  (* Final value pinned within ±$3K of the captured post-3.2 value
+     ($512,025.01). *)
+  assert_that final_value
+    (is_between (module Float_ord) ~low:509_025.01 ~high:515_025.01);
+  (* Max drawdown captured at 14.8438%; cap at captured + 1pp slack. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.16)
 
 (* ------------------------------------------------------------------ *)
 (* Portfolio value stays positive: 2020–2021                            *)
@@ -194,20 +245,37 @@ let test_portfolio_value_stays_positive _ =
       ~start_date:(Date.of_string "2020-01-02")
       ~end_date:(Date.of_string "2021-12-31")
   in
-  (* Pinned: 729 steps, 2 buys (HD, KO); under support-floor stops 1 sell
-     fires intra-backtest (vs 0 sells with the prior fixed-buffer proxy). *)
-  assert_that (List.length result.steps) (equal_to 729);
-  assert_that (_count_by_side result.steps Trading_base.Types.Buy) (equal_to 2);
-  assert_that (_count_by_side result.steps Trading_base.Types.Sell) (equal_to 1);
-  (* Every step has positive portfolio value *)
+  let n_buys = _count_by_side result.steps Trading_base.Types.Buy in
+  let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
   let min_value = _min_portfolio_value result.steps in
-  assert_that min_value (gt (module Float_ord) 0.0);
-  (* Max drawdown under 8% *)
   let max_drawdown_pct = (initial_cash -. min_value) /. initial_cash in
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.08);
-  (* Final value above starting capital — recovery after COVID *)
   let final_value = (List.last_exn result.steps).portfolio_value in
-  assert_that final_value (gt (module Float_ord) initial_cash)
+  let round_trips = Metrics.extract_round_trips result.steps in
+  let symbols = _traded_symbols result.steps in
+  let stats = Metrics.compute_summary round_trips in
+  (* Stage 3 PR 3.2 (post-rework): pinned post-3.2 values. The 2020-2021
+     window opens during the COVID crash, so every step has positive PV
+     and the strategy completes 4 buys / 3 sells across {HD, KO} with
+     1W/2L and final ≈ $505,302.82. *)
+  assert_that (List.length result.steps) (equal_to 729);
+  assert_that n_buys (equal_to 4);
+  assert_that n_sells (equal_to 3);
+  assert_that symbols (elements_are [ equal_to "HD"; equal_to "KO" ]);
+  assert_that (List.length round_trips) (equal_to 3);
+  assert_that stats
+    (is_some_and
+       (all_of
+          [
+            field (fun s -> s.Metrics.win_count) (equal_to 1);
+            field (fun s -> s.Metrics.loss_count) (equal_to 2);
+          ]));
+  assert_that min_value (gt (module Float_ord) 0.0);
+  (* Max drawdown captured at 7.6625%; cap at captured + 1pp slack. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.087);
+  (* Final value pinned within ±$3K of the captured post-3.2 value
+     ($505,302.82). *)
+  assert_that final_value
+    (is_between (module Float_ord) ~low:502_302.82 ~high:508_302.82)
 
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)

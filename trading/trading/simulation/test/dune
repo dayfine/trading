@@ -117,6 +117,7 @@
   fpath
   weinstein.data_source
   trading.base
+  trading.data_panel
   trading.engine
   trading.portfolio
   trading.simulation
@@ -125,6 +126,4 @@
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk
   ounit2
-  matchers)
- (preprocess
-  (pps ppx_test_matcher)))
+  matchers))

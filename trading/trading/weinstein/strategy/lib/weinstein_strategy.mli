@@ -36,12 +36,8 @@ open Core
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. See {!Ad_bars}. *)
 
-module Bar_history = Bar_history
-(** Per-symbol daily bar buffer. See {!Bar_history}. *)
-
 module Bar_reader = Bar_reader
-(** Bar source abstraction backing {!Bar_history} and panel-backed reads. See
-    {!Bar_reader}. *)
+(** Panel-backed bar source. See {!Bar_reader}. *)
 
 module Stops_runner = Stops_runner
 (** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
@@ -97,14 +93,12 @@ type config = {
       (** Number of weekly bars to pass to stage/macro analysers (default: 52).
           Must be >= 30 (one MA period). *)
   bar_history_max_lookback_days : int option;
-      (** Hypothesis-testing field (perf workstream C1). When [Some n], strategy
-          callers can use this as the upper bound on Bar_history retention (drop
-          bars older than [as_of - n] days). [None] (default) preserves current
-          behaviour — Bar_history grows unbounded for the run. The strategy
-          itself does NOT yet call [Bar_history.trim_before] on this field;
-          wiring is deferred to PR 3 of the Bar_history trim sequence (see
-          [dev/plans/bar-history-trim-2026-04-24.md]). C1 only ships the field
-          so downstream PRs and the [--override] mechanism can use it. *)
+      (** Hypothesis-testing field (perf workstream C1). Vestigial after the
+          Stage 3 PR 3.2 deletion of [Bar_history] — the parallel cache no
+          longer exists, so trimming has no behavioural effect. The field is
+          kept on [config] so existing override sexps and CLI flags continue to
+          parse; setting it is a no-op. Will be removed once backtest_runner CLI
+          surface drops the corresponding flag. *)
   skip_ad_breadth : bool;
       (** Hypothesis-testing field (perf workstream C1). When [true], the runner
           does NOT call [Weinstein_strategy.Ad_bars.load]; macro indicators that
@@ -130,18 +124,17 @@ type config = {
       (** Hypothesis-testing field (perf workstream H2). When [Some n], the
           Tiered loader's [Bar_loader.Full_compute.tail_days] is set to [n]
           instead of the default. Caps the bar count retained per Full-tier
-          symbol. Lower values = less memory but possibly different strategy
-          behaviour, since [Stops_runner] / [Weinstein_stops] read bars from
-          [Bar_history], which is seeded from [Full.t.bars] on Full promotion.
+          symbol.
 
           [None] (default) uses [Full_compute.default_config.tail_days] (1800).
           The Legacy [loader_strategy] does not use [Full_compute] at all, so
-          the override is a no-op on that path.
+          the override is a no-op on that path. Stage 3 PR 3.2 deleted
+          [Bar_history], so the strategy no longer reads from [Full.t.bars] via
+          the Friday-cycle seed; this override remains relevant only to the
+          loader's own retention.
 
-          Hypothesis-testing only — like the other hypothesis toggles. Setting
-          this is expected to change strategy outputs at scale (PnL, trade
-          count). Use for A/B vs the [None] baseline only when measuring memory
-          attribution. NOT safe to flip on in production. See H2 in
+          Hypothesis-testing only — like the other hypothesis toggles. NOT safe
+          to flip on in production. See H2 in
           [dev/plans/backtest-perf-2026-04-24.md]. *)
 }
 [@@deriving sexp]
@@ -217,7 +210,6 @@ val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->
   ?ticker_sectors:(string, string) Hashtbl.t ->
-  ?bar_history:Bar_history.t ->
   ?bar_panels:Data_panel.Bar_panels.t ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
@@ -240,18 +232,10 @@ val make :
       {!Sector_map.load}. Used to expand the ETF-level sector analysis to
       individual stock tickers in the screener. Default: empty table (sector
       gate degrades to Neutral for all tickers).
-    @param bar_history
-      Optional shared [Bar_history.t]. When provided, the strategy reads from
-      and writes into the caller's buffer instead of allocating a fresh one.
-      Used by the Tiered backtest path so the [Tiered_strategy_wrapper] can
-      [Bar_history.seed] from [Bar_loader.get_full] after Full-tier promotions
-      and have those bars visible to the strategy's own readers. Default: a
-      fresh empty [Bar_history.t] (the pre-existing behaviour).
     @param bar_panels
-      Optional [Bar_panels.t] (panel-backed bar reader). When provided, takes
-      precedence over [bar_history] — the strategy reads from panel columns via
-      {!Bar_reader.of_panels} instead of the parallel Hashtbl cache. Used by the
-      Panel backtest path. Stage 2 of the columnar-data-shape plan (see
-      [dev/plans/columnar-data-shape-2026-04-25.md]) replaces [Bar_history] with
-      this; until Stage 2 ships, both backends are supported and a parity test
-      pins their behaviour as bit-identical. *)
+      Optional [Bar_panels.t] (panel-backed bar reader). When provided, the
+      strategy reads OHLCV bars from panel columns via {!Bar_reader.of_panels}.
+      When omitted, an empty reader is used — every read returns the empty list,
+      which is sufficient for tests that exercise control paths where no
+      panel-backed bar is ever consumed (empty universe, no held positions,
+      etc.). Production callers must always supply this. *)

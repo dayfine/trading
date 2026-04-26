@@ -2,6 +2,9 @@ open OUnit2
 open Core
 open Matchers
 open Weinstein_strategy
+module Bar_panels = Data_panel.Bar_panels
+module Symbol_index = Data_panel.Symbol_index
+module Ohlcv_panels = Data_panel.Ohlcv_panels
 
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                              *)
@@ -32,14 +35,50 @@ let make_rising_bars ~start_date ~n ~start_price =
         volume = 1_000_000;
       })
 
-(** Seed a [Bar_history.t] with [bars] for [symbol] by repeatedly feeding them
-    through [accumulate], matching the strategy's usage pattern. *)
-let seed_bar_history ~symbol ~bars =
-  let t = Bar_history.create () in
-  List.iter bars ~f:(fun bar ->
-      let get_price s = if String.equal s symbol then Some bar else None in
-      Bar_history.accumulate t ~get_price ~symbols:[ symbol ]);
-  t
+(** Build a [Bar_reader.t] backed by [Bar_panels] over a synthetic universe.
+    [symbols_with_bars] is [(symbol, bars)] pairs; each bar's date must be a
+    weekday since the calendar is built from those dates. Symbols absent from
+    the list (e.g., ones referenced by a sector_etfs config but with no
+    synthetic series) read as empty — the same contract the deleted
+    [Bar_history.create ()] satisfied. *)
+let make_bar_reader ~symbols_with_bars =
+  let universe = List.map symbols_with_bars ~f:fst in
+  match universe with
+  | [] -> Bar_reader.empty ()
+  | _ ->
+      let symbol_index =
+        match Symbol_index.create ~universe with
+        | Ok t -> t
+        | Error err -> failwith ("Symbol_index.create: " ^ err.Status.message)
+      in
+      let calendar =
+        symbols_with_bars
+        |> List.concat_map ~f:(fun (_, bars) ->
+            List.map bars ~f:(fun b -> b.Types.Daily_price.date))
+        |> List.dedup_and_sort ~compare:Date.compare
+        |> Array.of_list
+      in
+      let n_days = Array.length calendar in
+      let ohlcv = Ohlcv_panels.create symbol_index ~n_days in
+      let calendar_idx = Hashtbl.create (module Date) in
+      Array.iteri calendar ~f:(fun i d ->
+          Hashtbl.add calendar_idx ~key:d ~data:i
+          |> (ignore : [ `Ok | `Duplicate ] -> unit));
+      List.iter symbols_with_bars ~f:(fun (symbol, bars) ->
+          match Symbol_index.to_row symbol_index symbol with
+          | None -> ()
+          | Some row ->
+              List.iter bars ~f:(fun (bar : Types.Daily_price.t) ->
+                  match Hashtbl.find calendar_idx bar.date with
+                  | None -> ()
+                  | Some day ->
+                      Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day bar));
+      let panels =
+        match Bar_panels.create ~ohlcv ~calendar with
+        | Ok p -> p
+        | Error err -> failwith ("Bar_panels.create: " ^ err.Status.message)
+      in
+      Bar_reader.of_panels panels
 
 (* ------------------------------------------------------------------ *)
 (* Canonical constants                                                  *)
@@ -83,11 +122,10 @@ let test_default_global_indices_is_canonical_triple _ =
 (* ------------------------------------------------------------------ *)
 
 let test_build_global_index_bars_empty _ =
-  let t = Bar_history.create () in
+  let bar_reader = Bar_reader.empty () in
   let result =
     Macro_inputs.build_global_index_bars ~lookback_bars:52
-      ~global_index_symbols:Macro_inputs.default_global_indices
-      ~bar_reader:(Bar_reader.of_history t)
+      ~global_index_symbols:Macro_inputs.default_global_indices ~bar_reader
       ~as_of:(Date.of_string "2024-12-31")
   in
   assert_that result is_empty
@@ -100,12 +138,14 @@ let test_build_global_index_bars_drops_symbols_without_bars _ =
       ~start_date:(Date.of_string "2024-01-01")
       ~n:10 ~start_price:100.0
   in
-  let t = seed_bar_history ~symbol:"GDAXI.INDX" ~bars in
+  let as_of = (List.last_exn bars).date in
+  let bar_reader =
+    make_bar_reader ~symbols_with_bars:[ ("GDAXI.INDX", bars) ]
+  in
   let result =
     Macro_inputs.build_global_index_bars ~lookback_bars:52
-      ~global_index_symbols:Macro_inputs.default_global_indices
-      ~bar_reader:(Bar_reader.of_history t)
-      ~as_of:(Date.of_string "2024-12-31")
+      ~global_index_symbols:Macro_inputs.default_global_indices ~bar_reader
+      ~as_of
   in
   assert_that result (elements_are [ field fst (equal_to "DAX") ])
 
@@ -118,12 +158,11 @@ let test_build_global_index_bars_drops_symbols_without_bars _ =
 let _sufficient_daily_bars = 250
 
 let test_build_sector_map_empty_bar_history _ =
-  let t = Bar_history.create () in
+  let bar_reader = Bar_reader.empty () in
   let sector_prior_stages = Hashtbl.create (module String) in
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
-      ~lookback_bars:52 ~sector_etfs:Macro_inputs.spdr_sector_etfs
-      ~bar_reader:(Bar_reader.of_history t)
+      ~lookback_bars:52 ~sector_etfs:Macro_inputs.spdr_sector_etfs ~bar_reader
       ~as_of:(Date.of_string "2024-12-31")
       ~sector_prior_stages ~index_bars:[]
       ~ticker_sectors:(Hashtbl.create (module String))
@@ -142,15 +181,14 @@ let test_build_sector_map_drops_etfs_with_insufficient_bars _ =
       ~start_date:(Date.of_string "2024-01-01")
       ~n:_sufficient_daily_bars ~start_price:4500.0
   in
-  let t = seed_bar_history ~symbol:"XLK" ~bars in
+  let as_of = (List.last_exn bars).date in
+  let bar_reader = make_bar_reader ~symbols_with_bars:[ ("XLK", bars) ] in
   let sector_prior_stages = Hashtbl.create (module String) in
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_reader:(Bar_reader.of_history t)
-      ~as_of:(Date.of_string "2024-12-31")
-      ~sector_prior_stages ~index_bars
+      ~bar_reader ~as_of ~sector_prior_stages ~index_bars
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)
@@ -164,15 +202,14 @@ let test_build_sector_map_drops_etfs_when_index_bars_empty _ =
       ~start_date:(Date.of_string "2024-01-01")
       ~n:_sufficient_daily_bars ~start_price:100.0
   in
-  let t = seed_bar_history ~symbol:"XLK" ~bars in
+  let as_of = (List.last_exn bars).date in
+  let bar_reader = make_bar_reader ~symbols_with_bars:[ ("XLK", bars) ] in
   let sector_prior_stages = Hashtbl.create (module String) in
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_reader:(Bar_reader.of_history t)
-      ~as_of:(Date.of_string "2024-12-31")
-      ~sector_prior_stages ~index_bars:[]
+      ~bar_reader ~as_of ~sector_prior_stages ~index_bars:[]
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)
@@ -188,7 +225,8 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
       ~start_date:(Date.of_string "2024-01-01")
       ~n:_sufficient_daily_bars ~start_price:100.0
   in
-  let t = seed_bar_history ~symbol:"XLK" ~bars in
+  let as_of = (List.last_exn bars).date in
+  let bar_reader = make_bar_reader ~symbols_with_bars:[ ("XLK", bars) ] in
   let index_bars =
     make_rising_bars
       ~start_date:(Date.of_string "2024-01-01")
@@ -199,9 +237,7 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_reader:(Bar_reader.of_history t)
-      ~as_of:(Date.of_string "2024-12-31")
-      ~sector_prior_stages ~index_bars
+      ~bar_reader ~as_of ~sector_prior_stages ~index_bars
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)

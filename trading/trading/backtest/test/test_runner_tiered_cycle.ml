@@ -94,14 +94,12 @@ let _no_indicator : Strategy_interface.get_indicator_fn = fun _ _ _ _ -> None
 let _empty_portfolio : Portfolio_view.t =
   { cash = 0.0; positions = String.Map.empty }
 
-let _wrapper_config ~loader ~bar_history ~universe ~primary_index
-    ?(always_loaded = []) () : Backtest.Tiered_strategy_wrapper.config =
+let _wrapper_config ~loader ~universe ~primary_index ?(always_loaded = []) () :
+    Backtest.Tiered_strategy_wrapper.config =
   {
     bar_loader = loader;
-    bar_history;
     universe;
     always_loaded_symbols = String.Set.of_list (primary_index :: always_loaded);
-    seed_warmup_start = Date.create_exn ~y:2023 ~m:Jan ~d:1;
     stop_log = Backtest.Stop_log.create ();
     primary_index;
   }
@@ -129,12 +127,10 @@ type _wrapper_under_test = {
     [out.transitions_ref] between [on_market_close] calls. *)
 let _setup ?(universe = [ "AAA" ]) () : _wrapper_under_test =
   let loader, trace = _make_loader ~universe:(_primary_index :: universe) in
-  let bar_history = Weinstein_strategy.Bar_history.create () in
   let transitions_ref = ref [] in
   let stub = _stub_strategy ~transitions_ref in
   let config =
-    _wrapper_config ~loader ~bar_history ~universe ~primary_index:_primary_index
-      ()
+    _wrapper_config ~loader ~universe ~primary_index:_primary_index ()
   in
   let wrapper = Backtest.Tiered_strategy_wrapper.wrap ~config stub in
   { wrapper; trace; transitions_ref }
@@ -421,7 +417,6 @@ let test_inner_transitions_pass_through _ =
 let test_inner_error_skips_post_inner_tier_bookkeeping _ =
   let universe = [ "AAA" ] in
   let loader, trace = _make_loader ~universe:(_primary_index :: universe) in
-  let bar_history = Weinstein_strategy.Bar_history.create () in
   let module Failing = struct
     let name = "Failing"
 
@@ -429,8 +424,7 @@ let test_inner_error_skips_post_inner_tier_bookkeeping _ =
       Error (Status.invalid_argument_error "test error")
   end in
   let config =
-    _wrapper_config ~loader ~bar_history ~universe ~primary_index:_primary_index
-      ()
+    _wrapper_config ~loader ~universe ~primary_index:_primary_index ()
   in
   let (module W) =
     Backtest.Tiered_strategy_wrapper.wrap ~config (module Failing)
@@ -483,11 +477,10 @@ let _get_price_for_all ~symbols_with_bars ~date :
 
 let _run_probe ~universe ~probe_symbols ~always_loaded ~date ~portfolio =
   let loader, _trace = _make_loader ~universe:(_primary_index :: universe) in
-  let bar_history = Weinstein_strategy.Bar_history.create () in
   let out = ref [] in
   let probe = _probe_strategy ~probe_symbols ~out in
   let config =
-    _wrapper_config ~loader ~bar_history ~universe ~primary_index:_primary_index
+    _wrapper_config ~loader ~universe ~primary_index:_primary_index
       ~always_loaded ()
   in
   let (module W) = Backtest.Tiered_strategy_wrapper.wrap ~config probe in

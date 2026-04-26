@@ -344,10 +344,16 @@ let recording_get_price ~bars_by_symbol ~recorded symbol =
   recorded := symbol :: !recorded;
   List.Assoc.find bars_by_symbol symbol ~equal:String.equal
 
-let test_strategy_accumulates_configured_symbols _ =
-  (* One test for the wiring: sector ETFs and global indices configured in
-     the config are queried via get_price on every on_market_close call.
-     Regression guard against silent drop-on-the-floor for extra symbols. *)
+let test_strategy_queries_only_primary_index_via_get_price _ =
+  (* Stage 3 PR 3.2 invariant: the strategy reads OHLCV bars from
+     [Bar_panels] (panel-backed) rather than [get_price]. The only symbol it
+     queries via [get_price] on an empty-portfolio call is the primary index
+     — used for day-of-week detection and the current_date fallback.
+
+     Universe tickers, sector ETFs, and global indices are NOT queried via
+     [get_price] anymore: their bars come from the panels. Compare against
+     the pre-3.2 contract where the strategy iterated every configured symbol
+     via [Bar_reader.accumulate ~get_price]. *)
   let base = default_config ~universe:[ "AAPL" ] ~index_symbol:"GSPCX" in
   let cfg =
     {
@@ -380,13 +386,11 @@ let test_strategy_accumulates_configured_symbols _ =
       ~get_indicator:empty_get_indicator ~portfolio:empty_portfolio
   in
   let unique_calls = List.dedup_and_sort !recorded ~compare:String.compare in
-  assert_that unique_calls
-    (equal_to [ "AAPL"; "GDAXI.INDX"; "GSPCX"; "N225.INDX"; "XLF"; "XLK" ])
+  assert_that unique_calls (equal_to [ "GSPCX" ])
 
-let test_strategy_empty_macro_config_queries_only_universe _ =
-  (* Regression guard: default config queries only universe + indices.primary,
-     nothing else. If a future change accidentally accumulates for unrelated
-     symbols, this test fails. *)
+let test_strategy_with_default_config_queries_only_primary_index _ =
+  (* Default config (no sector ETFs, no globals): same invariant — the
+     strategy only queries [get_price] for the primary index. *)
   let (module S) = make cfg in
   let bars_by_symbol =
     [
@@ -401,7 +405,7 @@ let test_strategy_empty_macro_config_queries_only_universe _ =
       ~get_indicator:empty_get_indicator ~portfolio:empty_portfolio
   in
   let unique_calls = List.dedup_and_sort !recorded ~compare:String.compare in
-  assert_that unique_calls (equal_to [ "AAPL"; "GSPCX" ])
+  assert_that unique_calls (equal_to [ "GSPCX" ])
 
 (* Decision-making tests that depend on the screener producing trades under
    Normal conditions (and NOT producing trades under bearish conditions) live
@@ -573,7 +577,7 @@ let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
 let test_entries_from_candidates_emits_short _ =
   let cfg = default_config ~universe:[ "XYZ" ] ~index_symbol:"GSPCX" in
   let stop_states = ref String.Map.empty in
-  let bar_reader = Bar_reader.of_history (Bar_history.create ()) in
+  let bar_reader = Bar_reader.empty () in
   (* Short: entry 80, stop 88 (above entry). *)
   let cand =
     make_scored_candidate ~ticker:"XYZ" ~side:Trading_base.Types.Short
@@ -617,7 +621,7 @@ let test_entries_from_candidates_emits_short _ =
 let test_entries_from_candidates_emits_long _ =
   let cfg = default_config ~universe:[ "XYZ" ] ~index_symbol:"GSPCX" in
   let stop_states = ref String.Map.empty in
-  let bar_reader = Bar_reader.of_history (Bar_history.create ()) in
+  let bar_reader = Bar_reader.empty () in
   (* Long: entry 100, stop 92 (below entry). *)
   let cand =
     make_scored_candidate ~ticker:"XYZ" ~side:Trading_base.Types.Long
@@ -664,10 +668,10 @@ let () =
            "bar accumulation multiple days"
            >:: test_bar_accumulation_multiple_days;
            "transition uses bar date" >:: test_transition_uses_bar_date;
-           "strategy accumulates configured sector ETF and global index bars"
-           >:: test_strategy_accumulates_configured_symbols;
-           "strategy with empty macro config queries only universe + index"
-           >:: test_strategy_empty_macro_config_queries_only_universe;
+           "strategy queries only primary index via get_price"
+           >:: test_strategy_queries_only_primary_index_via_get_price;
+           "strategy with default config queries only primary index"
+           >:: test_strategy_with_default_config_queries_only_primary_index;
            "held_symbols excludes Closed positions"
            >:: test_held_symbols_excludes_closed;
            "held_symbols empty when all positions Closed"
