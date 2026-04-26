@@ -149,33 +149,48 @@ let test_six_year_full_lifecycle _ =
   let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
   let final_value = (List.last_exn result.steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips result.steps in
-  (* Stage 3 PR 3.2: with [Bar_history] deleted, bar visibility timing
-     shifted (panels populated up-front vs pre-3.2 incremental
-     accumulation). Trade counts and the win/loss split moved off the
-     pre-3.2 pinned values (23/21 with 10W/11L). The structural contract
-     still holds: 6-year backtest produces 2187 simulator steps, the
-     strategy executes both buys and sells, multiple symbols trade, and
-     the final value is in the conservative-sizing band. The exact
-     trade-count pin migrates to [test_panel_loader_parity]'s
-     round_trips golden, which is the load-bearing parity gate post-3.2. *)
-  assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (gt (module Int_ord) 0);
-  assert_that n_sells (gt (module Int_ord) 0);
-  assert_that
-    (List.length (_traded_symbols result.steps))
-    (gt (module Int_ord) 0);
-  assert_that (List.length round_trips) (gt (module Int_ord) 0);
-  (* Final value within the conservative-sizing band — strategy doesn't
-     wildly accumulate either gains or losses. *)
-  assert_that final_value
-    (is_between (module Float_ord) ~low:400_000.0 ~high:600_000.0);
-  (* Max drawdown bounded; pre-3.2 ceiling was 12%, panel-mode trades a
-     slightly different path through the 2020 crash + 2022 correction so
-     keep the bound at 20% for headroom. *)
+  let symbols = _traded_symbols result.steps in
+  let stats = Metrics.compute_summary round_trips in
   let max_drawdown_pct =
     (initial_cash -. _min_portfolio_value result.steps) /. initial_cash
   in
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.20)
+  (* Stage 3 PR 3.2 (post-rework): pin the deterministic post-3.2 values.
+     With [Bar_history] deleted, panel-backed reads make bars visible
+     up-front rather than via the pre-3.2 incremental cache. The trade
+     counts shifted from the buggy pre-3.2 numbers (23/21 with 10W/11L)
+     to the correct post-3.2 numbers captured below. The exact set of
+     traded tickers, win/loss split, and a tight final-value band
+     guarantee the strategy path is reproducible end-to-end. *)
+  assert_that (List.length result.steps) (equal_to 2187);
+  assert_that n_buys (equal_to 36);
+  assert_that n_sells (equal_to 33);
+  assert_that symbols
+    (elements_are
+       [
+         equal_to "AAPL";
+         equal_to "CVX";
+         equal_to "HD";
+         equal_to "JNJ";
+         equal_to "JPM";
+         equal_to "KO";
+         equal_to "MSFT";
+       ]);
+  assert_that (List.length round_trips) (equal_to 33);
+  assert_that stats
+    (is_some_and
+       (all_of
+          [
+            field (fun s -> s.Metrics.win_count) (equal_to 16);
+            field (fun s -> s.Metrics.loss_count) (equal_to 17);
+          ]));
+  (* Final value pinned within ±$3K of the captured post-3.2 value
+     ($506,694.70). Tight band catches drift in the screener cascade or
+     stop-loss path. *)
+  assert_that final_value
+    (is_between (module Float_ord) ~low:503_694.70 ~high:509_694.70);
+  (* Max drawdown captured at 14.4778%; pin upper bound at captured + 1pp
+     slack to catch regressions while tolerating tiny float drift. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.155)
 
 (* ------------------------------------------------------------------ *)
 (* Entry/exit cycle around COVID crash: 2019–mid 2020                   *)
@@ -191,25 +206,34 @@ let test_entry_exit_cycle_around_covid _ =
   let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
   let final_value = (List.last_exn result.steps).portfolio_value in
   let round_trips = Metrics.extract_round_trips result.steps in
-  (* Stage 3 PR 3.2: trade-count pinning relaxed for the same reason as
-     [test_six_year_full_lifecycle] — bar visibility timing shifted under
-     panel-backed reads. Step count, structural buy/sell parity, and the
-     conservative-sizing PV band remain pinned. *)
-  assert_that (List.length result.steps) (equal_to 545);
-  assert_that n_buys (gt (module Int_ord) 0);
-  assert_that n_sells (gt (module Int_ord) 0);
-  assert_that
-    (List.length (_traded_symbols result.steps))
-    (gt (module Int_ord) 0);
-  assert_that (List.length round_trips) (gt (module Int_ord) 0);
-  (* Final value in conservative-sizing band — losses are small, gains
-     are limited by the 0.3% per-trade risk cap. *)
-  assert_that final_value
-    (is_between (module Float_ord) ~low:400_000.0 ~high:600_000.0);
+  let symbols = _traded_symbols result.steps in
+  let stats = Metrics.compute_summary round_trips in
   let max_drawdown_pct =
     (initial_cash -. _min_portfolio_value result.steps) /. initial_cash
   in
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.20)
+  (* Stage 3 PR 3.2 (post-rework): pinned post-3.2 deterministic values.
+     Pre-3.2 was 6 buys / 6 sells; post-3.2 the cycle yields 11 buys / 10
+     sells across {AAPL, HD, JNJ, KO} with 4W/6L and final ≈ $512,025. *)
+  assert_that (List.length result.steps) (equal_to 545);
+  assert_that n_buys (equal_to 11);
+  assert_that n_sells (equal_to 10);
+  assert_that symbols
+    (elements_are
+       [ equal_to "AAPL"; equal_to "HD"; equal_to "JNJ"; equal_to "KO" ]);
+  assert_that (List.length round_trips) (equal_to 10);
+  assert_that stats
+    (is_some_and
+       (all_of
+          [
+            field (fun s -> s.Metrics.win_count) (equal_to 4);
+            field (fun s -> s.Metrics.loss_count) (equal_to 6);
+          ]));
+  (* Final value pinned within ±$3K of the captured post-3.2 value
+     ($512,025.01). *)
+  assert_that final_value
+    (is_between (module Float_ord) ~low:509_025.01 ~high:515_025.01);
+  (* Max drawdown captured at 14.8438%; cap at captured + 1pp slack. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.16)
 
 (* ------------------------------------------------------------------ *)
 (* Portfolio value stays positive: 2020–2021                            *)
@@ -221,24 +245,37 @@ let test_portfolio_value_stays_positive _ =
       ~start_date:(Date.of_string "2020-01-02")
       ~end_date:(Date.of_string "2021-12-31")
   in
-  (* Stage 3 PR 3.2: trade-count pinning relaxed (panel-backed reads
-     change bar visibility timing). Step count and the positive-PV /
-     bounded-drawdown invariants remain pinned. *)
-  assert_that (List.length result.steps) (equal_to 729);
-  assert_that
-    (_count_by_side result.steps Trading_base.Types.Buy)
-    (gt (module Int_ord) 0);
-  (* Every step has positive portfolio value *)
+  let n_buys = _count_by_side result.steps Trading_base.Types.Buy in
+  let n_sells = _count_by_side result.steps Trading_base.Types.Sell in
   let min_value = _min_portfolio_value result.steps in
-  assert_that min_value (gt (module Float_ord) 0.0);
-  (* Max drawdown under 15% — pre-3.2 ceiling was 8%, panel-mode trades
-     produce a slightly different path so keep the bound with headroom. *)
   let max_drawdown_pct = (initial_cash -. min_value) /. initial_cash in
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.15);
-  (* Final value within a reasonable band of starting capital. *)
   let final_value = (List.last_exn result.steps).portfolio_value in
+  let round_trips = Metrics.extract_round_trips result.steps in
+  let symbols = _traded_symbols result.steps in
+  let stats = Metrics.compute_summary round_trips in
+  (* Stage 3 PR 3.2 (post-rework): pinned post-3.2 values. The 2020-2021
+     window opens during the COVID crash, so every step has positive PV
+     and the strategy completes 4 buys / 3 sells across {HD, KO} with
+     1W/2L and final ≈ $505,302.82. *)
+  assert_that (List.length result.steps) (equal_to 729);
+  assert_that n_buys (equal_to 4);
+  assert_that n_sells (equal_to 3);
+  assert_that symbols (elements_are [ equal_to "HD"; equal_to "KO" ]);
+  assert_that (List.length round_trips) (equal_to 3);
+  assert_that stats
+    (is_some_and
+       (all_of
+          [
+            field (fun s -> s.Metrics.win_count) (equal_to 1);
+            field (fun s -> s.Metrics.loss_count) (equal_to 2);
+          ]));
+  assert_that min_value (gt (module Float_ord) 0.0);
+  (* Max drawdown captured at 7.6625%; cap at captured + 1pp slack. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.087);
+  (* Final value pinned within ±$3K of the captured post-3.2 value
+     ($505,302.82). *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:400_000.0 ~high:700_000.0)
+    (is_between (module Float_ord) ~low:502_302.82 ~high:508_302.82)
 
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)

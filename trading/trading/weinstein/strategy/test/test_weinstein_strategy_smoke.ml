@@ -423,7 +423,15 @@ let test_weinstein_breakout_trade _ =
       assert_that result.steps (not_ is_empty);
       (* A single AAPL buy on the first Friday after the breakout. Once
          held, the held-symbol filter prevents re-entry on subsequent
-         Fridays — correct Weinstein behavior (one entry per stock). *)
+         Fridays — correct Weinstein behavior (one entry per stock).
+
+         Stage 3 PR 3.2 changed bar visibility timing: with panels
+         populated up-front (vs the deleted [Bar_history] cache that grew
+         incrementally), the strategy's breakout-price scan and resistance
+         lookback see a slightly different window on the first qualifying
+         Friday, so the exact entry price + share count drifted from the
+         pre-3.2 golden (~162.45 → 166.383146). Pin the post-3.2
+         deterministic values exactly: 80 shares at $166.383146. *)
       let all_trades =
         List.concat_map result.steps ~f:(fun step -> step.trades)
       in
@@ -438,23 +446,15 @@ let test_weinstein_breakout_trade _ =
                    (equal_to Trading_base.Types.Buy);
                  field
                    (fun t -> t.Trading_base.Types.quantity)
-                   (gt (module Float_ord) 0.0);
+                   (float_equal ~epsilon:0.5 80.0);
                  field
                    (fun t -> t.Trading_base.Types.price)
-                   (gt (module Float_ord) 0.0);
+                   (float_equal ~epsilon:0.1 166.383146);
                ];
            ]);
-      (* Stage 3 PR 3.2 changed bar visibility timing: with panels populated
-         up-front (vs the deleted [Bar_history] cache that grew incrementally),
-         the strategy's breakout-price scan and resistance lookback see a
-         slightly different window on the first qualifying Friday, so the
-         exact entry price + share count drifted from the pre-3.2 golden
-         (~162.45 → ~166.38). The contract pinned here is "the screener
-         cascade fires and produces a single AAPL Buy" — the precise pricing
-         is captured by the per-scenario round_trips goldens in
-         [test_panel_loader_parity]. Started with $100k, one buy of ~80
-         shares (~$13k invested); remainder stays in cash; price rises ~2%/wk
-         from breakout for the rest of the year. *)
+      (* Started with $100k, one buy of ~80 shares (~$13k invested);
+         remainder stays in cash; price rises ~2%/wk from breakout for the
+         rest of the year. *)
       let final_value = (List.last_exn result.steps).portfolio_value in
       assert_that final_value (gt (module Float_ord) 100_000.0))
 
