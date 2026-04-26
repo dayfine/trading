@@ -4,6 +4,7 @@ open Core
 open Trading_simulation
 module Symbol_index = Data_panel.Symbol_index
 module Ohlcv_panels = Data_panel.Ohlcv_panels
+module Bar_panels = Data_panel.Bar_panels
 module Indicator_panels = Data_panel.Indicator_panels
 module Indicator_spec = Data_panel.Indicator_spec
 module Bar_history = Weinstein_strategy.Bar_history
@@ -62,20 +63,25 @@ let _build_indicators ~ohlcv ~n_days =
   Indicator_panels.create ~symbol_index ~n_days ~specs:_default_specs
 
 let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_history
-    ~warmup_start ~ohlcv ~indicators ~calendar =
-  (* Stage 2: do NOT pass [~bar_panels] yet. The strategy still uses
-     [Bar_history] under both Panel and Tiered modes; the only Panel-vs-Tiered
-     difference today is the panel-backed [get_indicator] (which the strategy
-     does not yet consume). Wiring [Bar_panels] in here would change Panel-mode
-     trade count vs Tiered because [Bar_panels] is fully populated up-front
-     while [Bar_history] under Tiered is incrementally seeded by the Friday
-     full-tier promote cycle. The reader-site parity test
-     [test_panels_reader_parity] exercises the [?bar_panels] swap directly with
-     identical bars from both backends; the runner-level swap will land in a
-     follow-up PR that also collapses the Tiered cycle (Stage 3). *)
+    ~bar_panels ~warmup_start ~ohlcv ~indicators ~calendar =
+  (* Stage 3 PR 3.1: pass [~bar_panels] through to the inner Weinstein strategy
+     so Panel mode reads bars from the panel columns instead of the parallel
+     [Bar_history] cache. [Weinstein_strategy.make] gives [bar_panels]
+     precedence over [bar_history]; the [Tiered_strategy_wrapper] is still
+     constructed with a [bar_history] handle but its Friday-cycle seeding is
+     no-op-equivalent now (the inner strategy never reads from it).
+     Behavioural consequence: Panel-mode round_trips diverge from Tiered-mode
+     round_trips by design — see the data-panels Stage 3 plan under dev/plans.
+     [Bar_panels] is fully populated from CSV up-front; [Bar_history] under
+     Tiered is incrementally seeded by the Friday Full-tier promote cycle, so
+     not-yet-promoted symbols return [[]] from [Bar_history] but a meaningful
+     bar slice from [Bar_panels]. Same strategy + same data -> different trade
+     decisions because the bar visibility timing differs. The Panel-mode
+     parity gate is now [test_panel_round_trips_golden] (sexp-equality against
+     a checked-in golden), not a Tiered-vs-Panel comparison. *)
   let inner_strategy =
     Weinstein_strategy.make ~ad_bars:input.ad_bars
-      ~ticker_sectors:input.ticker_sectors ~bar_history input.config
+      ~ticker_sectors:input.ticker_sectors ~bar_history ~bar_panels input.config
   in
   let always_loaded =
     String.Set.of_list
@@ -109,12 +115,12 @@ let _build_strategy (input : Tiered_runner.input) ~loader ~stop_log ~bar_history
 
 let _make_simulator (input : Tiered_runner.input) ~loader ~stop_log ~start_date
     ~end_date ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators
-    ~calendar =
+    ~calendar ~bar_panels =
   let bar_history = Bar_history.create () in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy =
-    _build_strategy input ~loader ~stop_log ~bar_history ~warmup_start ~ohlcv
-      ~indicators ~calendar
+    _build_strategy input ~loader ~stop_log ~bar_history ~bar_panels
+      ~warmup_start ~ohlcv ~indicators ~calendar
   in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
@@ -172,6 +178,13 @@ let run ~(input : Tiered_runner.input) ~start_date ~end_date ~warmup_days
     (Date.to_string end_date);
   let ohlcv = _build_ohlcv ~input ~calendar in
   let indicators = _build_indicators ~ohlcv ~n_days in
+  let bar_panels =
+    match Bar_panels.create ~ohlcv ~calendar with
+    | Ok p -> p
+    | Error err ->
+        failwithf "Panel_runner: Bar_panels.create failed: %s" (Status.show err)
+          ()
+  in
   eprintf
     "Panel_runner: panels built (%d symbols × %d days, %d indicator specs)\n%!"
     (Ohlcv_panels.n ohlcv) n_days
@@ -183,7 +196,7 @@ let run ~(input : Tiered_runner.input) ~start_date ~end_date ~warmup_days
   let stop_log = Stop_log.create () in
   let sim =
     _make_simulator input ~loader ~stop_log ~start_date ~end_date ~warmup_days
-      ~initial_cash ~commission ~ohlcv ~indicators ~calendar
+      ~initial_cash ~commission ~ohlcv ~indicators ~calendar ~bar_panels
   in
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->

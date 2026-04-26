@@ -1,11 +1,11 @@
 # Status: data-panels
 
-## Last updated: 2026-04-25 (PR-H pushed)
+## Last updated: 2026-04-25
 
 ## Status
 READY_FOR_REVIEW
 
-Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PR-B (Stage.classify reshape) MERGED as #559. Stage 2 PR-C (Rs.analyze reshape) MERGED as #560. Stage 2 PR-D (Stock_analysis.analyze reshape) MERGED as #561. Stage 2 PR-E (Sector.analyze reshape) MERGED as #562. Stage 2 PR-F (Macro.analyze reshape) MERGED as #563. Stage 2 PR-G (Weinstein_stops support floor reshape) on `feat/panels-stage02-pr-g-stops-support-floor` (READY_FOR_REVIEW). Stage 2 PR-H (final — `Bar_reader` abstraction + 6 reader-site swap point + reader-site parity test) on `feat/panels-stage02-pr-h-final` READY_FOR_REVIEW.
+Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PRs B–H all MERGED (#559 / #560 / #561 / #562 / #563 / #564 / #565). Stage 3 PR 3.1 (wire `~bar_panels` into Panel_runner + replace Tiered-vs-Panel parity test with a Panel-mode round_trips golden) on `feat/panels-stage03-pr-a-wire-and-gate` READY_FOR_REVIEW.
 
 **PR-H summary**: introduces `Bar_reader.t` — a thin closure-bundle over either `Bar_history` (the parallel Hashtbl cache) or `Bar_panels` (panel-backed reads from the `Ohlcv_panels` columns). The 6 reader sites identified in `dev/notes/bar-history-readers-2026-04-24.md` (macro_inputs ×2, stops_runner ×1, weinstein_strategy ×3) now consume `Bar_reader` exclusively. `Weinstein_strategy.make` gains an optional `?bar_panels:Bar_panels.t` parameter that takes precedence over `?bar_history` when both are provided. `Bar_panels.column_of_date` (new helper) maps the strategy's notion of "today's date" (the primary index bar's date) to a panel column.
 
