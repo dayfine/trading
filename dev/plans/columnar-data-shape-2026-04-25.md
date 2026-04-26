@@ -418,15 +418,43 @@ There's only one path now.
 Branch: `feat/panels-stage03-tier-collapse`. Big PR — touches many call
 sites — but mostly deletions.
 
-### Stage 4: weekly cadence + remaining indicators (~300 LOC, 2 days)
+### Stage 4: weekly cadence + remaining indicators + callback wiring (~600 LOC, 3-4 days)
 
-Add `Ohlcv_weekly_panels` + Friday-rollup. Port `MA_30W` weekly,
-`RS_line_52W` weekly, Stage classifier, Volume confirmation, Resistance.
+**Scope expanded post-Stage-3 PR 3.2 spike.** See
+`dev/notes/panels-rss-spike-2026-04-25.md`. Stage 2 PRs B–H reshaped
+callee internals to take callbacks but kept the bar-list wrappers as
+the public entry. Panel mode at N=292 T=6y peaks at **3.47 GB** (vs
+projection < 800 MB) because every reader site reconstructs
+`Daily_price.t list` from the panel on every tick. The RSS unlock is
+NOT in weekly cadence — it's in dropping the list intermediates.
 
-Gate: golden parity. By end of stage 4, every indicator the strategy
-reads goes through panels.
+Stage 4 work:
 
-Branch: `feat/panels-stage04-weekly`.
+1. **Wire callbacks through `Panel_runner`.** Switch the strategy's
+   call sites (macro_inputs, stops_runner, weinstein_strategy,
+   sector, stock_analysis, weinstein_stops) from
+   `*.analyze ~bars:...` (list-shaped) to
+   `*.analyze_with_callbacks ~callbacks:...` (per-cell reads from
+   panels). The `callbacks_from_bars` constructors become
+   bar-list-only test helpers; production no longer materializes
+   lists.
+2. **Drop `bars_for_volume_resistance` transitional param** on
+   `Stock_analysis.analyze_with_callbacks` (carry-over from PR-D).
+   Reshape `Volume.analyze_breakout` and `Resistance.analyze` to
+   accept the same callback shape.
+3. **Add `Ohlcv_weekly_panels`** + Friday-rollup. Port weekly indicators:
+   `MA_30W` weekly, `RS_line_52W` weekly. Daily-tick wrapper does one
+   panel append per Friday. Holidays handled at the daily→weekly
+   boundary, not per indicator.
+4. **Port remaining daily indicators** to kernels: Stage classifier
+   (variant-valued, int8 panel + decoder), Volume confirmation,
+   Resistance.
+
+Gate: golden parity (existing PR 3.1 round_trips goldens) **plus**
+spike re-run on `bull-crash-292x6y` showing peak RSS ≤ 800 MB. If the
+spike fails the gate, abort migration and memtrace per plan §R1.
+
+Branch: `feat/panels-stage04-weekly-and-callbacks`.
 
 ### Stage 5: live-mode universe-rebalance (~150 LOC, 1 day)
 

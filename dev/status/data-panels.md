@@ -1,11 +1,13 @@
 # Status: data-panels
 
-## Last updated: 2026-04-25 (PR 3.2 pushed)
+## Last updated: 2026-04-25 (PR 3.2 pushed; perf spike post-3.2 measured)
 
 ## Status
 READY_FOR_REVIEW
 
 Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PRs B–H all MERGED (#559 / #560 / #561 / #562 / #563 / #564 / #565). Stage 3 PR 3.1 MERGED as #567. Stage 3 PR 3.2 (delete `Bar_history` + `Bar_reader.History` backend + Tiered Friday seed) on `feat/panels-stage03-pr-b-delete-bar-history` READY_FOR_REVIEW.
+
+**Post-3.2 perf spike** (`dev/notes/panels-rss-spike-2026-04-25.md`, 2026-04-25): Panel mode at N=292 T=6y on `/tmp/data-small-302` peaks at **3.47 GB / 6:00 wall** vs pre-3.2 Legacy 1.87 GB / Tiered 3.74 GB. Projection (<800 MB) **way off** (~4.4× over). Structural Bar_history deletion landed but `Daily_price.t list` allocation pressure in `Bar_panels` reads + list-shaped callees still dominates RSS — Stage 4 (callee reshape PR-H wiring) is required before the projected memory win materializes. Plan §"Memory and CPU expectations" needs a list-intermediate term.
 
 **PR 3.2 summary**: deletes the parallel `Bar_history` Hashtbl cache and its Friday-cycle seeding step. `Bar_reader.t` collapses to a thin alias over `Bar_panels.t` — `of_history` and `accumulate` are gone, replaced by `of_panels` (existing) and a new `empty ()` for tests. `Weinstein_strategy.make` drops `?bar_history`; the only bar source it accepts now is `?bar_panels` (or the empty reader for control-path tests). `Tiered_strategy_wrapper.config` drops the `bar_history` and `seed_warmup_start` fields; `_seed_from_full` and `_truncate_bars` are deleted. The Friday cycle in the Tiered wrapper still drives Bar_loader tier bookkeeping (Promote_full trace events) but no longer feeds an external cache.
 
