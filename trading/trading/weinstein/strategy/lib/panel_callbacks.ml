@@ -178,30 +178,27 @@ let _compute_momentum_ma_scalar ~momentum_period (ad_bars : Macro.ad_bar list) :
 let _get_ad_momentum_ma (ma : float option) : week_offset:int -> float option =
  fun ~week_offset -> if week_offset = 0 then ma else None
 
+let _named_global_stage (config : Macro.config)
+    ((name, view) : string * Bar_panels.weekly_view) : string * Stage.callbacks
+    =
+  (name, stage_callbacks_of_weekly_view ~config:config.stage_config ~weekly:view)
+
 let macro_callbacks_of_weekly_views ~(config : Macro.config)
     ~(index : Bar_panels.weekly_view)
     ~(globals : (string * Bar_panels.weekly_view) list)
     ~(ad_bars : Macro.ad_bar list) : Macro.callbacks =
-  let index_stage =
-    stage_callbacks_of_weekly_view ~config:config.stage_config ~weekly:index
-  in
   let cum_ad_arr = _build_cumulative_ad_array ad_bars in
   let ma_scalar =
     _compute_momentum_ma_scalar
       ~momentum_period:config.indicator_thresholds.momentum_period ad_bars
   in
-  let global_index_stages =
-    List.map globals ~f:(fun (name, view) ->
-        ( name,
-          stage_callbacks_of_weekly_view ~config:config.stage_config
-            ~weekly:view ))
-  in
   {
-    index_stage;
+    index_stage =
+      stage_callbacks_of_weekly_view ~config:config.stage_config ~weekly:index;
     get_index_close = _get_from_float_array index.closes;
     get_cumulative_ad = _get_from_float_array cum_ad_arr;
     get_ad_momentum_ma = _get_ad_momentum_ma ma_scalar;
-    global_index_stages;
+    global_index_stages = List.map globals ~f:(_named_global_stage config);
   }
 
 (* ------------------------------------------------------------------ *)
