@@ -93,6 +93,16 @@ mechanics + release-gate procedure.
 4. After ~10 PR cycles of tier-1 perf data: pin per-cell budgets and
    flip `continue-on-error: false` on `perf-tier1.yml` and
    `PERF_CATALOG_CHECK_STRICT=1` on the catalog check.
+5. **`release_perf_report` OCaml exe.** Markdown report comparing the
+   current release's tier-3/4 scenario results vs the prior release —
+   N×T peak-RSS matrix, wall-time matrix, regression flags. Drives
+   release-gate Step 3 in `dev/plans/perf-scenario-catalog-2026-04-25.md`.
+   Replaces the deleted `dev/scripts/perf_sweep_report.py` (Legacy-vs-
+   Tiered axis is gone post-PR #575; need single-mode N×T tables instead).
+   Per `.claude/rules/no-python.md`: write fresh in OCaml, do not port.
+   Lands together with or just before tier-3 weekly workflow (Step 2)
+   so the weekly run produces a useful diff vs the prior week. ~150 LOC
+   exe + .mli + tests.
 
 ## Ownership
 
