@@ -177,22 +177,32 @@ let _in_date_range ~start_date ~end_date (price : Types.Daily_price.t) =
    within the requested date range. Avoids materializing the full file
    contents (lines list) or the full parsed-prices list, which previously
    dominated allocation churn during repeated reads of large symbol CSVs. *)
+
+(* Parse [line] and accumulate into [result] if it falls in the date range.
+   Returns an error status on a parse failure. *)
+let _parse_and_accumulate line ~start_date ~end_date ~result =
+  match Parser.parse_line line with
+  | Error msg -> Error (Status.invalid_argument_error msg)
+  | Ok price ->
+      if _in_date_range ~start_date ~end_date price then
+        result := price :: !result;
+      Ok ()
+
+(* Read the next line from [chan] and process it.
+   Returns [None] on EOF, [Some (Ok ())] on success, [Some (Error _)] on parse failure. *)
+let _read_next_line chan ~start_date ~end_date ~result =
+  match In_channel.input_line chan with
+  | None -> None
+  | Some line -> Some (_parse_and_accumulate line ~start_date ~end_date ~result)
+
 let _stream_in_range_prices chan ~start_date ~end_date =
   let result = ref [] in
   let error = ref None in
   let rec loop () =
-    match !error with
-    | Some _ -> ()
-    | None -> (
-        match In_channel.input_line chan with
-        | None -> ()
-        | Some line ->
-            (match Parser.parse_line line with
-            | Ok price ->
-                if _in_date_range ~start_date ~end_date price then
-                  result := price :: !result
-            | Error msg -> error := Some (Status.invalid_argument_error msg));
-            loop ())
+    match _read_next_line chan ~start_date ~end_date ~result with
+    | None -> ()
+    | Some (Error e) -> error := Some e
+    | Some (Ok ()) -> loop ()
   in
   loop ();
   match !error with Some err -> Error err | None -> Ok (List.rev !result)
