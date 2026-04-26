@@ -10,6 +10,37 @@
 # reporting").
 #
 # ----------------------------------------------------------------------------
+# Configuration — project-specific values referenced below.
+# When porting this workflow to a new project, replace every occurrence
+# of these literals body-wide. List doubles as the strip-pass checklist
+# for the agent-harness extraction (see
+# dev/plans/harness-template-extraction-2026-04-26.md).
+# ----------------------------------------------------------------------------
+#
+#   repo_name:               dayfine/trading
+#   container_image:         ghcr.io/${{ github.repository_owner }}/trading-devcontainer:latest
+#   container_image_short:   trading-devcontainer
+#   container_user:          opam
+#
+#   secret_names:
+#     - BOT_GITHUB_TOKEN          (fine-grained PAT for repo writes)
+#     - CLAUDE_CODE_OAUTH_TOKEN   (claude-code-action auth)
+#     - GITHUB_TOKEN              (auto-provided by GHA; used for ghcr login)
+#
+#   cron_slots:              "17 7 * * *"   (00:17 PT)
+#                            "17 12 * * *"  (05:17 PT)
+#                            (UTC times — GitHub cron is UTC-only, no DST)
+#
+#   branch_patterns:         feat/, harness/, cleanup/, data/, fix/, ops/
+#   daily_summary_branch:    ops/daily-<date>-runN
+#   summary_dir:             dev/daily/
+#   escalations_section:     ## Escalations
+#                            (orchestrator's marker for partial-failure;
+#                            post-step fails the job if non-empty)
+#
+# ----------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------
 # SECRETS REQUIRED BEFORE THIS WORKFLOW CAN RUN
 # ----------------------------------------------------------------------------
 # The first `workflow_dispatch` run will fail at the "Run lead-orchestrator"
