@@ -17,10 +17,9 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
-- [ ] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — `_stream_in_range_prices` (line 180) avg=3.61 max=9 from PR #543 H7 stream-parse refactor (source: 2026-04-26-fast.md)
-
 ## Completed
 
+- [x] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — extracted `_parse_and_accumulate` and `_read_next_line` helpers; nesting linter now passes (835 fns, all OK). (source: 2026-04-26-fast.md, PR TBD, 2026-04-26)
 - [x] fn_length / file_length: weinstein_strategy.ml — added @large-module annotation; file length linter now passes. (source: 2026-04-19-fast.md, PR #453, 2026-04-19)
 
 ## Out of scope
