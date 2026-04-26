@@ -249,3 +249,19 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:posix_sh_check_test.sh})))
+
+; Perf-catalog integrity check: verifies every scenario sexp under
+; trading/test_data/backtest_scenarios/{goldens-small,goldens-broad,perf-sweep,smoke}/
+; carries a [;; perf-tier: <1|2|3|4>] header line, AND that paths
+; referenced from .github/workflows/perf-tier1.yml exist on disk and
+; carry [;; perf-tier: 1].
+;
+; Annotate-only by default (exits 0 with WARNING output on violations).
+; Set PERF_CATALOG_CHECK_STRICT=1 to gate the build instead. See
+; dev/plans/perf-scenario-catalog-2026-04-25.md §"Decision items" #3.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:perf_catalog_check.sh})))
