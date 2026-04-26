@@ -42,18 +42,18 @@
 name: Daily orchestrator
 
 on:
-  # Four runs per day (10 PM / 3 AM / 8 AM / 1 PM Pacific) to amortize
-  # the rolling 5-hour Claude quota window. Gap of 9h between the 1 PM
-  # and 10 PM slots covers the evening window by design. Minute `:17`
-  # avoids top-of-hour GHA load (scheduled jobs at :00 – :05 get delayed
-  # or silently dropped). GitHub cron is UTC-only, no DST awareness —
-  # these are set for UTC-7 (PDT); during PST months they drift back 1
-  # hour.
+  # Two overnight runs (12 AM / 5 AM Pacific) so routine agent work
+  # progresses while the human is asleep. Daytime slots dropped because
+  # substantive work happens in dedicated local sessions (memory:
+  # `project_orchestrator_off.md` 2026-04-25 cost decision; revisited
+  # 2026-04-26 — keep nightly cadence only). Minute `:17` avoids
+  # top-of-hour GHA scheduler load (scheduled jobs at :00 – :05 get
+  # delayed or silently dropped). GitHub cron is UTC-only, no DST
+  # awareness — these are set for UTC-7 (PDT); during PST months they
+  # drift back 1 hour.
   schedule:
-    - cron: "17 5 * * *"    # 22:17 PT (prev day)
-    - cron: "17 10 * * *"   # 03:17 PT
-    - cron: "17 15 * * *"   # 08:17 PT
-    - cron: "17 20 * * *"   # 13:17 PT
+    - cron: "17 7 * * *"    # 00:17 PT
+    - cron: "17 12 * * *"   # 05:17 PT
   workflow_dispatch:
 
 # Queue, do not cancel, if a previous run is still executing when the
