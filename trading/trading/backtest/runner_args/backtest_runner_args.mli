@@ -14,10 +14,6 @@ type t = {
   overrides : Sexp.t list;
       (** Override sexps in the order they were passed on the command line. Each
           is the parsed sexp of one [--override <sexp>] argument. *)
-  loader_strategy : Loader_strategy.t option;
-      (** [None] when [--loader-strategy] was not passed; the runner then uses
-          its default. [Some _] when the flag was passed with a recognised
-          value. *)
   trace_path : string option;
       (** [None] when [--trace] was not passed (no trace file written).
           [Some path] when [--trace <path>] was passed; the runner constructs a
@@ -41,7 +37,7 @@ val parse : string list -> t Status.status_or
     [Array.to_list (Sys.get_argv ()) |> List.tl_exn]) into a {!t}.
 
     Returns [Error status] (with [Status.code = Invalid_argument]) on any
-    parsing problem (missing flag value, unknown loader strategy, missing
-    required positional, too many positionals). The executable's [main] turns
-    [Error _] into an [eprintf] + [Stdlib.exit 1]; tests assert via the
-    [Matchers] library's [is_ok_and_holds] / [is_error]. *)
+    parsing problem (missing flag value, missing required positional, too many
+    positionals). The executable's [main] turns [Error _] into an [eprintf] +
+    [Stdlib.exit 1]; tests assert via the [Matchers] library's [is_ok_and_holds]
+    / [is_error]. *)

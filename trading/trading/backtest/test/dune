@@ -15,7 +15,6 @@
   core_unix.time_ns_unix
   fpath
   backtest
-  trading.backtest.loader_strategy
   trading.backtest.runner_args
   scenario_lib
   weinstein.data_source

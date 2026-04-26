@@ -5,7 +5,6 @@
   core_unix
   fpath
   weinstein.data_source
-  trading.backtest.loader_strategy
   trading.data_panel
   trading.base
   trading.engine

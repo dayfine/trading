@@ -1,11 +1,35 @@
 # Status: data-panels
 
-## Last updated: 2026-04-25 (PR 3.3 pushed)
+## Last updated: 2026-04-26
 
 ## Status
 READY_FOR_REVIEW
 
-Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PRs B–H all MERGED (#559 / #560 / #561 / #562 / #563 / #564 / #565). Stage 3 PR 3.1 MERGED as #567. Stage 3 PR 3.2 MERGED as #569. Stage 3 PR 3.3 (delete Tiered runner + bar_loader subsystem + Trace.Phase tier variants) on `feat/panels-stage03-pr-c-delete-tiered` READY_FOR_REVIEW.
+Stage 3 PR 3.4 READY_FOR_REVIEW on `feat/panels-stage03-pr-d-delete-legacy` (PR #575). All earlier stages merged: Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PRs B–H all MERGED (#559 / #560 / #561 / #562 / #563 / #564 / #565). Stage 3 PR 3.1 MERGED as #567. Stage 3 PR 3.2 MERGED as #569. Stage 3 PR 3.3 MERGED as #573. Stage 3 PR 3.4 (delete Legacy + finalize Panel-only) on `feat/panels-stage03-pr-d-delete-legacy` IN_PROGRESS as #575.
+
+**Next dispatch**: Stage 4 (callbacks-through-runner wiring) is the load-bearing memory-win work — see plan §"Memory and CPU expectations" and `dev/notes/panels-rss-spike-2026-04-25.md`. The post-3.2 spike showed Panel mode at N=292 T=6y peaks at 3.47 GB / 6:00 wall vs the projected <800 MB; the gap is `Daily_price.t list` allocation pressure in `Bar_panels` reads + list-shaped callees still in the hot path. Stage 4 reshapes those callees to consume callbacks directly through `Panel_runner` and is the next dispatch after PR 3.4 lands.
+
+**PR 3.4 summary**: After PR 3.3 (#573) deleted the Tiered runner, `Loader_strategy.t` carried only `Legacy | Panel` and both paths produced identical output (panel-backed since PR 3.2). PR 3.4 finalises panel-only:
+- Deletes the `Loader_strategy` library entirely (`trading/trading/backtest/loader_strategy/`).
+- Deletes `_run_legacy` + `_make_simulator` + `_build_legacy_*` from `runner.ml`. `Backtest.Runner.run_backtest` now delegates directly to `Panel_runner.run`; the `?loader_strategy` parameter is gone from the public API.
+- Deletes the `--loader-strategy` CLI flag from `backtest_runner` and the `loader_strategy : Loader_strategy.t option` field from `Backtest_runner_args.t`.
+- Drops the `loader_strategy` field from `Scenario.t`. Pre-3.4 scenario sexp files that still set `(loader_strategy <variant>)` continue to parse via `[@@sexp.allow_extra_fields]`; the runner ignores the field. Tested by a new backward-compat assertion in `test_scenario.ml`.
+- Pre-flag verifications (per plan §"PR 3.4"):
+  - **PR-F (Macro int-then-float fold)**: `_build_cumulative_ad_array` in `analysis/weinstein/macro/lib/macro.ml` keeps the running sum as `int` and converts via `Array.map ~f:Float.of_int` only at the array boundary. Preserved.
+  - **PR-H QC (`Bar_reader.accumulate` / `_all_accumulated_symbols`)**: Fully removed in PR 3.2 (#569); no production code references either symbol. Only one stale doc comment remains in `test_weinstein_strategy.ml`.
+  - **`bars_for_volume_resistance` on `Stock_analysis.analyze_with_callbacks`**: Volume + Resistance reshape NOT yet merged in parallel, so per the plan, this parameter is left in place. The existing `.mli` doc already references "PRs E/F/G or a follow-up" so no new TODO needed.
+
+**LOC delta**: -271 lines net across 21 files. Mostly deletions: `_run_legacy` + helpers (~80 lines from `runner.ml`), `loader_strategy` library (~45 lines), `--loader-strategy` flag wiring (~30 lines from `runner_args` + CLI). Test files lose the loader-strategy parameter threading (~70 lines net deletion).
+
+Parity gate: `test_panel_loader_parity` round_trips golden continues to hold — panel-mode path is unchanged; only the entry-point shape changes.
+
+Verify: `cd trading && dune build && dune runtest trading/backtest`. All test suites green; the two pre-existing linter failures on `main` (`csv_storage.ml` nesting + `data-panels.md` "## Last updated" malformed line — the latter fixed by this PR) are unrelated to PR 3.4.
+
+PR 3.4 is bookmarked at `feat/panels-stage03-pr-d-delete-legacy`. Plan: `dev/plans/data-panels-stage3-2026-04-25.md` §"PR 3.4".
+
+---
+
+**(Below: prior PR summaries kept as historical record.)**
 
 **PR 3.3 summary**: deletes the entire Tiered backtest path. `tiered_runner.{ml,mli}`, `tiered_strategy_wrapper.{ml,mli}`, and the entire `bar_loader/` subdirectory (incl. 6 test files) are gone. `Trace.Phase.t` drops `Promote_summary | Promote_full | Demote | Promote_metadata`. `Loader_strategy.t` drops the `Tiered` variant — only `Legacy | Panel` remain. `Panel_runner` becomes standalone (its own `input` record; no longer wraps with `Tiered_strategy_wrapper`; no `Bar_loader` construction). `Runner` drops the `tier_op_to_phase` re-export, the `_tiered_input_of_deps` helper, the `_run_tiered_backtest` function, and the `Loader_strategy.Tiered` match arm. `full_compute_tail_days` and `bar_history_max_lookback_days` config fields are kept as vestigial (no-op) so existing override sexps still parse. Tiered-specific tests (`test_runner_tiered_skeleton`, `test_runner_tiered_cycle`, `test_runner_tiered_metadata_tolerance`, `test_tiered_loader_parity`) deleted along with the bar_loader test suite. Surviving tests — `test_runner_hypothesis_overrides`, `test_backtest_runner_args`, `test_trace`, `test_panel_loader_parity`, `test_scenario` — ported to drop Tiered references. CLI flag now accepts `legacy|panel`. Panel-mode round_trips golden gate (`test_panel_loader_parity`) still pinned bit-equal to the checked-in goldens.
 

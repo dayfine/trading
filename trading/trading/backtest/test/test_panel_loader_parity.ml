@@ -4,14 +4,15 @@
     Stage 3 PR 3.1 wired [~bar_panels] into [Panel_runner._build_strategy] so
     the inner Weinstein strategy reads bars from {!Data_panel.Bar_panels}
     instead of the parallel {!Bar_history} cache. Stage 3 PR 3.3 then deleted
-    the Tiered runner + bar_loader subsystem entirely. Panel-mode is now the
-    sole panel-backed execution path; this golden gate pins its round_trips
-    against checked-in goldens.
+    the Tiered runner + bar_loader subsystem entirely. Stage 3 PR 3.4 deleted
+    the Legacy runner path + the [Loader_strategy] enum, leaving the
+    panel-backed runner as the single execution path; this golden gate pins its
+    round_trips against checked-in goldens.
 
-    This test pins Panel-mode behaviour to a checked-in golden sexp. For each
+    This test pins runner behaviour to a checked-in golden sexp. For each
     scenario the test:
 
-    - Loads the scenario, runs [run_backtest ~loader_strategy:Panel].
+    - Loads the scenario, runs [run_backtest] (panel-only path).
     - Extracts the [round_trips] list (every [Metrics.trade_metrics] field).
     - Compares against [test_data/backtest_scenarios/panel_goldens/<name>.sexp].
 
@@ -91,10 +92,10 @@ let _run_panel (s : Scenario.t) : Metrics.trade_metrics list =
     try
       Backtest.Runner.run_backtest ~start_date:s.period.start_date
         ~end_date:s.period.end_date ~overrides:s.config_overrides
-        ?sector_map_override ~loader_strategy:Loader_strategy.Panel ()
+        ?sector_map_override ()
     with e ->
       OUnit2.assert_failure
-        (sprintf "run_backtest raised under Panel: %s" (Exn.to_string e))
+        (sprintf "run_backtest raised: %s" (Exn.to_string e))
   in
   result.round_trips
 

@@ -1,4 +1,4 @@
 (library
  (public_name trading.backtest.runner_args)
  (name backtest_runner_args)
- (libraries core status trading.backtest.loader_strategy))
+ (libraries core status))

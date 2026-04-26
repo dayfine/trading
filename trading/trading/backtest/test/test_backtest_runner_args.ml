@@ -3,7 +3,11 @@
     these tests pin only the CLI flag-parsing logic — including the
     [--trace <path>] flag (workstream B4 of
     [dev/plans/backtest-perf-2026-04-24.md]) and the [--memtrace <path>] flag
-    (workstream B7 of the same plan). *)
+    (workstream B7 of the same plan).
+
+    After Stage 3 PR 3.4 of the columnar data-shape redesign deleted the
+    [Loader_strategy] enum + the [--loader-strategy] CLI flag, only the flags
+    surviving on the panel-only path are pinned here. *)
 
 open OUnit2
 open Core
@@ -22,9 +26,6 @@ let test_minimal_start_date_only _ =
               (fun (a : Backtest_runner_args.t) -> a.end_date)
               (equal_to None);
             field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 0);
-            field
-              (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-              (equal_to None);
             field
               (fun (a : Backtest_runner_args.t) -> a.trace_path)
               (equal_to None);
@@ -47,26 +48,6 @@ let test_start_and_end_date _ =
               (equal_to (Some "2019-12-31"));
           ]))
 
-let test_loader_strategy_legacy _ =
-  let result =
-    Backtest_runner_args.parse [ "2018-01-02"; "--loader-strategy"; "legacy" ]
-  in
-  assert_that result
-    (is_ok_and_holds
-       (field
-          (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-          (equal_to (Some Loader_strategy.Legacy))))
-
-let test_loader_strategy_panel _ =
-  let result =
-    Backtest_runner_args.parse [ "2018-01-02"; "--loader-strategy"; "panel" ]
-  in
-  assert_that result
-    (is_ok_and_holds
-       (field
-          (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-          (equal_to (Some Loader_strategy.Panel))))
-
 let test_trace_flag _ =
   let result =
     Backtest_runner_args.parse [ "2018-01-02"; "--trace"; "/tmp/run.sexp" ]
@@ -86,15 +67,13 @@ let test_trace_default_is_none _ =
           (equal_to None)))
 
 let test_trace_with_other_flags _ =
-  (* Verify that --trace composes with --loader-strategy, --override, and
-     end_date in a single command. Order should not matter. *)
+  (* Verify that --trace composes with --override and end_date in a single
+     command. Order should not matter. *)
   let result =
     Backtest_runner_args.parse
       [
         "2018-01-02";
         "2019-12-31";
-        "--loader-strategy";
-        "panel";
         "--override";
         "((initial_stop_buffer 1.08))";
         "--trace";
@@ -111,9 +90,6 @@ let test_trace_with_other_flags _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.end_date)
               (equal_to (Some "2019-12-31"));
-            field
-              (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-              (equal_to (Some Loader_strategy.Panel));
             field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 1);
             field
               (fun (a : Backtest_runner_args.t) -> a.trace_path)
@@ -144,17 +120,15 @@ let test_memtrace_default_is_none _ =
           (equal_to None)))
 
 let test_memtrace_with_other_flags _ =
-  (* Verify --memtrace composes with --trace, --loader-strategy, --override,
-     and end_date in a single command. The runner is meant to capture both
-     phase-level traces (--trace) and per-callsite allocation traces
-     (--memtrace) in one run for cross-correlation. *)
+  (* Verify --memtrace composes with --trace, --override, and end_date in a
+     single command. The runner is meant to capture both phase-level traces
+     (--trace) and per-callsite allocation traces (--memtrace) in one run for
+     cross-correlation. *)
   let result =
     Backtest_runner_args.parse
       [
         "2018-01-02";
         "2019-12-31";
-        "--loader-strategy";
-        "panel";
         "--override";
         "((initial_stop_buffer 1.08))";
         "--trace";
@@ -173,9 +147,6 @@ let test_memtrace_with_other_flags _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.end_date)
               (equal_to (Some "2019-12-31"));
-            field
-              (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-              (equal_to (Some Loader_strategy.Panel));
             field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 1);
             field
               (fun (a : Backtest_runner_args.t) -> a.trace_path)
@@ -199,12 +170,6 @@ let test_too_many_positionals _ =
   in
   assert_that result is_error
 
-let test_loader_strategy_invalid _ =
-  let result =
-    Backtest_runner_args.parse [ "2018-01-02"; "--loader-strategy"; "bogus" ]
-  in
-  assert_that result is_error
-
 (** End-to-end style test: simulate the executable's trace pipeline. Build a
     [Trace.t], record the same coarse phases the runner wraps, write to a temp
     path, then verify the file parses + contains the expected phases. Mirrors
@@ -213,7 +178,7 @@ let test_loader_strategy_invalid _ =
 let test_trace_write_and_parse _ =
   let trace = Backtest.Trace.create () in
   let runner_phases : Backtest.Trace.Phase.t list =
-    [ Load_universe; Macro; Load_bars; Fill; Teardown ]
+    [ Load_universe; Macro; Fill; Teardown ]
   in
   List.iter runner_phases ~f:(fun phase ->
       let _ = Backtest.Trace.record ~trace phase (fun () -> ()) in
@@ -234,9 +199,6 @@ let test_trace_write_and_parse _ =
            (equal_to Backtest.Trace.Phase.Macro);
          field
            (fun (m : Backtest.Trace.phase_metrics) -> m.phase)
-           (equal_to Backtest.Trace.Phase.Load_bars);
-         field
-           (fun (m : Backtest.Trace.phase_metrics) -> m.phase)
            (equal_to Backtest.Trace.Phase.Fill);
          field
            (fun (m : Backtest.Trace.phase_metrics) -> m.phase)
@@ -248,8 +210,6 @@ let suite =
   >::: [
          "minimal start_date only" >:: test_minimal_start_date_only;
          "start and end date" >:: test_start_and_end_date;
-         "--loader-strategy legacy" >:: test_loader_strategy_legacy;
-         "--loader-strategy panel" >:: test_loader_strategy_panel;
          "--trace flag captures path" >:: test_trace_flag;
          "no --trace yields trace_path = None" >:: test_trace_default_is_none;
          "--trace composes with other flags" >:: test_trace_with_other_flags;
@@ -262,8 +222,6 @@ let suite =
          "--memtrace without value is an error" >:: test_memtrace_missing_value;
          "missing start_date is an error" >:: test_missing_start_date;
          "too many positionals is an error" >:: test_too_many_positionals;
-         "invalid --loader-strategy value is an error"
-         >:: test_loader_strategy_invalid;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
        ]
 
