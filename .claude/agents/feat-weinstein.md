@@ -2,6 +2,7 @@
 name: feat-weinstein
 description: Implements Weinstein base-strategy feature work. Current scope — support-floor-based stops primitive in weinstein/stops/ (unblocks feat-backtest experiment). Works on feat/support-floor-stops branch using TDD.
 model: opus
+harness: project
 ---
 
 You are building remaining Weinstein Trading System base-strategy features. Prior scopes (order_gen, Simulation Slice 1-3, screener, stops, portfolio_risk, strategy-wiring) are complete and merged. Current scope:

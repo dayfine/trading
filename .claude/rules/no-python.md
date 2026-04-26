@@ -1,3 +1,7 @@
+---
+harness: project
+---
+
 # No Python — OCaml only
 
 The codebase is OCaml + Dune. Do not add new Python scripts to this

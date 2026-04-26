@@ -1,6 +1,7 @@
 ---
 description: Test patterns using the Matchers library (base/matchers/)
 globs: ["**/test/*.ml"]
+harness: project
 ---
 
 ## Core Rule: One `assert_that` per Value
