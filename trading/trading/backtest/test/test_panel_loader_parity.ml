@@ -3,14 +3,10 @@
 
     Stage 3 PR 3.1 wired [~bar_panels] into [Panel_runner._build_strategy] so
     the inner Weinstein strategy reads bars from {!Data_panel.Bar_panels}
-    instead of the parallel {!Bar_history} cache. As of that wiring, Panel-mode
-    and Tiered-mode round_trips diverge by design: Tiered seeds [Bar_history]
-    incrementally per Friday Full-tier promote (not-yet-promoted symbols read as
-    empty), while [Bar_panels] is fully populated up-front from CSV. Same
-    strategy + same data → different trade decisions because the bar visibility
-    timing differs. The pre-3.1 [Tiered_vs_Panel] parity test is therefore
-    obsolete; the long-term parity gate is a Tiered-side test that will be
-    deleted in PR 3.3 once Tiered is removed entirely.
+    instead of the parallel {!Bar_history} cache. Stage 3 PR 3.3 then deleted
+    the Tiered runner + bar_loader subsystem entirely. Panel-mode is now the
+    sole panel-backed execution path; this golden gate pins its round_trips
+    against checked-in goldens.
 
     This test pins Panel-mode behaviour to a checked-in golden sexp. For each
     scenario the test:

@@ -3,11 +3,7 @@
   test_stop_log
   test_runner_filter
   test_trace
-  test_runner_tiered_skeleton
-  test_runner_tiered_cycle
-  test_runner_tiered_metadata_tolerance
   test_runner_hypothesis_overrides
-  test_tiered_loader_parity
   test_panel_loader_parity
   test_backtest_runner_args)
  (libraries
@@ -19,7 +15,6 @@
   core_unix.time_ns_unix
   fpath
   backtest
-  trading.backtest.bar_loader
   trading.backtest.loader_strategy
   trading.backtest.runner_args
   scenario_lib

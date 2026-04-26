@@ -1,11 +1,17 @@
 # Status: data-panels
 
-## Last updated: 2026-04-25 (PR 3.2 pushed; perf spike post-3.2 measured)
+## Last updated: 2026-04-25 (PR 3.3 pushed)
 
 ## Status
 READY_FOR_REVIEW
 
-Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PRs B–H all MERGED (#559 / #560 / #561 / #562 / #563 / #564 / #565). Stage 3 PR 3.1 MERGED as #567. Stage 3 PR 3.2 (delete `Bar_history` + `Bar_reader.History` backend + Tiered Friday seed) on `feat/panels-stage03-pr-b-delete-bar-history` READY_FOR_REVIEW.
+Stage 0 MERGED as #555. Stage 1 MERGED as #557. Stage 2 foundation MERGED as #558. Stage 2 PRs B–H all MERGED (#559 / #560 / #561 / #562 / #563 / #564 / #565). Stage 3 PR 3.1 MERGED as #567. Stage 3 PR 3.2 MERGED as #569. Stage 3 PR 3.3 (delete Tiered runner + bar_loader subsystem + Trace.Phase tier variants) on `feat/panels-stage03-pr-c-delete-tiered` READY_FOR_REVIEW.
+
+**PR 3.3 summary**: deletes the entire Tiered backtest path. `tiered_runner.{ml,mli}`, `tiered_strategy_wrapper.{ml,mli}`, and the entire `bar_loader/` subdirectory (incl. 6 test files) are gone. `Trace.Phase.t` drops `Promote_summary | Promote_full | Demote | Promote_metadata`. `Loader_strategy.t` drops the `Tiered` variant — only `Legacy | Panel` remain. `Panel_runner` becomes standalone (its own `input` record; no longer wraps with `Tiered_strategy_wrapper`; no `Bar_loader` construction). `Runner` drops the `tier_op_to_phase` re-export, the `_tiered_input_of_deps` helper, the `_run_tiered_backtest` function, and the `Loader_strategy.Tiered` match arm. `full_compute_tail_days` and `bar_history_max_lookback_days` config fields are kept as vestigial (no-op) so existing override sexps still parse. Tiered-specific tests (`test_runner_tiered_skeleton`, `test_runner_tiered_cycle`, `test_runner_tiered_metadata_tolerance`, `test_tiered_loader_parity`) deleted along with the bar_loader test suite. Surviving tests — `test_runner_hypothesis_overrides`, `test_backtest_runner_args`, `test_trace`, `test_panel_loader_parity`, `test_scenario` — ported to drop Tiered references. CLI flag now accepts `legacy|panel`. Panel-mode round_trips golden gate (`test_panel_loader_parity`) still pinned bit-equal to the checked-in goldens.
+
+**LOC**: ~5000 lines deleted (bar_loader + Tiered files + Tiered tests), ~140 lines edited (runner.{ml,mli}, panel_runner.{ml,mli}, trace.{ml,mli}, loader_strategy.{ml,mli}, dune files, test_* updates, CLI runner). Net diff vs main: see `git diff --stat main feat/panels-stage03-pr-c-delete-tiered` (33 files).
+
+Verify: `cd trading/trading && TRADING_DATA_DIR=$PWD/test_data dune build && TRADING_DATA_DIR=$PWD/test_data dune runtest` (all green except the pre-existing `csv_storage.ml` nesting linter — unrelated to this PR).
 
 **Post-3.2 perf spike** (`dev/notes/panels-rss-spike-2026-04-25.md`, 2026-04-25): Panel mode at N=292 T=6y on `/tmp/data-small-302` peaks at **3.47 GB / 6:00 wall** vs pre-3.2 Legacy 1.87 GB / Tiered 3.74 GB. Projection (<800 MB) **way off** (~4.4× over). Structural Bar_history deletion landed but `Daily_price.t list` allocation pressure in `Bar_panels` reads + list-shaped callees still dominates RSS — Stage 4 (callee reshape PR-H wiring) is required before the projected memory win materializes. Plan §"Memory and CPU expectations" needs a list-intermediate term.
 
