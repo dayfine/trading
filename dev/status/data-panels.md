@@ -5,7 +5,48 @@
 ## Status
 READY_FOR_REVIEW
 
-Stage 4 PR-D READY_FOR_REVIEW on `feat/panels-stage04-pr-d-weekly-indicator-panels` — adds `Weekly_ma_cache` (per-symbol weekly MA memoisation) so the `stage_callbacks_of_weekly_view` hot path no longer recomputes SMA / WMA / EMA over weekly closes per Friday tick. Memoised by `(symbol, ma_type, period)`; built lazily at first request from the symbol's full weekly history; cache hits skip the `Indicator_types.t list` allocation entirely. Fallback to inline computation on cache miss (mid-week stops_runner calls + tests without a panel).
+Stage 4-5 PR-A READY_FOR_REVIEW on `feat/panels-stage045-pr-a-lazy-stage-filter` — restructures `_screen_universe` into a two-phase lazy cascade. Phase 1 runs cheap stage-only `Stage.classify_with_callbacks` (cache-aware via PR-D `Weekly_ma_cache`) over every loaded symbol. Phase 2 — the load-bearing allocation site (`Panel_callbacks.stock_analysis_callbacks_of_weekly_views` + `Stock_analysis.analyze_with_callbacks`) — runs only for survivors whose stage classification can yield a screener candidate (Stage2 longs / Stage4 shorts). Stage1 / Stage3 symbols are dropped after Phase 1; the screener would have rejected them after the full analysis anyway. `prior_stages` updates batch at end-of-pass to preserve pre-PR-A semantics where every per-symbol analysis on a Friday observed the previous Friday's snapshot.
+
+**Stage 4-5 PR-A scope**:
+- `weinstein_strategy.{ml,mli}` — split `_analyze_ticker` into `_classify_stage_for_screening` (Phase 1, cheap) + `_full_analysis_of_survivor` (Phase 2, heavy). New `_classify_all` builds the universe-wide stage classification list; `_commit_prior_stages` advances the table after the screening pass. `_screen_universe` now: (a) Phase 1 over universe, (b) filter survivors by `_survives_phase1`, (c) Phase 2 over survivors, (d) commit prior_stages, (e) screener cascade as before.
+- New public `Weinstein_strategy.survivors_for_screening` — exposes Phase 1 for testability. Returns `(string * Bar_panels.weekly_view * Stage.result) list` so tests can directly assert filter behaviour without instrumenting the screener loop with a counter.
+- Filter predicate `_survives_phase1` matches on `Stage2 _ | Stage4 _` (true) vs `Stage1 _ | Stage3 _` (false). Intentionally over-broad relative to the screener's actual `is_breakout_candidate` / `is_breakdown_candidate` rules (which also gate on volume / RS / prior_stage); keeping the gate stage-only preserves bit-equality with the bar-list output.
+
+**Bit-equality + parity**:
+- Load-bearing `test_panel_loader_parity` round_trips golden: 2 tests, all OK. Both `tiered-loader-parity` and `panel-golden-2019-full` round-trip lists are bit-equal — same trade dates, prices, sides, quantities as pre-PR-A.
+- The Phase 1 stage classification reuses the same `stage_callbacks_of_weekly_view` (cache-aware) that Phase 2's `stock_analysis_callbacks_of_weekly_views` embeds — both produce bit-identical Stage.result for the same view.
+- `prior_stage` threaded from Phase 1 into Phase 2 (instead of re-reading from the hashtbl) preserves the pre-PR-A invariant that every per-symbol analysis on a single Friday tick saw the previous Friday's stage snapshot. Initial implementation that re-read from the table after Phase 1 wrote it broke this — caught by the round_trips parity test (3 vs 5 trades) before merge.
+
+**Tests added** (`test_weinstein_strategy.ml`, +3 tests):
+- `survivors_for_screening filters by stage` — 4 trending symbols (2 rising, 2 declining), all survive (Stage2 / Stage4).
+- `survivors_for_screening drops Stage1 and Stage3` — basing series + topping series + Stage4 control; only the Stage4 control survives.
+- `phase 2 call count equals survivor count, not loaded count` — 6-symbol Stage-4-heavy universe (2 Stage1 + 2 Stage3 + 2 Stage4); asserts `(loaded_count, survivor_count) = (6, 2)` so the Phase 2 call count (a `List.map` over survivors) matches survivor count, not loaded count.
+
+**Files touched**:
+- modified: `trading/trading/weinstein/strategy/lib/weinstein_strategy.{ml,mli}` (~+95 / -45 production lines including doc comments).
+- modified: `trading/trading/weinstein/strategy/test/test_weinstein_strategy.ml` (+~210 test lines: 3 new tests + helpers for building synthetic Bar_panels at known stage profiles).
+- new: `dev/plans/panels-stage045-pr-a-2026-04-26.md` — PR-specific plan.
+
+**LOC delta**: ~+95 production, ~+210 tests; net new public API: `survivors_for_screening` (single new val).
+
+**Pragmatic deviation from dispatch**:
+- The dispatch suggested Phase 1 read panel cells directly without a `weekly_view_for` allocation. Phase 1 in this PR reuses `weekly_view_for` for symmetry with the existing cache-aware `stage_callbacks_of_weekly_view` and to preserve bit-equality. The view costs 5 float arrays of size ≤ 52 per symbol per Friday (~ 2 KB) — negligible compared to the eliminated Stock_analysis bundle + analyze. If post-PR-A matrix shows `weekly_view_for` is still a wedge, a follow-up PR can add a panel-row-direct stage callback (closes-only Bigarray slice + `Weekly_ma_cache` MA reads, no view materialisation).
+
+**Out of scope (deferred to PR-B / later)**:
+- Sector pre-filter as second early-exit gate (companion plan §"PR-B").
+- Tunable filter thresholds in config (PR-C, optional).
+- Memtrace / heap forensics — independent diagnostic, not gated on this work.
+- `Stops_runner.update` allocations on the daily-stop path — not touched by PR-A.
+
+**Verify**: `cd trading && eval $(opam env) && TRADING_DATA_DIR=$PWD/test_data dune build && dune runtest && dune build @fmt`. All suites green; formatter clean; nesting linter clean (max ≤5, avg 1.44 across 927 functions).
+
+PR-A is bookmarked at `feat/panels-stage045-pr-a-lazy-stage-filter`. Plan: `dev/plans/panels-stage045-pr-a-2026-04-26.md` (companion to `dev/plans/panels-stage045-lazy-tier-cascade-2026-04-26.md`).
+
+**Recommended next dispatch**: re-run the RSS matrix from `dev/notes/panels-rss-matrix-2026-04-26.md` at the four cells {50, 292} × {1y, 6y} on `bull-crash-292x6y` to validate β slope drop (target: 5.12 → ≤ 1.5 MB/symbol). If β doesn't drop, the wedge is outside `_screen_universe` (memtrace required next).
+
+---
+
+**Prior status (Stage 4 PR-D, READY_FOR_REVIEW)**: adds `Weekly_ma_cache` (per-symbol weekly MA memoisation) so the `stage_callbacks_of_weekly_view` hot path no longer recomputes SMA / WMA / EMA over weekly closes per Friday tick. Memoised by `(symbol, ma_type, period)`; built lazily at first request from the symbol's full weekly history; cache hits skip the `Indicator_types.t list` allocation entirely. Fallback to inline computation on cache miss (mid-week stops_runner calls + tests without a panel).
 
 **Stage 4 PR-D scope**:
 - New module `weinstein/strategy/lib/weekly_ma_cache.{ml,mli}`. Hashtbl-backed memoisation keyed by `{ symbol; ma_type tag; period }`. The MA tag is a local mirror of `Stage.ma_type` (so the module derives `hash` without touching `Stage.ma_type`). Stores `cached_ma = { values : float array; dates : Date.t array }`. `ma_values_for` lazily computes via the same `Sma.calculate_sma | Sma.calculate_weighted_ma | Ema.calculate_ema` kernels `Stage._compute_ma` uses, then caches the result. `locate_date` does a tail-anchored linear scan to map a view's most-recent date to its cached index.

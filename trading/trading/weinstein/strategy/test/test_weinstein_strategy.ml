@@ -650,6 +650,285 @@ let test_entries_from_candidates_emits_long _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* Stage 4-5 PR-A: lazy stage filter — survivors_for_screening         *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a Friday-anchored series of weekly bars. *)
+let _make_friday_bars ~start_friday ~n ~start_price ~step =
+  List.init n ~f:(fun i ->
+      let date = Date.add_days start_friday (i * 7) in
+      let price = start_price +. (Float.of_int i *. step) in
+      {
+        Types.Daily_price.date;
+        open_price = price;
+        high_price = price *. 1.01;
+        low_price = price *. 0.99;
+        close_price = price;
+        adjusted_close = price;
+        volume = 1_000_000;
+      })
+
+(** Pack [(symbol, bars)] pairs into a {!Bar_panels.t}. The calendar is the
+    union of all dates (sorted, deduped). Mirrors the helper in
+    {!test_panel_callbacks.ml}. *)
+let _panels_of_symbols
+    (symbols_with_bars : (string * Types.Daily_price.t list) list) =
+  let universe = List.map symbols_with_bars ~f:fst in
+  let symbol_index =
+    match Data_panel.Symbol_index.create ~universe with
+    | Ok t -> t
+    | Error err -> failwith ("Symbol_index.create: " ^ err.Status.message)
+  in
+  let calendar =
+    symbols_with_bars
+    |> List.concat_map ~f:(fun (_, bars) ->
+        List.map bars ~f:(fun b -> b.Types.Daily_price.date))
+    |> List.dedup_and_sort ~compare:Date.compare
+    |> Array.of_list
+  in
+  let ohlcv =
+    Data_panel.Ohlcv_panels.create symbol_index ~n_days:(Array.length calendar)
+  in
+  let date_to_col = Hashtbl.create (module Date) in
+  Array.iteri calendar ~f:(fun i d ->
+      Hashtbl.add date_to_col ~key:d ~data:i
+      |> (ignore : [ `Ok | `Duplicate ] -> unit));
+  List.iter symbols_with_bars ~f:(fun (symbol, bars) ->
+      match Data_panel.Symbol_index.to_row symbol_index symbol with
+      | None -> ()
+      | Some row ->
+          List.iter bars ~f:(fun bar ->
+              match Hashtbl.find date_to_col bar.Types.Daily_price.date with
+              | None -> ()
+              | Some day ->
+                  Data_panel.Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day
+                    bar));
+  match Data_panel.Bar_panels.create ~ohlcv ~calendar with
+  | Ok p -> p
+  | Error err -> failwith ("Bar_panels.create: " ^ err.Status.message)
+
+(** Build a 60-week Friday-anchored series with the given start_price + step.
+    Positive [step] yields a Stage2-classifying series (rising MA, price above
+    MA); negative [step] yields a Stage4 series. *)
+let _trending_series ~start_friday ~start_price ~step =
+  _make_friday_bars ~start_friday ~n:60 ~start_price ~step
+
+let test_survivors_for_screening_filters_by_stage _ =
+  (* Universe of four symbols: two rising (Stage2-survivors), two declining
+     (Stage4-survivors). The filter currently drops only Stage1 / Stage3, so
+     all four trend-in-one-direction symbols must survive. *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let rising_a = _trending_series ~start_friday ~start_price:50.0 ~step:0.8 in
+  let rising_b = _trending_series ~start_friday ~start_price:60.0 ~step:1.0 in
+  let declining_a =
+    _trending_series ~start_friday ~start_price:200.0 ~step:(-1.5)
+  in
+  let declining_b =
+    _trending_series ~start_friday ~start_price:180.0 ~step:(-1.0)
+  in
+  let panels =
+    _panels_of_symbols
+      [
+        ("RISE_A", rising_a);
+        ("RISE_B", rising_b);
+        ("FALL_A", declining_a);
+        ("FALL_B", declining_b);
+      ]
+  in
+  let bar_reader = Bar_reader.of_panels panels in
+  let cfg =
+    default_config
+      ~universe:[ "RISE_A"; "RISE_B"; "FALL_A"; "FALL_B" ]
+      ~index_symbol:"GSPCX"
+  in
+  let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
+  (* Use the panel's last date as the screening day — guaranteed to land in
+     the calendar so [weekly_view_for] returns a non-empty view. *)
+  let last_date =
+    let n = Data_panel.Bar_panels.n_days panels in
+    let cal_view =
+      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"RISE_A" ~n:1
+        ~as_of_day:(n - 1)
+    in
+    cal_view.dates.(cal_view.n - 1)
+  in
+  let survivors =
+    survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date
+  in
+  let survivor_tickers =
+    List.map survivors ~f:(fun (ticker, _, _) -> ticker)
+    |> List.sort ~compare:String.compare
+  in
+  (* All four trending series classify into Stage2 / Stage4 — none drop. *)
+  assert_that survivor_tickers
+    (equal_to [ "FALL_A"; "FALL_B"; "RISE_A"; "RISE_B" ])
+
+let test_survivors_for_screening_drops_stage1_and_stage3 _ =
+  (* Build symbols whose stage classification falls into Stage1 / Stage3.
+     [Stage1] = decline-then-flat (basing); [Stage3] = rise-then-flat
+     (topping). The filter must drop them. *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let make_dates ~n =
+    List.init n ~f:(fun i -> Date.add_days start_friday (i * 7))
+  in
+  let bars_of_prices prices =
+    List.map2_exn
+      (make_dates ~n:(List.length prices))
+      prices
+      ~f:(fun date p ->
+        {
+          Types.Daily_price.date;
+          open_price = p;
+          high_price = p *. 1.01;
+          low_price = p *. 0.99;
+          close_price = p;
+          adjusted_close = p;
+          volume = 1_000_000;
+        })
+  in
+  (* Stage1: 15 weeks declining 100 → 86, then 50 weeks flat at 85. *)
+  let stage1_bars =
+    let declining = List.init 15 ~f:(fun i -> 100.0 -. Float.of_int i) in
+    let flat = List.init 50 ~f:(fun _ -> 85.0) in
+    bars_of_prices (declining @ flat)
+  in
+  (* Stage3: 15 weeks rising 50 → 64, then 50 weeks flat at 65. *)
+  let stage3_bars =
+    let rising = List.init 15 ~f:(fun i -> 50.0 +. Float.of_int i) in
+    let flat = List.init 50 ~f:(fun _ -> 65.0) in
+    bars_of_prices (rising @ flat)
+  in
+  (* One Stage4 control to confirm filter survives at least one symbol. *)
+  let stage4_bars =
+    _trending_series ~start_friday ~start_price:200.0 ~step:(-1.5)
+  in
+  let panels =
+    _panels_of_symbols
+      [ ("BASE", stage1_bars); ("TOP", stage3_bars); ("DECLINE", stage4_bars) ]
+  in
+  let bar_reader = Bar_reader.of_panels panels in
+  let cfg =
+    default_config ~universe:[ "BASE"; "TOP"; "DECLINE" ] ~index_symbol:"GSPCX"
+  in
+  (* Seed prior stages so the classifier disambiguates Stage1 (prior Stage4)
+     from Stage3 (prior Stage2). *)
+  let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
+    Hashtbl.of_alist_exn
+      (module String)
+      [
+        ("BASE", Weinstein_types.Stage4 { weeks_declining = 10 });
+        ("TOP", Weinstein_types.Stage2 { weeks_advancing = 10; late = false });
+      ]
+  in
+  let last_date =
+    let n = Data_panel.Bar_panels.n_days panels in
+    let cal_view =
+      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"DECLINE" ~n:1
+        ~as_of_day:(n - 1)
+    in
+    cal_view.dates.(cal_view.n - 1)
+  in
+  let survivors =
+    survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date
+  in
+  let survivor_tickers = List.map survivors ~f:(fun (ticker, _, _) -> ticker) in
+  (* Only DECLINE (Stage4) passes; BASE (Stage1) and TOP (Stage3) drop. *)
+  assert_that survivor_tickers (equal_to [ "DECLINE" ])
+
+(** Stage 4-5 PR-A counter test: in a Stage-4-heavy universe, the number of full
+    {!Stock_analysis} analyses (Phase 2) must equal the survivor count, NOT the
+    loaded universe size. We exercise this via [survivors_for_screening] — Phase
+    2 in [_screen_universe] is a [List.map] over [survivors], so the survivor
+    list length is mathematically equivalent to the Phase 2 call count.
+
+    Pre-PR-A: every loaded symbol paid the full callback bundle + analyze cost.
+    Post-PR-A: only survivors do. The win is proportional to (loaded -
+    survivors). *)
+let test_phase2_call_count_equals_survivor_count _ =
+  (* Six-symbol universe: two Stage4 (survive), two Stage1 (drop), two Stage3
+     (drop). Post-PR-A only the two Stage4 symbols pay the full
+     [Stock_analysis] cost; pre-PR-A all six did. *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let make_dates ~n =
+    List.init n ~f:(fun i -> Date.add_days start_friday (i * 7))
+  in
+  let bars_of_prices prices =
+    List.map2_exn
+      (make_dates ~n:(List.length prices))
+      prices
+      ~f:(fun date p ->
+        {
+          Types.Daily_price.date;
+          open_price = p;
+          high_price = p *. 1.01;
+          low_price = p *. 0.99;
+          close_price = p;
+          adjusted_close = p;
+          volume = 1_000_000;
+        })
+  in
+  let stage1_bars _seed =
+    let declining = List.init 15 ~f:(fun i -> 100.0 -. Float.of_int i) in
+    let flat = List.init 50 ~f:(fun _ -> 85.0) in
+    bars_of_prices (declining @ flat)
+  in
+  let stage3_bars _seed =
+    let rising = List.init 15 ~f:(fun i -> 50.0 +. Float.of_int i) in
+    let flat = List.init 50 ~f:(fun _ -> 65.0) in
+    bars_of_prices (rising @ flat)
+  in
+  let stage4_bars seed =
+    _trending_series ~start_friday ~start_price:(200.0 +. seed) ~step:(-1.5)
+  in
+  let panels =
+    _panels_of_symbols
+      [
+        ("BASE_A", stage1_bars 0.0);
+        ("BASE_B", stage1_bars 1.0);
+        ("TOP_A", stage3_bars 0.0);
+        ("TOP_B", stage3_bars 1.0);
+        ("DECLINE_A", stage4_bars 0.0);
+        ("DECLINE_B", stage4_bars 5.0);
+      ]
+  in
+  let bar_reader = Bar_reader.of_panels panels in
+  let cfg =
+    default_config
+      ~universe:
+        [ "BASE_A"; "BASE_B"; "TOP_A"; "TOP_B"; "DECLINE_A"; "DECLINE_B" ]
+      ~index_symbol:"GSPCX"
+  in
+  let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
+    Hashtbl.of_alist_exn
+      (module String)
+      [
+        ("BASE_A", Weinstein_types.Stage4 { weeks_declining = 10 });
+        ("BASE_B", Weinstein_types.Stage4 { weeks_declining = 10 });
+        ("TOP_A", Weinstein_types.Stage2 { weeks_advancing = 10; late = false });
+        ("TOP_B", Weinstein_types.Stage2 { weeks_advancing = 10; late = false });
+      ]
+  in
+  let last_date =
+    let n = Data_panel.Bar_panels.n_days panels in
+    let cal_view =
+      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"DECLINE_A" ~n:1
+        ~as_of_day:(n - 1)
+    in
+    cal_view.dates.(cal_view.n - 1)
+  in
+  let loaded_count = List.length cfg.universe in
+  let survivors =
+    survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date
+  in
+  let survivor_count = List.length survivors in
+  assert_that (loaded_count, survivor_count) (equal_to ((6, 2) : int * int))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -680,4 +959,10 @@ let () =
            >:: test_entries_from_candidates_emits_short;
            "entries_from_candidates emits Long transition for Long candidate"
            >:: test_entries_from_candidates_emits_long;
+           "survivors_for_screening filters by stage"
+           >:: test_survivors_for_screening_filters_by_stage;
+           "survivors_for_screening drops Stage1 and Stage3"
+           >:: test_survivors_for_screening_drops_stage1_and_stage3;
+           "phase 2 call count equals survivor count, not loaded count"
+           >:: test_phase2_call_count_equals_survivor_count;
          ])

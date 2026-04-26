@@ -219,6 +219,119 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
       | Some kept -> kept :: acc)
   |> List.rev
 
+(** Stage 4-5 PR-A: a symbol survives Phase 1 if its current stage
+    classification could in principle yield a screener candidate. Long
+    candidates require [Stage2 _] (per [Stock_analysis.is_breakout_candidate]);
+    short candidates require [Stage4 _] (per
+    [Stock_analysis.is_breakdown_candidate]). [Stage1] and [Stage3] cannot
+    satisfy either predicate, so the screener would reject them after the full
+    analysis anyway — they are safe to skip in Phase 2.
+
+    The predicate is intentionally over-broad relative to the screener's actual
+    eligibility rules (which also require volume / RS / prior-stage matches);
+    keeping the gate on stage alone preserves bit-equality with the bar-list
+    output while still cutting the dominant per-symbol allocation. *)
+let _survives_phase1 (stage_result : Stage.result) : bool =
+  match stage_result.stage with
+  | Weinstein_types.Stage2 _ | Weinstein_types.Stage4 _ -> true
+  | Weinstein_types.Stage1 _ | Weinstein_types.Stage3 _ -> false
+
+(** Stage 4-5 PR-A Phase 1: classify the ticker via the cheap stage callback
+    bundle (cache-aware via PR-D) and return
+    [(ticker, weekly_view, prior_stage, stage_result)] when the weekly view is
+    non-empty. The [prior_stage] (the entry from [prior_stages] read at Phase 1
+    time, before any update) is threaded forward so Phase 2's [Stock_analysis]
+    receives the same prior-stage context the original pre-PR-A path saw —
+    necessary for the screener's Stage1→Stage2 / Stage3→Stage4 transition
+    signals to fire correctly.
+
+    [prior_stages] is NOT updated here; the update happens after Phase 2 (or in
+    a dedicated update pass for non-survivors below) so that within a single
+    Friday tick every per-symbol classification reads the same "previous
+    Friday's stage" snapshot. *)
+let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
+    ~current_date ticker =
+  let stock_view =
+    Bar_reader.weekly_view_for bar_reader ~symbol:ticker ~n:config.lookback_bars
+      ~as_of:current_date
+  in
+  if stock_view.n = 0 then None
+  else
+    let prior_stage = Hashtbl.find prior_stages ticker in
+    let stage_callbacks =
+      Panel_callbacks.stage_callbacks_of_weekly_view
+        ?ma_cache:(Bar_reader.ma_cache bar_reader)
+        ~symbol:ticker ~config:config.stage_config ~weekly:stock_view ()
+    in
+    let stage_result =
+      Stage.classify_with_callbacks ~config:config.stage_config
+        ~get_ma:stage_callbacks.get_ma ~get_close:stage_callbacks.get_close
+        ~prior_stage
+    in
+    Some (ticker, stock_view, prior_stage, stage_result)
+
+(** Stage 4-5 PR-A Phase 2: build the full [Stock_analysis.callbacks] bundle
+    (Stage / Rs / Volume / Resistance) for a survivor and run
+    [Stock_analysis.analyze_with_callbacks]. This is the load-bearing allocation
+    site: prior to PR-A it ran for every loaded symbol; now it runs only for
+    survivors of [_survives_phase1]. The [prior_stage] passed here is the value
+    Phase 1 captured before any [prior_stages] update — matches the pre-PR-A
+    semantics where every per-symbol analysis on a given Friday saw the same
+    "previous Friday" snapshot. *)
+let _full_analysis_of_survivor ~bar_reader ~index_view
+    ( ticker,
+      (stock_view : Data_panel.Bar_panels.weekly_view),
+      prior_stage,
+      (_stage_result : Stage.result) ) =
+  let as_of_date = stock_view.dates.(stock_view.n - 1) in
+  let callbacks =
+    Panel_callbacks.stock_analysis_callbacks_of_weekly_views
+      ?ma_cache:(Bar_reader.ma_cache bar_reader)
+      ~stock_symbol:ticker ~config:Stock_analysis.default_config
+      ~stock:stock_view ~benchmark:index_view ()
+  in
+  Stock_analysis.analyze_with_callbacks ~config:Stock_analysis.default_config
+    ~ticker ~callbacks ~prior_stage ~as_of_date
+
+(** Phase 1: classify every ticker in [config.universe] via the cheap stage-only
+    pass. Returns the full classification result — non-survivors retained so the
+    caller can update [prior_stages] in one pass after screening. *)
+let _classify_all ~config ~bar_reader ~prior_stages ~current_date =
+  List.filter_map config.universe
+    ~f:
+      (_classify_stage_for_screening ~config ~bar_reader ~prior_stages
+         ~current_date)
+
+(** Advance [prior_stages] in one pass — matches the pre-PR-A semantics where
+    every per-symbol analysis on a given Friday observed the previous Friday's
+    stage snapshot, and the table only advanced once at the end of the universe
+    loop. *)
+let _commit_prior_stages ~prior_stages classified =
+  List.iter classified ~f:(fun (ticker, _view, _prior, stage_result) ->
+      Hashtbl.set prior_stages ~key:ticker ~data:stage_result.Stage.stage)
+
+(** Stage 4-5 PR-A: Phase 1 of the cascade. Classify every symbol in
+    [config.universe] via the cheap stage-only callback bundle and return the
+    list of survivors as [(ticker, weekly_view, stage_result)] tuples. Updates
+    [prior_stages] for every classified symbol (even non-survivors) so the next
+    Friday's classification has accurate prior-stage context.
+
+    Public for testability — lets unit tests assert that the universe filter
+    drops Stage1 / Stage3 symbols and keeps Stage2 / Stage4 without having to
+    instrument the screener loop with a counter. *)
+let survivors_for_screening ~config ~bar_reader ~prior_stages ~current_date :
+    (string * Data_panel.Bar_panels.weekly_view * Stage.result) list =
+  let classified =
+    _classify_all ~config ~bar_reader ~prior_stages ~current_date
+  in
+  let survivors =
+    List.filter_map classified ~f:(fun (ticker, view, _prior, stage_result) ->
+        if _survives_phase1 stage_result then Some (ticker, view, stage_result)
+        else None)
+  in
+  _commit_prior_stages ~prior_stages classified;
+  survivors
+
 (** Screen the universe for both long and short candidates, returning a combined
     transition list. Macro-trend gating lives in the screener itself:
     [buy_candidates] are empty under [Bearish], [short_candidates] are empty
@@ -229,41 +342,25 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
     - [Neutral]: both — longs and shorts are both eligible.
     - [Bearish]: shorts only — longs are empty.
 
-    Stage 4 PR-A: per-ticker analysis goes through panel-shaped Stage / Rs
-    callbacks (no [Daily_price.t list] for those scans). Volume + Resistance in
-    [Stock_analysis] (Stage, Rs, breakout-price scan, peak-volume scan, Volume,
-    Resistance) reads through the panel-shaped callbacks below without
-    allocating any [Daily_price.t list]. *)
+    Stage 4-5 PR-A: per-ticker analysis is split into a cheap stage-only Phase 1
+    (universe-wide) and a heavy Phase 2 (survivors only). Phase 2 builds the
+    full callback bundle and runs [Stock_analysis.analyze_with_callbacks] —
+    previously this ran for every loaded symbol. Symbols whose stage cannot
+    yield a screener candidate (Stage1 / Stage3) are dropped after Phase 1. *)
 let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
     ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
     ~current_date =
-  let _analyze_ticker ticker =
-    let stock_view =
-      Bar_reader.weekly_view_for bar_reader ~symbol:ticker
-        ~n:config.lookback_bars ~as_of:current_date
-    in
-    if stock_view.n = 0 then None
-    else
-      let as_of_date =
-        if stock_view.n = 0 then current_date
-        else stock_view.dates.(stock_view.n - 1)
-      in
-      let prior_stage = Hashtbl.find prior_stages ticker in
-      let callbacks =
-        Panel_callbacks.stock_analysis_callbacks_of_weekly_views
-          ?ma_cache:(Bar_reader.ma_cache bar_reader)
-          ~stock_symbol:ticker ~config:Stock_analysis.default_config
-          ~stock:stock_view ~benchmark:index_view ()
-      in
-      let result =
-        Stock_analysis.analyze_with_callbacks
-          ~config:Stock_analysis.default_config ~ticker ~callbacks ~prior_stage
-          ~as_of_date
-      in
-      Hashtbl.set prior_stages ~key:ticker ~data:result.stage.stage;
-      Some result
+  let classified =
+    _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
-  let stocks = List.filter_map config.universe ~f:_analyze_ticker in
+  let survivors =
+    List.filter classified ~f:(fun (_, _, _, stage_result) ->
+        _survives_phase1 stage_result)
+  in
+  let stocks =
+    List.map survivors ~f:(_full_analysis_of_survivor ~bar_reader ~index_view)
+  in
+  _commit_prior_stages ~prior_stages classified;
   let screen_result =
     Screener.screen ~config:config.screening_config ~macro_trend ~sector_map
       ~stocks ~held_tickers:(held_symbols portfolio)

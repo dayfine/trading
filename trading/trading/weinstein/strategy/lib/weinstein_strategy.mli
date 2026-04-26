@@ -171,6 +171,31 @@ val held_symbols : Trading_strategy.Portfolio_view.t -> string list
     natural query on strategy state and the behaviour (exclude [Closed]) is
     worth pinning by direct unit test. *)
 
+val survivors_for_screening :
+  config:config ->
+  bar_reader:Bar_reader.t ->
+  prior_stages:Weinstein_types.stage Core.Hashtbl.M(String).t ->
+  current_date:Date.t ->
+  (string * Data_panel.Bar_panels.weekly_view * Stage.result) list
+(** Stage 4-5 PR-A: Phase 1 of the lazy screener cascade. For every ticker in
+    [config.universe], reads a panel weekly view and classifies the current
+    stage via the cheap stage-only callback bundle (cache-aware via PR-D
+    {!Weekly_ma_cache}). Returns survivors — symbols whose stage could in
+    principle yield a screener candidate ([Stage2 _] for longs; [Stage4 _] for
+    shorts) — paired with their weekly view (reused by Phase 2) and
+    {!Stage.result}.
+
+    [prior_stages] is updated for every classified symbol, including
+    non-survivors, so the next Friday's classification has accurate prior-stage
+    context.
+
+    Public for testability — lets unit tests assert that the universe filter
+    correctly drops Stage1 / Stage3 symbols without instrumenting the screener
+    loop. The filter predicate is intentionally over-broad relative to the
+    screener's full eligibility rules (which also depend on volume / RS / sector
+    / prior_stage); staying broad on stage alone keeps Phase 1 cheap and
+    preserves bit-equality with the bar-list output. *)
+
 val entries_from_candidates :
   config:config ->
   candidates:Screener.scored_candidate list ->
