@@ -1,9 +1,9 @@
 # Status: backtest-perf
 
-## Last updated: 2026-04-25
+## Last updated: 2026-04-26
 
 ## Status
-PENDING
+IN_PROGRESS — Steps 1+2 done on `feat/backtest-perf-tier1-catalog`; PR open for review. The `perf-tier1.yml` workflow file is **held out of this PR** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker.
 
 ## Interface stable
 N/A
@@ -31,25 +31,68 @@ mechanics + release-gate procedure.
 
 ## Open work
 
-- **PR #550** (this plan, doc-only) — open for human review. Covers
-  scope + tier structure + decision items.
+- **PR #550** (plan, doc-only) — MERGED 2026-04-25.
+- **`feat/backtest-perf-tier1-catalog`** (Steps 1+2) — open for review.
+  Adds tier headers to all 15 catalog scenarios, the
+  `perf_catalog_check.sh` integrity gate (annotate-only), the
+  `perf_tier1_smoke.sh` runner, and the `perf-tier1.yml` GHA
+  workflow.
 
-## Next steps (post-#550 merge)
+## Completed
 
-1. Catalog the existing `goldens-small/`, `goldens-broad/`, and
-   `perf-sweep/` scenarios into the 4 tiers (header tags only).
-   ~1 LOC per scenario.
-2. Define tier 1 (per-PR smoke, 2 cells) + add fast CI step in
-   `ci.yml`. ~30 LOC YAML.
-3. Define tier 2 (nightly, 5 cells) + create `perf-nightly.yml`.
+- **Step 1 — scenario catalog headers** (2026-04-26).
+  Added `;; perf-tier: <1|2|3|4>` + `;; perf-tier-rationale: ...` to
+  every scenario sexp under `goldens-small/`, `goldens-broad/`,
+  `perf-sweep/`, `smoke/`. Tier breakdown:
+  - **Tier 1** (per-PR, ≤2 min): 4 scenarios —
+    `smoke/{tiered-loader-parity, panel-golden-2019-full}`,
+    `perf-sweep/{bull-3m, bull-6m}`.
+  - **Tier 2** (nightly, ≤30 min): 6 scenarios —
+    `goldens-small/*`, `smoke/{bull-2019h2, crash-2020h1, recovery-2023}`.
+  - **Tier 3** (weekly, ≤2 h): 2 scenarios —
+    `perf-sweep/{bull-1y, bull-3y}`.
+  - **Tier 4** (release-gate, ≤8 h): 3 scenarios —
+    `goldens-broad/*` (currently SKIPPED placeholders).
+
+  Verify: `sh trading/devtools/checks/perf_catalog_check.sh` -> "OK: 15
+  scenarios all carry tier tags."
+- **Step 2 — tier-1 smoke gate** (2026-04-26).
+  - `trading/devtools/checks/perf_catalog_check.sh` + dune wiring —
+    grep-based integrity check; annotate-only by default, strict via
+    `PERF_CATALOG_CHECK_STRICT=1`.
+  - `dev/scripts/perf_tier1_smoke.sh` — POSIX-sh runner that
+    auto-discovers `;; perf-tier: 1` scenarios, runs each via
+    `scenario_runner.exe` with `timeout 120`, captures wall-time + peak
+    RSS, prints a summary table.
+  - `.github/workflows/perf-tier1.yml` — **drafted but held out of this
+    PR** because the agent's PAT lacks the `workflow` scope required to
+    push GHA workflow files. The script + check + headers all land in
+    this PR; a maintainer follow-up needs to add the workflow file
+    using a workflow-scoped token. Draft YAML is in the PR body /
+    branch history for paste-and-commit. Sibling workflow design
+    (`pull_request` + `push: main` triggers, non-blocking
+    (`continue-on-error: true`), publishes summary to
+    `$GITHUB_STEP_SUMMARY`).
+  - Verify locally: `dev/scripts/perf_tier1_smoke.sh` (run inside the
+    devcontainer or with `TRADING_IN_CONTAINER=1`).
+
+## Next steps
+
+1. (NEXT) Define tier 2 (nightly, 5 cells per the plan, mapped onto the
+   6 currently-tagged tier-2 scenarios) + create `perf-nightly.yml`.
    ~80 LOC YAML.
-4. Define tier 3 (weekly, 4 cells) + sibling weekly workflow.
-   ~80 LOC YAML.
-5. Tier 4 (release-gate, 5000-stock decade-long) — gated on the
-   `data-panels` refactor (`dev/status/data-panels.md`) landing
-   stages 0-3 at minimum. Current Tiered would extrapolate to
-   ~31 GB at 5000×10y; columnar projects to ~1.2 GB, well under
-   the 8 GB ceiling.
+2. Define tier 3 (weekly, 4 cells per the plan, mapped onto the 2
+   currently-tagged tier-3 scenarios — may need to expand) + sibling
+   weekly workflow. ~80 LOC YAML.
+3. Tier 4 (release-gate, 5000-stock decade-long) — was blocked on the
+   `data-panels` refactor (`dev/status/data-panels.md`); stages 0-3
+   landed (PRs #555, #557, #558, #559-565, #567, #569, #573).
+   Likely follows Stage 4 too. Current Tiered would extrapolate to
+   ~31 GB at 5000×10y; columnar projects to ~1.2 GB, well under the
+   8 GB ceiling.
+4. After ~10 PR cycles of tier-1 perf data: pin per-cell budgets and
+   flip `continue-on-error: false` on `perf-tier1.yml` and
+   `PERF_CATALOG_CHECK_STRICT=1` on the catalog check.
 
 ## Ownership
 
@@ -59,7 +102,8 @@ generators.
 
 ## Branch
 
-`feat/backtest-perf-<step>` per item above.
+`feat/backtest-perf-<step>` per item above. Active:
+`feat/backtest-perf-tier1-catalog` (Steps 1+2).
 
 ## Blocked on
 

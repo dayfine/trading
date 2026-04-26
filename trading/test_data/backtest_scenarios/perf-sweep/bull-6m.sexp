@@ -1,3 +1,6 @@
+;; perf-tier: 1
+;; perf-tier-rationale: Small perf-sweep cell (6 months / ~126 trading days). Per-PR smoke cadence (≤2 min budget) when run with a small universe_cap override. See dev/plans/perf-scenario-catalog-2026-04-25.md tier 1.
+;;
 ;; Synthetic perf-sweep scenario — vary universe_cap via --override to extract
 ;; complexity curve. NOT a regression gate.
 ;;

@@ -1,3 +1,6 @@
+;; perf-tier: 2
+;; perf-tier-rationale: 302-symbol small universe over 5 years; nightly cadence (≤30 min budget). See dev/plans/perf-scenario-catalog-2026-04-25.md tier 2.
+;;
 ;; Golden scenario: COVID crash and recovery through 2024.
 ;;
 ;; Baseline re-pinned on 2026-04-18 post-PR #409 (`_held_symbols` now

@@ -1,3 +1,6 @@
+;; perf-tier: 1
+;; perf-tier-rationale: 7-symbol panel-parity universe over ~8 months — small/fast, well under the per-PR ≤2 min budget. Already exercised by OUnit tests; tagging makes it eligible for the per-PR perf smoke too. See dev/plans/perf-scenario-catalog-2026-04-25.md tier 1.
+;;
 ;; Panel-mode golden parity scenario — second fixture for the
 ;; [test_panel_round_trips_golden] gate.
 ;;

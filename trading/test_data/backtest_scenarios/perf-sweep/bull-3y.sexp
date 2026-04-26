@@ -1,3 +1,6 @@
+;; perf-tier: 3
+;; perf-tier-rationale: Largest perf-sweep cell (3 years / ~756 trading days at N=1000, includes 2020 crash); weekly cadence (≤2 h budget). See dev/plans/perf-scenario-catalog-2026-04-25.md tier 3.
+;;
 ;; Synthetic perf-sweep scenario — vary universe_cap via --override to extract
 ;; complexity curve. NOT a regression gate.
 ;;

@@ -1,3 +1,6 @@
+;; perf-tier: 1
+;; perf-tier-rationale: 7-symbol parity universe over 6 months — fastest scenario in the catalog, well under the per-PR ≤2 min budget. Already exercised by OUnit tests; tagging makes it eligible for the per-PR perf smoke too. See dev/plans/perf-scenario-catalog-2026-04-25.md tier 1.
+;;
 ;; Merge-gate parity scenario for the tiered loader track.
 ;;
 ;; Runs under BOTH [loader_strategy = Legacy] and [loader_strategy = Tiered]

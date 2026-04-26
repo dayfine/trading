@@ -1,3 +1,6 @@
+;; perf-tier: 2
+;; perf-tier-rationale: 1654-symbol full-universe smoke over 6 months, ~5-10 min wall; too heavy for per-PR gate (≤2 min) — fits nightly cadence. See dev/plans/perf-scenario-catalog-2026-04-25.md tier 2.
+;;
 ;; Smoke scenario: bullish second half of 2019. Runs quickly (~5-10 min).
 ;; Ranges are broad sanity checks, not regression gates.
 ;;

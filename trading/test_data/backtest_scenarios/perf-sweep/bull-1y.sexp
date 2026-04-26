@@ -1,3 +1,6 @@
+;; perf-tier: 3
+;; perf-tier-rationale: Mid-scope perf-sweep cell (1 year / ~252 trading days at N=1000); weekly cadence (≤2 h budget). See dev/plans/perf-scenario-catalog-2026-04-25.md tier 3.
+;;
 ;; Synthetic perf-sweep scenario — vary universe_cap via --override to extract
 ;; complexity curve. NOT a regression gate.
 ;;

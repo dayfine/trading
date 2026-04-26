@@ -1,3 +1,6 @@
+;; perf-tier: 2
+;; perf-tier-rationale: 1654-symbol full-universe smoke over 12 months, ~5-10 min wall; too heavy for per-PR gate (≤2 min) — fits nightly cadence. See dev/plans/perf-scenario-catalog-2026-04-25.md tier 2.
+;;
 ;; Smoke scenario: calendar year 2023 recovery. Runs quickly (~5-10 min).
 ;; Ranges are broad sanity checks, not regression gates.
 ;;
