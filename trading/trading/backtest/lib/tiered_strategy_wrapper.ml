@@ -1,22 +1,19 @@
-(* @large-module: this file integrates three seams (tier bookkeeping, get_price
-   throttle, Bar_history seed) plus the Friday cycle orchestration, each of
-   which is tightly coupled to the wrapper's closure state. Splitting any one
-   concern into a sibling module would fragment the on_market_close flow
-   across files. *)
+(* @large-module: this file integrates two seams (tier bookkeeping +
+   get_price throttle) plus the Friday cycle orchestration, each of which is
+   tightly coupled to the wrapper's closure state. Splitting any one concern
+   into a sibling module would fragment the on_market_close flow across
+   files. *)
 
 (** Tier-bookkeeping wrapper around a [STRATEGY] — see
     [tiered_strategy_wrapper.mli]. *)
 
 open Core
 open Trading_strategy
-module Bar_history = Weinstein_strategy.Bar_history
 
 type config = {
   bar_loader : Bar_loader.t;
-  bar_history : Bar_history.t;
   universe : string list;
   always_loaded_symbols : String.Set.t;
-  seed_warmup_start : Date.t;
   stop_log : Stop_log.t;
   primary_index : string;
 }
@@ -77,100 +74,35 @@ let _promote_each_to t ~symbols ~to_ ~as_of ~ctx =
       Bar_loader.promote t.bar_loader ~symbols:[ symbol ] ~to_ ~as_of
       |> _swallow_err ~ctx)
 
-(** [_seed_from_full t ~symbols] pulls each symbol's [Full.t.bars] from the
-    loader and seeds the shared [bar_history] with them. Symbols that aren't at
-    Full tier (promotion failed, insufficient history) are silently skipped —
-    the wrapper's throttled [get_price] will keep returning [None] for them and
-    the strategy will stay oblivious.
-
-    Bars earlier than [t.seed_warmup_start] are truncated out before seeding.
-    Matches Legacy's warmup window: [Bar_history.accumulate] under Legacy grows
-    from [start_date - warmup_days] forward, so by day D the history holds at
-    most [D - warmup_start + 1] daily bars. Full tier's default multi-year tail
-    would otherwise give Tiered strictly more history, and
-    [Stock_analysis.analyze]'s RS / resistance / MA outputs diverge silently
-    when the weekly-bar input count differs. The lower bound on the seed window
-    is the correctness fix for that divergence.
-
-    This is the integration's load-bearing primitive: every Full-tier promotion
-    pair-fires with a seed, giving the strategy's [Bar_history] readers
-    ([_screen_universe], [Stops_runner._compute_ma], [_make_entry_transition])
-    the same bars they'd see under Legacy [accumulate]. *)
-let _truncate_bars ~cutoff (bars : Types.Daily_price.t list) =
-  List.filter bars ~f:(fun b -> Date.( >= ) b.Types.Daily_price.date cutoff)
-
-let _seed_one_symbol t ~cutoff symbol =
-  match Bar_loader.get_full t.bar_loader ~symbol with
-  | None -> ()
-  | Some full ->
-      let bars = _truncate_bars ~cutoff full.bars in
-      Bar_history.seed t.bar_history ~symbol ~bars
-
-let _seed_from_full t ~symbols =
-  let cutoff = t.seed_warmup_start in
-  List.iter symbols ~f:(_seed_one_symbol t ~cutoff)
-
 (** [_promote_universe_to_full] promotes every universe symbol in [symbols] to
-    Full tier and seeds [bar_history] with each symbol's [Full.t.bars].
-    Idempotent for symbols already at Full; per-symbol failures (missing CSV)
-    are logged + swallowed via [_promote_each_to].
+    Full tier. Idempotent for symbols already at Full; per-symbol failures
+    (missing CSV) are logged + swallowed via [_promote_each_to].
 
     Promotes directly to Full rather than gating on Summary. The underlying
     [Bar_loader._promote_one_to_full] treats Summary scalar resolution as
     best-effort — Full promotion succeeds as long as the CSV has at least one
-    bar (which implies Metadata succeeded). [Bar_history] gets seeded with
-    whatever bars the loader has, matching Legacy's "use whatever bars
-    [accumulate] has at this point" invariant. The strategy's per-indicator math
-    (Stage classifier, Stock_analysis) already handles short-history inputs by
-    returning [None] / skipping the symbol — which is the same behaviour Legacy
-    exhibits.
+    bar (which implies Metadata succeeded).
 
-    Memory cost: [Bar_history] grows monotonically to the universe size over the
-    simulation (one entry per symbol that has had a successful Metadata promote
-    at least once). The [Full.t.bars] cache stays bounded by
-    [Full_compute.tail_days], independent of [Bar_history]. *)
+    The data-panels Stage cleanup deleted the parallel [Bar_history] cache and
+    the Friday-cycle seed step that fed it from [Full.t.bars]. The strategy now
+    reads bars directly from {!Data_panel.Bar_panels} (populated up-front from
+    CSV at runner start), so the Full-tier promote drives loader bookkeeping and
+    trace events but no longer feeds an external cache. *)
 let _promote_universe_to_full t ~symbols ~as_of =
-  if not (List.is_empty symbols) then (
+  if not (List.is_empty symbols) then
     _promote_each_to t ~symbols ~to_:Full_tier ~as_of
-      ~ctx:"promote universe to Full";
-    _seed_from_full t ~symbols)
+      ~ctx:"promote universe to Full"
 
-(** [_run_friday_cycle] promotes every universe symbol to Full and seeds
-    [bar_history] from each symbol's [Full.t.bars]. Called once per Friday via
-    the wrapper's [on_market_close], {b before} delegating to the inner strategy
-    so the Full-tier bars + seeded [bar_history] are visible to the inner
-    screener's [_screen_universe] on the same day.
-
-    Parity-fix history (most recent first):
-
-    - {b Pass 3 (this fix)}: drop the intermediate Summary promote pass and
-      promote universe symbols straight to Full.
-      [Bar_loader.promote ~to_:Full_tier] auto-cascades through Metadata →
-      Summary → Full and (after the loader change paired with this fix) treats
-      Summary scalar resolution as best-effort. The wrapper now drives Full
-      directly and lets the loader's cascade handle the rest. Closes the
-      bull-crash residual divergence on the small CI fixture (pre-fix: Tiered
-      missed the early entry batch entirely because the Summary tier's RS window
-      — [rs_ma_period] weekly bars — hadn't resolved yet, leaving [Bar_history]
-      empty for the universe).
-
-    - {b Pass 2 (PR five-one-seven)}: dropped the [Shadow_screener] filter from
-      the promote step (it was pre-filtering candidates against Legacy's
-      screener cascade, capping at [full_candidate_limit]) and replaced it with
-      "promote every Summary-tier symbol to Full". Closed broad-goldens
-      multi-fold trade-count divergence; left small-fixture residual that Pass 3
-      closes.
-
-    - {b Pass 1 (pre-PR five-one-seven)}: original Shadow_screener-driven design
-      (now removed). The shadow's stricter RS gate and missing screener bonuses
-      produced a different candidate set than Legacy. *)
+(** [_run_friday_cycle] promotes every universe symbol to Full. Called once per
+    Friday via the wrapper's [on_market_close], {b before} delegating to the
+    inner strategy. *)
 let _run_friday_cycle t ~as_of =
   _promote_universe_to_full t ~symbols:t.universe ~as_of
 
 (** [_promote_new_entries] promotes every symbol referenced by a
-    [CreateEntering] transition to Full tier and seeds [bar_history] from the
-    loader's bars. Ensures the loader has OHLCV ready the first time the
-    strategy reads bars for the newly-tracked position on subsequent steps. *)
+    [CreateEntering] transition to Full tier. Ensures the loader has OHLCV ready
+    (in case a future tier-aware reader needs it) the first time the strategy
+    enters a new position. *)
 let _promote_new_entries t ~transitions ~as_of =
   let symbols =
     List.filter_map transitions ~f:(fun (trans : Position.transition) ->
@@ -178,10 +110,9 @@ let _promote_new_entries t ~transitions ~as_of =
         | CreateEntering { symbol; _ } -> Some symbol
         | _ -> None)
   in
-  if not (List.is_empty symbols) then (
+  if not (List.is_empty symbols) then
     _promote_each_to t ~symbols ~to_:Full_tier ~as_of
-      ~ctx:"promote new entries to Full";
-    _seed_from_full t ~symbols)
+      ~ctx:"promote new entries to Full"
 
 (** [_is_newly_closed ~prev id pos] — a position is newly closed iff its current
     state is [Closed] AND the previous snapshot either didn't know the id or had
@@ -232,8 +163,10 @@ let _held_symbols_set (portfolio : Portfolio_view.t) =
       In practice every held position is also at Full (we promote on
       [CreateEntering]); this is belt-and-braces against a bookkeeping drift
       where the two would otherwise diverge.
-    - Everything else resolves to [None]. [Bar_history.accumulate] silently
-      skips [None] returns — this is the core memory win. *)
+    - Everything else resolves to [None]. The strategy's [get_price]-driven
+      paths (day-of-week detection, fallback bar lookups) treat [None] as "no
+      bar today", so blocking metadata-tier symbols here keeps the inner
+      strategy from acting on data it shouldn't see. *)
 let _throttled_get_price t ~(get_price : Strategy_interface.get_price_fn)
     ~(portfolio : Portfolio_view.t) : Strategy_interface.get_price_fn =
   let held = _held_symbols_set portfolio in
@@ -248,8 +181,8 @@ let _throttled_get_price t ~(get_price : Strategy_interface.get_price_fn)
     inner strategy returns [Ok]: stop-log recording, per-Closed demote,
     per-Entering promote, and the prior-positions snapshot update. The Friday
     cycle has already fired {b before} the inner strategy (in [wrap]'s closure)
-    so its Full-tier promotions + seeding are visible to the inner screener on
-    the same day. *)
+    so its Full-tier promotions are visible to the inner screener on the same
+    day. *)
 let _handle_ok_output t ~prior_positions ~get_price ~portfolio
     ~(transitions : Position.transition list) =
   Stop_log.record_transitions t.stop_log transitions;
@@ -270,7 +203,7 @@ let _handle_ok_output t ~prior_positions ~get_price ~portfolio
 let _on_market_close_wrapped ~inner ~t ~prior_positions ~get_price
     ~get_indicator ~portfolio =
   (* Friday cycle fires before the inner strategy so its Full-tier promotions
-     + seeded bar_history are visible to the inner screener the same day. *)
+     are visible to the inner screener the same day. *)
   if _is_friday ~get_price ~primary_index:t.primary_index then
     _run_friday_cycle t
       ~as_of:(_current_date ~get_price ~primary_index:t.primary_index);

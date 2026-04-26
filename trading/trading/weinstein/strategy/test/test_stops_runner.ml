@@ -78,8 +78,7 @@ let test_update_no_positions_returns_empty _ =
       ~stage_config:default_stage_cfg ~lookback_bars:52
       ~positions:String.Map.empty
       ~get_price:(fun _ -> None)
-      ~stop_states
-      ~bar_reader:(Bar_reader.of_history (Bar_history.create ()))
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
   in
@@ -97,8 +96,7 @@ let test_update_position_without_stop_state_returns_empty _ =
     Stops_runner.update ~stops_config:default_cfg
       ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
       ~get_price:(fun _ -> Some (make_bar "2024-01-12" ~close:95.0 ()))
-      ~stop_states
-      ~bar_reader:(Bar_reader.of_history (Bar_history.create ()))
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
   in
@@ -119,8 +117,7 @@ let test_update_position_without_bar_returns_empty _ =
     Stops_runner.update ~stops_config:default_cfg
       ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
       ~get_price:(fun _ -> None)
-      ~stop_states
-      ~bar_reader:(Bar_reader.of_history (Bar_history.create ()))
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
   in
@@ -146,8 +143,7 @@ let test_update_stop_hit_emits_trigger_exit _ =
     Stops_runner.update ~stops_config:default_cfg
       ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
       ~get_price:(get_price_of [ (ticker, bar) ])
-      ~stop_states
-      ~bar_reader:(Bar_reader.of_history (Bar_history.create ()))
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
   in
@@ -194,8 +190,7 @@ let test_update_mutates_stop_states_ref _ =
     Stops_runner.update ~stops_config:default_cfg
       ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
       ~get_price:(get_price_of [ (ticker, bar) ])
-      ~stop_states
-      ~bar_reader:(Bar_reader.of_history (Bar_history.create ()))
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
   in

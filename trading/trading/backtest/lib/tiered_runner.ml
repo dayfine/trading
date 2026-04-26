@@ -2,6 +2,9 @@
 
 open Core
 open Trading_simulation
+module Symbol_index = Data_panel.Symbol_index
+module Ohlcv_panels = Data_panel.Ohlcv_panels
+module Bar_panels = Data_panel.Bar_panels
 
 type input = {
   data_dir_fpath : Fpath.t;
@@ -10,6 +13,51 @@ type input = {
   config : Weinstein_strategy.config;
   all_symbols : string list;
 }
+
+(** With [Bar_history] deleted, the strategy reads OHLCV bars from
+    {!Data_panel.Bar_panels}. The Tiered runner builds the same panels
+    Panel_runner does so the strategy has a working bar source. The Tiered
+    loader's tier system continues to drive [get_price] visibility for
+    [Stops_runner] / [Portfolio_view.portfolio_value]; the panels feed the
+    strategy's stage / RS / resistance / breakout reads. *)
+let _build_calendar ~start ~end_ : Date.t array =
+  let rec loop d acc =
+    if Date.( > ) d end_ then List.rev acc
+    else
+      let dow = Date.day_of_week d in
+      let is_weekend =
+        Day_of_week.equal dow Day_of_week.Sat
+        || Day_of_week.equal dow Day_of_week.Sun
+      in
+      let acc' = if is_weekend then acc else d :: acc in
+      loop (Date.add_days d 1) acc'
+  in
+  Array.of_list (loop start [])
+
+let _build_bar_panels (input : input) ~start_date ~end_date ~warmup_days =
+  let warmup_start = Date.add_days start_date (-warmup_days) in
+  let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
+  let symbol_index =
+    match Symbol_index.create ~universe:input.all_symbols with
+    | Ok t -> t
+    | Error err ->
+        failwithf "Tiered_runner: Symbol_index.create failed: %s"
+          err.Status.message ()
+  in
+  let ohlcv =
+    match
+      Ohlcv_panels.load_from_csv_calendar symbol_index
+        ~data_dir:input.data_dir_fpath ~calendar
+    with
+    | Ok t -> t
+    | Error err ->
+        failwithf "Tiered_runner: Ohlcv_panels.load_from_csv_calendar: %s"
+          (Status.show err) ()
+  in
+  match Bar_panels.create ~ohlcv ~calendar with
+  | Ok p -> p
+  | Error err ->
+      failwithf "Tiered_runner: Bar_panels.create: %s" err.Status.message ()
 
 let tier_op_to_phase (op : Bar_loader.tier_op) : Trace.Phase.t =
   match op with
@@ -31,9 +79,10 @@ let _make_trace_hook ?trace () : Bar_loader.trace_hook =
     When [config.full_compute_tail_days = Some n], override the default
     [tail_days] (currently 1800) with [n]. Lower values cap the bar count
     retained per Full-tier symbol, reducing the per-symbol memory cost of
-    [Full.t.bars] but possibly changing strategy behaviour (Bar_history is
-    seeded from [Full.t.bars] on promotion). Hypothesis-testing only — see the
-    H2 row in [dev/plans/backtest-perf-2026-04-24.md].
+    [Full.t.bars]. Hypothesis-testing only — see the H2 row in the backtest-perf
+    plan. After [Bar_history] was deleted in the data-panels Stage 3 cleanup,
+    this override only affects the loader's per-symbol retention; the strategy
+    reads bars from [Bar_panels] regardless.
 
     When [None] (default), returns [Full_compute.default_config] unchanged so
     the Tiered path's per-symbol bar retention is byte-identical to the
@@ -145,33 +194,25 @@ let _always_loaded_symbols (config : Weinstein_strategy.config) =
   String.Set.of_list
     ((config.indices.primary :: sector_etf_symbols) @ global_index_symbols)
 
-let _make_wrapper_config (input : input) ~loader ~bar_history ~warmup_start
-    ~stop_log : Tiered_strategy_wrapper.config =
+let _make_wrapper_config (input : input) ~loader ~stop_log :
+    Tiered_strategy_wrapper.config =
   {
     bar_loader = loader;
-    bar_history;
     universe = input.all_symbols;
     always_loaded_symbols = _always_loaded_symbols input.config;
-    seed_warmup_start = warmup_start;
     stop_log;
     primary_index = input.config.indices.primary;
   }
 
 let _make_simulator (input : input) ~loader ~stop_log ~start_date ~end_date
     ~warmup_days ~initial_cash ~commission =
-  (* Allocate a shared Bar_history — passed to the inner strategy (so it reads
-     from and writes into this buffer instead of a fresh one) and to the
-     wrapper (so the wrapper can seed it from loader Full bars on promotion).
-     This is the integration seam Option b-seed relies on. *)
-  let bar_history = Weinstein_strategy.Bar_history.create () in
   let warmup_start = Date.add_days start_date (-warmup_days) in
+  let bar_panels = _build_bar_panels input ~start_date ~end_date ~warmup_days in
   let inner_strategy =
     Weinstein_strategy.make ~ad_bars:input.ad_bars
-      ~ticker_sectors:input.ticker_sectors ~bar_history input.config
+      ~ticker_sectors:input.ticker_sectors ~bar_panels input.config
   in
-  let wrapper_config =
-    _make_wrapper_config input ~loader ~bar_history ~warmup_start ~stop_log
-  in
+  let wrapper_config = _make_wrapper_config input ~loader ~stop_log in
   let strategy =
     Tiered_strategy_wrapper.wrap ~config:wrapper_config inner_strategy
   in
