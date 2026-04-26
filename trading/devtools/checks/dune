@@ -250,6 +250,18 @@
  (action
   (run sh %{dep:posix_sh_check_test.sh})))
 
+; No-Python enforcement: fails if any *.py file exists in the repo (outside
+; .git/, _build/, node_modules/, vendor/, .devcontainer/). The two previously
+; grandfathered scripts (perf_sweep_report.py, perf_hypothesis_report.py) were
+; deleted in cleanup/no-more-python when the Legacy loader_strategy was removed.
+; See .claude/rules/no-python.md for the policy.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:no_python_check.sh})))
+
 ; Perf-catalog integrity check: verifies every scenario sexp under
 ; trading/test_data/backtest_scenarios/{goldens-small,goldens-broad,perf-sweep,smoke}/
 ; carries a [;; perf-tier: <1|2|3|4>] header line, AND that paths
