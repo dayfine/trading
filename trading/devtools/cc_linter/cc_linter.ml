@@ -8,14 +8,17 @@
    - Each when guard: +1
    - Boolean operators && and ||: +1 each
 
-   Usage: cc_linter <trading-root> [<output-json-path>]
+   Usage: cc_linter <trading-root> [--out <output-json-path>]
 
    Scans all lib/*.ml and scripts/**/*.ml files under <trading-root>,
    excluding _build/ and ta_ocaml/ directories.
 
    Exits 0 always — CC is a quality signal, not a hard gate. Warnings are
-   printed to stdout. If a JSON output path is provided, per-function CC
-   data is written there for trend analysis. *)
+   printed to stdout. If --out <path> is provided, per-function CC data is
+   written there for trend analysis.
+
+   NOTE: positional arguments after <trading-root> are ignored. JSON output
+   must be requested explicitly with --out to avoid clobbering source files. *)
 
 (* --- Utility --------------------------------------------------------------- *)
 
@@ -265,16 +268,34 @@ let write_json path root date all_results =
 
 let cc_warn_limit = 10
 
+(* Parse CLI arguments: extract --out <path> flag and return (trading_root, json_out).
+   All positional arguments beyond trading_root are silently ignored; JSON output
+   must be requested with --out to prevent accidental source-file clobbering. *)
+let _parse_args () =
+  let args = Array.to_list (Array.sub Sys.argv 1 (Array.length Sys.argv - 1)) in
+  let rec go remaining root json_out =
+    match remaining with
+    | [] -> (root, json_out)
+    | "--out" :: path :: rest -> go rest root (Some path)
+    | "--out" :: [] ->
+        Printf.eprintf "cc_linter: --out requires a path argument\n";
+        exit 2
+    | arg :: rest -> (
+        match root with
+        | None -> go rest (Some arg) json_out
+        | Some _ ->
+            (* Additional positional args are ignored; do not write to them *)
+            go rest root json_out)
+  in
+  match go args None None with
+  | None, _ ->
+      Printf.eprintf
+        "Usage: cc_linter <trading-root> [--out <output-json-path>]\n";
+      exit 2
+  | Some root, json_out -> (root, json_out)
+
 let () =
-  let trading_root =
-    if Array.length Sys.argv > 1 then Sys.argv.(1)
-    else (
-      Printf.eprintf "Usage: cc_linter <trading-root> [<output-json-path>]\n";
-      exit 2)
-  in
-  let json_output =
-    if Array.length Sys.argv > 2 then Some Sys.argv.(2) else None
-  in
+  let trading_root, json_output = _parse_args () in
   let files = collect_lib_ml_files trading_root |> List.sort String.compare in
   let all_results = List.concat_map (fun f -> check_file f) files in
   let warnings =
