@@ -102,7 +102,7 @@ let test_stage_callbacks_parity _ =
   let config = Stage.default_config in
   let bar_list_callbacks = Stage.callbacks_from_bars ~config ~bars in
   let panel_callbacks =
-    Panel_callbacks.stage_callbacks_of_weekly_view ~config ~weekly:view
+    Panel_callbacks.stage_callbacks_of_weekly_view ~config ~weekly:view ()
   in
   let bar_list_result =
     Stage.classify_with_callbacks ~config ~get_ma:bar_list_callbacks.get_ma
@@ -212,7 +212,7 @@ let test_stock_analysis_callbacks_parity _ =
   in
   let panel_cbs =
     Panel_callbacks.stock_analysis_callbacks_of_weekly_views ~config
-      ~stock:stock_view ~benchmark:bench_view
+      ~stock:stock_view ~benchmark:bench_view ()
   in
   let bar_list_result =
     Stock_analysis.analyze_with_callbacks ~config ~ticker:"AAPL"
@@ -263,7 +263,7 @@ let test_sector_callbacks_parity _ =
   in
   let panel_cbs =
     Panel_callbacks.sector_callbacks_of_weekly_views ~config ~sector:sector_view
-      ~benchmark:bench_view
+      ~benchmark:bench_view ()
   in
   let bar_list_result =
     Sector.analyze_with_callbacks ~config ~sector_name:"Information Technology"
@@ -324,7 +324,7 @@ let test_macro_callbacks_parity _ =
   let panel_cbs =
     Panel_callbacks.macro_callbacks_of_weekly_views ~config ~index:index_view
       ~globals:[ ("DAX", global_view) ]
-      ~ad_bars
+      ~ad_bars ()
   in
   let bar_list_result =
     Macro.analyze_with_callbacks ~config ~callbacks:bar_cbs ~prior_stage:None
@@ -486,10 +486,59 @@ let test_resistance_callbacks_parity _ =
            (equal_to (List.length bar_result.zones_above));
        ])
 
+(* Stage parity with PR-D cache: classify on a 60-week rising series,
+   build callbacks two ways — one with [?ma_cache] passed (cache hit on
+   the latest Friday date), one without — and require bit-identical
+   Stage.result. The default ma_type is WMA; the cache returns the
+   same MA values as inline because WMA is sliding-window. *)
+let test_stage_callbacks_parity_with_cache _ =
+  let bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2024-01-05")
+      ~n:60 ~start_price:100.0 ~step:0.5
+  in
+  let panels = panels_of_symbols [ ("AAPL", bars) ] in
+  let view =
+    Bar_panels.weekly_view_for panels ~symbol:"AAPL" ~n:60
+      ~as_of_day:(Bar_panels.n_days panels - 1)
+  in
+  let config = Stage.default_config in
+  let cache = Weinstein_strategy.Weekly_ma_cache.create panels in
+  let inline_callbacks =
+    Panel_callbacks.stage_callbacks_of_weekly_view ~config ~weekly:view ()
+  in
+  let cached_callbacks =
+    Panel_callbacks.stage_callbacks_of_weekly_view ~ma_cache:cache
+      ~symbol:"AAPL" ~config ~weekly:view ()
+  in
+  let inline_result =
+    Stage.classify_with_callbacks ~config ~get_ma:inline_callbacks.get_ma
+      ~get_close:inline_callbacks.get_close ~prior_stage:None
+  in
+  let cached_result =
+    Stage.classify_with_callbacks ~config ~get_ma:cached_callbacks.get_ma
+      ~get_close:cached_callbacks.get_close ~prior_stage:None
+  in
+  assert_that cached_result
+    (all_of
+       [
+         field
+           (fun (r : Stage.result) -> r.ma_value)
+           (float_equal inline_result.ma_value);
+         field
+           (fun (r : Stage.result) -> r.ma_slope_pct)
+           (float_equal inline_result.ma_slope_pct);
+         field
+           (fun (r : Stage.result) -> r.above_ma_count)
+           (equal_to inline_result.above_ma_count);
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
          "Stage parity" >:: test_stage_callbacks_parity;
+         "Stage parity (cache vs inline)"
+         >:: test_stage_callbacks_parity_with_cache;
          "Rs parity" >:: test_rs_callbacks_parity;
          "Stock_analysis parity" >:: test_stock_analysis_callbacks_parity;
          "Sector parity" >:: test_sector_callbacks_parity;

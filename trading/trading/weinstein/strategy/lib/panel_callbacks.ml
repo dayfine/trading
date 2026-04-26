@@ -1,3 +1,10 @@
+(* @large-module: panel-shaped callback constructors for the eight strategy
+   callees (Stage / Rs / Volume / Resistance / Stock_analysis / Sector /
+   Macro / Support_floor) plus PR-D's cache-aware Stage path. Splitting
+   the per-callee constructors into sibling modules would force a cycle
+   (Sector / Macro / Stock_analysis re-call the Stage constructor) so they
+   live together, sharing the helpers above. *)
+
 (** Panel-shaped callback bundles for the Weinstein strategy callees.
 
     See {!Panel_callbacks_intf} (panel_callbacks.mli) for the public contract.
@@ -61,15 +68,61 @@ let _ma_values_of_closes ~(config : Stage.config) ~closes
 (* Stage                                                                *)
 (* ------------------------------------------------------------------ *)
 
-let stage_callbacks_of_weekly_view ~(config : Stage.config)
-    ~(weekly : Bar_panels.weekly_view) : Stage.callbacks =
+(** Build the inline [get_ma] from the view's closes (current allocational path;
+    one allocation per call). Used as the cache-miss fallback and the
+    bar-list-only path. *)
+let _inline_get_ma ~(config : Stage.config) ~(weekly : Bar_panels.weekly_view) :
+    week_offset:int -> float option =
   let ma_values =
     _ma_values_of_closes ~config ~closes:weekly.closes ~dates:weekly.dates
   in
-  {
-    get_ma = _get_from_float_array ma_values;
-    get_close = _get_from_float_array weekly.closes;
-  }
+  _get_from_float_array ma_values
+
+(** Cap the cached [get_ma] by view depth: the bar-list path computes MA over
+    the truncated weekly view's closes (yielding [view.n - period + 1] values),
+    so any deeper offsets must read [None] for parity. *)
+let _capped_get_ma ~(cached_values : float array) ~(end_idx : int)
+    ~(view_ma_depth : int) : week_offset:int -> float option =
+  let n = Array.length cached_values in
+  fun ~week_offset ->
+    let idx = end_idx - week_offset in
+    let in_view = week_offset >= 0 && week_offset < view_ma_depth in
+    let in_array = idx >= 0 && idx < n in
+    if in_view && in_array then Some cached_values.(idx) else None
+
+(** Try to build [get_ma] from the cache; return [None] on miss (empty view, no
+    values for this key, or view's last date not in the cached dates array). *)
+let _cached_get_ma ~(cache : Weekly_ma_cache.t) ~(symbol : string)
+    ~(config : Stage.config) ~(weekly : Bar_panels.weekly_view) :
+    (week_offset:int -> float option) option =
+  if weekly.n = 0 then None
+  else
+    let values, dates =
+      Weekly_ma_cache.ma_values_for cache ~symbol ~ma_type:config.ma_type
+        ~period:config.ma_period
+    in
+    let target_date = weekly.dates.(weekly.n - 1) in
+    let view_ma_depth = max 0 (weekly.n - config.ma_period + 1) in
+    Option.map (Weekly_ma_cache.locate_date dates target_date)
+      ~f:(fun end_idx ->
+        _capped_get_ma ~cached_values:values ~end_idx ~view_ma_depth)
+
+(** Try the cache; on miss fall back to inline. The cache-aware path requires
+    both a registered cache AND a symbol to key on; either being [None]
+    short-circuits to inline. *)
+let _stage_get_ma ?ma_cache ?symbol ~(config : Stage.config)
+    ~(weekly : Bar_panels.weekly_view) () : week_offset:int -> float option =
+  match (ma_cache, symbol) with
+  | Some cache, Some symbol -> (
+      match _cached_get_ma ~cache ~symbol ~config ~weekly with
+      | Some f -> f
+      | None -> _inline_get_ma ~config ~weekly)
+  | _ -> _inline_get_ma ~config ~weekly
+
+let stage_callbacks_of_weekly_view ?ma_cache ?symbol ~(config : Stage.config)
+    ~(weekly : Bar_panels.weekly_view) () : Stage.callbacks =
+  let get_ma = _stage_get_ma ?ma_cache ?symbol ~config ~weekly () in
+  { get_ma; get_close = _get_from_float_array weekly.closes }
 
 (* ------------------------------------------------------------------ *)
 (* Rs — date-aligned join, then index into aligned arrays               *)
@@ -151,13 +204,15 @@ let resistance_callbacks_of_weekly_view ~(weekly : Bar_panels.weekly_view) :
 (* Stock_analysis — bundle of high/volume + nested Stage/Rs/Volume/Resistance *)
 (* ------------------------------------------------------------------ *)
 
-let stock_analysis_callbacks_of_weekly_views ~(config : Stock_analysis.config)
-    ~(stock : Bar_panels.weekly_view) ~(benchmark : Bar_panels.weekly_view) :
-    Stock_analysis.callbacks =
+let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
+    ~(config : Stock_analysis.config) ~(stock : Bar_panels.weekly_view)
+    ~(benchmark : Bar_panels.weekly_view) () : Stock_analysis.callbacks =
   {
     get_high = _get_from_float_array stock.highs;
     get_volume = _get_from_float_array stock.volumes;
-    stage = stage_callbacks_of_weekly_view ~config:config.stage ~weekly:stock;
+    stage =
+      stage_callbacks_of_weekly_view ?ma_cache ?symbol:stock_symbol
+        ~config:config.stage ~weekly:stock ();
     rs = rs_callbacks_of_weekly_views ~stock ~benchmark;
     volume = volume_callbacks_of_weekly_view ~weekly:stock;
     resistance = resistance_callbacks_of_weekly_view ~weekly:stock;
@@ -167,12 +222,13 @@ let stock_analysis_callbacks_of_weekly_views ~(config : Stock_analysis.config)
 (* Sector — pure delegation to nested Stage + Rs callbacks              *)
 (* ------------------------------------------------------------------ *)
 
-let sector_callbacks_of_weekly_views ~(config : Sector.config)
-    ~(sector : Bar_panels.weekly_view) ~(benchmark : Bar_panels.weekly_view) :
-    Sector.callbacks =
+let sector_callbacks_of_weekly_views ?ma_cache ?sector_symbol
+    ~(config : Sector.config) ~(sector : Bar_panels.weekly_view)
+    ~(benchmark : Bar_panels.weekly_view) () : Sector.callbacks =
   {
     stage =
-      stage_callbacks_of_weekly_view ~config:config.stage_config ~weekly:sector;
+      stage_callbacks_of_weekly_view ?ma_cache ?symbol:sector_symbol
+        ~config:config.stage_config ~weekly:sector ();
     rs = rs_callbacks_of_weekly_views ~stock:sector ~benchmark;
   }
 
@@ -211,15 +267,21 @@ let _compute_momentum_ma_scalar ~momentum_period (ad_bars : Macro.ad_bar list) :
 let _get_ad_momentum_ma (ma : float option) : week_offset:int -> float option =
  fun ~week_offset -> if week_offset = 0 then ma else None
 
-let _named_global_stage (config : Macro.config)
+(* Globals are passed as (label, view); the cache is keyed by symbol, not
+   label. The strategy's per-symbol global passes are small (~3 globals)
+   so the lost cache hit is negligible vs the universe-wide screener loop;
+   pass-through is intentionally bar-list-only (cache-miss path). *)
+let _named_global_stage ?ma_cache (config : Macro.config)
     ((name, view) : string * Bar_panels.weekly_view) : string * Stage.callbacks
     =
-  (name, stage_callbacks_of_weekly_view ~config:config.stage_config ~weekly:view)
+  ( name,
+    stage_callbacks_of_weekly_view ?ma_cache ~config:config.stage_config
+      ~weekly:view () )
 
-let macro_callbacks_of_weekly_views ~(config : Macro.config)
-    ~(index : Bar_panels.weekly_view)
+let macro_callbacks_of_weekly_views ?ma_cache ?index_symbol
+    ~(config : Macro.config) ~(index : Bar_panels.weekly_view)
     ~(globals : (string * Bar_panels.weekly_view) list)
-    ~(ad_bars : Macro.ad_bar list) : Macro.callbacks =
+    ~(ad_bars : Macro.ad_bar list) () : Macro.callbacks =
   let cum_ad_arr = _build_cumulative_ad_array ad_bars in
   let ma_scalar =
     _compute_momentum_ma_scalar
@@ -227,11 +289,13 @@ let macro_callbacks_of_weekly_views ~(config : Macro.config)
   in
   {
     index_stage =
-      stage_callbacks_of_weekly_view ~config:config.stage_config ~weekly:index;
+      stage_callbacks_of_weekly_view ?ma_cache ?symbol:index_symbol
+        ~config:config.stage_config ~weekly:index ();
     get_index_close = _get_from_float_array index.closes;
     get_cumulative_ad = _get_from_float_array cum_ad_arr;
     get_ad_momentum_ma = _get_ad_momentum_ma ma_scalar;
-    global_index_stages = List.map globals ~f:(_named_global_stage config);
+    global_index_stages =
+      List.map globals ~f:(_named_global_stage ?ma_cache config);
   }
 
 (* ------------------------------------------------------------------ *)

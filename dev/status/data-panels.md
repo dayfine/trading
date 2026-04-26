@@ -3,9 +3,54 @@
 ## Last updated: 2026-04-26
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-Stage 4 PR-B IN_PROGRESS on `feat/panels-stage04-pr-b-volume-resistance-callbacks` — drops the residual `bars_for_volume_resistance : Daily_price.t list` parameter from `Stock_analysis.analyze_with_callbacks`. The strategy's hot path no longer materialises any `Daily_price.t list` per-symbol per-Friday.
+Stage 4 PR-D READY_FOR_REVIEW on `feat/panels-stage04-pr-d-weekly-indicator-panels` — adds `Weekly_ma_cache` (per-symbol weekly MA memoisation) so the `stage_callbacks_of_weekly_view` hot path no longer recomputes SMA / WMA / EMA over weekly closes per Friday tick. Memoised by `(symbol, ma_type, period)`; built lazily at first request from the symbol's full weekly history; cache hits skip the `Indicator_types.t list` allocation entirely. Fallback to inline computation on cache miss (mid-week stops_runner calls + tests without a panel).
+
+**Stage 4 PR-D scope**:
+- New module `weinstein/strategy/lib/weekly_ma_cache.{ml,mli}`. Hashtbl-backed memoisation keyed by `{ symbol; ma_type tag; period }`. The MA tag is a local mirror of `Stage.ma_type` (so the module derives `hash` without touching `Stage.ma_type`). Stores `cached_ma = { values : float array; dates : Date.t array }`. `ma_values_for` lazily computes via the same `Sma.calculate_sma | Sma.calculate_weighted_ma | Ema.calculate_ema` kernels `Stage._compute_ma` uses, then caches the result. `locate_date` does a tail-anchored linear scan to map a view's most-recent date to its cached index.
+- `Bar_reader.t` becomes a record `{ panels; ma_cache : Weekly_ma_cache.t option }`. `of_panels ?ma_cache` lets callers supply the cache; `ma_cache : t -> t option` exposes it for `Panel_callbacks` to thread through.
+- `Panel_callbacks.stage_callbacks_of_weekly_view ?ma_cache ?symbol ~config ~weekly ()` — when both `ma_cache` and `symbol` are supplied, looks up the cached MA values, locates the view's last date, and builds a capped `get_ma` closure (returns `None` for `week_offset >= view.n - period + 1` to match the bar-list path's truncation). On cache miss (date not in cached dates) falls back to inline `_ma_values_of_closes`.
+- `stock_analysis_callbacks_of_weekly_views`, `sector_callbacks_of_weekly_views`, `macro_callbacks_of_weekly_views` all gain `?ma_cache ?stock_symbol / ?sector_symbol / ?index_symbol` and thread to nested `stage_callbacks_of_weekly_view`. Macro globals pass through with no symbol (cache-miss path) since the (label, view) bundles drop the symbol; this is only ~3 indices vs the universe-wide screener loop.
+- `Weinstein_strategy.make` constructs the cache when `bar_panels` are supplied and bundles it into `Bar_reader.of_panels ~ma_cache`. The cache lifetime is the strategy closure's lifetime.
+- `Stops_runner.update`, `Macro_inputs.build_sector_map` and `Macro_inputs._sector_context_from_views` thread `?ma_cache` through to the panel callbacks. Trailing `()` arg added where OCaml's "unerasable optional argument" rule required it.
+
+**Bit-equality**:
+- SMA / WMA: bit-identical at every offset (sliding window).
+- EMA: bit-identical at offset 0 and after sufficient warmup; default Stage config uses WMA, so EMA-via-cache is exercised only by tests.
+- View-depth cap on the cached `get_ma` ensures `_count_above_ma_callback` and `_is_late_stage2_callback` see the same `None`-cutoff the bar-list path produces.
+
+**Parity gates green**:
+- Load-bearing `test_panel_loader_parity` (round_trips golden): 2 tests, all OK.
+- New `test_weekly_ma_cache.ml`: 9 tests (SMA period=30 / WMA period=30 / EMA period=30 / SMA period=10 cache-vs-inline parity; short-history → empty; unknown-symbol → empty; locate_date present / missing; cache memoisation phys-equal). All OK.
+- `test_panel_callbacks.ml`: 9 tests (8 pre-existing + 1 new "Stage parity (cache vs inline)" test that builds two callback bundles — one cache-aware, one inline — and asserts bit-identical Stage.result over a 60-week WMA-default rising series). All OK.
+- `test_macro_inputs.ml` (8 tests), `test_stops_runner.ml` (5 tests), all `weinstein/strategy/test` suites green.
+- All other test suites green: `data_panel/test` (60 tests), `backtest/test` (13 tests), all module tests pass.
+
+**Files touched**:
+- new: `trading/trading/weinstein/strategy/lib/weekly_ma_cache.{ml,mli}` (~105 + 90 lines).
+- new: `trading/trading/weinstein/strategy/test/test_weekly_ma_cache.ml` (~225 lines).
+- modified: `trading/trading/weinstein/strategy/lib/{panel_callbacks,bar_reader,stops_runner,macro_inputs,weinstein_strategy}.{ml,mli}`. Net +~120 lines including doc comments. `panel_callbacks.ml` declared `@large-module` (326 lines — splitting the per-callee constructors creates cycles).
+- modified: `trading/trading/weinstein/strategy/lib/dune` — added `ppx_compare ppx_hash` to preprocess (needed by the cache key's `[@@deriving hash, compare]`).
+- modified: `trading/trading/weinstein/strategy/test/dune` — registered `test_weekly_ma_cache` and added `indicators.{types,sma,ema}` to libraries.
+- modified: `trading/trading/weinstein/strategy/test/{test_panel_callbacks,test_macro_inputs,test_stops_runner}.ml` — added trailing `()` to call sites whose APIs gained the optional `?ma_cache` arg; added new "Stage parity (cache vs inline)" test.
+
+**LOC delta**: ~+450 production, ~+225 tests. `panel_callbacks.ml` 271 → 326 lines (declared `@large-module`).
+
+**Out of scope (deferred)**:
+- Stage classifier / Volume / Resistance ported to int8/decoder Bigarray panels (variant-typed result panel) — separate PR after PR-D's measured RSS impact.
+- Bigarray-backed weekly MA panel (uniform N×W). The Hashtbl path is simpler given per-symbol weekly histories vary in length (different first-trade dates); revisit if the cache footprint becomes a concern.
+- RSS spike re-run on `bull-crash-292x6y` to measure A+B+C+D combined peak RSS — separate dispatch (local devcontainer wall budget).
+
+**Verify**: `cd trading && eval $(opam env) && TRADING_DATA_DIR=$PWD/test_data dune build && dune runtest && dune build @fmt`. All suites green; formatter clean; nesting linter clean (max ≤5, avg ≤3.0).
+
+PR-D is bookmarked at `feat/panels-stage04-pr-d-weekly-indicator-panels`. Plan: `dev/plans/panels-stage04-pr-d-2026-04-26.md`.
+
+---
+
+**Prior status (Stage 4 PR-C, MERGED #590)**: single-pass weekly aggregation in `Bar_panels.weekly_view_for`.
+
+**Prior status (Stage 4 PR-B, MERGED #588)**: drops the residual `bars_for_volume_resistance : Daily_price.t list` parameter from `Stock_analysis.analyze_with_callbacks`. The strategy's hot path no longer materialises any `Daily_price.t list` per-symbol per-Friday.
 
 **Stage 4 PR-B scope**:
 - `Volume.analyze_breakout_with_callbacks ~callbacks ~event_offset` — new callback-shaped entry point. `Volume.callbacks = { get_volume : week_offset:int -> float option }`. Indices match the panel layout (`week_offset:0` = newest). Existing bar-list `analyze_breakout` is now a thin wrapper that converts `event_idx` ↔ `event_offset` and delegates.

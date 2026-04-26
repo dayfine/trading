@@ -81,6 +81,7 @@ let test_update_no_positions_returns_empty _ =
       ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
+      ()
   in
   assert_that exits is_empty;
   assert_that adjusts is_empty
@@ -99,6 +100,7 @@ let test_update_position_without_stop_state_returns_empty _ =
       ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
+      ()
   in
   assert_that exits is_empty;
   assert_that adjusts is_empty
@@ -120,6 +122,7 @@ let test_update_position_without_bar_returns_empty _ =
       ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
+      ()
   in
   assert_that exits is_empty;
   assert_that adjusts is_empty
@@ -146,6 +149,7 @@ let test_update_stop_hit_emits_trigger_exit _ =
       ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
+      ()
   in
   assert_that adjusts is_empty;
   assert_that exits
@@ -193,6 +197,7 @@ let test_update_mutates_stop_states_ref _ =
       ~stop_states ~bar_reader:(Bar_reader.empty ())
       ~as_of:(Date.of_string "2024-12-31")
       ~prior_stages:(Hashtbl.create (module String))
+      ()
   in
   (* Entry for AAPL still exists in the ref (may be same state or advanced). *)
   assert_that (Map.find !stop_states ticker) (is_some_and (fun _ -> ()))

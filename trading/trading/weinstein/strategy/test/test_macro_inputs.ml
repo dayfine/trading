@@ -176,6 +176,7 @@ let test_build_sector_map_empty_bar_history _ =
       ~as_of:(Date.of_string "2024-12-31")
       ~sector_prior_stages ~index_view:_empty_weekly_view
       ~ticker_sectors:(Hashtbl.create (module String))
+      ()
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -208,6 +209,7 @@ let test_build_sector_map_drops_etfs_with_insufficient_bars _ =
         (Hashtbl.of_alist_exn
            (module String)
            [ ("XLK", "Information Technology") ])
+      ()
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -229,6 +231,7 @@ let test_build_sector_map_drops_etfs_when_index_bars_empty _ =
         (Hashtbl.of_alist_exn
            (module String)
            [ ("XLK", "Information Technology") ])
+      ()
   in
   assert_that (Hashtbl.to_alist result) is_empty
 
@@ -262,6 +265,7 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
         (Hashtbl.of_alist_exn
            (module String)
            [ ("XLK", "Information Technology") ])
+      ()
   in
   assert_that (Hashtbl.to_alist result)
     (elements_are

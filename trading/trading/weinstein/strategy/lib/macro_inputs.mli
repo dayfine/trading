@@ -59,6 +59,7 @@ val build_global_index_bars :
     fixtures. *)
 
 val build_sector_map :
+  ?ma_cache:Weekly_ma_cache.t ->
   stage_config:Stage.config ->
   lookback_bars:int ->
   sector_etfs:(string * string) list ->
@@ -67,6 +68,7 @@ val build_sector_map :
   sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
   index_view:Data_panel.Bar_panels.weekly_view ->
   ticker_sectors:(string, string) Hashtbl.t ->
+  unit ->
   (string, Screener.sector_context) Hashtbl.t
 (** [build_sector_map] returns a map keyed by stock ticker (e.g. ["AAPL"]). Each
     entry is the {!Screener.sector_context} produced by
@@ -83,4 +85,7 @@ val build_sector_map :
 
     [sector_prior_stages] is read and updated in place so that Stage1->Stage2
     transitions are detected across screening days — the caller owns this
-    hashtable as part of the strategy closure state. *)
+    hashtable as part of the strategy closure state.
+
+    Stage 4 PR-D: when [ma_cache] is passed, sector ETF MA values are fetched
+    from the cache rather than recomputed per Friday. *)

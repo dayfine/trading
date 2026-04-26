@@ -21,13 +21,28 @@
     — no transitional [bars_for_volume_resistance] parameter remains. *)
 
 val stage_callbacks_of_weekly_view :
+  ?ma_cache:Weekly_ma_cache.t ->
+  ?symbol:string ->
   config:Stage.config ->
   weekly:Data_panel.Bar_panels.weekly_view ->
+  unit ->
   Stage.callbacks
-(** [stage_callbacks_of_weekly_view ~config ~weekly] builds a {!Stage.callbacks}
-    bundle backed by the float-array view's [closes] and [dates], using the same
-    {!Sma.calculate_sma} / [Sma.calculate_weighted_ma] / {!Ema.calculate_ema}
-    kernels as {!Stage.callbacks_from_bars}. *)
+(** [stage_callbacks_of_weekly_view ?ma_cache ?symbol ~config ~weekly ()] builds
+    a {!Stage.callbacks} bundle backed by the float-array view's [closes] and
+    [dates], using the same {!Sma.calculate_sma} / [Sma.calculate_weighted_ma] /
+    {!Ema.calculate_ema} kernels as {!Stage.callbacks_from_bars}.
+
+    Stage 4 PR-D: when both [ma_cache] and [symbol] are passed, the MA values
+    array is fetched from the cache instead of recomputed per call. The cache
+    stores Friday-aligned MA values; if the view's most-recent date matches a
+    cached date, the call short-circuits to a panel-cell read. On cache miss
+    (mid-week date / unknown symbol) the constructor falls back to inline MA
+    computation — preserving bit-equality with the bar-list path on every call.
+
+    Tests and bar-list-only callers pass [()] for the trailing positional arg
+    without [?ma_cache] / [?symbol] to use the inline path. The trailing [unit]
+    keeps the optional args unambiguous (otherwise OCaml warns "this optional
+    argument cannot be erased"). *)
 
 val rs_callbacks_of_weekly_views :
   stock:Data_panel.Bar_panels.weekly_view ->
@@ -53,9 +68,12 @@ val resistance_callbacks_of_weekly_view :
     [n_bars] return [None]. *)
 
 val stock_analysis_callbacks_of_weekly_views :
+  ?ma_cache:Weekly_ma_cache.t ->
+  ?stock_symbol:string ->
   config:Stock_analysis.config ->
   stock:Data_panel.Bar_panels.weekly_view ->
   benchmark:Data_panel.Bar_panels.weekly_view ->
+  unit ->
   Stock_analysis.callbacks
 (** [stock_analysis_callbacks_of_weekly_views ~config ~stock ~benchmark] builds
     a {!Stock_analysis.callbacks} bundle indexing the stock's [highs] and
@@ -68,19 +86,25 @@ val stock_analysis_callbacks_of_weekly_views :
     sub-callee consumes a callback bundle. *)
 
 val sector_callbacks_of_weekly_views :
+  ?ma_cache:Weekly_ma_cache.t ->
+  ?sector_symbol:string ->
   config:Sector.config ->
   sector:Data_panel.Bar_panels.weekly_view ->
   benchmark:Data_panel.Bar_panels.weekly_view ->
+  unit ->
   Sector.callbacks
 (** [sector_callbacks_of_weekly_views ~config ~sector ~benchmark] builds a
     {!Sector.callbacks} bundle: nested {!Stage.callbacks} over the sector's own
     bars and {!Rs.callbacks} over the sector vs benchmark. *)
 
 val macro_callbacks_of_weekly_views :
+  ?ma_cache:Weekly_ma_cache.t ->
+  ?index_symbol:string ->
   config:Macro.config ->
   index:Data_panel.Bar_panels.weekly_view ->
   globals:(string * Data_panel.Bar_panels.weekly_view) list ->
   ad_bars:Macro.ad_bar list ->
+  unit ->
   Macro.callbacks
 (** [macro_callbacks_of_weekly_views ~config ~index ~globals ~ad_bars] builds a
     {!Macro.callbacks} bundle:

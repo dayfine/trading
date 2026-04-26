@@ -6,6 +6,7 @@
   test_macro_inputs
   test_panel_callbacks
   test_stops_runner
+  test_weekly_ma_cache
   test_weinstein_strategy
   test_weinstein_strategy_smoke)
  (libraries
@@ -27,6 +28,9 @@
   weinstein.types
   weinstein.screener
   weinstein.stage
+  indicators.types
+  indicators.sma
+  indicators.ema
   weinstein.macro
   weinstein.rs
   weinstein.sector
