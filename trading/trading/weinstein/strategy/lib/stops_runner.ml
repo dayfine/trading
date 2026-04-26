@@ -1,21 +1,30 @@
 open Core
 open Trading_strategy
 
-(** Compute MA direction and value for a symbol from its accumulated bar
-    history. Reads and updates [prior_stages] so Stage1->Stage2 transition
-    detection works across calls. Returns [(Flat, close_price)] when there
-    aren't enough bars yet for the MA. *)
+(** Compute MA direction and value for a symbol via panel-shaped callbacks.
+    Reads and updates [prior_stages] so Stage1->Stage2 transition detection
+    works across calls. Returns [(Flat, fallback_price)] when there aren't
+    enough weekly bars yet for the MA.
+
+    Stage 4 PR-A: this no longer materialises a {!Daily_price.t list}. The
+    weekly view is read directly from panels and threaded into a
+    {!Stage.callbacks} bundle. *)
 let _compute_ma ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
     ~prior_stages ~symbol ~fallback_price =
   let weekly =
-    Bar_reader.weekly_bars_for bar_reader ~symbol ~n:lookback_bars ~as_of
+    Bar_reader.weekly_view_for bar_reader ~symbol ~n:lookback_bars ~as_of
   in
-  if List.length weekly < stage_config.ma_period then
+  if weekly.n < stage_config.ma_period then
     (Weinstein_types.Flat, fallback_price)
   else
     let prior_stage = Hashtbl.find prior_stages symbol in
+    let callbacks =
+      Panel_callbacks.stage_callbacks_of_weekly_view ~config:stage_config
+        ~weekly
+    in
     let result =
-      Stage.classify ~config:stage_config ~bars:weekly ~prior_stage
+      Stage.classify_with_callbacks ~config:stage_config
+        ~get_ma:callbacks.get_ma ~get_close:callbacks.get_close ~prior_stage
     in
     Hashtbl.set prior_stages ~key:symbol ~data:result.stage;
     (result.ma_direction, result.ma_value)

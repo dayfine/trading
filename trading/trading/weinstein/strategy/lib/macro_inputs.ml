@@ -22,6 +22,18 @@ let spdr_sector_etfs =
 let default_global_indices =
   [ ("GDAXI.INDX", "DAX"); ("N225.INDX", "Nikkei"); ("ISF.LSE", "FTSE") ]
 
+(* Stage 4 PR-A: build_global_index_views returns weekly views (panel-shaped).
+   Each entry is consumed by the macro callback bundle constructor; no
+   [Daily_price.t list] is ever materialised. The strategy's hot path uses
+   this; bar-list callers can use the legacy [build_global_index_bars]. *)
+let build_global_index_views ~lookback_bars ~global_index_symbols ~bar_reader
+    ~as_of =
+  List.filter_map global_index_symbols ~f:(fun (symbol, label) ->
+      let view =
+        Bar_reader.weekly_view_for bar_reader ~symbol ~n:lookback_bars ~as_of
+      in
+      if view.n = 0 then None else Some (label, view))
+
 let build_global_index_bars ~lookback_bars ~global_index_symbols ~bar_reader
     ~as_of =
   List.filter_map global_index_symbols ~f:(fun (symbol, label) ->
@@ -30,35 +42,41 @@ let build_global_index_bars ~lookback_bars ~global_index_symbols ~bar_reader
       in
       if List.is_empty bars then None else Some (label, bars))
 
-(** Analyze one sector ETF and return its {!Screener.sector_context}, keyed by
-    the ETF symbol. Returns [None] when not enough bars are accumulated yet for
-    stage classification or when the benchmark index has no bars. *)
-let _sector_context_for ~(stage_config : Stage.config) ~lookback_bars
-    ~bar_reader ~as_of ~sector_prior_stages ~index_bars ~etf_symbol ~sector_name
-    : (string * Screener.sector_context) option =
-  let sector_bars =
-    Bar_reader.weekly_bars_for bar_reader ~symbol:etf_symbol ~n:lookback_bars
+(** Analyze one sector ETF via panel-shaped callbacks and return its
+    {!Screener.sector_context}. Returns [None] when not enough bars are
+    accumulated yet for stage classification or when the benchmark index view is
+    empty. *)
+let _sector_context_from_views ~(stage_config : Stage.config) ~lookback_bars
+    ~bar_reader ~as_of ~sector_prior_stages
+    ~(index_view : Data_panel.Bar_panels.weekly_view) ~etf_symbol ~sector_name :
+    (string * Screener.sector_context) option =
+  let sector_view =
+    Bar_reader.weekly_view_for bar_reader ~symbol:etf_symbol ~n:lookback_bars
       ~as_of
   in
-  if List.length sector_bars < stage_config.ma_period then None
-  else if List.is_empty index_bars then None
+  if sector_view.n < stage_config.ma_period then None
+  else if index_view.n = 0 then None
   else
     let prior_stage = Hashtbl.find sector_prior_stages etf_symbol in
+    let callbacks =
+      Panel_callbacks.sector_callbacks_of_weekly_views
+        ~config:Sector.default_config ~sector:sector_view ~benchmark:index_view
+    in
     let result =
-      Sector.analyze ~config:Sector.default_config ~sector_name ~sector_bars
-        ~benchmark_bars:index_bars ~constituent_analyses:[] ~prior_stage
+      Sector.analyze_with_callbacks ~config:Sector.default_config ~sector_name
+        ~callbacks ~constituent_analyses:[] ~prior_stage
     in
     Hashtbl.set sector_prior_stages ~key:etf_symbol ~data:result.stage.stage;
     Some (etf_symbol, Sector.sector_context_of result)
 
 let build_sector_map ~stage_config ~lookback_bars ~sector_etfs ~bar_reader
-    ~as_of ~sector_prior_stages ~index_bars ~ticker_sectors =
+    ~as_of ~sector_prior_stages ~index_view ~ticker_sectors =
   (* Step 1: Analyze each sector ETF to get sector_name -> sector_context. *)
   let sector_ctx_by_name = Hashtbl.create (module String) in
   List.iter sector_etfs ~f:(fun (etf_symbol, sector_name) ->
       match
-        _sector_context_for ~stage_config ~lookback_bars ~bar_reader ~as_of
-          ~sector_prior_stages ~index_bars ~etf_symbol ~sector_name
+        _sector_context_from_views ~stage_config ~lookback_bars ~bar_reader
+          ~as_of ~sector_prior_stages ~index_view ~etf_symbol ~sector_name
       with
       | None -> ()
       | Some (_key, ctx) ->

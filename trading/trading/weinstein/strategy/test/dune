@@ -4,6 +4,7 @@
   test_ad_bars_compose
   test_ad_bars_weekly_e2e
   test_macro_inputs
+  test_panel_callbacks
   test_stops_runner
   test_weinstein_strategy
   test_weinstein_strategy_smoke)
@@ -27,6 +28,9 @@
   weinstein.screener
   weinstein.stage
   weinstein.macro
+  weinstein.rs
+  weinstein.sector
+  weinstein.stock_analysis
   weinstein_trading.portfolio_risk
   weinstein_trading.stops
   weinstein.data_source.testing

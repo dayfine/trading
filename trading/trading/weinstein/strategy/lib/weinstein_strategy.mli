@@ -48,6 +48,10 @@ module Macro_inputs = Macro_inputs
     canonical {!Macro_inputs.spdr_sector_etfs} and
     {!Macro_inputs.default_global_indices} constants for use in {!config}. *)
 
+module Panel_callbacks = Panel_callbacks
+(** Panel-shaped callback bundle constructors for the strategy's callees. See
+    {!Panel_callbacks}. *)
+
 (** {1 Configuration} *)
 
 type index_config = {

@@ -17,6 +17,10 @@ module Macro_inputs = Macro_inputs
     [spdr_sector_etfs] and [default_global_indices] as canonical constants for
     callers to use in {!config}. *)
 
+module Panel_callbacks = Panel_callbacks
+(** Panel-shaped callback-bundle constructors for the strategy's callees. Stage
+    4 PR-A. *)
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -106,14 +110,21 @@ let _make_entry_transition ~config ~stop_states ~bar_reader ~portfolio_value
   if sizing.shares = 0 then None
   else
     let id = _gen_position_id cand.ticker in
-    let daily_bars =
-      Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker
+    (* Stage 4 PR-A: read a daily view directly from panels — no
+       [Daily_price.t list]. The view is windowed to [support_floor_lookback_bars]
+       at construction, matching the wrapper [callbacks_from_bars] semantics. *)
+    let daily_view =
+      Bar_reader.daily_view_for bar_reader ~symbol:cand.ticker
         ~as_of:current_date
+        ~lookback:config.stops_config.support_floor_lookback_bars
+    in
+    let callbacks =
+      Panel_callbacks.support_floor_callbacks_of_daily_view daily_view
     in
     let initial_stop =
-      Weinstein_stops.compute_initial_stop_with_floor
+      Weinstein_stops.compute_initial_stop_with_floor_with_callbacks
         ~config:config.stops_config ~side:cand.side
-        ~entry_price:cand.suggested_entry ~bars:daily_bars ~as_of:current_date
+        ~entry_price:cand.suggested_entry ~callbacks
         ~fallback_buffer:config.initial_stop_buffer
     in
     stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
@@ -212,26 +223,45 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
 
     - [Bullish]: longs only — shorts are empty.
     - [Neutral]: both — longs and shorts are both eligible.
-    - [Bearish]: shorts only — longs are empty. *)
-let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
+    - [Bearish]: shorts only — longs are empty.
+
+    Stage 4 PR-A: per-ticker analysis goes through panel-shaped Stage / Rs
+    callbacks (no [Daily_price.t list] for those scans). Volume + Resistance in
+    [Stock_analysis] still consume a bar list — that reshape is deferred to
+    PR-B; the bar list is built on-demand here from
+    [Bar_reader.weekly_bars_for]. *)
+let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
     ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
     ~current_date =
   let _analyze_ticker ticker =
-    let bars =
-      Bar_reader.weekly_bars_for bar_reader ~symbol:ticker
+    let stock_view =
+      Bar_reader.weekly_view_for bar_reader ~symbol:ticker
         ~n:config.lookback_bars ~as_of:current_date
     in
-    if List.is_empty bars then None
+    if stock_view.n = 0 then None
     else
       let as_of_date =
-        match List.last bars with
-        | Some b -> b.Types.Daily_price.date
-        | None -> current_date
+        if stock_view.n = 0 then current_date
+        else stock_view.dates.(stock_view.n - 1)
       in
       let prior_stage = Hashtbl.find prior_stages ticker in
+      (* PR-B carry-over: Volume + Resistance still consume a [Daily_price.t]
+         list. Build it on-demand here; the rest of Stock_analysis (Stage,
+         Rs, breakout-price scan, peak-volume scan) reads through the
+         panel-shaped callbacks above without allocating. *)
+      let bars_for_volume_resistance =
+        Bar_reader.weekly_bars_for bar_reader ~symbol:ticker
+          ~n:config.lookback_bars ~as_of:current_date
+      in
+      let callbacks =
+        Panel_callbacks.stock_analysis_callbacks_of_weekly_views
+          ~config:Stock_analysis.default_config ~stock:stock_view
+          ~benchmark:index_view
+      in
       let result =
-        Stock_analysis.analyze ~config:Stock_analysis.default_config ~ticker
-          ~bars ~benchmark_bars:index_bars ~prior_stage ~as_of_date
+        Stock_analysis.analyze_with_callbacks
+          ~config:Stock_analysis.default_config ~ticker ~callbacks
+          ~bars_for_volume_resistance ~prior_stage ~as_of_date
       in
       Hashtbl.set prior_stages ~key:ticker ~data:result.stage.stage;
       Some result
@@ -252,13 +282,16 @@ let _screen_universe ~config ~index_bars ~macro_trend ~sector_map ~stop_states
 (* make                                                                  *)
 (* ------------------------------------------------------------------ *)
 
-(** Stops are adjusted daily; screening runs only on Fridays (weekly review). *)
-let _is_screening_day index_bars =
-  match List.last index_bars with
-  | None -> false
-  | Some bar ->
-      Date.day_of_week bar.Types.Daily_price.date
-      |> Day_of_week.equal Day_of_week.Fri
+(** Stops are adjusted daily; screening runs only on Fridays (weekly review).
+
+    Stage 4 PR-A: takes the panel weekly view directly. The screening day is the
+    date of the most recent bar in the view (the Friday of the latest week, by
+    week-bucket aggregation). *)
+let _is_screening_day_view (view : Data_panel.Bar_panels.weekly_view) =
+  if view.n = 0 then false
+  else
+    Date.day_of_week view.dates.(view.n - 1)
+    |> Day_of_week.equal Day_of_week.Fri
 
 (** Run the Friday macro + screener path and return entry transitions. Under all
     macro regimes (Bullish, Neutral, Bearish) the screener is invoked;
@@ -268,25 +301,29 @@ let _is_screening_day index_bars =
     returned [] unconditionally. *)
 let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_bars =
+    ~current_date ~index_view =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
-  let global_index_bars =
-    Macro_inputs.build_global_index_bars ~lookback_bars:config.lookback_bars
+  let global_index_views =
+    Macro_inputs.build_global_index_views ~lookback_bars:config.lookback_bars
       ~global_index_symbols:config.indices.global ~bar_reader
       ~as_of:current_date
   in
+  let macro_callbacks =
+    Panel_callbacks.macro_callbacks_of_weekly_views ~config:config.macro_config
+      ~index:index_view ~globals:global_index_views ~ad_bars
+  in
   let macro_result =
-    Macro.analyze ~config:config.macro_config ~index_bars ~ad_bars
-      ~global_index_bars ~prior_stage:index_prior_stage ~prior:None
+    Macro.analyze_with_callbacks ~config:config.macro_config
+      ~callbacks:macro_callbacks ~prior_stage:index_prior_stage ~prior:None
   in
   prior_macro := macro_result.trend;
   let sector_map =
     Macro_inputs.build_sector_map ~stage_config:config.stage_config
       ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
-      ~bar_reader ~as_of:current_date ~sector_prior_stages ~index_bars
+      ~bar_reader ~as_of:current_date ~sector_prior_stages ~index_view
       ~ticker_sectors
   in
-  _screen_universe ~config ~index_bars ~macro_trend:macro_result.trend
+  _screen_universe ~config ~index_view ~macro_trend:macro_result.trend
     ~sector_map ~stop_states ~portfolio ~get_price ~bar_reader ~prior_stages
     ~current_date
 
@@ -305,16 +342,19 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
       ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
       ~prior_stages
   in
-  let index_bars =
-    Bar_reader.weekly_bars_for bar_reader ~symbol:config.indices.primary
+  (* Stage 4 PR-A: read the primary index as a weekly view directly. The
+     Friday detection uses the view's latest date; the screener path consumes
+     the same view to avoid building two parallel inputs. *)
+  let index_view =
+    Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary
       ~n:config.lookback_bars ~as_of:current_date
   in
   let entry_transitions =
-    if not (_is_screening_day index_bars) then []
+    if not (_is_screening_day_view index_view) then []
     else
       _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
         ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-        ~current_date ~index_bars
+        ~current_date ~index_view
   in
   Ok
     {

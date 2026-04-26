@@ -157,6 +157,16 @@ let test_build_global_index_bars_drops_symbols_without_bars _ =
     weekly bars. 30 weeks × 5 weekdays = 150, so 250 is comfortably over. *)
 let _sufficient_daily_bars = 250
 
+let _empty_weekly_view : Bar_panels.weekly_view =
+  {
+    closes = [||];
+    highs = [||];
+    lows = [||];
+    volumes = [||];
+    dates = [||];
+    n = 0;
+  }
+
 let test_build_sector_map_empty_bar_history _ =
   let bar_reader = Bar_reader.empty () in
   let sector_prior_stages = Hashtbl.create (module String) in
@@ -164,7 +174,7 @@ let test_build_sector_map_empty_bar_history _ =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52 ~sector_etfs:Macro_inputs.spdr_sector_etfs ~bar_reader
       ~as_of:(Date.of_string "2024-12-31")
-      ~sector_prior_stages ~index_bars:[]
+      ~sector_prior_stages ~index_view:_empty_weekly_view
       ~ticker_sectors:(Hashtbl.create (module String))
   in
   assert_that (Hashtbl.to_alist result) is_empty
@@ -182,13 +192,18 @@ let test_build_sector_map_drops_etfs_with_insufficient_bars _ =
       ~n:_sufficient_daily_bars ~start_price:4500.0
   in
   let as_of = (List.last_exn bars).date in
-  let bar_reader = make_bar_reader ~symbols_with_bars:[ ("XLK", bars) ] in
+  let bar_reader =
+    make_bar_reader ~symbols_with_bars:[ ("XLK", bars); ("INDEX", index_bars) ]
+  in
+  let index_view =
+    Bar_reader.weekly_view_for bar_reader ~symbol:"INDEX" ~n:52 ~as_of
+  in
   let sector_prior_stages = Hashtbl.create (module String) in
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_reader ~as_of ~sector_prior_stages ~index_bars
+      ~bar_reader ~as_of ~sector_prior_stages ~index_view
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)
@@ -209,7 +224,7 @@ let test_build_sector_map_drops_etfs_when_index_bars_empty _ =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_reader ~as_of ~sector_prior_stages ~index_bars:[]
+      ~bar_reader ~as_of ~sector_prior_stages ~index_view:_empty_weekly_view
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)
@@ -226,18 +241,23 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
       ~n:_sufficient_daily_bars ~start_price:100.0
   in
   let as_of = (List.last_exn bars).date in
-  let bar_reader = make_bar_reader ~symbols_with_bars:[ ("XLK", bars) ] in
   let index_bars =
     make_rising_bars
       ~start_date:(Date.of_string "2024-01-01")
       ~n:_sufficient_daily_bars ~start_price:4500.0
+  in
+  let bar_reader =
+    make_bar_reader ~symbols_with_bars:[ ("XLK", bars); ("INDEX", index_bars) ]
+  in
+  let index_view =
+    Bar_reader.weekly_view_for bar_reader ~symbol:"INDEX" ~n:52 ~as_of
   in
   let sector_prior_stages = Hashtbl.create (module String) in
   let result =
     Macro_inputs.build_sector_map ~stage_config:Stage.default_config
       ~lookback_bars:52
       ~sector_etfs:[ ("XLK", "Information Technology") ]
-      ~bar_reader ~as_of ~sector_prior_stages ~index_bars
+      ~bar_reader ~as_of ~sector_prior_stages ~index_view
       ~ticker_sectors:
         (Hashtbl.of_alist_exn
            (module String)

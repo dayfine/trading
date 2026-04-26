@@ -111,3 +111,174 @@ let low_window t ~symbol ~as_of_day ~len =
     Option.map (_row_for t symbol) ~f:(fun row ->
         let row_view = BA2.slice_left (Ohlcv_panels.low t.ohlcv) row in
         BA1.sub row_view pos len)
+
+(* ------------------------------------------------------------------ *)
+(* Float-array views (Stage 4 PR-A)                                     *)
+(*                                                                      *)
+(* The weekly_view / daily_view primitives walk panel cells directly    *)
+(* and emit float arrays — no [Daily_price.t list] intermediate. This   *)
+(* is the foundation for {!Panel_callbacks}, which builds Stage / Rs /  *)
+(* Sector / Macro / Stops callback bundles over the resulting arrays.   *)
+(* ------------------------------------------------------------------ *)
+
+type weekly_view = {
+  closes : float array;
+  highs : float array;
+  lows : float array;
+  volumes : float array;
+  dates : Date.t array;
+  n : int;
+}
+
+type daily_view = {
+  highs : float array;
+  lows : float array;
+  closes : float array;
+  dates : Date.t array;
+  n_days : int;
+}
+
+let _empty_weekly_view : weekly_view =
+  {
+    closes = [||];
+    highs = [||];
+    lows = [||];
+    volumes = [||];
+    dates = [||];
+    n = 0;
+  }
+
+let _empty_daily_view : daily_view =
+  { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
+
+(* Walk panel cells along [from_day..to_day_inclusive], dropping NaN closes,
+   and return the count + per-field float buffers (sized to the maximum span
+   so this allocates exactly once). All buffers are written into the same
+   prefix index in lockstep, so the count tells how many are valid. *)
+let _read_row_cells ~ohlcv ~calendar ~row ~from_day ~to_day_inclusive =
+  let n_max = to_day_inclusive - from_day + 1 in
+  let highs = Array.create ~len:n_max Float.nan in
+  let lows = Array.create ~len:n_max Float.nan in
+  let closes = Array.create ~len:n_max Float.nan in
+  let volumes = Array.create ~len:n_max Float.nan in
+  let adjusted = Array.create ~len:n_max Float.nan in
+  let dates = Array.create ~len:n_max calendar.(from_day) in
+  let close_p = Ohlcv_panels.close ohlcv in
+  let high_p = Ohlcv_panels.high ohlcv in
+  let low_p = Ohlcv_panels.low ohlcv in
+  let vol_p = Ohlcv_panels.volume ohlcv in
+  let adj_p = Ohlcv_panels.adjusted_close ohlcv in
+  let count = ref 0 in
+  for day = from_day to to_day_inclusive do
+    let close = BA2.unsafe_get close_p row day in
+    if not (Float.is_nan close) then (
+      let i = !count in
+      highs.(i) <- BA2.unsafe_get high_p row day;
+      lows.(i) <- BA2.unsafe_get low_p row day;
+      closes.(i) <- close;
+      volumes.(i) <- BA2.unsafe_get vol_p row day;
+      adjusted.(i) <- BA2.unsafe_get adj_p row day;
+      dates.(i) <- calendar.(day);
+      Int.incr count)
+  done;
+  (!count, highs, lows, closes, volumes, adjusted, dates)
+
+let _take_prefix arr n = Array.sub arr ~pos:0 ~len:n
+
+let daily_view_for t ~symbol ~as_of_day ~lookback =
+  _check_as_of t ~as_of_day;
+  if lookback <= 0 then _empty_daily_view
+  else
+    match _row_for t symbol with
+    | None -> _empty_daily_view
+    | Some row ->
+        let from_day = max 0 (as_of_day - lookback + 1) in
+        let count, highs, lows, closes, _vol, _adj, dates =
+          _read_row_cells ~ohlcv:t.ohlcv ~calendar:t.calendar ~row ~from_day
+            ~to_day_inclusive:as_of_day
+        in
+        if count = 0 then _empty_daily_view
+        else
+          {
+            highs = _take_prefix highs count;
+            lows = _take_prefix lows count;
+            closes = _take_prefix closes count;
+            dates = _take_prefix dates count;
+            n_days = count;
+          }
+
+(* ISO-week key: year + week number, Monday-anchored. Two adjacent days are
+   in the same bucket iff [Week_bucketing] would group them. *)
+let _week_key (date : Date.t) : int * int =
+  (Date.year date, Date.week_number date)
+
+(* Aggregate the cell prefix [0..n-1] of the per-field buffers into weekly
+   buckets. Emits float arrays keyed by week. Each bucket's date is the date
+   of the latest trading day in the week, [closes] is the adjusted close of
+   that day, [highs] = max within week, [lows] = min within week, [volumes] =
+   sum within week. *)
+let _aggregate_weekly ~n ~highs ~lows ~adjusted ~volumes ~dates : weekly_view =
+  if n = 0 then _empty_weekly_view
+  else
+    let n_weeks = ref 1 in
+    let prev_key = ref (_week_key dates.(0)) in
+    for i = 1 to n - 1 do
+      let k = _week_key dates.(i) in
+      if not ([%equal: int * int] k !prev_key) then (
+        Int.incr n_weeks;
+        prev_key := k)
+    done;
+    let nw = !n_weeks in
+    let w_closes = Array.create ~len:nw Float.nan in
+    let w_highs = Array.create ~len:nw Float.neg_infinity in
+    let w_lows = Array.create ~len:nw Float.infinity in
+    let w_vol = Array.create ~len:nw 0.0 in
+    let w_dates = Array.create ~len:nw dates.(0) in
+    let bucket = ref 0 in
+    let cur_key = ref (_week_key dates.(0)) in
+    for i = 0 to n - 1 do
+      let k = _week_key dates.(i) in
+      if not ([%equal: int * int] k !cur_key) then (
+        Int.incr bucket;
+        cur_key := k);
+      if Float.( > ) highs.(i) w_highs.(!bucket) then
+        w_highs.(!bucket) <- highs.(i);
+      if Float.( < ) lows.(i) w_lows.(!bucket) then w_lows.(!bucket) <- lows.(i);
+      w_vol.(!bucket) <- w_vol.(!bucket) +. volumes.(i);
+      w_closes.(!bucket) <- adjusted.(i);
+      w_dates.(!bucket) <- dates.(i)
+    done;
+    {
+      closes = w_closes;
+      highs = w_highs;
+      lows = w_lows;
+      volumes = w_vol;
+      dates = w_dates;
+      n = nw;
+    }
+
+let weekly_view_for t ~symbol ~n ~as_of_day =
+  _check_as_of t ~as_of_day;
+  match _row_for t symbol with
+  | None -> _empty_weekly_view
+  | Some row ->
+      let count, highs, lows, _closes_unused, volumes, adjusted, dates =
+        _read_row_cells ~ohlcv:t.ohlcv ~calendar:t.calendar ~row ~from_day:0
+          ~to_day_inclusive:as_of_day
+      in
+      let _ = _closes_unused in
+      let view =
+        _aggregate_weekly ~n:count ~highs ~lows ~adjusted ~volumes ~dates
+      in
+      if view.n <= n then view
+      else
+        let drop = view.n - n in
+        let take a = Array.sub a ~pos:drop ~len:n in
+        {
+          closes = take view.closes;
+          highs = take view.highs;
+          lows = take view.lows;
+          volumes = take view.volumes;
+          dates = take view.dates;
+          n;
+        }
