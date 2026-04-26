@@ -4,7 +4,7 @@ Single-source view of all tracked work. Update when a status file flips
 state, an owner changes, or a PR opens / merges / closes. Keep the table
 terse; detail belongs in the per-track status files linked in column 1.
 
-Last updated: 2026-04-26 (Stage 3 PR 3.4 of `data-panels` opens on `feat/panels-stage03-pr-d-delete-legacy` as PR #575 — deletes Legacy runner + `Loader_strategy` enum; QC APPROVED structural+behavioral, quality 5/5. `backtest-perf` Steps 1+2 (catalog 15 scenarios into 4 perf tiers + tier-1 smoke gate) opens as PR #574; QC APPROVED structural+behavioral, quality 5/5. Stage 3 PRs 3.1 #567, 3.2 #569, 3.3 #573 all MERGED 2026-04-25/26. Stage 4 (callbacks-through-runner wiring; load-bearing memory-win work per `dev/notes/panels-rss-spike-2026-04-25.md`) is the next dispatch.)
+Last updated: 2026-04-26-run2 (cleanup PR #578 opens on `cleanup/csv-storage-nesting` — extracts two `_`-prefixed helpers in `csv_storage.ml:_stream_in_range_prices` to flatten nesting; no behavior change, ~37 LOC. Verified empirically on the cleanup branch: `OK: nesting linter — all 886 functions within limits` (was: 833 + 1 fail). Build gate still exits 1 on main due to the unrelated `data-panels.md` `## Last updated:` integrity violation, which PR #575 fixes — that PR remains awaiting human merge. data-panels Stage 3 PR 3.4 (#575) and backtest-perf catalog (#574) both unchanged since run-1: tip SHAs match Reviewed SHAs in `dev/reviews/*` so re-QC was correctly skipped per Step 1.5.)
 
 ## Active + complete tracks
 
@@ -23,7 +23,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | MERGED | — | — | — (#436 merged 2026-04-19). GHA orchestrator runs continue to consume `trading/test_data/sectors.csv`. |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | No open harness PR. Recent merges: #493 POSIX-sh linter, #495 cost-capture new-day fix, #499 cost-capture commit+auto-merge, #504 budget PR creation via curl, #505 budget rescue (all 2026-04-22). Backlog remains saturated — T1 done; T2 milestone-gated; T3-C superseded; T3-H low-priority. Recurring status-file integrity drift from human-merged PRs is a [info] follow-up — linter already exits 1 on violation; requires branch-protection config to enforce. |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-adjacent | — | Phase 1 live (daily cron runs producing summary PRs). Phase 2 (background execution for scrapers, golden re-runs, cross-feature QC) pending empirical tests per status file. |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | Backlog remains empty (no new medium/high findings from latest deep scan or today's fast health check). No code-health dispatch this run. |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #578 (csv_storage nesting fix on `cleanup/csv-storage-nesting`) | Item `[~]` in flight: `_stream_in_range_prices` nested-match cleanup. PR #578 opened this run (run-2); helper-extraction approach. Awaiting human merge. After merge: backlog empty until next health-scan finding. |
 | [cost-tracking](cost-tracking.md) | IN_PROGRESS | harness-maintainer | — | GHA cost capture step landed (#483). Cost-capture new-day bug fixed via #495 + #499 (both 2026-04-22). Next: verify measured `total_cost_usd` now lands correctly on this run's `dev/budget/2026-04-22-run3.json`; compare costs pre/post #481/#482/#495/#499. |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
