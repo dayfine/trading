@@ -18,9 +18,7 @@
 #     trading/devtools/checks/deep_scan/*.sh  (deep scan per-check scripts)
 #     dev/lib/*.sh                            (shared lib scripts)
 #     dev/scripts/*.sh                        (one-off dev scripts — e.g.
-#                                             the tiered-loader A/B compare
-#                                             script invoked by the nightly
-#                                             tiered-loader-ab.yml workflow)
+#                                             perf sweep + tier-1 smoke runners)
 #   EXCLUDED:
 #     Scripts with explicit bash shebang (#!/bin/bash or #!/usr/bin/env bash)
 #     -- those scripts intentionally use bash features and are out of scope.
