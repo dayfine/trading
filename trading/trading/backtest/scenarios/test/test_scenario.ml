@@ -181,43 +181,28 @@ let test_universe_path_roundtrip _ =
   let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
   assert_that roundtripped.universe_path (equal_to "universes/custom.sexp")
 
-(* A scenario sexp that omits [loader_strategy] should round-trip with
-   [loader_strategy = None], preserving backward compat with all existing
-   scenario files that pre-date increment 3e. *)
-let test_loader_strategy_field_absent _ =
-  let s =
-    Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
-  in
-  assert_that s.loader_strategy is_none
-
-let _make_sexp_with_loader_strategy ~loader_strategy =
+(* Pre-3.4 scenario files set [(loader_strategy <variant>)]; after Stage 3
+   PR 3.4 deleted the [Loader_strategy] enum + the field, those scenarios
+   must continue to parse via [@sexp.allow_extra_fields]. The runner's
+   single panel-backed path ignores the field. *)
+let _make_sexp_with_loader_strategy_extra =
   sprintf
     {|
   ((name "test-scenario")
    (description "Unit-test fixture")
    (period ((start_date 2023-01-02) (end_date 2023-12-31)))
    (config_overrides ())
-   (loader_strategy %s)
+   (loader_strategy Panel)
    (expected
     (%s)))
   |}
-    loader_strategy _base_expected_fields
+    _base_expected_fields
 
-(* Panel was added in Stage 1 of the columnar redesign (see
-   [dev/plans/columnar-data-shape-2026-04-25.md]). After Stage 3 PR 3.3
-   deleted the Tiered runner, Panel is the only non-Legacy variant
-   exercised here. *)
-let test_loader_strategy_panel_roundtrip _ =
-  let original =
-    Scenario.t_of_sexp
-      (Sexp.of_string
-         (_make_sexp_with_loader_strategy ~loader_strategy:"Panel"))
+let test_loader_strategy_extra_field_tolerated _ =
+  let s =
+    Scenario.t_of_sexp (Sexp.of_string _make_sexp_with_loader_strategy_extra)
   in
-  assert_that original.loader_strategy
-    (is_some_and (equal_to Loader_strategy.Panel));
-  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
-  assert_that roundtripped.loader_strategy
-    (is_some_and (equal_to Loader_strategy.Panel))
+  assert_that s.universe_path (equal_to Scenario.default_universe_path)
 
 let suite =
   "Scenario"
@@ -232,9 +217,8 @@ let suite =
          >:: test_universe_path_absent_uses_default;
          "universe_path present => round-trips" >:: test_universe_path_present;
          "universe_path sexp round-trips" >:: test_universe_path_roundtrip;
-         "loader_strategy absent => None" >:: test_loader_strategy_field_absent;
-         "loader_strategy=Panel round-trips"
-         >:: test_loader_strategy_panel_roundtrip;
+         "extra loader_strategy field is tolerated (post-3.4 backward compat)"
+         >:: test_loader_strategy_extra_field_tolerated;
          "all scenario files parse" >:: test_all_scenario_files_parse;
        ]
 

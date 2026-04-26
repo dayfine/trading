@@ -53,8 +53,7 @@ let _sector_map_override (s : Scenario.t) =
 let _run (s : Scenario.t) ~overrides =
   let sector_map_override = _sector_map_override s in
   Backtest.Runner.run_backtest ~start_date:s.period.start_date
-    ~end_date:s.period.end_date ~overrides ?sector_map_override
-    ~loader_strategy:Loader_strategy.Legacy ()
+    ~end_date:s.period.end_date ~overrides ?sector_map_override ()
 
 (* -------------------------------------------------------------------- *)
 (* Sexp round-trip                                                       *)

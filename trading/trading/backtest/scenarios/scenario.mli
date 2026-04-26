@@ -51,24 +51,17 @@ type t = {
   config_overrides : Sexp.t list;
       (** Partial config sexps deep-merged into the default Weinstein config, in
           order. Empty list means the default config. *)
-  loader_strategy : Loader_strategy.t option; [@sexp.option]
-      (** Selects the bar-loader execution strategy used for this scenario:
-          - [None] (default) — Runner falls back to its own default
-            ([Loader_strategy.Legacy] today). Pre-3e scenario files have no
-            field and continue to behave exactly as before.
-          - [Some Legacy] — explicit opt-in to the legacy path. Useful for
-            scenarios that should pin the legacy behaviour even after the global
-            default flips.
-          - [Some Tiered] — opt-in to the tiered loader. Today this raises
-            inside the runner since the implementation lands in increment 3f of
-            [dev/plans/backtest-tiered-loader-2026-04-19.md]; once available,
-            scenarios will use this to exercise it. *)
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
-(** Extra fields in the scenario file (e.g. [universe_size]) are tolerated —
-    they document the context the scenario was written for but aren't part of
-    the runtime contract. *)
+(** Extra fields in the scenario file (e.g. [universe_size], [loader_strategy])
+    are tolerated — they document the context the scenario was written for but
+    aren't part of the runtime contract. After Stage 3 PR 3.4 of the columnar
+    data-shape redesign, the Loader_strategy enum + the [loader_strategy] field
+    here were both removed since the runner has a single (panel-backed)
+    execution path; pre-existing scenario files that still set
+    [(loader_strategy Panel)] continue to parse via [@sexp.allow_extra_fields]
+    and the field is ignored. *)
 
 val load : string -> t
 (** Load and parse a scenario sexp file. Raises [Failure] on malformed input. *)

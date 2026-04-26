@@ -4,7 +4,6 @@ type t = {
   start_date : string;
   end_date : string option;
   overrides : Sexp.t list;
-  loader_strategy : Loader_strategy.t option;
   trace_path : string option;
   memtrace_path : string option;
 }
@@ -12,7 +11,6 @@ type t = {
 type acc = {
   positional : string list;
   overrides : Sexp.t list;
-  loader_strategy : Loader_strategy.t option;
   trace_path : string option;
   memtrace_path : string option;
 }
@@ -21,18 +19,9 @@ type acc = {
     immutable {!t} only. *)
 
 let _empty_acc =
-  {
-    positional = [];
-    overrides = [];
-    loader_strategy = None;
-    trace_path = None;
-    memtrace_path = None;
-  }
+  { positional = []; overrides = []; trace_path = None; memtrace_path = None }
 
 let _err msg = Error (Status.invalid_argument_error msg)
-
-let _parse_loader_strategy value =
-  try Ok (Loader_strategy.of_string value) with Failure msg -> _err msg
 
 let rec _extract_flags args (acc : acc) =
   match args with
@@ -52,13 +41,6 @@ let rec _extract_flags args (acc : acc) =
             (sprintf "--override value is not a valid sexp: %s"
                (Error.to_string_hum err)))
   | [ "--override" ] -> _err "--override requires a sexp argument"
-  | "--loader-strategy" :: value :: rest -> (
-      match _parse_loader_strategy value with
-      | Ok parsed ->
-          _extract_flags rest { acc with loader_strategy = Some parsed }
-      | Error _ as e -> e)
-  | [ "--loader-strategy" ] ->
-      _err "--loader-strategy requires a value (legacy or panel)"
   | "--trace" :: value :: rest ->
       _extract_flags rest { acc with trace_path = Some value }
   | [ "--trace" ] -> _err "--trace requires a path argument"
@@ -84,7 +66,6 @@ let parse args =
               start_date;
               end_date;
               overrides = acc.overrides;
-              loader_strategy = acc.loader_strategy;
               trace_path = acc.trace_path;
               memtrace_path = acc.memtrace_path;
             }))

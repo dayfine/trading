@@ -1,15 +1,11 @@
 (* @large-module: backtest orchestration covers config-override deep-merge,
    universe + sector-map resolution, AD-breadth + sector-ETF loading (each
    gated by hypothesis-testing toggles in [Weinstein_strategy.config]), and
-   the Legacy/Panel loader-strategy split. Splitting any of these would
-   either duplicate the small helpers or leak the [_deps] record's shape
-   across modules; the Panel path already lives in [panel_runner.ml] for
-   the same reason. *)
+   the dispatch into the panel-backed runner. The actual simulator
+   construction + run-loop lives in [panel_runner.ml]; this module owns
+   the dependency-loading orchestration only. *)
 open Core
 open Trading_simulation
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
-module Bar_panels = Data_panel.Bar_panels
 
 (* Configuration constants *)
 
@@ -220,118 +216,8 @@ let _load_deps ?trace ~overrides ~sector_map_override () =
 
 (* Simulation *)
 
-(** With [Bar_history] deleted, the strategy reads OHLCV bars from
-    {!Data_panel.Bar_panels}. The Legacy runner builds the panels at
-    simulator-construction time so the strategy has a working bar source.
-    Symmetric with [Panel_runner]. *)
-let _build_legacy_calendar ~start ~end_ : Date.t array =
-  let rec loop d acc =
-    if Date.( > ) d end_ then List.rev acc
-    else
-      let dow = Date.day_of_week d in
-      let is_weekend =
-        Day_of_week.equal dow Day_of_week.Sat
-        || Day_of_week.equal dow Day_of_week.Sun
-      in
-      let acc' = if is_weekend then acc else d :: acc in
-      loop (Date.add_days d 1) acc'
-  in
-  Array.of_list (loop start [])
-
-let _build_legacy_bar_panels (deps : _deps) ~start_date ~end_date =
-  let warmup_start = Date.add_days start_date (-warmup_days) in
-  let calendar = _build_legacy_calendar ~start:warmup_start ~end_:end_date in
-  let symbol_index =
-    match Symbol_index.create ~universe:deps.all_symbols with
-    | Ok t -> t
-    | Error err ->
-        failwithf "Backtest.Runner: Symbol_index.create failed: %s"
-          err.Status.message ()
-  in
-  let ohlcv =
-    match
-      Ohlcv_panels.load_from_csv_calendar symbol_index
-        ~data_dir:deps.data_dir_fpath ~calendar
-    with
-    | Ok t -> t
-    | Error err ->
-        failwithf "Backtest.Runner: Ohlcv_panels.load_from_csv_calendar: %s"
-          (Status.show err) ()
-  in
-  match Bar_panels.create ~ohlcv ~calendar with
-  | Ok p -> p
-  | Error err ->
-      failwithf "Backtest.Runner: Bar_panels.create: %s" err.Status.message ()
-
-let _make_simulator deps ~stop_log ~start_date ~end_date =
-  let bar_panels = _build_legacy_bar_panels deps ~start_date ~end_date in
-  let strategy =
-    Weinstein_strategy.make ~ad_bars:deps.ad_bars
-      ~ticker_sectors:deps.ticker_sectors ~bar_panels deps.config
-  in
-  let strategy = Strategy_wrapper.wrap ~stop_log strategy in
-  let warmup_start = Date.add_days start_date (-warmup_days) in
-  let metric_suite = Metric_computers.default_metric_suite () in
-  let sim_deps =
-    Simulator.create_deps ~symbols:deps.all_symbols
-      ~data_dir:deps.data_dir_fpath ~strategy ~commission ~metric_suite ()
-  in
-  let sim_config =
-    Simulator.
-      {
-        start_date = warmup_start;
-        end_date;
-        initial_cash;
-        commission;
-        strategy_cadence = Types.Cadence.Daily;
-      }
-  in
-  match Simulator.create ~config:sim_config ~deps:sim_deps with
-  | Ok s -> s
-  | Error e ->
-      failwith
-        (sprintf "Backtest.Runner: failed to create simulator: %s"
-           (Status.show e))
-
-let _run_simulator sim =
-  match Simulator.run sim with
-  | Ok r -> r
-  | Error e ->
-      failwith
-        (sprintf "Backtest.Runner: simulation failed: %s" (Status.show e))
-
-let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
-    ~sim_result : Summary.t =
-  {
-    start_date;
-    end_date;
-    universe_size = deps.universe_size;
-    n_steps = List.length steps;
-    initial_cash;
-    final_portfolio_value = final_value;
-    n_round_trips = List.length round_trips;
-    metrics = sim_result.Trading_simulation_types.Simulator_types.metrics;
-  }
-
-let _run_legacy ~deps ~start_date ~end_date ?trace () =
-  let stop_log = Stop_log.create () in
-  let n_all_symbols = List.length deps.all_symbols in
-  let sim =
-    Trace.record ?trace ~symbols_in:n_all_symbols ~symbols_out:n_all_symbols
-      Trace.Phase.Load_bars (fun () ->
-        _make_simulator deps ~stop_log ~start_date ~end_date)
-  in
-  let sim_result =
-    Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
-        _run_simulator sim)
-  in
-  (sim_result, stop_log)
-
-(* Panel loader_strategy path — Stage 1 of the columnar data-shape redesign.
-   Plan lives under dev/plans/. Delegates to [Panel_runner], which builds
-   OHLCV + Indicator panels and runs the simulator with a panel-backed
-   [get_indicator_fn]. *)
-
+(** Build the [Panel_runner.input] view of the loaded deps — the only fields the
+    panel-backed runner needs. *)
 let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
   {
     data_dir_fpath = deps.data_dir_fpath;
@@ -346,24 +232,31 @@ let _run_panel_backtest ~deps ~start_date ~end_date ?trace () =
     ~input:(_panel_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace ()
 
+let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
+    ~sim_result : Summary.t =
+  {
+    start_date;
+    end_date;
+    universe_size = deps.universe_size;
+    n_steps = List.length steps;
+    initial_cash;
+    final_portfolio_value = final_value;
+    n_round_trips = List.length round_trips;
+    metrics = sim_result.Trading_simulation_types.Simulator_types.metrics;
+  }
+
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
-    ?trace ?(loader_strategy = Loader_strategy.Legacy) () =
+    ?trace () =
   let deps = _load_deps ?trace ~overrides ~sector_map_override () in
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length deps.all_symbols);
   let warmup_start = Date.add_days start_date (-warmup_days) in
-  eprintf
-    "Running backtest (%s to %s, warmup from %s, loader_strategy=%s)...\n%!"
+  eprintf "Running backtest (%s to %s, warmup from %s)...\n%!"
     (Date.to_string start_date)
     (Date.to_string end_date)
-    (Date.to_string warmup_start)
-    (Loader_strategy.show loader_strategy);
+    (Date.to_string warmup_start);
   let sim_result, stop_log =
-    match loader_strategy with
-    | Loader_strategy.Legacy ->
-        _run_legacy ~deps ~start_date ~end_date ?trace ()
-    | Loader_strategy.Panel ->
-        _run_panel_backtest ~deps ~start_date ~end_date ?trace ()
+    _run_panel_backtest ~deps ~start_date ~end_date ?trace ()
   in
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on

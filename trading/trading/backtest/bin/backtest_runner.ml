@@ -1,15 +1,11 @@
 (** Backtest runner CLI — thin wrapper around the {!Backtest} library.
 
     Usage: backtest_runner <start_date> \[end_date\] \[--override '<sexp>'\]
-    \[--loader-strategy legacy\|panel\] \[--trace <path>\] \[--memtrace <path>\]
+    \[--trace <path>\] \[--memtrace <path>\]
 
     - start_date: required (e.g. 2018-01-02)
     - end_date: optional, defaults to today
     - --override: partial config sexp, deep-merged into the default. Can repeat.
-    - --loader-strategy: which bar-loader execution strategy to use. Defaults to
-      [legacy] (current production path). [panel] (Stage 1 of the columnar
-      data-shape redesign) builds [Ohlcv_panels] / [Indicator_panels] over the
-      universe and runs the simulator with a panel-backed [get_indicator_fn].
     - --trace: when given, instruments the run with per-phase timing + memory
       measurements via {!Backtest.Trace} and writes the trace sexp at [<path>]
       after the result is written. Without this flag, no trace is captured (the
@@ -39,7 +35,6 @@
     Manual repro for the [--trace] flag:
     {[
       backtest_runner 2015-01-02 2015-12-31 \
-        --loader-strategy legacy \
         --trace /tmp/sample-trace.sexp
       head /tmp/sample-trace.sexp
     ]}
@@ -47,7 +42,6 @@
     Manual repro for the [--memtrace] flag:
     {[
       backtest_runner 2015-01-02 2015-12-31 \
-        --loader-strategy legacy \
         --memtrace /tmp/sample.memtrace.ctf
       ls -la /tmp/sample.memtrace.ctf  # non-zero size on success
       # opam install memtrace_viewer && memtrace_viewer /tmp/sample.memtrace.ctf
@@ -55,7 +49,12 @@
 
     Writes params.sexp, summary.sexp, trades.csv, equity_curve.csv to a
     timestamped directory under dev/backtest/ and prints the summary sexp to
-    stdout. *)
+    stdout.
+
+    After Stage 3 PR 3.4 of the columnar data-shape redesign, the runner has a
+    single execution path (panel-backed). The pre-existing [--loader-strategy]
+    flag was deleted along with the [Loader_strategy] enum and the Legacy/Tiered
+    code paths. *)
 
 open Core
 
@@ -64,7 +63,7 @@ let _parse_args () =
   if Array.length argv < 2 then (
     eprintf
       "Usage: backtest_runner <start_date> [end_date] [--override '<sexp>'] \
-       [--loader-strategy legacy|panel] [--trace <path>] [--memtrace <path>]\n";
+       [--trace <path>] [--memtrace <path>]\n";
     Stdlib.exit 1);
   let args = Array.to_list argv |> List.tl_exn in
   match Backtest_runner_args.parse args with
@@ -81,7 +80,6 @@ let _parse_args () =
       ( start_date,
         end_date,
         parsed.overrides,
-        parsed.loader_strategy,
         parsed.trace_path,
         parsed.memtrace_path )
 
@@ -123,12 +121,7 @@ let _start_memtrace ~path =
   eprintf "Memtrace started, writing to: %s\n%!" path
 
 let () =
-  let ( start_date,
-        end_date,
-        overrides,
-        loader_strategy,
-        trace_path,
-        memtrace_path ) =
+  let start_date, end_date, overrides, trace_path, memtrace_path =
     _parse_args ()
   in
   (* Start Memtrace BEFORE any backtest work so allocations from [run_backtest]
@@ -140,8 +133,7 @@ let () =
      default code path is unchanged). *)
   let trace = Option.map trace_path ~f:(fun _ -> Backtest.Trace.create ()) in
   let result =
-    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
-      ?loader_strategy ?trace ()
+    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides ?trace ()
   in
   let output_dir = _make_output_dir () in
   eprintf "Writing output to %s/\n%!" output_dir;

@@ -54,7 +54,6 @@ type t = {
   period : period;
   universe_path : string; [@sexp.default default_universe_path]
   config_overrides : Sexp.t list;
-  loader_strategy : Loader_strategy.t option; [@sexp.option]
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]

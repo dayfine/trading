@@ -44,7 +44,6 @@ val run_backtest :
   ?overrides:Sexp.t list ->
   ?sector_map_override:(string, string) Core.Hashtbl.t ->
   ?trace:Trace.t ->
-  ?loader_strategy:Loader_strategy.t ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -71,22 +70,15 @@ val run_backtest :
     level:
     - [Load_universe] — resolving the sector map
     - [Macro] — loading AD breadth bars
-    - [Load_bars] — creating the simulator (allocates per-symbol bar loaders)
     - [Fill] — running the simulator main loop (all per-bar strategy work)
     - [Teardown] — extracting round-trips and gathering stop infos
+
+    The actual simulator construction + run-loop is delegated to
+    {!Panel_runner.run}, which builds [Ohlcv_panels] + [Indicator_panels] over
+    the universe and threads a panel-backed [get_indicator_fn] into the
+    strategy. Parity is pinned by [test_panel_loader_parity].
 
     Finer-grained wrap points for the per-bar phases inside [Simulator.run]
     (Sector_rank / Rs_rank / Stage_classify / Screener / Stop_update /
     Order_gen) require strategy-level instrumentation and are tracked as a
-    follow-up. When [trace] is omitted, instrumentation is a no-op.
-
-    [loader_strategy] selects how universe bars are loaded:
-    - [Legacy] (default) — current production path: simulator materializes all
-      universe bars up-front via per-symbol bar loaders. The [Load_bars] phase
-      records simulator allocation here. The strategy reads OHLCV bars from a
-      {!Data_panel.Bar_panels} built at simulator-construction time.
-    - [Panel] — Stage 1 of the columnar data-shape redesign (see
-      {!Panel_runner}). Builds [Ohlcv_panels] + [Indicator_panels] over the
-      universe + a per-tick panel-backed [get_indicator_fn] in addition to the
-      [Bar_panels] view the strategy already reads. Parity is pinned by
-      [test_panel_loader_parity]. *)
+    follow-up. When [trace] is omitted, instrumentation is a no-op. *)
