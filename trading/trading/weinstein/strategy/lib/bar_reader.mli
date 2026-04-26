@@ -17,12 +17,23 @@ open Core
 type t
 (** Opaque bar source. *)
 
-val of_panels : Data_panel.Bar_panels.t -> t
-(** [of_panels p] produces a reader backed by [Bar_panels]. The [as_of]
-    parameter of the read functions is mapped to a panel column via
+val of_panels : ?ma_cache:Weekly_ma_cache.t -> Data_panel.Bar_panels.t -> t
+(** [of_panels ?ma_cache p] produces a reader backed by [Bar_panels]. The
+    [as_of] parameter of the read functions is mapped to a panel column via
     {!Data_panel.Bar_panels.column_of_date}; when [as_of] is not in the
     underlying calendar (e.g., a date before the backtest start) the reader
-    returns the empty list. *)
+    returns the empty list.
+
+    Stage 4 PR-D: an optional [ma_cache] piggy-backs on the reader so the
+    strategy's hot-path callees can fetch per-symbol MA values from the cache
+    without threading a separate parameter through every helper. Populated
+    lazily by {!Weekly_ma_cache.ma_values_for} on first access. *)
+
+val ma_cache : t -> Weekly_ma_cache.t option
+(** [ma_cache t] returns the cache the reader was constructed with, or [None]
+    when no cache was provided. The strategy's panel-callback constructors check
+    this and dispatch to the cache-aware path on [Some], falling back to inline
+    MA computation on [None]. *)
 
 val empty : unit -> t
 (** [empty ()] produces a reader with an empty universe / zero-day calendar. All

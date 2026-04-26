@@ -21,6 +21,10 @@ module Panel_callbacks = Panel_callbacks
 (** Panel-shaped callback-bundle constructors for the strategy's callees. Stage
     4 PR-A. *)
 
+module Weekly_ma_cache = Weekly_ma_cache
+(** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
+    Stops MA reads keyed by [(symbol, ma_type, period)]. *)
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -247,8 +251,9 @@ let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
       let prior_stage = Hashtbl.find prior_stages ticker in
       let callbacks =
         Panel_callbacks.stock_analysis_callbacks_of_weekly_views
-          ~config:Stock_analysis.default_config ~stock:stock_view
-          ~benchmark:index_view
+          ?ma_cache:(Bar_reader.ma_cache bar_reader)
+          ~stock_symbol:ticker ~config:Stock_analysis.default_config
+          ~stock:stock_view ~benchmark:index_view ()
       in
       let result =
         Stock_analysis.analyze_with_callbacks
@@ -300,9 +305,11 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
       ~global_index_symbols:config.indices.global ~bar_reader
       ~as_of:current_date
   in
+  let ma_cache = Bar_reader.ma_cache bar_reader in
   let macro_callbacks =
-    Panel_callbacks.macro_callbacks_of_weekly_views ~config:config.macro_config
-      ~index:index_view ~globals:global_index_views ~ad_bars
+    Panel_callbacks.macro_callbacks_of_weekly_views ?ma_cache
+      ~index_symbol:config.indices.primary ~config:config.macro_config
+      ~index:index_view ~globals:global_index_views ~ad_bars ()
   in
   let macro_result =
     Macro.analyze_with_callbacks ~config:config.macro_config
@@ -310,10 +317,10 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
   in
   prior_macro := macro_result.trend;
   let sector_map =
-    Macro_inputs.build_sector_map ~stage_config:config.stage_config
+    Macro_inputs.build_sector_map ?ma_cache ~stage_config:config.stage_config
       ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
       ~bar_reader ~as_of:current_date ~sector_prior_stages ~index_view
-      ~ticker_sectors
+      ~ticker_sectors ()
   in
   _screen_universe ~config ~index_view ~macro_trend:macro_result.trend
     ~sector_map ~stop_states ~portfolio ~get_price ~bar_reader ~prior_stages
@@ -329,10 +336,11 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     | None -> Date.today ~zone:Time_float.Zone.utc
   in
   let exit_transitions, adjust_transitions =
-    Stops_runner.update ~stops_config:config.stops_config
-      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-      ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
-      ~prior_stages
+    Stops_runner.update
+      ?ma_cache:(Bar_reader.ma_cache bar_reader)
+      ~stops_config:config.stops_config ~stage_config:config.stage_config
+      ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
+      ~bar_reader ~as_of:current_date ~prior_stages ()
   in
   (* Stage 4 PR-A: read the primary index as a weekly view directly. The
      Friday detection uses the view's latest date; the screener path consumes
@@ -360,9 +368,19 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
+  (* Stage 4 PR-D: when bar_panels are present, also create a [Weekly_ma_cache]
+     scoped to this strategy and bundle it into the [Bar_reader]. The cache
+     is read by [Panel_callbacks.stage_callbacks_of_weekly_view] (and
+     transitively by Stock_analysis / Sector / Macro / Stops_runner) so
+     per-symbol weekly MA values are computed once, not per Friday tick.
+
+     The cache is opt-in (only when bar_panels are passed) so test
+     fixtures using [Bar_reader.empty ()] aren't affected. *)
   let bar_reader =
     match bar_panels with
-    | Some p -> Bar_reader.of_panels p
+    | Some p ->
+        let ma_cache = Weekly_ma_cache.create p in
+        Bar_reader.of_panels ~ma_cache p
     | None -> Bar_reader.empty ()
   in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =

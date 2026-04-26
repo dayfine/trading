@@ -8,9 +8,13 @@ open Trading_strategy
 
     Stage 4 PR-A: this no longer materialises a {!Daily_price.t list}. The
     weekly view is read directly from panels and threaded into a
-    {!Stage.callbacks} bundle. *)
-let _compute_ma ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
-    ~prior_stages ~symbol ~fallback_price =
+    {!Stage.callbacks} bundle.
+
+    Stage 4 PR-D: an optional [ma_cache] threads through to the panel callbacks.
+    Mid-week stop adjustments miss the cache (Friday-aligned only) and fall back
+    to inline; Friday-aligned calls hit the cache. *)
+let _compute_ma ?ma_cache ~(stage_config : Stage.config) ~lookback_bars
+    ~bar_reader ~as_of ~prior_stages ~symbol ~fallback_price () =
   let weekly =
     Bar_reader.weekly_view_for bar_reader ~symbol ~n:lookback_bars ~as_of
   in
@@ -19,8 +23,8 @@ let _compute_ma ~(stage_config : Stage.config) ~lookback_bars ~bar_reader ~as_of
   else
     let prior_stage = Hashtbl.find prior_stages symbol in
     let callbacks =
-      Panel_callbacks.stage_callbacks_of_weekly_view ~config:stage_config
-        ~weekly
+      Panel_callbacks.stage_callbacks_of_weekly_view ?ma_cache ~symbol
+        ~config:stage_config ~weekly ()
     in
     let result =
       Stage.classify_with_callbacks ~config:stage_config
@@ -62,13 +66,14 @@ let _make_adjust_transition ~(pos : Position.t) ~current_date
 
 (** Process stop logic for one held position. Returns (exit_transition option,
     adjust_transition option). *)
-let _handle_stop ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
-    ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
-    ~bar_reader ~as_of ~prior_stages =
+let _handle_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars
+    ~(pos : Position.t) ~(risk_params : Position.risk_params) ~state ~bar
+    ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages () =
   let current_date = bar.Types.Daily_price.date in
   let ma_direction, ma_value =
-    _compute_ma ~stage_config ~lookback_bars ~bar_reader ~as_of ~prior_stages
-      ~symbol:ticker ~fallback_price:bar.Types.Daily_price.close_price
+    _compute_ma ?ma_cache ~stage_config ~lookback_bars ~bar_reader ~as_of
+      ~prior_stages ~symbol:ticker
+      ~fallback_price:bar.Types.Daily_price.close_price ()
   in
   let new_state, event =
     Weinstein_stops.update ~config:stops_config ~side:pos.Position.side ~state
@@ -88,8 +93,8 @@ let _handle_stop ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
 
 (** Process stop for one position; returns updated (exits, adjusts) accumulator.
 *)
-let _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
-    ~get_price ~bar_reader ~as_of ~prior_stages (pos : Position.t)
+let _process_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars
+    ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages (pos : Position.t)
     (exits, adjusts) =
   let ticker = pos.symbol in
   match
@@ -97,17 +102,17 @@ let _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
   with
   | Position.Holding h, Some state, Some bar -> (
       match
-        _handle_stop ~stops_config ~stage_config ~lookback_bars ~pos
+        _handle_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars ~pos
           ~risk_params:h.risk_params ~state ~bar ~stop_states ~ticker
-          ~bar_reader ~as_of ~prior_stages
+          ~bar_reader ~as_of ~prior_stages ()
       with
       | Some exit_tr, _ -> (exit_tr :: exits, adjusts)
       | _, Some adj_tr -> (exits, adj_tr :: adjusts)
       | None, None -> (exits, adjusts))
   | _ -> (exits, adjusts)
 
-let update ~stops_config ~stage_config ~lookback_bars ~positions ~get_price
-    ~stop_states ~bar_reader ~as_of ~prior_stages =
+let update ?ma_cache ~stops_config ~stage_config ~lookback_bars ~positions
+    ~get_price ~stop_states ~bar_reader ~as_of ~prior_stages () =
   Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
-      _process_stop ~stops_config ~stage_config ~lookback_bars ~stop_states
-        ~get_price ~bar_reader ~as_of ~prior_stages pos acc)
+      _process_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars
+        ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages pos acc)

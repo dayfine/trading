@@ -52,6 +52,10 @@ module Panel_callbacks = Panel_callbacks
 (** Panel-shaped callback bundle constructors for the strategy's callees. See
     {!Panel_callbacks}. *)
 
+module Weekly_ma_cache = Weekly_ma_cache
+(** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
+    Stops MA reads keyed by [(symbol, ma_type, period)]. *)
+
 (** {1 Configuration} *)
 
 type index_config = {

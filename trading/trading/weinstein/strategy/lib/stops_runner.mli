@@ -9,6 +9,7 @@ open Core
 open Trading_strategy
 
 val update :
+  ?ma_cache:Weekly_ma_cache.t ->
   stops_config:Weinstein_stops.config ->
   stage_config:Stage.config ->
   lookback_bars:int ->
@@ -18,6 +19,7 @@ val update :
   bar_reader:Bar_reader.t ->
   as_of:Date.t ->
   prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
+  unit ->
   Position.transition list * Position.transition list
 (** [update] folds over every held position and advances its stop state. For
     each position it:
@@ -30,4 +32,9 @@ val update :
     transition on [Stop_raised].
 
     Returns [(exit_transitions, adjust_transitions)] as separate lists so the
-    caller can order them consistently in the final output. *)
+    caller can order them consistently in the final output.
+
+    Stage 4 PR-D: when [ma_cache] is passed, MA values are read from the
+    per-symbol cache on Friday-aligned ticks (cache hit). Mid-week ticks miss
+    the cache and fall back to inline MA computation — preserving bit-equality
+    with the bar-list path on every call. *)
