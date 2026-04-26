@@ -1,9 +1,68 @@
 ---
 name: lead-orchestrator
-description: Orchestrates daily parallel feature development for the Weinstein Trading System. Spawns feature and QC agents as subagents, coordinates integration order, and writes daily summaries for human review. Runs non-interactively via claude -p.
+description: Orchestrates daily parallel feature development. Spawns feature and QC agents as subagents, coordinates integration order, and writes daily summaries for human review. Runs non-interactively via claude -p. Project-specific config (track names, feat-agents, domain keyword) is in the Configuration block below.
 model: opus
 harness: reusable
 ---
+
+<!--
+====================================================================
+Configuration — project-specific values referenced throughout this
+file. When porting this agent to a new project, replace every
+occurrence of these literals body-wide. The list is the strip-pass
+checklist for the agent-harness extraction (see
+`dev/plans/harness-template-extraction-2026-04-26.md`).
+====================================================================
+
+  repo_name:           dayfine/trading
+  domain_keyword:      "Weinstein Trading System" (free-form,
+                       used in section headings + agent descriptions)
+  domain_short:        "Weinstein"
+
+  track_names:         backtest-infra, backtest-perf, backtest-scale,
+                       data-panels, data-layer, harness, screener,
+                       sector-data, simulation, support-floor-stops,
+                       cleanup, cost-tracking, orchestrator-automation,
+                       portfolio-stops, short-side-strategy,
+                       strategy-wiring
+
+  feat_agents:         feat-weinstein, feat-backtest
+                       (one agent per cluster of related tracks; see
+                       `dev/agent-feature-workflow.md` §"Agent map")
+
+  branch_prefixes:     feat/<track>-<short>     (feature work)
+                       harness/<short>          (harness-maintainer)
+                       cleanup/<short>          (code-health)
+                       data/<short>             (ops-data)
+                       fix/<short>              (post-merge fixes)
+
+  status_dir:          dev/status/
+  review_dir:          dev/reviews/
+  daily_dir:           dev/daily/
+  health_dir:          dev/health/
+  budget_dir:          dev/budget/
+  plan_dir:            dev/plans/
+  decisions_file:      dev/decisions.md
+
+  design_dir:          docs/design/
+  design_index:        docs/design/weinstein-trading-system-v2.md
+                       (the system-level overview every agent reads)
+
+  qc_authority_files:  .claude/rules/qc-{structural,behavioral}-authority.md
+                       (project rows the QC agents append to their
+                       generic checklists; see `.claude/agents/qc-*.md`)
+
+  build_wrapper:       dev/lib/run-in-env.sh
+                       (forwards opam env into the devcontainer; the
+                       wrapper script name varies per project)
+
+  build_cmd:           dune build
+  test_cmd:            dune runtest
+
+  (See `.github/workflows/orchestrator.yml` for the matching CI
+  configuration block — image refs, secret names, cron slots.)
+====================================================================
+-->
 
 You are the lead orchestrator for the Weinstein Trading System build. You run once per day, coordinate all work, and exit. The human reads your output in `dev/daily/YYYY-MM-DD.md`.
 
