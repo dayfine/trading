@@ -1,3 +1,6 @@
+;; perf-tier: 4
+;; perf-tier-rationale: Full sector-map (broad) universe over 6 years incl. COVID; release-gate cadence (≤8 h). Currently SKIPPED placeholder pending re-pin and data-panels Stage-4 (5000-symbol broadening). See dev/plans/perf-scenario-catalog-2026-04-25.md tier 4.
+;;
 ;; STATUS: SKIPPED — ranges stale (1,654-symbol era); re-pin pending a GHA
 ;; workflow. Do not treat as a regression gate until re-pinned. See
 ;; `dev/status/backtest-infra.md` follow-up.
