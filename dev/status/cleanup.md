@@ -17,7 +17,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
-- [ ] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — `_stream_in_range_prices` (line 180) avg=3.61 max=9 from PR #543 H7 stream-parse refactor (source: 2026-04-26-fast.md)
+- [~] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — `_stream_in_range_prices` (line 180) avg=3.61 max=9 from PR #543 H7 stream-parse refactor (source: 2026-04-26-fast.md)
 
 ## Completed
 
