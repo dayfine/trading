@@ -2,8 +2,25 @@
 
 ## Status
 
-PROPOSED. Decomposes Stage 3 of `dev/plans/columnar-data-shape-2026-04-25.md`
-into 4 PRs sized for incremental review. Nothing built yet.
+IN_PROGRESS. PR 3.1 (#567) + PR 3.2 (#569) merged. PR 3.3 in flight.
+PR 3.4 pending.
+
+**Post-PR-3.2 spike finding (2026-04-25):** Panel mode peak RSS at
+N=292 T=6y bull-crash = **3.47 GB** (pre-3.2 Legacy 1.87 GB / Tiered
+3.74 GB; projection < 800 MB). The structural Bar_history deletion
+landed (Tiered → Panel: -7%, the +95% gap is gone), but the absolute
+RSS thesis hasn't materialized. Top hypothesis: every reader site
+still rebuilds `Daily_price.t list` from `Bar_panels` per tick. Stage
+2's bar-list-shaped wrappers are the source. See
+`dev/notes/panels-rss-spike-2026-04-25.md` for full analysis.
+
+Implications:
+- **PR 3.3 + 3.4 still safe to land** — they delete dead code
+  (Tiered, bar_loader, Legacy) and don't affect Panel-mode RSS.
+- **Stage 4 scope expanded** to call out the callback-through-runner
+  wiring as the load-bearing perf gate. See master plan §"Stage 4".
+- **Plan §Decision point applies** post-Stage-4: if the re-run spike
+  is still > 1 GB, abort migration and memtrace.
 
 ## Context
 

@@ -134,6 +134,25 @@ Actual is 3.47 GB → **~30× over the projected lower bound**. The
 projection model in the plan needs an explicit `Daily_price.t list`
 intermediate-allocation term until Stage 4 wraps it up.
 
+## Next spike (scheduled)
+
+Re-run the same command **after Stage 4 lands** (or after the
+callback-wiring sub-PR within Stage 4, whichever ships first):
+
+- Same scenario `bull-crash-292x6y`, same invocation
+  (`--loader-strategy panel`, `2015-01-02..2020-12-31`,
+  `universe_cap=292`, blue-chip 292-symbol universe).
+- New expected outcome: peak RSS ≤ 800 MB (the original projection),
+  validating that the `Daily_price.t list` intermediate allocation
+  pressure was the load-bearing source of the 3.5 GB gap.
+- If the next spike is still > 1 GB: stop, memtrace, and revisit
+  the plan thesis. Per `columnar-data-shape-2026-04-25.md`
+  §"Risks/Decision point": "if RSS gain < 30%, abort the migration
+  and revisit." Two consecutive spikes failing the gate is the
+  signal to escalate.
+- If the next spike passes (≤ 800 MB): proceed to Stage 4
+  release-gate sweep at N=5000 T=10y; gate ≤ 8 GB.
+
 ## Artifacts
 
 - `/tmp/panel-spike-run/panel.{time,stdout,stderr}` (in-container,
