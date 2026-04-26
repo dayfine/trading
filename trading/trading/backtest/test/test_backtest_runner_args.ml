@@ -9,10 +9,6 @@ open OUnit2
 open Core
 open Matchers
 
-let _ok = function
-  | Ok x -> x
-  | Error msg -> assert_failure ("parse failed unexpectedly: " ^ msg)
-
 let test_minimal_start_date_only _ =
   let result = Backtest_runner_args.parse [ "2018-01-02" ] in
   assert_that result
@@ -61,16 +57,6 @@ let test_loader_strategy_legacy _ =
           (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
           (equal_to (Some Loader_strategy.Legacy))))
 
-let test_loader_strategy_tiered _ =
-  let result =
-    Backtest_runner_args.parse [ "2018-01-02"; "--loader-strategy"; "tiered" ]
-  in
-  assert_that result
-    (is_ok_and_holds
-       (field
-          (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-          (equal_to (Some Loader_strategy.Tiered))))
-
 let test_loader_strategy_panel _ =
   let result =
     Backtest_runner_args.parse [ "2018-01-02"; "--loader-strategy"; "panel" ]
@@ -108,7 +94,7 @@ let test_trace_with_other_flags _ =
         "2018-01-02";
         "2019-12-31";
         "--loader-strategy";
-        "tiered";
+        "panel";
         "--override";
         "((initial_stop_buffer 1.08))";
         "--trace";
@@ -127,7 +113,7 @@ let test_trace_with_other_flags _ =
               (equal_to (Some "2019-12-31"));
             field
               (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-              (equal_to (Some Loader_strategy.Tiered));
+              (equal_to (Some Loader_strategy.Panel));
             field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 1);
             field
               (fun (a : Backtest_runner_args.t) -> a.trace_path)
@@ -168,7 +154,7 @@ let test_memtrace_with_other_flags _ =
         "2018-01-02";
         "2019-12-31";
         "--loader-strategy";
-        "tiered";
+        "panel";
         "--override";
         "((initial_stop_buffer 1.08))";
         "--trace";
@@ -189,7 +175,7 @@ let test_memtrace_with_other_flags _ =
               (equal_to (Some "2019-12-31"));
             field
               (fun (a : Backtest_runner_args.t) -> a.loader_strategy)
-              (equal_to (Some Loader_strategy.Tiered));
+              (equal_to (Some Loader_strategy.Panel));
             field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 1);
             field
               (fun (a : Backtest_runner_args.t) -> a.trace_path)
@@ -263,7 +249,6 @@ let suite =
          "minimal start_date only" >:: test_minimal_start_date_only;
          "start and end date" >:: test_start_and_end_date;
          "--loader-strategy legacy" >:: test_loader_strategy_legacy;
-         "--loader-strategy tiered" >:: test_loader_strategy_tiered;
          "--loader-strategy panel" >:: test_loader_strategy_panel;
          "--trace flag captures path" >:: test_trace_flag;
          "no --trace yields trace_path = None" >:: test_trace_default_is_none;

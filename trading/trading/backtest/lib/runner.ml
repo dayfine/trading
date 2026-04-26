@@ -1,9 +1,9 @@
 (* @large-module: backtest orchestration covers config-override deep-merge,
    universe + sector-map resolution, AD-breadth + sector-ETF loading (each
    gated by hypothesis-testing toggles in [Weinstein_strategy.config]), and
-   the Legacy/Tiered loader-strategy split. Splitting any of these would
+   the Legacy/Panel loader-strategy split. Splitting any of these would
    either duplicate the small helpers or leak the [_deps] record's shape
-   across modules; the Tiered path already lives in [tiered_runner.ml] for
+   across modules; the Panel path already lives in [panel_runner.ml] for
    the same reason. *)
 open Core
 open Trading_simulation
@@ -223,7 +223,7 @@ let _load_deps ?trace ~overrides ~sector_map_override () =
 (** With [Bar_history] deleted, the strategy reads OHLCV bars from
     {!Data_panel.Bar_panels}. The Legacy runner builds the panels at
     simulator-construction time so the strategy has a working bar source.
-    Symmetric with [Tiered_runner._build_bar_panels] / [Panel_runner]. *)
+    Symmetric with [Panel_runner]. *)
 let _build_legacy_calendar ~start ~end_ : Date.t array =
   let rec loop d acc =
     if Date.( > ) d end_ then List.rev acc
@@ -327,15 +327,12 @@ let _run_legacy ~deps ~start_date ~end_date ?trace () =
   in
   (sim_result, stop_log)
 
-(* Tiered loader_strategy path — delegates to [Tiered_runner]. The
-   implementation lives there so runner.ml stays within the file-length soft
-   limit and the two execution paths are obviously parallel at the module
-   boundary. [tier_op_to_phase] re-exports [Tiered_runner.tier_op_to_phase]
-   so existing callers (tests) keep working. *)
+(* Panel loader_strategy path — Stage 1 of the columnar data-shape redesign.
+   Plan lives under dev/plans/. Delegates to [Panel_runner], which builds
+   OHLCV + Indicator panels and runs the simulator with a panel-backed
+   [get_indicator_fn]. *)
 
-let tier_op_to_phase = Tiered_runner.tier_op_to_phase
-
-let _tiered_input_of_deps (deps : _deps) : Tiered_runner.input =
+let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
   {
     data_dir_fpath = deps.data_dir_fpath;
     ticker_sectors = deps.ticker_sectors;
@@ -344,17 +341,9 @@ let _tiered_input_of_deps (deps : _deps) : Tiered_runner.input =
     all_symbols = deps.all_symbols;
   }
 
-let _run_tiered_backtest ~deps ~start_date ~end_date ?trace () =
-  Tiered_runner.run
-    ~input:(_tiered_input_of_deps deps)
-    ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace ()
-
-(* Panel loader_strategy path — Stage 1 of the columnar data-shape redesign.
-   Plan lives under dev/plans/. Delegates to [Panel_runner], which builds
-   OHLCV + Indicator panels alongside reusing the Tiered execution flow. *)
 let _run_panel_backtest ~deps ~start_date ~end_date ?trace () =
   Panel_runner.run
-    ~input:(_tiered_input_of_deps deps)
+    ~input:(_panel_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace ()
 
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
@@ -373,8 +362,6 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     match loader_strategy with
     | Loader_strategy.Legacy ->
         _run_legacy ~deps ~start_date ~end_date ?trace ()
-    | Loader_strategy.Tiered ->
-        _run_tiered_backtest ~deps ~start_date ~end_date ?trace ()
     | Loader_strategy.Panel ->
         _run_panel_backtest ~deps ~start_date ~end_date ?trace ()
   in

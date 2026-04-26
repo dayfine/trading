@@ -21,10 +21,9 @@ let _calendar_index calendar =
       Hashtbl.add tbl ~key:d ~data:i |> (ignore : [ `Ok | `Duplicate ] -> unit));
   tbl
 
-(* Today's date is read from the primary index bar — same heuristic as
-   [Tiered_strategy_wrapper._current_date]. When the benchmark bar is missing
-   we cannot resolve a panel column, so the caller falls back to the
-   simulator's original [get_indicator]. *)
+(* Today's date is read from the primary index bar. When the benchmark bar
+   is missing we cannot resolve a panel column, so the caller falls back to
+   the simulator's original [get_indicator]. *)
 let _today_date_opt ~(get_price : Strategy_interface.get_price_fn)
     ~primary_index =
   Option.map (get_price primary_index) ~f:(fun bar ->

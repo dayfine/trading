@@ -16,10 +16,6 @@ let test_phase_sexp_round_trip _ =
       Order_gen;
       Fill;
       Teardown;
-      Promote_summary;
-      Promote_full;
-      Demote;
-      Promote_metadata;
     ]
   in
   List.iter all_phases ~f:(fun p ->

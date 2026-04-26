@@ -24,18 +24,6 @@ type result = {
           with [round_trips] via symbol + entry_date. *)
 }
 
-val tier_op_to_phase : Bar_loader.tier_op -> Trace.Phase.t
-(** Map a [Bar_loader.tier_op] (the library-internal tier-op tag) onto the
-    corresponding [Trace.Phase.t] emitted by the Tiered runner path:
-
-    - [Promote_to_summary] → [Promote_summary]
-    - [Promote_to_full] → [Promote_full]
-    - [Demote_op] → [Demote]
-
-    Exposed so the Tiered runner's trace bridging is observable from unit tests
-    without reaching into private helpers. Pure — depends only on the input
-    variant. *)
-
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
 (** True if [step] represents a real trading day — i.e. the portfolio's
@@ -95,16 +83,10 @@ val run_backtest :
     [loader_strategy] selects how universe bars are loaded:
     - [Legacy] (default) — current production path: simulator materializes all
       universe bars up-front via per-symbol bar loaders. The [Load_bars] phase
-      records simulator allocation here.
-    - [Tiered] — full Tiered execution path (see {!Tiered_runner}). Builds a
-      [Bar_loader] then bulk-promotes the universe to Metadata under a
-      [Promote_metadata] trace wrap (no [Load_bars] phase emitted on this path);
-      per-bar tier transitions emit [Promote_summary] / [Promote_full] /
-      [Demote] records via the loader's tier-op trace hook.
+      records simulator allocation here. The strategy reads OHLCV bars from a
+      {!Data_panel.Bar_panels} built at simulator-construction time.
     - [Panel] — Stage 1 of the columnar data-shape redesign (see
-      {!Panel_runner}). Reuses the Tiered execution flow and additionally builds
-      [Ohlcv_panels] + [Indicator_panels] over the universe + a per-tick
-      panel-backed [get_indicator_fn]. [Bar_history] stays alive in this stage;
-      the Weinstein strategy does not yet consume the panel-backed
-      [get_indicator] so behaviour is identical to Tiered (parity gate locked in
-      [test_panel_loader_parity]). *)
+      {!Panel_runner}). Builds [Ohlcv_panels] + [Indicator_panels] over the
+      universe + a per-tick panel-backed [get_indicator_fn] in addition to the
+      [Bar_panels] view the strategy already reads. Parity is pinned by
+      [test_panel_loader_parity]. *)

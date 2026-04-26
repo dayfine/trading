@@ -58,7 +58,7 @@ let rec _extract_flags args (acc : acc) =
           _extract_flags rest { acc with loader_strategy = Some parsed }
       | Error _ as e -> e)
   | [ "--loader-strategy" ] ->
-      _err "--loader-strategy requires a value (legacy or tiered)"
+      _err "--loader-strategy requires a value (legacy or panel)"
   | "--trace" :: value :: rest ->
       _extract_flags rest { acc with trace_path = Some value }
   | [ "--trace" ] -> _err "--trace requires a path argument"

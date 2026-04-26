@@ -15,10 +15,6 @@ module Phase = struct
     | Order_gen
     | Fill
     | Teardown
-    | Promote_summary
-    | Promote_full
-    | Demote
-    | Promote_metadata
   [@@deriving show, eq, sexp]
 end
 

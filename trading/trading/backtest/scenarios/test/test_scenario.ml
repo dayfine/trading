@@ -203,23 +203,10 @@ let _make_sexp_with_loader_strategy ~loader_strategy =
   |}
     loader_strategy _base_expected_fields
 
-(* When [loader_strategy = Tiered] is present, the value must round-trip
-   through [sexp_of_t] / [t_of_sexp] unchanged. *)
-let test_loader_strategy_tiered_roundtrip _ =
-  let original =
-    Scenario.t_of_sexp
-      (Sexp.of_string
-         (_make_sexp_with_loader_strategy ~loader_strategy:"Tiered"))
-  in
-  assert_that original.loader_strategy
-    (is_some_and (equal_to Loader_strategy.Tiered));
-  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
-  assert_that roundtripped.loader_strategy
-    (is_some_and (equal_to Loader_strategy.Tiered))
-
 (* Panel was added in Stage 1 of the columnar redesign (see
-   [dev/plans/columnar-data-shape-2026-04-25.md]). Same round-trip contract
-   as Tiered. *)
+   [dev/plans/columnar-data-shape-2026-04-25.md]). After Stage 3 PR 3.3
+   deleted the Tiered runner, Panel is the only non-Legacy variant
+   exercised here. *)
 let test_loader_strategy_panel_roundtrip _ =
   let original =
     Scenario.t_of_sexp
@@ -246,8 +233,6 @@ let suite =
          "universe_path present => round-trips" >:: test_universe_path_present;
          "universe_path sexp round-trips" >:: test_universe_path_roundtrip;
          "loader_strategy absent => None" >:: test_loader_strategy_field_absent;
-         "loader_strategy=Tiered round-trips"
-         >:: test_loader_strategy_tiered_roundtrip;
          "loader_strategy=Panel round-trips"
          >:: test_loader_strategy_panel_roundtrip;
          "all scenario files parse" >:: test_all_scenario_files_parse;

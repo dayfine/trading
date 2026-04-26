@@ -1,16 +1,15 @@
 (** Backtest runner CLI — thin wrapper around the {!Backtest} library.
 
     Usage: backtest_runner <start_date> \[end_date\] \[--override '<sexp>'\]
-    \[--loader-strategy legacy\|tiered\] \[--trace <path>\] \[--memtrace
-    <path>\]
+    \[--loader-strategy legacy\|panel\] \[--trace <path>\] \[--memtrace <path>\]
 
     - start_date: required (e.g. 2018-01-02)
     - end_date: optional, defaults to today
     - --override: partial config sexp, deep-merged into the default. Can repeat.
     - --loader-strategy: which bar-loader execution strategy to use. Defaults to
-      [legacy] (current production path). [tiered] currently raises a [Failure]
-      in the runner since the implementation lands in increment 3f of
-      [dev/plans/backtest-tiered-loader-2026-04-19.md].
+      [legacy] (current production path). [panel] (Stage 1 of the columnar
+      data-shape redesign) builds [Ohlcv_panels] / [Indicator_panels] over the
+      universe and runs the simulator with a panel-backed [get_indicator_fn].
     - --trace: when given, instruments the run with per-phase timing + memory
       measurements via {!Backtest.Trace} and writes the trace sexp at [<path>]
       after the result is written. Without this flag, no trace is captured (the
@@ -65,7 +64,7 @@ let _parse_args () =
   if Array.length argv < 2 then (
     eprintf
       "Usage: backtest_runner <start_date> [end_date] [--override '<sexp>'] \
-       [--loader-strategy legacy|tiered] [--trace <path>] [--memtrace <path>]\n";
+       [--loader-strategy legacy|panel] [--trace <path>] [--memtrace <path>]\n";
     Stdlib.exit 1);
   let args = Array.to_list argv |> List.tl_exn in
   match Backtest_runner_args.parse args with

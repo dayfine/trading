@@ -121,21 +121,12 @@ type config = {
           like H5 (how does RSS scale with universe size?). NOT safe to flip on
           in production. *)
   full_compute_tail_days : int option;
-      (** Hypothesis-testing field (perf workstream H2). When [Some n], the
-          Tiered loader's [Bar_loader.Full_compute.tail_days] is set to [n]
-          instead of the default. Caps the bar count retained per Full-tier
-          symbol.
-
-          [None] (default) uses [Full_compute.default_config.tail_days] (1800).
-          The Legacy [loader_strategy] does not use [Full_compute] at all, so
-          the override is a no-op on that path. Stage 3 PR 3.2 deleted
-          [Bar_history], so the strategy no longer reads from [Full.t.bars] via
-          the Friday-cycle seed; this override remains relevant only to the
-          loader's own retention.
-
-          Hypothesis-testing only — like the other hypothesis toggles. NOT safe
-          to flip on in production. See H2 in
-          [dev/plans/backtest-perf-2026-04-24.md]. *)
+      (** Hypothesis-testing field (perf workstream H2). Vestigial after Stage 3
+          PR 3.3 deleted the Tiered runner + [Bar_loader] subsystem; the
+          original target ([Bar_loader.Full_compute.tail_days]) no longer
+          exists, so setting this is a no-op. The field is kept on [config] so
+          existing override sexps and CLI flags continue to parse. Will be
+          removed in a follow-up cleanup. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
