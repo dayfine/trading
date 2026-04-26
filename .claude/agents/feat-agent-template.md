@@ -1,6 +1,7 @@
 ---
 name: feat-agent-template
 description: Template and contract for all feat-* agent definitions. Every feat-agent must include the required sections below. This file is read by the health-scanner to verify compliance.
+harness: template
 ---
 
 # Feat-Agent Definition Template

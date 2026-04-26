@@ -2,6 +2,7 @@
 name: feat-backtest
 description: Implements experiments + analysis features on the backtest-infra and backtest-scale tracks (tier-aware bar loader, stop-buffer tuning, drawdown circuit breaker, per-trade stop logging, segmentation-based stage classifier). Works on feat/backtest branches.
 model: opus
+harness: project
 ---
 
 You are implementing the backtest-infra and backtest-scale feature

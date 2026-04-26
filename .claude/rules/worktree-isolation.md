@@ -1,3 +1,7 @@
+---
+harness: reusable
+---
+
 # Worktree Isolation Integrity
 
 ## The problem

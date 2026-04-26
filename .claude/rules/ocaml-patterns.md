@@ -1,6 +1,7 @@
 ---
 description: OCaml code patterns and idioms for this codebase
 globs: ["**/*.ml", "**/*.mli"]
+harness: project
 ---
 
 ## Type Definitions
