@@ -10,11 +10,25 @@ landed via PR #617 on 2026-04-27. Reactivated 2026-04-27 because the
 real-data SP500 verification (PR #612) revealed a live-cascade bug:
 0 short trades + 37 long entries opened in 2022 bear despite
 `Macro.analyze` correctly returning Bearish at the unit level. The
-bear-window regression test (#617) confirms the screener → strategy
-seam is correct, isolating the bug upstream in
-`Panel_callbacks.macro_callbacks_of_weekly_views`. Tracked as
-follow-up #4 below; in-flight via feat-weinstein agent dispatched
-2026-04-27.
+bear-window regression test (#617) confirmed the screener → strategy
+seam is correct. Root cause located 2026-04-27 (this session): not in
+`Panel_callbacks.macro_callbacks_of_weekly_views` itself, but upstream
+— `Weinstein_strategy.make` loaded composer-AD bars covering ~1973 to
+April 2026 and passed them to every Friday's `_on_market_close`
+without filtering by `current_date`. Future-leaking synthetic A-D
+disagreed with the real 2022 Stage 4 GSPC index, flipping the macro
+composite from Bearish to Neutral/Bullish. Fix landed in
+`feat/short-side-bear-window-fix-cascade-plumbing`: add
+`Macro_inputs.ad_bars_at_or_before` and call it in `_run_screen`.
+
+Pinned by `trading/trading/weinstein/strategy/test/test_macro_panel_callbacks_real_data.ml`:
+- Real 2022 GSPC + empty AD bars + panel-callbacks → Bearish (mirrors
+  `test_macro_2022_bear_market` in macro/test/test_macro_e2e.ml).
+- Real 2022 GSPC + composer-loaded AD bars filtered to `<= 2022-10-14`
+  → Bearish, confidence < 0.5 (the fix's contract).
+- Real 2022 GSPC + composer-loaded AD bars unfiltered (~1973 to April
+  2026) → non-Bearish (the bug, double-pinned to catch regressions
+  from either direction).
 
 ## Interface stable
 YES
@@ -65,7 +79,22 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
 1. ~~**Bear-window backtest regression** (item 6 above)~~ — landed in PR #617 (`feat/short-side-bear-window-regression`). New file `trading/trading/weinstein/strategy/test/test_short_side_bear_window.ml` pins both directions of the bear-window contract through the public `Screener.screen` -> `Weinstein_strategy.entries_from_candidates` seam (synthetic-mocked candidates, not full simulator). Pivoted from the `test_weinstein_backtest.ml` end-to-end approach because the synthetic Declining pattern still does not trigger a clean Stage 3 → Stage 4 transition under the default screener — the right primitive seam is the screener -> entries_from_candidates pipeline, which catches regressions deterministically. Live-cascade gap (PR #612 — 0 short trades and 37 long entries opened in 2022 bear on real SP500 data) remains; diagnosis is upstream of this seam, in `_run_screen`'s `macro_callbacks` construction. Tracked separately.
 2. **Full short screener cascade** — current implementation emits short candidates via the existing cascade with the Ch.11 hard RS gate added. Full mirror of the long cascade (positive weight for negative RS trend, resistance-ceiling clean-space weighting for shorts, short-side volume confirmation rules) is a follow-up.
 3. **Ch.11 spot-check** — qc-behavioral review against book examples (never-short-Stage-2 verified in unit tests; confirm Stage 4 + negative RS + bearish macro combination on real data).
-4. **Live-cascade Bearish macro plumbing** (new, ex-#612) — real-data SP500 5y emits 0 shorts and 37 longs in 2022 bear despite `Macro.analyze` correctly returning Bearish on real GSPC bars at the unit level. The bear-window contract test landed in PR #617 confirms the screener seam is correct; the bug is upstream — likely in how `_run_screen` constructs `macro_callbacks` via `Panel_callbacks.macro_callbacks_of_weekly_views` from panel views. See `dev/notes/short-side-real-data-verification-2026-04-27.md`.
+4. ~~**Live-cascade Bearish macro plumbing** (new, ex-#612)~~ — fixed
+   in `feat/short-side-bear-window-fix-cascade-plumbing`. Root cause was
+   upstream of `Panel_callbacks.macro_callbacks_of_weekly_views`: the
+   composer-loaded AD breadth series was time-unfiltered, so the macro
+   analyzer's `get_cumulative_ad ~week_offset:0` returned the cumulative
+   as of the last loaded synthetic bar (~April 2026), date-misaligned by
+   ~3 years against the index close at the simulator's current 2022 tick.
+   Fix: `Macro_inputs.ad_bars_at_or_before` filters AD bars to dates
+   `<= current_date` inside `_run_screen` before they reach the panel
+   callbacks. Pinned by `test_macro_panel_callbacks_real_data.ml`.
+
+5. **Verify SP500 5y backtest emits non-zero shorts in 2022** — follow-up
+   to (4): rerun the full SP500 2019-2023 scenario with the fix to
+   confirm the symptom (0 shorts, 37 long entries in 2022) is resolved.
+   Out of scope for the fix PR per cost (~2.5 min wall, full backtest);
+   covered by the next nightly Tier-3 perf run.
 
 ## References
 

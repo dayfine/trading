@@ -392,7 +392,17 @@ let _is_screening_day_view (view : Data_panel.Bar_panels.weekly_view) =
     macro-specific gating — longs blocked under Bearish, shorts blocked under
     Bullish — happens inside the screener. Under Bearish this yields short-side
     entries (per the bear-market shorting chapter), where previously the branch
-    returned [] unconditionally. *)
+    returned [] unconditionally.
+
+    Filters [ad_bars] to dates [<= current_date] before constructing macro
+    callbacks. The strategy's [make] function loads the full A-D breadth series
+    once at construction time (via {!Ad_bars.load}); the composer-loaded
+    synthetic series typically extends past the simulator's current tick.
+    Without this filter the macro analyzer's [get_cumulative_ad ~week_offset:0]
+    returns the cumulative as of the {b last loaded} bar rather than the current
+    tick — leaking future breadth into the indicator readings and misclassifying
+    real bear-market regimes as [Neutral] / [Bullish]. See
+    [test_macro_panel_callbacks_real_data.ml]. *)
 let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
     ~current_date ~index_view =
@@ -403,10 +413,14 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
       ~as_of:current_date
   in
   let ma_cache = Bar_reader.ma_cache bar_reader in
+  let ad_bars_until_now =
+    Macro_inputs.ad_bars_at_or_before ~ad_bars ~as_of:current_date
+  in
   let macro_callbacks =
     Panel_callbacks.macro_callbacks_of_weekly_views ?ma_cache
       ~index_symbol:config.indices.primary ~config:config.macro_config
-      ~index:index_view ~globals:global_index_views ~ad_bars ()
+      ~index:index_view ~globals:global_index_views ~ad_bars:ad_bars_until_now
+      ()
   in
   let macro_result =
     Macro.analyze_with_callbacks ~config:config.macro_config

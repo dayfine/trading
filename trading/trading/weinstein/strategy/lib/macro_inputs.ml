@@ -22,6 +22,29 @@ let spdr_sector_etfs =
 let default_global_indices =
   [ ("GDAXI.INDX", "DAX"); ("N225.INDX", "Nikkei"); ("ISF.LSE", "FTSE") ]
 
+(* AD bars are loaded once at strategy [make] time from disk (via
+   [Ad_bars.load], which composes Unicorn + Synthetic). The synthetic CSV
+   typically extends to the most recent [compute_synthetic_adl.exe] run,
+   often well past the simulator's current tick. Without filtering, the
+   panel-callbacks [get_cumulative_ad ~week_offset:0] returns the
+   cumulative as of the {b last loaded} A-D bar (e.g., April 2026) while
+   [get_index_close ~week_offset:0] correctly returns the {b current
+   simulator tick}'s close (e.g., October 2022) — the macro indicator
+   readings then disagree across an ~3-year date misalignment, breaking
+   the [trend = Bearish] composite during real bear-market periods. The
+   filter trims [ad_bars] to dates [<= current_date] before they reach
+   {!Panel_callbacks.macro_callbacks_of_weekly_views}. *)
+let ad_bars_at_or_before ~(ad_bars : Macro.ad_bar list) ~(as_of : Date.t) :
+    Macro.ad_bar list =
+  match ad_bars with
+  | [] -> []
+  | bars -> (
+      match List.last bars with
+      | Some last_bar when Date.( <= ) last_bar.Macro.date as_of -> bars
+      | _ ->
+          List.filter bars ~f:(fun (b : Macro.ad_bar) ->
+              Date.( <= ) b.date as_of))
+
 (* Stage 4 PR-A: build_global_index_views returns weekly views (panel-shaped).
    Each entry is consumed by the macro callback bundle constructor; no
    [Daily_price.t list] is ever materialised. The strategy's hot path uses
