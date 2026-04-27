@@ -32,6 +32,15 @@ SCENARIO_ROOT="${REPO_ROOT}/trading/test_data/backtest_scenarios"
 RUN_IN_ENV="${REPO_ROOT}/dev/lib/run-in-env.sh"
 TIMEOUT="${PERF_TIER1_TIMEOUT:-120}"
 
+# Aggressive major-GC + smaller minor heap. Confirmed by post-#602 tuning
+# matrix (dev/notes/panels-rss-matrix-post602-gc-tuned-2026-04-26.md): without
+# this, the GC steady-state high-water mark inflates peak RSS by ~25-37%
+# for runs that have low allocation rates (post-Stage-4-PR-D + #602 collapsed
+# the cons-cell churn that was previously forcing compaction). Override via
+# PERF_TIER1_OCAMLRUNPARAM=... if a specific scenario needs a different
+# heap shape; pass empty to use the OCaml defaults.
+export OCAMLRUNPARAM="${PERF_TIER1_OCAMLRUNPARAM:-o=60,s=512k}"
+
 if [ ! -x "$RUN_IN_ENV" ]; then
   printf 'FAIL: %s not found / not executable\n' "$RUN_IN_ENV" >&2
   exit 1

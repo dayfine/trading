@@ -311,6 +311,55 @@ they pass to Owl with zero conversion.
 Compare to today's 12–22 GB extrapolated. **~10× memory reduction at
 release-gate scale.**
 
+### Measured fit (post-Stage-4 + Stage 4.5 + #602 + GC tuning)
+
+**Replace the 1.05 GB projection above with the measured fit** —
+empirical results from the 4-cell N×T matrix on `bull-crash-292x6y`
+diverge from the projection because the per-symbol cost is dominated
+by per-tick simulation/engine allocations (price-cache lookups,
+price-path generation), not panel residency.
+
+`RSS ≈ 68 + 4.3·N + 0.2·N·(T − 1)` MB (with `OCAMLRUNPARAM=o=60,s=512k`)
+
+| N × T | Projected (GC tuned) |
+|---|---:|
+| 1,000 × 10y | 6.2 GB ✓ fits 8 GB |
+| 5,000 × 10y | 30 GB |
+| 10,000 × 10y | 61 GB |
+
+The α ≈ 68 MB matches "panels alone" — the projection above is
+correct for the panel-residency component. The β ≈ 4.3 MB / symbol
+is the simulation/engine working set (not modeled in the projection):
+price-cache by-date Hashtbl, position state, trade/stop history,
+closure environments retained per Friday tick. The γ ≈ 0.2 MB /
+symbol / year is small accumulating state (`Stop_log`, `Trace`).
+
+**Implication for tier-4 release-gate**: at the original N=5,000 ×
+T=10y plan target, RSS projects to **~30 GB** with all current
+optimisations + GC tuning. **Does not fit the 8 GB ceiling**.
+
+Two options:
+1. **Lower the scope to N=1,000 × T=10y** (6.2 GB; fits). Smaller
+   universe than originally planned but reachable today without
+   architectural change. The 1,000-stock cap can be the curated
+   S&P 500 subset (`trading/test_data/backtest_scenarios/universes/sp500.sexp`).
+2. **Hybrid-tier architecture** — only "interesting" symbols
+   (Stage 2 / Stage 4 in active sectors) carry full panels; cold
+   symbols carry metadata + last-price only (in-place updated).
+   Brings β down by ~80% if 80% of symbols stay cold. Plan deferred
+   to a separate doc; not part of Stage 4 / 4.5.
+
+Spike progression that produced the fit:
+- `dev/notes/panels-rss-spike-2026-04-25.md` (pre-Stage-4: 3,468 MB / 6:00)
+- `dev/notes/panels-rss-spike-postB-2026-04-26.md` (#588: 1,944 / 4:11)
+- `dev/notes/panels-rss-spike-postC-2026-04-26.md` (#590: 1,939 / 4:19)
+- `dev/notes/panels-rss-spike-postD-2026-04-26.md` (#594: 1,861 / 4:39)
+- `dev/notes/panels-rss-matrix-postA-2026-04-26.md` (#599: 1,866 / 4:05)
+- `dev/notes/panels-rss-matrix-post602-2026-04-26.md` (#602: 2,323 / 1:44)
+- `dev/notes/panels-rss-matrix-post602-gc-tuned-2026-04-26.md` (+ GC: 1,453 / 2:51)
+- Memtrace: `dev/notes/panels-memtrace-postA-2026-04-26.md` (allocator
+  attribution that drove #602).
+
 Earlier ticks have less resident memory because Bigarray malloc is
 page-mapped; cells only become resident when written. RSS grows
 linearly with t, not stepwise on Friday.
