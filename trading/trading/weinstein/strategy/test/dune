@@ -5,6 +5,7 @@
   test_ad_bars_weekly_e2e
   test_macro_inputs
   test_panel_callbacks
+  test_short_side_bear_window
   test_stops_runner
   test_weekly_ma_cache
   test_weinstein_strategy
