@@ -1,11 +1,11 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-24
+## Last updated: 2026-04-27
 
 ## Status
 MERGED
 
-MVP slice landed via #420 on 2026-04-19; follow-ups tracked below.
+MVP slice landed via #420 on 2026-04-19; bear-window regression test landed via PR #617 on 2026-04-27. Other follow-ups tracked below.
 
 **Reactivation cue (2026-04-24):** flip Status back to IN_PROGRESS
 once the Tiered loader flip in `backtest-scale.md` lands. The three
@@ -61,9 +61,10 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
 
 ## Follow-ups
 
-1. **Bear-window backtest regression** (item 6 above) — extend `test_weinstein_backtest.ml` with a Bearish macro scenario that exercises short entries end-to-end. Requires a synthetic Declining-stock scenario that produces a proper Stage 3 → Stage 4 transition under the default screener (or a lower `min_grade` config on the test harness side).
+1. ~~**Bear-window backtest regression** (item 6 above)~~ — landed in PR #617 (`feat/short-side-bear-window-regression`). New file `trading/trading/weinstein/strategy/test/test_short_side_bear_window.ml` pins both directions of the bear-window contract through the public `Screener.screen` -> `Weinstein_strategy.entries_from_candidates` seam (synthetic-mocked candidates, not full simulator). Pivoted from the `test_weinstein_backtest.ml` end-to-end approach because the synthetic Declining pattern still does not trigger a clean Stage 3 → Stage 4 transition under the default screener — the right primitive seam is the screener -> entries_from_candidates pipeline, which catches regressions deterministically. Live-cascade gap (PR #612 — 0 short trades and 37 long entries opened in 2022 bear on real SP500 data) remains; diagnosis is upstream of this seam, in `_run_screen`'s `macro_callbacks` construction. Tracked separately.
 2. **Full short screener cascade** — current implementation emits short candidates via the existing cascade with the Ch.11 hard RS gate added. Full mirror of the long cascade (positive weight for negative RS trend, resistance-ceiling clean-space weighting for shorts, short-side volume confirmation rules) is a follow-up.
 3. **Ch.11 spot-check** — qc-behavioral review against book examples (never-short-Stage-2 verified in unit tests; confirm Stage 4 + negative RS + bearish macro combination on real data).
+4. **Live-cascade Bearish macro plumbing** (new, ex-#612) — real-data SP500 5y emits 0 shorts and 37 longs in 2022 bear despite `Macro.analyze` correctly returning Bearish on real GSPC bars at the unit level. The bear-window contract test landed in PR #617 confirms the screener seam is correct; the bug is upstream — likely in how `_run_screen` constructs `macro_callbacks` via `Panel_callbacks.macro_callbacks_of_weekly_views` from panel views. See `dev/notes/short-side-real-data-verification-2026-04-27.md`.
 
 ## References
 
