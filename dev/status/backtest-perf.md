@@ -5,7 +5,20 @@
 ## Status
 IN_PROGRESS
 
-Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged 2026-04-26T16:07Z. The `perf-tier1.yml` workflow file remains **held out** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML from #574's PR body. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker. Step 5 (release_perf_report OCaml exe) tracked separately; landed via #585 / #606 on the test-data + perf-runner side. Tier-4 release-gate scenarios structurally unblocked since data-panels Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z. **Engine-layer-pooling PR-1 (Gc.stat instrumentation, ~50 LOC measurement-only)** open for review at PR #618 (branch `feat/backtest-perf-engine-pool-instrument`); confirms `Engine.update_market` dominates the per-tick allocator profile on real data so PR-2..PR-4 (per-symbol scratch + float-array buffers + buffer pooling) can land with confidence.
+Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged
+2026-04-26T16:07Z. **`perf-tier1.yml` landed via PR #616 on 2026-04-27**
+— per-PR perf smoke is now wired (continue-on-error: true for now;
+gate later). **Engine-layer-pooling PR-1 (Gc.stat instrumentation,
+panel_runner per-step snapshots) merged via PR #618 on 2026-04-27**;
+PR-2..PR-4 (per-symbol scratch + float-array buffers + buffer
+pooling) gated on a 3-month full-universe gc-trace run that confirms
+the engine-update-market wedge. Tier-2 nightly + tier-3 weekly
+workflows outstanding (token scope confirmed; previous PAT-blocker
+no longer applies post-#616). Step 5 (release_perf_report OCaml exe)
+tracked separately; landed via #585 / #606 on the test-data +
+perf-runner side. Tier-4 release-gate scenarios structurally
+unblocked since data-panels Stage 4.5 PR-B (#604) merged
+2026-04-27T02:33Z.
 
 ## Interface stable
 NO
