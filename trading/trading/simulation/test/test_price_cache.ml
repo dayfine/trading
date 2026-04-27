@@ -228,6 +228,38 @@ let test_nonexistent_symbol _ =
 
   teardown_test_data test_data_dir
 
+let test_get_price_on_date_hit _ =
+  let test_data_dir = setup_test_data "get_price_on_date_hit" in
+  let backend = create ~data_dir:test_data_dir in
+
+  let date = Date.of_string "2024-01-02" in
+  assert_that
+    (get_price_on_date backend ~symbol:"AAPL" ~date)
+    (is_some_and
+       (field
+          (fun (p : Types.Daily_price.t) -> p.close_price)
+          (float_equal 102.0)));
+
+  teardown_test_data test_data_dir
+
+let test_get_price_on_date_miss _ =
+  let test_data_dir = setup_test_data "get_price_on_date_miss" in
+  let backend = create ~data_dir:test_data_dir in
+
+  let date = Date.of_string "1999-01-01" in
+  assert_that (get_price_on_date backend ~symbol:"AAPL" ~date) is_none;
+
+  teardown_test_data test_data_dir
+
+let test_get_price_on_date_unknown_symbol _ =
+  let test_data_dir = setup_test_data "get_price_on_date_unknown" in
+  let backend = create ~data_dir:test_data_dir in
+
+  let date = Date.of_string "2024-01-01" in
+  assert_that (get_price_on_date backend ~symbol:"NONEXISTENT" ~date) is_none;
+
+  teardown_test_data test_data_dir
+
 let suite =
   "Price cache tests"
   >::: [
@@ -239,6 +271,10 @@ let suite =
          "test_preload_symbols" >:: test_preload_symbols;
          "test_clear_cache" >:: test_clear_cache;
          "test_nonexistent_symbol" >:: test_nonexistent_symbol;
+         "test_get_price_on_date_hit" >:: test_get_price_on_date_hit;
+         "test_get_price_on_date_miss" >:: test_get_price_on_date_miss;
+         "test_get_price_on_date_unknown_symbol"
+         >:: test_get_price_on_date_unknown_symbol;
        ]
 
 let () = run_test_tt_main suite
