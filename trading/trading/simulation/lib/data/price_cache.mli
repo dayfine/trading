@@ -36,6 +36,20 @@ val get_prices :
     @param end_date Optional end date (inclusive)
     @return List of daily prices sorted by date (oldest first), or error *)
 
+val get_price_on_date :
+  t -> symbol:string -> date:Date.t -> Types.Daily_price.t option
+(** Direct lookup: return the bar for [symbol] on exactly [date], or [None] if
+    the symbol failed to load or has no bar on that date.
+
+    On first access for [symbol], loads the CSV file and builds an internal
+    date-indexed table; subsequent calls are O(1) with no allocation. Use this
+    in hot-path per-tick price lookups instead of {!get_prices} + filter + find
+    — the latter allocates a fresh list per call.
+
+    Errors during load (missing CSV, malformed file) collapse to [None]. The
+    [Result]-based load path is in {!get_prices}; callers that need the load
+    error still go through that one. *)
+
 val preload_symbols : t -> string list -> (unit, Status.t) Result.t
 (** Preload data for multiple symbols upfront.
 
