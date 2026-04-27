@@ -1,0 +1,94 @@
+# Tier-3 perf weekly: weekly large-scope perf coverage (≤2 h budget per cell)
+# for the perf catalog.
+#
+# Runs every scenario tagged `;; perf-tier: 3` under
+# trading/test_data/backtest_scenarios/ via dev/scripts/perf_tier3_weekly.sh,
+# captures wall-time + peak RSS, and writes the result into the GHA job
+# summary so the human can read off perf at a glance.
+#
+# Non-blocking by design (continue-on-error: true) — same rationale as
+# perf-tier1.yml + perf-nightly.yml: VISIBILITY first, gating later. Flip
+# continue-on-error off once the budgets in
+# dev/plans/perf-scenario-catalog-2026-04-25.md tier 3 are pinned (~10
+# weekly cycles of data).
+#
+# Tier-3 scenarios covered (kept in sync via
+# trading/devtools/checks/perf_catalog_check.sh — `;; perf-tier: 3` tag is
+# the source of truth, the discovery in the runner script auto-matches):
+#   trading/test_data/backtest_scenarios/perf-sweep/bull-1y.sexp
+#   trading/test_data/backtest_scenarios/perf-sweep/bull-3y.sexp
+name: perf-weekly
+
+on:
+  # Weekly cron at 07:00 UTC Monday = 00:00 PT (PDT) / 23:00 PT Sunday (PST).
+  # Chosen because:
+  #   - Daily perf-nightly runs at 05:00 UTC; this is 2 hours later, so no
+  #     concurrency overlap with that runner.
+  #   - Daily orchestrator runs at 07:17 UTC (00:17 PT). This slot starts 17
+  #     minutes earlier; tier-3 jobs can take hours, but the orchestrator's
+  #     workload is independent (different repos / different PR queues), so
+  #     the only contention is GHA scheduler queueing — acceptable.
+  #   - image.yml runs at 06:00 UTC Mon; this is 1 hour later, so the
+  #     trading-ci:latest image being pulled is at most 1 hour stale.
+  #   - deps-update.yml runs at 08:00 UTC Mon; that's 1 hour later, no
+  #     overlap.
+  #   - health-deep-weekly.yml runs at 15:17 UTC Mon (08:17 PT); 8 hours
+  #     later, no overlap.
+  #   - GitHub cron is UTC-only, no DST awareness; this drifts back
+  #     1 hour PT during PST months (i.e. 23:00 PT Sunday).
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+jobs:
+  perf-tier3-weekly:
+    runs-on: ubuntu-latest
+    # Per-cell budget is 2 h; two tier-3 cells run sequentially, so the
+    # job-level ceiling is ~4 h with some build/setup overhead. 300 min
+    # gives headroom for the 3y cell plus the _build cache restore cost
+    # on a cold runner. (GHA job-level max is 360 min on ubuntu-latest.)
+    timeout-minutes: 300
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      TRADING_IN_CONTAINER: "1"
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache _build
+        uses: actions/cache@v4
+        with:
+          path: trading/_build
+          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          restore-keys: |
+            dune-${{ runner.os }}-
+
+      - name: Run tier-3 perf weekly
+        id: tier3
+        continue-on-error: true
+        run: dev/scripts/perf_tier3_weekly.sh
+
+      - name: Publish summary
+        if: always()
+        run: |
+          summary_file=$(ls -1t dev/perf/tier3-weekly-*/summary.txt 2>/dev/null | head -1)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            {
+              echo "## Tier-3 perf weekly"
+              echo ""
+              echo '```'
+              cat "$summary_file"
+              echo '```'
+            } >>"$GITHUB_STEP_SUMMARY"
+          else
+            echo "Tier-3 perf weekly: no summary produced." >>"$GITHUB_STEP_SUMMARY"
+          fi
