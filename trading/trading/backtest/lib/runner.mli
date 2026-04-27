@@ -88,6 +88,16 @@ val run_backtest :
     phase boundaries as [trace] (universe-load done, macro-load done, fill done,
     teardown done). Used by Phase 1 of the hybrid-tier architecture plan to
     discriminate among load-time / per-tick / Friday-cycle residency hypotheses.
+
+    Additionally, the panel runner snapshots [Gc.stat] before and after every
+    simulator step (one step = one calendar day in the [Daily] cadence = one
+    [Engine.update_market] call). Phase labels are shaped
+    [step_<YYYY-MM-DD>_before] / [step_<YYYY-MM-DD>_after] so the per-day delta
+    is recoverable from the CSV by pairing labels. Used by PR-1 of the
+    engine-pooling plan ([dev/plans/engine-layer-pooling-2026-04-27.md]) to
+    confirm on real data that [Engine.update_market] dominates the per-tick
+    allocator profile before the buffer-reuse refactors land.
+
     Independent measurement plane from [trace]'s per-phase wall-time + RSS
     readings; both can be passed in the same run. When [gc_trace] is omitted, no
     snapshots are taken. *)

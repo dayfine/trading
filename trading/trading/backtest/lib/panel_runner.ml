@@ -121,15 +121,58 @@ let _make_simulator (input : input) ~stop_log ~start_date ~end_date ~warmup_days
         (sprintf "Backtest.Panel_runner: failed to create simulator: %s"
            (Status.show e))
 
-let _run_simulator sim =
-  match Simulator.run sim with
-  | Ok r -> r
-  | Error e ->
-      failwith
-        (sprintf "Backtest.Panel_runner: simulation failed: %s" (Status.show e))
+(** Phase label for one step boundary. The date is the step-about-to-execute's
+    date so a CSV consumer can pair [_before] and [_after] rows on it. *)
+let _step_phase ~date ~boundary =
+  sprintf "step_%s_%s" (Date.to_string date) boundary
+
+(** One step iteration: snapshot [_before], call [Simulator.step], snapshot
+    [_after], return either the final result or the next simulator state. *)
+let _step_with_gc_trace ?gc_trace ~date sim =
+  Gc_trace.record ?trace:gc_trace
+    ~phase:(_step_phase ~date ~boundary:"before")
+    ();
+  let outcome = Simulator.step sim in
+  Gc_trace.record ?trace:gc_trace
+    ~phase:(_step_phase ~date ~boundary:"after")
+    ();
+  outcome
+
+let _step_failed e =
+  failwith
+    (sprintf "Backtest.Panel_runner: simulation failed: %s" (Status.show e))
+
+(** One iteration of the step loop: snapshot before/after, dispatch on the
+    outcome. Returns [`Done r] when the simulator completes, or [`Continue sim']
+    with the next simulator state. *)
+let _step_loop_iter ?gc_trace ~date sim =
+  match _step_with_gc_trace ?gc_trace ~date sim with
+  | Error e -> _step_failed e
+  | Ok (Simulator.Completed result) -> `Done result
+  | Ok (Simulator.Stepped (sim', _step_result)) -> `Continue sim'
+
+(** Step-loop replacement for [Simulator.run] that snapshots [Gc.stat] before
+    and after each [Simulator.step] call. One step = one calendar day in the
+    [Daily] cadence used by the panel runner = one [Engine.update_market] call
+    (the dominant per-tick allocator per the post-PR-A memtrace).
+
+    When [gc_trace = None] the loop is functionally identical to [Simulator.run]
+    modulo one [Option.is_some] check per step.
+
+    [pending_date] is tracked locally in lockstep with the simulator's internal
+    [current_date] so the [_before] snapshot can be labeled with the step's date
+    *before* [Simulator.step] is invoked. *)
+let _run_simulator_with_gc_trace ?gc_trace sim =
+  let start_date = (Simulator.get_config sim).start_date in
+  let rec loop sim ~pending_date =
+    match _step_loop_iter ?gc_trace ~date:pending_date sim with
+    | `Done result -> result
+    | `Continue sim' -> loop sim' ~pending_date:(Date.add_days pending_date 1)
+  in
+  loop sim ~pending_date:start_date
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
-    ~commission ?trace () =
+    ~commission ?trace ?gc_trace () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let n_days = Array.length calendar in
@@ -157,6 +200,6 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
-        _run_simulator sim)
+        _run_simulator_with_gc_trace ?gc_trace sim)
   in
   (sim_result, stop_log)
