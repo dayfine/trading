@@ -183,13 +183,14 @@ let _all_runner_symbols ~(config : Weinstein_strategy.config) ~universe =
   (index_symbol :: universe) @ sector_etf_symbols @ global_index_symbols
   |> List.dedup_and_sort ~compare:String.compare
 
-let _load_deps ?trace ~overrides ~sector_map_override () =
+let _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () =
   let data_dir_fpath = Data_path.default_data_dir () in
   let data_dir = Fpath.to_string data_dir_fpath in
   let ticker_sectors =
     Trace.record ?trace Trace.Phase.Load_universe (fun () ->
         _resolve_ticker_sectors ~data_dir:data_dir_fpath sector_map_override)
   in
+  Gc_trace.record ?trace:gc_trace ~phase:"load_universe_done" ();
   let universe =
     Hashtbl.keys ticker_sectors |> List.sort ~compare:String.compare
   in
@@ -204,6 +205,7 @@ let _load_deps ?trace ~overrides ~sector_map_override () =
   eprintf "Universe: %d stocks\n%!" universe_size;
   let config = _maybe_clear_sector_etfs { config with universe } in
   let ad_bars = _load_ad_bars ?trace ~data_dir ~universe_size ~config () in
+  Gc_trace.record ?trace:gc_trace ~phase:"macro_done" ();
   let all_symbols = _all_runner_symbols ~config ~universe in
   {
     data_dir_fpath;
@@ -246,8 +248,8 @@ let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
   }
 
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
-    ?trace () =
-  let deps = _load_deps ?trace ~overrides ~sector_map_override () in
+    ?trace ?gc_trace () =
+  let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length deps.all_symbols);
   let warmup_start = Date.add_days start_date (-warmup_days) in
@@ -258,6 +260,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
   let sim_result, stop_log =
     _run_panel_backtest ~deps ~start_date ~end_date ?trace ()
   in
+  Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on
      these steps, so it must see *every* step where a trade fill happened —
@@ -280,6 +283,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         ( Metrics.extract_round_trips steps_in_range,
           Stop_log.get_stop_infos stop_log ))
   in
+  Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
   let summary =
     _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
       ~sim_result

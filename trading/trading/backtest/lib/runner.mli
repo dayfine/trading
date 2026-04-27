@@ -44,6 +44,7 @@ val run_backtest :
   ?overrides:Sexp.t list ->
   ?sector_map_override:(string, string) Core.Hashtbl.t ->
   ?trace:Trace.t ->
+  ?gc_trace:Gc_trace.t ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -81,4 +82,12 @@ val run_backtest :
     Finer-grained wrap points for the per-bar phases inside [Simulator.run]
     (Sector_rank / Rs_rank / Stage_classify / Screener / Stop_update /
     Order_gen) require strategy-level instrumentation and are tracked as a
-    follow-up. When [trace] is omitted, instrumentation is a no-op. *)
+    follow-up. When [trace] is omitted, instrumentation is a no-op.
+
+    [gc_trace], when passed, records [Gc.stat] snapshots at the same coarse
+    phase boundaries as [trace] (universe-load done, macro-load done, fill done,
+    teardown done). Used by Phase 1 of the hybrid-tier architecture plan to
+    discriminate among load-time / per-tick / Friday-cycle residency hypotheses.
+    Independent measurement plane from [trace]'s per-phase wall-time + RSS
+    readings; both can be passed in the same run. When [gc_trace] is omitted, no
+    snapshots are taken. *)

@@ -1,7 +1,7 @@
 (** Backtest runner CLI — thin wrapper around the {!Backtest} library.
 
     Usage: backtest_runner <start_date> \[end_date\] \[--override '<sexp>'\]
-    \[--trace <path>\] \[--memtrace <path>\]
+    \[--trace <path>\] \[--memtrace <path>\] \[--gc-trace <path>\]
 
     - start_date: required (e.g. 2018-01-02)
     - end_date: optional, defaults to today
@@ -24,6 +24,14 @@
       +95% Tiered RSS investigation. Composes with [--trace]: phase-level
       timing/RSS + per-callsite allocation traces are independent measurement
       planes and can be captured in the same run.
+    - --gc-trace: when given, captures [Gc.stat] snapshots at each coarse
+      lifecycle boundary (start, after universe load, after macro load, after
+      simulator fill, after teardown, end) and writes them as CSV at [<path>].
+      Used by Phase 1 of the hybrid-tier architecture plan
+      ([dev/plans/hybrid-tier-architecture-2026-04-26.md]) to discriminate among
+      load-time / per-tick / Friday-cycle residency hypotheses. Composes with
+      [--trace] and [--memtrace] (independent measurement planes). Without the
+      flag, no snapshots are taken and no file is written.
 
     Example:
     {[
@@ -63,7 +71,7 @@ let _parse_args () =
   if Array.length argv < 2 then (
     eprintf
       "Usage: backtest_runner <start_date> [end_date] [--override '<sexp>'] \
-       [--trace <path>] [--memtrace <path>]\n";
+       [--trace <path>] [--memtrace <path>] [--gc-trace <path>]\n";
     Stdlib.exit 1);
   let args = Array.to_list argv |> List.tl_exn in
   match Backtest_runner_args.parse args with
@@ -81,7 +89,8 @@ let _parse_args () =
         end_date,
         parsed.overrides,
         parsed.trace_path,
-        parsed.memtrace_path )
+        parsed.memtrace_path,
+        parsed.gc_trace_path )
 
 let _make_output_dir () =
   let data_dir_fpath = Data_path.default_data_dir () in
@@ -109,6 +118,14 @@ let _write_trace ~path ~trace =
     without distorting wall-clock numbers in the same run). *)
 let _memtrace_sampling_rate = 1e-4
 
+(** Write the captured GC-trace CSV at [path] and report the location on stderr.
+    Pulled out of [main] to keep the side-effect explicit at the call site,
+    mirroring [_write_trace] for the [--trace] flag. *)
+let _write_gc_trace ~path ~gc_trace =
+  let snapshots = Backtest.Gc_trace.snapshot_list gc_trace in
+  Backtest.Gc_trace.write ~out_path:path snapshots;
+  eprintf "Gc-trace written to: %s\n%!" path
+
 (** Start [Memtrace] tracing to [path], discarding the returned tracer handle.
     [Memtrace] registers an [at_exit] hook to stop tracing + flush the [.ctf]
     file at process exit, so we don't need to retain the tracer ourselves. Logs
@@ -121,7 +138,8 @@ let _start_memtrace ~path =
   eprintf "Memtrace started, writing to: %s\n%!" path
 
 let () =
-  let start_date, end_date, overrides, trace_path, memtrace_path =
+  let start_date, end_date, overrides, trace_path, memtrace_path, gc_trace_path
+      =
     _parse_args ()
   in
   (* Start Memtrace BEFORE any backtest work so allocations from [run_backtest]
@@ -132,8 +150,17 @@ let () =
      records into it; otherwise [trace = None] and tracing is a no-op (the
      default code path is unchanged). *)
   let trace = Option.map trace_path ~f:(fun _ -> Backtest.Trace.create ()) in
+  (* When [--gc-trace <path>] is passed, pre-allocate a [Gc_trace.t] and
+     record a [start] snapshot before any backtest work so the CSV captures
+     the baseline GC state. Without the flag, [gc_trace = None] and every
+     [Gc_trace.record] call is a no-op. *)
+  let gc_trace =
+    Option.map gc_trace_path ~f:(fun _ -> Backtest.Gc_trace.create ())
+  in
+  Backtest.Gc_trace.record ?trace:gc_trace ~phase:"start" ();
   let result =
-    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides ?trace ()
+    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides ?trace
+      ?gc_trace ()
   in
   let output_dir = _make_output_dir () in
   eprintf "Writing output to %s/\n%!" output_dir;
@@ -141,6 +168,9 @@ let () =
   eprintf "Output written to: %s/\n%!" output_dir;
   Option.iter (Option.both trace_path trace) ~f:(fun (path, trace) ->
       _write_trace ~path ~trace);
+  Backtest.Gc_trace.record ?trace:gc_trace ~phase:"end" ();
+  Option.iter (Option.both gc_trace_path gc_trace) ~f:(fun (path, gc_trace) ->
+      _write_gc_trace ~path ~gc_trace);
   Out_channel.output_string stdout
     (Sexp.to_string_hum (Backtest.Summary.sexp_of_t result.summary));
   Out_channel.newline stdout

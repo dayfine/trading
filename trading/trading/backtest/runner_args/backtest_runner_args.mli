@@ -29,6 +29,17 @@ type t = {
           [at_exit] hook registered by [Memtrace] itself. Workstream B7 of
           [dev/plans/backtest-perf-2026-04-24.md] — per-callsite allocation
           attribution. *)
+  gc_trace_path : string option;
+      (** [None] when [--gc-trace] was not passed (no GC snapshots taken, zero
+          overhead). [Some path] when [--gc-trace <path>] was passed; the runner
+          builds a {!Backtest.Gc_trace.t} and records [Gc.stat] snapshots at
+          coarse phase boundaries (start, after universe load, after macro load,
+          after fill, after teardown, end), writing the accumulated CSV at
+          [path]. Phase 1 of the hybrid-tier architecture plan
+          ([dev/plans/hybrid-tier-architecture-2026-04-26.md]) — discriminates
+          among load-time / per-tick / Friday-cycle residency hypotheses.
+          Composes with [--trace] and [--memtrace] (independent measurement
+          planes). *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 
