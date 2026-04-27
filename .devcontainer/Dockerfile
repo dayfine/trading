@@ -40,6 +40,7 @@ FROM docker.io/ocaml/opam:ubuntu-22.04-ocaml-5.3 AS ci
 #   plplot-driver-cairo - owl-plplot
 #   autoconf, automake,
 #   libtool             - ta-lib build system
+#   jq                  - JSON parsing in shell scripts (per .claude/rules/no-python.md)
 # -----------------------------------------------------------------------------
 RUN sudo apt-get update && sudo apt-get install -y \
     pkg-config \
@@ -56,6 +57,7 @@ RUN sudo apt-get update && sudo apt-get install -y \
     automake \
     libtool \
     time \
+    jq \
     && sudo rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------

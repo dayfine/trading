@@ -226,71 +226,60 @@ jobs:
           # with type="result" carries total_cost_usd (float, USD).
           TOTAL_COST="null"
           if [ -n "${EXECUTION_FILE:-}" ] && [ -f "${EXECUTION_FILE}" ]; then
-            TOTAL_COST="$(python3 -c "
-          import json, sys
-          data = json.load(open('${EXECUTION_FILE}'))
-          # data is an array; find the last result message
-          for msg in reversed(data if isinstance(data, list) else [data]):
-              if isinstance(msg, dict) and msg.get('type') == 'result':
-                  cost = msg.get('total_cost_usd')
-                  if cost is not None:
-                      print(cost)
-                      sys.exit(0)
-          print('null')
-          " 2>/dev/null || echo "null")"
+            TOTAL_COST="$(jq -r '
+              (if type == "array" then . else [.] end)
+              | map(select(type == "object" and .type == "result" and .total_cost_usd != null))
+              | last.total_cost_usd // "null"
+            ' "${EXECUTION_FILE}" 2>/dev/null || echo "null")"
           else
             echo "execution_file output not available (${EXECUTION_FILE:-empty}); recording null cost."
           fi
 
           TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           # Belt-and-suspenders: TOTAL_COST is initialized to "null" above and
-          # reassigned by the python3 -c block, but if any future edit leaves it
-          # as an empty string the heredoc below would emit `"total_cost_usd": ,`
-          # and crash Python at parse time. Coerce to "null" if empty.
+          # reassigned by the jq block, but if any future edit leaves it as an
+          # empty string the JSON construction below would crash with an empty
+          # numeric arg. Coerce to "null" if empty.
           TOTAL_COST="${TOTAL_COST:-null}"
 
-          python3 - <<PYEOF
-          import json, os
-          data = {
-            "run_id": os.environ["RUN_ID"] if False else "${RUN_ID}",
-            "timestamp": "${TIMESTAMP}",
-            "commit_sha": "${COMMIT_SHA}",
-            "measurement_source": "claude-code-action execution_file (total_cost_usd from SDKResultMessage)",
-            "fallback_branch": "1b",
-            "notes": (
-              "total_cost_usd covers entire orchestrator run including all "
-              "internally-spawned subagents (Agent tool calls). Per-subagent "
-              "breakdown not available from action output — see "
-              "dev/status/cost-tracking.md for limitation details."
-            ),
-            "subagents": [
-              {
-                "name": "orchestrator-total",
-                "model": "sonnet",
-                "input_tokens": None,
-                "output_tokens": None,
-                "cache_read_input_tokens": None,
-                "cache_creation_input_tokens": None,
-                "estimated_cost_usd": None,
-                "note": (
-                  "Per-subagent breakdown not available from claude-code-action. "
-                  "total_cost_usd in totals covers all spawned subagents."
-                )
+          jq -n \
+            --arg run_id "${RUN_ID}" \
+            --arg timestamp "${TIMESTAMP}" \
+            --arg commit_sha "${COMMIT_SHA}" \
+            --argjson cost "${TOTAL_COST}" \
+            '{
+              run_id: $run_id,
+              timestamp: $timestamp,
+              commit_sha: $commit_sha,
+              measurement_source: "claude-code-action execution_file (total_cost_usd from SDKResultMessage)",
+              fallback_branch: "1b",
+              notes: ("total_cost_usd covers entire orchestrator run including all "
+                      + "internally-spawned subagents (Agent tool calls). Per-subagent "
+                      + "breakdown not available from action output — see "
+                      + "dev/status/cost-tracking.md for limitation details."),
+              subagents: [
+                {
+                  name: "orchestrator-total",
+                  model: "sonnet",
+                  input_tokens: null,
+                  output_tokens: null,
+                  cache_read_input_tokens: null,
+                  cache_creation_input_tokens: null,
+                  estimated_cost_usd: null,
+                  note: ("Per-subagent breakdown not available from claude-code-action. "
+                         + "total_cost_usd in totals covers all spawned subagents.")
+                }
+              ],
+              totals: {
+                input_tokens: null,
+                output_tokens: null,
+                cache_read_input_tokens: null,
+                cache_creation_input_tokens: null,
+                total_cost_usd: $cost,
+                measurement: "measured from claude-code-action execution_file total_cost_usd"
               }
-            ],
-            "totals": {
-              "input_tokens": None,
-              "output_tokens": None,
-              "cache_read_input_tokens": None,
-              "cache_creation_input_tokens": None,
-              "total_cost_usd": ${TOTAL_COST},
-              "measurement": "measured from claude-code-action execution_file total_cost_usd"
-            }
-          }
-          with open("${OUT_FILE}", "w") as f:
-              json.dump(data, f, indent=2)
-          print(f"Budget record written: ${OUT_FILE} (total_cost_usd=${TOTAL_COST})")
-          PYEOF
+            }' > "${OUT_FILE}"
+          echo "Budget record written: ${OUT_FILE} (total_cost_usd=${TOTAL_COST})"
 
           # Expose the written path so the commit step can find it deterministically.
           echo "out_file=${OUT_FILE}" >> "$GITHUB_OUTPUT"
@@ -329,7 +318,12 @@ jobs:
           fi
 
           BUDGET_BASENAME="$(basename "$OUT_FILE" .json)"
-          TOTAL_COST="$(python3 -c "import json; d=json.load(open('${OUT_FILE}')); v=d.get('totals',{}).get('total_cost_usd'); print('null' if v is None else f'{v:.4f}')")"
+          RAW_COST="$(jq -r '.totals.total_cost_usd // empty' "$OUT_FILE")"
+          if [ -z "$RAW_COST" ]; then
+            TOTAL_COST="null"
+          else
+            TOTAL_COST="$(printf '%.4f' "$RAW_COST")"
+          fi
 
           # safe.directory: inside the container we run as --user 0 on a
           # workspace that actions/checkout initialized as a non-root user.
@@ -344,32 +338,19 @@ jobs:
           # ---------------------------------------------------------------
           DATE="$(date +%F)"
           OWNER="${REPO%/*}"
-          # Single API fetch, parsed twice via env-prefixed python3.
-          # Prior bug: trailing `DATE="$DATE"` after the closing quote was
-          # passed as argv (not env), so os.environ['DATE'] raised KeyError,
-          # was swallowed by `2>/dev/null || true`, the lookup returned "",
-          # and this step took the fallback branch — leaving the daily PR
-          # un-merged. Fix: env-prefix on the rhs of the pipe.
+          # Single API fetch; jq picks number + branch from first matching PR.
           PRS_JSON="$(curl -sSL \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${REPO}/pulls?state=open&base=main&per_page=20")"
 
-          DAILY_PR_NUMBER="$(printf '%s' "$PRS_JSON" | DATE="$DATE" python3 -c '
-          import json, sys, os
-          prs = json.load(sys.stdin)
-          prefix = "ops/daily-" + os.environ["DATE"]
-          matches = [p for p in prs if p.get("head", {}).get("ref", "").startswith(prefix)]
-          print(matches[0]["number"] if matches else "")
-          ' || true)"
+          DAILY_PR_NUMBER="$(printf '%s' "$PRS_JSON" \
+            | jq -r --arg date "$DATE" \
+              '[.[] | select(.head.ref | startswith("ops/daily-" + $date))][0].number // empty')"
 
-          DAILY_BRANCH="$(printf '%s' "$PRS_JSON" | DATE="$DATE" python3 -c '
-          import json, sys, os
-          prs = json.load(sys.stdin)
-          prefix = "ops/daily-" + os.environ["DATE"]
-          matches = [p for p in prs if p.get("head", {}).get("ref", "").startswith(prefix)]
-          print(matches[0]["head"]["ref"] if matches else "")
-          ' || true)"
+          DAILY_BRANCH="$(printf '%s' "$PRS_JSON" \
+            | jq -r --arg date "$DATE" \
+              '[.[] | select(.head.ref | startswith("ops/daily-" + $date))][0].head.ref // empty')"
 
           if [ -z "$DAILY_PR_NUMBER" ] || [ -z "$DAILY_BRANCH" ]; then
             echo "::warning::No open ops/daily-${DATE} PR found. lead-orchestrator may have failed or already merged. Committing budget JSON to fallback branch ops/budget-${BUDGET_BASENAME} — human merge required."
@@ -416,7 +397,7 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -d '{"merge_method":"squash"}' \
             "https://api.github.com/repos/${REPO}/pulls/${DAILY_PR_NUMBER}/merge")"
-          MERGED="$(printf '%s' "$MERGE_RESPONSE" | python3 -c 'import json,sys;r=json.load(sys.stdin);print("true" if r.get("merged") else "false")' 2>/dev/null || echo false)"
+          MERGED="$(printf '%s' "$MERGE_RESPONSE" | jq -r '.merged // false | tostring')"
           if [ "$MERGED" = "true" ]; then
             echo "Auto-merged PR #${DAILY_PR_NUMBER} (daily summary + budget JSON)."
           else
