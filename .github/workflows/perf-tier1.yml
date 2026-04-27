@@ -1,0 +1,71 @@
+# Tier-1 perf smoke: per-PR fast smoke (≤2 min budget) for the perf catalog.
+#
+# Runs every scenario tagged `;; perf-tier: 1` under
+# trading/test_data/backtest_scenarios/ via dev/scripts/perf_tier1_smoke.sh,
+# captures wall-time + peak RSS, and writes the result into the GHA job
+# summary so reviewers can read off perf at a glance.
+#
+# Non-blocking by design (continue-on-error: true). The catalog is fresh
+# and per-cell budgets aren't pinned yet; we want VISIBILITY first, gating
+# later. Flip continue-on-error off once the budgets in
+# dev/plans/perf-scenario-catalog-2026-04-25.md tier 1 are pinned.
+#
+# Tier-1 scenarios covered (kept in sync via trading/devtools/checks/perf_catalog_check.sh):
+#   trading/test_data/backtest_scenarios/perf-sweep/bull-3m.sexp
+#   trading/test_data/backtest_scenarios/perf-sweep/bull-6m.sexp
+#   trading/test_data/backtest_scenarios/smoke/panel-golden-2019-full.sexp
+#   trading/test_data/backtest_scenarios/smoke/tiered-loader-parity.sexp
+name: perf-tier1
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  perf-tier1-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      TRADING_IN_CONTAINER: "1"
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache _build
+        uses: actions/cache@v4
+        with:
+          path: trading/_build
+          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          restore-keys: |
+            dune-${{ runner.os }}-
+
+      - name: Run tier-1 perf smoke
+        id: tier1
+        continue-on-error: true
+        run: dev/scripts/perf_tier1_smoke.sh
+
+      - name: Publish summary
+        if: always()
+        run: |
+          summary_file=$(ls -1t dev/perf/tier1-smoke-*/summary.txt 2>/dev/null | head -1)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            {
+              echo "## Tier-1 perf smoke"
+              echo ""
+              echo '```'
+              cat "$summary_file"
+              echo '```'
+            } >>"$GITHUB_STEP_SUMMARY"
+          else
+            echo "Tier-1 perf smoke: no summary produced." >>"$GITHUB_STEP_SUMMARY"
+          fi
