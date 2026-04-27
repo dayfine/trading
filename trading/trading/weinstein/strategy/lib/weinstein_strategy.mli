@@ -172,29 +172,40 @@ val held_symbols : Trading_strategy.Portfolio_view.t -> string list
     worth pinning by direct unit test. *)
 
 val survivors_for_screening :
+  ?sector_map:(string, Screener.sector_context) Core.Hashtbl.t ->
   config:config ->
   bar_reader:Bar_reader.t ->
   prior_stages:Weinstein_types.stage Core.Hashtbl.M(String).t ->
   current_date:Date.t ->
+  unit ->
   (string * Data_panel.Bar_panels.weekly_view * Stage.result) list
-(** Stage 4-5 PR-A: Phase 1 of the lazy screener cascade. For every ticker in
-    [config.universe], reads a panel weekly view and classifies the current
-    stage via the cheap stage-only callback bundle (cache-aware via PR-D
-    {!Weekly_ma_cache}). Returns survivors — symbols whose stage could in
+(** Stage 4-5 PR-A / PR-B: cheap-cascade survivors of the lazy screener. For
+    every ticker in [config.universe], reads a panel weekly view and classifies
+    the current stage via the cheap stage-only callback bundle (cache-aware via
+    PR-D {!Weekly_ma_cache}). Returns survivors — symbols whose stage could in
     principle yield a screener candidate ([Stage2 _] for longs; [Stage4 _] for
     shorts) — paired with their weekly view (reused by Phase 2) and
     {!Stage.result}.
+
+    When [?sector_map] is supplied, also applies the sector pre-filter (PR-B): a
+    Stage 2 candidate in a [Weak]-rated sector and a Stage 4 candidate in a
+    [Strong]-rated sector are dropped, mirroring {!Screener._long_candidate} /
+    {!Screener._short_candidate}'s downstream rejection rules. Tickers not
+    present in [sector_map] default to PASS (matches
+    {!Screener._resolve_sector}'s [Neutral] fallback for unknown tickers). When
+    [?sector_map] is omitted, returns stage-only survivors — the PR-A behaviour,
+    retained for tests that exercise the stage filter in isolation.
 
     [prior_stages] is updated for every classified symbol, including
     non-survivors, so the next Friday's classification has accurate prior-stage
     context.
 
     Public for testability — lets unit tests assert that the universe filter
-    correctly drops Stage1 / Stage3 symbols without instrumenting the screener
-    loop. The filter predicate is intentionally over-broad relative to the
-    screener's full eligibility rules (which also depend on volume / RS / sector
-    / prior_stage); staying broad on stage alone keeps Phase 1 cheap and
-    preserves bit-equality with the bar-list output. *)
+    correctly drops Stage1 / Stage3 symbols (PR-A) and weak-/strong-sector
+    symbols (PR-B) without instrumenting the screener loop. The filter
+    predicates are intentionally narrow (stage-only and sector-only); the
+    screener's full eligibility rules (volume / RS / prior_stage / quality)
+    still run inside Phase 2's [Stock_analysis] for the surviving symbols. *)
 
 val entries_from_candidates :
   config:config ->
