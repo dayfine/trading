@@ -229,10 +229,11 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
     all_symbols = deps.all_symbols;
   }
 
-let _run_panel_backtest ~deps ~start_date ~end_date ?trace () =
+let _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace () =
   Panel_runner.run
     ~input:(_panel_input_of_deps deps)
-    ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace ()
+    ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace
+    ?gc_trace ()
 
 let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     ~sim_result : Summary.t =
@@ -258,7 +259,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     (Date.to_string end_date)
     (Date.to_string warmup_start);
   let sim_result, stop_log =
-    _run_panel_backtest ~deps ~start_date ~end_date ?trace ()
+    _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
   (* Steps in the requested date range, all days included. Round-trip

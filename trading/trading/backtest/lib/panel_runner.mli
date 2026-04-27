@@ -41,8 +41,19 @@ val run :
   initial_cash:float ->
   commission:Trading_engine.Types.commission_config ->
   ?trace:Trace.t ->
+  ?gc_trace:Gc_trace.t ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result * Stop_log.t
 (** Same shape as the Legacy path's per-strategy entry point. The Panel branch
     in [Runner] uses this; callers should not call this directly outside of
-    tests. *)
+    tests.
+
+    [gc_trace], when passed, snapshots [Gc.stat] before and after every
+    simulator step (one step = one calendar day = one [Engine.update_market]
+    call). Phase labels are shaped [step_<YYYY-MM-DD>_before] and
+    [step_<YYYY-MM-DD>_after] so the per-day delta is recoverable from the CSV
+    by pairing labels. Used by PR-1 of the engine-pooling plan
+    ([dev/plans/engine-layer-pooling-2026-04-27.md]) to confirm on real data
+    that [Engine.update_market] dominates the per-tick allocator profile before
+    the buffer-reuse refactors land. When [gc_trace] is omitted, the runner
+    takes no per-step snapshots and the cost is one [None] match per step. *)

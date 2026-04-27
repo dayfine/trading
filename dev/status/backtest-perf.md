@@ -5,7 +5,7 @@
 ## Status
 IN_PROGRESS
 
-Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged 2026-04-26T16:07Z. The `perf-tier1.yml` workflow file remains **held out** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML from #574's PR body. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker. Step 5 (release_perf_report OCaml exe) tracked separately; landed via #585 / #606 on the test-data + perf-runner side. Tier-4 release-gate scenarios structurally unblocked since data-panels Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z; engine-layer-pooling (hybrid-tier Option 1) is the next memory-win lever, currently awaiting human go-ahead via PR #611.
+Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged 2026-04-26T16:07Z. The `perf-tier1.yml` workflow file remains **held out** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML from #574's PR body. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker. Step 5 (release_perf_report OCaml exe) tracked separately; landed via #585 / #606 on the test-data + perf-runner side. Tier-4 release-gate scenarios structurally unblocked since data-panels Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z. **Engine-layer-pooling PR-1 (Gc.stat instrumentation, ~50 LOC measurement-only)** open for review at PR #618 (branch `feat/backtest-perf-engine-pool-instrument`); confirms `Engine.update_market` dominates the per-tick allocator profile on real data so PR-2..PR-4 (per-symbol scratch + float-array buffers + buffer pooling) can land with confidence.
 
 ## Interface stable
 NO
@@ -39,8 +39,31 @@ mechanics + release-gate procedure.
   `perf_catalog_check.sh` integrity gate (annotate-only), the
   `perf_tier1_smoke.sh` runner, and the `perf-tier1.yml` GHA
   workflow.
+- **`feat/backtest-perf-engine-pool-instrument`** (engine-pooling PR-1) —
+  PR #618 open for review. Per-step `Gc.stat` snapshots in
+  `Panel_runner.run`, gated by the existing `?gc_trace`. Confirms
+  `Engine.update_market` is the dominant per-tick allocator before
+  the buffer-reuse refactors land (PR-2..PR-4 per
+  `dev/plans/engine-layer-pooling-2026-04-27.md`).
 
 ## Completed
+
+- **Engine-pooling PR-1 — Gc.stat instrumentation** (2026-04-27, PR #618).
+  Per-step `Gc.stat` snapshots in `Panel_runner.run`, gated by the
+  existing `?gc_trace`. Phase labels `step_<YYYY-MM-DD>_before` /
+  `step_<YYYY-MM-DD>_after` interleave between `macro_done` and
+  `fill_done` so a CSV consumer can pair them by date and recover
+  per-day deltas. When `gc_trace = None` the loop is functionally
+  identical to `Simulator.run` modulo one `Option.is_some` check per
+  step. Smoke check on a 6-month tier-1 run produces 476 per-step
+  rows; cumulative `minor_words` climbs 2.8M→93M, ready to be
+  diffed step-by-step. Verify:
+  `_build/default/trading/backtest/bin/backtest_runner.exe \
+   2019-06-03 2019-06-30 --gc-trace /tmp/gc_smoke.csv` then
+  `grep -c step_ /tmp/gc_smoke.csv` (expect ~476). Files:
+  `trading/trading/backtest/lib/panel_runner.{ml,mli}`,
+  `trading/trading/backtest/lib/runner.{ml,mli}`,
+  `trading/trading/backtest/test/test_panel_runner_gc_trace.ml`.
 
 - **Step 1 — scenario catalog headers** (2026-04-26).
   Added `;; perf-tier: <1|2|3|4>` + `;; perf-tier-rationale: ...` to
