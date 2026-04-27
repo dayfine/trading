@@ -11,16 +11,19 @@ Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged
 gate later). **Tier-2 nightly workflow landed via PR #622 on
 2026-04-27**: `perf_tier2_nightly.sh` +
 `.github/workflows/perf-nightly.yml`, six tier-2 cells, 30 min/cell
-budget, cron `0 5 * * *` (22:00 PT). **Engine-layer-pooling PR-1
+budget, cron `0 5 * * *` (22:00 PT). **Tier-3 weekly workflow open
+at `feat/backtest-perf-tier3-weekly` on 2026-04-27**:
+`perf_tier3_weekly.sh` + `.github/workflows/perf-weekly.yml`, two
+tier-3 cells (`perf-sweep/{bull-1y, bull-3y}`), 2 h/cell budget,
+cron `0 7 * * 1` (Monday 00:00 PT). **Engine-layer-pooling PR-1
 (Gc.stat instrumentation, panel_runner per-step snapshots) merged
 via PR #618 on 2026-04-27**; PR-2..PR-4 (per-symbol scratch +
 float-array buffers + buffer pooling) gated on a 3-month
 full-universe gc-trace run that confirms the engine-update-market
-wedge. Tier-3 weekly workflow still outstanding. Step 5
-(release_perf_report OCaml exe) tracked separately; landed via #585
-/ #606 on the test-data + perf-runner side. Tier-4 release-gate
-scenarios structurally unblocked since data-panels Stage 4.5 PR-B
-(#604) merged 2026-04-27T02:33Z.
+wedge. Step 5 (release_perf_report OCaml exe) tracked separately;
+landed via #585 / #606 on the test-data + perf-runner side. Tier-4
+release-gate scenarios structurally unblocked since data-panels
+Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z.
 
 ## Interface stable
 NO
@@ -60,22 +63,42 @@ mechanics + release-gate procedure.
   `Engine.update_market` is the dominant per-tick allocator before
   the buffer-reuse refactors land (PR-2..PR-4 per
   `dev/plans/engine-layer-pooling-2026-04-27.md`).
-- **`feat/backtest-perf-tier2-nightly`** (Step 3 — tier-2 nightly) —
-  open for review. Adds `dev/scripts/perf_tier2_nightly.sh` +
-  `.github/workflows/perf-nightly.yml`. Auto-discovers all six
-  `;; perf-tier: 2` scenarios under
-  `trading/test_data/backtest_scenarios/{goldens-small,smoke}/`,
-  runs each via `scenario_runner.exe --parallel 1` with `timeout 1800`,
-  publishes wall + peak-RSS table to `$GITHUB_STEP_SUMMARY`. Cron
-  `0 5 * * *` (22:00 PT PDT / 21:00 PT PST), well clear of the
-  orchestrator's 07:17/12:17 UTC slots. Non-blocking
+- **`feat/backtest-perf-tier3-weekly`** (Step 4 — tier-3 weekly) —
+  open for review. Adds `dev/scripts/perf_tier3_weekly.sh` +
+  `.github/workflows/perf-weekly.yml`. Auto-discovers both
+  `;; perf-tier: 3` scenarios under
+  `trading/test_data/backtest_scenarios/perf-sweep/{bull-1y,bull-3y}.sexp`,
+  runs each via `scenario_runner.exe --parallel 1` with
+  `timeout 7200`, publishes wall + peak-RSS table to
+  `$GITHUB_STEP_SUMMARY`. Cron `0 7 * * 1` (Monday 00:00 PT PDT /
+  23:00 PT Sunday PST), 2 h after perf-nightly's 05:00 UTC slot and
+  17 min before the orchestrator's 07:17 UTC slot. Non-blocking
   (`continue-on-error: true`) — same VISIBILITY-first posture as
-  tier-1. Tier-3 weekly + tier-4 release-gate workflows remain
-  outstanding (separate PRs).
+  tier-1/tier-2. Tier-4 release-gate workflow remains outstanding
+  (separate PR; gated on engine-pool PR-2..PR-5).
 
 ## Completed
 
-- **Step 3 — tier-2 nightly perf workflow** (2026-04-27, PR pending).
+- **Step 4 — tier-3 weekly perf workflow** (2026-04-27, PR pending).
+  Mirrors the tier-1/tier-2 pattern. Adds
+  `dev/scripts/perf_tier3_weekly.sh` (POSIX-sh runner that
+  auto-discovers `;; perf-tier: 3` scenarios via grep, runs each via
+  `scenario_runner.exe --parallel 1` with `timeout 7200` = 2 h,
+  captures wall + peak RSS, writes `summary.txt`) and
+  `.github/workflows/perf-weekly.yml` (cron `0 7 * * 1` = 00:00 PT
+  Monday PDT / 23:00 PT Sunday PST; 2 h after perf-nightly's 05:00
+  UTC and 17 min before the orchestrator's 07:17 UTC; same
+  `trading-ci:latest` container, same `_build` cache, same
+  `continue-on-error: true` posture as tier-1/tier-2; publishes
+  summary to `$GITHUB_STEP_SUMMARY`; `timeout-minutes: 300` job
+  ceiling). Two tier-3 cells covered:
+  `perf-sweep/{bull-1y, bull-3y}`. Verify locally:
+  `dev/scripts/perf_tier3_weekly.sh` inside the devcontainer (or
+  with `TRADING_IN_CONTAINER=1`); the workflow itself is exercised
+  on its first scheduled run (next Monday 07:00 UTC) or via manual
+  `workflow_dispatch`.
+
+- **Step 3 — tier-2 nightly perf workflow** (2026-04-27, PR #622 merged).
   Mirrors the tier-1 pattern. Adds
   `dev/scripts/perf_tier2_nightly.sh` (POSIX-sh runner that
   auto-discovers `;; perf-tier: 2` scenarios via grep, runs each via
@@ -148,15 +171,18 @@ mechanics + release-gate procedure.
 
 ## Next steps
 
-1. (IN_PROGRESS) Tier 2 (nightly) — `perf-nightly.yml` +
-   `perf_tier2_nightly.sh` open at `feat/backtest-perf-tier2-nightly`.
-   Auto-discovers all six `;; perf-tier: 2` scenarios:
-   `goldens-small/{bull-crash-2015-2020, covid-recovery-2020-2024,
-   six-year-2018-2023}` and `smoke/{bull-2019h2, crash-2020h1,
-   recovery-2023}`. 30 min budget per cell. Cron `0 5 * * *` (22:00 PT).
-2. (NEXT) Define tier 3 (weekly, 4 cells per the plan, mapped onto the
-   2 currently-tagged tier-3 scenarios — may need to expand) + sibling
-   weekly workflow. ~80 LOC YAML.
+1. (DONE) Tier 2 (nightly) — `perf-nightly.yml` +
+   `perf_tier2_nightly.sh` merged in PR #622 on 2026-04-27. Six
+   tier-2 cells, 30 min budget per cell, cron `0 5 * * *` (22:00 PT).
+2. (DONE on this PR) Tier 3 (weekly) — `perf-weekly.yml` +
+   `perf_tier3_weekly.sh`, two tier-3 cells
+   (`perf-sweep/{bull-1y, bull-3y}`), 2 h budget per cell, cron
+   `0 7 * * 1` (Monday 00:00 PT). The tier-3 cell count is below
+   the original plan's 4 because tagged tier-3 scenarios are
+   currently 2; expanding the catalog (e.g., bull-crash 1000×6y,
+   covid-recovery 300×4y, six-year 300×6y per the plan's Tier 3
+   table) is a follow-up scenario-authoring task, not gating on
+   the workflow itself.
 3. Tier 4 (release-gate, 5000-stock decade-long) — was blocked on the
    `data-panels` refactor (`dev/status/data-panels.md`); stages 0-3
    landed (PRs #555, #557, #558, #559-565, #567, #569, #573).
@@ -167,7 +193,8 @@ mechanics + release-gate procedure.
    flip `continue-on-error: false` on `perf-tier1.yml` and
    `PERF_CATALOG_CHECK_STRICT=1` on the catalog check. Same flip
    applies to `perf-nightly.yml` once tier-2 budgets are pinned
-   (~10 weeks of nightly data).
+   (~10 weeks of nightly data) and to `perf-weekly.yml` once
+   tier-3 budgets are pinned (~10 weekly cycles).
 5. **`release_perf_report` OCaml exe.** Markdown report comparing the
    current release's tier-3/4 scenario results vs the prior release —
    N×T peak-RSS matrix, wall-time matrix, regression flags. Drives
@@ -175,9 +202,8 @@ mechanics + release-gate procedure.
    Replaces the deleted `dev/scripts/perf_sweep_report.py` (Legacy-vs-
    Tiered axis is gone post-PR #575; need single-mode N×T tables instead).
    Per `.claude/rules/no-python.md`: write fresh in OCaml, do not port.
-   Lands together with or just before tier-3 weekly workflow (Step 2)
-   so the weekly run produces a useful diff vs the prior week. ~150 LOC
-   exe + .mli + tests.
+   Now lands as a follow-up after tier-3 weekly so the weekly run
+   has data to diff against. ~150 LOC exe + .mli + tests.
 
 ## Ownership
 
@@ -188,7 +214,7 @@ generators.
 ## Branch
 
 `feat/backtest-perf-<step>` per item above. Active:
-`feat/backtest-perf-tier2-nightly` (Step 3) and
+`feat/backtest-perf-tier3-weekly` (Step 4) and
 `feat/backtest-perf-engine-pool-instrument` (engine-pooling PR-1).
 
 ## Blocked on
