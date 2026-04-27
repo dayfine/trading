@@ -32,6 +32,9 @@ let test_minimal_start_date_only _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.memtrace_path)
               (equal_to None);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.gc_trace_path)
+              (equal_to None);
           ]))
 
 let test_start_and_end_date _ =
@@ -160,6 +163,70 @@ let test_memtrace_missing_value _ =
   let result = Backtest_runner_args.parse [ "2018-01-02"; "--memtrace" ] in
   assert_that result is_error
 
+let test_gc_trace_flag _ =
+  let result =
+    Backtest_runner_args.parse [ "2018-01-02"; "--gc-trace"; "/tmp/gc.csv" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.gc_trace_path)
+          (equal_to (Some "/tmp/gc.csv"))))
+
+let test_gc_trace_default_is_none _ =
+  let result = Backtest_runner_args.parse [ "2018-01-02" ] in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.gc_trace_path)
+          (equal_to None)))
+
+let test_gc_trace_with_other_flags _ =
+  (* Verify --gc-trace composes with --trace, --memtrace, --override, and
+     end_date in a single command. The runner is meant to capture phase-level
+     traces (--trace), per-callsite allocation traces (--memtrace), and GC
+     phase-boundary snapshots (--gc-trace) in one run for cross-correlation. *)
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2018-01-02";
+        "2019-12-31";
+        "--override";
+        "((initial_stop_buffer 1.08))";
+        "--trace";
+        "/tmp/sample.trace.sexp";
+        "--memtrace";
+        "/tmp/sample.memtrace.ctf";
+        "--gc-trace";
+        "/tmp/sample.gc.csv";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.start_date)
+              (equal_to "2018-01-02");
+            field
+              (fun (a : Backtest_runner_args.t) -> a.end_date)
+              (equal_to (Some "2019-12-31"));
+            field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 1);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.trace_path)
+              (equal_to (Some "/tmp/sample.trace.sexp"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.memtrace_path)
+              (equal_to (Some "/tmp/sample.memtrace.ctf"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.gc_trace_path)
+              (equal_to (Some "/tmp/sample.gc.csv"));
+          ]))
+
+let test_gc_trace_missing_value _ =
+  let result = Backtest_runner_args.parse [ "2018-01-02"; "--gc-trace" ] in
+  assert_that result is_error
+
 let test_missing_start_date _ =
   let result = Backtest_runner_args.parse [] in
   assert_that result is_error
@@ -220,6 +287,12 @@ let suite =
          "--memtrace composes with --trace and other flags"
          >:: test_memtrace_with_other_flags;
          "--memtrace without value is an error" >:: test_memtrace_missing_value;
+         "--gc-trace flag captures path" >:: test_gc_trace_flag;
+         "no --gc-trace yields gc_trace_path = None"
+         >:: test_gc_trace_default_is_none;
+         "--gc-trace composes with --trace, --memtrace, and other flags"
+         >:: test_gc_trace_with_other_flags;
+         "--gc-trace without value is an error" >:: test_gc_trace_missing_value;
          "missing start_date is an error" >:: test_missing_start_date;
          "too many positionals is an error" >:: test_too_many_positionals;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
