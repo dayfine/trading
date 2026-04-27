@@ -3,17 +3,18 @@
 ## Last updated: 2026-04-27
 
 ## Status
-MERGED
+IN_PROGRESS
 
-MVP slice landed via #420 on 2026-04-19; bear-window regression test landed via PR #617 on 2026-04-27. Other follow-ups tracked below.
-
-**Reactivation cue (2026-04-24):** flip Status back to IN_PROGRESS
-once the Tiered loader flip in `backtest-scale.md` lands. The three
-§ Follow-ups below practically require broad-universe backtest scale
-to be feasible (bear-window regression test, full short cascade
-tuning, Ch.11 spot-check on real data). They're not hard-blocked at
-the API level; the orchestrator should pick them up as soon as the
-scale work is unblocked.
+MVP slice landed via #420 on 2026-04-19; bear-window regression test
+landed via PR #617 on 2026-04-27. Reactivated 2026-04-27 because the
+real-data SP500 verification (PR #612) revealed a live-cascade bug:
+0 short trades + 37 long entries opened in 2022 bear despite
+`Macro.analyze` correctly returning Bearish at the unit level. The
+bear-window regression test (#617) confirms the screener → strategy
+seam is correct, isolating the bug upstream in
+`Panel_callbacks.macro_callbacks_of_weekly_views`. Tracked as
+follow-up #4 below; in-flight via feat-weinstein agent dispatched
+2026-04-27.
 
 ## Interface stable
 YES
