@@ -1,11 +1,15 @@
 # Status: data-panels
 
-## Last updated: 2026-04-26
+## Last updated: 2026-04-27
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-Stage 4-5 PR-B READY_FOR_REVIEW on `feat/panels-stage045-pr-b-sector-prefilter` — adds the sector pre-filter as the third early-exit gate in the lazy cascade between PR-A's Phase 1 (cheap stage classify) and Phase 2 (full Stock_analysis). New private `_survives_sector_filter` mirrors the screener's `_long_candidate` / `_short_candidate` sector gate exactly: drops Stage2 candidates whose sector is rated `Weak` (the screener rejects them on the same predicate downstream) and Stage4 candidates whose sector is rated `Strong` (same). Tickers absent from `sector_map` default to PASS, matching `Screener._resolve_sector`'s `Neutral` fallback. The filter is bit-identical to letting these symbols flow into Phase 2 and being rejected by `Screener.screen` — but skips the Phase 2 `Stock_analysis.analyze_with_callbacks` cost for each.
+Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z — the last in-flight data-panels PR. The columnar redesign + lazy cascade (Stages 0–4 + 4.5 PR-A/PR-B) is now landed end-to-end on `main`. Engine-wedge investigation surfaced by post-PR-A memtrace handed off to the `hybrid-tier` track (Phase 1 results in `dev/notes/hybrid-tier-phase1-results-2026-04-27.md` confirm the residual cost is engine-layer per-tick allocation, not data-layer). PR-C (tunable filter thresholds in config) remains an optional follow-up; not currently scoped.
+
+---
+
+**Prior status (Stage 4-5 PR-B, READY_FOR_REVIEW on `feat/panels-stage045-pr-b-sector-prefilter`)** — adds the sector pre-filter as the third early-exit gate in the lazy cascade between PR-A's Phase 1 (cheap stage classify) and Phase 2 (full Stock_analysis). New private `_survives_sector_filter` mirrors the screener's `_long_candidate` / `_short_candidate` sector gate exactly: drops Stage2 candidates whose sector is rated `Weak` (the screener rejects them on the same predicate downstream) and Stage4 candidates whose sector is rated `Strong` (same). Tickers absent from `sector_map` default to PASS, matching `Screener._resolve_sector`'s `Neutral` fallback. The filter is bit-identical to letting these symbols flow into Phase 2 and being rejected by `Screener.screen` — but skips the Phase 2 `Stock_analysis.analyze_with_callbacks` cost for each.
 
 **Stage 4-5 PR-B scope**:
 - `weinstein_strategy.{ml,mli}` — new `_survives_sector_filter`; `survivors_for_screening` gains optional `?sector_map` (and a trailing `()` for the optional-arg unerasable rule). When `?sector_map` is omitted, returns Phase-1-only survivors (preserves the PR-A test contract); when supplied, applies the sector pre-filter.
