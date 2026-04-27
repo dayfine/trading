@@ -392,6 +392,22 @@ jobs:
           # now defers to this step so the merge happens after the budget
           # JSON is bundled.
           # ---------------------------------------------------------------
+          # GitHub needs a few seconds after a push to compute mergeability;
+          # an immediate PUT /merge in that window returns HTTP 405 "Pull
+          # Request is not mergeable" and the daily PR sits open. Poll until
+          # GitHub reports `mergeable=true` (or give up after ~30 s).
+          # See run 24996059895 for the original failure mode.
+          for _ in 1 2 3 4 5 6; do
+            MERGEABLE="$(curl -sSL \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/pulls/${DAILY_PR_NUMBER}" \
+              | jq -r '.mergeable // "null"')"
+            [ "$MERGEABLE" = "true" ] && break
+            echo "Waiting for GitHub to compute mergeability (current: ${MERGEABLE})..."
+            sleep 5
+          done
+
           MERGE_RESPONSE="$(curl -sSL -X PUT \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
