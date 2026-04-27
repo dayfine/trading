@@ -1,0 +1,92 @@
+# Tier-2 perf nightly: every-night perf coverage (≤30 min budget per cell)
+# for the perf catalog.
+#
+# Runs every scenario tagged `;; perf-tier: 2` under
+# trading/test_data/backtest_scenarios/ via dev/scripts/perf_tier2_nightly.sh,
+# captures wall-time + peak RSS, and writes the result into the GHA job
+# summary so the human can read off perf at a glance.
+#
+# Non-blocking by design (continue-on-error: true) — same rationale as
+# perf-tier1.yml: VISIBILITY first, gating later. Flip continue-on-error
+# off once the budgets in dev/plans/perf-scenario-catalog-2026-04-25.md
+# tier 2 are pinned (~10 weeks of nightly data).
+#
+# Tier-2 scenarios covered (kept in sync via
+# trading/devtools/checks/perf_catalog_check.sh — `;; perf-tier: 2` tag is
+# the source of truth, the discovery in the runner script auto-matches):
+#   trading/test_data/backtest_scenarios/goldens-small/bull-crash-2015-2020.sexp
+#   trading/test_data/backtest_scenarios/goldens-small/covid-recovery-2020-2024.sexp
+#   trading/test_data/backtest_scenarios/goldens-small/six-year-2018-2023.sexp
+#   trading/test_data/backtest_scenarios/smoke/bull-2019h2.sexp
+#   trading/test_data/backtest_scenarios/smoke/crash-2020h1.sexp
+#   trading/test_data/backtest_scenarios/smoke/recovery-2023.sexp
+name: perf-nightly
+
+on:
+  # Nightly cron at 05:00 UTC = 22:00 PT (PDT) / 21:00 PT (PST). Chosen
+  # because:
+  #   - Daily orchestrator runs at 07:17 UTC (00:17 PT) and 12:17 UTC
+  #     (05:17 PT). Both are hours after this slot, so no concurrency
+  #     contention with the BOT_GITHUB_TOKEN-authenticated orchestrator
+  #     pushes. (See orchestrator.yml for that schedule.)
+  #   - Top-of-hour minutes (`:00`) generally see more GHA scheduler load
+  #     than `:17`, but for an isolated, non-orchestrator workflow that's
+  #     fine — worst case a scheduled run starts a few minutes late.
+  #   - GitHub cron is UTC-only, no DST awareness; this drifts back
+  #     1 hour PT during PST months.
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  perf-tier2-nightly:
+    runs-on: ubuntu-latest
+    # Per-cell budget is 30 min; six tier-2 cells run sequentially, so the
+    # job-level ceiling is ~3.5 h with some build/setup overhead. 240 min
+    # gives headroom for the slowest cell (six-year-2018-2023) plus the
+    # _build cache restore cost on a cold runner.
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      TRADING_IN_CONTAINER: "1"
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache _build
+        uses: actions/cache@v4
+        with:
+          path: trading/_build
+          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          restore-keys: |
+            dune-${{ runner.os }}-
+
+      - name: Run tier-2 perf nightly
+        id: tier2
+        continue-on-error: true
+        run: dev/scripts/perf_tier2_nightly.sh
+
+      - name: Publish summary
+        if: always()
+        run: |
+          summary_file=$(ls -1t dev/perf/tier2-nightly-*/summary.txt 2>/dev/null | head -1)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            {
+              echo "## Tier-2 perf nightly"
+              echo ""
+              echo '```'
+              cat "$summary_file"
+              echo '```'
+            } >>"$GITHUB_STEP_SUMMARY"
+          else
+            echo "Tier-2 perf nightly: no summary produced." >>"$GITHUB_STEP_SUMMARY"
+          fi
