@@ -219,22 +219,31 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
       | Some kept -> kept :: acc)
   |> List.rev
 
-(** Stage 4-5 PR-A: a symbol survives Phase 1 if its current stage
-    classification could in principle yield a screener candidate. Long
-    candidates require [Stage2 _] (per [Stock_analysis.is_breakout_candidate]);
-    short candidates require [Stage4 _] (per
-    [Stock_analysis.is_breakdown_candidate]). [Stage1] and [Stage3] cannot
-    satisfy either predicate, so the screener would reject them after the full
-    analysis anyway — they are safe to skip in Phase 2.
-
-    The predicate is intentionally over-broad relative to the screener's actual
-    eligibility rules (which also require volume / RS / prior-stage matches);
-    keeping the gate on stage alone preserves bit-equality with the bar-list
-    output while still cutting the dominant per-symbol allocation. *)
+(** Stage 4-5 PR-A: a symbol survives Phase 1 only when its stage could in
+    principle yield a screener candidate ([Stage2 _] for longs; [Stage4 _] for
+    shorts). [Stage1] / [Stage3] cannot satisfy
+    {!Stock_analysis.is_breakout_candidate} or {!is_breakdown_candidate}, so the
+    screener would reject them downstream. Filter is over-broad versus the
+    screener's full rules (volume / RS / prior_stage); staying broad on stage
+    alone preserves bit-equality with the bar-list output. *)
 let _survives_phase1 (stage_result : Stage.result) : bool =
   match stage_result.stage with
   | Weinstein_types.Stage2 _ | Weinstein_types.Stage4 _ -> true
   | Weinstein_types.Stage1 _ | Weinstein_types.Stage3 _ -> false
+
+(** PR-B sector pre-filter: drop a Phase 1 survivor whose sector would cause an
+    automatic screener rejection ([Weak] for Stage2 longs per
+    {!Screener._long_candidate}; [Strong] for Stage4 shorts per
+    {!Screener._short_candidate}). Tickers absent from [sector_map] default to
+    PASS, matching {!Screener._resolve_sector}'s [Neutral] fallback. *)
+let _survives_sector_filter ~sector_map (ticker, _view, stage_result) =
+  match Hashtbl.find sector_map ticker with
+  | None -> true
+  | Some (sector_ctx : Screener.sector_context) -> (
+      match (stage_result.Stage.stage, sector_ctx.rating) with
+      | Weinstein_types.Stage2 _, Screener.Weak -> false
+      | Weinstein_types.Stage4 _, Screener.Strong -> false
+      | _ -> true)
 
 (** Stage 4-5 PR-A Phase 1: classify the ticker via the cheap stage callback
     bundle (cache-aware via PR-D) and return
@@ -310,55 +319,46 @@ let _commit_prior_stages ~prior_stages classified =
   List.iter classified ~f:(fun (ticker, _view, _prior, stage_result) ->
       Hashtbl.set prior_stages ~key:ticker ~data:stage_result.Stage.stage)
 
-(** Stage 4-5 PR-A: Phase 1 of the cascade. Classify every symbol in
-    [config.universe] via the cheap stage-only callback bundle and return the
-    list of survivors as [(ticker, weekly_view, stage_result)] tuples. Updates
-    [prior_stages] for every classified symbol (even non-survivors) so the next
-    Friday's classification has accurate prior-stage context.
-
-    Public for testability — lets unit tests assert that the universe filter
-    drops Stage1 / Stage3 symbols and keeps Stage2 / Stage4 without having to
-    instrument the screener loop with a counter. *)
-let survivors_for_screening ~config ~bar_reader ~prior_stages ~current_date :
+(** Public for testability. See {!Weinstein_strategy.survivors_for_screening} in
+    the .mli for the full contract. *)
+let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
+    ~current_date () :
     (string * Data_panel.Bar_panels.weekly_view * Stage.result) list =
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
-  let survivors =
-    List.filter_map classified ~f:(fun (ticker, view, _prior, stage_result) ->
-        if _survives_phase1 stage_result then Some (ticker, view, stage_result)
-        else None)
+  let final_survivors =
+    classified
+    |> List.filter_map ~f:(fun (ticker, view, _prior, sr) ->
+        if _survives_phase1 sr then Some (ticker, view, sr) else None)
+    |> fun stage_survivors ->
+    match sector_map with
+    | None -> stage_survivors
+    | Some m ->
+        List.filter stage_survivors ~f:(_survives_sector_filter ~sector_map:m)
   in
   _commit_prior_stages ~prior_stages classified;
-  survivors
+  final_survivors
 
-(** Screen the universe for both long and short candidates, returning a combined
-    transition list. Macro-trend gating lives in the screener itself:
-    [buy_candidates] are empty under [Bearish], [short_candidates] are empty
-    under [Bullish]. Concatenating the two lists gives the strategy-level
-    behaviour:
-
-    - [Bullish]: longs only — shorts are empty.
-    - [Neutral]: both — longs and shorts are both eligible.
-    - [Bearish]: shorts only — longs are empty.
-
-    Stage 4-5 PR-A: per-ticker analysis is split into a cheap stage-only Phase 1
-    (universe-wide) and a heavy Phase 2 (survivors only). Phase 2 builds the
-    full callback bundle and runs [Stock_analysis.analyze_with_callbacks] —
-    previously this ran for every loaded symbol. Symbols whose stage cannot
-    yield a screener candidate (Stage1 / Stage3) are dropped after Phase 1. *)
+(** Screen the universe via the lazy cascade (Phase 1 stage filter → PR-B sector
+    pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
+    the screener; concatenating [buy_candidates] + [short_candidates] yields the
+    right shape per regime. *)
 let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
     ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
     ~current_date =
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
-  let survivors =
-    List.filter classified ~f:(fun (_, _, _, stage_result) ->
-        _survives_phase1 stage_result)
-  in
+  (* Cascade: Phase 1 stage filter → PR-B sector pre-filter → Phase 2 full
+     analysis. The four-tuple shape is preserved through both filters so
+     [prior_stage] stays threaded into [_full_analysis_of_survivor]. *)
   let stocks =
-    List.map survivors ~f:(_full_analysis_of_survivor ~bar_reader ~index_view)
+    classified
+    |> List.filter ~f:(fun (_, _, _, sr) -> _survives_phase1 sr)
+    |> List.filter ~f:(fun (ticker, view, _prior, sr) ->
+        _survives_sector_filter ~sector_map (ticker, view, sr))
+    |> List.map ~f:(_full_analysis_of_survivor ~bar_reader ~index_view)
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =

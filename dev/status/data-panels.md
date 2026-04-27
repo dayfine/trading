@@ -5,7 +5,46 @@
 ## Status
 READY_FOR_REVIEW
 
-Stage 4-5 PR-A READY_FOR_REVIEW on `feat/panels-stage045-pr-a-lazy-stage-filter` — restructures `_screen_universe` into a two-phase lazy cascade. Phase 1 runs cheap stage-only `Stage.classify_with_callbacks` (cache-aware via PR-D `Weekly_ma_cache`) over every loaded symbol. Phase 2 — the load-bearing allocation site (`Panel_callbacks.stock_analysis_callbacks_of_weekly_views` + `Stock_analysis.analyze_with_callbacks`) — runs only for survivors whose stage classification can yield a screener candidate (Stage2 longs / Stage4 shorts). Stage1 / Stage3 symbols are dropped after Phase 1; the screener would have rejected them after the full analysis anyway. `prior_stages` updates batch at end-of-pass to preserve pre-PR-A semantics where every per-symbol analysis on a Friday observed the previous Friday's snapshot.
+Stage 4-5 PR-B READY_FOR_REVIEW on `feat/panels-stage045-pr-b-sector-prefilter` — adds the sector pre-filter as the third early-exit gate in the lazy cascade between PR-A's Phase 1 (cheap stage classify) and Phase 2 (full Stock_analysis). New private `_survives_sector_filter` mirrors the screener's `_long_candidate` / `_short_candidate` sector gate exactly: drops Stage2 candidates whose sector is rated `Weak` (the screener rejects them on the same predicate downstream) and Stage4 candidates whose sector is rated `Strong` (same). Tickers absent from `sector_map` default to PASS, matching `Screener._resolve_sector`'s `Neutral` fallback. The filter is bit-identical to letting these symbols flow into Phase 2 and being rejected by `Screener.screen` — but skips the Phase 2 `Stock_analysis.analyze_with_callbacks` cost for each.
+
+**Stage 4-5 PR-B scope**:
+- `weinstein_strategy.{ml,mli}` — new `_survives_sector_filter`; `survivors_for_screening` gains optional `?sector_map` (and a trailing `()` for the optional-arg unerasable rule). When `?sector_map` is omitted, returns Phase-1-only survivors (preserves the PR-A test contract); when supplied, applies the sector pre-filter.
+- `_screen_universe` threads the existing `sector_map` (already computed in `_run_screen` before this call) into the cascade. The four-tuple `(ticker, view, prior, stage_result)` shape is preserved through the new filter so PR-A's `prior_stage` threading into Phase 2 still holds.
+- 4 new tests in `test_weinstein_strategy.ml`: drops Weak-sector longs, drops Strong-sector shorts, ticker-absent passes, and a PR-B counter test asserting `(loaded, stage_pass, sector_pass) = (6, 6, 3)` on a six-symbol fixture (4 Stage2 + 2 Stage4) where the dropped set matches the expected (Weak-sector longs and Strong-sector shorts).
+
+**Filter predicate (exact rule)**:
+```ocaml
+match (stage_result.stage, sector_ctx.rating) with
+| Stage2 _, Weak -> false   (* drop: Stage2 long candidate in Weak sector *)
+| Stage4 _, Strong -> false (* drop: Stage4 short candidate in Strong sector *)
+| _ -> true                 (* pass: Strong/Neutral longs, Weak/Neutral shorts *)
+```
+
+This is **side-aware**, not a uniform "drop Weak". The dispatch suggested "Strong/Neutral pass; Weak drop" but reading `Screener._long_candidate` / `_short_candidate` showed the rule must be asymmetric — Stage4 shorts in Weak sectors would be wrongly dropped by a uniform rule. The side-aware version mirrors the screener exactly.
+
+**Pragmatic deviation from dispatch**: dispatch suggested changing `survivors_for_screening`'s return type to a `(loaded, stage_pass, sector_pass)` triple. Instead, the function gains optional `?sector_map`: when omitted, returns Phase-1-only survivors (PR-A behaviour, kept for tests that exercise the stage filter in isolation); when supplied, applies the sector filter and returns the post-sector survivors list. The PR-B counter test invokes the function twice on the same fixture (once without `sector_map` → `stage_pass`, once with → `sector_pass`) and computes `loaded` from `cfg.universe`. This avoids breaking PR-A tests and keeps the production call site direct.
+
+**Bit-equality + parity**:
+- Load-bearing `test_panel_loader_parity` round_trips golden: 2 tests, all OK. Both `tiered-loader-parity` and `panel-golden-2019-full` round-trip lists are bit-equal — sector pre-filter only drops symbols the screener would have rejected on the same `sector.rating` predicate downstream, so trade output is identical.
+- All `weinstein/strategy/test` suites: 22 tests, all OK (was 18 pre-PR-B). Magic number, nesting, file length, `dune fmt`, `dune build @fmt` linters all silent.
+- `weinstein_strategy.ml` is at exactly 500 lines (declared-large hard limit). PR-B added ~30 production lines + cascade extension but trimmed some of PR-A's docstrings to compensate; the filter contract is captured in the `.mli`'s `survivors_for_screening` doc.
+
+**LOC delta**: ~+30 production, ~+170 tests; net new public surface: `survivors_for_screening` gains `?sector_map:(string, Screener.sector_context) Hashtbl.t` and a trailing `()`.
+
+**Out of scope** (deferred or skipped):
+- `Macro` early-exit (skip the loop on bearish macro). Dispatch explicitly skipped — the screener's macro gate runs after `_screen_universe` and adding a macro pre-filter is a separate optimization.
+- Tunable filter thresholds in config (PR-C, optional).
+- The post-PR-B RSS matrix re-run is **not recommended**. PR-A's matrix already pinned that the wedge is in simulation/engine (`dev/notes/panels-memtrace-postA-2026-04-26.md`); PR-B's expected impact at small-302 is minimal (per dispatch). The next dispatch should pick up the simulation/engine wedge.
+
+**Verify**: `cd trading && eval $(opam env) && TRADING_DATA_DIR=$PWD/test_data dune build && dune runtest && dune build @fmt`. All suites green; formatter clean; nesting linter clean (max ≤5, avg 1.44 across 928 functions); file length linter passes (12 declared-large of 113 total).
+
+PR-B is bookmarked at `feat/panels-stage045-pr-b-sector-prefilter`. Plan: `dev/plans/panels-stage045-pr-b-2026-04-26.md` (companion to `dev/plans/panels-stage045-lazy-tier-cascade-2026-04-26.md`).
+
+**Recommended next dispatch**: simulation/engine wedge investigation per `dev/notes/panels-memtrace-postA-2026-04-26.md`. Skip the post-PR-B matrix re-run (minimal expected impact at small-302 scale; PR-A pinned the wedge is outside `_screen_universe`).
+
+---
+
+**Prior status (Stage 4-5 PR-A, READY_FOR_REVIEW on `feat/panels-stage045-pr-a-lazy-stage-filter`)**: restructures `_screen_universe` into a two-phase lazy cascade. Phase 1 runs cheap stage-only `Stage.classify_with_callbacks` (cache-aware via PR-D `Weekly_ma_cache`) over every loaded symbol. Phase 2 — the load-bearing allocation site (`Panel_callbacks.stock_analysis_callbacks_of_weekly_views` + `Stock_analysis.analyze_with_callbacks`) — runs only for survivors whose stage classification can yield a screener candidate (Stage2 longs / Stage4 shorts). Stage1 / Stage3 symbols are dropped after Phase 1; the screener would have rejected them after the full analysis anyway. `prior_stages` updates batch at end-of-pass to preserve pre-PR-A semantics where every per-symbol analysis on a Friday observed the previous Friday's snapshot.
 
 **Stage 4-5 PR-A scope**:
 - `weinstein_strategy.{ml,mli}` — split `_analyze_ticker` into `_classify_stage_for_screening` (Phase 1, cheap) + `_full_analysis_of_survivor` (Phase 2, heavy). New `_classify_all` builds the universe-wide stage classification list; `_commit_prior_stages` advances the table after the screening pass. `_screen_universe` now: (a) Phase 1 over universe, (b) filter survivors by `_survives_phase1`, (c) Phase 2 over survivors, (d) commit prior_stages, (e) screener cascade as before.

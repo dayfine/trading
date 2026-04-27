@@ -756,7 +756,7 @@ let test_survivors_for_screening_filters_by_stage _ =
   in
   let survivors =
     survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
-      ~current_date:last_date
+      ~current_date:last_date ()
   in
   let survivor_tickers =
     List.map survivors ~f:(fun (ticker, _, _) -> ticker)
@@ -833,7 +833,7 @@ let test_survivors_for_screening_drops_stage1_and_stage3 _ =
   in
   let survivors =
     survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
-      ~current_date:last_date
+      ~current_date:last_date ()
   in
   let survivor_tickers = List.map survivors ~f:(fun (ticker, _, _) -> ticker) in
   (* Only DECLINE (Stage4) passes; BASE (Stage1) and TOP (Stage3) drop. *)
@@ -923,10 +923,235 @@ let test_phase2_call_count_equals_survivor_count _ =
   let loaded_count = List.length cfg.universe in
   let survivors =
     survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
-      ~current_date:last_date
+      ~current_date:last_date ()
   in
   let survivor_count = List.length survivors in
   assert_that (loaded_count, survivor_count) (equal_to ((6, 2) : int * int))
+
+(* ------------------------------------------------------------------ *)
+(* Stage 4-5 PR-B: sector pre-filter — survivors_for_screening          *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a sector_map entry with the given rating for [ticker] under
+    [sector_name]. *)
+let _make_sector_entry ~ticker:_ ~sector_name ~rating =
+  ( sector_name,
+    {
+      Screener.sector_name;
+      rating;
+      stage = Weinstein_types.Stage1 { weeks_in_base = 0 };
+    } )
+
+(** Build a [sector_map : (string, sector_context) Hashtbl.t] from a list of
+    [(ticker, rating)] pairs. Each ticker gets its own one-off sector. *)
+let _sector_map_of_pairs (pairs : (string * Screener.sector_rating) list) =
+  let map = Hashtbl.create (module String) in
+  List.iter pairs ~f:(fun (ticker, rating) ->
+      let _name, ctx =
+        _make_sector_entry ~ticker ~sector_name:(ticker ^ "_sector") ~rating
+      in
+      Hashtbl.set map ~key:ticker ~data:ctx);
+  map
+
+let test_survivors_for_screening_sector_filter_drops_weak_long _ =
+  (* Universe: two Stage2 symbols. RISE_STRONG sits in a Strong sector
+     (passes). RISE_WEAK sits in a Weak sector (drops — screener's
+     [_long_candidate] would reject it on the same rating). *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let rising_strong =
+    _trending_series ~start_friday ~start_price:50.0 ~step:0.8
+  in
+  let rising_weak =
+    _trending_series ~start_friday ~start_price:60.0 ~step:1.0
+  in
+  let panels =
+    _panels_of_symbols
+      [ ("RISE_STRONG", rising_strong); ("RISE_WEAK", rising_weak) ]
+  in
+  let bar_reader = Bar_reader.of_panels panels in
+  let cfg =
+    default_config
+      ~universe:[ "RISE_STRONG"; "RISE_WEAK" ]
+      ~index_symbol:"GSPCX"
+  in
+  let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
+  let last_date =
+    let n = Data_panel.Bar_panels.n_days panels in
+    let cal_view =
+      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"RISE_STRONG" ~n:1
+        ~as_of_day:(n - 1)
+    in
+    cal_view.dates.(cal_view.n - 1)
+  in
+  let sector_map =
+    _sector_map_of_pairs
+      [ ("RISE_STRONG", Screener.Strong); ("RISE_WEAK", Screener.Weak) ]
+  in
+  let survivors =
+    survivors_for_screening ~sector_map ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date ()
+  in
+  let survivor_tickers = List.map survivors ~f:(fun (ticker, _, _) -> ticker) in
+  assert_that survivor_tickers (equal_to [ "RISE_STRONG" ])
+
+let test_survivors_for_screening_sector_filter_drops_strong_short _ =
+  (* Universe: two Stage4 symbols. FALL_WEAK sits in a Weak sector
+     (passes — screener's [_short_candidate] accepts Weak/Neutral).
+     FALL_STRONG sits in a Strong sector (drops — screener's
+     [_short_candidate] rejects on Strong rating). *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let declining_weak =
+    _trending_series ~start_friday ~start_price:200.0 ~step:(-1.5)
+  in
+  let declining_strong =
+    _trending_series ~start_friday ~start_price:180.0 ~step:(-1.0)
+  in
+  let panels =
+    _panels_of_symbols
+      [ ("FALL_WEAK", declining_weak); ("FALL_STRONG", declining_strong) ]
+  in
+  let bar_reader = Bar_reader.of_panels panels in
+  let cfg =
+    default_config
+      ~universe:[ "FALL_WEAK"; "FALL_STRONG" ]
+      ~index_symbol:"GSPCX"
+  in
+  let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
+  let last_date =
+    let n = Data_panel.Bar_panels.n_days panels in
+    let cal_view =
+      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"FALL_WEAK" ~n:1
+        ~as_of_day:(n - 1)
+    in
+    cal_view.dates.(cal_view.n - 1)
+  in
+  let sector_map =
+    _sector_map_of_pairs
+      [ ("FALL_WEAK", Screener.Weak); ("FALL_STRONG", Screener.Strong) ]
+  in
+  let survivors =
+    survivors_for_screening ~sector_map ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date ()
+  in
+  let survivor_tickers = List.map survivors ~f:(fun (ticker, _, _) -> ticker) in
+  assert_that survivor_tickers (equal_to [ "FALL_WEAK" ])
+
+let test_survivors_for_screening_sector_filter_unknown_ticker_passes _ =
+  (* Tickers absent from the sector_map default to PASS — matches
+     [Screener._resolve_sector]'s [Neutral] fallback. *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let rising = _trending_series ~start_friday ~start_price:50.0 ~step:0.8 in
+  let panels = _panels_of_symbols [ ("UNKNOWN", rising) ] in
+  let bar_reader = Bar_reader.of_panels panels in
+  let cfg = default_config ~universe:[ "UNKNOWN" ] ~index_symbol:"GSPCX" in
+  let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
+  let last_date =
+    let n = Data_panel.Bar_panels.n_days panels in
+    let cal_view =
+      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"UNKNOWN" ~n:1
+        ~as_of_day:(n - 1)
+    in
+    cal_view.dates.(cal_view.n - 1)
+  in
+  (* Empty sector_map: every ticker is "unknown" → all PASS. *)
+  let sector_map = Hashtbl.create (module String) in
+  let survivors =
+    survivors_for_screening ~sector_map ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date ()
+  in
+  let survivor_tickers = List.map survivors ~f:(fun (ticker, _, _) -> ticker) in
+  assert_that survivor_tickers (equal_to [ "UNKNOWN" ])
+
+(** PR-B counter test: assert the (loaded, stage_pass, sector_pass) triple
+    monotonically narrows. The test runs [survivors_for_screening] twice on the
+    same fixture — once without [sector_map] (yields [stage_pass]) and once with
+    (yields [sector_pass]) — so we can read both counts directly without
+    instrumenting the screener loop. *)
+let test_survivors_for_screening_pr_b_counter _ =
+  (* Six-symbol universe: two Stage2-strong, two Stage2-weak, two Stage4-mixed
+     (one Strong-sector → drop, one Weak-sector → pass). Stage4 in Strong
+     sector: drops; Stage4 in Weak sector: passes. *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let rising seed =
+    _trending_series ~start_friday ~start_price:(50.0 +. seed) ~step:0.8
+  in
+  let declining seed =
+    _trending_series ~start_friday ~start_price:(200.0 +. seed) ~step:(-1.5)
+  in
+  let panels =
+    _panels_of_symbols
+      [
+        ("RISE_STRONG_A", rising 0.0);
+        ("RISE_STRONG_B", rising 1.0);
+        ("RISE_WEAK_A", rising 2.0);
+        ("RISE_WEAK_B", rising 3.0);
+        ("FALL_STRONG", declining 0.0);
+        ("FALL_WEAK", declining 1.0);
+      ]
+  in
+  let bar_reader = Bar_reader.of_panels panels in
+  let cfg =
+    default_config
+      ~universe:
+        [
+          "RISE_STRONG_A";
+          "RISE_STRONG_B";
+          "RISE_WEAK_A";
+          "RISE_WEAK_B";
+          "FALL_STRONG";
+          "FALL_WEAK";
+        ]
+      ~index_symbol:"GSPCX"
+  in
+  let last_date =
+    let n = Data_panel.Bar_panels.n_days panels in
+    let cal_view =
+      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"RISE_STRONG_A" ~n:1
+        ~as_of_day:(n - 1)
+    in
+    cal_view.dates.(cal_view.n - 1)
+  in
+  let sector_map =
+    _sector_map_of_pairs
+      [
+        ("RISE_STRONG_A", Screener.Strong);
+        ("RISE_STRONG_B", Screener.Strong);
+        ("RISE_WEAK_A", Screener.Weak);
+        ("RISE_WEAK_B", Screener.Weak);
+        ("FALL_STRONG", Screener.Strong);
+        ("FALL_WEAK", Screener.Weak);
+      ]
+  in
+  let loaded = List.length cfg.universe in
+  (* First pass: no sector_map → stage-only filter. Use a fresh prior_stages
+     each time so the two calls don't interact. *)
+  let stage_pass =
+    let prior_stages = Hashtbl.create (module String) in
+    survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date ()
+    |> List.length
+  in
+  let sector_pass_survivors =
+    let prior_stages = Hashtbl.create (module String) in
+    survivors_for_screening ~sector_map ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date ()
+  in
+  let sector_pass = List.length sector_pass_survivors in
+  let surviving_tickers =
+    List.map sector_pass_survivors ~f:(fun (ticker, _, _) -> ticker)
+    |> List.sort ~compare:String.compare
+  in
+  assert_that
+    (loaded, stage_pass, sector_pass)
+    (equal_to ((6, 6, 3) : int * int * int));
+  assert_that surviving_tickers
+    (equal_to [ "FALL_WEAK"; "RISE_STRONG_A"; "RISE_STRONG_B" ])
 
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
@@ -965,4 +1190,12 @@ let () =
            >:: test_survivors_for_screening_drops_stage1_and_stage3;
            "phase 2 call count equals survivor count, not loaded count"
            >:: test_phase2_call_count_equals_survivor_count;
+           "PR-B sector filter drops Weak-sector longs"
+           >:: test_survivors_for_screening_sector_filter_drops_weak_long;
+           "PR-B sector filter drops Strong-sector shorts"
+           >:: test_survivors_for_screening_sector_filter_drops_strong_short;
+           "PR-B sector filter: ticker absent from sector_map passes"
+           >:: test_survivors_for_screening_sector_filter_unknown_ticker_passes;
+           "PR-B counter test: (loaded, stage_pass, sector_pass) narrows"
+           >:: test_survivors_for_screening_pr_b_counter;
          ])
