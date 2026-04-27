@@ -344,31 +344,32 @@ jobs:
           # ---------------------------------------------------------------
           DATE="$(date +%F)"
           OWNER="${REPO%/*}"
-          DAILY_PR_NUMBER="$(curl -sSL \
+          # Single API fetch, parsed twice via env-prefixed python3.
+          # Prior bug: trailing `DATE="$DATE"` after the closing quote was
+          # passed as argv (not env), so os.environ['DATE'] raised KeyError,
+          # was swallowed by `2>/dev/null || true`, the lookup returned "",
+          # and this step took the fallback branch — leaving the daily PR
+          # un-merged. Fix: env-prefix on the rhs of the pipe.
+          PRS_JSON="$(curl -sSL \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${REPO}/pulls?state=open&base=main&per_page=20" \
-            | python3 -c "
-          import json, sys, os
-          prs = json.load(sys.stdin)
-          date = os.environ['DATE']
-          prefix = f'ops/daily-{date}'
-          matches = [p for p in prs if p.get('head',{}).get('ref','').startswith(prefix)]
-          print(matches[0]['number'] if matches else '')
-          " DATE="$DATE" 2>/dev/null || true)"
+            "https://api.github.com/repos/${REPO}/pulls?state=open&base=main&per_page=20")"
 
-          DAILY_BRANCH="$(curl -sSL \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${REPO}/pulls?state=open&base=main&per_page=20" \
-            | python3 -c "
+          DAILY_PR_NUMBER="$(printf '%s' "$PRS_JSON" | DATE="$DATE" python3 -c '
           import json, sys, os
           prs = json.load(sys.stdin)
-          date = os.environ['DATE']
-          prefix = f'ops/daily-{date}'
-          matches = [p for p in prs if p.get('head',{}).get('ref','').startswith(prefix)]
-          print(matches[0]['head']['ref'] if matches else '')
-          " DATE="$DATE" 2>/dev/null || true)"
+          prefix = "ops/daily-" + os.environ["DATE"]
+          matches = [p for p in prs if p.get("head", {}).get("ref", "").startswith(prefix)]
+          print(matches[0]["number"] if matches else "")
+          ' || true)"
+
+          DAILY_BRANCH="$(printf '%s' "$PRS_JSON" | DATE="$DATE" python3 -c '
+          import json, sys, os
+          prs = json.load(sys.stdin)
+          prefix = "ops/daily-" + os.environ["DATE"]
+          matches = [p for p in prs if p.get("head", {}).get("ref", "").startswith(prefix)]
+          print(matches[0]["head"]["ref"] if matches else "")
+          ' || true)"
 
           if [ -z "$DAILY_PR_NUMBER" ] || [ -z "$DAILY_BRANCH" ]; then
             echo "::warning::No open ops/daily-${DATE} PR found. lead-orchestrator may have failed or already merged. Committing budget JSON to fallback branch ops/budget-${BUDGET_BASENAME} — human merge required."
