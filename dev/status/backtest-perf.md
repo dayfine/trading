@@ -1,11 +1,11 @@
 # Status: backtest-perf
 
-## Last updated: 2026-04-26
+## Last updated: 2026-04-27
 
 ## Status
 IN_PROGRESS
 
-Steps 1+2 done on `feat/backtest-perf-tier1-catalog`; PR open for review. The `perf-tier1.yml` workflow file is **held out of this PR** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker.
+Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged 2026-04-26T16:07Z. The `perf-tier1.yml` workflow file remains **held out** (agent PAT lacks `workflow` scope) — needs maintainer follow-up to commit the drafted YAML from #574's PR body. Steps 3+4 (tier-2 nightly + tier-3 weekly workflows) outstanding and have the same scope-blocker. Step 5 (release_perf_report OCaml exe) tracked separately; landed via #585 / #606 on the test-data + perf-runner side. Tier-4 release-gate scenarios structurally unblocked since data-panels Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z; engine-layer-pooling (hybrid-tier Option 1) is the next memory-win lever, currently awaiting human go-ahead via PR #611.
 
 ## Interface stable
 NO
