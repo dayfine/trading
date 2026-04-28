@@ -1,0 +1,4 @@
+(test
+ (name test_split_detector)
+ (modules test_split_detector)
+ (libraries core ounit2 matchers types))
