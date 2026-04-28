@@ -1,37 +1,29 @@
 # Status: hybrid-tier
 
-## Last updated: 2026-04-27
+## Last updated: 2026-04-28
 
 ## Status
-BLOCKED
+PARTIAL_DONE
 
-Phase 1 (measurement infra) **complete and merged** (#609); the
-empirical experiments **invalidate the original Phase 2 design**.
-Awaiting plan revision / human go-ahead before Phase 2 starts.
+Phase 1 (measurement infra) merged (#609). Phase 2 was replanned via
+PR #611 into two separate plans after Phase 1 results showed the
+original 3-tier design wouldn't move RSS:
 
-Phase 1 results (`dev/notes/hybrid-tier-phase1-results-2026-04-27.md`):
+- **Option 1: Engine-layer pooling** — DONE 2026-04-28. Five PRs
+  (#618 instrumentation, #626 Scratch type, #628 thread per-tick,
+  #632 buffer pool, #633 matrix re-run). β: 4.30 → 3.94 MB/symbol
+  (−8%, short of the 1-1.5 plan target). Wall: −36% at 292×6y.
+  Cumulative promoted_words 85.8M < 100M ceiling. Working set
+  unchanged — peak RSS dominated by major-heap steady-state, not
+  allocation churn. N=1000×10y now fits 8 GB. Plan complete.
+- **Option 2: Daily-snapshot streaming** — P1 future work.
+  `dev/plans/daily-snapshot-streaming-2026-04-27.md`, ~3,000 LOC
+  across 5-8 PRs. Required for tier-4 release-gate at N≥5,000.
+  Not yet started.
 
-- **Exp A (load-vs-activity)**: RSS-default 2,131 MB ≈ RSS-no-candidates
-  2,134 MB (within 0.2%). H_load wins decisively. Strategy/screener/
-  position-state hygiene won't move RSS.
-- **Exp B (GC phase boundaries)**: all heap growth happens during
-  the simulator loop (`fill_done`). Panel build + macro init add
-  4K words combined; the major-heap steady state is per-tick engine
-  allocations (~10 GB cumulative promoted, 1.4 GB peak resident).
-- **Combined**: the wedge is in the engine/simulator per-tick
-  allocations, not in the strategy / data-load layer the original
-  3-tier hybrid plan targeted. The `Tiered_panels.t` design (Cold/
-  Warm/Hot strategy state) **would not move RSS meaningfully**
-  given these results.
-
-Two replanning options (see results note §Recommendation):
-- **Option 1**: Engine-layer pooling (`Price_path._sample_*` buffer
-  reuse). ~600 LOC, scoped, immediate.
-- **Option 2**: Daily-snapshot streaming (offline ops-data builds
-  per-day cross-sections; runtime mmap's only ±30 days). ~3,000
-  LOC, larger payoff at tier-4 release-gate scale.
-
-Recommend Option 1 first, then Option 2 as a separate plan.
+Phase 1 results (retained for reference):
+`dev/notes/hybrid-tier-phase1-results-2026-04-27.md`. Engine-pool
+matrix re-run: `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`.
 
 ## Interface stable
 NO
