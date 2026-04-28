@@ -22,3 +22,7 @@
 (test
  (name test_price_path_buffer_reuse)
  (libraries ounit2 core trading.engine trading.base matchers))
+
+(test
+ (name test_buffer_pool)
+ (libraries ounit2 trading.engine matchers))

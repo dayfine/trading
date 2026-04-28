@@ -37,21 +37,36 @@ let default_config =
 let _capacity_slack_for_config = 8
 let _min_scratch_capacity = 4
 
+(* Pool tuning for transient workspaces inside [Price_path]. The hottest
+   pool consumer is [_sample_student_t], which acquires a 1-slot float
+   accumulator on every call (called once per interpolated bar point, ~390
+   times per [generate_path_into] call). With [max_size = 4] the pool
+   never grows past a handful of buffers in steady state, and
+   [initial_size = 1] keeps each buffer minimal. *)
+let _student_t_pool_initial_size = 1
+let _student_t_pool_max_size = 4
+
 module Scratch = struct
-  type t = { path_points : float array }
+  type t = { path_points : float array; student_t_pool : Buffer_pool.t }
 
   let create ~capacity =
     if capacity < _min_scratch_capacity then
       invalid_arg
         (Printf.sprintf "Price_path.Scratch.create: capacity %d < min %d"
            capacity _min_scratch_capacity);
-    { path_points = Array.create ~len:capacity 0.0 }
+    {
+      path_points = Array.create ~len:capacity 0.0;
+      student_t_pool =
+        Buffer_pool.create ~initial_size:_student_t_pool_initial_size
+          ~max_size:_student_t_pool_max_size;
+    }
 
   let required_capacity (c : path_config) =
     Int.max _min_scratch_capacity (c.total_points + _capacity_slack_for_config)
 
   let for_config (c : path_config) = create ~capacity:(required_capacity c)
   let capacity t = Array.length t.path_points
+  let student_t_pool t = t.student_t_pool
 end
 
 (** {1 Utility Functions} *)
@@ -327,28 +342,31 @@ let _sample_standard_normal (random_state : Random.State.t) : float =
   Float.sqrt (-2.0 *. Float.log u1) *. Float.cos (2.0 *. Float.pi *. u2)
 
 (** Sample Student's t-distribution: T = Z / sqrt(V/df), with Z ~ N(0,1) and V ~
-    Chi-squared(df). Heavier tails than Gaussian for low df. The chi- squared
-    sum is a [for] loop with a mutable accumulator (left-fold) — same FP order
-    as the previous recursive impl, so seeded goldens stay bit-equal. *)
-let _sample_student_t (random_state : Random.State.t) (df : float) : float =
+    Chi-squared(df). Heavier tails than Gaussian for low df. The chi-squared sum
+    uses a 1-slot [float array] accumulator borrowed from [pool] (PR-4 of the
+    engine-pooling plan); previously this was a [ref 0.0] allocated per call.
+    The accumulation order is the same left-fold [for] loop as before — seeded
+    goldens stay bit-equal. *)
+let _sample_student_t ~pool (random_state : Random.State.t) (df : float) : float
+    =
   let z = _sample_standard_normal random_state in
-  let chi_squared =
-    let acc = ref 0.0 in
-    for _ = 1 to Float.to_int df do
-      let s = _sample_standard_normal random_state in
-      acc := !acc +. (s *. s)
-    done;
-    !acc
-  in
+  let acc = Buffer_pool.acquire pool ~capacity:1 () in
+  acc.(0) <- 0.0;
+  for _ = 1 to Float.to_int df do
+    let s = _sample_standard_normal random_state in
+    acc.(0) <- acc.(0) +. (s *. s)
+  done;
+  let chi_squared = acc.(0) in
+  Buffer_pool.release pool acc;
   z /. Float.sqrt (chi_squared /. df)
 
 (** Brownian bridge: write [n_points] interpolated prices into
     [out.(out_start .. out_start + n_points - 1)] from [start_price] toward
     [end_price]. The endpoint is NOT written; callers append it. FP order
     matches the previous list-based version. *)
-let _generate_bridge_segment_into ~random_state ~out ~out_start ~start_price
-    ~end_price ~n_points ~volatility_scale ~degrees_of_freedom ~resolution
-    ~low_bound ~high_bound =
+let _generate_bridge_segment_into ~random_state ~pool ~out ~out_start
+    ~start_price ~end_price ~n_points ~volatility_scale ~degrees_of_freedom
+    ~resolution ~low_bound ~high_bound =
   (* Noise scales with sqrt(time): each step covers dt/(n_points+1) of the
      bar's [dt = n_points/resolution] fraction. *)
   let dt = Float.of_int n_points /. Float.of_int resolution in
@@ -362,7 +380,7 @@ let _generate_bridge_segment_into ~random_state ~out ~out_start ~start_price
       (end_price -. !current_price) /. Float.of_int remaining_steps
     in
     let noise =
-      _sample_student_t random_state degrees_of_freedom *. noise_scale
+      _sample_student_t ~pool random_state degrees_of_freedom *. noise_scale
     in
     let new_price = !current_price +. needed_drift +. noise in
     let clamped_price =
@@ -377,8 +395,9 @@ let _generate_bridge_segment_into ~random_state ~out ~out_start ~start_price
 (** Append one segment of prices to [out] from [cursor]; return the new cursor.
     First segment writes [p1] as slot 0; subsequent ones inherit it from the
     previous segment's endpoint. *)
-let _append_segment_into ~random_state ~volatility_scale ~degrees_of_freedom
-    ~total_points ~low_bound ~high_bound ~out ~cursor p1 p2 idx1 idx2 =
+let _append_segment_into ~random_state ~pool ~volatility_scale
+    ~degrees_of_freedom ~total_points ~low_bound ~high_bound ~out ~cursor p1 p2
+    idx1 idx2 =
   let cursor =
     if cursor = 0 then (
       out.(0) <- p1;
@@ -386,7 +405,7 @@ let _append_segment_into ~random_state ~volatility_scale ~degrees_of_freedom
     else cursor
   in
   let n_points = idx2 - idx1 in
-  _generate_bridge_segment_into ~random_state ~out ~out_start:cursor
+  _generate_bridge_segment_into ~random_state ~pool ~out ~out_start:cursor
     ~start_price:p1 ~end_price:p2 ~n_points ~volatility_scale
     ~degrees_of_freedom ~resolution:total_points ~low_bound ~high_bound;
   let cursor = cursor + n_points in
@@ -395,14 +414,14 @@ let _append_segment_into ~random_state ~volatility_scale ~degrees_of_freedom
 
 (** Interpolate three pairs of waypoints into [out]; return final cursor (=
     total length written). *)
-let _generate_segments_into ~random_state ~volatility_scale ~degrees_of_freedom
-    ~total_points ~low_bound ~high_bound ~out ~waypoint_prices ~waypoint_indices
-    =
+let _generate_segments_into ~random_state ~pool ~volatility_scale
+    ~degrees_of_freedom ~total_points ~low_bound ~high_bound ~out
+    ~waypoint_prices ~waypoint_indices =
   let p0, p1, p2, p3 = waypoint_prices in
   let i0, i1, i2, i3 = waypoint_indices in
   let append =
-    _append_segment_into ~random_state ~volatility_scale ~degrees_of_freedom
-      ~total_points ~low_bound ~high_bound ~out
+    _append_segment_into ~random_state ~pool ~volatility_scale
+      ~degrees_of_freedom ~total_points ~low_bound ~high_bound ~out
   in
   let cursor = append ~cursor:0 p0 p1 i0 i1 in
   let cursor = append ~cursor p1 p2 i1 i2 in
@@ -439,8 +458,9 @@ let _generate_path_with_scratch ~scratch ~config (bar : price_bar) :
     let p0, p1, p2, p3 = waypoint_prices in
     [ { price = p0 }; { price = p1 }; { price = p2 }; { price = p3 } ]
   else
+    let pool = Scratch.student_t_pool scratch in
     let len =
-      _generate_segments_into ~random_state ~volatility_scale
+      _generate_segments_into ~random_state ~pool ~volatility_scale
         ~degrees_of_freedom:config.degrees_of_freedom
         ~total_points:config.total_points ~low_bound:bar.low_price
         ~high_bound:bar.high_price ~out:scratch.Scratch.path_points
