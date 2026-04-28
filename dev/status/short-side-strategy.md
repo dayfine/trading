@@ -1,25 +1,27 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-27
+## Last updated: 2026-04-28
 
 ## Status
-IN_PROGRESS
+MERGED
 
-MVP slice landed via #420 on 2026-04-19; bear-window regression test
-landed via PR #617 on 2026-04-27. Reactivated 2026-04-27 because the
-real-data SP500 verification (PR #612) revealed a live-cascade bug:
-0 short trades + 37 long entries opened in 2022 bear despite
-`Macro.analyze` correctly returning Bearish at the unit level. The
-bear-window regression test (#617) confirmed the screener → strategy
-seam is correct. Root cause located 2026-04-27 (this session): not in
-`Panel_callbacks.macro_callbacks_of_weekly_views` itself, but upstream
-— `Weinstein_strategy.make` loaded composer-AD bars covering ~1973 to
-April 2026 and passed them to every Friday's `_on_market_close`
-without filtering by `current_date`. Future-leaking synthetic A-D
-disagreed with the real 2022 Stage 4 GSPC index, flipping the macro
-composite from Bearish to Neutral/Bullish. Fix landed in
-`feat/short-side-bear-window-fix-cascade-plumbing`: add
-`Macro_inputs.ad_bars_at_or_before` and call it in `_run_screen`.
+All four follow-ups landed via PRs #617 (bear-window regression test),
+#623 (live-cascade Bearish macro plumbing fix), #630 (full short
+screener cascade), and #631 (Ch.11 spot-check on real data). MVP
+originally landed via #420 on 2026-04-19. Track wraps; future
+short-side work is performance-driven (e.g., revisiting the cascade
+parameters once the trade-audit track ships) rather than feature
+build-out.
+
+**Historical: live-cascade bug (resolved by #623)**: real-data SP500
+verification (PR #612) revealed 0 short trades + 37 long entries in
+2022 bear despite `Macro.analyze` correctly returning Bearish at the
+unit level. Root cause: `Weinstein_strategy.make` loaded composer-AD
+bars covering ~1973 to April 2026 and passed them to every Friday's
+`_on_market_close` without filtering by `current_date`. Future-leaking
+synthetic A-D disagreed with the real 2022 Stage 4 GSPC index,
+flipping the macro composite from Bearish to Neutral/Bullish. Fix:
+`Macro_inputs.ad_bars_at_or_before` called in `_run_screen`.
 
 Pinned by `trading/trading/weinstein/strategy/test/test_macro_panel_callbacks_real_data.ml`:
 - Real 2022 GSPC + empty AD bars + panel-callbacks → Bearish (mirrors

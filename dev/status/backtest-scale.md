@@ -1,11 +1,21 @@
 # Status: backtest-scale
 
-## Last updated: 2026-04-24
+## Last updated: 2026-04-28
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-**Seed-timing fix (PR #519, MERGED 2026-04-24 03:42Z)** — closes the
+Track wraps. The Legacy/Tiered-loader work (#517, #519) closed via the
+data-panels Stage 0-4 refactor (`dev/status/data-panels.md`, MERGED),
+which deleted both the Legacy and Tiered loader code paths in favour
+of a single panel-backed runner — see PR #575. The seed-timing fix
+note below is retained as the historical resolution of the
+post-#517 parity gap. Memory-scale concerns (β at large N, tier-4
+release-gate scenarios) now live under `backtest-perf.md` and the
+engine-pool plan (DONE via #618-#633) + daily-snapshot streaming plan
+(`dev/plans/daily-snapshot-streaming-2026-04-27.md`, P1).
+
+**Historical (PR #519, MERGED 2026-04-24 03:42Z)** — closes the
 residual post-#517 gap on `tiered-loader-ab`. Verified on GHA
 workflow_dispatch (run 24870169890) — all three broad goldens
 (`bull-crash-2015-2020`, `covid-recovery-2020-2024`,
