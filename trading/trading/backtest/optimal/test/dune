@@ -1,16 +1,18 @@
 (tests
- (names test_stage_transition_scanner)
+ (names test_stage_transition_scanner test_outcome_scorer)
  (libraries
   ounit2
   core
   matchers
   trading.base
+  types
   weinstein.screener
   weinstein.stock_analysis
   weinstein.types
   weinstein.stage
   weinstein.rs
   weinstein.volume
+  weinstein_trading.stops
   backtest_optimal)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
