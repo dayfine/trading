@@ -22,6 +22,11 @@ type result = {
           records the initial stop level, the stop level at exit, and the exit
           trigger (stop-loss, take-profit, etc.). Keyed by position_id; joinable
           with [round_trips] via symbol + entry_date. *)
+  audit : Trade_audit.audit_record list;
+      (** Per-trade decision-trail records captured by the strategy. Empty until
+          PR-2 of the trade-audit plan wires capture sites in [_run_screen] /
+          [entries_from_candidates] / the exit path. When non-empty,
+          [Result_writer.write] persists it as [trade_audit.sexp]. *)
 }
 
 val is_trading_day :

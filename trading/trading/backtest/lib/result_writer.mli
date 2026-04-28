@@ -4,4 +4,9 @@
 
 val write : output_dir:string -> Runner.result -> unit
 (** Write [params.sexp], [summary.sexp], [trades.csv], and [equity_curve.csv]
-    into [output_dir]. The directory must already exist. *)
+    into [output_dir]. The directory must already exist.
+
+    Additionally writes [trade_audit.sexp] iff [result.audit] is non-empty.
+    Empty audit lists (the pre-PR-2 default, capture sites not yet wired)
+    produce no file rather than a sexp containing [()] — consumers must tolerate
+    the file's absence. *)
