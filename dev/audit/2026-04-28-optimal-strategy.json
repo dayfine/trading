@@ -1,17 +1,17 @@
 {
   "date": "2026-04-28",
   "feature": "optimal-strategy",
-  "branch": "feat/optimal-strategy-pr1",
+  "branch": "feat/optimal-strategy-pr2",
   "structural_qc": "APPROVED",
   "behavioral_qc": "APPROVED",
   "overall_qc": "APPROVED",
   "harness_gap": "",
-  "quality_score": 4,
+  "quality_score": 5,
   "findings_count": {
     "PASS": 0,
     "FAIL": 0,
     "FLAG": 0
   },
   "consecutive_rework_count": 0,
-  "notes": "qc-structural agent verdict was NEEDS_REWORK on H3+A2; orchestrator overrode both as documented in dev/reviews/optimal-strategy.md (H3: dune runtest --force exits 0, agent confused advisory linter stdout for non-zero exit; A2: rule stale relative to repo — 5+ existing trading/trading/backtest/* dunes already import weinstein.* analysis-tree libs, this PR follows precedent). Effective combined verdict: APPROVED+APPROVED. Quality score 4 from qc-behavioral."
+  "notes": "PR-2 of optimal-strategy track. Both QC stages APPROVED (Quality 5). A2 architecture rule flagged not failed (same as PR-1 — rule is stale relative to repo precedent). Overwrote run-1 audit which was for PR-1 (now in git history); this entry covers PR-2 (PR #659)."
 }
