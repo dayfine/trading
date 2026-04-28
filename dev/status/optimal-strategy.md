@@ -3,10 +3,11 @@
 ## Last updated: 2026-04-28
 
 ## Status
-PLANNING
+IN_PROGRESS
 
-Plan-only PR open against `docs/optimal-strategy-counterfactual-plan`.
-No implementation work yet.
+PR-1 (data model + `Stage_transition_scanner`) implemented and opened
+as draft PR #652 on branch `feat/optimal-strategy-pr1`. PR-2
+(`Outcome_scorer`) is the next slice.
 
 ## Goal
 
@@ -39,12 +40,28 @@ NO
 
 ## Open work
 
-Plan-only PR awaiting human review. No implementation branch yet.
+**PR-2 — `Outcome_scorer`** is next. Per plan §Phase B + §PR-2:
+
+- `trading/trading/backtest/optimal/lib/outcome_scorer.{ml,mli}` —
+  pure scorer. Input: `candidate_entry + Bar_panel.t`. Output:
+  `scored_candidate`. Implements the counterfactual exit rule
+  (`Stage3_transition` / `Stop_hit` / `End_of_run`, whichever first).
+  Reuses `Weinstein_stops.compute_initial_stop_with_floor` for the
+  initial stop and the existing trailing-stop walker for subsequent
+  weeks.
+- `trading/trading/backtest/optimal/test/test_outcome_scorer.ml` —
+  three exit-trigger fixtures + an R-multiple computation pin test.
+
+LOC estimate: 300.
+
+The `scored_candidate` schema already lives in `Optimal_types` (PR-1),
+so PR-2 is type-stable and can land independently.
 
 ## Phasing (per plan)
 
-- [ ] **PR-1**: `Optimal_types` data model + `Stage_transition_scanner`
-      (enumerate breakout candidates over the panel). ~300 LOC.
+- [x] **PR-1**: `Optimal_types` data model + `Stage_transition_scanner`
+      — PR #652 (draft), branch `feat/optimal-strategy-pr1`.
+      Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`.
 - [ ] **PR-2**: `Outcome_scorer` — realized-outcome scorer per candidate
       (Stage3-transition vs stop-hit forward walk). ~300 LOC.
 - [ ] **PR-3**: `Optimal_portfolio_filler` — greedy sizing-constrained
@@ -65,16 +82,20 @@ pure-functional analysis layer over backtest outputs.
 
 ## Branch
 
-`docs/optimal-strategy-counterfactual-plan` for the plan.
-Implementation branches per phase: `feat/optimal-strategy-pr1`,
-`feat/optimal-strategy-pr2`, etc.
+Implementation branches per phase:
+
+- `feat/optimal-strategy-pr1` — PR #652 (draft, READY_FOR_REVIEW pending QC).
+- `feat/optimal-strategy-pr2` (next).
+
+Plan branch: `docs/optimal-strategy-counterfactual-plan` (merged via
+PR #650, 2026-04-28).
 
 ## Blocked on
 
-Human plan review before any implementation begins. Possibly: a
-pure-functional walker for `Weinstein_stops` (PR-2 §Risks item 4 — may
-require a small refactor of stops to expose a non-stateful API; that
-decision belongs to `feat-weinstein` if invoked).
+PR-2 may need a **pure-functional walker for `Weinstein_stops`** (plan
+§Risks item 4 — may require a small refactor of stops to expose a
+non-stateful API; that decision belongs to `feat-weinstein` if invoked).
+PR-1 does not touch stops, so PR-1 is unblocked.
 
 ## Authority docs
 
@@ -88,4 +109,22 @@ decision belongs to `feat-weinstein` if invoked).
 
 ## Completed
 
-(none yet — plan-only)
+- **PR-1** (2026-04-28): `Optimal_types` data model +
+  `Stage_transition_scanner`.
+  - Files added:
+    - `trading/trading/backtest/optimal/lib/dune`
+    - `trading/trading/backtest/optimal/lib/optimal_types.{ml,mli}`
+    - `trading/trading/backtest/optimal/lib/stage_transition_scanner.{ml,mli}`
+    - `trading/trading/backtest/optimal/test/dune`
+    - `trading/trading/backtest/optimal/test/test_stage_transition_scanner.ml`
+  - Coverage: 13 OUnit2 cases — sexp round-trip on each record type;
+    scanner emits one per breakout in arrival order; non-breakouts
+    dropped; `passes_macro` tagging across Bullish/Neutral/Bearish;
+    missing-sector fallback to "Unknown"; entry/stop/risk match screener
+    formulas; multi-week scan_panel concatenation; empty-input edge
+    cases.
+  - Verify:
+    - `dev/lib/run-in-env.sh dune build`
+    - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
+    - `dev/lib/run-in-env.sh dune build @fmt`
+  - Branch / PR: `feat/optimal-strategy-pr1` / PR #652.
