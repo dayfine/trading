@@ -4,6 +4,12 @@ open Core
 module TA = Backtest.Trade_audit
 module Stop_log = Backtest.Stop_log
 
+module Trade_audit_ratings = Trade_audit_ratings
+(** Re-export the per-trade-rating + analysis library so external callers can
+    reach it via [Trade_audit_report.Trade_audit_ratings]. The library wrap
+    suppresses the auto-generated alias when a same-named entry module exists,
+    so we re-export here explicitly. *)
+
 (* Types ------------------------------------------------------------------ *)
 
 type scenario_header = {
@@ -44,10 +50,19 @@ type per_trade_row = {
 }
 [@@deriving sexp]
 
+type analysis = {
+  ratings : Trade_audit_ratings.rating list;
+  behavioral : Trade_audit_ratings.behavioral_metrics;
+  weinstein : Trade_audit_ratings.weinstein_aggregate;
+  decision_quality : Trade_audit_ratings.decision_quality_matrix;
+}
+[@@deriving sexp]
+
 type t = {
   header : scenario_header;
   best_worst : best_worst;
   rows : per_trade_row list;
+  analysis : analysis option;
 }
 [@@deriving sexp]
 
@@ -162,8 +177,28 @@ let _compute_header ~scenario_name ~period_start ~period_end ~universe_size
     total_realized_return_pct;
   }
 
-let render ?scenario_name ?period_start ?period_end ?universe_size ~trade_audit
-    ~trades () : t =
+let _compute_analysis ~config ~trade_audit ~trades : analysis option =
+  let ratings =
+    Trade_audit_ratings.rate_all ~config ~audit:trade_audit ~trades
+  in
+  if List.is_empty ratings then None
+  else
+    let behavioral =
+      Trade_audit_ratings.behavioral_metrics_of ~config ~ratings
+        ~audit:trade_audit ~trades
+    in
+    let weinstein =
+      Trade_audit_ratings.weinstein_aggregate_of ~config ~ratings
+        ~audit:trade_audit
+    in
+    let decision_quality =
+      Trade_audit_ratings.decision_quality_matrix_of ~ratings
+    in
+    Some { ratings; behavioral; weinstein; decision_quality }
+
+let render ?scenario_name ?period_start ?period_end ?universe_size
+    ?(ratings_config = Trade_audit_ratings.default_config) ~trade_audit ~trades
+    () : t =
   let audit_idx = _audit_index trade_audit in
   let rows =
     List.map trades ~f:(_row_of_trade audit_idx)
@@ -174,7 +209,10 @@ let render ?scenario_name ?period_start ?period_end ?universe_size ~trade_audit
       ~rows
   in
   let best_worst = _compute_best_worst rows in
-  { header; best_worst; rows }
+  let analysis =
+    _compute_analysis ~config:ratings_config ~trade_audit ~trades
+  in
+  { header; best_worst; rows; analysis }
 
 (* Markdown formatting ---------------------------------------------------- *)
 
@@ -281,13 +319,22 @@ let _format_table (rows : per_trade_row list) : string list =
   in
   head @ body @ [ "" ]
 
+let _format_analysis (a : analysis) : string list =
+  Trade_audit_ratings.format_per_trade_extras ~ratings:a.ratings
+  @ Trade_audit_ratings.format_behavioral_section a.behavioral
+  @ Trade_audit_ratings.format_weinstein_section a.weinstein
+  @ Trade_audit_ratings.format_decision_quality_section a.decision_quality
+
 let to_markdown (t : t) : string =
-  let lines =
+  let core_lines =
     _format_header t.header
     @ _format_aggregate t.best_worst
     @ _format_table t.rows
   in
-  String.concat ~sep:"\n" lines ^ "\n"
+  let analysis_lines =
+    match t.analysis with Some a -> _format_analysis a | None -> []
+  in
+  String.concat ~sep:"\n" (core_lines @ analysis_lines) ^ "\n"
 
 (* Loader ----------------------------------------------------------------- *)
 
