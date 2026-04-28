@@ -250,6 +250,104 @@ let test_short_candidate_populated _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* M3 Test 6: Ch.11 spot-check — 2022 bear shorts on real data         *)
+(* ------------------------------------------------------------------ *)
+
+(** Ch.11 spot-check: at 2022-07-15 (mid-bear, six weeks past the June-2022
+    relief rally peak), the screener over the same 7-stock universe under
+    [Bearish] macro emits exactly two Stage 4 short candidates whose rationale
+    cleanly maps onto Weinstein's Ch.11 short-entry checklist
+    (weinstein-book-reference.md §6.1):
+
+    - {b MSFT}: score 45 — "Early Stage4" + "RS bearish crossover". Tech
+      mega-cap that had topped in late 2021, broke its 30-week MA in early 2022,
+      and printed a fresh bearish RS crossover vs the S&P. Enters Stage 4 with
+      negative-and-deteriorating RS, the textbook Ch. 11 short setup.
+    - {b JPM}: score 45 — "Early Stage4" + "Adequate breakdown volume" + "RS
+      negative & declining". Financials sector breakdown with confirming volume
+      on the move below support. Hits items 1, 4, 5, and 6 of the §6.1
+      checklist; volume is a bonus signal, not required (§6.2: "stocks can truly
+      fall of their own weight").
+
+    {b What this test pins:}
+    - Stage 4 + negative RS + Bearish macro → short emitted (Ch.11 checklist
+      items 1, 4, 5).
+    - Volume confirmation either as Strong/Adequate breakdown or as bearish RS
+      crossover (Ch.11 §6.2 — volume is supporting, not gating, evidence).
+    - No buy candidates leak into the output (Ch.11 §6.1 item 1 — bearish macro
+      is the unconditional gate).
+
+    {b Why mid-2022 and not later:} the 2022 bear bottomed in October 2022 with
+    intervening relief rallies. The screener's "Early Stage4" detector triggers
+    when the prior_stage transitions or the breakdown is fresh; the most
+    consistent short-side window with the cached 7-stock universe is mid-July
+    (after the relief rally peaked in June). End-of-2022 (2022-12-30) also
+    produces shorts (AAPL + MSFT) but is captured implicitly by the
+    [test_short_candidate_populated] coverage of the 2020 COVID crash; the
+    mid-2022 pin is the cleaner Ch.11 spot-check because both shorts here have
+    distinct Ch.11 rationale paths (RS bearish crossover for MSFT, classic
+    breakdown-volume + RS-negative-declining for JPM).
+
+    See [dev/notes/short-side-ch11-spotcheck-2026-04-27.md] for the per-pattern
+    mapping. *)
+let test_ch11_spotcheck_2022_bear _ =
+  let stocks =
+    _analyze_universe
+      ~start_date:(Date.of_string "2020-01-01")
+      ~end_date:(Date.of_string "2022-07-15")
+  in
+  let result =
+    Screener.screen ~config:Screener.default_config ~macro_trend:Bearish
+      ~sector_map:(_empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.Screener.macro_trend (equal_to Bearish);
+  assert_that result.Screener.buy_candidates is_empty;
+  assert_that result.Screener.short_candidates
+    (elements_are
+       [
+         _candidate_matcher ~side:`Short ~ticker:"MSFT" ~score:45
+           ~entry_low:349.0 ~entry_high:354.0 ~stop_low:377.0 ~stop_high:382.0
+           ~risk_low:0.075 ~risk_high:0.085;
+         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:45
+           ~entry_low:171.0 ~entry_high:176.0 ~stop_low:185.0 ~stop_high:190.0
+           ~risk_low:0.075 ~risk_high:0.085;
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* M3 Test 7: Ch.11 negative — never short Stage 2 (positive RS gate) *)
+(* ------------------------------------------------------------------ *)
+
+(** Ch.11 negative confirmation: under a [Bullish] macro covering the same 2022
+    mid-bear window, the screener emits {b zero} short candidates even though
+    the underlying stocks include Stage 4 names (MSFT, JPM) with negative RS.
+    The [Bullish] gate at the top of the cascade overrides the short-side path
+    entirely (Ch.11 §6.1 item 1: "Market trend is bearish [DJI in Stage 4]").
+    This pins the {b absolute-rule} contract from the book: shorts only fire
+    when macro confirms.
+
+    Note: this is the {b cascade-gate} mirror of the never-short-Stage-2 rule.
+    The per-stock never-short-Stage-2 rule is pinned at the unit level by
+    [test_positive_rs_blocks_short] in [test_screener.ml]; this test pins the
+    macro-gate version of the same Ch. 11 invariant. Together, the two cover
+    both the per-stock and per-regime arms of the never-short rules. *)
+let test_ch11_no_shorts_under_bullish_macro_2022 _ =
+  let stocks =
+    _analyze_universe
+      ~start_date:(Date.of_string "2020-01-01")
+      ~end_date:(Date.of_string "2022-07-15")
+  in
+  let result =
+    Screener.screen ~config:Screener.default_config ~macro_trend:Bullish
+      ~sector_map:(_empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (r : Screener.result) -> r.macro_trend) (equal_to Bullish);
+         field (fun (r : Screener.result) -> r.short_candidates) is_empty;
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -265,4 +363,8 @@ let () =
            >:: test_candidate_fields_populated;
            "short candidates populated under bearish macro"
            >:: test_short_candidate_populated;
+           "Ch.11 spot-check: 2022 bear shorts (MSFT + JPM)"
+           >:: test_ch11_spotcheck_2022_bear;
+           "Ch.11 negative: bullish macro emits zero shorts (2022 window)"
+           >:: test_ch11_no_shorts_under_bullish_macro_2022;
          ])
