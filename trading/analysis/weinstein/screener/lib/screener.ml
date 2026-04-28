@@ -129,13 +129,27 @@ let _late_stage2_signal ~w ~(a : Stock_analysis.t) =
       [ (w.w_late_stage2_penalty, "Late Stage2 (penalty)") ]
   | _ -> []
 
-(** Volume confirmation signal. *)
+(** Volume confirmation signal for long setups (Stage 2 breakout). *)
 let _volume_signal ~w ~(a : Stock_analysis.t) =
   match a.volume with
   | Some { confirmation = Strong _; _ } ->
       [ (w.w_strong_volume, "Strong volume") ]
   | Some { confirmation = Adequate _; _ } ->
       [ (w.w_adequate_volume, "Adequate volume") ]
+  | _ -> []
+
+(** Volume confirmation signal for short setups (Stage 4 breakdown). Per
+    Weinstein, volume is NOT required for a valid breakdown — stocks can fall of
+    their own weight. Volume increase on breakdown is even more bearish, but
+    absence doesn't invalidate the setup. Therefore [Strong] / [Adequate] add
+    positive weight; [Weak] / no-data adds zero — never a penalty. Mirrors
+    [_volume_signal]'s shape with breakdown-specific rationale labels. *)
+let _volume_short_signal ~w ~(a : Stock_analysis.t) =
+  match a.volume with
+  | Some { confirmation = Strong _; _ } ->
+      [ (w.w_strong_volume, "Strong breakdown volume") ]
+  | Some { confirmation = Adequate _; _ } ->
+      [ (w.w_adequate_volume, "Adequate breakdown volume") ]
   | _ -> []
 
 (** Bullish RS signal for long setups. *)
@@ -222,7 +236,8 @@ let _score_long ~weights ~sector (a : Stock_analysis.t) : int * string list =
 let _score_short ~weights ~sector (a : Stock_analysis.t) : int * string list =
   let w = weights in
   _tally
-    (_stage_short_signal ~w ~a @ _rs_short_signal ~w ~a
+    (_stage_short_signal ~w ~a @ _volume_short_signal ~w ~a
+   @ _rs_short_signal ~w ~a
     @ _sector_short_signal ~w ~sector)
 
 (** Convert score to grade using configurable thresholds. *)
