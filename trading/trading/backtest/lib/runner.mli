@@ -27,6 +27,13 @@ type result = {
           PR-2 of the trade-audit plan wires capture sites in [_run_screen] /
           [entries_from_candidates] / the exit path. When non-empty,
           [Result_writer.write] persists it as [trade_audit.sexp]. *)
+  cascade_summaries : Trade_audit.cascade_summary list;
+      (** Per-Friday cascade-rejection counts captured by the strategy at the
+          end of every screen call. Complements [audit] — where [audit] only
+          covers candidates that were ENTERED (plus immediate rivals), this
+          field records the per-cascade-phase activity for every Friday,
+          including those where the cascade filtered everything. Persisted
+          alongside [audit] in [trade_audit.sexp] when either is non-empty. *)
 }
 
 val is_trading_day :

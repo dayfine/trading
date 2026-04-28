@@ -37,9 +37,21 @@ type exit_event = {
   distance_from_ma_pct : float;
 }
 
+type cascade_event = {
+  date : Date.t;
+  diagnostics : Screener.cascade_diagnostics;
+  entered : int;
+}
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
+  record_cascade_summary : cascade_event -> unit;
 }
 
-let noop : t = { record_entry = (fun _ -> ()); record_exit = (fun _ -> ()) }
+let noop : t =
+  {
+    record_entry = (fun _ -> ());
+    record_exit = (fun _ -> ());
+    record_cascade_summary = (fun _ -> ());
+  }

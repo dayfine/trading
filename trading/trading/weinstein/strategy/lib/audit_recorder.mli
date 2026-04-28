@@ -90,13 +90,36 @@ type exit_event = {
 }
 (** Event captured at exit-decision time. *)
 
+type cascade_event = {
+  date : Date.t;
+      (** Friday on which the screen ran — same as [current_date] passed into
+          [_screen_universe]. *)
+  diagnostics : Screener.cascade_diagnostics;
+      (** Per-cascade-phase admission counts. Carried through unchanged from
+          [Screener.result.cascade_diagnostics]. *)
+  entered : int;
+      (** How many of the {!Screener.scored_candidate}s the strategy actually
+          entered this Friday — the count of {!Position.transition}s emitted by
+          {!Weinstein_strategy.entries_from_candidates}. Sits below
+          [diagnostics.long_top_n_admitted + diagnostics.short_top_n_admitted]
+          because cash limits, sector concentration, and round-share sizing all
+          drop further candidates between the screener output and the actual
+          entry list. *)
+}
+(** Event captured at the end of one Friday's cascade. Complements
+    [entry_event]: where [entry_event] records a single chosen candidate plus
+    its rivals, [cascade_event] records the per-phase activity counts for the
+    whole cascade — including phases that filter out every candidate before any
+    rival comparison happens. *)
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
+  record_cascade_summary : cascade_event -> unit;
 }
-(** Recorder bundle. Both callbacks are invoked unconditionally by the strategy
-    at entry / exit sites; the implementation decides whether to persist or
-    drop. *)
+(** Recorder bundle. All callbacks are invoked unconditionally by the strategy
+    at entry / exit / per-Friday sites; the implementation decides whether to
+    persist or drop. *)
 
 val noop : t
 (** Recorder that drops every event. Default for callers (tests, live mode) that

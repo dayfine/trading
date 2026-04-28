@@ -102,11 +102,30 @@ type scored_candidate = {
   rationale : string list;
 }
 
+type cascade_diagnostics = {
+  total_stocks : int;
+  candidates_after_held : int;
+  macro_trend : market_trend;
+  long_macro_admitted : int;
+  long_breakout_admitted : int;
+  long_sector_admitted : int;
+  long_grade_admitted : int;
+  long_top_n_admitted : int;
+  short_macro_admitted : int;
+  short_breakdown_admitted : int;
+  short_sector_admitted : int;
+  short_rs_hard_gate_admitted : int;
+  short_grade_admitted : int;
+  short_top_n_admitted : int;
+}
+[@@deriving sexp]
+
 type result = {
   buy_candidates : scored_candidate list;
   short_candidates : scored_candidate list;
   watchlist : (string * string) list;
   macro_trend : market_trend;
+  cascade_diagnostics : cascade_diagnostics;
 }
 
 (* ------------------------------------------------------------------ *)
@@ -410,6 +429,59 @@ let _top_n n lst =
   List.sort lst ~compare:(fun a b -> Int.compare b.score a.score) |> fun l ->
   List.sub l ~pos:0 ~len:(min n (List.length l))
 
+(** Long-side admission predicates: per-pair, returns one bool per phase that
+    actually got evaluated. Phases short-circuit (a [false] earlier means later
+    bools are [false]) so [(true, true, true)] means the pair passed all three
+    gates. *)
+let _long_admission ~weights ~thresholds ~min_grade (a, sector) =
+  let passes_breakout = Stock_analysis.is_breakout_candidate a in
+  let passes_sector =
+    passes_breakout && not (equal_sector_rating sector.rating Weak)
+  in
+  let passes_grade =
+    if not passes_sector then false
+    else
+      let score, _ = _score_long ~weights ~sector a in
+      compare_grade (_grade_of_score ~thresholds score) min_grade <= 0
+  in
+  (passes_breakout, passes_sector, passes_grade)
+
+(** Bump the counter by one when [b] is [true]. *)
+let _bump n b = if b then n + 1 else n
+
+(** Long-side phase counts for the cascade-diagnostics record. Folds the
+    per-pair predicate triple into running counts. *)
+let _count_long_phases ~weights ~thresholds ~min_grade ~candidates =
+  List.fold candidates ~init:(0, 0, 0)
+    ~f:(fun (breakout, sector_ok, grade_ok) pair ->
+      let pb, ps, pg = _long_admission ~weights ~thresholds ~min_grade pair in
+      (_bump breakout pb, _bump sector_ok ps, _bump grade_ok pg))
+
+(** Short-side admission predicates. Mirrors [_long_admission] with the RS hard
+    gate inserted between sector and grade — see [_short_candidate]. *)
+let _short_admission ~weights ~thresholds ~min_grade (a, sector) =
+  let passes_breakdown = Stock_analysis.is_breakdown_candidate a in
+  let passes_sector =
+    passes_breakdown && not (equal_sector_rating sector.rating Strong)
+  in
+  let passes_rs = passes_sector && not (_rs_blocks_short a.Stock_analysis.rs) in
+  let passes_grade =
+    if not passes_rs then false
+    else
+      let score, _ = _score_short ~weights ~sector a in
+      compare_grade (_grade_of_score ~thresholds score) min_grade <= 0
+  in
+  (passes_breakdown, passes_sector, passes_rs, passes_grade)
+
+(** Short-side phase counts mirroring [_count_long_phases]. *)
+let _count_short_phases ~weights ~thresholds ~min_grade ~candidates =
+  List.fold candidates ~init:(0, 0, 0, 0)
+    ~f:(fun (breakdown, sector_ok, rs_ok, grade_ok) pair ->
+      let pb, ps, pr, pg =
+        _short_admission ~weights ~thresholds ~min_grade pair
+      in
+      (_bump breakdown pb, _bump sector_ok ps, _bump rs_ok pr, _bump grade_ok pg))
+
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~max_buy_candidates
     ~candidates ~macro_trend : scored_candidate list =
@@ -456,6 +528,60 @@ let _resolve_sector ~sector_map ticker =
         stage = Stage1 { weeks_in_base = 0 };
       }
 
+(** Build the cascade-diagnostics record from the per-side phase counts and the
+    final top-N counts. Pure projection. *)
+let _build_cascade_diagnostics ~total_stocks ~candidates_after_held ~macro_trend
+    ~long_phases ~short_phases ~buy_candidates ~short_candidates =
+  let long_breakout, long_sector, long_grade = long_phases in
+  let short_breakdown, short_sector, short_rs, short_grade = short_phases in
+  let long_macro_admitted =
+    match macro_trend with
+    | Bearish -> 0
+    | Bullish | Neutral -> candidates_after_held
+  in
+  let short_macro_admitted =
+    match macro_trend with
+    | Bullish -> 0
+    | Bearish | Neutral -> candidates_after_held
+  in
+  (* When the macro gate closes the side, downstream phase counts collapse to
+     0 — the screener never evaluates them. The fold above runs over all
+     candidates regardless of macro, so we reset here to keep the post-macro
+     phases consistent with what the screener actually emitted. *)
+  let zero_if (gate : int) (n : int) = if gate = 0 then 0 else n in
+  {
+    total_stocks;
+    candidates_after_held;
+    macro_trend;
+    long_macro_admitted;
+    long_breakout_admitted = zero_if long_macro_admitted long_breakout;
+    long_sector_admitted = zero_if long_macro_admitted long_sector;
+    long_grade_admitted = zero_if long_macro_admitted long_grade;
+    long_top_n_admitted = List.length buy_candidates;
+    short_macro_admitted;
+    short_breakdown_admitted = zero_if short_macro_admitted short_breakdown;
+    short_sector_admitted = zero_if short_macro_admitted short_sector;
+    short_rs_hard_gate_admitted = zero_if short_macro_admitted short_rs;
+    short_grade_admitted = zero_if short_macro_admitted short_grade;
+    short_top_n_admitted = List.length short_candidates;
+  }
+
+(** Compute the cascade-diagnostics record for one screen call. Decoupled from
+    [screen] so the latter stays within the 50-line linter cap. *)
+let _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade ~total_stocks
+    ~candidates_after_held ~macro_trend ~candidates ~buy_candidates
+    ~short_candidates =
+  let long_phases =
+    _count_long_phases ~weights ~thresholds:grade_thresholds ~min_grade
+      ~candidates
+  in
+  let short_phases =
+    _count_short_phases ~weights ~thresholds:grade_thresholds ~min_grade
+      ~candidates
+  in
+  _build_cascade_diagnostics ~total_stocks ~candidates_after_held ~macro_trend
+    ~long_phases ~short_phases ~buy_candidates ~short_candidates
+
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   let held_set = String.Set.of_list held_tickers in
   let {
@@ -471,6 +597,7 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   let buys_active =
     match macro_trend with Bullish | Neutral -> true | Bearish -> false
   in
+  let total_stocks = List.length stocks in
   (* Was: chained filter |> map allocated two lists (one for the held-set
      filter, one for the (analysis, sector) pairs). Now: single-pass
      filter_map keeps only one output list. Runs every Friday over the full
@@ -480,6 +607,7 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
         if Set.mem held_set a.ticker then None
         else Some (a, _resolve_sector ~sector_map a.ticker))
   in
+  let candidates_after_held = List.length candidates in
   let buy_candidates =
     _evaluate_longs ~weights ~thresholds:grade_thresholds
       ~params:candidate_params ~min_grade ~max_buy_candidates ~candidates
@@ -494,4 +622,15 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
     _build_watchlist ~weights ~thresholds:grade_thresholds ~candidates
       ~buy_candidates ~buys_active
   in
-  { buy_candidates; short_candidates; watchlist; macro_trend }
+  let cascade_diagnostics =
+    _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade ~total_stocks
+      ~candidates_after_held ~macro_trend ~candidates ~buy_candidates
+      ~short_candidates
+  in
+  {
+    buy_candidates;
+    short_candidates;
+    watchlist;
+    macro_trend;
+    cascade_diagnostics;
+  }

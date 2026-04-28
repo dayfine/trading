@@ -599,6 +599,138 @@ let test_positive_rs_blocks_short _ =
   in
   assert_that result.short_candidates is_empty
 
+(* ------------------------------------------------------------------ *)
+(* Cascade diagnostics                                                 *)
+(* ------------------------------------------------------------------ *)
+
+(** Bullish-macro Stage-2 setup: rising bars across a 35-week window from $50 to
+    $100 with a Strong volume spike late in the run. The same fixture used by
+    several existing buy-side tests; reused here so the diagnostic-count
+    expectations stay aligned with the rest of the suite. *)
+let _stage2_breakout_setup ticker =
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:30 in
+  make_analysis ticker (Some (Stage1 { weeks_in_base = 12 })) bars
+
+let test_diagnostics_empty_universe _ =
+  let result =
+    screen ~config:cfg ~macro_trend:Neutral ~sector_map:(empty_sector_map ())
+      ~stocks:[] ~held_tickers:[]
+  in
+  assert_that result.cascade_diagnostics
+    (all_of
+       [
+         field (fun (d : cascade_diagnostics) -> d.total_stocks) (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.candidates_after_held)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.long_macro_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.short_macro_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.long_top_n_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.short_top_n_admitted)
+           (equal_to 0);
+       ])
+
+let test_diagnostics_total_stocks_and_held _ =
+  let stocks =
+    [
+      _stage2_breakout_setup "AAPL";
+      _stage2_breakout_setup "MSFT";
+      _stage2_breakout_setup "NVDA";
+    ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[ "MSFT" ]
+  in
+  (* total_stocks counts the input list; candidates_after_held drops the held
+     ticker. *)
+  assert_that result.cascade_diagnostics
+    (all_of
+       [
+         field (fun (d : cascade_diagnostics) -> d.total_stocks) (equal_to 3);
+         field
+           (fun (d : cascade_diagnostics) -> d.candidates_after_held)
+           (equal_to 2);
+         field
+           (fun (d : cascade_diagnostics) -> d.macro_trend)
+           (equal_to Bullish);
+       ])
+
+let test_diagnostics_bearish_macro_blocks_longs _ =
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks:[ _stage2_breakout_setup "AAPL" ]
+      ~held_tickers:[]
+  in
+  (* Macro=Bearish closes the long side: every long-side phase must read 0. *)
+  assert_that result.cascade_diagnostics
+    (all_of
+       [
+         field
+           (fun (d : cascade_diagnostics) -> d.long_macro_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.long_breakout_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.long_sector_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.long_grade_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.long_top_n_admitted)
+           (equal_to 0);
+       ])
+
+let test_diagnostics_bullish_macro_blocks_shorts _ =
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks:[ _stage2_breakout_setup "AAPL" ]
+      ~held_tickers:[]
+  in
+  assert_that result.cascade_diagnostics
+    (all_of
+       [
+         field
+           (fun (d : cascade_diagnostics) -> d.short_macro_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.short_breakdown_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.short_sector_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.short_rs_hard_gate_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.short_grade_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.short_top_n_admitted)
+           (equal_to 0);
+       ])
+
+let test_diagnostics_long_top_n_matches_buy_candidates _ =
+  let stocks =
+    List.init 5 ~f:(fun i -> _stage2_breakout_setup (sprintf "T%d" i))
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  (* long_top_n_admitted is by definition [List.length buy_candidates]. *)
+  assert_that result.cascade_diagnostics.long_top_n_admitted
+    (equal_to (List.length result.buy_candidates))
+
 let suite =
   "screener_tests"
   >::: [
@@ -633,6 +765,15 @@ let suite =
          >:: test_short_side_volume_adequate_label;
          "test_negative_rs_scoring_order" >:: test_negative_rs_scoring_order;
          "test_support_below_scoring_order" >:: test_support_below_scoring_order;
+         "test_diagnostics_empty_universe" >:: test_diagnostics_empty_universe;
+         "test_diagnostics_total_stocks_and_held"
+         >:: test_diagnostics_total_stocks_and_held;
+         "test_diagnostics_bearish_macro_blocks_longs"
+         >:: test_diagnostics_bearish_macro_blocks_longs;
+         "test_diagnostics_bullish_macro_blocks_shorts"
+         >:: test_diagnostics_bullish_macro_blocks_shorts;
+         "test_diagnostics_long_top_n_matches_buy_candidates"
+         >:: test_diagnostics_long_top_n_matches_buy_candidates;
        ]
 
 let () = run_test_tt_main suite
