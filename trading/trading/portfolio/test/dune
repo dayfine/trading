@@ -5,3 +5,9 @@
 (test
  (name test_calculations)
  (libraries ounit2 trading.portfolio trading.base matchers))
+
+(test
+ (name test_split_event)
+ (libraries ounit2 trading.portfolio trading.base matchers)
+ (preprocess
+  (pps ppx_test_matcher)))

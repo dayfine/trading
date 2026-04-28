@@ -31,7 +31,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |
-| [simulation](simulation.md) | MERGED | — | — | PR #641 (`fix/split-day-mtm`) closed-without-merge 2026-04-28T12:50Z — band-aid was over-broad per `dev/notes/session-followups-2026-04-28.md` §1. Recommended fix is a broker-model redesign (track positions in split-adjusted shares, multiply quantity on actual split day, leave raw OHLC alone); next session should open `dev/plans/split-day-ohlc-redesign-<date>.md`. Not on the orchestrator dispatch surface — human authorship task. |
+| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | feat/split-day-pr2 | Split-day OHLC redesign (`dev/plans/split-day-ohlc-redesign-2026-04-28.md`) in flight. PR-1 (`Split_detector` primitive) merged 2026-04-28 as #658. PR-2 (`Split_event` ledger primitive in `Trading_portfolio`) opened 2026-04-28 on `feat/split-day-pr2` — pure broker-model adjustment, preserves total cost basis, keeps fractional shares. No simulator wiring yet (PR-3). Existing goldens stay bit-identical. |
 
 ## How to use
 
