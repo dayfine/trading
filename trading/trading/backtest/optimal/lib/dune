@@ -3,8 +3,11 @@
  (libraries
   core
   trading.base
+  types
   weinstein.screener
+  weinstein.stage
   weinstein.stock_analysis
-  weinstein.types)
+  weinstein.types
+  weinstein_trading.stops)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
