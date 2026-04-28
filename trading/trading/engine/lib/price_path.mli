@@ -85,6 +85,12 @@ module Scratch : sig
       Capacity is set to [config.total_points + slack] to absorb the small
       rounding overshoot from segment generation. *)
 
+  val required_capacity : path_config -> int
+  (** Capacity the buffer needs to hold the path implied by [config]. Pure —
+      does not allocate. Use this to compare against an existing scratch's
+      [capacity] before deciding whether to re-allocate (see
+      {!Engine.update_market}, which threads scratches per symbol). *)
+
   val capacity : t -> int
   (** Return the buffer's capacity (max path length it can hold). *)
 end

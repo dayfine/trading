@@ -954,10 +954,88 @@ let test_stop_order_deterministic_slippage _ =
       assert_that trade.price (float_equal ~epsilon:0.000001 103.143016)
   | _ -> assert_failure "Expected one filled report"
 
+(* PR-3 of the engine-pooling plan threads a per-symbol [Price_path.Scratch.t]
+   through [Engine.update_market] so that the path-generation scratch buffer
+   is reused across calls instead of being allocated fresh per tick. The
+   load-bearing constraint is bit-equality with the pre-PR-3 simulator output:
+   buffer reuse must only affect allocation, never arithmetic.
+
+   This test exercises the engine seam directly: with a fixed seed, a single
+   reused engine processing N consecutive bars must produce the same fill
+   prices that N independently-created engines would. Failure means scratch
+   reuse leaked state between calls. The test pairs with the lower-level
+   [test_price_path_buffer_reuse] which pins parity at the [Price_path]
+   level, and the higher-level [test_panel_loader_parity] which pins the
+   end-to-end backtest output. *)
+let _fill_price_for_market_buy ~engine ~order_mgr ~bar =
+  update_market
+    ~path_config:{ default_config with seed = Some 7 }
+    engine [ bar ];
+  match process_orders engine order_mgr with
+  | Ok [ report ] -> (
+      match report.trades with
+      | [ t ] -> t.price
+      | _ -> assert_failure "Expected exactly one trade in fill report")
+  | _ -> assert_failure "Expected exactly one filled report"
+
+let test_engine_scratch_threading_parity _ =
+  (* Three sequential bars on the same symbol. With seeded path generation,
+     the engine that reuses its per-symbol scratch must produce the same fill
+     prices as three fresh engines processing one bar each. *)
+  let bars =
+    [
+      make_bar "AAPL" ~open_price:100.0 ~high_price:110.0 ~low_price:95.0
+        ~close_price:105.0;
+      make_bar "AAPL" ~open_price:105.0 ~high_price:108.0 ~low_price:102.0
+        ~close_price:107.5;
+      make_bar "AAPL" ~open_price:107.5 ~high_price:115.0 ~low_price:106.0
+        ~close_price:113.0;
+    ]
+  in
+  let new_setup () =
+    let config = make_config () in
+    let engine = create config in
+    let order_mgr = OrderManager.create () in
+    (engine, order_mgr)
+  in
+  let submit_market_buy order_mgr =
+    let params =
+      make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+        ~quantity:100.0 ()
+    in
+    let order =
+      match create_order ~now_time:test_timestamp params with
+      | Ok o -> o
+      | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+    in
+    submit_single_order order_mgr order
+  in
+  (* Reused-scratch path: one engine, three sequential update_market calls. *)
+  let reused_prices =
+    let engine, order_mgr = new_setup () in
+    List.map bars ~f:(fun bar ->
+        submit_market_buy order_mgr;
+        _fill_price_for_market_buy ~engine ~order_mgr ~bar)
+  in
+  (* Fresh-scratch path: three engines, each processes one bar. *)
+  let fresh_prices =
+    List.map bars ~f:(fun bar ->
+        let engine, order_mgr = new_setup () in
+        submit_market_buy order_mgr;
+        _fill_price_for_market_buy ~engine ~order_mgr ~bar)
+  in
+  (* Bit-equal float comparison via [equal_to] (no epsilon). The path
+     generator is fully deterministic given the seed, so any drift here means
+     the scratch reuse leaked state across calls. *)
+  assert_that reused_prices
+    (elements_are (List.map fresh_prices ~f:(fun p -> equal_to p)))
+
 (* Test suite *)
 let suite =
   "Engine Tests"
   >::: [
+         "test_engine_scratch_threading_parity"
+         >:: test_engine_scratch_threading_parity;
          "test_create_engine" >:: test_create_engine;
          "test_create_engine_with_custom_commission"
          >:: test_create_engine_with_custom_commission;
