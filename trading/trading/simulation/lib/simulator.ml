@@ -99,6 +99,40 @@ let _submit_orders t orders =
 
 let _is_complete t = Date.( >= ) t.current_date t.config.end_date
 
+(** Scale a [Daily_price.t]'s OHLC into "adjusted units" by multiplying
+    open/high/low by [adjusted_close / close_price] and replacing close_price
+    with adjusted_close. The factor is exactly [1.0] for any bar where
+    adjusted_close == close_price (i.e. no split or dividend adjustment applies
+    on or after the bar's date), so the transform is a no-op for scenarios with
+    no corporate actions in window.
+
+    Why: the simulator marks open positions to market via close_price and fills
+    market orders at open_price. On the day of a stock split the raw close (and
+    open/high/low) drops by the split factor, while adjusted_close stays
+    continuous (it is split-back-rolled). Without this scaling, a position held
+    through the split sees a one-day portfolio_value crash of
+    [1 - 1/split_factor] (e.g. 75% on a 4:1 split) even though the holder's
+    economic value is unchanged. By feeding adjusted prices into both the engine
+    and the strategy, every trade.price (and therefore every cost_basis) lands
+    in the same adjusted units as the MtM, so split-day continuity is preserved.
+
+    Degenerate cases — close_price not finite or non-positive — return the bar
+    unchanged. NaN / 0.0 closes mean the bar is malformed; downstream consumers
+    (price_path, portfolio_value) already tolerate them. *)
+let _split_adjust_bar (bar : Types.Daily_price.t) : Types.Daily_price.t =
+  let close = bar.close_price in
+  if (not (Float.is_finite close)) || Float.(close <= 0.0) then bar
+  else if Float.equal close bar.adjusted_close then bar
+  else
+    let factor = bar.adjusted_close /. close in
+    {
+      bar with
+      open_price = bar.open_price *. factor;
+      high_price = bar.high_price *. factor;
+      low_price = bar.low_price *. factor;
+      close_price = bar.adjusted_close;
+    }
+
 (** Convert Daily_price to engine price_bar *)
 let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
     Trading_engine.Types.price_bar =
@@ -110,11 +144,14 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
     close_price = daily_price.close_price;
   }
 
-(** Get all price bars for today using market data adapter *)
+(** Get all price bars for today using market data adapter. Bars are
+    split-adjusted so the engine's order-fill path and downstream MtM see
+    consistent prices across corporate actions. *)
 let _get_today_bars t =
   let get_bar symbol =
     Trading_simulation_data.Market_data_adapter.get_price
       t.deps.market_data_adapter ~symbol ~date:t.current_date
+    |> Option.map ~f:_split_adjust_bar
     |> Option.map ~f:(_to_price_bar symbol)
   in
   List.filter_map t.deps.symbols ~f:get_bar
@@ -137,11 +174,15 @@ let _compute_portfolio_value ~portfolio ~today_bars =
 let _extract_trades reports =
   List.concat_map reports ~f:(fun report -> report.Trading_engine.Types.trades)
 
-(** Create get_price function for strategy *)
+(** Create get_price function for strategy. Returns split-adjusted bars via
+    [_split_adjust_bar] so the strategy's [Portfolio_view.portfolio_value]
+    (sizing input) and the simulator's [_compute_portfolio_value] (equity curve)
+    read the same close_price for any held symbol. *)
 let _make_get_price t : Trading_strategy.Strategy_interface.get_price_fn =
  fun symbol ->
   Trading_simulation_data.Market_data_adapter.get_price
     t.deps.market_data_adapter ~symbol ~date:t.current_date
+  |> Option.map ~f:_split_adjust_bar
 
 (** Create get_indicator function for strategy *)
 let _make_get_indicator t : Trading_strategy.Strategy_interface.get_indicator_fn
