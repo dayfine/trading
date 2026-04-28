@@ -15,10 +15,9 @@
 #   - env var override is PERF_TIER4_TIMEOUT / PERF_TIER4_OCAMLRUNPARAM
 #
 # Designed to run on-demand at release-cut time, not on a recurring schedule —
-# tier-4 is the heaviest tier (≤8 h per cell, decade-long at N=1000). The
-# accompanying GHA workflow (.github/workflows/perf-release-gate.yml) is
-# manual-only (workflow_dispatch). See dev/plans/perf-scenario-catalog-2026-04-25.md
-# §"Release-gate strategy" for the cut procedure.
+# tier-4 is the heaviest tier (≤8 h per cell, decade-long at N=1000). Local-only:
+# GHA cannot satisfy `Full_sector_map` data load. See
+# dev/notes/tier4-release-gate-checklist-2026-04-28.md for the cut procedure.
 #
 # Exit status:
 #   0 if every tier-4 scenario completes within budget

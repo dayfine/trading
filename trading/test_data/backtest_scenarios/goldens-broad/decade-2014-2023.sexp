@@ -1,9 +1,9 @@
 ;; perf-tier: 4
-;; perf-tier-rationale: Tier-4 release-gate cell — full decade (2014-2023, ~10y) at N=1000. The flagship "can we run a decade-long backtest at scale?" cell. Per dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md (RSS ≈ 67 + 3.94·N + 0.19·N·(T−1)), projects to ~5.7 GB peak at N=1000×10y — fits the 8 GB ceiling. Run on-demand via `.github/workflows/perf-release-gate.yml` when cutting a release. N>=5000 release-gate stays P1 awaiting daily-snapshot streaming (dev/plans/daily-snapshot-streaming-2026-04-27.md).
+;; perf-tier-rationale: Tier-4 release-gate cell — full decade (2014-2023, ~10y) at N=1000. The flagship "can we run a decade-long backtest at scale?" cell. Per dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md (RSS ≈ 67 + 3.94·N + 0.19·N·(T−1)), projects to ~5.7 GB peak at N=1000×10y — fits the 8 GB ceiling. Run on-demand via `dev/scripts/perf_tier4_release_gate.sh` (see `dev/notes/tier4-release-gate-checklist-2026-04-28.md`) when cutting a release. N>=5000 release-gate stays P1 awaiting daily-snapshot streaming (dev/plans/daily-snapshot-streaming-2026-04-27.md).
 ;;
 ;; STATUS: BASELINE_PENDING — expected ranges are intentionally wide because no
 ;; fresh baseline run has been recorded yet. The first manual dispatch of
-;; `perf-release-gate.yml` produces the canonical baseline; tighten ranges via
+;; `dev/scripts/perf_tier4_release_gate.sh` produces the canonical baseline; tighten ranges via
 ;; a follow-up PR after that run lands. Until ranges are tightened, this cell
 ;; catches catastrophic regressions only (sign flips, wholesale wipeouts, OOM);
 ;; fine-grained perf gating happens in tier-1/tier-2/tier-3.

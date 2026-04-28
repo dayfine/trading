@@ -37,15 +37,16 @@ or in flight. See `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`**
 Step 5 (release_perf_report OCaml exe) tracked separately;
 landed via #585 / #606 on the test-data + perf-runner side. Tier-4
 release-gate scenarios structurally unblocked since data-panels
-Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z. **Tier-4 release-gate
-workflow at N=1000 open at `feat/backtest-perf-tier4-release-gate` on
-2026-04-28**: `perf_tier4_release_gate.sh` +
-`.github/workflows/perf-release-gate.yml` (manual-only — no cron),
-four `goldens-broad/` cells (`bull-crash-2015-2020`,
+Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z. **Tier-4 release-gate is local-only**: `dev/scripts/perf_tier4_release_gate.sh`
+runs at release-cut time per
+`dev/notes/tier4-release-gate-checklist-2026-04-28.md`. Four
+`goldens-broad/` cells (`bull-crash-2015-2020`,
 `covid-recovery-2020-2024`, `decade-2014-2023` (NEW),
 `six-year-2018-2023`) all baking `(config_overrides
-((universe_cap 1000)))`, 8 h/cell budget. **N≥5000 release-gate stays
-P1** pending daily-snapshot streaming.
+((universe_cap 1000)))`, 8 h/cell budget. The accompanying GHA
+workflow `.github/workflows/perf-release-gate.yml` was removed
+2026-04-28 (could not satisfy `Full_sector_map` data load on GHA).
+**N≥5000 release-gate stays P1** pending daily-snapshot streaming.
 
 ## Interface stable
 NO
@@ -163,25 +164,25 @@ mechanics + release-gate procedure.
   (`continue-on-error: true`) — same VISIBILITY-first posture as
   tier-1/tier-2.
 - **`feat/backtest-perf-tier4-release-gate`** (Step 5 — tier-4
-  release-gate at N=1000) — open for review. Adds
-  `dev/scripts/perf_tier4_release_gate.sh` +
-  `.github/workflows/perf-release-gate.yml` (**manual-only** —
-  `workflow_dispatch` only, no cron schedule). Auto-discovers four
-  `;; perf-tier: 4` scenarios under
+  release-gate at N=1000) — local-only. Adds
+  `dev/scripts/perf_tier4_release_gate.sh` (the GHA workflow yaml
+  added in this branch was removed 2026-04-28 because it could not
+  satisfy `Full_sector_map` data load on GHA — see
+  `dev/notes/tier4-release-gate-checklist-2026-04-28.md`).
+  Auto-discovers four `;; perf-tier: 4` scenarios under
   `trading/test_data/backtest_scenarios/goldens-broad/{bull-crash-2015-2020,covid-recovery-2020-2024,decade-2014-2023,six-year-2018-2023}.sexp`,
   runs each via `scenario_runner.exe --parallel 1` with
-  `timeout 28800` (8 h), publishes wall + peak-RSS table to
-  `$GITHUB_STEP_SUMMARY`. All four sexps now bake
+  `timeout 28800` (8 h). All four sexps now bake
   `(config_overrides ((universe_cap 1000)))` so each cell runs at
   N=1000 self-contained. The four sexps had been SKIPPED placeholders
   pinned to the 1,654-symbol era; this PR resets them to
-  BASELINE_PENDING (wide ranges) for the first manual dispatch to
-  fill in. The new `decade-2014-2023.sexp` is the canonical 10-year
-  release-gate cell. Per
+  BASELINE_PENDING (wide ranges) for the first run to fill in. The
+  new `decade-2014-2023.sexp` is the canonical 10-year release-gate
+  cell. Per
   `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`,
   N=1000×10y projects to ~5.7 GB (fits 8 GB ceiling). N≥5000 stays
-  blocked on daily-snapshot streaming. First manual dispatch is
-  **not yet scheduled** — out-of-PR follow-up.
+  blocked on daily-snapshot streaming. First run is **not yet
+  scheduled** — out-of-PR follow-up.
 
 ## Completed
 
@@ -237,17 +238,15 @@ mechanics + release-gate procedure.
 
 - **Step 5 — tier-4 release-gate workflow at N=1000** (2026-04-28, PR pending).
   Mirrors the tier-1/2/3 pattern but is **manual-only**
-  (`workflow_dispatch` — no cron). Adds
+  (local-only). Adds
   `dev/scripts/perf_tier4_release_gate.sh` (POSIX-sh runner that
   auto-discovers `;; perf-tier: 4` scenarios via grep, runs each via
   `scenario_runner.exe --parallel 1` with `timeout 28800` = 8 h,
-  captures wall + peak RSS, writes `summary.txt`) and
-  `.github/workflows/perf-release-gate.yml` (manual-only via
-  `workflow_dispatch`; same `trading-ci:latest` container, same
-  `_build` cache, same `continue-on-error: true` posture as tier-1/2/3;
-  publishes summary to `$GITHUB_STEP_SUMMARY`; `timeout-minutes: 350`
-  job ceiling, just under the 360 min platform ceiling on
-  ubuntu-latest). Four tier-4 cells covered, all under
+  captures wall + peak RSS, writes `summary.txt`). The GHA workflow
+  (`perf-release-gate.yml`) added on this branch was removed
+  2026-04-28 because GHA cannot supply `Full_sector_map` data — see
+  `dev/notes/tier4-release-gate-checklist-2026-04-28.md`. Four tier-4
+  cells covered, all under
   `goldens-broad/`: `bull-crash-2015-2020` (~6y), `covid-recovery-2020-2024`
   (~5y), `decade-2014-2023` (~10y, NEW canonical decade-long cell),
   `six-year-2018-2023` (6y). All four bake
@@ -258,14 +257,12 @@ mechanics + release-gate procedure.
   dispatch produces the canonical baseline; tighten ranges via
   follow-up PR. **N≥5000 release-gate stays P1** awaiting
   daily-snapshot streaming
-  (`dev/plans/daily-snapshot-streaming-2026-04-27.md`). First manual
-  dispatch is **not yet scheduled**; operator triggers when ready to
-  cut a release. Verify locally:
+  (`dev/plans/daily-snapshot-streaming-2026-04-27.md`). First run is
+  **not yet scheduled**; operator triggers when ready to cut a
+  release. Verify locally:
   `dev/scripts/perf_tier4_release_gate.sh` inside the devcontainer
-  (or with `TRADING_IN_CONTAINER=1`); the workflow itself is
-  exercised on its first manual `workflow_dispatch` invocation.
+  (or with `TRADING_IN_CONTAINER=1`).
   Files: `dev/scripts/perf_tier4_release_gate.sh`,
-  `.github/workflows/perf-release-gate.yml`,
   `trading/test_data/backtest_scenarios/goldens-broad/{bull-crash-2015-2020,covid-recovery-2020-2024,decade-2014-2023,six-year-2018-2023}.sexp`.
 
 - **Step 4 — tier-3 weekly perf workflow** (2026-04-27, PR pending).
@@ -394,14 +391,14 @@ mechanics + release-gate procedure.
    covid-recovery 300×4y, six-year 300×6y per the plan's Tier 3
    table) is a follow-up scenario-authoring task, not gating on
    the workflow itself.
-3. **(DONE on `feat/backtest-perf-tier4-release-gate`)** Tier 4
-   (release-gate) at **N=1000 × decade-long** — `perf-release-gate.yml`
-   + `perf_tier4_release_gate.sh`, four tier-4 cells under
+3. **(DONE on `feat/backtest-perf-tier4-release-gate`; GHA removed
+   2026-04-28)** Tier 4 (release-gate) at **N=1000 × decade-long** —
+   `dev/scripts/perf_tier4_release_gate.sh`, four tier-4 cells under
    `goldens-broad/` (`bull-crash-2015-2020`, `covid-recovery-2020-2024`,
    `decade-2014-2023` (NEW), `six-year-2018-2023`), 8 h budget per
-   cell, **manual-only** (`workflow_dispatch`; no cron — release-gate
-   runs at release-cut time, not on a recurring schedule). The four
-   sexps now bake `(config_overrides ((universe_cap 1000)))` so each
+   cell, **local-only** (release-gate runs at release-cut time, not on
+   a recurring schedule). The four sexps now bake
+   `(config_overrides ((universe_cap 1000)))` so each
    cell is self-contained — no CLI override needed. Per
    `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md` (β=3.94
    MB/symbol), N=1000×10y projects to ~5.7 GB peak RSS, fits the 8 GB
