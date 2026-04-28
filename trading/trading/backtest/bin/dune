@@ -14,3 +14,8 @@
  (name release_perf_report)
  (modules release_perf_report)
  (libraries core trading.backtest.release_report))
+
+(executable
+ (name trade_audit_report_bin)
+ (modules trade_audit_report_bin)
+ (libraries core trade_audit_report))
