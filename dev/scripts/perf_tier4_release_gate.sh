@@ -127,6 +127,9 @@ _run_one() {
 
   start_epoch=$(date +%s)
   rc=0
+  # Pass --fixtures-root so the runner resolves the scenario's [universe_path]
+  # against the original fixtures dir, not the per-cell `_stage_<name>/`
+  # scratch dir. Tier-1/2/3 pass this same flag (#634).
   if [ "$HAVE_GNU_TIME" = "1" ]; then
     /usr/bin/time -o "$rss_path" -f '%M' \
       timeout "$TIMEOUT" \
@@ -134,6 +137,7 @@ _run_one() {
         dune exec --no-build \
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
+          --fixtures-root "$SCENARIO_ROOT" \
         >"$log_path" 2>&1 || rc=$?
   else
     timeout "$TIMEOUT" \
@@ -141,6 +145,7 @@ _run_one() {
         dune exec --no-build \
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
+          --fixtures-root "$SCENARIO_ROOT" \
         >"$log_path" 2>&1 || rc=$?
     printf 'UNAVAILABLE\n' >"$rss_path"
   fi
