@@ -5,10 +5,17 @@
 # captures wall-time + peak RSS, and writes the result into the GHA job
 # summary so reviewers can read off perf at a glance.
 #
-# Non-blocking by design (continue-on-error: true). The catalog is fresh
-# and per-cell budgets aren't pinned yet; we want VISIBILITY first, gating
-# later. Flip continue-on-error off once the budgets in
-# dev/plans/perf-scenario-catalog-2026-04-25.md tier 1 are pinned.
+# Tier-1 is the per-PR gate: continue-on-error: false (strict). Per-cell
+# budgets aren't pinned yet, but the smoke MUST pass — i.e. every tier-1
+# scenario must complete without crashing inside the 120 s/cell timeout.
+# Once budgets are pinned (~10 PR cycles of real data per
+# dev/plans/perf-scenario-catalog-2026-04-25.md tier 1), the wall +
+# peak-RSS thresholds add a second layer of regression detection on top
+# of the smoke pass.
+#
+# Tier-2 (perf-nightly.yml) and tier-3 (perf-weekly.yml) keep
+# continue-on-error: true for now — they're VISIBILITY-first while
+# their budgets warm up (~10 weeks / ~10 weekly cycles of data).
 #
 # Tier-1 scenarios covered (kept in sync via trading/devtools/checks/perf_catalog_check.sh):
 #   trading/test_data/backtest_scenarios/perf-sweep/bull-3m.sexp
@@ -51,7 +58,7 @@ jobs:
 
       - name: Run tier-1 perf smoke
         id: tier1
-        continue-on-error: true
+        continue-on-error: false
         run: dev/scripts/perf_tier1_smoke.sh
 
       - name: Publish summary

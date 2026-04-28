@@ -268,12 +268,19 @@
 ; referenced from .github/workflows/perf-tier1.yml exist on disk and
 ; carry [;; perf-tier: 1].
 ;
-; Annotate-only by default (exits 0 with WARNING output on violations).
-; Set PERF_CATALOG_CHECK_STRICT=1 to gate the build instead. See
-; dev/plans/perf-scenario-catalog-2026-04-25.md §"Decision items" #3.
+; Strict by default — every catalog scenario MUST carry a tier tag.
+; Initially landed annotate-only (PR #574); flipped to STRICT alongside
+; the perf-tier1.yml continue-on-error: false flip on 2026-04-28 so
+; that adding a new scenario without a tier tag fails the build rather
+; than silently drifting. See
+; dev/plans/perf-scenario-catalog-2026-04-25.md §"Decision items" #3
+; and dev/status/backtest-perf.md next-step #4.
 
 (rule
  (alias runtest)
  (deps _check_lib.sh)
  (action
-  (run sh %{dep:perf_catalog_check.sh})))
+  (setenv
+   PERF_CATALOG_CHECK_STRICT
+   1
+   (run sh %{dep:perf_catalog_check.sh}))))
