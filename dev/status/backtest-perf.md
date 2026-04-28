@@ -189,13 +189,26 @@ mechanics + release-gate procedure.
    Likely follows Stage 4 too. Current Tiered would extrapolate to
    ~31 GB at 5000×10y; columnar projects to ~1.2 GB, well under the
    8 GB ceiling.
-4. After ~10 PR cycles of tier-1 perf data: pin per-cell budgets and
-   flip `continue-on-error: false` on `perf-tier1.yml` and
-   `PERF_CATALOG_CHECK_STRICT=1` on the catalog check. Same flip
-   applies to `perf-nightly.yml` once tier-2 budgets are pinned
-   (~10 weeks of nightly data) and to `perf-weekly.yml` once
-   tier-3 budgets are pinned (~10 weekly cycles).
-5. **`release_perf_report` OCaml exe.** Markdown report comparing the
+4. **Tier-1 smoke is broken — universe_path resolution.** As of
+   2026-04-27, every tier-1 run since #616 landed fails 4/4 with
+   `Sys_error: ".../trading/trading/test_data/backtest_scenarios/
+   universes/broad.sexp: No such file or directory"` (note the
+   doubled `trading/trading/`). The smoke's `_stage_<name>` copy
+   approach loses the original fixtures-root context, so
+   `scenario_runner.exe --dir <stage>` resolves `(universe_path
+   "universes/broad.sexp")` against the wrong base path.
+   `continue-on-error: true` masks the failure in the job-level
+   conclusion. Functionally tier-1 smoke gates nothing right now.
+   **Defer the fix to after engine-pool PR-2..5 land** so we don't
+   churn `dev/scripts/` mid-stack. Then fix the universe_path
+   resolution + flip `continue-on-error: false` +
+   `PERF_CATALOG_CHECK_STRICT=1`.
+5. After ~10 PR cycles of *real* tier-1 perf data (i.e. post
+   smoke-fix above): pin per-cell budgets. Same flip applies to
+   `perf-nightly.yml` once tier-2 budgets are pinned (~10 weeks of
+   nightly data) and to `perf-weekly.yml` once tier-3 budgets are
+   pinned (~10 weekly cycles).
+6. **`release_perf_report` OCaml exe.** Markdown report comparing the
    current release's tier-3/4 scenario results vs the prior release —
    N×T peak-RSS matrix, wall-time matrix, regression flags. Drives
    release-gate Step 3 in `dev/plans/perf-scenario-catalog-2026-04-25.md`.
