@@ -47,12 +47,10 @@ module Scratch = struct
            capacity _min_scratch_capacity);
     { path_points = Array.create ~len:capacity 0.0 }
 
-  let for_config (c : path_config) =
-    create
-      ~capacity:
-        (Int.max _min_scratch_capacity
-           (c.total_points + _capacity_slack_for_config))
+  let required_capacity (c : path_config) =
+    Int.max _min_scratch_capacity (c.total_points + _capacity_slack_for_config)
 
+  let for_config (c : path_config) = create ~capacity:(required_capacity c)
   let capacity t = Array.length t.path_points
 end
 
@@ -454,10 +452,7 @@ let generate_path_into ~scratch ?(config = default_config) (bar : price_bar) :
     intraday_path =
   (* Required size matches [Scratch.for_config] so any buffer sized via that
      helper is always accepted. *)
-  let required =
-    Int.max _min_scratch_capacity
-      (config.total_points + _capacity_slack_for_config)
-  in
+  let required = Scratch.required_capacity config in
   if Scratch.capacity scratch < required then
     invalid_arg
       (Printf.sprintf

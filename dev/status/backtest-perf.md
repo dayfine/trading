@@ -1,6 +1,6 @@
 # Status: backtest-perf
 
-## Last updated: 2026-04-27
+## Last updated: 2026-04-27 (PR-3 of engine-pooling)
 
 ## Status
 IN_PROGRESS
@@ -17,10 +17,15 @@ at `feat/backtest-perf-tier3-weekly` on 2026-04-27**:
 tier-3 cells (`perf-sweep/{bull-1y, bull-3y}`), 2 h/cell budget,
 cron `0 7 * * 1` (Monday 00:00 PT). **Engine-layer-pooling PR-1
 (Gc.stat instrumentation, panel_runner per-step snapshots) merged
-via PR #618 on 2026-04-27**; PR-2..PR-4 (per-symbol scratch +
-float-array buffers + buffer pooling) gated on a 3-month
-full-universe gc-trace run that confirms the engine-update-market
-wedge. Step 5 (release_perf_report OCaml exe) tracked separately;
+via PR #618 on 2026-04-27**; **PR-2 (per-symbol Scratch type +
+buffer-reusing internal helpers + parity gate) merged via PR #626
+on 2026-04-27**; **PR-3 (thread Scratch through `Engine.update_market`
+per-tick loop) opened at `feat/backtest-perf-engine-pool-thread` on
+2026-04-27 — collapses per-tick float-array allocs to per-symbol-once;
+parity-tested via `test_panel_loader_parity` and
+`test_engine_scratch_threading_parity`**; PR-4 (transient buffer pool
+for one-off workspaces) and PR-5 (matrix re-run validation) still
+outstanding. Step 5 (release_perf_report OCaml exe) tracked separately;
 landed via #585 / #606 on the test-data + perf-runner side. Tier-4
 release-gate scenarios structurally unblocked since data-panels
 Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z.
@@ -63,6 +68,20 @@ mechanics + release-gate procedure.
   `Engine.update_market` is the dominant per-tick allocator before
   the buffer-reuse refactors land (PR-2..PR-4 per
   `dev/plans/engine-layer-pooling-2026-04-27.md`).
+- **`feat/backtest-perf-engine-pool-thread`** (engine-pooling PR-3) —
+  open for review. Threads `Price_path.Scratch.t` through
+  `Engine.update_market` per-tick by giving `Engine.t` a
+  `(symbol, Scratch.t) Hashtbl.t` and replacing the
+  `Price_path.generate_path` call site with `generate_path_into ~scratch`.
+  Adds `Price_path.Scratch.required_capacity` to make the per-symbol
+  re-allocation decision pure (no throwaway probe scratch). New
+  `test_engine_scratch_threading_parity` pins bit-equality between a
+  reused engine and N fresh engines. Bit-exact parity vs PR-2
+  validated by `test_panel_loader_parity` on both `tiered-loader-parity`
+  and `panel-golden-2019-full` scenarios.
+  See `dev/notes/engine-pool-pr3-impact-2026-04-27.md` for the
+  per-call allocation breakdown (~3.2 KB float-array alloc dropped
+  per `update_market` call after the symbol's first day).
 - **`feat/backtest-perf-tier3-weekly`** (Step 4 — tier-3 weekly) —
   open for review. Adds `dev/scripts/perf_tier3_weekly.sh` +
   `.github/workflows/perf-weekly.yml`. Auto-discovers both
