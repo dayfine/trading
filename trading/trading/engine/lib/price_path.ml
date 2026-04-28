@@ -27,6 +27,35 @@ let default_config =
     degrees_of_freedom = 4.0;
   }
 
+(** {1 Scratch Buffer}
+
+    See [.mli] for the public contract. *)
+
+(* [_capacity_slack_for_config] +8 absorbs the rounding overshoot from
+   segment generation (4 waypoints plus interpolated points between each
+   pair). *)
+let _capacity_slack_for_config = 8
+let _min_scratch_capacity = 4
+
+module Scratch = struct
+  type t = { path_points : float array }
+
+  let create ~capacity =
+    if capacity < _min_scratch_capacity then
+      invalid_arg
+        (Printf.sprintf "Price_path.Scratch.create: capacity %d < min %d"
+           capacity _min_scratch_capacity);
+    { path_points = Array.create ~len:capacity 0.0 }
+
+  let for_config (c : path_config) =
+    create
+      ~capacity:
+        (Int.max _min_scratch_capacity
+           (c.total_points + _capacity_slack_for_config))
+
+  let capacity t = Array.length t.path_points
+end
+
 (** {1 Utility Functions} *)
 
 (** Clamp a value to a range [min_val, max_val] *)
@@ -114,12 +143,10 @@ let _decide_high_first_directional random_state bar body =
      - High volatility (~1.5): reduced confidence, bias ≈ 0.2
      - Very high volatility (~2.0): low confidence, bias ≈ 0.15 *)
   let confidence_factor = 1.0 /. Float.max volatility_scale 1.0 in
-  let direction_bias =
-    let raw_bias =
-      if Float.(body > 0.0) then max_direction_bias else -.max_direction_bias
-    in
-    raw_bias *. confidence_factor
+  let raw_bias =
+    if Float.(body > 0.0) then max_direction_bias else -.max_direction_bias
   in
+  let direction_bias = raw_bias *. confidence_factor in
   let prob_clamped =
     _clamp ~min_val:min_prob ~max_val:max_prob (neutral_prob +. direction_bias)
   in
@@ -247,13 +274,14 @@ let _ensure_unique_waypoints (resolution : int) (t1 : int) (t2 : int) :
     - Uniform: Random placement in middle 60% (skip early/late extremes for
       robustness)
 
-    Returns [idx_open; idx_first_extreme; idx_second_extreme; idx_close] as bar
+    Returns (idx_open, idx_first_extreme, idx_second_extreme, idx_close) as bar
     indices in [0, resolution-1].
 
     Note: The order of high vs low is determined separately by
     _decide_high_first. *)
 let _generate_waypoint_indices (random_state : Random.State.t)
-    (profile : distribution_profile) (resolution : int) : int list =
+    (profile : distribution_profile) (resolution : int) : int * int * int * int
+    =
   match profile with
   | UShaped | JShaped | ReverseJ ->
       (* Sample from density using rejection sampling
@@ -272,7 +300,7 @@ let _generate_waypoint_indices (random_state : Random.State.t)
       let t_first, t_second =
         _ensure_unique_waypoints resolution t1_clamped t2_clamped
       in
-      [ 0; t_first; t_second; resolution - 1 ]
+      (0, t_first, t_second, resolution - 1)
   | Uniform ->
       (* Uniform: place extremes randomly in middle 60% to avoid edge effects
          - Skip first 20% (opening volatility/gaps)
@@ -287,7 +315,7 @@ let _generate_waypoint_indices (random_state : Random.State.t)
       let t2 = middle_start + Random.State.int random_state range in
       (* Ensure uniqueness and sort *)
       let t_first, t_second = _ensure_unique_waypoints resolution t1 t2 in
-      [ 0; t_first; t_second; resolution - 1 ]
+      (0, t_first, t_second, resolution - 1)
 
 (** {1 Brownian Bridge Segment Generation} *)
 
@@ -300,136 +328,145 @@ let _sample_standard_normal (random_state : Random.State.t) : float =
   let u2 = Random.State.float random_state 1.0 in
   Float.sqrt (-2.0 *. Float.log u1) *. Float.cos (2.0 *. Float.pi *. u2)
 
-(** Generate a single sample from Student's t-distribution with given degrees of
-    freedom.
-
-    Student's t has heavier tails than Gaussian, better modeling extreme moves
-    in financial markets. Lower df = heavier tails.
-
-    Algorithm: 1. Sample Z ~ N(0,1) 2. Sample V ~ Chi-squared(df) = sum of df
-    squared standard normals 3. Return T = Z / sqrt(V/df)
-
-    For df > 30, this closely approximates a Gaussian distribution. *)
+(** Sample Student's t-distribution: T = Z / sqrt(V/df), with Z ~ N(0,1) and V ~
+    Chi-squared(df). Heavier tails than Gaussian for low df. The chi- squared
+    sum is a [for] loop with a mutable accumulator (left-fold) — same FP order
+    as the previous recursive impl, so seeded goldens stay bit-equal. *)
 let _sample_student_t (random_state : Random.State.t) (df : float) : float =
-  (* Sample standard normal for numerator *)
   let z = _sample_standard_normal random_state in
-  (* Sample chi-squared(df) for denominator
-     Chi-squared(df) = sum of df independent squared standard normals *)
   let chi_squared =
-    let rec sum_squares count acc =
-      if count <= 0 then acc
-      else
-        let normal_sample = _sample_standard_normal random_state in
-        sum_squares (count - 1) (acc +. (normal_sample *. normal_sample))
-    in
-    sum_squares (Float.to_int df) 0.0
+    let acc = ref 0.0 in
+    for _ = 1 to Float.to_int df do
+      let s = _sample_standard_normal random_state in
+      acc := !acc +. (s *. s)
+    done;
+    !acc
   in
-  (* Student's t = Z / sqrt(V/df) *)
   z /. Float.sqrt (chi_squared /. df)
 
-(** Generate price segment between two waypoints using Brownian bridge.
-
-    The bridge ensures we hit the target price while adding realistic noise.
-    Noise is sampled from Student's t-distribution for fat tails.
-
-    @param start_price Starting price
-    @param end_price Ending price (must reach exactly)
-    @param n_points Number of intermediate points to generate
-    @param volatility_scale Scaling factor for noise amplitude
-    @param degrees_of_freedom
-      Student's t degrees of freedom (lower = heavier tails)
-    @param resolution
-      Total path resolution (waypoint indices are in [0, resolution-1])
-    @param low_bound Lower price bound (from bar)
-    @param high_bound Upper price bound (from bar)
-    @return List of path_points from start to end *)
-let _generate_bridge_segment ~random_state ~start_price ~end_price ~n_points
-    ~volatility_scale ~degrees_of_freedom ~resolution ~low_bound ~high_bound :
-    path_point list =
-  (* Noise scaling based on Brownian motion properties:
-     - Variance of Brownian motion scales linearly with time
-     - Standard deviation scales with sqrt(time)
-     - dt = fraction of full bar this segment spans (0.0 to 1.0)
-     - Each step covers time dt/(n_points+1), so noise ~ sqrt(dt/(n_points+1)) *)
+(** Brownian bridge: write [n_points] interpolated prices into
+    [out.(out_start .. out_start + n_points - 1)] from [start_price] toward
+    [end_price]. The endpoint is NOT written; callers append it. FP order
+    matches the previous list-based version. *)
+let _generate_bridge_segment_into ~random_state ~out ~out_start ~start_price
+    ~end_price ~n_points ~volatility_scale ~degrees_of_freedom ~resolution
+    ~low_bound ~high_bound =
+  (* Noise scales with sqrt(time): each step covers dt/(n_points+1) of the
+     bar's [dt = n_points/resolution] fraction. *)
   let dt = Float.of_int n_points /. Float.of_int resolution in
   let noise_scale =
     volatility_scale *. Float.sqrt (dt /. Float.of_int (n_points + 1))
   in
-  let rec generate_points i current_price acc =
-    if i > n_points then List.rev acc
-    else
-      (* Brownian bridge: adjust drift to ensure we reach endpoint *)
-      let remaining_steps = n_points + 1 - i in
-      let needed_drift =
-        (end_price -. current_price) /. Float.of_int remaining_steps
-      in
-      (* Add Student's t noise scaled by volatility for realistic fat tails *)
-      let noise =
-        _sample_student_t random_state degrees_of_freedom *. noise_scale
-      in
-      let new_price = current_price +. needed_drift +. noise in
-      (* Clamp to bar bounds using helper *)
-      let clamped_price =
-        _clamp ~min_val:low_bound ~max_val:high_bound new_price
-      in
-      let point : path_point = { price = clamped_price } in
-      generate_points (i + 1) clamped_price (point :: acc)
-  in
-  generate_points 1 start_price []
+  let current_price = ref start_price in
+  for i = 1 to n_points do
+    let remaining_steps = n_points + 1 - i in
+    let needed_drift =
+      (end_price -. !current_price) /. Float.of_int remaining_steps
+    in
+    let noise =
+      _sample_student_t random_state degrees_of_freedom *. noise_scale
+    in
+    let new_price = !current_price +. needed_drift +. noise in
+    let clamped_price =
+      _clamp ~min_val:low_bound ~max_val:high_bound new_price
+    in
+    out.(out_start + i - 1) <- clamped_price;
+    current_price := clamped_price
+  done
 
 (** {1 Main Path Generation} *)
 
-let _append_segment ~random_state ~volatility_scale ~degrees_of_freedom
-    ~total_points ~low_bound ~high_bound acc p1 p2 idx1 idx2 =
-  let acc' =
-    if List.is_empty acc then ({ price = p1 } : path_point) :: acc else acc
+(** Append one segment of prices to [out] from [cursor]; return the new cursor.
+    First segment writes [p1] as slot 0; subsequent ones inherit it from the
+    previous segment's endpoint. *)
+let _append_segment_into ~random_state ~volatility_scale ~degrees_of_freedom
+    ~total_points ~low_bound ~high_bound ~out ~cursor p1 p2 idx1 idx2 =
+  let cursor =
+    if cursor = 0 then (
+      out.(0) <- p1;
+      1)
+    else cursor
   in
-  let segment =
-    _generate_bridge_segment ~random_state ~start_price:p1 ~end_price:p2
-      ~n_points:(idx2 - idx1) ~volatility_scale ~degrees_of_freedom
-      ~resolution:total_points ~low_bound ~high_bound
+  let n_points = idx2 - idx1 in
+  _generate_bridge_segment_into ~random_state ~out ~out_start:cursor
+    ~start_price:p1 ~end_price:p2 ~n_points ~volatility_scale
+    ~degrees_of_freedom ~resolution:total_points ~low_bound ~high_bound;
+  let cursor = cursor + n_points in
+  out.(cursor) <- p2;
+  cursor + 1
+
+(** Interpolate three pairs of waypoints into [out]; return final cursor (=
+    total length written). *)
+let _generate_segments_into ~random_state ~volatility_scale ~degrees_of_freedom
+    ~total_points ~low_bound ~high_bound ~out ~waypoint_prices ~waypoint_indices
+    =
+  let p0, p1, p2, p3 = waypoint_prices in
+  let i0, i1, i2, i3 = waypoint_indices in
+  let append =
+    _append_segment_into ~random_state ~volatility_scale ~degrees_of_freedom
+      ~total_points ~low_bound ~high_bound ~out
   in
-  ({ price = p2 } : path_point) :: List.rev_append segment acc'
+  let cursor = append ~cursor:0 p0 p1 i0 i1 in
+  let cursor = append ~cursor p1 p2 i1 i2 in
+  append ~cursor p2 p3 i2 i3
 
-(* Interpolate between waypoints using Brownian bridge segments, accumulating
-   path points. Each segment is bridged from its start waypoint to its end
-   waypoint. The opening price is prepended on the first segment. *)
-let rec _generate_segments ~random_state ~volatility_scale ~degrees_of_freedom
-    ~total_points ~low_bound ~high_bound prices indices acc =
-  match (prices, indices) with
-  | p1 :: p2 :: rest_prices, idx1 :: idx2 :: rest_indices ->
-      let acc' =
-        _append_segment ~random_state ~volatility_scale ~degrees_of_freedom
-          ~total_points ~low_bound ~high_bound acc p1 p2 idx1 idx2
-      in
-      _generate_segments ~random_state ~volatility_scale ~degrees_of_freedom
-        ~total_points ~low_bound ~high_bound (p2 :: rest_prices)
-        (idx2 :: rest_indices) acc'
-  | _, _ -> List.rev acc
+(** Materialize the public [path_point list] from the populated prefix
+    [out.(0..len-1)]. This is the only required allocation per call. *)
+let _path_of_array (out : float array) ~len : intraday_path =
+  let acc = ref [] in
+  for i = len - 1 downto 0 do
+    acc := ({ price = out.(i) } : path_point) :: !acc
+  done;
+  !acc
 
-let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
+let _waypoint_prices_of_bar (bar : price_bar) ~high_first =
+  if high_first then
+    (bar.open_price, bar.high_price, bar.low_price, bar.close_price)
+  else (bar.open_price, bar.low_price, bar.high_price, bar.close_price)
+
+let _generate_path_with_scratch ~scratch ~config (bar : price_bar) :
+    intraday_path =
   let random_state =
     match config.seed with
     | Some seed -> Random.State.make [| seed |]
     | None -> Random.State.make_self_init ()
   in
   let high_first = _decide_high_first random_state bar in
-  let waypoint_prices =
-    if high_first then
-      [ bar.open_price; bar.high_price; bar.low_price; bar.close_price ]
-    else [ bar.open_price; bar.low_price; bar.high_price; bar.close_price ]
-  in
+  let waypoint_prices = _waypoint_prices_of_bar bar ~high_first in
   let waypoint_indices =
     _generate_waypoint_indices random_state config.profile config.total_points
   in
   let volatility_scale = _infer_volatility_scale bar in
   if config.total_points <= 4 then
-    List.map waypoint_prices ~f:(fun price -> ({ price } : path_point))
+    let p0, p1, p2, p3 = waypoint_prices in
+    [ { price = p0 }; { price = p1 }; { price = p2 }; { price = p3 } ]
   else
-    _generate_segments ~random_state ~volatility_scale
-      ~degrees_of_freedom:config.degrees_of_freedom
-      ~total_points:config.total_points ~low_bound:bar.low_price
-      ~high_bound:bar.high_price waypoint_prices waypoint_indices []
+    let len =
+      _generate_segments_into ~random_state ~volatility_scale
+        ~degrees_of_freedom:config.degrees_of_freedom
+        ~total_points:config.total_points ~low_bound:bar.low_price
+        ~high_bound:bar.high_price ~out:scratch.Scratch.path_points
+        ~waypoint_prices ~waypoint_indices
+    in
+    _path_of_array scratch.Scratch.path_points ~len
+
+let generate_path_into ~scratch ?(config = default_config) (bar : price_bar) :
+    intraday_path =
+  (* Required size matches [Scratch.for_config] so any buffer sized via that
+     helper is always accepted. *)
+  let required =
+    Int.max _min_scratch_capacity
+      (config.total_points + _capacity_slack_for_config)
+  in
+  if Scratch.capacity scratch < required then
+    invalid_arg
+      (Printf.sprintf
+         "Price_path.generate_path_into: scratch capacity %d < required %d"
+         (Scratch.capacity scratch) required);
+  _generate_path_with_scratch ~scratch ~config bar
+
+let generate_path ?(config = default_config) (bar : price_bar) : intraday_path =
+  _generate_path_with_scratch ~scratch:(Scratch.for_config config) ~config bar
 
 (** {1 Early Exit Optimization} *)
 
