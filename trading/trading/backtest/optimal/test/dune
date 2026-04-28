@@ -1,0 +1,16 @@
+(tests
+ (names test_stage_transition_scanner)
+ (libraries
+  ounit2
+  core
+  matchers
+  trading.base
+  weinstein.screener
+  weinstein.stock_analysis
+  weinstein.types
+  weinstein.stage
+  weinstein.rs
+  weinstein.volume
+  backtest_optimal)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
