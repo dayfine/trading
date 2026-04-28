@@ -1,0 +1,101 @@
+# Tier-4 perf release-gate: on-demand large-scope perf certification (≤8 h
+# budget per cell) for cutting a release.
+#
+# Runs every scenario tagged `;; perf-tier: 4` under
+# trading/test_data/backtest_scenarios/ via
+# dev/scripts/perf_tier4_release_gate.sh, captures wall-time + peak RSS, and
+# writes the result into the GHA job summary so the human can read off perf
+# at a glance.
+#
+# UNLIKE perf-tier1 / perf-nightly / perf-weekly, this workflow is
+# manual-only (`workflow_dispatch`). Tier-4 is the heaviest tier (decade-long
+# at N=1000, ~5.7 GB RSS, multiple-hour wall per cell — the FOUR existing
+# tier-4 cells together can run for >24 h on one runner). Running this on a
+# cron would burn a meaningful slice of the GHA minute budget for very
+# little marginal signal — the trading metrics are essentially flat
+# day-to-day, and infra-perf changes that affect tier 4 also show up in
+# tier-2 / tier-3. Per dev/plans/perf-scenario-catalog-2026-04-25.md
+# §"Release-gate strategy", this workflow is dispatched at release-cut time
+# and its output feeds the release-perf-report comparison.
+#
+# Non-blocking by design (continue-on-error: true) — same VISIBILITY-first
+# posture as tier-1/2/3. Flip continue-on-error off once budgets in
+# dev/plans/perf-scenario-catalog-2026-04-25.md tier 4 are pinned (after
+# the first 1-2 manual dispatches produce baseline numbers).
+#
+# Tier-4 scenarios covered (kept in sync via
+# trading/devtools/checks/perf_catalog_check.sh — `;; perf-tier: 4` tag is
+# the source of truth, the discovery in the runner script auto-matches):
+#   trading/test_data/backtest_scenarios/goldens-broad/bull-crash-2015-2020.sexp
+#   trading/test_data/backtest_scenarios/goldens-broad/covid-recovery-2020-2024.sexp
+#   trading/test_data/backtest_scenarios/goldens-broad/decade-2014-2023.sexp
+#   trading/test_data/backtest_scenarios/goldens-broad/six-year-2018-2023.sexp
+#
+# All four currently target N=1000 (cap via `(config_overrides
+# ((universe_cap 1000)))`). The N>=5000 release-gate cells stay deferred
+# pending daily-snapshot streaming (dev/plans/daily-snapshot-streaming-2026-04-27.md)
+# — at the post-engine-pool β=3.94 MB/symbol, N=5000×10y projects to
+# ~28 GB RSS, far beyond the 8 GB ubuntu-latest ceiling.
+name: perf-release-gate
+
+on:
+  # Manual-only — see header comment for why no cron schedule.
+  workflow_dispatch:
+
+jobs:
+  perf-tier4-release-gate:
+    runs-on: ubuntu-latest
+    # Per-cell budget is 8 h; four tier-4 cells run sequentially, so the
+    # job-level ceiling could in principle hit ~32 h. GHA caps job runtime
+    # at 360 min (6 h) on ubuntu-latest hosted runners, so we set
+    # timeout-minutes: 350 to give a margin under the platform ceiling. If
+    # in practice the four cells together exceed that, the per-cell
+    # `timeout 28800` in the shell script enforces the 8-h cap — but the
+    # job will still get killed at the platform ceiling. Acceptable for
+    # now because the operator runs this manually and can split into
+    # multiple dispatches if needed (PERF_TIER4_TIMEOUT can scope down).
+    timeout-minutes: 350
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      TRADING_IN_CONTAINER: "1"
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache _build
+        uses: actions/cache@v4
+        with:
+          path: trading/_build
+          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          restore-keys: |
+            dune-${{ runner.os }}-
+
+      - name: Run tier-4 perf release-gate
+        id: tier4
+        continue-on-error: true
+        run: dev/scripts/perf_tier4_release_gate.sh
+
+      - name: Publish summary
+        if: always()
+        run: |
+          summary_file=$(ls -1t dev/perf/tier4-release-gate-*/summary.txt 2>/dev/null | head -1)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            {
+              echo "## Tier-4 perf release-gate"
+              echo ""
+              echo '```'
+              cat "$summary_file"
+              echo '```'
+            } >>"$GITHUB_STEP_SUMMARY"
+          else
+            echo "Tier-4 perf release-gate: no summary produced." >>"$GITHUB_STEP_SUMMARY"
+          fi
