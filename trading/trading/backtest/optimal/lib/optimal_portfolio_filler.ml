@@ -144,25 +144,29 @@ let _close_due (book : _book) (friday : Date.t) : unit =
 
 (** Try to admit [sc] into [book] under [config]. Returns [true] iff the
     candidate cleared every check and was admitted; [false] otherwise. Mutates
-    [book] when admitting. *)
+    [book] when admitting.
+
+    All checks are evaluated upfront into a single boolean; mutation only
+    happens on the admit branch. The pre-checks ([_compute_shares] and the cost
+    computation) are cheap pure expressions, so eager evaluation costs nothing
+    and avoids a five-deep [if/else] cascade. *)
 let _try_admit ~(config : config) (book : _book)
     (sc : Optimal_types.scored_candidate) : bool =
-  if _holds_symbol book sc.entry.symbol then false
-  else if List.length book.opens >= config.max_positions then false
-  else if _sector_count book sc.entry.sector >= config.max_sector_concentration
-  then false
+  let shares = _compute_shares ~config sc in
+  let cost = shares *. sc.entry.entry_price in
+  let admissible =
+    (not (_holds_symbol book sc.entry.symbol))
+    && List.length book.opens < config.max_positions
+    && _sector_count book sc.entry.sector < config.max_sector_concentration
+    && Float.(shares > 0.0)
+    && Float.(cost <= book.cash)
+  in
+  if not admissible then false
   else
-    let shares = _compute_shares ~config sc in
-    if Float.(shares <= 0.0) then false
-    else
-      let cost = shares *. sc.entry.entry_price in
-      if Float.(cost > book.cash) then false
-      else
-        let initial_risk_dollars = sc.initial_risk_per_share *. shares in
-        book.cash <- book.cash -. cost;
-        book.opens <-
-          { scored = sc; shares; initial_risk_dollars } :: book.opens;
-        true
+    let initial_risk_dollars = sc.initial_risk_per_share *. shares in
+    book.cash <- book.cash -. cost;
+    book.opens <- { scored = sc; shares; initial_risk_dollars } :: book.opens;
+    true
 
 (** Process all entries on [friday] in R-descending order. *)
 let _process_entries ~config (book : _book)
