@@ -25,7 +25,7 @@
   backtest
   trade_audit_report
   trading.backtest.runner_args
-  trading.backtest.release_report
+  release_report
   scenario_lib
   weinstein.data_source
   weinstein.types
