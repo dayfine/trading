@@ -1,5 +1,9 @@
 (tests
- (names test_stage_transition_scanner test_outcome_scorer)
+ (names
+  test_stage_transition_scanner
+  test_outcome_scorer
+  test_optimal_portfolio_filler
+  test_optimal_summary)
  (libraries
   ounit2
   core
@@ -15,4 +19,4 @@
   weinstein_trading.stops
   backtest_optimal)
  (preprocess
-  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq ppx_test_matcher)))

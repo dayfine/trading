@@ -5,10 +5,10 @@
 ## Status
 READY_FOR_REVIEW
 
-PR-1 (data model + `Stage_transition_scanner`) implemented and opened
-as PR #652 on branch `feat/optimal-strategy-pr1` — marked ready for
-review (13/13 tests pass; `dune build && dune build @fmt` clean). PR-2
-(`Outcome_scorer`) is the next slice; track stays open.
+PR-3 (`Optimal_portfolio_filler` + `Optimal_summary`) implemented on
+branch `feat/optimal-strategy-pr3`. PR-1 (#652) and PR-2 (#659) both
+merged into `main`. PR-4 (`Optimal_strategy_report` renderer +
+`optimal_strategy.exe` binary) is the next slice; track stays open.
 
 ## Goal
 
@@ -41,32 +41,48 @@ NO
 
 ## Open work
 
-**PR-2 — `Outcome_scorer`** is next. Per plan §Phase B + §PR-2:
+**PR-4 — `Optimal_strategy_report` + binary** is next. Per plan §Phase D
++ §PR-4:
 
-- `trading/trading/backtest/optimal/lib/outcome_scorer.{ml,mli}` —
-  pure scorer. Input: `candidate_entry + Bar_panel.t`. Output:
-  `scored_candidate`. Implements the counterfactual exit rule
-  (`Stage3_transition` / `Stop_hit` / `End_of_run`, whichever first).
-  Reuses `Weinstein_stops.compute_initial_stop_with_floor` for the
-  initial stop and the existing trailing-stop walker for subsequent
-  weeks.
-- `trading/trading/backtest/optimal/test/test_outcome_scorer.ml` —
-  three exit-trigger fixtures + an R-multiple computation pin test.
+- `trading/trading/backtest/optimal/lib/optimal_strategy_report.{ml,mli}`
+  — pure markdown renderer. Inputs: actual round-trips + summary +
+  optimal round-trips + summary (constrained + relaxed). Output:
+  markdown string with headline comparison table, per-Friday divergence
+  table, "trades the actual missed", "trades the actual took",
+  implications block. Disclaimer in header.
+- `trading/trading/backtest/optimal/bin/optimal_strategy.ml` — thin
+  binary: reads `output_dir/`'s artefacts (`trades.csv`,
+  `summary.sexp`, panel), invokes
+  `Stage_transition_scanner` →
+  `Outcome_scorer` →
+  `Optimal_portfolio_filler` (×2 variants) →
+  `Optimal_summary` (×2) →
+  `Optimal_strategy_report.render`. Writes
+  `<output_dir>/optimal_strategy.md`.
+- `trading/trading/backtest/optimal/bin/dune` — register exe.
+- `trading/trading/backtest/optimal/test/test_optimal_strategy_report.ml`
+  — fixture with seeded actual + counterfactual round-trips; assert
+  rendered markdown contains expected divergence rows, outlier callouts,
+  and the right implications-block narrative for the seeded ratio.
 
-LOC estimate: 300.
+LOC estimate: 400.
 
-The `scored_candidate` schema already lives in `Optimal_types` (PR-1),
-so PR-2 is type-stable and can land independently.
+The filler + summary types from PR-3 are already stable, so PR-4 is
+ready to start once PR-3 lands.
 
 ## Phasing (per plan)
 
 - [x] **PR-1**: `Optimal_types` data model + `Stage_transition_scanner`
-      — PR #652 (draft), branch `feat/optimal-strategy-pr1`.
+      — PR #652 (merged), branch `feat/optimal-strategy-pr1`.
       Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`.
-- [ ] **PR-2**: `Outcome_scorer` — realized-outcome scorer per candidate
-      (Stage3-transition vs stop-hit forward walk). ~300 LOC.
-- [ ] **PR-3**: `Optimal_portfolio_filler` — greedy sizing-constrained
-      fill + `Optimal_summary` aggregator. ~400 LOC.
+- [x] **PR-2**: `Outcome_scorer` — realized-outcome scorer per candidate
+      (Stage3-transition vs stop-hit forward walk) — PR #659 (merged),
+      branch `feat/optimal-strategy-pr2`. ~300 LOC.
+- [x] **PR-3**: `Optimal_portfolio_filler` — greedy sizing-constrained
+      fill + `Optimal_summary` aggregator — branch
+      `feat/optimal-strategy-pr3`. ~1,073 LOC including tests
+      (interface ~145, implementation ~315, tests ~575). 15 OUnit2
+      cases (10 filler + 5 summary), all passing.
 - [ ] **PR-4**: `Optimal_strategy_report` markdown renderer +
       `optimal_strategy.exe` binary. ~400 LOC.
 - [ ] **PR-5** (optional): wire into `release_perf_report` so each
@@ -85,18 +101,20 @@ pure-functional analysis layer over backtest outputs.
 
 Implementation branches per phase:
 
-- `feat/optimal-strategy-pr1` — PR #652 (draft, READY_FOR_REVIEW pending QC).
-- `feat/optimal-strategy-pr2` (next).
+- `feat/optimal-strategy-pr1` — PR #652 (merged).
+- `feat/optimal-strategy-pr2` — PR #659 (merged).
+- `feat/optimal-strategy-pr3` — current PR (READY_FOR_REVIEW).
+- `feat/optimal-strategy-pr4` (next).
 
 Plan branch: `docs/optimal-strategy-counterfactual-plan` (merged via
 PR #650, 2026-04-28).
 
 ## Blocked on
 
-PR-2 may need a **pure-functional walker for `Weinstein_stops`** (plan
-§Risks item 4 — may require a small refactor of stops to expose a
-non-stateful API; that decision belongs to `feat-weinstein` if invoked).
-PR-1 does not touch stops, so PR-1 is unblocked.
+None. The pure-functional stop walker (plan §Risks item 4) was resolved
+in PR-2 by seeding `Weinstein_stops.update` directly with the
+candidate's `suggested_stop`. PR-3 does not touch stops at all — it
+consumes scorer output as opaque exit fields.
 
 ## Authority docs
 
@@ -128,4 +146,45 @@ PR-1 does not touch stops, so PR-1 is unblocked.
     - `dev/lib/run-in-env.sh dune build`
     - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
     - `dev/lib/run-in-env.sh dune build @fmt`
-  - Branch / PR: `feat/optimal-strategy-pr1` / PR #652.
+  - Branch / PR: `feat/optimal-strategy-pr1` / PR #652 (merged).
+
+- **PR-2** (2026-04-28): `Outcome_scorer` realised-outcome walker.
+  - Files added:
+    - `trading/trading/backtest/optimal/lib/outcome_scorer.{ml,mli}`
+    - `trading/trading/backtest/optimal/test/test_outcome_scorer.ml`
+  - Coverage: 9 OUnit2 cases — one fixture per `exit_trigger` variant
+    (`Stage3_transition`, `Stop_hit`, `End_of_run`); R-multiple
+    arithmetic pin; empty-forward / immediate stop / invalid-candidate
+    edges; Stage-3 streak reset on Stage-2 break; sensitivity at
+    `stage3_confirm_weeks = 1`.
+  - Verify: same as PR-1.
+  - Branch / PR: `feat/optimal-strategy-pr2` / PR #659 (merged).
+
+- **PR-3** (2026-04-28): `Optimal_portfolio_filler` greedy fill +
+  `Optimal_summary` aggregator.
+  - Files added:
+    - `trading/trading/backtest/optimal/lib/optimal_portfolio_filler.{ml,mli}`
+    - `trading/trading/backtest/optimal/lib/optimal_summary.{ml,mli}`
+    - `trading/trading/backtest/optimal/test/test_optimal_portfolio_filler.ml`
+    - `trading/trading/backtest/optimal/test/test_optimal_summary.ml`
+  - `trading/trading/backtest/optimal/test/dune` updated to register
+    the two new test executables.
+  - Coverage:
+    - 10 filler cases — empty input, Constrained-variant macro filter,
+      Relaxed_macro admits both, R-descending tie ordering, concurrent
+      cap forces lower-rank skip, sector cap forces skip, cash
+      exhaustion forces skip, skip-already-held, end-of-run close-out,
+      cash recycles after exit funds a later entry.
+    - 5 summary cases — empty input -> zero summary with
+      `profit_factor = +infinity`, seeded 2-winners + 1-loser pin
+      (every metric value pinned), drawdown over multiple Fridays,
+      same-Friday batching of equity steps, no-losers infinite profit
+      factor.
+  - Heuristic A only (earliest-Friday + R-descending). Heuristics B
+    (knapsack) and C (Monte-Carlo) are PR-5 follow-ups per plan
+    §Phase C.
+  - Verify:
+    - `dev/lib/run-in-env.sh dune build`
+    - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
+    - `dev/lib/run-in-env.sh dune build @fmt`
+  - Branch / PR: `feat/optimal-strategy-pr3` / PR #TBD.
