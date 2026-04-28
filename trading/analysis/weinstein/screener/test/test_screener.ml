@@ -387,6 +387,188 @@ let test_short_candidates_are_short _ =
   | c :: _ -> assert_that c.side (equal_to Trading_base.Types.Short)
 
 (* ------------------------------------------------------------------ *)
+(* Short-side volume confirmation (mirror of long-side)                *)
+(* ------------------------------------------------------------------ *)
+
+(** Short-side cascade weights breakdown volume the same way the long-side
+    cascade weights breakout volume: Strong adds [w_strong_volume], Adequate
+    adds [w_adequate_volume], Weak adds 0. Mirrors the test patterns in
+    {!test_candidate_grade_matches_score} but on the short path. The
+    declining-bars-with-spike helper places a 3000-volume bar at offset 55,
+    surrounded by 1000-volume bars; the peak-volume scanner picks it up and
+    {!Volume.analyze_breakout} classifies the spike vs the prior 4-bar average
+    (1000) as Strong (ratio = 3.0).
+
+    The synthetic Support analysis on the same declining bars yields Clean
+    support below (the bars between [breakdown_price] and the most recent bar
+    are spread across multiple congestion bands, so no single band hits the
+    moderate-resistance threshold of 3). Clean adds [w_clean_resistance = 15].
+    The score tallies stage (30) + Strong breakdown volume (20) + bearish RS
+    [Negative_declining] (20) + Clean support below (15) = 85 → A+. The test
+    pins both the score and the presence of the breakdown-volume rationale
+    label. *)
+let test_short_side_volume_confirmation_strong _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let base = make_analysis "VOL_STRONG" prior bars in
+  let neg_rs : Rs.result =
+    {
+      current_rs = 0.8;
+      current_normalized = -10.0;
+      trend = Negative_declining;
+      history = [];
+    }
+  in
+  let with_neg_rs = { base with rs = Some neg_rs } in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks:[ with_neg_rs ] ~held_tickers:[]
+  in
+  match result.short_candidates with
+  | [] -> assert_failure "Expected a short candidate"
+  | c :: _ ->
+      assert_that c
+        (all_of
+           [
+             field (fun c -> c.ticker) (equal_to "VOL_STRONG");
+             field (fun c -> c.score) (equal_to 85);
+             field (fun c -> c.grade) (equal_to (A_plus : grade));
+             field
+               (fun c -> c.rationale)
+               (matching ~msg:"rationale contains breakdown-volume label"
+                  (fun rs ->
+                    if
+                      List.exists rs ~f:(fun r ->
+                          String.is_substring r ~substring:"breakdown volume")
+                    then Some ()
+                    else None)
+                  (equal_to ()));
+           ])
+
+(** Adequate breakdown volume (1.5x average) adds [w_adequate_volume = 10]
+    points, lifting a Stage-4 candidate that would otherwise score 30 + 0 + 0
+    (Negative_improving = half of w_positive_rs = 10) = 40 to 50, but the
+    important assertion is that the rationale labels reflect the short-side
+    breakdown context, not generic "volume". *)
+let test_short_side_volume_adequate_label _ =
+  let bars =
+    let step = (100.0 -. 30.0) /. Float.of_int (60 - 1) in
+    List.init 60 ~f:(fun i ->
+        let p = 100.0 -. (Float.of_int i *. step) in
+        let v = if i = 55 then 1500 else 1000 in
+        (p, v))
+    |> weekly_bars_with_volumes
+  in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let base = make_analysis "VOL_ADQ" prior bars in
+  let neg_rs : Rs.result =
+    {
+      current_rs = 0.8;
+      current_normalized = -10.0;
+      trend = Negative_declining;
+      history = [];
+    }
+  in
+  let with_neg_rs = { base with rs = Some neg_rs } in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks:[ with_neg_rs ] ~held_tickers:[]
+  in
+  match result.short_candidates with
+  | [] -> assert_failure "Expected a short candidate"
+  | c :: _ ->
+      assert_that c.rationale
+        (matching ~msg:"contains 'Adequate breakdown volume'"
+           (fun rs ->
+             List.find rs ~f:(fun r ->
+                 String.equal r "Adequate breakdown volume"))
+           (equal_to "Adequate breakdown volume"))
+
+(** Inject a [Support.result] directly onto an otherwise-identical candidate and
+    assert the screener's [_support_signal] picks it up as a clean-space- below
+    bonus. Pins the contract that mirrors [_resistance_signal] for the short
+    side: Virgin / Clean → [w_clean_resistance], Moderate → halved, Heavy / None
+    → 0. The candidate's other signals contribute a fixed baseline so the
+    support delta is the only thing varying across cases. Mirrors
+    {!test_negative_rs_scoring_order}'s injection-and-compare shape. *)
+let test_support_below_scoring_order _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let neg_rs : Rs.result =
+    {
+      current_rs = 0.8;
+      current_normalized = -10.0;
+      trend = Negative_declining;
+      history = [];
+    }
+  in
+  let make_with_support ticker quality =
+    let base = make_analysis ticker prior bars in
+    let support : Support.result = { quality; breakdown_price = 50.0 } in
+    { base with rs = Some neg_rs; support = Some support }
+  in
+  let stocks =
+    [
+      make_with_support "VIRGIN" Virgin_territory;
+      make_with_support "CLEAN" Clean;
+      make_with_support "MOD" Moderate_resistance;
+      make_with_support "HEAVY" Heavy_resistance;
+    ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  let by_ticker t =
+    List.find_exn result.short_candidates ~f:(fun c -> String.(c.ticker = t))
+  in
+  let virgin = by_ticker "VIRGIN" in
+  let clean = by_ticker "CLEAN" in
+  let mod_ = by_ticker "MOD" in
+  let heavy = by_ticker "HEAVY" in
+  assert_that virgin.score (equal_to clean.score);
+  assert_that clean.score (gt (module Int_ord) mod_.score);
+  assert_that mod_.score (gt (module Int_ord) heavy.score)
+
+(** Negative-RS scoring (already wired prior to this PR) is a positive signal
+    for shorts: [Bearish_crossover] adds
+    [w_positive_rs + w_bullish_rs_crossover = 30], [Negative_declining] adds
+    [w_positive_rs = 20], and [Negative_improving] adds
+    [w_positive_rs / 2 = 10]. This regression test pins the relative ordering by
+    injecting three otherwise-identical Stage-4 candidates differing only on RS
+    trend and asserting the bearish-crossover score > negative-declining score >
+    negative-improving score. *)
+let test_negative_rs_scoring_order _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let make_with_rs ticker trend =
+    let base = make_analysis ticker prior bars in
+    let rs : Rs.result =
+      { current_rs = 0.8; current_normalized = -10.0; trend; history = [] }
+    in
+    { base with rs = Some rs }
+  in
+  let stocks =
+    [
+      make_with_rs "BX" Bearish_crossover;
+      make_with_rs "ND" Negative_declining;
+      make_with_rs "NI" Negative_improving;
+    ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  let by_ticker t =
+    List.find_exn result.short_candidates ~f:(fun c -> String.(c.ticker = t))
+  in
+  let bx = by_ticker "BX" in
+  let nd = by_ticker "ND" in
+  let ni = by_ticker "NI" in
+  assert_that bx.score (gt (module Int_ord) nd.score);
+  assert_that nd.score (gt (module Int_ord) ni.score)
+
+(* ------------------------------------------------------------------ *)
 (* Ch. 11 rule: positive RS blocks short candidates                   *)
 (* ------------------------------------------------------------------ *)
 
@@ -445,6 +627,12 @@ let suite =
          "test_buy_candidates_are_long" >:: test_buy_candidates_are_long;
          "test_short_candidates_are_short" >:: test_short_candidates_are_short;
          "test_positive_rs_blocks_short" >:: test_positive_rs_blocks_short;
+         "test_short_side_volume_confirmation_strong"
+         >:: test_short_side_volume_confirmation_strong;
+         "test_short_side_volume_adequate_label"
+         >:: test_short_side_volume_adequate_label;
+         "test_negative_rs_scoring_order" >:: test_negative_rs_scoring_order;
+         "test_support_below_scoring_order" >:: test_support_below_scoring_order;
        ]
 
 let () = run_test_tt_main suite

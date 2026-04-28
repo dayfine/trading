@@ -1,6 +1,6 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-27 (run-2)
+## Last updated: 2026-04-27
 
 ## Status
 IN_PROGRESS
@@ -86,7 +86,7 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
 ## Follow-ups
 
 1. ~~**Bear-window backtest regression** (item 6 above)~~ — landed in PR #617 (`feat/short-side-bear-window-regression`). New file `trading/trading/weinstein/strategy/test/test_short_side_bear_window.ml` pins both directions of the bear-window contract through the public `Screener.screen` -> `Weinstein_strategy.entries_from_candidates` seam (synthetic-mocked candidates, not full simulator). Pivoted from the `test_weinstein_backtest.ml` end-to-end approach because the synthetic Declining pattern still does not trigger a clean Stage 3 → Stage 4 transition under the default screener — the right primitive seam is the screener -> entries_from_candidates pipeline, which catches regressions deterministically. Live-cascade gap (PR #612 — 0 short trades and 37 long entries opened in 2022 bear on real SP500 data) remains; diagnosis is upstream of this seam, in `_run_screen`'s `macro_callbacks` construction. Tracked separately.
-2. **Full short screener cascade** — current implementation emits short candidates via the existing cascade with the Ch.11 hard RS gate added. Full mirror of the long cascade (positive weight for negative RS trend, resistance-ceiling clean-space weighting for shorts, short-side volume confirmation rules) is a follow-up.
+2. ~~**Full short screener cascade**~~ — DONE via `feat/short-side-cascade-rules` (this PR). Adds three weighted signals to the short cascade: (a) `_volume_short_signal` boosts Strong / Adequate breakdown volume by `w_strong_volume` / `w_adequate_volume`, mirroring the long-side breakout-volume signal; (b) new `Support` module under `analysis/weinstein/support/` grades below-breakdown clean space (Virgin / Clean / Moderate_resistance / Heavy_resistance) and `Screener._support_signal` weights Virgin and Clean by `w_clean_resistance`, Moderate by half; (c) the Ch.11 hard RS gate stays load-bearing, with `_rs_short_signal` already weighting `Bearish_crossover > Negative_declining > Negative_improving` from prior MVP. Stock_analysis.t now carries `support : Support.result option` and `breakdown_price : float option`. Pinned values updated: VOL_STRONG synthetic 70→85 (+Clean), e2e bear-window JPM 65→72 / CVX 45→52 (+Moderate support), backtest 6-year n_buys/n_sells 36/33→39/36 (+3 trades, symbols unchanged). 22 screener unit tests + 8 new Support tests + 5 e2e tests all pass.
 3. **Ch.11 spot-check** — qc-behavioral review against book examples (never-short-Stage-2 verified in unit tests; confirm Stage 4 + negative RS + bearish macro combination on real data).
 4. ~~**Live-cascade Bearish macro plumbing** (new, ex-#612)~~ — fixed
    in `feat/short-side-bear-window-fix-cascade-plumbing`. Root cause was
