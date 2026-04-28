@@ -3,6 +3,7 @@
   test_stop_log
   test_runner_filter
   test_trace
+  test_trade_audit
   test_runner_hypothesis_overrides
   test_panel_loader_parity
   test_backtest_runner_args
@@ -22,6 +23,7 @@
   trading.backtest.release_report
   scenario_lib
   weinstein.data_source
+  weinstein.types
   trading.base
   trading.engine
   trading.portfolio

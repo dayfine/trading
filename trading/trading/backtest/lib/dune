@@ -12,6 +12,8 @@
   trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
-  weinstein.macro)
+  weinstein.macro
+  weinstein.screener
+  weinstein.types)
  (preprocess
   (pps ppx_let ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))

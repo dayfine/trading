@@ -106,6 +106,18 @@ let _write_equity_curve ~output_dir
       fprintf oc "%s,%.2f\n" (Date.to_string s.date) s.portfolio_value);
   Out_channel.close oc
 
+(** Persist [result.audit] as [trade_audit.sexp] when the collector captured any
+    records. No file is written when the list is empty — that's the pre-PR-2
+    default (capture sites not yet wired) and any consumer of the artefact must
+    tolerate its absence. *)
+let _write_trade_audit ~output_dir ~(audit : Trade_audit.audit_record list) =
+  match audit with
+  | [] -> ()
+  | _ ->
+      Sexp.save_hum
+        (output_dir ^ "/trade_audit.sexp")
+        (Trade_audit.sexp_of_audit_records audit)
+
 let write ~output_dir (result : Runner.result) =
   _write_params ~output_dir result;
   Sexp.save_hum
@@ -113,4 +125,5 @@ let write ~output_dir (result : Runner.result) =
     (Summary.sexp_of_t result.summary);
   _write_trades ~output_dir ~round_trips:result.round_trips
     ~stop_infos:result.stop_infos;
-  _write_equity_curve ~output_dir ~steps:result.steps
+  _write_equity_curve ~output_dir ~steps:result.steps;
+  _write_trade_audit ~output_dir ~audit:result.audit

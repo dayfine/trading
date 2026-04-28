@@ -24,6 +24,7 @@ type result = {
   steps : Trading_simulation_types.Simulator_types.step_result list;
   overrides : Sexp.t list;
   stop_infos : Stop_log.stop_info list;
+  audit : Trade_audit.audit_record list;
 }
 
 (* Trading-day filter *)
@@ -289,4 +290,8 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
       ~sim_result
   in
-  { summary; round_trips; steps; overrides; stop_infos }
+  (* PR-1 of trade-audit: empty audit list. PR-2 will create a
+     [Trade_audit.t] here, thread it through [_run_panel_backtest], and
+     drain it into [audit] alongside [stop_infos]. *)
+  let audit = [] in
+  { summary; round_trips; steps; overrides; stop_infos; audit }
