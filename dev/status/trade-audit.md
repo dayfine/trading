@@ -3,11 +3,36 @@
 ## Last updated: 2026-04-28
 
 ## Status
-IN_PROGRESS
+MERGED
 
-PR-1 merged (#638) — types + collector + persistence. PR-2 in flight on
-`feat/trade-audit-pr2-capture` — capture sites at entry / exit decision
-sites, plus parity + smoke tests.
+All five phased PRs from the plan landed 2026-04-28, plus one cascade-
+rejection extension to PR-2:
+
+- PR-1 (#638) — types + collector + persistence (`trade_audit.sexp`).
+- PR-2 (#642) — capture sites in `Weinstein_strategy._run_screen` /
+  `_screen_universe` / `entries_from_candidates` + exit capture in
+  `_on_market_close`, threaded via strategy-side `Audit_recorder` and
+  backtest-side `Trade_audit_recorder.of_collector`. Pinned by
+  `test_trade_audit_capture` (5 e2e tests) + the existing panel-loader
+  golden parity test. PR #647 records a follow-up regression
+  investigation that did not reproduce on rebased main.
+- PR-2 extension (#646) — cascade-rejection counts via
+  `Screener.cascade_diagnostics` (additive). 13 new tests
+  (5 screener + 5 trade_audit + 3 e2e capture). Bit-exact behavioural
+  parity preserved.
+- PR-3 (#643) — markdown renderer.
+- PR-4 (#649) — `Trade_rating` heuristics (R-multiple, Weinstein
+  conformance, decision-quality cells, hold-time anomaly,
+  counterfactual looser stop, 4 behavioral metrics).
+- PR-5 (#651) — wired ratings into `release_perf_report` so each
+  release-gate run auto-emits `trade_audit.md` + ratings summary.
+
+Future strategy-tuning experiments will *consume* the audit (regime-
+aware stops, drawdown circuit breaker, segmentation classifier — see
+`backtest-infra.md`) but those reactions are sibling-track work, not
+trade-audit work. Sister track `optimal-strategy` (counterfactual
+opportunity-cost analysis, plan #650 merged 2026-04-28) is now picking
+up the next layer of decision-trail analysis.
 
 ## Goal
 
@@ -34,35 +59,20 @@ NO
 
 ## Open work
 
-PR-2 (capture sites) in flight on
-`feat/trade-audit-pr2-capture`. After it merges, PR-3 (markdown
-renderer + binary) can begin.
+(none — track MERGED 2026-04-28)
 
 ## Phasing (per plan)
 
-- [x] **PR-1**: `Trade_audit` module — types + collector + persistence
-      (`trade_audit.sexp` alongside `trades.csv`). Merged as #638.
-      Verify: `dune exec backtest/test/test_trade_audit.exe`.
-- [x] **PR-2**: Capture sites in `Weinstein_strategy._run_screen` /
-      `_screen_universe` / `entries_from_candidates` + exit capture
-      in `_on_market_close`. Threaded via a strategy-side
-      `Audit_recorder` callback bundle (no Backtest dep on
-      Weinstein_strategy and vice versa); backtest-side
-      `Trade_audit_recorder.of_collector` translates events into the
-      `Trade_audit` records. Bit-equivalence pinned by the existing
-      panel-loader golden parity test. End-to-end smoke at
-      `trading/backtest/test/test_trade_audit_capture.ml` (5 tests):
-      audit non-empty after a run with round-trips, every entry block
-      well-formed, round-trip symbols match audit entries, ≥1 exit_
-      block populated, position_ids unique. Verify:
-      `TRADING_DATA_DIR=$PWD/test_data dune exec backtest/test/test_trade_audit_capture.exe`.
-- [ ] **PR-3**: `trade_audit.exe` + markdown renderer. Per-trade table
-      + outlier callouts + aggregate breakdowns. ~400 LOC.
-- [ ] **PR-4**: `Trade_rating` heuristics (R-multiple,
-      decision-quality cells, hold-time anomaly, counterfactual
-      looser stop, alternative coverage) + insight aggregator. ~450
-      LOC.
-- [ ] **PR-5** (optional): wire into `release_perf_report`. ~100 LOC.
+- [x] **PR-1** (#638) — types + collector + persistence.
+- [x] **PR-2** (#642) — capture sites in `Weinstein_strategy` + exit
+      capture in `_on_market_close`. 5 e2e tests. Bit-equivalence
+      pinned by panel-loader golden parity.
+- [x] **PR-2 ext** (#646) — `Screener.cascade_diagnostics` cascade-
+      rejection counts. 13 new tests.
+- [x] **PR-3** (#643) — markdown renderer.
+- [x] **PR-4** (#649) — `Trade_rating` heuristics + 4 behavioral
+      metrics + Weinstein conformance.
+- [x] **PR-5** (#651) — wired into `release_perf_report`.
 
 ## Ownership
 
