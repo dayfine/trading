@@ -13,7 +13,11 @@
   trading.strategy
   weinstein_trading.strategy
   weinstein.macro
+  weinstein.resistance
+  weinstein.rs
   weinstein.screener
-  weinstein.types)
+  weinstein.support
+  weinstein.types
+  weinstein.volume)
  (preprocess
   (pps ppx_let ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))

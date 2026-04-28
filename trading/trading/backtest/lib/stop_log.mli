@@ -29,6 +29,14 @@ type exit_trigger =
   | Portfolio_rebalancing  (** Closed for rebalancing *)
 [@@deriving show, eq, sexp]
 
+val exit_trigger_of_reason : Position.exit_reason -> exit_trigger
+(** Map a {!Position.exit_reason} (the strategy-emitted form) into an
+    {!exit_trigger} (the audit-friendly form). Pure translation — no information
+    loss except that the [PortfolioRebalancing] / no-detail variants drop their
+    associated metadata, mirroring the in-collector behaviour. Public so other
+    backtest-side audit modules can produce the same mapping without duplicating
+    the case-split. *)
+
 type stop_info = {
   position_id : string;  (** Strategy position ID *)
   symbol : string;  (** Ticker symbol *)

@@ -4,6 +4,7 @@
   test_runner_filter
   test_trace
   test_trade_audit
+  test_trade_audit_capture
   test_runner_hypothesis_overrides
   test_panel_loader_parity
   test_backtest_runner_args

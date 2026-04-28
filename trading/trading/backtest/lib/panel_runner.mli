@@ -43,10 +43,17 @@ val run :
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
   unit ->
-  Trading_simulation_types.Simulator_types.run_result * Stop_log.t
+  Trading_simulation_types.Simulator_types.run_result
+  * Stop_log.t
+  * Trade_audit.t
 (** Same shape as the Legacy path's per-strategy entry point. The Panel branch
     in [Runner] uses this; callers should not call this directly outside of
     tests.
+
+    Returns a triple of [(run_result, stop_log, trade_audit)]: the simulator
+    output, the per-position stop log accumulated by the strategy wrapper, and
+    the per-trade decision-trail audit collected at the strategy's entry / exit
+    decision sites (PR-2 of the trade-audit plan).
 
     [gc_trace], when passed, snapshots [Gc.stat] before and after every
     simulator step (one step = one calendar day = one [Engine.update_market]

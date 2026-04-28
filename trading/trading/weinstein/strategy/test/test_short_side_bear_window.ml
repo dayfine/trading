@@ -239,7 +239,7 @@ let test_bearish_macro_emits_only_short_transitions _ =
     entries_from_candidates ~config:cfg ~candidates ~stop_states ~bar_reader
       ~portfolio:_empty_portfolio
       ~get_price:(_get_price_of_candidates candidates)
-      ~current_date:_as_of
+      ~current_date:_as_of ()
   in
   let sides = List.filter_map transitions ~f:_entry_side in
   assert_that

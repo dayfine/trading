@@ -32,7 +32,7 @@ type t = { positions : (string, _pos_record) Hashtbl.t }
 
 let create () = { positions = Hashtbl.create (module String) }
 
-let _exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
+let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
   match reason with
   | StopLoss { stop_price; actual_price; _ } ->
       Stop_loss { stop_price; actual_price }
@@ -70,7 +70,7 @@ let _process_transition t (trans : Position.transition) =
       record.pos_current_stop <- new_risk_params.stop_loss_price
   | TriggerExit { exit_reason; _ } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
-      record.pos_exit_trigger <- Some (_exit_trigger_of_reason exit_reason)
+      record.pos_exit_trigger <- Some (exit_trigger_of_reason exit_reason)
   | EntryFill _ | CancelEntry _ | ExitFill _ | ExitComplete -> ()
 
 let record_transitions t transitions =

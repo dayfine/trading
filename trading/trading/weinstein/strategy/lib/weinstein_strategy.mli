@@ -56,6 +56,20 @@ module Weekly_ma_cache = Weekly_ma_cache
 (** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
     Stops MA reads keyed by [(symbol, ma_type, period)]. *)
 
+module Audit_recorder = Audit_recorder
+(** Decision-trail recorder bundle invoked at entry / exit decision sites. The
+    strategy emits raw events; backtest layers wrap a {!Backtest.Trade_audit.t}
+    collector. See {!Audit_recorder}. *)
+
+module Entry_audit_capture = Entry_audit_capture
+(** Per-candidate entry construction + audit emission. Factored out of the main
+    strategy file to keep it under the file-length cap. See
+    {!Entry_audit_capture}. *)
+
+module Exit_audit_capture = Exit_audit_capture
+(** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
+    {!Audit_recorder.exit_event}. See {!Exit_audit_capture}. *)
+
 (** {1 Configuration} *)
 
 type index_config = {
@@ -215,6 +229,9 @@ val entries_from_candidates :
   portfolio:Trading_strategy.Portfolio_view.t ->
   get_price:(string -> Types.Daily_price.t option) ->
   current_date:Date.t ->
+  ?audit_recorder:Audit_recorder.t ->
+  ?macro:Macro.result ->
+  unit ->
   Trading_strategy.Position.transition list
 (** Generate [CreateEntering] transitions for a list of screener candidates.
 
@@ -239,13 +256,25 @@ val entries_from_candidates :
 
     Public because it's a useful primitive for callers that want to run
     screening out-of-band (e.g. custom universe loops) and feed candidates into
-    the strategy's entry pipeline. *)
+    the strategy's entry pipeline.
+
+    @param audit_recorder
+      Optional decision-trail recorder. When passed, every entered candidate
+      yields a {!Audit_recorder.entry_event} populated with the chosen
+      candidate, the macro snapshot ([macro]), the alternatives considered, and
+      the audit-relevant intermediates ([installed_stop], [stop_floor_kind],
+      sizing). Defaults to {!Audit_recorder.noop}.
+    @param macro
+      Macro snapshot consumed by [audit_recorder]'s entry event. Required only
+      when [audit_recorder] is passed; ignored otherwise. Tests that don't
+      record audit events can omit it. *)
 
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->
   ?ticker_sectors:(string, string) Hashtbl.t ->
   ?bar_panels:Data_panel.Bar_panels.t ->
+  ?audit_recorder:Audit_recorder.t ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -273,4 +302,10 @@ val make :
       When omitted, an empty reader is used — every read returns the empty list,
       which is sufficient for tests that exercise control paths where no
       panel-backed bar is ever consumed (empty universe, no held positions,
-      etc.). Production callers must always supply this. *)
+      etc.). Production callers must always supply this.
+    @param audit_recorder
+      Optional callback bundle invoked at entry / exit decision sites
+      ({!Audit_recorder.entry_event} / [exit_event]). When omitted defaults to
+      {!Audit_recorder.noop} — no observation is emitted and the strategy runs
+      unchanged. Backtest callers wire a recorder backed by a
+      [Backtest.Trade_audit.t] collector. *)
