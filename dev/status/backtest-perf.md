@@ -37,7 +37,15 @@ or in flight. See `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`**
 Step 5 (release_perf_report OCaml exe) tracked separately;
 landed via #585 / #606 on the test-data + perf-runner side. Tier-4
 release-gate scenarios structurally unblocked since data-panels
-Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z.
+Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z. **Tier-4 release-gate
+workflow at N=1000 open at `feat/backtest-perf-tier4-release-gate` on
+2026-04-28**: `perf_tier4_release_gate.sh` +
+`.github/workflows/perf-release-gate.yml` (manual-only — no cron),
+four `goldens-broad/` cells (`bull-crash-2015-2020`,
+`covid-recovery-2020-2024`, `decade-2014-2023` (NEW),
+`six-year-2018-2023`) all baking `(config_overrides
+((universe_cap 1000)))`, 8 h/cell budget. **N≥5000 release-gate stays
+P1** pending daily-snapshot streaming.
 
 ## Interface stable
 NO
@@ -138,13 +146,32 @@ mechanics + release-gate procedure.
   23:00 PT Sunday PST), 2 h after perf-nightly's 05:00 UTC slot and
   17 min before the orchestrator's 07:17 UTC slot. Non-blocking
   (`continue-on-error: true`) — same VISIBILITY-first posture as
-  tier-1/tier-2. Tier-4 release-gate workflow remains outstanding
-  (separate PR; gated on engine-pool PR-2..PR-5).
+  tier-1/tier-2.
+- **`feat/backtest-perf-tier4-release-gate`** (Step 5 — tier-4
+  release-gate at N=1000) — open for review. Adds
+  `dev/scripts/perf_tier4_release_gate.sh` +
+  `.github/workflows/perf-release-gate.yml` (**manual-only** —
+  `workflow_dispatch` only, no cron schedule). Auto-discovers four
+  `;; perf-tier: 4` scenarios under
+  `trading/test_data/backtest_scenarios/goldens-broad/{bull-crash-2015-2020,covid-recovery-2020-2024,decade-2014-2023,six-year-2018-2023}.sexp`,
+  runs each via `scenario_runner.exe --parallel 1` with
+  `timeout 28800` (8 h), publishes wall + peak-RSS table to
+  `$GITHUB_STEP_SUMMARY`. All four sexps now bake
+  `(config_overrides ((universe_cap 1000)))` so each cell runs at
+  N=1000 self-contained. The four sexps had been SKIPPED placeholders
+  pinned to the 1,654-symbol era; this PR resets them to
+  BASELINE_PENDING (wide ranges) for the first manual dispatch to
+  fill in. The new `decade-2014-2023.sexp` is the canonical 10-year
+  release-gate cell. Per
+  `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`,
+  N=1000×10y projects to ~5.7 GB (fits 8 GB ceiling). N≥5000 stays
+  blocked on daily-snapshot streaming. First manual dispatch is
+  **not yet scheduled** — out-of-PR follow-up.
 
 ## Completed
 
 - **Tier-1 smoke universe_path resolution + flip continue-on-error: false**
-  (2026-04-28, on `fix/perf-tier1-universe-path`). Fix for next-step #4.
+  (2026-04-28, PR #634). Fix for next-step #4.
   Root cause: `scenario_runner._fixtures_root` did
   `Data_path.default_data_dir() |> Fpath.parent ^ "trading/test_data/..."`
   which assumed `TRADING_DATA_DIR` pointed at the legacy `data/` location
@@ -192,6 +219,39 @@ mechanics + release-gate procedure.
   instead of `<ws>/dev/backtest/...`); the path resolves and the dir
   is created, just lands one level too deep. Not load-bearing —
   separate clean-up.
+
+- **Step 5 — tier-4 release-gate workflow at N=1000** (2026-04-28, PR pending).
+  Mirrors the tier-1/2/3 pattern but is **manual-only**
+  (`workflow_dispatch` — no cron). Adds
+  `dev/scripts/perf_tier4_release_gate.sh` (POSIX-sh runner that
+  auto-discovers `;; perf-tier: 4` scenarios via grep, runs each via
+  `scenario_runner.exe --parallel 1` with `timeout 28800` = 8 h,
+  captures wall + peak RSS, writes `summary.txt`) and
+  `.github/workflows/perf-release-gate.yml` (manual-only via
+  `workflow_dispatch`; same `trading-ci:latest` container, same
+  `_build` cache, same `continue-on-error: true` posture as tier-1/2/3;
+  publishes summary to `$GITHUB_STEP_SUMMARY`; `timeout-minutes: 350`
+  job ceiling, just under the 360 min platform ceiling on
+  ubuntu-latest). Four tier-4 cells covered, all under
+  `goldens-broad/`: `bull-crash-2015-2020` (~6y), `covid-recovery-2020-2024`
+  (~5y), `decade-2014-2023` (~10y, NEW canonical decade-long cell),
+  `six-year-2018-2023` (6y). All four bake
+  `(config_overrides ((universe_cap 1000)))` so each cell is
+  self-contained at N=1000 (the largest size that fits the 8 GB
+  ubuntu-latest ceiling at decade-length per β=3.94 MB/symbol). Expected
+  ranges intentionally wide (BASELINE_PENDING) — first manual
+  dispatch produces the canonical baseline; tighten ranges via
+  follow-up PR. **N≥5000 release-gate stays P1** awaiting
+  daily-snapshot streaming
+  (`dev/plans/daily-snapshot-streaming-2026-04-27.md`). First manual
+  dispatch is **not yet scheduled**; operator triggers when ready to
+  cut a release. Verify locally:
+  `dev/scripts/perf_tier4_release_gate.sh` inside the devcontainer
+  (or with `TRADING_IN_CONTAINER=1`); the workflow itself is
+  exercised on its first manual `workflow_dispatch` invocation.
+  Files: `dev/scripts/perf_tier4_release_gate.sh`,
+  `.github/workflows/perf-release-gate.yml`,
+  `trading/test_data/backtest_scenarios/goldens-broad/{bull-crash-2015-2020,covid-recovery-2020-2024,decade-2014-2023,six-year-2018-2023}.sexp`.
 
 - **Step 4 — tier-3 weekly perf workflow** (2026-04-27, PR pending).
   Mirrors the tier-1/tier-2 pattern. Adds
@@ -319,35 +379,37 @@ mechanics + release-gate procedure.
    covid-recovery 300×4y, six-year 300×6y per the plan's Tier 3
    table) is a follow-up scenario-authoring task, not gating on
    the workflow itself.
-3. Tier 4 (release-gate, 5000-stock decade-long) — was blocked on the
-   `data-panels` refactor (`dev/status/data-panels.md`); stages 0-3
-   landed (PRs #555, #557, #558, #559-565, #567, #569, #573).
-   Likely follows Stage 4 too. Current Tiered would extrapolate to
-   ~31 GB at 5000×10y; columnar projects to ~1.2 GB, well under the
-   8 GB ceiling.
+3. **(DONE on `feat/backtest-perf-tier4-release-gate`)** Tier 4
+   (release-gate) at **N=1000 × decade-long** — `perf-release-gate.yml`
+   + `perf_tier4_release_gate.sh`, four tier-4 cells under
+   `goldens-broad/` (`bull-crash-2015-2020`, `covid-recovery-2020-2024`,
+   `decade-2014-2023` (NEW), `six-year-2018-2023`), 8 h budget per
+   cell, **manual-only** (`workflow_dispatch`; no cron — release-gate
+   runs at release-cut time, not on a recurring schedule). The four
+   sexps now bake `(config_overrides ((universe_cap 1000)))` so each
+   cell is self-contained — no CLI override needed. Per
+   `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md` (β=3.94
+   MB/symbol), N=1000×10y projects to ~5.7 GB peak RSS, fits the 8 GB
+   ubuntu-latest ceiling. **N≥5000 release-gate stays P1 awaiting
+   daily-snapshot streaming** (`dev/plans/daily-snapshot-streaming-2026-04-27.md`):
+   at β=3.94, N=5000×10y projects to ~28 GB, far beyond the runner
+   ceiling. Expected ranges are intentionally wide for the four cells
+   (BASELINE_PENDING) — first manual dispatch produces the canonical
+   baseline; tighten ranges via follow-up PR after that run lands.
 4. **(DONE on `fix/perf-tier1-universe-path`)** Tier-1 smoke
    universe_path resolution + flip the gate. Added
-   `Scenario_lib.Fixtures_root.resolve` (saner default than the old
-   `Fpath.parent + "trading/test_data/..."` heuristic — uses
-   `Data_path.default_data_dir() / "backtest_scenarios"`, the same
-   shape `test/test_panel_loader_parity.ml` and the perf workflows
-   already assume) plus a new `--fixtures-root` CLI flag on
-   `scenario_runner.exe` that the three tier scripts now pass
-   explicitly so the per-cell `_stage_<name>/` scratch dir doesn't
-   confuse universe-path resolution. Flipped
-   `.github/workflows/perf-tier1.yml` `continue-on-error: false`
-   (tier-1 is the per-PR gate; tier-2/3 stay VISIBILITY-first while
-   their warm-up budgets accumulate). Set
-   `PERF_CATALOG_CHECK_STRICT=1` in `trading/devtools/checks/dune`
-   so missing tier tags fail the build. Verified: 4/4 PASS via
-   `TRADING_DATA_DIR=<repo>/trading/test_data
-   dev/scripts/perf_tier1_smoke.sh` (post-fix). Plan:
+   `Scenario_lib.Fixtures_root.resolve` plus `--fixtures-root` CLI
+   flag on `scenario_runner.exe` that the three tier scripts pass
+   explicitly. Flipped `.github/workflows/perf-tier1.yml`
+   `continue-on-error: false` (tier-1 is the per-PR gate; tier-2/3
+   stay VISIBILITY-first). Set `PERF_CATALOG_CHECK_STRICT=1` in
+   `trading/devtools/checks/dune`. Verified: 4/4 PASS post-fix. Plan:
    `dev/plans/perf-tier1-universe-path-2026-04-28.md`.
-5. After ~10 PR cycles of *real* tier-1 perf data (i.e. post
-   smoke-fix above): pin per-cell budgets. Same flip applies to
-   `perf-nightly.yml` once tier-2 budgets are pinned (~10 weeks of
-   nightly data) and to `perf-weekly.yml` once tier-3 budgets are
-   pinned (~10 weekly cycles).
+5. After ~10 PR cycles of *real* tier-1 perf data: pin per-cell
+   budgets. Same flip applies to `perf-nightly.yml` once tier-2
+   budgets are pinned (~10 weeks of nightly data) and to
+   `perf-weekly.yml` once tier-3 budgets are pinned (~10 weekly
+   cycles).
 6. (DONE on `feat/backtest-perf-release-report`) **`release_perf_report`
    OCaml exe.** New library
    `trading/trading/backtest/release_report/` (`release_report.{ml,mli}`,
@@ -380,14 +442,16 @@ generators.
 ## Branch
 
 `feat/backtest-perf-<step>` per item above. Active:
-`feat/backtest-perf-tier3-weekly` (Step 4) and
-`feat/backtest-perf-engine-pool-instrument` (engine-pooling PR-1).
+`feat/backtest-perf-tier4-release-gate` (Step 5 — tier-4 release-gate
+at N=1000) and `feat/backtest-perf-tier3-weekly` (Step 4).
 
 ## Blocked on
 
-- **Tier 4 release-gate scenarios** are blocked on the `data-panels`
-  refactor (stages 0-3 at minimum) landing. Tiers 1-3 can proceed
-  independently.
+- **Tier 4 release-gate at N≥5000** stays blocked on daily-snapshot
+  streaming (`dev/plans/daily-snapshot-streaming-2026-04-27.md`). At
+  the post-engine-pool β=3.94 MB/symbol, N=5000×10y projects to ~28 GB
+  RSS, far beyond the 8 GB ubuntu-latest ceiling. Tier-4 at N=1000 is
+  **unblocked** and shipped on `feat/backtest-perf-tier4-release-gate`.
 
 ## Decision items (need human or QC sign-off)
 
@@ -396,10 +460,13 @@ Carried verbatim from `dev/plans/perf-scenario-catalog-2026-04-25.md`:
 1. Are the tier costs (per-PR ≤2min, nightly ≤30min, weekly ≤2h,
    release ≤8h) the right budget?
 2. Tier 4 pass criteria — what RSS / wall budget defines a passing
-   release? Today's bull-crash 1000-symbol Tiered = 3.7 GB; 5000
-   stocks would extrapolate to ~31 GB Tiered. The `data-panels`
-   refactor (PR #554) projects ~1.2 GB at the same scale, so
-   tier-4 criteria can stay tight (~8 GB ceiling) once it lands.
+   release? Per `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`,
+   post-engine-pool β=3.94 MB/symbol; tier-4 at N=1000×10y projects
+   to ~5.7 GB (fits 8 GB ceiling). N≥5000 release-gate still requires
+   daily-snapshot streaming
+   (`dev/plans/daily-snapshot-streaming-2026-04-27.md`). Initial
+   tier-4 ranges are intentionally wide (BASELINE_PENDING); first
+   manual dispatch produces the canonical baseline.
 3. Should `perf_catalog_check` fail builds or annotate-only?
    Initial: annotate-only.
 4. Tracking format: CSV in repo (auditable, grows) vs external store.
