@@ -54,6 +54,41 @@ val default_config : path_config
 (** Default path configuration: UShaped profile, 390 total points, no seed,
     df=4.0 *)
 
+(** {1 Reusable Scratch Buffer}
+
+    [Scratch.t] is a per-symbol mutable workspace for path generation. Allocate
+    one buffer at panel-build time (one per loaded symbol) and pass it to
+    [generate_path_into] on each tick — this avoids the per-tick allocation of
+    intermediate float arrays / list cells inside the Brownian bridge sampler.
+
+    The buffer is sized to hold any path up to a configured capacity.
+    [generate_path_into] writes only into the prefix it needs and returns a
+    fresh [intraday_path] of the appropriate length, so leftover state from
+    earlier calls is invisible to callers.
+
+    The buffer holds **only float prices** internally; the final
+    [path_point list] is materialized once per call as the return value.
+
+    Not thread-safe: a buffer must be owned by exactly one logical caller at a
+    time. The intended use pattern (one buffer per loaded symbol, threaded
+    through the simulator's per-tick loop) satisfies this naturally. *)
+module Scratch : sig
+  type t
+  (** Mutable scratch buffer for path generation. *)
+
+  val create : capacity:int -> t
+  (** Create a scratch buffer that can hold paths up to [capacity] points
+      (waypoints + interpolated points). Must be at least 4. *)
+
+  val for_config : path_config -> t
+  (** Convenience: create a scratch buffer sized for the given path config.
+      Capacity is set to [config.total_points + slack] to absorb the small
+      rounding overshoot from segment generation. *)
+
+  val capacity : t -> int
+  (** Return the buffer's capacity (max path length it can hold). *)
+end
+
 val generate_path : ?config:path_config -> price_bar -> intraday_path
 (** Generate realistic intraday price path from OHLC bar.
 
@@ -79,7 +114,22 @@ val generate_path : ?config:path_config -> price_bar -> intraday_path
     @return
       Intraday path with realistic microstructure. Length approximately matches
       config.total_points (default ~390), except when total_points <= 4 which
-      returns exactly 4 waypoints. *)
+      returns exactly 4 waypoints.
+
+    Allocates a fresh internal scratch buffer per call. For per-symbol hot-loop
+    callers, prefer [generate_path_into] with a reused buffer. *)
+
+val generate_path_into :
+  scratch:Scratch.t -> ?config:path_config -> price_bar -> intraday_path
+(** Same as [generate_path], but writes intermediate path samples into the given
+    [scratch] buffer instead of allocating fresh internal storage.
+
+    The output [intraday_path] is bit-identical to what [generate_path] would
+    produce for the same [config] and [bar] — buffer reuse only affects
+    allocation, not arithmetic.
+
+    @raise Invalid_argument
+      if [scratch] is too small to hold the path implied by [config]. *)
 
 val might_fill : price_bar -> side -> order_type -> bool
 (** Check if an order could possibly fill given OHLC bounds.
