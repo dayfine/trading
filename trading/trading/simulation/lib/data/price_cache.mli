@@ -50,6 +50,14 @@ val get_price_on_date :
     [Result]-based load path is in {!get_prices}; callers that need the load
     error still go through that one. *)
 
+val get_previous_bar :
+  t -> symbol:string -> date:Date.t -> Types.Daily_price.t option
+(** Return the most recent bar for [symbol] strictly before [date], or [None] if
+    no such bar exists (symbol failed to load, [date] precedes the first bar,
+    etc.). Used by split detection to compare today's bar against the prior
+    trading day, since calendar days without bars (weekends, holidays) must be
+    skipped. Errors during load collapse to [None]. *)
+
 val preload_symbols : t -> string list -> (unit, Status.t) Result.t
 (** Preload data for multiple symbols upfront.
 

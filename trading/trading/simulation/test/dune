@@ -127,3 +127,19 @@
   weinstein_trading.portfolio_risk
   ounit2
   matchers))
+
+(test
+ (name test_split_day_mtm)
+ (modules test_split_day_mtm)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))

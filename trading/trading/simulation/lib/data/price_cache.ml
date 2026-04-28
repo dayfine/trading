@@ -80,6 +80,29 @@ let get_price_on_date t ~symbol ~date =
   | None -> None
   | Some tbl -> Hashtbl.find tbl date
 
+(* Walk the cached price list (sorted oldest first) and return the last
+   bar with [bar.date < date], or [None] if no such bar exists. We use
+   the list rather than [by_date] because we need a "<" lookup, not "=".
+   The list is small enough per-symbol (a few thousand bars at most) and
+   the iteration is O(n) but bounded; in the simulator's hot loop this
+   is called at most once per (held symbol, day) pair. *)
+let get_previous_bar t ~symbol ~date =
+  let prices_result =
+    match Hashtbl.find t.cache symbol with
+    | Some cached -> Ok cached
+    | None -> _load_symbol t symbol
+  in
+  match prices_result with
+  | Error _ -> None
+  | Ok prices ->
+      List.fold prices ~init:None ~f:(fun acc (bar : Types.Daily_price.t) ->
+          if Date.( < ) bar.date date then
+            match acc with
+            | None -> Some bar
+            | Some prev when Date.( > ) bar.date prev.date -> Some bar
+            | Some _ -> acc
+          else acc)
+
 let preload_symbols t symbols =
   let results =
     List.map symbols ~f:(fun symbol ->

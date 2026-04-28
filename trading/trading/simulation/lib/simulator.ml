@@ -275,22 +275,62 @@ let _apply_trades_best_effort portfolio trades =
       | Ok p -> (p, accepted @ [ trade ])
       | Error _ -> (portfolio, accepted))
 
+(* Detect a split for [symbol] between the prior trading day's bar and
+   today's bar. Returns [Some event] when both bars exist and the detector
+   fires, otherwise [None]. Pure with respect to the adapter's cache. *)
+let _detect_split_for_held_symbol ~adapter ~date ~symbol =
+  let curr =
+    Trading_simulation_data.Market_data_adapter.get_price adapter ~symbol ~date
+  in
+  let prev =
+    Trading_simulation_data.Market_data_adapter.get_previous_bar adapter ~symbol
+      ~date
+  in
+  let%bind.Option curr in
+  let%bind.Option prev in
+  let%map.Option factor = Types.Split_detector.detect_split ~prev ~curr () in
+  { Trading_portfolio.Split_event.symbol; date; factor }
+
+(* For every symbol currently held in [portfolio], compare the prior
+   trading day's bar against the current day's bar and return the list of
+   detected split events. Symbols with no current bar (weekends/holidays)
+   or no prior bar (first appearance) yield no event. Order follows
+   [portfolio.positions] (sorted by symbol). *)
+let _detect_splits_for_held_positions t =
+  let adapter = t.deps.market_data_adapter in
+  let date = t.current_date in
+  List.filter_map t.portfolio.Trading_portfolio.Portfolio.positions
+    ~f:(fun (pos : Trading_portfolio.Types.portfolio_position) ->
+      _detect_split_for_held_symbol ~adapter ~date ~symbol:pos.symbol)
+
+(* Apply each detected split event to [portfolio] in order. Pure: returns
+   the updated portfolio with all events folded in. *)
+let _apply_split_events portfolio events =
+  List.fold events ~init:portfolio ~f:(fun acc event ->
+      Trading_portfolio.Split_event.apply_to_portfolio event acc)
+
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
   else
     let open Result.Let_syntax in
+    (* Detect and apply split events before anything else in the step.
+       Splits multiply held quantities so MtM at today's (post-split) close
+       is continuous with yesterday's close × yesterday's quantity. The fix
+       is purely in the portfolio ledger; bars themselves are unchanged. *)
+    let split_events = _detect_splits_for_held_positions t in
+    let portfolio = _apply_split_events t.portfolio split_events in
     let today_bars = _get_today_bars t in
     Trading_engine.Engine.update_market t.deps.engine today_bars;
     let%bind execution_reports =
       Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
     in
     let all_trades = _extract_trades execution_reports in
-    let portfolio, trades = _apply_trades_best_effort t.portfolio all_trades in
+    let portfolio, trades = _apply_trades_best_effort portfolio all_trades in
     let%bind positions =
       _update_positions_from_trades ~date:t.current_date ~positions:t.positions
         ~trades
     in
-    let%bind transitions = _call_strategy { t with positions } in
+    let%bind transitions = _call_strategy { t with portfolio; positions } in
     let%bind positions = _apply_transitions ~positions ~transitions in
     let%bind orders =
       Order_generator.transitions_to_orders ~positions transitions
@@ -302,6 +342,7 @@ let step t =
         portfolio_value = _compute_portfolio_value ~portfolio ~today_bars;
         trades;
         orders_submitted = _submit_orders t orders;
+        splits_applied = split_events;
       }
     in
     let t' =

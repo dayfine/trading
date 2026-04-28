@@ -21,6 +21,7 @@ type step_result = {
   portfolio_value : float;
   trades : Trading_base.Types.trade list;
   orders_submitted : Trading_orders.Types.order list;
+  splits_applied : Trading_portfolio.Split_event.t list;
 }
 [@@deriving show, eq]
 
