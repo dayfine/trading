@@ -31,6 +31,23 @@ val default_global_indices : (string * string) list
     physical-replication tracker with negligible tracking error at weekly
     cadence. *)
 
+val ad_bars_at_or_before :
+  ad_bars:Macro.ad_bar list -> as_of:Core.Date.t -> Macro.ad_bar list
+(** [ad_bars_at_or_before ~ad_bars ~as_of] returns the prefix of [ad_bars] whose
+    [date <= as_of]. Used by {!Weinstein_strategy._run_screen} to prevent the
+    composer-loaded synthetic A-D series (which extends to its last
+    [compute_synthetic_adl.exe] run, often well past the simulator's current
+    tick) from leaking future breadth into the macro analyzer. Without this
+    filter, [Macro.analyze_with_callbacks]'s [get_cumulative_ad ~week_offset:0]
+    returns the cumulative as of the {b last loaded} A-D bar rather than the
+    current simulation date — flipping the A-D / Momentum readings on real
+    bear-market data and causing the [Bearish] composite to be misclassified as
+    [Neutral] / [Bullish].
+
+    Assumes [ad_bars] is sorted ascending by date, which {!Ad_bars.load}
+    guarantees. Returns the input list unchanged when [as_of >= last bar.date]
+    (the production-tail case). *)
+
 val build_global_index_views :
   lookback_bars:int ->
   global_index_symbols:(string * string) list ->

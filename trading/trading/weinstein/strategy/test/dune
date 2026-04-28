@@ -4,6 +4,7 @@
   test_ad_bars_compose
   test_ad_bars_weekly_e2e
   test_macro_inputs
+  test_macro_panel_callbacks_real_data
   test_panel_callbacks
   test_short_side_bear_window
   test_stops_runner

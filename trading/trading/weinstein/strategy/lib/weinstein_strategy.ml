@@ -93,14 +93,11 @@ let _normalised_entry_stop_for_sizing (cand : Screener.scored_candidate) =
 
 (** Try to build a CreateEntering transition for one screened candidate.
     Registers the initial stop state as a side effect. Returns None if the
-    candidate is un-sizeable (zero portfolio value or zero shares).
-
-    The initial stop is derived via
-    {!Weinstein_stops.compute_initial_stop_with_floor}, which — depending on
-    [cand.side] — pulls either the prior correction low (long) or the prior
-    counter-rally high (short) from the candidate's accumulated bar history;
-    falls back to the fixed-buffer proxy when the lookback window holds no
-    qualifying counter-move. *)
+    candidate is un-sizeable (zero portfolio value or zero shares). The initial
+    stop comes from
+    {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}, which
+    pulls a prior correction low (long) or counter-rally high (short) from
+    [cand]'s bar history, falling back to the fixed-buffer proxy. *)
 let _make_entry_transition ~config ~stop_states ~bar_reader ~portfolio_value
     ~current_date (cand : Screener.scored_candidate) =
   let entry_for_sizing, stop_for_sizing =
@@ -403,6 +400,9 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
       ~as_of:current_date
   in
   let ma_cache = Bar_reader.ma_cache bar_reader in
+  let ad_bars =
+    Macro_inputs.ad_bars_at_or_before ~ad_bars ~as_of:current_date
+  in
   let macro_callbacks =
     Panel_callbacks.macro_callbacks_of_weekly_views ?ma_cache
       ~index_symbol:config.indices.primary ~config:config.macro_config
