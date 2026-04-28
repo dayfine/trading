@@ -5,6 +5,7 @@
   test_trace
   test_trade_audit
   test_trade_audit_capture
+  test_trade_audit_report
   test_runner_hypothesis_overrides
   test_panel_loader_parity
   test_backtest_runner_args
@@ -20,6 +21,7 @@
   core_unix.time_ns_unix
   fpath
   backtest
+  trade_audit_report
   trading.backtest.runner_args
   trading.backtest.release_report
   scenario_lib

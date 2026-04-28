@@ -1,0 +1,12 @@
+(library
+ (name trade_audit_report)
+ (libraries
+  core
+  core_unix
+  core_unix.sys_unix
+  backtest
+  trading.simulation
+  trading.base
+  weinstein.types)
+ (preprocess
+  (pps ppx_sexp_conv)))
