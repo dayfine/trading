@@ -82,6 +82,14 @@ mechanics + release-gate procedure.
   See `dev/notes/engine-pool-pr3-impact-2026-04-27.md` for the
   per-call allocation breakdown (~3.2 KB float-array alloc dropped
   per `update_market` call after the symbol's first day).
+- **`feat/backtest-perf-release-report`** (Step 6 — release_perf_report
+  OCaml exe) — open for review. Adds
+  `trading/trading/backtest/release_report/` library +
+  `trading/trading/backtest/bin/release_perf_report.ml` binary +
+  11-test fixture (`test_release_perf_report.ml`). Replaces the
+  deleted Python `perf_sweep_report.py`. End-to-end smoke verified:
+  feeding two synthetic scenario dirs reproduces the full markdown
+  shape including the `:rotating_light:` flag on +20% RSS regression.
 - **`feat/backtest-perf-tier3-weekly`** (Step 4 — tier-3 weekly) —
   open for review. Adds `dev/scripts/perf_tier3_weekly.sh` +
   `.github/workflows/perf-weekly.yml`. Auto-discovers both
@@ -227,15 +235,28 @@ mechanics + release-gate procedure.
    `perf-nightly.yml` once tier-2 budgets are pinned (~10 weeks of
    nightly data) and to `perf-weekly.yml` once tier-3 budgets are
    pinned (~10 weekly cycles).
-6. **`release_perf_report` OCaml exe.** Markdown report comparing the
-   current release's tier-3/4 scenario results vs the prior release —
-   N×T peak-RSS matrix, wall-time matrix, regression flags. Drives
-   release-gate Step 3 in `dev/plans/perf-scenario-catalog-2026-04-25.md`.
-   Replaces the deleted `dev/scripts/perf_sweep_report.py` (Legacy-vs-
-   Tiered axis is gone post-PR #575; need single-mode N×T tables instead).
-   Per `.claude/rules/no-python.md`: write fresh in OCaml, do not port.
-   Now lands as a follow-up after tier-3 weekly so the weekly run
-   has data to diff against. ~150 LOC exe + .mli + tests.
+6. (DONE on `feat/backtest-perf-release-report`) **`release_perf_report`
+   OCaml exe.** New library
+   `trading/trading/backtest/release_report/` (`release_report.{ml,mli}`,
+   `dune`) + binary `trading/trading/backtest/bin/release_perf_report.ml`
+   + 11 tests in `trading/trading/backtest/test/test_release_perf_report.ml`.
+   Reads two release `dev/backtest/scenarios-<ts>/` directories (each
+   subdirectory = one scenario with `actual.sexp`, `summary.sexp`, and
+   optional `peak_rss_kb.txt` / `wall_seconds.txt` sidecars from the
+   perf-tier runners), pairs scenarios by name, and emits a markdown
+   report with three matrices: trading metrics (return %, Sharpe, win
+   rate, max DD, trades, avg holding) side-by-side; peak-RSS (current
+   vs prior, ∆%); wall-time (current vs prior, ∆%). PR-level regression
+   flags fire when ∆% exceeds defaults from
+   `dev/plans/perf-scenario-catalog-2026-04-25.md` (RSS > +10%, wall
+   > +25%); both thresholds are CLI-overridable via
+   `--threshold-rss-pct N` / `--threshold-wall-pct M`. Verify:
+   `dune build trading/backtest/release_report
+   trading/backtest/bin/release_perf_report.exe` then run
+   `_build/default/trading/backtest/bin/release_perf_report.exe
+   --current <dir> --prior <dir>`; tests via
+   `dune test trading/backtest/test/test_release_perf_report.exe`
+   (11/11 PASS). Pure OCaml per `.claude/rules/no-python.md`.
 
 ## Ownership
 

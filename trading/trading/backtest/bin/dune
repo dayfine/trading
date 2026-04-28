@@ -1,5 +1,6 @@
 (executable
  (name backtest_runner)
+ (modules backtest_runner)
  (libraries
   core
   core_unix
@@ -8,3 +9,8 @@
   weinstein.data_source
   trading.backtest.runner_args
   backtest))
+
+(executable
+ (name release_perf_report)
+ (modules release_perf_report)
+ (libraries core trading.backtest.release_report))
