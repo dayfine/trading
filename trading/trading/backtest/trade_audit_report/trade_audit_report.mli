@@ -19,6 +19,10 @@
 
 open Core
 
+module Trade_audit_ratings = Trade_audit_ratings
+(** Re-exported per-trade rating + analysis library so callers reach it via
+    [Trade_audit_report.Trade_audit_ratings]. *)
+
 (** {1 Document model}
 
     The rendered document has three sections — a scenario header, an aggregate
@@ -91,12 +95,33 @@ type per_trade_row = {
     was found or when the audit collector did not capture this entry (e.g.
     pre-PR-2 outputs). *)
 
+type analysis = {
+  ratings : Trade_audit_ratings.rating list;
+      (** Per-trade ratings — one per trade with a matching audit record. Trades
+          without an audit match are skipped here but retained in [rows]. *)
+  behavioral : Trade_audit_ratings.behavioral_metrics;
+      (** The four behavioural metrics — over-trading, exit-too-early,
+          exit-too-late, entering-losers-too-often. *)
+  weinstein : Trade_audit_ratings.weinstein_aggregate;
+      (** Run-level Weinstein-conformance rollup. *)
+  decision_quality : Trade_audit_ratings.decision_quality_matrix;
+      (** Cascade-quartile vs outcome matrix (ranked by [r_multiple]). *)
+}
+[@@deriving sexp]
+(** PR-4 analysis layer: per-trade ratings + run-level aggregates. Computed by
+    {!render} when at least one trade has a matching audit record; rendered into
+    the markdown by {!to_markdown}. *)
+
 type t = {
   header : scenario_header;
   best_worst : best_worst;
   rows : per_trade_row list;
       (** Sorted by [entry_date] ascending then by [symbol] for stable output
           across runs. *)
+  analysis : analysis option;
+      (** [Some _] when at least one trade in the run has a matching audit
+          record. [None] for pre-PR-2 outputs where no audit was captured — the
+          markdown renderer skips the analysis sections in that case. *)
 }
 [@@deriving sexp]
 (** A complete trade-audit report ready to format. *)
@@ -108,6 +133,7 @@ val render :
   ?period_start:Date.t ->
   ?period_end:Date.t ->
   ?universe_size:int ->
+  ?ratings_config:Trade_audit_ratings.config ->
   trade_audit:Backtest.Trade_audit.audit_record list ->
   trades:Trading_simulation.Metrics.trade_metrics list ->
   unit ->
@@ -122,7 +148,11 @@ val render :
     [scenario_name] populates the report header. [period_start], [period_end],
     [universe_size] are echoed into the header verbatim; when [period_start] /
     [period_end] are omitted they are derived from the trades' min entry-date /
-    max exit-date. *)
+    max exit-date.
+
+    [ratings_config] tunes the PR-4 analysis layer thresholds (over-trading,
+    exit-early, R-multiple bounds). Defaults to
+    {!Trade_audit_ratings.default_config}. *)
 
 val to_markdown : t -> string
 (** Render [t] to a markdown string. Output is deterministic for a given [t] —
