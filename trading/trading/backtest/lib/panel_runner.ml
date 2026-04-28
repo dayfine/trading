@@ -88,7 +88,6 @@ let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar
       indicators;
       calendar;
       primary_index = input.config.indices.primary;
-      universe = input.all_symbols;
     }
   in
   Panel_strategy_wrapper.wrap ~config:panel_config inner_strategy
