@@ -7,6 +7,26 @@ module Portfolio = Trading_portfolio.Portfolio
 module Split_event = Trading_portfolio.Split_event
 open Matchers
 
+(* Re-declare the production records to get exhaustive matcher generation
+   via [ppx_test_matcher]. If a field is added or removed in
+   [Trading_portfolio.Types], these declarations stop compiling — that's
+   the exhaustiveness guarantee, and every call to [match_*] below has to
+   handle the new field explicitly (or with [__]). *)
+type position_lot = Trading_portfolio.Types.position_lot = {
+  lot_id : lot_id;
+  quantity : quantity;
+  cost_basis : float;
+  acquisition_date : Date.t;
+}
+[@@deriving test_matcher]
+
+type portfolio_position = Trading_portfolio.Types.portfolio_position = {
+  symbol : symbol;
+  lots : position_lot list;
+  accounting_method : accounting_method;
+}
+[@@deriving test_matcher]
+
 (* Test fixture: synthesize a single-lot position with the given quantity and
    per-share cost. Mirrors the helper in test_calculations.ml. *)
 let make_position ~symbol ~quantity ~avg_cost =
@@ -33,28 +53,16 @@ let test_forward_4_to_1 _ =
   in
   let result = Split_event.apply_to_position event position in
   assert_that result
-    (all_of
-       [
-         field (fun p -> p.symbol) (equal_to "AAPL");
-         field (fun p -> p.accounting_method) (equal_to AverageCost);
-         field position_quantity (float_equal 400.0);
-         field avg_cost_of_position (float_equal 37.5);
-         field position_cost_basis (float_equal 15000.0);
-         field
-           (fun p -> p.lots)
-           (elements_are
-              [
-                all_of
-                  [
-                    field (fun l -> l.lot_id) (equal_to "lot1");
-                    field (fun l -> l.quantity) (float_equal 400.0);
-                    field (fun l -> l.cost_basis) (float_equal 15000.0);
-                    field
-                      (fun l -> l.acquisition_date)
-                      (equal_to (Date.create_exn ~y:2024 ~m:Jan ~d:15));
-                  ];
-              ]);
-       ])
+    (match_portfolio_position ~symbol:(equal_to "AAPL")
+       ~accounting_method:(equal_to AverageCost)
+       ~lots:
+         (elements_are
+            [
+              match_position_lot ~lot_id:(equal_to "lot1")
+                ~quantity:(float_equal 400.0) ~cost_basis:(float_equal 15000.0)
+                ~acquisition_date:
+                  (equal_to (Date.create_exn ~y:2024 ~m:Jan ~d:15));
+            ]))
 
 (* Reverse 1:5 split: 500 → 100 shares; per-share cost $10 → $50; total
    cost basis preserved at $5,000. *)
