@@ -120,6 +120,58 @@ type scored_candidate = {
 }
 (** A scored and graded candidate ready for the weekly report. *)
 
+type cascade_diagnostics = {
+  total_stocks : int;
+      (** Number of stocks input to {!screen} this run (post strategy-side phase
+          1
+          + sector pre-filter; pre held-ticker exclusion). *)
+  candidates_after_held : int;
+      (** [total_stocks] minus tickers in [held_tickers]. *)
+  macro_trend : Weinstein_types.market_trend;
+      (** The macro trend that gated this cascade — same value as
+          [result.macro_trend]. Carried in the diagnostics record so consumers
+          can read the regime without cross-referencing the parent {!result}. *)
+  long_macro_admitted : int;
+      (** [candidates_after_held] when [macro_trend <> Bearish], else [0]. The
+          macro gate is binary across all candidates per side. *)
+  long_breakout_admitted : int;
+      (** Of [long_macro_admitted], how many satisfied
+          [Stock_analysis.is_breakout_candidate]. *)
+  long_sector_admitted : int;
+      (** Of [long_breakout_admitted], how many sat in a sector that was not
+          [Weak]. *)
+  long_grade_admitted : int;
+      (** Of [long_sector_admitted], how many scored at or above [min_grade]. *)
+  long_top_n_admitted : int;
+      (** [List.length buy_candidates] — survivors after the
+          [max_buy_candidates] cap. *)
+  short_macro_admitted : int;
+      (** [candidates_after_held] when [macro_trend <> Bullish], else [0]. *)
+  short_breakdown_admitted : int;
+      (** Of [short_macro_admitted], how many satisfied
+          [Stock_analysis.is_breakdown_candidate]. *)
+  short_sector_admitted : int;
+      (** Of [short_breakdown_admitted], how many sat in a sector that was not
+          [Strong]. *)
+  short_rs_hard_gate_admitted : int;
+      (** Of [short_sector_admitted], how many were not blocked by the RS hard
+          gate (Weinstein Ch. 11 — never short a stock with strong relative
+          strength). *)
+  short_grade_admitted : int;
+      (** Of [short_rs_hard_gate_admitted], how many scored at or above
+          [min_grade]. *)
+  short_top_n_admitted : int;
+      (** [List.length short_candidates] — survivors after the
+          [max_short_candidates] cap. *)
+}
+[@@deriving sexp]
+(** Per-cascade-phase admission counts for one {!screen} call.
+
+    Captured pure-functionally — same input → same diagnostics. Pairs with the
+    backtest-side per-Friday cascade-summary record so analyses can answer "how
+    often did the macro gate filter everything" / "did the RS hard gate ever
+    block shorts" without re-running the strategy. *)
+
 type result = {
   buy_candidates : scored_candidate list;  (** Ranked by score descending. *)
   short_candidates : scored_candidate list;  (** Ranked by score descending. *)
@@ -128,6 +180,10 @@ type result = {
           [(ticker, reason)]. *)
   macro_trend : Weinstein_types.market_trend;
       (** The macro trend used by the cascade gate. *)
+  cascade_diagnostics : cascade_diagnostics;
+      (** Per-phase admission counts. Populated unconditionally — has zero cost
+          when ignored, and unblocks per-Friday cascade-rejection tracking on
+          the backtest side without requiring a parallel pass. *)
 }
 (** Screener output. *)
 

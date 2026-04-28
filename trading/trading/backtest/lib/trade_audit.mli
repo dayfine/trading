@@ -138,6 +138,57 @@ type audit_record = { entry : entry_decision; exit_ : exit_decision option }
 
     Field name [exit_] (rather than [exit]) avoids shadowing [Stdlib.exit]. *)
 
+type cascade_summary = {
+  date : Date.t;
+      (** Friday on which the cascade ran — same date the strategy passed into
+          {!Screener.screen}. *)
+  total_stocks : int;
+      (** Number of stocks input to the screener post strategy-side phase 1 +
+          sector pre-filter. *)
+  candidates_after_held : int;
+      (** [total_stocks] minus already-held tickers. *)
+  macro_trend : Weinstein_types.market_trend;
+  long_macro_admitted : int;
+  long_breakout_admitted : int;
+  long_sector_admitted : int;
+  long_grade_admitted : int;
+  long_top_n_admitted : int;
+  short_macro_admitted : int;
+  short_breakdown_admitted : int;
+  short_sector_admitted : int;
+  short_rs_hard_gate_admitted : int;
+  short_grade_admitted : int;
+  short_top_n_admitted : int;
+  entered : int;
+      (** Of the screener's combined top-N candidates, how many actually got
+          entered (count of {!Position.transition}s emitted). Sits below
+          [long_top_n_admitted + short_top_n_admitted] because cash limits,
+          sector concentration, and round-share sizing all drop further
+          candidates between the screener output and actual entry. *)
+}
+[@@deriving sexp]
+(** Per-Friday cascade-rejection counts — complements [audit_record]'s per-trade
+    decision trail.
+
+    Where [audit_record] captures only the candidates that were ENTERED (plus
+    their immediate rivals via [alternatives_considered]), [cascade_summary]
+    captures the full per-phase admission-count history: candidates the cascade
+    EVALUATED but did NOT admit.
+
+    Lets the audit answer "did the macro gate ever block a candidate", "was the
+    sector filter trivially permissive", "did the RS hard gate ever filter
+    shorts" — questions [audit_record] alone cannot answer because filtered
+    candidates never reach the per-entry record's alternatives bucket. *)
+
+type audit_blob = {
+  audit_records : audit_record list;
+  cascade_summaries : cascade_summary list;
+}
+[@@deriving sexp]
+(** Combined persistence envelope for [trade_audit.sexp]. Holds both the
+    per-trade decision trail and the per-Friday cascade-rejection counts in a
+    single sexp file. *)
+
 (** {1 Collector} *)
 
 type t
@@ -157,9 +208,22 @@ val record_exit : t -> exit_decision -> unit
     exit is dropped (the strategy never entered the position via this audit
     surface). *)
 
+val record_cascade_summary : t -> cascade_summary -> unit
+(** Append a per-Friday cascade summary. Append-only — recording two summaries
+    with the same [date] keeps both. *)
+
 val get_audit_records : t -> audit_record list
 (** Return all audit records, sorted by [position_id]. Records with no exit yet
     recorded (positions still open) carry [exit_ = None]. *)
+
+val get_cascade_summaries : t -> cascade_summary list
+(** Return all per-Friday cascade summaries, sorted by [date] ascending. *)
+
+val get_audit_blob : t -> audit_blob
+(** Return the combined audit-records + cascade-summaries snapshot. Equivalent
+    to
+    [{ audit_records = get_audit_records t; cascade_summaries =
+     get_cascade_summaries t }]. *)
 
 (** {1 Sexp persistence} *)
 
@@ -170,3 +234,11 @@ val sexp_of_audit_records : audit_record list -> Sexp.t
 val audit_records_of_sexp : Sexp.t -> audit_record list
 (** Parse an audit-record list from a sexp. Inverse of [sexp_of_audit_records].
 *)
+
+val sexp_of_audit_blob : audit_blob -> Sexp.t
+(** Serialize the combined audit-records + cascade-summaries snapshot as a
+    single sexp. Inverse of {!audit_blob_of_sexp}. *)
+
+val audit_blob_of_sexp : Sexp.t -> audit_blob
+(** Parse a combined audit-records + cascade-summaries snapshot from sexp.
+    Inverse of {!sexp_of_audit_blob}. *)

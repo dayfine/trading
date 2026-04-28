@@ -94,6 +94,31 @@ let _exit_decision_of_event (e : AR.exit_event) : Trade_audit.exit_decision =
     weeks_stage_left_2 = 0;
   }
 
+(** Translate one {!AR.cascade_event} into a {!Trade_audit.cascade_summary}.
+    Pure projection — copies the screener's diagnostic counts verbatim and adds
+    the strategy-side [entered] count. *)
+let _cascade_summary_of_event (e : AR.cascade_event) :
+    Trade_audit.cascade_summary =
+  let d = e.diagnostics in
+  {
+    date = e.date;
+    total_stocks = d.total_stocks;
+    candidates_after_held = d.candidates_after_held;
+    macro_trend = d.macro_trend;
+    long_macro_admitted = d.long_macro_admitted;
+    long_breakout_admitted = d.long_breakout_admitted;
+    long_sector_admitted = d.long_sector_admitted;
+    long_grade_admitted = d.long_grade_admitted;
+    long_top_n_admitted = d.long_top_n_admitted;
+    short_macro_admitted = d.short_macro_admitted;
+    short_breakdown_admitted = d.short_breakdown_admitted;
+    short_sector_admitted = d.short_sector_admitted;
+    short_rs_hard_gate_admitted = d.short_rs_hard_gate_admitted;
+    short_grade_admitted = d.short_grade_admitted;
+    short_top_n_admitted = d.short_top_n_admitted;
+    entered = e.entered;
+  }
+
 let of_collector (collector : Trade_audit.t) : AR.t =
   {
     record_entry =
@@ -102,4 +127,8 @@ let of_collector (collector : Trade_audit.t) : AR.t =
     record_exit =
       (fun event ->
         Trade_audit.record_exit collector (_exit_decision_of_event event));
+    record_cascade_summary =
+      (fun event ->
+        Trade_audit.record_cascade_summary collector
+          (_cascade_summary_of_event event));
   }

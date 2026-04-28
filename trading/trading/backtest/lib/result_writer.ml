@@ -106,17 +106,25 @@ let _write_equity_curve ~output_dir
       fprintf oc "%s,%.2f\n" (Date.to_string s.date) s.portfolio_value);
   Out_channel.close oc
 
-(** Persist [result.audit] as [trade_audit.sexp] when the collector captured any
-    records. No file is written when the list is empty — that's the pre-PR-2
-    default (capture sites not yet wired) and any consumer of the artefact must
-    tolerate its absence. *)
-let _write_trade_audit ~output_dir ~(audit : Trade_audit.audit_record list) =
-  match audit with
-  | [] -> ()
-  | _ ->
+(** Persist [result.audit] + [result.cascade_summaries] as [trade_audit.sexp]
+    when either is non-empty. No file is written when both are empty — that's
+    the live-mode / unwired-capture default and downstream consumers must
+    tolerate its absence.
+
+    The on-disk format is the {!Trade_audit.audit_blob} envelope, which holds
+    both lists in a single sexp record so a single file load returns both the
+    per-trade decision trail and the per-Friday cascade activity. *)
+let _write_trade_audit ~output_dir ~(audit : Trade_audit.audit_record list)
+    ~(cascade_summaries : Trade_audit.cascade_summary list) =
+  match (audit, cascade_summaries) with
+  | [], [] -> ()
+  | _, _ ->
+      let blob : Trade_audit.audit_blob =
+        { audit_records = audit; cascade_summaries }
+      in
       Sexp.save_hum
         (output_dir ^ "/trade_audit.sexp")
-        (Trade_audit.sexp_of_audit_records audit)
+        (Trade_audit.sexp_of_audit_blob blob)
 
 let write ~output_dir (result : Runner.result) =
   _write_params ~output_dir result;
@@ -127,3 +135,4 @@ let write ~output_dir (result : Runner.result) =
     ~stop_infos:result.stop_infos;
   _write_equity_curve ~output_dir ~steps:result.steps;
   _write_trade_audit ~output_dir ~audit:result.audit
+    ~cascade_summaries:result.cascade_summaries

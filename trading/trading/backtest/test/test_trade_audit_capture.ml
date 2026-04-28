@@ -163,6 +163,79 @@ let test_audit_position_ids_are_unique _ =
      id twice or the test rig is double-recording. *)
   assert_that (List.length ids - List.length dedup) (equal_to 0)
 
+(** Per-Friday cascade summaries must populate over a multi-Friday scenario. The
+    6-month bull-window scenario has roughly ~26 Fridays; we don't pin a
+    specific count (depends on the calendar) but require [> 5] to confirm the
+    capture site fires each Friday and isn't a one-shot. A failure here means
+    the [_screen_universe] cascade-summary call site is not wired. *)
+let test_cascade_summaries_populate_per_friday _ =
+  let result = _run_scenario () in
+  assert_that (List.length result.cascade_summaries) (gt (module Int_ord) 5)
+
+(** Each cascade summary must carry coherent counts: [total_stocks] equals the
+    universe size after strategy-side filters, [candidates_after_held] never
+    exceeds it, and the per-side admission chain monotonically decreases (each
+    phase admits at most as many as the prior one). Pins capture-site
+    correctness without locking in specific values, which would drift with
+    universe / fixture changes. *)
+let test_cascade_summary_counts_are_coherent _ =
+  let result = _run_scenario () in
+  assert_that result.cascade_summaries
+    (each
+       (all_of
+          [
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) -> s.total_stocks)
+              (ge (module Int_ord) 0);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.candidates_after_held <= s.total_stocks)
+              (equal_to true);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.long_breakout_admitted <= s.long_macro_admitted)
+              (equal_to true);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.long_sector_admitted <= s.long_breakout_admitted)
+              (equal_to true);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.long_grade_admitted <= s.long_sector_admitted)
+              (equal_to true);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.short_breakdown_admitted <= s.short_macro_admitted)
+              (equal_to true);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.short_sector_admitted <= s.short_breakdown_admitted)
+              (equal_to true);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.short_rs_hard_gate_admitted <= s.short_sector_admitted)
+              (equal_to true);
+            field
+              (fun (s : Backtest.Trade_audit.cascade_summary) ->
+                s.short_grade_admitted <= s.short_rs_hard_gate_admitted)
+              (equal_to true);
+          ]))
+
+(** [entered] sums to the same universe of round-trips the audit captures.
+    Specifically: the total entered count across all cascade summaries must
+    equal the count of audit records (each entered candidate produces exactly
+    one audit record). Pins the wiring between the per-Friday [entered] count
+    and the per-trade audit collection. *)
+let test_cascade_entered_sum_matches_audit_records _ =
+  let result = _run_scenario () in
+  let total_entered =
+    List.sum
+      (module Int)
+      result.cascade_summaries
+      ~f:(fun (s : Backtest.Trade_audit.cascade_summary) -> s.entered)
+  in
+  assert_that total_entered (equal_to (List.length result.audit))
+
 let suite =
   "Trade_audit_capture"
   >::: [
@@ -175,6 +248,12 @@ let suite =
          "at least one audit record has a populated exit_ block"
          >:: test_some_audit_records_have_exit_blocks;
          "audit position_ids are unique" >:: test_audit_position_ids_are_unique;
+         "cascade summaries populate per Friday"
+         >:: test_cascade_summaries_populate_per_friday;
+         "cascade summary counts are coherent"
+         >:: test_cascade_summary_counts_are_coherent;
+         "cascade entered sum matches audit records"
+         >:: test_cascade_entered_sum_matches_audit_records;
        ]
 
 let () = run_test_tt_main suite

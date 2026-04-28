@@ -285,6 +285,95 @@ let test_collector_round_trips_through_sexp _ =
   let parsed = TA.audit_records_of_sexp (TA.sexp_of_audit_records original) in
   assert_that parsed (elements_are (List.map original ~f:equal_to))
 
+(* Cascade summary builders + tests --------------------------------------- *)
+
+(** Minimal but realistic [cascade_summary] builder. Defaults model a typical
+    Bullish-macro Friday with modest long-side activity and one entry. *)
+let make_cascade_summary ?(date = _date "2024-01-19") ?(total_stocks = 20)
+    ?(candidates_after_held = 18) ?(macro_trend = Weinstein_types.Bullish)
+    ?(long_macro_admitted = 18) ?(long_breakout_admitted = 5)
+    ?(long_sector_admitted = 5) ?(long_grade_admitted = 3)
+    ?(long_top_n_admitted = 3) ?(short_macro_admitted = 18)
+    ?(short_breakdown_admitted = 0) ?(short_sector_admitted = 0)
+    ?(short_rs_hard_gate_admitted = 0) ?(short_grade_admitted = 0)
+    ?(short_top_n_admitted = 0) ?(entered = 1) () : TA.cascade_summary =
+  {
+    date;
+    total_stocks;
+    candidates_after_held;
+    macro_trend;
+    long_macro_admitted;
+    long_breakout_admitted;
+    long_sector_admitted;
+    long_grade_admitted;
+    long_top_n_admitted;
+    short_macro_admitted;
+    short_breakdown_admitted;
+    short_sector_admitted;
+    short_rs_hard_gate_admitted;
+    short_grade_admitted;
+    short_top_n_admitted;
+    entered;
+  }
+
+let test_cascade_summary_sexp_round_trip _ =
+  let s = make_cascade_summary () in
+  let parsed = TA.cascade_summary_of_sexp (TA.sexp_of_cascade_summary s) in
+  assert_that parsed (equal_to s)
+
+let test_record_cascade_summary_appears_in_collector _ =
+  let t = TA.create () in
+  let s = make_cascade_summary () in
+  TA.record_cascade_summary t s;
+  assert_that (TA.get_cascade_summaries t) (elements_are [ equal_to s ])
+
+let test_get_cascade_summaries_sorts_by_date _ =
+  let t = TA.create () in
+  let s1 = make_cascade_summary ~date:(_date "2024-03-15") () in
+  let s2 = make_cascade_summary ~date:(_date "2024-01-19") () in
+  let s3 = make_cascade_summary ~date:(_date "2024-02-09") () in
+  TA.record_cascade_summary t s1;
+  TA.record_cascade_summary t s2;
+  TA.record_cascade_summary t s3;
+  assert_that
+    (TA.get_cascade_summaries t)
+    (elements_are
+       [
+         field
+           (fun (s : TA.cascade_summary) -> Date.to_string s.date)
+           (equal_to "2024-01-19");
+         field
+           (fun (s : TA.cascade_summary) -> Date.to_string s.date)
+           (equal_to "2024-02-09");
+         field
+           (fun (s : TA.cascade_summary) -> Date.to_string s.date)
+           (equal_to "2024-03-15");
+       ])
+
+let test_audit_blob_round_trip _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_exit t (make_exit ());
+  TA.record_cascade_summary t (make_cascade_summary ());
+  TA.record_cascade_summary t
+    (make_cascade_summary ~date:(_date "2024-01-26")
+       ~macro_trend:Weinstein_types.Bearish ~long_macro_admitted:0
+       ~long_breakout_admitted:0 ~long_sector_admitted:0 ~long_grade_admitted:0
+       ~long_top_n_admitted:0 ~entered:0 ());
+  let blob = TA.get_audit_blob t in
+  let parsed = TA.audit_blob_of_sexp (TA.sexp_of_audit_blob blob) in
+  assert_that parsed (equal_to blob)
+
+let test_empty_collector_returns_empty_blob _ =
+  let t = TA.create () in
+  let blob = TA.get_audit_blob t in
+  assert_that blob
+    (all_of
+       [
+         field (fun (b : TA.audit_blob) -> b.audit_records) is_empty;
+         field (fun (b : TA.audit_blob) -> b.cascade_summaries) is_empty;
+       ])
+
 let suite =
   "Trade_audit"
   >::: [
@@ -311,6 +400,15 @@ let suite =
          >:: test_get_audit_records_sorts_by_position_id;
          "collector round-trips through sexp"
          >:: test_collector_round_trips_through_sexp;
+         "cascade_summary sexp round-trip"
+         >:: test_cascade_summary_sexp_round_trip;
+         "record_cascade_summary appears in collector"
+         >:: test_record_cascade_summary_appears_in_collector;
+         "get_cascade_summaries sorts by date"
+         >:: test_get_cascade_summaries_sorts_by_date;
+         "audit_blob round-trips through sexp" >:: test_audit_blob_round_trip;
+         "empty collector returns empty audit_blob"
+         >:: test_empty_collector_returns_empty_blob;
        ]
 
 let () = run_test_tt_main suite

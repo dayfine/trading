@@ -79,6 +79,32 @@ type exit_decision = {
 type audit_record = { entry : entry_decision; exit_ : exit_decision option }
 [@@deriving sexp]
 
+type cascade_summary = {
+  date : Date.t;
+  total_stocks : int;
+  candidates_after_held : int;
+  macro_trend : Weinstein_types.market_trend;
+  long_macro_admitted : int;
+  long_breakout_admitted : int;
+  long_sector_admitted : int;
+  long_grade_admitted : int;
+  long_top_n_admitted : int;
+  short_macro_admitted : int;
+  short_breakdown_admitted : int;
+  short_sector_admitted : int;
+  short_rs_hard_gate_admitted : int;
+  short_grade_admitted : int;
+  short_top_n_admitted : int;
+  entered : int;
+}
+[@@deriving sexp]
+
+type audit_blob = {
+  audit_records : audit_record list;
+  cascade_summaries : cascade_summary list;
+}
+[@@deriving sexp]
+
 (* Collector -------------------------------------------------------------- *)
 
 type _bucket = {
@@ -88,9 +114,20 @@ type _bucket = {
 (** Internal mutable bucket. [exit_] is added to a record when the matching
     entry has already been recorded; otherwise the exit is dropped. *)
 
-type t = { records : (string, _bucket) Hashtbl.t }
+type t = {
+  records : (string, _bucket) Hashtbl.t;
+  cascade_summaries : cascade_summary Queue.t;
+      (** Per-Friday cascade summaries, recorded in insertion order. Sorted by
+          [date] ascending on retrieval — the strategy emits one per Friday
+          screen call, but ordering across multiple backtests / threads is not
+          relied on. *)
+}
 
-let create () = { records = Hashtbl.create (module String) }
+let create () =
+  {
+    records = Hashtbl.create (module String);
+    cascade_summaries = Queue.create ();
+  }
 
 let record_entry t (entry : entry_decision) =
   Hashtbl.set t.records ~key:entry.position_id
@@ -101,16 +138,31 @@ let record_exit t (exit_ : exit_decision) =
   | None -> ()
   | Some bucket -> bucket.bucket_exit <- Some exit_
 
+let record_cascade_summary t (summary : cascade_summary) =
+  Queue.enqueue t.cascade_summaries summary
+
 let _bucket_to_record (bucket : _bucket) : audit_record =
   { entry = bucket.bucket_entry; exit_ = bucket.bucket_exit }
 
 let _compare_by_position_id (a : audit_record) (b : audit_record) =
   String.compare a.entry.position_id b.entry.position_id
 
+let _compare_by_date (a : cascade_summary) (b : cascade_summary) =
+  Date.compare a.date b.date
+
 let get_audit_records t : audit_record list =
   Hashtbl.fold t.records ~init:[] ~f:(fun ~key:_ ~data:bucket acc ->
       _bucket_to_record bucket :: acc)
   |> List.sort ~compare:_compare_by_position_id
+
+let get_cascade_summaries t : cascade_summary list =
+  Queue.to_list t.cascade_summaries |> List.sort ~compare:_compare_by_date
+
+let get_audit_blob t : audit_blob =
+  {
+    audit_records = get_audit_records t;
+    cascade_summaries = get_cascade_summaries t;
+  }
 
 (* Sexp persistence ------------------------------------------------------- *)
 
@@ -119,3 +171,9 @@ let sexp_of_audit_records (records : audit_record list) : Sexp.t =
 
 let audit_records_of_sexp (sexp : Sexp.t) : audit_record list =
   [%of_sexp: audit_record list] sexp
+
+let sexp_of_audit_blob (blob : audit_blob) : Sexp.t =
+  [%sexp_of: audit_blob] blob
+
+let audit_blob_of_sexp (sexp : Sexp.t) : audit_blob =
+  [%of_sexp: audit_blob] sexp

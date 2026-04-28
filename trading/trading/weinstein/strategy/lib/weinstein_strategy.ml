@@ -292,9 +292,22 @@ let _screen_universe ~config ~index_view ~(macro_result : Macro.result)
     screen_result.Screener.buy_candidates
     @ screen_result.Screener.short_candidates
   in
-  entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
-    ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
-    ~macro:macro_result ()
+  let entries =
+    entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
+      ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
+      ~macro:macro_result ()
+  in
+  (* Per-Friday cascade-rejection capture. Fires after the entry walk so the
+     [entered] count reflects actual transitions emitted, not just the
+     screener's top-N output. Recorder is [Audit_recorder.noop] in non-audit
+     contexts (live mode, tests) — zero cost. *)
+  audit_recorder.Audit_recorder.record_cascade_summary
+    {
+      date = current_date;
+      diagnostics = screen_result.Screener.cascade_diagnostics;
+      entered = List.length entries;
+    };
+  entries
 
 (* ------------------------------------------------------------------ *)
 (* make                                                                  *)

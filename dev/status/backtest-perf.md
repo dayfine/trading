@@ -73,6 +73,21 @@ mechanics + release-gate procedure.
 
 ## Open work
 
+- **`feat/trade-audit-cascade-rejections`** (trade-audit cascade-rejection
+  counts, extension to PR-2) — open for review. Extends the per-trade audit
+  shipped in #642 with per-Friday cascade-phase admission counts. Lets the
+  audit answer "did the macro gate ever block a candidate", "was the sector
+  filter trivially permissive", "did the RS hard gate ever filter shorts" —
+  questions the per-trade audit alone can't answer because filtered
+  candidates never reach the per-entry alternatives bucket. `Screener.result`
+  gains a `cascade_diagnostics` field (additive); `Audit_recorder` gains a
+  `record_cascade_summary` callback fired at the end of each Friday's
+  `_screen_universe`; `Trade_audit.t` gains a `cascade_summaries` queue and
+  the `audit_blob` envelope persists both lists in `trade_audit.sexp`. 13
+  new tests (5 screener diagnostic + 5 trade_audit cascade + 3 e2e capture).
+  Bit-exact behavioural parity — pure observer extension. Verify:
+  `dune build && dune build @fmt` clean; existing parity tests
+  (`test_panel_loader_parity`, `test_runner_hypothesis_overrides`) unchanged.
 - **PR #550** (plan, doc-only) — MERGED 2026-04-25.
 - **`feat/backtest-perf-tier1-catalog`** (Steps 1+2) — open for review.
   Adds tier headers to all 15 catalog scenarios, the
