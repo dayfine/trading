@@ -3,6 +3,7 @@
  (libraries
   core
   trading.base
+  trading.simulation
   types
   weinstein.screener
   weinstein.stage
