@@ -1,6 +1,6 @@
 # Status: backtest-perf
 
-## Last updated: 2026-04-27 (PR-3 of engine-pooling)
+## Last updated: 2026-04-27 (PR-4 of engine-pooling)
 
 ## Status
 IN_PROGRESS
@@ -23,9 +23,11 @@ on 2026-04-27**; **PR-3 (thread Scratch through `Engine.update_market`
 per-tick loop) opened at `feat/backtest-perf-engine-pool-thread` on
 2026-04-27 — collapses per-tick float-array allocs to per-symbol-once;
 parity-tested via `test_panel_loader_parity` and
-`test_engine_scratch_threading_parity`**; PR-4 (transient buffer pool
-for one-off workspaces) and PR-5 (matrix re-run validation) still
-outstanding. Step 5 (release_perf_report OCaml exe) tracked separately;
+`test_engine_scratch_threading_parity`**; **PR-4 (transient
+buffer pool for `_sample_student_t.sum_squares` accumulator +
+`Hashtbl.find_or_add` in `update_market`) opened at
+`feat/backtest-perf-engine-pool-pool` on 2026-04-27 — PR #632**;
+PR-5 (matrix re-run validation) still outstanding. Step 5 (release_perf_report OCaml exe) tracked separately;
 landed via #585 / #606 on the test-data + perf-runner side. Tier-4
 release-gate scenarios structurally unblocked since data-panels
 Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z.
@@ -82,6 +84,20 @@ mechanics + release-gate procedure.
   See `dev/notes/engine-pool-pr3-impact-2026-04-27.md` for the
   per-call allocation breakdown (~3.2 KB float-array alloc dropped
   per `update_market` call after the symbol's first day).
+- **`feat/backtest-perf-engine-pool-pool`** (engine-pooling PR-4) —
+  PR #632 open for review. Adds `Buffer_pool.{ml,mli}` (Stack-backed
+  pool of `float array` workspaces with `acquire ?capacity () /
+  release` API, bounded by `max_size`). Routes the per-call
+  `_sample_student_t` chi-squared accumulator (was `let acc = ref
+  0.0`) through a 1-slot float array borrowed from a per-`Scratch`
+  pool. Switches `Engine._scratch_for_symbol` from `match Hashtbl.find
+  … with Some …` to `Hashtbl.find_or_add … ~default` to remove the
+  per-call `Some` allocation that dominated `update_market.(fun)` per
+  the post-PR-A memtrace. FP order is unchanged — same left-fold for
+  loop, just a different storage location for the accumulator. New
+  9-test `test_buffer_pool.ml` pins the pool's API contract;
+  `test_golden_bit_equality` and `test_panel_loader_parity` (the
+  load-bearing parity gates) pass unchanged.
 - **`feat/backtest-perf-release-report`** (Step 6 — release_perf_report
   OCaml exe) — open for review. Adds
   `trading/trading/backtest/release_report/` library +
@@ -142,6 +158,28 @@ mechanics + release-gate procedure.
   inside the devcontainer (or with `TRADING_IN_CONTAINER=1`); the
   workflow itself is exercised on its first scheduled run / manual
   `workflow_dispatch`.
+
+- **Engine-pooling PR-4 — Buffer_pool for transient workspaces** (2026-04-27, PR #632 open).
+  New `trading/trading/engine/lib/buffer_pool.{ml,mli}` — Stack-backed
+  pool of `float array` workspace buffers; pre-seeds one buffer at
+  construction so the first `acquire` is allocation-free; bounded by
+  `max_size` (drops on overflow). `Price_path._sample_student_t` now
+  acquires a 1-slot float-array accumulator on entry and releases it
+  on exit, removing the `let acc = ref 0.0` per-call heap allocation
+  (~85K sampled events / ~850M real allocations on `bull-crash-292x6y`
+  per the post-PR-A memtrace). `Engine._scratch_for_symbol` now uses
+  `Hashtbl.find_or_add ~default`, removing the per-call `Some`
+  allocation that dominated `update_market.(fun)` (~316 KB / 19,800
+  sampled events). Bit-equality preserved: chi-squared accumulation
+  order is identical (same left-fold for-loop, just `acc.(0)` instead
+  of `!acc`); `test_golden_bit_equality` and `test_panel_loader_parity`
+  pass unchanged. Verify:
+  `dune runtest trading/engine/test` (96 tests) +
+  `TRADING_DATA_DIR=$(pwd)/test_data dune exec
+  trading/backtest/test/test_panel_loader_parity.exe`. Files:
+  `trading/trading/engine/lib/buffer_pool.{ml,mli}`,
+  `trading/trading/engine/lib/{price_path,engine,dune}.ml`,
+  `trading/trading/engine/test/test_buffer_pool.ml`.
 
 - **Engine-pooling PR-1 — Gc.stat instrumentation** (2026-04-27, PR #618).
   Per-step `Gc.stat` snapshots in `Panel_runner.run`, gated by the

@@ -35,15 +35,25 @@ let create config =
 
 (* Look up (or lazily create) a [Price_path.Scratch.t] for [symbol] sized for
    [path_config]. The capacity probe is pure — no scratch is allocated unless
-   one is actually missing or too small. *)
+   one is actually missing or too small.
+
+   PR-4 of the engine-pooling plan: use [Hashtbl.find_or_add] (which calls
+   [default ()] only on miss) instead of [Hashtbl.find] + match on
+   [Some]/[None]. The earlier [match Hashtbl.find …] form allocated a fresh
+   [Some] tag on every call — the largest per-call cost left in
+   [Engine.update_market.(fun)] after PR-3 per the post-PR-A memtrace
+   ([dev/notes/panels-memtrace-postA-2026-04-26.md]). *)
 let _scratch_for_symbol engine ~symbol ~path_config =
   let required = Price_path.Scratch.required_capacity path_config in
-  match Hashtbl.find engine.path_scratches symbol with
-  | Some scratch when Price_path.Scratch.capacity scratch >= required -> scratch
-  | _ ->
-      let scratch = Price_path.Scratch.for_config path_config in
-      Hashtbl.set engine.path_scratches ~key:symbol ~data:scratch;
-      scratch
+  let scratch =
+    Hashtbl.find_or_add engine.path_scratches symbol ~default:(fun () ->
+        Price_path.Scratch.for_config path_config)
+  in
+  if Price_path.Scratch.capacity scratch >= required then scratch
+  else
+    let grown = Price_path.Scratch.for_config path_config in
+    Hashtbl.set engine.path_scratches ~key:symbol ~data:grown;
+    grown
 
 let update_market ?(path_config = Price_path.default_config) engine bars =
   List.iter bars ~f:(fun bar ->
