@@ -432,6 +432,21 @@ mechanics + release-gate procedure.
    --current <dir> --prior <dir>`; tests via
    `dune test trading/backtest/test/test_release_perf_report.exe`
    (11/11 PASS). Pure OCaml per `.claude/rules/no-python.md`.
+7. (DONE on `docs/goldens-performance-baselines`) **Goldens performance
+   baselines — small + sp500.** Ran the four non-broad goldens
+   (`goldens-small/{bull-crash-2015-2020, covid-recovery-2020-2024,
+   six-year-2018-2023}` + `goldens-sp500/sp500-2019-2023`) and
+   documented per-cell metrics + buy-and-hold context in
+   `dev/notes/goldens-performance-baselines-2026-04-28.md`. Pure
+   docs PR. Headline finding: strategy underperforms B&H on 4/4
+   windows; closest on bull-crash (−2.2 pp), worst on covid-recovery
+   (−49.6 pp). Three of the four cells are now red against their
+   pinned `total_trades` ranges — trade-count drift since the
+   2026-04-18 pinning is the next thing the trade-audit work
+   (`dev/plans/trade-audit-2026-04-28.md`) needs to explain.
+   Surfaced an Aug-2020 mark-to-market anomaly on the sp500 cell
+   (portfolio briefly $25K during AAPL/Tesla split window) — flagged
+   for trade-audit follow-up.
 
 ## Ownership
 
