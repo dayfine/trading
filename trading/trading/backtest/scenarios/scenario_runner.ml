@@ -3,11 +3,17 @@
 
     Usage: scenario_runner
     [--goldens-small | --goldens-broad | --goldens | --smoke | --dir <path>]
-    [--parallel N]
+    [--parallel N] [--fixtures-root <path>]
 
     [--goldens-small] — small-universe goldens (~300 symbols; local-friendly).
     [--goldens-broad] — broad-universe goldens (full sector-map; nightly/GHA).
     [--goldens] — alias for [--goldens-small] for backwards compat.
+
+    [--fixtures-root <path>] — directory the scenario [universe_path] field is
+    resolved against (defaults to [TRADING_DATA_DIR/backtest_scenarios]). The
+    perf-tier smoke scripts pass this explicitly because they stage the scenario
+    sexp into a per-cell scratch dir, which loses the original fixtures-root
+    context.
 
     Reads all *.sexp files from the selected directory, runs each via
     {!Backtest.Runner.run_backtest}, prints a pass/fail table, and writes
@@ -21,19 +27,16 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
+module Fixtures_root = Scenario_lib.Fixtures_root
 
 (* Universe resolution *)
 
-let _fixtures_root () =
-  let root = Data_path.default_data_dir () |> Fpath.parent |> Fpath.to_string in
-  root ^ "trading/test_data/backtest_scenarios"
-
-let _sector_map_of_universe_file path =
+let _sector_map_of_universe_file ~fixtures_root path =
   (* Resolve the scenario's [universe_path] relative to the fixtures root,
      load it, and return an optional sector-map for [Backtest.Runner] to use
      as its universe. [None] means "use the full [data/sectors.csv]" (broad
      tier / pre-migration behaviour). *)
-  let resolved = Filename.concat (_fixtures_root ()) path in
+  let resolved = Filename.concat fixtures_root path in
   Universe_file.to_sector_map_override (Universe_file.load resolved)
 
 (* Actual metrics extracted from a run — serialized so the parent process
@@ -151,13 +154,15 @@ let _actual_path ~output_root (s : Scenario.t) =
 
 (* Run one scenario inside a child process *)
 
-let _run_scenario_in_child ~output_root (s : Scenario.t) =
+let _run_scenario_in_child ~output_root ~fixtures_root (s : Scenario.t) =
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
     (Date.to_string s.period.start_date)
     (Date.to_string s.period.end_date);
   let scenario_dir = _scenario_dir ~output_root s in
   Core_unix.mkdir_p scenario_dir;
-  let sector_map_override = _sector_map_of_universe_file s.universe_path in
+  let sector_map_override =
+    _sector_map_of_universe_file ~fixtures_root s.universe_path
+  in
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
@@ -170,11 +175,11 @@ let _run_scenario_in_child ~output_root (s : Scenario.t) =
 (* Fork-based worker pool. Scenarios run in parallel child processes up to
    [parallel] at a time. *)
 
-let _fork_scenario ~output_root (s : Scenario.t) =
+let _fork_scenario ~output_root ~fixtures_root (s : Scenario.t) =
   match Core_unix.fork () with
   | `In_the_child -> (
       try
-        _run_scenario_in_child ~output_root s;
+        _run_scenario_in_child ~output_root ~fixtures_root s;
         Stdlib.exit 0
       with e ->
         eprintf "Scenario %s crashed: %s\n%!" s.name (Exn.to_string e);
@@ -187,8 +192,8 @@ let _await_one running =
   let _, pid = Queue.dequeue_exn running in
   match Core_unix.waitpid pid with Ok () -> Succeeded | Error _ -> Crashed
 
-let _run_scenarios_parallel ~output_root ~parallel (scenarios : Scenario.t list)
-    =
+let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
+    (scenarios : Scenario.t list) =
   let running = Queue.create () in
   let statuses = Hashtbl.create (module String) in
   let reap () =
@@ -199,7 +204,7 @@ let _run_scenarios_parallel ~output_root ~parallel (scenarios : Scenario.t list)
   in
   List.iter scenarios ~f:(fun s ->
       if Queue.length running >= parallel then reap ();
-      let pid = _fork_scenario ~output_root s in
+      let pid = _fork_scenario ~output_root ~fixtures_root s in
       Queue.enqueue running (s, pid));
   while not (Queue.is_empty running) do
     reap ()
@@ -236,40 +241,49 @@ let _process_result ~output_root (s, status) =
 
 (* CLI *)
 
-type _cli_args = { dir : string; parallel : int }
+type _cli_args = { dir : string; parallel : int; fixtures_root : string option }
 
 let _default_parallel = 4
 
 let _usage () =
   eprintf
     "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
-     --smoke | --dir <path>] [--parallel N]\n";
+     --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>]\n";
   Stdlib.exit 1
 
 let _parse_flag args =
-  let rec loop args dir parallel =
+  let rec loop args dir parallel fixtures_root =
     match args with
     | [] ->
         let dir = Option.value dir ~default:(_goldens_small_dir ()) in
-        { dir; parallel = Option.value parallel ~default:_default_parallel }
+        {
+          dir;
+          parallel = Option.value parallel ~default:_default_parallel;
+          fixtures_root;
+        }
     | "--goldens-small" :: rest ->
-        loop rest (Some (_goldens_small_dir ())) parallel
+        loop rest (Some (_goldens_small_dir ())) parallel fixtures_root
     | "--goldens-broad" :: rest ->
-        loop rest (Some (_goldens_broad_dir ())) parallel
-    | "--goldens" :: rest -> loop rest (Some (_goldens_small_dir ())) parallel
-    | "--smoke" :: rest -> loop rest (Some (_smoke_dir ())) parallel
-    | "--dir" :: path :: rest -> loop rest (Some path) parallel
-    | "--parallel" :: n :: rest -> loop rest dir (Some (Int.of_string n))
+        loop rest (Some (_goldens_broad_dir ())) parallel fixtures_root
+    | "--goldens" :: rest ->
+        loop rest (Some (_goldens_small_dir ())) parallel fixtures_root
+    | "--smoke" :: rest ->
+        loop rest (Some (_smoke_dir ())) parallel fixtures_root
+    | "--dir" :: path :: rest -> loop rest (Some path) parallel fixtures_root
+    | "--parallel" :: n :: rest ->
+        loop rest dir (Some (Int.of_string n)) fixtures_root
+    | "--fixtures-root" :: path :: rest -> loop rest dir parallel (Some path)
     | _ -> _usage ()
   in
-  loop args None None
+  loop args None None None
 
 let _parse_args () =
   let argv = Sys.get_argv () in
   _parse_flag (List.tl_exn (Array.to_list argv))
 
 let () =
-  let { dir; parallel } = _parse_args () in
+  let { dir; parallel; fixtures_root } = _parse_args () in
+  let fixtures_root = Fixtures_root.resolve ?fixtures_root () in
   let files = _list_scenario_files dir in
   if List.is_empty files then (
     eprintf "No .sexp scenario files found in %s\n" dir;
@@ -277,10 +291,13 @@ let () =
   let parallel = min parallel (List.length files) in
   eprintf "Loading %d scenarios from %s (parallel=%d)\n%!" (List.length files)
     dir parallel;
+  eprintf "Fixtures root: %s\n%!" fixtures_root;
   let scenarios = List.map files ~f:Scenario.load in
   let output_root = _make_output_root () in
   eprintf "Output root: %s\n%!" output_root;
-  let results = _run_scenarios_parallel ~output_root ~parallel scenarios in
+  let results =
+    _run_scenarios_parallel ~output_root ~fixtures_root ~parallel scenarios
+  in
   _print_header ();
   let pass_flags = List.map results ~f:(_process_result ~output_root) in
   let all_pass = List.for_all pass_flags ~f:Fn.id in

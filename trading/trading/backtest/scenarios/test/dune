@@ -1,4 +1,4 @@
 (tests
- (names test_scenario test_universe_file)
- (modules test_scenario test_universe_file)
- (libraries ounit2 core scenario_lib matchers))
+ (names test_scenario test_universe_file test_fixtures_root)
+ (modules test_scenario test_universe_file test_fixtures_root)
+ (libraries ounit2 core core_unix scenario_lib matchers))

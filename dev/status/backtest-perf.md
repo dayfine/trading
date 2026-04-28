@@ -7,8 +7,11 @@ IN_PROGRESS
 
 Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged
 2026-04-26T16:07Z. **`perf-tier1.yml` landed via PR #616 on 2026-04-27**
-— per-PR perf smoke is now wired (continue-on-error: true for now;
-gate later). **Tier-2 nightly workflow landed via PR #622 on
+— per-PR perf smoke is now wired. **Tier-1 universe-path bug fixed
++ gate flipped to strict on `fix/perf-tier1-universe-path`
+2026-04-28**: explicit `--fixtures-root` flag, `Fixtures_root.resolve`
+helper, `continue-on-error: false`, `PERF_CATALOG_CHECK_STRICT=1`;
+local smoke 4/4 PASS. **Tier-2 nightly workflow landed via PR #622 on
 2026-04-27**: `perf_tier2_nightly.sh` +
 `.github/workflows/perf-nightly.yml`, six tier-2 cells, 30 min/cell
 budget, cron `0 5 * * *` (22:00 PT). **Tier-3 weekly workflow open
@@ -139,6 +142,56 @@ mechanics + release-gate procedure.
   (separate PR; gated on engine-pool PR-2..PR-5).
 
 ## Completed
+
+- **Tier-1 smoke universe_path resolution + flip continue-on-error: false**
+  (2026-04-28, on `fix/perf-tier1-universe-path`). Fix for next-step #4.
+  Root cause: `scenario_runner._fixtures_root` did
+  `Data_path.default_data_dir() |> Fpath.parent ^ "trading/test_data/..."`
+  which assumed `TRADING_DATA_DIR` pointed at the legacy `data/` location
+  at the repo root. The perf workflows set
+  `TRADING_DATA_DIR=$WS/trading/test_data`, so `Fpath.parent` walked
+  one level too high and `^ "trading/..."` produced a
+  doubled-segment path
+  `.../trading/trading/test_data/backtest_scenarios`. Net: every
+  tier-1 run since #616 crashed 4/4 on the universe lookup, masked
+  by `continue-on-error: true`.
+  Files:
+  - `trading/trading/backtest/scenarios/fixtures_root.{ml,mli}` — new
+    `Fixtures_root.resolve ?fixtures_root ()` helper. With
+    `?fixtures_root`, returns it verbatim. Without, returns
+    `Data_path.default_data_dir() / "backtest_scenarios"` (matches the
+    convention `test/test_panel_loader_parity.ml` and the perf
+    workflows already use).
+  - `trading/trading/backtest/scenarios/scenario_runner.ml` — adds
+    `--fixtures-root <path>` CLI flag, threads it through
+    `_run_scenario_in_child` so each child resolves the scenario's
+    `universe_path` against the original fixtures root rather than
+    the per-cell `_stage_<name>/` scratch dir.
+  - `trading/trading/backtest/scenarios/test/test_fixtures_root.ml` —
+    4-test regression suite; pins explicit-override behaviour, env
+    fallback, and the no-doubled-`trading/trading` invariant.
+  - `dev/scripts/perf_tier{1_smoke,2_nightly,3_weekly}.sh` — pass
+    `--fixtures-root "$SCENARIO_ROOT"`.
+  - `.github/workflows/perf-tier1.yml` —
+    `continue-on-error: false` (tier-1 is the per-PR gate; tier-2/3
+    stay `true` while their warm-up budgets accumulate).
+  - `trading/devtools/checks/dune` — set
+    `PERF_CATALOG_CHECK_STRICT=1` on the dune rule so missing tier
+    tags fail the build (was annotate-only).
+  Verify:
+  ```
+  TRADING_DATA_DIR=$(pwd)/trading/test_data \
+    dev/scripts/perf_tier1_smoke.sh
+  ```
+  expected: 4/4 PASS. Also run
+  `dune runtest trading/backtest/scenarios/` (4 + 7 + 10 tests, all
+  green). Plan: `dev/plans/perf-tier1-universe-path-2026-04-28.md`.
+  Follow-up: `_repo_root()`/`_make_output_root()` in
+  `scenario_runner.ml` still uses the old `Fpath.parent` heuristic
+  (writes artefacts to `<ws>/trading/dev/backtest/scenarios-...`
+  instead of `<ws>/dev/backtest/...`); the path resolves and the dir
+  is created, just lands one level too deep. Not load-bearing —
+  separate clean-up.
 
 - **Step 4 — tier-3 weekly perf workflow** (2026-04-27, PR pending).
   Mirrors the tier-1/tier-2 pattern. Adds
@@ -272,20 +325,24 @@ mechanics + release-gate procedure.
    Likely follows Stage 4 too. Current Tiered would extrapolate to
    ~31 GB at 5000×10y; columnar projects to ~1.2 GB, well under the
    8 GB ceiling.
-4. **Tier-1 smoke is broken — universe_path resolution.** As of
-   2026-04-27, every tier-1 run since #616 landed fails 4/4 with
-   `Sys_error: ".../trading/trading/test_data/backtest_scenarios/
-   universes/broad.sexp: No such file or directory"` (note the
-   doubled `trading/trading/`). The smoke's `_stage_<name>` copy
-   approach loses the original fixtures-root context, so
-   `scenario_runner.exe --dir <stage>` resolves `(universe_path
-   "universes/broad.sexp")` against the wrong base path.
-   `continue-on-error: true` masks the failure in the job-level
-   conclusion. Functionally tier-1 smoke gates nothing right now.
-   **Defer the fix to after engine-pool PR-2..5 land** so we don't
-   churn `dev/scripts/` mid-stack. Then fix the universe_path
-   resolution + flip `continue-on-error: false` +
-   `PERF_CATALOG_CHECK_STRICT=1`.
+4. **(DONE on `fix/perf-tier1-universe-path`)** Tier-1 smoke
+   universe_path resolution + flip the gate. Added
+   `Scenario_lib.Fixtures_root.resolve` (saner default than the old
+   `Fpath.parent + "trading/test_data/..."` heuristic — uses
+   `Data_path.default_data_dir() / "backtest_scenarios"`, the same
+   shape `test/test_panel_loader_parity.ml` and the perf workflows
+   already assume) plus a new `--fixtures-root` CLI flag on
+   `scenario_runner.exe` that the three tier scripts now pass
+   explicitly so the per-cell `_stage_<name>/` scratch dir doesn't
+   confuse universe-path resolution. Flipped
+   `.github/workflows/perf-tier1.yml` `continue-on-error: false`
+   (tier-1 is the per-PR gate; tier-2/3 stay VISIBILITY-first while
+   their warm-up budgets accumulate). Set
+   `PERF_CATALOG_CHECK_STRICT=1` in `trading/devtools/checks/dune`
+   so missing tier tags fail the build. Verified: 4/4 PASS via
+   `TRADING_DATA_DIR=<repo>/trading/test_data
+   dev/scripts/perf_tier1_smoke.sh` (post-fix). Plan:
+   `dev/plans/perf-tier1-universe-path-2026-04-28.md`.
 5. After ~10 PR cycles of *real* tier-1 perf data (i.e. post
    smoke-fix above): pin per-cell budgets. Same flip applies to
    `perf-nightly.yml` once tier-2 budgets are pinned (~10 weeks of

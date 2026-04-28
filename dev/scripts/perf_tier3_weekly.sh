@@ -121,6 +121,9 @@ _run_one() {
 
   start_epoch=$(date +%s)
   rc=0
+  # Pass --fixtures-root so the runner resolves the scenario's [universe_path]
+  # against the original trading/test_data/backtest_scenarios/ root, not the
+  # _stage_<name>/ scratch dir we copied the scenario into.
   if [ "$HAVE_GNU_TIME" = "1" ]; then
     /usr/bin/time -o "$rss_path" -f '%M' \
       timeout "$TIMEOUT" \
@@ -128,6 +131,7 @@ _run_one() {
         dune exec --no-build \
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
+          --fixtures-root "$SCENARIO_ROOT" \
         >"$log_path" 2>&1 || rc=$?
   else
     timeout "$TIMEOUT" \
@@ -135,6 +139,7 @@ _run_one() {
         dune exec --no-build \
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
+          --fixtures-root "$SCENARIO_ROOT" \
         >"$log_path" 2>&1 || rc=$?
     printf 'UNAVAILABLE\n' >"$rss_path"
   fi
