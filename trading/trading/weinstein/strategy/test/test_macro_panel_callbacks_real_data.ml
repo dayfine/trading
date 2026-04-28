@@ -1,11 +1,12 @@
 (** Real-data regression test for the live cascade's macro plumbing.
 
     Pins the contract that {!Weinstein_strategy._run_screen}'s macro-input
-    construction (real 2022 GSPC weekly bars + composer-loaded weekly ad_bars +
-    the panel-callbacks path through
+    construction (real 2022 GSPC weekly bars + a future-leaking weekly [ad_bars]
+    series + the panel-callbacks path through
     {!Panel_callbacks.macro_callbacks_of_weekly_views}) yields [trend = Bearish]
-    / [confidence < 0.5] — i.e. the same Bearish regime that
-    {!test_macro_2022_bear_market} demonstrates at the unit level.
+    / [confidence < 0.5] {b only when} [ad_bars] is filtered to dates
+    [<= current_date]. Without filtering, the composite trend flips to
+    non-Bearish — exactly the live-cascade bug PR #612 surfaced.
 
     {1 Why this test exists}
 
@@ -23,18 +24,30 @@
     The {!Weinstein_strategy.make} function loads AD breadth bars {b once} at
     strategy-construction time and passes them to every Friday's
     [_on_market_close] call without filtering by [current_date]. The
-    composer-loaded synthetic AD CSV covers ~1973 to {b April 2026} (the last
-    [compute_synthetic_adl.exe] run); when the simulator is replaying a 2022
-    Friday the macro analyzer's [get_cumulative_ad ~week_offset:0] therefore
-    returns the cumulative A-D as of {b 2026}, not 2022. The [ad_line] /
-    [momentum_index] indicator readings see future synthetic data that disagrees
-    with the (correct) 2022 Stage 4 GSPC bear regime, and the composite
-    confidence drifts above [bearish_threshold = 0.35] — flipping [trend] to
-    [Neutral] (or [Bullish]) instead of [Bearish].
+    composer-loaded synthetic AD CSV in production covers ~1973 to
+    {b April 2026} (the last [compute_synthetic_adl.exe] run); when the
+    simulator is replaying a 2022 Friday the macro analyzer's
+    [get_cumulative_ad ~week_offset:0] therefore returns the cumulative A-D as
+    of {b 2026}, not 2022. The [ad_line] / [momentum_index] indicator readings
+    see future synthetic data that disagrees with the (correct) 2022 Stage 4
+    GSPC bear regime, and the composite confidence drifts above
+    [bearish_threshold = 0.35] — flipping [trend] to [Neutral] (or [Bullish])
+    instead of [Bearish].
 
     The fix filters the supplied [ad_bars] to dates [<= current_date] inside
     [_run_screen] before passing them through to
-    [Panel_callbacks.macro_callbacks_of_weekly_views]. *)
+    [Panel_callbacks.macro_callbacks_of_weekly_views].
+
+    {1 Why synthetic A-D bars rather than [Ad_bars.load]}
+
+    The CI fixture under [trading/test_data/] does not ship the production
+    [breadth/{nyse,synthetic}_*.csv] files, and copying the production
+    composer's output into the fixture would make the test depend on whatever
+    extent [compute_synthetic_adl.exe] last produced — fragile and noisy.
+    Instead, {!_synthetic_ad_bars} below builds a deterministic two-phase series
+    with the same date-misalignment shape (declining-breadth phase through
+    [pivot]; rising-breadth phase past it). This pins the {b filter contract}
+    the production fix introduced without depending on any data fixture. *)
 
 open Core
 open OUnit2
@@ -44,7 +57,6 @@ module Bar_panels = Data_panel.Bar_panels
 module Symbol_index = Data_panel.Symbol_index
 module Ohlcv_panels = Data_panel.Ohlcv_panels
 module Panel_callbacks = Weinstein_strategy.Panel_callbacks
-module Ad_bars = Weinstein_strategy.Ad_bars
 
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                              *)
@@ -88,6 +100,53 @@ let _panels_of_symbols
   match Bar_panels.create ~ohlcv ~calendar with
   | Ok p -> p
   | Error err -> failwith ("Bar_panels.create: " ^ err.Status.message)
+
+(** Enumerate every Friday from [start] to [until] inclusive. *)
+let _fridays_between ~start ~until =
+  let rec collect d acc =
+    if Date.( > ) d until then List.rev acc
+    else
+      let acc =
+        if Day_of_week.equal (Date.day_of_week d) Day_of_week.Fri then d :: acc
+        else acc
+      in
+      collect (Date.add_days d 1) acc
+  in
+  collect start []
+
+(** Synthetic weekly [Macro.ad_bar] series shaped to mimic the production
+    composer-loaded breadth's date misalignment. The series spans [pivot] back
+    through [start_date] (declining-breadth phase: declines > advances each
+    week) then forward through [end_date] (advancing-breadth phase: advances >
+    declines each week).
+
+    Filtering to dates [<= pivot] (via {!Macro_inputs.ad_bars_at_or_before})
+    yields only the declining phase — cumulative A-D falls monotonically and the
+    [ad_line] divergence read with a {b also-falling} 2022 GSPC index is
+    [Bearish]-confirming. Without filtering, the cumulative reverses and rises
+    above the 26-weeks-prior offset, flipping divergence to [Bullish] diverging
+    — the same shape the production composer's ~1973→2026 synthetic A-D induced
+    when the simulator's tick was 2022.
+
+    Per-week magnitudes ([decl_mag], [adv_mag]) are picked so:
+    - [momentum_period = 200] sees a negative mean in the filtered case (~145
+      negative weeks 2020→2022) and a positive mean in the unfiltered case (~183
+      positive weeks 2022→2026 dominate the 200-week window).
+    - The [ad_min_bars = 4] / [ad_line_lookback = 26] guards in
+      {!Macro_indicators._ad_divergence_signal} are satisfied in both phases. *)
+let _synthetic_ad_bars ~start_date ~pivot ~end_date ~decl_mag ~adv_mag :
+    Macro.ad_bar list =
+  let bears =
+    _fridays_between ~start:start_date ~until:pivot
+    |> List.map ~f:(fun date ->
+        { Macro.date; advancing = 100; declining = 100 + decl_mag })
+  in
+  let bulls =
+    _fridays_between ~start:(Date.add_days pivot 1) ~until:end_date
+    |> List.map ~f:(fun date ->
+        { Macro.date; advancing = 100 + adv_mag; declining = 100 })
+  in
+  bears @ bulls
 
 (* ------------------------------------------------------------------ *)
 (* The pinned regression                                                *)
@@ -137,23 +196,31 @@ let test_macro_2022_bear_panel_path _ =
 
 (** Mirror of the live cascade construction in
     {!Weinstein_strategy._run_screen}: real 2022 GSPC weekly view +
-    {b composer-loaded weekly AD bars} + panel-callbacks path. The composer's
-    synthetic CSV covers ~1973 to April 2026; the live cascade does not filter
-    by [current_date], so the macro sees future-leaking A-D.
+    {b future-leaking weekly AD bars} + panel-callbacks path. The production
+    composer's synthetic CSV covers ~1973 to April 2026; the pre-fix live
+    cascade did not filter by [current_date], so the macro saw future-leaking
+    A-D. {!_synthetic_ad_bars} below shapes a deterministic series with the same
+    date-misalignment property — declining-breadth phase through 2022,
+    rising-breadth phase through 2026 — independent of any data fixture so the
+    test is reproducible across CI environments without relying on
+    [data/breadth/*.csv] availability.
 
-    Pre-fix: this test {b fails} — [trend = Neutral] (or [Bullish]) because the
-    cumulative A-D at offset 0 is the 2026 endpoint, the [ad_line_lookback]-back
-    sample is somewhere in 2025, and the resulting A-D rising/falling read
-    disagrees with the (correctly Bearish) 2022 GSPC Stage 4 regime — flipping
-    the composite confidence above [bearish_threshold = 0.35].
+    Pre-fix (see {!test_unfiltered_ad_bars_break_bearish_trend} below):
+    [trend = Neutral] (or [Bullish]) because the cumulative A-D at offset 0 is
+    the 2026 endpoint, the [ad_line_lookback]-back sample is in 2025, and the
+    resulting A-D rising/falling read disagrees with the (correctly Bearish)
+    2022 GSPC Stage 4 regime — flipping the composite confidence above
+    [bearish_threshold = 0.35].
 
-    Post-fix: [_run_screen] filters [ad_bars] to dates [<= current_date] before
-    building [macro_callbacks], the cumulative-A-D series is truncated at Oct
-    2022, and the indicator readings agree with the index Stage 4 → trend =
-    Bearish. *)
+    Post-fix: [_run_screen] filters [ad_bars] to dates [<= current_date] via
+    [Macro_inputs.ad_bars_at_or_before] before building [macro_callbacks]; the
+    cumulative-A-D series is truncated at Oct 2022, the declining-phase is
+    monotonically falling (matching the falling 2022 index), and the indicator
+    readings agree with the index Stage 4 → trend = Bearish. *)
 let test_macro_2022_bear_with_composer_ad_bars _ =
   let start_date = Date.of_string "2020-01-01" in
   let current_date = Date.of_string "2022-10-14" in
+  let future_end = Date.of_string "2026-04-24" in
   let daily_bars =
     Test_data_loader.load_daily_bars ~symbol:"GSPC.INDX" ~start_date
       ~end_date:current_date
@@ -165,16 +232,14 @@ let test_macro_2022_bear_with_composer_ad_bars _ =
     Bar_panels.weekly_view_for panels ~symbol:"GSPC.INDX" ~n:lookback_bars
       ~as_of_day:(n_days - 1)
   in
-  (* Composer load reads the synthetic CSV covering ~1973 to April 2026
-     (whatever [compute_synthetic_adl.exe] last produced), then aggregates
-     to weekly. Before the fix, [_run_screen] passed those bars directly to
-     [Panel_callbacks.macro_callbacks_of_weekly_views], leaking future
-     breadth into the macro analyzer. After the fix, [_run_screen] filters
-     to [<= current_date] via [Macro_inputs.ad_bars_at_or_before] first;
-     this test mirrors that same pipeline. *)
-  let data_dir = Fpath.to_string (Data_path.default_data_dir ()) in
+  (* The synthetic A-D series spans 2020-01-01 → 2026-04-24, with the pivot
+     at the simulator's [current_date] (Oct 2022). Filtering via
+     [Macro_inputs.ad_bars_at_or_before] keeps only the declining phase —
+     mirroring the post-fix [_run_screen] pipeline — and asserts the
+     resulting macro composite is Bearish. *)
   let weekly_ad_bars_full =
-    Ad_bars_aggregation.daily_to_weekly (Ad_bars.load ~data_dir)
+    _synthetic_ad_bars ~start_date ~pivot:current_date ~end_date:future_end
+      ~decl_mag:50 ~adv_mag:50
   in
   let weekly_ad_bars =
     Weinstein_strategy.Macro_inputs.ad_bars_at_or_before
@@ -204,12 +269,12 @@ let test_macro_2022_bear_with_composer_ad_bars _ =
 (* ------------------------------------------------------------------ *)
 
 (** Negative companion to the previous test: real 2022 GSPC weekly view +
-    {b unfiltered} composer-loaded AD bars (which extend past the simulator's
-    current tick into 2025-2026 synthetic data) yields a non-Bearish trend
-    through the panel-callbacks path. This is the {b actual} bug behaviour PR
-    #612 observed in the SP500 5y backtest: the macro analyzer's
+    {b unfiltered} synthetic AD bars (extending past the simulator's current
+    tick through April 2026) yields a non-Bearish trend through the
+    panel-callbacks path. This is the {b actual} bug behaviour PR #612 observed
+    in the SP500 5y backtest: the macro analyzer's
     [get_cumulative_ad ~week_offset:0] returns the 2026 endpoint,
-    [get_cumulative_ad ~week_offset:25] returns ~Sept 2025, and the resulting
+    [get_cumulative_ad ~week_offset:25] returns ~late 2025, and the resulting
     A-D rising/falling read disagrees with the (correctly Bearish) 2022 Stage 4
     GSPC regime — pushing composite confidence above [bearish_threshold = 0.35]
     and flipping [trend] to non-Bearish.
@@ -218,15 +283,11 @@ let test_macro_2022_bear_with_composer_ad_bars _ =
     in the [test_macro_2022_bear_with_composer_ad_bars] test above) double-pins
     the contract: a regression that re-introduces the leak makes the previous
     test pass {b and} this one fail; a regression that breaks the macro analyzer
-    in some other way makes both fail.
-
-    This test will need to flip from [equal_to Bearish] to [not Bearish] if the
-    synthetic A-D data is ever regenerated to better track the real 2022 bear
-    regime — but the {b filter} is what
-    [test_macro_2022_bear_with_composer_ad_bars] pins regardless. *)
+    in some other way makes both fail. *)
 let test_unfiltered_ad_bars_break_bearish_trend _ =
   let start_date = Date.of_string "2020-01-01" in
   let current_date = Date.of_string "2022-10-14" in
+  let future_end = Date.of_string "2026-04-24" in
   let daily_bars =
     Test_data_loader.load_daily_bars ~symbol:"GSPC.INDX" ~start_date
       ~end_date:current_date
@@ -238,10 +299,13 @@ let test_unfiltered_ad_bars_break_bearish_trend _ =
     Bar_panels.weekly_view_for panels ~symbol:"GSPC.INDX" ~n:lookback_bars
       ~as_of_day:(n_days - 1)
   in
-  let data_dir = Fpath.to_string (Data_path.default_data_dir ()) in
-  (* Unfiltered: covers ~1973 to April 2026 — the pre-fix construction. *)
+  (* Unfiltered: covers 2020 → 2026-04-24 — the pre-fix construction. The
+     advancing phase 2022→2026 reverses the cumulative A-D, so even though
+     the index_view's most recent week is in 2022 the [ad_line] divergence
+     reads "A-D rising while index falling" → Bullish divergence. *)
   let weekly_ad_bars_full =
-    Ad_bars_aggregation.daily_to_weekly (Ad_bars.load ~data_dir)
+    _synthetic_ad_bars ~start_date ~pivot:current_date ~end_date:future_end
+      ~decl_mag:50 ~adv_mag:50
   in
   let config = Macro.default_config in
   let panel_cbs =

@@ -34,16 +34,24 @@ let default_global_indices =
    the [trend = Bearish] composite during real bear-market periods. The
    filter trims [ad_bars] to dates [<= current_date] before they reach
    {!Panel_callbacks.macro_callbacks_of_weekly_views}. *)
+
+(** Production-tail fast path: when [ad_bars] is empty, or its last bar's date
+    already lies on or before [as_of], the input list satisfies the contract
+    verbatim. Returns [None] when a [List.filter] pass is required. *)
+let _passthrough_if_in_range ~(ad_bars : Macro.ad_bar list) ~(as_of : Date.t) :
+    Macro.ad_bar list option =
+  match List.last ad_bars with
+  | None -> Some []
+  | Some last_bar when Date.( <= ) last_bar.Macro.date as_of -> Some ad_bars
+  | _ -> None
+
 let ad_bars_at_or_before ~(ad_bars : Macro.ad_bar list) ~(as_of : Date.t) :
     Macro.ad_bar list =
-  match ad_bars with
-  | [] -> []
-  | bars -> (
-      match List.last bars with
-      | Some last_bar when Date.( <= ) last_bar.Macro.date as_of -> bars
-      | _ ->
-          List.filter bars ~f:(fun (b : Macro.ad_bar) ->
-              Date.( <= ) b.date as_of))
+  match _passthrough_if_in_range ~ad_bars ~as_of with
+  | Some bars -> bars
+  | None ->
+      List.filter ad_bars ~f:(fun (b : Macro.ad_bar) ->
+          Date.( <= ) b.date as_of)
 
 (* Stage 4 PR-A: build_global_index_views returns weekly views (panel-shaped).
    Each entry is consumed by the macro callback bundle constructor; no

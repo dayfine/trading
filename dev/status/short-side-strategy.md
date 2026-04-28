@@ -1,6 +1,6 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-27
+## Last updated: 2026-04-27 (run-2)
 
 ## Status
 IN_PROGRESS
@@ -24,11 +24,20 @@ composite from Bearish to Neutral/Bullish. Fix landed in
 Pinned by `trading/trading/weinstein/strategy/test/test_macro_panel_callbacks_real_data.ml`:
 - Real 2022 GSPC + empty AD bars + panel-callbacks → Bearish (mirrors
   `test_macro_2022_bear_market` in macro/test/test_macro_e2e.ml).
-- Real 2022 GSPC + composer-loaded AD bars filtered to `<= 2022-10-14`
+- Real 2022 GSPC + synthetic AD bars filtered to `<= 2022-10-14`
   → Bearish, confidence < 0.5 (the fix's contract).
-- Real 2022 GSPC + composer-loaded AD bars unfiltered (~1973 to April
-  2026) → non-Bearish (the bug, double-pinned to catch regressions
-  from either direction).
+- Real 2022 GSPC + synthetic AD bars extending through 2026 unfiltered
+  → non-Bearish (the bug, double-pinned to catch regressions from
+  either direction).
+
+Run-2 (2026-04-27): the second commit on `feat/short-side-bear-window-fix-cascade-plumbing`
+swaps `Ad_bars.load`/`Ad_bars_aggregation.daily_to_weekly` in the test for
+a deterministic two-phase synthetic series so the contract pins on CI runs
+where `TRADING_DATA_DIR=trading/test_data` ships only Unicorn breadth
+2017-2020 (no synthetic CSV). Same commit pulls the parent commit's
+`weinstein_strategy.ml` back to the 500-line `@large-module` ceiling and
+splits `Macro_inputs.ad_bars_at_or_before` so neither helper exceeds the
+nesting limit.
 
 ## Interface stable
 YES
