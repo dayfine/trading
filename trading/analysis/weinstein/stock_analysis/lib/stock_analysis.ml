@@ -43,7 +43,9 @@ type t = {
   rs : Rs.result option;
   volume : Volume.result option;
   resistance : Resistance.result option;
+  support : Support.result option;
   breakout_price : float option;
+  breakdown_price : float option;
   prior_stage : stage option;
   as_of_date : Date.t;
 }
@@ -74,6 +76,10 @@ type callbacks = {
 let _max_opt (best : float option) (h : float) : float option =
   match best with None -> Some h | Some b -> Some (Float.max b h)
 
+(** Combine a running minimum with a fresh sample. Mirror of [_max_opt]. *)
+let _min_opt (best : float option) (l : float) : float option =
+  match best with None -> Some l | Some b -> Some (Float.min b l)
+
 (** Walk back from [week_offset = base_end_offset .. base_lookback - 1] reading
     [get_high] at each offset. Returns the maximum defined high. Stops the walk
     at the first [None] (treated as "no more bars"). Returns [None] when the
@@ -88,6 +94,27 @@ let _scan_max_high_callback ~get_high ~base_end_offset ~base_lookback :
         match get_high ~week_offset:off with
         | None -> best
         | Some h -> loop (off + 1) (_max_opt best h)
+    in
+    loop base_end_offset None
+
+(** Mirror of {!_scan_max_high_callback} for the short-side cascade: walks
+    [bar_offset = base_end_offset .. base_lookback - 1] reading [get_low] at
+    each offset and returns the {b minimum} defined low. The base low is the
+    short-side analogue of the breakout price.
+
+    Note: [get_low] is consumed via the Resistance callback bundle, which uses
+    [~bar_offset] rather than [~week_offset]. Both indexing conventions mean
+    "offset from the newest bar"; only the labelled-arg name differs. *)
+let _scan_min_low_callback ~get_low ~base_end_offset ~base_lookback :
+    float option =
+  if base_end_offset >= base_lookback then None
+  else
+    let rec loop off best =
+      if off >= base_lookback then best
+      else
+        match get_low ~bar_offset:off with
+        | None -> best
+        | Some l -> loop (off + 1) (_min_opt best l)
     in
     loop base_end_offset None
 
@@ -199,6 +226,17 @@ let _resistance_result ~(config : config)
       Resistance.analyze_with_callbacks ~config:config.resistance
         ~callbacks:resistance_callbacks ~breakout_price:bp ~as_of_date)
 
+(** Compute the short-side mirror of [_resistance_result]: support density below
+    [breakdown_price]. Reuses [resistance_callbacks] (same per-bar fields, only
+    the comparison flips inside [Support.analyze_with_callbacks]). Reuses
+    [config.resistance] so the same defaults govern both directions. *)
+let _support_result ~(config : config)
+    ~(resistance_callbacks : Resistance.callbacks) ~as_of_date ~breakdown_price
+    : Support.result option =
+  Option.map breakdown_price ~f:(fun bp ->
+      Support.analyze_with_callbacks ~config:config.resistance
+        ~callbacks:resistance_callbacks ~breakdown_price:bp ~as_of_date)
+
 (* ------------------------------------------------------------------ *)
 (* Main analyzer — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
@@ -221,6 +259,11 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
       ~base_end_offset:config.base_end_offset_weeks
       ~base_lookback:config.base_lookback_weeks
   in
+  let breakdown_price =
+    _scan_min_low_callback ~get_low:callbacks.resistance.get_low
+      ~base_end_offset:config.base_end_offset_weeks
+      ~base_lookback:config.base_lookback_weeks
+  in
   let peak_offset_opt =
     _find_peak_volume_offset_callback ~get_volume:callbacks.get_volume
       ~lookback:config.breakout_event_lookback
@@ -232,13 +275,19 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     _resistance_result ~config ~resistance_callbacks:callbacks.resistance
       ~as_of_date ~breakout_price
   in
+  let support_result =
+    _support_result ~config ~resistance_callbacks:callbacks.resistance
+      ~as_of_date ~breakdown_price
+  in
   {
     ticker;
     stage = stage_result;
     rs = rs_result;
     volume = volume_result;
     resistance = resistance_result;
+    support = support_result;
     breakout_price;
+    breakdown_price;
     prior_stage;
     as_of_date;
   }

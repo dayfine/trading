@@ -213,14 +213,16 @@ let test_candidate_fields_populated _ =
 
 (** Runs the screener over the same 7-stock universe at the COVID crash low
     (2018-01-01 → 2020-03-20) under [Bearish] macro. JPM, KO, and CVX are in
-    early Stage 4 with breakdown-volume confirmation: JPM scores 65 (Stage 4 +
-    Strong breakdown volume + bearish RS crossover), KO scores 55 (Stage 4 +
-    Adequate breakdown volume + bearish RS crossover), and CVX scores 45 (Stage
-    4 + Adequate breakdown volume + RS negative & declining), all clearing the
-    grade-C floor. The remaining four tickers fail the short-side gate. The test
-    pins the exact short_candidates list and shape (entry, stop>entry, risk_pct)
-    and asserts that no buy candidates leak through under Bearish macro. This is
-    the deterministic counterpart to the bullish test. *)
+    early Stage 4 with breakdown-volume confirmation: JPM scores 72 (Stage 4 +
+    Strong breakdown volume + bearish RS crossover + Moderate support below), KO
+    scores 55 (Stage 4 + Adequate breakdown volume + bearish RS crossover; Heavy
+    support below contributes no clean-space bonus), and CVX scores 52 (Stage 4
+    \+ Adequate breakdown volume + RS negative & declining + Moderate support
+    below), all clearing the grade-C floor. The remaining four tickers fail the
+    short-side gate. The test pins the exact short_candidates list and shape
+    (entry, stop>entry, risk_pct) and asserts that no buy candidates leak
+    through under Bearish macro. This is the deterministic counterpart to the
+    bullish test. *)
 let test_short_candidate_populated _ =
   let stocks =
     _analyze_universe
@@ -236,13 +238,13 @@ let test_short_candidate_populated _ =
   assert_that result.Screener.short_candidates
     (elements_are
        [
-         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:65
+         _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:72
            ~entry_low:139.0 ~entry_high:144.0 ~stop_low:151.0 ~stop_high:155.0
            ~risk_low:0.075 ~risk_high:0.085;
          _candidate_matcher ~side:`Short ~ticker:"KO" ~score:55 ~entry_low:56.0
            ~entry_high:60.0 ~stop_low:61.0 ~stop_high:65.0 ~risk_low:0.075
            ~risk_high:0.085;
-         _candidate_matcher ~side:`Short ~ticker:"CVX" ~score:45
+         _candidate_matcher ~side:`Short ~ticker:"CVX" ~score:52
            ~entry_low:125.0 ~entry_high:130.0 ~stop_low:135.0 ~stop_high:141.0
            ~risk_low:0.075 ~risk_high:0.085;
        ])

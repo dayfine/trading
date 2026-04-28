@@ -397,8 +397,16 @@ let test_short_candidates_are_short _ =
     declining-bars-with-spike helper places a 3000-volume bar at offset 55,
     surrounded by 1000-volume bars; the peak-volume scanner picks it up and
     {!Volume.analyze_breakout} classifies the spike vs the prior 4-bar average
-    (1000) as Strong (ratio = 3.0). The score then tallies stage (30) + Strong
-    breakdown volume (20) + bearish RS [Negative_declining] (20) = 70 → A. *)
+    (1000) as Strong (ratio = 3.0).
+
+    The synthetic Support analysis on the same declining bars yields Clean
+    support below (the bars between [breakdown_price] and the most recent bar
+    are spread across multiple congestion bands, so no single band hits the
+    moderate-resistance threshold of 3). Clean adds [w_clean_resistance = 15].
+    The score tallies stage (30) + Strong breakdown volume (20) + bearish RS
+    [Negative_declining] (20) + Clean support below (15) = 85 → A+. The test
+    pins both the score and the presence of the breakdown-volume rationale
+    label. *)
 let test_short_side_volume_confirmation_strong _ =
   let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
   let prior = Some (Stage3 { weeks_topping = 8 }) in
@@ -423,8 +431,8 @@ let test_short_side_volume_confirmation_strong _ =
         (all_of
            [
              field (fun c -> c.ticker) (equal_to "VOL_STRONG");
-             field (fun c -> c.score) (equal_to 70);
-             field (fun c -> c.grade) (equal_to (A : grade));
+             field (fun c -> c.score) (equal_to 85);
+             field (fun c -> c.grade) (equal_to (A_plus : grade));
              field
                (fun c -> c.rationale)
                (matching ~msg:"rationale contains breakdown-volume label"
@@ -475,6 +483,52 @@ let test_short_side_volume_adequate_label _ =
              List.find rs ~f:(fun r ->
                  String.equal r "Adequate breakdown volume"))
            (equal_to "Adequate breakdown volume"))
+
+(** Inject a [Support.result] directly onto an otherwise-identical candidate and
+    assert the screener's [_support_signal] picks it up as a clean-space- below
+    bonus. Pins the contract that mirrors [_resistance_signal] for the short
+    side: Virgin / Clean → [w_clean_resistance], Moderate → halved, Heavy / None
+    → 0. The candidate's other signals contribute a fixed baseline so the
+    support delta is the only thing varying across cases. Mirrors
+    {!test_negative_rs_scoring_order}'s injection-and-compare shape. *)
+let test_support_below_scoring_order _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let neg_rs : Rs.result =
+    {
+      current_rs = 0.8;
+      current_normalized = -10.0;
+      trend = Negative_declining;
+      history = [];
+    }
+  in
+  let make_with_support ticker quality =
+    let base = make_analysis ticker prior bars in
+    let support : Support.result = { quality; breakdown_price = 50.0 } in
+    { base with rs = Some neg_rs; support = Some support }
+  in
+  let stocks =
+    [
+      make_with_support "VIRGIN" Virgin_territory;
+      make_with_support "CLEAN" Clean;
+      make_with_support "MOD" Moderate_resistance;
+      make_with_support "HEAVY" Heavy_resistance;
+    ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  let by_ticker t =
+    List.find_exn result.short_candidates ~f:(fun c -> String.(c.ticker = t))
+  in
+  let virgin = by_ticker "VIRGIN" in
+  let clean = by_ticker "CLEAN" in
+  let mod_ = by_ticker "MOD" in
+  let heavy = by_ticker "HEAVY" in
+  assert_that virgin.score (equal_to clean.score);
+  assert_that clean.score (gt (module Int_ord) mod_.score);
+  assert_that mod_.score (gt (module Int_ord) heavy.score)
 
 (** Negative-RS scoring (already wired prior to this PR) is a positive signal
     for shorts: [Bearish_crossover] adds
@@ -578,6 +632,7 @@ let suite =
          "test_short_side_volume_adequate_label"
          >:: test_short_side_volume_adequate_label;
          "test_negative_rs_scoring_order" >:: test_negative_rs_scoring_order;
+         "test_support_below_scoring_order" >:: test_support_below_scoring_order;
        ]
 
 let () = run_test_tt_main suite

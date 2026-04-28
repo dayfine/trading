@@ -184,6 +184,24 @@ let _resistance_signal ~w ~(a : Stock_analysis.t) =
       [ (w.w_clean_resistance / 2, "Moderate resistance") ]
   | _ -> []
 
+(** Below-breakdown clean-space signal for short setups. Mirror of
+    [_resistance_signal] for the short-side cascade. Per Weinstein, the Short
+    Entry Checklist requires "minimal nearby support below breakdown point" — a
+    steep prior advance with small congestion is ideal. Heavy support below
+    means the decline will struggle through prior congestion zones; minimal /
+    virgin support below means the stock can fall freely. The shared
+    [overhead_quality] variant carries side-flipped semantics — see [Support]
+    module-level doc. *)
+let _support_signal ~w ~(a : Stock_analysis.t) =
+  match a.support with
+  | Some { quality = Virgin_territory; _ } ->
+      [ (w.w_clean_resistance, "Virgin support below") ]
+  | Some { quality = Clean; _ } ->
+      [ (w.w_clean_resistance, "Clean support below") ]
+  | Some { quality = Moderate_resistance; _ } ->
+      [ (w.w_clean_resistance / 2, "Moderate support below") ]
+  | _ -> []
+
 (** Sector bonus/penalty for long setups. *)
 let _sector_long_signal ~w ~sector =
   match sector.rating with
@@ -237,7 +255,7 @@ let _score_short ~weights ~sector (a : Stock_analysis.t) : int * string list =
   let w = weights in
   _tally
     (_stage_short_signal ~w ~a @ _volume_short_signal ~w ~a
-   @ _rs_short_signal ~w ~a
+   @ _rs_short_signal ~w ~a @ _support_signal ~w ~a
     @ _sector_short_signal ~w ~sector)
 
 (** Convert score to grade using configurable thresholds. *)

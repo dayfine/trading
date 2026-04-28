@@ -548,7 +548,9 @@ let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
       rs = None;
       volume = None;
       breakout_price = Some entry;
+      breakdown_price = None;
       resistance = None;
+      support = None;
       prior_stage = Some (Stage3 { weeks_topping = 8 });
       as_of_date = Date.of_string "2024-01-05";
     }

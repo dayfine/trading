@@ -160,10 +160,16 @@ let test_six_year_full_lifecycle _ =
      counts shifted from the buggy pre-3.2 numbers (23/21 with 10W/11L)
      to the correct post-3.2 numbers captured below. The exact set of
      traded tickers, win/loss split, and a tight final-value band
-     guarantee the strategy path is reproducible end-to-end. *)
+     guarantee the strategy path is reproducible end-to-end.
+
+     Short-side cascade-rules update (2026-04): n_buys/n_sells bumped
+     from 36/33 → 39/36 after the support-below clean-space signal
+     joined the short-side score. Three additional short trades in
+     2018-2020 bear with no change to the round-trip count or
+     traded-symbol set; final value drift well inside the ±$3K band. *)
   assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 36);
-  assert_that n_sells (equal_to 33);
+  assert_that n_buys (equal_to 39);
+  assert_that n_sells (equal_to 36);
   assert_that symbols
     (elements_are
        [

@@ -35,9 +35,20 @@ type t = {
       (** None if there is no identifiable breakout bar in the recent window. *)
   resistance : Resistance.result option;
       (** None if no breakout price can be determined from the bars. *)
+  support : Support.result option;
+      (** Below-breakdown support density grade. Mirror of [resistance] for the
+          short-side cascade — measures how much prior trading sits below the
+          breakdown floor (heavy support = decline will struggle through; virgin
+          support = stock falls freely). [None] when no breakdown price can be
+          determined. *)
   breakout_price : float option;
       (** Detected breakout price (top of prior base / resistance zone). Used by
           the screener to set suggested entry. *)
+  breakdown_price : float option;
+      (** Detected breakdown price (bottom of prior base / support floor).
+          Mirror of [breakout_price] for the short-side cascade. Computed as the
+          minimum [low_price] over the prior-base window
+          [(base_end_offset_weeks .. base_lookback_weeks)]. *)
   prior_stage : Weinstein_types.stage option;
       (** Stage from the previous week, passed forward for transition tracking.
       *)
