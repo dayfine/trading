@@ -2,6 +2,6 @@
  (public_name trading.portfolio)
  (name trading_portfolio)
  (libraries core trading.base core_unix.time_ns_unix status)
- (modules types portfolio calculations)
+ (modules types portfolio calculations split_event)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
