@@ -9,22 +9,20 @@ release cut. Tracks the procedure laid out in
 
 Tier-4 scenarios target the `Full_sector_map` universe sentinel
 (~1000 symbols loaded from `data/sectors.csv` + per-symbol bars under
-`data/`). The GHA workflow `.github/workflows/perf-release-gate.yml`
-sets `TRADING_DATA_DIR=$WS/trading/test_data`, which is the in-repo
-7-symbol CI fixture — not enough to satisfy `Full_sector_map`. Result:
-all 4 tier-4 cells exit instantly with universe-load failure (run
-[25034915781] showed 4/4 instant-FAIL).
+`data/`). GHA runners do not carry a universe-scale EODHD pull, so the
+`Full_sector_map` load fails instantly on any GHA invocation.
 
 The runner size itself is fine: per
 `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`, the
 post-engine-pool fit projects N=1000×10y to ~5.7 GB peak RSS, comfortably
 inside the 8 GB `ubuntu-latest` ceiling. The blocker is purely data
-plumbing — GHA runners do not carry a fresh universe-scale EODHD pull.
+plumbing.
 
-**Decision**: tier-4 runs locally only. The GHA workflow stays in the
-repo as the smoke-tested invocation shape (so the script + workflow
-glue keeps building cleanly), but it is not scheduled-cronned and
-`workflow_dispatch` runs are no-ops on the in-repo fixture.
+**Decision**: tier-4 runs locally only. The previous GHA workflow
+`.github/workflows/perf-release-gate.yml` was removed (run
+[25034915781] showed 4/4 instant-FAIL on universe load). If GHA-side
+tier-4 ever becomes desirable, the unblock is data plumbing, not
+runner sizing — see "GHA workflow status" below.
 
 ## When to run
 
@@ -114,18 +112,16 @@ Go / no-go on the release based on the report:
 
 ## GHA workflow status
 
-`.github/workflows/perf-release-gate.yml` stays in the repo unchanged.
-It builds cleanly and serves as the canonical smoke-test of the
-tier-4 invocation shape (script invocation, summary publishing, build
-caching). No cron schedule. `workflow_dispatch` is allowed but the
-runs are no-ops against the in-repo 7-symbol fixture — useful only to
-exercise the script wiring, not to produce real numbers.
+`.github/workflows/perf-release-gate.yml` was removed on 2026-04-28
+(see PR for this checklist's update). It exited in 0–1s on every run
+and produced no useful signal.
 
 If GHA-side tier-4 ever becomes desirable, the unblock is data
 plumbing, not runner sizing: either (a) host the universe-scale data
 on a runner-accessible volume, or (b) plumb a streaming data source
 (`dev/plans/daily-snapshot-streaming-2026-04-27.md`) so the runner
-does not need a full local mirror.
+does not need a full local mirror. At that point, reconstruct the
+workflow shape from `dev/scripts/perf_tier4_release_gate.sh`.
 
 ## References
 
@@ -136,7 +132,5 @@ does not need a full local mirror.
 - `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md` —
   source for the "8 GB at N=1000 fits" finding.
 - `dev/scripts/perf_tier4_release_gate.sh` — the runner script.
-- `.github/workflows/perf-release-gate.yml` — the held-but-unscheduled
-  GHA workflow.
 - `trading/trading/backtest/bin/release_perf_report.ml` — comparison
   exe (built via `dune build trading/backtest/bin/release_perf_report.exe`).
