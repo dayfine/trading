@@ -1,0 +1,10 @@
+(library
+ (name backtest_optimal)
+ (libraries
+  core
+  trading.base
+  weinstein.screener
+  weinstein.stock_analysis
+  weinstein.types)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
