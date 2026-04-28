@@ -27,6 +27,7 @@ type scenario_run = {
   summary : summary_meta;
   peak_rss_kb : int option;
   wall_seconds : float option;
+  trade_quality : Trade_audit_report.t option;
 }
 [@@deriving sexp]
 
@@ -64,6 +65,15 @@ let _read_optional_float path =
   Option.bind (_read_first_line path) ~f:(fun s ->
       try Some (Float.of_string s) with _ -> None)
 
+let _try_load_trade_quality ~dir : Trade_audit_report.t option =
+  (* The audit-report loader requires [trades.csv]; [trade_audit.sexp] is
+     optional. If [trades.csv] is missing we skip silently — the section
+     simply renders as N/A in the comparison. Any malformed input is also
+     swallowed: the audit is auxiliary, never a hard requirement. *)
+  let trades_path = Filename.concat dir "trades.csv" in
+  if not (Sys_unix.file_exists_exn trades_path) then None
+  else try Some (Trade_audit_report.load ~scenario_dir:dir) with _ -> None
+
 let load_scenario_run ~dir =
   let name = Filename.basename dir in
   let actual_path = Filename.concat dir "actual.sexp" in
@@ -80,7 +90,8 @@ let load_scenario_run ~dir =
   let wall_seconds =
     _read_optional_float (Filename.concat dir "wall_seconds.txt")
   in
-  { name; actual; summary; peak_rss_kb; wall_seconds }
+  let trade_quality = _try_load_trade_quality ~dir in
+  { name; actual; summary; peak_rss_kb; wall_seconds; trade_quality }
 
 let _list_scenario_subdirs root =
   if not (Sys_unix.is_directory_exn root) then
@@ -267,11 +278,204 @@ let _one_sided_section ~title names =
     let body = List.map names ~f:(fun n -> sprintf "- `%s`" n) in
     header @ body @ [ "" ]
 
+(* --- Trade quality summary ---
+
+   For each paired scenario where at least one side has a [trade_quality]
+   record, surface the headline behavioural / Weinstein-conformance numbers
+   and the per-side delta. This complements the trading-metrics table: a
+   scenario can show flat returns while its trade quality regresses (e.g.
+   higher exit-losers-too-late or a falling Weinstein spirit score). *)
+
+type _quality_summary = {
+  spirit_score : float option;
+      (* avg per-trade Weinstein score [[0,1]]; None when no analysis *)
+  mean_r_multiple : float option;
+  median_r_multiple : float option;
+  trades_per_year : float option;
+  over_trading_flag : bool;
+  exit_winners_flagged : int;
+  winners_evaluated : int;
+  exit_losers_flagged : int;
+  losers_evaluated : int;
+  decision_quality_win_rate_pct : float;
+}
+
+let _finite_or_none v = if Float.is_finite v then Some v else None
+
+let _r_multiple_stats
+    (ratings : Trade_audit_report.Trade_audit_ratings.rating list) =
+  let rs =
+    List.filter_map ratings ~f:(fun r ->
+        if Float.is_finite r.Trade_audit_report.Trade_audit_ratings.r_multiple
+        then Some r.r_multiple
+        else None)
+  in
+  if List.is_empty rs then (None, None)
+  else
+    let sorted = List.sort rs ~compare:Float.compare in
+    let n = List.length sorted in
+    let mean = List.fold sorted ~init:0.0 ~f:( +. ) /. Float.of_int n in
+    let median =
+      if n mod 2 = 1 then List.nth_exn sorted (n / 2)
+      else
+        let a = List.nth_exn sorted ((n / 2) - 1) in
+        let b = List.nth_exn sorted (n / 2) in
+        (a +. b) /. 2.0
+    in
+    (Some mean, Some median)
+
+let _summarize_quality (q : Trade_audit_report.t option) : _quality_summary =
+  let empty =
+    {
+      spirit_score = None;
+      mean_r_multiple = None;
+      median_r_multiple = None;
+      trades_per_year = None;
+      over_trading_flag = false;
+      exit_winners_flagged = 0;
+      winners_evaluated = 0;
+      exit_losers_flagged = 0;
+      losers_evaluated = 0;
+      decision_quality_win_rate_pct = 0.0;
+    }
+  in
+  match q with
+  | None -> empty
+  | Some t -> (
+      match t.analysis with
+      | None -> empty
+      | Some a ->
+          let mean, median = _r_multiple_stats a.ratings in
+          {
+            spirit_score = _finite_or_none a.weinstein.spirit_score;
+            mean_r_multiple = mean;
+            median_r_multiple = median;
+            trades_per_year =
+              _finite_or_none a.behavioral.over_trading.trades_per_year;
+            over_trading_flag = a.behavioral.over_trading.exceeds_threshold;
+            exit_winners_flagged =
+              a.behavioral.exit_winners_too_early.flagged_count;
+            winners_evaluated =
+              a.behavioral.exit_winners_too_early.winners_evaluated;
+            exit_losers_flagged =
+              a.behavioral.exit_losers_too_late.flagged_count;
+            losers_evaluated =
+              a.behavioral.exit_losers_too_late.losers_evaluated;
+            decision_quality_win_rate_pct =
+              a.decision_quality.overall_win_rate_pct;
+          })
+
+let _fmt_opt_float fmt = function Some v -> sprintf fmt v | None -> "n/a"
+let _fmt_opt_score = _fmt_opt_float "%.3f"
+let _fmt_opt_r = _fmt_opt_float "%+.2f"
+let _fmt_opt_tpy = _fmt_opt_float "%.1f"
+let _fmt_count_of n_total n_eval = sprintf "%d / %d" n_total n_eval
+
+let _delta_opt_float ~current ~prior =
+  match (current, prior) with Some c, Some p -> Some (c -. p) | _ -> None
+
+let _fmt_delta_signed = function None -> "n/a" | Some d -> sprintf "%+.3f" d
+
+let _row_quality_metric ~label ~current_str ~prior_str ~delta_str =
+  sprintf "| %s | %s | %s | %s |" label current_str prior_str delta_str
+
+let _fmt_delta_float_opt = function
+  | None -> "n/a"
+  | Some d -> sprintf "%+.1f" d
+
+let _over_trading_str (s : _quality_summary) =
+  sprintf "%s%s"
+    (_fmt_opt_tpy s.trades_per_year)
+    (if s.over_trading_flag then " :rotating_light:" else "")
+
+let _score_rows ~(cur : _quality_summary) ~(prior : _quality_summary) =
+  (* Float metrics with optional values: spirit score, R-multiple stats. *)
+  let delta name f fmt =
+    _row_quality_metric ~label:name
+      ~current_str:(fmt (f cur))
+      ~prior_str:(fmt (f prior))
+      ~delta_str:
+        (_fmt_delta_signed (_delta_opt_float ~current:(f cur) ~prior:(f prior)))
+  in
+  [
+    delta "Weinstein spirit score" (fun s -> s.spirit_score) _fmt_opt_score;
+    delta "Mean R-multiple" (fun s -> s.mean_r_multiple) _fmt_opt_r;
+    delta "Median R-multiple" (fun s -> s.median_r_multiple) _fmt_opt_r;
+  ]
+
+let _count_rows ~(cur : _quality_summary) ~(prior : _quality_summary) =
+  (* Integer counts + win rate — deltas are always-defined arithmetic. *)
+  let delta_tpy =
+    _delta_opt_float ~current:cur.trades_per_year ~prior:prior.trades_per_year
+  in
+  [
+    _row_quality_metric ~label:"Trades / year"
+      ~current_str:(_over_trading_str cur) ~prior_str:(_over_trading_str prior)
+      ~delta_str:(_fmt_delta_float_opt delta_tpy);
+    _row_quality_metric ~label:"Exit winners too early (flagged / evaluated)"
+      ~current_str:
+        (_fmt_count_of cur.exit_winners_flagged cur.winners_evaluated)
+      ~prior_str:
+        (_fmt_count_of prior.exit_winners_flagged prior.winners_evaluated)
+      ~delta_str:
+        (sprintf "%+d" (cur.exit_winners_flagged - prior.exit_winners_flagged));
+    _row_quality_metric ~label:"Exit losers too late (flagged / evaluated)"
+      ~current_str:(_fmt_count_of cur.exit_losers_flagged cur.losers_evaluated)
+      ~prior_str:
+        (_fmt_count_of prior.exit_losers_flagged prior.losers_evaluated)
+      ~delta_str:
+        (sprintf "%+d" (cur.exit_losers_flagged - prior.exit_losers_flagged));
+    _row_quality_metric ~label:"Decision-quality win rate %"
+      ~current_str:(sprintf "%.1f" cur.decision_quality_win_rate_pct)
+      ~prior_str:(sprintf "%.1f" prior.decision_quality_win_rate_pct)
+      ~delta_str:
+        (sprintf "%+.1f"
+           (cur.decision_quality_win_rate_pct
+          -. prior.decision_quality_win_rate_pct));
+  ]
+
+let _quality_rows ~(cur : _quality_summary) ~(prior : _quality_summary) =
+  _score_rows ~cur ~prior @ _count_rows ~cur ~prior
+
+let _row_quality_for_pair (cur, prior) =
+  let cur_q = _summarize_quality cur.trade_quality in
+  let prior_q = _summarize_quality prior.trade_quality in
+  [
+    sprintf "### %s" cur.name;
+    "";
+    "| Metric | Current | Prior | Δ |";
+    "|---|---:|---:|---:|";
+  ]
+  @ _quality_rows ~cur:cur_q ~prior:prior_q
+  @ [ "" ]
+
+let _trade_quality_section paired =
+  let with_quality =
+    List.filter paired ~f:(fun (c, p) ->
+        Option.is_some c.trade_quality || Option.is_some p.trade_quality)
+  in
+  if List.is_empty with_quality then []
+  else
+    let header =
+      [
+        "## Trade quality";
+        "";
+        "Behavioural metrics + Weinstein conformance per scenario \
+         (`trade_audit.sexp` required). Δ is current minus prior — lower \
+         exit-winners-flagged / exit-losers-flagged is better; higher spirit \
+         score and mean R-multiple is better.";
+        "";
+      ]
+    in
+    let body = List.concat_map with_quality ~f:_row_quality_for_pair in
+    header @ body
+
 let render ?(thresholds = default_thresholds) (t : t) =
   let lines =
     _section_header ~title:"Release perf report" ~current:t.current_label
       ~prior:t.prior_label
     @ _trading_section t.paired
+    @ _trade_quality_section t.paired
     @ _rss_section ~thresholds t.paired
     @ _wall_section ~thresholds t.paired
     @ _one_sided_section ~title:"Current-only scenarios" t.current_only

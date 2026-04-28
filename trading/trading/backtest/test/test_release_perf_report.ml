@@ -35,10 +35,11 @@ let _make_summary ?(start_date = Date.of_string "2023-01-02")
   }
 
 let _make_run ?(name = "scenario") ?actual ?summary ?(peak_rss_kb = None)
-    ?(wall_seconds = None) () : Release_report.scenario_run =
+    ?(wall_seconds = None) ?(trade_quality = None) () :
+    Release_report.scenario_run =
   let actual = Option.value actual ~default:(_make_actual ()) in
   let summary = Option.value summary ~default:(_make_summary ()) in
-  { name; actual; summary; peak_rss_kb; wall_seconds }
+  { name; actual; summary; peak_rss_kb; wall_seconds; trade_quality }
 
 (* --- default_thresholds --- *)
 
@@ -355,6 +356,269 @@ let test_load_pairs_and_one_sided _ =
            (elements_are [ equal_to "prior-only" ]);
        ])
 
+(* --- Trade quality section ---
+
+   The "Trade quality" section is only rendered for scenarios where at least
+   one side has a [trade_quality] record. These tests build synthetic
+   {!Trade_audit_report.t} values, drive the renderer end-to-end, and pin the
+   header text + at least one row each from the behavioural / Weinstein /
+   decision-quality sub-summaries. *)
+
+let _date d = Date.of_string d
+
+let _make_audit_record ~symbol ~entry_date
+    ?(stage = Weinstein_types.Stage2 { weeks_advancing = 4; late = false })
+    ?(macro_trend = Weinstein_types.Bullish)
+    ?(cascade_grade = Weinstein_types.A) ?(cascade_score = 75)
+    ?(initial_risk_dollars = 6_000.0)
+    ?(stop_floor_kind = Backtest.Trade_audit.Buffer_fallback)
+    ?(rs_trend = Some Weinstein_types.Positive_rising)
+    ?(side = Trading_base.Types.Long) () : Backtest.Trade_audit.audit_record =
+  let entry : Backtest.Trade_audit.entry_decision =
+    {
+      symbol;
+      entry_date;
+      position_id = symbol ^ "-1";
+      macro_trend;
+      macro_confidence = 0.72;
+      macro_indicators = [];
+      stage;
+      ma_direction = Weinstein_types.Rising;
+      ma_slope_pct = 0.018;
+      rs_trend;
+      rs_value = Some 1.05;
+      volume_quality = Some (Weinstein_types.Strong 2.4);
+      resistance_quality = Some Weinstein_types.Clean;
+      support_quality = Some Weinstein_types.Clean;
+      sector_name = "Tech";
+      sector_rating = Screener.Strong;
+      cascade_score;
+      cascade_grade;
+      cascade_score_components = [];
+      cascade_rationale = [];
+      side;
+      suggested_entry = 100.0;
+      suggested_stop = 90.0;
+      installed_stop = 90.0;
+      stop_floor_kind;
+      risk_pct = 0.10;
+      initial_position_value = 60_000.0;
+      initial_risk_dollars;
+      alternatives_considered = [];
+    }
+  in
+  let exit_ : Backtest.Trade_audit.exit_decision =
+    {
+      symbol;
+      exit_date = Date.add_days entry_date 100;
+      position_id = symbol ^ "-1";
+      exit_trigger =
+        Backtest.Stop_log.Stop_loss { stop_price = 90.0; actual_price = 89.0 };
+      macro_trend_at_exit = Weinstein_types.Neutral;
+      macro_confidence_at_exit = 0.45;
+      stage_at_exit = Weinstein_types.Stage3 { weeks_topping = 2 };
+      rs_trend_at_exit = Some Weinstein_types.Positive_flat;
+      distance_from_ma_pct = -0.025;
+      max_favorable_excursion_pct = 0.08;
+      max_adverse_excursion_pct = -0.05;
+      weeks_macro_was_bearish = 0;
+      weeks_stage_left_2 = 1;
+    }
+  in
+  { entry; exit_ = Some exit_ }
+
+let _make_trade ~symbol ~entry_date ?(days_held = 100) ?(entry_price = 100.0)
+    ?(exit_price = 110.0) ?(quantity = 100.0) ?(pnl_dollars = 1_000.0)
+    ?(pnl_percent = 10.0) () : Trading_simulation.Metrics.trade_metrics =
+  {
+    symbol;
+    entry_date;
+    exit_date = Date.add_days entry_date days_held;
+    days_held;
+    entry_price;
+    exit_price;
+    quantity;
+    pnl_dollars;
+    pnl_percent;
+  }
+
+let _make_trade_quality ~entries : Trade_audit_report.t =
+  (* [entries] is a list of (symbol, entry_date, pnl_dollars) triples — one
+     audit record + one matching round-trip per entry. *)
+  let trade_audit =
+    List.map entries ~f:(fun (symbol, entry_date, _pnl) ->
+        _make_audit_record ~symbol ~entry_date ())
+  in
+  let trades =
+    List.map entries ~f:(fun (symbol, entry_date, pnl) ->
+        _make_trade ~symbol ~entry_date ~pnl_dollars:pnl
+          ~pnl_percent:(pnl /. 100.0) ())
+  in
+  Trade_audit_report.render ~scenario_name:"recovery-2023" ~trade_audit ~trades
+    ()
+
+let test_render_omits_trade_quality_when_both_none _ =
+  let cur = _make_run ~name:"recovery-2023" () in
+  let prior = _make_run ~name:"recovery-2023" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"## Trade quality")
+           (equal_to false);
+         field
+           (fun s -> String.is_substring s ~substring:"Weinstein spirit score")
+           (equal_to false);
+       ])
+
+let test_render_includes_trade_quality_when_present _ =
+  let entries =
+    [
+      ("AAPL", _date "2023-02-01", 1_500.0);
+      ("MSFT", _date "2023-04-15", 2_000.0);
+      ("WRB", _date "2023-09-20", -800.0);
+    ]
+  in
+  let prior_entries =
+    [
+      ("AAPL", _date "2023-02-01", 800.0);
+      ("MSFT", _date "2023-04-15", 1_200.0);
+      ("WRB", _date "2023-09-20", -1_500.0);
+    ]
+  in
+  let cur =
+    _make_run ~name:"recovery-2023"
+      ~trade_quality:(Some (_make_trade_quality ~entries))
+      ()
+  in
+  let prior =
+    _make_run ~name:"recovery-2023"
+      ~trade_quality:(Some (_make_trade_quality ~entries:prior_entries))
+      ()
+  in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"## Trade quality")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s ~substring:"| Weinstein spirit score |")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"| Mean R-multiple |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s ~substring:"| Decision-quality win rate % |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Exit winners too early (flagged / evaluated) |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Exit losers too late (flagged / evaluated) |")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"### recovery-2023")
+           (equal_to true);
+       ])
+
+let test_render_includes_trade_quality_when_only_current _ =
+  (* Section renders even when only one side has audit data; the absent side
+     surfaces "n/a" in the spirit-score / R-multiple cells. *)
+  let entries = [ ("AAPL", _date "2023-02-01", 1_500.0) ] in
+  let cur =
+    _make_run ~name:"recovery-2023"
+      ~trade_quality:(Some (_make_trade_quality ~entries))
+      ()
+  in
+  let prior = _make_run ~name:"recovery-2023" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"## Trade quality")
+           (equal_to true);
+         (* Prior side has no audit -> spirit score column shows "n/a". *)
+         field
+           (fun s ->
+             String.is_substring s ~substring:"| Weinstein spirit score |")
+           (equal_to true);
+       ])
+
+(* --- Loader: trade_quality round-trip via on-disk fixtures --- *)
+
+let _write_trades_csv path =
+  _write_text path
+    "symbol,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger\n\
+     AAPL,2023-02-01,2023-05-01,90,100.00,110.00,100,1000.00,10.00,90.00,108.00,signal_reversal\n\
+     MSFT,2023-04-15,2023-07-15,90,250.00,275.00,50,1250.00,10.00,225.00,270.00,signal_reversal\n"
+
+let _write_trade_audit_sexp path =
+  let records =
+    [
+      _make_audit_record ~symbol:"AAPL" ~entry_date:(_date "2023-02-01") ();
+      _make_audit_record ~symbol:"MSFT" ~entry_date:(_date "2023-04-15") ();
+    ]
+  in
+  let sexp = Backtest.Trade_audit.sexp_of_audit_records records in
+  Sexp.save_hum path sexp
+
+let test_load_scenario_run_loads_trade_quality_when_present _ =
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_audit_" in
+  _make_scenario_dir ~root:dir "with-audit" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "with-audit" in
+  _write_trades_csv (Filename.concat scenario_dir "trades.csv");
+  _write_trade_audit_sexp (Filename.concat scenario_dir "trade_audit.sexp");
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.trade_quality
+    (is_some_and
+       (field
+          (fun (t : Trade_audit_report.t) -> t.header.total_round_trips)
+          (equal_to 2)))
+
+let test_load_scenario_run_no_trade_quality_when_trades_csv_missing _ =
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_audit_" in
+  _make_scenario_dir ~root:dir "no-audit" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "no-audit" in
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.trade_quality is_none
+
 let suite =
   "release_perf_report"
   >::: [
@@ -368,12 +632,22 @@ let suite =
          >:: test_render_custom_threshold_suppresses_flag;
          "render no pairs" >:: test_render_no_pairs;
          "render one-sided scenarios listed" >:: test_render_one_sided_scenarios;
+         "render omits trade quality when both none"
+         >:: test_render_omits_trade_quality_when_both_none;
+         "render includes trade quality when present"
+         >:: test_render_includes_trade_quality_when_present;
+         "render includes trade quality when only current"
+         >:: test_render_includes_trade_quality_when_only_current;
          "load_scenario_run reads all fields"
          >:: test_load_scenario_run_reads_all_fields;
          "load_scenario_run missing perf files -> None"
          >:: test_load_scenario_run_missing_perf_files_is_none;
          "load pairs scenarios and tracks one-sided"
          >:: test_load_pairs_and_one_sided;
+         "load_scenario_run loads trade_quality when present"
+         >:: test_load_scenario_run_loads_trade_quality_when_present;
+         "load_scenario_run no trade_quality when trades.csv missing"
+         >:: test_load_scenario_run_no_trade_quality_when_trades_csv_missing;
        ]
 
 let () = run_test_tt_main suite

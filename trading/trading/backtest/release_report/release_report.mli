@@ -66,12 +66,20 @@ type scenario_run = {
   summary : summary_meta;
   peak_rss_kb : int option;
   wall_seconds : float option;
+  trade_quality : Trade_audit_report.t option;
+      (** Loaded from [trade_audit.sexp] + [trades.csv] in the scenario dir when
+          present. [None] for pre-PR-2 outputs that did not capture an audit
+          trail, or when [trades.csv] is missing. The report renders an
+          additional "Trade quality" section for paired scenarios where at least
+          one side has [Some _]. *)
 }
 [@@deriving sexp]
 (** One scenario's per-run readings — the [actual] block plus optional
-    infra-perf measurements. Both [peak_rss_kb] and [wall_seconds] are [None]
-    when the corresponding sibling files are absent in the batch dir; the report
-    still renders trading metrics in that case. *)
+    infra-perf measurements and an optional trade-audit summary. Both
+    [peak_rss_kb] and [wall_seconds] are [None] when the corresponding sibling
+    files are absent in the batch dir; the report still renders trading metrics
+    in that case. [trade_quality] is [None] when no audit artefacts were found
+    or when the audit was empty (no trades). *)
 
 type t = {
   current_label : string;

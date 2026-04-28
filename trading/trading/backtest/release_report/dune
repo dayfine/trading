@@ -1,6 +1,5 @@
 (library
  (name release_report)
- (public_name trading.backtest.release_report)
- (libraries core core_unix core_unix.sys_unix)
+ (libraries core core_unix core_unix.sys_unix trade_audit_report)
  (preprocess
   (pps ppx_sexp_conv)))
