@@ -7,7 +7,8 @@
   test_panel_loader_parity
   test_backtest_runner_args
   test_gc_trace
-  test_panel_runner_gc_trace)
+  test_panel_runner_gc_trace
+  test_release_perf_report)
  (libraries
   ounit2
   core
@@ -18,6 +19,7 @@
   fpath
   backtest
   trading.backtest.runner_args
+  trading.backtest.release_report
   scenario_lib
   weinstein.data_source
   trading.base
