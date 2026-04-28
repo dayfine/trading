@@ -259,7 +259,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     (Date.to_string start_date)
     (Date.to_string end_date)
     (Date.to_string warmup_start);
-  let sim_result, stop_log =
+  let sim_result, stop_log, trade_audit =
     _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
@@ -280,18 +280,15 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
      consumers use the series. *)
   let steps = List.filter steps_in_range ~f:is_trading_day in
   let final_value = (List.last_exn steps).portfolio_value in
-  let round_trips, stop_infos =
+  let round_trips, stop_infos, audit =
     Trace.record ?trace Trace.Phase.Teardown (fun () ->
         ( Metrics.extract_round_trips steps_in_range,
-          Stop_log.get_stop_infos stop_log ))
+          Stop_log.get_stop_infos stop_log,
+          Trade_audit.get_audit_records trade_audit ))
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
   let summary =
     _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
       ~sim_result
   in
-  (* PR-1 of trade-audit: empty audit list. PR-2 will create a
-     [Trade_audit.t] here, thread it through [_run_panel_backtest], and
-     drain it into [audit] alongside [stop_infos]. *)
-  let audit = [] in
   { summary; round_trips; steps; overrides; stop_infos; audit }

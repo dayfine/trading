@@ -25,6 +25,15 @@ module Weekly_ma_cache = Weekly_ma_cache
 (** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
     Stops MA reads keyed by [(symbol, ma_type, period)]. *)
 
+module Audit_recorder = Audit_recorder
+(** Decision-trail recorder. See [audit_recorder.mli]. *)
+
+module Entry_audit_capture = Entry_audit_capture
+(** Per-candidate entry construction + audit emission. *)
+
+module Exit_audit_capture = Exit_audit_capture
+(** Exit-side trade-audit capture. *)
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -72,92 +81,6 @@ let name = "Weinstein"
 (* Helpers                                                              *)
 (* ------------------------------------------------------------------ *)
 
-let _position_counter = ref 0
-
-let _gen_position_id symbol =
-  Int.incr _position_counter;
-  Printf.sprintf "%s-wein-%d" symbol !_position_counter
-
-(** Normalise (entry, stop) to the order [Portfolio_risk.compute_position_size]
-    expects: entry first, stop below. For longs that's the identity (stop <
-    entry); for shorts we swap (stop > entry → [max, min]). The result has the
-    same absolute risk per share, so [sizing.shares] is unchanged between sides.
-*)
-let _normalised_entry_stop_for_sizing (cand : Screener.scored_candidate) =
-  let open Trading_base.Types in
-  match cand.side with
-  | Long -> (cand.suggested_entry, cand.suggested_stop)
-  | Short ->
-      ( Float.max cand.suggested_entry cand.suggested_stop,
-        Float.min cand.suggested_entry cand.suggested_stop )
-
-(** Try to build a CreateEntering transition for one screened candidate.
-    Registers the initial stop state as a side effect. Returns None if the
-    candidate is un-sizeable (zero portfolio value or zero shares). The initial
-    stop comes from
-    {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}, which
-    pulls a prior correction low (long) or counter-rally high (short) from
-    [cand]'s bar history, falling back to the fixed-buffer proxy. *)
-let _make_entry_transition ~config ~stop_states ~bar_reader ~portfolio_value
-    ~current_date (cand : Screener.scored_candidate) =
-  let entry_for_sizing, stop_for_sizing =
-    _normalised_entry_stop_for_sizing cand
-  in
-  let sizing =
-    Portfolio_risk.compute_position_size ~config:config.portfolio_config
-      ~portfolio_value ~entry_price:entry_for_sizing ~stop_price:stop_for_sizing
-      ()
-  in
-  if sizing.shares = 0 then None
-  else
-    let id = _gen_position_id cand.ticker in
-    (* Stage 4 PR-A: read a daily view directly from panels — no
-       [Daily_price.t list]. The view is windowed to [support_floor_lookback_bars]
-       at construction, matching the wrapper [callbacks_from_bars] semantics. *)
-    let daily_view =
-      Bar_reader.daily_view_for bar_reader ~symbol:cand.ticker
-        ~as_of:current_date
-        ~lookback:config.stops_config.support_floor_lookback_bars
-    in
-    let callbacks =
-      Panel_callbacks.support_floor_callbacks_of_daily_view daily_view
-    in
-    let initial_stop =
-      Weinstein_stops.compute_initial_stop_with_floor_with_callbacks
-        ~config:config.stops_config ~side:cand.side
-        ~entry_price:cand.suggested_entry ~callbacks
-        ~fallback_buffer:config.initial_stop_buffer
-    in
-    stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
-    let description =
-      Printf.sprintf "Weinstein %s: %s"
-        (Weinstein_types.grade_to_string cand.grade)
-        (String.concat ~sep:"; " cand.rationale)
-    in
-    let reasoning = Position.ManualDecision { description } in
-    let kind =
-      Position.CreateEntering
-        {
-          symbol = cand.ticker;
-          side = cand.side;
-          target_quantity = Float.of_int sizing.shares;
-          entry_price = cand.suggested_entry;
-          reasoning;
-        }
-    in
-    Some { Position.position_id = id; date = current_date; kind }
-
-(** Check that entry cost fits remaining cash; deduct if so. *)
-let _check_cash_and_deduct remaining_cash (trans : Position.transition) =
-  match trans.kind with
-  | Position.CreateEntering e ->
-      let cost = e.target_quantity *. e.entry_price in
-      if Float.( > ) cost !remaining_cash then None
-      else (
-        remaining_cash := !remaining_cash -. cost;
-        Some trans)
-  | _ -> Some trans
-
 (** Collect ticker symbols of positions the strategy is still holding (or still
     trying to enter/exit). Closed positions are excluded — the strategy has no
     stake in them and must be free to re-enter the symbol.
@@ -176,45 +99,47 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
-(** Try to convert a single screener candidate to a kept transition. Returns
-    [None] when the ticker is already held, when sizing rejects it, or when cash
-    is insufficient. *)
-let _candidate_to_transition ~held_set ~make_entry ~remaining_cash
-    (c : Screener.scored_candidate) =
-  if Set.mem held_set c.ticker then None
-  else Option.bind (make_entry c) ~f:(_check_cash_and_deduct remaining_cash)
-
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
     Public (see .mli) so callers running custom screening out-of-band can feed
     candidates through the same entry pipeline the strategy uses.
 
-    Was: chained [List.filter |> List.filter_map |> List.filter_map] over
-    [candidates] — three list traversals each allocating a fresh intermediate
-    list. Now: one [List.fold] walks [candidates] once, calls
-    [_candidate_to_transition] per element, and accumulates a single reversed
-    output list. The cash-deduction side effect on [remaining_cash] runs in the
-    same order it did before — every successful entry decrements
-    [remaining_cash] before the next candidate is considered — so we preserve
-    the "first-come keeps cash" tie-break. Per the perf followup notes under
-    dev/notes/: List.filter was the top allocator on the strategy hot path. *)
+    The walk produces a tagged decision list (see
+    {!Entry_audit_capture.candidate_decision}). After the walk, kept candidates
+    are emitted to [audit_recorder.record_entry] with the rivals they outranked
+    — this is the PR-2 entry-capture site. The output transition list (in
+    original screener order) is bit-equivalent to the pre-audit shape: same
+    candidates, same transitions, same side-effects on [stop_states] and
+    [remaining_cash]. *)
 let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
-    ~(portfolio : Portfolio_view.t) ~get_price ~current_date =
+    ~(portfolio : Portfolio_view.t) ~get_price ~current_date
+    ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let remaining_cash = ref portfolio.cash in
   let make_entry =
-    _make_entry_transition ~config ~stop_states ~bar_reader ~portfolio_value
-      ~current_date
+    Entry_audit_capture.make_entry_transition
+      ~portfolio_risk_config:config.portfolio_config
+      ~stops_config:config.stops_config
+      ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
+      ~portfolio_value ~current_date
   in
-  List.fold candidates ~init:[] ~f:(fun acc c ->
-      match
-        _candidate_to_transition ~held_set ~make_entry ~remaining_cash c
-      with
-      | None -> acc
-      | Some kept -> kept :: acc)
-  |> List.rev
+  let decisions =
+    List.map candidates ~f:(fun c ->
+        ( c,
+          Entry_audit_capture.classify_candidate ~held_set ~make_entry
+            ~remaining_cash c ))
+  in
+  let kept =
+    List.filter_map decisions ~f:(fun (_, d) ->
+        match d with
+        | Entry_audit_capture.Kept (trans, _) -> Some trans
+        | Skipped _ -> None)
+  in
+  Entry_audit_capture.emit_entries ~audit_recorder ~macro ~current_date
+    ~decisions;
+  kept
 
 (** Stage 4-5 PR-A: a symbol survives Phase 1 only when its stage could in
     principle yield a screener candidate ([Stage2 _] for longs; [Stage4 _] for
@@ -341,9 +266,9 @@ let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
     pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
     right shape per regime. *)
-let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
-    ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
-    ~current_date =
+let _screen_universe ~config ~index_view ~(macro_result : Macro.result)
+    ~sector_map ~stop_states ~(portfolio : Portfolio_view.t) ~get_price
+    ~bar_reader ~prior_stages ~current_date ~audit_recorder =
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
@@ -359,15 +284,17 @@ let _screen_universe ~config ~index_view ~macro_trend ~sector_map ~stop_states
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =
-    Screener.screen ~config:config.screening_config ~macro_trend ~sector_map
-      ~stocks ~held_tickers:(held_symbols portfolio)
+    Screener.screen ~config:config.screening_config
+      ~macro_trend:macro_result.trend ~sector_map ~stocks
+      ~held_tickers:(held_symbols portfolio)
   in
   let combined_candidates =
     screen_result.Screener.buy_candidates
     @ screen_result.Screener.short_candidates
   in
   entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
-    ~bar_reader ~portfolio ~get_price ~current_date
+    ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
+    ~macro:macro_result ()
 
 (* ------------------------------------------------------------------ *)
 (* make                                                                  *)
@@ -390,9 +317,9 @@ let _is_screening_day_view (view : Data_panel.Bar_panels.weekly_view) =
     Bullish — happens inside the screener. Under Bearish this yields short-side
     entries (per the bear-market shorting chapter), where previously the branch
     returned [] unconditionally. *)
-let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_view =
+let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~prior_macro_result
+    ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
+    ~portfolio ~current_date ~index_view ~audit_recorder =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
   let global_index_views =
     Macro_inputs.build_global_index_views ~lookback_bars:config.lookback_bars
@@ -413,19 +340,21 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
       ~callbacks:macro_callbacks ~prior_stage:index_prior_stage ~prior:None
   in
   prior_macro := macro_result.trend;
+  prior_macro_result := Some macro_result;
   let sector_map =
     Macro_inputs.build_sector_map ?ma_cache ~stage_config:config.stage_config
       ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
       ~bar_reader ~as_of:current_date ~sector_prior_stages ~index_view
       ~ticker_sectors ()
   in
-  _screen_universe ~config ~index_view ~macro_trend:macro_result.trend
-    ~sector_map ~stop_states ~portfolio ~get_price ~bar_reader ~prior_stages
-    ~current_date
+  _screen_universe ~config ~index_view ~macro_result ~sector_map ~stop_states
+    ~portfolio ~get_price ~bar_reader ~prior_stages ~current_date
+    ~audit_recorder
 
-let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
-    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
+let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
+    ~prior_macro_result ~bar_reader ~prior_stages ~sector_prior_stages
+    ~ticker_sectors ~audit_recorder ~get_price ~get_indicator:_
+    ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let current_date =
     match get_price config.indices.primary with
@@ -439,6 +368,11 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
       ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
       ~bar_reader ~as_of:current_date ~prior_stages ()
   in
+  List.iter exit_transitions
+    ~f:
+      (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
+         ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
+         ~bar_reader ~prior_stages ~positions);
   (* Stage 4 PR-A: read the primary index as a weekly view directly. The
      Friday detection uses the view's latest date; the screener path consumes
      the same view to avoid building two parallel inputs. *)
@@ -449,9 +383,9 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
   let entry_transitions =
     if not (_is_screening_day_view index_view) then []
     else
-      _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
-        ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-        ~current_date ~index_view
+      _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~prior_macro_result
+        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+        ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
   in
   Ok
     {
@@ -460,11 +394,17 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro ~bar_reader
     }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels config =
+    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels
+    ?(audit_recorder = Audit_recorder.noop) config =
   let stop_states = ref initial_stop_states in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
+  (* Cached full macro result for exit-time audit capture. Updated alongside
+     [prior_macro] inside [_run_screen]. Held as an option until the first
+     Friday so an exit firing before the first screen call gets a stable
+     [Neutral / 0.0] snapshot. *)
+  let prior_macro_result : Macro.result option ref = ref None in
   (* Stage 4 PR-D: when bar_panels are present, also create a [Weekly_ma_cache]
      scoped to this strategy and bundle it into the [Bar_reader]. The cache
      is read by [Panel_callbacks.stage_callbacks_of_weekly_view] (and
@@ -495,6 +435,7 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
 
     let on_market_close =
       _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states ~prior_macro
-        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+        ~prior_macro_result ~bar_reader ~prior_stages ~sector_prior_stages
+        ~ticker_sectors ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)

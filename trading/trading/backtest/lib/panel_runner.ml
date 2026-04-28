@@ -69,7 +69,8 @@ let _build_indicators ~ohlcv ~n_days =
   let symbol_index = Ohlcv_panels.symbol_index ohlcv in
   Indicator_panels.create ~symbol_index ~n_days ~specs:_default_specs
 
-let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar =
+let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar
+    ~audit_recorder =
   (* The inner Weinstein strategy reads OHLCV bars from
      {!Data_panel.Bar_panels} (populated up-front from CSV at runner start).
      Stage 3 PR-C deleted the Tiered tier system + parallel [Bar_history]
@@ -78,7 +79,8 @@ let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar =
      [get_indicator_fn]. *)
   let inner_strategy =
     Weinstein_strategy.make ~ad_bars:input.ad_bars
-      ~ticker_sectors:input.ticker_sectors ~bar_panels input.config
+      ~ticker_sectors:input.ticker_sectors ~bar_panels ~audit_recorder
+      input.config
   in
   let panel_config : Panel_strategy_wrapper.config =
     {
@@ -91,11 +93,13 @@ let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar =
   in
   Panel_strategy_wrapper.wrap ~config:panel_config inner_strategy
 
-let _make_simulator (input : input) ~stop_log ~start_date ~end_date ~warmup_days
-    ~initial_cash ~commission ~ohlcv ~indicators ~calendar ~bar_panels =
+let _make_simulator (input : input) ~stop_log ~audit_recorder ~start_date
+    ~end_date ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators
+    ~calendar ~bar_panels =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy =
     _build_strategy input ~bar_panels ~ohlcv ~indicators ~calendar
+      ~audit_recorder
   in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let sim_deps =
@@ -193,13 +197,16 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     (Ohlcv_panels.n ohlcv) n_days
     (List.length _default_specs);
   let stop_log = Stop_log.create () in
+  let trade_audit = Trade_audit.create () in
+  let audit_recorder = Trade_audit_recorder.of_collector trade_audit in
   let n_all_symbols = List.length input.all_symbols in
   let sim =
-    _make_simulator input ~stop_log ~start_date ~end_date ~warmup_days
-      ~initial_cash ~commission ~ohlcv ~indicators ~calendar ~bar_panels
+    _make_simulator input ~stop_log ~audit_recorder ~start_date ~end_date
+      ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators ~calendar
+      ~bar_panels
   in
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
         _run_simulator_with_gc_trace ?gc_trace sim)
   in
-  (sim_result, stop_log)
+  (sim_result, stop_log, trade_audit)

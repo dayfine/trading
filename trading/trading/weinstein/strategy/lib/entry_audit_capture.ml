@@ -1,0 +1,177 @@
+(** Entry-side trade-audit capture. See [entry_audit_capture.mli]. *)
+
+open Core
+open Trading_strategy
+
+type entry_meta = {
+  position_id : string;
+  shares : int;
+  installed_stop : float;
+  stop_floor_kind : Audit_recorder.stop_floor_kind;
+}
+
+type candidate_decision =
+  | Kept of Position.transition * entry_meta
+  | Skipped of Audit_recorder.skip_reason
+
+let classify_stop_floor_kind ~stops_config ~callbacks ~side :
+    Audit_recorder.stop_floor_kind =
+  match
+    Weinstein_stops.Support_floor.find_recent_level_with_callbacks ~callbacks
+      ~side ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct
+  with
+  | Some _ -> Support_floor
+  | None -> Buffer_fallback
+
+(* ------------------------------------------------------------------ *)
+(* Per-candidate entry construction                                     *)
+(* ------------------------------------------------------------------ *)
+
+let _position_counter = ref 0
+
+let gen_position_id symbol =
+  Int.incr _position_counter;
+  Printf.sprintf "%s-wein-%d" symbol !_position_counter
+
+(** Normalise (entry, stop) to the order [Portfolio_risk.compute_position_size]
+    expects: entry first, stop below. For longs that's the identity (stop <
+    entry); for shorts we swap (stop > entry → [max, min]). *)
+let _normalised_entry_stop_for_sizing (cand : Screener.scored_candidate) =
+  let open Trading_base.Types in
+  match cand.side with
+  | Long -> (cand.suggested_entry, cand.suggested_stop)
+  | Short ->
+      ( Float.max cand.suggested_entry cand.suggested_stop,
+        Float.min cand.suggested_entry cand.suggested_stop )
+
+let make_entry_transition ~portfolio_risk_config ~stops_config
+    ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value ~current_date
+    (cand : Screener.scored_candidate) =
+  let entry_for_sizing, stop_for_sizing =
+    _normalised_entry_stop_for_sizing cand
+  in
+  let sizing =
+    Portfolio_risk.compute_position_size ~config:portfolio_risk_config
+      ~portfolio_value ~entry_price:entry_for_sizing ~stop_price:stop_for_sizing
+      ()
+  in
+  if sizing.shares = 0 then None
+  else
+    let id = gen_position_id cand.ticker in
+    let daily_view =
+      Bar_reader.daily_view_for bar_reader ~symbol:cand.ticker
+        ~as_of:current_date
+        ~lookback:stops_config.Weinstein_stops.support_floor_lookback_bars
+    in
+    let callbacks =
+      Panel_callbacks.support_floor_callbacks_of_daily_view daily_view
+    in
+    let initial_stop =
+      Weinstein_stops.compute_initial_stop_with_floor_with_callbacks
+        ~config:stops_config ~side:cand.side ~entry_price:cand.suggested_entry
+        ~callbacks ~fallback_buffer:initial_stop_buffer
+    in
+    let stop_floor_kind =
+      classify_stop_floor_kind ~stops_config ~callbacks ~side:cand.side
+    in
+    stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
+    let description =
+      Printf.sprintf "Weinstein %s: %s"
+        (Weinstein_types.grade_to_string cand.grade)
+        (String.concat ~sep:"; " cand.rationale)
+    in
+    let reasoning = Position.ManualDecision { description } in
+    let kind =
+      Position.CreateEntering
+        {
+          symbol = cand.ticker;
+          side = cand.side;
+          target_quantity = Float.of_int sizing.shares;
+          entry_price = cand.suggested_entry;
+          reasoning;
+        }
+    in
+    let transition = { Position.position_id = id; date = current_date; kind } in
+    let meta : entry_meta =
+      {
+        position_id = id;
+        shares = sizing.shares;
+        installed_stop = Weinstein_stops.get_stop_level initial_stop;
+        stop_floor_kind;
+      }
+    in
+    Some (transition, meta)
+
+let check_cash_and_deduct ~remaining_cash
+    ((trans : Position.transition), (meta : entry_meta)) =
+  match trans.kind with
+  | Position.CreateEntering e ->
+      let cost = e.target_quantity *. e.entry_price in
+      if Float.( > ) cost !remaining_cash then None
+      else (
+        remaining_cash := !remaining_cash -. cost;
+        Some (trans, meta))
+  | _ -> Some (trans, meta)
+
+let classify_candidate ~held_set ~make_entry ~remaining_cash
+    (c : Screener.scored_candidate) : candidate_decision =
+  if Set.mem held_set c.ticker then Skipped Already_held
+  else
+    match make_entry c with
+    | None -> Skipped Sized_to_zero
+    | Some (trans, meta) -> (
+        match check_cash_and_deduct ~remaining_cash (trans, meta) with
+        | Some (trans, meta) -> Kept (trans, meta)
+        | None -> Skipped Insufficient_cash)
+
+let alternatives_of_decisions ~decisions ~exclude_position_id :
+    Audit_recorder.alternative_input list =
+  List.filter_map decisions ~f:(fun (candidate, decision) ->
+      match decision with
+      | Skipped reason -> Some { Audit_recorder.candidate; reason }
+      | Kept (_, meta) ->
+          if String.equal meta.position_id exclude_position_id then None
+          else None)
+
+let build_entry_event ~(macro : Macro.result) ~current_date
+    ~(candidate : Screener.scored_candidate) ~(meta : entry_meta)
+    ~(alternatives : Audit_recorder.alternative_input list) :
+    Audit_recorder.entry_event =
+  let initial_position_value =
+    Float.of_int meta.shares *. candidate.suggested_entry
+  in
+  let initial_risk_dollars =
+    Float.of_int meta.shares
+    *. Float.abs (candidate.suggested_entry -. meta.installed_stop)
+  in
+  {
+    Audit_recorder.position_id = meta.position_id;
+    candidate;
+    macro;
+    current_date;
+    installed_stop = meta.installed_stop;
+    stop_floor_kind = meta.stop_floor_kind;
+    shares = meta.shares;
+    initial_position_value;
+    initial_risk_dollars;
+    alternatives;
+  }
+
+let emit_entries ~(audit_recorder : Audit_recorder.t)
+    ~(macro : Macro.result option) ~current_date ~decisions =
+  match macro with
+  | None -> ()
+  | Some macro ->
+      List.iter decisions ~f:(fun (candidate, d) ->
+          match d with
+          | Skipped _ -> ()
+          | Kept (_, meta) ->
+              let alternatives =
+                alternatives_of_decisions ~decisions
+                  ~exclude_position_id:meta.position_id
+              in
+              let event =
+                build_entry_event ~macro ~current_date ~candidate ~meta
+                  ~alternatives
+              in
+              audit_recorder.record_entry event)

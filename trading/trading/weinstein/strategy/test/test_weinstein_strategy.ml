@@ -593,6 +593,7 @@ let test_entries_from_candidates_emits_short _ =
     entries_from_candidates ~config:cfg ~candidates:[ cand ] ~stop_states
       ~bar_reader ~portfolio ~get_price
       ~current_date:(Date.of_string "2024-01-05")
+      ()
   in
   assert_that transitions
     (elements_are
@@ -637,6 +638,7 @@ let test_entries_from_candidates_emits_long _ =
     entries_from_candidates ~config:cfg ~candidates:[ cand ] ~stop_states
       ~bar_reader ~portfolio ~get_price
       ~current_date:(Date.of_string "2024-01-05")
+      ()
   in
   assert_that transitions
     (elements_are
