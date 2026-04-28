@@ -3,11 +3,14 @@
 ## Last updated: 2026-04-28
 
 ## Status
-PARTIAL_DONE
+IN_PROGRESS
 
 Phase 1 (measurement infra) merged (#609). Phase 2 was replanned via
 PR #611 into two separate plans after Phase 1 results showed the
-original 3-tier design wouldn't move RSS:
+original 3-tier design wouldn't move RSS. Option 1 (engine-layer
+pooling) is DONE as of 2026-04-28; Option 2 (daily-snapshot streaming)
+remains P1 future work, so the track stays IN_PROGRESS rather than
+MERGED.
 
 - **Option 1: Engine-layer pooling** — DONE 2026-04-28. Five PRs
   (#618 instrumentation, #626 Scratch type, #628 thread per-tick,
