@@ -1,6 +1,6 @@
 # Status: backtest-perf
 
-## Last updated: 2026-04-27 (PR-4 of engine-pooling)
+## Last updated: 2026-04-28
 
 ## Status
 IN_PROGRESS
@@ -25,9 +25,13 @@ per-tick loop) opened at `feat/backtest-perf-engine-pool-thread` on
 parity-tested via `test_panel_loader_parity` and
 `test_engine_scratch_threading_parity`**; **PR-4 (transient
 buffer pool for `_sample_student_t.sum_squares` accumulator +
-`Hashtbl.find_or_add` in `update_market`) opened at
-`feat/backtest-perf-engine-pool-pool` on 2026-04-27 — PR #632**;
-PR-5 (matrix re-run validation) still outstanding. Step 5 (release_perf_report OCaml exe) tracked separately;
+`Hashtbl.find_or_add` in `update_market`) merged via PR #632 on
+2026-04-27**; **PR-5 (matrix re-run validation) opened at
+`feat/backtest-perf-engine-pool-matrix` on 2026-04-28 — measured
+β: 4.3 → 3.94 MB/symbol (−8%, far short of plan's 1-1.5 target);
+wall: −36% at 292×6y (2:51 → 1:49). All 5 engine-pool PRs landed
+or in flight. See `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`**.
+Step 5 (release_perf_report OCaml exe) tracked separately;
 landed via #585 / #606 on the test-data + perf-runner side. Tier-4
 release-gate scenarios structurally unblocked since data-panels
 Stage 4.5 PR-B (#604) merged 2026-04-27T02:33Z.
@@ -85,7 +89,7 @@ mechanics + release-gate procedure.
   per-call allocation breakdown (~3.2 KB float-array alloc dropped
   per `update_market` call after the symbol's first day).
 - **`feat/backtest-perf-engine-pool-pool`** (engine-pooling PR-4) —
-  PR #632 open for review. Adds `Buffer_pool.{ml,mli}` (Stack-backed
+  PR #632 merged 2026-04-27. Adds `Buffer_pool.{ml,mli}` (Stack-backed
   pool of `float array` workspaces with `acquire ?capacity () /
   release` API, bounded by `max_size`). Routes the per-call
   `_sample_student_t` chi-squared accumulator (was `let acc = ref
@@ -98,6 +102,20 @@ mechanics + release-gate procedure.
   9-test `test_buffer_pool.ml` pins the pool's API contract;
   `test_golden_bit_equality` and `test_panel_loader_parity` (the
   load-bearing parity gates) pass unchanged.
+- **`feat/backtest-perf-engine-pool-matrix`** (engine-pooling PR-5) —
+  open for review. Re-runs the 4-cell matrix (N×T = {50,292}×{1y,6y})
+  with all four engine-pool PRs landed. **β: 4.3 → 3.94 MB/symbol
+  (−8%, far short of plan's 1-1.5 MB/symbol target). Wall: −36% at
+  292×6y (2:51 → 1:49)**. The cumulative-promotion target *was* hit
+  (50×1y `promoted_words = 85.8M` < plan's 100M target); peak RSS
+  didn't move because at the post-#602+GC-tuned baseline RSS is
+  dominated by the major-heap working set, not allocation churn. New
+  fit: `RSS ≈ 67 + 3.94·N + 0.19·N·(T−1)` MB. Tier-4 implication:
+  N=1000×10y at ~5.7 GB still fits 8 GB; N≥5000 still requires
+  daily-snapshot streaming (separate plan
+  `dev/plans/daily-snapshot-streaming-2026-04-27.md`). Note:
+  `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md`. No
+  code changes — pure measurement + docs PR.
 - **`feat/backtest-perf-release-report`** (Step 6 — release_perf_report
   OCaml exe) — open for review. Adds
   `trading/trading/backtest/release_report/` library +
