@@ -3,11 +3,12 @@
 ## Last updated: 2026-04-28
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
 PR-1 (data model + `Stage_transition_scanner`) implemented and opened
-as draft PR #652 on branch `feat/optimal-strategy-pr1`. PR-2
-(`Outcome_scorer`) is the next slice.
+as PR #652 on branch `feat/optimal-strategy-pr1` — marked ready for
+review (13/13 tests pass; `dune build && dune build @fmt` clean). PR-2
+(`Outcome_scorer`) is the next slice; track stays open.
 
 ## Goal
 
