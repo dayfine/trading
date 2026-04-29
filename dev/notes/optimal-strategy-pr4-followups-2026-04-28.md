@@ -61,7 +61,7 @@ small smoke test through a synthetic-panel fixture is added.
   the trade-audit's per-Friday cascade summaries / rejection diagnostics.
   Missing-audit case: pass `[]` (renderer renders without reasons).
 
-### Follow-up B — fuller renderer fixture tests
+### Follow-up B — fuller renderer fixture tests — DONE (2026-04-29)
 
 The smoke tests pin section presence + a few key substrings. The plan
 asked for "the rendered markdown contains the expected divergence rows,
@@ -72,6 +72,30 @@ the missed-trade ranking ordering are not yet pinned.
 
 **Estimated LOC:** ~100 of additional fixture tests in
 `test_optimal_strategy_report.ml`. Same file, same harness.
+
+**Landed:** branch `feat/optimal-strategy-pr4-followup-b`. Three new
+OUnit2 cases in `test_optimal_strategy_report.ml` (~205 LOC of tests +
+inline fixtures, no new test-helper modules):
+
+1. `test_divergence_pins_specific_cells` — 2 actual + 4 counterfactual
+   round-trips across 2 Fridays. Pins the section's `### YYYY-MM-DD`
+   subheaders, the actual rows' `SYM (N sh)` cells, and the optimal
+   rows' `SYM (N sh, R=±X.XX)` cells with R-multiples to two decimals.
+2. `test_missed_trades_ordered_by_pnl_descending` — 3 missed-trade
+   candidates with deliberately misaligned alphabetical / P&L order
+   (`AAA`/`ZBIG`/`MSML` with P&L 300/1000/50). Restricts the search
+   to the missed-trades section (so symbol mentions in the divergence
+   section don't pollute) and asserts position(`ZBIG`) <
+   position(`AAA`) < position(`MSML`) — pinning the descending-by-
+   `pnl_dollars` ordering documented in the renderer's `.mli` and
+   implemented by `Float.compare b.pnl_dollars a.pnl_dollars`.
+3. `test_empty_divergence_renders_sentinel` — identical actual /
+   counterfactual symbol sets => the divergence section emits the
+   single sentinel line `_No Fridays where actual and constrained-
+   counterfactual picks differed._` and no per-Friday detail rows.
+
+Test count: 45 → 48. `dune build @fmt` and `dune runtest
+trading/backtest/optimal/` clean.
 
 ### Follow-up C — PR-5 (already optional in plan)
 
