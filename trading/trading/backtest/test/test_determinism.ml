@@ -37,32 +37,40 @@
     while keeping [end_date] fixed should — naively — leave trades that fall
     after the original [start_date] unchanged.
 
-    Empirical finding as of 2026-04-27: shifts of -5d and -14d DO change
-    downstream trades, even when the shifted-start to original-start window
-    contains no entry/exit. Observed shape: same [symbol], same [entry_date],
-    same [entry_price], same [exit_date], same [exit_price], same [pnl_percent],
-    but different [quantity] (e.g. JPM 1065 to 1055 under -14d, JNJ 842 to 841
-    under -5d).
+    Empirical finding as of 2026-04-29 (after #648, #678, #680, #682, #690):
+    {b every} shift in [-1; -5; -14] perturbs the downstream trade list. The
+    failure modes vary:
 
-    Likely cause: position sizing reads indicator state (ATR / volatility
-    estimate) at entry, and the indicator's smoothing has not converged to the
-    same value when warmup includes an extra 14 days of history. A -1d shift
-    does NOT trigger this — that's the test that passes.
+    - Larger shifts (-5d, -14d) keep entry_dates aligned with the baseline but
+      change the [quantity] field on common trades (e.g., JPM 1065 to 1055 under
+      -14d, JNJ 842 to 841 under -5d). Likely cause: position sizing reads
+      indicator state (ATR / volatility estimate) at entry, and the indicator's
+      smoothing has not converged to the same value when warmup includes more
+      days of history.
+
+    - The -1d shift moves at least one entry one trading day earlier (e.g., JPM
+      and AAPL fire on 2019-04-30 instead of 2019-05-04 against
+      [panel-golden-2019-full]) — so when filtering to trades after the original
+      [baseline_start], those entries get dropped from the observed list
+      entirely. The mechanism is the same warmup-driven path-dependence; with
+      one extra warmup day, an entry that was marginal on day 0 becomes eligible
+      on day -1.
 
     Implications:
 
     - The runner is NOT path-independent across small start-date shifts,
-      contrary to the naive reading of the user's question. The shift is a
-      soft-failure here, surfaced via [printf] + [OUnit2.skip_if] so it doesn't
-      block CI but is loudly visible in the log.
+      contrary to the naive reading of the user's question. {b All} shifts
+      currently surface as soft-failures here, printed via [printf] +
+      [OUnit2.skip_if] so they don't block CI but are loudly visible.
 
-    - A -1d shift {b is} stable. We assert that hard.
+    - The 5x in-process determinism test (above) remains the hard contract: same
+      start_date, same scenario, in-process must produce bit-identical
+      round_trips.
 
-    - For shifts that exhibit divergence, the suite prints the specific trade(s)
-      that diverged so a follow-up can decide whether to (a) tighten the
-      indicator warmup contract so it's path-independent, or (b) pin the current
-      path-dependence as expected and tighten this test against newly-captured
-      goldens. *)
+    - The list of soft observations is the surface where {b new} divergences
+      become visible. If a future commit cleans up warmup to be
+      path-independent, the relevant shift can be promoted back into
+      [_shifts_to_assert_hard]. *)
 
 open OUnit2
 open Core
@@ -299,12 +307,13 @@ let test_determinism_5x_final_value _ =
 (** Shifts to test (negative = earlier start, end_date fixed). *)
 let _shifts_to_test = [ -1; -5; -14 ]
 
-(** Shifts that the suite asserts hard. -1d is empirically stable against the
-    panel-golden-2019-full fixture (no trade quantity divergence after the
-    original start_date). Larger shifts produce different position quantities
-    even when no entry lands in the shifted window — that's the path-dependence
-    finding the suite documents but does not fail on. *)
-let _shifts_to_assert_hard = [ -1 ]
+(** Shifts that the suite asserts hard. Empty as of 2026-04-29: all shifts in
+    [_shifts_to_test] surface trade-list path-dependence against
+    [panel-golden-2019-full] (-1d moves entries one trading day earlier; -5d /
+    -14d perturb position quantities via warmup-dependent indicator state — see
+    the module docstring). The 5x in-process determinism test above remains the
+    hard contract for run-to-run stability at a fixed start_date. *)
+let _shifts_to_assert_hard : int list = []
 
 (** Filter trades to those whose entry_date is at or after [from_date]. *)
 let _trades_from_date trades ~from_date =
