@@ -1,6 +1,6 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-29
+## Last updated: 2026-04-29 (PR-4 follow-up B)
 
 ## Status
 READY_FOR_REVIEW
@@ -96,13 +96,17 @@ ready to start once PR-3 lands.
       determinism, trailing newline). 45/45 pass across the optimal track.
       The binary + deeper fixture tests are deferred to PR-4b — see
       `dev/notes/optimal-strategy-pr4-followups-2026-04-28.md`.
-- [~] **PR-4b**: `optimal_strategy.exe` binary (panel loading + pipeline
-      orchestration). In flight on `feat/optimal-strategy-pr4b` / PR #666.
-      Bin scaffold + `bin/dune` shipped; panel-walking smoke test deferred
-      to a follow-up commit on the same branch (writing real artefacts to
-      a tmp dir is the cheapest path; needs panel CSV fixtures). The
-      fuller per-Friday divergence + missed-trade ordering renderer
-      fixture tests remain pending and stay attached to PR-4 followup B.
+- [x] **PR-4b**: `optimal_strategy.exe` binary (panel loading + pipeline
+      orchestration) — PR #666 (merged 2026-04-29). Bin scaffold +
+      `bin/dune`; panel-walking smoke test deferred to the lib-extraction
+      follow-up. Macro-trend hardcoded to `Neutral` until the read-side
+      wiring of #671's artefact lands.
+- [x] **PR-4 follow-up B**: fuller per-Friday divergence + missed-trade
+      ordering fixture tests on `feat/optimal-strategy-pr4-followup-b`.
+      Three new cases in `test_optimal_strategy_report.ml` pin specific
+      symbols / sizes / R-multiples in the divergence section, the
+      missed-trades descending-by-P&L ordering, and the no-divergence
+      sentinel. 45 → 48 tests pass.
 - [ ] **PR-5** (optional): wire into `release_perf_report` so each
       scenario emits the counterfactual delta. ~200 LOC.
 
@@ -225,7 +229,7 @@ consumes scorer output as opaque exit fields.
     - `dev/lib/run-in-env.sh dune build @fmt`
   - Branch / PR: `feat/optimal-strategy-pr3` / PR #TBD.
 
-- **PR-4b** (2026-04-29, in flight): `optimal_strategy.exe` binary —
+- **PR-4b** (2026-04-29, MERGED): `optimal_strategy.exe` binary —
   thin orchestration wrapper that wires the existing pure-functional
   optimal-lib pipeline (scanner → scorer → filler ×2 → summary ×2) to
   artefacts on disk and emits `<output_dir>/optimal_strategy.md`.
@@ -234,13 +238,14 @@ consumes scorer output as opaque exit fields.
     - `trading/trading/backtest/optimal/bin/optimal_strategy.ml`
   - Coverage: existing 45/45 optimal-track tests still pass; no new
     unit tests in this commit. Smoke test (synthetic-panel fixture
-    invoking `main`) deferred to a follow-up commit on the same branch.
+    invoking `main`) deferred to the lib-extraction follow-up.
   - Macro-trend simplification: bin uses fixed `Neutral` for every
     Friday because run artefacts don't persist per-Friday macro state.
     `Constrained` and `Relaxed_macro` therefore tag every candidate
     identically until macro persistence lands; the headline
     cascade-ranking comparison is unaffected. Documented in the bin's
-    docstring.
+    docstring. Read-side wiring of #671's `macro_trend.sexp` artefact
+    is a small follow-up.
   - Cascade rejections sourced from `trade_audit.sexp`'s
     `alternatives_considered` when present; missing-audit case passes
     `[]` and the renderer drops rejection annotations from missed-trade
@@ -250,3 +255,34 @@ consumes scorer output as opaque exit fields.
     - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
     - `dev/lib/run-in-env.sh dune build @fmt`
   - Branch / PR: `feat/optimal-strategy-pr4b` / PR #666.
+
+- **PR-4 follow-up B** (2026-04-29): fuller renderer fixture tests.
+  - Files modified:
+    - `trading/trading/backtest/optimal/test/test_optimal_strategy_report.ml`
+      (3 new OUnit2 cases, ~205 LOC of additions; no production code
+      touched).
+  - Coverage:
+    - `test_divergence_pins_specific_cells` — 2 actual + 4 counterfactual
+      round-trips across 2 Fridays. Pins `### YYYY-MM-DD` subheaders,
+      actual `SYM (N sh)` cells, and optimal `SYM (N sh, R=±X.XX)` cells
+      with R-multiples to two decimals (per `_fmt_actual_pick` and
+      `_fmt_optimal_pick` in the renderer).
+    - `test_missed_trades_ordered_by_pnl_descending` — 3 missed-trade
+      candidates with P&L 300 / 1000 / 50 (alphabetical order
+      `AAA`/`MSML`/`ZBIG` deliberately disagrees with P&L order). Test
+      restricts the substring search to the missed-trades section so
+      the divergence section's symbol mentions don't pollute, then
+      asserts position(`ZBIG`) < position(`AAA`) < position(`MSML`)
+      via `lt (module Int_ord)`. Pins the descending-by-`pnl_dollars`
+      ordering documented in the renderer's `.mli`.
+    - `test_empty_divergence_renders_sentinel` — identical actual /
+      counterfactual symbol sets => the divergence section emits the
+      single sentinel line `_No Fridays where actual and constrained-
+      counterfactual picks differed._` and no per-Friday detail rows
+      (`### YYYY-MM-DD` substring absent).
+  - Test count: 45 → 48 across the optimal track.
+  - Verify:
+    - `dev/lib/run-in-env.sh dune build`
+    - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
+    - `dev/lib/run-in-env.sh dune build @fmt`
+  - Branch / PR: `feat/optimal-strategy-pr4-followup-b` / PR #670.
