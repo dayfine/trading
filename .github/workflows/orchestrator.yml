@@ -371,6 +371,13 @@ jobs:
           # ---------------------------------------------------------------
           # Add the budget JSON onto the daily summary branch.
           # ---------------------------------------------------------------
+          # The lead-orchestrator step (jj) leaves the working tree dirty:
+          # modified dev/reviews/*.md and untracked dev/audit/* / dev/health/*
+          # files that it committed via jj but did not clean up from the git
+          # working copy.  git checkout refuses to overwrite those files.
+          # Everything intentional is already on the remote branch, so a
+          # hard reset + clean is safe here.
+          git reset --hard HEAD && git clean -fd
           git fetch origin "${DAILY_BRANCH}"
           git checkout "${DAILY_BRANCH}"
           git add "$OUT_FILE"

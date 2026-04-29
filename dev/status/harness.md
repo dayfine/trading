@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-25
+## Last updated: 2026-04-29
 
 ## Status
 IN_PROGRESS
@@ -327,6 +327,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ### Deep scan heuristic gap sub-item 1: Drift coverage extension (backtest)
 
 - [x] `trading/trading/backtest/` subsystem added to `trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh` — checks top-level subdirectories of `trading/trading/backtest/` against `dev/plans/backtest-scale-optimization-2026-04-17.md` using the same heuristic as the existing Weinstein subsystem checks (grep for dir name in plan doc; missing = WARNING). Plan document is the active backtest design spec. Current live finding: `trading/trading/backtest/bin/` is not mentioned in the plan (expected — runner binary added post-plan). Smoke test: `trading/devtools/checks/deep_scan_drift_coverage_check.sh` — verifies BACKTEST_PLAN, BACKTEST_DIR, and the plan filename markers are present in `check_02`, and that the most-recent deep scan report references drift. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `sh trading/devtools/checks/deep_scan_drift_coverage_check.sh` — prints OK; `sh trading/devtools/checks/deep_scan.sh` — report shows `Design doc drift items: 1` and warns about `backtest/bin/`.
+
+### orchestrator-daily bundle-budget checkout fix
+
+- [x] GHA "Bundle budget into daily summary and auto-merge" step now resets the working tree before `git checkout "${DAILY_BRANCH}"`. Root cause: lead-orchestrator (jj) leaves modified `dev/reviews/*.md` and untracked `dev/audit/*` / `dev/health/*` files in the git working copy after pushing to the daily branch; `git checkout` refuses to overwrite them. Fix: `git reset --hard HEAD && git clean -fd` added immediately before `git fetch origin "${DAILY_BRANCH}"` with an explanatory comment. Failed run: https://github.com/dayfine/trading/actions/runs/25109871573. File: `.github/workflows/orchestrator.yml` (lines 374–382). Verify: next scheduled run (00:17 or 05:17 PT) completes the step without checkout error.
 
 ### POSIX shell portability linter
 
