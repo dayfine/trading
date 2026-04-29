@@ -1,6 +1,6 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-29 (PR-4b in flight)
+## Last updated: 2026-04-29
 
 ## Status
 READY_FOR_REVIEW
