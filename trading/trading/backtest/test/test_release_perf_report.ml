@@ -886,6 +886,77 @@ let test_load_scenario_run_no_optimal_when_md_missing _ =
   let run = Release_report.load_scenario_run ~dir:scenario_dir in
   assert_that run.optimal_strategy is_none
 
+let test_load_scenario_run_no_optimal_when_sexp_missing_but_md_present _ =
+  (* Mirror image of the prior test: pins the asymmetric branch of the
+     both-must-exist guard. If the markdown report is staged but the
+     structured sexp is absent, the loader still returns [None] because
+     there is nothing to deserialise. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "md-only" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "md-only" in
+  _write_text
+    (Filename.concat scenario_dir "optimal_strategy.md")
+    "# Optimal-strategy counterfactual\n";
+  (* No optimal_summary.sexp staged. *)
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy is_none
+
+let test_load_scenario_run_no_optimal_when_sexp_malformed _ =
+  (* Pins the [try ... with _ -> None] swallow on parse failure. Both files
+     are present, so the existence guard is satisfied, but the sexp is not
+     valid syntax — the loader must return [None] rather than raise. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "malformed-sexp" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "malformed-sexp" in
+  _write_text
+    (Filename.concat scenario_dir "optimal_summary.sexp")
+    "this is not valid sexp\n";
+  _write_text
+    (Filename.concat scenario_dir "optimal_strategy.md")
+    "# Optimal-strategy counterfactual\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy is_none
+
+let test_load_scenario_run_loads_optimal_strategy_with_extra_fields _ =
+  (* Pins the outer [_optimal_summary_artefact_on_disk] record's
+     [@@sexp.allow_extra_fields] — the existing happy-path test only
+     exercises [@@sexp.allow_extra_fields] on the inner [optimal_summary]
+     record (via the [variant] field tolerance). Here we add a wholly new
+     outer field [(future_extension foo)] that the type does not know
+     about; the loader must accept it and still surface the known
+     [total_return_pct] values. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "with-extra" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "with-extra" in
+  _write_text
+    (Filename.concat scenario_dir "optimal_summary.sexp")
+    "((constrained ((total_round_trips 50) (winners 25) (losers 25)\n\
+    \                (total_return_pct 0.30) (win_rate_pct 0.50)\n\
+    \                (avg_r_multiple 0.40) (profit_factor 1.20)\n\
+    \                (max_drawdown_pct 0.10) (variant Constrained)))\n\
+    \ (relaxed_macro ((total_round_trips 60) (winners 32) (losers 28)\n\
+    \                  (total_return_pct 0.35) (win_rate_pct 0.53)\n\
+    \                  (avg_r_multiple 0.45) (profit_factor 1.25)\n\
+    \                  (max_drawdown_pct 0.12) (variant Relaxed_macro)))\n\
+    \ (future_extension foo))\n";
+  _write_text
+    (Filename.concat scenario_dir "optimal_strategy.md")
+    "# Optimal-strategy counterfactual\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (p : Release_report.optimal_summary_pair) ->
+                p.constrained.total_return_pct)
+              (float_equal 0.30);
+            field
+              (fun (p : Release_report.optimal_summary_pair) ->
+                p.relaxed_macro.total_return_pct)
+              (float_equal 0.35);
+          ]))
+
 let suite =
   "release_perf_report"
   >::: [
@@ -927,6 +998,13 @@ let suite =
          >:: test_load_scenario_run_no_optimal_when_files_missing;
          "load_scenario_run no optimal_strategy when md missing"
          >:: test_load_scenario_run_no_optimal_when_md_missing;
+         "load_scenario_run no optimal_strategy when sexp missing but md \
+          present"
+         >:: test_load_scenario_run_no_optimal_when_sexp_missing_but_md_present;
+         "load_scenario_run no optimal_strategy when sexp malformed"
+         >:: test_load_scenario_run_no_optimal_when_sexp_malformed;
+         "load_scenario_run loads optimal_strategy with extra outer fields"
+         >:: test_load_scenario_run_loads_optimal_strategy_with_extra_fields;
        ]
 
 let () = run_test_tt_main suite
