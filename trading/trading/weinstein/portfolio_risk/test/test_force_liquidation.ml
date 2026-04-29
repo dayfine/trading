@@ -246,6 +246,37 @@ let test_portfolio_floor_precedence _ =
     (elements_are
        [ field (fun (e : FL.event) -> e.reason) (equal_to FL.Portfolio_floor) ])
 
+(* ---- Defensive guards (PR #695, qc-behavioral B3) ---- *)
+
+(** Guard: [_check_per_position] short-circuits when cost basis is non-positive
+    (zero or negative). Pin the no-fire behaviour so a refactor that drops the
+    [cost_basis <= 0] guard fails deterministically. Per-position threshold
+    semantics are undefined when there's no cost basis to size the loss against
+    (would otherwise divide by zero / produce NaN). *)
+let test_zero_cost_basis_does_not_fire _ =
+  let pt = FL.Peak_tracker.create () in
+  let positions =
+    [ make_long ~entry_price:0.0 ~current_price:50.0 ~quantity:100.0 () ]
+  in
+  let events =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  assert_that events is_empty
+
+let test_zero_quantity_does_not_fire _ =
+  (* Symmetric: cost_basis = entry_price * quantity; quantity = 0 yields 0
+     cost_basis. Pin no-fire here too. *)
+  let pt = FL.Peak_tracker.create () in
+  let positions =
+    [ make_long ~entry_price:100.0 ~current_price:40.0 ~quantity:0.0 () ]
+  in
+  let events =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  assert_that events is_empty
+
 (* ---- Default config ---- *)
 
 let test_default_config_values _ =
@@ -302,6 +333,8 @@ let suite =
          "portfolio_floor_no_fire_under_threshold"
          >:: test_portfolio_floor_no_fire_under_threshold;
          "portfolio_floor_precedence" >:: test_portfolio_floor_precedence;
+         "zero cost basis does not fire" >:: test_zero_cost_basis_does_not_fire;
+         "zero quantity does not fire" >:: test_zero_quantity_does_not_fire;
          "default_config_values" >:: test_default_config_values;
          "event_sexp_round_trip" >:: test_event_sexp_round_trip;
        ]

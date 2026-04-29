@@ -331,3 +331,50 @@ val make :
       {!Audit_recorder.noop} — no observation is emitted and the strategy runs
       unchanged. Backtest callers wire a recorder backed by a
       [Backtest.Trade_audit.t] collector. *)
+
+(** {1 Internal — testing only}
+
+    Direct seams into the strategy's [_on_market_close] used by behavioural
+    regression tests. These bypass {!make}'s closure so a test can drive a
+    [Peak_tracker] in a known [Halted] state and assert that the next Friday
+    tick resets the halt to [Active] when macro flips off Bearish (PR #695,
+    review item B1). Not for production use. *)
+module Internal_for_test : sig
+  val on_market_close :
+    config:config ->
+    ad_bars:Macro.ad_bar list ->
+    stop_states:Weinstein_stops.stop_state String.Map.t ref ->
+    prior_macro:Weinstein_types.market_trend ref ->
+    prior_macro_result:Macro.result option ref ->
+    peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
+    bar_reader:Bar_reader.t ->
+    prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
+    sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
+    ticker_sectors:(string, string) Hashtbl.t ->
+    audit_recorder:Audit_recorder.t ->
+    get_price:Trading_strategy.Strategy_interface.get_price_fn ->
+    get_indicator:Trading_strategy.Strategy_interface.get_indicator_fn ->
+    portfolio:Trading_strategy.Portfolio_view.t ->
+    Trading_strategy.Strategy_interface.output Status.status_or
+  (** Drives [_on_market_close] with all closure-scoped state passed in
+      explicitly. Mutates [stop_states] / [prior_macro] / [prior_macro_result] /
+      [peak_tracker] / [prior_stages] / [sector_prior_stages] in place,
+      mirroring the closure semantics in {!make}. *)
+
+  val maybe_reset_halt :
+    peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
+    macro_trend:Weinstein_types.market_trend ->
+    unit
+  (** Resets [peak_tracker]'s halt state to [Active] when [macro_trend] is not
+      [Bearish]; no-op otherwise. The strategy invokes this on every Friday
+      after refreshing macro so the halt clears as soon as macro recovers. *)
+
+  val positions_minus_exited :
+    positions:Trading_strategy.Position.t String.Map.t ->
+    stop_exit_transitions:Trading_strategy.Position.transition list ->
+    Trading_strategy.Position.t String.Map.t
+  (** Filters [positions] down to those whose [position_id] is NOT among the
+      [TriggerExit] transitions in [stop_exit_transitions]. Used to ensure
+      force-liquidation does not double-exit a position [Stops_runner] already
+      closed on this tick. *)
+end
