@@ -125,6 +125,23 @@ favour of a discrete event on the position ledger. Four PRs landed:
   unresponsive at session time; reasoning and TDD against the existing
   `test_split_day_mtm.ml` shape are the verification trail.
 
+  - **Strategy-side complement (DONE)** — `feat/weinstein-split-day-stop-adjustment`
+    PR opened 2026-04-29. Adds `Weinstein_stops.Stop_split_adjust.scale` (pure
+    helper that divides every absolute-price field of a `stop_state` by the
+    split factor) plus `Weinstein_strategy.Stops_split_runner.adjust` (per-tick
+    detector that re-uses `Types.Split_detector.detect_split` on the most
+    recent two daily bars from the panel-backed `Bar_reader` and rescales the
+    matching `stop_states` entry). Wired into `_on_market_close` immediately
+    before `Stops_runner.update`. 13 new tests across two files (7 unit + 6
+    integration) including the strategy-level regression: pre-split $440 stop
+    scales to $110 so the post-split bar's $124 low does NOT trip
+    `Weinstein_stops.check_stop_hit`; control case with a genuine adverse
+    move past the adjusted stop DOES trip it. Without this fix the
+    broker-model #678 sync would still produce a phantom-trigger exit on
+    every split-day position. See `dev/decisions.md` §"2026-04-29 — Split-day
+    broker model: regression" "DONE — `feat/weinstein-split-day-stop-adjustment`"
+    sub-bullet.
+
 - M5 (walk-forward backtest, parameter tuner) is next
 
 ## Blocking Refactors

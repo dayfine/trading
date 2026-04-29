@@ -4,6 +4,7 @@ open Weinstein_types
 open Trading_base.Types
 include Stop_types
 module Support_floor = Support_floor
+module Stop_split_adjust = Stop_split_adjust
 
 (* ---- Nudge functions ---- *)
 

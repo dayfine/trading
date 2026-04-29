@@ -43,6 +43,12 @@ module Stops_runner = Stops_runner
 (** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
 *)
 
+module Stops_split_runner = Stops_split_runner
+(** Per-tick split-event detector and stop-state rescaler. Invoked at the top of
+    [on_market_close] (before {!Stops_runner.update}) so absolute stop prices
+    stay in lockstep with the broker-side share-count rescale on a
+    corporate-action split. See {!Stops_split_runner}. *)
+
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
     canonical {!Macro_inputs.spdr_sector_etfs} and
