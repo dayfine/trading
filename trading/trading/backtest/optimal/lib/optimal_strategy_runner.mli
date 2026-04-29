@@ -26,26 +26,47 @@
       {!Optimal_strategy_report.render}, writing it to
       [<output_dir>/optimal_strategy.md].
 
-    {1 Macro-trend simplification}
+    {1 Macro-trend lookup}
 
-    The actual run records a per-Friday macro trend implicitly, but it is not
-    yet persisted to disk. The counterfactual currently uses a fixed [Neutral]
-    macro trend across all weeks: [passes_macro = true] for every candidate (the
-    gate's rule is [macro_trend <> Bearish]), so [Constrained] and
-    [Relaxed_macro] tag every candidate identically. The headline comparison
-    still surfaces the cascade-ranking gap; honest macro-driven divergence
-    between the two variants is a follow-up blocked on the macro-trend
-    persistence work (PR #671 emits the file from the writer side; the read side
-    is a separate ~30 LOC follow-up).
+    Per-Friday macro trend is read from [<output_dir>/macro_trend.sexp] — the
+    artefact emitted by [Backtest.Macro_trend_writer] on every backtest run (PR
+    #671). The runner builds a [Date.t -> market_trend] table at startup and
+    consults it inside [_scan_all_fridays] when constructing each
+    [Stage_transition_scanner.week_input]. With the file present, [Bearish]
+    Fridays cause [passes_macro = false] for that week's candidates, so the
+    [Constrained] variant filters them out while [Relaxed_macro] admits them —
+    the variants now diverge on macro-driven outcomes.
+
+    Legacy / partial runs that predate PR #671 will not have [macro_trend.sexp].
+    The runner falls back to [Neutral] for every Friday (which produces
+    [passes_macro = true] across the board) and emits a one-line stderr warning.
+    The pipeline still completes; the variants will tag candidates identically
+    as they did before the read-side wiring.
 
     {1 I/O surface}
 
-    - Reads [output_dir/{summary,actual,trade_audit}.sexp] +
-      [output_dir/trades.csv] (the latter two optional).
+    - Reads [output_dir/{summary,actual,trade_audit,macro_trend}.sexp] +
+      [output_dir/trades.csv]. [trade_audit.sexp] / [trades.csv] /
+      [macro_trend.sexp] are optional; missing values fall back to empty /
+      [Neutral].
     - Reads OHLCV CSVs and [sectors.csv] under [Data_path.default_data_dir ()]
       (overridable via [TRADING_DATA_DIR]).
     - Writes [output_dir/optimal_strategy.md] (the rendered report).
     - Writes progress messages to stderr. *)
+
+open Core
+
+val load_macro_trend :
+  output_dir:string -> (Date.t, Weinstein_types.market_trend) Hashtbl.t
+(** [load_macro_trend ~output_dir] reads [<output_dir>/macro_trend.sexp] and
+    returns a [Date.t -> market_trend] lookup table indexed by Friday. The
+    artefact is emitted by [Backtest.Macro_trend_writer] on every run.
+
+    Returns an empty table when the file is missing (legacy runs that predate PR
+    #671 — write-side macro persistence) or when parsing fails, after logging a
+    one-line stderr warning. The runner's fallback at lookup-miss is
+    [Weinstein_types.Neutral]. Exposed for direct unit testing; the runner
+    itself consumes it through {!run}. *)
 
 val run : output_dir:string -> unit
 (** [run ~output_dir] executes the full pipeline end-to-end:

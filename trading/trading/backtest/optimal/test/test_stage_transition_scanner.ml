@@ -9,6 +9,15 @@
     - [passes_macro] is set from [week.macro_trend] (true for Bullish/Neutral,
       false for Bearish), independent of whether the candidate is otherwise
       admitted.
+    - End-to-end divergence: a [Bearish] [macro_trend] threaded into the scanner
+      causes [Optimal_portfolio_filler] under the [Constrained] variant to
+      reject the candidate while [Relaxed_macro] admits it; a [Neutral]
+      counterpart pins that both variants admit when macro permits — pinning
+      that [Bearish] is the discriminator at the scanner→filler seam. (The
+      isolated [passes_macro] tag is pinned by
+      [test_scan_week_passes_macro_bearish] / [_neutral]; the isolated variant
+      filter is pinned by [test_optimal_portfolio_filler.ml]; the divergence
+      tests join them.)
     - Sector context is resolved through [sector_map]; missing entries fall back
       to the "Unknown" stub.
     - Multi-week scan via [scan_panel] preserves arrival order across weeks.
@@ -18,6 +27,7 @@ open OUnit2
 open Core
 open Matchers
 module S = Backtest_optimal.Stage_transition_scanner
+module F = Backtest_optimal.Optimal_portfolio_filler
 module OT = Backtest_optimal.Optimal_types
 
 (* ------------------------------------------------------------------ *)
@@ -347,6 +357,99 @@ let test_scan_week_passes_macro_neutral _ =
          field (fun (c : OT.candidate_entry) -> c.passes_macro) (equal_to true);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* End-to-end divergence: scanner [Bearish] -> filler [Constrained]    *)
+(* rejects while [Relaxed_macro] admits.                                *)
+(*                                                                      *)
+(* This pins the chain PR #676 wires up: macro_trend at scan time flows *)
+(* through [passes_macro] on the candidate and through the filler's    *)
+(* variant filter to produce divergent round-trip sets. The scanner    *)
+(* tests above ([test_scan_week_passes_macro_bearish] /                *)
+(* [_neutral]) pin only the [passes_macro] tag; the filler tests in    *)
+(* [test_optimal_portfolio_filler.ml] pin only the variant-filter      *)
+(* behaviour given hand-built candidates. This test joins them so a    *)
+(* break anywhere along the chain (scanner stops setting              *)
+(* [passes_macro]; filler stops honouring it; or the lookup loses the  *)
+(* macro trend before it reaches the scanner) is caught here.          *)
+(* ------------------------------------------------------------------ *)
+
+(** Promote a [candidate_entry] into a synthetic [scored_candidate] by adding a
+    plausible exit four weeks out at a fixed +2R outcome. Bypasses
+    {!Outcome_scorer} — this test exercises the macro divergence chain at the
+    scanner→filler seam, not the scorer's exit-trigger logic (which has its own
+    test file). *)
+let _scored_of_candidate ?(exit_week_offset_weeks = 4) ?(r_multiple = 2.0)
+    (c : OT.candidate_entry) : OT.scored_candidate =
+  let initial_risk_per_share = Float.abs (c.entry_price -. c.suggested_stop) in
+  let raw_return_pct =
+    r_multiple *. (initial_risk_per_share /. c.entry_price)
+  in
+  let exit_price = c.entry_price *. (1.0 +. raw_return_pct) in
+  let exit_week = Date.add_days c.entry_week (7 * exit_week_offset_weeks) in
+  {
+    entry = c;
+    exit_week;
+    exit_price;
+    exit_trigger = OT.End_of_run;
+    raw_return_pct;
+    hold_weeks = exit_week_offset_weeks;
+    initial_risk_per_share;
+    r_multiple;
+  }
+
+(** Scan one Friday with the given [macro_trend] and a single breakout-eligible
+    analysis, then run the filler under both variants. Returns
+    [(constrained_round_trips, relaxed_round_trips)] for the caller to pin. *)
+let _run_chain ~macro_trend :
+    OT.optimal_round_trip list * OT.optimal_round_trip list =
+  let week : S.week_input =
+    {
+      date = _date "2024-01-19";
+      macro_trend;
+      analyses = [ make_analysis ~ticker:"AAPL" () ];
+      sector_map =
+        make_sector_map [ ("AAPL", "Information Technology", Strong) ];
+    }
+  in
+  let candidates = S.scan_week ~config:default_config week in
+  let scored = List.map candidates ~f:_scored_of_candidate in
+  let constrained =
+    F.fill ~config:F.default_config
+      { candidates = scored; variant = OT.Constrained }
+  in
+  let relaxed =
+    F.fill ~config:F.default_config
+      { candidates = scored; variant = OT.Relaxed_macro }
+  in
+  (constrained, relaxed)
+
+let test_bearish_macro_diverges_constrained_vs_relaxed _ =
+  (* Bearish macro: scanner stamps passes_macro=false; Constrained drops it,
+     Relaxed_macro keeps it. *)
+  let constrained, relaxed = _run_chain ~macro_trend:Weinstein_types.Bearish in
+  assert_that constrained (size_is 0);
+  assert_that relaxed
+    (elements_are
+       [
+         field (fun (rt : OT.optimal_round_trip) -> rt.symbol) (equal_to "AAPL");
+       ])
+
+let test_neutral_macro_admits_under_both_variants _ =
+  (* Neutral macro: scanner stamps passes_macro=true; both variants admit.
+     Confirms Bearish is the discriminator in the test above (not some other
+     gate). *)
+  let constrained, relaxed = _run_chain ~macro_trend:Weinstein_types.Neutral in
+  assert_that constrained
+    (elements_are
+       [
+         field (fun (rt : OT.optimal_round_trip) -> rt.symbol) (equal_to "AAPL");
+       ]);
+  assert_that relaxed
+    (elements_are
+       [
+         field (fun (rt : OT.optimal_round_trip) -> rt.symbol) (equal_to "AAPL");
+       ])
+
 let test_scan_week_unknown_sector_falls_back _ =
   (* No sector_map entry for AAPL — sector should resolve to "Unknown".
      The screener's defaulting policy is to admit (Neutral rating), so
@@ -493,6 +596,11 @@ let suite =
          >:: test_scan_week_passes_macro_bearish;
          "scan_week tags passes_macro = true on Neutral"
          >:: test_scan_week_passes_macro_neutral;
+         "Bearish macro -> Constrained rejects, Relaxed_macro admits \
+          (scanner+filler)"
+         >:: test_bearish_macro_diverges_constrained_vs_relaxed;
+         "Neutral macro -> both variants admit (scanner+filler)"
+         >:: test_neutral_macro_admits_under_both_variants;
          "scan_week falls back to Unknown sector"
          >:: test_scan_week_unknown_sector_falls_back;
          "scan_week empty analyses → empty output"

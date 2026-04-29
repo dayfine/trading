@@ -174,26 +174,63 @@ let _forward_outlooks ~bar_panels ~all_fridays ~stage_config ~bar_lookback
               Some { Scorer.date = friday; bar; stage_result }))
 
 (* ---------------------------------------------------------------- *)
+(* Macro-trend persistence (read side)                                *)
+(* ---------------------------------------------------------------- *)
+
+(** Read [<output_dir>/macro_trend.sexp] and index its entries by Friday for
+    O(1) lookup inside [_scan_all_fridays]. The file is emitted by
+    [Backtest.Macro_trend_writer] on every run (PR #671). Missing file or
+    malformed sexp ⇒ empty table + stderr warning; the runner's lookup fallback
+    is [Weinstein_types.Neutral], so the pipeline still completes. *)
+let load_macro_trend ~output_dir :
+    (Date.t, Weinstein_types.market_trend) Hashtbl.t =
+  let path = Filename.concat output_dir "macro_trend.sexp" in
+  let tbl = Hashtbl.create (module Date) in
+  if not (Sys_unix.file_exists_exn path) then (
+    eprintf
+      "optimal_strategy: macro_trend.sexp absent at %s; falling back to \
+       Neutral for every Friday\n\
+       %!"
+      path;
+    tbl)
+  else
+    try
+      let entries =
+        Backtest.Macro_trend_writer.t_of_sexp (Sexp.load_sexp path)
+      in
+      List.iter entries ~f:(fun (e : Backtest.Macro_trend_writer.per_friday) ->
+          Hashtbl.set tbl ~key:e.date ~data:e.trend);
+      tbl
+    with exn ->
+      eprintf
+        "optimal_strategy: failed to read macro_trend.sexp (%s); falling back \
+         to Neutral for every Friday\n\
+         %!"
+        (Exn.to_string exn);
+      tbl
+
+(* ---------------------------------------------------------------- *)
 (* Scanning + scoring all candidates                                  *)
 (* ---------------------------------------------------------------- *)
 
-(** Run the scanner over all Fridays in the run and emit candidates. *)
+(** Run the scanner over all Fridays in the run and emit candidates. Each week's
+    [macro_trend] is sourced from [macro_trend_table] (built from the run's
+    [macro_trend.sexp]); Fridays absent from the table fall back to [Neutral].
+*)
 let _scan_all_fridays ~bar_panels ~fridays ~universe ~sector_map ~stock_config
-    ~scanner_config ~bar_lookback : OT.candidate_entry list =
+    ~scanner_config ~bar_lookback ~macro_trend_table : OT.candidate_entry list =
   List.concat_map fridays ~f:(fun friday ->
       let analyses =
         List.filter_map universe ~f:(fun sym ->
             _analyze_symbol_on_friday ~bar_panels ~friday ~stock_config
               ~bar_lookback sym)
       in
+      let macro_trend =
+        Hashtbl.find macro_trend_table friday
+        |> Option.value ~default:Weinstein_types.Neutral
+      in
       let week : Scanner.week_input =
-        {
-          date = friday;
-          (* TODO follow-up: read macro_trend.sexp once #671 merges *)
-          macro_trend = Weinstein_types.Neutral;
-          analyses;
-          sector_map;
-        }
+        { date = friday; macro_trend; analyses; sector_map }
       in
       Scanner.scan_week ~config:scanner_config week)
 
@@ -247,11 +284,16 @@ type _world = {
   sector_ctx_map : (string, Screener.sector_context) Hashtbl.t;
   fridays : Date.t list;
   universe : string list;
+  macro_trend_table : (Date.t, Weinstein_types.market_trend) Hashtbl.t;
+      (** Per-Friday macro reading loaded from [macro_trend.sexp]. Populated by
+          {!load_macro_trend}; missing entries fall back to [Neutral] inside
+          [_scan_all_fridays]. *)
 }
-(** Loaded panels + per-symbol sector context + Friday calendar over the run
-    window. Built once per invocation, consumed by scan + score. *)
+(** Loaded panels + per-symbol sector context + Friday calendar + per-Friday
+    macro trends over the run window. Built once per invocation, consumed by
+    scan + score. *)
 
-let _build_world ~(actual_run : Report.actual_run) : _world =
+let _build_world ~output_dir ~(actual_run : Report.actual_run) : _world =
   let data_dir_fpath = Data_path.default_data_dir () in
   let sectors_tbl = Sector_map.load ~data_dir:data_dir_fpath in
   let universe =
@@ -269,7 +311,10 @@ let _build_world ~(actual_run : Report.actual_run) : _world =
   let fridays =
     _fridays_in_range ~start:actual_run.start_date ~end_:actual_run.end_date
   in
-  { bar_panels; sector_ctx_map; fridays; universe }
+  let macro_trend_table = load_macro_trend ~output_dir in
+  eprintf "optimal_strategy: macro_trend.sexp loaded (%d Friday entries)\n%!"
+    (Hashtbl.length macro_trend_table);
+  { bar_panels; sector_ctx_map; fridays; universe; macro_trend_table }
 
 let _scan_and_score ~(world : _world) : OT.scored_candidate list =
   eprintf "optimal_strategy: scanning %d Fridays\n%!"
@@ -283,6 +328,7 @@ let _scan_and_score ~(world : _world) : OT.scored_candidate list =
     _scan_all_fridays ~bar_panels:world.bar_panels ~fridays:world.fridays
       ~universe:world.universe ~sector_map:world.sector_ctx_map ~stock_config
       ~scanner_config ~bar_lookback:_bar_lookback_weeks
+      ~macro_trend_table:world.macro_trend_table
   in
   eprintf "optimal_strategy: %d candidates emitted; scoring...\n%!"
     (List.length candidates);
@@ -321,6 +367,6 @@ let run ~output_dir =
     (Date.to_string actual_run.start_date)
     (Date.to_string actual_run.end_date)
     actual_run.universe_size;
-  let world = _build_world ~actual_run in
+  let world = _build_world ~output_dir ~actual_run in
   let scored = _scan_and_score ~world in
   _emit_report ~output_dir ~actual_run ~scored

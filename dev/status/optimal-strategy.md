@@ -131,18 +131,35 @@ ready to start once PR-3 lands.
       `trading/trading/backtest/lib/macro_trend_writer.{ml,mli}`. Verify:
       `dev/lib/run-in-env.sh dune exec trading/backtest/test/test_macro_trend_writer.exe`.
       Branch / PR: `feat/scenario-runner-macro-persistence` / TBD.
-- [ ] **Read side** (post-merge follow-up): the runner currently
-      hardcodes `Weinstein_types.Neutral` at the per-Friday
-      `Scanner.week_input` construction site (`_scan_all_fridays`
-      in `optimal_strategy_runner.ml`) — making the `Constrained` and
-      `Relaxed_macro` counterfactual variants produce identical output
-      because every candidate gets `passes_macro = true`. After PR-4c
-      merges, swap the hardcode for a per-Friday lookup against the
-      `Macro_trend_writer.t_of_sexp (Sexp.load_sexp …)` blob loaded
-      once at world-build time. ~30 LOC change in the lib (no bin
-      change). The `(* TODO follow-up: read macro_trend.sexp once
-      \#671 merges *)` comment is already in place at the exact
-      callsite.
+- [x] **Read side**: per-Friday lookup wired in. New
+      `Optimal_strategy_runner.load_macro_trend ~output_dir`
+      (`trading/trading/backtest/optimal/lib/optimal_strategy_runner.{ml,mli}`)
+      reads `<output_dir>/macro_trend.sexp` via
+      `Backtest.Macro_trend_writer.t_of_sexp` into a
+      `(Date.t, market_trend) Hashtbl.t` and plumbs it through
+      `_world` → `_scan_and_score` → `_scan_all_fridays`. The
+      `_scan_all_fridays` callsite now resolves each Friday's macro
+      via `Hashtbl.find … |> Option.value ~default:Neutral`,
+      replacing the prior hardcoded `Weinstein_types.Neutral`. Missing
+      file (legacy runs that predate #671) ⇒ empty table + stderr
+      warning ⇒ `Neutral` fallback at every lookup, so the pipeline
+      still completes for old artefacts. With the file present,
+      `Bearish` Fridays now flip `passes_macro = false` for that
+      week's candidates, so `Constrained` filters them while
+      `Relaxed_macro` admits them — the variants diverge on
+      macro-driven outcomes. Tests added: 3 new OUnit2 cases in
+      `test_optimal_strategy_runner.ml` (5 → was 2 with PR-4c) —
+      direct loader test (3-Friday Bullish/Neutral/Bearish round-trip),
+      missing-file fallback, and end-to-end runner consumption with a
+      staged `macro_trend.sexp`. The honest divergence test (variants
+      produce different round-trip counts on a Bearish week with an
+      actual breakout) is a follow-up that needs hand-crafted Stage-1→2
+      OHLCV bars in the synthetic fixture; the existing flat-price
+      fixture produces zero candidates either way. Verify:
+      `dev/lib/run-in-env.sh dune build` +
+      `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
+      (53/53 pass: 50 prior + 3 new). Branch / PR:
+      `feat/optimal-strategy-macro-read` / PR TBD.
 
 ## Ownership
 
