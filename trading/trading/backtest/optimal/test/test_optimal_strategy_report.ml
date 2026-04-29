@@ -448,8 +448,19 @@ let test_missed_trades_ordered_by_pnl_descending _ =
   let pos_big = _index_of missed_section "ZBIG" in
   let pos_mid = _index_of missed_section "AAA" in
   let pos_sml = _index_of missed_section "MSML" in
-  assert_that pos_big (lt (module Int_ord) pos_mid);
-  assert_that pos_mid (lt (module Int_ord) pos_sml)
+  (* Pin one logical invariant — the missed-trades section lists symbols in
+     descending P&L order — as a single assert_that on the canonical value
+     (the realised order in the document). Per .claude/rules/test-patterns.md
+     §"One assert_that per Value", multiple ordering relations should compose
+     into a single matcher tree. *)
+  let order_in_document =
+    List.sort
+      [ ("ZBIG", pos_big); ("AAA", pos_mid); ("MSML", pos_sml) ]
+      ~compare:(fun (_, a) (_, b) -> Int.compare a b)
+    |> List.map ~f:fst
+  in
+  assert_that order_in_document
+    (elements_are [ equal_to "ZBIG"; equal_to "AAA"; equal_to "MSML" ])
 
 (* ------------------------------------------------------------------ *)
 (* Empty divergence — sentinel renders when symbol sets match           *)
