@@ -4,11 +4,16 @@
   test_outcome_scorer
   test_optimal_portfolio_filler
   test_optimal_summary
-  test_optimal_strategy_report)
+  test_optimal_strategy_report
+  test_optimal_strategy_runner)
  (libraries
   ounit2
   core
+  core_unix
+  core_unix.sys_unix
+  fpath
   matchers
+  csv
   trading.base
   trading.simulation
   types

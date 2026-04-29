@@ -1,24 +1,4 @@
 (executable
  (name optimal_strategy)
  (modules optimal_strategy)
- (libraries
-  core
-  core_unix
-  core_unix.sys_unix
-  fpath
-  trading.base
-  trading.data_panel
-  trading.simulation
-  types
-  weinstein.data_source
-  weinstein.macro
-  weinstein.screener
-  weinstein.stage
-  weinstein.stock_analysis
-  weinstein.types
-  weinstein_trading.stops
-  weinstein_trading.strategy
-  backtest
-  backtest_optimal)
- (preprocess
-  (pps ppx_sexp_conv)))
+ (libraries core backtest_optimal))

@@ -1,19 +1,20 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-29
+## Last updated: 2026-04-29 (PR-4c lib extraction)
 
 ## Status
 READY_FOR_REVIEW
 
-PR-1 (#652), PR-2 (#659), PR-3 (#663), and PR-4 (#665) all merged into
-`main`. PR-4b (`optimal_strategy.exe` binary scaffold) is open as PR
-#666 on branch `feat/optimal-strategy-pr4b`. The bin wires the existing
-pure-functional optimal-lib pipeline (scanner → scorer → filler →
-summary → renderer) to disk artefacts and emits
-`<output_dir>/optimal_strategy.md`. The synthetic-panel smoke test and
-the deeper renderer fixture tests remain as a follow-up commit on the
-same branch / PR-4 followup B respectively — see
-`dev/notes/optimal-strategy-pr4-followups-2026-04-28.md`.
+PR-1 (#652), PR-2 (#659), PR-3 (#663), PR-4 (#665), PR-4b (#666), and
+the macro-trend write side (#671) are all merged into `main`. PR-4c
+(`Optimal_strategy_runner` + `Optimal_run_artefacts` lib extraction
+from the bin) is open as `feat/optimal-strategy-runner-lib`. The
+~480-LOC bin shrinks to ~35 LOC of CLI-parse-and-dispatch and the full
+pipeline becomes directly unit-testable. PR-4 follow-up A (the
+deferred synthetic-panel smoke test) ships in this PR — two new
+OUnit2 cases under `test_optimal_strategy_runner.ml` exercise the full
+pipeline end-to-end against a tmpdir fixture and a one-symbol OHLCV
+fixture (with `TRADING_DATA_DIR` overriden to point at it).
 
 ## Goal
 
@@ -98,15 +99,25 @@ ready to start once PR-3 lands.
       `dev/notes/optimal-strategy-pr4-followups-2026-04-28.md`.
 - [x] **PR-4b**: `optimal_strategy.exe` binary (panel loading + pipeline
       orchestration) — PR #666 (merged 2026-04-29). Bin scaffold +
-      `bin/dune`; panel-walking smoke test deferred to the lib-extraction
-      follow-up. Macro-trend hardcoded to `Neutral` until the read-side
+      `bin/dune`; panel-walking smoke test deferred to PR-4c lib
+      extraction. Macro-trend hardcoded to `Neutral` until the read-side
       wiring of #671's artefact lands.
 - [x] **PR-4 follow-up B**: fuller per-Friday divergence + missed-trade
       ordering fixture tests on `feat/optimal-strategy-pr4-followup-b`.
       Three new cases in `test_optimal_strategy_report.ml` pin specific
       symbols / sizes / R-multiples in the divergence section, the
       missed-trades descending-by-P&L ordering, and the no-divergence
-      sentinel. 45 → 48 tests pass.
+      sentinel. 45 → 48 tests pass. PR #670 (merged 2026-04-29).
+- [~] **PR-4c**: lib extraction. Move pipeline orchestration code from
+      `bin/optimal_strategy.ml` into `lib/optimal_strategy_runner.ml`
+      \+ `lib/optimal_run_artefacts.ml`; bin shrinks from ~480 LOC to
+      ~35 LOC. Lands the deferred synthetic-panel smoke test (2 new
+      OUnit2 cases) which is now possible because the entry point is a
+      lib function. Branch `feat/optimal-strategy-runner-lib` / PR #672.
+      Verify: `dev/lib/run-in-env.sh dune runtest
+      trading/backtest/optimal/` (47/47 pass: 45 prior + 2 new smoke
+      tests). Unblocks the macro-persistence read-side wiring (a clean
+      lib edit instead of a 480-line bin edit).
 - [ ] **PR-5** (optional): wire into `release_perf_report` so each
       scenario emits the counterfactual delta. ~200 LOC.
 
@@ -120,13 +131,18 @@ ready to start once PR-3 lands.
       `trading/trading/backtest/lib/macro_trend_writer.{ml,mli}`. Verify:
       `dev/lib/run-in-env.sh dune exec trading/backtest/test/test_macro_trend_writer.exe`.
       Branch / PR: `feat/scenario-runner-macro-persistence` / TBD.
-- [ ] **Read side** (post-merge follow-up): `optimal_strategy.exe` (PR-4b
-      / #666) currently hardcodes `Weinstein_types.Neutral` for every
-      Friday because run artefacts didn't persist macro state — making
-      the `Constrained` and `Relaxed_macro` counterfactual variants
-      produce identical output. After this PR + PR-4b both merge, swap
-      the hardcode for `Macro_trend_writer.t_of_sexp (Sexp.load_sexp …)`.
-      ~30 LOC change in the bin.
+- [ ] **Read side** (post-merge follow-up): the runner currently
+      hardcodes `Weinstein_types.Neutral` at the per-Friday
+      `Scanner.week_input` construction site (`_scan_all_fridays`
+      in `optimal_strategy_runner.ml`) — making the `Constrained` and
+      `Relaxed_macro` counterfactual variants produce identical output
+      because every candidate gets `passes_macro = true`. After PR-4c
+      merges, swap the hardcode for a per-Friday lookup against the
+      `Macro_trend_writer.t_of_sexp (Sexp.load_sexp …)` blob loaded
+      once at world-build time. ~30 LOC change in the lib (no bin
+      change). The `(* TODO follow-up: read macro_trend.sexp once
+      \#671 merges *)` comment is already in place at the exact
+      callsite.
 
 ## Ownership
 
@@ -238,7 +254,7 @@ consumes scorer output as opaque exit fields.
     - `trading/trading/backtest/optimal/bin/optimal_strategy.ml`
   - Coverage: existing 45/45 optimal-track tests still pass; no new
     unit tests in this commit. Smoke test (synthetic-panel fixture
-    invoking `main`) deferred to the lib-extraction follow-up.
+    invoking `main`) deferred to PR-4c.
   - Macro-trend simplification: bin uses fixed `Neutral` for every
     Friday because run artefacts don't persist per-Friday macro state.
     `Constrained` and `Relaxed_macro` therefore tag every candidate
@@ -256,7 +272,7 @@ consumes scorer output as opaque exit fields.
     - `dev/lib/run-in-env.sh dune build @fmt`
   - Branch / PR: `feat/optimal-strategy-pr4b` / PR #666.
 
-- **PR-4 follow-up B** (2026-04-29): fuller renderer fixture tests.
+- **PR-4 follow-up B** (2026-04-29, MERGED): fuller renderer fixture tests.
   - Files modified:
     - `trading/trading/backtest/optimal/test/test_optimal_strategy_report.ml`
       (3 new OUnit2 cases, ~205 LOC of additions; no production code
@@ -286,3 +302,64 @@ consumes scorer output as opaque exit fields.
     - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
     - `dev/lib/run-in-env.sh dune build @fmt`
   - Branch / PR: `feat/optimal-strategy-pr4-followup-b` / PR #670.
+
+- **PR-4c** (2026-04-29, in flight): pipeline orchestration extracted
+  from the bin into reusable lib modules, plus the deferred
+  synthetic-panel smoke test (PR-4 follow-up A).
+  - Rationale: the bin sat at ~480 LOC and contained substantively all
+    of the pipeline (sexp shape mirrors, CSV trade-row parser,
+    cascade-rejection harvest, panel construction, Friday math, scan
+    + score, four pipeline phases). Extracting unblocks the deferred
+    smoke test (a binary entry can't be unit-tested without a process
+    round-trip) and turns the upcoming macro-persistence read-side
+    wiring (Read side TODO above) into a clean lib edit.
+  - Files added:
+    - `trading/trading/backtest/optimal/lib/optimal_run_artefacts.{ml,mli}`
+      — sexp shapes (`actual.sexp` + `summary.sexp`) + trades.csv
+      parser + trade-audit cascade-rejection harvest, returning a
+      bundled `actual_run_inputs` record. Tolerates missing optional
+      artefacts; logs malformed rows / parse failures to stderr and
+      drops them.
+    - `trading/trading/backtest/optimal/lib/optimal_strategy_runner.{ml,mli}`
+      — pipeline orchestration: builds the bar-panel world, scans +
+      scores per Friday, fills + summarises both variants, renders the
+      report. Single entry point: `Optimal_strategy_runner.run
+      ~output_dir : unit`.
+    - `trading/trading/backtest/optimal/test/test_optimal_strategy_runner.ml`
+      — 2 OUnit2 smoke tests against a synthetic-panel fixture
+      (one-symbol OHLCV CSV + sectors.csv staged in a tmpdir,
+      `TRADING_DATA_DIR` overriden via `Core_unix.putenv` for the
+      duration of the call). Asserts the runner writes
+      `<output_dir>/optimal_strategy.md` with the disclaimer + scenario
+      name; second case omits `trade_audit.sexp` and asserts the
+      missed-trades section emits no `(reason: ...)` annotations.
+  - Files modified:
+    - `trading/trading/backtest/optimal/bin/optimal_strategy.ml`
+      — shrinks from ~480 LOC to 35 LOC. Now a thin CLI wrapper that
+      parses `--output-dir` and dispatches to
+      `Backtest_optimal.Optimal_strategy_runner.run`.
+    - `trading/trading/backtest/optimal/bin/dune` — drops 11 of its
+      13 library deps (everything moved to the lib); keeps only `core`
+      \+ `backtest_optimal`.
+    - `trading/trading/backtest/optimal/lib/dune` — pulls in the deps
+      that came from the bin (`core_unix.sys_unix`, `trading.data_panel`,
+      `weinstein.data_source`, `backtest`).
+    - `trading/trading/backtest/optimal/test/dune` — registers the new
+      test executable + adds `core_unix`, `core_unix.sys_unix`, `fpath`,
+      `csv` deps for the fixture-staging helpers.
+  - Two-module split rationale: the runner is 326 LOC standalone; with
+    the artefact loaders inlined it would be 460 LOC and cross the
+    typical lib-module size cliff. Splitting on the load-vs-orchestrate
+    seam keeps each module under 350 LOC and lets the artefact loader
+    be tested independently if needed later.
+  - Macro-trend hardcode preserved (`Weinstein_types.Neutral` at the
+    `_scan_all_fridays` callsite) with an inline `(* TODO follow-up:
+    read macro_trend.sexp once #671 merges *)` comment marking the
+    exact fix location for the read-side wiring follow-up.
+  - Test count: 45 → 47 across the optimal track (5 + 10 + 8 + 2 +
+    9 + 13 — the +2 is the new runner smoke tests).
+  - Verify:
+    - `dev/lib/run-in-env.sh dune build`
+    - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
+    - `dev/lib/run-in-env.sh dune build @fmt`
+  - Branch / PR: `feat/optimal-strategy-runner-lib` / PR #672.

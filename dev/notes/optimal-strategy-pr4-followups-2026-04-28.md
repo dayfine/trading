@@ -26,10 +26,21 @@ These are the slices the original PR-4 plan listed that did not land in
 this PR. Each is independently mergeable; the `feat-backtest` agent can
 pick them up sequentially.
 
-### Follow-up A — `bin/optimal_strategy.ml` + `bin/dune`
+### Follow-up A — `bin/optimal_strategy.ml` + `bin/dune` — DONE (2026-04-29)
 
-The thin binary that wires scenario-runner artefacts into the renderer.
-Plan §PR-4 spec (lines 347–352):
+The bin scaffold itself shipped in PR-4b (#666, merged 2026-04-29).
+The deferred synthetic-panel smoke test landed in PR-4c
+(`feat/optimal-strategy-runner-lib`) as part of the lib-extraction
+refactor — the runner became a lib function
+(`Optimal_strategy_runner.run ~output_dir`) so the smoke test can call
+it directly without a process round-trip. Two new OUnit2 cases in
+`test_optimal_strategy_runner.ml` exercise the full pipeline against a
+tmpdir fixture (one-symbol OHLCV CSV + sectors.csv +
+`{summary,actual,trade_audit}.sexp` + trades.csv), with
+`TRADING_DATA_DIR` overriden for the duration of the call. Test count:
+45 → 47.
+
+Original spec retained for context. Plan §PR-4 spec (lines 347–352):
 
 > Reads `output_dir/`'s artefacts (`trades.csv`, `summary.sexp`, the panel
 > cache referenced by `summary.sexp`), invokes scanner→scorer→filler→
