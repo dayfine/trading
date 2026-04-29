@@ -2,26 +2,25 @@
 
     Reads the artefacts written by a prior [scenario_runner.exe] run from
     [--output-dir] and produces [<output_dir>/optimal_strategy.md] — a markdown
-    report comparing the actual run's performance against the
-    [Constrained] / [Relaxed_macro] counterfactual variants, rendered via
+    report comparing the actual run's performance against the [Constrained] /
+    [Relaxed_macro] counterfactual variants, rendered via
     {!Backtest_optimal.Optimal_strategy_report.render}.
 
     {1 Pipeline}
 
-    1. Parse [--output-dir] from the CLI.
-    2. Load [actual.sexp], [summary.sexp], [trades.csv] (and optionally
-       [trade_audit.sexp]) to build the renderer's [actual_run].
-    3. Re-build OHLCV + bar panels over the run's universe + period via the same
-       calendar-aware loader [Panel_runner] uses.
-    4. Walk Fridays in [start_date, end_date]:
-       - Per symbol: run [Stock_analysis.analyze] via {!Stage_callbacks_from_bars}
-         to produce a candidate-eligibility analysis.
-       - Build a [Stage_transition_scanner.week_input] and call [scan_week].
-    5. For each candidate, score forward-weekly outlooks via
-       {!Outcome_scorer.score} (walks future Fridays' bar + stage classification).
-    6. Run [Optimal_portfolio_filler.fill] for [Constrained] and [Relaxed_macro];
-       summarise each via [Optimal_summary.summarize].
-    7. Build the renderer input and write [<output_dir>/optimal_strategy.md].
+    1. Parse [--output-dir] from the CLI. 2. Load [actual.sexp], [summary.sexp],
+    [trades.csv] (and optionally [trade_audit.sexp]) to build the renderer's
+    [actual_run]. 3. Re-build OHLCV + bar panels over the run's universe +
+    period via the same calendar-aware loader [Panel_runner] uses. 4. Walk
+    Fridays in [start_date, end_date]:
+    - Per symbol: run [Stock_analysis.analyze] via {!Stage_callbacks_from_bars}
+      to produce a candidate-eligibility analysis.
+    - Build a [Stage_transition_scanner.week_input] and call [scan_week]. 5. For
+      each candidate, score forward-weekly outlooks via {!Outcome_scorer.score}
+      (walks future Fridays' bar + stage classification). 6. Run
+      [Optimal_portfolio_filler.fill] for [Constrained] and [Relaxed_macro];
+      summarise each via [Optimal_summary.summarize]. 7. Build the renderer
+      input and write [<output_dir>/optimal_strategy.md].
 
     {1 Macro-trend simplification}
 
@@ -60,8 +59,8 @@ module OT = Backtest_optimal.Optimal_types
 (* CLI parsing                                                       *)
 (* ---------------------------------------------------------------- *)
 
-(** Parsed CLI arguments. *)
 type cli_args = { output_dir : string }
+(** Parsed CLI arguments. *)
 
 let _usage_and_exit () =
   eprintf "Usage: optimal_strategy --output-dir <path>\n";
@@ -82,9 +81,6 @@ let _parse_args () : cli_args =
 (* Loading actual-run artefacts                                       *)
 (* ---------------------------------------------------------------- *)
 
-(** Mirrors [Backtest.Scenarios.Scenario_runner.actual] — a private record
-    written alongside other artefacts. We re-declare the shape locally and
-    parse it via the same [@@deriving sexp]. *)
 type _actual_sexp_shape = {
   total_return_pct : float;
   total_trades : float;
@@ -95,9 +91,10 @@ type _actual_sexp_shape = {
   unrealized_pnl : float;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
+(** Mirrors [Backtest.Scenarios.Scenario_runner.actual] — a private record
+    written alongside other artefacts. We re-declare the shape locally and parse
+    it via the same [@@deriving sexp]. *)
 
-(** Mirrors [Backtest.Summary.t]'s on-disk fields. We use [sexp.allow_extra_fields]
-    to tolerate the [metrics] field which we don't read here. *)
 type _summary_sexp_shape = {
   start_date : Date.t;
   end_date : Date.t;
@@ -106,6 +103,9 @@ type _summary_sexp_shape = {
   final_portfolio_value : float;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
+(** Mirrors [Backtest.Summary.t]'s on-disk fields. We use
+    [sexp.allow_extra_fields] to tolerate the [metrics] field which we don't
+    read here. *)
 
 let _load_actual_sexp ~output_dir : _actual_sexp_shape =
   let path = Filename.concat output_dir "actual.sexp" in
@@ -123,8 +123,9 @@ let _load_summary_sexp ~output_dir : _summary_sexp_shape =
 (* Loading trades.csv                                                 *)
 (* ---------------------------------------------------------------- *)
 
-(** Parse one line of trades.csv into a [Trading_simulation.Metrics.trade_metrics].
-    The on-disk format is set by [Backtest.Result_writer._write_trade_row]:
+(** Parse one line of trades.csv into a
+    [Trading_simulation.Metrics.trade_metrics]. The on-disk format is set by
+    [Backtest.Result_writer._write_trade_row]:
     [symbol,entry_date,exit_date,days_held,entry_price,exit_price,
      quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger]. *)
 let _parse_trade_row line : Trading_simulation.Metrics.trade_metrics option =
@@ -169,8 +170,11 @@ let _load_cascade_rejections ~output_dir : (string * string) list =
   if not (Sys_unix.file_exists_exn path) then []
   else
     try
-      let blob = Backtest.Trade_audit.audit_blob_of_sexp (Sexp.load_sexp path) in
-      List.concat_map blob.audit_records ~f:(fun (rec_ : Backtest.Trade_audit.audit_record) ->
+      let blob =
+        Backtest.Trade_audit.audit_blob_of_sexp (Sexp.load_sexp path)
+      in
+      List.concat_map blob.audit_records
+        ~f:(fun (rec_ : Backtest.Trade_audit.audit_record) ->
           List.map rec_.entry.alternatives_considered
             ~f:(fun (alt : Backtest.Trade_audit.alternative_candidate) ->
               let reason =
@@ -208,8 +212,7 @@ let _build_calendar ~start ~end_ : Date.t array =
 let _build_bar_panels ~data_dir_fpath ~universe ~calendar :
     Bar_panels.t * Date.t array =
   let symbols =
-    _index_symbol :: universe
-    |> List.dedup_and_sort ~compare:String.compare
+    _index_symbol :: universe |> List.dedup_and_sort ~compare:String.compare
   in
   let symbol_index =
     match Symbol_index.create ~universe:symbols with
@@ -230,8 +233,7 @@ let _build_bar_panels ~data_dir_fpath ~universe ~calendar :
   let bar_panels =
     match Bar_panels.create ~ohlcv ~calendar with
     | Ok p -> p
-    | Error err ->
-        failwithf "Bar_panels.create failed: %s" (Status.show err) ()
+    | Error err -> failwithf "Bar_panels.create failed: %s" (Status.show err) ()
   in
   (bar_panels, calendar)
 
@@ -292,8 +294,8 @@ let _analyze_symbol_on_friday ~bar_panels ~friday ~stock_config ~bar_lookback
 (** Build a [sector_map] (symbol → [Screener.sector_context]) from a flat
     [sectors : (symbol → sector_name)] table. The screener's sector-context
     expects a [rating] and [stage] per sector; we use [Neutral] / [Stage2] as
-    pass-throughs because the counterfactual treats sector caps separately
-    (via the filler's [max_sector_concentration]). *)
+    pass-throughs because the counterfactual treats sector caps separately (via
+    the filler's [max_sector_concentration]). *)
 let _build_sector_context_map (sectors : (string, string) Hashtbl.t) :
     (string, Screener.sector_context) Hashtbl.t =
   let out = Hashtbl.create (module String) in
@@ -313,9 +315,9 @@ let _build_sector_context_map (sectors : (string, string) Hashtbl.t) :
 (* ---------------------------------------------------------------- *)
 
 (** Build a forward [Outcome_scorer.weekly_outlook list] for [symbol] starting
-    on the Friday {b after} [entry_friday]. Reads weekly bars + classifies
-    Stage at each Friday via [Stage.classify]. Empty list means the run ends
-    at or before [entry_friday]. *)
+    on the Friday {b after} [entry_friday]. Reads weekly bars + classifies Stage
+    at each Friday via [Stage.classify]. Empty list means the run ends at or
+    before [entry_friday]. *)
 let _forward_outlooks ~bar_panels ~all_fridays ~stage_config ~bar_lookback
     ~symbol ~entry_friday : Scorer.weekly_outlook list =
   let after =
@@ -361,8 +363,8 @@ let _scan_all_fridays ~bar_panels ~fridays ~universe ~sector_map ~stock_config
       in
       Scanner.scan_week ~config:scanner_config week)
 
-(** Score each candidate by forward-walking the panel. Drops candidates with
-    no forward bars (degenerate end-of-run). *)
+(** Score each candidate by forward-walking the panel. Drops candidates with no
+    forward bars (degenerate end-of-run). *)
 let _score_all_candidates ~bar_panels ~all_fridays ~scorer_config ~stage_config
     ~bar_lookback (candidates : OT.candidate_entry list) :
     OT.scored_candidate list =
@@ -389,8 +391,8 @@ let _build_variant ~filler_config ~variant ~scored ~starting_cash :
 (* Top-level                                                          *)
 (* ---------------------------------------------------------------- *)
 
-(** Number of weekly bars to slice for each per-Friday analysis. Large enough
-    to satisfy the 30-week MA + breakout-base lookback in
+(** Number of weekly bars to slice for each per-Friday analysis. Large enough to
+    satisfy the 30-week MA + breakout-base lookback in
     [Stock_analysis.default_config]. *)
 let _bar_lookback_weeks = 90
 
@@ -431,13 +433,13 @@ let main ~output_dir =
     Hashtbl.keys sectors_tbl |> List.sort ~compare:String.compare
   in
   let warmup_start = Date.add_days actual_run.start_date (-_warmup_days) in
-  let calendar = _build_calendar ~start:warmup_start ~end_:actual_run.end_date in
+  let calendar =
+    _build_calendar ~start:warmup_start ~end_:actual_run.end_date
+  in
   eprintf "optimal_strategy: building panels (%d symbols × %d days)\n%!"
     (List.length universe + 1)
     (Array.length calendar);
-  let bar_panels, _ =
-    _build_bar_panels ~data_dir_fpath ~universe ~calendar
-  in
+  let bar_panels, _ = _build_bar_panels ~data_dir_fpath ~universe ~calendar in
   let sector_ctx_map = _build_sector_context_map sectors_tbl in
   let fridays =
     _fridays_in_range ~start:actual_run.start_date ~end_:actual_run.end_date
@@ -469,7 +471,9 @@ let main ~output_dir =
     _build_variant ~filler_config ~variant:OT.Relaxed_macro ~scored
       ~starting_cash:actual_run.initial_cash
   in
-  let input : Report.input = { actual = actual_run; constrained; relaxed_macro } in
+  let input : Report.input =
+    { actual = actual_run; constrained; relaxed_macro }
+  in
   let md = Report.render input in
   let out_path = Filename.concat output_dir "optimal_strategy.md" in
   Out_channel.write_all out_path ~data:md;

@@ -1,18 +1,19 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-28 (post run-2)
+## Last updated: 2026-04-29 (PR-4b in flight)
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-PR-1 (#652), PR-2 (#659), and PR-3 (#663) all merged into `main`. PR-4
-(`Optimal_strategy_report` renderer + smoke tests) is open as a partial
-landing on branch `feat/optimal-strategy-pr4`. The renderer + smoke tests
-ship in this PR; the binary (`optimal_strategy.exe`) and the deeper
-fixture tests are deferred — see
-`dev/notes/optimal-strategy-pr4-followups-2026-04-28.md` for the
-follow-up surface (PR-4b for the bin, ~150–200 LOC; optional follow-up
-B for fuller renderer fixture tests).
+PR-1 (#652), PR-2 (#659), PR-3 (#663), and PR-4 (#665) all merged into
+`main`. PR-4b (`optimal_strategy.exe` binary scaffold) is open as PR
+#666 on branch `feat/optimal-strategy-pr4b`. The bin wires the existing
+pure-functional optimal-lib pipeline (scanner → scorer → filler →
+summary → renderer) to disk artefacts and emits
+`<output_dir>/optimal_strategy.md`. The synthetic-panel smoke test and
+the deeper renderer fixture tests remain as a follow-up commit on the
+same branch / PR-4 followup B respectively — see
+`dev/notes/optimal-strategy-pr4-followups-2026-04-28.md`.
 
 ## Goal
 
@@ -95,9 +96,13 @@ ready to start once PR-3 lands.
       determinism, trailing newline). 45/45 pass across the optimal track.
       The binary + deeper fixture tests are deferred to PR-4b — see
       `dev/notes/optimal-strategy-pr4-followups-2026-04-28.md`.
-- [ ] **PR-4b**: `optimal_strategy.exe` binary (panel loading + pipeline
-      orchestration), plus fuller per-Friday divergence + missed-trade
-      ordering fixture tests. ~250 LOC. Deferred per PR-4 followups note.
+- [~] **PR-4b**: `optimal_strategy.exe` binary (panel loading + pipeline
+      orchestration). In flight on `feat/optimal-strategy-pr4b` / PR #666.
+      Bin scaffold + `bin/dune` shipped; panel-walking smoke test deferred
+      to a follow-up commit on the same branch (writing real artefacts to
+      a tmp dir is the cheapest path; needs panel CSV fixtures). The
+      fuller per-Friday divergence + missed-trade ordering renderer
+      fixture tests remain pending and stay attached to PR-4 followup B.
 - [ ] **PR-5** (optional): wire into `release_perf_report` so each
       scenario emits the counterfactual delta. ~200 LOC.
 
@@ -201,3 +206,29 @@ consumes scorer output as opaque exit fields.
     - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
     - `dev/lib/run-in-env.sh dune build @fmt`
   - Branch / PR: `feat/optimal-strategy-pr3` / PR #TBD.
+
+- **PR-4b** (2026-04-29, in flight): `optimal_strategy.exe` binary —
+  thin orchestration wrapper that wires the existing pure-functional
+  optimal-lib pipeline (scanner → scorer → filler ×2 → summary ×2) to
+  artefacts on disk and emits `<output_dir>/optimal_strategy.md`.
+  - Files added:
+    - `trading/trading/backtest/optimal/bin/dune`
+    - `trading/trading/backtest/optimal/bin/optimal_strategy.ml`
+  - Coverage: existing 45/45 optimal-track tests still pass; no new
+    unit tests in this commit. Smoke test (synthetic-panel fixture
+    invoking `main`) deferred to a follow-up commit on the same branch.
+  - Macro-trend simplification: bin uses fixed `Neutral` for every
+    Friday because run artefacts don't persist per-Friday macro state.
+    `Constrained` and `Relaxed_macro` therefore tag every candidate
+    identically until macro persistence lands; the headline
+    cascade-ranking comparison is unaffected. Documented in the bin's
+    docstring.
+  - Cascade rejections sourced from `trade_audit.sexp`'s
+    `alternatives_considered` when present; missing-audit case passes
+    `[]` and the renderer drops rejection annotations from missed-trade
+    rows.
+  - Verify:
+    - `dev/lib/run-in-env.sh dune build`
+    - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
+    - `dev/lib/run-in-env.sh dune build @fmt`
+  - Branch / PR: `feat/optimal-strategy-pr4b` / PR #666.
