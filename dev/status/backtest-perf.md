@@ -1,6 +1,6 @@
 # Status: backtest-perf
 
-## Last updated: 2026-04-28
+## Last updated: 2026-04-29
 
 ## Status
 IN_PROGRESS
@@ -185,6 +185,33 @@ mechanics + release-gate procedure.
   scheduled** — out-of-PR follow-up.
 
 ## Completed
+
+- **Split-day broker-model fix lands; sp500 phantom MaxDD bug resolved
+  on the simulator side** (2026-04-29, PR-4 of split-day redesign).
+  PR #658 (Split_detector), PR #662 (Split_event), PR #664 (Simulator
+  wire-in), and the PR-4 verification PR collectively close the open
+  PR #641 trail. The 97.69% phantom MaxDD documented for
+  `goldens-sp500/sp500-2019-2023` in
+  `dev/notes/goldens-performance-baselines-2026-04-28.md` and
+  `dev/notes/sp500-2019-2023-baseline-canonical-2026-04-28.md` is
+  caused by the AAPL 2020-08-31 4:1 phantom drop (raw close
+  $499.23 → $129.04 with no ledger adjustment, MtM crashes 75%); the
+  broker model multiplies quantity by 4 / divides cost-basis-per-share
+  by 4 on the split day, preserving total cost basis and eliminating
+  the phantom drop. Verification: `test_split_day_mtm.ml` 3/3 PASS,
+  smoke parity goldens (`panel-golden-2019-full`,
+  `tiered-loader-parity`) bit-identical to pre-#641 main.
+  **Local sp500 baseline rerun is deferred** because GHA's 22-symbol
+  fixture cannot satisfy the 491-symbol sp500 universe (same
+  data-availability blocker that scoped tier-4 release-gate to
+  local). Expected post-fix metrics on the canonical baseline:
+  trades ≈ 134, return ≈ +71%, win rate ≈ 38%, MaxDD ~5% (down from
+  97.69%). When a maintainer captures these, two follow-ups:
+  (a) supersede `dev/notes/sp500-2019-2023-baseline-canonical-2026-04-28.md`
+  with a 2026-04-29-or-later note, (b) re-pin
+  `goldens-sp500/sp500-2019-2023.sexp` `expected` ranges against the
+  corrected MaxDD. Plan: `dev/plans/split-day-ohlc-redesign-2026-04-28.md`.
+  Verification record: `dev/notes/split-day-broker-model-verification-2026-04-29.md`.
 
 - **Tier-1 smoke universe_path resolution + flip continue-on-error: false**
   (2026-04-28, PR #634). Fix for next-step #4.

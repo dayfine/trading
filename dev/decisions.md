@@ -43,6 +43,12 @@ _(None yet — system just initialized.)_
 
 ## Direction Changes
 
+### 2026-04-29 — Split-day OHLC: broker model (closes #641, ships PR-1..PR-4)
+
+Split days are **discrete events on the position ledger**, not continuous OHLC adjustments. All consumers (Simulator MtM, engine fills, screener `get_price`, resistance, breakout) read raw OHLC straight from `Daily_price.t`; `adjusted_close` is reserved for back-rolled smoothness on relative-strength, MAs, momentum, and breakout-vs-historical-resistance only. On a split day the position's quantity multiplies by the split factor and per-share cost basis divides — total cost basis preserved exactly, realized P&L unchanged. This matches live brokerage semantics and is the canonical fix for the AAPL 2020-08-31 4:1 phantom 75% MtM drop on `sp500-2019-2023` (the 97.7% MaxDD was the bug, not the strategy).
+
+Closure: PR #641's band-aid (`_split_adjust_bar` rescaling every pre-corporate-action bar) was held indefinitely because dividend back-roll meant every historical day got rescaled, drifting fill prices and dropping sp500 from 134 trades to 30 — un-comparable to baseline. The broker-model redesign was authored as `dev/plans/split-day-ohlc-redesign-2026-04-28.md` and shipped over four PRs: PR-1 (#658) added `Split_detector` primitive; PR-2 (#662) added `Split_event` ledger primitive; PR-3 (#664) wired detector + ledger into `Simulator.step` (raw OHLC paths unchanged); PR-4 (this PR) verified non-split-window goldens stay bit-identical (smoke parity gates 7 / 5 round-trips match pre-#641 main) and resolved the #641 closure trail. The 97.7% phantom MaxDD on sp500 is now expected to drop to ~5% on a local re-run of the canonical scenario; that re-run is deferred to a maintainer-local invocation because GHA cannot supply the 491-symbol sp500 universe data (same blocker as the tier-4 release-gate).
+
 ### 2026-04-16 — Reopen feat-weinstein for support-floor-stops + close open escalations
 
 Decisions from the 2026-04-16-run1 orchestrator session (daily PR #375, §Escalations):
