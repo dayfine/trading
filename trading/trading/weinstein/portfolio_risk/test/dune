@@ -13,6 +13,13 @@
   (pps ppx_deriving.show ppx_deriving.eq ppx_test_matcher)))
 
 (test
+ (name test_force_liquidation)
+ (modules test_force_liquidation)
+ (libraries portfolio_risk ounit2 core matchers trading.base)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(test
  (name test_portfolio_risk_e2e)
  (modules test_portfolio_risk_e2e)
  (libraries

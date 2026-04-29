@@ -7,6 +7,7 @@
   test_trade_audit_capture
   test_trade_audit_report
   test_trade_audit_ratings
+  test_result_writer
   test_runner_hypothesis_overrides
   test_panel_loader_parity
   test_backtest_runner_args
@@ -37,6 +38,7 @@
   trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
+  weinstein_trading.portfolio_risk
   weinstein.screener
   status
   matchers)

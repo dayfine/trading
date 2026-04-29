@@ -43,10 +43,13 @@ type cascade_event = {
   entered : int;
 }
 
+type force_liquidation_event = Portfolio_risk.Force_liquidation.event
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
   record_cascade_summary : cascade_event -> unit;
+  record_force_liquidation : force_liquidation_event -> unit;
 }
 
 let noop : t =
@@ -54,4 +57,5 @@ let noop : t =
     record_entry = (fun _ -> ());
     record_exit = (fun _ -> ());
     record_cascade_summary = (fun _ -> ());
+    record_force_liquidation = (fun _ -> ());
   }

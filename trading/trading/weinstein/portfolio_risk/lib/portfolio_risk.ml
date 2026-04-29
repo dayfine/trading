@@ -1,4 +1,5 @@
 open Core
+module Force_liquidation = Force_liquidation
 
 type portfolio_snapshot = {
   total_value : float;
@@ -40,6 +41,8 @@ type config = {
   max_sector_concentration : int;
   max_unknown_sector_positions : int;
   big_winner_multiplier : float;
+  force_liquidation : Force_liquidation.config;
+      [@sexp.default Force_liquidation.default_config]
 }
 [@@deriving show, eq, sexp]
 
@@ -53,6 +56,7 @@ let default_config =
     max_sector_concentration = 5;
     max_unknown_sector_positions = 2;
     big_winner_multiplier = 1.5;
+    force_liquidation = Force_liquidation.default_config;
   }
 
 (* ---- Snapshot helpers ---- *)

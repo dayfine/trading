@@ -46,6 +46,7 @@ val run :
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
   * Trade_audit.t
+  * Force_liquidation_log.t
 (** Same shape as the Legacy path's per-strategy entry point. The Panel branch
     in [Runner] uses this; callers should not call this directly outside of
     tests.

@@ -26,6 +26,7 @@ type result = {
   stop_infos : Stop_log.stop_info list;
   audit : Trade_audit.audit_record list;
   cascade_summaries : Trade_audit.cascade_summary list;
+  force_liquidations : Portfolio_risk.Force_liquidation.event list;
 }
 
 (* Trading-day filter *)
@@ -260,7 +261,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     (Date.to_string start_date)
     (Date.to_string end_date)
     (Date.to_string warmup_start);
-  let sim_result, stop_log, trade_audit =
+  let sim_result, stop_log, trade_audit, force_liquidation_log =
     _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
@@ -281,12 +282,13 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
      consumers use the series. *)
   let steps = List.filter steps_in_range ~f:is_trading_day in
   let final_value = (List.last_exn steps).portfolio_value in
-  let round_trips, stop_infos, audit, cascade_summaries =
+  let round_trips, stop_infos, audit, cascade_summaries, force_liquidations =
     Trace.record ?trace Trace.Phase.Teardown (fun () ->
         ( Metrics.extract_round_trips steps_in_range,
           Stop_log.get_stop_infos stop_log,
           Trade_audit.get_audit_records trade_audit,
-          Trade_audit.get_cascade_summaries trade_audit ))
+          Trade_audit.get_cascade_summaries trade_audit,
+          Force_liquidation_log.events force_liquidation_log ))
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
   let summary =
@@ -301,4 +303,5 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     stop_infos;
     audit;
     cascade_summaries;
+    force_liquidations;
   }

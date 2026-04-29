@@ -7,6 +7,7 @@ open Trading_strategy
 module Bar_reader = Bar_reader
 module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
+module Force_liquidation_runner = Force_liquidation_runner
 
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. Exposed as a top-level submodule
@@ -329,15 +330,14 @@ let _is_screening_day_view (view : Data_panel.Bar_panels.weekly_view) =
     Date.day_of_week view.dates.(view.n - 1)
     |> Day_of_week.equal Day_of_week.Fri
 
-(** Run the Friday macro + screener path and return entry transitions. Under all
-    macro regimes (Bullish, Neutral, Bearish) the screener is invoked;
-    macro-specific gating — longs blocked under Bearish, shorts blocked under
-    Bullish — happens inside the screener. Under Bearish this yields short-side
-    entries (per the bear-market shorting chapter), where previously the branch
-    returned [] unconditionally. *)
-let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~prior_macro_result
-    ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
-    ~portfolio ~current_date ~index_view ~audit_recorder =
+(** Compute the macro result for [current_date] and update the strategy's macro
+    refs. Cheap relative to [_run_screen_after_macro] — touches only the index,
+    globals, AD bars, and the macro analyser. Runs unconditionally on every
+    Friday (including when the halt is active) so [_maybe_reset_halt] can
+    consult the freshest macro trend even when the universe screen is gated off.
+*)
+let _run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result
+    ~bar_reader ~prior_stages ~current_date ~index_view =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
   let global_index_views =
     Macro_inputs.build_global_index_views ~lookback_bars:config.lookback_bars
@@ -359,6 +359,17 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~prior_macro_result
   in
   prior_macro := macro_result.trend;
   prior_macro_result := Some macro_result;
+  macro_result
+
+(** Run the Friday universe screener path given an already-computed
+    [macro_result]. Under all macro regimes (Bullish, Neutral, Bearish) the
+    screener is invoked; macro-specific gating — longs blocked under Bearish,
+    shorts blocked under Bullish — happens inside the screener. Under Bearish
+    this yields short-side entries (per the bear-market shorting chapter). *)
+let _run_screen_after_macro ~config ~stop_states ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder ~macro_result =
+  let ma_cache = Bar_reader.ma_cache bar_reader in
   let sector_map =
     Macro_inputs.build_sector_map ?ma_cache ~stage_config:config.stage_config
       ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
@@ -369,10 +380,41 @@ let _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~prior_macro_result
     ~portfolio ~get_price ~bar_reader ~prior_stages ~current_date
     ~audit_recorder
 
+(** Filter the position map down to symbols not yet exited on this tick. The
+    force-liquidation pass runs after [Stops_runner.update] but before the
+    [TriggerExit] transitions are applied to position state, so a position that
+    already received a stop-out exit transition this tick must NOT be
+    double-exited via force-liquidation. *)
+let _positions_minus_exited ~(positions : Position.t Map.M(String).t)
+    ~(stop_exit_transitions : Position.transition list) :
+    Position.t Map.M(String).t =
+  let exited_ids =
+    List.filter_map stop_exit_transitions ~f:(fun (t : Position.transition) ->
+        match t.kind with
+        | Position.TriggerExit _ -> Some t.position_id
+        | _ -> None)
+    |> String.Set.of_list
+  in
+  if Set.is_empty exited_ids then positions
+  else
+    Map.filter positions ~f:(fun (p : Position.t) ->
+        not (Set.mem exited_ids p.id))
+
+(** When the macro flips off Bearish, reset the force-liquidation halt so the
+    strategy can resume opening new positions. Bearish-window peak drawdowns are
+    exactly when the halt fires; once macro recovers we trust the standard
+    cascade gating again. *)
+let _maybe_reset_halt ~peak_tracker
+    ~(macro_trend : Weinstein_types.market_trend) =
+  match macro_trend with
+  | Weinstein_types.Bearish -> ()
+  | Weinstein_types.Bullish | Weinstein_types.Neutral ->
+      Portfolio_risk.Force_liquidation.Peak_tracker.reset peak_tracker
+
 let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
-    ~prior_macro_result ~bar_reader ~prior_stages ~sector_prior_stages
-    ~ticker_sectors ~audit_recorder ~get_price ~get_indicator:_
-    ~(portfolio : Portfolio_view.t) =
+    ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~audit_recorder ~get_price
+    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   let current_date =
     match get_price config.indices.primary with
@@ -397,6 +439,19 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
       (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
          ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
          ~bar_reader ~prior_stages ~positions);
+  (* Force-liquidation pass: defense in depth beyond stops (G4). Runs AFTER
+     [Stops_runner.update] so positions that were already stop-exited this
+     tick are filtered out — we never double-exit. Updates the peak tracker
+     and may flip the halt state to [Halted] for the portfolio-floor case. *)
+  let live_positions =
+    _positions_minus_exited ~positions ~stop_exit_transitions:exit_transitions
+  in
+  let force_exit_transitions =
+    Force_liquidation_runner.update
+      ~config:config.portfolio_config.force_liquidation
+      ~positions:live_positions ~get_price ~cash:portfolio.cash ~current_date
+      ~peak_tracker ~audit_recorder
+  in
   (* Stage 4 PR-A: read the primary index as a weekly view directly. The
      Friday detection uses the view's latest date; the screener path consumes
      the same view to avoid building two parallel inputs. *)
@@ -404,17 +459,47 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
     Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary
       ~n:config.lookback_bars ~as_of:current_date
   in
+  (* On every Friday — including Fridays where the force-liquidation halt is
+     active — run the cheap macro-only path and consult [_maybe_reset_halt]
+     BEFORE deciding whether to invoke the universe screen. This preserves the
+     contract claim that the halt clears when macro flips off Bearish: if we
+     short-circuited on [halted = true] before updating [prior_macro], the
+     halt would latch permanently because no path would ever observe the new
+     macro trend. The macro-only path is a strict subset of the full screen
+     and adds no work over the buggy short-circuit when no halt is active. *)
+  let is_screening_day = _is_screening_day_view index_view in
+  let macro_result_opt =
+    if is_screening_day then
+      Some
+        (_run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result
+           ~bar_reader ~prior_stages ~current_date ~index_view)
+    else None
+  in
+  if is_screening_day then
+    _maybe_reset_halt ~peak_tracker ~macro_trend:!prior_macro;
+  (* New entries are blocked entirely while the halt is active — that is the
+     portfolio-floor trigger's purpose. The halt clears when macro flips off
+     Bearish (the typical condition under which the floor fires). *)
+  let halted =
+    match
+      Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
+    with
+    | Halted -> true
+    | Active -> false
+  in
   let entry_transitions =
-    if not (_is_screening_day_view index_view) then []
-    else
-      _run_screen ~config ~ad_bars ~stop_states ~prior_macro ~prior_macro_result
-        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-        ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+    match (halted, is_screening_day, macro_result_opt) with
+    | false, true, Some macro_result ->
+        _run_screen_after_macro ~config ~stop_states ~bar_reader ~prior_stages
+          ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
+          ~current_date ~index_view ~audit_recorder ~macro_result
+    | _ -> []
   in
   Ok
     {
       Strategy_interface.transitions =
-        exit_transitions @ adjust_transitions @ entry_transitions;
+        exit_transitions @ force_exit_transitions @ adjust_transitions
+        @ entry_transitions;
     }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
@@ -424,6 +509,11 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
+  (* Force-liquidation peak tracker (G4). Lives in the strategy closure: each
+     [make] call yields an independent tracker so concurrent backtest /
+     paper / live instances don't pollute each other. The tracker is
+     observed every [_on_market_close] tick. *)
+  let peak_tracker = Portfolio_risk.Force_liquidation.Peak_tracker.create () in
   (* Cached full macro result for exit-time audit capture. Updated alongside
      [prior_macro] inside [_run_screen]. Held as an option until the first
      Friday so an exit firing before the first screen call gets a stable
@@ -459,7 +549,17 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
 
     let on_market_close =
       _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states ~prior_macro
-        ~prior_macro_result ~bar_reader ~prior_stages ~sector_prior_stages
-        ~ticker_sectors ~audit_recorder
+        ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
+        ~sector_prior_stages ~ticker_sectors ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
+
+(** Test-only entry point. Exposes [_on_market_close] with all closure-scoped
+    refs / hashtables passed in explicitly so tests can pin the macro / halt /
+    screening-day gating without the indirection of going through {!make}. Not
+    intended for production use — public callers must use {!make} instead. *)
+module Internal_for_test = struct
+  let on_market_close = _on_market_close
+  let maybe_reset_halt = _maybe_reset_halt
+  let positions_minus_exited = _positions_minus_exited
+end

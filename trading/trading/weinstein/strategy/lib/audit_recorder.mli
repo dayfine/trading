@@ -112,10 +112,19 @@ type cascade_event = {
     whole cascade — including phases that filter out every candidate before any
     rival comparison happens. *)
 
+type force_liquidation_event = Portfolio_risk.Force_liquidation.event
+(** Event captured every time {!Force_liquidation.check} fires for a position.
+    Mirrors [Force_liquidation.event] one-for-one; re-exposed here as part of
+    the recorder bundle so the strategy library does not depend on [Backtest.*].
+    The backtest-side recorder maps these into a [Force_liquidation_log] for
+    [force_liquidations.sexp] persistence and [trades.csv] exit-trigger
+    labelling. *)
+
 type t = {
   record_entry : entry_event -> unit;
   record_exit : exit_event -> unit;
   record_cascade_summary : cascade_event -> unit;
+  record_force_liquidation : force_liquidation_event -> unit;
 }
 (** Recorder bundle. All callbacks are invoked unconditionally by the strategy
     at entry / exit / per-Friday sites; the implementation decides whether to

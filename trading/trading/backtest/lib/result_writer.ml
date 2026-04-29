@@ -57,6 +57,26 @@ let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   | Underperforming _ -> "underperforming"
   | Portfolio_rebalancing -> "rebalancing"
 
+(** Build a (symbol, exit_date) -> reason map from force-liquidation events.
+    [trades.csv] rows are post-processed: when a row's (symbol, exit_date)
+    matches a recorded force-liquidation, the [exit_trigger] column is
+    overridden from the generic stop-loss label to the force-liquidation label.
+    The pair (symbol, exit_date) is unique enough in practice — a single
+    position cannot be force-closed twice and the same symbol can only re-enter
+    on a different date. *)
+let _build_force_liq_index
+    (events : Portfolio_risk.Force_liquidation.event list) =
+  List.fold events
+    ~init:(Map.empty (module String))
+    ~f:(fun acc (e : Portfolio_risk.Force_liquidation.event) ->
+      let key = e.symbol ^ "|" ^ Date.to_string e.date in
+      Map.set acc ~key ~data:e.reason)
+
+let _force_liq_label (reason : Portfolio_risk.Force_liquidation.reason) =
+  match reason with
+  | Per_position -> "force_liquidation_position"
+  | Portfolio_floor -> "force_liquidation_portfolio"
+
 let _pop_stop_info stop_index ~symbol =
   match Map.find !stop_index symbol with
   | Some (info :: rest) ->
@@ -81,9 +101,15 @@ let _side_label = function
   | Trading_base.Types.Buy -> "LONG"
   | Trading_base.Types.Sell -> "SHORT"
 
-let _write_trade_row oc stop_index (t : Metrics.trade_metrics) =
+let _write_trade_row oc stop_index force_liq_index (t : Metrics.trade_metrics) =
   let info = _pop_stop_info stop_index ~symbol:t.symbol in
-  let entry_stop, exit_stop, exit_trigger = _stop_fields info in
+  let entry_stop, exit_stop, base_exit_trigger = _stop_fields info in
+  let force_liq_key = t.symbol ^ "|" ^ Date.to_string t.exit_date in
+  let exit_trigger =
+    match Map.find force_liq_index force_liq_key with
+    | Some reason -> _force_liq_label reason
+    | None -> base_exit_trigger
+  in
   fprintf oc "%s,%s,%s,%s,%d,%.2f,%.2f,%.0f,%.2f,%.2f,%s,%s,%s\n" t.symbol
     (_side_label t.side)
     (Date.to_string t.entry_date)
@@ -92,7 +118,8 @@ let _write_trade_row oc stop_index (t : Metrics.trade_metrics) =
     t.pnl_percent entry_stop exit_stop exit_trigger
 
 let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
-    ~(stop_infos : Stop_log.stop_info list) =
+    ~(stop_infos : Stop_log.stop_info list)
+    ~(force_liquidations : Portfolio_risk.Force_liquidation.event list) =
   let path = output_dir ^ "/trades.csv" in
   let oc = Out_channel.create path in
   let header =
@@ -101,7 +128,8 @@ let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
   in
   fprintf oc "%s\n" header;
   let stop_index = ref (_build_stop_index stop_infos) in
-  List.iter round_trips ~f:(_write_trade_row oc stop_index);
+  let force_liq_index = _build_force_liq_index force_liquidations in
+  List.iter round_trips ~f:(_write_trade_row oc stop_index force_liq_index);
   Out_channel.close oc
 
 let _write_equity_curve ~output_dir
@@ -134,14 +162,30 @@ let _write_trade_audit ~output_dir ~(audit : Trade_audit.audit_record list)
         (output_dir ^ "/trade_audit.sexp")
         (Trade_audit.sexp_of_audit_blob blob)
 
+(** Persist [result.force_liquidations] as [force_liquidations.sexp] when
+    non-empty. Empty list (the common case — the policy did not fire) produces
+    no file rather than an empty-record sexp; downstream consumers tolerate the
+    file's absence. *)
+let _write_force_liquidations ~output_dir
+    ~(force_liquidations : Portfolio_risk.Force_liquidation.event list) =
+  match force_liquidations with
+  | [] -> ()
+  | evs ->
+      let blob : Force_liquidation_log.artefact = { events = evs } in
+      Sexp.save_hum
+        (output_dir ^ "/force_liquidations.sexp")
+        (Force_liquidation_log.sexp_of_artefact blob)
+
 let write ~output_dir (result : Runner.result) =
   _write_params ~output_dir result;
   Sexp.save_hum
     (output_dir ^ "/summary.sexp")
     (Summary.sexp_of_t result.summary);
   _write_trades ~output_dir ~round_trips:result.round_trips
-    ~stop_infos:result.stop_infos;
+    ~stop_infos:result.stop_infos ~force_liquidations:result.force_liquidations;
   _write_equity_curve ~output_dir ~steps:result.steps;
   _write_trade_audit ~output_dir ~audit:result.audit
     ~cascade_summaries:result.cascade_summaries;
+  _write_force_liquidations ~output_dir
+    ~force_liquidations:result.force_liquidations;
   Macro_trend_writer.write ~output_dir result.cascade_summaries

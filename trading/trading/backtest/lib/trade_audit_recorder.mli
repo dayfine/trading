@@ -7,8 +7,15 @@
     it builds {!Trade_audit.entry_decision} / [exit_decision] records from the
     events and accumulates them into the collector. *)
 
-val of_collector : Trade_audit.t -> Weinstein_strategy.Audit_recorder.t
-(** [of_collector collector] returns a recorder bundle whose [record_entry] and
-    [record_exit] callbacks construct the corresponding {!Trade_audit} records
-    from the strategy's events and route them into [collector] via
-    {!Trade_audit.record_entry} / [record_exit]. *)
+val of_collector :
+  trade_audit:Trade_audit.t ->
+  force_liquidation_log:Force_liquidation_log.t ->
+  Weinstein_strategy.Audit_recorder.t
+(** [of_collector ~trade_audit ~force_liquidation_log] returns a recorder bundle
+    whose:
+    - [record_entry] / [record_exit] / [record_cascade_summary] callbacks
+      construct the corresponding {!Trade_audit} records from the strategy's
+      events and route them into [trade_audit].
+    - [record_force_liquidation] callback appends the event to
+      [force_liquidation_log] verbatim — the event already carries every
+      audit-relevant field. *)
