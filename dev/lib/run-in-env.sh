@@ -21,6 +21,22 @@
 # Both paths verify that dune-workspace exists at the resolved root and fail
 # loudly if it doesn't — this catches path mismatches rather than silently
 # running dune in the wrong directory.
+#
+# Docker liveness probe (local path only):
+#   Before running the user command, the script verifies the container is
+#   responsive via a lightweight `docker exec <container> true`. If this
+#   fails (daemon down, container stopped), the script prints a clear error
+#   to stderr and exits 1. Without this probe, a dead docker daemon can
+#   silently return exit 0 in some shell configurations.
+#
+# Worktree path resolution (local path only):
+#   Isolated agent worktrees live at .claude/worktrees/agent-<ID>/ inside
+#   the host repo root. The container's bind-mount covers the entire host
+#   repo root, so worktree directories ARE accessible inside the container.
+#   This script detects its own location relative to the bind-mount source
+#   and computes the correct container-side DOCKER_TRADING_ROOT, so that
+#   `dune build` inside the container operates on the worktree's tree rather
+#   than the parent repo's tree.
 
 set -euo pipefail
 
@@ -60,9 +76,55 @@ if [ -n "${TRADING_IN_CONTAINER:-}" ]; then
 else
   # --- Local path: delegate to docker exec ---
 
-  # The container mounts the repo at /workspaces/trading-1/.
-  # The dune workspace root is at /workspaces/trading-1/trading/ (has dune-workspace).
-  DOCKER_TRADING_ROOT="/workspaces/trading-1/trading"
+  # Bug 1 fix: liveness probe before running the user command.
+  # Detects docker daemon down or container stopped; avoids silent success
+  # when docker exec fails to connect. Without this probe, some shell
+  # environments may observe exit code 0 from a failed docker exec invocation.
+  if ! docker exec "$CONTAINER_NAME" true 2>/dev/null; then
+    echo "FAIL: container '${CONTAINER_NAME}' not responsive (docker daemon down or container stopped)" >&2
+    echo "  Run: docker start ${CONTAINER_NAME}" >&2
+    exit 1
+  fi
+
+  # Bug 2 fix: compute the container-side path from the script's own location.
+  # Isolated agent worktrees live at .claude/worktrees/agent-<ID>/ inside the
+  # host repo root. The container bind-mounts the host repo root at
+  # /workspaces/trading-1/, so worktrees are accessible at
+  # /workspaces/trading-1/.claude/worktrees/agent-<ID>/trading/.
+  #
+  # Strategy: ask docker for the bind-mount source, compute the host repo root
+  # (two levels up from this script's dev/lib/ location), derive the relative
+  # path from mount source to repo root, and append /trading.
+  _SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  _HOST_PROJECT_ROOT="$(cd "${_SCRIPT_DIR}/../.." && pwd)"
+
+  # Query the container's bind-mount source for /workspaces/trading-1.
+  # Falls back to the hardcoded default if docker inspect is unavailable or
+  # returns no matching mount.
+  _DOCKER_MOUNT_SRC=$(docker inspect "$CONTAINER_NAME" \
+    --format '{{range .Mounts}}{{if eq .Destination "/workspaces/trading-1"}}{{.Source}}{{end}}{{end}}' \
+    2>/dev/null || true)
+
+  if [ -n "$_DOCKER_MOUNT_SRC" ]; then
+    # Strip the mount source prefix from the host project root to get the
+    # path fragment that exists inside the container.
+    # Example (worktree case):
+    #   _DOCKER_MOUNT_SRC  = /Users/difan/Projects/trading-1
+    #   _HOST_PROJECT_ROOT = /Users/difan/Projects/trading-1/.claude/worktrees/agent-XYZ
+    #   _REL_PATH          = /.claude/worktrees/agent-XYZ
+    #   DOCKER_TRADING_ROOT = /workspaces/trading-1/.claude/worktrees/agent-XYZ/trading
+    # Example (parent repo case):
+    #   _DOCKER_MOUNT_SRC  = /Users/difan/Projects/trading-1
+    #   _HOST_PROJECT_ROOT = /Users/difan/Projects/trading-1
+    #   _REL_PATH          = (empty)
+    #   DOCKER_TRADING_ROOT = /workspaces/trading-1/trading
+    _REL_PATH="${_HOST_PROJECT_ROOT#${_DOCKER_MOUNT_SRC}}"
+    DOCKER_TRADING_ROOT="/workspaces/trading-1${_REL_PATH}/trading"
+  else
+    # docker inspect failed or returned no mount — fall back to the original
+    # hardcoded path (parent repo, no worktree).
+    DOCKER_TRADING_ROOT="/workspaces/trading-1/trading"
+  fi
 
   # Forward EODHD_API_KEY if set.
   DOCKER_ENV_FLAGS=""
