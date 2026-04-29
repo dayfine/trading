@@ -21,6 +21,25 @@ type summary_meta = {
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 
+type optimal_summary = {
+  total_round_trips : int;
+  winners : int;
+  losers : int;
+  total_return_pct : float;
+  win_rate_pct : float;
+  avg_r_multiple : float;
+  profit_factor : float;
+  max_drawdown_pct : float;
+}
+[@@deriving sexp] [@@sexp.allow_extra_fields]
+
+type optimal_summary_pair = {
+  constrained : optimal_summary;
+  relaxed_macro : optimal_summary;
+  report_path : string;
+}
+[@@deriving sexp] [@@sexp.allow_extra_fields]
+
 type scenario_run = {
   name : string;
   actual : actual;
@@ -28,6 +47,7 @@ type scenario_run = {
   peak_rss_kb : int option;
   wall_seconds : float option;
   trade_quality : Trade_audit_report.t option;
+  optimal_strategy : optimal_summary_pair option;
 }
 [@@deriving sexp]
 
@@ -74,6 +94,41 @@ let _try_load_trade_quality ~dir : Trade_audit_report.t option =
   if not (Sys_unix.file_exists_exn trades_path) then None
   else try Some (Trade_audit_report.load ~scenario_dir:dir) with _ -> None
 
+(* On-disk shape of [optimal_summary.sexp] — mirrors the
+   [Optimal_strategy_runner.optimal_summary_artefact] producer. We re-declare
+   the shape locally so [release_report] does not need to depend on the heavy
+   [backtest_optimal] library; [@@sexp.allow_extra_fields] keeps us forward-
+   compatible with future field additions on the producer side. *)
+type _optimal_summary_artefact_on_disk = {
+  constrained : optimal_summary;
+  relaxed_macro : optimal_summary;
+}
+[@@deriving of_sexp] [@@sexp.allow_extra_fields]
+
+let _try_load_optimal_summary ~dir ~scenario_name : optimal_summary_pair option
+    =
+  (* Both the structured sexp and the markdown report must exist for the
+     section to be rendered — the link target would 404 otherwise. Any read /
+     parse failure swallows silently: the optimal-strategy section is
+     auxiliary, never a hard requirement. *)
+  let sexp_path = Filename.concat dir "optimal_summary.sexp" in
+  let md_path = Filename.concat dir "optimal_strategy.md" in
+  if not (Sys_unix.file_exists_exn sexp_path && Sys_unix.file_exists_exn md_path)
+  then None
+  else
+    try
+      let artefact =
+        _optimal_summary_artefact_on_disk_of_sexp (Sexp.load_sexp sexp_path)
+      in
+      let report_path = Filename.concat scenario_name "optimal_strategy.md" in
+      Some
+        {
+          constrained = artefact.constrained;
+          relaxed_macro = artefact.relaxed_macro;
+          report_path;
+        }
+    with _ -> None
+
 let load_scenario_run ~dir =
   let name = Filename.basename dir in
   let actual_path = Filename.concat dir "actual.sexp" in
@@ -91,7 +146,16 @@ let load_scenario_run ~dir =
     _read_optional_float (Filename.concat dir "wall_seconds.txt")
   in
   let trade_quality = _try_load_trade_quality ~dir in
-  { name; actual; summary; peak_rss_kb; wall_seconds; trade_quality }
+  let optimal_strategy = _try_load_optimal_summary ~dir ~scenario_name:name in
+  {
+    name;
+    actual;
+    summary;
+    peak_rss_kb;
+    wall_seconds;
+    trade_quality;
+    optimal_strategy;
+  }
 
 let _list_scenario_subdirs root =
   if not (Sys_unix.is_directory_exn root) then
@@ -470,12 +534,110 @@ let _trade_quality_section paired =
     let body = List.concat_map with_quality ~f:_row_quality_for_pair in
     header @ body
 
+(* --- Optimal-strategy counterfactual delta section ---
+
+   For each paired scenario where at least one side has [Some _] optimal-
+   strategy artefacts, surface the constrained + relaxed-macro counterfactual
+   total returns alongside the actual total return, plus a per-side Δ from
+   actual to each variant. Each scenario also links its full
+   [optimal_strategy.md] so reviewers can drill into per-Friday divergence,
+   missed-trade ordering, and the implications block. Δ is rendered in
+   percentage points (constrained - actual) — positive means the cascade
+   ranking left return on the table; negative (rare) means the actual run
+   outperformed the perfect-hindsight greedy fill under sizing caps. *)
+
+(* The runner's [Optimal_types.optimal_summary.total_return_pct] is a fraction
+   (e.g. 0.30 = +30%); the actual side's [actual.total_return_pct] is already a
+   percentage (e.g. 30.0). Normalise both to percentage units before computing
+   Δ so the headline rows are directly comparable. *)
+let _opt_return_pct_pp (s : optimal_summary) = s.total_return_pct *. 100.0
+let _fmt_pct_signed_pp v = sprintf "%+.2f%%" v
+let _fmt_delta_pp_pct v = sprintf "%+.2f pp" v
+let _fmt_optional_str = function Some s -> s | None -> "—"
+
+let _opt_row ~label ~cur_str ~prior_str =
+  sprintf "| %s | %s | %s |" label cur_str prior_str
+
+let _opt_actual_str (run : scenario_run) =
+  _fmt_pct_signed_pp run.actual.total_return_pct
+
+let _opt_variant_str (run : scenario_run)
+    ~(get : optimal_summary_pair -> optimal_summary) =
+  match run.optimal_strategy with
+  | None -> "—"
+  | Some pair -> _fmt_pct_signed_pp (_opt_return_pct_pp (get pair))
+
+let _opt_delta_str (run : scenario_run)
+    ~(get : optimal_summary_pair -> optimal_summary) =
+  match run.optimal_strategy with
+  | None -> "—"
+  | Some pair ->
+      let actual = run.actual.total_return_pct in
+      let opt = _opt_return_pct_pp (get pair) in
+      _fmt_delta_pp_pct (opt -. actual)
+
+let _opt_link_str (run : scenario_run) =
+  Option.map run.optimal_strategy ~f:(fun pair ->
+      sprintf "[optimal_strategy.md](%s)" pair.report_path)
+  |> _fmt_optional_str
+
+let _row_optimal_for_pair (cur, prior) =
+  [
+    sprintf "### %s" cur.name;
+    "";
+    sprintf "Report — Current: %s · Prior: %s" (_opt_link_str cur)
+      (_opt_link_str prior);
+    "";
+    "| Metric | Current | Prior |";
+    "|---|---:|---:|";
+    _opt_row ~label:"Actual total return" ~cur_str:(_opt_actual_str cur)
+      ~prior_str:(_opt_actual_str prior);
+    _opt_row ~label:"Optimal (constrained)"
+      ~cur_str:(_opt_variant_str cur ~get:(fun p -> p.constrained))
+      ~prior_str:(_opt_variant_str prior ~get:(fun p -> p.constrained));
+    _opt_row ~label:"Δ to constrained"
+      ~cur_str:(_opt_delta_str cur ~get:(fun p -> p.constrained))
+      ~prior_str:(_opt_delta_str prior ~get:(fun p -> p.constrained));
+    _opt_row ~label:"Optimal (relaxed macro)"
+      ~cur_str:(_opt_variant_str cur ~get:(fun p -> p.relaxed_macro))
+      ~prior_str:(_opt_variant_str prior ~get:(fun p -> p.relaxed_macro));
+    _opt_row ~label:"Δ to relaxed"
+      ~cur_str:(_opt_delta_str cur ~get:(fun p -> p.relaxed_macro))
+      ~prior_str:(_opt_delta_str prior ~get:(fun p -> p.relaxed_macro));
+    "";
+  ]
+
+let _optimal_strategy_section paired =
+  let with_optimal =
+    List.filter paired ~f:(fun (c, p) ->
+        Option.is_some c.optimal_strategy || Option.is_some p.optimal_strategy)
+  in
+  if List.is_empty with_optimal then []
+  else
+    let header =
+      [
+        "## Optimal-strategy delta";
+        "";
+        "Counterfactual comparison against the perfect-hindsight greedy fill \
+         under the same sizing envelope (`optimal_summary.sexp` required). Δ \
+         is constrained-counterfactual minus actual, in percentage points — \
+         positive means the cascade ranking left return on the table; negative \
+         (rare) means the actual run outperformed the counterfactual under \
+         sizing caps. Per-Friday divergence detail lives in the linked \
+         `optimal_strategy.md`.";
+        "";
+      ]
+    in
+    let body = List.concat_map with_optimal ~f:_row_optimal_for_pair in
+    header @ body
+
 let render ?(thresholds = default_thresholds) (t : t) =
   let lines =
     _section_header ~title:"Release perf report" ~current:t.current_label
       ~prior:t.prior_label
     @ _trading_section t.paired
     @ _trade_quality_section t.paired
+    @ _optimal_strategy_section t.paired
     @ _rss_section ~thresholds t.paired
     @ _wall_section ~thresholds t.paired
     @ _one_sided_section ~title:"Current-only scenarios" t.current_only

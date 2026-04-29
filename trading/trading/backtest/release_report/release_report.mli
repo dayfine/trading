@@ -60,6 +60,45 @@ type summary_meta = {
     the run-identifying fields that are useful in a comparison header; detailed
     per-metric data is already in [actual]. *)
 
+type optimal_summary = {
+  total_round_trips : int;
+  winners : int;
+  losers : int;
+  total_return_pct : float;
+      (** Cumulative counterfactual return, expressed as a fraction (e.g. [0.42]
+          = +42%). Mirrors the [Optimal_types.optimal_summary.total_return_pct]
+          contract — multiply by 100 to compare to {!actual.total_return_pct}
+          which is already in percentage units. *)
+  win_rate_pct : float;
+      (** Counterfactual win rate as a fraction in [0.0, 1.0]. *)
+  avg_r_multiple : float;
+  profit_factor : float;
+  max_drawdown_pct : float;
+      (** Counterfactual peak-to-trough drawdown as a fraction in [0.0, 1.0]. *)
+}
+[@@deriving sexp]
+(** One variant's headline counterfactual metrics. Mirrors the on-disk shape
+    that {!Backtest_optimal.Optimal_strategy_runner} writes to
+    [optimal_summary.sexp] for the [Constrained] and [Relaxed_macro] variants;
+    fields are decoded with [@@sexp.allow_extra_fields] so the reader survives
+    forward additions to the producing record (e.g. a future [variant] tag). *)
+
+type optimal_summary_pair = {
+  constrained : optimal_summary;
+      (** Counterfactual variant honouring the macro gate — the honest
+          comparison against the actual run. *)
+  relaxed_macro : optimal_summary;
+      (** Counterfactual variant ignoring the macro gate — the upper bound. *)
+  report_path : string;
+      (** Relative path (from the scenario directory's parent batch root) to
+          [optimal_strategy.md] — used to render a markdown link in the report's
+          per-scenario row. Always [<scenario_name>/optimal_strategy.md]. *)
+}
+[@@deriving sexp]
+(** The [optimal_summary.sexp] artefact + the relative link the report renders
+    alongside it. Built by {!load_scenario_run} when both files are present in
+    the scenario dir. *)
+
 type scenario_run = {
   name : string;
   actual : actual;
@@ -72,14 +111,22 @@ type scenario_run = {
           trail, or when [trades.csv] is missing. The report renders an
           additional "Trade quality" section for paired scenarios where at least
           one side has [Some _]. *)
+  optimal_strategy : optimal_summary_pair option;
+      (** Loaded from [optimal_summary.sexp] + [optimal_strategy.md] in the
+          scenario dir when present. [None] for scenarios that did not run the
+          [optimal_strategy.exe] binary against their output dir. The report
+          renders an additional "Optimal-strategy delta" section for paired
+          scenarios where at least one side has [Some _]. *)
 }
 [@@deriving sexp]
 (** One scenario's per-run readings — the [actual] block plus optional
-    infra-perf measurements and an optional trade-audit summary. Both
-    [peak_rss_kb] and [wall_seconds] are [None] when the corresponding sibling
-    files are absent in the batch dir; the report still renders trading metrics
-    in that case. [trade_quality] is [None] when no audit artefacts were found
-    or when the audit was empty (no trades). *)
+    infra-perf measurements, an optional trade-audit summary, and an optional
+    optimal-strategy counterfactual summary. Both [peak_rss_kb] and
+    [wall_seconds] are [None] when the corresponding sibling files are absent in
+    the batch dir; the report still renders trading metrics in that case.
+    [trade_quality] is [None] when no audit artefacts were found or when the
+    audit was empty (no trades). [optimal_strategy] is [None] when no
+    [optimal_summary.sexp] was emitted. *)
 
 type t = {
   current_label : string;

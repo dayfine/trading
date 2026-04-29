@@ -267,6 +267,33 @@ let test_run_consumes_macro_trend_sexp _ =
          _has "Optimal (relaxed macro)";
        ])
 
+let test_run_emits_optimal_summary_sexp _ =
+  (* The runner emits [optimal_summary.sexp] alongside [optimal_strategy.md]
+     so downstream consumers (Release_report PR-5) can read the headline
+     counterfactual metrics without parsing markdown. Pin: file exists, parses
+     as a sexp pair tagged with both [Constrained] and [Relaxed_macro]. *)
+  let data_dir, output_dir = _mk_tmpdirs "opt_runner_summary_sexp" in
+  _stage_fixture ~data_dir ~output_dir;
+  _with_data_dir ~data_dir (fun () ->
+      Backtest_optimal.Optimal_strategy_runner.run ~output_dir);
+  let sexp_path = Filename.concat output_dir "optimal_summary.sexp" in
+  let exists = Sys_unix.file_exists_exn sexp_path in
+  let body = if exists then In_channel.read_all sexp_path else "" in
+  assert_that (exists, body)
+    (all_of
+       [
+         field (fun (e, _) -> e) (equal_to true);
+         field
+           (fun (_, b) -> b)
+           (all_of
+              [
+                _has "(constrained";
+                _has "(relaxed_macro";
+                _has "(variant Constrained)";
+                _has "(variant Relaxed_macro)";
+              ]);
+       ])
+
 let test_run_handles_missing_trade_audit _ =
   let data_dir, output_dir = _mk_tmpdirs "opt_runner_no_audit" in
   _stage_fixture ~data_dir ~output_dir;
@@ -299,6 +326,8 @@ let suite =
          "load_macro_trend missing file returns empty table"
          >:: test_load_macro_trend_missing_file_returns_empty_table;
          "run consumes macro_trend.sexp" >:: test_run_consumes_macro_trend_sexp;
+         "run emits optimal_summary.sexp"
+         >:: test_run_emits_optimal_summary_sexp;
          "run handles missing trade_audit.sexp"
          >:: test_run_handles_missing_trade_audit;
        ]

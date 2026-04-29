@@ -357,7 +357,9 @@ let _emit_report ~output_dir ~(actual_run : Report.actual_run) ~scored : unit =
   let md = Report.render input in
   let out_path = Filename.concat output_dir "optimal_strategy.md" in
   Out_channel.write_all out_path ~data:md;
-  eprintf "optimal_strategy: wrote %s\n%!" out_path
+  eprintf "optimal_strategy: wrote %s\n%!" out_path;
+  Optimal_summary_artefact.write ~output_dir
+    { constrained = constrained.summary; relaxed_macro = relaxed_macro.summary }
 
 let run ~output_dir =
   eprintf "optimal_strategy: reading artefacts from %s\n%!" output_dir;

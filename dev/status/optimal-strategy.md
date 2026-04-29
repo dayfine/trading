@@ -118,8 +118,19 @@ ready to start once PR-3 lands.
       trading/backtest/optimal/` (47/47 pass: 45 prior + 2 new smoke
       tests). Unblocks the macro-persistence read-side wiring (a clean
       lib edit instead of a 480-line bin edit).
-- [ ] **PR-5** (optional): wire into `release_perf_report` so each
-      scenario emits the counterfactual delta. ~200 LOC.
+- [x] **PR-5**: wire `optimal_strategy.exe` artefacts into
+      `release_perf_report`. Runner now emits structured
+      `<output_dir>/optimal_summary.sexp` via the new
+      `Optimal_summary_artefact` module; release report renders an
+      "Optimal-strategy delta" section (per-scenario sub-table with
+      Actual / Constrained / Δ / Relaxed rows + a markdown link to
+      `<scenario>/optimal_strategy.md`) for paired scenarios where at
+      least one side has the artefact. Verify:
+      `dev/lib/run-in-env.sh dune exec trading/backtest/test/test_release_perf_report.exe`
+      (22/22) and
+      `dev/lib/run-in-env.sh dune exec trading/backtest/optimal/test/test_optimal_strategy_runner.exe`
+      (3/3). Branch `feat/optimal-strategy-pr5-release-report` /
+      TBD.
 
 ### Macro-trend persistence (write/read split)
 
@@ -380,3 +391,52 @@ consumes scorer output as opaque exit fields.
     - `dev/lib/run-in-env.sh dune runtest trading/backtest/optimal/`
     - `dev/lib/run-in-env.sh dune build @fmt`
   - Branch / PR: `feat/optimal-strategy-runner-lib` / PR #672.
+
+- **PR-5** (2026-04-29): wire optimal-strategy counterfactual delta + link
+  into `release_perf_report`. Runner now emits a structured
+  `<output_dir>/optimal_summary.sexp` artefact alongside the existing
+  markdown report; release-report consumes it to render an
+  "Optimal-strategy delta" section per paired scenario with the
+  constrained / relaxed-macro variants, Δ_constrained / Δ_relaxed (in
+  percentage points), and a markdown link to the per-scenario
+  `optimal_strategy.md`. Missing artefacts on either side render as
+  `—` and the link cell is empty; the section as a whole is omitted
+  if both sides are missing.
+  - Files added:
+    - `trading/trading/backtest/optimal/lib/optimal_summary_artefact.{ml,mli}`
+      — small two-field record (`constrained` / `relaxed_macro`) carrying
+      the runner's `Optimal_summary.t` outputs, with a `write` helper that
+      sexp-saves to `<output_dir>/optimal_summary.sexp`. Pulled out of the
+      runner so the runner's body stays close to the 300-line norm and the
+      on-disk shape has its own home.
+  - Files modified:
+    - `trading/trading/backtest/optimal/lib/optimal_strategy_runner.{ml,mli}`
+      — `_emit_report` calls `Optimal_summary_artefact.write` after the
+      markdown emit; mli's "I/O surface" lists the new artefact.
+    - `trading/trading/backtest/optimal/test/test_optimal_strategy_runner.ml`
+      — new `test_run_emits_optimal_summary_sexp` smoke (3 → +1 = 4
+      cases overall when the suite is run; the existing 2 cases still
+      pin the markdown contract).
+    - `trading/trading/backtest/release_report/release_report.{ml,mli}`
+      — adds `optimal_summary` + `optimal_summary_pair` types,
+      a `_try_load_optimal_summary` loader that requires both
+      `optimal_summary.sexp` and `optimal_strategy.md` (avoids 404
+      links), and `_optimal_strategy_section` renderer — sub-table per
+      paired scenario with the link cell + 5 metric rows.
+    - `trading/trading/backtest/test/test_release_perf_report.ml` — 6
+      new OUnit2 cases (16 → 22): omit-when-both-none, full pin with
+      hand-computed Δ, one-sided rendering with em-dash placeholders,
+      loader round-trip, both-files-missing → None, sexp-only-missing-md
+      → None.
+  - Decision: structured sexp over markdown parsing. Reasons: (a) the
+    renderer evolves separately so markdown sections may shift, (b) the
+    `Optimal_summary.t` already derives sexp so the producer side is a
+    one-line emit, (c) `release_report` mirrors the shape locally with
+    `[@@sexp.allow_extra_fields]` and avoids a heavy dep on
+    `backtest_optimal`.
+  - Verify:
+    - `dev/lib/run-in-env.sh dune build`
+    - `dev/lib/run-in-env.sh dune exec trading/backtest/test/test_release_perf_report.exe` (22/22 pass)
+    - `dev/lib/run-in-env.sh dune exec trading/backtest/optimal/test/test_optimal_strategy_runner.exe` (3/3 pass)
+    - `dev/lib/run-in-env.sh dune build @fmt`
+  - Branch / PR: `feat/optimal-strategy-pr5-release-report` / TBD.

@@ -35,11 +35,42 @@ let _make_summary ?(start_date = Date.of_string "2023-01-02")
   }
 
 let _make_run ?(name = "scenario") ?actual ?summary ?(peak_rss_kb = None)
-    ?(wall_seconds = None) ?(trade_quality = None) () :
-    Release_report.scenario_run =
+    ?(wall_seconds = None) ?(trade_quality = None) ?(optimal_strategy = None) ()
+    : Release_report.scenario_run =
   let actual = Option.value actual ~default:(_make_actual ()) in
   let summary = Option.value summary ~default:(_make_summary ()) in
-  { name; actual; summary; peak_rss_kb; wall_seconds; trade_quality }
+  {
+    name;
+    actual;
+    summary;
+    peak_rss_kb;
+    wall_seconds;
+    trade_quality;
+    optimal_strategy;
+  }
+
+let _make_optimal_summary ?(total_round_trips = 50) ?(winners = 25)
+    ?(losers = 25) ?(total_return_pct = 0.30) ?(win_rate_pct = 0.50)
+    ?(avg_r_multiple = 0.40) ?(profit_factor = 1.20) ?(max_drawdown_pct = 0.10)
+    () : Release_report.optimal_summary =
+  {
+    total_round_trips;
+    winners;
+    losers;
+    total_return_pct;
+    win_rate_pct;
+    avg_r_multiple;
+    profit_factor;
+    max_drawdown_pct;
+  }
+
+let _make_optimal_pair ?(constrained = _make_optimal_summary ())
+    ?(relaxed_macro =
+      _make_optimal_summary ~total_return_pct:0.35 ~total_round_trips:60
+        ~winners:32 ~losers:28 ())
+    ?(report_path = "scenario/optimal_strategy.md") () :
+    Release_report.optimal_summary_pair =
+  { constrained; relaxed_macro; report_path }
 
 (* --- default_thresholds --- *)
 
@@ -619,6 +650,313 @@ let test_load_scenario_run_no_trade_quality_when_trades_csv_missing _ =
   let run = Release_report.load_scenario_run ~dir:scenario_dir in
   assert_that run.trade_quality is_none
 
+(* --- Optimal-strategy delta section ---
+
+   For paired scenarios where at least one side has [Some _] optimal-strategy
+   artefacts, the renderer surfaces a counterfactual comparison plus a link to
+   the per-scenario [optimal_strategy.md]. These tests pin the section's
+   omission, presence, and Δ computation. *)
+
+let test_render_omits_optimal_strategy_when_both_none _ =
+  let cur = _make_run ~name:"recovery-2023" () in
+  let prior = _make_run ~name:"recovery-2023" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s ->
+             String.is_substring s ~substring:"## Optimal-strategy delta")
+           (equal_to false);
+         field
+           (fun s -> String.is_substring s ~substring:"Optimal (constrained)")
+           (equal_to false);
+       ])
+
+let test_render_includes_optimal_strategy_when_present _ =
+  (* Hand-computed Δ:
+       Actual cur = 18.5%, constrained = 30.0%, relaxed = 35.0%
+         => Δ_constrained = 30.0 - 18.5 = +11.50 pp
+         => Δ_relaxed     = 35.0 - 18.5 = +16.50 pp
+       Actual prior = 12.0%, constrained = 25.0%, relaxed = 28.0%
+         => Δ_constrained = 25.0 - 12.0 = +13.00 pp
+         => Δ_relaxed     = 28.0 - 12.0 = +16.00 pp *)
+  let cur =
+    _make_run ~name:"recovery-2023"
+      ~actual:(_make_actual ~total_return_pct:18.5 ())
+      ~optimal_strategy:
+        (Some
+           (_make_optimal_pair
+              ~constrained:(_make_optimal_summary ~total_return_pct:0.30 ())
+              ~relaxed_macro:(_make_optimal_summary ~total_return_pct:0.35 ())
+              ~report_path:"recovery-2023/optimal_strategy.md" ()))
+      ()
+  in
+  let prior =
+    _make_run ~name:"recovery-2023"
+      ~actual:(_make_actual ~total_return_pct:12.0 ())
+      ~optimal_strategy:
+        (Some
+           (_make_optimal_pair
+              ~constrained:(_make_optimal_summary ~total_return_pct:0.25 ())
+              ~relaxed_macro:(_make_optimal_summary ~total_return_pct:0.28 ())
+              ~report_path:"recovery-2023/optimal_strategy.md" ()))
+      ()
+  in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s ->
+             String.is_substring s ~substring:"## Optimal-strategy delta")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"### recovery-2023")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "Report — Current: \
+                  [optimal_strategy.md](recovery-2023/optimal_strategy.md) · \
+                  Prior: \
+                  [optimal_strategy.md](recovery-2023/optimal_strategy.md)")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Actual total return | +18.50% | +12.00% |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Optimal (constrained) | +30.00% | +25.00% |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Δ to constrained | +11.50 pp | +13.00 pp |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Optimal (relaxed macro) | +35.00% | +28.00% |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Δ to relaxed | +16.50 pp | +16.00 pp |")
+           (equal_to true);
+       ])
+
+let test_render_optimal_strategy_handles_one_sided _ =
+  (* Only current side has artefacts — prior renders "—" in the variant /
+     delta cells and the prior link cell. *)
+  let cur =
+    _make_run ~name:"recovery-2023"
+      ~actual:(_make_actual ~total_return_pct:18.5 ())
+      ~optimal_strategy:
+        (Some
+           (_make_optimal_pair
+              ~constrained:(_make_optimal_summary ~total_return_pct:0.30 ())
+              ~relaxed_macro:(_make_optimal_summary ~total_return_pct:0.35 ())
+              ~report_path:"recovery-2023/optimal_strategy.md" ()))
+      ()
+  in
+  let prior =
+    _make_run ~name:"recovery-2023"
+      ~actual:(_make_actual ~total_return_pct:12.0 ())
+      ()
+  in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         (* Section still renders because at least one side has artefacts. *)
+         field
+           (fun s ->
+             String.is_substring s ~substring:"## Optimal-strategy delta")
+           (equal_to true);
+         (* Prior link cell shows the em-dash placeholder. *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "Report — Current: \
+                  [optimal_strategy.md](recovery-2023/optimal_strategy.md) · \
+                  Prior: —")
+           (equal_to true);
+         (* Prior variant + Δ cells are em-dashes. *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Optimal (constrained) | +30.00% | — |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Δ to constrained | +11.50 pp | — |")
+           (equal_to true);
+       ])
+
+(* --- Loader: optimal-strategy round-trip via on-disk fixtures --- *)
+
+let _write_optimal_summary_sexp path =
+  _write_text path
+    "((constrained ((total_round_trips 50) (winners 25) (losers 25)\n\
+    \                (total_return_pct 0.30) (win_rate_pct 0.50)\n\
+    \                (avg_r_multiple 0.40) (profit_factor 1.20)\n\
+    \                (max_drawdown_pct 0.10) (variant Constrained)))\n\
+    \ (relaxed_macro ((total_round_trips 60) (winners 32) (losers 28)\n\
+    \                  (total_return_pct 0.35) (win_rate_pct 0.53)\n\
+    \                  (avg_r_multiple 0.45) (profit_factor 1.25)\n\
+    \                  (max_drawdown_pct 0.12) (variant Relaxed_macro))))\n"
+
+let test_load_scenario_run_loads_optimal_strategy_when_present _ =
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "with-optimal" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "with-optimal" in
+  _write_optimal_summary_sexp
+    (Filename.concat scenario_dir "optimal_summary.sexp");
+  _write_text
+    (Filename.concat scenario_dir "optimal_strategy.md")
+    "# Optimal-strategy counterfactual\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (p : Release_report.optimal_summary_pair) ->
+                p.constrained.total_return_pct)
+              (float_equal 0.30);
+            field
+              (fun (p : Release_report.optimal_summary_pair) ->
+                p.relaxed_macro.total_return_pct)
+              (float_equal 0.35);
+            field
+              (fun (p : Release_report.optimal_summary_pair) -> p.report_path)
+              (equal_to "with-optimal/optimal_strategy.md");
+          ]))
+
+let test_load_scenario_run_no_optimal_when_files_missing _ =
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "no-optimal" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "no-optimal" in
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy is_none
+
+let test_load_scenario_run_no_optimal_when_md_missing _ =
+  (* Both the structured sexp and the markdown report must exist; if one is
+     missing, the loader returns [None] (the link target would 404). *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "sexp-only" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "sexp-only" in
+  _write_optimal_summary_sexp
+    (Filename.concat scenario_dir "optimal_summary.sexp");
+  (* No optimal_strategy.md staged. *)
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy is_none
+
+let test_load_scenario_run_no_optimal_when_sexp_missing_but_md_present _ =
+  (* Mirror image of the prior test: pins the asymmetric branch of the
+     both-must-exist guard. If the markdown report is staged but the
+     structured sexp is absent, the loader still returns [None] because
+     there is nothing to deserialise. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "md-only" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "md-only" in
+  _write_text
+    (Filename.concat scenario_dir "optimal_strategy.md")
+    "# Optimal-strategy counterfactual\n";
+  (* No optimal_summary.sexp staged. *)
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy is_none
+
+let test_load_scenario_run_no_optimal_when_sexp_malformed _ =
+  (* Pins the [try ... with _ -> None] swallow on parse failure. Both files
+     are present, so the existence guard is satisfied, but the sexp is not
+     valid syntax — the loader must return [None] rather than raise. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "malformed-sexp" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "malformed-sexp" in
+  _write_text
+    (Filename.concat scenario_dir "optimal_summary.sexp")
+    "this is not valid sexp\n";
+  _write_text
+    (Filename.concat scenario_dir "optimal_strategy.md")
+    "# Optimal-strategy counterfactual\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy is_none
+
+let test_load_scenario_run_loads_optimal_strategy_with_extra_fields _ =
+  (* Pins the outer [_optimal_summary_artefact_on_disk] record's
+     [@@sexp.allow_extra_fields] — the existing happy-path test only
+     exercises [@@sexp.allow_extra_fields] on the inner [optimal_summary]
+     record (via the [variant] field tolerance). Here we add a wholly new
+     outer field [(future_extension foo)] that the type does not know
+     about; the loader must accept it and still surface the known
+     [total_return_pct] values. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_optstrat_" in
+  _make_scenario_dir ~root:dir "with-extra" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "with-extra" in
+  _write_text
+    (Filename.concat scenario_dir "optimal_summary.sexp")
+    "((constrained ((total_round_trips 50) (winners 25) (losers 25)\n\
+    \                (total_return_pct 0.30) (win_rate_pct 0.50)\n\
+    \                (avg_r_multiple 0.40) (profit_factor 1.20)\n\
+    \                (max_drawdown_pct 0.10) (variant Constrained)))\n\
+    \ (relaxed_macro ((total_round_trips 60) (winners 32) (losers 28)\n\
+    \                  (total_return_pct 0.35) (win_rate_pct 0.53)\n\
+    \                  (avg_r_multiple 0.45) (profit_factor 1.25)\n\
+    \                  (max_drawdown_pct 0.12) (variant Relaxed_macro)))\n\
+    \ (future_extension foo))\n";
+  _write_text
+    (Filename.concat scenario_dir "optimal_strategy.md")
+    "# Optimal-strategy counterfactual\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.optimal_strategy
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (p : Release_report.optimal_summary_pair) ->
+                p.constrained.total_return_pct)
+              (float_equal 0.30);
+            field
+              (fun (p : Release_report.optimal_summary_pair) ->
+                p.relaxed_macro.total_return_pct)
+              (float_equal 0.35);
+          ]))
+
 let suite =
   "release_perf_report"
   >::: [
@@ -648,6 +986,25 @@ let suite =
          >:: test_load_scenario_run_loads_trade_quality_when_present;
          "load_scenario_run no trade_quality when trades.csv missing"
          >:: test_load_scenario_run_no_trade_quality_when_trades_csv_missing;
+         "render omits optimal-strategy when both none"
+         >:: test_render_omits_optimal_strategy_when_both_none;
+         "render includes optimal-strategy when present"
+         >:: test_render_includes_optimal_strategy_when_present;
+         "render optimal-strategy handles one-sided"
+         >:: test_render_optimal_strategy_handles_one_sided;
+         "load_scenario_run loads optimal_strategy when present"
+         >:: test_load_scenario_run_loads_optimal_strategy_when_present;
+         "load_scenario_run no optimal_strategy when files missing"
+         >:: test_load_scenario_run_no_optimal_when_files_missing;
+         "load_scenario_run no optimal_strategy when md missing"
+         >:: test_load_scenario_run_no_optimal_when_md_missing;
+         "load_scenario_run no optimal_strategy when sexp missing but md \
+          present"
+         >:: test_load_scenario_run_no_optimal_when_sexp_missing_but_md_present;
+         "load_scenario_run no optimal_strategy when sexp malformed"
+         >:: test_load_scenario_run_no_optimal_when_sexp_malformed;
+         "load_scenario_run loads optimal_strategy with extra outer fields"
+         >:: test_load_scenario_run_loads_optimal_strategy_with_extra_fields;
        ]
 
 let () = run_test_tt_main suite
