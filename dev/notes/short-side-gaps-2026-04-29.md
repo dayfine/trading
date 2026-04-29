@@ -141,6 +141,21 @@ between two semantics:
 
 Either approach interacts with G4 below.
 
+**DONE — see PR `feat/portfolio-cash-floor-shorts`** (2026-04-29):
+soft semantics adopted. New
+`Portfolio.unrealized_pnl_per_position : (symbol * float) list`
+field + `Portfolio.mark_to_market` API; `_check_sufficient_cash`
+extended to apply on both Buy and Sell sides using effective cash =
+`current_cash + cash_change + sum(min(0, unrealized_pnl_per_position))`.
+12 new portfolio unit tests cover short entry/cover under sufficient
+cash, rejection when unrealized drag exceeds available cash, cumulative
+floor across a sequence of shorts, mark-to-market drop semantics, and
+asymmetric clamping (positive unrealized PnL never inflates floor).
+Strict broker-margin variant deliberately deferred.
+
+G4 (force-liquidation policy) ships as a sibling PR after this lands
+and will wire into the new `mark_to_market` + accumulator surface.
+
 ### G4 — No force-liquidation / margin-call mechanism
 
 User suggestion (2026-04-29): defense in depth beyond stops. When a

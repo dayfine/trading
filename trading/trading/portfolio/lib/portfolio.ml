@@ -2,6 +2,7 @@
 open Core
 open Result.Let_syntax
 open Status
+open Trading_base.Types
 open Types
 
 type t = {
@@ -12,6 +13,10 @@ type t = {
   positions : portfolio_position list;
   accounting_method : accounting_method;
       (* Default accounting method for new positions *)
+  unrealized_pnl_per_position : (symbol * float) list;
+      (* Mark-to-market state, sorted by symbol. Updated externally via
+         mark_to_market; consumed by _check_sufficient_cash to compute the
+         effective cash floor. *)
 }
 [@@deriving show, eq, sexp]
 
@@ -22,6 +27,7 @@ let create ?(accounting_method = AverageCost) ~initial_cash () =
     current_cash = initial_cash;
     positions = [];
     accounting_method;
+    unrealized_pnl_per_position = [];
   }
 
 let _find_position_in_list positions symbol =
@@ -311,15 +317,42 @@ let _calculate_realized_pnl (trade : Trading_base.Types.trade)
     | FIFO -> _calculate_fifo_pnl trade trade_qty existing_position
   else 0.0 (* Opening or adding to position *)
 
+(* Sum of negative unrealized P&L across all marked positions. Positive
+   unrealized P&L is clamped to 0 — only paper losses count against the
+   effective cash floor. Returns 0.0 when the portfolio has never been
+   marked or every position is at-or-above its entry. *)
+let _negative_unrealized_pnl_total portfolio =
+  List.fold portfolio.unrealized_pnl_per_position ~init:0.0
+    ~f:(fun acc (_symbol, pnl) -> acc +. Float.min 0.0 pnl)
+
 let _check_sufficient_cash portfolio cash_change =
   let new_cash = portfolio.current_cash +. cash_change in
-  if Float.(new_cash < 0.0) then
+  let unrealized_drag = _negative_unrealized_pnl_total portfolio in
+  let effective_cash = new_cash +. unrealized_drag in
+  if Float.(effective_cash < 0.0) then
     error_invalid_argument
       ("Insufficient cash for trade. Required: "
       ^ Float.to_string (-.cash_change)
       ^ ", Available: "
-      ^ Float.to_string portfolio.current_cash)
+      ^ Float.to_string portfolio.current_cash
+      ^ ", Unrealized loss drag: "
+      ^ Float.to_string unrealized_drag)
   else Result.Ok new_cash
+
+(* After a trade, prune the unrealized-pnl accumulator. Positions that no
+   longer exist (fully closed) are dropped. New positions get a 0.0 seed,
+   so the accumulator's symbol set tracks the current open positions —
+   stale until the next mark_to_market. Existing entries on
+   not-yet-closed positions are kept (their MtM is also stale until the
+   next mark, but carrying the prior loss is the conservative choice for
+   the cash-floor check). *)
+let _refresh_unrealized_after_trade ~old_accumulator ~new_positions =
+  let old_map = Map.of_alist_exn (module String) old_accumulator in
+  List.map new_positions ~f:(fun (p : portfolio_position) ->
+      let pnl =
+        match Map.find old_map p.symbol with Some v -> v | None -> 0.0
+      in
+      (p.symbol, pnl))
 
 let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
     t status_or =
@@ -334,6 +367,10 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
     _update_position_with_trade portfolio.positions portfolio.accounting_method
       trade
   in
+  let new_accumulator =
+    _refresh_unrealized_after_trade
+      ~old_accumulator:portfolio.unrealized_pnl_per_position ~new_positions
+  in
   let trade_with_pnl = { trade; realized_pnl } in
   return
     {
@@ -341,10 +378,22 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
       current_cash = new_cash;
       positions = new_positions;
       trade_history = portfolio.trade_history @ [ trade_with_pnl ];
+      unrealized_pnl_per_position = new_accumulator;
     }
 
 let apply_trades portfolio trades =
   List.fold_result trades ~init:portfolio ~f:apply_single_trade
+
+let mark_to_market portfolio market_prices =
+  let price_map = Map.of_alist_exn (module String) market_prices in
+  let new_accumulator =
+    List.filter_map portfolio.positions ~f:(fun (p : portfolio_position) ->
+        match Map.find price_map p.symbol with
+        | None -> None
+        | Some price -> Some (p.symbol, Calculations.unrealized_pnl p price))
+    |> List.sort ~compare:(fun (s1, _) (s2, _) -> String.compare s1 s2)
+  in
+  { portfolio with unrealized_pnl_per_position = new_accumulator }
 
 (* Reconstruct portfolio from scratch for validation *)
 let reconstruct_from_history initial_cash accounting_method trade_history =
