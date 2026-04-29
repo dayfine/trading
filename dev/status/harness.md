@@ -102,6 +102,8 @@ Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. 
 
 Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
+- ~~**A2 rule stale — false-positive NEEDS_REWORK verdicts**~~ — DONE (harness/a2-rule-update): `.claude/rules/qc-structural-authority.md` §A2 updated from blanket ban to explicit allow-list. `trading/trading/backtest/**/dune` files may declare `weinstein.*` dependencies (established practice: 5+ dune files verified). Still FAIL: (1) non-`weinstein.*` analysis imports; (2) `weinstein.*` imports outside `trading/trading/backtest/**`. Source: orchestrator override notes in `dev/reviews/optimal-strategy.md` (PRs #652, #666). Verify: read `A2` row in `.claude/rules/qc-structural-authority.md`.
+
 - **`.claude/worktrees/` gitignore gap** — `EnterWorktree` creates git worktrees
   jj can't track. Either ignore the directory or teach jj to ignore the paths.
   Source: `dev/daily/2026-04-11.md`.
