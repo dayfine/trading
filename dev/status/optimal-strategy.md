@@ -1,6 +1,6 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-29 (track wrap-up)
+## Last updated: 2026-04-29
 
 ## Status
 MERGED
