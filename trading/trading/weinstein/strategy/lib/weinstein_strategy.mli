@@ -155,6 +155,16 @@ type config = {
           exists, so setting this is a no-op. The field is kept on [config] so
           existing override sexps and CLI flags continue to parse. Will be
           removed in a follow-up cleanup. *)
+  enable_short_side : bool; [@sexp.default true]
+      (** When [false], the strategy drops [Screener.short_candidates] before
+          generating entry transitions — only long-side breakouts are
+          considered. Default [true] (preserves prior behaviour). Turning this
+          off is a temporary mitigation while the short-side gaps documented in
+          [dev/notes/short-side-gaps-2026-04-29.md] are open: stops on shorts do
+          not fire correctly, [Metrics.extract_round_trips] does not pair
+          Sell→Buy round-trips so shorts are invisible in [trades.csv], and the
+          cash floor only triggers on Buy so unbounded short losses cannot
+          force-liquidate. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

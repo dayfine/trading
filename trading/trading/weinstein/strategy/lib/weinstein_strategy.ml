@@ -54,6 +54,7 @@ type config = {
   skip_sector_etf_load : bool;
   universe_cap : int option;
   full_compute_tail_days : int option;
+  enable_short_side : bool; [@sexp.default true]
 }
 [@@deriving sexp]
 
@@ -74,6 +75,7 @@ let default_config ~universe ~index_symbol =
     skip_sector_etf_load = false;
     universe_cap = None;
     full_compute_tail_days = None;
+    enable_short_side = true;
   }
 
 let name = "Weinstein"
@@ -290,8 +292,10 @@ let _screen_universe ~config ~index_view ~(macro_result : Macro.result)
       ~held_tickers:(held_symbols portfolio)
   in
   let combined_candidates =
-    screen_result.Screener.buy_candidates
-    @ screen_result.Screener.short_candidates
+    if config.enable_short_side then
+      screen_result.Screener.buy_candidates
+      @ screen_result.Screener.short_candidates
+    else screen_result.Screener.buy_candidates
   in
   let entries =
     entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
