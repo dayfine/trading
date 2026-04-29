@@ -277,7 +277,17 @@ let test_bar_accumulation_multiple_days _ =
   let portfolio : Trading_strategy.Portfolio_view.t =
     { cash = 100000.0; positions }
   in
-  (* Three consecutive days with rising price — stop adjusts each day *)
+  (* Three consecutive days with rising price — too few bars for the
+     30-week MA to come online, so the stop machinery stays in its
+     position-favourable warmup pose throughout. Pre-G1 fix
+     ([Stops_runner._handle_stop] hardcoded [stage = Stage2] + [Flat MA]
+     for the warmup fallback), Day 2 spuriously emitted a [Stop_raised]
+     transition driven by [_should_tighten_long]'s "30-week MA flattening"
+     branch — the same pathology that pulled short stops AGAINST short
+     positions on the short-side audit (G1, see
+     [dev/notes/short-side-gaps-2026-04-29.md]). Post-fix, the runner
+     passes [Stage2 + Rising MA] during long warmup, no spurious tightening
+     fires, and all three days emit zero transitions. *)
   let days_and_prices =
     [ ("2024-01-08", 175.0); ("2024-01-09", 180.0); ("2024-01-10", 185.0) ]
   in
@@ -292,10 +302,7 @@ let test_bar_accumulation_multiple_days _ =
         in
         _transition_count result)
   in
-  (* Day 1: Initial stop, no raise yet (0 transitions).
-     Day 2: bar history now has 2 days; stop adjusts (1 transition).
-     Day 3: stop already adjusted, no further raise at this level (0). *)
-  assert_that counts (elements_are [ equal_to 0; equal_to 1; equal_to 0 ])
+  assert_that counts (elements_are [ equal_to 0; equal_to 0; equal_to 0 ])
 
 (* ------------------------------------------------------------------ *)
 (* simulation date: transition uses bar date, not Date.today            *)

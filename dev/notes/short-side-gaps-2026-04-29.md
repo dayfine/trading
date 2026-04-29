@@ -35,6 +35,77 @@ regression test in `trading/trading/weinstein/portfolio_risk/test/`
 that pins both directions: short with price below stop → no trigger;
 short with price above stop → trigger.
 
+**Diagnosed (PR `fix/g1-short-stop-diagnosis`, DRAFT)**: the original
+hypothesis ("`Stops_runner.update` evaluating with long-side sense")
+was wrong — PR #689 audit harness Tests A + B already pin the
+unit-level `Weinstein_stops.check_stop_hit` predicate as
+direction-correct. Two distinct bugs in `Stops_runner` produce the
+audit anomaly:
+
+1. **Stage hardcode** in `Stops_runner._handle_stop`. When invoking
+   `Weinstein_stops.update`, the runner unconditionally passes
+   `~stage:(Stage2 { weeks_advancing = 1; late = false })` — regardless
+   of position side. For shorts in warmup (the `weekly.n < ma_period`
+   branch where `ma_direction = Flat`),
+   `Weinstein_stops._should_tighten_short` matches `Stage1 | Stage2 ->
+   tighten` and fires `Entered_tightening` on the first Initial-state
+   tick. The candidate computed from the bar high (e.g. $98 + 1 % buf
+   ≈ $99 for an entry-bar high of $98) is "better" than the entry
+   stop $103.58 in short-direction logic, so the stop drops to ~$99
+   on bar 1 — already BELOW entry. Any subsequent small counter-bounce
+   above the eroded stop fires a spurious exit at a profitable price
+   (the ALB pathology shape).
+
+2. **`actual_price = bar.low_price` hardcode** in
+   `Stops_runner._make_exit_transition`. For longs, `bar.low_price` is
+   the worst-case fill on a stop trigger (the bar's low crosses DOWN
+   through the stop). For SHORTS, the trigger fires on `bar.high >=
+   stop_level` and the worst-case cover fill is at `bar.high_price`,
+   not `bar.low_price`. With the legacy hardcode, the audit log
+   records ALB exit `actual_price = $77.49` when the actual trigger
+   occurred at the bar's high (≥ $103.58). This makes the audit entry
+   read as "stop fired against profitable territory" even when the
+   trigger itself was correct.
+
+**Fix**: `Stops_runner._compute_ma` now also returns the classified
+stage (or a position-favourable warmup default: `Stage2 + Rising` for
+longs, `Stage4 + Declining` for shorts — both no-tighten by
+`_should_tighten_*`'s logic). `_make_exit_transition` selects
+`actual_price` by side: `bar.low_price` for longs, `bar.high_price`
+for shorts.
+
+**Reproducer tests**: two new tests in
+`trading/trading/weinstein/strategy/test/test_stops_runner.ml` —
+`test_g1_short_no_exit_on_counter_bounce` (pins #1: short with
+$103.58 stop emits zero exits across pullback + small counter-bounce
+below entry) and `test_g1_short_exit_records_high_not_low` (pins #2:
+on a violent down-day where bar high crosses the short stop, the
+recorded `actual_price` and `exit_price` must be ≥ stop_level, not
+bar.low). Both fail on current main, pass post-fix.
+
+**Side-effect on long-side test**:
+`test_weinstein_strategy.test_bar_accumulation_multiple_days` was
+pinning the same warmup-tightening pathology for longs (Day 2
+expected 1 transition driven by spurious tightening). Updated to
+expect 0 transitions across all 3 days — the position-favourable
+warmup default applies symmetrically to both sides.
+
+**Out-of-scope follow-up**: there is a deeper Trailing-state
+phantom-cycle bug in `Weinstein_stops._completed_cycle_stop`. For
+monotonically declining shorts (no actual counter-rally), the seeded
+`last_correction_extreme = bar.high` from `_to_trailing` paired with
+an advancing `last_trend_extreme` later phantom-fires the cycle
+without a real counter-move. This pulls the short stop further DOWN
+through entry over multiple bars. Fixing it cleanly requires a
+state-machine change (track temporal ordering of correction-vs-trend
+extremes — naive seeding-reset breaks the long-side `regression_test`
+at `stage2_trailing_stop_raised_phase_a` which deliberately seeds
+the entry-bar low as the cycle-1 correction anchor). The minimal G1
+fix above closes the runner-side hardcodes and lets the trailing
+logic operate on correct stage inputs. Re-evaluate after the
+sp500-baseline rerun whether the runner-side fix alone is sufficient
+or whether the trailing-state phantom needs follow-up work.
+
 ### G2 — `Metrics.extract_round_trips` is blind to shorts
 
 Currently pairs Buy → Sell only. Sell → Buy short round-trips are
