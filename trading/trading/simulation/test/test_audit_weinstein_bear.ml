@@ -55,19 +55,22 @@
     weinstein_backtest integration tests; here we pin the runner's short-side
     direction contract.
 
-    {1 Pass / fail expectations on current main}
+    {1 Pass / fail expectations on current main (post-#690)}
 
-    + {b Test A — PASSES on current main.} The unit-level
-      [Weinstein_stops.check_stop_hit] direction predicate is correct: a short
-      with stop above price does NOT trigger from the [Initial] state. This pins
-      the contract — a future regression that swaps the direction (e.g., the
-      long-side comparison leaking into the short branch) would fail this test.
-    + {b Test B — PASSES on current main.} The positive-case predicate also
-      fires correctly: bar high ≥ short stop level emits a [TriggerExit].
-    + {b Test C — FAILS on current main.} [Metrics.extract_round_trips] pairs
-      Buy→Sell only ([_is_buy_sell_pair]), so the Sell→Buy short round-trip is
-      silently dropped — the filtered list is empty and [elements_are] fails on
-      length mismatch. This is exactly the gap G2 documents.
+    + {b Test A — PASSES.} The unit-level [Weinstein_stops.check_stop_hit]
+      direction predicate is correct: a short with stop above price does NOT
+      trigger from the [Initial] state. This pins the contract — a future
+      regression that swaps the direction (e.g., the long-side comparison
+      leaking into the short branch) would fail this test.
+    + {b Test B — PASSES.} The positive-case predicate also fires correctly: bar
+      high ≥ short stop level emits a [TriggerExit].
+    + {b Test C — PASSES post-#690.} Originally written to FAIL on pre-#690 main
+      (where [Metrics.extract_round_trips] paired Buy→Sell only, so the Sell→Buy
+      short round-trip was silently dropped). PR #690 added Sell→Buy pairing,
+      closing G2. Test C now pins the post-fix contract: a synthetic strategy
+      that emits [Short_open] then [TriggerExit] drives the simulator through
+      the entry-Sell + cover-Buy fill sequence, and the resulting step.trades
+      stream produces a SHORT round-trip with positive P&L when cover < entry.
 
     {b Note for G1 follow-ups.} The audit evidence in
     [dev/notes/short-side-gaps-2026-04-29.md] shows ALB short reportedly exiting
@@ -283,11 +286,20 @@ let test_b_short_stop_fires_above _ =
     The resulting [step.trades] sequence is therefore Sell → Buy for symbol
     "BEAR".
 
-    {!Metrics.extract_round_trips} on current main only pairs Buy→Sell —
-    [_is_buy_sell_pair] returns false for the Sell→Buy case so the short
-    round-trip is silently dropped. This test asserts the contract: short
-    round-trips appear in the extracted trade list, with [pnl_dollars]
-    reflecting the short P&L direction (cover below entry = profit). *)
+    Post-#690, {!Metrics.extract_round_trips} pairs both Buy→Sell (long) and
+    Sell→Buy (short) — see [_is_paired_round_trip]. This test asserts the
+    contract end-to-end through the simulator: a synthetic Short_open +
+    TriggerExit pair drives the entry-Sell + cover-Buy fill sequence, and the
+    resulting round-trip is reported with [pnl_dollars > 0] when cover < entry.
+
+    {b End-date fence-post.} The simulator's [_is_complete] fires on
+    [current_date >= end_date], i.e. the end date is exclusive of the last
+    processing day. Orders are filled the bar AFTER submission, so to fill the
+    cover-Buy submitted on [exit_date], the simulation must run through
+    [exit_date + 1 trading day]. We pad [end_date] one beyond the last fixture
+    bar (01-09 → 01-10) so the cover fill on 01-09 is captured in [step.trades];
+    extra non-trading dates produce empty steps and do not perturb the result.
+*)
 
 (** A scheduled strategy that opens a short on [open_date] then emits a
     [TriggerExit] on [exit_date] for the held short. This is the same
@@ -393,10 +405,16 @@ let test_c_short_round_trip_in_metrics _ =
     let open_date = _date "2024-01-02"
     let exit_date = _date "2024-01-08"
   end) in
+  (* The simulator's [_is_complete] fires on [current_date >= end_date], so the
+     end date is exclusive — to reach the bar on 01-09 (the cover-Buy fill day,
+     since orders submitted on 01-08 fill next day), end_date must be the day
+     AFTER the fill date. The bear fixture extends through 01-09 only, so we
+     pad end_date one beyond the last bar — extra non-trading dates are fine,
+     the simulator just produces empty steps. *)
   let config =
     {
       Trading_simulation_types.Simulator_types.start_date = _date "2024-01-02";
-      end_date = _date "2024-01-09";
+      end_date = _date "2024-01-10";
       initial_cash = 100_000.0;
       commission = _zero_commission;
       strategy_cadence = Types.Cadence.Daily;
@@ -422,15 +440,11 @@ let test_c_short_round_trip_in_metrics _ =
     Trading_simulation.Metrics.extract_round_trips result.steps
   in
   (* Contract (G2): the Sell→Buy short round-trip must be reported. The
-     entry is the Sell at the open-day fill (~$97.5 close on 01-03 fill);
-     the exit is the Buy cover at the exit-day fill (~$83.5 close on
-     01-08 fill). For a short, P&L = (entry − cover) × quantity, so
-     P&L > 0 when cover is below entry.
-
-     [Metrics.extract_round_trips] on current main pairs Buy→Sell only,
-     so this filter returns an empty list — the assertion fails-by-empty.
-     That's the right shape for pinning the gap: "no short round-trip
-     emitted" is exactly what trades.csv reviewers see today. *)
+     entry is the Sell at the open-day fill (~$99.50 open price on 01-03
+     fill, since orders fill the bar after submission); the exit is the
+     Buy cover at the exit-day fill (~$83.00 open on 01-09). For a short,
+     P&L = (entry − cover) × quantity, so P&L > 0 when cover is below
+     entry. *)
   let bear_round_trips =
     List.filter round_trips
       ~f:(fun (m : Trading_simulation.Metrics.trade_metrics) ->
