@@ -329,3 +329,130 @@ methodology section so readers understand the labeling convention.
 ## Verdict
 
 APPROVED
+
+
+---
+
+# Structural QC — optimal-strategy (PR-4b: optimal_strategy.exe binary)
+Date: 2026-04-29
+Reviewer: qc-structural
+Reviewed SHA: 0efdb3ca75b788f64958492102b9a7c69c1eb5d8 (was 0dd074950e03c5bc1bc73e3ff4752ad332656403; orchestrator pushed `fix(status): drop parenthetical from 'Last updated'` between QC dispatch and override)
+
+## Structural Checklist (post-orchestrator-override)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | Verified by orchestrator: `dune build @fmt` exit 0 on tip 0efdb3c. |
+| H2 | dune build | PASS | Verified by orchestrator: `dune build` exit 0 on tip 0efdb3c. |
+| H3 | dune runtest | PASS | Verified by orchestrator: `dune build && dune runtest` exit 0 on tip 0efdb3c. (qc-structural reported H3 FAIL based on advisory linter `FAIL:` text — same recurring agent error as on PR-1; documented in lead-orchestrator.md Step 6.1 "trust only the exit code, not stdout FAIL strings".) |
+| P1 | Functions ≤ 50 lines — covered by language-specific linter | FLAG (advisory) | The new bin file `trading/trading/backtest/optimal/bin/optimal_strategy.ml` is 484 lines with multiple helpers approaching the 50-line limit. fn_length linter prints advisory FAIL: text but `dune runtest` exits 0 — so this is not a hard gate in current configuration. **Same shape as the renderer file (442 LOC) merged in #665 without `@large-module` annotation.** Flagged as a follow-up code-quality concern: a refactor breaking the bin into smaller modules (`Artefact_loader`, `Pipeline_driver`, `Cli`) would be valuable; tracked as a `cleanup` backlog item in this run's daily summary. |
+| P2 | No magic numbers | PASS | linter_magic_numbers.sh exit 0; no bare numeric literals in business logic; CLI defaults exposed via the bin's argv parser. |
+| P3 | All configurable thresholds in config record | PASS | The bin orchestrates pure modules whose configs already live in their respective `config` records. The bin contributes only one numeric: `default_lookback = 252` (calendar-aware lookback for panel construction), which is named with a `let _LOOKBACK_DAYS = 252` constant — within OCaml-patterns.md's allowed-constants policy. |
+| P4 | Public-symbol export hygiene | PASS | linter_mli_coverage.sh exit 0 — bin has no public API surface (it's an exe), and the `.ml` is the entry point. |
+| P5 | Internal helpers prefixed per project convention | PASS | All non-`main` definitions use the `_<name>` prefix (`_load_summary_sexp`, `_load_actual_sexp`, `_panel_for_run`, etc.). |
+| P6 | Tests conform to `.claude/rules/test-patterns.md` | NA | No new test file in this PR; the bin smoke test was deferred per the followups note. (Existing 45/45 optimal-track tests pass unchanged.) |
+| A1 | Core module modifications | NA | No modifications to Portfolio/Orders/Position/Strategy/Engine. |
+| A2 | No imports from `analysis/` into `trading/trading/` | FLAG | bin/dune imports `weinstein.*` libs (screener, stage, stock_analysis, types) — same precedent as PR-1/2/3/4 and 5+ existing `trading/trading/backtest/*/dune` files. Per dispatch instruction, marked FLAG (not FAIL); orchestrator does NOT need to override this run because the agent followed the dispatch instruction. The underlying rule (`qc-structural-authority.md` §A2) is stale and tracked as a [info] follow-up since 2026-04-28. |
+| A3 | No unnecessary modifications to existing (non-feature) modules | PASS | After orchestrator's `fix(status)` follow-up commit, only `dev/status/optimal-strategy.md` is modified outside the new bin directory. Status update is expected; no other module touched. (qc-structural's A3 finding ("Last updated parenthetical violates schema") was a real status-file-integrity advisory — orchestrator pushed the format fix in commit 0efdb3c and re-verified the linter exits OK.) |
+
+## qc-structural agent's verdict (as returned)
+
+NEEDS_REWORK (cited P1 function length on the new bin, A3 status file format error, and H3 false-positive based on advisory linter FAIL: text).
+
+## Orchestrator override (lead-orchestrator, 2026-04-29 run-1)
+
+**Effective verdict: APPROVED**
+
+Reasoning:
+
+1. **H3 false positive on advisory linter text.** This is the recurring failure mode documented in `lead-orchestrator.md` Step 6.1 ("trust only the exit code") and previously corrected on PR-1 of this same track. Re-verified on 0efdb3c: `dune build && dune runtest` exits 0; `dune build` exits 0; `dune build @fmt` exits 0.
+
+2. **P1 advisory, consistent with #665 precedent.** The new bin is 484 LOC. The merged renderer (#665) is 442 LOC. Neither has a `@large-module` annotation; both produce advisory `FAIL:` text from the file_length / fn_length linters but neither exits non-zero. The repo's actual gating threshold for these linters is "advisory until human review demands action." Refactoring the bin into smaller modules is a reasonable code-quality follow-up — captured as a backlog item but NOT a structural blocker for merge.
+
+3. **A3 fixed in orchestrator follow-up commit 0efdb3c.** The status file format error was real; the orchestrator pushed a one-line fix on the PR branch (`## Last updated: 2026-04-29 (PR-4b in flight)` → `## Last updated: 2026-04-29`). The status_file_integrity linter now exits OK on the updated tip. This is consistent with the orchestrator's documented authority to edit status files (Step 5.5 reconcile rights extend to format fixes that block linter passage).
+
+4. **A2 is stale rule, marked FLAG per dispatch instruction.** No override needed — the agent followed the instruction. Underlying rule reformulation tracked as carried-forward [info].
+
+Audit-trail entry will be written to `dev/audit/2026-04-29-optimal-strategy.json` with override notes.
+---
+
+# Behavioral QC — optimal-strategy (PR-4b)
+Date: 2026-04-29
+Reviewer: qc-behavioral
+Reviewed SHA: 0efdb3ca75b788f64958492102b9a7c69c1eb5d8
+
+## Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new .mli docstrings has an identified test that pins it | NA | This PR ships only `bin/optimal_strategy.ml` (an executable; no `.mli` is conventional for binaries) and a `bin/dune` registration. The bin's docstring claims (pipeline shape, macro-trend simplification, output path) describe orchestration of already-tested pure modules — the underlying contracts (scanner, scorer, filler, summary, renderer) are pinned by the test suites of PR-1/2/3/4 (45/45 in the optimal track). The bin itself is pure orchestration; no new domain claims to pin. |
+| CP2 | Each claim in PR body "Test plan"/"Test coverage" sections has a corresponding test in the committed test file | NA | PR body is an integration-binary follow-up; per the deferred-item spec (`dev/notes/optimal-strategy-pr4-followups-2026-04-28.md` Follow-up A), the bin smoke-test was scoped as optional ("~50 if a small smoke test through a synthetic-panel fixture is added"). No test-file claims are advertised in this PR; nothing to verify. The bin's correctness rests on (a) the unchanged contracts of the pure modules it composes (already pinned upstream) and (b) integration validation by running it against a live `output_dir` (operational test — out of unit-test scope and called out as such by the dispatch). |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size_is | NA | No pass-through semantics in this PR (no new tests at all). The bin transforms artefacts → markdown via the renderer; semantic identity is upstream. |
+| CP4 | Each guard called out explicitly in code docstrings has a test that exercises the guarded-against scenario | NA | Three guards exist in code: (1) missing-`actual.sexp` / `summary.sexp` raises `failwithf` (`_load_actual_sexp`/`_load_summary_sexp` lines 110–120); (2) missing-`trades.csv` returns `[]` (line 153); (3) missing-`trade_audit.sexp` returns `[]` (line 170). These are operational guards documented inline. The bin has no test file in this PR, so no test-side guard pin. The guard semantics are simple ("file missing → known fallback or fail loudly"); a future smoke test (Follow-up A's optional ~50 LOC) would be the right place to pin them. Not a blocker for this PR — flagged for the eventual smoke-test follow-on. |
+
+## Behavioral Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1 | Core module modification is strategy-agnostic | NA | qc-structural's A1 = NA — no core-module changes. PR is purely additive in `trading/backtest/optimal/bin/`. |
+| S1 | Stage 1 definition matches book | NA | Pure orchestration PR. Stage classification is delegated to `Stage.classify` (canonical, unchanged). |
+| S2 | Stage 2 definition matches book | NA | Same. The bin invokes `Stage.classify` via `Stock_analysis.analyze` (line 290) and via `_forward_outlooks` (line 338). No re-implementation. |
+| S3 | Stage 3 definition matches book | NA | Same. |
+| S4 | Stage 4 definition matches book | NA | Same. Long-side-only counterfactual per PR-1 scope. |
+| S5 | Buy criteria | NA | Entry-eligibility logic lives in `Stock_analysis.is_breakout_candidate` and `Stage_transition_scanner.scan_week` — both pinned by PR-1. The bin only assembles `week_input` records and calls `scan_week`. |
+| S6 | No buy signals in Stage 1/3/4 | NA | Same as S5. |
+| L1 | Initial stop placed below the base | NA | Stop logic lives in `Outcome_scorer` (PR-2). The bin does not touch stops. |
+| L2 | Trailing stop never lowered | NA | Same. |
+| L3 | Stop triggers on weekly close | NA | Same. |
+| L4 | Stop state machine transitions | NA | Same. |
+| C1 | Screener cascade order | NA | Cascade is upstream (`Stage_transition_scanner` + `Stock_analysis`). The bin uses `Screener.default_config` projected through `Scanner.config_of_screener_config` (line 451) — matches plan §Risks item 3 ("screener config used by the scanner must match the actual run"). Note: the bin uses the **default** screener config, NOT a config loaded from `summary.sexp`. Plan §Risks item 3 mitigation prefers reading from `summary.sexp` but that is a PR-1 concern, not addressed here. Acceptable for PR-4b because (a) `summary.sexp` does not currently persist screener config, (b) the actual run also uses default config in the baseline scenario, so drift is moot in practice. **Methodology-note flag** for the eventual `release_perf_report` integration (PR-5): if scenarios start customising screener config, the bin will silently mis-compare. |
+| C2 | Bearish macro blocks all buys | PASS-with-caveat | The bin sets `macro_trend = Weinstein_types.Neutral` for **every** Friday (line 359). Per scanner contract (`stage_transition_scanner.mli` line 87: `passes_macro = (week.macro_trend <> Bearish)`), this means every candidate gets `passes_macro = true`. Consequence: `Constrained` and `Relaxed_macro` admit identical candidate sets — they will be tagged identically. The bin's docstring (lines 25–34) acknowledges this explicitly and labels it a follow-up requiring per-Friday macro persistence in `actual.sexp`. **This is correctly documented and is the consequence the dispatch specifically asked me to verify.** The downstream effect on the headline-comparison table is that the Δ between Constrained and Relaxed_macro will be 0.0 across all metrics until macro persistence lands; the actual-vs-counterfactual Δ remains meaningful. The bin's docstring serves as the methodology disclosure but the rendered markdown does NOT contain this caveat — the renderer's "look-ahead disclaimer" addresses look-ahead bias but not the macro-tag-collapse. **Recommend** PR-5 add a short methodology note in the rendered markdown surface ("Constrained ≡ Relaxed_macro until macro trend is persisted per-Friday"); not a blocker for this PR. |
+| C3 | Sector RS vs market | NA | Sector context is built via `_build_sector_context_map` (lines 299–311). Bin populates each symbol with `rating = Neutral` and `stage = Stage2 { weeks_advancing = 4; late = false }` as pass-through values — the bin's docstring (lines 297–298) explains the counterfactual treats sector caps separately via the filler's `max_sector_concentration`. This is a deliberate design choice (sector-context-as-pass-through; the cap is applied in the filler, not the scanner gate). Not a domain violation: the live screener applies sector RS gates that the counterfactual deliberately relaxes (per plan §Phase A "counterfactual relaxes screener gates"). The cap-based replacement preserves sector concentration risk control without depending on a specific RS threshold. |
+| T1 | Tests cover all 4 stage transitions | NA | No tests in this PR. Stage-transition scanning is pinned by PR-1 tests. |
+| T2 | Tests include a bearish macro scenario producing zero buy candidates | NA | No tests. Macro-gating semantics are pinned by PR-1 (scanner) tests; the bin currently *cannot* exercise a bearish-macro scenario because it hardcodes `Neutral` (see C2). |
+| T3 | Stop-loss tests verify trailing behavior | NA | No tests; out-of-scope. Pinned by PR-2 (`outcome_scorer` test suite). |
+| T4 | Tests assert domain outcomes | NA | No tests in this PR. |
+
+## Pipeline-shape verification (the PR's behavioral surface)
+
+The plan §PR-4 spec (lines 347–352) and Follow-up A (`pr4-followups` lines 29–62) jointly specify:
+
+> Reads `output_dir/`'s artefacts (`trades.csv`, `summary.sexp`, the panel cache referenced by `summary.sexp`), invokes `scanner→scorer→filler→renderer`, writes `<output_dir>/optimal_strategy.md`.
+
+Trace through `main` (lines 423–480):
+
+1. `_build_actual_run` (line 425) → reads `actual.sexp` + `summary.sexp` + `trades.csv` + (optional) `trade_audit.sexp`. **Matches Follow-up A "Inputs the bin must build".**
+2. Panel build via `_build_calendar` + `_build_bar_panels` (lines 436–442) — re-loads from `data_dir` per plan §Risks item 5 option (i). **Matches plan choice.** Warmup of 210 days (line 192) matches `Panel_runner` convention.
+3. `_scan_all_fridays` (line 453) → walks `_fridays_in_range`, builds `Scanner.week_input` per Friday with universe analyses + `sector_map` + (fixed) `macro_trend = Neutral`, calls `Scanner.scan_week`. **Matches plan: scanner pass.**
+4. `_score_all_candidates` (line 459) → for each candidate, builds forward-Friday outlooks via `_forward_outlooks` → `Scorer.score`. **Matches plan: scorer pass.**
+5. `_build_variant ×2` (lines 466–473) → invokes `Filler.fill` then `Summary_agg.summarize` for `Constrained` and `Relaxed_macro` variants. **Matches plan: filler ×2 + summary ×2.**
+6. `Report.render input` → `Out_channel.write_all` (lines 477–479). **Matches plan: renderer + write to `<output_dir>/optimal_strategy.md`.**
+
+**Pipeline shape is faithful to the plan.**
+
+## Friday-cadence verification
+
+`_fridays_in_range` (lines 261–270): computes `friday_on_or_before(start)`, advances by 7 days if it lands before `start`, then walks 7-day strides while `d ≤ end_`. Yields all Fridays in `[start_date, end_date]` inclusive. **Correct.** Cross-checked against the canonical Weinstein "weekly cadence" rule — Friday is the canonical signal day per `weinstein-book-reference.md` §Stage Definitions ("weekly close above 30-week MA"). The bin's reliance on Friday cadence matches both the canonical strategy and the underlying scorer's `weekly_outlook` shape.
+
+## Macro-trend simplification — methodological consequences
+
+This is the dispatch's flagged item. The bin documents on lines 25–34 that:
+- `macro_trend = Neutral` is hardcoded across all Fridays.
+- This makes `passes_macro = true` for every candidate.
+- `Constrained` and `Relaxed_macro` will tag every candidate identically.
+
+Verification:
+- Hardcoding is at line 359 in `_scan_all_fridays`'s `week_input` construction.
+- Scanner contract (`stage_transition_scanner.mli` §`scan_week`): `passes_macro = (week.macro_trend <> Bearish)` — `Neutral` is not `Bearish`, so `passes_macro = true` always.
+- Filler contract (`optimal_portfolio_filler.mli` lines 101–103): `Constrained` filters by `passes_macro`. With every candidate passing, `Constrained` admits the full candidate set, identical to `Relaxed_macro`.
+- The bin's docstring (lines 25–34) accurately describes this consequence. Not silently degraded.
+
+**Methodology-note flag for PR-5** (release_perf_report integration): the rendered markdown does NOT inherit this disclaimer — the renderer's only built-in disclaimer is the look-ahead-bias one. PR-5 should ensure the methodology note "Constrained and Relaxed_macro are equivalent until per-Friday macro state is persisted alongside actual.sexp" is surfaced in the rendered report (either via the renderer's header or a footer added by the bin). Tracked as `LINTER_CANDIDATE` for harness gap (a substring-presence test on rendered output would deterministically catch a future regression where the disclaimer is dropped).
+
+## Quality Score
+
+4 — Faithful, well-documented orchestration of already-tested pure modules. Pipeline shape matches plan §PR-4 and Follow-up A spec; Friday cadence is correctly bounded; macro-trend simplification is honestly disclosed in the bin's docstring. Knocked from 5 to 4 because (a) the macro-tag-collapse caveat does not surface in the rendered markdown itself (only in the bin's source docstring) — a methodology consumer reading `optimal_strategy.md` would not know `Constrained ≡ Relaxed_macro` for now, and (b) no smoke test exists for the bin's artefact-loading guards (the optional ~50 LOC fixture call-out in Follow-up A). Both are flagged as forward-looking improvements for PR-5, neither is a blocker.
+
+## Verdict
+
+APPROVED
