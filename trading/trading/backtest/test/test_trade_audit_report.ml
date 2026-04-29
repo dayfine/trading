@@ -19,12 +19,14 @@ module TA = Backtest.Trade_audit
 
 let _date d = Date.of_string d
 
-let make_trade ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
-    ?(exit_date = _date "2024-04-20") ?(days_held = 96) ?(entry_price = 150.50)
-    ?(exit_price = 138.46) ?(quantity = 500.0) ?(pnl_dollars = -6_020.0)
-    ?(pnl_percent = -8.0) () : Trading_simulation.Metrics.trade_metrics =
+let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
+    ?(entry_date = _date "2024-01-15") ?(exit_date = _date "2024-04-20")
+    ?(days_held = 96) ?(entry_price = 150.50) ?(exit_price = 138.46)
+    ?(quantity = 500.0) ?(pnl_dollars = -6_020.0) ?(pnl_percent = -8.0) () :
+    Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
+    side;
     entry_date;
     exit_date;
     days_held;
@@ -492,6 +494,248 @@ let test_load_missing_trades_csv_raises _ =
   in
   assert_that result (equal_to (Error "raised" : (unit, string) Result.t))
 
+(* --- Loader: post-G2 13-column trades.csv -----------------------------
+
+   The G2 contract adds a [side] column to trades.csv, with values [LONG]
+   (Buy→Sell round-trip) and [SHORT] (Sell→Buy round-trip). The {!_canonical_post_g2_header}
+   literal mirrors [Backtest.Result_writer._write_trades]'s header verbatim so
+   schema drift on either side fails the parser tests below loudly. The legacy
+   12-column tests above continue to exercise the fallback parser branch. *)
+
+(** Mirror of [Backtest.Result_writer._write_trades]'s post-G2 header. *)
+let _canonical_post_g2_header =
+  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger"
+
+(* AAPL LONG round-trip: bought at 280, sold at 404, +12 400 / +44.20%. *)
+let _post_g2_long_row =
+  "AAPL,LONG,2020-04-25,2020-08-01,98,280.00,404.00,100,12400.00,44.20,260.00,400.00,signal_reversal"
+
+(* TSLA SHORT round-trip: shorted at 200, covered at 180, +1 000 / +10.00%. *)
+let _post_g2_short_row =
+  "TSLA,SHORT,2024-03-04,2024-04-08,35,200.00,180.00,50,1000.00,10.00,210.00,185.00,stop_loss"
+
+let _stage_post_g2_scenario ~prefix ~rows =
+  let dir = Core_unix.mkdtemp ("/tmp/trade_audit_report_" ^ prefix ^ "_") in
+  let scenario_dir = Filename.concat dir "scenario" in
+  Core_unix.mkdir_p scenario_dir;
+  let csv =
+    String.concat ~sep:"\n" (_canonical_post_g2_header :: rows) ^ "\n"
+  in
+  _write_text (Filename.concat scenario_dir "trades.csv") csv;
+  _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
+  scenario_dir
+
+let test_load_post_g2_long_round_trip _ =
+  let scenario_dir =
+    _stage_post_g2_scenario ~prefix:"post_g2_long" ~rows:[ _post_g2_long_row ]
+  in
+  let report = TAR.load ~scenario_dir in
+  (* TAR.load builds [per_trade_row]s whose [side] is sourced from the
+     trade-audit's [entry.side] when matched, OR defaulted to [Long] when no
+     audit is present. With no audit staged, the row's [side] field cannot
+     pin the LONG-vs-SHORT contract — the parser-level pin runs through the
+     trade_metrics list returned by [_read_trades_csv], which the report
+     surfaces only via header counts. We pin: 1 winner (LONG row had +pnl)
+     and the parsed pnl + price fields exposed in [per_trade_row]. *)
+  assert_that report
+    (all_of
+       [
+         field (fun (t : TAR.t) -> t.header.total_round_trips) (equal_to 1);
+         field (fun (t : TAR.t) -> t.header.winners) (equal_to 1);
+         field
+           (fun (t : TAR.t) -> t.rows)
+           (elements_are
+              [
+                all_of
+                  [
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.symbol)
+                      (equal_to "AAPL");
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.entry_price)
+                      (float_equal 280.00);
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.exit_price)
+                      (float_equal 404.00);
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.pnl_dollars)
+                      (float_equal 12_400.00);
+                  ];
+              ]);
+       ])
+
+let test_load_post_g2_short_round_trip _ =
+  let scenario_dir =
+    _stage_post_g2_scenario ~prefix:"post_g2_short" ~rows:[ _post_g2_short_row ]
+  in
+  let report = TAR.load ~scenario_dir in
+  (* SHORT row produces a positive pnl (covered below entry). The [side] field
+     in the parsed [trade_metrics] is [Sell] — see the parallel pin in
+     [test_optimal_run_artefacts.ml]. Here we pin the row-level fields surfaced
+     by the report. *)
+  assert_that report
+    (all_of
+       [
+         field (fun (t : TAR.t) -> t.header.total_round_trips) (equal_to 1);
+         field (fun (t : TAR.t) -> t.header.winners) (equal_to 1);
+         field
+           (fun (t : TAR.t) -> t.rows)
+           (elements_are
+              [
+                all_of
+                  [
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.symbol)
+                      (equal_to "TSLA");
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.entry_price)
+                      (float_equal 200.00);
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.exit_price)
+                      (float_equal 180.00);
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.pnl_dollars)
+                      (float_equal 1_000.00);
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.pnl_percent)
+                      (float_equal 10.00);
+                  ];
+              ]);
+       ])
+
+let test_load_post_g2_mixed_long_and_short _ =
+  let scenario_dir =
+    _stage_post_g2_scenario ~prefix:"post_g2_mixed"
+      ~rows:[ _post_g2_long_row; _post_g2_short_row ]
+  in
+  let report = TAR.load ~scenario_dir in
+  (* Both rows must parse and surface in entry-date order. *)
+  assert_that report
+    (all_of
+       [
+         field (fun (t : TAR.t) -> t.header.total_round_trips) (equal_to 2);
+         field (fun (t : TAR.t) -> t.header.winners) (equal_to 2);
+         field
+           (fun (t : TAR.t) -> t.rows)
+           (elements_are
+              [
+                field
+                  (fun (r : TAR.per_trade_row) -> r.symbol)
+                  (equal_to "AAPL");
+                field
+                  (fun (r : TAR.per_trade_row) -> r.symbol)
+                  (equal_to "TSLA");
+              ]);
+       ])
+
+(* --- Writer -> reader round-trip --------------------------------------
+
+   The strongest CP2 closure: stage a [Runner.result] with one LONG and one
+   SHORT round-trip, write it via the canonical [Result_writer.write], and
+   read the resulting [trades.csv] back via [TAR.load]. Pins both sides of
+   the on-disk contract at once — schema drift on either fails this test. *)
+
+let _make_runner_result ~start_date ~end_date ~round_trips :
+    Backtest.Runner.result =
+  {
+    summary =
+      {
+        start_date;
+        end_date;
+        universe_size = 2;
+        n_steps = 1;
+        initial_cash = 10_000.0;
+        final_portfolio_value =
+          10_000.0
+          +. List.fold round_trips ~init:0.0
+               ~f:(fun acc (t : Trading_simulation.Metrics.trade_metrics) ->
+                 acc +. t.pnl_dollars);
+        n_round_trips = List.length round_trips;
+        metrics = Trading_simulation_types.Metric_types.empty;
+      };
+    round_trips;
+    steps = [];
+    overrides = [];
+    stop_infos = [];
+    audit = [];
+    cascade_summaries = [];
+  }
+
+let test_writer_reader_post_g2_round_trip _ =
+  let dir = Core_unix.mkdtemp "/tmp/trade_audit_report_writer_" in
+  let long_trip : Trading_simulation.Metrics.trade_metrics =
+    {
+      symbol = "AAPL";
+      side = Trading_base.Types.Buy;
+      entry_date = _date "2024-01-15";
+      exit_date = _date "2024-02-20";
+      days_held = 36;
+      entry_price = 150.00;
+      exit_price = 165.00;
+      quantity = 10.0;
+      pnl_dollars = 150.00;
+      pnl_percent = 10.00;
+    }
+  in
+  let short_trip : Trading_simulation.Metrics.trade_metrics =
+    {
+      symbol = "TSLA";
+      side = Trading_base.Types.Sell;
+      entry_date = _date "2024-03-04";
+      exit_date = _date "2024-04-08";
+      days_held = 35;
+      entry_price = 200.00;
+      exit_price = 180.00;
+      quantity = 5.0;
+      pnl_dollars = 100.00;
+      pnl_percent = 10.00;
+    }
+  in
+  let result =
+    _make_runner_result ~start_date:(_date "2024-01-01")
+      ~end_date:(_date "2024-04-30") ~round_trips:[ long_trip; short_trip ]
+  in
+  Backtest.Result_writer.write ~output_dir:dir result;
+  (* Pin: writer emitted the canonical post-G2 header verbatim. Schema drift on
+     the writer side fails this string match. *)
+  let trades_csv_path = Filename.concat dir "trades.csv" in
+  let lines = In_channel.read_lines trades_csv_path in
+  let header_line = List.hd_exn lines in
+  assert_that header_line (equal_to _canonical_post_g2_header);
+  (* Reader parses both rows back. The report aggregates over [trade_metrics]
+     where [side] survives intact; we pin via the header counts (both winners)
+     and the ordered symbol list. *)
+  let report = TAR.load ~scenario_dir:dir in
+  assert_that report
+    (all_of
+       [
+         field (fun (t : TAR.t) -> t.header.total_round_trips) (equal_to 2);
+         field (fun (t : TAR.t) -> t.header.winners) (equal_to 2);
+         field
+           (fun (t : TAR.t) -> t.rows)
+           (elements_are
+              [
+                all_of
+                  [
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.symbol)
+                      (equal_to "AAPL");
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.pnl_dollars)
+                      (float_equal 150.00);
+                  ];
+                all_of
+                  [
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.symbol)
+                      (equal_to "TSLA");
+                    field
+                      (fun (r : TAR.per_trade_row) -> r.pnl_dollars)
+                      (float_equal 100.00);
+                  ];
+              ]);
+       ])
+
 let suite =
   "Trade_audit_report"
   >::: [
@@ -515,6 +759,12 @@ let suite =
          "load without audit file" >:: test_load_without_audit_file;
          "load missing trades.csv raises"
          >:: test_load_missing_trades_csv_raises;
+         "load post-G2 LONG round-trip" >:: test_load_post_g2_long_round_trip;
+         "load post-G2 SHORT round-trip" >:: test_load_post_g2_short_round_trip;
+         "load post-G2 mixed LONG and SHORT"
+         >:: test_load_post_g2_mixed_long_and_short;
+         "writer -> reader post-G2 round-trip"
+         >:: test_writer_reader_post_g2_round_trip;
        ]
 
 let () = run_test_tt_main suite

@@ -12,21 +12,33 @@ open Core
 
 type trade_metrics = {
   symbol : string;  (** The traded symbol *)
-  entry_date : Date.t;  (** Date of entry (buy) *)
-  exit_date : Date.t;  (** Date of exit (sell) *)
+  side : Trading_base.Types.side;
+      (** Direction of the round-trip's {b entry} leg. [Buy] means a long
+          round-trip (Buy→Sell); [Sell] means a short round-trip (Sell→Buy where
+          the closing buy covers the short). Callers that distinguish long vs
+          short P&L (release-report, [trades.csv], regression metrics) must
+          dispatch on this field. *)
+  entry_date : Date.t;  (** Date of entry — the open leg *)
+  exit_date : Date.t;  (** Date of exit — the close leg *)
   days_held : int;  (** Number of days position was held *)
-  entry_price : float;  (** Price at entry *)
-  exit_price : float;  (** Price at exit *)
+  entry_price : float;  (** Price at entry — i.e. the open-leg fill price *)
+  exit_price : float;  (** Price at exit — i.e. the close-leg fill price *)
   quantity : float;  (** Number of shares traded *)
-  pnl_dollars : float;  (** Profit/loss in dollars *)
-  pnl_percent : float;  (** Profit/loss as percentage of entry price *)
+  pnl_dollars : float;
+      (** Profit/loss in dollars. Long: [(exit − entry) × qty]. Short:
+          [(entry − exit) × qty] (positive when cover price < entry). *)
+  pnl_percent : float;
+      (** Profit/loss as percentage of entry price. Mirrored direction so a
+          positive reading always means profit, regardless of long or short. *)
 }
 [@@deriving show, eq]
 (** Metrics for a completed round-trip trade.
 
-    A round-trip trade consists of an entry (buy) followed by an exit (sell) for
-    the same symbol. This record captures the key performance metrics for
-    analyzing trade profitability. *)
+    A round-trip trade consists of an entry followed by a close trade for the
+    same symbol. Two directions are supported: long (Buy→Sell) and short
+    (Sell→Buy, where the closing buy covers the short). [side] tags the
+    direction of the entry leg so downstream consumers can dispatch P&L
+    semantics. *)
 
 type summary_stats = {
   total_pnl : float;  (** Sum of P&L across all trades *)
@@ -48,9 +60,17 @@ val extract_round_trips :
   trade_metrics list
 (** Extract round-trip trades from simulation step results.
 
-    A round-trip is identified by pairing buy trades with subsequent sell trades
-    for the same symbol. Trades are matched in chronological order, with each
-    buy paired with the next sell.
+    A round-trip is identified by pairing an entry trade with the next close
+    trade for the same symbol. Two directions are paired:
+
+    - {b Long} round-trip: Buy → Sell, with [side = Buy] in the result.
+    - {b Short} round-trip: Sell → Buy (the buy covers the short), with
+      [side = Sell] in the result.
+
+    Trades are matched in chronological order, with each entry paired with the
+    next opposite-side trade for the same symbol. A trailing entry trade with no
+    matching close (e.g., an open position at the end of the simulation window)
+    is dropped.
 
     @param steps List of step results from simulator run
     @return List of trade metrics for completed round-trips *)

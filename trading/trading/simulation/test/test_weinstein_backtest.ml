@@ -181,13 +181,18 @@ let test_six_year_full_lifecycle _ =
          equal_to "KO";
          equal_to "MSFT";
        ]);
-  assert_that (List.length round_trips) (equal_to 33);
+  (* Post-G2 ([dev/notes/short-side-gaps-2026-04-29.md]): Sell→Buy short
+     round-trips are now extracted alongside Buy→Sell longs. The 33 long
+     round-trips remain unchanged; an additional 3 short round-trips appear
+     from the 2018-2020 bear-window short cascade activity (n_buys 39 /
+     n_sells 36 — the delta of 3 was the unpaired-but-now-paired set). *)
+  assert_that (List.length round_trips) (equal_to 36);
   assert_that stats
     (is_some_and
        (all_of
           [
-            field (fun s -> s.Metrics.win_count) (equal_to 16);
-            field (fun s -> s.Metrics.loss_count) (equal_to 17);
+            field (fun s -> s.Metrics.win_count) (equal_to 17);
+            field (fun s -> s.Metrics.loss_count) (equal_to 19);
           ]));
   (* Final value pinned within ±$3K of the captured post-3.2 value
      ($506,694.70). Tight band catches drift in the screener cascade or

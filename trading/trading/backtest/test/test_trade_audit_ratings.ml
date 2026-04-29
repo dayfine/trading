@@ -88,12 +88,14 @@ let make_exit ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
 let make_record ?(exit_ = Some (make_exit ())) entry : TA.audit_record =
   { entry; exit_ }
 
-let make_trade ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
-    ?(exit_date = _date "2024-04-20") ?(days_held = 96) ?(entry_price = 100.0)
-    ?(exit_price = 95.0) ?(quantity = 100.0) ?(pnl_dollars = -500.0)
-    ?(pnl_percent = -5.0) () : Trading_simulation.Metrics.trade_metrics =
+let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
+    ?(entry_date = _date "2024-01-15") ?(exit_date = _date "2024-04-20")
+    ?(days_held = 96) ?(entry_price = 100.0) ?(exit_price = 95.0)
+    ?(quantity = 100.0) ?(pnl_dollars = -500.0) ?(pnl_percent = -5.0) () :
+    Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
+    side;
     entry_date;
     exit_date;
     days_held;

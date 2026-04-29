@@ -45,33 +45,81 @@ let _load_summary_sexp ~output_dir : _summary_sexp_shape =
     failwithf "Missing summary.sexp at %s" path ();
   _summary_sexp_shape_of_sexp (Sexp.load_sexp path)
 
-(** Parse one trades.csv line. Format set by [Backtest.Result_writer]:
-    [symbol,entry_date,exit_date,days_held,entry_price,exit_price,quantity,
-     pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger]. Columns after
-    [pnl_percent] are read but discarded — the renderer only consumes the first
-    9. *)
-let _parse_trade_row line : Trading_simulation.Metrics.trade_metrics option =
-  match String.split line ~on:',' with
-  | symbol :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
-    :: quantity :: pnl_dollars :: pnl_percent :: _stop_fields -> (
-      try
-        Some
-          {
-            symbol;
-            entry_date = Date.of_string entry_date;
-            exit_date = Date.of_string exit_date;
-            days_held = Int.of_string days_held;
-            entry_price = Float.of_string entry_price;
-            exit_price = Float.of_string exit_price;
-            quantity = Float.of_string quantity;
-            pnl_dollars = Float.of_string pnl_dollars;
-            pnl_percent = Float.of_string pnl_percent;
-          }
-      with exn ->
-        eprintf "optimal_strategy: skipping malformed trade row (%s)\n%!"
-          (Exn.to_string exn);
-        None)
+(** Parse the [side] column. [Backtest.Result_writer] emits [LONG] for a
+    Buy→Sell round-trip and [SHORT] for a Sell→Buy round-trip. The
+    [trade_metrics.side] field stores the entry-leg side, so [LONG]→[Buy] and
+    [SHORT]→[Sell]. Any unknown label falls back to [Buy] to keep parsing
+    permissive against pre-G2 trades.csv files that omit the column. *)
+let _parse_side = function
+  | "LONG" -> Trading_base.Types.Buy
+  | "SHORT" -> Trading_base.Types.Sell
+  | _ -> Trading_base.Types.Buy
+
+(** Build a [trade_metrics] from already-parsed string cells. Common builder
+    shared by the post-G2 [(symbol, side, …)] layout and the legacy
+    [(symbol, …)] layout, so adding new columns in one place doesn't require
+    chasing two parser branches. *)
+let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
+    ~entry_price ~exit_price ~quantity ~pnl_dollars ~pnl_percent :
+    Trading_simulation.Metrics.trade_metrics =
+  {
+    symbol;
+    side = _parse_side side;
+    entry_date = Date.of_string entry_date;
+    exit_date = Date.of_string exit_date;
+    days_held = Int.of_string days_held;
+    entry_price = Float.of_string entry_price;
+    exit_price = Float.of_string exit_price;
+    quantity = Float.of_string quantity;
+    pnl_dollars = Float.of_string pnl_dollars;
+    pnl_percent = Float.of_string pnl_percent;
+  }
+
+(** Match a post-G2 row layout ([symbol,side,…] with [side] = [LONG]/[SHORT]).
+    Returns [None] when [cells] doesn't have the post-G2 column count or the
+    second cell isn't a valid side tag. *)
+let _match_post_g2_row cells : Trading_simulation.Metrics.trade_metrics option =
+  match cells with
+  | symbol
+    :: ("LONG" as side)
+    :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
+    :: quantity :: pnl_dollars :: pnl_percent :: _stop_fields
+  | symbol
+    :: ("SHORT" as side)
+    :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
+    :: quantity :: pnl_dollars :: pnl_percent :: _stop_fields ->
+      Some
+        (_trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date
+           ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
+           ~pnl_percent)
   | _ -> None
+
+(** Match a legacy (pre-G2) row layout: [symbol,entry_date,…]. Defaults [side]
+    to [Buy] preserving the historical long-only semantics. *)
+let _match_legacy_row cells : Trading_simulation.Metrics.trade_metrics option =
+  match cells with
+  | symbol :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
+    :: quantity :: pnl_dollars :: pnl_percent :: _stop_fields ->
+      Some
+        (_trade_metrics_of_strings ~symbol ~side:"LONG" ~entry_date ~exit_date
+           ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
+           ~pnl_percent)
+  | _ -> None
+
+(** Parse one trades.csv line. Tolerates the post-G2 [(symbol,side,…)] layout
+    and the legacy [(symbol,…)] layout — see {!_match_post_g2_row} and
+    {!_match_legacy_row}. Conversion exceptions surface as a warning + [None].
+*)
+let _parse_trade_row line : Trading_simulation.Metrics.trade_metrics option =
+  let cells = String.split line ~on:',' in
+  try
+    match _match_post_g2_row cells with
+    | Some _ as t -> t
+    | None -> _match_legacy_row cells
+  with exn ->
+    eprintf "optimal_strategy: skipping malformed trade row (%s)\n%!"
+      (Exn.to_string exn);
+    None
 
 let _load_trades ~output_dir : Trading_simulation.Metrics.trade_metrics list =
   let path = Filename.concat output_dir "trades.csv" in
