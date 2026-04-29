@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/difan/Projects/trading-1/dev/scripts/sweep_stale_worktrees.sh --threshold-percent 85 --stale-hours 24"
+          }
+        ]
+      }
+    ]
+  }
+}
