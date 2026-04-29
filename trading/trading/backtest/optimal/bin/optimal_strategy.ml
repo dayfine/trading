@@ -145,7 +145,10 @@ let _parse_trade_row line : Trading_simulation.Metrics.trade_metrics option =
             pnl_dollars = Float.of_string pnl_dollars;
             pnl_percent = Float.of_string pnl_percent;
           }
-      with _ -> None)
+      with exn ->
+        eprintf "optimal_strategy: skipping malformed trade row (%s)\n%!"
+          (Exn.to_string exn);
+        None)
   | _ -> None
 
 let _load_trades ~output_dir : Trading_simulation.Metrics.trade_metrics list =
@@ -182,7 +185,10 @@ let _load_cascade_rejections ~output_dir : (string * string) list =
                   (Backtest.Trade_audit.sexp_of_skip_reason alt.reason_skipped)
               in
               (alt.symbol, reason)))
-    with _ -> []
+    with exn ->
+      eprintf "optimal_strategy: failed to read trade_audit.sexp (%s)\n%!"
+        (Exn.to_string exn);
+      []
 
 (* ---------------------------------------------------------------- *)
 (* Panel construction (cribbed from Panel_runner)                     *)
@@ -420,13 +426,16 @@ let _build_actual_run ~output_dir : Report.actual_run =
     cascade_rejections;
   }
 
-let main ~output_dir =
-  eprintf "optimal_strategy: reading artefacts from %s\n%!" output_dir;
-  let actual_run = _build_actual_run ~output_dir in
-  eprintf "optimal_strategy: actual run %s..%s, universe=%d\n%!"
-    (Date.to_string actual_run.start_date)
-    (Date.to_string actual_run.end_date)
-    actual_run.universe_size;
+type pipeline_world = {
+  bar_panels : Bar_panels.t;
+  sector_ctx_map : (string, Screener.sector_context) Hashtbl.t;
+  fridays : Date.t list;
+  universe : string list;
+}
+(** Loaded panels + per-symbol sector context + Friday calendar over the run
+    window. Built once per invocation, consumed by scan + score. *)
+
+let _build_world ~(actual_run : Report.actual_run) : pipeline_world =
   let data_dir_fpath = Data_path.default_data_dir () in
   let sectors_tbl = Sector_map.load ~data_dir:data_dir_fpath in
   let universe =
@@ -444,24 +453,33 @@ let main ~output_dir =
   let fridays =
     _fridays_in_range ~start:actual_run.start_date ~end_:actual_run.end_date
   in
-  eprintf "optimal_strategy: scanning %d Fridays\n%!" (List.length fridays);
+  { bar_panels; sector_ctx_map; fridays; universe }
+
+let _scan_and_score ~(world : pipeline_world) : OT.scored_candidate list =
+  eprintf "optimal_strategy: scanning %d Fridays\n%!"
+    (List.length world.fridays);
   let stock_config = Stock_analysis.default_config in
   let stage_config = stock_config.stage in
   let screener_config = Screener.default_config in
   let scanner_config = Scanner.config_of_screener_config screener_config in
   let scorer_config = Scorer.default_config in
   let candidates =
-    _scan_all_fridays ~bar_panels ~fridays ~universe ~sector_map:sector_ctx_map
-      ~stock_config ~scanner_config ~bar_lookback:_bar_lookback_weeks
+    _scan_all_fridays ~bar_panels:world.bar_panels ~fridays:world.fridays
+      ~universe:world.universe ~sector_map:world.sector_ctx_map ~stock_config
+      ~scanner_config ~bar_lookback:_bar_lookback_weeks
   in
   eprintf "optimal_strategy: %d candidates emitted; scoring...\n%!"
     (List.length candidates);
   let scored =
-    _score_all_candidates ~bar_panels ~all_fridays:fridays ~scorer_config
-      ~stage_config ~bar_lookback:_bar_lookback_weeks candidates
+    _score_all_candidates ~bar_panels:world.bar_panels
+      ~all_fridays:world.fridays ~scorer_config ~stage_config
+      ~bar_lookback:_bar_lookback_weeks candidates
   in
   eprintf "optimal_strategy: %d scored candidates; filling variants...\n%!"
     (List.length scored);
+  scored
+
+let _emit_report ~output_dir ~(actual_run : Report.actual_run) ~scored : unit =
   let filler_config = Filler.default_config in
   let constrained =
     _build_variant ~filler_config ~variant:OT.Constrained ~scored
@@ -478,6 +496,17 @@ let main ~output_dir =
   let out_path = Filename.concat output_dir "optimal_strategy.md" in
   Out_channel.write_all out_path ~data:md;
   eprintf "optimal_strategy: wrote %s\n%!" out_path
+
+let main ~output_dir =
+  eprintf "optimal_strategy: reading artefacts from %s\n%!" output_dir;
+  let actual_run = _build_actual_run ~output_dir in
+  eprintf "optimal_strategy: actual run %s..%s, universe=%d\n%!"
+    (Date.to_string actual_run.start_date)
+    (Date.to_string actual_run.end_date)
+    actual_run.universe_size;
+  let world = _build_world ~actual_run in
+  let scored = _scan_and_score ~world in
+  _emit_report ~output_dir ~actual_run ~scored
 
 let () =
   let { output_dir } = _parse_args () in
