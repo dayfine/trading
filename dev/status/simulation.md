@@ -1,9 +1,9 @@
 # Status: simulation
 
-## Last updated: 2026-04-28
+## Last updated: 2026-04-29
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)
@@ -52,32 +52,55 @@ The Weinstein work in eng-design-4 adds Weinstein-specific components **on top**
 
 All slices merged: Slice 1 (#196), Slice 2 (#237, #240, #241, #242), Slice 3 (#246).
 
-## In Progress
+### Split-day OHLC redesign — broker-model approach (2026-04-29)
 
-### Split-day OHLC redesign (broker-model approach, supersedes PR #641)
+Plan: `dev/plans/split-day-ohlc-redesign-2026-04-28.md`. Closes the open
+PR #641 band-aid trail; supersedes its `_split_adjust_bar` rescale in
+favour of a discrete event on the position ledger. Four PRs landed:
 
-Plan: `dev/plans/split-day-ohlc-redesign-2026-04-28.md`. Four-PR sequence
-landing the broker-model fix to phantom MtM drops on split days.
-
-- PR-1 (split-detector primitive) — MERGED 2026-04-28 as #658
-  (`trading/analysis/data/types/lib/split_detector.{ml,mli}`).
-- PR-2 (split-event ledger primitive) — MERGED 2026-04-28 as #662
-  (`trading/trading/portfolio/lib/split_event.{ml,mli}`).
-- PR-3 (wire detector + ledger into the simulator step) — IN_FLIGHT on
-  `feat/split-day-pr3`. Adds `Price_cache.get_previous_bar` /
+- **PR-1 — Split_detector primitive** (#658, MERGED 2026-04-28).
+  `trading/analysis/data/types/lib/split_detector.{ml,mli}`. Pure
+  function `detect_split ~prev ~curr` that compares raw vs adjusted
+  close ratios, snaps to small rationals, distinguishes splits from
+  dividends via a 5% threshold. Configurable tolerances. 5 fixtures
+  (AAPL 4:1, reverse 1:5, dividend, quiet, 3:2 boundary).
+- **PR-2 — Split_event ledger primitive** (#662, MERGED 2026-04-28).
+  `trading/trading/portfolio/lib/split_event.{ml,mli}` — built
+  alongside `Portfolio` per CLAUDE.md. `apply_to_position` quadruples
+  quantity / quarters cost-basis-per-share on 4:1; total cost basis
+  preserved. `apply_to_portfolio` no-ops when symbol not held. 4
+  fixtures (forward 4:1, reverse 1:5, no-op, 3:2 fractional).
+- **PR-3 — wire detector + ledger into `Simulator.step`** (#664, MERGED
+  2026-04-29). Adds `Price_cache.get_previous_bar` /
   `Market_data_adapter.get_previous_bar`, a `splits_applied :
   Split_event.t list` field on `step_result`, and a
   `_detect_splits_for_held_positions` step in `Simulator.step` that
   fires before strategy invocation. `_to_price_bar`,
-  `_compute_portfolio_value`, `_make_get_price` are unchanged — bars
-  themselves are untouched, only the position ledger is adjusted on
-  splits. New regression test `test_split_day_mtm.ml` (3 cases: 4:1
-  continuity, no-split window unchanged, split day with no held
-  position). Existing pinned goldens (`test_weinstein_backtest`,
-  `test_panel_loader_parity`) bit-identical; verified locally.
-- PR-4 (sp500 + perf-tier3 verification + status updates) — pending PR-3.
+  `_compute_portfolio_value`, `_make_get_price` are unchanged — raw
+  OHLC flows everywhere, only the position ledger is adjusted on
+  splits. New `test_split_day_mtm.ml` (3/3 PASS): 4:1 continuity,
+  no-split window unchanged, split-day with no held position.
+- **PR-4 — verification + decisions promotion** (this PR, 2026-04-29).
+  `dune build && dune runtest` exit 0; `dune build @fmt` clean. Smoke
+  parity goldens bit-identical to pre-#641 main (`panel-golden-2019-full`
+  7 round-trips / 33.3% win, `tiered-loader-parity` 5 round-trips /
+  60.0% win). Decision promoted to `dev/decisions.md`. sp500-2019-2023
+  canonical baseline rerun deferred to local — GHA's 22-symbol fixture
+  cannot satisfy the 491-symbol universe (same data-availability
+  blocker that scoped the tier-4 release-gate to local). When a
+  maintainer runs the local sp500 baseline, MaxDD is expected to drop
+  from 97.69% to ~5% (the strategy's actual non-bug Stage-4 floor)
+  with trade count, return, and win rate roughly unchanged. Tracked
+  in `dev/notes/split-day-broker-model-verification-2026-04-29.md`
+  and the §Follow-up below.
 
-### Other in-flight
+  Verify: `dev/lib/run-in-env.sh dune runtest trading/simulation/test/`
+  (3/3 split_day_mtm PASS) + `dev/lib/run-in-env.sh
+  _build/default/trading/backtest/scenarios/scenario_runner.exe --dir
+  test_data/backtest_scenarios/smoke --fixtures-root
+  test_data/backtest_scenarios` (5/5 PASS).
+
+## In Progress
 
 - M5 (walk-forward backtest, parameter tuner) is next
 
@@ -86,6 +109,25 @@ landing the broker-model fix to phantom MtM drops on split days.
 
 ## Follow-up
 
+- **Local sp500 baseline rerun (deferred from PR-4 of split-day redesign)** —
+  capture post-PR-3 metrics on `goldens-sp500/sp500-2019-2023` against
+  the full 491-symbol universe. Cannot run in GHA (22-symbol fixture
+  insufficient). Reproduction shape:
+  ```sh
+  docker exec trading-1-dev bash -c '
+    cd /workspaces/trading-1/trading && eval $(opam env) &&
+    dune build trading/backtest/scenarios/scenario_runner.exe &&
+    _build/default/trading/backtest/scenarios/scenario_runner.exe \
+      --dir trading/test_data/backtest_scenarios/goldens-sp500 \
+      --fixtures-root trading/test_data/backtest_scenarios'
+  ```
+  Expected: trade count ≈ 134 (per
+  `dev/notes/sp500-2019-2023-baseline-canonical-2026-04-28.md`),
+  total return ≈ +71%, win rate ≈ 38%, MaxDD ~5% (down from 97.69%
+  phantom). Once captured, supersede the canonical baseline note and
+  re-pin `goldens-sp500/sp500-2019-2023.sexp` `expected` ranges
+  against the corrected MaxDD. Plan reference:
+  `dev/plans/split-day-ohlc-redesign-2026-04-28.md` §PR-4.
 - Volume dilution in weekly aggregation: a single high-volume daily breakout bar gets averaged with 4 normal-volume bars in the weekly sum, requiring unrealistically high `breakout_volume_mult` (8x daily) to achieve 2x weekly ratio. Consider enhancing `Synthetic_source.Breakout` to apply volume spike across multiple days of the breakout week.
 - Test does not yet assert on specific position symbols (AAPL open position) or PnL direction — trades are confirmed but position-level assertions deferred.
 - `TODO(simulation/price-cache-data-source)` — Remove tmpdir round-trip in strategy smoke tests once `Price_cache` accepts an injected `DATA_SOURCE` (follow-up to #218/#219). See `trading/weinstein/strategy/test/test_weinstein_strategy_smoke.ml`.
