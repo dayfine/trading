@@ -456,3 +456,48 @@ Verification:
 ## Verdict
 
 APPROVED
+
+---
+
+# Structural QC — optimal-strategy (PR-4 follow-up B: fuller renderer fixture tests)
+
+Date: 2026-04-29
+Reviewer: qc-structural
+Reviewed SHA: b6e4f819aecc4777333e615854da598a8116dfe6
+
+## Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | No formatting issues found. |
+| H2 | dune build | PASS | Build succeeds; new test code compiles cleanly. |
+| H3 | dune runtest | PASS | All tests pass, exit code 0. New module tests (3 additional cases in test_optimal_strategy_report.ml) pass with the 45 existing cases, 48 total. |
+| P1 | Functions ≤ 50 lines — covered by language-specific linter | PASS | Test helper functions are inline in the test file and conform to limits. |
+| P2 | No magic numbers — covered by language-specific linter | PASS | linter_magic_numbers.sh passes. Test fixtures use named constants. |
+| P3 | All configurable thresholds in config record | NA | Pure test PR; no new config needed. |
+| P4 | Public-symbol export hygiene | NA | No new production modules; test file only. |
+| P5 | Internal helpers prefixed per project convention | PASS | Test helpers use underscore prefix (`_has`, `_index_of`, `_make_actual_trade`, `_make_optimal_rt`, `_make_summary`, `_make_actual`, `_date`). |
+| P6 | Tests conform to `.claude/rules/test-patterns.md` | FAIL | `test_missed_trades_ordered_by_pnl_descending` contains two consecutive `assert_that` calls on the same logical value (lines 451–452), violating the "One assert_that per Value" rule. The two assertions should be composed using `all_of` or another matcher to form a single `assert_that` statement. |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | NA | No modifications to core modules; new tests only. |
+| A2 | No imports from `analysis/` into `trading/trading/` | NA | No new production code; test file uses existing imports. |
+| A3 | No unnecessary modifications to existing (non-feature) modules | FAIL | `dev/status/optimal-strategy.md` line 3 modified: `## Last updated: 2026-04-29 (PR-4 follow-up B)` violates the `status_file_integrity.sh` linter schema (line 98: regex must match `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`). The parenthetical suffix is not allowed. origin/main has the correct format `2026-04-29` with no text following the date. This is a structural violation of the schema. |
+
+## Verdict
+
+NEEDS_REWORK
+
+## NEEDS_REWORK Items
+
+### P6: Multiple assert_that on same logical value in test
+- Finding: `test_missed_trades_ordered_by_pnl_descending` (lines 451–452) contains two consecutive `assert_that` statements: `assert_that pos_big (lt (module Int_ord) pos_mid); assert_that pos_mid (lt (module Int_ord) pos_sml)`. These check a single ordering invariant (three positions in descending P&L order) and should be composed into one `assert_that` using matcher composition (e.g., `all_of` with nested assertions or a custom matcher).
+- Location: `trading/trading/backtest/optimal/test/test_optimal_strategy_report.ml`, lines 451–452
+- Authority: `.claude/rules/test-patterns.md` §"Core Rule: One assert_that per Value" — "Each value under test gets **one** `assert_that` call. Compose multiple checks into the matcher tree using `all_of`, `field`, `elements_are`, etc."
+- Required fix: Combine the two assertions into a single `assert_that` statement using `all_of` or a pattern-matching approach that expresses the three-position ordering in one assertion tree.
+- harness_gap: LINTER_CANDIDATE — a deterministic grep check for consecutive `assert_that` lines in test files (avoiding those inside let-bindings) could catch this pattern.
+
+### A3: Status file schema violation
+- Finding: `dev/status/optimal-strategy.md` line 3 contains `## Last updated: 2026-04-29 (PR-4 follow-up B)` which includes a parenthetical. The `status_file_integrity.sh` linter requires the format to match exactly `^[0-9]{4}-[0-9]{2}-[0-9]{2}$` (bare date, no suffix text). This is a structural schema violation that will cause the linter to report a violation.
+- Location: `dev/status/optimal-strategy.md`, line 3
+- Authority: `trading/devtools/checks/status_file_integrity.sh`, lines 98–99 (regex enforcement) and the schema definition on line 13: "`## Last updated: YYYY-MM-DD`"
+- Required fix: Remove the parenthetical text. Change line 3 to `## Last updated: 2026-04-29` (matching the format on origin/main before this PR).
+- harness_gap: LINTER_CANDIDATE — the existing `status_file_integrity.sh` linter is the enforcement mechanism; it correctly identifies the violation. This PR's edit introduced the violation by appending the parenthetical text.
