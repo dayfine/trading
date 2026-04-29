@@ -17,7 +17,7 @@
  (period ((start_date 2020-01-02) (end_date 2024-12-31)))
  (universe_path "universes/broad.sexp")
  (universe_size 1000)
- (config_overrides (((universe_cap 1000))))
+ (config_overrides (((universe_cap (1000)))))
  (expected
   ((total_return_pct   ((min -100.0)  (max 1000.0)))
    (total_trades       ((min 0)       (max 1000)))

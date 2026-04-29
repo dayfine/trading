@@ -21,7 +21,7 @@
  (period ((start_date 2014-01-02) (end_date 2023-12-29)))
  (universe_path "universes/broad.sexp")
  (universe_size 1000)
- (config_overrides (((universe_cap 1000))))
+ (config_overrides (((universe_cap (1000)))))
  (expected
   ((total_return_pct   ((min -100.0)  (max 2000.0)))
    (total_trades       ((min 0)       (max 2000)))
