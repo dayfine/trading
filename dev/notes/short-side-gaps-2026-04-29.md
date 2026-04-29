@@ -192,6 +192,20 @@ machinery failed to protect the trade.
 `trading/trading/backtest/lib/trade_audit.{ml,mli}`. Tests at
 `trading/trading/weinstein/portfolio_risk/test/`.
 
+**DONE — see PR `feat/force-liquidation`** (2026-04-29): defaults
+50% per-position unrealized-loss threshold + 40% portfolio-of-peak
+floor (configurable via `Portfolio_risk.config.force_liquidation`).
+New module `Portfolio_risk.Force_liquidation` (pure check + mutable
+`Peak_tracker`) plus `Weinstein_strategy.Force_liquidation_runner`
+wiring TriggerExit transitions and routing events through a new
+`Audit_recorder.record_force_liquidation` callback. Backtest-side:
+new `Force_liquidation_log.t` collector, `force_liquidations.sexp`
+artefact, and `trades.csv` exit-trigger column overrides
+(`force_liquidation_position` | `force_liquidation_portfolio`). Per-
+scenario count surfaces in the release-perf report's trading-metrics
+table with a non-zero red-flag glyph. Halt state in `Peak_tracker`
+suppresses new entries until macro flips off Bearish.
+
 ### G5 — Audit harness lacks a Weinstein-strategy-backed scenario
 
 `test_split_day_audit.ml` (now 14 scenarios after PR #681) uses

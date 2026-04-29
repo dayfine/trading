@@ -9,8 +9,8 @@ open Matchers
 
 let _make_actual ?(total_return_pct = 12.0) ?(total_trades = 39.0)
     ?(win_rate = 50.0) ?(sharpe_ratio = 0.58) ?(max_drawdown_pct = 13.77)
-    ?(avg_holding_days = 6.07) ?(unrealized_pnl = None) () :
-    Release_report.actual =
+    ?(avg_holding_days = 6.07) ?(unrealized_pnl = None)
+    ?(force_liquidations_count = 0) () : Release_report.actual =
   {
     total_return_pct;
     total_trades;
@@ -19,6 +19,7 @@ let _make_actual ?(total_return_pct = 12.0) ?(total_trades = 39.0)
     max_drawdown_pct;
     avg_holding_days;
     unrealized_pnl;
+    force_liquidations_count;
   }
 
 let _make_summary ?(start_date = Date.of_string "2023-01-02")
@@ -139,6 +140,7 @@ let test_render_trading_section_pinned _ =
         "| Max DD % | 14.00 | 15.00 | -6.7% |";
         "| Trades | 40.0 | 35.0 | +14.3% |";
         "| Avg hold (d) | 6.50 | 7.00 | -7.1% |";
+        "| Force-liq count | 0 | 0 | n/a |";
         "";
         "## Peak RSS (kB)";
         "";
@@ -251,6 +253,36 @@ let test_render_custom_threshold_suppresses_flag _ =
     (equal_to false);
   assert_that
     (String.is_substring md ~substring:"Regression flag: \xce\x94% > 50%")
+    (equal_to true)
+
+(* --- Render: force-liquidation count flagged when non-zero --- *)
+
+let test_render_flags_force_liquidations _ =
+  (* Non-zero force-liq counts on either side surface the rotating-light
+     glyph — this is the G4 risk-machinery red flag. *)
+  let cur =
+    _make_run ~name:"sp500-2019"
+      ~actual:(_make_actual ~force_liquidations_count:5 ())
+      ()
+  in
+  let prior =
+    _make_run ~name:"sp500-2019"
+      ~actual:(_make_actual ~force_liquidations_count:0 ())
+      ()
+  in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that
+    (String.is_substring md
+       ~substring:"| Force-liq count | 5 :rotating_light: | 0 |")
     (equal_to true)
 
 (* --- Render: empty pairing --- *)
@@ -964,6 +996,8 @@ let suite =
   >::: [
          "default_thresholds match plan" >:: test_default_thresholds_match_plan;
          "render trading section pinned" >:: test_render_trading_section_pinned;
+         "render flags force liquidations"
+         >:: test_render_flags_force_liquidations;
          "render flags rss regression" >:: test_render_flags_rss_regression;
          "render no flag within threshold"
          >:: test_render_no_flag_within_threshold;

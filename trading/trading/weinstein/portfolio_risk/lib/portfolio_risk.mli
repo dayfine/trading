@@ -20,6 +20,9 @@
     Does NOT modify the existing Portfolio module. Works alongside it by taking
     a snapshot of the portfolio state. *)
 
+module Force_liquidation = Force_liquidation
+(** Force-liquidation policy. See {!Force_liquidation}. *)
+
 (** {1 Portfolio Snapshot} *)
 
 type portfolio_snapshot = {
@@ -119,6 +122,10 @@ type config = {
           missing sector metadata from dominating the portfolio. *)
   big_winner_multiplier : float;
       (** Size multiplier for high-conviction trades (default: 1.5x) *)
+  force_liquidation : Force_liquidation.config;
+      [@sexp.default Force_liquidation.default_config]
+      (** Force-liquidation thresholds — see {!Force_liquidation}. Default: 50%
+          per-position loss, 40% portfolio-of-peak floor. *)
 }
 [@@deriving show, eq, sexp]
 (** All risk management parameters — nothing hardcoded. *)
@@ -132,7 +139,8 @@ val default_config : config
     - min_cash_pct = 0.10 (10%)
     - max_sector_concentration = 5
     - max_unknown_sector_positions = 2
-    - big_winner_multiplier = 1.5 *)
+    - big_winner_multiplier = 1.5
+    - force_liquidation = {!Force_liquidation.default_config} *)
 
 val compute_position_size :
   config:config ->

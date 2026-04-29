@@ -119,16 +119,19 @@ let _cascade_summary_of_event (e : AR.cascade_event) :
     entered = e.entered;
   }
 
-let of_collector (collector : Trade_audit.t) : AR.t =
+let of_collector ~(trade_audit : Trade_audit.t)
+    ~(force_liquidation_log : Force_liquidation_log.t) : AR.t =
   {
     record_entry =
       (fun event ->
-        Trade_audit.record_entry collector (_entry_decision_of_event event));
+        Trade_audit.record_entry trade_audit (_entry_decision_of_event event));
     record_exit =
       (fun event ->
-        Trade_audit.record_exit collector (_exit_decision_of_event event));
+        Trade_audit.record_exit trade_audit (_exit_decision_of_event event));
     record_cascade_summary =
       (fun event ->
-        Trade_audit.record_cascade_summary collector
+        Trade_audit.record_cascade_summary trade_audit
           (_cascade_summary_of_event event));
+    record_force_liquidation =
+      Force_liquidation_log.record force_liquidation_log;
   }

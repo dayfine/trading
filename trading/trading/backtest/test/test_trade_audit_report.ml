@@ -659,6 +659,7 @@ let _make_runner_result ~start_date ~end_date ~round_trips :
     stop_infos = [];
     audit = [];
     cascade_summaries = [];
+    force_liquidations = [];
   }
 
 let test_writer_reader_post_g2_round_trip _ =

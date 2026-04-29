@@ -8,6 +8,7 @@ type actual = {
   max_drawdown_pct : float;
   avg_holding_days : float;
   unrealized_pnl : float option; [@sexp.option]
+  force_liquidations_count : int; [@sexp.default 0]
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 
@@ -260,6 +261,9 @@ let _row_trading_metrics (cur, prior) =
       (_fmt_delta_pct
          (_delta_pct ~current:(get cur.actual) ~prior:(get prior.actual)))
   in
+  let force_liq_flag a =
+    if a.force_liquidations_count > 0 then " :rotating_light:" else ""
+  in
   [
     sprintf "### %s" cur.name;
     "";
@@ -276,6 +280,17 @@ let _row_trading_metrics (cur, prior) =
     row "Max DD %" _fmt_float_2 (fun a -> a.max_drawdown_pct);
     row "Trades" _fmt_float_1 (fun a -> a.total_trades);
     row "Avg hold (d)" _fmt_float_2 (fun a -> a.avg_holding_days);
+    (* G4 force-liquidation count. Non-zero on either side flags a primary
+       stop-machinery regression (red light glyph). *)
+    sprintf "| Force-liq count | %d%s | %d%s | %s |"
+      cur.actual.force_liquidations_count
+      (force_liq_flag cur.actual)
+      prior.actual.force_liquidations_count
+      (force_liq_flag prior.actual)
+      (_fmt_delta_pct
+         (_delta_pct
+            ~current:(Float.of_int cur.actual.force_liquidations_count)
+            ~prior:(Float.of_int prior.actual.force_liquidations_count)));
     "";
   ]
 

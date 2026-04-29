@@ -50,6 +50,9 @@ type actual = {
   max_drawdown_pct : float;
   avg_holding_days : float;
   unrealized_pnl : float;
+  force_liquidations_count : int; [@sexp.default 0]
+      (* G4 (force-liquidation policy). Defaults to 0 on read so pre-G4
+         actual.sexp files that don't carry the field still parse. *)
 }
 [@@deriving sexp]
 
@@ -66,6 +69,7 @@ let _actual_of_result (r : Backtest.Runner.result) =
     max_drawdown_pct = get MaxDrawdown;
     avg_holding_days = get AvgHoldingDays;
     unrealized_pnl = get UnrealizedPnl;
+    force_liquidations_count = List.length r.force_liquidations;
   }
 
 (* Range checking *)

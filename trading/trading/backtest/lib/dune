@@ -12,6 +12,7 @@
   trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
+  weinstein_trading.portfolio_risk
   weinstein.macro
   weinstein.resistance
   weinstein.rs

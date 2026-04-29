@@ -3,6 +3,7 @@
   test_ad_bars_unicorn
   test_ad_bars_compose
   test_ad_bars_weekly_e2e
+  test_force_liquidation_runner
   test_macro_inputs
   test_macro_panel_callbacks_real_data
   test_panel_callbacks

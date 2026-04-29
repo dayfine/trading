@@ -34,6 +34,13 @@ type result = {
           field records the per-cascade-phase activity for every Friday,
           including those where the cascade filtered everything. Persisted
           alongside [audit] in [trade_audit.sexp] when either is non-empty. *)
+  force_liquidations : Portfolio_risk.Force_liquidation.event list;
+      (** Per-position force-liquidation events recorded by the strategy (G4 —
+          see [dev/notes/short-side-gaps-2026-04-29.md]). Empty when no forced
+          close fired during the run. When non-empty, [Result_writer.write]
+          persists it as [force_liquidations.sexp]. Each event is evidence the
+          primary stop machinery failed to protect a trade — non-zero counts on
+          a release run flag a regression. *)
 }
 
 val is_trading_day :

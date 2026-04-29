@@ -197,7 +197,10 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     (List.length _default_specs);
   let stop_log = Stop_log.create () in
   let trade_audit = Trade_audit.create () in
-  let audit_recorder = Trade_audit_recorder.of_collector trade_audit in
+  let force_liquidation_log = Force_liquidation_log.create () in
+  let audit_recorder =
+    Trade_audit_recorder.of_collector ~trade_audit ~force_liquidation_log
+  in
   let n_all_symbols = List.length input.all_symbols in
   let sim =
     _make_simulator input ~stop_log ~audit_recorder ~start_date ~end_date
@@ -208,4 +211,4 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
         _run_simulator_with_gc_trace ?gc_trace sim)
   in
-  (sim_result, stop_log, trade_audit)
+  (sim_result, stop_log, trade_audit, force_liquidation_log)

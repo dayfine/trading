@@ -49,6 +49,12 @@ module Stops_split_runner = Stops_split_runner
     stay in lockstep with the broker-side share-count rescale on a
     corporate-action split. See {!Stops_split_runner}. *)
 
+module Force_liquidation_runner = Force_liquidation_runner
+(** Force-liquidation policy runner. Invoked at the bottom of [on_market_close]
+    after {!Stops_runner.update} — defense in depth beyond stops. Closes G4 from
+    [dev/notes/short-side-gaps-2026-04-29.md]. See {!Force_liquidation_runner}.
+*)
+
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
     canonical {!Macro_inputs.spdr_sector_etfs} and
