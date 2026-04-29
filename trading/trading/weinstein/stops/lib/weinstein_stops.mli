@@ -19,6 +19,11 @@ module Support_floor = Support_floor
     longs, counter-rally high for shorts. Feeds the [reference_level] argument
     to {!compute_initial_stop}. See the module doc for algorithm details. *)
 
+module Stop_split_adjust = Stop_split_adjust
+(** Apply a stock-split factor to a {!stop_state}. Used by the strategy to keep
+    absolute stop prices in lockstep with the broker-side share-count rescale on
+    a corporate-action split. See the module doc for the contract. *)
+
 (** {1 Core Functions} *)
 
 val compute_initial_stop :

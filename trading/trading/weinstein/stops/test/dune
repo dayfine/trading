@@ -3,6 +3,7 @@
   test_weinstein_stops
   regression_test
   test_support_floor
+  test_stop_split_adjust
   test_weinstein_stops_callbacks_parity)
  (libraries
   weinstein_trading.stops

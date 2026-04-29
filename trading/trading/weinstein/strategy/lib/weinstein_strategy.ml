@@ -6,6 +6,7 @@ open Core
 open Trading_strategy
 module Bar_reader = Bar_reader
 module Stops_runner = Stops_runner
+module Stops_split_runner = Stops_split_runner
 
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. Exposed as a top-level submodule
@@ -374,6 +375,12 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
     | Some bar -> bar.Types.Daily_price.date
     | None -> Date.today ~zone:Time_float.Zone.utc
   in
+  (* Rescale stop_states for any held symbol that just split. Runs BEFORE
+     Stops_runner.update so the state machine sees post-split-comparable
+     stop levels. No-ops on non-split days and on positions without a
+     [stop_states] entry. See [Stops_split_runner] for the full contract. *)
+  Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
+    ~as_of:current_date;
   let exit_transitions, adjust_transitions =
     Stops_runner.update
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
