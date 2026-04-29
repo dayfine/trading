@@ -1,6 +1,6 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-29 (PR-4 follow-up B)
+## Last updated: 2026-04-29
 
 ## Status
 READY_FOR_REVIEW
