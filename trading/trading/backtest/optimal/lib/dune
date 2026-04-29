@@ -2,13 +2,17 @@
  (name backtest_optimal)
  (libraries
   core
+  core_unix.sys_unix
   trading.base
+  trading.data_panel
   trading.simulation
   types
+  weinstein.data_source
   weinstein.screener
   weinstein.stage
   weinstein.stock_analysis
   weinstein.types
-  weinstein_trading.stops)
+  weinstein_trading.stops
+  backtest)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
