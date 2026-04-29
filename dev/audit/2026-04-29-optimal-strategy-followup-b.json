@@ -1,0 +1,17 @@
+{
+  "date": "2026-04-29",
+  "feature": "optimal-strategy-followup-b",
+  "branch": "feat/optimal-strategy-pr4-followup-b",
+  "structural_qc": "NEEDS_REWORK",
+  "behavioral_qc": "SKIPPED",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 0,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 2,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "PR #670 (PR-4 follow-up B) reviewed by qc-structural with two real findings: P6 (two consecutive assert_thats on related ordering invariants in test_missed_trades_ordered_by_pnl_descending) and A3 (status-file Last updated parenthetical violates schema). Behavioral QC skipped — pure-test PR with all S*/L*/C*/T* rows NA, plus PR was merged at 13:03:59Z by maintainer dayfine while QC was in flight, so the rework loop became moot. Orchestrator opened post-merge fix PR #673 (fix/optimal-strategy-pr4-followup-b-review) addressing both findings; build+runtest+fmt all exit 0 on the fix tip. Quality score 0 reflects the unaddressed-pre-merge state; once #673 merges the effective state is clean. Recurring orchestrator-merge-race pattern: re-evaluate whether QC should run before maintainer merges or whether mid-flight merge is acceptable."
+}
