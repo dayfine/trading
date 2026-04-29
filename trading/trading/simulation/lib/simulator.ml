@@ -369,8 +369,8 @@ let _apply_splits_to_positions
     Trading_strategy.Position.t String.Map.t =
   List.fold events ~init:positions ~f:(fun acc event ->
       Map.map acc ~f:(fun pos ->
-          if String.equal pos.Trading_strategy.Position.symbol event.symbol
-          then _apply_split_to_position event.factor pos
+          if String.equal pos.Trading_strategy.Position.symbol event.symbol then
+            _apply_split_to_position event.factor pos
           else pos))
 
 let step t =

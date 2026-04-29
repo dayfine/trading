@@ -2,60 +2,57 @@
     consistency.
 
     Background. PR-3 of the broker-model split redesign (#664) wired
-    [Simulator._detect_splits_for_held_positions] +
-    [_apply_split_events] into the daily step. On a split day the held
-    [Trading_portfolio.Portfolio.t]'s lots are rescaled (×factor), keeping
-    [_compute_portfolio_value] continuous. Verified by [test_split_day_mtm.ml]
-    (3/3 PASS).
+    [Simulator._detect_splits_for_held_positions] + [_apply_split_events] into
+    the daily step. On a split day the held [Trading_portfolio.Portfolio.t]'s
+    lots are rescaled (×factor), keeping [_compute_portfolio_value] continuous.
+    Verified by [test_split_day_mtm.ml] (3/3 PASS).
 
-    What PR-3 missed. The simulator only adjusts the {b broker portfolio
-    ledger}; it does {b not} adjust the strategy-side [Position.t] map
-    ([t.positions : Position.t Core.String.Map.t]). After a 4:1 split on
-    a held long:
+    What PR-3 missed. The simulator only adjusts the
+    {b broker portfolio ledger}; it does {b not} adjust the strategy-side
+    [Position.t] map ([t.positions : Position.t Core.String.Map.t]). After a 4:1
+    split on a held long:
 
     - [Trading_portfolio.Portfolio.positions] reflects the post-split lot
       quantity (e.g. 400 shares; total cost basis preserved at $50K).
-    - [Position.t] still carries the pre-split [Holding.quantity = 100]
-      and pre-split [entry_price = $500].
+    - [Position.t] still carries the pre-split [Holding.quantity = 100] and
+      pre-split [entry_price = $500].
     - The strategy reads its [Portfolio_view.positions] (built from
       [t.positions]) and sees 100 shares; the broker actually holds 400.
 
     Surface — exit on a post-split bar. When a strategy emits [TriggerExit]
     after a split day, [Position.apply_transition] reads the stale
     [Holding.quantity = 100] and produces an [Exiting { quantity = 100; ... }]
-    state. [Order_generator] reads that quantity and builds a market sell
-    for 100 shares. The engine fills 100 shares against a 400-share broker
-    position. The strategy's [Position] transitions to [Closed], so it will
-    {b never} attempt to sell the remaining 300 shares — they are orphaned
-    in the broker ledger. On a long-only universe run the cumulative
-    bookkeeping drift across many split-day events drives portfolio value
-    arbitrarily off the rails (negative on the sp500-2019-2023 baseline
-    rerun reported in the dispatch).
+    state. [Order_generator] reads that quantity and builds a market sell for
+    100 shares. The engine fills 100 shares against a 400-share broker position.
+    The strategy's [Position] transitions to [Closed], so it will {b never}
+    attempt to sell the remaining 300 shares — they are orphaned in the broker
+    ledger. On a long-only universe run the cumulative bookkeeping drift across
+    many split-day events drives portfolio value arbitrarily off the rails
+    (negative on the sp500-2019-2023 baseline rerun reported in the dispatch).
 
-    Test setup. Synthetic [TEST] symbol with 7 trading days. Days 1–4:
-    pre-split closes around $500; adjusted_close back-rolled to ~$125. Day 5:
-    4:1 forward split — raw close drops to $125, adjusted_close continuous.
-    Days 6–7: post-split flat. The custom [Buy_then_exit] strategy enters
-    100 shares on day 1, then emits [TriggerExit] on a post-split day
-    (parameterized).
+    Test setup. Synthetic [TEST] symbol with 7 trading days. Days 1–4: pre-split
+    closes around $500; adjusted_close back-rolled to ~$125. Day 5: 4:1 forward
+    split — raw close drops to $125, adjusted_close continuous. Days 6–7:
+    post-split flat. The custom [Buy_then_exit] strategy enters 100 shares on
+    day 1, then emits [TriggerExit] on a post-split day (parameterized).
 
     Assertions, all of which FAIL on current main and PASS after the fix:
 
-    - [test_post_split_exit_clears_position]: after the exit fully fills,
-      the broker portfolio's positions list is empty (no orphaned lots). On
-      current main only 100 of 400 shares clear; the broker still holds
-      300 orphan shares.
+    - [test_post_split_exit_clears_position]: after the exit fully fills, the
+      broker portfolio's positions list is empty (no orphaned lots). On current
+      main only 100 of 400 shares clear; the broker still holds 300 orphan
+      shares.
 
-    - [test_post_split_exit_no_orphan_equity]: at the last step, cash is
-      back to ~$100K (initial), reflecting full 400-share liquidation at
-      $125 against a per-share cost basis of $125 (zero realised P&L). On
-      current main, cash recovers to only $62.5K and the orphan equity
-      inflates [portfolio_value] to ~$100.6K (cash $62.5K + 300 × $127).
+    - [test_post_split_exit_no_orphan_equity]: at the last step, cash is back to
+      ~$100K (initial), reflecting full 400-share liquidation at $125 against a
+      per-share cost basis of $125 (zero realised P&L). On current main, cash
+      recovers to only $62.5K and the orphan equity inflates [portfolio_value]
+      to ~$100.6K (cash $62.5K + 300 × $127).
 
-    - [test_split_day_position_reflects_post_split]: on the split day's
-      step output, the strategy-side [Holding.quantity] for [TEST] is 400
-      (×4) and [Holding.entry_price] is $125 (÷4). On current main both
-      stay at the pre-split values. *)
+    - [test_split_day_position_reflects_post_split]: on the split day's step
+      output, the strategy-side [Holding.quantity] for [TEST] is 400 (×4) and
+      [Holding.entry_price] is $125 (÷4). On current main both stay at the
+      pre-split values. *)
 
 open OUnit2
 open Core
@@ -114,8 +111,8 @@ let _config =
 (** Two-phase strategy:
 
     - First call: emit [CreateEntering] for [target_quantity] shares at the
-      day's close. The simulator places + fills a market order on the next
-      bar; the position transitions to [Holding] when [EntryComplete] fires.
+      day's close. The simulator places + fills a market order on the next bar;
+      the position transitions to [Holding] when [EntryComplete] fires.
     - Subsequent calls: passive until [bar.date >= trigger_exit_on_or_after],
       then emit [TriggerExit] reading the {b live} [Holding] state from the
       [Portfolio_view.positions] map. The exit price is taken from the live
@@ -171,12 +168,12 @@ end) : Strategy_interface.STRATEGY = struct
 
   let on_market_close ~get_price ~get_indicator:_
       ~(portfolio : Trading_strategy.Portfolio_view.t) =
-    if not !entered then
+    if not !entered then (
       match get_price Cfg.symbol with
       | None -> Ok { Strategy_interface.transitions = [] }
       | Some bar ->
           entered := true;
-          Ok { Strategy_interface.transitions = [ _entry_transition ~bar ] }
+          Ok { Strategy_interface.transitions = [ _entry_transition ~bar ] })
     else if !exited then Ok { Strategy_interface.transitions = [] }
     else
       match get_price Cfg.symbol with
@@ -189,13 +186,8 @@ end) : Strategy_interface.STRATEGY = struct
               _exit_transition_opt ~positions:portfolio.positions
                 ~current_date:bar.date
             in
-            (match trans_opt with
-            | Some _ -> exited := true
-            | None -> ());
-            Ok
-              {
-                Strategy_interface.transitions = Option.to_list trans_opt;
-              }
+            (match trans_opt with Some _ -> exited := true | None -> ());
+            Ok { Strategy_interface.transitions = Option.to_list trans_opt }
 end
 
 (** Find the step on a specific date. Fail with diagnostic on miss. *)
@@ -251,15 +243,15 @@ let _run_split_exit_simulation ~trigger_exit_on =
     - Day 2 (01-03): order fills at open=$500. Broker: 100 shares, $50K cost
       basis, cash=$50K. Strategy: [Holding { quantity=100; entry_price=500 }].
     - Days 3–4: passive.
-    - Day 5 (01-08, split day): detector fires (factor=4). Broker:
-      400 shares, $50K cost basis (per-share $125), cash=$50K. {b POST-FIX}
-      strategy [Holding { quantity=400; entry_price=125 }]. {b PRE-FIX}
-      strategy stays at [{ quantity=100; entry_price=500 }].
+    - Day 5 (01-08, split day): detector fires (factor=4). Broker: 400 shares,
+      $50K cost basis (per-share $125), cash=$50K. {b POST-FIX} strategy
+      [Holding { quantity=400; entry_price=125 }]. {b PRE-FIX} strategy stays at
+      [{ quantity=100; entry_price=500 }].
     - Day 6 (01-09): strategy emits [TriggerExit] reading the live
       [Holding.quantity]. POST-FIX: 400. PRE-FIX: 100.
-    - Day 7 (01-10): exit order fills at open=$125. POST-FIX: 400 shares
-      sell, broker cash recovers to $100K, position closed. PRE-FIX: 100
-      shares sell, leaving 300 orphan shares.
+    - Day 7 (01-10): exit order fills at open=$125. POST-FIX: 400 shares sell,
+      broker cash recovers to $100K, position closed. PRE-FIX: 100 shares sell,
+      leaving 300 orphan shares.
 
     Pin: broker.positions is empty at the last step. *)
 let test_post_split_exit_clears_position _ =
@@ -273,11 +265,11 @@ let test_post_split_exit_clears_position _ =
 (* Test 2: realised cash + portfolio_value after exit are split-clean   *)
 (* ------------------------------------------------------------------ *)
 
-(** Cost basis of the original 100-share entry at $500 = $50,000 total.
-    After 4:1 split: 400 shares at $125 per share, total cost basis still
-    $50,000. Selling all 400 at the post-split open ($125) yields $0
-    realised P&L (commission is zero). Cash: $50K (after entry) + $50K
-    (from full exit) = $100K (= initial).
+(** Cost basis of the original 100-share entry at $500 = $50,000 total. After
+    4:1 split: 400 shares at $125 per share, total cost basis still $50,000.
+    Selling all 400 at the post-split open ($125) yields $0 realised P&L
+    (commission is zero). Cash: $50K (after entry) + $50K (from full exit) =
+    $100K (= initial).
 
     PRE-FIX: only 100 shares sell at $125 → $12,500 cash recovered →
     cash=$62,500. Plus 300 orphan shares × $127 (last close) = $38,100 of
@@ -307,24 +299,23 @@ let test_post_split_exit_no_orphan_equity _ =
 
 (** This pins the new behaviour added by the fix: on the split day, the
     strategy-side [Position.t] (read by the strategy via
-    [Portfolio_view.positions]) is split-adjusted in lockstep with the
-    broker portfolio. [Holding.quantity] becomes 400 (×4) and
-    [Holding.entry_price] becomes $125 (÷4). PRE-FIX both stay at 100 / $500.
+    [Portfolio_view.positions]) is split-adjusted in lockstep with the broker
+    portfolio. [Holding.quantity] becomes 400 (×4) and [Holding.entry_price]
+    becomes $125 (÷4). PRE-FIX both stay at 100 / $500.
 
     Assertion: read [Position.t] for symbol [TEST] from the {b post-fix}
-    [step_result.portfolio_view] equivalent. We don't expose the
-    [Position.t] map on [step_result] directly, so we observe the effect
-    indirectly: a lazy strategy that {e never} exits would leave the broker
-    with 400 shares at the last day. The post-split bar's broker quantity
-    is already pinned by [test_split_day_mtm.ml] to 400; this test pins
-    that the strategy-side exit (which reads [Holding.quantity]) clears
-    {b all} 400 shares — which is only possible if the strategy's
-    [Holding.quantity] is 400.
+    [step_result.portfolio_view] equivalent. We don't expose the [Position.t]
+    map on [step_result] directly, so we observe the effect indirectly: a lazy
+    strategy that {e never} exits would leave the broker with 400 shares at the
+    last day. The post-split bar's broker quantity is already pinned by
+    [test_split_day_mtm.ml] to 400; this test pins that the strategy-side exit
+    (which reads [Holding.quantity]) clears {b all} 400 shares — which is only
+    possible if the strategy's [Holding.quantity] is 400.
 
-    Concretely: when [trigger_exit_on_or_after] is the split day itself,
-    the strategy emits [TriggerExit] at the close of the split day (after
-    the simulator has applied the split), and the order fills the next bar.
-    Pin that the post-fill broker holds 0 shares. *)
+    Concretely: when [trigger_exit_on_or_after] is the split day itself, the
+    strategy emits [TriggerExit] at the close of the split day (after the
+    simulator has applied the split), and the order fills the next bar. Pin that
+    the post-fill broker holds 0 shares. *)
 let test_split_day_position_reflects_post_split _ =
   let result =
     _run_split_exit_simulation ~trigger_exit_on:(_date "2024-01-08")
