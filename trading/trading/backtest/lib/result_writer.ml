@@ -135,4 +135,5 @@ let write ~output_dir (result : Runner.result) =
     ~stop_infos:result.stop_infos;
   _write_equity_curve ~output_dir ~steps:result.steps;
   _write_trade_audit ~output_dir ~audit:result.audit
-    ~cascade_summaries:result.cascade_summaries
+    ~cascade_summaries:result.cascade_summaries;
+  Macro_trend_writer.write ~output_dir result.cascade_summaries

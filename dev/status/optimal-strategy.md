@@ -101,6 +101,24 @@ ready to start once PR-3 lands.
 - [ ] **PR-5** (optional): wire into `release_perf_report` so each
       scenario emits the counterfactual delta. ~200 LOC.
 
+### Macro-trend persistence (write/read split)
+
+- [x] **Write side**: per-Friday `macro_trend.sexp` artefact emitted by
+      `Backtest.Result_writer` on every backtest run. Sourced from
+      `Trade_audit.cascade_summary.{date,macro_trend}` (already populated
+      by the strategy's `Macro.analyze_with_callbacks` call inside
+      `_run_screen` — no plumbing changes needed). Module:
+      `trading/trading/backtest/lib/macro_trend_writer.{ml,mli}`. Verify:
+      `dev/lib/run-in-env.sh dune exec trading/backtest/test/test_macro_trend_writer.exe`.
+      Branch / PR: `feat/scenario-runner-macro-persistence` / TBD.
+- [ ] **Read side** (post-merge follow-up): `optimal_strategy.exe` (PR-4b
+      / #666) currently hardcodes `Weinstein_types.Neutral` for every
+      Friday because run artefacts didn't persist macro state — making
+      the `Constrained` and `Relaxed_macro` counterfactual variants
+      produce identical output. After this PR + PR-4b both merge, swap
+      the hardcode for `Macro_trend_writer.t_of_sexp (Sexp.load_sexp …)`.
+      ~30 LOC change in the bin.
+
 ## Ownership
 
 `feat-backtest` agent — sibling of backtest-infra, backtest-perf,
