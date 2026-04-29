@@ -52,6 +52,12 @@
     - Reads OHLCV CSVs and [sectors.csv] under [Data_path.default_data_dir ()]
       (overridable via [TRADING_DATA_DIR]).
     - Writes [output_dir/optimal_strategy.md] (the rendered report).
+    - Writes [output_dir/optimal_summary.sexp] via
+      {!Optimal_summary_artefact.write} — a structured record with both
+      [Constrained] and [Relaxed_macro] variants of
+      {!Optimal_types.optimal_summary}, for downstream consumers (e.g.
+      release_report) that want headline counterfactual metrics without parsing
+      markdown. See {!Optimal_summary_artefact} for the on-disk shape.
     - Writes progress messages to stderr. *)
 
 open Core
