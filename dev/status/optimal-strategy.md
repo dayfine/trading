@@ -1,20 +1,29 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-29 (PR-4c lib extraction)
+## Last updated: 2026-04-29
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-PR-1 (#652), PR-2 (#659), PR-3 (#663), PR-4 (#665), PR-4b (#666), and
-the macro-trend write side (#671) are all merged into `main`. PR-4c
-(`Optimal_strategy_runner` + `Optimal_run_artefacts` lib extraction
-from the bin) is open as `feat/optimal-strategy-runner-lib`. The
-~480-LOC bin shrinks to ~35 LOC of CLI-parse-and-dispatch and the full
-pipeline becomes directly unit-testable. PR-4 follow-up A (the
-deferred synthetic-panel smoke test) ships in this PR — two new
-OUnit2 cases under `test_optimal_strategy_runner.ml` exercise the full
-pipeline end-to-end against a tmpdir fixture and a one-symbol OHLCV
-fixture (with `TRADING_DATA_DIR` overriden to point at it).
+All planned phases shipped to `main`:
+
+- **PR-1** (#652) — `Optimal_types` + `Stage_transition_scanner`.
+- **PR-2** (#659) — `Outcome_scorer`.
+- **PR-3** (#663) — `Optimal_portfolio_filler` + `Optimal_summary`.
+- **PR-4** (#665) — `Optimal_strategy_report` markdown renderer.
+- **PR-4 follow-up B** (#670) — fuller renderer fixture tests.
+- **PR-4b** (#666) — `optimal_strategy.exe` binary scaffold.
+- **PR-4c** (#672) — pipeline lib extraction (`Optimal_strategy_runner`
+  + `Optimal_run_artefacts`); bin shrinks ~480 → ~35 LOC; PR-4 follow-up
+  A smoke test ships here.
+- **PR-5** (#677) — `release_perf_report` consumes per-scenario
+  `optimal_summary.sexp`, renders Δ-to-optimal column + link to
+  `optimal_strategy.md`.
+- **Macro-trend write side** (#671) — per-Friday `macro_trend.sexp`
+  artefact emitted by `Backtest.Macro_trend_writer`.
+- **Macro-trend read side** (#676) — runner consumes the artefact;
+  `Constrained` and `Relaxed_macro` variants now diverge on
+  Bearish-macro Fridays.
 
 ## Goal
 
@@ -89,8 +98,9 @@ ready to start once PR-3 lands.
       `feat/optimal-strategy-pr3`. ~1,073 LOC including tests
       (interface ~145, implementation ~315, tests ~575). 15 OUnit2
       cases (10 filler + 5 summary), all passing.
-- [~] **PR-4**: `Optimal_strategy_report` markdown renderer + smoke
-      tests landing on `feat/optimal-strategy-pr4`. Renderer ~538 LOC
+- [x] **PR-4**: `Optimal_strategy_report` markdown renderer + smoke
+      tests on `feat/optimal-strategy-pr4` — PR #665 (merged 2026-04-29).
+      Renderer ~538 LOC
       lib (already over the original 400-LOC plan estimate), 8 OUnit2
       smoke tests on the renderer (section presence, headline-3-variants,
       missed-trade-with-rejection-reason, three implications branches,
@@ -108,12 +118,13 @@ ready to start once PR-3 lands.
       symbols / sizes / R-multiples in the divergence section, the
       missed-trades descending-by-P&L ordering, and the no-divergence
       sentinel. 45 → 48 tests pass. PR #670 (merged 2026-04-29).
-- [~] **PR-4c**: lib extraction. Move pipeline orchestration code from
-      `bin/optimal_strategy.ml` into `lib/optimal_strategy_runner.ml`
-      \+ `lib/optimal_run_artefacts.ml`; bin shrinks from ~480 LOC to
-      ~35 LOC. Lands the deferred synthetic-panel smoke test (2 new
-      OUnit2 cases) which is now possible because the entry point is a
-      lib function. Branch `feat/optimal-strategy-runner-lib` / PR #672.
+- [x] **PR-4c**: lib extraction (merged 2026-04-29 as #672). Pipeline
+      orchestration code moved from `bin/optimal_strategy.ml` into
+      `lib/optimal_strategy_runner.ml` \+ `lib/optimal_run_artefacts.ml`;
+      bin shrinks from ~480 LOC to ~35 LOC. Landed the deferred
+      synthetic-panel smoke test (2 new OUnit2 cases) which is now
+      possible because the entry point is a lib function. Branch
+      `feat/optimal-strategy-runner-lib` / PR #672.
       Verify: `dev/lib/run-in-env.sh dune runtest
       trading/backtest/optimal/` (47/47 pass: 45 prior + 2 new smoke
       tests). Unblocks the macro-persistence read-side wiring (a clean
