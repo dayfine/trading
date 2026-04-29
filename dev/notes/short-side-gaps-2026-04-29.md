@@ -206,6 +206,24 @@ scenario count surfaces in the release-perf report's trading-metrics
 table with a non-zero red-flag glyph. Halt state in `Peak_tracker`
 suppresses new entries until macro flips off Bearish.
 
+**REWORK DONE (2026-04-29, second commit on PR #695)**: applied
+qc-behavioral findings B1–B3.
+- **B1 (load-bearing)**: halt-resume bug fixed by splitting
+  `_run_screen` into `_run_macro_only` + `_run_screen_after_macro` and
+  running the macro pass + `_maybe_reset_halt` on every Friday
+  including halted Fridays. Pre-fix the halt latched permanently
+  because `prior_macro` never refreshed after the floor fired.
+- **B2**: end-to-end `trades.csv` exit-trigger pinning via new
+  `test_result_writer.ml` (3 tests covering both labels + non-match).
+- **B3**: defensive guards pinned — zero cost-basis, zero quantity,
+  non-Holding position, missing price, double-exit avoidance (5 new
+  tests across `test_force_liquidation.ml` and
+  `test_force_liquidation_runner.ml`).
+- Test seam: new `Weinstein_strategy.Internal_for_test` exposing
+  `on_market_close` / `maybe_reset_halt` / `positions_minus_exited`
+  for direct strategy-level testing without going through `make`'s
+  closure.
+
 ### G5 — Audit harness lacks a Weinstein-strategy-backed scenario
 
 `test_split_day_audit.ml` (now 14 scenarios after PR #681) uses
