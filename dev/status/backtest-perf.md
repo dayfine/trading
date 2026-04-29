@@ -186,6 +186,32 @@ mechanics + release-gate procedure.
 
 ## Completed
 
+- **goldens-broad long-only baselines pinned** (2026-04-29,
+  `feat/goldens-broad-long-only-baselines`). All four `goldens-broad/*.sexp`
+  cells (`bull-crash-2015-2020`, `covid-recovery-2020-2024`,
+  `six-year-2018-2023`, `decade-2014-2023`) now have `(enable_short_side
+  false)` in `config_overrides` (mirrors the sp500 mitigation in #682) and
+  tightened `expected` ranges replacing the prior BASELINE_PENDING wide
+  bounds. Per-cell metrics (run-1):
+  | Cell | Return | Trades | WinRate | MaxDD | RSS | Wall |
+  |---|---:|---:|---:|---:|---:|---:|
+  | bull-crash | +148.77 % | 91 | 39.56 % | 62.91 % | 1,650 MB | 2:33 |
+  | covid | +15.12 % | 149 | 20.81 % | 75.30 % | 1,693 MB | 2:50 |
+  | six-year | +35.34 % | 167 | 37.13 % | 74.86 % | 1,722 MB | 3:00 |
+  | decade | +1582.85 % | 145 | 40.69 % | 94.31 % | 1,956 MB | 4:31 |
+  Validation rerun: 4/4 PASS. **Determinism finding**: 3/4 cells are
+  bit-identical across reruns; **decade-2014-2023 is non-deterministic**
+  (run-1: 145 trades / +1582.85 % return; run-2: 135 trades / +1627.09 %
+  return — same Sharpe ~0.96, MaxDD ~94 %). Decade ranges are widened to
+  encompass both observed runs; source of variance (likely Hashtbl
+  iteration order on the longer 10y horizon) is a follow-up. Files:
+  `trading/test_data/backtest_scenarios/goldens-broad/{bull-crash-2015-2020,covid-recovery-2020-2024,six-year-2018-2023,decade-2014-2023}.sexp`,
+  `dev/notes/goldens-broad-long-only-baselines-2026-04-29.md`. Disclaimer:
+  these are LONG-ONLY baselines — when short-side gaps G1-G4 close
+  (`dev/notes/short-side-gaps-2026-04-29.md`), the
+  `enable_short_side false` override should be reverted and ranges
+  re-pinned against shorts-on numbers (same playbook as the sp500 cell).
+
 - **Split-day broker-model fix lands; sp500 phantom MaxDD bug resolved
   on the simulator side** (2026-04-29, PR-4 of split-day redesign).
   PR #658 (Split_detector), PR #662 (Split_event), PR #664 (Simulator
