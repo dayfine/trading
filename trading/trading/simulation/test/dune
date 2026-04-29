@@ -159,3 +159,19 @@
   types
   matchers
   simulation_test_helpers))
+
+(test
+ (name test_split_day_audit)
+ (modules test_split_day_audit)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
