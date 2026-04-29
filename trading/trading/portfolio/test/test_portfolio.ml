@@ -39,6 +39,7 @@ let test_create_portfolio _ accounting_method =
       trade_history = [];
       positions = [];
       accounting_method;
+      unrealized_pnl_per_position = [];
     }
   in
   assert_equal expected portfolio ~msg:"Portfolio should match expected state"
@@ -581,6 +582,172 @@ let test_fifo_multiple_partial_sells _ =
            (float_equal 116.666666666667)))
 
 (* ========================================================================== *)
+(* Soft cash-floor checks on shorts (G3 from short-side-gaps-2026-04-29.md)  *)
+(* ========================================================================== *)
+
+(* Effective cash floor =
+     current_cash + cash_change + sum(min(0, unrealized_pnl_per_position))
+   Sell entries (opening shorts) and Buy covers both go through this check.
+   Unrealized losses on open positions count as drag against the floor.
+   See [Portfolio.apply_single_trade] docstring. *)
+
+let test_short_entry_against_sufficient_cash _ accounting_method =
+  (* Empty portfolio with $10k cash; first short entry should succeed. *)
+  let portfolio = create ~accounting_method ~initial_cash:10_000.0 () in
+  let short_entry =
+    make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell ~quantity:100.0
+      ~price:50.0 ()
+  in
+  assert_that
+    (apply_single_trade portfolio short_entry)
+    (is_ok_and_holds
+       (all_of
+          [
+            (* Cash should rise by 100 * 50 = 5000 *)
+            field (fun p -> p.current_cash) (float_equal 15_000.0);
+            (* New short position should seed accumulator at 0.0 *)
+            field
+              (fun p -> p.unrealized_pnl_per_position)
+              (elements_are [ equal_to (("AAPL", 0.0) : string * float) ]);
+          ]))
+
+let test_short_cover_within_budget_succeeds _ accounting_method =
+  (* Open short, mark-to-market at a small adverse move, then cover. The
+     unrealized drag is counted, but cash-on-hand is enough to absorb it
+     plus the cover cash outflow. *)
+  let portfolio = create ~accounting_method ~initial_cash:10_000.0 () in
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell
+          ~quantity:100.0 ~price:50.0 ();
+      ]
+      ~error_msg:"Short entry should succeed"
+  in
+  (* Mark price at $60 → unrealized P&L = (60 - 50) * (-100) = -1000 *)
+  let portfolio = mark_to_market portfolio [ ("AAPL", 60.0) ] in
+  let cover =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
+      ~price:60.0 ()
+  in
+  assert_that
+    (apply_single_trade portfolio cover)
+    (is_ok_and_holds
+       (all_of
+          [
+            (* Cash: 10000 + 5000 - 6000 = 9000 *)
+            field (fun p -> p.current_cash) (float_equal 9_000.0);
+            (* Position closed → accumulator pruned *)
+            field (fun p -> p.unrealized_pnl_per_position) is_empty;
+          ]))
+
+let test_short_entry_rejected_when_unrealized_drag_exceeds_cash _
+    accounting_method =
+  (* Existing short with massive unrealized loss leaves no room for
+     a new short entry, even though Sell adds cash. *)
+  let portfolio = create ~accounting_method ~initial_cash:1_000.0 () in
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell
+          ~quantity:100.0 ~price:50.0 ();
+      ]
+      ~error_msg:"First short should succeed"
+  in
+  (* Cash now $6000. Mark AAPL at $200 → unrealized = (200 - 50) * -100 = -15000. *)
+  let portfolio = mark_to_market portfolio [ ("AAPL", 200.0) ] in
+  (* Effective floor before new short: 6000 + (-15000) = -9000 already.
+     A new Sell adds cash but not enough: 100 * 50 = 5000 → -4000. *)
+  let new_short =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"MSFT" ~side:Sell ~quantity:100.0
+      ~price:50.0 ()
+  in
+  assert_that (apply_single_trade portfolio new_short) is_error
+
+let test_sequence_of_shorts_hits_cumulative_floor _ accounting_method =
+  (* Walk through multiple shorts, mark-to-market between each, and confirm
+     a final entry fails once cumulative unrealized losses outpace cash. *)
+  let portfolio = create ~accounting_method ~initial_cash:2_000.0 () in
+  (* 1) Short A — succeeds, cash +1000 → 3000 *)
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"A" ~side:Sell
+          ~quantity:100.0 ~price:10.0 ();
+      ]
+      ~error_msg:"Short A should succeed"
+  in
+  (* Mark A @ $30 → unrealized = -2000. Effective floor: 3000 - 2000 = 1000. *)
+  let portfolio = mark_to_market portfolio [ ("A", 30.0) ] in
+  (* 2) Short B — succeeds (effective floor 1000 + 500 = 1500). *)
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t2" ~order_id:"o2" ~symbol:"B" ~side:Sell
+          ~quantity:100.0 ~price:5.0 ();
+      ]
+      ~error_msg:"Short B should succeed"
+  in
+  (* Cash 3500. Mark A @ $30 still, mark B @ $40 → A: -2000, B: -3500.
+     Sum of negatives = -5500. Effective floor: 3500 - 5500 = -2000. *)
+  let portfolio = mark_to_market portfolio [ ("A", 30.0); ("B", 40.0) ] in
+  (* 3) A new short, even bringing cash, can't escape the floor.
+     Try Short C @ $1, qty 100 → cash_change +100. Effective:
+     3500 + 100 - 5500 = -1900 < 0 → ERROR. *)
+  let final_short =
+    make_trade ~id:"t3" ~order_id:"o3" ~symbol:"C" ~side:Sell ~quantity:100.0
+      ~price:1.0 ()
+  in
+  assert_that (apply_single_trade portfolio final_short) is_error
+
+let test_mark_to_market_drops_positions_without_price _ accounting_method =
+  (* mark_to_market wipes the accumulator and rebuilds only from supplied
+     prices — symbols with no price feed do NOT carry forward stale
+     unrealized values. *)
+  let portfolio = create ~accounting_method ~initial_cash:10_000.0 () in
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell
+          ~quantity:100.0 ~price:50.0 ();
+        make_trade ~id:"t2" ~order_id:"o2" ~symbol:"MSFT" ~side:Sell
+          ~quantity:50.0 ~price:100.0 ();
+      ]
+      ~error_msg:"Shorts should succeed"
+  in
+  let portfolio =
+    mark_to_market portfolio [ ("AAPL", 60.0); ("MSFT", 110.0) ]
+  in
+  (* Now mark only AAPL — MSFT should be dropped. *)
+  let portfolio = mark_to_market portfolio [ ("AAPL", 70.0) ] in
+  assert_that portfolio.unrealized_pnl_per_position
+    (elements_are [ equal_to (("AAPL", -2000.0) : string * float) ])
+
+let test_positive_unrealized_pnl_does_not_inflate_floor _ accounting_method =
+  (* Profitable shorts reduce neither the floor nor (importantly) inflate
+     it. The drag term clamps positive PnL to 0. *)
+  let portfolio = create ~accounting_method ~initial_cash:1_000.0 () in
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell
+          ~quantity:100.0 ~price:50.0 ();
+      ]
+      ~error_msg:"Short should succeed"
+  in
+  (* Mark AAPL @ $40 → short profitable, unrealized = +1000. *)
+  let portfolio = mark_to_market portfolio [ ("AAPL", 40.0) ] in
+  (* Try to spend more than cash; profitable unrealized P&L MUST NOT
+     extend the floor. Cash is 6000 (1000 + 5000 from short).
+     Buy MSFT at 100*60 = 6500 → cash_change -6500.
+     Effective = 6000 - 6500 + 0 = -500 < 0 → ERROR. *)
+  let oversized_buy =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"MSFT" ~side:Buy ~quantity:100.0
+      ~price:65.0 ()
+  in
+  assert_that (apply_single_trade portfolio oversized_buy) is_error
+
+(* ========================================================================== *)
 (* Test suite organization                                                   *)
 (* ========================================================================== *)
 
@@ -615,6 +782,22 @@ let suite =
              test_complete_offset_and_reversal;
            make_parameterized_tests "realized_pnl_calculation"
              test_realized_pnl_calculation;
+           (* Soft cash-floor on shorts (G3) *)
+           make_parameterized_tests "short_entry_against_sufficient_cash"
+             test_short_entry_against_sufficient_cash;
+           make_parameterized_tests "short_cover_within_budget_succeeds"
+             test_short_cover_within_budget_succeeds;
+           make_parameterized_tests
+             "short_entry_rejected_when_unrealized_drag_exceeds_cash"
+             test_short_entry_rejected_when_unrealized_drag_exceeds_cash;
+           make_parameterized_tests "sequence_of_shorts_hits_cumulative_floor"
+             test_sequence_of_shorts_hits_cumulative_floor;
+           make_parameterized_tests
+             "mark_to_market_drops_positions_without_price"
+             test_mark_to_market_drops_positions_without_price;
+           make_parameterized_tests
+             "positive_unrealized_pnl_does_not_inflate_floor"
+             test_positive_unrealized_pnl_does_not_inflate_floor;
            (* FIFO-specific tests - only run for FIFO *)
            [
              "fifo_basic_buy_sell" >:: test_fifo_basic_buy_sell;
