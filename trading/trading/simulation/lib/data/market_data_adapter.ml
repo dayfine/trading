@@ -20,6 +20,9 @@ let get_price t ~symbol ~date =
      after first symbol load, with no per-call allocation. *)
   Price_cache.get_price_on_date t.price_cache ~symbol ~date
 
+let get_previous_bar t ~symbol ~date =
+  Price_cache.get_previous_bar t.price_cache ~symbol ~date
+
 let get_indicator t ~symbol ~indicator_name ~period ~cadence ~date =
   let spec = Indicator_manager.{ name = indicator_name; period; cadence } in
   match

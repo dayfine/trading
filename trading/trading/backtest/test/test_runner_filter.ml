@@ -45,6 +45,7 @@ let _make_step_with_trades ~date ~portfolio ~trades =
     portfolio_value = portfolio.Trading_portfolio.Portfolio.current_cash;
     trades;
     orders_submitted = [];
+    splits_applied = [];
   }
 
 (* -------------------------------------------------------------------- *)

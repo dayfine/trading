@@ -99,7 +99,14 @@ let test_summary_stats_to_metrics _ =
 (* Helper to create a mock step_result *)
 let make_step_result ~date ~portfolio_value =
   let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
-  { date; portfolio; portfolio_value; trades = []; orders_submitted = [] }
+  {
+    date;
+    portfolio;
+    portfolio_value;
+    trades = [];
+    orders_submitted = [];
+    splits_applied = [];
+  }
 
 let make_config () =
   {
@@ -413,6 +420,7 @@ let test_profit_factor_all_winners _ =
         portfolio_value = 10000.0;
         trades = [ buy_trade ];
         orders_submitted = [];
+        splits_applied = [];
       };
       {
         date = date_of_string "2024-01-10";
@@ -420,6 +428,7 @@ let test_profit_factor_all_winners _ =
         portfolio_value = 10100.0;
         trades = [ sell_trade ];
         orders_submitted = [];
+        splits_applied = [];
       };
     ]
   in
@@ -561,6 +570,7 @@ let test_portfolio_state_with_trades _ =
         portfolio_value = 10000.0;
         trades = [ trade ];
         orders_submitted = [];
+        splits_applied = [];
       };
       {
         date = date_of_string "2024-01-05";
@@ -568,6 +578,7 @@ let test_portfolio_state_with_trades _ =
         portfolio_value = 10050.0;
         trades = [ trade; trade ];
         orders_submitted = [];
+        splits_applied = [];
       };
     ]
   in
@@ -625,6 +636,7 @@ let test_portfolio_state_skips_non_trading_final_step _ =
         portfolio_value = mtm_value;
         trades = [];
         orders_submitted = [];
+        splits_applied = [];
       };
       {
         (* Non-trading day — simulator fell back to cash. *)
@@ -633,6 +645,7 @@ let test_portfolio_state_skips_non_trading_final_step _ =
         portfolio_value = cash;
         trades = [];
         orders_submitted = [];
+        splits_applied = [];
       };
     ]
   in
@@ -664,6 +677,7 @@ let test_portfolio_state_uses_last_step_when_all_trading_days _ =
         portfolio_value = cash +. 500.0;
         trades = [];
         orders_submitted = [];
+        splits_applied = [];
       };
       {
         date = date_of_string "2024-01-06";
@@ -671,6 +685,7 @@ let test_portfolio_state_uses_last_step_when_all_trading_days _ =
         portfolio_value = cash +. 800.0;
         trades = [];
         orders_submitted = [];
+        splits_applied = [];
       };
     ]
   in

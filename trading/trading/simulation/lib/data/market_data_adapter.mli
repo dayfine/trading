@@ -35,6 +35,12 @@ val get_price : t -> symbol:string -> date:Date.t -> Types.Daily_price.t option
 
     Returns None if symbol not found or no price for that date. *)
 
+val get_previous_bar :
+  t -> symbol:string -> date:Date.t -> Types.Daily_price.t option
+(** Get the most recent bar for [symbol] strictly before [date], or [None] if
+    none exists. Used by split detection in the simulator step to compare
+    today's bar against the prior trading day. *)
+
 val get_indicator :
   t ->
   symbol:string ->

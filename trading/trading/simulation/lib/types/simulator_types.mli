@@ -31,6 +31,10 @@ type step_result = {
       (** Trades from orders that filled during this step *)
   orders_submitted : Trading_orders.Types.order list;
       (** Orders submitted for execution on the next step *)
+  splits_applied : Trading_portfolio.Split_event.t list;
+      (** Split events detected and applied to held positions at the start of
+          this step, in detection order. Empty on non-split days (the common
+          case). Used for diagnostics and parity checks. *)
 }
 [@@deriving show, eq]
 (** Result of a single simulation step *)

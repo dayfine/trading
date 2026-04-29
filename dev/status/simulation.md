@@ -1,9 +1,9 @@
 # Status: simulation
 
-## Last updated: 2026-04-28 (split-day OHLC redesign PR-2)
+## Last updated: 2026-04-28
 
 ## Status
-IN_PROGRESS (split-day OHLC redesign in flight on `feat/split-day-pr1..pr4`; previous slices remain MERGED)
+IN_PROGRESS
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)
@@ -61,15 +61,20 @@ landing the broker-model fix to phantom MtM drops on split days.
 
 - PR-1 (split-detector primitive) — MERGED 2026-04-28 as #658
   (`trading/analysis/data/types/lib/split_detector.{ml,mli}`).
-- PR-2 (split-event ledger primitive) — IN_FLIGHT on `feat/split-day-pr2`.
-  Adds `Trading_portfolio.Split_event` with `apply_to_position` /
-  `apply_to_portfolio`. Pure; preserves total cost basis; keeps
-  fractional shares (matches `Position.quantity : float`). 5 tests cover
-  forward 4:1, reverse 1:5, fractional 3:2, no-op when symbol not held,
-  end-to-end portfolio adjustment. Existing goldens remain bit-identical
-  — no simulator wiring yet.
-- PR-3 (wire detector + ledger into the simulator step) — pending PR-2
-  merge. Will re-enable the regression test from closed #641.
+- PR-2 (split-event ledger primitive) — MERGED 2026-04-28 as #662
+  (`trading/trading/portfolio/lib/split_event.{ml,mli}`).
+- PR-3 (wire detector + ledger into the simulator step) — IN_FLIGHT on
+  `feat/split-day-pr3`. Adds `Price_cache.get_previous_bar` /
+  `Market_data_adapter.get_previous_bar`, a `splits_applied :
+  Split_event.t list` field on `step_result`, and a
+  `_detect_splits_for_held_positions` step in `Simulator.step` that
+  fires before strategy invocation. `_to_price_bar`,
+  `_compute_portfolio_value`, `_make_get_price` are unchanged — bars
+  themselves are untouched, only the position ledger is adjusted on
+  splits. New regression test `test_split_day_mtm.ml` (3 cases: 4:1
+  continuity, no-split window unchanged, split day with no held
+  position). Existing pinned goldens (`test_weinstein_backtest`,
+  `test_panel_loader_parity`) bit-identical; verified locally.
 - PR-4 (sp500 + perf-tier3 verification + status updates) — pending PR-3.
 
 ### Other in-flight

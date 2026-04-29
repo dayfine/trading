@@ -54,7 +54,14 @@ let make_expected_step_result ~date ~portfolio ?portfolio_value ~trades
     Option.value portfolio_value
       ~default:portfolio.Trading_portfolio.Portfolio.current_cash
   in
-  { date; portfolio; portfolio_value; trades; orders_submitted }
+  {
+    date;
+    portfolio;
+    portfolio_value;
+    trades;
+    orders_submitted;
+    splits_applied = [];
+  }
 
 (* Custom matchers for step_outcome *)
 let is_stepped f = function
