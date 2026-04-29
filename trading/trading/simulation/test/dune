@@ -175,3 +175,22 @@
   types
   matchers
   simulation_test_helpers))
+
+(test
+ (name test_audit_weinstein_bear)
+ (modules test_audit_weinstein_bear)
+ (libraries
+  ounit2
+  core
+  status
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.strategy
+  weinstein_trading.strategy
+  weinstein_trading.stops
+  weinstein.stage
+  types
+  matchers
+  simulation_test_helpers))
