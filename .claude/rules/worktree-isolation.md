@@ -83,3 +83,31 @@ force-push — do not hand off a contaminated PR for review.
   this rule for most concurrent work.
 - Git-mode dispatch inside `$TRADING_IN_CONTAINER` (GHA) — CI runners start
   from a fresh checkout, so contamination doesn't occur there.
+
+## Cleanup
+
+Stale `agent-*` worktrees accumulate in `.claude/worktrees/` after each session
+and consume disk space (typically 50–150 MB each). A `SessionStart` hook in
+`.claude/settings.json` automatically invokes the sweep script at the start of
+every Claude Code session.
+
+**Script:** `dev/scripts/sweep_stale_worktrees.sh`
+
+**Auto-detection trigger:** runs at every `SessionStart`; only sweeps when disk
+usage on the repo filesystem is ≥ 85% **and** the worktree mtime is older than
+24 hours. Both thresholds are configurable via CLI flags.
+
+**Manual invocation:**
+
+```bash
+# Dry-run: see what would be removed (no deletions)
+bash dev/scripts/sweep_stale_worktrees.sh --dry-run --force
+
+# Force sweep regardless of disk level, 24h+ stale
+bash dev/scripts/sweep_stale_worktrees.sh --force
+
+# Custom thresholds
+bash dev/scripts/sweep_stale_worktrees.sh --threshold-percent 70 --stale-hours 48
+```
+
+Logs append to `dev/logs/worktree-sweep-YYYY-MM-DD.log`.
