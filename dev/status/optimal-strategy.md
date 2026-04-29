@@ -1,14 +1,18 @@
 # Status: optimal-strategy
 
-## Last updated: 2026-04-28
+## Last updated: 2026-04-28 (post run-2)
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
-PR-3 (`Optimal_portfolio_filler` + `Optimal_summary`) implemented on
-branch `feat/optimal-strategy-pr3`. PR-1 (#652) and PR-2 (#659) both
-merged into `main`. PR-4 (`Optimal_strategy_report` renderer +
-`optimal_strategy.exe` binary) is the next slice; track stays open.
+PR-1 (#652), PR-2 (#659), and PR-3 (#663) all merged into `main`. PR-4
+(`Optimal_strategy_report` renderer + smoke tests) is open as a partial
+landing on branch `feat/optimal-strategy-pr4`. The renderer + smoke tests
+ship in this PR; the binary (`optimal_strategy.exe`) and the deeper
+fixture tests are deferred — see
+`dev/notes/optimal-strategy-pr4-followups-2026-04-28.md` for the
+follow-up surface (PR-4b for the bin, ~150–200 LOC; optional follow-up
+B for fuller renderer fixture tests).
 
 ## Goal
 
@@ -41,8 +45,8 @@ NO
 
 ## Open work
 
-**PR-4 — `Optimal_strategy_report` + binary** is next. Per plan §Phase D
-+ §PR-4:
+**PR-4 — `Optimal_strategy_report` + binary** — partial landing in
+flight. Per plan §Phase D + §PR-4:
 
 - `trading/trading/backtest/optimal/lib/optimal_strategy_report.{ml,mli}`
   — pure markdown renderer. Inputs: actual round-trips + summary +
@@ -83,8 +87,17 @@ ready to start once PR-3 lands.
       `feat/optimal-strategy-pr3`. ~1,073 LOC including tests
       (interface ~145, implementation ~315, tests ~575). 15 OUnit2
       cases (10 filler + 5 summary), all passing.
-- [ ] **PR-4**: `Optimal_strategy_report` markdown renderer +
-      `optimal_strategy.exe` binary. ~400 LOC.
+- [~] **PR-4**: `Optimal_strategy_report` markdown renderer + smoke
+      tests landing on `feat/optimal-strategy-pr4`. Renderer ~538 LOC
+      lib (already over the original 400-LOC plan estimate), 8 OUnit2
+      smoke tests on the renderer (section presence, headline-3-variants,
+      missed-trade-with-rejection-reason, three implications branches,
+      determinism, trailing newline). 45/45 pass across the optimal track.
+      The binary + deeper fixture tests are deferred to PR-4b — see
+      `dev/notes/optimal-strategy-pr4-followups-2026-04-28.md`.
+- [ ] **PR-4b**: `optimal_strategy.exe` binary (panel loading + pipeline
+      orchestration), plus fuller per-Friday divergence + missed-trade
+      ordering fixture tests. ~250 LOC. Deferred per PR-4 followups note.
 - [ ] **PR-5** (optional): wire into `release_perf_report` so each
       scenario emits the counterfactual delta. ~200 LOC.
 

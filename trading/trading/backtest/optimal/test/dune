@@ -3,12 +3,14 @@
   test_stage_transition_scanner
   test_outcome_scorer
   test_optimal_portfolio_filler
-  test_optimal_summary)
+  test_optimal_summary
+  test_optimal_strategy_report)
  (libraries
   ounit2
   core
   matchers
   trading.base
+  trading.simulation
   types
   weinstein.screener
   weinstein.stock_analysis
