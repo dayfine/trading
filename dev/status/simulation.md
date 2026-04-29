@@ -3,7 +3,10 @@
 ## Last updated: 2026-04-29
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS — split-day broker-model regression debug in flight on
+`fix/split-day-broker-model-debug` (DRAFT PR). Slice 1+3 verdicts remain
+APPROVED; the regression fix is a cross-cutting follow-up to the merged
+PR-3 (#664).
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)
@@ -101,6 +104,26 @@ favour of a discrete event on the position ledger. Four PRs landed:
   test_data/backtest_scenarios` (5/5 PASS).
 
 ## In Progress
+
+- **Split-day broker model regression** (`fix/split-day-broker-model-debug`,
+  draft PR opened 2026-04-29). Full sp500-2019-2023 universe rerun against
+  post-PR-3 main produced -144.5% total return, 245.79% MaxDD, and
+  portfolio_value -$17,793 on 2020-08-31 (a long-only cash-accounting bug).
+  Root cause: PR-3 (#664) only adjusted the broker `Portfolio.t` on splits,
+  not the strategy-side `Position.t String.Map.t` (`t.positions`). On a 4:1
+  split, `Holding.quantity` stays at 100 while broker holds 400 shares;
+  next `TriggerExit` sells only 100 shares against the 400-share broker
+  position, leaving 300 orphan shares per split-day position. Strategy
+  Position transitions to `Closed` so orphans never clear. Fix: new helper
+  `Simulator._apply_splits_to_positions` scales `Holding`/`Exiting` state
+  in lockstep with `_apply_split_events`. Regression test:
+  `trading/trading/simulation/test/test_split_day_stop_exit.ml` (3 tests:
+  position-clears, no-orphan-equity, exit-on-split-day). All 3 FAIL on
+  current main, PASS post-fix. See `dev/decisions.md` §"2026-04-29 —
+  Split-day broker model: regression". DRAFT — needs maintainer review +
+  full sp500 rerun before merge. Local build/test gated on Docker
+  unresponsive at session time; reasoning and TDD against the existing
+  `test_split_day_mtm.ml` shape are the verification trail.
 
 - M5 (walk-forward backtest, parameter tuner) is next
 

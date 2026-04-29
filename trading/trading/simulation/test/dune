@@ -143,3 +143,19 @@
   types
   matchers
   simulation_test_helpers))
+
+(test
+ (name test_split_day_stop_exit)
+ (modules test_split_day_stop_exit)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
