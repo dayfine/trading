@@ -338,46 +338,122 @@ let to_markdown (t : t) : string =
 
 (* Loader ----------------------------------------------------------------- *)
 
+(** Map the CSV [side] column ([LONG] / [SHORT]) emitted by
+    [Backtest.Result_writer] back to the [Trading_base.Types.side] of the
+    round-trip's entry leg. Unknown labels fall back to [Buy] so pre-G2
+    trades.csv files (with no [side] column) keep parsing. *)
+let _parse_side = function
+  | "LONG" -> Trading_base.Types.Buy
+  | "SHORT" -> Trading_base.Types.Sell
+  | _ -> Trading_base.Types.Buy
+
+(** Build a [trade_metrics] from already-parsed string cells. Shared by the
+    post-G2 (with [side]) and legacy (no [side]) parser branches in
+    {!_read_trades_csv} so the field list lives in one place. *)
+let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
+    ~entry_price ~exit_price ~quantity ~pnl_dollars ~pnl_percent :
+    Trading_simulation.Metrics.trade_metrics =
+  {
+    symbol;
+    side = _parse_side side;
+    entry_date = Date.of_string entry_date;
+    exit_date = Date.of_string exit_date;
+    days_held = Int.of_string days_held;
+    entry_price = Float.of_string entry_price;
+    exit_price = Float.of_string exit_price;
+    quantity = Float.of_string quantity;
+    pnl_dollars = Float.of_string pnl_dollars;
+    pnl_percent = Float.of_string pnl_percent;
+  }
+
+(** Match a post-G2 row layout (13 columns; [side] = [LONG]/[SHORT]). *)
+let _match_post_g2_csv_row cells :
+    Trading_simulation.Metrics.trade_metrics option =
+  match cells with
+  | [
+      symbol;
+      ("LONG" as side);
+      entry_date;
+      exit_date;
+      days_held;
+      entry_price;
+      exit_price;
+      quantity;
+      pnl_dollars;
+      pnl_percent;
+      _entry_stop;
+      _exit_stop;
+      _exit_trigger;
+    ]
+  | [
+      symbol;
+      ("SHORT" as side);
+      entry_date;
+      exit_date;
+      days_held;
+      entry_price;
+      exit_price;
+      quantity;
+      pnl_dollars;
+      pnl_percent;
+      _entry_stop;
+      _exit_stop;
+      _exit_trigger;
+    ] ->
+      Some
+        (_trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date
+           ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
+           ~pnl_percent)
+  | _ -> None
+
+(** Match a legacy (pre-G2) 12-column row layout. Defaults [side] to [Buy]. *)
+let _match_legacy_csv_row cells :
+    Trading_simulation.Metrics.trade_metrics option =
+  match cells with
+  | [
+   symbol;
+   entry_date;
+   exit_date;
+   days_held;
+   entry_price;
+   exit_price;
+   quantity;
+   pnl_dollars;
+   pnl_percent;
+   _entry_stop;
+   _exit_stop;
+   _exit_trigger;
+  ] ->
+      Some
+        (_trade_metrics_of_strings ~symbol ~side:"LONG" ~entry_date ~exit_date
+           ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
+           ~pnl_percent)
+  | _ -> None
+
+(** Read trades.csv. Tolerates both the post-G2 (13-column, with [side]) and
+    legacy (12-column, no [side]) layouts. The disambiguator is whether the
+    second cell is a [LONG]/[SHORT] tag (post-G2) or a date (legacy). Legacy
+    rows default to [side = Buy] preserving the historical long-only semantics.
+*)
+let _parse_trades_csv_line path line :
+    Trading_simulation.Metrics.trade_metrics option =
+  if String.is_empty (String.strip line) then None
+  else
+    let cells = String.split line ~on:',' in
+    match _match_post_g2_csv_row cells with
+    | Some _ as t -> t
+    | None -> (
+        match _match_legacy_csv_row cells with
+        | Some _ as t -> t
+        | None -> failwithf "Unexpected trades.csv row in %s: %s" path line ())
+
 let _read_trades_csv path : Trading_simulation.Metrics.trade_metrics list =
   let ic = In_channel.create path in
   let lines = In_channel.input_lines ic in
   In_channel.close ic;
   match lines with
   | [] -> failwithf "trades.csv at %s is empty" path ()
-  | _header :: rest ->
-      List.filter_map rest ~f:(fun line ->
-          if String.is_empty (String.strip line) then None
-          else
-            let cells = String.split line ~on:',' in
-            match cells with
-            | [
-             symbol;
-             entry_date;
-             exit_date;
-             days_held;
-             entry_price;
-             exit_price;
-             quantity;
-             pnl_dollars;
-             pnl_percent;
-             _entry_stop;
-             _exit_stop;
-             _exit_trigger;
-            ] ->
-                Some
-                  ({
-                     symbol;
-                     entry_date = Date.of_string entry_date;
-                     exit_date = Date.of_string exit_date;
-                     days_held = Int.of_string days_held;
-                     entry_price = Float.of_string entry_price;
-                     exit_price = Float.of_string exit_price;
-                     quantity = Float.of_string quantity;
-                     pnl_dollars = Float.of_string pnl_dollars;
-                     pnl_percent = Float.of_string pnl_percent;
-                   }
-                    : Trading_simulation.Metrics.trade_metrics)
-            | _ -> failwithf "Unexpected trades.csv row in %s: %s" path line ())
+  | _header :: rest -> List.filter_map rest ~f:(_parse_trades_csv_line path)
 
 type _summary_meta = {
   start_date : Date.t;

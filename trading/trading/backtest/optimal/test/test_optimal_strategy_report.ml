@@ -43,9 +43,11 @@ let _make_actual ?(scenario_name = "test-2024") ?(round_trips = []) () :
   }
 
 let _make_actual_trade ~symbol ~entry_date ~exit_date ~pnl_dollars ~pnl_percent
-    () : Trading_simulation.Metrics.trade_metrics =
+    ?(side = Trading_base.Types.Buy) () :
+    Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
+    side;
     entry_date;
     exit_date;
     days_held = Date.diff exit_date entry_date;

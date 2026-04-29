@@ -8,6 +8,7 @@ module Simulator_types = Trading_simulation_types.Simulator_types
 
 type trade_metrics = {
   symbol : string;
+  side : Trading_base.Types.side;
   entry_date : Date.t;
   exit_date : Date.t;
   days_held : int;
@@ -30,10 +31,15 @@ type summary_stats = {
 
 (** {1 Trade Metrics Functions} *)
 
+let _side_label = function
+  | Trading_base.Types.Buy -> "LONG"
+  | Trading_base.Types.Sell -> "SHORT"
+
 let show_trade_metrics m =
   Printf.sprintf
-    "%s: %s -> %s (%d days), entry=%.2f exit=%.2f qty=%.0f, P&L=$%.2f (%.2f%%)"
-    m.symbol
+    "%s [%s]: %s -> %s (%d days), entry=%.2f exit=%.2f qty=%.0f, P&L=$%.2f \
+     (%.2f%%)"
+    m.symbol (_side_label m.side)
     (Date.to_string m.entry_date)
     (Date.to_string m.exit_date)
     m.days_held m.entry_price m.exit_price m.quantity m.pnl_dollars
@@ -45,13 +51,36 @@ let show_summary s =
     s.total_pnl s.avg_holding_days s.win_rate s.win_count
     (s.win_count + s.loss_count)
 
+(** Compute (pnl_dollars, pnl_percent) for a closed round-trip, dispatching on
+    the entry side. Long: profit when exit > entry. Short: profit when exit
+    (cover) < entry. Both pnl_percent figures are expressed as a percentage of
+    the entry price; the sign convention is that a positive reading always means
+    profit, regardless of direction. *)
+let _compute_pnl ~entry_side ~entry_price ~exit_price ~quantity =
+  let dollars =
+    match entry_side with
+    | Trading_base.Types.Buy -> (exit_price -. entry_price) *. quantity
+    | Trading_base.Types.Sell -> (entry_price -. exit_price) *. quantity
+  in
+  let percent =
+    match entry_side with
+    | Trading_base.Types.Buy ->
+        (exit_price -. entry_price) /. entry_price *. 100.0
+    | Trading_base.Types.Sell ->
+        (entry_price -. exit_price) /. entry_price *. 100.0
+  in
+  (dollars, percent)
+
 let _make_trade_metric symbol entry_date entry exit_date exit =
   let open Trading_base.Types in
   let days_held = Date.diff exit_date entry_date in
-  let pnl_dollars = (exit.price -. entry.price) *. entry.quantity in
-  let pnl_percent = (exit.price -. entry.price) /. entry.price *. 100.0 in
+  let pnl_dollars, pnl_percent =
+    _compute_pnl ~entry_side:entry.side ~entry_price:entry.price
+      ~exit_price:exit.price ~quantity:entry.quantity
+  in
   {
     symbol;
+    side = entry.side;
     entry_date;
     exit_date;
     days_held;
@@ -62,17 +91,26 @@ let _make_trade_metric symbol entry_date entry exit_date exit =
     pnl_percent;
   }
 
-let _is_buy_sell_pair entry exit =
+(** Recognise a paired round-trip by side direction. A long round-trip is
+    Buy→Sell; a short round-trip is Sell→Buy (the entry is the short open, the
+    exit is the buy-to-cover). The pairing is direction-only — quantities are
+    not required to match because the simulator can in principle scale out;
+    callers wanting a quantity-equality invariant assert that separately. *)
+let _is_paired_round_trip entry exit =
   let open Trading_base.Types in
-  equal_side entry.side Buy && equal_side exit.side Sell
+  match (entry.side, exit.side) with
+  | Buy, Sell | Sell, Buy -> true
+  | Buy, Buy | Sell, Sell -> false
 
-(** Pair buy trades with sells to form round-trips for a single symbol. *)
+(** Pair entry trades with subsequent close trades to form round-trips for a
+    single symbol. Handles both Buy→Sell (long) and Sell→Buy (short) — see
+    {!_is_paired_round_trip}. *)
 let _pair_trades_for_symbol symbol
     (trades : (Date.t * Trading_base.Types.trade) list) : trade_metrics list =
   let rec pair_trades trades_list metrics =
     match trades_list with
     | (entry_date, entry) :: (exit_date, exit) :: rest
-      when _is_buy_sell_pair entry exit ->
+      when _is_paired_round_trip entry exit ->
         let m = _make_trade_metric symbol entry_date entry exit_date exit in
         pair_trades rest (m :: metrics)
     | _ :: rest -> pair_trades rest metrics

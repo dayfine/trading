@@ -74,10 +74,18 @@ let _stop_fields (info : Stop_log.stop_info option) =
         _fmt_float_opt i.exit_stop,
         Option.value_map i.exit_trigger ~default:"" ~f:_exit_trigger_label )
 
+(** Direction label for a round-trip's entry leg, surfaced as the [side] column
+    in [trades.csv]. [LONG] = Buy→Sell round-trip; [SHORT] = Sell→Buy round-trip
+    (closing buy covers the short). *)
+let _side_label = function
+  | Trading_base.Types.Buy -> "LONG"
+  | Trading_base.Types.Sell -> "SHORT"
+
 let _write_trade_row oc stop_index (t : Metrics.trade_metrics) =
   let info = _pop_stop_info stop_index ~symbol:t.symbol in
   let entry_stop, exit_stop, exit_trigger = _stop_fields info in
-  fprintf oc "%s,%s,%s,%d,%.2f,%.2f,%.0f,%.2f,%.2f,%s,%s,%s\n" t.symbol
+  fprintf oc "%s,%s,%s,%s,%d,%.2f,%.2f,%.0f,%.2f,%.2f,%s,%s,%s\n" t.symbol
+    (_side_label t.side)
     (Date.to_string t.entry_date)
     (Date.to_string t.exit_date)
     t.days_held t.entry_price t.exit_price t.quantity t.pnl_dollars
@@ -88,7 +96,7 @@ let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
   let path = output_dir ^ "/trades.csv" in
   let oc = Out_channel.create path in
   let header =
-    "symbol,entry_date,exit_date,days_held,entry_price,exit_price,"
+    "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,"
     ^ "quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger"
   in
   fprintf oc "%s\n" header;

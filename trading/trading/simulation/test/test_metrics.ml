@@ -94,6 +94,223 @@ let test_summary_stats_to_metrics _ =
          (AvgHoldingDays, float_equal 5.5);
        ])
 
+(* ==================== extract_round_trips Tests ==================== *)
+
+(** Build a trade record. Defaults the boilerplate fields so test cases stay
+    focused on the side / price / quantity that matters. *)
+let _make_trade ~id ~symbol ~side ~quantity ~price =
+  {
+    Trading_base.Types.id;
+    order_id = id ^ "-order";
+    symbol;
+    side;
+    quantity;
+    price;
+    commission = 0.0;
+    timestamp = Time_ns_unix.now ();
+  }
+
+(** Wrap a list of trades in a single [step_result] on [date]. The portfolio +
+    portfolio_value fields are placeholders — [extract_round_trips] only
+    consumes [step.trades] and [step.date]. *)
+let _step_with_trades ~date ~trades =
+  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  {
+    date;
+    portfolio;
+    portfolio_value = 10000.0;
+    trades;
+    orders_submitted = [];
+    splits_applied = [];
+  }
+
+(** Long round-trip: Buy@100 → Sell@110, quantity 10, profit $100. Pins the
+    pre-existing contract — this test must keep passing after the short-side
+    extension. *)
+let test_extract_round_trips_long_pair _ =
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"AAPL" ~side:Buy ~quantity:10.0 ~price:100.0
+  in
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"AAPL" ~side:Sell ~quantity:10.0 ~price:110.0
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ buy ];
+      _step_with_trades ~date:(date_of_string "2024-01-12") ~trades:[ sell ];
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.symbol) (equal_to "AAPL");
+             field
+               (fun (t : trade_metrics) -> t.side)
+               (equal_to Trading_base.Types.Buy);
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 110.0);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 10.0);
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.pnl_percent) (float_equal 10.0);
+             field (fun (t : trade_metrics) -> t.days_held) (equal_to 10);
+           ];
+       ])
+
+(** Short round-trip: Sell@110 → Buy@100 covers a short. Cover below entry means
+    the short was profitable: pnl_dollars = (entry − cover) × qty = (110 − 100)
+    × 10 = $100. Pins gap G2 from [dev/notes/short-side-gaps-2026-04-29.md]. *)
+let test_extract_round_trips_short_pair_profit _ =
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"BEAR" ~side:Sell ~quantity:10.0 ~price:110.0
+  in
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"BEAR" ~side:Buy ~quantity:10.0 ~price:100.0
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ];
+      _step_with_trades ~date:(date_of_string "2024-01-09") ~trades:[ buy ];
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.symbol) (equal_to "BEAR");
+             field
+               (fun (t : trade_metrics) -> t.side)
+               (equal_to Trading_base.Types.Sell);
+             (* Entry = sell-side fill price, exit = buy-to-cover fill price. *)
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 110.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 10.0);
+             (* (entry − cover) × qty = (110 − 100) × 10 = +100 *)
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal 100.0);
+             (* pnl percent: (entry − cover) / entry × 100 = 10/110 × 100 *)
+             field
+               (fun (t : trade_metrics) -> t.pnl_percent)
+               (float_equal ~epsilon:1e-6 (10.0 /. 110.0 *. 100.0));
+             field (fun (t : trade_metrics) -> t.days_held) (equal_to 7);
+           ];
+       ])
+
+(** Short round-trip with a cover ABOVE entry: short took a loss. P&L for a
+    short is (entry − cover) × qty, so cover above entry yields negative. *)
+let test_extract_round_trips_short_pair_loss _ =
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"BEAR" ~side:Sell ~quantity:10.0 ~price:100.0
+  in
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"BEAR" ~side:Buy ~quantity:10.0 ~price:120.0
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ];
+      _step_with_trades ~date:(date_of_string "2024-01-09") ~trades:[ buy ];
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (t : trade_metrics) -> t.side)
+               (equal_to Trading_base.Types.Sell);
+             (* (100 − 120) × 10 = −200 *)
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal (-200.0));
+             field
+               (fun (t : trade_metrics) -> t.pnl_percent)
+               (float_equal ~epsilon:1e-6 (-20.0));
+           ];
+       ])
+
+(** Long and short legs in the same run, on different symbols, must both be
+    paired up — independent per-symbol pairing means the order they arrive at
+    [extract_round_trips] does not matter. *)
+let test_extract_round_trips_long_and_short_mixed _ =
+  let long_buy =
+    _make_trade ~id:"l1" ~symbol:"AAPL" ~side:Buy ~quantity:5.0 ~price:200.0
+  in
+  let long_sell =
+    _make_trade ~id:"l2" ~symbol:"AAPL" ~side:Sell ~quantity:5.0 ~price:220.0
+  in
+  let short_sell =
+    _make_trade ~id:"s1" ~symbol:"BEAR" ~side:Sell ~quantity:10.0 ~price:50.0
+  in
+  let short_buy =
+    _make_trade ~id:"s2" ~symbol:"BEAR" ~side:Buy ~quantity:10.0 ~price:40.0
+  in
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:[ long_buy; short_sell ];
+      _step_with_trades
+        ~date:(date_of_string "2024-01-12")
+        ~trades:[ long_sell; short_buy ];
+    ]
+  in
+  let trips = extract_round_trips steps in
+  let by_symbol =
+    List.fold trips
+      ~init:(Map.empty (module String))
+      ~f:(fun acc (m : trade_metrics) -> Map.set acc ~key:m.symbol ~data:m)
+  in
+  assert_that by_symbol
+    (map_includes
+       [
+         ( "AAPL",
+           all_of
+             [
+               field
+                 (fun (t : trade_metrics) -> t.side)
+                 (equal_to Trading_base.Types.Buy);
+               field
+                 (fun (t : trade_metrics) -> t.pnl_dollars)
+                 (float_equal 100.0);
+             ] );
+         ( "BEAR",
+           all_of
+             [
+               field
+                 (fun (t : trade_metrics) -> t.side)
+                 (equal_to Trading_base.Types.Sell);
+               field
+                 (fun (t : trade_metrics) -> t.pnl_dollars)
+                 (float_equal 100.0);
+             ] );
+       ])
+
+(** A dangling Sell with no Buy follow-up (e.g., open short position at the end
+    of the simulation window) must NOT be reported as a round-trip. The pairing
+    only fires when a complete close trade arrives. *)
+let test_extract_round_trips_unclosed_short_dropped _ =
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"BEAR" ~side:Sell ~quantity:10.0 ~price:100.0
+  in
+  let steps =
+    [ _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ] ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips (size_is 0)
+
 (* ==================== Metric Computer Tests ==================== *)
 
 (* Helper to create a mock step_result *)
@@ -715,6 +932,16 @@ let suite =
          "format_metrics multiple" >:: test_format_metrics_multiple;
          (* Summary stats conversion *)
          "summary_stats_to_metrics" >:: test_summary_stats_to_metrics;
+         (* extract_round_trips tests *)
+         "extract_round_trips long pair" >:: test_extract_round_trips_long_pair;
+         "extract_round_trips short pair profit"
+         >:: test_extract_round_trips_short_pair_profit;
+         "extract_round_trips short pair loss"
+         >:: test_extract_round_trips_short_pair_loss;
+         "extract_round_trips long and short mixed"
+         >:: test_extract_round_trips_long_and_short_mixed;
+         "extract_round_trips unclosed short dropped"
+         >:: test_extract_round_trips_unclosed_short_dropped;
          (* Sharpe ratio tests *)
          "sharpe ratio zero with no data"
          >:: test_sharpe_ratio_zero_with_no_data;

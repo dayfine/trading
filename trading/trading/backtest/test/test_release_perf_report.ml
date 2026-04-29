@@ -458,11 +458,13 @@ let _make_audit_record ~symbol ~entry_date
   in
   { entry; exit_ = Some exit_ }
 
-let _make_trade ~symbol ~entry_date ?(days_held = 100) ?(entry_price = 100.0)
-    ?(exit_price = 110.0) ?(quantity = 100.0) ?(pnl_dollars = 1_000.0)
-    ?(pnl_percent = 10.0) () : Trading_simulation.Metrics.trade_metrics =
+let _make_trade ~symbol ~entry_date ?(side = Trading_base.Types.Buy)
+    ?(days_held = 100) ?(entry_price = 100.0) ?(exit_price = 110.0)
+    ?(quantity = 100.0) ?(pnl_dollars = 1_000.0) ?(pnl_percent = 10.0) () :
+    Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
+    side;
     entry_date;
     exit_date = Date.add_days entry_date days_held;
     days_held;

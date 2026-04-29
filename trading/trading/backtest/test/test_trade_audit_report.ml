@@ -19,12 +19,14 @@ module TA = Backtest.Trade_audit
 
 let _date d = Date.of_string d
 
-let make_trade ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
-    ?(exit_date = _date "2024-04-20") ?(days_held = 96) ?(entry_price = 150.50)
-    ?(exit_price = 138.46) ?(quantity = 500.0) ?(pnl_dollars = -6_020.0)
-    ?(pnl_percent = -8.0) () : Trading_simulation.Metrics.trade_metrics =
+let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
+    ?(entry_date = _date "2024-01-15") ?(exit_date = _date "2024-04-20")
+    ?(days_held = 96) ?(entry_price = 150.50) ?(exit_price = 138.46)
+    ?(quantity = 500.0) ?(pnl_dollars = -6_020.0) ?(pnl_percent = -8.0) () :
+    Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
+    side;
     entry_date;
     exit_date;
     days_held;
