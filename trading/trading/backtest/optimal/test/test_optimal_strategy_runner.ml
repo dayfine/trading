@@ -16,6 +16,20 @@
     - [test_run_handles_missing_trade_audit] — same fixture without
       [trade_audit.sexp]; pipeline still completes and the renderer's "no
       rejection annotations" path is exercised.
+    - [test_load_macro_trend_returns_all_entries] — round-trips a 3-Friday
+      [macro_trend.sexp] with [Bullish] / [Neutral] / [Bearish] entries and pins
+      each lookup. Direct unit test of {!load_macro_trend}.
+    - [test_load_macro_trend_missing_file_returns_empty_table] — absent
+      [macro_trend.sexp] yields an empty table without crashing (legacy run
+      compatibility).
+    - [test_run_consumes_macro_trend_sexp] — full pipeline with a staged
+      3-Friday [macro_trend.sexp] (Bullish / Neutral / Bearish). With the
+      flat-price fixture no breakouts fire, so both variants emit zero
+      round-trips — the assertion pins the runner reads the file and the
+      [Constrained] / [Relaxed_macro] rendering paths still execute. The honest
+      macro-driven divergence test (variants produce different round-trip
+      counts) requires a fixture that actually triggers breakouts on a [Bearish]
+      week — a follow-up that needs hand-crafted Stage-1→2 breakout OHLCV bars.
 
     The renderer's content contract is pinned by
     [test_optimal_strategy_report.ml]; these tests are not a content audit. *)
@@ -177,6 +191,82 @@ let test_run_emits_optimal_strategy_md _ =
               ]);
        ])
 
+(** Stage [output_dir/macro_trend.sexp] with [(date, trend)] pairs serialized
+    via the canonical [Backtest.Macro_trend_writer.sexp_of_t]. Mirrors the
+    on-disk format the writer side emits — the loader's contract is to read that
+    exact format. *)
+let _write_macro_trend_sexp ~output_dir entries =
+  let path = Filename.concat output_dir "macro_trend.sexp" in
+  let payload : Backtest.Macro_trend_writer.t =
+    List.map entries ~f:(fun (date, trend) ->
+        { Backtest.Macro_trend_writer.date; trend })
+  in
+  Sexp.save_hum path (Backtest.Macro_trend_writer.sexp_of_t payload)
+
+let test_load_macro_trend_returns_all_entries _ =
+  let _data_dir, output_dir = _mk_tmpdirs "opt_runner_macro_load" in
+  _write_macro_trend_sexp ~output_dir
+    [
+      (Date.of_string "2024-01-12", Weinstein_types.Bullish);
+      (Date.of_string "2024-01-19", Weinstein_types.Neutral);
+      (Date.of_string "2024-01-26", Weinstein_types.Bearish);
+    ];
+  let table =
+    Backtest_optimal.Optimal_strategy_runner.load_macro_trend ~output_dir
+  in
+  assert_that table
+    (all_of
+       [
+         field (fun t -> Hashtbl.length t) (equal_to 3);
+         field
+           (fun t -> Hashtbl.find t (Date.of_string "2024-01-12"))
+           (is_some_and (equal_to Weinstein_types.Bullish));
+         field
+           (fun t -> Hashtbl.find t (Date.of_string "2024-01-19"))
+           (is_some_and (equal_to Weinstein_types.Neutral));
+         field
+           (fun t -> Hashtbl.find t (Date.of_string "2024-01-26"))
+           (is_some_and (equal_to Weinstein_types.Bearish));
+       ])
+
+let test_load_macro_trend_missing_file_returns_empty_table _ =
+  (* Legacy runs from before PR #671 (write side of macro persistence) won't
+     have macro_trend.sexp at all. The loader must tolerate this — return an
+     empty table — so the runner can fall back to Neutral for every Friday. *)
+  let _data_dir, output_dir = _mk_tmpdirs "opt_runner_macro_missing" in
+  let path = Filename.concat output_dir "macro_trend.sexp" in
+  assert_that (Sys_unix.file_exists_exn path) (equal_to false);
+  let table =
+    Backtest_optimal.Optimal_strategy_runner.load_macro_trend ~output_dir
+  in
+  assert_that table (field (fun t -> Hashtbl.length t) (equal_to 0))
+
+let test_run_consumes_macro_trend_sexp _ =
+  (* Stage the standard fixture plus a 3-Friday macro_trend.sexp. The runner
+     must complete without crashing and emit the report. The flat-price fixture
+     produces zero candidates regardless of macro state, so the variants tag
+     the same (empty) round-trip set — the test pins the wiring (file read +
+     plumbed through to the scanner) rather than the divergence outcome. *)
+  let data_dir, output_dir = _mk_tmpdirs "opt_runner_macro_present" in
+  _stage_fixture ~data_dir ~output_dir;
+  _write_macro_trend_sexp ~output_dir
+    [
+      (Date.of_string "2024-01-12", Weinstein_types.Bullish);
+      (Date.of_string "2024-01-19", Weinstein_types.Neutral);
+      (Date.of_string "2024-01-26", Weinstein_types.Bearish);
+    ];
+  _with_data_dir ~data_dir (fun () ->
+      Backtest_optimal.Optimal_strategy_runner.run ~output_dir);
+  let report_path = Filename.concat output_dir "optimal_strategy.md" in
+  let body = In_channel.read_all report_path in
+  assert_that body
+    (all_of
+       [
+         _has "# Optimal-strategy counterfactual";
+         _has "Optimal (constrained)";
+         _has "Optimal (relaxed macro)";
+       ])
+
 let test_run_handles_missing_trade_audit _ =
   let data_dir, output_dir = _mk_tmpdirs "opt_runner_no_audit" in
   _stage_fixture ~data_dir ~output_dir;
@@ -204,6 +294,11 @@ let suite =
   "Optimal_strategy_runner"
   >::: [
          "run emits optimal_strategy.md" >:: test_run_emits_optimal_strategy_md;
+         "load_macro_trend returns all entries"
+         >:: test_load_macro_trend_returns_all_entries;
+         "load_macro_trend missing file returns empty table"
+         >:: test_load_macro_trend_missing_file_returns_empty_table;
+         "run consumes macro_trend.sexp" >:: test_run_consumes_macro_trend_sexp;
          "run handles missing trade_audit.sexp"
          >:: test_run_handles_missing_trade_audit;
        ]
