@@ -264,8 +264,29 @@ that consumed the prior config sexp continue to parse via
 
 ## Re-enabling shorts
 
-Once G1 + G2 + G3 + G4 close, the sp500 scenario's
+**2026-04-30 update**: rerun attempted on 2026-04-30 after G1-G5 landed
+(#689-#695). Surfaced new gap **G7 — position sizing for shorts**.
+Details in `dev/notes/sp500-shortside-rerun-blocked-g7-2026-04-30.md`.
+Force-liquidation fired 910× because shorts were sized at >100 % of
+portfolio (ABBV 2019-02-01: $1.238M position vs $1M portfolio). G3 cash
+floor passed the entry; sizing helper or cash-check has the bug.
+
+Once G1 + G2 + G3 + G4 + **G7** close, the sp500 scenario's
 `config_overrides` should be reverted (drop the override, defaulting
 back to `enable_short_side = true`), the BASELINE_PENDING expected
 ranges re-pinned to whatever the with-shorts run produces, and G5
 added as the standing regression gate.
+
+## G7 — Position sizing for shorts
+
+See `dev/notes/sp500-shortside-rerun-blocked-g7-2026-04-30.md` for
+full details. Summary:
+
+- Symptom: shorts open with position_value > portfolio_value (ABBV
+  $1.238M vs $1M portfolio). Cash floor (G3) does not reject.
+- Likely fix surface: `Portfolio_risk.compute_position_size` or
+  `Portfolio._check_sufficient_cash` Sell-entry branch.
+- Owner: `feat-weinstein` (portfolio_risk + sizing scope).
+- Pre-fix test: a $1M portfolio + $100/share short with default
+  `max_short_exposure_pct` should size `target_quantity * entry_price
+  ≤ max_short_exposure_pct * portfolio_value`. Currently fails.
