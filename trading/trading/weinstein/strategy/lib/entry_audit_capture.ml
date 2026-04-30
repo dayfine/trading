@@ -33,27 +33,17 @@ let gen_position_id symbol =
   Int.incr _position_counter;
   Printf.sprintf "%s-wein-%d" symbol !_position_counter
 
-(** Normalise (entry, stop) to the order [Portfolio_risk.compute_position_size]
-    expects: entry first, stop below. For longs that's the identity (stop <
-    entry); for shorts we swap (stop > entry → [max, min]). *)
-let _normalised_entry_stop_for_sizing (cand : Screener.scored_candidate) =
-  let open Trading_base.Types in
-  match cand.side with
-  | Long -> (cand.suggested_entry, cand.suggested_stop)
-  | Short ->
-      ( Float.max cand.suggested_entry cand.suggested_stop,
-        Float.min cand.suggested_entry cand.suggested_stop )
+let _sizing_side_of_cand_side (side : Trading_base.Types.position_side) =
+  match side with Long -> `Long | Short -> `Short
 
 let make_entry_transition ~portfolio_risk_config ~stops_config
     ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value ~current_date
     (cand : Screener.scored_candidate) =
-  let entry_for_sizing, stop_for_sizing =
-    _normalised_entry_stop_for_sizing cand
-  in
   let sizing =
     Portfolio_risk.compute_position_size ~config:portfolio_risk_config
-      ~portfolio_value ~entry_price:entry_for_sizing ~stop_price:stop_for_sizing
-      ()
+      ~portfolio_value
+      ~side:(_sizing_side_of_cand_side cand.side)
+      ~entry_price:cand.suggested_entry ~stop_price:cand.suggested_stop ()
   in
   if sizing.shares = 0 then None
   else

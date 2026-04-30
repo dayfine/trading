@@ -349,7 +349,7 @@ let test_position_sizing_respects_risk_budget _ =
     List.map cases ~f:(fun (entry, stop) ->
         let result =
           Portfolio_risk.compute_position_size ~config ~portfolio_value
-            ~entry_price:entry ~stop_price:stop ()
+            ~side:`Long ~entry_price:entry ~stop_price:stop ()
         in
         result.risk_amount /. portfolio_value)
   in

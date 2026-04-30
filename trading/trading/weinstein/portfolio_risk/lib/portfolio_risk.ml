@@ -125,10 +125,35 @@ let snapshot_of_portfolio ~portfolio ~prices ?(sectors = []) () =
 
 (* ---- Position sizing ---- *)
 
-let compute_position_size ~config ~portfolio_value ~entry_price ~stop_price
-    ?(big_winner = false) () =
-  let risk_per_share = entry_price -. stop_price in
-  if Float.( <= ) risk_per_share 0.0 then
+(* G7 fix: cap shares so that position_value never exceeds the side's
+   max-exposure budget. Without this, a tight stop (small risk_per_share)
+   relative to dollar_risk produces an unbounded share count, allowing single
+   positions whose notional dwarfs portfolio_value (observed: ABBV short at 124%
+   of $1M starting portfolio, sp500-2019-2023 rerun 2026-04-30). *)
+let _max_shares_by_exposure ~config ~side ~portfolio_value ~entry_price =
+  let max_pct =
+    match side with
+    | `Long -> config.max_long_exposure_pct
+    | `Short -> config.max_short_exposure_pct
+  in
+  let max_position_value = portfolio_value *. max_pct in
+  if Float.( <= ) entry_price 0.0 then Int.max_value
+  else Int.of_float (Float.round_down (max_position_value /. entry_price))
+
+let compute_position_size ~config ~portfolio_value ~side ~entry_price
+    ~stop_price ?(big_winner = false) () =
+  (* Risk-per-share is the absolute distance between entry and stop. The
+     direction is determined by [side]: for [Long] the stop must be below
+     entry; for [Short] the stop must be above entry. If the stop is on the
+     wrong side or equal to entry, [|entry - stop| = 0] (or the stop fails
+     the directional check) and we return 0 shares. *)
+  let stop_on_correct_side =
+    match side with
+    | `Long -> Float.( < ) stop_price entry_price
+    | `Short -> Float.( > ) stop_price entry_price
+  in
+  let risk_per_share = Float.abs (entry_price -. stop_price) in
+  if (not stop_on_correct_side) || Float.( <= ) risk_per_share 0.0 then
     { shares = 0; position_value = 0.0; position_pct = 0.0; risk_amount = 0.0 }
   else
     let base_risk_pct = config.risk_per_trade_pct in
@@ -137,9 +162,13 @@ let compute_position_size ~config ~portfolio_value ~entry_price ~stop_price
       else base_risk_pct
     in
     let dollar_risk = portfolio_value *. effective_risk_pct in
-    let shares =
+    let risk_based_shares =
       Int.of_float (Float.round_down (dollar_risk /. risk_per_share))
     in
+    let exposure_capped_shares =
+      _max_shares_by_exposure ~config ~side ~portfolio_value ~entry_price
+    in
+    let shares = Int.min risk_based_shares exposure_capped_shares in
     let position_value = Float.of_int shares *. entry_price in
     let position_pct =
       if Float.( <= ) portfolio_value 0.0 then 0.0
