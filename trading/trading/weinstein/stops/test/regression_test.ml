@@ -554,6 +554,141 @@ let long_monotonic_advance_no_phantom_cycle _ =
        (le (module Int_ord) 1))
 
 (* ------------------------------------------------------------------ *)
+(* Long-side cycle gate — partial pullback that never touches the       *)
+(* post-cycle reset close                                               *)
+(* ------------------------------------------------------------------ *)
+(* Pins the post-#707 strict-gate behaviour for a partial-pullback edge
+   case on the long side. Setup: cycle 1 just completed with
+   [_raised_trailing] resetting both extremes to close=100. Subsequent
+   bars produce a pullback that, in the cycle math, looks like an 8.26%
+   correction off the new trend high — but no bar's [low] ever reaches
+   100 (the running anchor). The "8.26%" is an artifact of the stale
+   reset value being paired with a fresh trend extreme; the actually
+   observed pullback is only [(109-105)/109 ~= 3.7%], well below the
+   8% threshold.
+
+   Per Weinstein book §5.2 (weinstein-book-reference.md, line 226-228):
+   a cycle requires a real correction (8-10%+) followed by a recovery.
+   Without an anchor-touching bar, no real ≥8% pullback was observed,
+   so the gate correctly refuses to fire cycle 2.
+
+   This is path (a) of the read-and-decide spec: pin the strict gate.
+   The contrast variant below (one bar's low reaches 100) shows cycle 2
+   firing, proving the gate flag — not some coincidental no-op — is the
+   load-bearing mechanism. *)
+
+(* Pre-state encodes "cycle 1 just completed via [_raised_trailing]":
+   both extremes reset to the recovery bar's close=100, count=1, flag
+   cleared. Stop=85 is well below candidate stop levels so a fired
+   cycle would visibly raise it. MA at 98 keeps [effective_ref] above
+   85 in the contrast case (min(corr=100, ma=98)=98 → candidate 96.875). *)
+let _post_cycle1_state =
+  Trailing
+    {
+      stop_level = 85.0;
+      last_correction_extreme = 100.0;
+      last_trend_extreme = 100.0;
+      ma_at_last_adjustment = 98.0;
+      correction_count = 1;
+      correction_observed_since_reset = false;
+    }
+
+(* Bar trace — partial pullback, no bar low reaches 100:
+   bar 1: close=109 → trend extends to 109; low=101 (no touch)
+   bar 2: close=108, low=105 → pullback math now (109-100)/109 = 8.26%
+          but actual observed pullback is only (109-105)/109 = 3.7%
+   bar 3: close=112, low=108 → close ≥ 109 = recovery condition.
+          Cycle math says had_correction=true, recovered=true. Gate
+          checks anchor_is_fresh = (count=0)||observed_in_call. Both
+          false — cycle BLOCKED. *)
+let _no_touch_bars =
+  [
+    (109.0, 101.0, 110.0, 98.0, Rising, stage2);
+    (108.0, 105.0, 110.0, 98.0, Rising, stage2);
+    (112.0, 108.0, 113.0, 98.0, Rising, stage2);
+  ]
+
+let long_partial_pullback_no_touch_blocks_cycle _ =
+  let final_state, last_event =
+    run_sequence _post_cycle1_state Long _no_touch_bars
+  in
+  (* Stop unchanged at 85: the gate rejected cycle 2 because no bar's
+     low ever reached the running anchor at 100, so the apparent 8.26%
+     correction in the cycle math is a stale-anchor artifact, not a
+     real Weinstein 8%+ pullback. *)
+  assert_that last_event (equal_to No_change);
+  assert_that final_state
+    (matching ~msg:"Trailing: unchanged stop=85, count=1, observed=false"
+       (function
+         | Trailing
+             {
+               stop_level;
+               correction_count;
+               correction_observed_since_reset;
+               last_correction_extreme;
+               last_trend_extreme;
+               _;
+             } ->
+             Some
+               ( stop_level,
+                 correction_count,
+                 correction_observed_since_reset,
+                 last_correction_extreme,
+                 last_trend_extreme )
+         | _ -> None)
+       (all_of
+          [
+            field (fun (s, _, _, _, _) -> s) (float_equal 85.0);
+            field (fun (_, c, _, _, _) -> c) (equal_to 1);
+            field (fun (_, _, o, _, _) -> o) (equal_to false);
+            field (fun (_, _, _, ce, _) -> ce) (float_equal 100.0);
+            field (fun (_, _, _, _, te) -> te) (float_equal 112.0);
+          ]))
+
+(* Contrast: same setup, but bar 3's low reaches 100 — a real touch on
+   the running anchor. The gate flag flips to true, cycle 2 fires.
+   Confirms the strict gate (not some coincidence) is what blocks the
+   above test. *)
+let _touch_bars =
+  [
+    (109.0, 101.0, 110.0, 98.0, Rising, stage2);
+    (108.0, 105.0, 110.0, 98.0, Rising, stage2);
+    (* low=100 — exact touch on the post-reset anchor *)
+    (112.0, 100.0, 113.0, 98.0, Rising, stage2);
+  ]
+
+let long_partial_pullback_with_touch_fires_cycle _ =
+  let final_state, last_event =
+    run_sequence _post_cycle1_state Long _touch_bars
+  in
+  (* effective_ref = min(corr=100, ma=98) = 98. candidate = 98 * 0.99 =
+     97.02. Round-number nudge: nearest_half(97.02)=97.0; |97.02-97.0|
+     <= 0.125 nudge; 97.02 ≥ 97.0 → 97.0 - 0.125 = 96.875. *)
+  assert_that last_event
+    (matching ~msg:"cycle 2 fires: stop raised to 96.875"
+       (function Stop_raised { new_level; _ } -> Some new_level | _ -> None)
+       (float_equal 96.875));
+  assert_that final_state
+    (matching
+       ~msg:"Trailing: stop=96.875, count=2, observed=false (after reset)"
+       (function
+         | Trailing
+             {
+               stop_level;
+               correction_count;
+               correction_observed_since_reset;
+               _;
+             } ->
+             Some (stop_level, correction_count, correction_observed_since_reset)
+         | _ -> None)
+       (all_of
+          [
+            field (fun (s, _, _) -> s) (float_equal 96.875);
+            field (fun (_, c, _) -> c) (equal_to 2);
+            field (fun (_, _, o) -> o) (equal_to false);
+          ]))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -577,4 +712,8 @@ let () =
            >:: short_monotonic_decline_no_phantom_cycle;
            "long monotonic advance — no phantom cycles, stop stays below entry"
            >:: long_monotonic_advance_no_phantom_cycle;
+           "long partial pullback no anchor touch — cycle 2 blocked by gate"
+           >:: long_partial_pullback_no_touch_blocks_cycle;
+           "long partial pullback with anchor touch — cycle 2 fires (contrast)"
+           >:: long_partial_pullback_with_touch_fires_cycle;
          ])
