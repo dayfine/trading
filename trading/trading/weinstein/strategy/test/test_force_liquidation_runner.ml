@@ -506,6 +506,84 @@ let test_double_exit_avoidance_filters_already_exited _ =
     (Map.keys filtered |> List.sort ~compare:String.compare)
     (elements_are [ equal_to "TSLA" ])
 
+(* ------------------------------------------------------------------ *)
+(* G12 — phantom peak spike from inconsistent (positions, cash) snapshot *)
+(* ------------------------------------------------------------------ *)
+
+(** Regression: phantom peak spike from inconsistent (positions, cash) passed to
+    [FL.check].
+
+    Invariant: peak_tracker.peak after [update] = Portfolio_view.portfolio_value
+    ~cash ~positions
+
+    Buggy path: positions = full \ \{S1\}, cash = pre_tick_cash (S1 already
+    removed to avoid double-exit but its buy-back debit has not yet posted to
+    cash) → peak inflated by [current_price_S1 * quantity_S1] (the absolute
+    value of S1's signed mtm contribution; for a short the contribution is
+    [-current_price * quantity], so removing S1 from the sum while keeping the
+    same cash adds a positive term back).
+
+    Fixed path: positions = full, cash = pre_tick_cash → peak = true pre-tick
+    portfolio_value.
+
+    Contract enforced at the call site (Weinstein_strategy._on_market_close):
+    (positions, cash) must be a consistent snapshot — either both pre-stop or
+    both post-stop, never the hybrid. The runner here just takes the arguments
+    it's given; this test pins the math at the runner boundary so a desync
+    (caller passing inconsistent snapshots) shows up as a measurable peak
+    divergence on the very same tick, without needing to run forward to the
+    floor breach. The breach is downstream — the load-bearing witness is the
+    peak value after a single [update] call. *)
+let test_inconsistent_positions_cash_phantom_spikes_peak _ =
+  let make_short ~symbol ~entry_price ~qty =
+    _make_holding ~symbol ~side:Trading_base.Types.Short
+      ~entry_date:(_date "2024-01-02") ~quantity:qty ~entry_price
+  in
+  let s1 = make_short ~symbol:"S1" ~entry_price:100.0 ~qty:1000.0 in
+  let s2 = make_short ~symbol:"S2" ~entry_price:200.0 ~qty:500.0 in
+  (* Both shorts profitable: current < entry. *)
+  let bar_s1 = _make_bar ~date:(_date "2024-01-15") ~close:80.0 in
+  let bar_s2 = _make_bar ~date:(_date "2024-01-15") ~close:180.0 in
+  let get_price s =
+    if String.equal s "S1" then Some bar_s1
+    else if String.equal s "S2" then Some bar_s2
+    else None
+  in
+  (* Pre-tick cash = $1.2M (post-entry: $1M starting + $100K S1 proceeds +
+     $100K S2 proceeds).
+     True portfolio_value:
+       1_200_000 + (-80 * 1000) + (-180 * 500)
+       = 1_200_000 - 80_000 - 90_000 = 1_030_000.
+     S1's mtm magnitude (which the buggy desync adds back to the sum):
+       current_price_S1 * quantity_S1 = 80 * 1000 = 80_000. *)
+  let pre_tick_cash = 1_200_000.0 in
+  let true_pv = 1_030_000.0 in
+  let s1_mtm_magnitude = 80_000.0 in
+  let recorder, _ = _capturing_recorder () in
+  let positions_full = String.Map.of_alist_exn [ ("S1", s1); ("S2", s2) ] in
+  let positions_buggy = String.Map.singleton "S2" s2 in
+  let date = _date "2024-01-15" in
+  (* Fixed path: consistent snapshot (full positions, pre-tick cash). *)
+  let peak_fixed = FL.Peak_tracker.create () in
+  let _ =
+    Force_liquidation_runner.update ~config:FL.default_config
+      ~positions:positions_full ~get_price ~cash:pre_tick_cash
+      ~current_date:date ~peak_tracker:peak_fixed ~audit_recorder:recorder
+  in
+  assert_that (FL.Peak_tracker.peak peak_fixed) (float_equal true_pv);
+  (* Buggy path: positions filtered as if S1 already removed, cash NOT yet
+     debited for the buy-back — the exact desync the WIP G12 fix prevents at
+     the call site. *)
+  let peak_buggy = FL.Peak_tracker.create () in
+  let _ =
+    Force_liquidation_runner.update ~config:FL.default_config
+      ~positions:positions_buggy ~get_price ~cash:pre_tick_cash
+      ~current_date:date ~peak_tracker:peak_buggy ~audit_recorder:recorder
+  in
+  assert_that
+    (FL.Peak_tracker.peak peak_buggy)
+    (float_equal (true_pv +. s1_mtm_magnitude))
+
 let suite =
   "force_liquidation_runner"
   >::: [
@@ -526,6 +604,8 @@ let suite =
          >:: test_short_holding_does_not_inflate_peak;
          "G9 — two profitable shorts do not trigger portfolio_floor"
          >:: test_two_profitable_shorts_no_portfolio_floor;
+         "G12 — inconsistent (positions, cash) phantom-spikes peak"
+         >:: test_inconsistent_positions_cash_phantom_spikes_peak;
        ]
 
 let () = run_test_tt_main suite

@@ -479,17 +479,36 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
          ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
          ~bar_reader ~prior_stages ~positions);
   (* Force-liquidation pass: defense in depth beyond stops (G4). Runs AFTER
-     [Stops_runner.update] so positions that were already stop-exited this
-     tick are filtered out — we never double-exit. Updates the peak tracker
-     and may flip the halt state to [Halted] for the portfolio-floor case. *)
-  let live_positions =
-    _positions_minus_exited ~positions ~stop_exit_transitions:exit_transitions
+     [Stops_runner.update] but operates on the FULL pre-tick portfolio (cash
+     + all positions) so [Portfolio_view.portfolio_value] is consistent with
+     [portfolio.cash] (which has not yet been updated for this tick's
+     stop-exits). Mixing pre-tick cash with a stop-filtered position map
+     phantom-spikes [portfolio_value] when shorts stop out — a short's
+     negative contribution disappears but its buy-back debit has not yet
+     posted — permanently inflating [peak_tracker.peak] and triggering
+     spurious [Portfolio_floor] breaches on subsequent days (G12,
+     2026-04-30). Double-exit avoidance is done by filtering the returned
+     transitions instead of by hiding positions from the runner. Updates
+     the peak tracker and may flip the halt state to [Halted] for the
+     portfolio-floor case. *)
+  let raw_force_exit_transitions =
+    Force_liquidation_runner.update
+      ~config:config.portfolio_config.force_liquidation ~positions ~get_price
+      ~cash:portfolio.cash ~current_date ~peak_tracker ~audit_recorder
+  in
+  let stop_exited_ids =
+    List.filter_map exit_transitions ~f:(fun (t : Position.transition) ->
+        match t.kind with
+        | Position.TriggerExit _ -> Some t.position_id
+        | _ -> None)
+    |> String.Set.of_list
   in
   let force_exit_transitions =
-    Force_liquidation_runner.update
-      ~config:config.portfolio_config.force_liquidation
-      ~positions:live_positions ~get_price ~cash:portfolio.cash ~current_date
-      ~peak_tracker ~audit_recorder
+    if Set.is_empty stop_exited_ids then raw_force_exit_transitions
+    else
+      List.filter raw_force_exit_transitions
+        ~f:(fun (t : Position.transition) ->
+          not (Set.mem stop_exited_ids t.position_id))
   in
   (* Stage 4 PR-A: read the primary index as a weekly view directly. The
      Friday detection uses the view's latest date; the screener path consumes

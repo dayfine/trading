@@ -34,6 +34,25 @@ val update :
   Position.transition list
 (** Run the force-liquidation policy and return TriggerExit transitions.
 
+    [positions] is used both for the per-position
+    [Force_liquidation.position_input]s and for the
+    [Portfolio_view.portfolio_value] computation that drives the [peak_tracker].
+    Callers that have already filtered out stop-exited-this-tick positions for
+    double-exit avoidance MUST still pass the unfiltered set here — see
+    {!Weinstein_strategy._on_market_close} for the safe pattern.
+
+    G12 (2026-04-30): the strategy previously called this with a filtered
+    position map ([live_positions]) but the unfiltered [cash] from the portfolio
+    view. That mixed pre-tick cash with post-stop-filter positions, causing
+    [Portfolio_view.portfolio_value] to phantom-spike whenever a short stop
+    fired (the short's negative contribution disappeared from the sum, but its
+    buy-back debit had not yet been applied to cash). Each spike permanently
+    inflated [peak_tracker.peak], and on subsequent days the post-buyback cash
+    fell below the inflated [0.4 * peak] floor — triggering mass
+    [Portfolio_floor] events on still-profitable shorts. Per-position
+    double-exit avoidance now happens at the strategy layer (filter the returned
+    transitions), not by passing a filtered position map here.
+
     Side effects:
     - [peak_tracker] observe + halt-state update via
       {!Portfolio_risk.Force_liquidation.check}.
