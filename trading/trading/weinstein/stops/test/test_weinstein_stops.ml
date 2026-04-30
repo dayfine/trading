@@ -108,6 +108,7 @@ let test_get_stop_level_trailing _ =
         last_trend_extreme = 55.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   assert_that (get_stop_level state) (float_equal 48.0)
@@ -154,6 +155,7 @@ let test_update_stop_hit_trailing _ =
         last_trend_extreme = 55.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~low_price:47.0 ~close_price:47.5 () in
@@ -175,6 +177,7 @@ let test_update_stop_hit_short _ =
         last_trend_extreme = 45.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~high_price:56.0 ~close_price:55.5 () in
@@ -215,6 +218,7 @@ let test_update_tighten_on_stage3 _ =
         last_trend_extreme = 55.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~low_price:52.0 ~close_price:53.0 () in
@@ -243,6 +247,7 @@ let test_update_tighten_on_flat_ma _ =
         last_trend_extreme = 55.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~low_price:52.0 ~close_price:53.0 () in
@@ -269,6 +274,7 @@ let test_update_no_tighten_when_disabled _ =
         last_trend_extreme = 55.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 0;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~low_price:52.0 ~close_price:53.0 () in
@@ -292,6 +298,7 @@ let test_update_tighten_short_on_stage2 _ =
         last_trend_extreme = 45.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~high_price:48.0 ~close_price:47.0 () in
@@ -311,7 +318,9 @@ let test_update_tighten_short_on_stage2 _ =
 (* ---- update: stop ratchet after correction cycle ---- *)
 
 let test_update_stop_raised_after_cycle _ =
-  (* Scenario: price had a correction (pullback >= 8%), now recovered *)
+  (* Scenario: price had a correction (pullback >= 8%), now recovered.
+     [correction_observed_since_reset = true] models a real prior pullback —
+     the corr=49 anchor was touched during the current trend leg. *)
   let peak = 55.0 in
   let correction_low = 49.0 in
   (* pullback = (55 - 49)/55 = 10.9% > 8% ✓ *)
@@ -323,6 +332,7 @@ let test_update_stop_raised_after_cycle _ =
         last_trend_extreme = peak;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = true;
       }
   in
   (* Current bar: close above the previous rally peak — cycle complete *)
@@ -359,6 +369,7 @@ let test_update_no_ratchet_insufficient_correction _ =
         last_trend_extreme = peak;
         ma_at_last_adjustment = 50.0;
         correction_count = 0;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~low_price:53.0 ~close_price:56.0 () in
@@ -403,6 +414,7 @@ let test_stop_never_lowered_for_long _ =
         last_trend_extreme = 55.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = true;
       }
   in
   let bar = make_bar ~low_price:53.0 ~close_price:56.0 () in
@@ -424,6 +436,7 @@ let test_stop_never_raised_for_short _ =
         last_trend_extreme = 45.0;
         ma_at_last_adjustment = 50.0;
         correction_count = 1;
+        correction_observed_since_reset = true;
       }
   in
   (* Close above last_trend_extreme (45.0) — but this is a SHORT, so close above
@@ -455,6 +468,7 @@ let test_no_phantom_cycle_on_continuous_advance _ =
         last_trend_extreme = 100.0;
         ma_at_last_adjustment = 90.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   let bar = make_bar ~low_price:107.0 ~close_price:110.0 () in

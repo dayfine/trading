@@ -19,6 +19,21 @@ type stop_state =
       ma_at_last_adjustment : float;
           (** 30-week MA value when stop was last adjusted *)
       correction_count : int;  (** Number of correction cycles completed *)
+      correction_observed_since_reset : bool;
+          (** Whether a real counter-move bar has touched/breached the running
+              [last_correction_extreme] since the last cycle reset (or, for
+              [correction_count = 0], since the [Initial → Trailing]
+              transition).
+
+              Used to gate phantom cycles after a cycle reset: when the
+              correction extreme is reset to [bar.close_price] on cycle
+              completion, monotonic price action in the trend's favour can
+              accumulate a stale [last_correction_extreme] that the cycle math
+              would otherwise pair with a fresh trend extreme to phantom-fire a
+              new cycle. The first cycle (count = 0) is allowed to fire on the
+              entry-bar-extreme seed regardless of this flag — that pre-entry
+              extreme represents the breakout/breakdown reference point, which
+              is a legitimate Weinstein anchor (book §Stop-Loss Rules). *)
     }
   | Tightened of {
       stop_level : float;

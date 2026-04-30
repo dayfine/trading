@@ -121,7 +121,10 @@ let stage2_trailing_stop_raised_phase_a _ =
 let stage2_trailing_stop_raised_phase_b _ =
   (* Start from the state left by phase A *)
   (* Initial state reflects what the fix produces after phase A: both extremes
-     reset to close_price=122 of the cycle-completion bar, not the bar's low. *)
+     reset to close_price=122 of the cycle-completion bar, not the bar's low.
+     [correction_observed_since_reset = false] mirrors what [_raised_trailing]
+     produces — the phase-B bars must touch the corr=122 anchor before cycle 3
+     can fire (bar 4 with low=122 provides that touch). *)
   let initial_state =
     Trailing
       {
@@ -130,6 +133,7 @@ let stage2_trailing_stop_raised_phase_b _ =
         last_trend_extreme = 122.0;
         ma_at_last_adjustment = 109.0;
         correction_count = 2;
+        correction_observed_since_reset = false;
       }
   in
   let steps =
@@ -169,6 +173,12 @@ let stage2_trailing_stop_raised_phase_b _ =
    - Bar 3 (c=129, Flat MA, Stage3): tightening fires, stop→126.72 *)
 
 let stage3_tightening _ =
+  (* [correction_observed_since_reset = true]: this initial state encodes a
+     pulled-back-and-recovering scenario where corr=115 represents a real
+     prior pullback low touched during the current trend leg. Without this
+     flag set, the phantom-cycle guard would (correctly) refuse to fire
+     cycle 3 from a stale anchor; here we are explicitly modeling a real
+     anchor. *)
   let initial_state =
     Trailing
       {
@@ -177,6 +187,7 @@ let stage3_tightening _ =
         last_trend_extreme = 130.0;
         ma_at_last_adjustment = 118.0;
         correction_count = 2;
+        correction_observed_since_reset = true;
       }
   in
   let steps =
@@ -231,6 +242,10 @@ let stop_hit_long _ =
    - cycle 2 at c=78: (90-80)/80=12.5%, close=78 ≤ trend=80 → fires *)
 
 let short_stage4_stop_lowered _ =
+  (* count = 0 lets the first cycle fire on the seeded counter-rally anchor
+     regardless of [correction_observed_since_reset]; the post-cycle-1 anchor
+     reset to close_price (88) is then refreshed by bar 4 (high=88, exact
+     touch) before cycle 2 fires. *)
   let initial_state =
     Trailing
       {
@@ -239,6 +254,7 @@ let short_stage4_stop_lowered _ =
         last_trend_extreme = 108.0;
         ma_at_last_adjustment = 110.0;
         correction_count = 0;
+        correction_observed_since_reset = false;
       }
   in
   let steps =
@@ -410,6 +426,134 @@ let full_lifecycle_short _ =
        (pair (float_equal 37.35) (float_equal 35.35)))
 
 (* ------------------------------------------------------------------ *)
+(* Phantom-cycle guard — monotonically declining short, no counter-rally *)
+(* ------------------------------------------------------------------ *)
+(* Reproducer for the trailing-state phantom-cycle bug: a short with
+   monotonically declining bars (no actual counter-rally above the seeded
+   entry-bar high) must NOT phantom-fire repeated cycles that pull the
+   stop DOWN through entry. Pre-fix, the seeded [last_correction_extreme]
+   = bar.high paired with a continuously falling [last_trend_extreme]
+   triggered cycle 1 off the seed (stop dropped), then [_raised_trailing]
+   reset both extremes to bar.close — and the stale post-reset value
+   would phantom-fire cycle 2+ on subsequent declining bars, pulling the
+   stop below entry. The first cycle's drop (from seed) is bounded by
+   the seed value itself and stays above entry; the load-bearing claim
+   is that NO subsequent cycle fires without a real counter-move. *)
+
+let _short_monotonic_decline_bars =
+  (* Entry stop $103, entry close $99, entry high $100. Subsequent bars
+     decline by $2 close-to-close with NO bar high reaching $89 (the
+     post-cycle-1 reset close). *)
+  [
+    (97.0, 96.0, 98.0);
+    (95.0, 94.0, 96.0);
+    (93.0, 92.0, 94.0);
+    (91.0, 90.0, 92.0);
+    (89.0, 88.0, 90.0);
+    (* potential cycle 1 around here *)
+    (87.0, 86.0, 88.0);
+    (85.0, 84.0, 86.0);
+    (83.0, 82.0, 84.0);
+    (81.0, 80.0, 82.0);
+    (79.0, 78.0, 80.0);
+    (* if cycle 2 would phantom-fire it would be here *)
+  ]
+
+let short_monotonic_decline_no_phantom_cycle _ =
+  (* Entry: bar high=100, low=98, close=99. Initial stop $103 (≈ 99 *
+     1.04, nudged). After Initial→Trailing, corr=100 (high), trend=99
+     (close). Subsequent monotonic decline with NO counter-rally above
+     100 — every bar's high is strictly less than the previous bar's
+     close (no real counter-move). MA is held below the seed at 85 so
+     [effective_ref] in cycle stop calc would be the corr anchor — pre-
+     fix, this is exactly what drives the stop down. *)
+  let entry_bar = make_bar ~low_price:98.0 ~high_price:100.0 99.0 in
+  let initial_state =
+    compute_initial_stop ~config:cfg ~side:Short ~reference_level:99.0
+  in
+  let entry_stop = get_stop_level initial_state in
+  let trailing_state, _ =
+    update ~config:cfg ~side:Short ~state:initial_state ~current_bar:entry_bar
+      ~ma_value:99.0 ~ma_direction:Declining ~stage:stage4
+  in
+  let final_state =
+    List.fold _short_monotonic_decline_bars ~init:trailing_state
+      ~f:(fun state (close, low, high) ->
+        let bar = make_bar ~low_price:low ~high_price:high close in
+        let new_state, _ =
+          update ~config:cfg ~side:Short ~state ~current_bar:bar ~ma_value:85.0
+            ~ma_direction:Declining ~stage:stage4
+        in
+        new_state)
+  in
+  (* Contract: the stop never moves through entry on a no-counter-rally
+     short. The first cycle (count = 0 gate) is allowed to fire on the
+     seeded high — that drop is bounded above the entry close. The
+     phantom-cycle guard rejects every subsequent cycle, so the stop
+     stays above entry across the entire monotonic decline. *)
+  let final_stop = get_stop_level final_state in
+  assert_that final_stop
+    (gt (module Float_ord) entry_bar.Types.Daily_price.close_price);
+  (* Sanity: the stop did not move backward (above entry stop). It
+     either held or improved (lower for short). *)
+  assert_that final_stop (le (module Float_ord) entry_stop);
+  (* And the correction_count is at most 1 (only the seed-anchored cycle
+     ever fires; no phantoms after the reset). *)
+  assert_that final_state
+    (matching ~msg:"Trailing with correction_count <= 1"
+       (function
+         | Trailing { correction_count; _ } -> Some correction_count | _ -> None)
+       (le (module Int_ord) 1))
+
+(* Mirror long-side check: monotonic advance with no real pullback should
+   produce at most 1 cycle (the seed-anchored one) and the stop stays
+   below entry close throughout. *)
+
+let _long_monotonic_advance_bars =
+  [
+    (102.0, 101.0, 103.0);
+    (104.0, 103.0, 105.0);
+    (106.0, 105.0, 107.0);
+    (108.0, 107.0, 109.0);
+    (110.0, 109.0, 111.0);
+    (112.0, 111.0, 113.0);
+    (114.0, 113.0, 115.0);
+    (116.0, 115.0, 117.0);
+    (118.0, 117.0, 119.0);
+    (120.0, 119.0, 121.0);
+  ]
+
+let long_monotonic_advance_no_phantom_cycle _ =
+  let entry_bar = make_bar ~low_price:99.0 ~high_price:101.0 100.0 in
+  let initial_state =
+    compute_initial_stop ~config:cfg ~side:Long ~reference_level:100.0
+  in
+  let entry_stop = get_stop_level initial_state in
+  let trailing_state, _ =
+    update ~config:cfg ~side:Long ~state:initial_state ~current_bar:entry_bar
+      ~ma_value:100.0 ~ma_direction:Rising ~stage:stage2
+  in
+  let final_state =
+    List.fold _long_monotonic_advance_bars ~init:trailing_state
+      ~f:(fun state (close, low, high) ->
+        let bar = make_bar ~low_price:low ~high_price:high close in
+        let new_state, _ =
+          update ~config:cfg ~side:Long ~state ~current_bar:bar ~ma_value:115.0
+            ~ma_direction:Rising ~stage:stage2
+        in
+        new_state)
+  in
+  let final_stop = get_stop_level final_state in
+  assert_that final_stop
+    (lt (module Float_ord) entry_bar.Types.Daily_price.close_price);
+  assert_that final_stop (ge (module Float_ord) entry_stop);
+  assert_that final_state
+    (matching ~msg:"Trailing with correction_count <= 1"
+       (function
+         | Trailing { correction_count; _ } -> Some correction_count | _ -> None)
+       (le (module Int_ord) 1))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -429,4 +573,8 @@ let () =
            >:: full_lifecycle_long;
            "full lifecycle short (initial→trailing→tightened→stop_hit)"
            >:: full_lifecycle_short;
+           "short monotonic decline — no phantom cycles, stop stays above entry"
+           >:: short_monotonic_decline_no_phantom_cycle;
+           "long monotonic advance — no phantom cycles, stop stays below entry"
+           >:: long_monotonic_advance_no_phantom_cycle;
          ])

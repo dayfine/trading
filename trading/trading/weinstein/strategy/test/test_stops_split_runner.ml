@@ -216,6 +216,7 @@ let test_forward_4_to_1_scales_trailing_stop _ =
         last_trend_extreme = 520.0;
         ma_at_last_adjustment = 480.0;
         correction_count = 2;
+        correction_observed_since_reset = true;
       }
   in
   let stop_states = ref (String.Map.singleton symbol trailing) in
@@ -232,6 +233,7 @@ let test_forward_4_to_1_scales_trailing_stop _ =
                last_trend_extreme = 130.0;
                ma_at_last_adjustment = 120.0;
                correction_count = 2;
+               correction_observed_since_reset = true;
              })))
 
 (* Strategy-level regression. After [adjust] runs on a 4:1 split day, the

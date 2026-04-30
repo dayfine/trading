@@ -12,6 +12,7 @@ type stop_state =
       last_trend_extreme : float;
       ma_at_last_adjustment : float;
       correction_count : int;
+      correction_observed_since_reset : bool;
     }
   | Tightened of {
       stop_level : float;
