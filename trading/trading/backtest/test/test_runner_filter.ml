@@ -390,6 +390,116 @@ let test_filter_force_liquidations_keeps_boundary _ =
   in
   assert_that kept (size_is 1)
 
+(* -------------------------------------------------------------------- *)
+(* Phase 6: trade_audit + cascade_summary filters                        *)
+(* -------------------------------------------------------------------- *)
+
+(** Regression: warmup-emit leak in [trade_audit]. The audit recorder fires from
+    [warmup_start], so [audit_record]s with warmup-window [entry.entry_date] and
+    [cascade_summary]s with warmup-window [date] sit in the collector at
+    teardown.
+
+    [Runner.filter_audit_records_in_window] /
+    [Runner.filter_cascade_summaries_in_window] drop entries before [start_date]
+    from [trade_audit.sexp]. *)
+let _entry ~entry_date ~position_id ~symbol :
+    Backtest.Trade_audit.entry_decision =
+  {
+    symbol;
+    entry_date;
+    position_id;
+    macro_trend = Bullish;
+    macro_confidence = 0.5;
+    macro_indicators = [];
+    stage = Stage1 { weeks_in_base = 0 };
+    ma_direction = Flat;
+    ma_slope_pct = 0.0;
+    rs_trend = None;
+    rs_value = None;
+    volume_quality = None;
+    resistance_quality = None;
+    support_quality = None;
+    sector_name = "Tech";
+    sector_rating = Neutral;
+    cascade_score = 0;
+    cascade_grade = D;
+    cascade_score_components = [];
+    cascade_rationale = [];
+    side = Long;
+    suggested_entry = 100.0;
+    suggested_stop = 95.0;
+    installed_stop = 95.0;
+    stop_floor_kind = Buffer_fallback;
+    risk_pct = 0.05;
+    initial_position_value = 10_000.0;
+    initial_risk_dollars = 500.0;
+    alternatives_considered = [];
+  }
+
+let _audit_record ~entry_date ~position_id ~symbol :
+    Backtest.Trade_audit.audit_record =
+  { entry = _entry ~entry_date ~position_id ~symbol; exit_ = None }
+
+let test_filter_audit_records_drops_warmup _ =
+  let start_date = date_of_string "2019-01-02" in
+  let warmup =
+    _audit_record
+      ~entry_date:(date_of_string "2018-08-01")
+      ~position_id:"A-1" ~symbol:"AAPL"
+  in
+  let in_window =
+    _audit_record
+      ~entry_date:(date_of_string "2019-04-15")
+      ~position_id:"M-1" ~symbol:"MSFT"
+  in
+  let kept =
+    Backtest.Runner.filter_audit_records_in_window [ warmup; in_window ]
+      ~start_date
+  in
+  assert_that kept
+    (elements_are
+       [
+         field
+           (fun (r : Backtest.Trade_audit.audit_record) -> r.entry.symbol)
+           (equal_to "MSFT");
+       ])
+
+let _cascade_summary ~date : Backtest.Trade_audit.cascade_summary =
+  {
+    date;
+    total_stocks = 100;
+    candidates_after_held = 100;
+    macro_trend = Bullish;
+    long_macro_admitted = 0;
+    long_breakout_admitted = 0;
+    long_sector_admitted = 0;
+    long_grade_admitted = 0;
+    long_top_n_admitted = 0;
+    short_macro_admitted = 0;
+    short_breakdown_admitted = 0;
+    short_sector_admitted = 0;
+    short_rs_hard_gate_admitted = 0;
+    short_grade_admitted = 0;
+    short_top_n_admitted = 0;
+    entered = 0;
+  }
+
+let test_filter_cascade_summaries_drops_warmup _ =
+  let start_date = date_of_string "2019-01-02" in
+  let warmup = _cascade_summary ~date:(date_of_string "2018-09-07") in
+  let in_window = _cascade_summary ~date:(date_of_string "2019-03-15") in
+  let kept =
+    Backtest.Runner.filter_cascade_summaries_in_window [ warmup; in_window ]
+      ~start_date
+  in
+  assert_that kept
+    (elements_are
+       [
+         field
+           (fun (s : Backtest.Trade_audit.cascade_summary) -> s.date)
+           (equal_to (date_of_string "2019-03-15"));
+       ])
+
 let suite =
   "Runner_filter"
   >::: [
@@ -411,6 +521,10 @@ let suite =
          >:: test_filter_force_liquidations_drops_warmup;
          "filter_force_liquidations keeps events on the start_date boundary"
          >:: test_filter_force_liquidations_keeps_boundary;
+         "filter_audit_records drops warmup entries"
+         >:: test_filter_audit_records_drops_warmup;
+         "filter_cascade_summaries drops warmup entries"
+         >:: test_filter_cascade_summaries_drops_warmup;
        ]
 
 let () = run_test_tt_main suite

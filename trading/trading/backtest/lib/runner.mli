@@ -74,6 +74,25 @@ val filter_force_liquidations_in_window :
     [start_date]; without this filter, warmup-window force-liqs leak into
     [force_liquidations.sexp] and inflate the visible event count. *)
 
+val filter_audit_records_in_window :
+  Trade_audit.audit_record list ->
+  start_date:Date.t ->
+  Trade_audit.audit_record list
+(** Drop audit records whose entry-decision date is before [start_date]. The
+    strategy's audit recorder fires from [warmup_start], so without this filter
+    [trade_audit.sexp] picks up entries whose round-trips were never reported to
+    [trades.csv]. *)
+
+val filter_cascade_summaries_in_window :
+  Trade_audit.cascade_summary list ->
+  start_date:Date.t ->
+  Trade_audit.cascade_summary list
+(** Drop cascade-summary rows whose Friday [date] is before [start_date] —
+    cascade evaluations that ran during the warmup window. The strategy records
+    summaries every Friday from [warmup_start], so without this filter
+    [trade_audit.sexp] reports activity counts that include warmup- window
+    screen calls. *)
+
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
 (** True if [step] represents a real trading day — i.e. the portfolio's
