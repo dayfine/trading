@@ -209,7 +209,14 @@ let _to_tightened ~config ~side ~stop_level ~correction_extreme ~reason =
       },
     Entered_tightening { reason } )
 
-(* Transitions from Initial to Trailing, seeding tracking fields from current bar. *)
+(* Transitions from Initial to Trailing, seeding tracking fields from current bar.
+
+   The seeded [last_correction_extreme] (entry-bar low for longs, entry-bar high
+   for shorts) represents the breakout/breakdown reference. It is treated as a
+   legitimate first-cycle anchor — see the [correction_count = 0] gate in
+   [_completed_cycle_stop]. The [correction_observed_since_reset] flag starts
+   [false]: it only becomes load-bearing after the first cycle, when the reset
+   value (close_price) needs a real touch to be re-validated. *)
 let _to_trailing ~side ~ma_value ~stop_level ~bar =
   Trailing
     {
@@ -218,6 +225,7 @@ let _to_trailing ~side ~ma_value ~stop_level ~bar =
       last_trend_extreme = bar.Types.Daily_price.close_price;
       ma_at_last_adjustment = ma_value;
       correction_count = 0;
+      correction_observed_since_reset = false;
     }
 
 (* ---- Shared stop-hit and tighten dispatch ---- *)
@@ -261,6 +269,19 @@ let _update_initial ~config ~side ~state ~current_bar ~ma_value ~ma_direction
 
 (* ---- Correction cycle helpers ---- *)
 
+(* Did the current bar's against-trend extreme reach (or breach) the running
+   correction extreme? This is the "real counter-move" predicate that gates
+   post-reset phantom cycles. For longs: bar.low must dip to or below the
+   running pullback low. For shorts: bar.high must rally to or above the
+   running counter-rally high. A bar that strictly stays beyond the extreme in
+   the trend's favour did not observe any counter-move and does not refresh the
+   correction anchor. *)
+let _is_correction_touch ~side ~last_correction_extreme ~bar =
+  let extreme = _bar_extreme ~side ~bar in
+  match side with
+  | Long -> Float.( <= ) extreme last_correction_extreme
+  | Short -> Float.( >= ) extreme last_correction_extreme
+
 (* Advance correction_extreme/trend_extreme tracking for one bar.
    Returns (new_trend_extreme, new_correction_extreme). *)
 let _advance_tracking ~side ~last_correction_extreme ~last_trend_extreme ~bar =
@@ -292,16 +313,31 @@ let _advance_tracking ~side ~last_correction_extreme ~last_trend_extreme ~bar =
    held above it." When the correction dips below the MA (common in a
    healthy Stage 2), the correction low is the binding constraint.  When
    the correction holds above the MA (shallow pullback), the MA is lower
-   and becomes the reference. Either way, the stop stays below BOTH. *)
+   and becomes the reference. Either way, the stop stays below BOTH.
+
+   Phantom-cycle guard: the cycle math operates on the running correction
+   extreme without any awareness of WHEN that extreme was last observed.
+   On a fresh [Trailing] state ([correction_count = 0]) the seed represents
+   a legitimate breakout/breakdown reference (book §Stop-Loss Rules) and
+   the cycle is allowed to fire on it. After [_raised_trailing] resets both
+   extremes to [close_price], a continuing trend in a direction that drives
+   trend_extreme past the reset close (rising for long → no problem, falling
+   for short → cycle math tries to phantom-fire) needs an actual counter-move
+   bar — [correction_observed_since_reset = true] — to refresh the anchor.
+   Without it, the stale reset value is rejected as a cycle anchor. *)
 let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
-    ~correction_extreme ~ma_value ~bar =
+    ~correction_extreme ~correction_count ~correction_observed_since_reset
+    ~ma_value ~bar =
   let had_correction =
     _is_correction ~config ~side ~trend_extreme ~correction_extreme
   in
   let recovered =
     _is_recovery ~side ~close:bar.Types.Daily_price.close_price ~trend_extreme
   in
-  if had_correction && recovered then
+  let anchor_is_fresh =
+    correction_count = 0 || correction_observed_since_reset
+  in
+  if had_correction && recovered && anchor_is_fresh then
     (* Use whichever reference is more conservative: correction low or MA *)
     let effective_ref =
       match side with
@@ -317,7 +353,9 @@ let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
 
 (* Build a Trailing state after a completed correction cycle.
    Both extremes reset to close_price so the next cycle starts fresh — no phantom
-   cycles from a prior correction low being reused against a continuing advance. *)
+   cycles from a prior correction low being reused against a continuing advance.
+   [correction_observed_since_reset] resets to [false]: the next cycle requires a
+   real counter-move bar before its anchor can be paired with an advanced trend. *)
 let _raised_trailing ~side:_ ~new_stop ~ma_value ~correction_count ~bar =
   Trailing
     {
@@ -326,13 +364,19 @@ let _raised_trailing ~side:_ ~new_stop ~ma_value ~correction_count ~bar =
       last_trend_extreme = bar.Types.Daily_price.close_price;
       ma_at_last_adjustment = ma_value;
       correction_count = correction_count + 1;
+      correction_observed_since_reset = false;
     }
 
 (* Advances tracking and adjusts stop if a correction cycle completed. *)
-let _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
-    ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment ~bar =
+let _raise_after_cycle ~config ~side ~ma_value ~correction_count
+    ~correction_observed_since_reset ~stop_level ~last_correction_extreme
+    ~last_trend_extreme ~ma_at_last_adjustment ~bar =
   let new_trend_extreme, new_correction_extreme =
     _advance_tracking ~side ~last_correction_extreme ~last_trend_extreme ~bar
+  in
+  let new_observed =
+    correction_observed_since_reset
+    || _is_correction_touch ~side ~last_correction_extreme ~bar
   in
   let no_change =
     Trailing
@@ -342,12 +386,14 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
         last_trend_extreme = new_trend_extreme;
         ma_at_last_adjustment;
         correction_count;
+        correction_observed_since_reset = new_observed;
       }
   in
   match
     _completed_cycle_stop ~config ~side ~stop_level
       ~trend_extreme:last_trend_extreme
-      ~correction_extreme:new_correction_extreme ~ma_value ~bar
+      ~correction_extreme:new_correction_extreme ~correction_count
+      ~correction_observed_since_reset:new_observed ~ma_value ~bar
   with
   | None -> (no_change, No_change)
   | Some new_stop ->
@@ -365,15 +411,16 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
 (* Apply stop/tighten/cycle logic to a fully unpacked Trailing state. *)
 let _apply_trailing ~config ~side ~state ~bar ~ma_value ~stop_level
     ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment
-    ~correction_count ~ma_direction ~stage =
+    ~correction_count ~correction_observed_since_reset ~ma_direction ~stage =
   match
     _check_stop_or_tighten ~config ~side ~state ~bar
       ~correction_extreme:last_correction_extreme ~ma_direction ~stage
   with
   | Some result -> result
   | None ->
-      _raise_after_cycle ~config ~side ~ma_value ~correction_count ~stop_level
-        ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment ~bar
+      _raise_after_cycle ~config ~side ~ma_value ~correction_count
+        ~correction_observed_since_reset ~stop_level ~last_correction_extreme
+        ~last_trend_extreme ~ma_at_last_adjustment ~bar
 
 let _update_trailing ~config ~side ~state ~current_bar ~ma_value ~ma_direction
     ~stage =
@@ -386,10 +433,11 @@ let _update_trailing ~config ~side ~state ~current_bar ~ma_value ~ma_direction
         last_trend_extreme;
         ma_at_last_adjustment;
         correction_count;
+        correction_observed_since_reset;
       } ->
       _apply_trailing ~config ~side ~state ~bar ~ma_value ~stop_level
         ~last_correction_extreme ~last_trend_extreme ~ma_at_last_adjustment
-        ~correction_count ~ma_direction ~stage
+        ~correction_count ~correction_observed_since_reset ~ma_direction ~stage
   | _ -> (state, No_change)
 
 (* ---- Tightened ratchet ---- *)

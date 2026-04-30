@@ -32,8 +32,8 @@ let test_initial_reverse_1_to_5 _ =
 (* ---- Trailing state ---- *)
 
 let test_trailing_forward_4_to_1 _ =
-  (* Every absolute price field divides by 4; correction_count is a
-     {b count} and must NOT scale. *)
+  (* Every absolute price field divides by 4; non-price fields
+     ([correction_count], [correction_observed_since_reset]) must NOT scale. *)
   let state =
     Trailing
       {
@@ -42,6 +42,7 @@ let test_trailing_forward_4_to_1 _ =
         last_trend_extreme = 520.0;
         ma_at_last_adjustment = 480.0;
         correction_count = 3;
+        correction_observed_since_reset = true;
       }
   in
   assert_that
@@ -54,6 +55,7 @@ let test_trailing_forward_4_to_1 _ =
             last_trend_extreme = 130.0;
             ma_at_last_adjustment = 120.0;
             correction_count = 3;
+            correction_observed_since_reset = true;
           }))
 
 (* ---- Tightened state ---- *)
@@ -92,6 +94,7 @@ let test_factor_one_is_identity _ =
         last_trend_extreme = 130.0;
         ma_at_last_adjustment = 120.0;
         correction_count = 1;
+        correction_observed_since_reset = false;
       }
   in
   assert_that (Stop_split_adjust.scale ~factor:1.0 state) (equal_to state)

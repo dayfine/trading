@@ -23,6 +23,7 @@ let scale ~factor state =
         last_trend_extreme;
         ma_at_last_adjustment;
         correction_count;
+        correction_observed_since_reset;
       } ->
       Trailing
         {
@@ -31,6 +32,7 @@ let scale ~factor state =
           last_trend_extreme = last_trend_extreme /. factor;
           ma_at_last_adjustment = ma_at_last_adjustment /. factor;
           correction_count;
+          correction_observed_since_reset;
         }
   | Tightened { stop_level; last_correction_extreme; reason } ->
       Tightened

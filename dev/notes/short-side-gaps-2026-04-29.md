@@ -106,6 +106,30 @@ logic operate on correct stage inputs. Re-evaluate after the
 sp500-baseline rerun whether the runner-side fix alone is sufficient
 or whether the trailing-state phantom needs follow-up work.
 
+**DONE — see PR `fix/trailing-phantom-cycle`** (2026-04-30): added a
+`correction_observed_since_reset : bool` field to the `Trailing` state
+constructor. The cycle gate in `_completed_cycle_stop` now requires
+`correction_count = 0 || correction_observed_since_reset`: the first
+cycle is allowed to fire on the entry-bar-extreme seed (preserves the
+long-side `stage2_trailing_stop_raised_phase_a` contract), and
+subsequent cycles after a `_raised_trailing` reset require a real
+counter-move bar — `bar.low ≤ last_correction_extreme` for longs or
+`bar.high ≥ last_correction_extreme` for shorts — to refresh the
+anchor before the cycle math can re-fire. Pre-fix on a 10-bar
+monotonic short decline the stop drops from $103.125 (entry stop) to
+$90.125 (below entry close $99) via two phantom cycles; post-fix the
+stop drops to $101.125 on the seed-anchored cycle 1 and holds there
+across the remaining decline (count remains 1, second phantom is
+rejected). New regression scenarios in
+`trading/trading/weinstein/stops/test/regression_test.ml`:
+`short_monotonic_decline_no_phantom_cycle` and the symmetric
+`long_monotonic_advance_no_phantom_cycle`. Long-side
+`stage2_trailing_stop_raised_phase_a` and `_phase_b` continue to pass
+unchanged. `stage3_tightening` updated to set
+`correction_observed_since_reset = true` (it constructs an initial
+state that explicitly models a real prior pullback). Round-number
+nudge and `_advance_tracking` math are unchanged.
+
 ### G2 — `Metrics.extract_round_trips` is blind to shorts
 
 Currently pairs Buy → Sell only. Sell → Buy short round-trips are
