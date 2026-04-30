@@ -18,9 +18,12 @@
 #          The script lives at <repo-root>/dev/lib/; climb two levels to reach
 #          the repo root, then descend into trading/ (the dune workspace root).
 #
-# Both paths verify that dune-workspace exists at the resolved root and fail
-# loudly if it doesn't — this catches path mismatches rather than silently
-# running dune in the wrong directory.
+# The in-container path verifies dune-workspace exists at the resolved root and
+# fails loudly if it doesn't — catches path mismatches rather than silently
+# running dune in the wrong directory. The local docker-exec path delegates
+# path resolution to a docker-inspect query against the container's mount table
+# (see "Worktree path resolution" below), with a fallback that emits a stderr
+# warning if the inspect returns empty.
 #
 # Docker liveness probe (local path only):
 #   Before running the user command, the script verifies the container is
@@ -123,6 +126,7 @@ else
   else
     # docker inspect failed or returned no mount — fall back to the original
     # hardcoded path (parent repo, no worktree).
+    echo "WARN: docker inspect on '${CONTAINER_NAME}' returned no mount source; falling back to parent-repo path /workspaces/trading-1/trading. If running from an isolated worktree, this is wrong — check 'docker inspect ${CONTAINER_NAME} --format ...'." >&2
     DOCKER_TRADING_ROOT="/workspaces/trading-1/trading"
   fi
 
