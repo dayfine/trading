@@ -47,14 +47,21 @@ val run :
   * Stop_log.t
   * Trade_audit.t
   * Force_liquidation_log.t
+  * (string * float) list
 (** Same shape as the Legacy path's per-strategy entry point. The Panel branch
     in [Runner] uses this; callers should not call this directly outside of
     tests.
 
-    Returns a triple of [(run_result, stop_log, trade_audit)]: the simulator
-    output, the per-position stop log accumulated by the strategy wrapper, and
-    the per-trade decision-trail audit collected at the strategy's entry / exit
-    decision sites (PR-2 of the trade-audit plan).
+    Returns a 5-tuple
+    [(run_result, stop_log, trade_audit, force_liquidation_log,
+     final_close_prices)]: the simulator output, the per-position stop log
+    accumulated by the strategy wrapper, the per-trade decision-trail audit
+    collected at the strategy's entry / exit decision sites (PR-2 of the
+    trade-audit plan), the force-liquidation event log, and an alist of
+    [(symbol, close_price)] read from the [Bar_panels.t] last calendar column
+    for every symbol in the universe with a non-NaN close at run end. The
+    consumer ([Runner]) filters [final_close_prices] to symbols still held at
+    end of run when populating [Runner.result.final_prices].
 
     [gc_trace], when passed, snapshots [Gc.stat] before and after every
     simulator step (one step = one calendar day = one [Engine.update_market]
