@@ -154,6 +154,8 @@ authoritative file list, not derived from git-log walks.
 **Owner**: `harness-maintainer`. Update agent prompt to mandate
 `gh pr view` for file enumeration.
 
+**DONE 2026-04-30**: `.claude/agents/qc-structural.md` Step 3 replaced with `gh pr view $PR_NUMBER --json files` as canonical file enumeration. `.claude/rules/qc-structural-authority.md` A3 row updated with explicit warning citing PR #687 false-positive. PR: harness/qc-structural-gh-pr-view.
+
 ## Sequencing for upcoming work
 
 Per `dev/notes/short-side-gaps-2026-04-29.md` plus today's findings:
