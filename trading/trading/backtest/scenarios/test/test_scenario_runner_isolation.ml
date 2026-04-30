@@ -212,4 +212,18 @@ let suite =
          >:: test_target_after_two_perturber_cycles_matches;
        ]
 
-let () = run_test_tt_main suite
+(* CI sets [TRADING_DATA_DIR] explicitly. Local dev container does not, so
+   [Data_path.default_data_dir ()] would fall back to [/workspaces/trading-1/data]
+   where [backtest_scenarios/] does not exist. Fall back to the canonical local
+   path before the suite runs so the test works in both environments. *)
+let _ensure_trading_data_dir () =
+  match Sys.getenv "TRADING_DATA_DIR" with
+  | Some _ -> ()
+  | None ->
+      let local_default = "/workspaces/trading-1/trading/test_data" in
+      if Sys_unix.is_directory_exn local_default then
+        Core_unix.putenv ~key:"TRADING_DATA_DIR" ~data:local_default
+
+let () =
+  _ensure_trading_data_dir ();
+  run_test_tt_main suite
