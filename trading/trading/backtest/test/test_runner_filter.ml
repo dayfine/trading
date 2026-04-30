@@ -336,6 +336,60 @@ let test_filter_stop_infos_keeps_boundary _ =
   in
   assert_that kept (size_is 1)
 
+(* -------------------------------------------------------------------- *)
+(* Phase 5: force-liquidation event filter — drop warmup-window events  *)
+(* -------------------------------------------------------------------- *)
+
+(** Regression: warmup-emit leak in [force_liquidation_log]. The simulator runs
+    from [warmup_start] so [Audit_recorder.record_force_liquidation] observes
+    events from the warmup window. Without filtering, those events leak into
+    [force_liquidations.sexp] and inflate downstream consumers' counts.
+
+    [Runner.filter_force_liquidations_in_window] drops events with
+    [date < start_date]. *)
+let _force_liq_event ~date ~symbol : Portfolio_risk.Force_liquidation.event =
+  {
+    symbol;
+    position_id = symbol ^ "-1";
+    date;
+    side = Trading_base.Types.Long;
+    entry_price = 100.0;
+    current_price = 40.0;
+    quantity = 100.0;
+    cost_basis = 10_000.0;
+    unrealized_pnl = -6_000.0;
+    unrealized_pnl_pct = -0.6;
+    reason = Portfolio_risk.Force_liquidation.Per_position;
+  }
+
+let test_filter_force_liquidations_drops_warmup _ =
+  let start_date = date_of_string "2019-01-02" in
+  let warmup =
+    _force_liq_event ~date:(date_of_string "2018-09-15") ~symbol:"AAPL"
+  in
+  let in_window =
+    _force_liq_event ~date:(date_of_string "2019-04-12") ~symbol:"MSFT"
+  in
+  let kept =
+    Backtest.Runner.filter_force_liquidations_in_window [ warmup; in_window ]
+      ~start_date
+  in
+  assert_that kept
+    (elements_are
+       [
+         field
+           (fun (e : Portfolio_risk.Force_liquidation.event) -> e.symbol)
+           (equal_to "MSFT");
+       ])
+
+let test_filter_force_liquidations_keeps_boundary _ =
+  let start_date = date_of_string "2019-01-02" in
+  let boundary = _force_liq_event ~date:start_date ~symbol:"AAPL" in
+  let kept =
+    Backtest.Runner.filter_force_liquidations_in_window [ boundary ] ~start_date
+  in
+  assert_that kept (size_is 1)
+
 let suite =
   "Runner_filter"
   >::: [
@@ -353,6 +407,10 @@ let suite =
          >:: test_filter_stop_infos_keeps_unstamped;
          "filter_stop_infos keeps entries on the start_date boundary"
          >:: test_filter_stop_infos_keeps_boundary;
+         "filter_force_liquidations drops warmup-window events"
+         >:: test_filter_force_liquidations_drops_warmup;
+         "filter_force_liquidations keeps events on the start_date boundary"
+         >:: test_filter_force_liquidations_keeps_boundary;
        ]
 
 let () = run_test_tt_main suite

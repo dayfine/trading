@@ -64,6 +64,16 @@ val filter_stop_infos_in_window :
     Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
     {!Stop_log.set_current_date}). *)
 
+val filter_force_liquidations_in_window :
+  Portfolio_risk.Force_liquidation.event list ->
+  start_date:Date.t ->
+  Portfolio_risk.Force_liquidation.event list
+(** Drop force-liquidation events whose [date] is before [start_date] — i.e.
+    events that fired during the warmup window. The simulator runs from
+    [warmup_start] so [Force_liquidation_log] observes events from days before
+    [start_date]; without this filter, warmup-window force-liqs leak into
+    [force_liquidations.sexp] and inflate the visible event count. *)
+
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
 (** True if [step] represents a real trading day — i.e. the portfolio's
