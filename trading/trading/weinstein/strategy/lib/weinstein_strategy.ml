@@ -56,6 +56,13 @@ type config = {
   universe_cap : int option;
   full_compute_tail_days : int option;
   enable_short_side : bool; [@sexp.default true]
+  stop_update_cadence : Stops_runner.stop_update_cadence;
+      [@sexp.default Stops_runner.Daily]
+      (** Cadence for trailing-stop trail advancement (G11). [Daily] (the
+          default) preserves all existing baselines: the trail can tighten on
+          every daily bar. [Weekly] only advances the state machine on Friday
+          ticks, matching Weinstein Ch. 6 §Stop-Loss Rules ("trail moves only on
+          weekly close"). Trigger logic stays continuous in both modes. *)
 }
 [@@deriving sexp]
 
@@ -77,6 +84,7 @@ let default_config ~universe ~index_symbol =
     universe_cap = None;
     full_compute_tail_days = None;
     enable_short_side = true;
+    stop_update_cadence = Stops_runner.Daily;
   }
 
 let name = "Weinstein"
@@ -430,6 +438,7 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
   let exit_transitions, adjust_transitions =
     Stops_runner.update
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
+      ~stop_update_cadence:config.stop_update_cadence
       ~stops_config:config.stops_config ~stage_config:config.stage_config
       ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
       ~bar_reader ~as_of:current_date ~prior_stages ()

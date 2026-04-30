@@ -171,6 +171,22 @@ type config = {
           Sell→Buy round-trips so shorts are invisible in [trades.csv], and the
           cash floor only triggers on Buy so unbounded short losses cannot
           force-liquidate. *)
+  stop_update_cadence : Stops_runner.stop_update_cadence;
+      [@sexp.default Stops_runner.Daily]
+      (** Cadence at which the trailing-stop state machine advances (G11).
+
+          - [Daily] (default) — preserves all existing baselines: the trail can
+            tighten on every daily bar.
+          - [Weekly] — only advances the state machine on Friday ticks. Mirrors
+            Weinstein Ch. 6 §Stop-Loss Rules: "the trail moves only when a
+            weekly bar confirms a new pivot above the prior pivot." Trigger
+            logic stays continuous — a stop can still fire on any daily bar.
+
+          Lever introduced to test whether the daily-cadence default explains
+          the very-short-hold cluster observed in
+          [dev/notes/sp500-trade-quality-findings-2026-04-30.md] §G11. The
+          comparison run is a follow-up; this field exists so the experiment
+          becomes a config flip rather than a code change. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

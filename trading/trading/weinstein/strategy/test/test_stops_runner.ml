@@ -359,6 +359,187 @@ let test_g1_short_exit_records_high_not_low _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* G11: stop_update_cadence flag                                        *)
+(*                                                                      *)
+(* Authority: docs/design/weinstein-book-reference.md §Stop-Loss Rules *)
+(* — the trail moves only when a weekly bar confirms a new pivot.       *)
+(* Trigger remains continuous regardless of cadence.                    *)
+(*                                                                      *)
+(* Findings: dev/notes/sp500-trade-quality-findings-2026-04-30.md §G11  *)
+(* — under the daily-cadence default, the trail tightens above entry    *)
+(* within 3 bars; any pullback fires the stop. The Weekly cadence is    *)
+(* the lever that scopes the experiment to a config flip.               *)
+(* ------------------------------------------------------------------ *)
+
+(** Drive a long [Holding] through five trending daily bars (Mon-Fri of one
+    week) under a chosen cadence. The bars are designed so that the [Daily]
+    state machine advances out of [Initial] into [Trailing] on the first bar,
+    while [Weekly] only advances on the Friday bar — leaving the state in
+    [Initial] for Mon-Thu. No bar's low crosses the stop, so neither cadence
+    fires an exit. Returns [(final_state, exits)]. *)
+let _run_long_week_trending ~stop_update_cadence =
+  let ticker = "AAPL" in
+  let entry_date = Date.of_string "2024-01-05" in
+  let entry_price = 100.0 in
+  let pos = make_holding_pos ticker entry_price entry_date in
+  let positions = String.Map.singleton ticker pos in
+  let stop_states =
+    ref
+      (String.Map.singleton ticker
+         (Weinstein_stops.Initial { stop_level = 95.0; reference_level = 100.0 }))
+  in
+  let prior_stages = Hashtbl.create (module String) in
+  (* Mon 2024-01-08 .. Fri 2024-01-12: a calm uptrend.  No bar low touches
+     the $95 stop, so trigger never fires.  Bars give the state machine
+     room to advance under Daily but no real cycle to complete. *)
+  let bars =
+    [
+      make_bar "2024-01-08" ~close:101.0 ~low:100.5 ~high:101.5 ();
+      make_bar "2024-01-09" ~close:102.0 ~low:101.5 ~high:102.5 ();
+      make_bar "2024-01-10" ~close:103.0 ~low:102.5 ~high:103.5 ();
+      make_bar "2024-01-11" ~close:104.0 ~low:103.5 ~high:104.5 ();
+      make_bar "2024-01-12" ~close:105.0 ~low:104.5 ~high:105.5 ();
+    ]
+  in
+  let exits =
+    List.concat_map bars ~f:(fun bar ->
+        let exits, _adjusts =
+          Stops_runner.update ~stop_update_cadence ~stops_config:default_cfg
+            ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
+            ~get_price:(get_price_of [ (ticker, bar) ])
+            ~stop_states ~bar_reader:(Bar_reader.empty ())
+            ~as_of:bar.Types.Daily_price.date ~prior_stages ()
+        in
+        exits)
+  in
+  (Map.find !stop_states ticker, exits)
+
+(** Daily cadence: trail advances on every bar — [_update_initial] transitions
+    [Initial -> Trailing] on the first non-stop-hit bar, so by the end of the
+    week the state is [Trailing _]. This pins the existing default behaviour. *)
+let test_daily_cadence_advances_state_on_each_bar _ =
+  let final_state, exits =
+    _run_long_week_trending ~stop_update_cadence:Stops_runner.Daily
+  in
+  assert_that exits is_empty;
+  assert_that final_state
+    (is_some_and
+       (matching ~msg:"Expected Trailing under Daily cadence"
+          (function Weinstein_stops.Trailing _ -> Some () | _ -> None)
+          (equal_to ())))
+
+(** Weekly cadence: state machine only advances on Friday. With Mon-Thu bars
+    bypassing [Weinstein_stops.update], the state stays [Initial] until the
+    Friday tick advances it to [Trailing]. Mid-week ticks ran the trigger check
+    (no hit) but did not mutate [stop_states]. *)
+let test_weekly_cadence_advances_state_only_on_friday _ =
+  let final_state, exits =
+    _run_long_week_trending ~stop_update_cadence:Stops_runner.Weekly
+  in
+  assert_that exits is_empty;
+  (* On Friday (2024-01-12) the state machine ran once and advanced
+     [Initial -> Trailing] on a no-hit bar.  Mon-Thu were trigger-only
+     no-ops; [stop_states] was untouched on those days. *)
+  assert_that final_state
+    (is_some_and
+       (matching ~msg:"Expected Trailing under Weekly cadence after Friday tick"
+          (function Weinstein_stops.Trailing _ -> Some () | _ -> None)
+          (equal_to ())))
+
+(** Weekly cadence on Mon-Thu only: when no Friday tick is included, the state
+    machine never advances — [stop_states] remains exactly the [Initial] state
+    seeded at entry. Pins the "Mon-Thu skip" behaviour directly without relying
+    on the Friday case to disambiguate. *)
+let test_weekly_cadence_no_state_advance_when_only_midweek _ =
+  let ticker = "AAPL" in
+  let entry_date = Date.of_string "2024-01-05" in
+  let entry_price = 100.0 in
+  let pos = make_holding_pos ticker entry_price entry_date in
+  let positions = String.Map.singleton ticker pos in
+  let initial_state =
+    Weinstein_stops.Initial { stop_level = 95.0; reference_level = 100.0 }
+  in
+  let stop_states = ref (String.Map.singleton ticker initial_state) in
+  let prior_stages = Hashtbl.create (module String) in
+  (* Only Mon-Thu bars. Under Weekly, none of these advance the state. *)
+  let bars =
+    [
+      make_bar "2024-01-08" ~close:101.0 ();
+      make_bar "2024-01-09" ~close:102.0 ();
+      make_bar "2024-01-10" ~close:103.0 ();
+      make_bar "2024-01-11" ~close:104.0 ();
+    ]
+  in
+  let exits =
+    List.concat_map bars ~f:(fun bar ->
+        let exits, _adjusts =
+          Stops_runner.update ~stop_update_cadence:Stops_runner.Weekly
+            ~stops_config:default_cfg ~stage_config:default_stage_cfg
+            ~lookback_bars:52 ~positions
+            ~get_price:(get_price_of [ (ticker, bar) ])
+            ~stop_states ~bar_reader:(Bar_reader.empty ())
+            ~as_of:bar.Types.Daily_price.date ~prior_stages ()
+        in
+        exits)
+  in
+  assert_that exits is_empty;
+  (* State is unchanged from the seeded [Initial] — no Friday tick fired,
+     so [Weinstein_stops.update] was never called and stop_states never
+     mutated. *)
+  assert_that
+    (Map.find !stop_states ticker)
+    (is_some_and (equal_to initial_state))
+
+(** Weekly cadence still fires the trigger continuously: a Wednesday bar whose
+    low crosses the stop emits a [TriggerExit] even though the state machine is
+    not advanced. Pins the "trigger ≠ update" contract from the book. *)
+let test_weekly_cadence_trigger_fires_on_midweek_bar _ =
+  let ticker = "AAPL" in
+  let entry_date = Date.of_string "2024-01-05" in
+  let entry_price = 100.0 in
+  let pos = make_holding_pos ticker entry_price entry_date in
+  let positions = String.Map.singleton ticker pos in
+  let stop_states =
+    ref
+      (String.Map.singleton ticker
+         (Weinstein_stops.Initial { stop_level = 90.0; reference_level = 95.0 }))
+  in
+  (* Wednesday 2024-01-10. Bar low $85 crosses the $90 stop. *)
+  let bar = make_bar "2024-01-10" ~close:88.0 ~low:85.0 ~high:92.0 () in
+  let exits, adjusts =
+    Stops_runner.update ~stop_update_cadence:Stops_runner.Weekly
+      ~stops_config:default_cfg ~stage_config:default_stage_cfg
+      ~lookback_bars:52 ~positions
+      ~get_price:(get_price_of [ (ticker, bar) ])
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
+      ~as_of:(Date.of_string "2024-01-10")
+      ~prior_stages:(Hashtbl.create (module String))
+      ()
+  in
+  assert_that adjusts is_empty;
+  assert_that exits
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (tr : Trading_strategy.Position.transition) ->
+                 tr.position_id)
+               (equal_to ticker);
+             field
+               (fun (tr : Trading_strategy.Position.transition) -> tr.kind)
+               (matching ~msg:"Expected TriggerExit"
+                  (function
+                    | Trading_strategy.Position.TriggerExit _ -> Some ()
+                    | _ -> None)
+                  (equal_to ()));
+             field
+               (fun (tr : Trading_strategy.Position.transition) -> tr.date)
+               (equal_to (Date.of_string "2024-01-10"));
+           ];
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -380,4 +561,12 @@ let () =
            >:: test_g1_short_no_exit_on_counter_bounce;
            "G1: short exit records high (not low) on violent down-day"
            >:: test_g1_short_exit_records_high_not_low;
+           "G11: Daily cadence advances state machine on every bar"
+           >:: test_daily_cadence_advances_state_on_each_bar;
+           "G11: Weekly cadence advances state machine only on Friday"
+           >:: test_weekly_cadence_advances_state_only_on_friday;
+           "G11: Weekly cadence skips state advance on Mon-Thu"
+           >:: test_weekly_cadence_no_state_advance_when_only_midweek;
+           "G11: Weekly cadence still fires trigger on mid-week bar"
+           >:: test_weekly_cadence_trigger_fires_on_midweek_bar;
          ])
