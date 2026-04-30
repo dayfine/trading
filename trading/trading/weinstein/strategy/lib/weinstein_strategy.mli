@@ -344,6 +344,7 @@ module Internal_for_test : sig
     config:config ->
     ad_bars:Macro.ad_bar list ->
     stop_states:Weinstein_stops.stop_state String.Map.t ref ->
+    last_stop_out_dates:Date.t Hashtbl.M(String).t ->
     prior_macro:Weinstein_types.market_trend ref ->
     prior_macro_result:Macro.result option ref ->
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
@@ -357,9 +358,10 @@ module Internal_for_test : sig
     portfolio:Trading_strategy.Portfolio_view.t ->
     Trading_strategy.Strategy_interface.output Status.status_or
   (** Drives [_on_market_close] with all closure-scoped state passed in
-      explicitly. Mutates [stop_states] / [prior_macro] / [prior_macro_result] /
-      [peak_tracker] / [prior_stages] / [sector_prior_stages] in place,
-      mirroring the closure semantics in {!make}. *)
+      explicitly. Mutates [stop_states] / [last_stop_out_dates] / [prior_macro]
+      / [prior_macro_result] / [peak_tracker] / [prior_stages] /
+      [sector_prior_stages] in place, mirroring the closure semantics in
+      {!make}. *)
 
   val maybe_reset_halt :
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->

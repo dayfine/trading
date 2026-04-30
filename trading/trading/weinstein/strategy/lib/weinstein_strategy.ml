@@ -271,8 +271,9 @@ let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
     right shape per regime. *)
 let _screen_universe ~config ~index_view ~(macro_result : Macro.result)
-    ~sector_map ~stop_states ~(portfolio : Portfolio_view.t) ~get_price
-    ~bar_reader ~prior_stages ~current_date ~audit_recorder =
+    ~sector_map ~stop_states ~last_stop_out_dates
+    ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
+    ~current_date ~audit_recorder =
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
@@ -288,9 +289,10 @@ let _screen_universe ~config ~index_view ~(macro_result : Macro.result)
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =
-    Screener.screen ~config:config.screening_config
+    Screener.screen_with_cooldown ~config:config.screening_config
       ~macro_trend:macro_result.trend ~sector_map ~stocks
-      ~held_tickers:(held_symbols portfolio)
+      ~held_tickers:(held_symbols portfolio) ~as_of:current_date
+      ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
   in
   let combined_candidates =
     if config.enable_short_side then
@@ -366,9 +368,9 @@ let _run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result
     screener is invoked; macro-specific gating — longs blocked under Bearish,
     shorts blocked under Bullish — happens inside the screener. Under Bearish
     this yields short-side entries (per the bear-market shorting chapter). *)
-let _run_screen_after_macro ~config ~stop_states ~bar_reader ~prior_stages
-    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
-    ~index_view ~audit_recorder ~macro_result =
+let _run_screen_after_macro ~config ~stop_states ~last_stop_out_dates
+    ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
+    ~portfolio ~current_date ~index_view ~audit_recorder ~macro_result =
   let ma_cache = Bar_reader.ma_cache bar_reader in
   let sector_map =
     Macro_inputs.build_sector_map ?ma_cache ~stage_config:config.stage_config
@@ -377,8 +379,8 @@ let _run_screen_after_macro ~config ~stop_states ~bar_reader ~prior_stages
       ~ticker_sectors ()
   in
   _screen_universe ~config ~index_view ~macro_result ~sector_map ~stop_states
-    ~portfolio ~get_price ~bar_reader ~prior_stages ~current_date
-    ~audit_recorder
+    ~last_stop_out_dates ~portfolio ~get_price ~bar_reader ~prior_stages
+    ~current_date ~audit_recorder
 
 (** Filter the position map down to symbols not yet exited on this tick. The
     force-liquidation pass runs after [Stops_runner.update] but before the
@@ -411,8 +413,31 @@ let _maybe_reset_halt ~peak_tracker
   | Weinstein_types.Bullish | Weinstein_types.Neutral ->
       Portfolio_risk.Force_liquidation.Peak_tracker.reset peak_tracker
 
-let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
-    ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
+(** Update [last_stop_out_dates] from any [TriggerExit] transitions whose
+    [exit_reason] is [StopLoss] — i.e. only stop-machinery exits, not
+    take-profit / signal-reversal / time-expired / force-liquidation /
+    rebalancing. The mutated map is consumed by [Screener.screen_with_cooldown]
+    on the same Friday tick (and on every subsequent Friday until the cooldown
+    elapses). Looks up the symbol via [position_id] -> position.symbol from the
+    snapshot taken before the stops pass. *)
+let _record_stop_outs ~last_stop_out_dates
+    ~(positions : Position.t Map.M(String).t)
+    ~(exit_transitions : Position.transition list) ~current_date =
+  List.iter exit_transitions ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.TriggerExit { exit_reason = Position.StopLoss _; _ } -> (
+          match
+            Map.data positions
+            |> List.find ~f:(fun (p : Position.t) ->
+                String.equal p.id t.position_id)
+          with
+          | Some pos ->
+              Hashtbl.set last_stop_out_dates ~key:pos.symbol ~data:current_date
+          | None -> ())
+      | _ -> ())
+
+let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
+    ~prior_macro ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
     ~sector_prior_stages ~ticker_sectors ~audit_recorder ~get_price
     ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
@@ -434,6 +459,11 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
       ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
       ~bar_reader ~as_of:current_date ~prior_stages ()
   in
+  (* Track per-symbol last stop-out date for the cascade post-stop-out
+     cooldown gate. Walks [exit_transitions] before they are applied to the
+     position state — looks up symbols from the [positions] snapshot. *)
+  _record_stop_outs ~last_stop_out_dates ~positions ~exit_transitions
+    ~current_date;
   List.iter exit_transitions
     ~f:
       (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
@@ -490,9 +520,10 @@ let _on_market_close ~config ~ad_bars ~stop_states ~prior_macro
   let entry_transitions =
     match (halted, is_screening_day, macro_result_opt) with
     | false, true, Some macro_result ->
-        _run_screen_after_macro ~config ~stop_states ~bar_reader ~prior_stages
-          ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-          ~current_date ~index_view ~audit_recorder ~macro_result
+        _run_screen_after_macro ~config ~stop_states ~last_stop_out_dates
+          ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+          ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+          ~macro_result
     | _ -> []
   in
   Ok
@@ -506,6 +537,16 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels
     ?(audit_recorder = Audit_recorder.noop) config =
   let stop_states = ref initial_stop_states in
+  (* Per-symbol last stop-out date — feeds [Screener.screen_with_cooldown]
+     for the cascade post-stop-out cooldown gate
+     ([cascade_post_stop_cooldown_weeks]). Mutated in place by
+     [_record_stop_outs] after each [Stops_runner.update] tick. Empty when
+     the strategy is constructed: an empty map is bit-equivalent to no
+     cooldown effect, so backtests / live runs that don't set the cooldown
+     knob continue to behave identically. *)
+  let last_stop_out_dates : Date.t Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
@@ -548,9 +589,10 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     let name = name
 
     let on_market_close =
-      _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states ~prior_macro
-        ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
-        ~sector_prior_stages ~ticker_sectors ~audit_recorder
+      _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states
+        ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
+        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+        ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 

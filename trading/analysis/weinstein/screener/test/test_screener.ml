@@ -731,6 +731,66 @@ let test_diagnostics_long_top_n_matches_buy_candidates _ =
   assert_that result.cascade_diagnostics.long_top_n_admitted
     (equal_to (List.length result.buy_candidates))
 
+(* ------------------------------------------------------------------ *)
+(* Cascade post-stop-out cooldown gate                                 *)
+(* ------------------------------------------------------------------ *)
+
+(** Stage1→Stage2 breakout fixture used across the cooldown tests so each test
+    pins one independent variable (cooldown_weeks, recency, per-symbol scope).
+*)
+let _breakout_stocks tickers =
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  List.map tickers ~f:(fun t -> make_analysis t prior bars)
+
+(** Cooldown disabled (default 0 weeks): even a stop-out from yesterday must not
+    exclude the symbol — pins bit-equality with [screen]. *)
+let test_cooldown_disabled_no_exclusion _ =
+  let stocks = _breakout_stocks [ "AAPL" ] in
+  let result =
+    screen_with_cooldown ~config:cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-1)) ]
+  in
+  assert_that result.buy_candidates
+    (elements_are [ field (fun c -> c.ticker) (equal_to "AAPL") ])
+
+(** Cooldown 4 weeks, stop-out 14 days ago (< 28d): symbol excluded. *)
+let test_cooldown_recent_stop_excludes _ =
+  let stocks = _breakout_stocks [ "AAPL" ] in
+  let cooldown_cfg = { cfg with cascade_post_stop_cooldown_weeks = 4 } in
+  let result =
+    screen_with_cooldown ~config:cooldown_cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-14)) ]
+  in
+  assert_that result.buy_candidates is_empty
+
+(** Cooldown 4 weeks, stop-out 35 days ago (>= 28d): symbol eligible again. *)
+let test_cooldown_elapsed_stop_eligible _ =
+  let stocks = _breakout_stocks [ "AAPL" ] in
+  let cooldown_cfg = { cfg with cascade_post_stop_cooldown_weeks = 4 } in
+  let result =
+    screen_with_cooldown ~config:cooldown_cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-35)) ]
+  in
+  assert_that result.buy_candidates
+    (elements_are [ field (fun c -> c.ticker) (equal_to "AAPL") ])
+
+(** Cooldown applies per-symbol: a recent stop-out on AAPL must not block HD. *)
+let test_cooldown_per_symbol_scope _ =
+  let stocks = _breakout_stocks [ "AAPL"; "HD" ] in
+  let cooldown_cfg = { cfg with cascade_post_stop_cooldown_weeks = 4 } in
+  let result =
+    screen_with_cooldown ~config:cooldown_cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-7)) ]
+  in
+  assert_that result.buy_candidates
+    (all_of
+       [ size_is 1; elements_are [ field (fun c -> c.ticker) (equal_to "HD") ] ])
+
 let suite =
   "screener_tests"
   >::: [
@@ -774,6 +834,13 @@ let suite =
          >:: test_diagnostics_bullish_macro_blocks_shorts;
          "test_diagnostics_long_top_n_matches_buy_candidates"
          >:: test_diagnostics_long_top_n_matches_buy_candidates;
+         "test_cooldown_disabled_no_exclusion"
+         >:: test_cooldown_disabled_no_exclusion;
+         "test_cooldown_recent_stop_excludes"
+         >:: test_cooldown_recent_stop_excludes;
+         "test_cooldown_elapsed_stop_eligible"
+         >:: test_cooldown_elapsed_stop_eligible;
+         "test_cooldown_per_symbol_scope" >:: test_cooldown_per_symbol_scope;
        ]
 
 let () = run_test_tt_main suite
