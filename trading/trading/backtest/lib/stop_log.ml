@@ -16,6 +16,7 @@ type exit_trigger =
 type stop_info = {
   position_id : string;
   symbol : string;
+  entry_date : Date.t option;
   entry_stop : float option;
   exit_stop : float option;
   exit_trigger : exit_trigger option;
@@ -24,14 +25,21 @@ type stop_info = {
 
 type _pos_record = {
   mutable pos_symbol : string;
+  mutable pos_entry_date : Date.t option;
   mutable pos_entry_stop : float option;
   mutable pos_current_stop : float option;
   mutable pos_exit_trigger : exit_trigger option;
 }
 
-type t = { positions : (string, _pos_record) Hashtbl.t }
+type t = {
+  positions : (string, _pos_record) Hashtbl.t;
+  mutable current_date : Date.t option;
+}
 
-let create () = { positions = Hashtbl.create (module String) }
+let create () =
+  { positions = Hashtbl.create (module String); current_date = None }
+
+let set_current_date t date = t.current_date <- Some date
 
 let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
   match reason with
@@ -48,6 +56,7 @@ let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
 let _fresh_record ~symbol =
   {
     pos_symbol = symbol;
+    pos_entry_date = None;
     pos_entry_stop = None;
     pos_current_stop = None;
     pos_exit_trigger = None;
@@ -64,6 +73,7 @@ let _process_transition t (trans : Position.transition) =
       ()
   | EntryComplete { risk_params } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
+      record.pos_entry_date <- t.current_date;
       record.pos_entry_stop <- risk_params.stop_loss_price;
       record.pos_current_stop <- risk_params.stop_loss_price
   | UpdateRiskParams { new_risk_params } ->
@@ -91,6 +101,7 @@ let _record_to_info ~position_id record : stop_info =
   {
     position_id;
     symbol = record.pos_symbol;
+    entry_date = record.pos_entry_date;
     entry_stop = record.pos_entry_stop;
     exit_stop = record.pos_current_stop;
     exit_trigger = record.pos_exit_trigger;

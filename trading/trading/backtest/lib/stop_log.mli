@@ -47,6 +47,13 @@ val exit_trigger_of_reason : Position.exit_reason -> exit_trigger
 type stop_info = {
   position_id : string;  (** Strategy position ID *)
   symbol : string;  (** Ticker symbol *)
+  entry_date : Core.Date.t option;
+      (** Date the [EntryComplete] transition fired for this position — i.e. the
+          fill date of the entry leg. [None] when the collector observed an
+          [EntryComplete] without a prior {!set_current_date} call (e.g. unit
+          tests that drive transitions directly without simulating a calendar).
+          Populated automatically when the runner threads [set_current_date] per
+          simulation step. *)
   entry_stop : float option;
       (** Stop-loss price set when position entered Holding state *)
   exit_stop : float option;
@@ -67,11 +74,20 @@ type t
 val create : unit -> t
 (** Create an empty collector. *)
 
+val set_current_date : t -> Core.Date.t -> unit
+(** Set the current calendar date observed by subsequent {!record_transitions}
+    calls. The runner threads this per simulation step so that an
+    [EntryComplete] transition stamps {!stop_info.entry_date} with the
+    simulator's current step date. Tests that drive transitions directly can
+    either call this to control the stamped date or leave it unset (in which
+    case [entry_date = None]). *)
+
 val record_transitions : t -> Position.transition list -> unit
 (** Observe a batch of transitions (from one [on_market_close] call) and update
     internal state. Extracts:
     - [CreateEntering] records symbol and position_id
-    - [EntryComplete] records initial stop-loss price from risk_params
+    - [EntryComplete] records initial stop-loss price from risk_params and
+      stamps {!stop_info.entry_date} with the most recent {!set_current_date}.
     - [UpdateRiskParams] updates current stop-loss price
     - [TriggerExit] records exit trigger and final stop level
     - [ExitComplete] without a preceding [TriggerExit] tags

@@ -1,0 +1,8 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger
+JPM,LONG,2019-05-04,2019-05-07,3,116.00,114.03,1065,-2098.05,-1.70,,,stop_loss
+JNJ,LONG,2019-06-22,2019-06-25,3,141.46,143.27,842,1524.02,1.28,,,stop_loss
+JNJ,LONG,2019-06-29,2019-07-02,3,140.74,139.22,840,-1276.80,-1.08,,,stop_loss
+JNJ,LONG,2019-11-30,2019-12-03,3,137.60,136.91,847,-584.43,-0.50,,,stop_loss
+JNJ,LONG,2019-12-07,2019-12-10,3,139.46,140.80,868,1163.12,0.96,,,stop_loss
+CVX,LONG,2019-05-18,2019-10-03,138,120.06,112.06,969,-7752.00,-6.66,,113.15,stop_loss
+AAPL,LONG,2019-05-04,2019-05-07,3,210.89,205.88,533,-2670.33,-2.38,,,stop_loss

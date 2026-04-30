@@ -165,9 +165,14 @@ let _step_loop_iter ?gc_trace ~date sim =
     [pending_date] is tracked locally in lockstep with the simulator's internal
     [current_date] so the [_before] snapshot can be labeled with the step's date
     *before* [Simulator.step] is invoked. *)
-let _run_simulator_with_gc_trace ?gc_trace sim =
+let _run_simulator_with_gc_trace ?gc_trace ~stop_log sim =
   let start_date = (Simulator.get_config sim).start_date in
   let rec loop sim ~pending_date =
+    (* Stamp [pending_date] on [stop_log] so any [EntryComplete] transition
+       observed by the strategy wrapper during this step records the correct
+       entry_date. The runner reads this back at teardown to drop stop_infos
+       for positions opened during the warmup window. *)
+    Stop_log.set_current_date stop_log pending_date;
     match _step_loop_iter ?gc_trace ~date:pending_date sim with
     | `Done result -> result
     | `Continue sim' -> loop sim' ~pending_date:(Date.add_days pending_date 1)
@@ -227,7 +232,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
-        _run_simulator_with_gc_trace ?gc_trace sim)
+        _run_simulator_with_gc_trace ?gc_trace ~stop_log sim)
   in
   let final_close_prices = _final_close_prices ~ohlcv in
   (sim_result, stop_log, trade_audit, force_liquidation_log, final_close_prices)

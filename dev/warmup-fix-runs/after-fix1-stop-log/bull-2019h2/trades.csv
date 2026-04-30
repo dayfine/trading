@@ -1,0 +1,8 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger
+NOW,LONG,2019-12-14,2019-12-17,3,265.64,279.95,488,6983.28,5.39,,,stop_loss
+GILD,LONG,2019-06-29,2019-07-02,3,67.15,68.64,1785,2659.65,2.22,,,stop_loss
+D,LONG,2019-06-15,2019-06-18,3,76.15,76.92,1659,1277.43,1.01,,,stop_loss
+ARE,LONG,2019-06-01,2019-06-27,26,144.95,138.58,863,-5497.31,-4.39,,,stop_loss
+AMCR,LONG,2019-06-01,2019-06-14,13,11.15,11.00,11220,-1683.00,-1.35,,,stop_loss
+AIG,LONG,2019-06-01,2019-12-04,186,51.40,51.47,2745,192.15,0.14,,50.95,stop_loss
+ADSK,LONG,2019-12-07,2019-12-13,6,177.93,178.42,814,398.86,0.28,,,stop_loss

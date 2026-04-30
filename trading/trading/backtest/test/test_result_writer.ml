@@ -297,6 +297,7 @@ let test_end_of_period_renders_label _ =
         {
           position_id = "JPM-wein-1";
           symbol = "JPM";
+          entry_date = Some (_date "2024-04-22");
           entry_stop = Some 95.0;
           exit_stop = Some 95.0;
           exit_trigger = Some Backtest.Stop_log.End_of_period;

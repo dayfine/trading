@@ -52,6 +52,18 @@ type result = {
           [~/Projects/trading-reconciler/PHASE_1_SPEC.md] §3.3. *)
 }
 
+val filter_stop_infos_in_window :
+  Stop_log.stop_info list -> start_date:Date.t -> Stop_log.stop_info list
+(** Drop [stop_info]s whose [entry_date] is before [start_date] — i.e. positions
+    opened during the warmup window. Used at runner teardown to keep
+    warmup-window stop events from corrupting [trades.csv] columns (FIFO-pop in
+    [Result_writer._pop_stop_info] would otherwise attach a warmup-window
+    stop_info to an in-window round-trip when the same symbol re-trades across
+    the boundary).
+
+    Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
+    {!Stop_log.set_current_date}). *)
+
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
 (** True if [step] represents a real trading day — i.e. the portfolio's
