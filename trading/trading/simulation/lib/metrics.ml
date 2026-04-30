@@ -171,3 +171,32 @@ let summary_stats_to_metrics (stats : summary_stats) : Metric_types.metric_set =
       (LossCount, Float.of_int stats.loss_count);
       (WinRate, stats.win_rate);
     ]
+
+let compute_profit_factor (round_trips : trade_metrics list) =
+  let gross_profit =
+    List.fold round_trips ~init:0.0 ~f:(fun acc (m : trade_metrics) ->
+        if Float.(m.pnl_dollars > 0.0) then acc +. m.pnl_dollars else acc)
+  in
+  let gross_loss =
+    List.fold round_trips ~init:0.0 ~f:(fun acc (m : trade_metrics) ->
+        if Float.(m.pnl_dollars < 0.0) then acc +. Float.abs m.pnl_dollars
+        else acc)
+  in
+  if Float.(gross_loss = 0.0) then
+    if Float.(gross_profit > 0.0) then Float.infinity else 0.0
+  else gross_profit /. gross_loss
+
+let compute_round_trip_metric_set (round_trips : trade_metrics list) :
+    Metric_types.metric_set =
+  let pf = compute_profit_factor round_trips in
+  let pf_metric = Metric_types.singleton ProfitFactor pf in
+  match compute_summary round_trips with
+  | None ->
+      (* Empty round-trip list: legacy [Summary_computer] still emitted
+         [ProfitFactor = 0.0] (see [compute_profit_factor] convention).
+         Pin the same shape so existing callers and the no-trades test
+         observe identical behaviour. *)
+      pf_metric
+  | Some stats ->
+      let base = summary_stats_to_metrics stats in
+      Metric_types.merge base pf_metric

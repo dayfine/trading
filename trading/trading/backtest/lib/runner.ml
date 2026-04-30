@@ -238,6 +238,25 @@ let _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace () =
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace
     ?gc_trace ()
 
+(** Recompute the round-trip-derived metrics ([TotalPnl], [AvgHoldingDays],
+    [WinCount], [LossCount], [WinRate], [ProfitFactor]) from the runner's
+    range-filtered [round_trips] and overlay them onto the simulator's metric
+    set. This aligns the summary's win/loss counts with [trades.csv].
+
+    The simulator's [Summary_computer] folds over every step in [step_history],
+    including the warmup window (the simulator is configured with
+    [start_date = warmup_start]). The runner instead derives [round_trips] from
+    [steps_in_range] (steps with [date >= start_date]). When complete
+    round-trips fall in the warmup window, the simulator's metric set counts
+    them while [trades.csv] does not — observed empirically on
+    [panel-golden-2019-full] (summary wincount=3 vs trades.csv 2 wins). The
+    overlay restores the invariant that summary counts equal what's visible in
+    [trades.csv] / [n_round_trips]. *)
+let _align_summary_metrics_to_round_trips ~sim_result ~round_trips =
+  let overlay = Metrics.compute_round_trip_metric_set round_trips in
+  Trading_simulation_types.Metric_types.merge
+    sim_result.Trading_simulation_types.Simulator_types.metrics overlay
+
 let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     ~sim_result : Summary.t =
   {
@@ -248,7 +267,7 @@ let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     initial_cash;
     final_portfolio_value = final_value;
     n_round_trips = List.length round_trips;
-    metrics = sim_result.Trading_simulation_types.Simulator_types.metrics;
+    metrics = _align_summary_metrics_to_round_trips ~sim_result ~round_trips;
   }
 
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
