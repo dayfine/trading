@@ -377,9 +377,19 @@ jobs:
           # working copy.  git checkout refuses to overwrite those files.
           # Everything intentional is already on the remote branch, so a
           # hard reset + clean is safe here.
+          #
+          # Stash OUT_FILE outside the workspace before reset/clean — the
+          # cost-capture step wrote it as an untracked file, and `git clean`
+          # would delete it before we can stage it. Restore after checkout.
+          # (Earlier shape of this step lost the budget JSON to clean: see
+          # run 25166328542 / 2026-04-30 for the failure.)
+          BUDGET_STASH="${RUNNER_TEMP:-/tmp}/${BUDGET_BASENAME}.json"
+          cp "$OUT_FILE" "$BUDGET_STASH"
           git reset --hard HEAD && git clean -fd
           git fetch origin "${DAILY_BRANCH}"
           git checkout "${DAILY_BRANCH}"
+          mkdir -p "$(dirname "$OUT_FILE")"
+          cp "$BUDGET_STASH" "$OUT_FILE"
           git add "$OUT_FILE"
           if git diff --cached --quiet; then
             echo "Budget JSON already on branch (re-run?); skipping add."
