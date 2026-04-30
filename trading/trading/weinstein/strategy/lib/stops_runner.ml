@@ -1,6 +1,16 @@
 open Core
 open Trading_strategy
 
+type stop_update_cadence = Daily | Weekly [@@deriving show, eq, sexp]
+
+(** Friday is the cadence anchor: the strategy's screening pass uses the same
+    marker (see {!Weinstein_strategy._is_screening_day_view}). Keeping the
+    runner's weekly-cadence check on Friday matches that authority — book
+    §Stop-Loss Rules describes weekly re-evaluation, and Friday is the
+    week-bucket boundary used everywhere else in the strategy. *)
+let _is_weekly_close ~as_of =
+  Date.day_of_week as_of |> Day_of_week.equal Day_of_week.Fri
+
 (** Position-favourable stage + MA direction default for warmup periods (when
     fewer than [stage_config.ma_period] weekly bars are available). The return
     must drive {!Weinstein_stops.update} into a no-tighten branch:
@@ -112,22 +122,23 @@ let _make_adjust_transition ~(pos : Position.t) ~current_date
     kind = Position.UpdateRiskParams { new_risk_params };
   }
 
-(** Process stop logic for one held position. Returns (exit_transition option,
-    adjust_transition option). *)
-let _handle_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars
-    ~(pos : Position.t) ~(risk_params : Position.risk_params) ~state ~bar
-    ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages () =
-  let current_date = bar.Types.Daily_price.date in
-  let ma_direction, ma_value, stage =
-    _compute_ma_and_stage ?ma_cache ~stage_config ~lookback_bars ~bar_reader
-      ~as_of ~prior_stages ~symbol:ticker ~side:pos.Position.side
-      ~fallback_price:bar.Types.Daily_price.close_price ()
-  in
-  let new_state, event =
-    Weinstein_stops.update ~config:stops_config ~side:pos.Position.side ~state
-      ~current_bar:bar ~ma_value ~ma_direction ~stage
-  in
-  stop_states := Map.set !stop_states ~key:ticker ~data:new_state;
+(** Trigger-only branch for [Weekly] cadence on a non-Friday bar. The state
+    machine is not advanced (no trail tightening, no correction-cycle
+    bookkeeping progresses). The trigger check still fires continuously — book
+    §Stop-Loss Rules: the GTC stop sits in the market every day; only its
+    placement re-evaluation is weekly. If the bar's high/low crosses the
+    existing stop level, an exit transition is emitted at the same actual_price
+    the daily path would have used (bar low for longs, bar high for shorts). *)
+let _handle_stop_trigger_only ~(pos : Position.t) ~state ~bar ~current_date =
+  if Weinstein_stops.check_stop_hit ~state ~side:pos.Position.side ~bar then
+    (Some (_make_exit_transition ~pos ~current_date ~state ~bar), None)
+  else (None, None)
+
+(** Translate a {!Weinstein_stops.stop_event} into the (exit, adjust) transition
+    pair the runner emits to the strategy. Pure mapping — extracted from
+    [_handle_stop] to keep that function within the nesting linter's limits. *)
+let _transitions_of_stop_event ~(pos : Position.t)
+    ~(risk_params : Position.risk_params) ~state ~bar ~current_date ~event =
   match event with
   | Weinstein_stops.Stop_hit _ ->
       (Some (_make_exit_transition ~pos ~current_date ~state ~bar), None)
@@ -138,28 +149,72 @@ let _handle_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars
       )
   | _ -> (None, None)
 
+(** Daily-cadence branch (and Weekly-on-Friday): advance the state machine via
+    {!Weinstein_stops.update}, persist the new state, and emit the resulting
+    (exit, adjust) transition pair. Mutates [stop_states]. *)
+let _handle_stop_full ?ma_cache ~stops_config ~stage_config ~lookback_bars
+    ~(pos : Position.t) ~(risk_params : Position.risk_params) ~state ~bar
+    ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages ~current_date () =
+  let ma_direction, ma_value, stage =
+    _compute_ma_and_stage ?ma_cache ~stage_config ~lookback_bars ~bar_reader
+      ~as_of ~prior_stages ~symbol:ticker ~side:pos.Position.side
+      ~fallback_price:bar.Types.Daily_price.close_price ()
+  in
+  let new_state, event =
+    Weinstein_stops.update ~config:stops_config ~side:pos.Position.side ~state
+      ~current_bar:bar ~ma_value ~ma_direction ~stage
+  in
+  stop_states := Map.set !stop_states ~key:ticker ~data:new_state;
+  _transitions_of_stop_event ~pos ~risk_params ~state ~bar ~current_date ~event
+
+(** Process stop logic for one held position. Returns (exit_transition option,
+    adjust_transition option).
+
+    Under [Weekly] cadence with [as_of] not on a Friday, only the trigger check
+    runs (see [_handle_stop_trigger_only]); the state machine is not advanced
+    and [stop_states] is unchanged. Under [Daily] (or [Weekly] on Friday), the
+    state machine runs as before via [_handle_stop_full]. *)
+let _handle_stop ?ma_cache ?(stop_update_cadence = Daily) ~stops_config
+    ~stage_config ~lookback_bars ~(pos : Position.t)
+    ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
+    ~bar_reader ~as_of ~prior_stages () =
+  let current_date = bar.Types.Daily_price.date in
+  let advance_state_machine =
+    match stop_update_cadence with
+    | Daily -> true
+    | Weekly -> _is_weekly_close ~as_of
+  in
+  if not advance_state_machine then
+    _handle_stop_trigger_only ~pos ~state ~bar ~current_date
+  else
+    _handle_stop_full ?ma_cache ~stops_config ~stage_config ~lookback_bars ~pos
+      ~risk_params ~state ~bar ~stop_states ~ticker ~bar_reader ~as_of
+      ~prior_stages ~current_date ()
+
 (** Process stop for one position; returns updated (exits, adjusts) accumulator.
 *)
-let _process_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars
-    ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages (pos : Position.t)
-    (exits, adjusts) =
+let _process_stop ?ma_cache ?stop_update_cadence ~stops_config ~stage_config
+    ~lookback_bars ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages
+    (pos : Position.t) (exits, adjusts) =
   let ticker = pos.symbol in
   match
     (Position.get_state pos, Map.find !stop_states ticker, get_price ticker)
   with
   | Position.Holding h, Some state, Some bar -> (
       match
-        _handle_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars ~pos
-          ~risk_params:h.risk_params ~state ~bar ~stop_states ~ticker
-          ~bar_reader ~as_of ~prior_stages ()
+        _handle_stop ?ma_cache ?stop_update_cadence ~stops_config ~stage_config
+          ~lookback_bars ~pos ~risk_params:h.risk_params ~state ~bar
+          ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages ()
       with
       | Some exit_tr, _ -> (exit_tr :: exits, adjusts)
       | _, Some adj_tr -> (exits, adj_tr :: adjusts)
       | None, None -> (exits, adjusts))
   | _ -> (exits, adjusts)
 
-let update ?ma_cache ~stops_config ~stage_config ~lookback_bars ~positions
-    ~get_price ~stop_states ~bar_reader ~as_of ~prior_stages () =
+let update ?ma_cache ?stop_update_cadence ~stops_config ~stage_config
+    ~lookback_bars ~positions ~get_price ~stop_states ~bar_reader ~as_of
+    ~prior_stages () =
   Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
-      _process_stop ?ma_cache ~stops_config ~stage_config ~lookback_bars
-        ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages pos acc)
+      _process_stop ?ma_cache ?stop_update_cadence ~stops_config ~stage_config
+        ~lookback_bars ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages
+        pos acc)
