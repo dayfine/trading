@@ -81,12 +81,53 @@ dev/lib/run-in-env.sh dune runtest
 
 If any of the three fail, the overall verdict is NEEDS_REWORK immediately. Proceed to fill in the remaining checklist items you can determine from static analysis, then write the output.
 
-### Step 3: Read the diff
+### Step 3: Enumerate PR files and read the diff
 
+**The canonical file list for a PR is what `gh pr view` returns — not what git/jj ancestry walks produce.**
+
+When multiple agents work concurrently, ancestry diffs can include commits from sibling branches that happen to be ancestors of your working copy. `gh pr view --json files` reflects exactly what GitHub computed as the PR diff against its base branch — the same 6 files a reviewer sees on the PR page. Always use this as your source of truth for "what is in this PR".
+
+```
+WARNING: Do NOT derive the file list from `git log` walks, `jj log`-based ancestry,
+or `jj diff --from main@origin`. Concurrent feature development on adjacent branches
+will pollute that view with unrelated commits. The PR scope is what
+`gh pr view <N> --json files` returns, period.
+```
+
+**If `$PR_NUMBER` is known** (orchestrator dispatch prompts pass it as an env var or in the prompt body):
+
+GHA mode (`$TRADING_IN_CONTAINER` set):
 ```bash
+# Enumerate files in this PR — canonical scope
+PR_FILES=$(GH_TOKEN=$GH_TOKEN gh pr view "$PR_NUMBER" --json files --jq '.files[].path')
+echo "$PR_FILES"
+
+# Read the diff for content inspection (ancestry is fine for content once scope is established)
+git diff origin/main...origin/<branch> --stat
+git diff origin/main...origin/<branch>
+```
+
+Local jj mode:
+```bash
+# Enumerate files in this PR — canonical scope
+PR_FILES=$(gh pr view "$PR_NUMBER" --json files --jq '.files[].path')
+echo "$PR_FILES"
+
+# Read the diff for content inspection
 jj diff --from main@origin --to feat/<feature-name>@origin --stat
 jj diff --from main@origin --to feat/<feature-name>@origin
 ```
+
+**If `$PR_NUMBER` is not known** (e.g., branch not yet submitted):
+```bash
+# Fall back to jj/git diff for content, but add a checklist note:
+# "PR_NUMBER unavailable — file list derived from jj diff; verify matches PR
+#  once submitted via: gh pr view <N> --json files --jq '.files[].path'"
+jj diff --from main@origin --to feat/<feature-name>@origin --stat
+jj diff --from main@origin --to feat/<feature-name>@origin
+```
+
+Use `$PR_FILES` as the file list for all downstream checklist items (P6, A1, A2, A3). When `$PR_FILES` differs from what `jj diff --stat` shows, trust `$PR_FILES` — the discrepancy means ancestry contamination is present.
 
 ### Step 4: Fill in the structural checklist
 
