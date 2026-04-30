@@ -260,12 +260,12 @@ let _write_final_prices ~output_dir ~steps
       | None -> ());
   Out_channel.close oc
 
-(** Format a split factor for [splits.csv]. PHASE_1_SPEC §4 examples show
-    plain decimal output: [4.0] for forward 4:1, [0.125] for reverse 1:8.
-    Strategy: integer factors render as [N.0] (via [%.1f]); fractional factors
-    use [%.6g], which produces canonical [0.125] / [1.5] without trailing
-    zeros. [%g] alone prints integer factors as ["4"] without a decimal point,
-    which trips reconciler parsers expecting a float. *)
+(** Format a split factor for [splits.csv]. PHASE_1_SPEC §4 examples show plain
+    decimal output: [4.0] for forward 4:1, [0.125] for reverse 1:8. Strategy:
+    integer factors render as [N.0] (via [%.1f]); fractional factors use [%.6g],
+    which produces canonical [0.125] / [1.5] without trailing zeros. [%g] alone
+    prints integer factors as ["4"] without a decimal point, which trips
+    reconciler parsers expecting a float. *)
 let _format_split_factor (f : float) =
   if Float.( = ) f (Float.round_down f) then sprintf "%.1f" f
   else sprintf "%.6g" f
