@@ -290,3 +290,33 @@ full details. Summary:
 - Pre-fix test: a $1M portfolio + $100/share short with default
   `max_short_exposure_pct` should size `target_quantity * entry_price
   ≤ max_short_exposure_pct * portfolio_value`. Currently fails.
+
+**DONE — see PR `feat/g7-short-position-sizing`** (2026-04-30):
+leaking surface was `Portfolio_risk.compute_position_size`. The risk-
+budget formula `shares = floor(dollar_risk / |entry - stop|)` is
+unbounded when `|entry - stop|` is small relative to `dollar_risk`.
+The `max_long_exposure_pct` / `max_short_exposure_pct` config knobs
+(default 0.90 / 0.30) existed but were only consumed by
+`Portfolio_risk.check_limits`, which is **never called from the live
+entry pipeline** (zero non-test callers).
+
+Fix: added `~side` parameter to `compute_position_size`; final share
+count is now `min(risk_based_shares, exposure_capped_shares)` where
+`exposure_capped_shares = floor(portfolio_value * max_exposure_pct /
+entry_price)`. Pre-fix the ABBV-shape test ($1M portfolio, $101.59
+entry, $102.41 stop, side=Short) sized 12,195 shares ($1.238M); post-
+fix sizes 2,953 shares ($300K = 30% cap × $1M). Symmetric long-side
+cap also pinned (max 90%). Five new tests in
+`test_portfolio_risk.ml`; existing 4 long-side tests updated for the
+new required `~side` arg. Also absorbed the Long/Short entry-stop
+swap that used to live in
+`Entry_audit_capture._normalised_entry_stop_for_sizing` into
+`compute_position_size` itself (now uses `Float.abs (entry - stop)` +
+side-direction validation).
+
+Re-enabling shorts on sp500-2019-2023 (the validation rerun) is **not
+done in this PR** — left as the next step. The override stays in
+place. G7 closing means `compute_position_size` no longer produces
+oversized entries; whether that's *sufficient* to drop the force-
+liquidation count to single digits (and produce a defensible short-
+side baseline) is what the rerun will measure.

@@ -145,26 +145,48 @@ val default_config : config
 val compute_position_size :
   config:config ->
   portfolio_value:float ->
+  side:[ `Long | `Short ] ->
   entry_price:float ->
   stop_price:float ->
   ?big_winner:bool ->
   unit ->
   sizing_result
-(** Compute position size using fixed-risk sizing.
+(** Compute position size using fixed-risk sizing, capped by exposure limits.
 
-    Formula: shares = floor((portfolio_value * risk_pct) / (entry - stop))
+    Two formulas applied in series:
+    + Risk-based: shares_risk = floor((portfolio_value * risk_pct) / |entry -
+      stop|)
+    + Exposure-capped: shares_max = floor(portfolio_value * max_exposure_pct /
+      entry_price), where max_exposure_pct is [max_long_exposure_pct] for [Long]
+      and [max_short_exposure_pct] for [Short].
 
-    The stop must be strictly below the entry price (long) or above (short). If
-    stop >= entry (which would be invalid), returns 0 shares.
+    Final share count is the minimum of the two. The exposure cap prevents tight
+    stops (small [|entry - stop|]) from producing positions whose notional
+    exceeds the configured per-side budget — a sizing pathology observed in the
+    sp500-2019-2023 rerun where shorts opened at 124% of portfolio value (ABBV
+    2019-02-01).
+
+    Pass [entry_price] and [stop_price] in their natural sense — entry is the
+    real entry price and stop is the real stop level. The function checks the
+    direction against [side]:
+    - [Long]: requires [stop_price < entry_price]
+    - [Short]: requires [stop_price > entry_price]
+
+    If the stop is on the wrong side or equal to entry, returns 0 shares.
 
     @param config Risk configuration
-    @param portfolio_value Total portfolio value for risk calculation
+    @param portfolio_value Total portfolio value for risk + exposure calculation
+    @param side
+      [`Long] uses [max_long_exposure_pct]; [`Short] uses
+      [max_short_exposure_pct]
     @param entry_price Price at which to enter the position
     @param stop_price Stop-loss price for the position
     @param big_winner
-      If [true], scales position size by [config.big_winner_multiplier]. Use for
-      high-conviction setups — Stage 2 breakouts with strong volume and relative
-      strength — where you want to commit more capital. (default: false) *)
+      If [true], scales the risk-based share count by
+      [config.big_winner_multiplier]. The exposure cap still applies to the
+      final result. Use for high-conviction setups — Stage 2 breakouts with
+      strong volume and relative strength — where you want to commit more
+      capital. (default: false) *)
 
 (** {1 Limit Checks} *)
 
