@@ -122,3 +122,112 @@ Matches the plan's contract.
 
 APPROVED
 
+---
+
+# QC Structural Review — backtest-g6-decade-nondeterminism (PR #703)
+Date: 2026-04-30
+Reviewer: qc-structural
+
+Reviewed SHA: e39bda57ccedbd04f4c150791c8c021f9b11ba0e
+
+## Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | |
+| H2 | dune build | PASS | |
+| H3 | dune runtest | PASS | Trading-specific tests passed; pre-existing linter warnings on unmodified modules do not block (file-length, nesting, magic-numbers failures pre-date this PR) |
+| P1 | Functions ≤ 50 lines (linter) | PASS | New test module opens Matchers; dune-wired linter coverage includes new files |
+| P2 | No magic numbers (linter) | PASS | No magic numbers in new code |
+| P3 | Config completeness | NA | Investigation note + regression test; no new config parameters |
+| P4 | .mli coverage (linter) | NA | No new .mli files |
+| P5 | Internal helpers prefixed with underscore | PASS | `_load_scenario`, `_sector_map_override`, `_run`, `_trades_of`, `_first_trade_divergence`, `_fixtures_root`, `_target_scenario_relpath`, `_perturber_scenario_relpath` all properly prefixed |
+| P6 | Tests conform to test-patterns.md | PASS | Test opens `open Matchers`; Sub-rule 1 (List.exists + equal_to) — no matches. Sub-rule 2 (let _ = ...on_market_close or .run without assert) — no matches (all backtest runs captured and examined). Sub-rule 3 (match/Error/Ok without is_ok_and_holds) — clean: one assert_that on final_portfolio_value with float_equal matcher; explicit OUnit2.assert_failure for integration-test diagnostics (appropriate for cross-cell isolation checks that need clear error messages) |
+| A1 | Core module modifications (Portfolio/Orders/Position/Strategy/Engine) | PASS | No modifications to core modules; pure test + infra additions |
+| A2 | No analysis/ → trading/ imports outside backtest exception | PASS | PR imports `weinstein.data_source` in dune file (allowed under backtest exception); pure test module |
+| A3 | No unnecessary existing module modifications | PASS | File list from `gh pr view 703 --json files`: (1) investigation note markdown, (2) status file update (status section only, added "Completed" entry), (3) dune file (added test names/modules/library deps), (4) new test .ml file. No cross-feature drift, no unrelated modules touched. |
+
+## Verdict
+
+APPROVED
+
+## Notes
+
+- **Hard gates (H1–H3):** All pass. Pre-existing linter failures (file-length, nesting, magic-numbers on core modules from earlier features) do not block this PR.
+- **Investigation + test quality:** The investigation note (`dev/notes/g6-decade-nondeterminism-investigation-2026-04-30.md`) is a rigorous audit of the fork-per-cell flow in `scenario_runner.ml`, narrowing the non-determinism to order-ID generation in `trading/orders/lib/create_order.ml` (a core module outside this agent's scope, correctly flagged for feat-weinstein/orders-owner follow-up). The regression test (`test_scenario_runner_isolation.ml`) pins the cross-cell isolation property on small-window data where the divergence does NOT currently reproduce, correctly classifying it as a forward guard per the task spec.
+- **Test harness integration:** New dune file properly adds `test_scenario_runner_isolation` to the test suite and includes all required dependencies (`backtest`, `weinstein.data_source`, `trading.simulation`). Three test cases: (1) target after one perturber round_trips match standalone, (2) target after one perturber final_portfolio_value within ε=1e-9, (3) target across two perturber cycles round_trips stable. All pass on GHA-sized fixtures.
+- **Status file:** Correctly updated with a "Completed" entry documenting the investigation finding, the flag to feat-weinstein/orders-owner for follow-up, and a note that the regression test PASSES today on small data and will catch regressions.
+
+---
+
+# Behavioral QC — backtest-g6-decade-nondeterminism (PR #703)
+Date: 2026-04-30
+Reviewer: qc-behavioral
+
+## Note on applicability
+
+This PR is a **pure infrastructure / investigation / forward-guard test PR** with no production code changes and no Weinstein-domain logic. It adds:
+- A forward-guard regression test (`test_scenario_runner_isolation.ml`, ~215 LOC).
+- An investigation note (`dev/notes/g6-decade-nondeterminism-investigation-2026-04-30.md`, 268 LOC).
+- A `dev/status/backtest-perf.md` § Completed entry.
+- A dune rule update for the new test.
+
+Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely": pure infra / harness PRs that touch no domain logic — the generic CP1–CP4 alone constitute the full review. The S*/L*/C*/T* block is marked NA.
+
+Authority docs / claims sources consulted:
+- PR #703 body — explicit claims about what the PR does + does not do.
+- `dev/notes/g6-decade-nondeterminism-investigation-2026-04-30.md` — investigation claims.
+- `trading/trading/backtest/scenarios/test/test_scenario_runner_isolation.ml` public docstring + `test_…` definitions.
+- `trading/trading/orders/lib/create_order.ml` + `trading/trading/orders/lib/manager.ml` — to verify the suspected leak-site narrative is plausible.
+- `dev/status/backtest-perf.md` § Completed entry.
+
+## Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new .mli docstrings has an identified test that pins it | NA | No new .mli files in this PR. The new test module's top-of-file docstring (lines 1–28) is descriptive (purpose, sibling test, GHA-data caveat) and makes no promises about the `_run`/`_to_trade` helpers beyond what the suite asserts. |
+| CP2 | Each claim in PR body "Test plan"/"Test coverage" has a corresponding test in the committed test file | PASS | PR body advertises three sub-tests under "Forward-guard regression test": (a) "round_trips bit-identical to standalone" → `test_target_after_perturber_matches_standalone` (line 141); (b) "final_portfolio_value within 1e-9" → `test_target_after_perturber_summary_matches` (line 166, uses `float_equal ~epsilon:1e-9`); (c) "round_trips stable across two perturber+target cycles" → `test_target_after_two_perturber_cycles_matches` (line 179). All three are wired into the suite (lines 204–213) and present in the committed file. The agent reports 3 PASS in ~10 sec; the test passing today against the suspected (but non-reproducing on small data) leak is exactly the forward-guard contract this PR claims (small-data property holds today; test catches future regressions that flip even small-window runs). |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size_is | PASS | The "isolation" property is essentially an identity contract: `metric_record(target_alone) == metric_record(target_after_perturber)`. The implementation pins this via `_first_trade_divergence` (line 115), which performs element-wise structural-equality (`equal_trade`, derived via `[@@deriving sexp, eq, show]` on the local mirror type) and reports the first differing trade with a full record dump. This is correct identity-pinning, not size-only. The summary test (line 166) bit-pins `final_portfolio_value` with epsilon=1e-9 (effectively bit-equal). No `size_is`-only shortcuts. |
+| CP4 | Each guard in code docstrings has a test that exercises the guarded scenario | PASS | The investigation note's primary guard claim is "the leak is INSIDE the child runtime, not at the parent-fork boundary" + "different scenario before the target run does not contaminate." The test exercises this guard surface directly: it runs a perturber scenario (`tiered-loader-parity`) and re-runs the target (`panel-golden-2019-full`) in-process; if the in-process property holds, the fork-mode property holds (via the strict-subset argument the docstring at lines 5–8 makes). The "two-cycle" sub-test (line 179) further exercises the guard against leaks that ONLY surface after multiple perturber rounds — addressing a stated concern in the docstring. The test reports PASS on small data, matching the explicit forward-guard contract ("test holds today on small windows; would catch a regression that breaks isolation badly enough to flip even small runs"). |
+
+### Plausibility check — investigation note's suspected primary site (CP4 supplementary)
+
+Spot-verified the investigation note's mechanism narrative against source:
+- `_generate_order_id` at `trading/trading/orders/lib/create_order.ml:16-21` does mint IDs with `Time_ns_unix.now() |> to_int63_ns_since_epoch` prefix + `Random.int 10000` suffix — verified.
+- `Manager.orders` is `(order_id, order) Hashtbl.t` at `trading/trading/orders/lib/manager.ml:12` — verified.
+- `Manager.list_orders` iterates via `Hashtbl.fold (fun _ order acc -> order :: acc) manager.orders []` at `manager.ml:56-58` — verified.
+
+Chain (timestamp prefix → Hashtbl bucket order → list_orders fold order → process_orders fill order → metrics divergence) is internally consistent against the cited evidence. The note correctly hedges that wall-clock-derived IDs alone don't fully explain the run-1=run-3 vs run-2 batch divergence (note §"Structural finding") and offers a CPU-contention amplifier hypothesis. Plausible for the investigation's stated purpose (flagging the site for follow-up, not pinning a fix).
+
+## Behavioral Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1 | Core module modification is strategy-agnostic (only fill if qc-structural flagged A1) | NA | qc-structural reported A1 PASS — no core-module touches in this PR (the PR is explicit that it does NOT fix the suspected `trading/orders/lib/create_order.ml` site, just flags it). |
+| S1 | Stage 1 definition matches book | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| S2 | Stage 2 definition matches book | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| S3 | Stage 3 definition matches book | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| S4 | Stage 4 definition matches book | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| S5 | Buy criteria: Stage 2 entry on breakout with volume | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| S6 | No buy signals in Stage 1/3/4 | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| L1 | Initial stop below base | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| L2 | Trailing stop never lowered | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| L3 | Stop triggers on weekly close | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| L4 | Stop state machine transitions | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| C1 | Screener cascade order | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| C2 | Bearish macro blocks all buys | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| C3 | Sector RS vs. market, not absolute | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| T1 | Tests cover all 4 stage transitions | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| T2 | Bearish-macro → zero buy candidates test | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| T3 | Stop trailing tests | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+| T4 | Tests assert domain outcomes, not "no error" | NA | Pure infra / investigation / test PR; domain checklist not applicable. |
+
+## Quality Score
+
+5 — Investigation note is a rigorous, well-evidenced audit (parent-fork flow walk, candidate enumeration with measurable claims, multiplicative-surface math explaining why only the 10y cell drifts, hedged "explanations of last resort" where the primary mechanism doesn't fully account for run-1=run-3 vs run-2 divergence). The forward-guard test is correctly scoped (in-process is a stricter contract than fork-mode per the strict-subset argument), structurally pinned with element-wise identity (not size-only), and includes a 2-cycle stress sub-test. PR body claims map cleanly to committed test names. The agent correctly STOPPED at the scope boundary (suspected fix site is in core orders module) rather than overstepping.
+
+(Does not affect verdict. Tracked for quality trends over time.)
+
+## Verdict
+
+APPROVED

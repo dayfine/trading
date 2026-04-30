@@ -1,12 +1,17 @@
 # Status: simulation
 
-## Last updated: 2026-04-29
+## Last updated: 2026-04-30
 
 ## Status
-IN_PROGRESS — split-day broker-model regression debug in flight on
-`fix/split-day-broker-model-debug` (DRAFT PR). Slice 1+3 verdicts remain
-APPROVED; the regression fix is a cross-cutting follow-up to the merged
-PR-3 (#664).
+IN_PROGRESS
+
+Split-day broker-model redesign + regression follow-ups fully wrapped
+(PRs #658 / #662 / #664 / #667 broker-model; #678 strategy-side-position-map
+fix; #680 stop-state rescaling; #682 short-side flag for sp500 mitigation;
+all merged 2026-04-28..29). Slice 1+3 verdicts remain APPROVED. Track stays
+IN_PROGRESS for the M5 walk-forward + tuner catch-all items and the local
+sp500-2019-2023 baseline rerun (deferred — needs full 491-symbol universe
+data not present in GHA).
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)
@@ -105,44 +110,19 @@ favour of a discrete event on the position ledger. Four PRs landed:
 
 ## In Progress
 
-- **Split-day broker model regression** (`fix/split-day-broker-model-debug`,
-  draft PR opened 2026-04-29). Full sp500-2019-2023 universe rerun against
-  post-PR-3 main produced -144.5% total return, 245.79% MaxDD, and
-  portfolio_value -$17,793 on 2020-08-31 (a long-only cash-accounting bug).
-  Root cause: PR-3 (#664) only adjusted the broker `Portfolio.t` on splits,
-  not the strategy-side `Position.t String.Map.t` (`t.positions`). On a 4:1
-  split, `Holding.quantity` stays at 100 while broker holds 400 shares;
-  next `TriggerExit` sells only 100 shares against the 400-share broker
-  position, leaving 300 orphan shares per split-day position. Strategy
-  Position transitions to `Closed` so orphans never clear. Fix: new helper
-  `Simulator._apply_splits_to_positions` scales `Holding`/`Exiting` state
-  in lockstep with `_apply_split_events`. Regression test:
-  `trading/trading/simulation/test/test_split_day_stop_exit.ml` (3 tests:
-  position-clears, no-orphan-equity, exit-on-split-day). All 3 FAIL on
-  current main, PASS post-fix. See `dev/decisions.md` §"2026-04-29 —
-  Split-day broker model: regression". DRAFT — needs maintainer review +
-  full sp500 rerun before merge. Local build/test gated on Docker
-  unresponsive at session time; reasoning and TDD against the existing
-  `test_split_day_mtm.ml` shape are the verification trail.
+- **Split-day broker-model redesign + regression (WRAPPED 2026-04-29)**.
+  PRs #658 (Split_detector) + #662 (Split_event ledger) + #664 (Simulator
+  wire-in) + #667 (verification + decisions promotion) + #678
+  (`fix/split-day-broker-model-debug`, strategy-side `Position.t`
+  cross-side sync) + #680 (`feat/weinstein-split-day-stop-adjustment`,
+  `Stop_split_adjust.scale` rescaling stop_states on split events) +
+  #682 (`feat/weinstein-short-side-flag` + sp500 long-only override)
+  all merged. The 97.69% phantom MaxDD on `goldens-sp500/sp500-2019-2023`
+  is structurally resolved. See `dev/decisions.md` §"2026-04-29 —
+  Split-day broker model: regression" + §"2026-04-29 — Split-day OHLC:
+  broker model".
 
-  - **Strategy-side complement (DONE)** — `feat/weinstein-split-day-stop-adjustment`
-    PR opened 2026-04-29. Adds `Weinstein_stops.Stop_split_adjust.scale` (pure
-    helper that divides every absolute-price field of a `stop_state` by the
-    split factor) plus `Weinstein_strategy.Stops_split_runner.adjust` (per-tick
-    detector that re-uses `Types.Split_detector.detect_split` on the most
-    recent two daily bars from the panel-backed `Bar_reader` and rescales the
-    matching `stop_states` entry). Wired into `_on_market_close` immediately
-    before `Stops_runner.update`. 13 new tests across two files (7 unit + 6
-    integration) including the strategy-level regression: pre-split $440 stop
-    scales to $110 so the post-split bar's $124 low does NOT trip
-    `Weinstein_stops.check_stop_hit`; control case with a genuine adverse
-    move past the adjusted stop DOES trip it. Without this fix the
-    broker-model #678 sync would still produce a phantom-trigger exit on
-    every split-day position. See `dev/decisions.md` §"2026-04-29 — Split-day
-    broker model: regression" "DONE — `feat/weinstein-split-day-stop-adjustment`"
-    sub-bullet.
-
-- M5 (walk-forward backtest, parameter tuner) is next
+- M5 (walk-forward backtest, parameter tuner) is next.
 
 ## Blocking Refactors
 - None
