@@ -1,6 +1,6 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-28
+## Last updated: 2026-04-30 (evening)
 
 ## Status
 MERGED
@@ -12,6 +12,17 @@ originally landed via #420 on 2026-04-19. Track wraps; future
 short-side work is performance-driven (e.g., revisiting the cascade
 parameters once the trade-audit track ships) rather than feature
 build-out.
+
+**2026-04-30 (evening) update**: shorts now live in the sp500
+regression scenario. After G1-G5 + G7-G9 closed (PRs #689-#710),
+`goldens-sp500/sp500-2019-2023.sexp` has the `enable_short_side =
+false` override removed and ranges re-pinned to the with-shorts
+baseline (32 trades / -0.01% / 0 force-liquidations / 43d avg holding
+/ 5.8% MaxDD). See `dev/notes/sp500-shortside-reenabled-2026-04-30.md`.
+The 5-year sp500 scenario is now the standing regression gate for
+short-side correctness; the 4 short trades the strategy emits during
+the 2019 Bearish-macro window all exit via stop_loss with the correct
+sign convention.
 
 **Historical: live-cascade bug (resolved by #623)**: real-data SP500
 verification (PR #612) revealed 0 short trades + 37 long entries in

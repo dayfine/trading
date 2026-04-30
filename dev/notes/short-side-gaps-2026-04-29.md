@@ -313,6 +313,15 @@ back to `enable_short_side = true`), the BASELINE_PENDING expected
 ranges re-pinned to whatever the with-shorts run produces, and G5
 added as the standing regression gate.
 
+**DONE 2026-04-30 (evening)**: third retry succeeded after PR #710 (G9)
+landed. sp500-2019-2023 now runs with shorts enabled and produces
+clean, deterministic metrics: 32 trades / -0.01% return / 0 force-
+liquidations / 43-day avg holding / 5.8% MaxDD. Override removed,
+ranges re-pinned ±10-15% around measured baseline. See
+`dev/notes/sp500-shortside-reenabled-2026-04-30.md` for full report
+including side breakdown, comparison vs long-only / AM / PM runs, and
+G1-G9 fix validation.
+
 ## G7 — Position sizing for shorts
 
 See `dev/notes/sp500-shortside-rerun-blocked-g7-2026-04-30.md` for
