@@ -85,6 +85,7 @@ let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   | Time_expired _ -> "time_expired"
   | Underperforming _ -> "underperforming"
   | Portfolio_rebalancing -> "rebalancing"
+  | End_of_period -> "end_of_period"
 
 let _row_of_trade audit_idx (trade : Trading_simulation.Metrics.trade_metrics) :
     per_trade_row =

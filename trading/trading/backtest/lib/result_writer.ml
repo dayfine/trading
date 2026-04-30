@@ -56,6 +56,7 @@ let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   | Time_expired _ -> "time_expired"
   | Underperforming _ -> "underperforming"
   | Portfolio_rebalancing -> "rebalancing"
+  | End_of_period -> "end_of_period"
 
 (** Build a (symbol, exit_date) -> reason map from force-liquidation events.
     [trades.csv] rows are post-processed: when a row's (symbol, exit_date)
