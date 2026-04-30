@@ -10,6 +10,7 @@ type exit_trigger =
   | Time_expired of { days_held : int; max_days : int }
   | Underperforming of { days_held : int; current_return : float }
   | Portfolio_rebalancing
+  | End_of_period
 [@@deriving show, eq, sexp]
 
 type stop_info = {
@@ -71,7 +72,17 @@ let _process_transition t (trans : Position.transition) =
   | TriggerExit { exit_reason; _ } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
       record.pos_exit_trigger <- Some (exit_trigger_of_reason exit_reason)
-  | EntryFill _ | CancelEntry _ | ExitFill _ | ExitComplete -> ()
+  | ExitComplete ->
+      (* Simulator's end-of-period auto-close path emits [ExitFill] +
+         [ExitComplete] without a preceding [TriggerExit]. Tag the position
+         with [End_of_period] only when no strategy-emitted trigger has
+         already been recorded — an [ExitComplete] that follows a
+         [TriggerExit] (the normal stop-out / take-profit path) leaves the
+         strategy's trigger intact. *)
+      let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
+      if Option.is_none record.pos_exit_trigger then
+        record.pos_exit_trigger <- Some End_of_period
+  | EntryFill _ | CancelEntry _ | ExitFill _ -> ()
 
 let record_transitions t transitions =
   List.iter transitions ~f:(_process_transition t)

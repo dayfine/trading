@@ -27,6 +27,13 @@ type exit_trigger =
   | Underperforming of { days_held : int; current_return : float }
       (** Position underperformed *)
   | Portfolio_rebalancing  (** Closed for rebalancing *)
+  | End_of_period
+      (** Position was force-closed at the end of the backtest period without a
+          preceding strategy-emitted [TriggerExit]. The simulator's end-of-run
+          auto-close path emits [ExitFill] + [ExitComplete] but no
+          [TriggerExit], so the collector tags the resulting [stop_info] with
+          this fallback to avoid an empty [exit_trigger] column in [trades.csv].
+      *)
 [@@deriving show, eq, sexp]
 
 val exit_trigger_of_reason : Position.exit_reason -> exit_trigger
@@ -66,7 +73,12 @@ val record_transitions : t -> Position.transition list -> unit
     - [CreateEntering] records symbol and position_id
     - [EntryComplete] records initial stop-loss price from risk_params
     - [UpdateRiskParams] updates current stop-loss price
-    - [TriggerExit] records exit trigger and final stop level *)
+    - [TriggerExit] records exit trigger and final stop level
+    - [ExitComplete] without a preceding [TriggerExit] tags
+      [exit_trigger = End_of_period] (simulator end-of-run auto-close). An
+      [ExitComplete] that follows a [TriggerExit] keeps the strategy's original
+      trigger — the fallback is only applied when [exit_trigger] is still
+      [None]. *)
 
 val get_stop_infos : t -> stop_info list
 (** Return stop info for all positions that have been observed, sorted by

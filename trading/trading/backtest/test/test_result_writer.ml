@@ -77,8 +77,8 @@ let _empty_summary ~start_date ~end_date : Backtest.Summary.t =
     metrics = Trading_simulation_types.Metric_types.empty;
   }
 
-let _make_result ?(steps = []) ?(final_prices = []) ~round_trips
-    ~force_liquidations () : Backtest.Runner.result =
+let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
+    ~round_trips ~force_liquidations () : Backtest.Runner.result =
   let start_date = _date "2024-01-02" in
   let end_date = _date "2024-04-29" in
   {
@@ -86,7 +86,7 @@ let _make_result ?(steps = []) ?(final_prices = []) ~round_trips
     round_trips;
     steps;
     overrides = [];
-    stop_infos = [];
+    stop_infos;
     audit = [];
     cascade_summaries = [];
     force_liquidations;
@@ -271,6 +271,50 @@ let test_non_matching_event_does_not_override _ =
                  String.is_prefix (List.nth_exn cols idx)
                    ~prefix:"force_liquidation")
                (equal_to false);
+           ]))
+
+(* ------------------------------------------------------------------ *)
+(* B2.4 — End_of_period stop_info renders "end_of_period" in trades.csv *)
+(* ------------------------------------------------------------------ *)
+
+(** When the simulator's end-of-run auto-close fires (no preceding
+    [TriggerExit]), [Stop_log] tags the position with [End_of_period] and
+    [Result_writer] must render that as ["end_of_period"] in the [exit_trigger]
+    column. Pin this to avoid the empty-string regression seen in the
+    sp500-2019-2023 run (JPM 2019-05-04, HD 2021-03-27 — see
+    dev/notes/sp500-trade-quality-findings-2026-04-30.md). *)
+let test_end_of_period_renders_label _ =
+  let dir = Core_unix.mkdtemp "/tmp/result_writer_eop_" in
+  Fun.protect
+    ~finally:(fun () ->
+      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" dir) in
+      ())
+    (fun () ->
+      let trade =
+        _make_trade ~symbol:"JPM" ~exit_date:(_date "2024-04-29") ()
+      in
+      let stop_info : Backtest.Stop_log.stop_info =
+        {
+          position_id = "JPM-wein-1";
+          symbol = "JPM";
+          entry_stop = Some 95.0;
+          exit_stop = Some 95.0;
+          exit_trigger = Some Backtest.Stop_log.End_of_period;
+        }
+      in
+      let result =
+        _make_result ~round_trips:[ trade ] ~force_liquidations:[]
+          ~stop_infos:[ stop_info ] ()
+      in
+      Backtest.Result_writer.write ~output_dir:dir result;
+      let header, rows = _read_trades_csv ~output_dir:dir in
+      let idx = _exit_trigger_idx header in
+      assert_that rows
+        (elements_are
+           [
+             field
+               (fun cols -> List.nth_exn cols idx)
+               (equal_to "end_of_period");
            ]))
 
 (* ------------------------------------------------------------------ *)
@@ -489,6 +533,8 @@ let suite =
          >:: test_portfolio_floor_force_liq_overrides_exit_trigger;
          "non-matching event does not override exit_trigger"
          >:: test_non_matching_event_does_not_override;
+         "end_of_period stop_info renders end_of_period label"
+         >:: test_end_of_period_renders_label;
          "open_positions.csv header and rows"
          >:: test_open_positions_csv_header_and_rows;
          "open_positions.csv empty writes header only"
