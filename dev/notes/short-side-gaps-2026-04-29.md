@@ -271,7 +271,19 @@ Force-liquidation fired 910× because shorts were sized at >100 % of
 portfolio (ABBV 2019-02-01: $1.238M position vs $1M portfolio). G3 cash
 floor passed the entry; sizing helper or cash-check has the bug.
 
-Once G1 + G2 + G3 + G4 + **G7** close, the sp500 scenario's
+**2026-04-30 PM update**: second rerun attempted after G7 (#702) and G8
+(#705) landed. Force-liquidation count dropped from 910 → 928 (only
+marginal change), avg_holding_days remained at 3.46 (vs. expected
+~70+). Surfaced new gap **G9 — `Force_liquidation_runner._portfolio_value`
+has the same shorts-sign bug as pre-G8 `Portfolio_view._holding_market_value`**
+(G8 only patched one of two sites). Details in
+`dev/notes/sp500-shortside-rerun-blocked-g9-2026-04-30-pm.md`.
+Profitable shorts being force-liquidated on 2019-02-14 (ABBV +$21,596,
+CVS +$21,635, etc.) — `Portfolio_floor` fires because the buggy
+portfolio_value tracking inflates the peak then "drops" below 40 % of
+that inflated peak.
+
+Once G1 + G2 + G3 + G4 + G7 + G8 + **G9** close, the sp500 scenario's
 `config_overrides` should be reverted (drop the override, defaulting
 back to `enable_short_side = true`), the BASELINE_PENDING expected
 ranges re-pinned to whatever the with-shorts run produces, and G5
@@ -358,3 +370,38 @@ numeric assertions. No existing tests required updates: pre-fix the
 weinstein-strategy / simulation suites passed because their fixtures
 either used long-only positions or did not pin `portfolio_value` at a
 specific number.
+
+## G9 — `Force_liquidation_runner._portfolio_value` has the same shorts-sign bug
+
+Surfaced 2026-04-30 PM on the post-G8 sp500 rerun. See
+`dev/notes/sp500-shortside-rerun-blocked-g9-2026-04-30-pm.md` for full
+details.
+
+- Symptom: 928 `Portfolio_floor` force-liquidations on a $1M-starting
+  portfolio that never legitimately dropped below $774K (per the
+  equity_curve, which uses the correct
+  `Trading_portfolio.Calculations.portfolio_value`). The first
+  force-liquidation batch on 2019-02-14 includes ABBV short
+  +$21,596 unrealized, CVS +$21,635, HWM +$30,412 — profitable
+  shorts that should not trigger any floor.
+- Root cause: `Force_liquidation_runner._portfolio_value`
+  (`trading/trading/weinstein/strategy/lib/force_liquidation_runner.ml:33-41`)
+  duplicates `Portfolio_view._holding_market_value`'s logic but
+  uses the unsigned `Holding.quantity` directly. G8 (#705) fixed
+  `Portfolio_view._holding_market_value` but did not patch this
+  sibling copy.
+- Effect: cash inflates with each short entry (proceeds credited).
+  Buggy `_portfolio_value` adds positive position-values on top of
+  inflated cash → tracked peak is roughly 2× the true peak. As shorts
+  profit (price drops), `quantity * close_price` decreases → buggy
+  portfolio_value drops below 40 % of inflated peak →
+  `Portfolio_floor` fires on profitable shorts.
+- Leaking surface: single function in
+  `trading/trading/weinstein/strategy/lib/force_liquidation_runner.ml`.
+  Mechanically identical to G8's fix shape — sign by `pos.side`. Or
+  delegate to `Portfolio_view.portfolio_value` to remove the
+  duplicate code path.
+- Fix surface (post-investigation): one-line sign-by-side fix +
+  regression test pinning the inflated-peak vs. corrected-peak shape.
+  Should not exceed 100 LOC.
+- Owner: `feat-weinstein` (force_liquidation_runner scope).
