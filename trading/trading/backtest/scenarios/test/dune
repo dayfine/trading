@@ -1,4 +1,23 @@
 (tests
- (names test_scenario test_universe_file test_fixtures_root)
- (modules test_scenario test_universe_file test_fixtures_root)
- (libraries ounit2 core core_unix scenario_lib matchers))
+ (names
+  test_scenario
+  test_universe_file
+  test_fixtures_root
+  test_scenario_runner_isolation)
+ (modules
+  test_scenario
+  test_universe_file
+  test_fixtures_root
+  test_scenario_runner_isolation)
+ (libraries
+  ounit2
+  core
+  core_unix
+  fpath
+  scenario_lib
+  matchers
+  backtest
+  weinstein.data_source
+  trading.simulation)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))

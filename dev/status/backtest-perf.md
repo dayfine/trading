@@ -186,6 +186,37 @@ mechanics + release-gate procedure.
 
 ## Completed
 
+- **G6 — decade-2014-2023 non-determinism investigation + forward-guard test**
+  (2026-04-30, `feat/backtest-g6-decade-nondeterminism`). Investigation note
+  `dev/notes/g6-decade-nondeterminism-investigation-2026-04-30.md` audits the
+  scenario_runner.ml fork-per-cell flow and identifies the primary source of
+  the decade cell's `145 trades vs 135 trades` drift across run modes:
+  **`trading/orders/lib/create_order.ml:_generate_order_id` mints order IDs
+  with a `Time_ns_unix.now()` ns-precision prefix; these IDs are hashtable
+  keys in `Trading_orders.Manager.orders`; `Manager.list_orders` iterates via
+  `Hashtbl.fold` so iteration order depends on bucket placement of keys.**
+  Different wall-clock during order creation → different IDs → different
+  buckets → different `process_orders` iteration order → different fill
+  order under cash-floor / sizing edges → divergent metrics on long-horizon
+  ×broad-universe scenarios. Why only the 10y cell drifts: the multiplicative
+  factor 520 Fridays × N=1000 puts the per-Friday flip probability into a
+  range where ~40 % of runs see at least one flip; shorter cells stay below
+  the threshold. Why batch-of-4 is more divergent than single: 4 children
+  competing for cores produce more clock jitter, more divergent IDs.
+  Reproduction on GHA-sized data (22 symbols × 15 months) does NOT surface
+  the divergence — the multiplicative surface is ~1300 cell-Fridays vs
+  520k for decade. The fix surface is `trading/orders/lib/create_order.ml`,
+  outside this agent's scope (a "core module" per
+  `.claude/rules/qc-structural-authority.md` A1 list); flagged for
+  feat-weinstein / orders-owner follow-up. Forward-guard regression test
+  added at `trading/trading/backtest/scenarios/test/test_scenario_runner_isolation.ml`
+  with three sub-tests (round_trips after one perturber, summary after one
+  perturber, round_trips across two perturber cycles). Test PASSES today
+  on the GHA-sized panel-golden-2019-full + tiered-loader-parity pair —
+  the property holds on small data; the test catches future regressions
+  that break isolation badly enough to flip even small runs. Verify:
+  `dune runtest trading/backtest/scenarios/test/`.
+
 - **goldens-broad long-only baselines pinned** (2026-04-29,
   `feat/goldens-broad-long-only-baselines`). All four `goldens-broad/*.sexp`
   cells (`bull-crash-2015-2020`, `covid-recovery-2020-2024`,
