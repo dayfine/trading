@@ -172,6 +172,99 @@ let test_round_trip_extraction_survives_non_trading_day_filter _ =
     (List.length round_trips - List.length buggy_round_trips)
     (gt (module Int_ord) 0)
 
+(* -------------------------------------------------------------------- *)
+(* Phase 3: summary metrics overlay matches range-filtered round_trips    *)
+(* -------------------------------------------------------------------- *)
+
+(** Reconciler-surfaced regression: on [panel-golden-2019-full], summary's
+    WinCount disagreed with the count of [pnl_dollars > 0] rows in [trades.csv].
+    Root cause: the simulator runs from [warmup_start] to [end_date] and its
+    [Summary_computer] folds over the warmup steps too, while the runner's
+    [round_trips] are derived from [steps_in_range] (steps with
+    [date >= start_date]). When complete round-trips fall in the warmup window,
+    the simulator's metric set counts them but [trades.csv] does not.
+
+    [Backtest.Runner._make_summary] now overlays
+    [Metrics.compute_round_trip_metric_set runner_round_trips] onto
+    [sim_result.metrics] so the [Summary.t]'s WinCount/LossCount/etc. match
+    [trades.csv]. The overlay's semantics: keys present in the overlay win, keys
+    only in the simulator metric set are preserved (Sharpe, MaxDrawdown, CAGR,
+    etc., which are still computed from the full step series).
+
+    This test pins the alignment by composing the two public surfaces the runner
+    uses ([compute_round_trip_metric_set] + [Metric_types.merge]) — full
+    integration through [run_backtest] would require a real panel + scenario,
+    which is the smoke-fixture's domain. The synthetic case here mirrors the
+    panel-golden-2019-full bug exactly: simulator says 3 wins / 6 losses (warmup
+    contributed an extra 1 win + 1 loss); runner's range-filtered round_trips
+    show 2 wins / 5 losses. Post-overlay the summary must show 2 wins / 5
+    losses, never 3 / 6. *)
+let test_summary_metrics_overlay_aligns_with_range_round_trips _ =
+  let open Trading_simulation_types.Metric_types in
+  (* Simulator-reported metric_set: 3 wins + 6 losses (includes 1 win +
+     1 loss from the warmup window). *)
+  let sim_metrics =
+    of_alist_exn
+      [
+        (TotalPnl, -8000.0);
+        (WinCount, 3.0);
+        (LossCount, 6.0);
+        (WinRate, 33.33);
+        (AvgHoldingDays, 18.0);
+        (ProfitFactor, 0.4);
+        (* Non-round-trip metrics that the simulator computes from the
+           full step series — these must survive the overlay unchanged. *)
+        (SharpeRatio, 0.6);
+        (MaxDrawdown, 2.0);
+        (CAGR, 1.83);
+      ]
+  in
+  (* Runner's range-filtered round_trips: 2 wins, 5 losses. *)
+  let make_round_trip ~symbol ~pnl =
+    {
+      Trading_simulation.Metrics.symbol;
+      side = Trading_base.Types.Buy;
+      entry_date = date_of_string "2019-05-04";
+      exit_date = date_of_string "2019-05-07";
+      days_held = 3;
+      entry_price = 100.0;
+      exit_price = 100.0;
+      quantity = 100.0;
+      pnl_dollars = pnl;
+      pnl_percent = pnl /. 100.0;
+    }
+  in
+  let runner_round_trips =
+    [
+      make_round_trip ~symbol:"W1" ~pnl:1500.0;
+      make_round_trip ~symbol:"W2" ~pnl:1000.0;
+      make_round_trip ~symbol:"L1" ~pnl:(-2000.0);
+      make_round_trip ~symbol:"L2" ~pnl:(-1500.0);
+      make_round_trip ~symbol:"L3" ~pnl:(-1000.0);
+      make_round_trip ~symbol:"L4" ~pnl:(-500.0);
+      make_round_trip ~symbol:"L5" ~pnl:(-250.0);
+    ]
+  in
+  let overlay =
+    Trading_simulation.Metrics.compute_round_trip_metric_set runner_round_trips
+  in
+  let aligned = merge sim_metrics overlay in
+  assert_that aligned
+    (map_includes
+       [
+         (* The reconciler's arithmetic count must equal the summary's
+            count post-overlay. Both reflect runner_round_trips, not the
+            simulator's full-step view. *)
+         (WinCount, float_equal 2.0);
+         (LossCount, float_equal 5.0);
+         (WinRate, float_equal ~epsilon:1e-2 (2.0 /. 7.0 *. 100.0));
+         (TotalPnl, float_equal (-2750.0));
+         (* Non-overlay metrics (Sharpe, MaxDrawdown, CAGR) survive. *)
+         (SharpeRatio, float_equal 0.6);
+         (MaxDrawdown, float_equal 2.0);
+         (CAGR, float_equal 1.83);
+       ])
+
 let suite =
   "Runner_filter"
   >::: [
@@ -181,6 +274,8 @@ let suite =
          >:: test_is_trading_day_flat_value_with_positions;
          "round-trip extraction must not be gated on is_trading_day"
          >:: test_round_trip_extraction_survives_non_trading_day_filter;
+         "summary metrics overlay aligns with range-filtered round_trips"
+         >:: test_summary_metrics_overlay_aligns_with_range_round_trips;
        ]
 
 let () = run_test_tt_main suite

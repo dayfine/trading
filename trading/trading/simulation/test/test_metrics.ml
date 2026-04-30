@@ -668,6 +668,105 @@ let test_profit_factor_no_trades _ =
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
   assert_that metrics (contains_entry ProfitFactor (float_equal 0.0))
 
+(* ==================== compute_round_trip_metric_set Tests ==================== *)
+
+(** Build a synthetic [trade_metrics] record. Defaults the boilerplate fields so
+    test cases stay focused on [side] and [pnl_dollars]. *)
+let _make_round_trip ?(symbol = "SYM") ?(side = Trading_base.Types.Buy)
+    ?(entry_date = date_of_string "2024-01-02")
+    ?(exit_date = date_of_string "2024-01-12") ?(days_held = 10)
+    ?(entry_price = 100.0) ?(exit_price = 110.0) ?(quantity = 10.0) ~pnl_dollars
+    () =
+  let pnl_percent = pnl_dollars /. (entry_price *. quantity) *. 100.0 in
+  {
+    symbol;
+    side;
+    entry_date;
+    exit_date;
+    days_held;
+    entry_price;
+    exit_price;
+    quantity;
+    pnl_dollars;
+    pnl_percent;
+  }
+
+(** The flagship invariant: WinCount + LossCount equal the round-trip count, and
+    both reflect [pnl_dollars]'s sign. Synthetic 5 round-trips with 3 long wins,
+    1 long loss, 1 short win → [n_wins = 4], [n_losses = 1]. Pre-fix to
+    [Backtest.Runner._make_summary], the simulator's Summary_computer counted
+    warmup-window pairs that the runner's range-filtered [round_trips] did not,
+    so summary's WinCount disagreed with [List.count round_trips ~f:(pnl > 0)].
+    This test pins [compute_round_trip_metric_set] — the fix's load-bearing
+    helper — to the round-trip-derived count, which is what trades.csv reports.
+*)
+let test_compute_round_trip_metric_set_mixed_long_short _ =
+  let round_trips =
+    [
+      _make_round_trip ~symbol:"LONG_W1" ~side:Buy ~pnl_dollars:100.0 ();
+      _make_round_trip ~symbol:"LONG_W2" ~side:Buy ~pnl_dollars:200.0 ();
+      _make_round_trip ~symbol:"LONG_W3" ~side:Buy ~pnl_dollars:300.0 ();
+      _make_round_trip ~symbol:"LONG_L1" ~side:Buy ~pnl_dollars:(-150.0) ();
+      _make_round_trip ~symbol:"SHORT_W1" ~side:Sell ~pnl_dollars:50.0 ();
+    ]
+  in
+  let metrics = compute_round_trip_metric_set round_trips in
+  (* WinCount + LossCount must equal the round-trip count (no overcounting,
+     no off-by-one), and the win count must equal the arithmetic count of
+     pnl_dollars > 0 — the same predicate the reconciler applies to
+     trades.csv. *)
+  let arithmetic_wins =
+    List.count round_trips ~f:(fun (m : trade_metrics) ->
+        Float.(m.pnl_dollars > 0.0))
+  in
+  assert_that arithmetic_wins (equal_to 4);
+  assert_that metrics
+    (map_includes
+       [
+         (WinCount, float_equal 4.0);
+         (LossCount, float_equal 1.0);
+         (WinRate, float_equal 80.0);
+         (TotalPnl, float_equal 500.0);
+         (* gross_profit = 100+200+300+50 = 650; gross_loss = 150;
+            profit_factor = 650 / 150 ≈ 4.333... *)
+         (ProfitFactor, float_equal ~epsilon:1e-6 (650.0 /. 150.0));
+       ])
+
+(** Empty round-trip list emits only [ProfitFactor = 0.0], matching the legacy
+    [Summary_computer] convention (so existing callers / goldens that pin "no
+    trades" → [ProfitFactor = 0] stay green). The win/loss counts are omitted
+    from the overlay; the runner's [Metric_types.merge sim_metrics overlay]
+    therefore falls back to the simulator's WinCount/LossCount when the runner's
+    range-filtered [round_trips] is empty — which means the simulator's reading
+    also produced no round-trips on the steps it saw, so this is a graceful
+    no-op. *)
+let test_compute_round_trip_metric_set_empty _ =
+  let metrics = compute_round_trip_metric_set [] in
+  assert_that metrics (contains_entry ProfitFactor (float_equal 0.0));
+  assert_that (Map.mem metrics WinCount) (equal_to false);
+  assert_that (Map.mem metrics LossCount) (equal_to false);
+  assert_that (Map.mem metrics TotalPnl) (equal_to false)
+
+(** All winners → [LossCount = 0], [ProfitFactor = +inf] (matches the existing
+    profit-factor convention from Summary_computer). *)
+let test_compute_round_trip_metric_set_all_winners _ =
+  let round_trips =
+    [
+      _make_round_trip ~symbol:"W1" ~pnl_dollars:50.0 ();
+      _make_round_trip ~symbol:"W2" ~pnl_dollars:75.0 ();
+    ]
+  in
+  let metrics = compute_round_trip_metric_set round_trips in
+  assert_that metrics
+    (map_includes
+       [
+         (WinCount, float_equal 2.0);
+         (LossCount, float_equal 0.0);
+         (WinRate, float_equal 100.0);
+         (TotalPnl, float_equal 125.0);
+         (ProfitFactor, float_equal Float.infinity);
+       ])
+
 (* ==================== CAGR Tests ==================== *)
 
 let test_cagr_zero_with_no_data _ =
@@ -974,6 +1073,13 @@ let suite =
          (* Profit factor tests *)
          "profit factor all winners" >:: test_profit_factor_all_winners;
          "profit factor no trades" >:: test_profit_factor_no_trades;
+         (* compute_round_trip_metric_set tests *)
+         "compute_round_trip_metric_set mixed long+short"
+         >:: test_compute_round_trip_metric_set_mixed_long_short;
+         "compute_round_trip_metric_set empty"
+         >:: test_compute_round_trip_metric_set_empty;
+         "compute_round_trip_metric_set all winners"
+         >:: test_compute_round_trip_metric_set_all_winners;
          (* CAGR tests *)
          "cagr zero with no data" >:: test_cagr_zero_with_no_data;
          "cagr with growth" >:: test_cagr_with_growth;

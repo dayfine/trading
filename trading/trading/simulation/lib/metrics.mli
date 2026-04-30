@@ -99,3 +99,26 @@ val show_summary : summary_stats -> string
 val summary_stats_to_metrics :
   summary_stats -> Trading_simulation_types.Metric_types.metric_set
 (** Convert summary_stats to metric_set *)
+
+val compute_profit_factor : trade_metrics list -> float
+(** Compute profit factor: gross profit divided by gross loss across the given
+    round-trips. Returns [Float.infinity] when there are profitable trades but
+    no losses, and [0.0] when there are no trades or no profits. *)
+
+val compute_round_trip_metric_set :
+  trade_metrics list -> Trading_simulation_types.Metric_types.metric_set
+(** Build the round-trip-derived metric set ([TotalPnl], [AvgHoldingDays],
+    [WinCount], [LossCount], [WinRate], [ProfitFactor]) directly from a list of
+    round-trips.
+
+    Empty [round_trips] yields just [{ ProfitFactor = 0.0 }] — matching the
+    legacy [Summary_computer] convention. The win/loss/PnL keys are omitted so
+    an empty-range overlay leaves the simulator's pre-existing reading intact
+    via [Metric_types.merge].
+
+    This is the canonical computation of round-trip-derived metrics — callers
+    that have already extracted [round_trips] should use this rather than
+    re-running the simulator's [Summary_computer] over a step list, which
+    re-derives [round_trips] internally and may pair across step ranges that
+    differ from the caller's window. See [Backtest.Runner._make_summary] for the
+    warmup-vs-range-window alignment use case. *)
