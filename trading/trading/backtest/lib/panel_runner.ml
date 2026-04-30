@@ -174,6 +174,24 @@ let _run_simulator_with_gc_trace ?gc_trace sim =
   in
   loop sim ~pending_date:start_date
 
+(** Snapshot of close prices on the final calendar column. Iterates the universe
+    via [Symbol_index.symbols] and reads cell [(row, n_days - 1)] of
+    [Ohlcv_panels.close]. Symbols whose final cell is NaN (no bar that day —
+    weekend, holiday, suspended, or pre-IPO) are dropped. Empty result when
+    [n_days = 0]. The runner filters this alist to held symbols when populating
+    [Runner.result.final_prices]. *)
+let _final_close_prices ~ohlcv =
+  let n_days = Ohlcv_panels.n_days ohlcv in
+  if n_days <= 0 then []
+  else
+    let last_col = n_days - 1 in
+    let close_panel = Ohlcv_panels.close ohlcv in
+    let symbol_index = Ohlcv_panels.symbol_index ohlcv in
+    let symbols = Symbol_index.symbols symbol_index in
+    List.filter_mapi symbols ~f:(fun row symbol ->
+        let v = close_panel.{row, last_col} in
+        if Float.is_nan v then None else Some (symbol, v))
+
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?trace ?gc_trace () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
@@ -211,4 +229,5 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
         _run_simulator_with_gc_trace ?gc_trace sim)
   in
-  (sim_result, stop_log, trade_audit, force_liquidation_log)
+  let final_close_prices = _final_close_prices ~ohlcv in
+  (sim_result, stop_log, trade_audit, force_liquidation_log, final_close_prices)

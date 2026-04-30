@@ -27,6 +27,7 @@ type result = {
   audit : Trade_audit.audit_record list;
   cascade_summaries : Trade_audit.cascade_summary list;
   force_liquidations : Portfolio_risk.Force_liquidation.event list;
+  final_prices : (string * float) list;
 }
 
 (* Trading-day filter *)
@@ -270,6 +271,24 @@ let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     metrics = _align_summary_metrics_to_round_trips ~sim_result ~round_trips;
   }
 
+(** Filter [final_close_prices] to symbols that are still held in the last
+    step's portfolio. Empty result when [steps] is empty or no positions are
+    open. The reconciler only references [final_prices.csv] via the join key
+    against [open_positions.csv], so prices for never-held or already-closed
+    symbols are not needed and would just bloat the artefact. *)
+let _final_prices_for_held_symbols ~steps ~final_close_prices =
+  match List.last steps with
+  | None -> []
+  | Some last_step ->
+      let open Trading_simulation_types.Simulator_types in
+      let held =
+        last_step.portfolio.Trading_portfolio.Portfolio.positions
+        |> List.map ~f:(fun (p : Trading_portfolio.Types.portfolio_position) ->
+            p.symbol)
+        |> String.Set.of_list
+      in
+      List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
+
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?trace ?gc_trace () =
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
@@ -280,7 +299,11 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     (Date.to_string start_date)
     (Date.to_string end_date)
     (Date.to_string warmup_start);
-  let sim_result, stop_log, trade_audit, force_liquidation_log =
+  let ( sim_result,
+        stop_log,
+        trade_audit,
+        force_liquidation_log,
+        final_close_prices ) =
     _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
@@ -314,6 +337,9 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
       ~sim_result
   in
+  let final_prices =
+    _final_prices_for_held_symbols ~steps ~final_close_prices
+  in
   {
     summary;
     round_trips;
@@ -323,4 +349,5 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     audit;
     cascade_summaries;
     force_liquidations;
+    final_prices;
   }
