@@ -397,6 +397,15 @@ specific number.
 
 ## G9 — `Force_liquidation_runner._portfolio_value` has the same shorts-sign bug
 
+**DONE — see PR `fix/g9-force-liquidation-shorts`** (2026-04-30 PM):
+Refactored `_portfolio_value` to delegate to
+`Portfolio_view.portfolio_value` (the canonical, post-G8 signed
+implementation), eliminating the duplicate calculation. Two regression
+tests pin (a) the peak observed after `update` is the true (signed) value,
+not the inflated (unsigned) value; (b) profitable shorts do not trigger
+`Portfolio_floor`. Pre-fix both new tests fail with the inflation factor
+matching `2 * Σ short_notional`; post-fix they pass. Sibling-of G8 fix.
+
 Surfaced 2026-04-30 PM on the post-G8 sp500 rerun. See
 `dev/notes/sp500-shortside-rerun-blocked-g9-2026-04-30-pm.md` for full
 details.

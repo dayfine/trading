@@ -321,6 +321,137 @@ let test_missing_price_does_not_fire _ =
   assert_that !captured is_empty
 
 (* ------------------------------------------------------------------ *)
+(* G9 — shorts must subtract from portfolio_value (sign convention)     *)
+(* ------------------------------------------------------------------ *)
+
+(** Pin the G9 fix: a short Holding contributes [-quantity * close_price] to
+    portfolio_value, mirroring G8's fix to
+    {!Portfolio_view._holding_market_value}.
+
+    Pre-fix, [_portfolio_value] folded [+quantity * close_price] for every
+    Holding regardless of side. With shorts, this inflated portfolio_value by
+    twice the short notional (cash already includes short-entry proceeds, so
+    subtracting the buy-back liability is what makes mark-to-market track P&L
+    correctly).
+
+    The peak observed after one [update] call is the most direct surface to pin:
+    pre-fix returns the inflated peak, post-fix returns the true peak. *)
+let test_short_holding_does_not_inflate_peak _ =
+  (* 1 short, 1000 shares @ $100. Cash $1.1M (= $1M starting + $100K short
+     proceeds). True portfolio_value at entry: $1.1M - $100K = $1M.
+     Pre-fix portfolio_value: $1.1M + $100K = $1.2M (inflated by 2x notional). *)
+  let pos =
+    _make_holding ~symbol:"TSLA" ~side:Trading_base.Types.Short
+      ~entry_date:(_date "2024-01-02") ~quantity:1000.0 ~entry_price:100.0
+  in
+  let bar = _make_bar ~date:(_date "2024-01-02") ~close:100.0 in
+  let positions = String.Map.singleton "TSLA" pos in
+  let get_price s = if String.equal s "TSLA" then Some bar else None in
+  let peak_tracker = FL.Peak_tracker.create () in
+  let recorder, _captured = _capturing_recorder () in
+  let _ =
+    Force_liquidation_runner.update ~config:FL.default_config ~positions
+      ~get_price ~cash:1_100_000.0 ~current_date:(_date "2024-01-02")
+      ~peak_tracker ~audit_recorder:recorder
+  in
+  (* Post-fix: peak = $1M (true value). Pre-fix: peak = $1.2M (inflated). *)
+  assert_that (FL.Peak_tracker.peak peak_tracker) (float_equal 1_000_000.0)
+
+(** Pin the downstream consequence of G9: a profitable short should not trigger
+    Portfolio_floor.
+
+    Construction: portfolio is dominated by a single short. At entry the peak is
+    established. On a later tick the short price drops sharply (large profit).
+    With the buggy unsigned formula, the peak was set at
+    [cash + qty * entry_price] (inflated); on the profit tick, the buggy
+    portfolio_value drops to [cash + qty * lower_price], and at sufficient
+    short-dominance + price-drop ratios the buggy floor check fires.
+
+    Sized to actually trip the buggy floor: cash = $20K, 1000-share short at
+    $100 (entry proceeds bringing cash to $120K but starting cash post-entry set
+    at $20K so short notional dominates). At entry buggy value = $20K + 1000 *
+    $100 = $120K. Tick 2 at price $20: buggy = $20K + 1000 * $20 = $40K. $40K /
+    $120K = 0.333 < 0.4 → FLOOR FIRES. Post-fix value at entry = $20K - $100K =
+    -$80K (negative — peak observation is monotonic, so peak stays whatever it
+    became; if first observed value is -$80K, peak <= 0 and floor never fires
+    per [_portfolio_floor_breached]'s [peak > 0] guard). Even with profit at
+    price $20: post-fix value = $20K - $20K = $0K. Floor check requires peak > 0
+    — never fires.
+
+    To make the post-fix scenario produce a positive peak (closer to a real
+    portfolio), use a more realistic balance: cash = $1.05M, 100-share short at
+    $500 (cash already includes proceeds; pre-entry cash was $1M). True value =
+    $1.05M - $50K = $1M. Buggy = $1.05M + $50K = $1.1M. Tick 2 at price $50 (90%
+    short profit, large but plausible): buggy = $1.05M + $5K = $1.055M. $1.055M
+    / $1.1M = 0.959 > 0.4 → still doesn't fire on a single short.
+
+    The single-short surface alone is too tame to trip the floor without extreme
+    parameters. The peak-inflation assertion above pins the formula bug directly
+    — that is the load-bearing test. We add this companion test pinning that the
+    peak-tracker math passes through correctly when we add a second short,
+    multiplying the inflation factor. *)
+let test_two_profitable_shorts_no_portfolio_floor _ =
+  let pos_a =
+    _make_holding ~symbol:"AAPL" ~side:Trading_base.Types.Short
+      ~entry_date:(_date "2024-01-02") ~quantity:1000.0 ~entry_price:100.0
+  in
+  let pos_b =
+    _make_holding ~symbol:"TSLA" ~side:Trading_base.Types.Short
+      ~entry_date:(_date "2024-01-02") ~quantity:500.0 ~entry_price:200.0
+  in
+  let positions =
+    String.Map.of_alist_exn [ ("AAPL", pos_a); ("TSLA", pos_b) ]
+  in
+  let peak_tracker = FL.Peak_tracker.create () in
+  let recorder, captured = _capturing_recorder () in
+  (* Cash: $1M starting + $100K (AAPL short) + $100K (TSLA short) = $1.2M.
+     True value: $1.2M - $100K - $100K = $1M.
+     Buggy value: $1.2M + $100K + $100K = $1.4M. *)
+  let bar_par_a = _make_bar ~date:(_date "2024-01-02") ~close:100.0 in
+  let bar_par_b = _make_bar ~date:(_date "2024-01-02") ~close:200.0 in
+  let get_price_par s =
+    if String.equal s "AAPL" then Some bar_par_a
+    else if String.equal s "TSLA" then Some bar_par_b
+    else None
+  in
+  let _ =
+    Force_liquidation_runner.update ~config:FL.default_config ~positions
+      ~get_price:get_price_par ~cash:1_200_000.0
+      ~current_date:(_date "2024-01-02") ~peak_tracker ~audit_recorder:recorder
+  in
+  (* Post-fix peak: $1M. Pre-fix: $1.4M. *)
+  assert_that (FL.Peak_tracker.peak peak_tracker) (float_equal 1_000_000.0);
+  (* Tick 2: both shorts profit big — AAPL 100→50, TSLA 200→100 (50% profit
+     each). True value: $1.2M - $50K - $50K = $1.1M (peak rises to $1.1M).
+     Pre-fix: $1.2M + $50K + $50K = $1.3M (drops from buggy peak $1.4M to
+     $1.3M = 92.9% — still above 40% floor; per-position threshold is also
+     not exceeded since these are profits, not losses). The pre-fix bug
+     does NOT trip the floor in this scenario, but the bug is fully captured
+     by the peak assertion above. We assert no Portfolio_floor events fire
+     here to pin the higher-level invariant: profitable shorts → no
+     Portfolio_floor. *)
+  let bar_profit_a = _make_bar ~date:(_date "2024-04-29") ~close:50.0 in
+  let bar_profit_b = _make_bar ~date:(_date "2024-04-29") ~close:100.0 in
+  let get_price_profit s =
+    if String.equal s "AAPL" then Some bar_profit_a
+    else if String.equal s "TSLA" then Some bar_profit_b
+    else None
+  in
+  let _ =
+    Force_liquidation_runner.update ~config:FL.default_config ~positions
+      ~get_price:get_price_profit ~cash:1_200_000.0
+      ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder
+  in
+  (* No Portfolio_floor events captured — these shorts are profiting. *)
+  let portfolio_floor_events =
+    List.filter !captured ~f:(fun e ->
+        match e.FL.reason with FL.Portfolio_floor -> true | _ -> false)
+  in
+  assert_that portfolio_floor_events is_empty;
+  (* Halt state must remain Active. *)
+  assert_that (FL.Peak_tracker.halt_state peak_tracker) (equal_to FL.Active)
+
+(* ------------------------------------------------------------------ *)
 (* Double-exit avoidance — strategy-level filter                        *)
 (* ------------------------------------------------------------------ *)
 
@@ -391,6 +522,10 @@ let suite =
          "missing price does not fire" >:: test_missing_price_does_not_fire;
          "double-exit avoidance filters already-exited"
          >:: test_double_exit_avoidance_filters_already_exited;
+         "G9 — short holding does not inflate peak"
+         >:: test_short_holding_does_not_inflate_peak;
+         "G9 — two profitable shorts do not trigger portfolio_floor"
+         >:: test_two_profitable_shorts_no_portfolio_floor;
        ]
 
 let () = run_test_tt_main suite

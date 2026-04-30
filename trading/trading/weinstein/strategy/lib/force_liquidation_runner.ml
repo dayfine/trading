@@ -26,19 +26,19 @@ let _position_input_of_holding ~get_price (pos : Position.t) :
       | None -> None)
   | _ -> None
 
-(** Compute portfolio mark-to-market value the same way [Portfolio_view] does:
-    cash + sum of (quantity * close_price) over Holding positions whose symbol
-    has a price this tick. Mirrors {!Portfolio_view.portfolio_value} but takes
-    the cash separately so the strategy can pass its own cash field directly. *)
+(** Compute portfolio mark-to-market value via the canonical
+    [Portfolio_view.portfolio_value]. Long holdings contribute
+    [+quantity * close_price]; shorts contribute [-quantity * close_price] (cash
+    already reflects short-entry proceeds, so subtracting the buy-back liability
+    is what makes mark-to-market track P&L correctly).
+
+    G9 fix: previously this fold added [+quantity * close_price] for every
+    Holding regardless of side, mirroring the pre-G8 bug in
+    {!Portfolio_view._holding_market_value}. Delegating to
+    [Portfolio_view.portfolio_value] eliminates the duplicate calculation so the
+    sign convention has a single source of truth. *)
 let _portfolio_value ~cash ~positions ~get_price =
-  Map.fold positions ~init:cash ~f:(fun ~key:_ ~data:pos acc ->
-      match pos.Position.state with
-      | Position.Holding { quantity; _ } -> (
-          match get_price pos.symbol with
-          | Some (bar : Types.Daily_price.t) ->
-              acc +. (quantity *. bar.close_price)
-          | None -> acc)
-      | _ -> acc)
+  Portfolio_view.portfolio_value { cash; positions } ~get_price
 
 (** Convert a force-liquidation event into a TriggerExit transition. The
     exit_reason is [Position.StopLoss] — the existing variant the position state
