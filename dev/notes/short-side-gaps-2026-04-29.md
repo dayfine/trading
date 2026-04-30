@@ -320,3 +320,41 @@ place. G7 closing means `compute_position_size` no longer produces
 oversized entries; whether that's *sufficient* to drop the force-
 liquidation count to single digits (and produce a defensible short-
 side baseline) is what the rerun will measure.
+
+## G8 — `Portfolio_view.portfolio_value` ignores `pos.side`
+
+Surfaced 2026-04-30 by qc-behavioral on PR #702 (G7 fix).
+
+- Symptom: `Portfolio_view.portfolio_value` summed `quantity *.
+  close_price` for every `Holding` regardless of `pos.side`. Since
+  `Position.t.state.Holding.quantity` is unsigned and the long/short
+  direction lives in `pos.side`, short positions inflated
+  `portfolio_value` instead of subtracting from it.
+- Impact: any consumer reading
+  `Trading_strategy.Portfolio_view.portfolio_value` saw paper-rich
+  portfolios on bear-side trades. Sizing / risk / metrics that key off
+  this number all read inflated. Direct caller in the live entry path:
+  `Weinstein_strategy._build_entry_inputs` (uses portfolio_value to
+  compute target dollar exposure) — short candidates were sized as if
+  the short already counted as an asset twice over.
+- Leaking surface: `trading/trading/strategy/lib/portfolio_view.ml`,
+  `_holding_market_value` (single function — the strategy-side mark-to-
+  market path).
+- Not affected: `trading/trading/portfolio/lib/calculations.ml`. That
+  module's `market_value` / `unrealized_pnl` use the signed-quantity
+  convention from `lots.quantity` (negative for shorts), so it already
+  signs correctly. The bug was strictly the strategy-side
+  `Portfolio_view`, which carries the `Position.t` shape (unsigned
+  `quantity` + separate `side`).
+
+**DONE — see PR `fix/g8-portfolio-view-shorts`** (2026-04-30):
+`_holding_market_value` now matches on `pos.side` and contributes
+`+quantity * close_price` for `Long` and `-quantity * close_price` for
+`Short`. The fix is strategy-agnostic — works for any STRATEGY that
+returns long+short positions, no Weinstein-specific logic. Three new
+tests in `test_portfolio_view.ml` (short at profit, short at loss,
+mixed long+short) plus the existing two long-side tests, all explicit
+numeric assertions. No existing tests required updates: pre-fix the
+weinstein-strategy / simulation suites passed because their fixtures
+either used long-only positions or did not pin `portfolio_value` at a
+specific number.

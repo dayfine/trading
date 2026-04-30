@@ -12,5 +12,9 @@ type t = {
 
 val portfolio_value :
   t -> get_price:(string -> Types.Daily_price.t option) -> float
-(** Total portfolio value: [cash] + mark-to-market of all [Holding] positions.
-    Positions not in [Holding] state or without a current price are excluded. *)
+(** Total portfolio value: [cash] + signed mark-to-market of all [Holding]
+    positions. Long holdings contribute [+quantity * close_price]; shorts
+    contribute [-quantity * close_price] (the buy-back liability — cash already
+    reflects proceeds credited at short entry, so subtracting the current
+    liability tracks short P&L correctly). Positions not in [Holding] state or
+    without a current price are excluded. *)
