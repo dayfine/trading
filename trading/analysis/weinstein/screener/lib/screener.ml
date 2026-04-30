@@ -75,6 +75,7 @@ type config = {
   min_grade : grade;
   max_buy_candidates : int;
   max_short_candidates : int;
+  cascade_post_stop_cooldown_weeks : int; [@sexp.default 0]
 }
 [@@deriving sexp]
 
@@ -86,6 +87,7 @@ let default_config =
     min_grade = C;
     max_buy_candidates = 20;
     max_short_candidates = 10;
+    cascade_post_stop_cooldown_weeks = 0;
   }
 
 type scored_candidate = {
@@ -582,7 +584,32 @@ let _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade ~total_stocks
   _build_cascade_diagnostics ~total_stocks ~candidates_after_held ~macro_trend
     ~long_phases ~short_phases ~buy_candidates ~short_candidates
 
-let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
+(** Build the per-symbol cooldown set: tickers whose last stop-out is within
+    [cooldown_weeks] of [as_of] are blocked from the cascade. Returns an empty
+    set when the gate is disabled ([cooldown_weeks <= 0] or empty
+    [last_stop_out_dates]) — preserves bit-equality with the pre-gate behaviour.
+*)
+let _cooldown_block_set ~cooldown_weeks ~as_of ~last_stop_out_dates =
+  if cooldown_weeks <= 0 then String.Set.empty
+  else
+    let cooldown_days = cooldown_weeks * 7 in
+    List.filter_map last_stop_out_dates ~f:(fun (ticker, stop_date) ->
+        let elapsed = Date.diff as_of stop_date in
+        if elapsed < cooldown_days then Some ticker else None)
+    |> String.Set.of_list
+
+(** Single-pass filter that drops [held] and [cooldown] symbols and resolves
+    each survivor's sector context. Was a chained [filter |> map] allocating two
+    lists; the [filter_map] keeps just one. Runs every Friday over the full
+    screened universe (potentially thousands of symbols). *)
+let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map =
+  List.filter_map stocks ~f:(fun (a : Stock_analysis.t) ->
+      if Set.mem held_set a.ticker then None
+      else if Set.mem cooldown_set a.ticker then None
+      else Some (a, _resolve_sector ~sector_map a.ticker))
+
+let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
+    : result =
   let held_set = String.Set.of_list held_tickers in
   let {
     weights;
@@ -591,6 +618,7 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
     min_grade;
     max_buy_candidates;
     max_short_candidates;
+    cascade_post_stop_cooldown_weeks = _;
   } =
     config
   in
@@ -598,14 +626,8 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
     match macro_trend with Bullish | Neutral -> true | Bearish -> false
   in
   let total_stocks = List.length stocks in
-  (* Was: chained filter |> map allocated two lists (one for the held-set
-     filter, one for the (analysis, sector) pairs). Now: single-pass
-     filter_map keeps only one output list. Runs every Friday over the full
-     screened universe (potentially thousands of symbols). *)
   let candidates =
-    List.filter_map stocks ~f:(fun (a : Stock_analysis.t) ->
-        if Set.mem held_set a.ticker then None
-        else Some (a, _resolve_sector ~sector_map a.ticker))
+    _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map
   in
   let candidates_after_held = List.length candidates in
   let buy_candidates =
@@ -634,3 +656,15 @@ let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
     macro_trend;
     cascade_diagnostics;
   }
+
+let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
+  _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers
+    ~cooldown_set:String.Set.empty
+
+let screen_with_cooldown ~config ~macro_trend ~sector_map ~stocks ~held_tickers
+    ~as_of ~last_stop_out_dates : result =
+  let cooldown_set =
+    _cooldown_block_set ~cooldown_weeks:config.cascade_post_stop_cooldown_weeks
+      ~as_of ~last_stop_out_dates
+  in
+  _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set

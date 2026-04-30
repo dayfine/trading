@@ -99,6 +99,7 @@ let _next_friday d =
 
 type _strategy_state = {
   stop_states : Weinstein_stops.stop_state String.Map.t ref;
+  last_stop_out_dates : Date.t Hashtbl.M(String).t;
   prior_macro : market_trend ref;
   prior_macro_result : Macro.result option ref;
   peak_tracker : FL.Peak_tracker.t;
@@ -114,6 +115,7 @@ type _strategy_state = {
 let _fresh_state ~bar_reader =
   {
     stop_states = ref String.Map.empty;
+    last_stop_out_dates = Hashtbl.create (module String);
     prior_macro = ref Neutral;
     prior_macro_result = ref None;
     peak_tracker = FL.Peak_tracker.create ();
@@ -134,8 +136,9 @@ let _get_price_of_state state ~current_date symbol =
 
 let _drive_tick state ~config ~current_date ~portfolio =
   Internal_for_test.on_market_close ~config ~ad_bars:[]
-    ~stop_states:state.stop_states ~prior_macro:state.prior_macro
-    ~prior_macro_result:state.prior_macro_result
+    ~stop_states:state.stop_states
+    ~last_stop_out_dates:state.last_stop_out_dates
+    ~prior_macro:state.prior_macro ~prior_macro_result:state.prior_macro_result
     ~peak_tracker:state.peak_tracker ~bar_reader:state.bar_reader
     ~prior_stages:state.prior_stages
     ~sector_prior_stages:state.sector_prior_stages

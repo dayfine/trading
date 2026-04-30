@@ -1,9 +1,9 @@
 # Status: screener
 
-## Last updated: 2026-04-14
+## Last updated: 2026-04-30
 
 ## Status
-MERGED
+MERGED (with one optional knob in flight: cascade post-stop-out cooldown — PR #718)
 
 ## QC Review
 APPROVED — See dev/reviews/screener.md (2026-03-30). All prior blockers resolved.
@@ -42,9 +42,22 @@ YES
 Total: 87 new tests across 9 modules, all passing.
 
 ## In Progress
-- None — all code done, PRs open for review
+- PR #718 — cascade post-stop-out cooldown gate. Adds
+  `Screener.config.cascade_post_stop_cooldown_weeks` (default 0; preserves
+  bit-equality) and `Screener.screen_with_cooldown`. Wired through
+  `Weinstein_strategy._on_market_close` so a per-symbol last-stop-out date
+  map populates from `TriggerExit { exit_reason = StopLoss _ }` and feeds
+  the screener every Friday. Surfaces from
+  `dev/notes/sp500-trade-quality-findings-2026-04-30.md` §"Cascade re-firing
+  within days of stop-out". Sweep / scenario rerun is a separate follow-up.
 
 ## Followup / Known Improvements
+
+### Cascade post-stop-out — re-base detection
+PR #718 lands a time-based cooldown only. The findings note flags that
+"may need to be combined with re-base detection for full book conformance"
+— require the symbol to dip below the prior breakout level and re-emerge
+before the screener re-fires. Out of scope for #718.
 
 ### Stage classifier: segmentation-based MA direction
 `stage/lib/stage.ml` currently classifies MA direction via a two-point slope

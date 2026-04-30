@@ -89,6 +89,19 @@ type config = {
       (** Maximum number of buy candidates returned. Default: 20. *)
   max_short_candidates : int;
       (** Maximum number of short candidates returned. Default: 10. *)
+  cascade_post_stop_cooldown_weeks : int; [@sexp.default 0]
+      (** Per-symbol post-stop-out cooldown, in weeks. After a position stops
+          out, the symbol is excluded from the cascade for this many weeks.
+          Default: [0] (disabled — preserves prior behaviour bit-equally). When
+          [> 0], callers must pass [~as_of] and [~last_stop_out_dates] to
+          {!screen}; otherwise the gate is a no-op (no map → no exclusion).
+
+          Authority: weinstein-book-reference.md §Buy-Side Rules implies a
+          stopped-out trade signals the breakout was false. The book does not
+          prescribe a specific cooldown, so this lever is configurable. Surfaced
+          in response to the same-week re-fire pattern documented in
+          dev/notes/sp500-trade-quality-findings-2026-04-30.md §"Cascade
+          re-firing within days of stop-out". *)
 }
 [@@deriving sexp]
 (** Main screener configuration. *)
@@ -202,5 +215,33 @@ val screen :
     @param sector_map Map from ticker to sector context.
     @param stocks Per-stock analysis results.
     @param held_tickers Tickers already in portfolio — excluded from output.
+
+    Pure function. Equivalent to {!screen_with_cooldown} with [as_of = None] and
+    [last_stop_out_dates = []] — i.e. the post-stop-out cooldown gate is a no-op
+    regardless of [config.cascade_post_stop_cooldown_weeks]. *)
+
+val screen_with_cooldown :
+  config:config ->
+  macro_trend:Weinstein_types.market_trend ->
+  sector_map:(string, sector_context) Core.Hashtbl.t ->
+  stocks:Stock_analysis.t list ->
+  held_tickers:string list ->
+  as_of:Core.Date.t ->
+  last_stop_out_dates:(string * Core.Date.t) list ->
+  result
+(** [screen_with_cooldown] is {!screen} with the per-symbol post-stop-out
+    cooldown gate active.
+
+    @param as_of Cascade evaluation date.
+    @param last_stop_out_dates
+      Per-symbol last stop-out date. Each entry [(ticker, date)] excludes
+      [ticker] from the cascade if
+      [(as_of - date) < config.cascade_post_stop_cooldown_weeks * 7] days. When
+      [config.cascade_post_stop_cooldown_weeks = 0] the gate is a no-op, so this
+      function is bit-equal to {!screen} on the same inputs.
+
+    Authority: weinstein-book-reference.md §Buy-Side Rules — a stopped-out trade
+    signals the breakout was false; book does not prescribe a specific cooldown
+    so it is configurable.
 
     Pure function. *)
