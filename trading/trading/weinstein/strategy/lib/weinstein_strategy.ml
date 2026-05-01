@@ -449,36 +449,64 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
     ~sector_prior_stages ~ticker_sectors ~audit_recorder ~get_price
     ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
-  let current_date =
-    match get_price config.indices.primary with
-    | Some bar -> bar.Types.Daily_price.date
-    | None -> Date.today ~zone:Time_float.Zone.utc
-  in
-  (* Rescale stop_states for any held symbol that just split. Runs BEFORE
+  (* G13: non-trading-day short-circuit. The simulator iterates calendar
+     days (Mon-Fri including holidays), so [_on_market_close] is invoked on
+     days that have no bar in [Bar_panels]. When [get_price] returns [None]
+     for the primary index, every other [get_price] this tick also returns
+     [None], so:
+
+       1. [current_date] would fall back to [Date.today] — a meaningless
+          date that contaminates [last_stop_out_dates], cascade-summary
+          dates, and audit records.
+       2. [Force_liquidation_runner.update] would be called with cash that
+          contains accumulated short proceeds but [_holding_market_value]
+          returns 0.0 for every position (no [get_price] this tick), so
+          [Portfolio_view.portfolio_value] degenerates to bare [cash] —
+          well above the true mtm-aware value. [Peak_tracker.observe]
+          phantom-spikes the peak by exactly the absolute mtm contribution
+          of every short open at this point. On the next real trading day,
+          true [pv] is far below the inflated peak and [Portfolio_floor]
+          fires for every Holding position.
+
+     Empirically (sp500-2019-2023, post-G12): the peak got bumped ~$770K
+     every weekend a new short opened, eventually pinned at $2.74M; floor
+     at 0.4×peak = $1.096M; real-day pv ≈ $1M; cascade fired every Monday
+     for 449 spurious [Portfolio_floor] events in the post-G12 baseline.
+
+     The strategy has no business making decisions when there's no primary-
+     index bar — there's no market state to observe. Return empty
+     transitions and skip every side-effect (stops, FL, splits, macro,
+     screener) for this tick. *)
+  match get_price config.indices.primary with
+  | None -> Ok { Strategy_interface.transitions = [] }
+  | Some primary_bar ->
+      let current_date = primary_bar.Types.Daily_price.date in
+      (* Rescale stop_states for any held symbol that just split. Runs BEFORE
      Stops_runner.update so the state machine sees post-split-comparable
      stop levels. No-ops on non-split days and on positions without a
      [stop_states] entry. See [Stops_split_runner] for the full contract. *)
-  Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
-    ~as_of:current_date;
-  let exit_transitions, adjust_transitions =
-    Stops_runner.update
-      ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ~stop_update_cadence:config.stop_update_cadence
-      ~stops_config:config.stops_config ~stage_config:config.stage_config
-      ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
-      ~bar_reader ~as_of:current_date ~prior_stages ()
-  in
-  (* Track per-symbol last stop-out date for the cascade post-stop-out
+      Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
+        ~as_of:current_date;
+      let exit_transitions, adjust_transitions =
+        Stops_runner.update
+          ?ma_cache:(Bar_reader.ma_cache bar_reader)
+          ~stop_update_cadence:config.stop_update_cadence
+          ~stops_config:config.stops_config ~stage_config:config.stage_config
+          ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
+          ~bar_reader ~as_of:current_date ~prior_stages ()
+      in
+      (* Track per-symbol last stop-out date for the cascade post-stop-out
      cooldown gate. Walks [exit_transitions] before they are applied to the
      position state — looks up symbols from the [positions] snapshot. *)
-  _record_stop_outs ~last_stop_out_dates ~positions ~exit_transitions
-    ~current_date;
-  List.iter exit_transitions
-    ~f:
-      (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
-         ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-         ~bar_reader ~prior_stages ~positions);
-  (* Force-liquidation pass: defense in depth beyond stops (G4). Runs AFTER
+      _record_stop_outs ~last_stop_out_dates ~positions ~exit_transitions
+        ~current_date;
+      List.iter exit_transitions
+        ~f:
+          (Exit_audit_capture.emit_exit_audit ~audit_recorder
+             ~prior_macro_result ~stage_config:config.stage_config
+             ~lookback_bars:config.lookback_bars ~bar_reader ~prior_stages
+             ~positions);
+      (* Force-liquidation pass: defense in depth beyond stops (G4). Runs AFTER
      [Stops_runner.update] but operates on the FULL pre-tick portfolio (cash
      + all positions) so [Portfolio_view.portfolio_value] is consistent with
      [portfolio.cash] (which has not yet been updated for this tick's
@@ -491,33 +519,34 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
      transitions instead of by hiding positions from the runner. Updates
      the peak tracker and may flip the halt state to [Halted] for the
      portfolio-floor case. *)
-  let raw_force_exit_transitions =
-    Force_liquidation_runner.update
-      ~config:config.portfolio_config.force_liquidation ~positions ~get_price
-      ~cash:portfolio.cash ~current_date ~peak_tracker ~audit_recorder
-  in
-  let stop_exited_ids =
-    List.filter_map exit_transitions ~f:(fun (t : Position.transition) ->
-        match t.kind with
-        | Position.TriggerExit _ -> Some t.position_id
-        | _ -> None)
-    |> String.Set.of_list
-  in
-  let force_exit_transitions =
-    if Set.is_empty stop_exited_ids then raw_force_exit_transitions
-    else
-      List.filter raw_force_exit_transitions
-        ~f:(fun (t : Position.transition) ->
-          not (Set.mem stop_exited_ids t.position_id))
-  in
-  (* Stage 4 PR-A: read the primary index as a weekly view directly. The
+      let raw_force_exit_transitions =
+        Force_liquidation_runner.update
+          ~config:config.portfolio_config.force_liquidation ~positions
+          ~get_price ~cash:portfolio.cash ~current_date ~peak_tracker
+          ~audit_recorder
+      in
+      let stop_exited_ids =
+        List.filter_map exit_transitions ~f:(fun (t : Position.transition) ->
+            match t.kind with
+            | Position.TriggerExit _ -> Some t.position_id
+            | _ -> None)
+        |> String.Set.of_list
+      in
+      let force_exit_transitions =
+        if Set.is_empty stop_exited_ids then raw_force_exit_transitions
+        else
+          List.filter raw_force_exit_transitions
+            ~f:(fun (t : Position.transition) ->
+              not (Set.mem stop_exited_ids t.position_id))
+      in
+      (* Stage 4 PR-A: read the primary index as a weekly view directly. The
      Friday detection uses the view's latest date; the screener path consumes
      the same view to avoid building two parallel inputs. *)
-  let index_view =
-    Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary
-      ~n:config.lookback_bars ~as_of:current_date
-  in
-  (* On every Friday — including Fridays where the force-liquidation halt is
+      let index_view =
+        Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary
+          ~n:config.lookback_bars ~as_of:current_date
+      in
+      (* On every Friday — including Fridays where the force-liquidation halt is
      active — run the cheap macro-only path and consult [_maybe_reset_halt]
      BEFORE deciding whether to invoke the universe screen. This preserves the
      contract claim that the halt clears when macro flips off Bearish: if we
@@ -525,41 +554,41 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
      halt would latch permanently because no path would ever observe the new
      macro trend. The macro-only path is a strict subset of the full screen
      and adds no work over the buggy short-circuit when no halt is active. *)
-  let is_screening_day = _is_screening_day_view index_view in
-  let macro_result_opt =
-    if is_screening_day then
-      Some
-        (_run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result
-           ~bar_reader ~prior_stages ~current_date ~index_view)
-    else None
-  in
-  if is_screening_day then
-    _maybe_reset_halt ~peak_tracker ~macro_trend:!prior_macro;
-  (* New entries are blocked entirely while the halt is active — that is the
+      let is_screening_day = _is_screening_day_view index_view in
+      let macro_result_opt =
+        if is_screening_day then
+          Some
+            (_run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result
+               ~bar_reader ~prior_stages ~current_date ~index_view)
+        else None
+      in
+      if is_screening_day then
+        _maybe_reset_halt ~peak_tracker ~macro_trend:!prior_macro;
+      (* New entries are blocked entirely while the halt is active — that is the
      portfolio-floor trigger's purpose. The halt clears when macro flips off
      Bearish (the typical condition under which the floor fires). *)
-  let halted =
-    match
-      Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
-    with
-    | Halted -> true
-    | Active -> false
-  in
-  let entry_transitions =
-    match (halted, is_screening_day, macro_result_opt) with
-    | false, true, Some macro_result ->
-        _run_screen_after_macro ~config ~stop_states ~last_stop_out_dates
-          ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-          ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
-          ~macro_result
-    | _ -> []
-  in
-  Ok
-    {
-      Strategy_interface.transitions =
-        exit_transitions @ force_exit_transitions @ adjust_transitions
-        @ entry_transitions;
-    }
+      let halted =
+        match
+          Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
+        with
+        | Halted -> true
+        | Active -> false
+      in
+      let entry_transitions =
+        match (halted, is_screening_day, macro_result_opt) with
+        | false, true, Some macro_result ->
+            _run_screen_after_macro ~config ~stop_states ~last_stop_out_dates
+              ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+              ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+              ~macro_result
+        | _ -> []
+      in
+      Ok
+        {
+          Strategy_interface.transitions =
+            exit_transitions @ force_exit_transitions @ adjust_transitions
+            @ entry_transitions;
+        }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels

@@ -259,6 +259,62 @@ let test_halt_persists_when_macro_stays_bearish _ =
   assert_that !(state.prior_macro) (equal_to Bearish)
 
 (* ------------------------------------------------------------------ *)
+(* G13 — non-trading-day short-circuit                                 *)
+(* ------------------------------------------------------------------ *)
+
+(** Regression: the strategy must short-circuit on non-trading days (no bar for
+    the primary index). Pre-fix, [_on_market_close] fell back to [Date.today]
+    and ran the full pipeline — including [Force_liquidation_runner.update] —
+    with cash that contained accumulated short proceeds but
+    [_holding_market_value] returning 0.0 for every position (no [get_price]
+    this tick). [Portfolio_view.portfolio_value] degenerated to bare [cash],
+    well above the true mtm-aware value; [Peak_tracker.observe] phantom-spiked
+    the peak. On the next real trading day, [Portfolio_floor] fired for every
+    Holding position.
+
+    Empirically (sp500-2019-2023 post-G12, pre-G13): peak permanently set to
+    $2.74M from weekend phantom observations; floor at 0.4×peak = $1.096M;
+    cascade fired every Monday for 449 spurious force-liqs.
+
+    Post-fix, the strategy returns empty transitions and skips every side-effect
+    (stops, FL, splits, macro, screener) when no primary-index bar is available.
+    The load-bearing assertion is that [Peak_tracker] stays at its pre-call peak
+    — no observation contaminates it. *)
+let test_no_primary_index_bar_short_circuits _ =
+  let current_date =
+    Date.of_string "2019-01-13"
+    (* a Sunday *)
+  in
+  (* Bar reader with no bars for the primary index (or any other symbol) —
+     exactly the non-trading-day shape the simulator hits on weekends and
+     holidays in panel mode. *)
+  let bar_reader = Bar_reader.empty () in
+  let state = _fresh_state ~bar_reader in
+  let config =
+    Weinstein_strategy.default_config ~universe:[] ~index_symbol:_index_symbol
+  in
+  let portfolio : Trading_strategy.Portfolio_view.t =
+    { cash = 1_500_000.0; positions = String.Map.empty }
+  in
+  let result = _drive_tick state ~config ~current_date ~portfolio in
+  (* Tick succeeds with zero transitions. *)
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (o : Trading_strategy.Strategy_interface.output) ->
+            o.transitions)
+          is_empty));
+  (* The load-bearing assertion: peak_tracker is untouched. Pre-fix this
+     would equal [portfolio.cash = 1_500_000.0] (the phantom observation)
+     even though no real market state existed this tick. *)
+  assert_that (FL.Peak_tracker.peak state.peak_tracker) (float_equal 0.0);
+  (* Halt state stays Active too (no breach can fire when no observation
+     happens). *)
+  assert_that
+    (FL.Peak_tracker.halt_state state.peak_tracker)
+    (equal_to FL.Active)
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -275,6 +331,8 @@ let suite =
          >:: test_halt_resets_after_macro_flip;
          "halt persists when macro stays Bearish"
          >:: test_halt_persists_when_macro_stays_bearish;
+         "G13 — no primary index bar short-circuits without observing peak"
+         >:: test_no_primary_index_bar_short_circuits;
        ]
 
 let () = run_test_tt_main suite
