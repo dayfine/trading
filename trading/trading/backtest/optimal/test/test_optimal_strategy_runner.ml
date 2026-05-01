@@ -317,6 +317,110 @@ let test_run_handles_missing_trade_audit _ =
            (equal_to false);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Forward-table memoization (PR-1)                                     *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a synthetic [Daily_price.t] for forward-table tests. *)
+let _outlook_bar ~date ~close : Types.Daily_price.t =
+  {
+    date;
+    open_price = close;
+    high_price = close +. 1.0;
+    low_price = close -. 1.0;
+    close_price = close;
+    volume = 1_000_000;
+    adjusted_close = close;
+  }
+
+(** Synthetic Stage-2 result; the slice tests don't drive the stage classifier,
+    they just assert which Fridays are kept. *)
+let _stage2_result : Stage.result =
+  {
+    stage = Weinstein_types.Stage2 { weeks_advancing = 4; late = false };
+    ma_value = 95.0;
+    ma_direction = Weinstein_types.Rising;
+    ma_slope_pct = 0.02;
+    transition = None;
+    above_ma_count = 5;
+  }
+
+let _outlook ~date ~close : Backtest_optimal.Outcome_scorer.weekly_outlook =
+  { date; bar = _outlook_bar ~date ~close; stage_result = _stage2_result }
+
+let test_forward_outlooks_for_drops_entries_at_or_before_entry_friday _ =
+  (* Contract: outlooks are kept iff their date is STRICTLY after entry_friday.
+     Entry-week itself is excluded; the next Friday is the first forward bar. *)
+  let fridays =
+    [
+      Date.of_string "2024-01-05";
+      Date.of_string "2024-01-12";
+      Date.of_string "2024-01-19";
+      Date.of_string "2024-01-26";
+      Date.of_string "2024-02-02";
+    ]
+  in
+  let outlooks =
+    List.mapi fridays ~f:(fun i d ->
+        _outlook ~date:d ~close:(100.0 +. Float.of_int i))
+  in
+  let table : Backtest_optimal.Optimal_strategy_runner.forward_table =
+    Hashtbl.create (module String)
+  in
+  Hashtbl.set table ~key:"AAA" ~data:outlooks;
+  let sliced =
+    Backtest_optimal.Optimal_strategy_runner.forward_outlooks_for
+      ~forward_table:table ~symbol:"AAA"
+      ~entry_friday:(Date.of_string "2024-01-12")
+  in
+  assert_that sliced
+    (elements_are
+       [
+         field
+           (fun (o : Backtest_optimal.Outcome_scorer.weekly_outlook) -> o.date)
+           (equal_to (Date.of_string "2024-01-19"));
+         field
+           (fun (o : Backtest_optimal.Outcome_scorer.weekly_outlook) -> o.date)
+           (equal_to (Date.of_string "2024-01-26"));
+         field
+           (fun (o : Backtest_optimal.Outcome_scorer.weekly_outlook) -> o.date)
+           (equal_to (Date.of_string "2024-02-02"));
+       ])
+
+let test_forward_outlooks_for_missing_symbol_returns_empty _ =
+  (* Symbols absent from the table degenerate to an empty forward — the scorer
+     drops the candidate. Pin: lookup is total. *)
+  let table : Backtest_optimal.Optimal_strategy_runner.forward_table =
+    Hashtbl.create (module String)
+  in
+  let sliced =
+    Backtest_optimal.Optimal_strategy_runner.forward_outlooks_for
+      ~forward_table:table ~symbol:"ZZZ"
+      ~entry_friday:(Date.of_string "2024-01-12")
+  in
+  assert_that sliced (size_is 0)
+
+let test_forward_outlooks_for_entry_after_last_friday_returns_empty _ =
+  (* End-of-run case: entry_friday past the last memoized Friday yields an
+     empty slice — matches the original [_forward_outlooks] behaviour where
+     [List.drop_while] consumes the whole list. *)
+  let outlooks =
+    [
+      _outlook ~date:(Date.of_string "2024-01-05") ~close:100.0;
+      _outlook ~date:(Date.of_string "2024-01-12") ~close:101.0;
+    ]
+  in
+  let table : Backtest_optimal.Optimal_strategy_runner.forward_table =
+    Hashtbl.create (module String)
+  in
+  Hashtbl.set table ~key:"AAA" ~data:outlooks;
+  let sliced =
+    Backtest_optimal.Optimal_strategy_runner.forward_outlooks_for
+      ~forward_table:table ~symbol:"AAA"
+      ~entry_friday:(Date.of_string "2024-01-26")
+  in
+  assert_that sliced (size_is 0)
+
 let suite =
   "Optimal_strategy_runner"
   >::: [
@@ -330,6 +434,12 @@ let suite =
          >:: test_run_emits_optimal_summary_sexp;
          "run handles missing trade_audit.sexp"
          >:: test_run_handles_missing_trade_audit;
+         "forward_outlooks_for drops entries at or before entry_friday"
+         >:: test_forward_outlooks_for_drops_entries_at_or_before_entry_friday;
+         "forward_outlooks_for unknown symbol returns empty"
+         >:: test_forward_outlooks_for_missing_symbol_returns_empty;
+         "forward_outlooks_for entry past last Friday returns empty"
+         >:: test_forward_outlooks_for_entry_after_last_friday_returns_empty;
        ]
 
 let () = run_test_tt_main suite
