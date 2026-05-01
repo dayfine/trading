@@ -3,6 +3,7 @@
   test_ad_bars_unicorn
   test_ad_bars_compose
   test_ad_bars_weekly_e2e
+  test_entry_audit_capture
   test_force_liquidation_runner
   test_force_liquidation_strategy
   test_macro_inputs

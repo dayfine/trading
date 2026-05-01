@@ -123,6 +123,7 @@ let low_window t ~symbol ~as_of_day ~len =
 
 type weekly_view = {
   closes : float array;
+  raw_closes : float array;
   highs : float array;
   lows : float array;
   volumes : float array;
@@ -141,6 +142,7 @@ type daily_view = {
 let _empty_weekly_view : weekly_view =
   {
     closes = [||];
+    raw_closes = [||];
     highs = [||];
     lows = [||];
     volumes = [||];
@@ -242,8 +244,8 @@ let _count_weeks_in_panel ~ohlcv ~calendar ~row ~as_of_day =
   done;
   !n_weeks
 
-let _fill_weekly_buckets ~ohlcv ~calendar ~row ~as_of_day ~w_closes ~w_highs
-    ~w_lows ~w_vol ~w_dates =
+let _fill_weekly_buckets ~ohlcv ~calendar ~row ~as_of_day ~w_closes ~w_raw
+    ~w_highs ~w_lows ~w_vol ~w_dates =
   let close_p = Ohlcv_panels.close ohlcv in
   let high_p = Ohlcv_panels.high ohlcv in
   let low_p = Ohlcv_panels.low ohlcv in
@@ -265,6 +267,7 @@ let _fill_weekly_buckets ~ohlcv ~calendar ~row ~as_of_day ~w_closes ~w_highs
       if Float.( < ) lo w_lows.(b) then w_lows.(b) <- lo;
       w_vol.(b) <- w_vol.(b) +. BA2.unsafe_get vol_p row day;
       w_closes.(b) <- BA2.unsafe_get adj_p row day;
+      w_raw.(b) <- close;
       w_dates.(b) <- calendar.(day))
   done
 
@@ -273,14 +276,16 @@ let _weekly_view_from_panel ~ohlcv ~calendar ~row ~as_of_day : weekly_view =
   if nw = 0 then _empty_weekly_view
   else
     let w_closes = Array.create ~len:nw Float.nan in
+    let w_raw = Array.create ~len:nw Float.nan in
     let w_highs = Array.create ~len:nw Float.neg_infinity in
     let w_lows = Array.create ~len:nw Float.infinity in
     let w_vol = Array.create ~len:nw 0.0 in
     let w_dates = Array.create ~len:nw calendar.(0) in
-    _fill_weekly_buckets ~ohlcv ~calendar ~row ~as_of_day ~w_closes ~w_highs
-      ~w_lows ~w_vol ~w_dates;
+    _fill_weekly_buckets ~ohlcv ~calendar ~row ~as_of_day ~w_closes ~w_raw
+      ~w_highs ~w_lows ~w_vol ~w_dates;
     {
       closes = w_closes;
+      raw_closes = w_raw;
       highs = w_highs;
       lows = w_lows;
       volumes = w_vol;
@@ -303,6 +308,7 @@ let weekly_view_for t ~symbol ~n ~as_of_day =
         let take a = Array.sub a ~pos:drop ~len:n in
         {
           closes = take view.closes;
+          raw_closes = take view.raw_closes;
           highs = take view.highs;
           lows = take view.lows;
           volumes = take view.volumes;

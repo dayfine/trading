@@ -13,6 +13,14 @@ type entry_meta = {
   shares : int;
   installed_stop : float;
   stop_floor_kind : Audit_recorder.stop_floor_kind;
+  effective_entry_price : float;
+      (** The price the strategy installs into [Position.t] state — most recent
+          close from [bar_reader] at order placement, or
+          [candidate.suggested_entry] when no bars are available (G14 fix). The
+          dollar-denominated audit fields ([initial_position_value],
+          [initial_risk_dollars] in {!build_entry_event}) key off this rather
+          than [candidate.suggested_entry] so the audit reflects the realised
+          entry rather than the screener's pre-fill intent. *)
 }
 (** Audit-relevant intermediates computed during entry-transition construction.
     Returned alongside the transition so the audit recorder can capture them
@@ -65,7 +73,10 @@ val build_entry_event :
 (** Project [(candidate, meta, alternatives)] into an
     {!Audit_recorder.entry_event}. Computes the dollar-denominated sizing fields
     ([initial_position_value], [initial_risk_dollars]) from [meta.shares],
-    [candidate.suggested_entry], and [meta.installed_stop]. *)
+    [meta.effective_entry_price], and [meta.installed_stop]. The audit row's
+    [candidate] field still carries the screener-original
+    [candidate.suggested_entry], so consumers can compare the screener's
+    pre-fill intent against the strategy's realised entry. *)
 
 val emit_entries :
   audit_recorder:Audit_recorder.t ->

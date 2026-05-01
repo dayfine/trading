@@ -204,12 +204,33 @@ let resistance_callbacks_of_weekly_view ~(weekly : Bar_panels.weekly_view) :
 (* Stock_analysis — bundle of high/volume + nested Stage/Rs/Volume/Resistance *)
 (* ------------------------------------------------------------------ *)
 
+(** Per-bar split-adjustment factor lookup over a weekly view's [closes]
+    (adjusted) and [raw_closes] (unadjusted). Returns [None] when [raw_closes]
+    is empty (e.g., the empty weekly_view) or when the raw close at this offset
+    is non-positive. The factor stays constant across spans without splits and
+    changes at split boundaries — used by
+    {!Stock_analysis._scan_max_high_callback} / [_scan_min_low_callback] to
+    truncate the lookback window at the most recent split (G14). *)
+let _split_factor_of_weekly_view (weekly : Bar_panels.weekly_view) :
+    week_offset:int -> float option =
+  let n = Array.length weekly.raw_closes in
+  let m = Array.length weekly.closes in
+  fun ~week_offset ->
+    if n <> m then None
+    else
+      let idx = n - 1 - week_offset in
+      if idx < 0 || idx >= n then None
+      else
+        let raw = weekly.raw_closes.(idx) in
+        if Float.( <= ) raw 0.0 then None else Some (weekly.closes.(idx) /. raw)
+
 let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
     ~(config : Stock_analysis.config) ~(stock : Bar_panels.weekly_view)
     ~(benchmark : Bar_panels.weekly_view) () : Stock_analysis.callbacks =
   {
     get_high = _get_from_float_array stock.highs;
     get_volume = _get_from_float_array stock.volumes;
+    get_split_factor = _split_factor_of_weekly_view stock;
     stage =
       stage_callbacks_of_weekly_view ?ma_cache ?symbol:stock_symbol
         ~config:config.stage ~weekly:stock ();
