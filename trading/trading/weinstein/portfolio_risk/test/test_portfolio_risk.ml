@@ -210,15 +210,16 @@ let test_position_size_long_capped_by_max_long_exposure _ =
     compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
       ~side:`Long ~entry_price:100.0 ~stop_price:99.0 ()
   in
-  (* Per-position cap binds: $200K / $100 = 2,000 shares. *)
+  (* Per-position long cap binds: 0.30 * $1M / $100 = 3,000 shares.
+     (Asymmetric cap: long uses 0.30 default per 2026-05-01.) *)
   assert_that result
     (all_of
        [
-         field (fun (s : sizing) -> s.shares) (equal_to 2000);
+         field (fun (s : sizing) -> s.shares) (equal_to 3000);
          field
            (fun (s : sizing) -> s.position_value)
-           (le (module Float_ord) 200_000.0);
-         field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.20);
+           (le (module Float_ord) 300_000.0);
+         field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.30);
        ])
 
 (* Cap is configurable: tightening max_short_exposure_pct further reduces the
@@ -237,18 +238,37 @@ let test_position_size_short_cap_is_configurable _ =
          field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.10);
        ])
 
-(* max_position_pct cap binds when the side-exposure cap is looser. With
-   risk_per_trade_pct=0.01, portfolio_value=$1M, entry=$200, stop=$199:
+(* Long-side per-position cap binds. With risk_per_trade_pct=0.01,
+   portfolio_value=$1M, entry=$200, stop=$199:
      - risk-based: dollar_risk=$10K, risk_per_share=$1 → 10,000 shares
      - side-exposure cap (long 90%): $900K / $200 = 4,500 shares
-     - per-position cap (20%): $200K / $200 = 1,000 shares (binds)
-   Final shares = min(10000, 4500, 1000) = 1,000.
-
-   max_position_pct=0.20 cap landed 2026-05-01 — pins the new behavior. *)
-let test_position_size_capped_by_max_position_pct _ =
+     - per-position cap (long 30%): $300K / $200 = 1,500 shares (binds)
+   Final shares = min(10000, 4500, 1500) = 1,500. *)
+let test_position_size_long_capped_by_max_position_pct _ =
   let result =
     compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
       ~side:`Long ~entry_price:200.0 ~stop_price:199.0 ()
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (s : sizing) -> s.shares) (equal_to 1500);
+         field (fun (s : sizing) -> s.position_value) (float_equal 300_000.0);
+         field
+           (fun (s : sizing) -> s.position_pct)
+           (float_equal ~epsilon:1e-6 0.30);
+       ])
+
+(* Short-side per-position cap binds. Same setup but on the short side and
+   stop above entry:
+     - risk-based: 10,000 shares
+     - side-exposure cap (short 30%): $300K / $200 = 1,500 shares
+     - per-position cap (short 20%): $200K / $200 = 1,000 shares (binds)
+   Final shares = min(10000, 1500, 1000) = 1,000. *)
+let test_position_size_short_capped_by_max_position_pct _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
+      ~side:`Short ~entry_price:200.0 ~stop_price:201.0 ()
   in
   assert_that result
     (all_of
@@ -450,8 +470,10 @@ let suite =
          >:: test_position_size_long_capped_by_max_long_exposure;
          "position_size_short_cap_is_configurable"
          >:: test_position_size_short_cap_is_configurable;
-         "position_size_capped_by_max_position_pct"
-         >:: test_position_size_capped_by_max_position_pct;
+         "position_size_long_capped_by_max_position_pct"
+         >:: test_position_size_long_capped_by_max_position_pct;
+         "position_size_short_capped_by_max_position_pct"
+         >:: test_position_size_short_capped_by_max_position_pct;
          "position_size_below_cap_unaffected"
          >:: test_position_size_below_cap_unaffected;
          "check_limits_ok" >:: test_check_limits_ok;

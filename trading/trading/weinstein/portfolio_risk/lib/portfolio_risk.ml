@@ -32,9 +32,11 @@ type limit_violation =
   | Risk_too_high of float
 [@@deriving show]
 
-(* Named default for [max_position_pct] so the [@sexp.default] attribute
-   below references a binding rather than a bare numeric literal — the
-   magic-number linter accepts named constants but flags inline floats. *)
+(* Named defaults for the per-position cap so the [@sexp.default] attributes
+   reference bindings rather than bare numeric literals — the magic-number
+   linter accepts named constants but flags inline floats. *)
+let default_max_position_pct_long = 0.30
+let default_max_position_pct_short = 0.20
 let default_max_position_pct = 0.20
 
 type config = {
@@ -44,6 +46,8 @@ type config = {
   max_short_exposure_pct : float;
   max_short_notional_fraction : float;
   min_cash_pct : float;
+  max_position_pct_long : float; [@sexp.default default_max_position_pct_long]
+  max_position_pct_short : float; [@sexp.default default_max_position_pct_short]
   max_position_pct : float; [@sexp.default default_max_position_pct]
   max_sector_concentration : int;
   max_unknown_sector_positions : int;
@@ -61,6 +65,8 @@ let default_config =
     max_short_exposure_pct = 0.30;
     max_short_notional_fraction = 0.30;
     min_cash_pct = 0.10;
+    max_position_pct_long = default_max_position_pct_long;
+    max_position_pct_short = default_max_position_pct_short;
     max_position_pct = default_max_position_pct;
     max_sector_concentration = 5;
     max_unknown_sector_positions = 2;
@@ -143,10 +149,10 @@ let snapshot_of_portfolio ~portfolio ~prices ?(sectors = []) () =
    config.max_position_pct]. Per-position concentration sat well above the
    side-exposure cap; the [min()] of both caps tightens this. *)
 let _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price =
-  let exposure_pct =
+  let exposure_pct, position_pct =
     match side with
-    | `Long -> config.max_long_exposure_pct
-    | `Short -> config.max_short_exposure_pct
+    | `Long -> (config.max_long_exposure_pct, config.max_position_pct_long)
+    | `Short -> (config.max_short_exposure_pct, config.max_position_pct_short)
   in
   (* Clamp both caps to non-negative. With shorts, [portfolio_value] can go
      negative when short notional exceeds cash + longs; without the clamp,
@@ -156,9 +162,7 @@ let _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price =
      A negative cap means the strategy has no room to add positions — return
      zero shares instead of a negative count. *)
   let exposure_cap = Float.max 0.0 (portfolio_value *. exposure_pct) in
-  let position_cap =
-    Float.max 0.0 (portfolio_value *. config.max_position_pct)
-  in
+  let position_cap = Float.max 0.0 (portfolio_value *. position_pct) in
   let dollar_cap = Float.min exposure_cap position_cap in
   if Float.( <= ) entry_price 0.0 then Int.max_value
   else Int.of_float (Float.round_down (dollar_cap /. entry_price))
