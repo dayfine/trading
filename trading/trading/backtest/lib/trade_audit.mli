@@ -52,6 +52,17 @@ type skip_reason =
           per-position
           {!Force_liquidation.config.max_short_unrealized_loss_fraction} stop.
           Only emitted on [Short] candidates. *)
+  | Stop_too_wide
+      (** G15 step 3: skipped because the support-floor-derived initial stop
+          sits more than [Weinstein_stops.config.max_stop_distance_pct] from
+          entry. Implements Weinstein book §5.1's "if a stop requires more than
+          15% risk → prefer other candidates" rule. Symmetric on long and short
+          candidates. The diagnostic that motivated this gate
+          ([dev/notes/g15-stops-diagnostic-aos-hood-2026-05-01.md]) found two
+          short force-liquidations (AOS, HOOD) where the structural stop landed
+          at +16% above entry — wider than the 15% Per_position safety net —
+          meaning the position was guaranteed to force-liquidate before the
+          per-position stop could ever fire. *)
 [@@deriving sexp]
 
 type alternative_candidate = {

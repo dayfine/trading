@@ -163,7 +163,10 @@ let test_effective_entry_overrides_suggested_entry _ =
       ~portfolio_value:100_000.0 ~current_date cand
   in
   assert_that result
-    (is_some_and
+    (matching ~msg:"Expected Entry_ok"
+       (function
+         | Entry_audit_capture.Entry_ok (trans, meta) -> Some (trans, meta)
+         | _ -> None)
        (all_of
           [
             field
@@ -205,8 +208,8 @@ let test_entry_event_audit_dollars_use_effective_entry _ =
         ~stops_config:_stops_config ~initial_stop_buffer:0.92 ~stop_states
         ~bar_reader ~portfolio_value:100_000.0 ~current_date cand
     with
-    | Some pair -> pair
-    | None -> OUnit2.assert_failure "make_entry_transition returned None"
+    | Entry_audit_capture.Entry_ok (trans, meta) -> (trans, meta)
+    | _ -> OUnit2.assert_failure "make_entry_transition did not return Entry_ok"
   in
   let _, meta = trans_and_meta in
   let macro : Macro.result =
@@ -276,7 +279,10 @@ let test_empty_bar_reader_falls_back_to_suggested_entry _ =
       ~portfolio_value:100_000.0 ~current_date cand
   in
   assert_that result
-    (is_some_and
+    (matching ~msg:"Expected Entry_ok"
+       (function
+         | Entry_audit_capture.Entry_ok (trans, meta) -> Some (trans, meta)
+         | _ -> None)
        (field
           (fun (_, (m : Entry_audit_capture.entry_meta)) ->
             m.effective_entry_price)
@@ -417,6 +423,140 @@ let test_short_notional_cap_zero_existing _ =
           (equal_to 50)));
   assert_that !short_notional_acc (float_equal 5_000.0)
 
+(* ------------------------------------------------------------------ *)
+(* G15 step 3: stop-too-wide rejection at entry + sizing-uses-installed-stop *)
+(* ------------------------------------------------------------------ *)
+
+(** Long candidate with current_close=$100 and initial_stop_buffer=0.80 → the
+    fallback support-floor stop sits at $80, i.e. 20% below entry. With the
+    default [max_stop_distance_pct = 0.15], the gate must fire and the result
+    must be [Stop_too_wide]. No [stop_states] entry should be written; no
+    position id should be consumed. *)
+let test_long_stop_too_wide_rejects_at_20pct _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let initial_stop_states_size = Map.length !stop_states in
+  let result =
+    Entry_audit_capture.make_entry_transition
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.80 (* 20% below entry → over the 15% gate *)
+      ~stop_states ~bar_reader ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result
+    (matching ~msg:"Expected Stop_too_wide"
+       (function Entry_audit_capture.Stop_too_wide -> Some () | _ -> None)
+       (equal_to ()));
+  (* Pin the no-side-effect contract: stop_states untouched. *)
+  assert_that (Map.length !stop_states) (equal_to initial_stop_states_size)
+
+(** Short counterpart: with current_close=$100 and initial_stop_buffer=0.80, the
+    short-side fallback ref is $100/0.80=$125 (25% above entry → also over the
+    15% gate). *)
+let test_short_stop_too_wide_rejects_at_25pct _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    _short_candidate ~ticker:_ticker ~suggested_entry:100.0
+      ~suggested_stop:108.0 ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.80 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result
+    (matching ~msg:"Expected Stop_too_wide"
+       (function Entry_audit_capture.Stop_too_wide -> Some () | _ -> None)
+       (equal_to ()))
+
+(** Long with initial_stop_buffer=0.92 → fallback stop at 8% below entry, well
+    under 15% → must produce [Entry_ok]. Pins the admit-side of the gate. *)
+let test_stop_within_15pct_admits _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.92 (* 8% below entry → under the 15% gate *)
+      ~stop_states ~bar_reader ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result
+    (matching ~msg:"Expected Entry_ok"
+       (function
+         | Entry_audit_capture.Entry_ok (_, meta) -> Some meta | _ -> None)
+       (* Sanity: meta.installed_stop sits comfortably under 15% from $100
+          entry. The actual value is ~$88.32 (= support_floor level ~$92 ×
+          0.96 buffer-on-floor); range is 85..95 to accommodate the
+          buffer-on-floor compounding without pinning the exact value. *)
+       (field
+          (fun (m : Entry_audit_capture.entry_meta) -> m.installed_stop)
+          (is_between (module Float_ord) ~low:85.0 ~high:95.0)))
+
+(** Pin sizing-uses-installed-stop: configure [cand.suggested_stop] divorced
+    from [installed_stop] (suggested at 5% below entry, installed at 8% below
+    entry) and confirm the [risk_amount] embedded in [meta] keys off
+    [installed_stop], not [cand.suggested_stop]. The test reads
+    [shares * |effective_entry - installed_stop|] and compares to
+    [portfolio_value * risk_per_trade_pct] (the fixed-risk-sizing contract). *)
+let test_sizing_uses_installed_stop _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    (* suggested_stop $95 — pre-step-3 sizing would have keyed off this. *)
+    _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let portfolio_value = 100_000.0 in
+  let result =
+    Entry_audit_capture.make_entry_transition
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.92 (* installed_stop ~$92, distance ~8% *)
+      ~stop_states ~bar_reader ~portfolio_value ~current_date cand
+  in
+  let meta =
+    match result with
+    | Entry_audit_capture.Entry_ok (_, m) -> m
+    | _ -> OUnit2.assert_failure "expected Entry_ok"
+  in
+  let risk_per_share =
+    Float.abs (meta.effective_entry_price -. meta.installed_stop)
+  in
+  let risk_dollars = Float.of_int meta.shares *. risk_per_share in
+  let risk_per_trade_pct = _portfolio_risk_config.risk_per_trade_pct in
+  let target_risk_dollars = portfolio_value *. risk_per_trade_pct in
+  (* Risk-per-share should match installed_stop, not suggested_stop:
+     - installed_stop-based: |100 - 92| = 8 → shares = 1000*0.01/8 = 1.25 → 1
+     - suggested_stop-based: |100 - 95| = 5 → shares = 1000*0.01/5 = 2.0 → 2
+     The realised risk_dollars must be at-or-below target_risk_dollars (the
+     floor() rounding produces a strict inequality, but we never overshoot). *)
+  assert_that risk_dollars (le (module Float_ord) target_risk_dollars);
+  (* Pin the actual installed_stop landed near the buffered floor (~$88.32 =
+     support_floor ~$92 × 0.96), not the screener's suggested $95. This
+     catches a regression where sizing re-keyed off cand.suggested_stop. *)
+  assert_that meta.installed_stop
+    (is_between (module Float_ord) ~low:85.0 ~high:94.0)
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
@@ -435,4 +575,11 @@ let () =
            >:: test_short_notional_cap_does_not_block_longs;
            "G15-step2: short notional cap with zero existing"
            >:: test_short_notional_cap_zero_existing;
+           "G15-step3: long stop too wide rejects at 20%"
+           >:: test_long_stop_too_wide_rejects_at_20pct;
+           "G15-step3: short stop too wide rejects at 25%"
+           >:: test_short_stop_too_wide_rejects_at_25pct;
+           "G15-step3: stop within 15% admits" >:: test_stop_within_15pct_admits;
+           "G15-step3: sizing uses installed_stop"
+           >:: test_sizing_uses_installed_stop;
          ])

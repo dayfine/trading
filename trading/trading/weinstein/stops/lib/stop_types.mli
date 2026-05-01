@@ -86,6 +86,22 @@ type config = {
           narrow enough to avoid reaching into a prior regime. Used by
           {!Weinstein_stops.compute_initial_stop_with_floor}; depth threshold is
           shared with [min_correction_pct] (Weinstein's 8% rule). *)
+  max_stop_distance_pct : float;
+      (** G15 step 3: maximum allowed distance between entry price and the
+          installed initial stop, as a fraction of entry price (default: 0.15 =
+          15%). When [|installed_stop - entry| / entry > max_stop_distance_pct],
+          the candidate is rejected at the strategy's entry-decision site with a
+          [Stop_too_wide] skip reason rather than admitted with an oversized
+          structural stop.
+
+          Implements Weinstein book §5.1 ("Initial Stop Placement"): "if a stop
+          requires more than 15% risk → prefer other candidates". The gate fires
+          symmetrically on longs and shorts — both the long correction-low floor
+          and the short counter-rally-high floor can land structurally far from
+          entry, and the historical sp500-2019-2023 cascade that motivated this
+          fix was driven by short candidates whose support-floor-derived stop
+          sat 16%+ above entry (AOS, HOOD; see
+          [dev/notes/g15-stops-diagnostic-aos-hood-2026-05-01.md]). *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

@@ -34,6 +34,14 @@ type skip_reason =
       (** G15 step 2: short candidate dropped because aggregate short notional
           would exceed [Portfolio_risk.config.max_short_notional_fraction] of
           portfolio value. Only emitted for [Short] candidates. *)
+  | Stop_too_wide
+      (** G15 step 3: candidate dropped because the support-floor-derived
+          initial stop sits more than
+          [Weinstein_stops.config.max_stop_distance_pct] from entry. Implements
+          Weinstein book §5.1's "if a stop requires more than 15% risk → prefer
+          other candidates" rule. The gate fires symmetrically on longs and
+          shorts; both sides can see structurally wide initial stops when the
+          recent counter-move floor is far from current price. *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

@@ -11,6 +11,18 @@ type entry_meta = {
   effective_entry_price : float;
 }
 
+(** Outcome of an attempt to construct an entry transition for one candidate.
+    Distinguishes the two pre-cash gates the strategy applies in
+    {!make_entry_transition}: a stop wider than
+    [stops_config.max_stop_distance_pct] (G15 step 3 — Weinstein book §5.1
+    "reject if stop > 15%") and round-share sizing collapsing to zero. The
+    caller's classifier maps these directly into [Audit_recorder.skip_reason]s
+    so the audit row records WHICH gate fired. *)
+type entry_attempt_result =
+  | Entry_ok of Position.transition * entry_meta
+  | Stop_too_wide
+  | Sized_zero
+
 type candidate_decision =
   | Kept of Position.transition * entry_meta
   | Skipped of Audit_recorder.skip_reason
@@ -112,27 +124,51 @@ let _build_transition_and_meta ~id ~current_date ~effective_entry ~shares
   in
   (transition, meta)
 
+(** G15 step 3: distance between [installed_stop] and [effective_entry] as a
+    fraction of [effective_entry]. Symmetric for longs and shorts — both can
+    have a structurally wide initial stop when the recent counter-move floor
+    sits far from current price. *)
+let _stop_distance_pct ~effective_entry ~installed_stop =
+  Float.abs (installed_stop -. effective_entry) /. effective_entry
+
 let make_entry_transition ~portfolio_risk_config ~stops_config
     ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value ~current_date
-    (cand : Screener.scored_candidate) =
+    (cand : Screener.scored_candidate) : entry_attempt_result =
   let effective_entry = _effective_entry_price ~bar_reader ~current_date cand in
-  let sizing =
-    Portfolio_risk.compute_position_size ~config:portfolio_risk_config
-      ~portfolio_value
-      ~side:(_sizing_side_of_cand_side cand.side)
-      ~entry_price:effective_entry ~stop_price:cand.suggested_stop ()
+  let initial_stop, stop_floor_kind =
+    _initial_stop_and_kind ~stops_config ~initial_stop_buffer ~bar_reader
+      ~current_date ~effective_entry cand
   in
-  if sizing.shares = 0 then None
+  let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
+  let stop_distance_pct =
+    _stop_distance_pct ~effective_entry ~installed_stop:installed_stop_level
+  in
+  if
+    Float.( > ) stop_distance_pct
+      stops_config.Weinstein_stops.max_stop_distance_pct
+  then Stop_too_wide
   else
-    let id = gen_position_id cand.ticker in
-    let initial_stop, stop_floor_kind =
-      _initial_stop_and_kind ~stops_config ~initial_stop_buffer ~bar_reader
-        ~current_date ~effective_entry cand
+    (* G15 step 3: size off the INSTALLED stop, not [cand.suggested_stop]. The
+       support-floor-derived [installed_stop] may sit further from entry than
+       the screener's pre-fill suggestion, in which case risk-per-share is
+       larger and share count must shrink accordingly so total
+       risk-to-stop = config.risk_per_trade_pct * portfolio_value (the
+       fixed-risk-sizing contract). *)
+    let sizing =
+      Portfolio_risk.compute_position_size ~config:portfolio_risk_config
+        ~portfolio_value
+        ~side:(_sizing_side_of_cand_side cand.side)
+        ~entry_price:effective_entry ~stop_price:installed_stop_level ()
     in
-    stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
-    Some
-      (_build_transition_and_meta ~id ~current_date ~effective_entry
-         ~shares:sizing.shares ~initial_stop ~stop_floor_kind cand)
+    if sizing.shares = 0 then Sized_zero
+    else
+      let id = gen_position_id cand.ticker in
+      stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
+      let trans, meta =
+        _build_transition_and_meta ~id ~current_date ~effective_entry
+          ~shares:sizing.shares ~initial_stop ~stop_floor_kind cand
+      in
+      Entry_ok (trans, meta)
 
 let check_cash_and_deduct ~remaining_cash
     ((trans : Position.transition), (meta : entry_meta)) =
@@ -179,8 +215,9 @@ let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
   if Set.mem held_set c.ticker then Skipped Already_held
   else
     match make_entry c with
-    | None -> Skipped Sized_to_zero
-    | Some (trans, meta) -> (
+    | Stop_too_wide -> Skipped Stop_too_wide
+    | Sized_zero -> Skipped Sized_to_zero
+    | Entry_ok (trans, meta) -> (
         match check_cash_and_deduct ~remaining_cash (trans, meta) with
         | None -> Skipped Insufficient_cash
         | Some (trans, meta) -> (

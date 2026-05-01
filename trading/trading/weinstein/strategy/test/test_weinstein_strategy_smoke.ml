@@ -430,12 +430,16 @@ let test_weinstein_breakout_trade _ =
          screener's [cand.suggested_entry] (a buffered breakout level
          that historically diverged from the broker's actual fill —
          pre-G14 the synthetic test happened to land on values that
-         matched, but the divergence is real). With the new sizing, the
-         per-share risk = |effective_entry - suggested_stop| is larger
-         because effective_entry sits above suggested_stop by more than
-         the screener's nominal buffer; risk-based shares drop
-         proportionally. The trade.price (market fill) is unchanged.
-         Pin the post-G14 deterministic values: 41 shares at $166.38. *)
+         matched, but the divergence is real).
+
+         G15 step 3 (2026-05-01) changed risk_per_share to key off the
+         support-floor-derived [installed_stop] instead of
+         [cand.suggested_stop]. On this synthetic Stage-2 setup the
+         support-floor stop sits much closer to entry than the
+         screener's nominal buffer-based stop, so risk_per_share is
+         smaller and shares scale up proportionally. Trade.price
+         (market fill) is unchanged. Pin the post-G15-step-3
+         deterministic values: 271 shares at $166.38. *)
       let all_trades =
         List.concat_map result.steps ~f:(fun step -> step.trades)
       in
@@ -450,7 +454,7 @@ let test_weinstein_breakout_trade _ =
                    (equal_to Trading_base.Types.Buy);
                  field
                    (fun t -> t.Trading_base.Types.quantity)
-                   (float_equal ~epsilon:0.5 41.0);
+                   (float_equal ~epsilon:0.5 271.0);
                  field
                    (fun t -> t.Trading_base.Types.price)
                    (float_equal ~epsilon:0.1 166.383146);
