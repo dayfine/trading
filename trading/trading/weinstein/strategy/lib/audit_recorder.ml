@@ -2,7 +2,11 @@
 
 open Core
 
-type skip_reason = Insufficient_cash | Already_held | Sized_to_zero
+type skip_reason =
+  | Insufficient_cash
+  | Already_held
+  | Sized_to_zero
+  | Short_notional_cap
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

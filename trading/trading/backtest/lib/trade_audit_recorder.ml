@@ -12,6 +12,7 @@ let _skip_reason_of_event = function
   | AR.Insufficient_cash -> Trade_audit.Insufficient_cash
   | AR.Already_held -> Trade_audit.Already_held
   | AR.Sized_to_zero -> Trade_audit.Sized_to_zero
+  | AR.Short_notional_cap -> Trade_audit.Short_notional_cap
 
 let _alternative_of_event (alt : AR.alternative_input) :
     Trade_audit.alternative_candidate =

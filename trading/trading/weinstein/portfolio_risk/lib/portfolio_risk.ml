@@ -37,6 +37,7 @@ type config = {
   max_positions : int;
   max_long_exposure_pct : float;
   max_short_exposure_pct : float;
+  max_short_notional_fraction : float;
   min_cash_pct : float;
   max_sector_concentration : int;
   max_unknown_sector_positions : int;
@@ -52,6 +53,7 @@ let default_config =
     max_positions = 20;
     max_long_exposure_pct = 0.90;
     max_short_exposure_pct = 0.30;
+    max_short_notional_fraction = 0.30;
     min_cash_pct = 0.10;
     max_sector_concentration = 5;
     max_unknown_sector_positions = 2;

@@ -19,14 +19,21 @@ open Core
     The backtest-side recorder maps these into
     {!Backtest.Trade_audit.skip_reason}.
 
-    {b Note}: only the three reasons the strategy can directly observe at the
-    sizing/cash gates land here. Screener-internal truncations
+    {b Note}: only the four reasons the strategy can directly observe at the
+    sizing/cash/short-cap gates land here. Screener-internal truncations
     ([Below_min_grade], [Top_n_cutoff], [Sector_concentration]) are not visible
     at this site — the screener already filtered the candidate before the
     strategy saw it. The audit's [alternatives_considered] field therefore
     enumerates only the rivals from the same screen call that the strategy
     actually considered for entry. *)
-type skip_reason = Insufficient_cash | Already_held | Sized_to_zero
+type skip_reason =
+  | Insufficient_cash
+  | Already_held
+  | Sized_to_zero
+  | Short_notional_cap
+      (** G15 step 2: short candidate dropped because aggregate short notional
+          would exceed [Portfolio_risk.config.max_short_notional_fraction] of
+          portfolio value. Only emitted for [Short] candidates. *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

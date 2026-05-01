@@ -145,16 +145,63 @@ let check_cash_and_deduct ~remaining_cash
         Some (trans, meta))
   | _ -> Some (trans, meta)
 
-let classify_candidate ~held_set ~make_entry ~remaining_cash
-    (c : Screener.scored_candidate) : candidate_decision =
+(** G15 step 2: aggregate short-notional cap evaluated at entry-decision time.
+
+    The aggregate cap is checked on a running [short_notional_acc] that starts
+    at the existing short notional in the portfolio (computed once by the caller
+    from the [Holding] state of every short position) and grows as short
+    candidates are admitted within this Friday's entry walk.
+
+    For [Long] candidates the gate is a no-op pass-through: longs cannot push
+    the cap up, and the strategy still admits them via the cash check.
+
+    Pure side effect on [short_notional_acc]: bumped only on a [Short] candidate
+    that passes — that way later [Short] candidates within the same walk see the
+    up-to-date running total and the cap is enforced monotonically across the
+    cascade. *)
+let check_short_notional_cap ~short_notional_acc ~short_notional_cap
+    ((trans : Position.transition), (meta : entry_meta))
+    (cand : Screener.scored_candidate) =
+  match cand.side with
+  | Trading_base.Types.Long -> Some (trans, meta)
+  | Trading_base.Types.Short ->
+      let candidate_notional =
+        Float.of_int meta.shares *. meta.effective_entry_price
+      in
+      let projected = !short_notional_acc +. candidate_notional in
+      if Float.( > ) projected short_notional_cap then None
+      else (
+        short_notional_acc := projected;
+        Some (trans, meta))
+
+let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
+    ~short_notional_cap (c : Screener.scored_candidate) : candidate_decision =
   if Set.mem held_set c.ticker then Skipped Already_held
   else
     match make_entry c with
     | None -> Skipped Sized_to_zero
     | Some (trans, meta) -> (
         match check_cash_and_deduct ~remaining_cash (trans, meta) with
-        | Some (trans, meta) -> Kept (trans, meta)
-        | None -> Skipped Insufficient_cash)
+        | None -> Skipped Insufficient_cash
+        | Some (trans, meta) -> (
+            match
+              check_short_notional_cap ~short_notional_acc ~short_notional_cap
+                (trans, meta) c
+            with
+            | Some (trans, meta) -> Kept (trans, meta)
+            | None ->
+                (* Refund the cash we tentatively deducted in the cash check
+                   so subsequent candidates' cash gates see the correct
+                   running balance. The candidate was admissible on cash
+                   grounds but is being dropped on the short-notional cap. *)
+                (remaining_cash :=
+                   !remaining_cash
+                   +.
+                   match trans.kind with
+                   | Position.CreateEntering e ->
+                       e.target_quantity *. e.entry_price
+                   | _ -> 0.0);
+                Skipped Short_notional_cap))
 
 let alternatives_of_decisions ~decisions ~exclude_position_id :
     Audit_recorder.alternative_input list =
