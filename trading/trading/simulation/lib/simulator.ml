@@ -395,7 +395,8 @@ let step t =
     let%bind transitions = _call_strategy { t with portfolio; positions } in
     let%bind positions = _apply_transitions ~positions ~transitions in
     let%bind orders =
-      Order_generator.transitions_to_orders ~positions transitions
+      Order_generator.transitions_to_orders ~current_date:t.current_date
+        ~positions transitions
     in
     let step_result =
       {

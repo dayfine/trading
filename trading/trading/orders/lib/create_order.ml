@@ -11,15 +11,23 @@ type order_params = {
 }
 [@@deriving show, eq]
 
-let id_suffix_range = 10000
+(* Deterministic process-monotonic counter used when callers don't supply
+   their own [~id]. Replaces the previous wall-clock + Random.int generator,
+   which was the root cause of G6 (decade-backtest non-determinism): order IDs
+   are hashtable keys in [Manager.orders]; clock-jitter across forks produced
+   different keys -> different bucket placement -> different [list_orders]
+   iteration -> different fill order -> different cumulative state.
 
-let _generate_order_id () =
-  let timestamp =
-    Time_ns_unix.now () |> Time_ns_unix.to_int63_ns_since_epoch
-    |> Core.Int63.to_string
-  in
-  let random_suffix = Random.int id_suffix_range |> Printf.sprintf "%04d" in
-  timestamp ^ "_" ^ random_suffix
+   A fresh [Manager.t] is created per simulation run, so reusing the same
+   "ord-N" sequence across runs in the same process does not collide:
+   different [Manager.t] instances each see a disjoint set of IDs (1..N for
+   run 1, then N+1..M for run 2, etc.). The bug we're fixing is unstable IDs
+   within a single run, not cross-run reuse. *)
+let _next_id_counter = ref 0
+
+let _generate_default_id () =
+  incr _next_id_counter;
+  Printf.sprintf "ord-%d" !_next_id_counter
 
 (* Pure validation functions - each returns Ok () or Error *)
 let _validate_symbol symbol =
@@ -76,9 +84,9 @@ let _validate_order_type params =
       combine_status_list validations
   | Market -> Ok ()
 
-let _build_order ~now_time params =
+let _build_order ~now_time ~id params =
   {
-    id = _generate_order_id ();
+    id;
     symbol = params.symbol;
     side = params.side;
     order_type = params.order_type;
@@ -91,7 +99,7 @@ let _build_order ~now_time params =
     updated_at = now_time;
   }
 
-let create_order ?(now_time = Time_ns_unix.now ()) params =
+let create_order ?(now_time = Time_ns_unix.now ()) ?id params =
   let validations =
     [
       _validate_symbol params.symbol;
@@ -100,5 +108,7 @@ let create_order ?(now_time = Time_ns_unix.now ()) params =
     ]
   in
   match combine_status_list validations with
-  | Ok () -> Result.Ok (_build_order ~now_time params)
+  | Ok () ->
+      let id = match id with Some i -> i | None -> _generate_default_id () in
+      Result.Ok (_build_order ~now_time ~id params)
   | Error err -> Result.Error err
