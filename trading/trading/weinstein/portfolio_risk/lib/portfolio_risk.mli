@@ -102,11 +102,24 @@ type sizing_result = {
 
 (** {1 Configuration} *)
 
+val default_max_position_pct_long : float
+(** Default per-position concentration cap for {b long} entries (0.30 = 30% of
+    portfolio_value). Long positions compound best with concentration: on
+    sp500-2019-2023 long-only, the looser cap (0.30 / no-cap) yields +45.9%
+    return vs +28.2% under a tighter 0.20 cap. *)
+
+val default_max_position_pct_short : float
+(** Default per-position concentration cap for {b short} entries (0.20 = 20% of
+    portfolio_value). Shorts benefit from diversification + reduced
+    force-liquidation cascade depth: on sp500-2019-2023 with-shorts, tightening
+    to 0.20 lifts return +37.2% → +47.3% and drops max DD 34.5% → 28.8%. *)
+
 val default_max_position_pct : float
-(** Default per-position concentration cap (0.20 = 20% of portfolio_value).
-    Exposed as a binding so the [@sexp.default] attribute on
-    [config.max_position_pct] can reference it by name — the magic-number linter
-    accepts named constants in attributes but flags inline floats. *)
+(** {b Deprecated as of 2026-05-01.} Single-cap field retained for sexp
+    backwards compat with scenario fixtures pinned during PR #744. New code
+    should use [default_max_position_pct_long] /
+    [default_max_position_pct_short]. Value: 0.20 (matches the prior single cap
+    so scenarios reading the legacy field don't drift). *)
 
 type config = {
   risk_per_trade_pct : float;
@@ -139,16 +152,22 @@ type config = {
           [check_cash_and_deduct]. Cash discipline is now handled by
           [max_position_pct × max_positions] + macro gating + force-liquidation
           thresholds. Field retained for sexp compat. *)
+  max_position_pct_long : float; [@sexp.default default_max_position_pct_long]
+      (** Per-position concentration cap for long entries. Caps EACH new long at
+          [portfolio_value * max_position_pct_long] dollars of notional.
+          Combined with [max_long_exposure_pct] via [min()] in
+          {!compute_position_size}: the final share count is the minimum of
+          (risk-based, side-exposure cap, per-position cap). Default 0.30. *)
+  max_position_pct_short : float; [@sexp.default default_max_position_pct_short]
+      (** Per-position concentration cap for short entries. Caps EACH new short
+          at [portfolio_value * max_position_pct_short] dollars of notional.
+          Default 0.20. *)
   max_position_pct : float; [@sexp.default default_max_position_pct]
-      (** Per-position concentration cap. Caps EACH new position at
-          [portfolio_value * max_position_pct] dollars of notional. Combined
-          with the side-level [max_long_exposure_pct] / [max_short_exposure_pct]
-          caps via [min()] in {!compute_position_size}: the final share count is
-          the minimum of (risk-based, side-exposure cap, per-position cap).
-
-          Rationale: 45-48% per-position concentration was observed in
-          sp500-2019-2023 with no per-position cap; the 90% side cap fired only
-          at the aggregate level. Default 0.20 (20% of portfolio_value). *)
+      (** {b Deprecated as of 2026-05-01.} Sexp-compat field for fixtures pinned
+          during PR #744. The strategy code does NOT read this field — sizing
+          dispatches on [max_position_pct_long] / [max_position_pct_short]
+          instead. Retained so existing scenario sexps that mention this name
+          still parse. Will be removed once all callers migrate. *)
   max_sector_concentration : int;
       (** Maximum positions in any single named sector (default: 5) *)
   max_unknown_sector_positions : int;

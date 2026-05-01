@@ -440,10 +440,11 @@ let test_weinstein_breakout_trade _ =
          smaller and shares scale up proportionally. Trade.price
          (market fill) is unchanged.
 
-         max_position_pct=0.20 cap landed 2026-05-01 — re-pinned: with
-         portfolio_value=$100K and max_position_pct=0.20, the per-position
-         cap is $20K. At entry $166.38, max shares = floor($20K / $166.38)
-         = 120. The risk-based size (271) is now capped down to 120. *)
+         max_position_pct asymmetric cap (2026-05-01): long entries use
+         max_position_pct_long=0.30 (split out from the original 0.20 single
+         cap based on sp500-2019-2023 evidence that long compounding wants
+         looser concentration). Portfolio_value=$100K → long cap $30K. At
+         entry $166.38, max shares = floor($30K / $166.38) = 180. *)
       let all_trades =
         List.concat_map result.steps ~f:(fun step -> step.trades)
       in
@@ -458,7 +459,7 @@ let test_weinstein_breakout_trade _ =
                    (equal_to Trading_base.Types.Buy);
                  field
                    (fun t -> t.Trading_base.Types.quantity)
-                   (float_equal ~epsilon:0.5 120.0);
+                   (float_equal ~epsilon:0.5 180.0);
                  field
                    (fun t -> t.Trading_base.Types.price)
                    (float_equal ~epsilon:0.1 166.383146);
