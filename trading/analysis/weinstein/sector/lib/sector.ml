@@ -110,9 +110,22 @@ let _build_rationale ~stage ~rs ~constituent_pct ~rating : string list =
   let rating_msg = Printf.sprintf "Rating: %s" (_rating_string rating) in
   [ stage_msg; rs_msg; breadth_msg; rating_msg ]
 
+(** G15-followup (panel-golden cross-platform drift, 2026-05-01): snap
+    [confidence] to 4 decimal places before the boundary comparison. macOS libm
+    and glibc libm don't guarantee bit-identical results for the
+    chained-arithmetic + SMA-of-RS-ratio walk that produces [confidence]; the
+    diagnostic in [dev/notes/panel-golden-platform-drift-2026-05-01.md] showed
+    XLK's confidence flipping across the 0.6 [strong_confidence] boundary
+    between platforms, moving Information Technology between [Strong] and
+    [Neutral] and adding / subtracting +10 [w_sector_strong] from constituent
+    candidate scores. The quantization is the cheapest fix — sector ratings
+    change at the 4th-decimal granularity already (config thresholds are 0.6 /
+    0.4 = 1 dp), so 4 dp leaves the per-sector rating semantics unchanged in any
+    non-degenerate case while eliminating sub-ULP cross-platform divergence. *)
 let _rating_of_confidence ~config ~confidence : Screener.sector_rating =
-  if Float.(confidence >= config.strong_confidence) then Screener.Strong
-  else if Float.(confidence <= config.weak_confidence) then Screener.Weak
+  let snapped = Float.round_decimal ~decimal_digits:4 confidence in
+  if Float.(snapped >= config.strong_confidence) then Screener.Strong
+  else if Float.(snapped <= config.weak_confidence) then Screener.Weak
   else Screener.Neutral
 
 (* ------------------------------------------------------------------ *)

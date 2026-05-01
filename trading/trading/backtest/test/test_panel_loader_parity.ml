@@ -162,43 +162,27 @@ let _assert_round_trips_match_golden ~name ~scenario_rel _ctxt =
   let golden_missing =
     not (Core_unix.access path [ `Exists ] |> Result.is_ok)
   in
-  (* G15 step 3 (2026-05-01): the bit-exact whole-record golden assertion
-     hits a cross-platform float-precision divergence — macOS regenerates
-     4 round_trips for panel-golden-2019-full while Linux GHA produces 3.
-     The diff candidate sits on the boundary of the 15%
-     [max_stop_distance_pct] gate, where sub-ULP differences in libm-
-     derived support_floor calculations push it onto opposite sides of
-     the threshold per platform. Skipping the strict assertion unblocks
-     step 3; the regenerate-mode capture still works for local diagnosis.
-     Tracked at dev/notes/panel-golden-platform-drift.md (TODO). *)
-  if regenerate || golden_missing then _capture_and_skip ~name ~path ~observed
-  else
-    let _golden = _load_golden ~path in
-    let _ = _trade_matcher in
-    (* G15 follow-up debug: when [PANEL_GOLDEN_DEBUG=1] is set, dump the
-       observed round_trips to stderr before the skip so a CI run can
-       capture the Linux trade list for diffing against the macOS golden.
-       Off by default; the assertion remains skipped until the
-       cross-platform divergence is rooted out (see
-       dev/notes/panel-golden-platform-drift-2026-05-01.md). *)
-    (match Sys.getenv "PANEL_GOLDEN_DEBUG" with
-    | Some "1" ->
-        Printf.eprintf "OBSERVED %s n_round_trips=%d\n%!" name
-          (List.length observed);
-        List.iteri observed ~f:(fun i (g : golden_trade) ->
-            Printf.eprintf
-              "OBSERVED %s [%d] symbol=%s entry=%s exit=%s qty=%.6f pnl=%.6f\n\
-               %!"
-              name i g.symbol
-              (Date.to_string g.entry_date)
-              (Date.to_string g.exit_date)
-              g.quantity g.pnl_dollars)
-    | _ -> ());
-    OUnit2.skip_if true
-      (sprintf
-         "%s: panel-golden assertion temporarily skipped — see G15 step 3 \
-          platform-drift TODO"
-         name)
+  (if regenerate || golden_missing then _capture_and_skip ~name ~path ~observed
+   else
+     (* G15 follow-up debug: when [PANEL_GOLDEN_DEBUG=1] is set, dump the
+       observed round_trips to stderr alongside the assertion so CI logs
+       carry the Linux trade list for diffing against macOS golden.
+       Off by default; the assertion still gates correctness. *)
+     match Sys.getenv "PANEL_GOLDEN_DEBUG" with
+     | Some "1" ->
+         Printf.eprintf "OBSERVED %s n_round_trips=%d\n%!" name
+           (List.length observed);
+         List.iteri observed ~f:(fun i (g : golden_trade) ->
+             Printf.eprintf
+               "OBSERVED %s [%d] symbol=%s entry=%s exit=%s qty=%.6f pnl=%.6f\n\
+                %!"
+               name i g.symbol
+               (Date.to_string g.entry_date)
+               (Date.to_string g.exit_date)
+               g.quantity g.pnl_dollars)
+     | _ -> ());
+  let golden = _load_golden ~path in
+  assert_that observed (elements_are (List.map golden ~f:_trade_matcher))
 
 let _make_test (name, scenario_rel) =
   "panel-mode round_trips match golden: " ^ name

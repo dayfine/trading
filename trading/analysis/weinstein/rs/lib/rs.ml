@@ -42,6 +42,20 @@ type result = {
     - Within the positive zone, the stock is "flat" if its RS has not declined
       by more than [flat_threshold] (e.g., 0.98 means a < 2% drop is still
       considered flat). *)
+(** G15-followup (panel-golden cross-platform drift, 2026-05-01): snap
+    [rs_normalized] to 4 decimal places before zone-crossover comparison
+    against 1.0. The 52-week SMA-of-RS-ratio walk accumulates float error
+    cross-platform; XLK's [rs_normalized] hovered near 1.0 by construction
+    (the SMA tracks recent values of the same series) and a sub-ULP /
+    sub-1e-12 drift on macOS vs Linux flipped the sector's RS trend
+    between [Positive_rising] and [Negative_improving] / [Negative_declining]
+    — a 0.6 swing in the sector confidence score, enough to flip XLK
+    between [Strong] and [Neutral] rating, removing / restoring +10
+    [w_sector_strong] from constituent candidates' scores. The 4-dp snap
+    only matters for values within 1e-4 of the 1.0 boundary; everywhere
+    else it's a no-op against the existing semantics. *)
+let _zone_above_one x = Float.(Float.round_decimal ~decimal_digits:4 x > 1.0)
+
 let _classify_trend ~trend_lookback ~flat_threshold (history : raw_rs list) :
     rs_trend =
   let n = List.length history in
@@ -51,7 +65,7 @@ let _classify_trend ~trend_lookback ~flat_threshold (history : raw_rs list) :
     let prev =
       (List.nth_exn history (max 0 (n - 1 - trend_lookback))).rs_normalized
     in
-    match (Float.(cur > 1.0), Float.(prev > 1.0)) with
+    match (_zone_above_one cur, _zone_above_one prev) with
     | true, false -> Bullish_crossover
     | false, true -> Bearish_crossover
     | true, true ->
