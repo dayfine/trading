@@ -281,6 +281,20 @@ let filter_stop_infos_in_window stop_infos ~start_date =
       | Some d -> Date.( >= ) d start_date
       | None -> true)
 
+(** Drop force-liquidation events whose [date] is before [start_date] — i.e.
+    events that fired during the warmup window. The simulator runs from
+    [warmup_start] so [Force_liquidation_log] observes events from days before
+    [start_date]; without this filter, warmup-window force-liqs appear in
+    [force_liquidations.sexp] and the [_build_force_liq_index] layer in
+    [Result_writer] inflates the visible force-liq count for release-gate
+    consumers. Round-trip rows in [trades.csv] would not directly attach these
+    events (the index keys on [(symbol, exit_date)] which is in the warmup
+    window for warmup events), but downstream tooling that loads
+    [force_liquidations.sexp] independently still over-counts. *)
+let filter_force_liquidations_in_window events ~start_date =
+  List.filter events ~f:(fun (e : Portfolio_risk.Force_liquidation.event) ->
+      Date.( >= ) e.date start_date)
+
 let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     ~sim_result : Summary.t =
   {
@@ -355,7 +369,9 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
             ~start_date,
           Trade_audit.get_audit_records trade_audit,
           Trade_audit.get_cascade_summaries trade_audit,
-          Force_liquidation_log.events force_liquidation_log ))
+          filter_force_liquidations_in_window
+            (Force_liquidation_log.events force_liquidation_log)
+            ~start_date ))
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
   let summary =
