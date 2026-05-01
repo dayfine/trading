@@ -1,9 +1,11 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-04-30 (evening)
+## Last updated: 2026-05-01
 
 ## Status
 MERGED
+
+Track wrapped on the MVP + initial follow-up axis. New follow-ups surfaced overnight in `dev/notes/force-liq-cascade-findings-2026-05-01.md` (G14 split-adjustment on Position.t Holding state) and `dev/notes/g14-deep-dive-2026-05-01.md` (Option 1 fix recommendation). G15 (short-side risk control) also filed. Both are `feat-weinstein` — strategy + position state machine; current `feat-weinstein` scope is closed. See §Follow-ups below for the new items.
 
 All four follow-ups landed via PRs #617 (bear-window regression test),
 #623 (live-cascade Bearish macro plumbing fix), #630 (full short
@@ -117,6 +119,34 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
    confirm the symptom (0 shorts, 37 long entries in 2022) is resolved.
    Out of scope for the fix PR per cost (~2.5 min wall, full backtest);
    covered by the next nightly Tier-3 perf run.
+
+6. **G14 — split-adjustment on Position.t Holding state** (filed 2026-05-01,
+   `feat-weinstein` scope). All 5 residual force-liqs in the post-G13
+   sp500 baseline are `Per_position` triggers with stale pre-split
+   `entry_price` values (PANW 3:1 Sep 2022, GOOG 20:1 Jul 2022, plus
+   ALGN/DASH/TECH within-window highs). First-pass fix attempt
+   (`feat/g14-screener-adjusted-prices`, abandoned 2026-05-01 ~07:00 UTC)
+   showed Bug A (screener high/low scans in raw price space) cannot be
+   fixed alone — symbols with FUTURE splits (e.g., CTAS 2024 4:1) get
+   `suggested_entry` in adjusted space while `Position.t.entry_price` is
+   set in raw space, producing the same 250%+ phantom losses. Recommended
+   fix: **Option 1 — pin everything to raw close-price space** with
+   lookback truncation at most-recent-split boundary. See
+   `dev/notes/g14-deep-dive-2026-05-01.md` §Recommendation for next session.
+   Owner: `feat-weinstein` — current scope is closed; needs scope extension
+   per the 2026-04-16 precedent before dispatch.
+
+7. **G15 — short-side risk control** (filed 2026-05-01, `feat-weinstein`
+   scope). With G12 (#725) + G13 (#726) eliminating the spurious
+   `Portfolio_floor` cascade, sp500-2019-2023 portfolio goes negative
+   (-$175K minimum 2021-11-04, -66.7% return, 117.5% MaxDD). The phantom
+   floor was acting as an unintended risk control. Real candidates:
+   (a) max total short notional as fraction of portfolio; (b) tighter
+   per-position short stop-loss threshold (Weinstein recommends tighter
+   stops on shorts than longs); (c) honest portfolio-floor based on real
+   peak observations (now correct post-G13). Combination of (a) + (b)
+   likely needed. See `dev/notes/force-liq-cascade-findings-2026-05-01.md`
+   §G15. Owner: `feat-weinstein` — same scope-extension prereq as G14.
 
 ## References
 
