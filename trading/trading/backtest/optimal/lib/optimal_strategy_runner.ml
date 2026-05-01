@@ -405,4 +405,3 @@ let run ~output_dir =
   let world = _build_world ~output_dir ~actual_run in
   let scored = _scan_and_score ~world in
   _emit_report ~output_dir ~actual_run ~scored
-
