@@ -354,9 +354,91 @@ let test_equal_prices_stop_limit _ =
         order
   | Error _ -> assert_failure "Expected equal prices buy stop-limit to be valid"
 
+(* G6 regression guard: order IDs must be deterministic and free of any
+   wall-clock or Random-PRNG component. The previous generator used
+   [Time_ns_unix.now ()] for the prefix and [Random.int] for the suffix; that
+   scheme produced different IDs across forks, which caused unstable
+   [Manager.orders] hashtable iteration and metric drift on long-horizon
+   backtests (decade-2014-2023, sp500-2019-2023). See
+   dev/notes/g6-decade-nondeterminism-investigation-2026-04-30.md. *)
+let _make_market_params () =
+  {
+    symbol = "AAPL";
+    side = Buy;
+    order_type = Market;
+    quantity = 1.0;
+    time_in_force = GTC;
+  }
+
+let _ids_for_sequence n =
+  List.init n ~f:(fun _ ->
+      match create_order (_make_market_params ()) with
+      | Ok o -> o.id
+      | Error e -> assert_failure (Status.show e))
+
+let test_default_ids_are_deterministic_in_sequence _ =
+  (* Within a single sequence of [create_order] calls (no [~id] supplied),
+     subsequent IDs must be distinct and have a stable pattern -- the auto-id
+     generator must not depend on wall-clock or Random state. We compare each
+     ID prefix against "ord-" and assert all distinct. *)
+  let ids = _ids_for_sequence 5 in
+  let unique = List.dedup_and_sort ~compare:String.compare ids in
+  assert_that (List.length unique : int) (equal_to 5);
+  List.iter ids ~f:(fun id ->
+      assert_bool
+        ("Expected id " ^ id ^ " to start with \"ord-\"")
+        (String.is_prefix id ~prefix:"ord-"))
+
+let test_default_ids_have_no_wall_clock_or_random _ =
+  (* Sample a single ID and assert it does NOT contain a 19-digit
+     nanoseconds-since-epoch number. The legacy generator embedded
+     [Time_ns_unix.to_int63_ns_since_epoch] (~19 decimal digits in the post-
+     2001-09-09 era) followed by "_" and a 4-digit random suffix. If we ever
+     regress to that scheme, this test catches it. *)
+  let id =
+    match create_order (_make_market_params ()) with
+    | Ok o -> o.id
+    | Error e -> assert_failure (Status.show e)
+  in
+  assert_bool
+    ("Expected id " ^ id
+   ^ " to NOT contain '_' (legacy timestamp_random separator)")
+    (not (String.contains id '_'));
+  (* No long run of digits (>= 13 chars) anywhere in the id -- 13 digits is
+     ~milliseconds-since-epoch; legacy used 19. Counter IDs like "ord-12345"
+     have at most 5-6 digits in practice and never reach 13. *)
+  let max_digit_run =
+    String.fold id ~init:(0, 0) ~f:(fun (cur, best) c ->
+        if Char.is_digit c then (cur + 1, max best (cur + 1)) else (0, best))
+    |> snd
+  in
+  assert_bool
+    (Printf.sprintf "Expected id %s to have no long digit run (got max=%d)" id
+       max_digit_run)
+    (max_digit_run < 13)
+
+let test_explicit_id_overrides_default _ =
+  let result =
+    create_order ~id:"custom-id-123"
+      {
+        symbol = "MSFT";
+        side = Sell;
+        order_type = Market;
+        quantity = 50.0;
+        time_in_force = Day;
+      }
+  in
+  assert_that result
+    (is_ok_and_holds (field (fun o -> o.id) (equal_to "custom-id-123")))
+
 let suite =
   "Order Factory"
   >::: [
+         "default_ids_are_deterministic_in_sequence"
+         >:: test_default_ids_are_deterministic_in_sequence;
+         "default_ids_have_no_wall_clock_or_random"
+         >:: test_default_ids_have_no_wall_clock_or_random;
+         "explicit_id_overrides_default" >:: test_explicit_id_overrides_default;
          "create_limit_order" >:: test_create_limit_order;
          "stop_orders" >:: test_stop_orders;
          "stop_limit_orders" >:: test_stop_limit_orders;

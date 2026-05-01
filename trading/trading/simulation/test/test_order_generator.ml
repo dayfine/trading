@@ -107,7 +107,9 @@ let make_exiting_position ?(side = Long) ~position_id ~symbol ~quantity ~price
 (* ==================== transitions_to_orders tests ==================== *)
 
 let test_empty_transitions_returns_empty_orders _ =
-  let result = transitions_to_orders ~positions:empty_positions [] in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions []
+  in
   assert_that result (is_ok_and_holds (elements_are []))
 
 let test_create_entering_generates_buy_order _ =
@@ -117,7 +119,10 @@ let test_create_entering_generates_buy_order _ =
         ~quantity:100.0 ~price:150.0 ();
     ]
   in
-  let result = transitions_to_orders ~positions:empty_positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions
+      transitions
+  in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -139,7 +144,10 @@ let test_trigger_exit_no_position_returns_empty _ =
   let transitions =
     [ make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:155.0 ]
   in
-  let result = transitions_to_orders ~positions:empty_positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions
+      transitions
+  in
   assert_that result (is_ok_and_holds (elements_are []))
 
 let test_trigger_exit_with_position_generates_sell_order _ =
@@ -153,7 +161,9 @@ let test_trigger_exit_with_position_generates_sell_order _ =
   let transitions =
     [ make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:155.0 ]
   in
-  let result = transitions_to_orders ~positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions transitions
+  in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -178,12 +188,18 @@ let test_entry_fill_returns_no_orders _ =
         ~price:150.5;
     ]
   in
-  let result = transitions_to_orders ~positions:empty_positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions
+      transitions
+  in
   assert_that result (is_ok_and_holds (elements_are []))
 
 let test_entry_complete_returns_no_orders _ =
   let transitions = [ make_entry_complete_transition ~position_id:"AAPL-1" ] in
-  let result = transitions_to_orders ~positions:empty_positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions
+      transitions
+  in
   assert_that result (is_ok_and_holds (elements_are []))
 
 let test_multiple_create_entering_generates_multiple_orders _ =
@@ -195,7 +211,10 @@ let test_multiple_create_entering_generates_multiple_orders _ =
         ~quantity:50.0 ~price:140.0 ();
     ]
   in
-  let result = transitions_to_orders ~positions:empty_positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions
+      transitions
+  in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -236,7 +255,10 @@ let test_mixed_transitions_filters_non_order_generating _ =
       make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:155.0;
     ]
   in
-  let result = transitions_to_orders ~positions:empty_positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions
+      transitions
+  in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -263,7 +285,10 @@ let test_short_create_entering_generates_sell_order _ =
         ~symbol:"AAPL" ~quantity:100.0 ~price:150.0 ();
     ]
   in
-  let result = transitions_to_orders ~positions:empty_positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions:empty_positions
+      transitions
+  in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -291,7 +316,9 @@ let test_short_trigger_exit_generates_buy_order _ =
   let transitions =
     [ make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:145.0 ]
   in
-  let result = transitions_to_orders ~positions transitions in
+  let result =
+    transitions_to_orders ~current_date:today ~positions transitions
+  in
   assert_that result
     (is_ok_and_holds
        (elements_are
