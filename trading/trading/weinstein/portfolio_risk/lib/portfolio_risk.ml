@@ -148,8 +148,17 @@ let _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price =
     | `Long -> config.max_long_exposure_pct
     | `Short -> config.max_short_exposure_pct
   in
-  let exposure_cap = portfolio_value *. exposure_pct in
-  let position_cap = portfolio_value *. config.max_position_pct in
+  (* Clamp both caps to non-negative. With shorts, [portfolio_value] can go
+     negative when short notional exceeds cash + longs; without the clamp,
+     [position_cap] becomes negative and the share-count rounds to a negative
+     integer, silently corrupting downstream metrics + Sexp serialization
+     (sp500-2019-2023 with-shorts crashed silently post-#744 from this path).
+     A negative cap means the strategy has no room to add positions — return
+     zero shares instead of a negative count. *)
+  let exposure_cap = Float.max 0.0 (portfolio_value *. exposure_pct) in
+  let position_cap =
+    Float.max 0.0 (portfolio_value *. config.max_position_pct)
+  in
   let dollar_cap = Float.min exposure_cap position_cap in
   if Float.( <= ) entry_price 0.0 then Int.max_value
   else Int.of_float (Float.round_down (dollar_cap /. entry_price))
