@@ -85,9 +85,10 @@ let test_peak_tracker_halt_state _ =
 (* ---- Per-position trigger ---- *)
 
 let test_per_position_long_no_fire_under_threshold _ =
-  (* default 50% threshold; long at $100 → $60 = 40% loss; should NOT fire *)
+  (* default long threshold 25%; long at $100 → $80 = 20% loss; should NOT
+     fire *)
   let pt = FL.Peak_tracker.create () in
-  let positions = [ make_long ~entry_price:100.0 ~current_price:60.0 () ] in
+  let positions = [ make_long ~entry_price:100.0 ~current_price:80.0 () ] in
   let events =
     FL.check ~config:FL.default_config ~date ~positions
       ~portfolio_value:1_000_000.0 ~peak_tracker:pt
@@ -95,7 +96,7 @@ let test_per_position_long_no_fire_under_threshold _ =
   assert_that events (size_is 0)
 
 let test_per_position_long_fires_on_exceed _ =
-  (* long at $100 → $40 = 60% loss; default threshold 50%; SHOULD fire *)
+  (* long at $100 → $40 = 60% loss; default long threshold 25%; SHOULD fire *)
   let pt = FL.Peak_tracker.create () in
   let positions = [ make_long ~entry_price:100.0 ~current_price:40.0 () ] in
   let events =
@@ -116,7 +117,8 @@ let test_per_position_long_fires_on_exceed _ =
        ])
 
 let test_per_position_short_fires_on_exceed _ =
-  (* short at $200 → $320 = 60% loss; default threshold 50%; SHOULD fire *)
+  (* short at $200 → $320 = 60% loss; default short threshold 15%; SHOULD
+     fire *)
   let pt = FL.Peak_tracker.create () in
   let positions = [ make_short ~entry_price:200.0 ~current_price:320.0 () ] in
   let events =
@@ -146,10 +148,89 @@ let test_per_position_does_not_fire_on_winner _ =
   in
   assert_that events (size_is 0)
 
+(* ---- Asymmetric per-position thresholds (G15 step 1) ---- *)
+
+(** Long at $100 → $70 = 30% loss; default long threshold is 25% — fires. Pins
+    the long-side cap at the new 0.25 threshold. *)
+let test_per_position_long_threshold _ =
+  let pt = FL.Peak_tracker.create () in
+  let positions = [ make_long ~entry_price:100.0 ~current_price:70.0 () ] in
+  let events =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  assert_that events
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (e : FL.event) -> e.side)
+               (equal_to Trading_base.Types.Long);
+             field (fun (e : FL.event) -> e.reason) (equal_to FL.Per_position);
+             field
+               (fun (e : FL.event) -> e.unrealized_pnl_pct)
+               (float_equal (-0.3));
+           ];
+       ])
+
+(** Short at $200 → $236 = 18% loss; default short threshold is 15% — fires.
+    Pins the short-side cap at the tighter 0.15 threshold (asymmetric per
+    Weinstein's short-sale guidance — short downside is unbounded, so the loss
+    budget is held tighter than for longs). *)
+let test_per_position_short_threshold _ =
+  let pt = FL.Peak_tracker.create () in
+  let positions = [ make_short ~entry_price:200.0 ~current_price:236.0 () ] in
+  let events =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  assert_that events
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (e : FL.event) -> e.side)
+               (equal_to Trading_base.Types.Short);
+             field (fun (e : FL.event) -> e.reason) (equal_to FL.Per_position);
+             field
+               (fun (e : FL.event) -> e.unrealized_pnl_pct)
+               (float_equal (-0.18));
+           ];
+       ])
+
+(** Long at $100 → $80 = 20% loss; below the 25% long threshold — must NOT fire.
+    Pins the asymmetry: a 20% long loss survives, but a 20% short loss would
+    exceed the 15% short threshold. *)
+let test_per_position_long_no_fire_at_20pct _ =
+  let pt = FL.Peak_tracker.create () in
+  let positions = [ make_long ~entry_price:100.0 ~current_price:80.0 () ] in
+  let events =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  assert_that events is_empty
+
+(** Short at $200 → $224 = 12% loss; below the 15% short threshold — must NOT
+    fire. Pins the asymmetric counterpart: a 12% loss survives on a short, but
+    the same 12% loss on a short above the long threshold would not survive on a
+    long if scaled (e.g. 25%+ on a long). *)
+let test_per_position_short_no_fire_at_12pct _ =
+  let pt = FL.Peak_tracker.create () in
+  let positions = [ make_short ~entry_price:200.0 ~current_price:224.0 () ] in
+  let events =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  assert_that events is_empty
+
 let test_per_position_custom_threshold _ =
   (* tighter threshold of 20% — long at 100 → 75 = 25% loss; SHOULD fire *)
   let pt = FL.Peak_tracker.create () in
-  let config = { FL.default_config with max_unrealized_loss_fraction = 0.2 } in
+  let config =
+    { FL.default_config with max_long_unrealized_loss_fraction = 0.2 }
+  in
   let positions = [ make_long ~entry_price:100.0 ~current_price:75.0 () ] in
   let events =
     FL.check ~config ~date ~positions ~portfolio_value:1_000_000.0
@@ -283,7 +364,12 @@ let test_default_config_values _ =
   assert_that FL.default_config
     (all_of
        [
-         field (fun c -> c.FL.max_unrealized_loss_fraction) (float_equal 0.5);
+         field
+           (fun c -> c.FL.max_long_unrealized_loss_fraction)
+           (float_equal 0.25);
+         field
+           (fun c -> c.FL.max_short_unrealized_loss_fraction)
+           (float_equal 0.15);
          field
            (fun c -> c.FL.min_portfolio_value_fraction_of_peak)
            (float_equal 0.4);
@@ -324,6 +410,14 @@ let suite =
          >:: test_per_position_short_fires_on_exceed;
          "per_position_does_not_fire_on_winner"
          >:: test_per_position_does_not_fire_on_winner;
+         "per_position_long_threshold (G15)"
+         >:: test_per_position_long_threshold;
+         "per_position_short_threshold (G15)"
+         >:: test_per_position_short_threshold;
+         "per_position_long_no_fire_at_20pct (G15)"
+         >:: test_per_position_long_no_fire_at_20pct;
+         "per_position_short_no_fire_at_12pct (G15)"
+         >:: test_per_position_short_no_fire_at_12pct;
          "per_position_custom_threshold" >:: test_per_position_custom_threshold;
          "portfolio_floor_first_observation_no_fire"
          >:: test_portfolio_floor_first_observation_no_fire;

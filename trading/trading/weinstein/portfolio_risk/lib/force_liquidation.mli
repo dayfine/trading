@@ -7,9 +7,13 @@
 
     {1 Two trigger conditions}
 
-    - {b Per-position}: a single position's unrealized loss exceeds
-      [max_unrealized_loss_fraction] of its cost basis. Force-close that
-      position only.
+    - {b Per-position}: a single position's unrealized loss exceeds the
+      side-specific threshold ([max_long_unrealized_loss_fraction] for longs,
+      [max_short_unrealized_loss_fraction] for shorts) of its cost basis.
+      Force-close that position only. Asymmetric per Weinstein's stop-loss
+      rules: a long's downside is capped at 100% (price floor at 0); a short's
+      downside is unbounded (price has no ceiling), so shorts are held to a
+      tighter loss budget.
     - {b Portfolio-floor}: total portfolio value drops below
       [min_portfolio_value_fraction_of_peak] of the highest portfolio value
       observed since the strategy started. Force-close ALL positions and halt
@@ -37,10 +41,16 @@ open Core
 (** {1 Configuration} *)
 
 type config = {
-  max_unrealized_loss_fraction : float;
-      (** Per-position trigger: force-close a position when its unrealized loss
-          exceeds this fraction of cost basis. Default [0.5] (50% of cost basis
-          lost). Set to [Float.infinity] to disable the per-position trigger. *)
+  max_long_unrealized_loss_fraction : float;
+      (** Per-position trigger for {b longs}: force-close a long position when
+          its unrealized loss exceeds this fraction of cost basis. Default
+          [0.25] (25% of cost basis lost). Set to [Float.infinity] to disable.
+      *)
+  max_short_unrealized_loss_fraction : float;
+      (** Per-position trigger for {b shorts}: force-close a short position when
+          its unrealized loss exceeds this fraction of cost basis. Default
+          [0.15] (15% of cost basis lost) — tighter than longs because short
+          downside is unbounded. Set to [Float.infinity] to disable. *)
   min_portfolio_value_fraction_of_peak : float;
       (** Portfolio-floor trigger: force-close all positions and halt new
           entries when [portfolio_value < peak * fraction]. Default [0.4] (40%
@@ -51,8 +61,9 @@ type config = {
 (** All thresholds — nothing hardcoded. *)
 
 val default_config : config
-(** [{ max_unrealized_loss_fraction = 0.5; min_portfolio_value_fraction_of_peak
-     = 0.4 }]. *)
+(** [{ max_long_unrealized_loss_fraction = 0.25;
+     max_short_unrealized_loss_fraction = 0.15;
+     min_portfolio_value_fraction_of_peak = 0.4 }]. *)
 
 (** {1 Event} *)
 
