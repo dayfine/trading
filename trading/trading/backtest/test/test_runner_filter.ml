@@ -1,14 +1,14 @@
 (** Regression tests for the [Runner] step-filtering boundary.
 
     The [is_trading_day] heuristic was introduced by PR #393 so that
-    mark-to-market aware metrics like [UnrealizedPnl] ignore weekend/holiday
-    steps where the simulator falls back to [portfolio_value = cash]. The
-    heuristic was subsequently mis-applied to round-trip extraction, silently
-    dropping ~95% of trades from [trades.csv] on large multi-year runs when
-    entry+exit happened to land on steps that look "non-trading" to the
-    heuristic (e.g. because the only non-[Holding] positions are
-    [Entering]/[Closed], which contribute 0.0 to the mark-to-market portfolio
-    value).
+    mark-to-market aware metrics like [OpenPositionsValue] / [UnrealizedPnl]
+    ignore weekend/holiday steps where the simulator falls back to
+    [portfolio_value = cash]. The heuristic was subsequently mis-applied to
+    round-trip extraction, silently dropping ~95% of trades from [trades.csv] on
+    large multi-year runs when entry+exit happened to land on steps that look
+    "non-trading" to the heuristic (e.g. because the only non-[Holding]
+    positions are [Entering]/[Closed], which contribute 0.0 to the
+    mark-to-market portfolio value).
 
     These tests pin the invariant that round-trip extraction must see steps
     flagged as non-trading by [is_trading_day]. *)

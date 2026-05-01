@@ -9,7 +9,7 @@
 ;;   final_portfolio_value ~1.08M        total_return_pct ~8
 ;;   total_trades 21 (= n_round_trips)   win_rate ~31
 ;;   sharpe_ratio ~0.17                  max_drawdown_pct ~36
-;;   avg_holding_days ~70                unrealized_pnl ~0.86M
+;;   avg_holding_days ~70                open_positions_value ~0.86M
 ;;
 ;; Pre-#409 the count was 8 round-trips; post-#409, symbols cycle
 ;; multiple times through the 2020 crash + 2022 correction. Return is
@@ -20,8 +20,10 @@
 ;;
 ;; Previous baseline (1,654 stocks, 2026-04-13) preserved in git history.
 ;;
-;; [unrealized_pnl] range is wide: goal is to catch regression to exactly 0
-;; (PR #393's fix).
+;; [open_positions_value] range is wide: goal is to catch regression to
+;; exactly 0 (PR #393's fix). (Pre-rename this pin was named
+;; [unrealized_pnl] but matched mtm-value semantics; see metric_types.mli
+;; for the corrected meaning.)
 ((name "covid-recovery-2020-2024")
  (description "COVID crash and recovery through 2024")
  (period ((start_date 2020-01-02) (end_date 2024-12-31)))
@@ -34,4 +36,4 @@
    (sharpe_ratio       ((min -0.3)  (max 0.80)))
    (max_drawdown_pct   ((min 25.0)  (max 45.0)))
    (avg_holding_days   ((min 55.0)  (max 120.0)))
-   (unrealized_pnl     ((min 1000.0) (max 2500000.0))))))
+   (open_positions_value ((min 1000.0) (max 2500000.0))))))

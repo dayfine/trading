@@ -28,10 +28,10 @@
  (config_overrides (((universe_cap (1000)) (enable_short_side false))))
  ;; Baseline measured 2026-04-29 (long-only) — TWO independent runs landed:
  ;;   run-1: return +1582.85% / 145 trades / win_rate 40.69% / Sharpe 0.960 /
- ;;          MaxDD 94.31% / avg_hold 103.3d / unrealized_pnl $15.91M /
+ ;;          MaxDD 94.31% / avg_hold 103.3d / open_positions_value $15.91M /
  ;;          peak RSS 1,956 MB / wall 4:31.
  ;;   run-2: return +1627.09% / 135 trades / win_rate 40.00% / Sharpe 0.960 /
- ;;          MaxDD 94.84% / avg_hold 98.0d  / unrealized_pnl $16.66M.
+ ;;          MaxDD 94.84% / avg_hold 98.0d  / open_positions_value $16.66M.
  ;; The decade cell is the ONLY one of the four goldens-broad cells that is
  ;; non-deterministic across reruns (3/4 are bit-identical). Source of the
  ;; variance is unknown — likely Hashtbl iteration order divergence accumulating
@@ -46,4 +46,4 @@
    (sharpe_ratio       ((min 0.65)         (max 1.30)))     ;; small absolute, wider relative
    (max_drawdown_pct   ((min 84.0)         (max 100.0)))    ;; encompass 94.3 + 94.8 (capped at 100)
    (avg_holding_days   ((min 88.0)         (max 115.0)))    ;; encompass 98.0 + 103.3, ±10% headroom
-   (unrealized_pnl     ((min 13500000.0)   (max 19000000.0))))))   ;; encompass 15.9 + 16.7M
+   (open_positions_value ((min 13500000.0) (max 19000000.0))))))  ;; encompass 15.9 + 16.7M (mtm value, NOT true unrealized P&L; see metric_types.mli)

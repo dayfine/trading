@@ -17,12 +17,23 @@ type expected = {
   sharpe_ratio : range;
   max_drawdown_pct : range;
   avg_holding_days : range;
-  unrealized_pnl : range option; [@sexp.option]
-      (** Dollar range for end-of-simulation unrealized P&L. [None] skips the
+  open_positions_value : range option; [@sexp.option]
+      (** Dollar range for the end-of-simulation
+          [Metric_types.OpenPositionsValue] metric — the signed mark-to-market
+          value of open positions (= [portfolio_value - cash]). [None] skips the
           check — use for scenarios where no positions remain open at the end or
           where the value is otherwise not meaningful to pin. Scenarios with
           open positions should pin a non-zero range to guard against regression
-          to the UnrealizedPnl=0 bug (see PR #393). *)
+          to the [OpenPositionsValue=0] bug (see PR #393). NOTE: pre-rename
+          scenario files used [unrealized_pnl] for this same value; the rename
+          to [open_positions_value] reflects the corrected metric semantics
+          (mark-to-market value vs true unrealized P&L). *)
+  unrealized_pnl : range option; [@sexp.option]
+      (** Dollar range for the end-of-simulation [Metric_types.UnrealizedPnl]
+          metric — true paper P&L on open positions, computed as
+          [OpenPositionsValue - Σ position_cost_basis]. [None] skips the check.
+          Optional even when [open_positions_value] is pinned — populate when an
+          empirical baseline justifies a tight range. *)
 }
 [@@deriving sexp]
 

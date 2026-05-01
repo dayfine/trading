@@ -7,7 +7,13 @@ type actual = {
   sharpe_ratio : float;
   max_drawdown_pct : float;
   avg_holding_days : float;
+  open_positions_value : float option; [@sexp.option]
+      (** Post-rename signed mark-to-market value of open positions. Optional
+          for backward compat with actual.sexp files written before the rename
+          (those carry the same value under [unrealized_pnl] instead). *)
   unrealized_pnl : float option; [@sexp.option]
+      (** Post-rename: true unrealized P&L (OpenPositionsValue - cost basis).
+          Pre-rename actual.sexp files carry the legacy mtm-value here. *)
   force_liquidations_count : int; [@sexp.default 0]
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]

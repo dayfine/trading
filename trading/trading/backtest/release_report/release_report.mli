@@ -39,15 +39,17 @@ type actual = {
   sharpe_ratio : float;
   max_drawdown_pct : float;
   avg_holding_days : float;
+  open_positions_value : float option;
   unrealized_pnl : float option;
   force_liquidations_count : int;
 }
 [@@deriving sexp]
 (** Trading metrics extracted from a scenario's [actual.sexp]. Mirrors the
     fields written by [scenario_runner.ml]'s [_actual_of_result], with
-    [unrealized_pnl] optional for backward-compat with pre-#393 actuals that
-    omit the field, and [force_liquidations_count] defaulting to [0] for
-    backward-compat with pre-G4 actuals that omit the field. *)
+    [open_positions_value] / [unrealized_pnl] optional for backward-compat with
+    pre-rename / pre-#393 actuals that omit one or both, and
+    [force_liquidations_count] defaulting to [0] for backward-compat with pre-G4
+    actuals that omit the field. *)
 
 type summary_meta = {
   start_date : Date.t;

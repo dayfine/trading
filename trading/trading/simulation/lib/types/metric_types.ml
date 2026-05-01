@@ -18,6 +18,7 @@ module Metric_type = struct
       | CAGR
       | CalmarRatio
       | OpenPositionCount
+      | OpenPositionsValue
       | UnrealizedPnl
       | TradeFrequency
     [@@deriving show, eq, compare, sexp]
@@ -39,6 +40,7 @@ type metric_type = Metric_type.t =
   | CAGR
   | CalmarRatio
   | OpenPositionCount
+  | OpenPositionsValue
   | UnrealizedPnl
   | TradeFrequency
 [@@deriving show, eq, compare, sexp]
@@ -166,16 +168,36 @@ let get_metric_info = function
         description = "Number of open positions at end of simulation";
         unit = Count;
       }
+  | OpenPositionsValue ->
+      {
+        display_name = "Open Positions Value";
+        description =
+          "Signed mark-to-market value of all open positions at end of \
+           simulation. Equals last-marked-to-market portfolio_value minus \
+           current_cash on that step (= sum of [position_quantity(p) * \
+           current_close(p)] across each held position, with long \
+           contributions positive and short contributions negative). Computed \
+           from the most recent step whose portfolio_value actually reflects \
+           position mark-to-market — non-trading days (weekends, holidays, \
+           missing bars) are skipped because the simulator falls back to \
+           portfolio_value = cash on those days. NOT to be confused with \
+           unrealized P&L (see [UnrealizedPnl]) — this metric does not \
+           subtract cost basis.";
+        unit = Dollars;
+      }
   | UnrealizedPnl ->
       {
         display_name = "Unrealized P&L";
         description =
-          "Total unrealized profit/loss at end of simulation: \
-           last-marked-to-market portfolio_value minus current_cash on that \
-           step. Computed from the most recent step whose portfolio_value \
-           actually reflects position mark-to-market — non-trading days \
-           (weekends, holidays, missing bars) are skipped because the \
-           simulator falls back to portfolio_value = cash on those days.";
+          "Total unrealized profit/loss on open positions at end of \
+           simulation: sum of [(current_close(p) - entry_price(p)) * \
+           signed_qty(p)] across each held position, where signed_qty is \
+           positive for longs and negative for shorts. Equivalently: \
+           [OpenPositionsValue] minus the sum of position cost bases. Positive \
+           means paper gains on the open book; negative means paper losses. \
+           Computed from the most recent step whose portfolio_value actually \
+           reflects position mark-to-market — non-trading days are skipped per \
+           the same logic as [OpenPositionsValue].";
         unit = Dollars;
       }
   | TradeFrequency ->

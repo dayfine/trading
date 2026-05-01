@@ -23,7 +23,14 @@
 ;; Measured baseline (2026-04-30, post-#710 G9 fix):
 ;;   total_return_pct  -0.01  total_trades 32   win_rate 37.50
 ;;   sharpe_ratio       0.01  max_drawdown 5.81  avg_holding_days 43.03
-;;   unrealized_pnl     391,949   force_liquidations 0
+;;   open_positions_value 391,949   force_liquidations 0
+;;
+;; (Pre-rename: this metric was named [unrealized_pnl] but its semantics
+;; matched the renamed [Metric_types.OpenPositionsValue] — signed mtm value
+;; of open positions, NOT true paper P&L. The rename in PR
+;; feat/metrics-unrealized-pnl-rename clarifies the distinction; the
+;; corrected [UnrealizedPnl] metric (= OpenPositionsValue minus position
+;; cost basis) is now also emitted but not yet pinned here.)
 ;;
 ;; The S&P 500 is a moving target; the universe sexp is a fixed snapshot
 ;; so reruns are reproducible. Refresh the universe via the build script
@@ -41,4 +48,4 @@
    (sharpe_ratio       ((min -0.5)        (max  0.5)))
    (max_drawdown_pct   ((min 3.0)         (max  9.0)))
    (avg_holding_days   ((min 37.0)        (max  50.0)))
-   (unrealized_pnl     ((min 330000.0)    (max  450000.0))))))
+   (open_positions_value ((min 330000.0)  (max  450000.0))))))

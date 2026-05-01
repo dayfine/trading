@@ -56,7 +56,10 @@ val portfolio_state_computer : unit -> Simulator.any_metric_computer
 
     Metrics produced:
     - OpenPositionCount: Number of open positions at end
-    - UnrealizedPnl: Unrealized P&L (final value - current cash)
+    - OpenPositionsValue: Signed mark-to-market value of open positions (=
+      portfolio_value - current_cash on the last marked-to-market step)
+    - UnrealizedPnl: True paper P&L on open positions (= OpenPositionsValue
+      minus sum of position cost bases; signed-qty form covers longs + shorts)
     - TradeFrequency: Average trades per month *)
 
 (** {1 Default Computer Set} *)

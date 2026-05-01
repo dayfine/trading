@@ -4,10 +4,11 @@
 ;; Smoke scenario: first half of 2020 (COVID crash). Runs quickly (~5-10 min).
 ;; Ranges are broad sanity checks, not regression gates.
 ;;
-;; [unrealized_pnl] is NOT pinned here because a crash regime can plausibly
-;; leave the portfolio fully liquidated (all stops hit) OR holding a few
-;; late-stage positions — the end-of-window state is too regime-dependent
-;; to pick a single range. Revisit once follow-up #3 (universe rerun) lands.
+;; [open_positions_value] / [unrealized_pnl] are NOT pinned here because a
+;; crash regime can plausibly leave the portfolio fully liquidated (all stops
+;; hit) OR holding a few late-stage positions — the end-of-window state is
+;; too regime-dependent to pick a single range. Revisit once follow-up #3
+;; (universe rerun) lands.
 ((name "crash-2020h1")
  (description "Crash regime sanity check (H1 2020)")
  (period ((start_date 2020-01-02) (end_date 2020-06-30)))

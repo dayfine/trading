@@ -28,7 +28,13 @@
 ;; Current measured baseline 2026-05-01 (post-G12+G13, pre-G14/G15):
 ;;   total_return_pct  65.03   total_trades 136   win_rate 37.50
 ;;   sharpe_ratio       0.62   max_drawdown 31.78  avg_holding_days 69.51
-;;   unrealized_pnl 1,481,963  force_liquidations 6 (all Per_position, G14)
+;;   open_positions_value 1,481,963  force_liquidations 6 (all Per_position, G14)
+;;
+;; (Pre-rename the [unrealized_pnl] field above carried mtm-value semantics —
+;; the same quantity now exposed as [Metric_types.OpenPositionsValue]. The
+;; corrected [UnrealizedPnl] metric (open positions value minus cost basis)
+;; was first emitted in PR feat/metrics-unrealized-pnl-rename; on the
+;; long-only baseline measured 2026-04-30 it was +$421,922.)
 ;;
 ;; The 31.8% MaxDD vs the pin's 3..9% target reflects the strategy's
 ;; drawdown profile WITHOUT the (spurious) Portfolio_floor brake. Whether
@@ -47,4 +53,4 @@
    (sharpe_ratio       ((min -0.5)        (max  0.5)))
    (max_drawdown_pct   ((min 3.0)         (max  9.0)))
    (avg_holding_days   ((min 37.0)        (max  50.0)))
-   (unrealized_pnl     ((min 330000.0)    (max  450000.0))))))
+   (open_positions_value ((min 330000.0)  (max  450000.0))))))

@@ -9,7 +9,7 @@
 ;;   final_portfolio_value ~4.39M        total_return_pct ~339
 ;;   total_trades 15 (= n_round_trips)   win_rate ~37
 ;;   sharpe_ratio ~1.04                  max_drawdown_pct ~37
-;;   avg_holding_days ~101               unrealized_pnl ~4.37M
+;;   avg_holding_days ~101               open_positions_value ~4.37M
 ;;
 ;; Pre-#409 the count was 6 round-trips because once a symbol's position
 ;; closed it was blacklisted from re-entry (bug). Post-#409, symbols cycle
@@ -22,8 +22,10 @@
 ;; Ranges are wider than observed values to absorb Hashtbl iteration ordering
 ;; noise (see PR #298).
 ;;
-;; [unrealized_pnl] range is wide: goal is to catch regression to exactly 0
-;; (PR #393's fix).
+;; [open_positions_value] range is wide: goal is to catch regression to
+;; exactly 0 (PR #393's fix). (Pre-rename this pin was named
+;; [unrealized_pnl] but matched mtm-value semantics; see metric_types.mli
+;; for the corrected meaning.)
 ((name "bull-crash-2015-2020")
  (description "Strong bull market through the 2020 crash")
  (period ((start_date 2015-01-02) (end_date 2020-12-31)))
@@ -36,4 +38,4 @@
    (sharpe_ratio       ((min 0.60)  (max 1.40)))
    (max_drawdown_pct   ((min 30.0)  (max 45.0)))
    (avg_holding_days   ((min 80.0)  (max 140.0)))
-   (unrealized_pnl     ((min 1000.0) (max 6000000.0))))))
+   (open_positions_value ((min 1000.0) (max 6000000.0))))))
