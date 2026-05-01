@@ -102,6 +102,12 @@ type sizing_result = {
 
 (** {1 Configuration} *)
 
+val default_max_position_pct : float
+(** Default per-position concentration cap (0.20 = 20% of portfolio_value).
+    Exposed as a binding so the [@sexp.default] attribute on
+    [config.max_position_pct] can reference it by name — the magic-number linter
+    accepts named constants in attributes but flags inline floats. *)
+
 type config = {
   risk_per_trade_pct : float;
       (** Fraction of portfolio to risk per trade (default: 0.01 = 1%) *)
@@ -127,7 +133,22 @@ type config = {
           inflation of [portfolio_value] doesn't size around the cap. Default:
           0.30 (30% of portfolio_value). *)
   min_cash_pct : float;
-      (** Minimum cash fraction to maintain (default: 0.10 = 10%) *)
+      (** Minimum cash fraction to maintain (default: 0.10 = 10%).
+
+          {b Deprecated as of 2026-05-01:} never wired into the entry walk's
+          [check_cash_and_deduct]. Cash discipline is now handled by
+          [max_position_pct × max_positions] + macro gating + force-liquidation
+          thresholds. Field retained for sexp compat. *)
+  max_position_pct : float; [@sexp.default default_max_position_pct]
+      (** Per-position concentration cap. Caps EACH new position at
+          [portfolio_value * max_position_pct] dollars of notional. Combined
+          with the side-level [max_long_exposure_pct] / [max_short_exposure_pct]
+          caps via [min()] in {!compute_position_size}: the final share count is
+          the minimum of (risk-based, side-exposure cap, per-position cap).
+
+          Rationale: 45-48% per-position concentration was observed in
+          sp500-2019-2023 with no per-position cap; the 90% side cap fired only
+          at the aggregate level. Default 0.20 (20% of portfolio_value). *)
   max_sector_concentration : int;
       (** Maximum positions in any single named sector (default: 5) *)
   max_unknown_sector_positions : int;
@@ -151,7 +172,8 @@ val default_config : config
     - max_long_exposure_pct = 0.90 (90%)
     - max_short_exposure_pct = 0.30 (30%)
     - max_short_notional_fraction = 0.30 (30%)
-    - min_cash_pct = 0.10 (10%)
+    - min_cash_pct = 0.10 (10%, deprecated — see field doc)
+    - max_position_pct = 0.20 (20% per position)
     - max_sector_concentration = 5
     - max_unknown_sector_positions = 2
     - big_winner_multiplier = 1.5
@@ -171,15 +193,18 @@ val compute_position_size :
     Two formulas applied in series:
     + Risk-based: shares_risk = floor((portfolio_value * risk_pct) / |entry -
       stop|)
-    + Exposure-capped: shares_max = floor(portfolio_value * max_exposure_pct /
-      entry_price), where max_exposure_pct is [max_long_exposure_pct] for [Long]
-      and [max_short_exposure_pct] for [Short].
+    + Cap-bounded: shares_max = floor(min(side_exposure_cap, position_cap) /
+      entry_price), where side_exposure_cap = portfolio_value *
+      [max_long_exposure_pct] for [Long] (or [max_short_exposure_pct] for
+      [Short]) and position_cap = portfolio_value * [max_position_pct].
 
     Final share count is the minimum of the two. The exposure cap prevents tight
     stops (small [|entry - stop|]) from producing positions whose notional
     exceeds the configured per-side budget — a sizing pathology observed in the
     sp500-2019-2023 rerun where shorts opened at 124% of portfolio value (ABBV
-    2019-02-01).
+    2019-02-01). The per-position cap further bounds individual concentration —
+    45-48% per-position concentration was observed in sp500-2019-2023 with no
+    per-position cap (2026-05-01).
 
     Pass [entry_price] and [stop_price] in their natural sense — entry is the
     real entry price and stop is the real stop level. The function checks the

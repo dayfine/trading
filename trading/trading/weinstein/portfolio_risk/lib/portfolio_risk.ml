@@ -32,6 +32,11 @@ type limit_violation =
   | Risk_too_high of float
 [@@deriving show]
 
+(* Named default for [max_position_pct] so the [@sexp.default] attribute
+   below references a binding rather than a bare numeric literal — the
+   magic-number linter accepts named constants but flags inline floats. *)
+let default_max_position_pct = 0.20
+
 type config = {
   risk_per_trade_pct : float;
   max_positions : int;
@@ -39,6 +44,7 @@ type config = {
   max_short_exposure_pct : float;
   max_short_notional_fraction : float;
   min_cash_pct : float;
+  max_position_pct : float; [@sexp.default default_max_position_pct]
   max_sector_concentration : int;
   max_unknown_sector_positions : int;
   big_winner_multiplier : float;
@@ -55,6 +61,7 @@ let default_config =
     max_short_exposure_pct = 0.30;
     max_short_notional_fraction = 0.30;
     min_cash_pct = 0.10;
+    max_position_pct = default_max_position_pct;
     max_sector_concentration = 5;
     max_unknown_sector_positions = 2;
     big_winner_multiplier = 1.5;
@@ -132,15 +139,20 @@ let snapshot_of_portfolio ~portfolio ~prices ?(sectors = []) () =
    relative to dollar_risk produces an unbounded share count, allowing single
    positions whose notional dwarfs portfolio_value (observed: ABBV short at 124%
    of $1M starting portfolio, sp500-2019-2023 rerun 2026-04-30). *)
-let _max_shares_by_exposure ~config ~side ~portfolio_value ~entry_price =
-  let max_pct =
+(* Extended to also cap per-position notional at [portfolio_value *.
+   config.max_position_pct]. Per-position concentration sat well above the
+   side-exposure cap; the [min()] of both caps tightens this. *)
+let _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price =
+  let exposure_pct =
     match side with
     | `Long -> config.max_long_exposure_pct
     | `Short -> config.max_short_exposure_pct
   in
-  let max_position_value = portfolio_value *. max_pct in
+  let exposure_cap = portfolio_value *. exposure_pct in
+  let position_cap = portfolio_value *. config.max_position_pct in
+  let dollar_cap = Float.min exposure_cap position_cap in
   if Float.( <= ) entry_price 0.0 then Int.max_value
-  else Int.of_float (Float.round_down (max_position_value /. entry_price))
+  else Int.of_float (Float.round_down (dollar_cap /. entry_price))
 
 let compute_position_size ~config ~portfolio_value ~side ~entry_price
     ~stop_price ?(big_winner = false) () =
@@ -168,7 +180,7 @@ let compute_position_size ~config ~portfolio_value ~side ~entry_price
       Int.of_float (Float.round_down (dollar_risk /. risk_per_share))
     in
     let exposure_capped_shares =
-      _max_shares_by_exposure ~config ~side ~portfolio_value ~entry_price
+      _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price
     in
     let shares = Int.min risk_based_shares exposure_capped_shares in
     let position_value = Float.of_int shares *. entry_price in

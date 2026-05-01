@@ -438,8 +438,12 @@ let test_weinstein_breakout_trade _ =
          support-floor stop sits much closer to entry than the
          screener's nominal buffer-based stop, so risk_per_share is
          smaller and shares scale up proportionally. Trade.price
-         (market fill) is unchanged. Pin the post-G15-step-3
-         deterministic values: 271 shares at $166.38. *)
+         (market fill) is unchanged.
+
+         max_position_pct=0.20 cap landed 2026-05-01 — re-pinned: with
+         portfolio_value=$100K and max_position_pct=0.20, the per-position
+         cap is $20K. At entry $166.38, max shares = floor($20K / $166.38)
+         = 120. The risk-based size (271) is now capped down to 120. *)
       let all_trades =
         List.concat_map result.steps ~f:(fun step -> step.trades)
       in
@@ -454,7 +458,7 @@ let test_weinstein_breakout_trade _ =
                    (equal_to Trading_base.Types.Buy);
                  field
                    (fun t -> t.Trading_base.Types.quantity)
-                   (float_equal ~epsilon:0.5 271.0);
+                   (float_equal ~epsilon:0.5 120.0);
                  field
                    (fun t -> t.Trading_base.Types.price)
                    (float_equal ~epsilon:0.1 166.383146);
