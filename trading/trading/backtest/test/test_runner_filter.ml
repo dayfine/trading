@@ -265,6 +265,77 @@ let test_summary_metrics_overlay_aligns_with_range_round_trips _ =
          (CAGR, float_equal 1.83);
        ])
 
+(* -------------------------------------------------------------------- *)
+(* Phase 4: stop_info entry_date filter — drop warmup-window entries     *)
+(* -------------------------------------------------------------------- *)
+
+(** Regression: warmup-emit leak in [stop_log]. The simulator runs from
+    [warmup_start] so [Stop_log] observes [EntryComplete] transitions for
+    positions opened during warmup. [Result_writer._pop_stop_info] pops by
+    symbol-FIFO when rendering [trades.csv]; if the same symbol re-trades across
+    the [start_date] boundary, the warmup stop_info (sorted first by
+    [position_id]) gets attached to the in-window round-trip's row, corrupting
+    [entry_stop] / [exit_stop] / [exit_trigger] columns.
+
+    [Runner.filter_stop_infos_in_window] drops [stop_info]s whose
+    [entry_date < start_date] before the writer sees them, so only in-window
+    positions populate the trades.csv columns. [entry_date = None] (test
+    fixtures that don't drive {!Stop_log.set_current_date}) is kept
+    permissively. *)
+let _stop_info ?entry_date ~position_id ~symbol () : Backtest.Stop_log.stop_info
+    =
+  {
+    position_id;
+    symbol;
+    entry_date;
+    entry_stop = Some 100.0;
+    exit_stop = Some 95.0;
+    exit_trigger = None;
+  }
+
+let test_filter_stop_infos_drops_warmup_entries _ =
+  let start_date = date_of_string "2019-01-02" in
+  let warmup_open =
+    _stop_info
+      ~entry_date:(date_of_string "2018-08-15")
+      ~position_id:"AAPL-warmup" ~symbol:"AAPL" ()
+  in
+  let in_window =
+    _stop_info
+      ~entry_date:(date_of_string "2019-03-01")
+      ~position_id:"AAPL-window" ~symbol:"AAPL" ()
+  in
+  let kept =
+    Backtest.Runner.filter_stop_infos_in_window [ warmup_open; in_window ]
+      ~start_date
+  in
+  assert_that kept
+    (elements_are
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.position_id)
+           (equal_to "AAPL-window");
+       ])
+
+let test_filter_stop_infos_keeps_unstamped _ =
+  let start_date = date_of_string "2019-01-02" in
+  let unstamped = _stop_info ~position_id:"AAPL-1" ~symbol:"AAPL" () in
+  let kept =
+    Backtest.Runner.filter_stop_infos_in_window [ unstamped ] ~start_date
+  in
+  assert_that kept (size_is 1)
+
+let test_filter_stop_infos_keeps_boundary _ =
+  (* entry_date == start_date is in-window (>=). *)
+  let start_date = date_of_string "2019-01-02" in
+  let boundary =
+    _stop_info ~entry_date:start_date ~position_id:"AAPL-1" ~symbol:"AAPL" ()
+  in
+  let kept =
+    Backtest.Runner.filter_stop_infos_in_window [ boundary ] ~start_date
+  in
+  assert_that kept (size_is 1)
+
 let suite =
   "Runner_filter"
   >::: [
@@ -276,6 +347,12 @@ let suite =
          >:: test_round_trip_extraction_survives_non_trading_day_filter;
          "summary metrics overlay aligns with range-filtered round_trips"
          >:: test_summary_metrics_overlay_aligns_with_range_round_trips;
+         "filter_stop_infos drops warmup entries"
+         >:: test_filter_stop_infos_drops_warmup_entries;
+         "filter_stop_infos keeps unstamped (entry_date None) entries"
+         >:: test_filter_stop_infos_keeps_unstamped;
+         "filter_stop_infos keeps entries on the start_date boundary"
+         >:: test_filter_stop_infos_keeps_boundary;
        ]
 
 let () = run_test_tt_main suite

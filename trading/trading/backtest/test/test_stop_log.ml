@@ -451,6 +451,78 @@ let test_exit_complete_does_not_overwrite_trigger_exit _ =
                    : Backtest.Stop_log.exit_trigger)));
        ])
 
+(* Regression: warmup-emit leak. The runner calls [set_current_date] before
+   each step so [EntryComplete] stamps [entry_date]; the runner then drops
+   [stop_info]s whose [entry_date < start_date]. Without this stamp, warmup-
+   window stop events leak into [trades.csv] when the same symbol re-trades
+   across the [start_date] boundary (FIFO-pop in [_pop_stop_info]). *)
+let test_set_current_date_stamps_entry_date _ =
+  let log = Backtest.Stop_log.create () in
+  let entry_date = Date.of_string "2024-03-15" in
+  Backtest.Stop_log.set_current_date log entry_date;
+  Backtest.Stop_log.record_transitions log
+    [
+      {
+        Position.position_id = "AAPL-wein-1";
+        date = entry_date;
+        kind =
+          CreateEntering
+            {
+              symbol = "AAPL";
+              side = Long;
+              target_quantity = 100.0;
+              entry_price = 150.0;
+              reasoning = ManualDecision { description = "test" };
+            };
+      };
+      {
+        Position.position_id = "AAPL-wein-1";
+        date = entry_date;
+        kind =
+          EntryComplete
+            {
+              risk_params =
+                {
+                  stop_loss_price = Some 142.50;
+                  take_profit_price = None;
+                  max_hold_days = None;
+                };
+            };
+      };
+    ];
+  let infos = Backtest.Stop_log.get_stop_infos log in
+  assert_that infos
+    (elements_are
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.entry_date)
+           (is_some_and (equal_to entry_date));
+       ])
+
+let test_unset_current_date_leaves_entry_date_none _ =
+  let log = Backtest.Stop_log.create () in
+  Backtest.Stop_log.record_transitions log
+    [
+      {
+        Position.position_id = "AAPL-wein-1";
+        date;
+        kind =
+          EntryComplete
+            {
+              risk_params =
+                {
+                  stop_loss_price = Some 142.50;
+                  take_profit_price = None;
+                  max_hold_days = None;
+                };
+            };
+      };
+    ];
+  let infos = Backtest.Stop_log.get_stop_infos log in
+  assert_that infos
+    (elements_are
+       [ field (fun (i : Backtest.Stop_log.stop_info) -> i.entry_date) is_none ])
+
 let suite =
   "Stop_log"
   >::: [
@@ -466,6 +538,10 @@ let suite =
          >:: test_exit_complete_does_not_overwrite_trigger_exit;
          "wrapper passes through" >:: test_wrapper_passes_through;
          "wrapper handles error" >:: test_wrapper_handles_error;
+         "set_current_date stamps entry_date on EntryComplete"
+         >:: test_set_current_date_stamps_entry_date;
+         "unset current_date leaves entry_date None"
+         >:: test_unset_current_date_leaves_entry_date_none;
        ]
 
 let () = run_test_tt_main suite

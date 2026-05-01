@@ -258,6 +258,29 @@ let _align_summary_metrics_to_round_trips ~sim_result ~round_trips =
   Trading_simulation_types.Metric_types.merge
     sim_result.Trading_simulation_types.Simulator_types.metrics overlay
 
+(** Drop simulator-side [stop_info]s whose [entry_date] is before [start_date] —
+    i.e. positions opened during the warmup window. The simulator runs from
+    [warmup_start] so [Stop_log] observes [EntryComplete] transitions for
+    positions opened during warmup, then [Result_writer._pop_stop_info] pops by
+    symbol-FIFO when rendering [trades.csv]. When the same symbol re-trades
+    across the [start_date] boundary (warmup-window stop_info comes first by
+    [position_id] sort), the warmup stop_info gets attached to the in-window
+    round-trip's row, corrupting [entry_stop] / [exit_stop] / [exit_trigger]
+    columns.
+
+    Round-trips from [extract_round_trips steps_in_range] are already filtered
+    by construction (the steps list starts at [start_date]), so this filter is
+    only needed for the [stop_log] surface which has no date-driven extraction
+    API.
+
+    Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
+    {!Stop_log.set_current_date}). *)
+let filter_stop_infos_in_window stop_infos ~start_date =
+  List.filter stop_infos ~f:(fun (info : Stop_log.stop_info) ->
+      match info.entry_date with
+      | Some d -> Date.( >= ) d start_date
+      | None -> true)
+
 let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     ~sim_result : Summary.t =
   {
@@ -327,7 +350,9 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
   let round_trips, stop_infos, audit, cascade_summaries, force_liquidations =
     Trace.record ?trace Trace.Phase.Teardown (fun () ->
         ( Metrics.extract_round_trips steps_in_range,
-          Stop_log.get_stop_infos stop_log,
+          filter_stop_infos_in_window
+            (Stop_log.get_stop_infos stop_log)
+            ~start_date,
           Trade_audit.get_audit_records trade_audit,
           Trade_audit.get_cascade_summaries trade_audit,
           Force_liquidation_log.events force_liquidation_log ))
