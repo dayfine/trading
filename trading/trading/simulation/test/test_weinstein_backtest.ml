@@ -172,26 +172,23 @@ let test_six_year_full_lifecycle _ =
      order placement) plus split-boundary lookback truncation. Position
      sizing now correctly uses [effective_entry] (current close) rather
      than [cand.suggested_entry] (a buffered breakout level historically
-     above current price). Net effect on this 6-year window:
-     - long-side risk_per_share = effective_entry - cand.suggested_stop
-       is SMALLER than pre-fix → more shares per long → larger
-       absolute dollar exposure
-     - 27 buys / 25 sells across the same 7-symbol set (down from
-       39 / 36 because the larger size + same-cash budget yields
-       sized-to-zero on more candidates and fewer survive the cash
-       check on subsequent Fridays)
-     - 25 round-trips (4W/21L), reflecting the strategy's underlying
-       risk profile under realised-entry sizing — the pre-fix 17W/19L
-       was masked by Position.t.entry_price recorded above market
-     - 95% max drawdown is the underlying short-side risk surfaced by
-       removing the phantom-cash inflation; G15 ([dev/notes/force-liq-
-       cascade-findings-2026-05-01.md]) is the follow-on fix for
-       short-side risk control. The drawdown pin is loosened here to
-       capture the regression-after-fix; tightening it back belongs
-       with G15. *)
+     above current price).
+
+     G15 step 3 (2026-05-01) — Pre-entry stop-width gate (15% cap) +
+     sizing-uses-installed-stop. Sizing now keys off the support-floor-
+     derived [installed_stop] instead of [cand.suggested_stop]. Wider
+     structural stops → smaller risk_per_share → fewer shares → less
+     cash consumed per entry, so more candidates fit the running cash
+     budget. Net effect on this 6-year window:
+     - 30 buys / 27 sells (up from 27 / 25 pre-G15-step-3) across the
+       same 7-symbol set
+     - 27 round-trips (5W/22L) — same risk profile, just more entries
+     - max drawdown 54% (down from 95% pre-G15-step-3) reflects the
+       smaller per-entry exposure capping the underlying short-side
+       drawdown amplitude. *)
   assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 27);
-  assert_that n_sells (equal_to 25);
+  assert_that n_buys (equal_to 30);
+  assert_that n_sells (equal_to 27);
   assert_that symbols
     (elements_are
        [
@@ -203,21 +200,19 @@ let test_six_year_full_lifecycle _ =
          equal_to "KO";
          equal_to "MSFT";
        ]);
-  assert_that (List.length round_trips) (equal_to 25);
+  assert_that (List.length round_trips) (equal_to 27);
   assert_that stats
     (is_some_and
        (all_of
           [
-            field (fun s -> s.Metrics.win_count) (equal_to 4);
-            field (fun s -> s.Metrics.loss_count) (equal_to 21);
+            field (fun s -> s.Metrics.win_count) (equal_to 5);
+            field (fun s -> s.Metrics.loss_count) (equal_to 22);
           ]));
-  (* G14 (2026-05-01): final value $465,106.35; pin within ±$3K. *)
+  (* G15 step 3 (2026-05-01): final value $485,285.88; pin ±$3K. *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:462_106.35 ~high:468_106.35);
-  (* G14 (2026-05-01): max drawdown 95.10% — see comment above. Pin loose
-     at < 0.96 to catch further regression while accepting the post-fix
-     surfaced underlying risk. G15 follow-up needed. *)
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.96)
+    (is_between (module Float_ord) ~low:482_285.88 ~high:488_285.88);
+  (* G15 step 3 (2026-05-01): max drawdown 54.25%; pin loose at < 0.60. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.60)
 
 (* ------------------------------------------------------------------ *)
 (* Entry/exit cycle around COVID crash: 2019–mid 2020                   *)
@@ -243,9 +238,13 @@ let test_entry_exit_cycle_around_covid _ =
      sells across {AAPL, HD, JNJ, KO} with 4W/6L and final ≈ $512,025.
 
      G14 (2026-05-01): realised-entry sizing reduces trade count to
-     8 / 7 (same symbol set), 7 round-trips with 2W/5L, final ≈ $619.5K
-     (the few longs that work compound because of the larger size),
-     max drawdown 54%. *)
+     8 / 7 (same symbol set), 7 round-trips with 2W/5L.
+
+     G15 step 3 (2026-05-01): same trade count + W/L (8/7, 2W/5L) on
+     same symbol set; final value drops to $506,145 because sizing-
+     uses-installed-stop trims per-entry size on the longs that worked,
+     reducing compounding upside. Max drawdown 48.6% (down from 54.4%
+     pre-G15-step-3) for the same reason. *)
   assert_that (List.length result.steps) (equal_to 545);
   assert_that n_buys (equal_to 8);
   assert_that n_sells (equal_to 7);
@@ -260,11 +259,11 @@ let test_entry_exit_cycle_around_covid _ =
             field (fun s -> s.Metrics.win_count) (equal_to 2);
             field (fun s -> s.Metrics.loss_count) (equal_to 5);
           ]));
-  (* G14: final value $619,499.78 ± $5K. *)
+  (* G15 step 3 (2026-05-01): final value $506,145.21 ± $5K. *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:614_499.78 ~high:624_499.78);
-  (* G14 (2026-05-01): max drawdown 54.42%; pin loose at < 0.56. *)
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.56)
+    (is_between (module Float_ord) ~low:501_145.21 ~high:511_145.21);
+  (* G15 step 3 (2026-05-01): max drawdown 48.59%; pin loose at < 0.52. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.52)
 
 (* ------------------------------------------------------------------ *)
 (* Portfolio value stays positive: 2020–2021                            *)
@@ -290,28 +289,32 @@ let test_portfolio_value_stays_positive _ =
      1W/2L and final ≈ $505,302.82.
 
      G14 (2026-05-01): realised-entry sizing yields 3 / 2 trades on the
-     same symbol set, 2 round-trips with 1W/1L, final ≈ $505,232 — same
-     order of magnitude as pre-fix. Drawdown bumped from 7.66% to 9.6%
-     (more shares per long → bigger MTM swing on the COVID-era setup
-     entries) but PV still stays positive throughout. *)
+     same symbol set, 2 round-trips with 1W/1L.
+
+     G15 step 3 (2026-05-01): smaller per-entry sizing admits one extra
+     candidate that previously got cash-rejected → 4 / 3 trades, 3
+     round-trips with 1W/2L on same {HD, KO} symbol set. Final
+     $523,068; max drawdown 16.94% (up from 9.63% — the additional
+     entry is a loser whose MTM swing dominates the new minimum PV).
+     PV still stays positive throughout. *)
   assert_that (List.length result.steps) (equal_to 729);
-  assert_that n_buys (equal_to 3);
-  assert_that n_sells (equal_to 2);
+  assert_that n_buys (equal_to 4);
+  assert_that n_sells (equal_to 3);
   assert_that symbols (elements_are [ equal_to "HD"; equal_to "KO" ]);
-  assert_that (List.length round_trips) (equal_to 2);
+  assert_that (List.length round_trips) (equal_to 3);
   assert_that stats
     (is_some_and
        (all_of
           [
             field (fun s -> s.Metrics.win_count) (equal_to 1);
-            field (fun s -> s.Metrics.loss_count) (equal_to 1);
+            field (fun s -> s.Metrics.loss_count) (equal_to 2);
           ]));
   assert_that min_value (gt (module Float_ord) 0.0);
-  (* G14 (2026-05-01): max drawdown 9.63%; cap at < 0.10. *)
-  assert_that max_drawdown_pct (lt (module Float_ord) 0.10);
-  (* G14: final value $505,232.44 ± $3K. *)
+  (* G15 step 3 (2026-05-01): max drawdown 16.94%; cap at < 0.20. *)
+  assert_that max_drawdown_pct (lt (module Float_ord) 0.20);
+  (* G15 step 3: final value $523,067.89 ± $3K. *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:502_232.44 ~high:508_232.44)
+    (is_between (module Float_ord) ~low:520_067.89 ~high:526_067.89)
 
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)

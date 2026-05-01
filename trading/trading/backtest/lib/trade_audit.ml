@@ -14,6 +14,7 @@ type skip_reason =
   | Sector_concentration
   | Top_n_cutoff
   | Short_notional_cap
+  | Stop_too_wide
 [@@deriving sexp]
 
 type alternative_candidate = {

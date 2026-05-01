@@ -302,14 +302,18 @@ let test_ch11_spotcheck_2022_bear _ =
   in
   assert_that result.Screener.macro_trend (equal_to Bearish);
   assert_that result.Screener.buy_candidates is_empty;
+  (* Score-tied candidates (both score 45): screener sorts by score DESC
+     then by ticker ASC, so JPM precedes MSFT. The deterministic
+     secondary-sort prevents Hashtbl-iteration-order divergence between
+     macOS and Linux (G15 step 3 CI surfacing). *)
   assert_that result.Screener.short_candidates
     (elements_are
        [
-         _candidate_matcher ~side:`Short ~ticker:"MSFT" ~score:45
-           ~entry_low:349.0 ~entry_high:354.0 ~stop_low:377.0 ~stop_high:382.0
-           ~risk_low:0.075 ~risk_high:0.085;
          _candidate_matcher ~side:`Short ~ticker:"JPM" ~score:45
            ~entry_low:171.0 ~entry_high:176.0 ~stop_low:185.0 ~stop_high:190.0
+           ~risk_low:0.075 ~risk_high:0.085;
+         _candidate_matcher ~side:`Short ~ticker:"MSFT" ~score:45
+           ~entry_low:349.0 ~entry_high:354.0 ~stop_low:377.0 ~stop_high:382.0
            ~risk_low:0.075 ~risk_high:0.085;
        ])
 

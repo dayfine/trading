@@ -160,7 +160,9 @@ let _find_zones ~callbacks ~breakout_price ~band_pct ~as_of_date ~limit =
   _accumulate_chart tbl ~callbacks ~breakout_price ~band_size ~limit;
   Hashtbl.fold tbl ~init:[] ~f:(fun ~key:bkt ~data:agg acc ->
       _zone_of_agg ~breakout_price ~band_size ~as_of_date ~bkt ~agg :: acc)
-  |> List.sort ~compare:(fun a b -> Float.compare a.price_low b.price_low)
+  |> List.sort ~compare:(fun a b ->
+      let by_low = Float.compare a.price_low b.price_low in
+      if by_low <> 0 then by_low else Float.compare a.price_high b.price_high)
 
 (** True when no bar at offsets [0..limit-1] has [high > breakout_price]. *)
 let _is_virgin_territory ~callbacks ~breakout_price ~limit =

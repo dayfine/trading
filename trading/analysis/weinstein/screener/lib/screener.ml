@@ -428,8 +428,17 @@ let _watchlist_entry ~weights ~thresholds ~buy_candidates (sa, sector) =
 (* ------------------------------------------------------------------ *)
 
 let _top_n n lst =
-  List.sort lst ~compare:(fun a b -> Int.compare b.score a.score) |> fun l ->
-  List.sub l ~pos:0 ~len:(min n (List.length l))
+  (* Secondary sort by ticker breaks score ties deterministically. Without
+     it, [List.sort]'s stability depends on the input ordering — which in
+     turn depends on Hashtbl iteration order, and that diverges between
+     macOS and Linux. A G15-step-3 panel-golden CI failure surfaced this:
+     local regenerated more round_trips than GHA produced, with the diff
+     being a tied-score candidate that landed on either side of a
+     cash-budget boundary depending on its position in the sorted list. *)
+  List.sort lst ~compare:(fun a b ->
+      let by_score = Int.compare b.score a.score in
+      if by_score <> 0 then by_score else String.compare a.ticker b.ticker)
+  |> fun l -> List.sub l ~pos:0 ~len:(min n (List.length l))
 
 (** Long-side admission predicates: per-pair, returns one bool per phase that
     actually got evaluated. Phases short-circuit (a [false] earlier means later

@@ -7,6 +7,7 @@ type skip_reason =
   | Already_held
   | Sized_to_zero
   | Short_notional_cap
+  | Stop_too_wide
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

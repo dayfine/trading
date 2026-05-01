@@ -26,6 +26,27 @@ type entry_meta = {
     Returned alongside the transition so the audit recorder can capture them
     without duplicating the underlying support-floor lookup. *)
 
+(** Outcome of {!make_entry_transition}'s strategy-internal entry-construction
+    attempt for one candidate.
+
+    The strategy applies two pre-cash gates before {!classify_candidate}'s
+    cash-and-cap walk: the G15-step-3 [max_stop_distance_pct] gate, and
+    round-share sizing collapsing to zero. {!Entry_ok} carries the
+    successfully-built transition + audit meta forward. {!Stop_too_wide} and
+    {!Sized_zero} are mapped one-to-one into
+    [Audit_recorder.skip_reason.Stop_too_wide] / [Sized_to_zero] by
+    {!classify_candidate}; they are exposed here so callers running the entry
+    construction outside the classifier can act on them directly. *)
+type entry_attempt_result =
+  | Entry_ok of Trading_strategy.Position.transition * entry_meta
+  | Stop_too_wide
+      (** G15 step 3: support-floor-derived [installed_stop] sits more than
+          [stops_config.max_stop_distance_pct] from [effective_entry]. *)
+  | Sized_zero
+      (** [Portfolio_risk.compute_position_size] rounded shares down to 0 (risk
+          dollars too small relative to per-share cost, or stop on the wrong
+          side of entry). *)
+
 (** Per-candidate decision tag emitted by the entry walk. The [Kept] case
     carries the produced transition + audit meta; [Skipped] records why the
     candidate was passed over so the audit can populate
@@ -115,15 +136,33 @@ val make_entry_transition :
   portfolio_value:float ->
   current_date:Core.Date.t ->
   Screener.scored_candidate ->
-  (Trading_strategy.Position.transition * entry_meta) option
-(** Try to build a [CreateEntering] transition for [cand]. Returns [None] when
-    sizing yields zero shares (un-sizeable). Side-effects: registers the initial
-    stop in [stop_states]; bumps the global position-id counter. The initial
-    stop comes from
-    {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}, which
-    pulls a prior correction low (long) or counter-rally high (short) from
-    [cand]'s bar history, falling back to [initial_stop_buffer] when no
-    qualifying counter-move is in the lookback window. *)
+  entry_attempt_result
+(** Try to build a [CreateEntering] transition for [cand]. Returns:
+
+    - [Stop_too_wide]: the support-floor-derived initial stop sits more than
+      [stops_config.max_stop_distance_pct] from [effective_entry] (G15 step 3,
+      Weinstein book §5.1). No [stop_states] entry written; no position id
+      consumed.
+    - [Sized_zero]: [Portfolio_risk.compute_position_size] rounded the share
+      count to 0. No [stop_states] entry written; no position id consumed.
+    - [Entry_ok (transition, meta)]: an entry-side transition with audit meta.
+      Side-effects: registers the initial stop in [stop_states]; bumps the
+      global position-id counter.
+
+    Order of operations within: (1) compute [effective_entry] from [bar_reader];
+    (2) compute the support-floor-aware [initial_stop] via
+    {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}; (3)
+    compare [|installed_stop - effective_entry| / effective_entry] against
+    [stops_config.max_stop_distance_pct]; (4) compute sizing using the
+    [installed_stop] (not [cand.suggested_stop]) so risk-per-share matches the
+    actual structural risk; (5) build the transition and meta on success.
+
+    The G15 step 3 fix moves sizing to step (4), AFTER the support-floor logic
+    has run, so that risk-per-share — and therefore share count — keys off the
+    actual [installed_stop] the position will operate under. Pre-step-3
+    behaviour sized off [cand.suggested_stop], which left a structural sizing
+    drift whenever support-floor produced a wider stop than the screener's
+    pre-fill suggestion. *)
 
 val check_cash_and_deduct :
   remaining_cash:float ref ->
@@ -148,9 +187,7 @@ val check_short_notional_cap :
 
 val classify_candidate :
   held_set:Core.String.Set.t ->
-  make_entry:
-    (Screener.scored_candidate ->
-    (Trading_strategy.Position.transition * entry_meta) option) ->
+  make_entry:(Screener.scored_candidate -> entry_attempt_result) ->
   remaining_cash:float ref ->
   short_notional_acc:float ref ->
   short_notional_cap:float ->

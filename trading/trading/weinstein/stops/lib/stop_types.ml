@@ -36,6 +36,7 @@ type config = {
   trailing_stop_buffer_pct : float;
   tightened_stop_buffer_pct : float;
   support_floor_lookback_bars : int;
+  max_stop_distance_pct : float;
 }
 [@@deriving show, eq, sexp]
 
@@ -48,4 +49,5 @@ let default_config =
     trailing_stop_buffer_pct = 0.01;
     tightened_stop_buffer_pct = 0.005;
     support_floor_lookback_bars = 90;
+    max_stop_distance_pct = 0.15;
   }
