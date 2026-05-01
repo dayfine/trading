@@ -137,17 +137,27 @@ let _stop_distance_pct ~effective_entry ~installed_stop =
     gate and which branch fires. Used to compare macOS vs Linux GHA traces
     side-by-side and identify which candidate's [stop_distance_pct] flips across
     the threshold due to sub-ULP libm differences. Off by default so normal runs
-    (including the goldens) are unaffected. *)
-let _emit_candidate_trace ~ticker ~effective_entry ~installed_stop
-    ~stop_distance_pct ~max_stop_distance_pct ~outcome =
+    (including the goldens) are unaffected.
+
+    Trace also carries the screener's per-candidate [score] (Int) and
+    [rationale] (string list, joined with "; ") so cross-platform diffs can pin
+    not just the gate outcome but the upstream score that produced the candidate
+    order in the first place. The integer score is the sum of variant-gated
+    scoring weights — when scores differ across platforms, the divergent
+    classifier is upstream of the cascade in
+    [analysis/weinstein/{relative_strength, volume,resistance}/]. *)
+let _emit_candidate_trace ~ticker ~score ~rationale ~effective_entry
+    ~installed_stop ~stop_distance_pct ~max_stop_distance_pct ~outcome =
   match Sys.getenv "PANEL_GOLDEN_DEBUG" with
   | Some "1" ->
+      let rationale_str = String.concat ~sep:"; " rationale in
       Printf.eprintf
-        "CANDIDATE ticker=%s effective_entry=%.12f installed_stop=%.12f \
-         stop_distance_pct=%.12f max_stop_distance_pct=%.12f gate_outcome=%s\n\
+        "CANDIDATE ticker=%s score=%d rationale=%s effective_entry=%.12f \
+         installed_stop=%.12f stop_distance_pct=%.12f \
+         max_stop_distance_pct=%.12f gate_outcome=%s\n\
          %!"
-        ticker effective_entry installed_stop stop_distance_pct
-        max_stop_distance_pct outcome
+        ticker score rationale_str effective_entry installed_stop
+        stop_distance_pct max_stop_distance_pct outcome
   | _ -> ()
 
 let make_entry_transition ~portfolio_risk_config ~stops_config
@@ -166,7 +176,8 @@ let make_entry_transition ~portfolio_risk_config ~stops_config
     stops_config.Weinstein_stops.max_stop_distance_pct
   in
   if Float.( > ) stop_distance_pct max_stop_distance_pct then (
-    _emit_candidate_trace ~ticker:cand.ticker ~effective_entry
+    _emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
+      ~rationale:cand.rationale ~effective_entry
       ~installed_stop:installed_stop_level ~stop_distance_pct
       ~max_stop_distance_pct ~outcome:"Stop_too_wide";
     Stop_too_wide)
@@ -184,13 +195,15 @@ let make_entry_transition ~portfolio_risk_config ~stops_config
         ~entry_price:effective_entry ~stop_price:installed_stop_level ()
     in
     if sizing.shares = 0 then (
-      _emit_candidate_trace ~ticker:cand.ticker ~effective_entry
+      _emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
+        ~rationale:cand.rationale ~effective_entry
         ~installed_stop:installed_stop_level ~stop_distance_pct
         ~max_stop_distance_pct ~outcome:"Sized_zero";
       Sized_zero)
     else
       let () =
-        _emit_candidate_trace ~ticker:cand.ticker ~effective_entry
+        _emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
+          ~rationale:cand.rationale ~effective_entry
           ~installed_stop:installed_stop_level ~stop_distance_pct
           ~max_stop_distance_pct ~outcome:"Pass"
       in

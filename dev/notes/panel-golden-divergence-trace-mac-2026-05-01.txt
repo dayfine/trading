@@ -1,0 +1,16 @@
+CANDIDATE ticker=AAPL score=65 rationale=Stage1→Stage2 breakout; Adequate volume; Virgin territory; Strong sector effective_entry=204.300000000000 installed_stop=199.875000000000 stop_distance_pct=0.021659324523 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=AAPL side=Long decision=Kept remaining_cash=538486.300000 short_notional_acc=0.000000
+CANDIDATE ticker=MSFT score=57 rationale=Stage1→Stage2 breakout; Adequate volume; Moderate resistance; Strong sector effective_entry=129.890000000000 installed_stop=127.188288000000 stop_distance_pct=0.020800000000 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=MSFT side=Long decision=Kept remaining_cash=57763.410000 short_notional_acc=0.000000
+CANDIDATE ticker=JPM score=55 rationale=Stage1→Stage2 breakout; Adequate volume; Virgin territory effective_entry=114.470000000000 installed_stop=111.875000000000 stop_distance_pct=0.022669695117 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=JPM side=Long decision=Insufficient_cash remaining_cash=57763.410000 short_notional_acc=0.000000
+CANDIDATE ticker=AAPL score=50 rationale=Early Stage2; Adequate volume; Virgin territory; Strong sector effective_entry=211.750000000000 installed_stop=207.345600000000 stop_distance_pct=0.020800000000 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=AAPL side=Long decision=Kept remaining_cash=520527.280000 short_notional_acc=0.000000
+CANDIDATE ticker=JPM score=50 rationale=Early Stage2; Adequate volume; Clean overhead; Strong sector effective_entry=116.120000000000 installed_stop=113.704704000000 stop_distance_pct=0.020800000000 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=JPM side=Long decision=Kept remaining_cash=38629.280000 short_notional_acc=0.000000
+CANDIDATE ticker=CVX score=55 rationale=Stage1→Stage2 breakout; Adequate volume; Virgin territory effective_entry=120.520000000000 installed_stop=110.875000000000 stop_distance_pct=0.080028211085 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=CVX side=Long decision=Kept remaining_cash=854991.240000 short_notional_acc=0.000000
+CANDIDATE ticker=JNJ score=40 rationale=Early Stage2; Adequate volume; Virgin territory effective_entry=142.090000000000 installed_stop=139.134528000000 stop_distance_pct=0.020800000000 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=JNJ side=Long decision=Kept remaining_cash=383424.110000 short_notional_acc=0.000000
+CANDIDATE ticker=JNJ score=75 rationale=Stage1→Stage2 breakout; Adequate volume; RS positive; Virgin territory; Strong sector effective_entry=137.490000000000 installed_stop=134.630208000000 stop_distance_pct=0.020800000000 max_stop_distance_pct=0.150000000000 gate_outcome=Pass
+DECISION ticker=JNJ side=Long decision=Kept remaining_cash=501916.750000 short_notional_acc=0.000000
