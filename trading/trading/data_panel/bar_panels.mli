@@ -104,6 +104,13 @@ val low_window :
 type weekly_view = {
   closes : float array;
       (** Adjusted close per weekly bar (chronological, oldest at index 0). *)
+  raw_closes : float array;
+      (** Raw (un-adjusted) close per weekly bar — the close panel's value at
+          the last trading day of each weekly bucket. Used together with
+          [closes] to compute per-bar split-adjustment factors
+          ([closes.(i) /. raw_closes.(i)]). The factor stays constant for spans
+          without splits and changes at split boundaries (G14 — see
+          [dev/notes/g14-deep-dive-2026-05-01.md]). *)
   highs : float array;  (** Max high within each weekly bucket. *)
   lows : float array;  (** Min low within each weekly bucket. *)
   volumes : float array;

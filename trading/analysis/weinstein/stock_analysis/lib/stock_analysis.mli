@@ -63,6 +63,18 @@ type callbacks = {
   get_volume : week_offset:int -> float option;
       (** Bar volume at [week_offset] weeks back, encoded as a float. Used by
           the peak-volume scan over the recent window. *)
+  get_split_factor : week_offset:int -> float option;
+      (** Per-bar split-adjustment factor [adjusted_close / close_price] at
+          [week_offset] weeks back. Used by the breakout / breakdown scans to
+          truncate the lookback window at the most recent split boundary: a
+          factor that materially diverges from offset 0's factor means a split
+          occurred between that bar and the present, and bars on the far side of
+          the split would leak into the scan in a different price space.
+
+          Returns [None] when no bar exists at that offset, when the bar's
+          [close_price] is non-positive, or when the panel doesn't carry both
+          raw and adjusted close (in which case truncation is a no-op and the
+          caller falls through to the original full-window scan). *)
   stage : Stage.callbacks;
       (** Nested Stage callbacks. {!Stage.callbacks_from_bars} or a panel
           adapter constructs this. *)

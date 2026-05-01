@@ -62,6 +62,9 @@ type callbacks = {
       (** Bar volume at [week_offset] weeks back, encoded as a float (matches
           the panel encoding). Used by the peak-volume scan over the recent
           window. *)
+  get_split_factor : week_offset:int -> float option;
+      (** Per-bar [adjusted_close / close_price]; see [stock_analysis.mli] for
+          the truncation semantics. [None] disables truncation. *)
   stage : Stage.callbacks;  (** Nested Stage callbacks. *)
   rs : Rs.callbacks;  (** Nested RS callbacks. *)
   volume : Volume.callbacks;  (** Nested Volume callbacks. *)
@@ -80,16 +83,53 @@ let _max_opt (best : float option) (h : float) : float option =
 let _min_opt (best : float option) (l : float) : float option =
   match best with None -> Some l | Some b -> Some (Float.min b l)
 
+(** Per-bar split-jump threshold: the smallest [factor_at_off / factor_at_off-1]
+    ratio (in either direction) that we treat as a split rather than a dividend
+    / continuous-adjustment drift. A split causes a discrete multiplicative jump
+    in [adjusted_close / close_price] between consecutive bars (e.g., a forward
+    four-for-one split creates a 4x jump; a five-for- four reverse split creates
+    a 1.25x jump); dividends create only gradual drift. The smallest real-world
+    split is around 5:4 (a one-quarter jump); the largest dividend drift over a
+    couple of weeks is well under one- twentieth. The threshold below sits
+    safely between the two. *)
+let _split_jump_threshold = 0.20
+
+(** [true] when bars at [off] and [off-1] sit in the same price space — i.e.,
+    the per-bar split factor didn't jump by more than [_split_jump_threshold].
+    Used to truncate the breakout / breakdown scans at the most recent split
+    boundary: a [false] here means a split occurred between [off] (older) and
+    [off-1] (newer), so any further-back bars belong to the pre-split price
+    space and would leak into the scan. When either factor is unavailable the
+    comparison is a no-op (returns [true] — keep walking) so that fixtures
+    without raw / adjusted-close metadata behave as before. *)
+let _no_split_between ~get_split_factor ~off : bool =
+  if off <= 0 then true
+  else
+    match
+      ( get_split_factor ~week_offset:off,
+        get_split_factor ~week_offset:(off - 1) )
+    with
+    | None, _ | _, None -> true
+    | Some f_old, Some f_new
+      when Float.( <= ) f_old 0.0 || Float.( <= ) f_new 0.0 ->
+        true
+    | Some f_old, Some f_new ->
+        Float.( < ) (Float.abs ((f_old /. f_new) -. 1.0)) _split_jump_threshold
+
 (** Walk back from [week_offset = base_end_offset .. base_lookback - 1] reading
     [get_high] at each offset. Returns the maximum defined high. Stops the walk
-    at the first [None] (treated as "no more bars"). Returns [None] when the
-    range is empty or no bar produced a defined high. *)
-let _scan_max_high_callback ~get_high ~base_end_offset ~base_lookback :
-    float option =
+    at the first [None] (treated as "no more bars") OR at the first offset whose
+    per-bar split factor jumps materially relative to its more-recent neighbour
+    (a split occurred between [off] and [off-1]; everything older belongs to the
+    pre-split price space). Returns [None] when the range is empty or no bar
+    produced a defined high. *)
+let _scan_max_high_callback ~get_high ~get_split_factor ~base_end_offset
+    ~base_lookback : float option =
   if base_end_offset >= base_lookback then None
   else
     let rec loop off best =
       if off >= base_lookback then best
+      else if not (_no_split_between ~get_split_factor ~off) then best
       else
         match get_high ~week_offset:off with
         | None -> best
@@ -104,13 +144,18 @@ let _scan_max_high_callback ~get_high ~base_end_offset ~base_lookback :
 
     Note: [get_low] is consumed via the Resistance callback bundle, which uses
     [~bar_offset] rather than [~week_offset]. Both indexing conventions mean
-    "offset from the newest bar"; only the labelled-arg name differs. *)
-let _scan_min_low_callback ~get_low ~base_end_offset ~base_lookback :
-    float option =
+    "offset from the newest bar"; only the labelled-arg name differs.
+
+    Same split-boundary truncation as the max-high scan: stops at the first
+    offset whose [get_split_factor] jumps relative to its more-recent neighbour.
+*)
+let _scan_min_low_callback ~get_low ~get_split_factor ~base_end_offset
+    ~base_lookback : float option =
   if base_end_offset >= base_lookback then None
   else
     let rec loop off best =
       if off >= base_lookback then best
+      else if not (_no_split_between ~get_split_factor ~off) then best
       else
         match get_low ~bar_offset:off with
         | None -> best
@@ -195,12 +240,27 @@ let _make_get_volume_from_bars (bars : Daily_price.t array) :
     if idx < 0 || idx >= n then None
     else Some (Float.of_int bars.(idx).Daily_price.volume)
 
+(** Build a [get_split_factor] closure: per-bar [adjusted_close / close_price].
+    Returns [None] for offsets outside the array AND for bars whose raw close is
+    non-positive (avoiding a div-by-zero / sign flip). *)
+let _make_get_split_factor_from_bars (bars : Daily_price.t array) :
+    week_offset:int -> float option =
+  let n = Array.length bars in
+  fun ~week_offset ->
+    let idx = n - 1 - week_offset in
+    if idx < 0 || idx >= n then None
+    else
+      let bar = bars.(idx) in
+      if Float.( <= ) bar.Daily_price.close_price 0.0 then None
+      else Some (bar.Daily_price.adjusted_close /. bar.Daily_price.close_price)
+
 let callbacks_from_bars ~(config : config) ~(bars : Daily_price.t list)
     ~(benchmark_bars : Daily_price.t list) : callbacks =
   let bars_arr = Array.of_list bars in
   {
     get_high = _make_get_high_from_bars bars_arr;
     get_volume = _make_get_volume_from_bars bars_arr;
+    get_split_factor = _make_get_split_factor_from_bars bars_arr;
     stage = Stage.callbacks_from_bars ~config:config.stage ~bars;
     rs = Rs.callbacks_from_bars ~stock_bars:bars ~benchmark_bars;
     volume = Volume.callbacks_from_bars ~bars;
@@ -241,6 +301,25 @@ let _support_result ~(config : config)
 (* Main analyzer — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
 
+(** Compute [(breakout_price, breakdown_price)] from the prior-base window
+    callbacks. Both scans share the same window bounds and the same split-
+    boundary truncation guard ([get_split_factor]). *)
+let _breakout_and_breakdown_prices ~(config : config) ~(callbacks : callbacks) :
+    float option * float option =
+  let breakout =
+    _scan_max_high_callback ~get_high:callbacks.get_high
+      ~get_split_factor:callbacks.get_split_factor
+      ~base_end_offset:config.base_end_offset_weeks
+      ~base_lookback:config.base_lookback_weeks
+  in
+  let breakdown =
+    _scan_min_low_callback ~get_low:callbacks.resistance.get_low
+      ~get_split_factor:callbacks.get_split_factor
+      ~base_end_offset:config.base_end_offset_weeks
+      ~base_lookback:config.base_lookback_weeks
+  in
+  (breakout, breakdown)
+
 let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     ~prior_stage ~as_of_date : t =
   let stage_result =
@@ -254,15 +333,8 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
       ~get_benchmark_close:callbacks.rs.get_benchmark_close
       ~get_date:callbacks.rs.get_date
   in
-  let breakout_price =
-    _scan_max_high_callback ~get_high:callbacks.get_high
-      ~base_end_offset:config.base_end_offset_weeks
-      ~base_lookback:config.base_lookback_weeks
-  in
-  let breakdown_price =
-    _scan_min_low_callback ~get_low:callbacks.resistance.get_low
-      ~base_end_offset:config.base_end_offset_weeks
-      ~base_lookback:config.base_lookback_weeks
+  let breakout_price, breakdown_price =
+    _breakout_and_breakdown_prices ~config ~callbacks
   in
   let peak_offset_opt =
     _find_peak_volume_offset_callback ~get_volume:callbacks.get_volume

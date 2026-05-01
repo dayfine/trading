@@ -425,13 +425,17 @@ let test_weinstein_breakout_trade _ =
          held, the held-symbol filter prevents re-entry on subsequent
          Fridays — correct Weinstein behavior (one entry per stock).
 
-         Stage 3 PR 3.2 changed bar visibility timing: with panels
-         populated up-front (vs the deleted [Bar_history] cache that grew
-         incrementally), the strategy's breakout-price scan and resistance
-         lookback see a slightly different window on the first qualifying
-         Friday, so the exact entry price + share count drifted from the
-         pre-3.2 golden (~162.45 → 166.383146). Pin the post-3.2
-         deterministic values exactly: 80 shares at $166.383146. *)
+         G14 (2026-05-01) changed sizing to anchor on the realised entry
+         price (current close at order placement) rather than the
+         screener's [cand.suggested_entry] (a buffered breakout level
+         that historically diverged from the broker's actual fill —
+         pre-G14 the synthetic test happened to land on values that
+         matched, but the divergence is real). With the new sizing, the
+         per-share risk = |effective_entry - suggested_stop| is larger
+         because effective_entry sits above suggested_stop by more than
+         the screener's nominal buffer; risk-based shares drop
+         proportionally. The trade.price (market fill) is unchanged.
+         Pin the post-G14 deterministic values: 41 shares at $166.38. *)
       let all_trades =
         List.concat_map result.steps ~f:(fun step -> step.trades)
       in
@@ -446,7 +450,7 @@ let test_weinstein_breakout_trade _ =
                    (equal_to Trading_base.Types.Buy);
                  field
                    (fun t -> t.Trading_base.Types.quantity)
-                   (float_equal ~epsilon:0.5 80.0);
+                   (float_equal ~epsilon:0.5 41.0);
                  field
                    (fun t -> t.Trading_base.Types.price)
                    (float_equal ~epsilon:0.1 166.383146);

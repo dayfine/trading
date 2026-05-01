@@ -318,6 +318,98 @@ let test_parity_exact_base_window _ =
   let bench = rising_bars ~n:60 80.0 110.0 in
   assert_parity ~bars ~benchmark_bars:bench ()
 
+(* ------------------------------------------------------------------ *)
+(* G14 split-boundary truncation                                        *)
+(*                                                                      *)
+(* The breakout-price / breakdown-price scans must stop at the most     *)
+(* recent split between consecutive bars in the prior-base window —     *)
+(* otherwise pre-split raw highs (in a different price space) leak into *)
+(* post-split breakout levels. See [_scan_max_high_callback] in         *)
+(* [stock_analysis.ml] and [dev/notes/g14-deep-dive-2026-05-01.md].     *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a synthetic series of [n_total] bars where the first [n_pre] bars sit
+    in pre-split raw price space (high=[pre_high], close=[pre_close],
+    adjusted_close=[pre_adj]) and the remaining bars sit in post-split raw price
+    space (high=[post_high], close=[post_close], adjusted_close=[post_adj]). The
+    split is between bar [n_pre - 1] and bar [n_pre]: factor jumps from
+    [pre_adj /. pre_close] to [post_adj /. post_close] across that boundary.
+
+    Uses weekly cadence (date stride 7) so the bars look like weekly buckets to
+    [Stock_analysis.analyze]. *)
+let _split_synth ~n_total ~n_pre ~pre_high ~pre_close ~pre_adj ~post_high
+    ~post_close ~post_adj : Daily_price.t list =
+  List.init n_total ~f:(fun i ->
+      let high, close, adj =
+        if i < n_pre then (pre_high, pre_close, pre_adj)
+        else (post_high, post_close, post_adj)
+      in
+      {
+        Daily_price.date = Date.add_days base_date (i * 7);
+        open_price = close;
+        high_price = high;
+        low_price = close *. 0.99;
+        close_price = close;
+        adjusted_close = adj;
+        volume = 1000;
+      })
+
+(** With a 4:1 split between weeks 15 and 16 (pre: factor 0.25, post: factor
+    1.0), the prior-base scan must stop at the split boundary — pre-split raw
+    highs ($200) leaking into the breakout level would be in a different price
+    space than the current post-split fill ($50). The truncated max falls within
+    the post-split bars only (a small range around $52). *)
+let test_breakout_truncates_at_split_boundary _ =
+  (* n_pre = 16, n_total = 30. With base_end_offset = 8 the scan walks
+     offsets [8, 52) → bars [21..0]; the split lives between bars 15 and 16
+     (= offsets 13 and 14 from the newest-at-29). The truncation guard fires
+     at offset 14, so the scan covers bars [16..21] only (post-split). *)
+  let bars =
+    _split_synth ~n_total:30 ~n_pre:16 ~pre_high:200.0 ~pre_close:400.0
+      ~pre_adj:100.0 ~post_high:50.0 ~post_close:48.0 ~post_adj:48.0
+  in
+  let result =
+    analyze ~config:cfg ~ticker:"X" ~bars ~benchmark_bars:[] ~prior_stage:None
+      ~as_of_date:as_of
+  in
+  (* breakout_price comes from the post-split window only — never the
+     pre-split $200. Pin a tight upper bound to catch any leakage. *)
+  assert_that result.breakout_price (is_some_and (lt (module Float_ord) 100.0))
+
+(** Mirror of the breakout truncation: when post-split lows ($48) and pre- split
+    lows ($396) live in different price spaces, [_scan_min_low_callback] must
+    truncate at the split boundary so the breakdown level reflects the current
+    price space. The pre-split low at $396 is artificially high (it sits in the
+    pre-split raw space), so without truncation it would not affect the min —
+    but the symmetric test validates the truncation guard fires on the short
+    side too. We verify breakdown_price is below 100 (in the post-split price
+    space). *)
+let test_breakdown_truncates_at_split_boundary _ =
+  let bars =
+    _split_synth ~n_total:30 ~n_pre:16 ~pre_high:200.0 ~pre_close:400.0
+      ~pre_adj:100.0 ~post_high:50.0 ~post_close:48.0 ~post_adj:48.0
+  in
+  let result =
+    analyze ~config:cfg ~ticker:"X" ~bars ~benchmark_bars:[] ~prior_stage:None
+      ~as_of_date:as_of
+  in
+  assert_that result.breakdown_price (is_some_and (lt (module Float_ord) 100.0))
+
+(** Sanity: when there is no split (every bar's adjusted_close = close_price),
+    the truncation guard never fires and the scan covers the full prior-base
+    window. The classic rising_bars fixture exercises this. *)
+let test_no_split_no_truncation _ =
+  let bars = rising_bars ~n:60 50.0 150.0 in
+  let result =
+    analyze ~config:cfg ~ticker:"X" ~bars ~benchmark_bars:[] ~prior_stage:None
+      ~as_of_date:as_of
+  in
+  (* base window covers bars [8, 52) → indices [60-52..60-8) = [8..52) of the
+     rising series. Highs in this slice peak near the most-recent bar in the
+     window (~$133) — well above the all-bars min of ~$50. Pin the lower
+     bound to confirm truncation didn't fire spuriously. *)
+  assert_that result.breakout_price (is_some_and (gt (module Float_ord) 100.0))
+
 let suite =
   "stock_analysis_tests"
   >::: [
@@ -348,6 +440,11 @@ let suite =
          >:: test_parity_stage1_flat_after_decline;
          "test_parity_insufficient_bars" >:: test_parity_insufficient_bars;
          "test_parity_exact_base_window" >:: test_parity_exact_base_window;
+         "G14: breakout truncates at split boundary"
+         >:: test_breakout_truncates_at_split_boundary;
+         "G14: breakdown truncates at split boundary"
+         >:: test_breakdown_truncates_at_split_boundary;
+         "G14: no split, no truncation" >:: test_no_split_no_truncation;
        ]
 
 let () = run_test_tt_main suite

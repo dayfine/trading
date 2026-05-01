@@ -160,6 +160,7 @@ let _sufficient_daily_bars = 250
 let _empty_weekly_view : Bar_panels.weekly_view =
   {
     closes = [||];
+    raw_closes = [||];
     highs = [||];
     lows = [||];
     volumes = [||];

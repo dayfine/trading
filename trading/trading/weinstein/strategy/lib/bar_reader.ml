@@ -51,6 +51,7 @@ let weekly_bars_for t ~symbol ~n ~as_of =
 let _empty_weekly_view : Bar_panels.weekly_view =
   {
     closes = [||];
+    raw_closes = [||];
     highs = [||];
     lows = [||];
     volumes = [||];
