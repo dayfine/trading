@@ -409,19 +409,28 @@ jobs:
           # now defers to this step so the merge happens after the budget
           # JSON is bundled.
           # ---------------------------------------------------------------
-          # GitHub needs a few seconds after a push to compute mergeability;
-          # an immediate PUT /merge in that window returns HTTP 405 "Pull
-          # Request is not mergeable" and the daily PR sits open. Poll until
-          # GitHub reports `mergeable=true` (or give up after ~30 s).
-          # See run 24996059895 for the original failure mode.
-          for _ in 1 2 3 4 5 6; do
-            MERGEABLE="$(curl -sSL \
+          # The budget commit re-triggers `ci.yml` on the daily PR, which
+          # takes ~4 min to complete. We must wait for BOTH:
+          #   - .mergeable == true              (no merge conflicts)
+          #   - .mergeable_state == "clean"     (CI passed on the new commit)
+          # Polling only `.mergeable` returns true within seconds while CI
+          # is still running, so an immediate PUT /merge gets HTTP 405
+          # "Pull Request is not mergeable" or 409 "Head branch is out of
+          # date" — that was the silent failure mode 2026-04-26..2026-05-01
+          # (see dev/notes/orchestrator-auto-merge-regression-2026-05-01.md).
+          # Timeout 6 min (72 × 5s) covers the typical CI runtime; if CI
+          # genuinely fails the loop times out and the warning fires below.
+          # See run 24996059895 for the original "still computing" failure
+          # mode this poll was originally introduced to handle.
+          for _ in $(seq 1 72); do
+            RESPONSE="$(curl -sSL \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${REPO}/pulls/${DAILY_PR_NUMBER}" \
-              | jq -r '.mergeable // "null"')"
-            [ "$MERGEABLE" = "true" ] && break
-            echo "Waiting for GitHub to compute mergeability (current: ${MERGEABLE})..."
+              "https://api.github.com/repos/${REPO}/pulls/${DAILY_PR_NUMBER}")"
+            MERGEABLE="$(printf '%s' "$RESPONSE" | jq -r '.mergeable // "null"')"
+            MERGEABLE_STATE="$(printf '%s' "$RESPONSE" | jq -r '.mergeable_state // "unknown"')"
+            [ "$MERGEABLE" = "true" ] && [ "$MERGEABLE_STATE" = "clean" ] && break
+            echo "Waiting for GitHub (mergeable=${MERGEABLE}, state=${MERGEABLE_STATE})..."
             sleep 5
           done
 
