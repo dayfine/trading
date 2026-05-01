@@ -3,14 +3,22 @@
 open Core
 
 type config = {
-  max_unrealized_loss_fraction : float;
+  max_long_unrealized_loss_fraction : float;
+  max_short_unrealized_loss_fraction : float;
   min_portfolio_value_fraction_of_peak : float;
 }
 [@@deriving show, eq, sexp]
 
 let default_config =
   {
-    max_unrealized_loss_fraction = 0.5;
+    (* Longs cap at -25% of cost basis (book: hard 25% rule on individual
+       positions, see [docs/design/weinstein-book-reference.md] §Stop-Loss
+       Rules). *)
+    max_long_unrealized_loss_fraction = 0.25;
+    (* Shorts must cap tighter — short P&L is unbounded above (price has no
+       ceiling) while a long can lose at most 100% of cost basis. Per
+       Weinstein's short-sale guidance, exit on the first sign of strength. *)
+    max_short_unrealized_loss_fraction = 0.15;
     min_portfolio_value_fraction_of_peak = 0.4;
   }
 
@@ -194,9 +202,11 @@ let _event_of_input ~date ~reason (p : position_input) : event =
     reason;
   }
 
-(* Per-position trigger: a position fires when its unrealized loss exceeds
-   [config.max_unrealized_loss_fraction] of cost basis. Cost basis must be
-   strictly positive — degenerate inputs (zero-cost basis) are not flagged. *)
+(* Per-position trigger: a position fires when its unrealized loss exceeds the
+   side-specific threshold ([max_long_unrealized_loss_fraction] for longs,
+   [max_short_unrealized_loss_fraction] for shorts) of cost basis. Cost basis
+   must be strictly positive — degenerate inputs (zero-cost basis) are not
+   flagged. *)
 let _check_per_position ~config ~date (p : position_input) : event option =
   let cost_basis = p.entry_price *. p.quantity in
   if Float.( <= ) cost_basis 0.0 then None
@@ -206,7 +216,12 @@ let _check_per_position ~config ~date (p : position_input) : event option =
         ~current_price:p.current_price ~quantity:p.quantity
     in
     let loss_fraction = -.pnl /. cost_basis in
-    if Float.( > ) loss_fraction config.max_unrealized_loss_fraction then
+    let threshold =
+      match p.side with
+      | Trading_base.Types.Long -> config.max_long_unrealized_loss_fraction
+      | Trading_base.Types.Short -> config.max_short_unrealized_loss_fraction
+    in
+    if Float.( > ) loss_fraction threshold then
       Some (_event_of_input ~date ~reason:Per_position p)
     else None
 

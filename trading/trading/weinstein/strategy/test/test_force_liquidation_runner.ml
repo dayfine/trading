@@ -119,7 +119,8 @@ let _capturing_recorder () =
 (* ------------------------------------------------------------------ *)
 
 let test_per_position_trigger_emits_exit _ =
-  (* Long entered $100, current $40 — 60% loss; default threshold 50% fires. *)
+  (* Long entered $100, current $40 — 60% loss; default long threshold 25%
+     fires. *)
   let pos =
     _make_holding ~symbol:"AAPL" ~side:Trading_base.Types.Long
       ~entry_date:(_date "2024-01-02") ~quantity:100.0 ~entry_price:100.0
@@ -154,12 +155,12 @@ let test_per_position_trigger_emits_exit _ =
   assert_that !captured (size_is 1)
 
 let test_per_position_trigger_no_fire_under_threshold _ =
-  (* Long $100 → $60 = 40% loss; threshold 50%; no fire. *)
+  (* Long $100 → $80 = 20% loss; long threshold 25%; no fire. *)
   let pos =
     _make_holding ~symbol:"AAPL" ~side:Trading_base.Types.Long
       ~entry_date:(_date "2024-01-02") ~quantity:100.0 ~entry_price:100.0
   in
-  let bar = _make_bar ~date:(_date "2024-04-29") ~close:60.0 in
+  let bar = _make_bar ~date:(_date "2024-04-29") ~close:80.0 in
   let positions = String.Map.singleton "AAPL" pos in
   let get_price s = if String.equal s "AAPL" then Some bar else None in
   let peak_tracker = FL.Peak_tracker.create () in
@@ -244,7 +245,7 @@ let test_no_positions_no_events _ =
 
 let test_short_position_loss_fires _ =
   (* Short at $200, current $320 = 60% loss (entry 200 + price up 120 / cost
-     basis 200 = 0.6); default 50% fires. *)
+     basis 200 = 0.6); default short threshold 15% fires. *)
   let pos =
     _make_holding ~symbol:"TSLA" ~side:Trading_base.Types.Short
       ~entry_date:(_date "2024-01-02") ~quantity:50.0 ~entry_price:200.0
