@@ -176,45 +176,49 @@ let test_position_size_big_winner _ =
        ~risk_amount:__)
 
 (* G7 regression — short with very tight stop must not size to >100% of
-   portfolio. Pre-fix: risk-budget formula alone produces 12,191 shares for a
+   portfolio. Pre-G7: risk-budget formula alone produces 12,191 shares for a
    $1M portfolio at risk_pct=0.01 with 0.82 risk_per_share → $1.238M position
-   (124% of portfolio). Post-fix: capped by max_short_exposure_pct = 0.30. *)
+   (124% of portfolio). Post-G7: capped by max_short_exposure_pct = 0.30.
+
+   max_position_pct=0.20 cap landed 2026-05-01 — re-pinned: per-position cap
+   (20% × $1M = $200K) is now tighter than the side-exposure cap (30% × $1M
+   = $300K), so floor($200K / $101.59) = 1,968 shares is the binding limit. *)
 let test_position_size_short_capped_by_max_short_exposure _ =
   let result =
     compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
       ~side:`Short ~entry_price:101.59 ~stop_price:102.41 ()
   in
-  (* The risk-only formula would produce ~12,195 shares ($1.238M position).
-     With max_short_exposure_pct = 0.30, max position_value = $300K →
-     max shares = floor($300K / $101.59) = 2,953. *)
+  (* Per-position cap binds: floor($200K / $101.59) = 1,968 shares. *)
   assert_that result
     (all_of
        [
-         field (fun (s : sizing) -> s.shares) (equal_to 2953);
+         field (fun (s : sizing) -> s.shares) (equal_to 1968);
          field
            (fun (s : sizing) -> s.position_value)
-           (le (module Float_ord) 300_000.0);
-         field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.30);
+           (le (module Float_ord) 200_000.0);
+         field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.20);
        ])
 
 (* Symmetric long-side check: a long with a very tight stop must not exceed
-   max_long_exposure_pct (default 0.90). *)
+   the binding cap.
+
+   max_position_pct=0.20 cap landed 2026-05-01 — re-pinned: per-position cap
+   (20% × $1M = $200K) is tighter than max_long_exposure_pct = 0.90, so
+   $200K / $100 = 2,000 shares is the binding limit. *)
 let test_position_size_long_capped_by_max_long_exposure _ =
   let result =
     compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
       ~side:`Long ~entry_price:100.0 ~stop_price:99.0 ()
   in
-  (* Risk-only formula: dollar_risk = $10K, risk_per_share = $1 → 10,000 shares
-     × $100 = $1,000,000 position (100% of portfolio). With max_long_exposure_pct
-     = 0.90, max position_value = $900K → max shares = 9,000. *)
+  (* Per-position cap binds: $200K / $100 = 2,000 shares. *)
   assert_that result
     (all_of
        [
-         field (fun (s : sizing) -> s.shares) (equal_to 9000);
+         field (fun (s : sizing) -> s.shares) (equal_to 2000);
          field
            (fun (s : sizing) -> s.position_value)
-           (le (module Float_ord) 900_000.0);
-         field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.90);
+           (le (module Float_ord) 200_000.0);
+         field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.20);
        ])
 
 (* Cap is configurable: tightening max_short_exposure_pct further reduces the
@@ -231,6 +235,29 @@ let test_position_size_short_cap_is_configurable _ =
        [
          field (fun (s : sizing) -> s.shares) (equal_to 1000);
          field (fun (s : sizing) -> s.position_pct) (le (module Float_ord) 0.10);
+       ])
+
+(* max_position_pct cap binds when the side-exposure cap is looser. With
+   risk_per_trade_pct=0.01, portfolio_value=$1M, entry=$200, stop=$199:
+     - risk-based: dollar_risk=$10K, risk_per_share=$1 → 10,000 shares
+     - side-exposure cap (long 90%): $900K / $200 = 4,500 shares
+     - per-position cap (20%): $200K / $200 = 1,000 shares (binds)
+   Final shares = min(10000, 4500, 1000) = 1,000.
+
+   max_position_pct=0.20 cap landed 2026-05-01 — pins the new behavior. *)
+let test_position_size_capped_by_max_position_pct _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
+      ~side:`Long ~entry_price:200.0 ~stop_price:199.0 ()
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (s : sizing) -> s.shares) (equal_to 1000);
+         field (fun (s : sizing) -> s.position_value) (float_equal 200_000.0);
+         field
+           (fun (s : sizing) -> s.position_pct)
+           (float_equal ~epsilon:1e-6 0.20);
        ])
 
 (* When the risk-based sizing is already below the exposure cap, the cap is
@@ -423,6 +450,8 @@ let suite =
          >:: test_position_size_long_capped_by_max_long_exposure;
          "position_size_short_cap_is_configurable"
          >:: test_position_size_short_cap_is_configurable;
+         "position_size_capped_by_max_position_pct"
+         >:: test_position_size_capped_by_max_position_pct;
          "position_size_below_cap_unaffected"
          >:: test_position_size_below_cap_unaffected;
          "check_limits_ok" >:: test_check_limits_ok;
