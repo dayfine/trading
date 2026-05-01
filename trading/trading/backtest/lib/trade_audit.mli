@@ -43,6 +43,15 @@ type skip_reason =
       (** Skipped because the sector was at or above its concentration cap. *)
   | Top_n_cutoff
       (** Skipped because the candidate fell outside the top-N cap. *)
+  | Short_notional_cap
+      (** G15 step 2: skipped because admitting this short would push aggregate
+          short notional ([sum |entry * qty|] across all open shorts plus the
+          candidate's notional) past
+          [Portfolio_risk.config.max_short_notional_fraction] of portfolio
+          value. Bounds total short-side exposure as a complement to the
+          per-position
+          {!Force_liquidation.config.max_short_unrealized_loss_fraction} stop.
+          Only emitted on [Short] candidates. *)
 [@@deriving sexp]
 
 type alternative_candidate = {

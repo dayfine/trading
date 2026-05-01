@@ -112,6 +112,20 @@ type config = {
   max_short_exposure_pct : float;
       (** Maximum short exposure as fraction of portfolio (default: 0.30 = 30%)
       *)
+  max_short_notional_fraction : float;
+      (** G15 step 2: aggregate short-notional cap evaluated at entry-decision
+          time. The strategy sums [|entry_price * quantity|] across all
+          currently-open [Holding] shorts in the portfolio; if admitting the
+          candidate would push the running total past
+          [max_short_notional_fraction * portfolio_value], the short candidate
+          is dropped with a [Short_notional_cap] skip reason.
+
+          Differs from [max_short_exposure_pct] (which is consumed by
+          {!check_limits} on a portfolio snapshot at proposal time) by sitting
+          at the strategy's per-Friday entry walk: the gate fires before any
+          cash deduction or [Position.CreateEntering] is emitted, so short-cash
+          inflation of [portfolio_value] doesn't size around the cap. Default:
+          0.30 (30% of portfolio_value). *)
   min_cash_pct : float;
       (** Minimum cash fraction to maintain (default: 0.10 = 10%) *)
   max_sector_concentration : int;
@@ -136,6 +150,7 @@ val default_config : config
     - max_positions = 20
     - max_long_exposure_pct = 0.90 (90%)
     - max_short_exposure_pct = 0.30 (30%)
+    - max_short_notional_fraction = 0.30 (30%)
     - min_cash_pct = 0.10 (10%)
     - max_sector_concentration = 5
     - max_unknown_sector_positions = 2

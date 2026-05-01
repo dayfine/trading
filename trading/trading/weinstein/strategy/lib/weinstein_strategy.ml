@@ -130,6 +130,24 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let remaining_cash = ref portfolio.cash in
+  (* G15 step 2: seed the short-notional accumulator with the current
+     entry-price-denominated short notional across all open Holding shorts.
+     This is intentionally entry-price-denominated rather than current-price
+     so the cap measures committed-at-entry exposure (which is what we know
+     when sizing), not mtm liability. The strategy bumps the accumulator
+     each time a short is admitted within this Friday's entry walk. *)
+  let short_notional_acc =
+    ref
+      (Map.fold portfolio.positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
+           match (pos.side, pos.state) with
+           | ( Trading_base.Types.Short,
+               Position.Holding { quantity; entry_price; _ } ) ->
+               acc +. (Float.abs quantity *. entry_price)
+           | _ -> acc))
+  in
+  let short_notional_cap =
+    portfolio_value *. config.portfolio_config.max_short_notional_fraction
+  in
   let make_entry =
     Entry_audit_capture.make_entry_transition
       ~portfolio_risk_config:config.portfolio_config
@@ -141,7 +159,7 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
     List.map candidates ~f:(fun c ->
         ( c,
           Entry_audit_capture.classify_candidate ~held_set ~make_entry
-            ~remaining_cash c ))
+            ~remaining_cash ~short_notional_acc ~short_notional_cap c ))
   in
   let kept =
     List.filter_map decisions ~f:(fun (_, d) ->

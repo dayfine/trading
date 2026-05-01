@@ -133,15 +133,34 @@ val check_cash_and_deduct :
     [remaining_cash]. Deducts and returns [Some] when it does, returns [None]
     otherwise. Pass-through for non-[CreateEntering] transitions. *)
 
+val check_short_notional_cap :
+  short_notional_acc:float ref ->
+  short_notional_cap:float ->
+  Trading_strategy.Position.transition * entry_meta ->
+  Screener.scored_candidate ->
+  (Trading_strategy.Position.transition * entry_meta) option
+(** G15 step 2: aggregate short-notional cap. For [Long] candidates:
+    pass-through [Some]. For [Short] candidates: returns [Some] only when
+    [!short_notional_acc + (shares * effective_entry_price) <=
+     short_notional_cap]; otherwise [None]. Bumps [short_notional_acc] on the
+    pass case so later candidates in the same entry walk see the up-to-date
+    running total. *)
+
 val classify_candidate :
   held_set:Core.String.Set.t ->
   make_entry:
     (Screener.scored_candidate ->
     (Trading_strategy.Position.transition * entry_meta) option) ->
   remaining_cash:float ref ->
+  short_notional_acc:float ref ->
+  short_notional_cap:float ->
   Screener.scored_candidate ->
   candidate_decision
-(** Classify one candidate as [Kept] or [Skipped reason]. The three skip reasons
-    match {!Audit_recorder.skip_reason}: held, sized to zero, or rejected by the
-    running cash check. Order: held-check, then sizing via [make_entry], finally
-    the cash check. *)
+(** Classify one candidate as [Kept] or [Skipped reason]. The four skip reasons
+    match {!Audit_recorder.skip_reason}: held, sized to zero, rejected by the
+    running cash check, or rejected by the running short-notional cap. Order:
+    held-check, sizing via [make_entry], cash check, then short-notional cap.
+
+    The cash check tentatively deducts before the short-notional gate; on a
+    [Short_notional_cap] rejection the deducted cash is refunded into
+    [remaining_cash] so subsequent candidates see the correct balance. *)

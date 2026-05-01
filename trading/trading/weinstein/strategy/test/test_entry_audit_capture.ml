@@ -108,6 +108,26 @@ let _long_candidate ~ticker ~suggested_entry ~suggested_stop ~as_of_date :
     rationale = [ "test breakout"; "test volume confirm" ];
   }
 
+(** Short counterpart to {!_long_candidate}. The Stage4 fixture is interchanged
+    with Stage2 in the analysis bundle to satisfy the screener's directional
+    invariant; [make_entry_transition] does not read it but
+    [_short_notional_cap_*] tests still construct it for symmetry. *)
+let _short_candidate ~ticker ~suggested_entry ~suggested_stop ~as_of_date :
+    Screener.scored_candidate =
+  {
+    ticker;
+    analysis = _stock_analysis ~ticker ~as_of_date;
+    sector = _sector_context;
+    side = Trading_base.Types.Short;
+    grade = Weinstein_types.B;
+    score = 60;
+    suggested_entry;
+    suggested_stop;
+    risk_pct = (suggested_stop -. suggested_entry) /. suggested_entry;
+    swing_target = None;
+    rationale = [ "test breakdown" ];
+  }
+
 let _portfolio_risk_config : Portfolio_risk.config =
   Portfolio_risk.default_config
 
@@ -262,6 +282,141 @@ let test_empty_bar_reader_falls_back_to_suggested_entry _ =
             m.effective_entry_price)
           (float_equal 130.0)))
 
+(* ------------------------------------------------------------------ *)
+(* G15 step 2: short-notional cap tests                                  *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a stub [(Position.transition, entry_meta)] pair carrying an effective
+    entry + share count, suitable for driving
+    {!Entry_audit_capture.check_short_notional_cap}. We bypass
+    [make_entry_transition] here because the cap math is independent of the
+    sizing path — it keys solely off [meta.shares * meta.effective_entry_price]
+    — and constructing a fixture that produces the exact share count we want via
+    [compute_position_size] would couple the test to risk-config defaults. *)
+let _stub_trans_and_meta ~side ~shares ~effective_entry_price :
+    Position.transition * Entry_audit_capture.entry_meta =
+  let trans : Position.transition =
+    {
+      position_id = "STUB-1";
+      date = Date.of_string "2024-06-14";
+      kind =
+        Position.CreateEntering
+          {
+            symbol = "STUB";
+            side;
+            target_quantity = Float.of_int shares;
+            entry_price = effective_entry_price;
+            reasoning = Position.ManualDecision { description = "stub" };
+          };
+    }
+  in
+  let meta : Entry_audit_capture.entry_meta =
+    {
+      position_id = "STUB-1";
+      shares;
+      installed_stop = effective_entry_price *. 0.95;
+      stop_floor_kind = Audit_recorder.Buffer_fallback;
+      effective_entry_price;
+    }
+  in
+  (trans, meta)
+
+(** Portfolio at $100K with 25% existing short notional ($25K). A fresh short
+    candidate sized to $6K notional → 31% > 30% cap → must skip with
+    [Short_notional_cap]. *)
+let test_short_notional_cap_skips_at_31pct _ =
+  let short_notional_acc = ref 25_000.0 in
+  let short_notional_cap = 100_000.0 *. 0.30 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Short ~shares:60
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _short_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:115.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_short_notional_cap ~short_notional_acc
+      ~short_notional_cap (trans, meta) cand
+  in
+  assert_that result is_none;
+  (* Accumulator unchanged when the cap rejects. *)
+  assert_that !short_notional_acc (float_equal 25_000.0)
+
+(** 25% existing + $4K candidate → 29% < 30% cap → admitted, accumulator
+    advances to 29%. *)
+let test_short_notional_cap_admits_at_29pct _ =
+  let short_notional_acc = ref 25_000.0 in
+  let short_notional_cap = 100_000.0 *. 0.30 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Short ~shares:40
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _short_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:115.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_short_notional_cap ~short_notional_acc
+      ~short_notional_cap (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 40)));
+  assert_that !short_notional_acc (float_equal 29_000.0)
+
+(** Long candidate is a no-op: 25% existing short notional + a long candidate
+    must always pass through the cap regardless of the candidate's notional. *)
+let test_short_notional_cap_does_not_block_longs _ =
+  let short_notional_acc = ref 25_000.0 in
+  let short_notional_cap = 100_000.0 *. 0.30 in
+  (* A long with $50K notional — well over the cap if it counted. *)
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:500
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_short_notional_cap ~short_notional_acc
+      ~short_notional_cap (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 500)));
+  (* Long admission must not bump the short accumulator. *)
+  assert_that !short_notional_acc (float_equal 25_000.0)
+
+(** Empty portfolio (zero existing short notional) + 5% short candidate (well
+    under the 30% cap) → admitted; accumulator records the 5%. *)
+let test_short_notional_cap_zero_existing _ =
+  let short_notional_acc = ref 0.0 in
+  let short_notional_cap = 100_000.0 *. 0.30 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Short ~shares:50
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _short_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:115.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_short_notional_cap ~short_notional_acc
+      ~short_notional_cap (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 50)));
+  assert_that !short_notional_acc (float_equal 5_000.0)
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
@@ -272,4 +427,12 @@ let () =
            >:: test_entry_event_audit_dollars_use_effective_entry;
            "G14: empty bar_reader falls back to suggested_entry"
            >:: test_empty_bar_reader_falls_back_to_suggested_entry;
+           "G15-step2: short notional cap skips at 31%"
+           >:: test_short_notional_cap_skips_at_31pct;
+           "G15-step2: short notional cap admits at 29%"
+           >:: test_short_notional_cap_admits_at_29pct;
+           "G15-step2: short notional cap does not block longs"
+           >:: test_short_notional_cap_does_not_block_longs;
+           "G15-step2: short notional cap with zero existing"
+           >:: test_short_notional_cap_zero_existing;
          ])
