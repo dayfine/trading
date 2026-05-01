@@ -295,6 +295,25 @@ let filter_force_liquidations_in_window events ~start_date =
   List.filter events ~f:(fun (e : Portfolio_risk.Force_liquidation.event) ->
       Date.( >= ) e.date start_date)
 
+(** Drop trade-audit records whose entry-decision date is before [start_date] —
+    i.e. positions whose entry decision was made during the warmup window. The
+    strategy's audit recorder is wired from [warmup_start], so without this
+    filter [trade_audit.sexp] picks up entry/exit decision pairs whose
+    round-trips were never reported to [trades.csv]. *)
+let filter_audit_records_in_window records ~start_date =
+  List.filter records ~f:(fun (r : Trade_audit.audit_record) ->
+      Date.( >= ) r.entry.entry_date start_date)
+
+(** Drop cascade-summary rows whose Friday [date] is before [start_date] — i.e.
+    cascade evaluations that ran during the warmup window. The strategy's audit
+    recorder calls [record_cascade_summary] every Friday from [warmup_start], so
+    without this filter [trade_audit.sexp] reports activity counts that include
+    warmup-window screen calls (no candidates of which were ever entered into
+    [trades.csv]). *)
+let filter_cascade_summaries_in_window summaries ~start_date =
+  List.filter summaries ~f:(fun (s : Trade_audit.cascade_summary) ->
+      Date.( >= ) s.date start_date)
+
 let _make_summary ~start_date ~end_date ~deps ~steps ~final_value ~round_trips
     ~sim_result : Summary.t =
   {
@@ -367,8 +386,12 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
           filter_stop_infos_in_window
             (Stop_log.get_stop_infos stop_log)
             ~start_date,
-          Trade_audit.get_audit_records trade_audit,
-          Trade_audit.get_cascade_summaries trade_audit,
+          filter_audit_records_in_window
+            (Trade_audit.get_audit_records trade_audit)
+            ~start_date,
+          filter_cascade_summaries_in_window
+            (Trade_audit.get_cascade_summaries trade_audit)
+            ~start_date,
           filter_force_liquidations_in_window
             (Force_liquidation_log.events force_liquidation_log)
             ~start_date ))
