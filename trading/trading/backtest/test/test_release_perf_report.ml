@@ -9,8 +9,9 @@ open Matchers
 
 let _make_actual ?(total_return_pct = 12.0) ?(total_trades = 39.0)
     ?(win_rate = 50.0) ?(sharpe_ratio = 0.58) ?(max_drawdown_pct = 13.77)
-    ?(avg_holding_days = 6.07) ?(unrealized_pnl = None)
-    ?(force_liquidations_count = 0) () : Release_report.actual =
+    ?(avg_holding_days = 6.07) ?(open_positions_value = None)
+    ?(unrealized_pnl = None) ?(force_liquidations_count = 0) () :
+    Release_report.actual =
   {
     total_return_pct;
     total_trades;
@@ -18,6 +19,7 @@ let _make_actual ?(total_return_pct = 12.0) ?(total_trades = 39.0)
     sharpe_ratio;
     max_drawdown_pct;
     avg_holding_days;
+    open_positions_value;
     unrealized_pnl;
     force_liquidations_count;
   }

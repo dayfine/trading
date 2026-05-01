@@ -24,7 +24,7 @@
  (config_overrides (((universe_cap (1000)) (enable_short_side false))))
  ;; Baseline measured 2026-04-29 (long-only):
  ;;   return +15.12% / 149 trades / win_rate 20.81% / Sharpe 0.238 /
- ;;   MaxDD 75.30% / avg_hold 61.1d / unrealized_pnl $1.12M /
+ ;;   MaxDD 75.30% / avg_hold 61.1d / open_positions_value $1.12M /
  ;;   peak RSS 1,693 MB / wall 2:50.
  (expected
   ((total_return_pct   ((min 12.5)         (max 17.5)))     ;; ±15% around 15.1
@@ -33,4 +33,4 @@
    (sharpe_ratio       ((min 0.10)         (max 0.40)))     ;; small absolute, wider relative
    (max_drawdown_pct   ((min 67.5)         (max 83.0)))     ;; ±10% around 75.3
    (avg_holding_days   ((min 55.0)         (max 67.5)))     ;; ±10% around 61.1
-   (unrealized_pnl     ((min 955000.0)     (max 1295000.0))))))   ;; ±15% around 1.12M
+   (open_positions_value ((min 955000.0)   (max 1295000.0))))))  ;; ±15% around $1.12M (mtm value, NOT true unrealized P&L; see metric_types.mli)

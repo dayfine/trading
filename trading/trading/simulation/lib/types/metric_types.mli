@@ -22,7 +22,20 @@ module Metric_type : sig
     | CAGR  (** Compound annual growth rate *)
     | CalmarRatio  (** CAGR / max drawdown *)
     | OpenPositionCount  (** Open positions at end of simulation *)
-    | UnrealizedPnl  (** Unrealized P&L at end of simulation *)
+    | OpenPositionsValue
+        (** Signed mark-to-market value of all open positions at end of
+            simulation: [Σ position_quantity(p) * current_close(p)] across each
+            held position. Positive sum dominated by long mark-to-market;
+            negative when shorts dominate. Equal to
+            [portfolio_value - current_cash] on a marked-to-market step. NOT
+            unrealized P&L — that requires subtracting cost basis (see
+            [UnrealizedPnl]). *)
+    | UnrealizedPnl
+        (** True unrealized profit/loss on open positions at end of simulation:
+            [Σ (current_close(p) - entry_price(p)) * signed_qty(p)] across each
+            held position. Equal to [OpenPositionsValue - Σ position_cost_basis]
+            (longs and shorts both fold in via signed quantity). Positive means
+            paper gains on the open book; negative means paper losses. *)
     | TradeFrequency  (** Trades per month *)
   [@@deriving show, eq, compare, sexp]
 
@@ -42,6 +55,7 @@ type metric_type = Metric_type.t =
   | CAGR
   | CalmarRatio
   | OpenPositionCount
+  | OpenPositionsValue
   | UnrealizedPnl
   | TradeFrequency
 [@@deriving show, eq, compare, sexp]

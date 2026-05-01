@@ -1,5 +1,5 @@
 (** Portfolio state metric computer — captures end-of-simulation state:
-    OpenPositionCount, UnrealizedPnl, TradeFrequency. *)
+    OpenPositionCount, OpenPositionsValue, UnrealizedPnl, TradeFrequency. *)
 
 open Core
 module Metric_types = Trading_simulation_types.Metric_types
@@ -15,8 +15,8 @@ type state = {
           position market values). On non-trading days (weekends, holidays) or
           when price bars for open-position symbols are missing, the simulator
           falls back to [portfolio_value = current_cash] — such steps are
-          excluded here so [UnrealizedPnl] reflects actual end-of-sim unrealized
-          P&L. See [_is_marked_to_market]. *)
+          excluded here so [OpenPositionsValue] / [UnrealizedPnl] reflect actual
+          end-of-sim state. See [_is_marked_to_market]. *)
   total_trades : int;
 }
 
@@ -40,20 +40,34 @@ let _trade_frequency ~total_trades ~start_date ~end_date =
   let months = days /. 30.44 in
   if Float.(months <= 0.0) then 0.0 else Float.of_int total_trades /. months
 
+(** Sum of [position_cost_basis] across the portfolio's currently-held
+    positions. For longs this is positive (qty>0 times avg_cost>0); for shorts
+    it is negative (qty<0 times avg_cost>0). Subtracting this signed sum from
+    [OpenPositionsValue] yields the signed-qty unrealized P&L formula in the
+    [UnrealizedPnl] metric description. *)
+let _open_positions_cost_basis (portfolio : Trading_portfolio.Portfolio.t) =
+  List.fold portfolio.positions ~init:0.0 ~f:(fun acc pos ->
+      acc +. Trading_portfolio.Calculations.position_cost_basis pos)
+
 (** Build metric set. [position_step] is the step that determines
     [OpenPositionCount] (always the absolute last step). [marked_step] is the
-    step that determines [UnrealizedPnl] (the last mark-to-market step, which
-    may or may not equal [position_step]). *)
+    step that determines [OpenPositionsValue] / [UnrealizedPnl] (the last
+    mark-to-market step, which may or may not equal [position_step]). *)
 let _metrics_from_step ~(position_step : Simulator_types.step_result)
     ~(marked_step : Simulator_types.step_result) ~total_trades ~start_date
     ~end_date =
+  let open_positions_value =
+    marked_step.portfolio_value
+    -. marked_step.portfolio.Trading_portfolio.Portfolio.current_cash
+  in
+  let cost_basis = _open_positions_cost_basis marked_step.portfolio in
+  let unrealized_pnl = open_positions_value -. cost_basis in
   Metric_types.of_alist_exn
     [
       ( OpenPositionCount,
         Float.of_int (List.length position_step.portfolio.positions) );
-      ( UnrealizedPnl,
-        marked_step.portfolio_value
-        -. marked_step.portfolio.Trading_portfolio.Portfolio.current_cash );
+      (OpenPositionsValue, open_positions_value);
+      (UnrealizedPnl, unrealized_pnl);
       (TradeFrequency, _trade_frequency ~total_trades ~start_date ~end_date);
     ]
 
@@ -71,8 +85,9 @@ let _finalize ~state ~(config : Simulator_types.config) =
   | Some position_step ->
       (* If no step in the sim was marked-to-market (degenerate: e.g. all
          steps were non-trading days with open positions), fall back to the
-         last step. UnrealizedPnl will then be 0 as before — not great, but
-         consistent with pre-fix behaviour for that edge case. *)
+         last step. OpenPositionsValue / UnrealizedPnl will then be 0 as
+         before — not great, but consistent with pre-fix behaviour for that
+         edge case. *)
       let marked_step =
         Option.value state.last_marked_step ~default:position_step
       in

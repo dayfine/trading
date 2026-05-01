@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-04-25
+## Last updated: 2026-05-01
 
 ## Status
 MERGED
@@ -128,6 +128,22 @@ None. Merged in main:
 - Non-deterministic due to Hashtbl ordering (tracked, not fully fixed)
 
 ## Completed
+
+- [x] **UnrealizedPnl rename + corrected metric** (2026-05-01,
+  `feat/metrics-unrealized-pnl-rename`, PR #741). Bug surfaced via
+  reconciler today: the existing `UnrealizedPnl` metric (=
+  `final_portfolio_value - current_cash`) is the signed mtm value of open
+  positions, not paper P&L vs cost basis. On a long-only sp500-2019-2023
+  baseline that's $1,254K (mtm) vs a true paper P&L of +$422K. PR renames
+  the existing metric to `OpenPositionsValue` (semantics preserved) and
+  adds a NEW `UnrealizedPnl` computed as `OpenPositionsValue - Σ
+  position_cost_basis` — equivalent to `Σ (current - entry) * signed_qty`
+  (long: positive on gain; short: positive on price drop). All 13 scenario
+  sexp pin keys renamed `unrealized_pnl` → `open_positions_value`
+  (range preserved). New long / short / mixed-portfolio tests in
+  `test_metrics.ml`. The reconciler-confusion source flagged in
+  `dev/notes/short-cash-accounting-design-2026-05-01.md` is now closed.
+  Verify: `dune runtest trading/simulation/test trading/backtest/scenarios/test`.
 
 - [x] **Perf-sweep harness extension** (2026-04-23,
   `feat/backtest-perf-sweep-harness`). Wraps the existing C2 perf harness

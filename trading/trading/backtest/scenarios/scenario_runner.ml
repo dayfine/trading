@@ -49,7 +49,13 @@ type actual = {
   sharpe_ratio : float;
   max_drawdown_pct : float;
   avg_holding_days : float;
+  open_positions_value : float; [@sexp.default Float.nan]
+      (* Signed mark-to-market value of open positions at run end. Defaults to
+         NaN on read so pre-rename actual.sexp files (which used the
+         [unrealized_pnl] field for this same quantity) still parse. *)
   unrealized_pnl : float;
+      (* Post-rename: true unrealized P&L (OpenPositionsValue - cost basis).
+         Pre-rename actual.sexp files carry the legacy mtm-value here. *)
   force_liquidations_count : int; [@sexp.default 0]
       (* G4 (force-liquidation policy). Defaults to 0 on read so pre-G4
          actual.sexp files that don't carry the field still parse. *)
@@ -68,6 +74,7 @@ let _actual_of_result (r : Backtest.Runner.result) =
     sharpe_ratio = get SharpeRatio;
     max_drawdown_pct = get MaxDrawdown;
     avg_holding_days = get AvgHoldingDays;
+    open_positions_value = get OpenPositionsValue;
     unrealized_pnl = get UnrealizedPnl;
     force_liquidations_count = List.length r.force_liquidations;
   }
@@ -91,9 +98,17 @@ let _run_checks (a : actual) (e : Scenario.expected) =
       _check_one "avg_holding_days" a.avg_holding_days e.avg_holding_days;
     ]
   in
+  let with_opv =
+    match e.open_positions_value with
+    | None -> base
+    | Some range ->
+        base
+        @ [ _check_one "open_positions_value" a.open_positions_value range ]
+  in
   match e.unrealized_pnl with
-  | None -> base
-  | Some range -> base @ [ _check_one "unrealized_pnl" a.unrealized_pnl range ]
+  | None -> with_opv
+  | Some range ->
+      with_opv @ [ _check_one "unrealized_pnl" a.unrealized_pnl range ]
 
 let _failure_message checks =
   List.filter checks ~f:(fun c -> not c.ok)

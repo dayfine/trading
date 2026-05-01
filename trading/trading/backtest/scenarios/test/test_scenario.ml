@@ -67,8 +67,8 @@ let test_unrealized_pnl_roundtrip _ =
           ]))
 
 (* Sanity check: every real scenario file under [trading/test_data/backtest_scenarios]
-   must parse. The new [unrealized_pnl] field is optional, so scenarios both with
-   and without it must be accepted. *)
+   must parse. Both [open_positions_value] and [unrealized_pnl] are optional,
+   so scenarios with neither, either, or both must be accepted. *)
 let _scenarios_root () =
   (* Under [dune runtest], cwd is
      [_build/default/trading/backtest/scenarios/test]; the test data lives at
@@ -117,16 +117,20 @@ let test_all_scenario_files_parse _ =
         (sprintf "expected >=6 scenario files, found %d in %s"
            (List.length files) root)
         (List.length files >= 6);
-      (* At least one scenario should have a pinned [unrealized_pnl] range
-         excluding zero — this is the regression guard for PR #393. *)
+      (* At least one scenario should have a pinned [open_positions_value]
+         range excluding zero — this is the regression guard for PR #393.
+         (Pre-rename this guard checked [unrealized_pnl]; after the rename
+         the same regression class lives under [open_positions_value] since
+         that's the metric whose semantic regression to 0 PR #393 fixed.) *)
       let with_nonzero_pin =
         List.filter_map files ~f:(fun path ->
             let s = Scenario.load path in
-            match s.expected.unrealized_pnl with
+            match s.expected.open_positions_value with
             | Some r when Float.(r.min_f > 0.0) -> Some s.name
             | _ -> None)
       in
-      assert_bool "expected >=1 scenario pinning unrealized_pnl with min > 0"
+      assert_bool
+        "expected >=1 scenario pinning open_positions_value with min > 0"
         (not (List.is_empty with_nonzero_pin))
 
 (* Regression guard: a range like [min=1000, max=50000] catches a regression

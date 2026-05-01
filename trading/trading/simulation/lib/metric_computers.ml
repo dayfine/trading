@@ -55,7 +55,7 @@ let create_computer (metric_type : Metric_types.metric_type) :
   | MaxDrawdown -> max_drawdown_computer ()
   | CAGR -> cagr_computer ()
   | CalmarRatio -> _calmar_stub ()
-  | OpenPositionCount | UnrealizedPnl | TradeFrequency ->
+  | OpenPositionCount | OpenPositionsValue | UnrealizedPnl | TradeFrequency ->
       portfolio_state_computer ()
 
 (** {1 Default Computer Set} *)

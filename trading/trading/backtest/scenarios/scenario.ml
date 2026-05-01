@@ -42,6 +42,7 @@ type expected = {
   sharpe_ratio : range;
   max_drawdown_pct : range;
   avg_holding_days : range;
+  open_positions_value : range option; [@sexp.option]
   unrealized_pnl : range option; [@sexp.option]
 }
 [@@deriving sexp]

@@ -900,13 +900,17 @@ let test_portfolio_state_with_trades _ =
   in
   let computer = portfolio_state_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  (* 3 total trades across 2 steps *)
+  (* 3 total trades across 2 steps. The portfolio passed into each step is
+     the empty-positions fixture (no held positions), so OpenPositionsValue
+     collapses to [portfolio_value - cash = 50.0] and UnrealizedPnl collapses
+     to the same value (cost basis sum is 0 when no positions are held). *)
   assert_that
     (Map.find metrics TradeFrequency)
     (is_some_and (gt (module Float_ord) 0.0));
   assert_that
     (Map.find metrics OpenPositionCount)
     (is_some_and (float_equal 0.0));
+  assert_that metrics (contains_entry OpenPositionsValue (float_equal 50.0));
   assert_that metrics (contains_entry UnrealizedPnl (float_equal 50.0))
 
 (** Build a portfolio with one open long position by applying a buy trade. *)
@@ -930,12 +934,12 @@ let _portfolio_with_open_position ~symbol ~quantity ~price =
       OUnit2.assert_failure
         ("failed to build test portfolio: " ^ Status.show err)
 
-(** Reproduces the UnrealizedPnl=0 bug. The simulator produces a step every
+(** Reproduces the OpenPositionsValue=0 bug (originally tracked as
+    UnrealizedPnl=0 before the rename). The simulator produces a step every
     calendar day. On the final day (often a weekend), price bars are missing, so
     [_compute_portfolio_value] falls back to [portfolio_value = cash] even
-    though positions are open — leaving a spurious [UnrealizedPnl = 0] in the
-    summary. The computer must skip those steps and use the last real
-    mark-to-market step. *)
+    though positions are open — leaving a spurious zero in the summary. The
+    computer must skip those steps and use the last real mark-to-market step. *)
 let test_portfolio_state_skips_non_trading_final_step _ =
   let config = make_config () in
   let portfolio =
@@ -967,14 +971,19 @@ let test_portfolio_state_skips_non_trading_final_step _ =
   in
   let computer = portfolio_state_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* 1 long position, qty=10, entry $100, current $105:
+     - OpenPositionsValue = mtm_value - cash = 1050.0 (10 * $105)
+     - cost_basis sum = 10 * $100 = 1000.0
+     - UnrealizedPnl = OpenPositionsValue - cost_basis = 50.0 (10 * $5 gain) *)
   assert_that metrics
     (map_includes
        [
          (* OpenPositionCount still comes from the absolute final step
             (positions don't depend on price bars). *)
          (OpenPositionCount, float_equal 1.0);
-         (* UnrealizedPnl derived from the last marked-to-market step. *)
-         (UnrealizedPnl, float_equal (mtm_value -. cash));
+         (* OpenPositionsValue derived from the last marked-to-market step. *)
+         (OpenPositionsValue, float_equal (mtm_value -. cash));
+         (UnrealizedPnl, float_equal 50.0);
        ])
 
 (** Guard: when every step is marked-to-market, the final step wins unchanged.
@@ -1007,10 +1016,181 @@ let test_portfolio_state_uses_last_step_when_all_trading_days _ =
   in
   let computer = portfolio_state_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* 1 long position, qty=10, entry $100. Final step pins
+     OpenPositionsValue = 800.0 (= portfolio_value - cash). cost_basis = 10 *
+     $100 = 1000.0, so UnrealizedPnl = 800 - 1000 = -200.0 — the
+     hand-constructed final mtm represents an $80/share mark, i.e. a $20/share
+     paper loss. *)
   assert_that metrics
     (map_includes
        [
-         (OpenPositionCount, float_equal 1.0); (UnrealizedPnl, float_equal 800.0);
+         (OpenPositionCount, float_equal 1.0);
+         (OpenPositionsValue, float_equal 800.0);
+         (UnrealizedPnl, float_equal (-200.0));
+       ])
+
+(** Round-trip the new [OpenPositionsValue] / [UnrealizedPnl] split through the
+    full long-only formula on a single Holding position: enter at $100, current
+    bar $130, qty 100. *)
+let test_portfolio_state_long_unrealized_pnl _ =
+  let config = make_config () in
+  let portfolio =
+    _portfolio_with_open_position ~symbol:"BULL" ~quantity:100.0 ~price:100.0
+  in
+  let cash = portfolio.current_cash in
+  let current_price = 130.0 in
+  let portfolio_value = cash +. (100.0 *. current_price) in
+  let steps =
+    [
+      {
+        date = date_of_string "2024-01-05";
+        portfolio;
+        portfolio_value;
+        trades = [];
+        orders_submitted = [];
+        splits_applied = [];
+      };
+    ]
+  in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* 100 shares of BULL @ entry $100, current $130:
+     - OpenPositionsValue = 100 * $130 = $13,000
+     - UnrealizedPnl = (130 - 100) * 100 = +$3,000 *)
+  assert_that metrics
+    (map_includes
+       [
+         (OpenPositionCount, float_equal 1.0);
+         (OpenPositionsValue, float_equal 13_000.0);
+         (UnrealizedPnl, float_equal 3_000.0);
+       ])
+
+(** Build a portfolio with one open short position by applying a sell trade.
+    Mirror of [_portfolio_with_open_position] for the short side. *)
+let _portfolio_with_open_short ~symbol ~quantity ~price =
+  let base = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  let sell =
+    {
+      Trading_base.Types.id = "s1";
+      order_id = "o1";
+      symbol;
+      side = Sell;
+      quantity;
+      price;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  match Trading_portfolio.Portfolio.apply_single_trade base sell with
+  | Ok p -> p
+  | Error err ->
+      OUnit2.assert_failure
+        ("failed to build short test portfolio: " ^ Status.show err)
+
+(** Short-side counterpart: enter short at $100, current bar $80, qty 100.
+    OpenPositionsValue is signed-negative; UnrealizedPnl is positive (shorts
+    profit on price drops). *)
+let test_portfolio_state_short_unrealized_pnl _ =
+  let config = make_config () in
+  let portfolio =
+    _portfolio_with_open_short ~symbol:"BEAR" ~quantity:100.0 ~price:100.0
+  in
+  let cash = portfolio.current_cash in
+  let current_price = 80.0 in
+  (* signed_qty = -100 ; market_value contribution = -100 * 80 = -$8,000. *)
+  let portfolio_value = cash +. (-100.0 *. current_price) in
+  let steps =
+    [
+      {
+        date = date_of_string "2024-01-05";
+        portfolio;
+        portfolio_value;
+        trades = [];
+        orders_submitted = [];
+        splits_applied = [];
+      };
+    ]
+  in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  (* 100 shares short BEAR @ entry $100, current $80:
+     - OpenPositionsValue = -100 * $80 = -$8,000 (signed: shorts contribute
+       negative mtm)
+     - UnrealizedPnl = (80 - 100) * (-100) = +$2,000 (short gains $20/share) *)
+  assert_that metrics
+    (map_includes
+       [
+         (OpenPositionCount, float_equal 1.0);
+         (OpenPositionsValue, float_equal (-8_000.0));
+         (UnrealizedPnl, float_equal 2_000.0);
+       ])
+
+(** Mixed-portfolio guard: one long + one short, hand-pinned via arithmetic.
+    Confirms the signed-qty formula composes additively across positions. *)
+let test_portfolio_state_mixed_unrealized_pnl _ =
+  let config = make_config () in
+  let base = Trading_portfolio.Portfolio.create ~initial_cash:100_000.0 () in
+  let buy =
+    {
+      Trading_base.Types.id = "b1";
+      order_id = "ob";
+      symbol = "BULL";
+      side = Buy;
+      quantity = 100.0;
+      price = 100.0;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  let sell =
+    {
+      Trading_base.Types.id = "s1";
+      order_id = "os";
+      symbol = "BEAR";
+      side = Sell;
+      quantity = 50.0;
+      price = 200.0;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  let portfolio =
+    match Trading_portfolio.Portfolio.apply_trades base [ buy; sell ] with
+    | Ok p -> p
+    | Error err ->
+        OUnit2.assert_failure
+          ("failed to build mixed test portfolio: " ^ Status.show err)
+  in
+  let cash = portfolio.current_cash in
+  (* BULL current $130 (long winner): mtm contribution = 100 * 130 = +$13,000;
+     UnrealizedPnl_BULL = (130-100) * 100 = +$3,000.
+     BEAR current $250 (short loser, price went UP): mtm contribution =
+     -50 * 250 = -$12,500; UnrealizedPnl_BEAR = (250-200) * -50 = -$2,500. *)
+  let bull_mtm = 100.0 *. 130.0 in
+  let bear_mtm = -50.0 *. 250.0 in
+  let portfolio_value = cash +. bull_mtm +. bear_mtm in
+  let steps =
+    [
+      {
+        date = date_of_string "2024-01-05";
+        portfolio;
+        portfolio_value;
+        trades = [];
+        orders_submitted = [];
+        splits_applied = [];
+      };
+    ]
+  in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that metrics
+    (map_includes
+       [
+         (OpenPositionCount, float_equal 2.0);
+         (* +$13,000 + (-$12,500) = +$500 *)
+         (OpenPositionsValue, float_equal 500.0);
+         (* +$3,000 + (-$2,500) = +$500 *)
+         (UnrealizedPnl, float_equal 500.0);
        ])
 
 (* ==================== Test Suite ==================== *)
@@ -1093,6 +1273,12 @@ let suite =
          >:: test_portfolio_state_skips_non_trading_final_step;
          "portfolio state uses last step when all trading days"
          >:: test_portfolio_state_uses_last_step_when_all_trading_days;
+         "portfolio state long unrealized pnl"
+         >:: test_portfolio_state_long_unrealized_pnl;
+         "portfolio state short unrealized pnl"
+         >:: test_portfolio_state_short_unrealized_pnl;
+         "portfolio state mixed unrealized pnl"
+         >:: test_portfolio_state_mixed_unrealized_pnl;
        ]
 
 let () = run_test_tt_main suite

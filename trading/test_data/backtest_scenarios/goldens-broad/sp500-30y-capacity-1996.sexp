@@ -52,4 +52,4 @@
    (sharpe_ratio       ((min -10.0)        (max 10.0)))
    (max_drawdown_pct   ((min 0.0)          (max 100.0)))
    (avg_holding_days   ((min 0.0)          (max 10000.0)))
-   (unrealized_pnl     ((min -1000000000.0) (max 100000000000.0))))))
+   (open_positions_value ((min -1000000000.0) (max 100000000000.0))))))
