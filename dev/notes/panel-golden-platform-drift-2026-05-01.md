@@ -38,10 +38,35 @@ golden.
 
 **Follow-up (TODO):**
 
-1. Identify the specific candidate that flips. Add a debug logger
+1. ~~Identify the specific candidate that flips. Add a debug logger
    that records `(ticker, effective_entry, installed_stop,
    stop_distance_pct, gate_outcome)` on each candidate and capture
-   the trace on both platforms.
+   the trace on both platforms.~~
+   **Step 1 (2026-05-01):** instrumentation landed in
+   `entry_audit_capture.ml` (gated on `PANEL_GOLDEN_DEBUG=1`):
+   one CANDIDATE line per `make_entry_transition` call (gate
+   inputs + outcome) plus one DECISION line per
+   `classify_candidate` call (downstream cash / short-notional-cap
+   result). The panel-golden test also dumps an OBSERVED
+   round_trip list to stderr when the env var is set. CI workflow
+   `ci.yml` runs `dune runtest` with `PANEL_GOLDEN_DEBUG=1` on
+   this branch so the Linux trace lands in build logs side-by-side
+   with the macOS regenerate capture.
+
+   **macOS trace (panel-golden-2019-full, 2026-05-01):** 8
+   CANDIDATE evaluations; 7 Kept, 1 Insufficient_cash (JPM at
+   `remaining_cash=57763.41`). `gate_outcome=Pass` for all 8;
+   none sit on the 15% `max_stop_distance_pct` boundary — closest
+   is CVX at ~8%. So the proximate divergence is NOT the
+   stop-width gate. Likely site is **the cash gate**: JPM is
+   rejected at the precise boundary `cost > remaining_cash`
+   where `cost ≈ 480k` and `remaining_cash ≈ 57.8k`. A
+   single-ULP difference in any prior `entry_price * shares`
+   deduction (over multiple Fridays of MSFT/AAPL entries) pushes
+   the running cash above or below JPM's required cost. The
+   Linux CI trace will show whether JPM gets Kept or
+   Insufficient_cash on that platform.
+
 2. Pick a fix:
    - **Snap the comparator to a coarser grid:** quantize
      `stop_distance_pct` to e.g. 1e-6 before comparing. Robust but
