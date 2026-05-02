@@ -14,16 +14,23 @@
 ;; strategy, segmentation-based stage classifier, stop-buffer tuning, etc.
 ;; Once metrics here are pinned, follow-on PRs measure against this baseline.
 ;;
-;; Expected ranges pinned ±10-15% around the post-G9 with-shorts baseline
-;; measured 2026-04-30 (see dev/notes/sp500-shortside-reenabled-2026-04-30.md
-;; for the rerun results and dev/notes/short-side-gaps-2026-04-29.md for the
-;; G1-G9 gap closure history). Re-pin with each deliberate strategy
-;; behaviour change; don't bump these to absorb regressions.
+;; Expected ranges are pinned around the canonical run with cushion sized to
+;; absorb the start-date IQR observed in the PR #788 fuzz (5 variants at
+;; ±2w around 2019-01-02). Re-pin with each deliberate strategy behaviour
+;; change; don't bump these to absorb regressions.
 ;;
-;; Measured baseline (2026-04-30, post-#710 G9 fix):
-;;   total_return_pct  -0.01  total_trades 32   win_rate 37.50
-;;   sharpe_ratio       0.01  max_drawdown 5.81  avg_holding_days 43.03
-;;   open_positions_value 391,949   force_liquidations 0
+;; Measured baseline (2026-05-02, post-#744+#745+#746+#771):
+;;   total_return_pct  +60.86  total_trades 86   win_rate ~22.35
+;;   sharpe_ratio       0.55   max_drawdown 34.15
+;;
+;; Verified via PR #788 fuzz: 5 variants ±2w start_date all returned
+;; +37.92% to +60.86% / Sharpe 0.41-0.56 / MaxDD 31.28-35.99 / 82-99 trades
+;; (see dev/experiments/fuzz-startdate-canonical-full/fuzz_distribution.md).
+;; The pin shift from the prior 2026-04-30 baseline (-0.01% / 32 trades /
+;; 5.81% MaxDD) reflects the structural changes in #744 (sizing fix), #745
+;; (cash-deployment fix), #746 (long/short cap split), and #771 (stop
+;; tuning). Bands are sized to absorb the fuzz IQR plus cushion so future
+;; small drift (start-date sensitivity, calendar rolls) does not flap CI.
 ;;
 ;; (Pre-rename: this metric was named [unrealized_pnl] but its semantics
 ;; matched the renamed [Metric_types.OpenPositionsValue] — signed mtm value
@@ -42,10 +49,10 @@
  (universe_size 491)
  (config_overrides ())
  (expected
-  ((total_return_pct   ((min -15.0)       (max  15.0)))
-   (total_trades       ((min 27)          (max  37)))
-   (win_rate           ((min 31.0)        (max  44.0)))
-   (sharpe_ratio       ((min -0.5)        (max  0.5)))
-   (max_drawdown_pct   ((min 3.0)         (max  9.0)))
-   (avg_holding_days   ((min 37.0)        (max  50.0)))
-   (open_positions_value ((min 330000.0)  (max  450000.0))))))
+  ((total_return_pct   ((min  30.0)       (max  70.0)))
+   (total_trades       ((min 70)          (max 110)))
+   (win_rate           ((min 15.0)        (max  35.0)))
+   (sharpe_ratio       ((min  0.30)       (max   0.70)))
+   (max_drawdown_pct   ((min 25.0)        (max  42.0)))
+   (avg_holding_days   ((min 65.0)        (max 115.0)))
+   (open_positions_value ((min 1200000.0) (max 1700000.0))))))
