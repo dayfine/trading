@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-02
 
 ## Status
-PLANNED
+IN_PROGRESS — M5.2e per-trade context logging shipped (PR #769, READY_FOR_REVIEW); M5.2a–d still PLANNED, M5.4 blocked on M5.1.
 
 Track created 2026-05-02 to absorb M5.2 (experiment infra) + M5.4 (mechanical experiments). Plan: `dev/plans/m5-experiments-roadmap-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.2 + M5.4 (added 2026-05-02).
 
@@ -21,7 +21,7 @@ NO — track is brand-new.
 - **2b — Trade aggregates + return basics** (~300 LOC). Extend `metric_computers.ml` + `metric_types.ml` with win_rate, avg_win/loss, profit_factor, expectancy, max_consecutive_*, etc.
 - **2c — Risk-adjusted + drawdown analytics** (~300 LOC). Sharpe, Sortino, Calmar, MAR, Omega, ulcer/pain index, underwater area.
 - **2d — Distributional / antifragility** (~250 LOC). Skewness, kurtosis, **concavity_coef** (γ from quadratic regression), bucket_asymmetry, CVaR, tail_ratio, gain_to_pain.
-- **2e — Per-trade context logging** (~300 LOC). Extends trade-audit (#638/#642/#643/#651) with entry_stage, vol_ratio, stop_initial_distance, stop_trigger_kind, days_to_first_stop_trigger, screener_score_at_entry.
+- [x] **2e — Per-trade context logging** (PR #769, ~600 LOC incl. tests). Extends trade-audit (#638/#642/#643/#651) with entry_stage, entry_volume_ratio, stop_initial_distance_pct, stop_trigger_kind, days_to_first_stop_trigger, screener_score_at_entry. New `Trade_context` module (`trading/trading/backtest/lib/trade_context.{ml,mli}`) does the pure projection; `Stop_log.classify_stop_trigger_kind` distinguishes gap-down from intraday stops; `Trade_audit.entry_decision` gains `volume_ratio : float option`; `Result_writer` extends trades.csv with the 6 new columns (header pinned by test_result_writer; full join pinned by test_trade_context). Verify: `dune runtest trading/backtest/test --force`.
 
 ### M5.4 — Mechanical experiments
 
@@ -31,7 +31,10 @@ NO — track is brand-new.
 - **E4 — Scoring-weight sweep** (4-dim grid; manual prequel to M5.5 tuning)
 
 ## In Progress
-- None — track in PLANNED state until M5.1 unblocks.
+- M5.2e per-trade context logging — PR #769 awaiting review.
+
+## Completed
+- M5.2e per-trade context logging (PR #769, 2026-05-02) — 6 new columns on trades.csv; `Trade_context` module + `Stop_log.classify_stop_trigger_kind` + `Trade_audit.entry_decision.volume_ratio`. Trade audit + stop_log pure-projection join. Verify via `dune runtest trading/backtest/test --force` (passes 14/14 in test_trade_context.ml + 18/18 in test_stop_log.ml + 26/26 in test_result_writer.ml).
 
 ## Next Steps
 
