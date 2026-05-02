@@ -18,17 +18,17 @@ type state = {
   portfolio_values : float list;  (** Reversed: head is most recent. *)
   step_benchmark_returns : float list;
       (** Reversed: head is most recent. Accumulated from each trading step's
-          [step.benchmark_return] (filtering out [None]s) so the metric can
-          read the benchmark series straight from the simulator without an
+          [step.benchmark_return] (filtering out [None]s) so the metric can read
+          the benchmark series straight from the simulator without an
           out-of-band override. Aligned to [portfolio_values] only when every
           trading step carries a benchmark; otherwise the alignment helper
           truncates to the shorter length. *)
   benchmark_returns_override : float list option;
       (** Optional explicit benchmark series supplied at construction. When
-          [Some], it takes precedence over [step_benchmark_returns]; when
-          [None] the step-sourced series is used. The override path supports
-          synthetic tests that pin specific benchmark values without going
-          through the simulator. *)
+          [Some], it takes precedence over [step_benchmark_returns]; when [None]
+          the step-sourced series is used. The override path supports synthetic
+          tests that pin specific benchmark values without going through the
+          simulator. *)
 }
 
 let _step_returns_pct values =
@@ -180,8 +180,8 @@ let _build_metrics ~strat_returns ~benchmark_returns =
         ]
 
 (** Pick the benchmark series to use: explicit override wins; otherwise the
-    step-accumulated series (reversed back to chronological). [None] when
-    no override was supplied AND no step carried a [benchmark_return]. *)
+    step-accumulated series (reversed back to chronological). [None] when no
+    override was supplied AND no step carried a [benchmark_return]. *)
 let _resolve_benchmark_series state =
   match state.benchmark_returns_override with
   | Some _ as override -> override

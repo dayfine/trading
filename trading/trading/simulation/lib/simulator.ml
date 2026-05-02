@@ -38,8 +38,8 @@ type dependencies = {
       (** Optional symbol whose adjusted-close % change provides the per-step
           benchmark return populated on [step_result.benchmark_return]. The
           benchmark does not need to be in [symbols] — bars are fetched
-          independently via [market_data_adapter]. When [None] the field is
-          left as [None] on every step (default; preserves prior behaviour). *)
+          independently via [market_data_adapter]. When [None] the field is left
+          as [None] on every step (default; preserves prior behaviour). *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -119,8 +119,8 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
 
 (** Per-step benchmark return for the configured benchmark symbol, if any. We
     use [adjusted_close] (split- and dividend-adjusted) to keep returns
-    comparable across the simulation window; this matches the convention used
-    by [Antifragility_computer]'s synthetic tests, which feed in raw percent
+    comparable across the simulation window; this matches the convention used by
+    [Antifragility_computer]'s synthetic tests, which feed in raw percent
     returns. Returns [None] when no benchmark is configured, or when either
     today's bar or the prior trading day's bar is missing for the benchmark. *)
 let _compute_benchmark_return t : float option =
@@ -316,8 +316,8 @@ let _detect_split_for_held_symbol ~adapter ~date ~symbol =
     Trading_simulation_data.Market_data_adapter.get_previous_bar adapter ~symbol
       ~date
   in
-  let%bind.Option curr in
-  let%bind.Option prev in
+  let%bind.Option curr = curr in
+  let%bind.Option prev = prev in
   let%map.Option factor = Types.Split_detector.detect_split ~prev ~curr () in
   { Trading_portfolio.Split_event.symbol; date; factor }
 

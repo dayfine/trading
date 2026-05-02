@@ -26,9 +26,9 @@ type dependencies = {
   benchmark_symbol : string option;
       (** Optional benchmark symbol whose adjusted-close % change is captured
           per step on [step_result.benchmark_return]. The benchmark may be
-          outside [symbols] — bars are fetched independently. The
-          antifragility computer reads these per-step values to compute
-          ConcavityCoef and BucketAsymmetry. *)
+          outside [symbols] — bars are fetched independently. The antifragility
+          computer reads these per-step values to compute ConcavityCoef and
+          BucketAsymmetry. *)
 }
 
 val create_deps :
