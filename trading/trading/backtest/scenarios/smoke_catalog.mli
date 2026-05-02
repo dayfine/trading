@@ -13,10 +13,10 @@
     [--override] flags applied to each window in turn.
 
     {b Universe sizing.} Every window's [universe_path] points at
-    [universes/sp500.sexp] by default. The previous behaviour (defaulting to
-    the full ~10K-symbol [sectors.csv] universe) OOMed the 8 GB dev container
-    at ~6.9 GB RSS during the first window's panel load — defeating the whole
-    point of "smoke" being fast iteration. See dispatch note for the M5.4 E1
+    [universes/sp500.sexp] by default. The previous behaviour (defaulting to the
+    full ~10K-symbol [sectors.csv] universe) OOMed the 8 GB dev container at
+    ~6.9 GB RSS during the first window's panel load — defeating the whole point
+    of "smoke" being fast iteration. See dispatch note for the M5.4 E1
     short-on/off A/B that surfaced this. *)
 
 open Core

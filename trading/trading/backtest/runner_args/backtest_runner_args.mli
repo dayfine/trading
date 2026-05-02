@@ -28,8 +28,8 @@ type t = {
 
           Unlike [overrides], shared overrides apply to BOTH runs in
           [--baseline] mode. The intended use is to constrain the comparison
-          environment in a way that's shared between baseline and variant —
-          e.g. capping the universe to a smaller size for memory while still
+          environment in a way that's shared between baseline and variant — e.g.
+          capping the universe to a smaller size for memory while still
           A/B-testing a different parameter via [--override]. Outside
           [--baseline], shared overrides simply append to [overrides] before
           handing them to the runner. *)

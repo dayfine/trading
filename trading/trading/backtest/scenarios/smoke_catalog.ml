@@ -11,10 +11,10 @@ type window = {
 
 let _date ~y ~m ~d = Date.create_exn ~y ~m ~d
 
-(** Default universe for every smoke window. The full sector-map (~10K
-    symbols) was the historical default but OOMs the 8 GB dev container at
-    panel-load time, defeating the "fast iteration" purpose of smoke. The
-    sp500 sexp (~491 symbols) loads in well under 2 GB peak per window. *)
+(** Default universe for every smoke window. The full sector-map (~10K symbols)
+    was the historical default but OOMs the 8 GB dev container at panel-load
+    time, defeating the "fast iteration" purpose of smoke. The sp500 sexp (~491
+    symbols) loads in well under 2 GB peak per window. *)
 let _default_universe_path = "universes/sp500.sexp"
 
 let bull =

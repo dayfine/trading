@@ -178,8 +178,7 @@ let test_shared_override_can_repeat _ =
               (fun (a : Backtest_runner_args.t) -> a.shared_overrides)
               (elements_are
                  [
-                   equal_to "universe_cap=500";
-                   equal_to "skip_ad_breadth=true";
+                   equal_to "universe_cap=500"; equal_to "skip_ad_breadth=true";
                  ]);
             field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 0);
           ]))

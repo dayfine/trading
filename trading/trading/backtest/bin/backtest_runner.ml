@@ -23,8 +23,8 @@
 
     {1 Smoke mode}
 
-    [backtest_runner --smoke --experiment-name <name>
-     [--shared-override <arg> ...] [--override <arg> ...] [--baseline]]
+    [backtest_runner --smoke --experiment-name <name> [--shared-override <arg>
+     ...] [--override <arg> ...] [--baseline]]
 
     Runs each window in {!Scenario_lib.Smoke_catalog.all} (Bull / Crash /
     Recovery), writing results under [dev/experiments/<name>/<window-name>/].
@@ -145,9 +145,8 @@ let _start_memtrace ~path =
     so single-run / baseline / smoke modes all share the same per-run pipeline.
 
     [sector_map_override], when supplied, replaces the sector map normally
-    loaded from [data/sectors.csv] — used by smoke mode to constrain each
-    window to the catalog's [universe_path]. See
-    {!Backtest.Runner.run_backtest}.
+    loaded from [data/sectors.csv] — used by smoke mode to constrain each window
+    to the catalog's [universe_path]. See {!Backtest.Runner.run_backtest}.
 
     Returns the [Backtest.Runner.result] so callers (e.g. baseline mode) can
     feed both runs into [Backtest.Comparison.compute] without re-reading the
@@ -188,8 +187,8 @@ let _single_run ~start_date ~end_date ~overrides ~output_dir
     (Sexp.to_string_hum (Backtest.Summary.sexp_of_t result.summary));
   Out_channel.newline stdout
 
-(** Baseline-comparison mode: run with [shared_overrides @ overrides]
-    (variant) and again with [shared_overrides] only (baseline), then write
+(** Baseline-comparison mode: run with [shared_overrides @ overrides] (variant)
+    and again with [shared_overrides] only (baseline), then write
     [comparison.{sexp,md}] at [output_root]. The [shared_overrides] split is
     what lets a caller cap the universe (or tweak any other env-shaping
     parameter) for both legs of the A/B without contaminating the comparison
@@ -207,7 +206,8 @@ let _baseline_run ~start_date ~end_date ~shared_overrides ~overrides
       ~output_dir:baseline_dir ?sector_map_override ()
   in
   eprintf "[variant] running with %d shared + %d variant override(s)...\n%!"
-    (List.length shared_overrides) (List.length overrides);
+    (List.length shared_overrides)
+    (List.length overrides);
   let variant_result =
     _run_and_write ~start_date ~end_date
       ~overrides:(shared_overrides @ overrides)
@@ -261,8 +261,8 @@ let _smoke_run ~shared_overrides ~overrides ~output_root ~baseline () =
           ?sector_map_override ()
       else
         _single_run ~start_date:window.start_date ~end_date:window.end_date
-          ~overrides:(shared_overrides @ overrides) ~output_dir:window_dir
-          ?sector_map_override ())
+          ~overrides:(shared_overrides @ overrides)
+          ~output_dir:window_dir ?sector_map_override ())
 
 (** Resolve the raw start/end positionals into [Date.t]. Smoke mode supplies its
     own dates per window so the positionals are unused there; the caller only
@@ -302,6 +302,7 @@ let () =
       (* Outside [--baseline], shared overrides are equivalent to overrides:
          applied identically to the (single) run. *)
       _single_run ~start_date ~end_date
-        ~overrides:(shared_overrides @ overrides) ~output_dir:output_root
-        ?trace_path:parsed.trace_path ?memtrace_path:parsed.memtrace_path
-        ?gc_trace_path:parsed.gc_trace_path ()
+        ~overrides:(shared_overrides @ overrides)
+        ~output_dir:output_root ?trace_path:parsed.trace_path
+        ?memtrace_path:parsed.memtrace_path ?gc_trace_path:parsed.gc_trace_path
+        ()
