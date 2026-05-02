@@ -21,6 +21,35 @@ module Metric_type = struct
       | OpenPositionsValue
       | UnrealizedPnl
       | TradeFrequency
+      | TotalReturnPct
+      | VolatilityPctAnnualized
+      | DownsideDeviationPctAnnualized
+      | BestDayPct
+      | WorstDayPct
+      | BestWeekPct
+      | WorstWeekPct
+      | BestMonthPct
+      | WorstMonthPct
+      | BestQuarterPct
+      | WorstQuarterPct
+      | BestYearPct
+      | WorstYearPct
+      | NumTrades
+      | LossRate
+      | AvgWinDollar
+      | AvgWinPct
+      | AvgLossDollar
+      | AvgLossPct
+      | LargestWinDollar
+      | LargestLossDollar
+      | AvgTradeSizeDollar
+      | AvgTradeSizePct
+      | AvgHoldingDaysWinners
+      | AvgHoldingDaysLosers
+      | Expectancy
+      | WinLossRatio
+      | MaxConsecutiveWins
+      | MaxConsecutiveLosses
     [@@deriving show, eq, compare, sexp]
   end
 
@@ -43,6 +72,35 @@ type metric_type = Metric_type.t =
   | OpenPositionsValue
   | UnrealizedPnl
   | TradeFrequency
+  | TotalReturnPct
+  | VolatilityPctAnnualized
+  | DownsideDeviationPctAnnualized
+  | BestDayPct
+  | WorstDayPct
+  | BestWeekPct
+  | WorstWeekPct
+  | BestMonthPct
+  | WorstMonthPct
+  | BestQuarterPct
+  | WorstQuarterPct
+  | BestYearPct
+  | WorstYearPct
+  | NumTrades
+  | LossRate
+  | AvgWinDollar
+  | AvgWinPct
+  | AvgLossDollar
+  | AvgLossPct
+  | LargestWinDollar
+  | LargestLossDollar
+  | AvgTradeSizeDollar
+  | AvgTradeSizePct
+  | AvgHoldingDaysWinners
+  | AvgHoldingDaysLosers
+  | Expectancy
+  | WinLossRatio
+  | MaxConsecutiveWins
+  | MaxConsecutiveLosses
 [@@deriving show, eq, compare, sexp]
 
 include (Metric_type : Comparator.S with type t := metric_type)
@@ -205,6 +263,192 @@ let get_metric_info = function
         display_name = "Trade Frequency";
         description = "Average number of trades per month";
         unit = Ratio;
+      }
+  | TotalReturnPct ->
+      {
+        display_name = "Total Return";
+        description =
+          "Total period return: (final - initial) / initial. Raw, not \
+           annualized — use CAGR for annualized.";
+        unit = Percent;
+      }
+  | VolatilityPctAnnualized ->
+      {
+        display_name = "Volatility (Annualized)";
+        description =
+          "Annualized standard deviation of step returns: per-step stdev × \
+           sqrt(252).";
+        unit = Percent;
+      }
+  | DownsideDeviationPctAnnualized ->
+      {
+        display_name = "Downside Deviation (Annualized)";
+        description =
+          "Annualized standard deviation of negative step returns only \
+           (positive returns clipped to zero, Sortino convention).";
+        unit = Percent;
+      }
+  | BestDayPct ->
+      {
+        display_name = "Best Day";
+        description = "Largest single-step return in the period.";
+        unit = Percent;
+      }
+  | WorstDayPct ->
+      {
+        display_name = "Worst Day";
+        description = "Smallest single-step return in the period.";
+        unit = Percent;
+      }
+  | BestWeekPct ->
+      {
+        display_name = "Best Week";
+        description = "Largest cumulative return over a calendar week.";
+        unit = Percent;
+      }
+  | WorstWeekPct ->
+      {
+        display_name = "Worst Week";
+        description = "Smallest cumulative return over a calendar week.";
+        unit = Percent;
+      }
+  | BestMonthPct ->
+      {
+        display_name = "Best Month";
+        description = "Largest cumulative return over a calendar month.";
+        unit = Percent;
+      }
+  | WorstMonthPct ->
+      {
+        display_name = "Worst Month";
+        description = "Smallest cumulative return over a calendar month.";
+        unit = Percent;
+      }
+  | BestQuarterPct ->
+      {
+        display_name = "Best Quarter";
+        description = "Largest cumulative return over a calendar quarter.";
+        unit = Percent;
+      }
+  | WorstQuarterPct ->
+      {
+        display_name = "Worst Quarter";
+        description = "Smallest cumulative return over a calendar quarter.";
+        unit = Percent;
+      }
+  | BestYearPct ->
+      {
+        display_name = "Best Year";
+        description = "Largest cumulative return over a calendar year.";
+        unit = Percent;
+      }
+  | WorstYearPct ->
+      {
+        display_name = "Worst Year";
+        description = "Smallest cumulative return over a calendar year.";
+        unit = Percent;
+      }
+  | NumTrades ->
+      {
+        display_name = "Number of Trades";
+        description = "Total round-trip count (= win + loss).";
+        unit = Count;
+      }
+  | LossRate ->
+      {
+        display_name = "Loss Rate";
+        description = "Loss percentage; equals 100 - WinRate.";
+        unit = Percent;
+      }
+  | AvgWinDollar ->
+      {
+        display_name = "Average Win";
+        description = "Mean P&L of winning round-trips.";
+        unit = Dollars;
+      }
+  | AvgWinPct ->
+      {
+        display_name = "Average Win %";
+        description =
+          "Mean per-trade percent return of winning round-trips, relative to \
+           entry price.";
+        unit = Percent;
+      }
+  | AvgLossDollar ->
+      {
+        display_name = "Average Loss";
+        description = "Mean P&L of losing round-trips (negative).";
+        unit = Dollars;
+      }
+  | AvgLossPct ->
+      {
+        display_name = "Average Loss %";
+        description =
+          "Mean per-trade percent return of losing round-trips (negative).";
+        unit = Percent;
+      }
+  | LargestWinDollar ->
+      {
+        display_name = "Largest Win";
+        description = "Single largest winning round-trip in dollars.";
+        unit = Dollars;
+      }
+  | LargestLossDollar ->
+      {
+        display_name = "Largest Loss";
+        description = "Single largest losing round-trip in dollars.";
+        unit = Dollars;
+      }
+  | AvgTradeSizeDollar ->
+      {
+        display_name = "Average Trade Size";
+        description = "Mean entry notional (entry_price × quantity) per trade.";
+        unit = Dollars;
+      }
+  | AvgTradeSizePct ->
+      {
+        display_name = "Average Trade Size %";
+        description = "Mean entry notional as a percent of initial cash.";
+        unit = Percent;
+      }
+  | AvgHoldingDaysWinners ->
+      {
+        display_name = "Avg Holding Days (Winners)";
+        description = "Mean days_held across winning round-trips only.";
+        unit = Days;
+      }
+  | AvgHoldingDaysLosers ->
+      {
+        display_name = "Avg Holding Days (Losers)";
+        description = "Mean days_held across losing round-trips only.";
+        unit = Days;
+      }
+  | Expectancy ->
+      {
+        display_name = "Expectancy";
+        description =
+          "Per-trade expected dollars: win_rate × avg_win - loss_rate × \
+           |avg_loss|.";
+        unit = Dollars;
+      }
+  | WinLossRatio ->
+      {
+        display_name = "Win/Loss Ratio";
+        description = "avg_win_dollar / |avg_loss_dollar|.";
+        unit = Ratio;
+      }
+  | MaxConsecutiveWins ->
+      {
+        display_name = "Max Consecutive Wins";
+        description =
+          "Longest run of consecutive winning round-trips (chronological).";
+        unit = Count;
+      }
+  | MaxConsecutiveLosses ->
+      {
+        display_name = "Max Consecutive Losses";
+        description = "Longest run of consecutive losing round-trips.";
+        unit = Count;
       }
 
 (** {1 Formatting} *)

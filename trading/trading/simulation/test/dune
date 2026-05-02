@@ -194,3 +194,32 @@
   types
   matchers
   simulation_test_helpers))
+
+(test
+ (name test_trade_aggregates_computer)
+ (modules test_trade_aggregates_computer)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  types
+  matchers))
+
+(test
+ (name test_return_basics_computer)
+ (modules test_return_basics_computer)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  types
+  matchers))

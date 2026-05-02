@@ -104,7 +104,7 @@ let _make_simulator (input : input) ~stop_log ~audit_recorder ~start_date
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission
-      ~metric_suite:(Metric_computers.default_metric_suite ())
+      ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
       ()
   in
   let sim_config =

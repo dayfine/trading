@@ -35,6 +35,37 @@ let _metric_label : Metric_type.t -> string = function
   | OpenPositionsValue -> "open_positions_value"
   | UnrealizedPnl -> "unrealized_pnl"
   | TradeFrequency -> "trade_frequency"
+  (* M5.2b: returns block *)
+  | TotalReturnPct -> "total_return_pct"
+  | VolatilityPctAnnualized -> "volatility_pct_annualized"
+  | DownsideDeviationPctAnnualized -> "downside_deviation_pct_annualized"
+  | BestDayPct -> "best_day_pct"
+  | WorstDayPct -> "worst_day_pct"
+  | BestWeekPct -> "best_week_pct"
+  | WorstWeekPct -> "worst_week_pct"
+  | BestMonthPct -> "best_month_pct"
+  | WorstMonthPct -> "worst_month_pct"
+  | BestQuarterPct -> "best_quarter_pct"
+  | WorstQuarterPct -> "worst_quarter_pct"
+  | BestYearPct -> "best_year_pct"
+  | WorstYearPct -> "worst_year_pct"
+  (* M5.2b: trade aggregates *)
+  | NumTrades -> "num_trades"
+  | LossRate -> "loss_rate"
+  | AvgWinDollar -> "avg_win_dollar"
+  | AvgWinPct -> "avg_win_pct"
+  | AvgLossDollar -> "avg_loss_dollar"
+  | AvgLossPct -> "avg_loss_pct"
+  | LargestWinDollar -> "largest_win_dollar"
+  | LargestLossDollar -> "largest_loss_dollar"
+  | AvgTradeSizeDollar -> "avg_trade_size_dollar"
+  | AvgTradeSizePct -> "avg_trade_size_pct"
+  | AvgHoldingDaysWinners -> "avg_holding_days_winners"
+  | AvgHoldingDaysLosers -> "avg_holding_days_losers"
+  | Expectancy -> "expectancy"
+  | WinLossRatio -> "win_loss_ratio"
+  | MaxConsecutiveWins -> "max_consecutive_wins"
+  | MaxConsecutiveLosses -> "max_consecutive_losses"
 
 let _all_metric_types : Metric_type.t list =
   [
@@ -52,6 +83,37 @@ let _all_metric_types : Metric_type.t list =
     OpenPositionsValue;
     UnrealizedPnl;
     TradeFrequency;
+    (* M5.2b: returns block *)
+    TotalReturnPct;
+    VolatilityPctAnnualized;
+    DownsideDeviationPctAnnualized;
+    BestDayPct;
+    WorstDayPct;
+    BestWeekPct;
+    WorstWeekPct;
+    BestMonthPct;
+    WorstMonthPct;
+    BestQuarterPct;
+    WorstQuarterPct;
+    BestYearPct;
+    WorstYearPct;
+    (* M5.2b: trade aggregates *)
+    NumTrades;
+    LossRate;
+    AvgWinDollar;
+    AvgWinPct;
+    AvgLossDollar;
+    AvgLossPct;
+    LargestWinDollar;
+    LargestLossDollar;
+    AvgTradeSizeDollar;
+    AvgTradeSizePct;
+    AvgHoldingDaysWinners;
+    AvgHoldingDaysLosers;
+    Expectancy;
+    WinLossRatio;
+    MaxConsecutiveWins;
+    MaxConsecutiveLosses;
   ]
 
 let _diff_for_metric ~baseline_set ~variant_set (mt : Metric_type.t) =

@@ -581,8 +581,9 @@ let test_run_computers_combines_results _ =
 
 let test_default_computers _ =
   let computers = default_computers () in
-  (* Default set: summary, sharpe, max_drawdown, cagr, portfolio_state *)
-  assert_that computers (size_is 5)
+  (* Default set: summary, sharpe, max_drawdown, cagr, portfolio_state,
+     trade_aggregates (M5.2b), return_basics (M5.2b). *)
+  assert_that computers (size_is 7)
 
 (* ==================== Factory Tests ==================== *)
 

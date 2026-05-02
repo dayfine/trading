@@ -20,6 +20,8 @@
   sharpe_computer
   drawdown_computer
   cagr_computer
-  portfolio_state_computer)
+  portfolio_state_computer
+  trade_aggregates_computer
+  return_basics_computer)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
