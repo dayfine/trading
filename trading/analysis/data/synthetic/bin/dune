@@ -1,0 +1,6 @@
+(executable
+ (name generate_synth)
+ (modules generate_synth)
+ (libraries core core_unix.command_unix status synthetic types)
+ (preprocess
+  (pps ppx_jane)))

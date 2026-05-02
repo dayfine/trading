@@ -1,0 +1,14 @@
+(lang dune 3.17)
+
+(name synthetic)
+(version 0.1.0)
+
+(generate_opam_files true)
+
+(package
+ (name synthetic)
+ (synopsis "Synthetic market data generator (block bootstrap, M7.0 Track 3)")
+ (depends
+  ocaml
+  core
+  ppx_deriving))
