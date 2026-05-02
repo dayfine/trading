@@ -1,0 +1,14 @@
+(tests
+ (names test_snapshot_pipeline test_snapshot_manifest test_snapshot_verifier)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  matchers
+  ounit2
+  status
+  trading.data_panel.snapshot
+  weinstein.snapshot_pipeline
+  types)
+ (preprocess
+  (pps ppx_sexp_conv)))
