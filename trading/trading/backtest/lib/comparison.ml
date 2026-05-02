@@ -15,152 +15,91 @@ type t = {
   scalar_diffs : (string * float) list;
 }
 
-(** Hand-rolled lowercase + underscored metric name, kept stable across
-    refactors of the underlying enum. Existing baseline summaries on disk
-    already use this convention (e.g. [total_pnl], [sharpe_ratio]). The derived
-    [Metric_type.show] varies with module location and is unsuitable as a public
-    label. *)
-let _metric_label : Metric_type.t -> string = function
-  | TotalPnl -> "total_pnl"
-  | AvgHoldingDays -> "avg_holding_days"
-  | WinCount -> "win_count"
-  | LossCount -> "loss_count"
-  | WinRate -> "win_rate"
-  | SharpeRatio -> "sharpe_ratio"
-  | MaxDrawdown -> "max_drawdown"
-  | ProfitFactor -> "profit_factor"
-  | CAGR -> "cagr"
-  | CalmarRatio -> "calmar_ratio"
-  | OpenPositionCount -> "open_position_count"
-  | OpenPositionsValue -> "open_positions_value"
-  | UnrealizedPnl -> "unrealized_pnl"
-  | TradeFrequency -> "trade_frequency"
-  (* M5.2b: returns block *)
-  | TotalReturnPct -> "total_return_pct"
-  | VolatilityPctAnnualized -> "volatility_pct_annualized"
-  | DownsideDeviationPctAnnualized -> "downside_deviation_pct_annualized"
-  | BestDayPct -> "best_day_pct"
-  | WorstDayPct -> "worst_day_pct"
-  | BestWeekPct -> "best_week_pct"
-  | WorstWeekPct -> "worst_week_pct"
-  | BestMonthPct -> "best_month_pct"
-  | WorstMonthPct -> "worst_month_pct"
-  | BestQuarterPct -> "best_quarter_pct"
-  | WorstQuarterPct -> "worst_quarter_pct"
-  | BestYearPct -> "best_year_pct"
-  | WorstYearPct -> "worst_year_pct"
-  (* M5.2b: trade aggregates *)
-  | NumTrades -> "num_trades"
-  | LossRate -> "loss_rate"
-  | AvgWinDollar -> "avg_win_dollar"
-  | AvgWinPct -> "avg_win_pct"
-  | AvgLossDollar -> "avg_loss_dollar"
-  | AvgLossPct -> "avg_loss_pct"
-  | LargestWinDollar -> "largest_win_dollar"
-  | LargestLossDollar -> "largest_loss_dollar"
-  | AvgTradeSizeDollar -> "avg_trade_size_dollar"
-  | AvgTradeSizePct -> "avg_trade_size_pct"
-  | AvgHoldingDaysWinners -> "avg_holding_days_winners"
-  | AvgHoldingDaysLosers -> "avg_holding_days_losers"
-  | Expectancy -> "expectancy"
-  | WinLossRatio -> "win_loss_ratio"
-  | MaxConsecutiveWins -> "max_consecutive_wins"
-  | MaxConsecutiveLosses -> "max_consecutive_losses"
-  (* M5.2c: risk-adjusted *)
-  | SortinoRatioAnnualized -> "sortino_ratio_annualized"
-  | MarRatio -> "mar_ratio"
-  | OmegaRatio -> "omega_ratio"
-  (* M5.2c: drawdown analytics *)
-  | AvgDrawdownPct -> "avg_drawdown_pct"
-  | MedianDrawdownPct -> "median_drawdown_pct"
-  | MaxDrawdownDurationDays -> "max_drawdown_duration_days"
-  | AvgDrawdownDurationDays -> "avg_drawdown_duration_days"
-  | TimeInDrawdownPct -> "time_in_drawdown_pct"
-  | UlcerIndex -> "ulcer_index"
-  | PainIndex -> "pain_index"
-  | UnderwaterCurveArea -> "underwater_curve_area"
-  (* M5.2d: distributional *)
-  | Skewness -> "skewness"
-  | Kurtosis -> "kurtosis"
-  | CVaR95 -> "cvar_95"
-  | CVaR99 -> "cvar_99"
-  | TailRatio -> "tail_ratio"
-  | GainToPain -> "gain_to_pain"
-  (* M5.2d: antifragility *)
-  | ConcavityCoef -> "concavity_coef"
-  | BucketAsymmetry -> "bucket_asymmetry"
+(** Single registry mapping each [Metric_type.t] variant to its hand-rolled
+    lowercase + underscored output label. Adding a new metric variant requires
+    one new row here — both [_metric_label] and [all_metric_types] are derived
+    from this table.
 
-let _all_metric_types : Metric_type.t list =
+    The label is kept stable across refactors of the underlying enum. Existing
+    baseline summaries on disk already use this convention (e.g. [total_pnl],
+    [sharpe_ratio]). The derived [Metric_type.show] varies with module location
+    and is unsuitable as a public label, so it cannot be used here. *)
+let _metric_label_table : (Metric_type.t * string) list =
   [
-    TotalPnl;
-    AvgHoldingDays;
-    WinCount;
-    LossCount;
-    WinRate;
-    SharpeRatio;
-    MaxDrawdown;
-    ProfitFactor;
-    CAGR;
-    CalmarRatio;
-    OpenPositionCount;
-    OpenPositionsValue;
-    UnrealizedPnl;
-    TradeFrequency;
+    (TotalPnl, "total_pnl");
+    (AvgHoldingDays, "avg_holding_days");
+    (WinCount, "win_count");
+    (LossCount, "loss_count");
+    (WinRate, "win_rate");
+    (SharpeRatio, "sharpe_ratio");
+    (MaxDrawdown, "max_drawdown");
+    (ProfitFactor, "profit_factor");
+    (CAGR, "cagr");
+    (CalmarRatio, "calmar_ratio");
+    (OpenPositionCount, "open_position_count");
+    (OpenPositionsValue, "open_positions_value");
+    (UnrealizedPnl, "unrealized_pnl");
+    (TradeFrequency, "trade_frequency");
     (* M5.2b: returns block *)
-    TotalReturnPct;
-    VolatilityPctAnnualized;
-    DownsideDeviationPctAnnualized;
-    BestDayPct;
-    WorstDayPct;
-    BestWeekPct;
-    WorstWeekPct;
-    BestMonthPct;
-    WorstMonthPct;
-    BestQuarterPct;
-    WorstQuarterPct;
-    BestYearPct;
-    WorstYearPct;
+    (TotalReturnPct, "total_return_pct");
+    (VolatilityPctAnnualized, "volatility_pct_annualized");
+    (DownsideDeviationPctAnnualized, "downside_deviation_pct_annualized");
+    (BestDayPct, "best_day_pct");
+    (WorstDayPct, "worst_day_pct");
+    (BestWeekPct, "best_week_pct");
+    (WorstWeekPct, "worst_week_pct");
+    (BestMonthPct, "best_month_pct");
+    (WorstMonthPct, "worst_month_pct");
+    (BestQuarterPct, "best_quarter_pct");
+    (WorstQuarterPct, "worst_quarter_pct");
+    (BestYearPct, "best_year_pct");
+    (WorstYearPct, "worst_year_pct");
     (* M5.2b: trade aggregates *)
-    NumTrades;
-    LossRate;
-    AvgWinDollar;
-    AvgWinPct;
-    AvgLossDollar;
-    AvgLossPct;
-    LargestWinDollar;
-    LargestLossDollar;
-    AvgTradeSizeDollar;
-    AvgTradeSizePct;
-    AvgHoldingDaysWinners;
-    AvgHoldingDaysLosers;
-    Expectancy;
-    WinLossRatio;
-    MaxConsecutiveWins;
-    MaxConsecutiveLosses;
+    (NumTrades, "num_trades");
+    (LossRate, "loss_rate");
+    (AvgWinDollar, "avg_win_dollar");
+    (AvgWinPct, "avg_win_pct");
+    (AvgLossDollar, "avg_loss_dollar");
+    (AvgLossPct, "avg_loss_pct");
+    (LargestWinDollar, "largest_win_dollar");
+    (LargestLossDollar, "largest_loss_dollar");
+    (AvgTradeSizeDollar, "avg_trade_size_dollar");
+    (AvgTradeSizePct, "avg_trade_size_pct");
+    (AvgHoldingDaysWinners, "avg_holding_days_winners");
+    (AvgHoldingDaysLosers, "avg_holding_days_losers");
+    (Expectancy, "expectancy");
+    (WinLossRatio, "win_loss_ratio");
+    (MaxConsecutiveWins, "max_consecutive_wins");
+    (MaxConsecutiveLosses, "max_consecutive_losses");
     (* M5.2c: risk-adjusted *)
-    SortinoRatioAnnualized;
-    MarRatio;
-    OmegaRatio;
+    (SortinoRatioAnnualized, "sortino_ratio_annualized");
+    (MarRatio, "mar_ratio");
+    (OmegaRatio, "omega_ratio");
     (* M5.2c: drawdown analytics *)
-    AvgDrawdownPct;
-    MedianDrawdownPct;
-    MaxDrawdownDurationDays;
-    AvgDrawdownDurationDays;
-    TimeInDrawdownPct;
-    UlcerIndex;
-    PainIndex;
-    UnderwaterCurveArea;
+    (AvgDrawdownPct, "avg_drawdown_pct");
+    (MedianDrawdownPct, "median_drawdown_pct");
+    (MaxDrawdownDurationDays, "max_drawdown_duration_days");
+    (AvgDrawdownDurationDays, "avg_drawdown_duration_days");
+    (TimeInDrawdownPct, "time_in_drawdown_pct");
+    (UlcerIndex, "ulcer_index");
+    (PainIndex, "pain_index");
+    (UnderwaterCurveArea, "underwater_curve_area");
     (* M5.2d: distributional *)
-    Skewness;
-    Kurtosis;
-    CVaR95;
-    CVaR99;
-    TailRatio;
-    GainToPain;
+    (Skewness, "skewness");
+    (Kurtosis, "kurtosis");
+    (CVaR95, "cvar_95");
+    (CVaR99, "cvar_99");
+    (TailRatio, "tail_ratio");
+    (GainToPain, "gain_to_pain");
     (* M5.2d: antifragility *)
-    ConcavityCoef;
-    BucketAsymmetry;
+    (ConcavityCoef, "concavity_coef");
+    (BucketAsymmetry, "bucket_asymmetry");
   ]
+
+let _metric_label (mt : Metric_type.t) : string =
+  List.Assoc.find_exn _metric_label_table mt ~equal:Metric_type.equal
+
+let all_metric_types : Metric_type.t list = List.map _metric_label_table ~f:fst
 
 let _diff_for_metric ~baseline_set ~variant_set (mt : Metric_type.t) =
   let b = Map.find baseline_set mt in
@@ -173,7 +112,7 @@ let _diff_for_metric ~baseline_set ~variant_set (mt : Metric_type.t) =
 let _build_metric_diffs ~baseline ~variant =
   let baseline_set = baseline.Summary.metrics in
   let variant_set = variant.Summary.metrics in
-  List.filter_map _all_metric_types ~f:(fun mt ->
+  List.filter_map all_metric_types ~f:(fun mt ->
       let d = _diff_for_metric ~baseline_set ~variant_set mt in
       match (d.baseline, d.variant) with None, None -> None | _ -> Some d)
 

@@ -40,6 +40,12 @@ type t = {
 val compute : baseline:Summary.t -> variant:Summary.t -> t
 (** Build a [t] from two summaries. Pure — same input gives same output. *)
 
+val all_metric_types : Trading_simulation_types.Metric_types.Metric_type.t list
+(** All [Metric_type] variants known to the comparison-output registry, in
+    stable enum order. Exposed for tests so the variant-coverage test does not
+    have to duplicate the registry. Production callers should never need this —
+    use [compute] which iterates internally. *)
+
 val to_sexp : t -> Sexp.t
 (** Render [t] as a machine-readable sexp suitable for diffing or downstream
     tooling. Shape:

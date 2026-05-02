@@ -195,6 +195,32 @@ let test_to_markdown_includes_header_and_table _ =
     (String.is_substring md ~substring:"final_portfolio_value")
     (equal_to true)
 
+(* --- variant coverage --- *)
+
+(** Pin the data-driven label registry: every [Metric_type] variant exposed via
+    [Comparison.all_metric_types] must produce a non-empty label string in the
+    [metric_diffs] output of [compute]. This guarantees that adding a new enum
+    variant is wired into the comparison-output table (otherwise the
+    [List.Assoc.find_exn] in [_metric_label] would raise). *)
+let test_compute_yields_non_empty_label_for_every_variant _ =
+  let metrics =
+    Comparison.all_metric_types
+    |> List.map ~f:(fun mt -> (mt, 0.0))
+    |> Metric_types.of_alist_exn
+  in
+  let baseline = _make_summary ~metrics () in
+  let variant = _make_summary ~metrics () in
+  let result = Comparison.compute ~baseline ~variant in
+  assert_that result.metric_diffs
+    (all_of
+       [
+         size_is (List.length Comparison.all_metric_types);
+         each
+           (field
+              (fun (d : Comparison.metric_diff) -> String.length d.name)
+              (gt (module Int_ord) 0));
+       ])
+
 let test_write_markdown_creates_file _ =
   let baseline =
     _make_summary ~metrics:(_metrics_of_alist [ (TotalPnl, 100.0) ]) ()
@@ -229,6 +255,8 @@ let suite =
          "to_markdown: includes header + tables"
          >:: test_to_markdown_includes_header_and_table;
          "write_markdown: creates file" >:: test_write_markdown_creates_file;
+         "compute: every metric variant produces a non-empty label"
+         >:: test_compute_yields_non_empty_label_for_every_variant;
        ]
 
 let () = run_test_tt_main suite
