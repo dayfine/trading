@@ -288,8 +288,10 @@ let test_run_emits_optimal_summary_sexp _ =
            (all_of
               [
                 _has "(constrained";
+                _has "(score_picked";
                 _has "(relaxed_macro";
                 _has "(variant Constrained)";
+                _has "(variant Score_picked)";
                 _has "(variant Relaxed_macro)";
               ]);
        ])

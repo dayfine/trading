@@ -30,7 +30,7 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     ?(side = Trading_base.Types.Long) ?(entry_price = 100.0)
     ?(suggested_stop = 90.0) ?(risk_pct = 0.10)
     ?(sector = "Information Technology") ?(cascade_grade = Weinstein_types.B)
-    ?(passes_macro = true) () : OT.candidate_entry =
+    ?(cascade_score = 0) ?(passes_macro = true) () : OT.candidate_entry =
   {
     symbol;
     entry_week;
@@ -40,6 +40,7 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     risk_pct;
     sector;
     cascade_grade;
+    cascade_score;
     passes_macro;
   }
 
@@ -50,8 +51,9 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
 let make_scored ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     ?(side = Trading_base.Types.Long) ?(entry_price = 100.0)
     ?(suggested_stop = 90.0) ?(sector = "Information Technology")
-    ?(passes_macro = true) ?(exit_week_offset_weeks = 4) ?(r_multiple = 2.0)
-    ?(exit_trigger = OT.End_of_run) () : OT.scored_candidate =
+    ?(cascade_score = 0) ?(passes_macro = true) ?(exit_week_offset_weeks = 4)
+    ?(r_multiple = 2.0) ?(exit_trigger = OT.End_of_run) () : OT.scored_candidate
+    =
   let initial_risk_per_share = Float.abs (entry_price -. suggested_stop) in
   let raw_return_pct = r_multiple *. (initial_risk_per_share /. entry_price) in
   let exit_price =
@@ -63,7 +65,7 @@ let make_scored ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
   let entry =
     make_candidate ~symbol ~entry_week ~side ~entry_price ~suggested_stop
       ~risk_pct:(initial_risk_per_share /. entry_price)
-      ~sector ~passes_macro ()
+      ~sector ~cascade_score ~passes_macro ()
   in
   {
     entry;
@@ -135,6 +137,102 @@ let test_simultaneous_candidates_ranked_by_r_descending _ =
            (fun (rt : OT.optimal_round_trip) -> rt.symbol)
            (equal_to "STRONG");
          field (fun (rt : OT.optimal_round_trip) -> rt.symbol) (equal_to "WEAK");
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* Variant-driven sort key — Score_picked vs Constrained                *)
+(* ------------------------------------------------------------------ *)
+
+(** With [max_positions = 1] and two same-Friday candidates A and B where:
+    - A has the higher pre-trade [cascade_score] but the lower realised
+      [r_multiple];
+    - B has the higher [r_multiple] but the lower [cascade_score];
+
+    [Score_picked] must admit A first (orders by score DESC, the same signal the
+    live strategy uses) while [Constrained] must admit B first (orders by
+    R-multiple DESC, full outcome foresight). This pins that the variant flips
+    the per-Friday sort key — the central PR-4 contract. *)
+let test_score_picked_orders_by_score_constrained_by_r_multiple _ =
+  let cfg = { F.default_config with max_positions = 1 } in
+  let high_score_low_r =
+    make_scored ~symbol:"A" ~cascade_score:90 ~r_multiple:1.0 ~sector:"Sector_A"
+      ()
+  in
+  let low_score_high_r =
+    make_scored ~symbol:"B" ~cascade_score:10 ~r_multiple:5.0 ~sector:"Sector_B"
+      ()
+  in
+  let candidates = [ high_score_low_r; low_score_high_r ] in
+  let score_picked =
+    F.fill ~config:cfg { candidates; variant = OT.Score_picked }
+  in
+  let constrained =
+    F.fill ~config:cfg { candidates; variant = OT.Constrained }
+  in
+  assert_that
+    (score_picked, constrained)
+    (all_of
+       [
+         field
+           (fun (sp, _) -> sp)
+           (elements_are
+              [
+                field
+                  (fun (rt : OT.optimal_round_trip) -> rt.symbol)
+                  (equal_to "A");
+              ]);
+         field
+           (fun (_, c) -> c)
+           (elements_are
+              [
+                field
+                  (fun (rt : OT.optimal_round_trip) -> rt.symbol)
+                  (equal_to "B");
+              ]);
+       ])
+
+(** Score_picked tie-break: when two same-Friday candidates have identical
+    [cascade_score], the comparator falls back to symbol ASC to keep the order
+    deterministic across runs. With [max_positions = 1] the alphabetically
+    earlier symbol must be admitted. *)
+let test_score_picked_tie_breaks_by_symbol_asc _ =
+  let cfg = { F.default_config with max_positions = 1 } in
+  let later_alpha =
+    make_scored ~symbol:"ZED" ~cascade_score:50 ~r_multiple:5.0
+      ~sector:"Sector_A" ()
+  in
+  let earlier_alpha =
+    make_scored ~symbol:"ABC" ~cascade_score:50 ~r_multiple:1.0
+      ~sector:"Sector_B" ()
+  in
+  let result =
+    F.fill ~config:cfg
+      { candidates = [ later_alpha; earlier_alpha ]; variant = OT.Score_picked }
+  in
+  assert_that result
+    (elements_are
+       [
+         field (fun (rt : OT.optimal_round_trip) -> rt.symbol) (equal_to "ABC");
+       ])
+
+(** Score_picked honours the macro gate just like Constrained: a candidate with
+    [passes_macro = false] must be dropped. Mirrors
+    [test_constrained_variant_drops_macro_fail] for the new variant. *)
+let test_score_picked_drops_macro_fail _ =
+  let pass =
+    make_scored ~symbol:"AAPL" ~cascade_score:50 ~passes_macro:true ()
+  in
+  let fail =
+    make_scored ~symbol:"MSFT" ~cascade_score:90 ~passes_macro:false ()
+  in
+  let result =
+    F.fill ~config:F.default_config
+      { candidates = [ pass; fail ]; variant = OT.Score_picked }
+  in
+  assert_that result
+    (elements_are
+       [
+         field (fun (rt : OT.optimal_round_trip) -> rt.symbol) (equal_to "AAPL");
        ])
 
 (* ------------------------------------------------------------------ *)
@@ -329,6 +427,12 @@ let suite =
          >:: test_relaxed_macro_admits_both;
          "simultaneous candidates ranked by R-multiple desc"
          >:: test_simultaneous_candidates_ranked_by_r_descending;
+         "Score_picked orders by cascade_score; Constrained by r_multiple"
+         >:: test_score_picked_orders_by_score_constrained_by_r_multiple;
+         "Score_picked tie-breaks by symbol ASC"
+         >:: test_score_picked_tie_breaks_by_symbol_asc;
+         "Score_picked drops macro-fail candidates"
+         >:: test_score_picked_drops_macro_fail;
          "concurrent-position cap forces lower-rank skip"
          >:: test_concurrent_position_cap_forces_skip;
          "sector cap forces skip even when ranking allows"

@@ -65,6 +65,7 @@ let _candidate_of_scored ~date ~passes_macro (sc : Screener.scored_candidate) :
     risk_pct = sc.risk_pct;
     sector = sc.sector.sector_name;
     cascade_grade = sc.grade;
+    cascade_score = sc.score;
     passes_macro;
   }
 

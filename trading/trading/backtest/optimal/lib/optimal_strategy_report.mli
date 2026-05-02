@@ -1,7 +1,7 @@
 (** Phase D of the optimal-strategy counterfactual: pure markdown renderer.
 
-    Takes the actual run's round-trips + summary plus the two counterfactual
-    variants (Constrained, Relaxed_macro) produced by the
+    Takes the actual run's round-trips + summary plus the three counterfactual
+    variants (Constrained, Score_picked, Relaxed_macro) produced by the
     {!Optimal_portfolio_filler} and emits a markdown string suitable for writing
     to [<output_dir>/optimal_strategy.md].
 
@@ -11,9 +11,13 @@
 
     - {b Run header.} Period, universe size, scenario name, and a loud
       disclaimer that the counterfactual uses look-ahead and is unrealizable.
-    - {b Headline comparison table.} Actual vs Constrained vs Relaxed-macro,
-      with a Δ column relative to the Constrained variant. Rows: Total return,
-      Win rate, MaxDD, Sharpe, Profit factor, Round-trips, Avg R-multiple.
+    - {b Headline comparison table.} Actual vs Constrained vs Score_picked vs
+      Relaxed-macro, with a Δ column relative to the Constrained variant. The
+      column ordering reads left-to-right as a gap decomposition: [Actual] →
+      [Score_picked] is cascade-ranking error (closeable); [Score_picked] →
+      [Constrained] is outcome-foresight bonus (uncloseable); [Constrained] →
+      [Relaxed_macro] is macro-gate cost. Rows: Total return, Win rate, MaxDD,
+      Sharpe, Profit factor, Round-trips, Avg R-multiple.
     - {b Per-Friday divergence table.} For each Friday where the actual and
       Constrained-counterfactual picks differ: the actual picks (symbols +
       sizes), the counterfactual picks, and the top-3 candidates the actual
@@ -38,7 +42,8 @@ type variant_pack = {
   summary : Optimal_types.optimal_summary;
 }
 (** A single counterfactual variant's round-trips + headline summary. {!render}
-    consumes one of these per variant (Constrained, Relaxed_macro). *)
+    consumes one of these per variant (Constrained, Score_picked,
+    Relaxed_macro). *)
 
 type actual_run = {
   scenario_name : string;
@@ -78,9 +83,15 @@ type actual_run = {
 type input = {
   actual : actual_run;
   constrained : variant_pack;
-      (** Counterfactual variant honouring the macro gate. *)
+      (** Macro-gated, ordered by realised R-multiple — outcome-foresight
+          ceiling. *)
+  score_picked : variant_pack;
+      (** Macro-gated, ordered by pre-trade [cascade_score] — the same signal
+          the live strategy uses. The [Strategy actual] → [Score_picked] gap
+          isolates cascade-ranking error from outcome-foresight bonus. *)
   relaxed_macro : variant_pack;
-      (** Counterfactual variant ignoring the macro gate. *)
+      (** Macro gate dropped, ordered by realised R-multiple — unconstrained
+          upper bound. *)
 }
 (** Inputs for {!render}. *)
 

@@ -31,7 +31,7 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     ?(side = Trading_base.Types.Long) ?(entry_price = 100.0)
     ?(suggested_stop = 92.0) ?(risk_pct = 0.08)
     ?(sector = "Information Technology") ?(cascade_grade = Weinstein_types.B)
-    ?(passes_macro = true) () : OT.candidate_entry =
+    ?(cascade_score = 0) ?(passes_macro = true) () : OT.candidate_entry =
   {
     symbol;
     entry_week;
@@ -41,6 +41,7 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     risk_pct;
     sector;
     cascade_grade;
+    cascade_score;
     passes_macro;
   }
 

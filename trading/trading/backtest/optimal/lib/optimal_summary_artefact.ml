@@ -2,6 +2,7 @@ open Core
 
 type t = {
   constrained : Optimal_types.optimal_summary;
+  score_picked : Optimal_types.optimal_summary;
   relaxed_macro : Optimal_types.optimal_summary;
 }
 [@@deriving sexp]
