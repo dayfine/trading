@@ -1,6 +1,6 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-05-01
+## Last updated: 2026-05-02
 
 ## Status
 MERGED
@@ -121,20 +121,34 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
    covered by the next nightly Tier-3 perf run.
 
 6. **G14 — split-adjustment on Position.t Holding state** (filed 2026-05-01,
-   `feat-weinstein` scope). All 5 residual force-liqs in the post-G13
-   sp500 baseline are `Per_position` triggers with stale pre-split
-   `entry_price` values (PANW 3:1 Sep 2022, GOOG 20:1 Jul 2022, plus
-   ALGN/DASH/TECH within-window highs). First-pass fix attempt
-   (`feat/g14-screener-adjusted-prices`, abandoned 2026-05-01 ~07:00 UTC)
-   showed Bug A (screener high/low scans in raw price space) cannot be
-   fixed alone — symbols with FUTURE splits (e.g., CTAS 2024 4:1) get
-   `suggested_entry` in adjusted space while `Position.t.entry_price` is
-   set in raw space, producing the same 250%+ phantom losses. Recommended
-   fix: **Option 1 — pin everything to raw close-price space** with
-   lookback truncation at most-recent-split boundary. See
-   `dev/notes/g14-deep-dive-2026-05-01.md` §Recommendation for next session.
-   Owner: `feat-weinstein` — current scope is closed; needs scope extension
-   per the 2026-04-16 precedent before dispatch.
+   merged 2026-05-01 via PR #736). Fixed both interlocked bugs together
+   per Option 1 (raw close-price space + lookback truncation):
+   - **Bug A**: `_scan_max_high_callback` / `_scan_min_low_callback` in
+     `analysis/weinstein/stock_analysis/lib/stock_analysis.ml` now truncate
+     at the most recent split boundary using a `_no_split_between`
+     guard keyed off the per-bar `adjusted_close / close_price` factor
+     (threshold 0.20 — distinguishes splits from dividend drift).
+   - **Bug B**: `entry_audit_capture._effective_entry_price` reads the
+     most recent close from `bar_reader` and threads it through sizing,
+     stop computation, the `CreateEntering` transition, and audit-row
+     dollar fields. The audit row's `candidate.suggested_entry` is
+     preserved verbatim so consumers can reconcile screener intent vs
+     realised entry.
+   - **Result on sp500-2019-2023-long-only**: force-liqs 6 → 0;
+     return +65.0% → +21.6%; MaxDD 31.8% → 43.0% (the shifts reflect
+     underlying short-side risk previously masked by inflated
+     entry_price values; G15 is the follow-up).
+   - **Acceptance tests**: `test_breakout_truncates_at_split_boundary`,
+     `test_breakdown_truncates_at_split_boundary`,
+     `test_no_split_no_truncation` (stock_analysis);
+     `test_effective_entry_overrides_suggested_entry`,
+     `test_empty_bar_reader_falls_back_to_suggested_entry`
+     (entry_audit_capture).
+   - 2026-05-02 redispatch (this session) was a no-op — verified the
+     fix is on `origin/main` and all acceptance criteria from the
+     dispatch prompt are met by code already merged. No PR opened.
+     See `dev/notes/g14-deep-dive-2026-05-01.md` for the full
+     root-cause writeup.
 
 7. **G15 — short-side risk control** (filed 2026-05-01, `feat-weinstein`
    scope). With G12 (#725) + G13 (#726) eliminating the spurious
