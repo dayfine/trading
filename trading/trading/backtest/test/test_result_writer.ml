@@ -78,7 +78,8 @@ let _empty_summary ~start_date ~end_date : Backtest.Summary.t =
   }
 
 let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
-    ~round_trips ~force_liquidations () : Backtest.Runner.result =
+    ?(universe = []) ~round_trips ~force_liquidations () :
+    Backtest.Runner.result =
   let start_date = _date "2024-01-02" in
   let end_date = _date "2024-04-29" in
   {
@@ -91,6 +92,7 @@ let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
     cascade_summaries = [];
     force_liquidations;
     final_prices;
+    universe;
   }
 
 (** Build a [Trading_portfolio.Types.portfolio_position] with a single lot. The
