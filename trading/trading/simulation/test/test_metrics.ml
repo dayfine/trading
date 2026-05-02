@@ -584,8 +584,9 @@ let test_default_computers _ =
   let computers = default_computers () in
   (* Default set: summary, sharpe, max_drawdown, cagr, portfolio_state,
      trade_aggregates (M5.2b), return_basics (M5.2b), omega_ratio (M5.2c),
-     drawdown_analytics (M5.2c). *)
-  assert_that computers (size_is 9)
+     drawdown_analytics (M5.2c), distributional (M5.2d), antifragility
+     (M5.2d). *)
+  assert_that computers (size_is 11)
 
 (* ==================== Factory Tests ==================== *)
 

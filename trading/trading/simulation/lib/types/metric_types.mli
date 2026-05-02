@@ -143,6 +143,46 @@ module Metric_type : sig
         (** Sum of per-day drawdown percent across the run (= [PainIndex]
             multiplied by the number of trading days). Reported in percent·days;
             useful as a raw integral when the period length is held constant. *)
+    (* ---- M5.2d distributional ---- *)
+    | Skewness
+        (** Third standardized moment of the per-step return distribution
+            ([E[(r - μ)^3] / σ^3]). [0.0] for a symmetric distribution; positive
+            means the right tail (gains) is heavier; negative means the left
+            tail (losses) is heavier. *)
+    | Kurtosis
+        (** Excess kurtosis of the per-step return distribution: the fourth
+            standardized moment ([E[(r - μ)^4] / σ^4]) minus 3. [0.0] for a
+            normal distribution; positive (leptokurtic) means fatter tails;
+            negative (platykurtic) means thinner tails. *)
+    | CVaR95
+        (** Conditional Value-at-Risk at 95% (also known as Expected Shortfall):
+            the mean of the worst 5% of step returns, in percent. Negative for a
+            losing tail. *)
+    | CVaR99
+        (** Conditional Value-at-Risk at 99%: the mean of the worst 1% of step
+            returns, in percent. Negative for a losing tail. *)
+    | TailRatio
+        (** [mean(top 5% returns) / |mean(bottom 5% returns)|]. > 1 means upside
+            tail dominates downside tail. Returns [Float.infinity] when the
+            bottom-5% mean is zero (no losses) and the top-5% mean is positive;
+            [0.0] when there are no returns to bucket. *)
+    | GainToPain
+        (** [Σ positive_step_returns / |Σ negative_step_returns|]. Returns
+            [Float.infinity] when there are gains but no losses; [0.0] when
+            there are no gains. *)
+    (* ---- M5.2d antifragility ---- *)
+    | ConcavityCoef
+        (** Antifragility coefficient (γ) from the quadratic regression
+            [r_strat = α + β·r_bench + γ·r_bench²]. [γ > 0] is convex /
+            antifragile; [γ < 0] is concave / fragile. Reported as [0.0] when no
+            benchmark series is supplied to the antifragility computer (the
+            default for stand-alone backtest runs without a benchmark feed). *)
+    | BucketAsymmetry
+        (** [(Q1_mean + Q5_mean) / (Q2_mean + Q3_mean + Q4_mean)] of strategy
+            step returns bucketed by benchmark step-return quintile. > 1 means
+            the strategy concentrates returns in the extremes (barbell); ≤ 1
+            means returns are concentrated in the middle. Reported as [0.0] when
+            no benchmark series is supplied. *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -204,6 +244,14 @@ type metric_type = Metric_type.t =
   | UlcerIndex
   | PainIndex
   | UnderwaterCurveArea
+  | Skewness
+  | Kurtosis
+  | CVaR95
+  | CVaR99
+  | TailRatio
+  | GainToPain
+  | ConcavityCoef
+  | BucketAsymmetry
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)

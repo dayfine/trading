@@ -24,6 +24,8 @@
   trade_aggregates_computer
   return_basics_computer
   risk_adjusted_computer
-  drawdown_analytics_computer)
+  drawdown_analytics_computer
+  distributional_computer
+  antifragility_computer)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
