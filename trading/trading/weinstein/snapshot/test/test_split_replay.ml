@@ -1,8 +1,8 @@
 (** Split replay test — drives {!Round_trip_verifier.verify_split_round_trip}
     against a fixture-backed historical scenario.
 
-    Scope: AAPL 2020-08-31 4:1 split (PR-1) + TSLA 2020-08-31 5:1 split (PR-2).
-    Follow-up PRs add GOOG, NVDA, KO. *)
+    Scope: AAPL 2020-08-31 4:1 split (PR-1), TSLA 2020-08-31 5:1 split (PR-2),
+    GOOG 2022-07-18 20:1 split (PR-3). Follow-up PRs add NVDA, KO. *)
 
 open Core
 open OUnit2
@@ -268,6 +268,88 @@ let test_tsla_2020_split_tampered_stop_fails _ =
   assert_that failure_names
     (elements_are [ equal_to "position_carryover"; equal_to "stop_adjusted" ])
 
+(* --------- GOOG 2022-07-18 scenario (20:1 forward split) ---------
+
+   Cost-basis check: 10 * 2255.00 = 200 * 112.75 (factor=20).
+   Stop check: 2050.00 / 20 = 102.50. *)
+
+let _goog_pre_lot : Round_trip_verifier.held_lot =
+  { symbol = "GOOG"; quantity = 10.0; entry_price = 2255.00 }
+
+let _goog_split_factor = 20.0
+let _goog_split_date = Date.of_string "2022-07-18"
+
+let _load_goog_scenario () =
+  let dir = _fixture_dir "goog-2022-split" in
+  let bars = _read_bars (Filename.concat dir "bars.csv") in
+  let pick_pre = _read_snapshot (Filename.concat dir "pre_split.sexp") in
+  let pick_post = _read_snapshot (Filename.concat dir "post_split.sexp") in
+  (bars, pick_pre, pick_post)
+
+let test_goog_2022_split_all_checks_pass _ =
+  let bars, pick_pre, pick_post = _load_goog_scenario () in
+  let result =
+    Round_trip_verifier.verify_split_round_trip ~symbol:"GOOG"
+      ~split_date:_goog_split_date ~factor:_goog_split_factor ~bars
+      ~pre_split_lot:_goog_pre_lot ~pick_pre_split:pick_pre
+      ~pick_post_split:pick_post ()
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : Round_trip_verifier.Round_trip_result.t) -> r.checks)
+           (elements_are
+              [
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "adjusted_close_continuity");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "position_carryover");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "cost_basis_preserved");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "no_phantom_picks");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "stop_adjusted");
+              ]);
+         field
+           (fun (r : Round_trip_verifier.Round_trip_result.t) ->
+             Round_trip_verifier.Round_trip_result.failures r)
+           (equal_to []);
+       ])
+
+(* Negative test: tampered post-split snapshot with the wrong GOOG stop must
+   fail [position_carryover] and [stop_adjusted]. Mirrors AAPL/TSLA coverage so
+   regressions in any scenario are caught. *)
+
+let _tampered_goog_post_split (snapshot : Weekly_snapshot.t) =
+  let held' =
+    List.map snapshot.held_positions ~f:(fun h ->
+        if String.equal h.symbol "GOOG" then { h with stop = 999.99 } else h)
+  in
+  { snapshot with held_positions = held' }
+
+let test_goog_2022_split_tampered_stop_fails _ =
+  let bars, pick_pre, pick_post = _load_goog_scenario () in
+  let result =
+    Round_trip_verifier.verify_split_round_trip ~symbol:"GOOG"
+      ~split_date:_goog_split_date ~factor:_goog_split_factor ~bars
+      ~pre_split_lot:_goog_pre_lot ~pick_pre_split:pick_pre
+      ~pick_post_split:(_tampered_goog_post_split pick_post)
+      ()
+  in
+  let failure_names =
+    Round_trip_verifier.Round_trip_result.failures result
+    |> List.map ~f:(fun (c : Round_trip_verifier.check) -> c.name)
+  in
+  assert_that failure_names
+    (elements_are [ equal_to "position_carryover"; equal_to "stop_adjusted" ])
+
 let suite =
   "split_replay"
   >::: [
@@ -283,6 +365,10 @@ let suite =
          >:: test_tsla_2020_split_all_checks_pass;
          "tsla_2020_split_tampered_stop_fails"
          >:: test_tsla_2020_split_tampered_stop_fails;
+         "goog_2022_split_all_checks_pass"
+         >:: test_goog_2022_split_all_checks_pass;
+         "goog_2022_split_tampered_stop_fails"
+         >:: test_goog_2022_split_tampered_stop_fails;
        ]
 
 let () = run_test_tt_main suite

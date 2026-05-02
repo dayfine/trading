@@ -1,0 +1,16 @@
+((schema_version 1)
+ (system_version "test-fixture")
+ (date 2022-07-22)
+ (macro ((regime Bullish) (score 0.64)))
+ (sectors_strong (XLK XLC))
+ (sectors_weak (XLE))
+ (long_candidates
+  (((symbol GOOG) (score 0.86) (grade A) (entry 112.75) (stop 102.50)
+    (sector XLC) (rationale "Stage2 breakout above 30wk MA")
+    (rs_vs_spy (1.25)) (resistance_grade (A)))
+   ((symbol META) (score 0.81) (grade A) (entry 169.20) (stop 153.10)
+    (sector XLC) (rationale "Continuation breakout") (rs_vs_spy (1.10))
+    (resistance_grade ()))))
+ (short_candidates ())
+ (held_positions
+  (((symbol GOOG) (entered 2022-05-23) (stop 102.50) (status Holding)))))
