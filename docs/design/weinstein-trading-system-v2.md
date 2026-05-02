@@ -550,6 +550,65 @@ M7  Parameter Optimization  +P7         Tune config against history
 
 Each milestone is independently valuable. You could stop at M3 and have a useful screener. You could stop at M4 and have a complete manual trading system. M5+ adds simulation and optimization on top.
 
+### Milestone refinement (2026-05-02)
+
+After M1–M4 libraries landed (no live CLI yet) and M5 expanded into seven sub-tracks, the original three monolithic milestones M5/M6/M7 were split into sub-milestones to reflect the work that's actually queued. The build plan in §8 still stands at the phase level; the sub-milestones below are the units of dispatchable work.
+
+**M5 — Backtest at scale + experiments + tuning**
+
+| Sub | Capability | Notes |
+|---|---|---|
+| **M5.1** Foundation hardening | G14 split-adjust on `Position.t` Holding state + G15 short-side risk control + post-split-exit CI failure (`split_day_stop_exit:1:post_split_exit_no_orphan_equity`) all resolved | No backtest result is interpretable until this is clean |
+| **M5.2** Experiment infra | `--override key=val`, `--baseline`, `--smoke` flags on `backtest_runner`; 35-metric catalog (returns, risk-adjusted, drawdown, trade aggregates, distributional/antifragility, benchmark-relative, stability — annualized variants throughout); per-trade context logging (entry stage, vol ratio, gap-vs-intraday stop, days-to-stop) | See `dev/plans/m5-experiments-roadmap-2026-05-02.md` |
+| **M5.3** Scale infra | Daily-snapshot streaming (Option 2 hybrid-tier) + Norgate Data ingestion ($32/mo, point-in-time index membership → survivorship-bias-aware) → unblocks N≥5000 universe + 10y+ horizons | CRSP (100yr NYSE, ~$5k/yr) deferred until M7 grid search proves scaling matters |
+| **M5.4** Mechanical experiments | Short on/off A/B; segmentation-driven Stage classifier as feature-flagged alternate to MA-slope; stop-buffer sweep; scoring-weight sweep | Uses M5.2 infra |
+| **M5.5** Parameter tuning | T-A grid → T-B Bayesian → T-C supervised regression (oracle = `optimal-strategy` per-Friday counterfactual). Pure OCaml or FFI (xgboost/lightgbm); no Python | Uses M7.0 data foundations |
+
+**M6 — Incremental processing as verification harness** (not live trading yet)
+
+The reframe: weekly picks become first-class durable artifacts, decoupled from execution. Diffable, traceable, version-tagged. M6 is the verification layer that proves the system works before it goes live.
+
+| Sub | Capability | Why |
+|---|---|---|
+| **M6.1** Weekly snapshot generator | At each Friday close, write `dev/weekly-picks/<system-version>/<date>.sexp` — ranked candidates, scores, suggested entries/stops — as durable artifact | Picks become diffable & version-tagged; reveals screener week-to-week stability |
+| **M6.2** Forward-trace renderer | Pure function `(pick-file, future bars) → realized outcome per pick` — "if you'd taken pick X on date Y, here's what happened over horizon H" | Independent verification of pick quality, separate from full strategy execution |
+| **M6.3** Cross-version pick diff | Compare `picks-v1/<date>.sexp` vs `picks-v2/<date>.sexp` — symbols added/dropped, score deltas | A/B regression detection at pick level; catches silent screener drift |
+| **M6.4** Split/dividend verification harness | Replay AAPL 4:1 (2020-08), TSLA 5:1 (2020-08), GOOG 20:1 (2022-07), NVDA 10:1 (2024-06); assert pick set + adjusted prices round-trip correctly. Uses EODHD `/splits` + `/div` endpoints (already paid) | Catches G14-class bugs deterministically before live trading |
+| **M6.5** Weekly report renderer | Markdown report from a single pick file — candidates, rationale, suggested orders. Same shape as eventual live report | Bridge artifact; same renderer powers M6 cron when live-data wired |
+| **M6.6** True live cycle (later) | Wire `live` DATA_SOURCE + cron + alerts. Out of scope for now; previously the entire M6 | Unblocks Saturday review workflow per §3 |
+
+See `dev/plans/m6-weekly-snapshot-verification-2026-05-02.md`.
+
+**M7 — Data foundations + ML tuning**
+
+The original M7 was "parameter optimization." Refactored into a data foundation prerequisite (M7.0) plus ML training (M7.1) plus synthetic stress-test (M7.2). The grid/Bayesian search portion folds into M5.5.
+
+| Sub | Capability | Notes |
+|---|---|---|
+| **M7.0** Data foundations | Norgate ingest (US 30y); EODHD multi-market expansion; **synthetic generator v1 (block bootstrap on single index, ~250 LOC)** → v2 (HMM regimes, ~800 LOC) → v3 (factor model multi-symbol, ~1000 LOC) → v4 (GARCH+jumps, optional) | v1 first (cheap, useful immediately); skip GAN |
+| **M7.1** Train/test ML | Walk-forward train/test split, leakage-safe. Linear regression baseline → decision tree → optional FFI to xgboost/lightgbm. OCaml-resident model serialization. Target: per-symbol Score from per-trade features; oracle from `optimal-strategy` counterfactual | Uses M5.2 metrics + M7.0 data |
+| **M7.2** Synthetic stress | Run tuned configs on Synth-v3 universe; reject configs that fail stress on 80yr synthetic histories | Antifragility check at config level — not just point-estimate Sharpe |
+
+See `dev/plans/m7-data-and-tuning-2026-05-02.md`.
+
+**Dependency graph (top-of-queue first):**
+
+```
+M5.1 (hardening) ──┬──→ M5.2a (--override flag)
+                   │       ↓
+                   │    M5.2b/c/d (metrics expansion)
+                   │       ↓
+                   ├──→ M5.4 (experiments) ─────────┐
+                   │                                 │
+                   ├──→ M6.1 (weekly snapshot) ─→ M6.2 → M6.3
+                   │                                 │
+                   └──→ M6.4 (split/div verify) ────┤
+                                                     ↓
+                                             M5.5/M7 (tuning + ML)
+                                                     ↑
+                            M7.0 (Norgate + synth-v1) ─→ M5.3 (streaming)
+```
+
 ---
 
 ## 8. Build plan
