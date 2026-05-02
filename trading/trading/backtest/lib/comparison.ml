@@ -66,6 +66,19 @@ let _metric_label : Metric_type.t -> string = function
   | WinLossRatio -> "win_loss_ratio"
   | MaxConsecutiveWins -> "max_consecutive_wins"
   | MaxConsecutiveLosses -> "max_consecutive_losses"
+  (* M5.2c: risk-adjusted *)
+  | SortinoRatioAnnualized -> "sortino_ratio_annualized"
+  | MarRatio -> "mar_ratio"
+  | OmegaRatio -> "omega_ratio"
+  (* M5.2c: drawdown analytics *)
+  | AvgDrawdownPct -> "avg_drawdown_pct"
+  | MedianDrawdownPct -> "median_drawdown_pct"
+  | MaxDrawdownDurationDays -> "max_drawdown_duration_days"
+  | AvgDrawdownDurationDays -> "avg_drawdown_duration_days"
+  | TimeInDrawdownPct -> "time_in_drawdown_pct"
+  | UlcerIndex -> "ulcer_index"
+  | PainIndex -> "pain_index"
+  | UnderwaterCurveArea -> "underwater_curve_area"
 
 let _all_metric_types : Metric_type.t list =
   [
@@ -114,6 +127,19 @@ let _all_metric_types : Metric_type.t list =
     WinLossRatio;
     MaxConsecutiveWins;
     MaxConsecutiveLosses;
+    (* M5.2c: risk-adjusted *)
+    SortinoRatioAnnualized;
+    MarRatio;
+    OmegaRatio;
+    (* M5.2c: drawdown analytics *)
+    AvgDrawdownPct;
+    MedianDrawdownPct;
+    MaxDrawdownDurationDays;
+    AvgDrawdownDurationDays;
+    TimeInDrawdownPct;
+    UlcerIndex;
+    PainIndex;
+    UnderwaterCurveArea;
   ]
 
 let _diff_for_metric ~baseline_set ~variant_set (mt : Metric_type.t) =

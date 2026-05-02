@@ -86,6 +86,20 @@ val return_basics_computer : unit -> Simulator.any_metric_computer
     via × sqrt(252); calendar bucketing pairs adjacent buckets' last
     portfolio_value to compute compounded period returns. *)
 
+(** {1 Omega Ratio Computer (M5.2c)} *)
+
+val omega_ratio_computer : unit -> Simulator.any_metric_computer
+(** Computer that emits [OmegaRatio] at threshold 0%. See
+    {!Risk_adjusted_computer} for the full risk-adjusted suite (Sortino + MAR
+    are derived; only Omega is step-based). *)
+
+(** {1 Drawdown Analytics Computer (M5.2c)} *)
+
+val drawdown_analytics_computer : unit -> Simulator.any_metric_computer
+(** Computer that emits the M5.2c drawdown-block group: AvgDrawdownPct,
+    MedianDrawdownPct, MaxDrawdownDurationDays, AvgDrawdownDurationDays,
+    TimeInDrawdownPct, UlcerIndex, PainIndex, UnderwaterCurveArea. *)
+
 (** {1 Default Computer Set} *)
 
 val default_computers :
@@ -95,7 +109,8 @@ val default_computers :
   Simulator.any_metric_computer list
 (** Returns all default step-based metric computers: summary (including profit
     factor), Sharpe ratio, max drawdown, CAGR, portfolio state, trade
-    aggregates, and the M5.2b returns-block group.
+    aggregates, the M5.2b returns-block group, the M5.2c Omega ratio computer,
+    and the M5.2c drawdown analytics group.
 
     @param risk_free_rate
       Annual risk-free rate for Sharpe calculation (default: 0.0)
@@ -110,7 +125,10 @@ val calmar_ratio_derived : Simulator.derived_metric_computer
     being computed first by step-based computers. *)
 
 val default_derived_computers : unit -> Simulator.derived_metric_computer list
-(** Returns all default derived metric computers (currently: CalmarRatio). *)
+(** Returns all default derived metric computers: [CalmarRatio],
+    [SortinoRatioAnnualized] (= CAGR / DownsideDeviationPctAnnualized), and
+    [MarRatio] (= CAGR / MaxDrawdown — same formula as Calmar; both labels
+    surface for downstream tooling that expects either one). *)
 
 val default_metric_suite :
   ?risk_free_rate:float -> ?initial_cash:float -> unit -> Simulator.metric_suite
@@ -132,5 +150,9 @@ val create_computer :
     trade-aggregate group (NumTrades, LossRate, AvgWin/Loss, etc.) is produced
     together by trade_aggregates_computer; the returns-block group
     (TotalReturnPct, VolatilityPctAnnualized, BestDayPct, etc.) by
-    return_basics_computer. CalmarRatio is a derived metric computed post-hoc by
-    the simulator. *)
+    return_basics_computer. The drawdown-analytics group (AvgDrawdownPct,
+    UlcerIndex, etc.) by drawdown_analytics_computer.
+
+    CalmarRatio, SortinoRatioAnnualized, and MarRatio are derived metrics — the
+    factory returns a step-based stub that emits [0.0]; the real values come
+    from the corresponding entries in {!default_derived_computers}. *)

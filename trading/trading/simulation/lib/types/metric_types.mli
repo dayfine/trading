@@ -99,6 +99,50 @@ module Metric_type : sig
             entry date). *)
     | MaxConsecutiveLosses
         (** Longest run of consecutive losing round-trips. *)
+    (* ---- M5.2c risk-adjusted ---- *)
+    | SortinoRatioAnnualized
+        (** Annualized Sortino ratio: [CAGR / DownsideDeviationPctAnnualized]
+            (both in percent, so the ratio is dimensionless). Returns [0.0] when
+            downside deviation is zero. *)
+    | MarRatio
+        (** MAR ratio: [CAGR / |MaxDrawdown|]. Defined identically to
+            [CalmarRatio] over a single backtest window — exposed under both
+            names because the literature splits hairs (Calmar is conventionally
+            36-month; MAR is the long-window/since-inception variant) and
+            downstream tooling expects either label. *)
+    | OmegaRatio
+        (** Omega(threshold = 0%): ratio of average upside-area to average
+            downside-area of step returns above/below the threshold. > 1 means
+            average gains exceed average losses by area; < 1 means the inverse.
+            Returns [Float.infinity] when there are gains but no losses. *)
+    (* ---- M5.2c drawdown analytics ---- *)
+    | AvgDrawdownPct
+        (** Mean of the trough-depth percent across all completed drawdown
+            episodes (peak → trough → recovery to a new peak). The still-open
+            trailing drawdown at the end of the run is included as a final
+            episode (its trough is the lowest value reached after the most
+            recent peak). *)
+    | MedianDrawdownPct
+        (** Median of the trough-depth percent across drawdown episodes (same
+            episode definition as [AvgDrawdownPct]). *)
+    | MaxDrawdownDurationDays
+        (** Longest single drawdown episode duration in days, measured from the
+            peak that started the drawdown to the date of recovery (or to the
+            end of the run if the episode has not recovered). *)
+    | AvgDrawdownDurationDays  (** Mean drawdown episode duration in days. *)
+    | TimeInDrawdownPct
+        (** Percentage of trading days spent below the previous peak (= days
+            with drawdown > 0 divided by total trading days × 100). *)
+    | UlcerIndex
+        (** Ulcer Index: square-root of the mean of the squared per-day drawdown
+            percent. Penalises both depth and duration of drawdowns. *)
+    | PainIndex
+        (** Pain Index: arithmetic mean of per-day drawdown percent. Linear in
+            depth × duration. *)
+    | UnderwaterCurveArea
+        (** Sum of per-day drawdown percent across the run (= [PainIndex]
+            multiplied by the number of trading days). Reported in percent·days;
+            useful as a raw integral when the period length is held constant. *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -149,6 +193,17 @@ type metric_type = Metric_type.t =
   | WinLossRatio
   | MaxConsecutiveWins
   | MaxConsecutiveLosses
+  | SortinoRatioAnnualized
+  | MarRatio
+  | OmegaRatio
+  | AvgDrawdownPct
+  | MedianDrawdownPct
+  | MaxDrawdownDurationDays
+  | AvgDrawdownDurationDays
+  | TimeInDrawdownPct
+  | UlcerIndex
+  | PainIndex
+  | UnderwaterCurveArea
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)
@@ -174,33 +229,9 @@ val sexp_of_metric_set : metric_set -> Sexp.t
 val metric_set_to_sexp_pairs : metric_set -> Sexp.t
 (** Convert to a sexp list of [(key value)] pairs for human-readable output. *)
 
-(** {1 Metric Unit} *)
+(** {1 Metric Unit, Info, Formatting}
 
-(** Unit of measurement for formatting *)
-type metric_unit =
-  | Dollars  (** Monetary value in dollars *)
-  | Percent  (** Percentage value (0-100 scale) *)
-  | Days  (** Time duration in days *)
-  | Count  (** Discrete count *)
-  | Ratio  (** Dimensionless ratio *)
-[@@deriving show, eq]
-
-(** {1 Metric Info} *)
-
-type metric_info = {
-  display_name : string;  (** Human-readable name *)
-  description : string;  (** Brief explanation *)
-  unit : metric_unit;  (** Unit for formatting *)
-}
-(** Metadata about a metric type *)
-
-val get_metric_info : metric_type -> metric_info
-(** Get display info for a metric type *)
-
-(** {1 Formatting} *)
-
-val format_metric : metric_type -> float -> string
-(** Format a single metric for display (e.g., "Sharpe Ratio: 1.25") *)
-
-val format_metrics : metric_set -> string
-(** Format all metrics for display, one per line *)
+    Moved out of this module — see {!Metric_info_registry} for [metric_unit],
+    [metric_info], [get_metric_info], [format_metric], and [format_metrics].
+    Splitting was necessary to keep this enum file under the file-length linter
+    limit. *)
