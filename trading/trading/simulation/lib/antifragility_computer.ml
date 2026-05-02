@@ -16,8 +16,19 @@ let _det_tolerance = 1e-12
 
 type state = {
   portfolio_values : float list;  (** Reversed: head is most recent. *)
-  benchmark_returns : float list option;
-      (** Chronological. None = no plumbing. *)
+  step_benchmark_returns : float list;
+      (** Reversed: head is most recent. Accumulated from each trading step's
+          [step.benchmark_return] (filtering out [None]s) so the metric can
+          read the benchmark series straight from the simulator without an
+          out-of-band override. Aligned to [portfolio_values] only when every
+          trading step carries a benchmark; otherwise the alignment helper
+          truncates to the shorter length. *)
+  benchmark_returns_override : float list option;
+      (** Optional explicit benchmark series supplied at construction. When
+          [Some], it takes precedence over [step_benchmark_returns]; when
+          [None] the step-sourced series is used. The override path supports
+          synthetic tests that pin specific benchmark values without going
+          through the simulator. *)
 }
 
 let _step_returns_pct values =
@@ -159,7 +170,7 @@ let _empty_metric_set () =
 
 let _build_metrics ~strat_returns ~benchmark_returns =
   match benchmark_returns with
-  | None -> _empty_metric_set ()
+  | None | Some [] -> _empty_metric_set ()
   | Some bench ->
       let pairs = _align_pairs strat_returns bench in
       Metric_types.of_alist_exn
@@ -168,24 +179,46 @@ let _build_metrics ~strat_returns ~benchmark_returns =
           (BucketAsymmetry, _bucket_asymmetry pairs);
         ]
 
+(** Pick the benchmark series to use: explicit override wins; otherwise the
+    step-accumulated series (reversed back to chronological). [None] when
+    no override was supplied AND no step carried a [benchmark_return]. *)
+let _resolve_benchmark_series state =
+  match state.benchmark_returns_override with
+  | Some _ as override -> override
+  | None -> (
+      match state.step_benchmark_returns with
+      | [] -> None
+      | xs -> Some (List.rev xs))
+
 let _update ~state ~step =
   if not (Metric_computer_utils.is_trading_day_step step) then state
   else
-    {
-      state with
-      portfolio_values =
-        step.Simulator_types.portfolio_value :: state.portfolio_values;
-    }
+    let portfolio_values =
+      step.Simulator_types.portfolio_value :: state.portfolio_values
+    in
+    let step_benchmark_returns =
+      match step.Simulator_types.benchmark_return with
+      | None -> state.step_benchmark_returns
+      | Some r -> r :: state.step_benchmark_returns
+    in
+    { state with portfolio_values; step_benchmark_returns }
 
 let _finalize ~state ~config:_ =
   let strat_returns = _step_returns_pct (List.rev state.portfolio_values) in
-  _build_metrics ~strat_returns ~benchmark_returns:state.benchmark_returns
+  _build_metrics ~strat_returns
+    ~benchmark_returns:(_resolve_benchmark_series state)
 
 let computer ?benchmark_returns () : Simulator_types.any_metric_computer =
   Simulator_types.wrap_computer
     {
       name = "antifragility";
-      init = (fun ~config:_ -> { portfolio_values = []; benchmark_returns });
+      init =
+        (fun ~config:_ ->
+          {
+            portfolio_values = [];
+            step_benchmark_returns = [];
+            benchmark_returns_override = benchmark_returns;
+          });
       update = _update;
       finalize = _finalize;
     }

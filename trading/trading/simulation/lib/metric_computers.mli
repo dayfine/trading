@@ -111,10 +111,12 @@ val distributional_computer : unit -> Simulator.any_metric_computer
 
 val antifragility_computer :
   ?benchmark_returns:float list -> unit -> Simulator.any_metric_computer
-(** Computer that emits ConcavityCoef and BucketAsymmetry. Both metrics require
-    a benchmark return series; when [benchmark_returns] is omitted they emit 0.0
-    (the documented default for stand-alone backtest runs). See
-    {!Antifragility_computer} for spec and benchmark-plumbing rationale. *)
+(** Computer that emits ConcavityCoef and BucketAsymmetry. The benchmark series
+    is sourced from [step_result.benchmark_return] when the simulator is
+    configured with [dependencies.benchmark_symbol]; the optional
+    [?benchmark_returns] override pins a synthetic series for tests. When
+    neither source is available, both metrics emit 0.0. See
+    {!Antifragility_computer} for spec. *)
 
 (** {1 Default Computer Set} *)
 
@@ -127,8 +129,9 @@ val default_computers :
     factor), Sharpe ratio, max drawdown, CAGR, portfolio state, trade
     aggregates, the M5.2b returns-block group, the M5.2c Omega ratio computer,
     the M5.2c drawdown analytics group, the M5.2d distributional group, and the
-    M5.2d antifragility computer (no benchmark wired by default — its two
-    metrics emit 0.0 in this configuration).
+    M5.2d antifragility computer (which reads benchmark returns from
+    [step_result.benchmark_return]; emits 0.0 when no benchmark symbol was
+    wired into the simulator's dependencies).
 
     @param risk_free_rate
       Annual risk-free rate for Sharpe calculation (default: 0.0)
@@ -178,5 +181,7 @@ val create_computer :
     Distributional metrics (Skewness, Kurtosis, CVaR95, CVaR99, TailRatio,
     GainToPain) are produced together by [distributional_computer].
     Antifragility metrics (ConcavityCoef, BucketAsymmetry) are produced by
-    [antifragility_computer] with no benchmark wired by default — both emit
-    [0.0] under that configuration. *)
+    [antifragility_computer], which reads the benchmark series from
+    [step_result.benchmark_return] populated by the simulator when
+    [dependencies.benchmark_symbol] is set. With no benchmark wired, both
+    metrics emit [0.0]. *)

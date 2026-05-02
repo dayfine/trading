@@ -35,6 +35,16 @@ type step_result = {
       (** Split events detected and applied to held positions at the start of
           this step, in detection order. Empty on non-split days (the common
           case). Used for diagnostics and parity checks. *)
+  benchmark_return : float option;
+      (** Benchmark per-step percent return for this date, if a benchmark symbol
+          was configured on [dependencies] and a prior bar exists for it.
+          Computed as [(today.adjusted_close - prev.adjusted_close) /
+          prev.adjusted_close * 100.0] from the market data adapter. [None] when
+          no benchmark is configured, when the benchmark has no bar for [date]
+          (weekend/holiday/missing data), or when there is no prior bar (the
+          first appearance of the benchmark in the simulation window). The
+          antifragility computer reads this field per step to assemble its
+          benchmark series. *)
 }
 [@@deriving show, eq]
 (** Result of a single simulation step *)

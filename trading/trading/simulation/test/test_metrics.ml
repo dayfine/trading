@@ -123,6 +123,7 @@ let _step_with_trades ~date ~trades =
     trades;
     orders_submitted = [];
     splits_applied = [];
+    benchmark_return = None;
   }
 
 (** Long round-trip: Buy@100 → Sell@110, quantity 10, profit $100. Pins the
@@ -324,6 +325,7 @@ let make_step_result ~date ~portfolio_value =
     trades = [];
     orders_submitted = [];
     splits_applied = [];
+    benchmark_return = None;
   }
 
 let make_config () =
@@ -642,6 +644,7 @@ let test_profit_factor_all_winners _ =
         trades = [ buy_trade ];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
       {
         date = date_of_string "2024-01-10";
@@ -650,6 +653,7 @@ let test_profit_factor_all_winners _ =
         trades = [ sell_trade ];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
     ]
   in
@@ -891,6 +895,7 @@ let test_portfolio_state_with_trades _ =
         trades = [ trade ];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
       {
         date = date_of_string "2024-01-05";
@@ -899,6 +904,7 @@ let test_portfolio_state_with_trades _ =
         trades = [ trade; trade ];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
     ]
   in
@@ -961,6 +967,7 @@ let test_portfolio_state_skips_non_trading_final_step _ =
         trades = [];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
       {
         (* Non-trading day — simulator fell back to cash. *)
@@ -970,6 +977,7 @@ let test_portfolio_state_skips_non_trading_final_step _ =
         trades = [];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
     ]
   in
@@ -1007,6 +1015,7 @@ let test_portfolio_state_uses_last_step_when_all_trading_days _ =
         trades = [];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
       {
         date = date_of_string "2024-01-06";
@@ -1015,6 +1024,7 @@ let test_portfolio_state_uses_last_step_when_all_trading_days _ =
         trades = [];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
     ]
   in
@@ -1053,6 +1063,7 @@ let test_portfolio_state_long_unrealized_pnl _ =
         trades = [];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
     ]
   in
@@ -1112,6 +1123,7 @@ let test_portfolio_state_short_unrealized_pnl _ =
         trades = [];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
     ]
   in
@@ -1182,6 +1194,7 @@ let test_portfolio_state_mixed_unrealized_pnl _ =
         trades = [];
         orders_submitted = [];
         splits_applied = [];
+        benchmark_return = None;
       };
     ]
   in

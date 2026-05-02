@@ -61,6 +61,7 @@ let make_expected_step_result ~date ~portfolio ?portfolio_value ~trades
     trades;
     orders_submitted;
     splits_applied = [];
+    benchmark_return = None;
   }
 
 (* Custom matchers for step_outcome *)

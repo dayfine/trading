@@ -21,6 +21,7 @@ let _make_step ~date ~portfolio_value : Simulator_types.step_result =
     trades = [];
     orders_submitted = [];
     splits_applied = [];
+    benchmark_return = None;
   }
 
 let _config =

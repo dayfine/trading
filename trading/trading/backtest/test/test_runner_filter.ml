@@ -46,6 +46,7 @@ let _make_step_with_trades ~date ~portfolio ~trades =
     trades;
     orders_submitted = [];
     splits_applied = [];
+    benchmark_return = None;
   }
 
 (* -------------------------------------------------------------------- *)

@@ -1,10 +1,11 @@
 (** Antifragility / barbell metrics (M5.2d).
 
     These metrics describe the strategy's response curve as a function of a
-    {b benchmark} (default convention: SPY total return). The strategy's
-    per-step return is regressed quadratically against the benchmark's per-step
-    return; the curvature term [γ] (coefficient of [r_bench²]) is the
-    {b concavity coefficient} after Taleb:
+    {b benchmark} (typically SPY or GSPC.INDX total return; the simulator
+    accepts any symbol via [Simulator.dependencies.benchmark_symbol]). The
+    strategy's per-step return is regressed quadratically against the
+    benchmark's per-step return; the curvature term [γ] (coefficient of
+    [r_bench²]) is the {b concavity coefficient} after Taleb:
 
     - [γ > 0] → convex / antifragile (strategy gains more than linearly in
       benchmark extremes);
@@ -18,18 +19,23 @@
     Values > 1 indicate a barbell shape (strategy concentrates returns in the
     benchmark's extremes). Values ≤ 1 indicate a middle-heavy shape.
 
-    {b Benchmark plumbing.} The simulator's [step_result] does not currently
-    track benchmark returns. To avoid an invasive surface change in this PR, the
-    benchmark series is supplied directly at computer construction:
+    {b Benchmark plumbing.} The benchmark series can be sourced two ways:
 
-    {[
-      let computer = Antifragility_computer.computer ~benchmark_returns:[ ... ] ()
-    ]}
+    1. {b From the simulator} — when [Simulator.dependencies.benchmark_symbol]
+       is [Some sym], every [step_result] carries a [benchmark_return : float
+       option] computed from [sym]'s adjusted-close % change. The computer
+       accumulates those values and uses them automatically; nothing extra
+       is needed at the call site. This is the production path.
+    2. {b Override at construction} — pass [?benchmark_returns] to bypass the
+       step-sourced series and pin a synthetic series. Used by tests that
+       want to fix benchmark values independent of any market data adapter:
+       {[
+         let computer = Antifragility_computer.computer ~benchmark_returns:[ ... ] ()
+       ]}
 
-    When [benchmark_returns] is [None] (the default for stand-alone backtest
-    runs), both [ConcavityCoef] and [BucketAsymmetry] are emitted as [0.0]. A
-    follow-up PR will plumb a benchmark feed through the simulator, at which
-    point this computer will read the series from [config] instead.
+    When neither path supplies a benchmark — no override, and every step has
+    [benchmark_return = None] — both [ConcavityCoef] and [BucketAsymmetry] emit
+    [0.0]. This preserves the prior stand-alone-backtest behaviour.
 
     {b OLS formula.} Given paired samples [(x_i, y_i)] with [x = r_bench],
     [y = r_strat], the model is [y = α + β·x + γ·x²]. Define [u = x²]. Then
@@ -50,10 +56,13 @@ val computer :
     [BucketAsymmetry].
 
     @param benchmark_returns
-      Optional per-step benchmark percent-return series. When supplied, the list
-      must be in chronological order; the computer aligns it to the strategy's
-      per-step returns by truncating the longer side. When [None], both metrics
-      are emitted as [0.0].
+      Optional explicit per-step benchmark percent-return series. When
+      supplied, the list must be in chronological order; the computer aligns
+      it to the strategy's per-step returns by truncating the longer side.
+      When omitted, the computer falls back to the per-step values stored in
+      [step_result.benchmark_return] (populated by the simulator when
+      [dependencies.benchmark_symbol] is set). When neither source provides a
+      series, both metrics are emitted as [0.0].
 
     Edge cases:
     - Fewer than 5 paired samples → both metrics 0.0 (insufficient data for a
