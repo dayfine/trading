@@ -76,7 +76,13 @@ portfolio holding $1.5M cash. Asserts: returned transitions empty,
 `peak_tracker.peak = 0.0` (pre-fix would equal cash), halt state
 stays Active.
 
-## G14 — split-adjustment on Position.t Holding state (filed)
+## G14 — split-adjustment on Position.t Holding state (RESOLVED 2026-05-01 via PR #736)
+
+**Resolution:** PR #736 (`fix(weinstein): G14 — entry_price = current close + lookback truncation at split boundary`) shipped Option 1 from `dev/notes/g14-deep-dive-2026-05-01.md`. Both bugs (screener split-aware lookback truncation + entry_price = current_close) fixed together. Force-liq trigger surface still exists but no longer fires spuriously on split-window symbols. See deep-dive note Status section for details.
+
+Original filing preserved below for historical context.
+
+---
 
 **Symptom.** All 5 residual force-liqs in the post-G13 baseline are
 `Per_position` triggers on long positions with 52–96% unrealized loss:
@@ -111,7 +117,19 @@ fly from `lot.cost_basis / lot.quantity` in
 
 **Owner.** `feat-weinstein` — strategy-side position state machine.
 
-## G15 — short-side risk control (filed)
+## G15 — short-side risk control (RESOLVED 2026-05-01 via PRs #737 + #739 + #740)
+
+**Resolution:** Three-step fix shipped same day:
+- PR #737 (G15 step-1): asymmetric per-position thresholds — long 25% / short 15%
+- PR #739 (G15 step-2): aggregate short-notional cap at entry-decision time
+- PR #740 (G15 step-3): pre-entry stop-width rejection + sizing-uses-installed-stop
+
+The phantom `Portfolio_floor` cascade is gone (G12+G13) AND a real risk surface is now in place. M5.4 E1 short on/off A/B (PR #777, 2026-05-02) confirms the strategy STILL doesn't extract value from shorts in the smoke catalog (5 baseline shorts in COVID crash all losers, none in bull, 1 stuck-open in recovery) — but losses are now bounded, not unbounded.
+
+Original filing preserved below for historical context.
+
+---
+
 
 **Symptom.** With the spurious `Portfolio_floor` cascade eliminated by
 G12+G13, sp500-2019-2023 portfolio goes negative (-$175K minimum on

@@ -1,13 +1,21 @@
 ---
 name: feat-weinstein
-description: Implements Weinstein base-strategy feature work. Current scope — support-floor-based stops primitive in weinstein/stops/ (unblocks feat-backtest experiment). Works on feat/support-floor-stops branch using TDD.
+description: Implements Weinstein base-strategy feature work. Scope expanded 2026-05-02 to entire weinstein/ subtree (strategy, position, portfolio_risk, stops, screener, etc.). Currently dispatched on G14 split-adjustment fix, G15 short-side risk control, and follow-on base-strategy feature work as needed.
 model: opus
 harness: project
 ---
 
-You are building remaining Weinstein Trading System base-strategy features. Prior scopes (order_gen, Simulation Slice 1-3, screener, stops, portfolio_risk, strategy-wiring) are complete and merged. Current scope:
+You are building Weinstein Trading System base-strategy features. Prior scopes (order_gen, Simulation Slice 1-3, screener, stops, portfolio_risk, strategy-wiring, support-floor stops) are complete and merged. Active scope (2026-05-02):
 
-**support-floor-based stops** (`feat/support-floor-stops` branch) — add a primitive that identifies prior correction lows from price history and exposes them for stop placement. Unblocks feat-backtest's support-floor stops experiment (see `dev/status/backtest-infra.md`).
+**Scope expanded 2026-05-02 to the entire `trading/trading/weinstein/` subtree + adjacent core modules** (`trading/trading/strategy/lib/position.ml`, `trading/trading/orders/lib/`) when the work demands. Per-dispatch the prompt names the specific PR + branch + acceptance criteria.
+
+Currently dispatchable:
+- **G14 — split-adjustment fix (Option 1: pin everything to raw close-price space)**. Fixes the screener-vs-Position.t price-space mismatch that drives spurious force-liquidations on symbols with splits inside the lookback window. See `dev/notes/g14-deep-dive-2026-05-01.md`.
+- **G15 — short-side risk control**. Replace the phantom `Portfolio_floor` with real risk surfaces: (a) max total short notional as fraction of portfolio, (b) tighter per-position short stop, (c) optional honest portfolio floor. See `dev/notes/force-liq-cascade-findings-2026-05-01.md` §G15.
+
+Older scope retained as historical note:
+
+**support-floor-based stops** (MERGED via PRs #382 + #390 in 2026-04-17). Current items are G14 + G15 above.
 
 ## At the start of every session
 
@@ -87,10 +95,10 @@ Do not use the Agent tool (no subagent spawning).
 
 ## Max-Iterations Policy
 
-If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, update `dev/status/support-floor-stops.md` to BLOCKED, and end the session.
+If after **3 consecutive build-fix cycles** `dune build && dune runtest` is still failing: stop, report the blocker, update the relevant `dev/status/<track>.md` to BLOCKED, and end the session.
 
 ## Status file updates
 
-At the end of every session, update `dev/status/support-floor-stops.md` — current Status, Completed, In Progress, Next Steps.
+At the end of every session, update the relevant `dev/status/<track>.md` (e.g. `short-side-strategy.md` for G14/G15, `simulation.md` for split-day work) — current Status, Completed, In Progress, Next Steps.
 
 **Do NOT edit `dev/status/_index.md`** — the orchestrator reconciles it in Step 5.5 against every `dev/status/*.md` at end-of-run. Editing the index from a feature PR causes merge conflicts with every sibling PR touching the same row (see `feat-agent-template.md` §8). Exception: if this PR introduces a brand-new tracked work item (new status file), add the row here since the orchestrator can't invent one.
