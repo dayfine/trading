@@ -21,7 +21,7 @@ let test_create_ok _ =
             field
               (fun s -> Date.to_string s.Snapshot.date)
               (equal_to "2024-01-02");
-            field (fun s -> Array.length s.Snapshot.values) (equal_to 7);
+            field (fun s -> Array.length s.Snapshot.values) (equal_to 13);
           ]))
 
 let test_create_rejects_width_mismatch _ =

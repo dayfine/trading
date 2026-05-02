@@ -8,10 +8,30 @@ type field =
   | Stage
   | RS_line
   | Macro_composite
+  | Open
+  | High
+  | Low
+  | Close
+  | Volume
+  | Adjusted_close
 [@@deriving sexp, compare, equal, show]
 
 let all_fields =
-  [ EMA_50; SMA_50; ATR_14; RSI_14; Stage; RS_line; Macro_composite ]
+  [
+    EMA_50;
+    SMA_50;
+    ATR_14;
+    RSI_14;
+    Stage;
+    RS_line;
+    Macro_composite;
+    Open;
+    High;
+    Low;
+    Close;
+    Volume;
+    Adjusted_close;
+  ]
 
 let field_name = function
   | EMA_50 -> "EMA_50"
@@ -21,6 +41,12 @@ let field_name = function
   | Stage -> "Stage"
   | RS_line -> "RS_line"
   | Macro_composite -> "Macro_composite"
+  | Open -> "Open"
+  | High -> "High"
+  | Low -> "Low"
+  | Close -> "Close"
+  | Volume -> "Volume"
+  | Adjusted_close -> "Adjusted_close"
 
 (* Canonical sexp form drives the hash. We use [Sexp.to_string] (not
    [to_string_hum]) because the compact form omits whitespace entirely, so

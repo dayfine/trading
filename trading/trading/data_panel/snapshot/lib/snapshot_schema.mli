@@ -15,7 +15,8 @@
     silent corruption — see [Snapshot_format.read]). Migration cost is a full
     corpus rebuild via [bin/build_snapshots.exe] (Phase B). *)
 
-(** Phase A field set, locked-in per the plan §"Indicator set lock-in".
+(** Canonical field set for daily snapshots — derived indicators plus the raw
+    OHLCV scalars Phase D needs for per-tick price reads.
 
     Every value is a Float64 scalar (parity-gate decision, plan §Decisions).
     Variant-shaped indicators (e.g. multi-period RS) must be enumerated as
@@ -31,7 +32,33 @@
     - {!Stage}: Weinstein stage classification encoded as
       [1.0 | 2.0 | 3.0 | 4.0]; [Float.nan] means "not yet classifiable"
     - {!RS_line}: relative-strength line (price vs market benchmark)
-    - {!Macro_composite}: macro-environment composite score *)
+    - {!Macro_composite}: macro-environment composite score
+    - {!Open}: raw daily open price for the bar
+    - {!High}: raw daily high price for the bar
+    - {!Low}: raw daily low price for the bar
+    - {!Close}: raw daily close price for the bar (unadjusted)
+    - {!Volume}: raw daily share volume, cast to [float]; precision is exact for
+      counts up to ~2^53, well above any realistic equity volume
+    - {!Adjusted_close}: split- and dividend-adjusted close used by every
+      indicator (so consumers can join indicator scalars back to the price the
+      indicator was computed against)
+
+    {2 OHLCV addition}
+
+    Phase A originally enumerated only the seven indicator scalars. The Phase D
+    engine + simulator integration discovered that the per-tick simulator needs
+    raw OHLCV to price orders, and the Weinstein strategy reads OHLCV via
+    [Bar_reader] for [Stage.classify] / [Volume.analyze_breakout] /
+    [Resistance.analyze]. This precursor (Phase A.1) adds the six OHLCV fields
+    so Phase D can land without re-introducing a parallel bar-shaped data path.
+
+    The OHLCV fields are appended after the indicator scalars: existing column
+    indices for [EMA_50 .. Macro_composite] are unchanged; the schema width
+    grows from 7 to 13. The schema hash necessarily changes (it is order- and
+    set-sensitive by design) — see {!compute_hash}. Pre-existing on-disk
+    snapshots become unreadable under the new {!default}; the manifest's
+    [schema_hash] gate will surface the mismatch loudly. This is the intended
+    behaviour for a content-addressable schema fingerprint, not a regression. *)
 type field =
   | EMA_50
   | SMA_50
@@ -40,6 +67,12 @@ type field =
   | Stage
   | RS_line
   | Macro_composite
+  | Open
+  | High
+  | Low
+  | Close
+  | Volume
+  | Adjusted_close
 [@@deriving sexp, compare, equal, show]
 
 val all_fields : field list
@@ -71,9 +104,9 @@ val create : fields:field list -> t
     well-defined) but produces a schema that no real snapshot can match. *)
 
 val default : t
-(** [default] is the Phase-A locked-in schema: every variant of {!field} in
-    declaration order ({!all_fields}). The single source of truth for Phase-A
-    snapshots produced by the offline pipeline. *)
+(** [default] is the canonical 13-field schema: every variant of {!field} in
+    declaration order ({!all_fields}). The single source of truth for snapshots
+    produced by the offline pipeline. *)
 
 val compute_hash : field list -> string
 (** [compute_hash fields] returns a deterministic hex fingerprint of the ordered

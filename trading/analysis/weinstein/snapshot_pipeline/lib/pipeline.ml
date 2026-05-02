@@ -198,8 +198,8 @@ let _macro_value_for_prefix ~benchmark_bars ~cutoff =
       in
       result.confidence
 
-let _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~date ~benchmark_bars
-    =
+let _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~bars_arr ~date
+    ~benchmark_bars =
   match (field : Snapshot_schema.field) with
   | EMA_50 -> _ema_at ~closes ~period:_ema_period ~i
   | SMA_50 -> _sma_at ~closes ~period:_sma_period ~i
@@ -215,13 +215,19 @@ let _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~date ~benchmark_bars
       | None -> Float.nan
       | Some bench -> _macro_value_for_prefix ~benchmark_bars:bench ~cutoff:date
       )
+  | Open -> bars_arr.(i).Types.Daily_price.open_price
+  | High -> bars_arr.(i).Types.Daily_price.high_price
+  | Low -> bars_arr.(i).Types.Daily_price.low_price
+  | Close -> bars_arr.(i).Types.Daily_price.close_price
+  | Volume -> Float.of_int bars_arr.(i).Types.Daily_price.volume
+  | Adjusted_close -> bars_arr.(i).Types.Daily_price.adjusted_close
 
 let _row_for_day ~symbol ~schema ~bars ~bars_arr ~closes ~highs ~lows ~i
     ~benchmark_bars =
   let date = bars_arr.(i).Types.Daily_price.date in
   let values =
     Array.of_list_map schema.Snapshot_schema.fields ~f:(fun field ->
-        _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~date
+        _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~bars_arr ~date
           ~benchmark_bars)
   in
   Snapshot.create ~schema ~symbol ~date ~values
