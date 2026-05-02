@@ -52,9 +52,9 @@ val default_enter_exit_config : enter_exit_config
 
     Usage:
     {[
-      module My_strategy = Make_enter_then_exit_strategy (struct
-        let config = { default_enter_exit_config with symbol = "MSFT" }
-      end)
+    module My_strategy = Make_enter_then_exit_strategy (struct
+      let config = { default_enter_exit_config with symbol = "MSFT" }
+    end)
     ]} *)
 module Make_enter_then_exit_strategy (_ : sig
   val config : enter_exit_config

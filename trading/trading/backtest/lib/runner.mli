@@ -131,10 +131,10 @@ val run_backtest :
     order. Each must be a record sexp with fields matching
     [Weinstein_strategy.config]. Example:
     {[
-      [
-        Sexp.of_string "((initial_stop_buffer 1.08))";
-        Sexp.of_string "((stage_config ((ma_period 40))))";
-      ]
+    [
+      Sexp.of_string "((initial_stop_buffer 1.08))";
+      Sexp.of_string "((stage_config ((ma_period 40))))";
+    ]
     ]}
 
     [sector_map_override], when passed, replaces the sector-map normally loaded
