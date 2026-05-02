@@ -6,6 +6,12 @@ type fetch_fn = Uri.t -> string Status.status_or Deferred.t
     returns either [Ok body] with the response body as a string, or
     [Error status] if the request fails. *)
 
+val default_fetch : fetch_fn
+(** Default live HTTP fetcher, backed by [Cohttp_async.Client]. Sibling endpoint
+    modules ({!Splits_endpoint}, {!Dividends_endpoint}) reuse this so all live
+    HTTP traffic shares a single implementation. Tests inject a fixture-backed
+    [fetch_fn] instead. *)
+
 type historical_price_params = {
   symbol : string;  (** If not specified, omitted from the API call *)
   start_date : Date.t option;  (** If not specified, defaults to today *)

@@ -1,5 +1,5 @@
-(test
- (name test_http_client)
- (libraries eodhd core async async_unix ounit2 csv)
+(tests
+ (names test_http_client test_splits_endpoint test_dividends_endpoint)
+ (libraries eodhd core async async_unix ounit2 csv matchers status)
  (deps
   (glob_files ./data/*.json)))

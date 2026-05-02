@@ -22,7 +22,7 @@ type fundamentals = {
 
 let _api_host = "eodhd.com"
 
-let _fetch_body uri : string Status.status_or Deferred.t =
+let default_fetch uri : string Status.status_or Deferred.t =
   Cohttp_async.Client.get uri >>= fun (resp, body) ->
   match Cohttp.Response.status resp with
   | `OK -> Cohttp_async.Body.to_string body >>| fun body_str -> Ok body_str
@@ -30,6 +30,9 @@ let _fetch_body uri : string Status.status_or Deferred.t =
       let status_str = Cohttp.Code.string_of_status status in
       Cohttp_async.Body.to_string body >>| fun body_str ->
       Error (Status.internal_error ("Error: " ^ status_str ^ "\n" ^ body_str))
+
+(* Backwards-compatible alias for existing internal call sites. *)
+let _fetch_body = default_fetch
 
 let _period_to_string = function
   | Types.Cadence.Daily -> "d"
