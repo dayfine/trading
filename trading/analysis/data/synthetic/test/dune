@@ -1,6 +1,14 @@
 (test
  (name test_block_bootstrap)
  (modules test_block_bootstrap)
- (libraries core ounit2 matchers status synthetic types)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  ounit2
+  matchers
+  status
+  synthetic
+  types)
  (preprocess
   (pps ppx_jane)))

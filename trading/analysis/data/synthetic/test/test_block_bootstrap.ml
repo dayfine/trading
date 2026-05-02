@@ -268,6 +268,62 @@ let test_validation_source_too_short _ =
   assert_that result (is_error_with Status.Invalid_argument)
 
 (* ------------------------------------------------------------------ *)
+(* Test 10: validation — non-positive mean_block_length                 *)
+(* ------------------------------------------------------------------ *)
+
+let test_validation_zero_mean_block_length _ =
+  let source = _source_2000 () in
+  let cfg = { (_default_config ~target:200) with mean_block_length = 0 } in
+  let result = Block_bootstrap.generate ~source ~config:cfg in
+  assert_that result (is_error_with Status.Invalid_argument)
+
+(* ------------------------------------------------------------------ *)
+(* Test 11: validation — non-positive start_price                       *)
+(* ------------------------------------------------------------------ *)
+
+let test_validation_zero_start_price _ =
+  let source = _source_2000 () in
+  let cfg = { (_default_config ~target:200) with start_price = 0.0 } in
+  let result = Block_bootstrap.generate ~source ~config:cfg in
+  assert_that result (is_error_with Status.Invalid_argument)
+
+(* ------------------------------------------------------------------ *)
+(* Test 12: Source_loader.load_csv — missing file → NotFound            *)
+(* ------------------------------------------------------------------ *)
+
+let _with_temp_dir f =
+  let dir = Filename_unix.temp_dir "test_block_bootstrap" "" in
+  Fun.protect
+    ~finally:(fun () ->
+      let _ = Core_unix.system (Printf.sprintf "rm -rf %s" dir) in
+      ())
+    (fun () -> f dir)
+
+let test_load_csv_missing_file _ =
+  _with_temp_dir (fun dir ->
+      let result =
+        Source_loader.load_csv ~path:(Filename.concat dir "does_not_exist.csv")
+      in
+      assert_that result (is_error_with Status.NotFound))
+
+(* ------------------------------------------------------------------ *)
+(* Test 13: Source_loader.load_csv — malformed CSV → Invalid_argument   *)
+(* ------------------------------------------------------------------ *)
+
+let test_load_csv_malformed _ =
+  _with_temp_dir (fun dir ->
+      let path = Filename.concat dir "malformed.csv" in
+      (* Header (skipped by parser) plus a row missing columns. The parser
+         requires exactly 7 comma-separated columns; "not,enough,cols"
+         triggers the "Expected 7 columns" branch which surfaces as
+         Status.Invalid_argument. *)
+      Out_channel.write_all path
+        ~data:
+          "date,open,high,low,close,adjusted_close,volume\nnot,enough,cols\n";
+      let result = Source_loader.load_csv ~path in
+      assert_that result (is_error_with Status.Invalid_argument))
+
+(* ------------------------------------------------------------------ *)
 (* Test suite                                                           *)
 (* ------------------------------------------------------------------ *)
 
@@ -284,6 +340,12 @@ let suite =
          "validation: empty source" >:: test_validation_empty_source;
          "validation: zero target" >:: test_validation_zero_target;
          "validation: source too short" >:: test_validation_source_too_short;
+         "validation: zero mean_block_length"
+         >:: test_validation_zero_mean_block_length;
+         "validation: zero start_price" >:: test_validation_zero_start_price;
+         "load_csv: missing file → NotFound" >:: test_load_csv_missing_file;
+         "load_csv: malformed CSV → Invalid_argument"
+         >:: test_load_csv_malformed;
        ]
 
 let () = run_test_tt_main suite
