@@ -1,6 +1,6 @@
-(test
- (name test_block_bootstrap)
- (modules test_block_bootstrap)
+(tests
+ (names test_block_bootstrap test_regime_hmm test_garch test_synth_v2)
+ (modules test_block_bootstrap test_regime_hmm test_garch test_synth_v2)
  (libraries
   core
   core_unix
