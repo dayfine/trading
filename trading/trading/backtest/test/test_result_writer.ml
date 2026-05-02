@@ -140,6 +140,7 @@ let _make_step ~date ~portfolio ?(splits_applied = []) () :
     trades = [];
     orders_submitted = [];
     splits_applied;
+    benchmark_return = None;
   }
 
 (** Read a header-and-rows CSV back as [(header_columns, row_columns_list)].

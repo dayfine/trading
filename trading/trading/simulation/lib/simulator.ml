@@ -34,10 +34,16 @@ type dependencies = {
   order_manager : Trading_orders.Manager.order_manager;
   market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
   metric_suite : metric_suite;
+  benchmark_symbol : string option;
+      (** Optional symbol whose adjusted-close % change provides the per-step
+          benchmark return populated on [step_result.benchmark_return]. The
+          benchmark does not need to be in [symbols] — bars are fetched
+          independently via [market_data_adapter]. When [None] the field is
+          left as [None] on every step (default; preserves prior behaviour). *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
-    ?(metric_suite = { computers = []; derived = [] }) () =
+    ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol () =
   let engine_config = { Trading_engine.Types.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -52,6 +58,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     order_manager;
     market_data_adapter;
     metric_suite;
+    benchmark_symbol;
   }
 
 (** {1 Simulator State} *)
@@ -109,6 +116,29 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
     low_price = daily_price.low_price;
     close_price = daily_price.close_price;
   }
+
+(** Per-step benchmark return for the configured benchmark symbol, if any. We
+    use [adjusted_close] (split- and dividend-adjusted) to keep returns
+    comparable across the simulation window; this matches the convention used
+    by [Antifragility_computer]'s synthetic tests, which feed in raw percent
+    returns. Returns [None] when no benchmark is configured, or when either
+    today's bar or the prior trading day's bar is missing for the benchmark. *)
+let _compute_benchmark_return t : float option =
+  let%bind.Option symbol = t.deps.benchmark_symbol in
+  let adapter = t.deps.market_data_adapter in
+  let date = t.current_date in
+  let%bind.Option curr =
+    Trading_simulation_data.Market_data_adapter.get_price adapter ~symbol ~date
+  in
+  let%bind.Option prev =
+    Trading_simulation_data.Market_data_adapter.get_previous_bar adapter ~symbol
+      ~date
+  in
+  let prev_close = prev.Types.Daily_price.adjusted_close in
+  if Float.(prev_close <= 0.0) then None
+  else
+    let curr_close = curr.Types.Daily_price.adjusted_close in
+    Some ((curr_close -. prev_close) /. prev_close *. 100.0)
 
 (** Get all price bars for today using market data adapter *)
 let _get_today_bars t =
@@ -406,6 +436,7 @@ let step t =
         trades;
         orders_submitted = _submit_orders t orders;
         splits_applied = split_events;
+        benchmark_return = _compute_benchmark_return t;
       }
     in
     let t' =

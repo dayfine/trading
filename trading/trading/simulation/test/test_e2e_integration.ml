@@ -422,6 +422,85 @@ let test_ema_strategy_e2e _ =
   in
   Printf.printf "Total individual trades: %d\n" total_trades
 
+(* ==================== Benchmark Plumbing Integration Tests ==================== *)
+
+(** Integration test for the antifragility benchmark plumbing
+    (M5.2d follow-up).
+
+    Verifies that wiring [~benchmark_symbol] through
+    [Simulator.create_deps] populates [step_result.benchmark_return] on every
+    trading day for which the benchmark has both a current and a prior bar.
+    The benchmark symbol is independent from the universe — [symbols] holds
+    only ["AAPL"] but the benchmark series is sourced from [GSPC.INDX]. *)
+let test_benchmark_symbol_populates_step_result _ =
+  let deps =
+    create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
+      ~strategy:(module Noop_strategy)
+      ~commission:sample_commission ~benchmark_symbol:"GSPC.INDX" ()
+  in
+  let config =
+    {
+      start_date = date_of_string "2024-01-02";
+      end_date = date_of_string "2024-01-31";
+      initial_cash = 100000.0;
+      commission = sample_commission;
+      strategy_cadence = Types.Cadence.Daily;
+    }
+  in
+  let sim = create_exn ~config ~deps in
+  let steps, _ = run_sim_exn sim in
+  (* Every trading day past the first one should carry a benchmark return; the
+     first trading day has no prior bar inside the configured window so it can
+     be [None]. We assert at least 15 of the ~21 trading days have a value to
+     keep the test resilient to weekend/holiday spread. *)
+  let with_bench =
+    List.count steps ~f:(fun s -> Option.is_some s.benchmark_return)
+  in
+  assert_that with_bench (gt (module Int_ord) 15)
+
+(** Integration test: when [~benchmark_symbol] is wired and the antifragility
+    computer is included in the metric suite, the metrics produced by
+    [BucketAsymmetry] reflect the strategy/benchmark co-movement (non-zero,
+    finite). Uses [Buy_first_day_strategy] so portfolio_value moves with
+    AAPL — correlated with GSPC.INDX, so the OLS quadratic fit and the
+    bucket means are well-defined. *)
+let test_antifragility_metrics_non_zero_with_benchmark _ =
+  Buy_first_day_strategy.reset ();
+  let metric_suite =
+    Trading_simulation.Metric_computers.default_metric_suite ()
+  in
+  let deps =
+    create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
+      ~strategy:(module Buy_first_day_strategy)
+      ~commission:sample_commission ~metric_suite
+      ~benchmark_symbol:"GSPC.INDX" ()
+  in
+  let config =
+    {
+      start_date = date_of_string "2024-01-02";
+      end_date = date_of_string "2024-03-31";
+      initial_cash = 100000.0;
+      commission = sample_commission;
+      strategy_cadence = Types.Cadence.Daily;
+    }
+  in
+  let sim = create_exn ~config ~deps in
+  let result =
+    match run sim with
+    | Ok r -> r
+    | Error err -> failwith ("Sim failed: " ^ Status.show err)
+  in
+  (* BucketAsymmetry compares Q1+Q5 vs Q2+Q3+Q4 means; with AAPL co-moving
+     with the S&P 500 the bucket means are non-trivial and the ratio is
+     bounded away from 0. The exact value depends on the period; we assert
+     a strict positive lower bound (0.01) so a future regression to the
+     [None]-short-circuit path (which would emit 0.0) is caught. *)
+  let bucket_asym =
+    Map.find_exn result.metrics
+      Trading_simulation_types.Metric_types.BucketAsymmetry
+  in
+  assert_that (Float.abs bucket_asym) (gt (module Float_ord) 0.01)
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -444,6 +523,11 @@ let suite =
          "ema strategy e2e" >:: test_ema_strategy_e2e;
          (* Longer simulation *)
          "longer simulation period" >:: test_longer_simulation_period;
+         (* Benchmark plumbing (M5.2d follow-up) *)
+         "benchmark symbol populates step_result"
+         >:: test_benchmark_symbol_populates_step_result;
+         "antifragility metrics emit with benchmark"
+         >:: test_antifragility_metrics_non_zero_with_benchmark;
        ]
 
 let () = run_test_tt_main suite
