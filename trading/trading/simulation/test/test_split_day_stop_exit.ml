@@ -210,15 +210,18 @@ let _last_step steps =
   | None -> assert_failure "no steps in result"
 
 (** Run the simulation and return the result. Builds test data via
-    [with_test_data]. *)
-let _run_split_exit_simulation ~trigger_exit_on =
+    [with_test_data]. [test_name] is used as the unique CSV-storage subdirectory
+    so OUnit's parallel sub-test execution does not race on
+    [test_data/<name>/...] setup/teardown. Each sub-test in [suite] passes its
+    own name. *)
+let _run_split_exit_simulation ~test_name ~trigger_exit_on =
   let module Strat = Make_buy_then_exit (struct
     let symbol = "TEST"
     let target_quantity = 100.0
     let trigger_exit_on_or_after = trigger_exit_on
   end) in
   let result_ref = ref None in
-  with_test_data "split_day_stop_exit"
+  with_test_data test_name
     [ ("TEST", _split_bars) ]
     ~f:(fun data_dir ->
       let deps =
@@ -256,7 +259,8 @@ let _run_split_exit_simulation ~trigger_exit_on =
     Pin: broker.positions is empty at the last step. *)
 let test_post_split_exit_clears_position _ =
   let result =
-    _run_split_exit_simulation ~trigger_exit_on:(_date "2024-01-09")
+    _run_split_exit_simulation ~test_name:"split_day_stop_exit_clears_position"
+      ~trigger_exit_on:(_date "2024-01-09")
   in
   let last = _last_step result.steps in
   assert_that last.portfolio.positions (size_is 0)
@@ -277,7 +281,8 @@ let test_post_split_exit_clears_position _ =
     portfolio_value to ~$100K to fail in that regime. *)
 let test_post_split_exit_no_orphan_equity _ =
   let result =
-    _run_split_exit_simulation ~trigger_exit_on:(_date "2024-01-09")
+    _run_split_exit_simulation ~test_name:"split_day_stop_exit_no_orphan_equity"
+      ~trigger_exit_on:(_date "2024-01-09")
   in
   let last = _last_step result.steps in
   assert_that last
@@ -318,7 +323,9 @@ let test_post_split_exit_no_orphan_equity _ =
     the post-fill broker holds 0 shares. *)
 let test_split_day_position_reflects_post_split _ =
   let result =
-    _run_split_exit_simulation ~trigger_exit_on:(_date "2024-01-08")
+    _run_split_exit_simulation
+      ~test_name:"split_day_stop_exit_reflects_post_split"
+      ~trigger_exit_on:(_date "2024-01-08")
   in
   let last = _last_step result.steps in
   let last_cash_or_value =
