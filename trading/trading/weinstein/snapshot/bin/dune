@@ -1,5 +1,5 @@
 (executables
- (names trace_picks verify_corporate_actions)
+ (names trace_picks verify_corporate_actions diff_picks)
  (libraries
   core
   core_unix.command_unix
