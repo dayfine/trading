@@ -212,8 +212,7 @@ let test_missing_returns_none_in_both _ =
   in
   List.iter probes ~f:(fun (symbol, date) ->
       assert_that
-        (Trading_simulation_data.Market_data_adapter.get_price csv ~symbol
-           ~date)
+        (Trading_simulation_data.Market_data_adapter.get_price csv ~symbol ~date)
         is_none;
       assert_that
         (Trading_simulation_data.Market_data_adapter.get_price snap ~symbol

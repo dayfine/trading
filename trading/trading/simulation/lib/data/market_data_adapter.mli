@@ -23,9 +23,9 @@
     Two backends: {!create} (default, CSV-backed) and {!create_with_callbacks}
     (callback mode, used by the Phase D daily-snapshot path — see
     [dev/plans/daily-snapshot-streaming-2026-04-27.md]). Indicator +
-    finalize_period are degenerate in callback mode (return [None] / no-op);
-    the snapshot caller substitutes its own indicator backend at the strategy
-    layer (Panel_strategy_wrapper). *)
+    finalize_period are degenerate in callback mode (return [None] / no-op); the
+    snapshot caller substitutes its own indicator backend at the strategy layer
+    (Panel_strategy_wrapper). *)
 
 open Core
 
@@ -41,11 +41,11 @@ val create_with_callbacks :
   get_price:(symbol:string -> date:Date.t -> Types.Daily_price.t option) ->
   get_previous_bar:(symbol:string -> date:Date.t -> Types.Daily_price.t option) ->
   t
-(** Create a market data adapter that delegates [get_price] /
-    [get_previous_bar] to caller-supplied closures. {!get_indicator} returns
-    [None] for every call and {!finalize_period} is a no-op (see top-of-module
-    note). Phase D uses this with closures backed by [Daily_panels.t] —
-    see [Backtest.Snapshot_bar_source]. *)
+(** Create a market data adapter that delegates [get_price] / [get_previous_bar]
+    to caller-supplied closures. {!get_indicator} returns [None] for every call
+    and {!finalize_period} is a no-op (see top-of-module note). Phase D uses
+    this with closures backed by [Daily_panels.t] — see
+    [Backtest.Snapshot_bar_source]. *)
 
 val get_price : t -> symbol:string -> date:Date.t -> Types.Daily_price.t option
 (** Get price for symbol at specified date.

@@ -15,8 +15,8 @@
       [Snapshot_runtime.Daily_panels].
 
     The selector is inert until handed to {!build_adapter}, which constructs a
-    [Market_data_adapter.t] tied to the chosen backend. The simulator never
-    sees the selector — it consumes the resulting adapter via the same per-tick
+    [Market_data_adapter.t] tied to the chosen backend. The simulator never sees
+    the selector — it consumes the resulting adapter via the same per-tick
     interface in either mode, so parity follows by construction. *)
 
 type t =
@@ -28,8 +28,7 @@ type t =
       manifest : Snapshot_pipeline.Snapshot_manifest.t;
           (** Pre-loaded manifest — typically read from
               [snapshot_dir/manifest.sexp] via [Snapshot_manifest.read]. *)
-    }
-(** Selector value. *)
+    }  (** Selector value. *)
 
 val build_adapter :
   t ->
@@ -44,6 +43,6 @@ val build_adapter :
 
     For {!Snapshot _}: builds a [Daily_panels.t] over the snapshot directory
     + manifest with the given [max_cache_mb] cap, wires it through
-    {!Snapshot_bar_source.make_callbacks}, and returns the resulting
-    callback-mode adapter. Returns [Error] when [Daily_panels.create] fails
-    (e.g. invalid cap; corrupt manifest). *)
+      {!Snapshot_bar_source.make_callbacks}, and returns the resulting
+      callback-mode adapter. Returns [Error] when [Daily_panels.create] fails
+      (e.g. invalid cap; corrupt manifest). *)

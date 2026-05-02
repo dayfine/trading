@@ -10,16 +10,16 @@
     [high_price] ← [High], [low_price] ← [Low], [close_price] ← [Close],
     [volume] ← [Volume] (cast [Float.to_int] — exact for any realistic equity
     volume; counts up to ~2^53 round-trip exactly), [adjusted_close] ←
-    [Adjusted_close], [date] ← [Snapshot.t.date]. A row with any OHLCV field
-    set to [Float.nan] is treated as "no bar this day" — the closure returns
-    [None], matching the CSV path's "missing CSV row" semantics.
+    [Adjusted_close], [date] ← [Snapshot.t.date]. A row with any OHLCV field set
+    to [Float.nan] is treated as "no bar this day" — the closure returns [None],
+    matching the CSV path's "missing CSV row" semantics.
 
     [get_previous_bar] needs the most recent bar with date strictly less than
     the requested date. Snapshots are addressed by exact date, so we read a
-    bounded lookback window (60 calendar days — covers any realistic US
-    holiday cluster) via [Daily_panels.read_history] and take the last entry.
-    Symbols whose last bar is older than 60 days surface [None]; that matches
-    the CSV path's behaviour for delisted / suspended symbols. *)
+    bounded lookback window (60 calendar days — covers any realistic US holiday
+    cluster) via [Daily_panels.read_history] and take the last entry. Symbols
+    whose last bar is older than 60 days surface [None]; that matches the CSV
+    path's behaviour for delisted / suspended symbols. *)
 
 val make_callbacks :
   panels:Snapshot_runtime.Daily_panels.t ->
