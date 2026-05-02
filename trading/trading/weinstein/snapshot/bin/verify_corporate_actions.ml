@@ -1,9 +1,9 @@
 (** [verify_corporate_actions] CLI — runs the M6.4 split/dividend replay harness
     against fixture-backed scenarios.
 
-    Scope: AAPL 2020-08-31 4:1 split (PR-1) + TSLA 2020-08-31 5:1 split (PR-2).
-    Follow-up scenarios (GOOG, NVDA, KO) are added as additional entries in the
-    [scenarios] list without further code changes.
+    Scope: AAPL 2020-08-31 4:1 split (PR-1), TSLA 2020-08-31 5:1 split (PR-2),
+    GOOG 2022-07-18 20:1 split (PR-3). Follow-up scenarios (NVDA, KO) are added
+    as additional entries in the [scenarios] list without further code changes.
 
     Usage: [verify_corporate_actions <fixtures-root>]
 
@@ -74,7 +74,17 @@ let _tsla_2020_split : scenario =
     pre_lot = { symbol = "TSLA"; quantity = 50.0; entry_price = 2213.40 };
   }
 
-let scenarios = [ _aapl_2020_split; _tsla_2020_split ]
+let _goog_2022_split : scenario =
+  {
+    name = "goog-2022-split";
+    symbol = "GOOG";
+    fixture_dir = "goog-2022-split";
+    split_date = Date.of_string "2022-07-18";
+    factor = 20.0;
+    pre_lot = { symbol = "GOOG"; quantity = 10.0; entry_price = 2255.00 };
+  }
+
+let scenarios = [ _aapl_2020_split; _tsla_2020_split; _goog_2022_split ]
 
 (* --------- Runner --------- *)
 
