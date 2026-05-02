@@ -1,5 +1,5 @@
 (executables
- (names trace_picks verify_corporate_actions diff_picks)
+ (names trace_picks verify_corporate_actions diff_picks render_weekly_report)
  (libraries
   core
   core_unix.command_unix

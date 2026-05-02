@@ -1,5 +1,10 @@
 (tests
- (names test_round_trip test_forward_trace test_split_replay test_pick_diff)
+ (names
+  test_round_trip
+  test_forward_trace
+  test_split_replay
+  test_pick_diff
+  test_report_renderer)
  (libraries
   weinstein_trading.snapshot
   status
