@@ -1,0 +1,13 @@
+(executable
+ (name build_snapshots)
+ (libraries
+  core
+  core_unix
+  core_unix.command_unix
+  core_unix.filename_unix
+  status
+  trading.data_panel.snapshot
+  weinstein.snapshot_pipeline
+  csv)
+ (preprocess
+  (pps ppx_jane)))

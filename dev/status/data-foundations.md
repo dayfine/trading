@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-02
 
 ## Status
-PLANNED
+IN_PROGRESS — M5.3 streaming Phase A merged (#779) and Phase B in flight.
 
 Track created 2026-05-02 to absorb M5.3 (scale infra: streaming + Norgate) + M7.0 (data foundations: Norgate, multi-market, synthetic). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` + `dev/plans/m7-data-and-tuning-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.3 + M7.0 (added 2026-05-02).
 
@@ -77,7 +77,8 @@ Per `dev/plans/daily-snapshot-streaming-2026-04-27.md`. ~3000 LOC across 5–8 P
 Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS until streaming lands.
 
 ## In Progress
-- None.
+
+- **`feat/snapshot-pipeline-phase-b`** (M5.3 Phase B — offline pipeline, PR-2 of the snapshot-streaming sequence) — READY_FOR_REVIEW. Adds `weinstein.snapshot_pipeline` library (`Pipeline.build_for_symbol`, `Snapshot_manifest`, `Snapshot_verifier`) under `trading/analysis/weinstein/snapshot_pipeline/` plus the `build_snapshots.exe` CLI under `trading/analysis/scripts/build_snapshots/`. Reuses validated weinstein analysers (`Stage.classify`, `Rs.analyze`, `Macro.analyze`) on per-symbol weekly aggregates rather than the panel kernels — Phase B accepts the offline-cost in exchange for parity-by-construction with the runtime path. Macro_composite is computed from the benchmark's own bars (A-D + global indexes deferred to Phase C+ per plan §C1). Manifest schema-hash drives incremental rebuild semantics. End-to-end smoke on AAPL+MSFT+JPM × ~1500 days: 5.16s full, 0.07s incremental rerun (70× speedup), 3/3 verifier pass. Verify: `dune build && dune runtest analysis/weinstein/snapshot_pipeline` (23 tests pass) + `dune build @fmt` clean. PR diff ~750 LOC excluding tests/dune.
 
 ## Next Steps
 
