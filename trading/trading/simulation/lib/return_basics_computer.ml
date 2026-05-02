@@ -66,13 +66,13 @@ let _downside_returns step_returns =
    uses [initial_value] as its predecessor-end. *)
 
 let _week_key (d : Date.t) =
-  (* ISO week: rough approximation via (year, day_of_year / 7). Off by edge
-     cases at year boundaries — acceptable since callers compare by best/worst
-     bucketed return, not by bucket label. *)
-  let doy =
-    Date.diff d (Date.create_exn ~y:(Date.year d) ~m:Month.Jan ~d:1) + 1
-  in
-  (Date.year d, doy / 7)
+  (* ISO 8601 calendar week (Mon–Sun). Returns (week_numbering_year,
+     week_number); the week-numbering year may differ from the calendar year
+     near year boundaries (e.g. 2024-12-30 belongs to 2025-W01 by ISO). Equal
+     keys correspond to dates in the same ISO week, which is what the bucketing
+     logic requires. *)
+  let week, week_year = Date.week_number_and_year d in
+  (week_year, week)
 
 let _month_key (d : Date.t) = (Date.year d, Month.to_int (Date.month d))
 

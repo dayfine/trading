@@ -247,6 +247,40 @@ let test_consecutive_runs _ =
          (* L1 + L2 *)
        ])
 
+(* ----- AvgTradeSizePct zero-initial-cash guard ----- *)
+
+(** Exercises the documented [?initial_cash] default-0.0 guard in the .mli. Same
+    single-trade fixture, but the computer is built without [~initial_cash] so
+    the default of [0.0] applies. The guard must short- circuit the division and
+    emit [AvgTradeSizePct = 0.0] (not NaN, not +inf). [AvgTradeSizeDollar] is
+    unaffected by the guard and still equals the entry notional. *)
+let test_avg_trade_size_pct_zero_initial_cash _ =
+  let steps =
+    [
+      _step_with_trades ~date:(_date "2024-06-01")
+        ~trades:
+          [
+            _make_trade ~id:"x-b" ~symbol:"XYZ" ~side:Buy ~quantity:10.0
+              ~price:100.0;
+          ];
+      _step_with_trades ~date:(_date "2024-06-08")
+        ~trades:
+          [
+            _make_trade ~id:"x-s" ~symbol:"XYZ" ~side:Sell ~quantity:10.0
+              ~price:110.0;
+          ];
+    ]
+  in
+  let computer = Trading_simulation.Trade_aggregates_computer.computer () in
+  let metrics = computer.run ~config:_config ~steps in
+  assert_that metrics
+    (map_includes
+       [
+         (NumTrades, float_equal 1.0);
+         (AvgTradeSizeDollar, float_equal 1000.0);
+         (AvgTradeSizePct, float_equal 0.0);
+       ])
+
 let suite =
   "Trade_aggregates_computer"
   >::: [
@@ -256,6 +290,8 @@ let suite =
          "all wins → win/loss ratio = infinity"
          >:: test_all_wins_sets_win_loss_ratio_to_infinity;
          "consecutive runs over [W L L W W]" >:: test_consecutive_runs;
+         "AvgTradeSizePct = 0 when initial_cash defaults to 0"
+         >:: test_avg_trade_size_pct_zero_initial_cash;
        ]
 
 let () = run_test_tt_main suite

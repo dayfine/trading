@@ -181,6 +181,47 @@ let test_best_worst_year_and_quarter _ =
          (WorstQuarterPct, float_equal ~epsilon:1e-6 0.0);
        ])
 
+(* ----- Week bucketing across an ISO year boundary ----- *)
+
+(** ISO 8601 week-numbering pins (verified against the calendar):
+    - 2024-12-30 (Mon), 2024-12-31 (Tue), 2025-01-01 (Wed), 2025-01-02 (Thu) all
+      belong to ISO week 2025-W01.
+    - 2025-01-06 (Mon) starts ISO week 2025-W02.
+    - 2024-12-23 (Mon) is in ISO week 2024-W52.
+
+    Steps:
+    - 2024-12-23 → 10000 (week 2024-W52)
+    - 2024-12-30 → 11000 (start of week 2025-W01)
+    - 2025-01-02 → 9900 (still in week 2025-W01; bucket end-value)
+    - 2025-01-06 → 10395 (week 2025-W02)
+
+    With ISO bucketing, three week buckets emit:
+    - 2024-W52 last value 10000 → return vs initial 10000 = 0.0%
+    - 2025-W01 last value 9900 → return vs 10000 = -1.0%
+    - 2025-W02 last value 10395 → return vs 9900 = +5.0% Best week = +5.0, worst
+      week = -1.0.
+
+    The naive (year, day_of_year / 7) approximation would put 2024-12-30/31 in a
+    different bucket from 2025-01-01/02, splitting the W01 cluster and producing
+    a different best/worst pair. Asserting +5.0 / -1.0 here pins the ISO
+    behaviour. *)
+let test_week_bucket_year_boundary _ =
+  let steps =
+    [
+      _make_step ~date:(_date "2024-12-23") ~portfolio_value:10_000.0;
+      _make_step ~date:(_date "2024-12-30") ~portfolio_value:11_000.0;
+      _make_step ~date:(_date "2025-01-02") ~portfolio_value:9_900.0;
+      _make_step ~date:(_date "2025-01-06") ~portfolio_value:10_395.0;
+    ]
+  in
+  let metrics = _run steps in
+  assert_that metrics
+    (map_includes
+       [
+         (BestWeekPct, float_equal ~epsilon:1e-6 5.0);
+         (WorstWeekPct, float_equal ~epsilon:1e-6 (-1.0));
+       ])
+
 let suite =
   "Return_basics_computer"
   >::: [
@@ -192,6 +233,8 @@ let suite =
          >:: test_volatility_and_downside;
          "best/worst month" >:: test_best_worst_month;
          "best/worst year + best quarter" >:: test_best_worst_year_and_quarter;
+         "week bucket across ISO year boundary"
+         >:: test_week_bucket_year_boundary;
        ]
 
 let () = run_test_tt_main suite
