@@ -4,13 +4,19 @@
   core
   core_unix
   fpath
+  status
+  types
   weinstein.data_source
   trading.data_panel
+  trading.data_panel.snapshot
   trading.base
   trading.engine
   trading.simulation
+  trading.simulation.data
   trading.simulation.types
   trading.strategy
+  weinstein.snapshot_pipeline
+  weinstein.snapshot_runtime
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk
   weinstein.macro

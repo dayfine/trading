@@ -246,11 +246,12 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
     all_symbols = deps.all_symbols;
   }
 
-let _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace () =
+let _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace
+    ?bar_data_source () =
   Panel_runner.run
     ~input:(_panel_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace
-    ?gc_trace ()
+    ?gc_trace ?bar_data_source ()
 
 (** Re-run the step-based metric computers ([SharpeRatio], [MaxDrawdown],
     [CAGR]) on the in-window step list with a config whose [start_date] is the
@@ -423,7 +424,7 @@ let _final_prices_for_held_symbols ~steps ~final_close_prices =
       List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
 
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
-    ?trace ?gc_trace () =
+    ?trace ?gc_trace ?bar_data_source () =
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length deps.all_symbols);
@@ -437,7 +438,8 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         trade_audit,
         force_liquidation_log,
         final_close_prices ) =
-    _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace ()
+    _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace
+      ?bar_data_source ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
   (* Steps in the requested date range, all days included. Round-trip

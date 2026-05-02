@@ -43,12 +43,15 @@ type dependencies = {
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
-    ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol () =
+    ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
+    ?market_data_adapter () =
   let engine_config = { Trading_engine.Types.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
   let market_data_adapter =
-    Trading_simulation_data.Market_data_adapter.create ~data_dir
+    match market_data_adapter with
+    | Some adapter -> adapter
+    | None -> Trading_simulation_data.Market_data_adapter.create ~data_dir
   in
   {
     symbols;

@@ -11,6 +11,7 @@
   test_result_writer
   test_runner_hypothesis_overrides
   test_panel_loader_parity
+  test_snapshot_mode_parity
   test_backtest_runner_args
   test_config_override
   test_comparison
@@ -36,16 +37,20 @@
   release_report
   scenario_lib
   weinstein.data_source
+  weinstein.snapshot_pipeline
   weinstein.types
   trading.base
+  trading.data_panel.snapshot
   trading.engine
   trading.portfolio
   trading.simulation
+  trading.simulation.data
   trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk
   weinstein.screener
+  types
   status
   matchers)
  (preprocess

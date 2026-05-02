@@ -92,9 +92,28 @@ let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar
   in
   Panel_strategy_wrapper.wrap ~config:panel_config inner_strategy
 
+(* LRU cap for the snapshot cache. Generous for the typical small-universe
+   parity test (a few symbols × a few hundred days = handful of MB) and roomy
+   for a five-year sp500 golden (universe size in the hundreds × ~1.3K days
+   ≈ tens of MB). Tier-4 spike scenarios (large universes) will need a larger
+   cap when Phase E lands; for Phase D this is hard-coded since the only
+   consumer is the parity gate. *)
+let _snapshot_cache_mb = 256
+
+let _build_market_data_adapter ~data_dir ?bar_data_source () =
+  let source = Option.value bar_data_source ~default:Bar_data_source.Csv in
+  match
+    Bar_data_source.build_adapter source ~data_dir
+      ~max_cache_mb:_snapshot_cache_mb
+  with
+  | Ok adapter -> adapter
+  | Error err ->
+      failwithf "Panel_runner: Bar_data_source.build_adapter failed: %s"
+        (Status.show err) ()
+
 let _make_simulator (input : input) ~stop_log ~audit_recorder ~start_date
     ~end_date ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators
-    ~calendar ~bar_panels =
+    ~calendar ~bar_panels ~market_data_adapter =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy =
     _build_strategy input ~bar_panels ~ohlcv ~indicators ~calendar
@@ -105,7 +124,7 @@ let _make_simulator (input : input) ~stop_log ~audit_recorder ~start_date
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission
       ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
-      ()
+      ~market_data_adapter ()
   in
   let sim_config =
     Simulator.
@@ -198,7 +217,7 @@ let _final_close_prices ~ohlcv =
         if Float.is_nan v then None else Some (symbol, v))
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
-    ~commission ?trace ?gc_trace () =
+    ~commission ?trace ?gc_trace ?bar_data_source () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let n_days = Array.length calendar in
@@ -225,10 +244,14 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     Trade_audit_recorder.of_collector ~trade_audit ~force_liquidation_log
   in
   let n_all_symbols = List.length input.all_symbols in
+  let market_data_adapter =
+    _build_market_data_adapter ~data_dir:input.data_dir_fpath ?bar_data_source
+      ()
+  in
   let sim =
     _make_simulator input ~stop_log ~audit_recorder ~start_date ~end_date
       ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators ~calendar
-      ~bar_panels
+      ~bar_panels ~market_data_adapter
   in
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->

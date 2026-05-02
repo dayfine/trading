@@ -85,6 +85,20 @@ type t = {
           the positional [start_date] still drive the per-variant time range.
 
           Validated at parse time: [--fuzz-window] requires [--fuzz]. *)
+  snapshot_dir : string option;
+      (** [Some path] when [--snapshot-mode --snapshot-dir <path>] was passed
+          (both flags are required together): the simulator's per-tick OHLCV
+          reads come from the snapshot directory at [path] instead of the CSV
+          [data_dir]. The runner reads [<path>/manifest.sexp] and constructs a
+          [Backtest.Bar_data_source.Snapshot {snapshot_dir; manifest}] which is
+          forwarded into [Backtest.Runner.run_backtest ~bar_data_source:_].
+          Default [None] (CSV mode — pre-Phase-D behaviour). Phase D wiring; see
+          [dev/plans/snapshot-engine-phase-d-2026-05-02.md].
+
+          The snapshot directory must be pre-built via the Phase B writer
+          ([analysis/scripts/build_snapshots/build_snapshots.exe]); the backtest
+          runner will fail loudly if the manifest is missing or schema-skewed.
+      *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 

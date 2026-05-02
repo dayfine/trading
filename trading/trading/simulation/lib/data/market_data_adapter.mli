@@ -18,7 +18,14 @@
 
     Strategies call get_price and get_indicator without knowing about the
     underlying storage or caching mechanisms. The caller (simulator) manages the
-    current date and passes it to accessor functions. *)
+    current date and passes it to accessor functions.
+
+    Two backends: {!create} (default, CSV-backed) and {!create_with_callbacks}
+    (callback mode, used by the Phase D daily-snapshot path — see
+    [dev/plans/daily-snapshot-streaming-2026-04-27.md]). Indicator +
+    finalize_period are degenerate in callback mode (return [None] / no-op);
+    the snapshot caller substitutes its own indicator backend at the strategy
+    layer (Panel_strategy_wrapper). *)
 
 open Core
 
@@ -26,9 +33,19 @@ type t
 (** Market data adapter instance *)
 
 val create : data_dir:Fpath.t -> t
-(** Create market data adapter.
+(** Create market data adapter (CSV mode).
 
     @param data_dir Directory containing CSV price files *)
+
+val create_with_callbacks :
+  get_price:(symbol:string -> date:Date.t -> Types.Daily_price.t option) ->
+  get_previous_bar:(symbol:string -> date:Date.t -> Types.Daily_price.t option) ->
+  t
+(** Create a market data adapter that delegates [get_price] /
+    [get_previous_bar] to caller-supplied closures. {!get_indicator} returns
+    [None] for every call and {!finalize_period} is a no-op (see top-of-module
+    note). Phase D uses this with closures backed by [Daily_panels.t] —
+    see [Backtest.Snapshot_bar_source]. *)
 
 val get_price : t -> symbol:string -> date:Date.t -> Types.Daily_price.t option
 (** Get price for symbol at specified date.
@@ -56,10 +73,13 @@ val get_indicator :
     @param period Indicator period (e.g., 20 for 20-period EMA)
     @param cadence Time cadence (Daily, Weekly, Monthly)
     @param date Date to compute indicator for
-    @return Some value if computed, None if insufficient data *)
+    @return
+      Some value if computed, None if insufficient data. Always [None] in
+      callback mode — see {!create_with_callbacks}. *)
 
 val finalize_period : t -> cadence:Types.Cadence.t -> end_date:Date.t -> unit
 (** Finalize a period, invalidating provisional indicator caches.
 
     Call at period boundaries (e.g., Friday for weekly) to ensure subsequent
-    accesses recompute with finalized values. *)
+    accesses recompute with finalized values. No-op in callback mode — see
+    {!create_with_callbacks}. *)
