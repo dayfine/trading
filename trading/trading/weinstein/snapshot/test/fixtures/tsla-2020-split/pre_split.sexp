@@ -1,0 +1,16 @@
+((schema_version 1)
+ (system_version "test-fixture")
+ (date 2020-08-28)
+ (macro ((regime Bullish) (score 0.74)))
+ (sectors_strong (XLK XLY))
+ (sectors_weak (XLE))
+ (long_candidates
+  (((symbol TSLA) (score 0.93) (grade A+) (entry 2213.40) (stop 2050.00)
+    (sector XLY) (rationale "Stage2 breakout above 30wk MA")
+    (rs_vs_spy (1.62)) (resistance_grade (A)))
+   ((symbol NVDA) (score 0.85) (grade A) (entry 510.00) (stop 470.00)
+    (sector XLK) (rationale "Continuation breakout") (rs_vs_spy (1.21))
+    (resistance_grade ()))))
+ (short_candidates ())
+ (held_positions
+  (((symbol TSLA) (entered 2020-07-13) (stop 2050.00) (status Holding)))))
