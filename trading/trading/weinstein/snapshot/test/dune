@@ -1,0 +1,12 @@
+(tests
+ (names test_round_trip)
+ (libraries
+  weinstein_trading.snapshot
+  status
+  core
+  core_unix
+  core_unix.filename_unix
+  ounit2
+  matchers)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

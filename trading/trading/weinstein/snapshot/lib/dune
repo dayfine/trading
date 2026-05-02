@@ -1,0 +1,12 @@
+(library
+ (name weinstein_snapshot)
+ (public_name weinstein_trading.snapshot)
+ (libraries
+  core
+  core_unix
+  core_unix.sys_unix
+  core_unix.filename_unix
+  sexplib
+  status)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
