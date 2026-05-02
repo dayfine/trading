@@ -4,7 +4,7 @@
     input values as the warmup seed at column [period-1], then the recurrence
 
     {[
-    EMA [ t ] = (alpha * input [ t ]) + ((1 - alpha) * EMA [ t - 1 ])
+      EMA [ t ] = (alpha * input [ t ]) + ((1 - alpha) * EMA [ t - 1 ])
     ]}
 
     where [alpha = 2 / (period + 1)]. Output cells at columns [0..period-2] are

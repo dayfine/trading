@@ -22,16 +22,16 @@
     {b Benchmark plumbing.} The benchmark series can be sourced two ways:
 
     1. {b From the simulator} — when [Simulator.dependencies.benchmark_symbol]
-       is [Some sym], every [step_result] carries a [benchmark_return : float
-       option] computed from [sym]'s adjusted-close % change. The computer
-       accumulates those values and uses them automatically; nothing extra
-       is needed at the call site. This is the production path.
-    2. {b Override at construction} — pass [?benchmark_returns] to bypass the
-       step-sourced series and pin a synthetic series. Used by tests that
-       want to fix benchmark values independent of any market data adapter:
-       {[
-         let computer = Antifragility_computer.computer ~benchmark_returns:[ ... ] ()
-       ]}
+    is [Some sym], every [step_result] carries a
+    [benchmark_return : float option] computed from [sym]'s adjusted-close %
+    change. The computer accumulates those values and uses them automatically;
+    nothing extra is needed at the call site. This is the production path. 2.
+    {b Override at construction} — pass [?benchmark_returns] to bypass the
+    step-sourced series and pin a synthetic series. Used by tests that want to
+    fix benchmark values independent of any market data adapter:
+    {[
+      let computer = Antifragility_computer.computer ~benchmark_returns:[ ... ] ()
+    ]}
 
     When neither path supplies a benchmark — no override, and every step has
     [benchmark_return = None] — both [ConcavityCoef] and [BucketAsymmetry] emit
@@ -56,10 +56,10 @@ val computer :
     [BucketAsymmetry].
 
     @param benchmark_returns
-      Optional explicit per-step benchmark percent-return series. When
-      supplied, the list must be in chronological order; the computer aligns
-      it to the strategy's per-step returns by truncating the longer side.
-      When omitted, the computer falls back to the per-step values stored in
+      Optional explicit per-step benchmark percent-return series. When supplied,
+      the list must be in chronological order; the computer aligns it to the
+      strategy's per-step returns by truncating the longer side. When omitted,
+      the computer falls back to the per-step values stored in
       [step_result.benchmark_return] (populated by the simulator when
       [dependencies.benchmark_symbol] is set). When neither source provides a
       series, both metrics are emitted as [0.0].

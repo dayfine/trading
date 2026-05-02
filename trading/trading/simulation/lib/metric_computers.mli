@@ -130,8 +130,8 @@ val default_computers :
     aggregates, the M5.2b returns-block group, the M5.2c Omega ratio computer,
     the M5.2c drawdown analytics group, the M5.2d distributional group, and the
     M5.2d antifragility computer (which reads benchmark returns from
-    [step_result.benchmark_return]; emits 0.0 when no benchmark symbol was
-    wired into the simulator's dependencies).
+    [step_result.benchmark_return]; emits 0.0 when no benchmark symbol was wired
+    into the simulator's dependencies).
 
     @param risk_free_rate
       Annual risk-free rate for Sharpe calculation (default: 0.0)

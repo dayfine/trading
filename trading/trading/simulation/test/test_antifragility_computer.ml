@@ -58,8 +58,9 @@ let _curve_from_returns ?(seed_value = 10_000.0) returns_pct =
     |> List.rev
   in
   List.mapi values ~f:(fun i v ->
-      _make_step ~date:(Date.add_days (_date "2024-01-02") i) ~portfolio_value:v
-        ())
+      _make_step
+        ~date:(Date.add_days (_date "2024-01-02") i)
+        ~portfolio_value:v ())
 
 (* ==================== No-benchmark default ==================== *)
 
@@ -153,17 +154,15 @@ let _curve_with_step_benchmark ~strat ~bench =
     |> List.rev
   in
   List.mapi values ~f:(fun i v ->
-      let benchmark_return =
-        if i = 0 then None else List.nth bench (i - 1)
-      in
+      let benchmark_return = if i = 0 then None else List.nth bench (i - 1) in
       _make_step ?benchmark_return
         ~date:(Date.add_days (_date "2024-01-02") i)
         ~portfolio_value:v ())
 
 (** Convex strategy via step-sourced benchmark returns. Same shape as
     {!test_convex_strategy_gamma_positive} but the benchmark series flows
-    through [step_result.benchmark_return] instead of an override — pinning
-    the production wiring path. *)
+    through [step_result.benchmark_return] instead of an override — pinning the
+    production wiring path. *)
 let test_step_sourced_benchmark_recovers_convex _ =
   let bench = [ -3.0; -2.0; -1.0; 0.0; 1.0; 2.0; 3.0 ] in
   let strat = List.map bench ~f:(fun r -> r *. r) in
@@ -175,8 +174,8 @@ let test_step_sourced_benchmark_recovers_convex _ =
 
 (** When both an override and step-sourced benchmark returns are present, the
     override wins. Steps carry [Some 0.0] (linear-flat) but the override
-    supplies the convex series — γ should reflect the override (≈ 1.0), not
-    the step-sourced flat-line (which would yield γ = 0). *)
+    supplies the convex series — γ should reflect the override (≈ 1.0), not the
+    step-sourced flat-line (which would yield γ = 0). *)
 let test_override_wins_over_step_benchmark _ =
   let bench = [ -3.0; -2.0; -1.0; 0.0; 1.0; 2.0; 3.0 ] in
   let strat = List.map bench ~f:(fun r -> r *. r) in

@@ -424,14 +424,13 @@ let test_ema_strategy_e2e _ =
 
 (* ==================== Benchmark Plumbing Integration Tests ==================== *)
 
-(** Integration test for the antifragility benchmark plumbing
-    (M5.2d follow-up).
+(** Integration test for the antifragility benchmark plumbing (M5.2d follow-up).
 
-    Verifies that wiring [~benchmark_symbol] through
-    [Simulator.create_deps] populates [step_result.benchmark_return] on every
-    trading day for which the benchmark has both a current and a prior bar.
-    The benchmark symbol is independent from the universe — [symbols] holds
-    only ["AAPL"] but the benchmark series is sourced from [GSPC.INDX]. *)
+    Verifies that wiring [~benchmark_symbol] through [Simulator.create_deps]
+    populates [step_result.benchmark_return] on every trading day for which the
+    benchmark has both a current and a prior bar. The benchmark symbol is
+    independent from the universe — [symbols] holds only ["AAPL"] but the
+    benchmark series is sourced from [GSPC.INDX]. *)
 let test_benchmark_symbol_populates_step_result _ =
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
@@ -461,9 +460,9 @@ let test_benchmark_symbol_populates_step_result _ =
 (** Integration test: when [~benchmark_symbol] is wired and the antifragility
     computer is included in the metric suite, the metrics produced by
     [BucketAsymmetry] reflect the strategy/benchmark co-movement (non-zero,
-    finite). Uses [Buy_first_day_strategy] so portfolio_value moves with
-    AAPL — correlated with GSPC.INDX, so the OLS quadratic fit and the
-    bucket means are well-defined. *)
+    finite). Uses [Buy_first_day_strategy] so portfolio_value moves with AAPL —
+    correlated with GSPC.INDX, so the OLS quadratic fit and the bucket means are
+    well-defined. *)
 let test_antifragility_metrics_non_zero_with_benchmark _ =
   Buy_first_day_strategy.reset ();
   let metric_suite =
@@ -472,8 +471,8 @@ let test_antifragility_metrics_non_zero_with_benchmark _ =
   let deps =
     create_deps ~symbols:[ "AAPL" ] ~data_dir:real_data_dir
       ~strategy:(module Buy_first_day_strategy)
-      ~commission:sample_commission ~metric_suite
-      ~benchmark_symbol:"GSPC.INDX" ()
+      ~commission:sample_commission ~metric_suite ~benchmark_symbol:"GSPC.INDX"
+      ()
   in
   let config =
     {

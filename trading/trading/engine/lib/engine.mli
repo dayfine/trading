@@ -30,31 +30,31 @@ val update_market :
       Optional configuration for path generation. Defaults to
       Price_path.default_config. Use a fixed seed for deterministic testing:
       {[
-      let path_config = { Price_path.default_config with seed = Some 42 } in
-      Engine.update_market ~path_config engine bars
+        let path_config = { Price_path.default_config with seed = Some 42 } in
+        Engine.update_market ~path_config engine bars
       ]}
 
     Example:
     {[
-    let bars =
-      [
-        {
-          symbol = "AAPL";
-          open_price = 150.0;
-          high_price = 152.0;
-          low_price = 149.5;
-          close_price = 151.0;
-        };
-        {
-          symbol = "GOOGL";
-          open_price = 2800.0;
-          high_price = 2850.0;
-          low_price = 2790.0;
-          close_price = 2820.0;
-        };
-      ]
-    in
-    Engine.update_market engine bars
+      let bars =
+        [
+          {
+            symbol = "AAPL";
+            open_price = 150.0;
+            high_price = 152.0;
+            low_price = 149.5;
+            close_price = 151.0;
+          };
+          {
+            symbol = "GOOGL";
+            open_price = 2800.0;
+            high_price = 2850.0;
+            low_price = 2790.0;
+            close_price = 2820.0;
+          };
+        ]
+      in
+      Engine.update_market engine bars
     ]} *)
 
 val process_orders : t -> order_manager -> execution_report list status_or

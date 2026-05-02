@@ -84,10 +84,10 @@ val use_strategy :
     The accessor functions should already have market_data partially applied.
     Example:
     {[
-    let get_price_fn = get_price market_data in
-    let get_indicator_fn = get_indicator market_data in
-    use_strategy ~get_price:get_price_fn ~get_indicator:get_indicator_fn
-      ~positions strategy
+      let get_price_fn = get_price market_data in
+      let get_indicator_fn = get_indicator market_data in
+      use_strategy ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+        ~positions strategy
     ]} *)
 
 val get_name : t -> string
