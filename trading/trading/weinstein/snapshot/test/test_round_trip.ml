@@ -100,9 +100,7 @@ let test_re_serialize_identity _ =
   assert_that
     (Snapshot_reader.parse bytes)
     (is_ok_and_holds
-       (field
-          (fun t -> Snapshot_writer.serialize t)
-          (equal_to bytes)))
+       (field (fun t -> Snapshot_writer.serialize t) (equal_to bytes)))
 
 (* ------- Schema-version handling ------- *)
 

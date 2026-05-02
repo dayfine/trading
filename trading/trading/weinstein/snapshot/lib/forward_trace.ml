@@ -149,12 +149,8 @@ let _unfilled_outcome ~(c : Weekly_snapshot.candidate) ~(pick_date : Date.t) :
 let _filled_outcome ~(c : Weekly_snapshot.candidate) ~(pick_date : Date.t)
     ~(entry_bar : adj_bar) ~(entry_fill : float) ~(post : adj_bar list)
     ~(tracking : tracking) : per_pick_outcome =
-  let final_bar =
-    match List.last post with Some b -> b | None -> entry_bar
-  in
-  let pct_return_horizon =
-    (final_bar.adj_close -. entry_fill) /. entry_fill
-  in
+  let final_bar = match List.last post with Some b -> b | None -> entry_bar in
+  let pct_return_horizon = (final_bar.adj_close -. entry_fill) /. entry_fill in
   {
     symbol = c.symbol;
     pick_date;
