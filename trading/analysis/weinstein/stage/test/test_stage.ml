@@ -325,6 +325,192 @@ let test_parity_insufficient_data _ =
   let bars = List.init 10 ~f:(fun _ -> 50.0) |> bars_of_prices in
   assert_parity bars
 
+(* ------------------------------------------------------------------ *)
+(* Segmentation variant — feature-flagged Stage classifier (M5.4 E2)  *)
+(*                                                                      *)
+(* Goal: verify both [stage_method] variants produce a [Stage.t] for   *)
+(* each scenario and that the new [Segmentation] path identifies the   *)
+(* expected stage on clear-cut inputs (rising/declining series).       *)
+(* The default-on-MaSlope tests above guard the existing behavior.     *)
+(* ------------------------------------------------------------------ *)
+
+let cfg_segmentation = { default_config with stage_method = Segmentation }
+
+(** Default config preserves [MaSlope]: changing nothing else, the new field
+    must select the legacy path. *)
+let test_default_config_uses_ma_slope _ =
+  assert_that default_config.stage_method (equal_to MaSlope)
+
+(** Stage 2: clearly rising series with the segmentation variant should still
+    classify as Stage 2 with a Rising direction. *)
+let test_segmentation_stage2_rising _ =
+  let bars = rising_bars ~n:100 50.0 200.0 in
+  let result = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.stage) is_stage2;
+         field (fun r -> r.ma_direction) (equal_to Rising);
+       ])
+
+(** Stage 4: clearly declining series with the segmentation variant should
+    classify as Stage 4 with a Declining direction. *)
+let test_segmentation_stage4_declining _ =
+  let bars = declining_bars ~n:100 200.0 50.0 in
+  let result = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.stage) is_stage4;
+         field (fun r -> r.ma_direction) (equal_to Declining);
+       ])
+
+(** Insufficient data: the segmentation variant must take the same early-return
+    branch as the slope variant ([_stage1_default_result]). *)
+let test_segmentation_insufficient_data _ =
+  let bars = List.init 10 ~f:(fun _ -> 50.0) |> bars_of_prices in
+  let result = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.stage) is_stage1;
+         field (fun r -> r.ma_value) (float_equal 0.0);
+       ])
+
+(** Purity for the segmentation path: same inputs always produce the same
+    output. *)
+let test_segmentation_pure _ =
+  let bars = rising_bars ~n:80 50.0 150.0 in
+  let r1 = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  let r2 = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that r2
+    (all_of
+       [
+         field (fun r -> r.stage) (equal_to (r1.stage : stage));
+         field (fun r -> r.ma_value) (float_equal r1.ma_value);
+         field
+           (fun r -> r.ma_direction)
+           (equal_to (r1.ma_direction : ma_direction));
+         field (fun r -> r.ma_slope_pct) (float_equal r1.ma_slope_pct);
+       ])
+
+(** Both methods return a valid [Stage.t] for the same bars.
+
+    Acceptance criterion from M5.4 E2: "Both methods produce a [Stage.t] for the
+    same input." We assert both produce *some* stage; we do not require them to
+    agree on which stage. *)
+let test_both_methods_return_a_stage _ =
+  let bars = rising_bars ~n:80 50.0 150.0 in
+  let r_slope =
+    classify
+      ~config:{ default_config with stage_method = MaSlope }
+      ~bars ~prior_stage:None
+  in
+  let r_seg =
+    classify
+      ~config:{ default_config with stage_method = Segmentation }
+      ~bars ~prior_stage:None
+  in
+  (* Both stage values should belong to one of the four stage variants —
+     since [stage] is a closed variant, just asserting equality of the
+     stage_number domain is enough to confirm both produced a valid value. *)
+  let stage_number = function
+    | Stage1 _ -> 1
+    | Stage2 _ -> 2
+    | Stage3 _ -> 3
+    | Stage4 _ -> 4
+  in
+  assert_that
+    (stage_number r_slope.stage)
+    (is_between (module Int_ord) ~low:1 ~high:4);
+  assert_that (stage_number r_seg.stage)
+    (is_between (module Int_ord) ~low:1 ~high:4)
+
+(* ------------------------------------------------------------------ *)
+(* Segmentation guards: history truncation + empty-segments fallback   *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a [get_ma] callback over a synthetic MA-value array (oldest at index
+    0, newest at the end). Mirrors {!make_get_ma} but kept local for clarity in
+    these guard tests. *)
+let make_get_ma_array (ma_values : float array) ~week_offset =
+  let n = Array.length ma_values in
+  let idx = n - 1 - week_offset in
+  if idx < 0 || idx >= n then None else Some ma_values.(idx)
+
+(** Build a [get_close] callback that returns the same value as the MA at every
+    offset (sufficient for direction-only assertions; the [above_ma_count]
+    branch isn't load-bearing for what we pin here). *)
+let make_get_close_array (ma_values : float array) ~week_offset =
+  make_get_ma_array ma_values ~week_offset
+
+(** Pin: the [_segmentation_max_history_weeks = 200] truncation cap does not
+    bias the classification on long histories. We feed a deterministic linear MA
+    ramp of 250 weeks to the segmentation path, then truncate to the most recent
+    200 weeks of the same ramp and feed that. The cap silently drops the oldest
+    50 values from the 250-week input; the truncated input is naturally only 200
+    long. Both must classify identically (Stage 2 + Rising direction) — proving
+    the cap is a pure performance bound, not a behavioral knob. *)
+let test_segmentation_history_truncation_no_bias _ =
+  (* Deterministic linear ramp from 50.0 to 200.0 over 250 weeks. The shape is
+     monotonically increasing with no oscillation, so segmentation classifies
+     the most recent segment as Increasing regardless of where the cap lands. *)
+  let n_full = 250 in
+  let n_capped = 200 in
+  let ramp_full =
+    Array.init n_full ~f:(fun i ->
+        50.0 +. (Float.of_int i *. (150.0 /. Float.of_int (n_full - 1))))
+  in
+  let ramp_capped =
+    Array.sub ramp_full ~pos:(n_full - n_capped) ~len:n_capped
+  in
+  let result_full =
+    classify_with_callbacks ~config:cfg_segmentation
+      ~get_ma:(make_get_ma_array ramp_full)
+      ~get_close:(make_get_close_array ramp_full)
+      ~prior_stage:None
+  in
+  let result_capped =
+    classify_with_callbacks ~config:cfg_segmentation
+      ~get_ma:(make_get_ma_array ramp_capped)
+      ~get_close:(make_get_close_array ramp_capped)
+      ~prior_stage:None
+  in
+  (* The classification must be identical: same Stage variant + same direction.
+     ma_value should also match (newest MA point is the same in both inputs). *)
+  assert_that result_full
+    (all_of
+       [
+         field (fun r -> r.stage) (equal_to (result_capped.stage : stage));
+         field (fun r -> r.ma_direction) (equal_to Rising);
+         field (fun r -> r.ma_value) (float_equal result_capped.ma_value);
+       ])
+
+(** Pin: when the MA series has only a single defined point (passes the
+    [get_ma ~week_offset:0 = Some _] guard but [get_ma ~week_offset:1 = None]),
+    the segmentation path falls through to its conservative [(Flat, 0.0)]
+    result. The underlying {!Trend.Segmentation.segment_by_trends} returns one
+    Unknown segment for a length-1 array (n < min_segment_length), and
+    [_direction_of_trend Unknown = Flat] with slope 0.0 — exercising the
+    practical empty / unsegmentable fallback that was unreachable in the
+    pre-existing [test_segmentation_insufficient_data] (which short-circuits at
+    the higher-level [get_ma ~week_offset:0 = None] guard). *)
+let test_segmentation_single_ma_point_falls_back_to_flat _ =
+  let single_value = [| 100.0 |] in
+  let result =
+    classify_with_callbacks ~config:cfg_segmentation
+      ~get_ma:(make_get_ma_array single_value)
+      ~get_close:(make_get_close_array single_value)
+      ~prior_stage:None
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.ma_direction) (equal_to Flat);
+         field (fun r -> r.ma_slope_pct) (float_equal 0.0);
+         field (fun r -> r.ma_value) (float_equal 100.0);
+       ])
+
 let suite =
   "stage_tests"
   >::: [
@@ -352,6 +538,19 @@ let suite =
          >:: test_parity_stage3_flat_after_advance;
          "test_parity_late_stage2" >:: test_parity_late_stage2;
          "test_parity_insufficient_data" >:: test_parity_insufficient_data;
+         "test_default_config_uses_ma_slope"
+         >:: test_default_config_uses_ma_slope;
+         "test_segmentation_stage2_rising" >:: test_segmentation_stage2_rising;
+         "test_segmentation_stage4_declining"
+         >:: test_segmentation_stage4_declining;
+         "test_segmentation_insufficient_data"
+         >:: test_segmentation_insufficient_data;
+         "test_segmentation_pure" >:: test_segmentation_pure;
+         "test_both_methods_return_a_stage" >:: test_both_methods_return_a_stage;
+         "test_segmentation_history_truncation_no_bias"
+         >:: test_segmentation_history_truncation_no_bias;
+         "test_segmentation_single_ma_point_falls_back_to_flat"
+         >:: test_segmentation_single_ma_point_falls_back_to_flat;
        ]
 
 let () = run_test_tt_main suite

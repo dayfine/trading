@@ -9,6 +9,19 @@ open Types
 *)
 type ma_type = Sma | Wma | Ema [@@deriving show, eq, sexp]
 
+(** Method for determining MA direction (Rising/Flat/Declining).
+
+    [MaSlope] — current behavior (default): compare [MA_now] to
+    [MA_lookback_ago] and classify by slope_pct vs threshold.
+
+    [Segmentation] — feature-flagged alternative (M5.4 E2): runs piecewise
+    linear regression over the MA series via
+    {!Trend.Segmentation.segment_by_trends} and uses the most recent segment's
+    trend. Reduces false direction flips from short-term noise. The
+    [Trend.Trend_type.t] result maps as: [Increasing → Rising],
+    [Decreasing → Declining], [Flat | Unknown → Flat]. *)
+type stage_method = MaSlope | Segmentation [@@deriving show, eq, sexp]
+
 (** Stage classifier for the Weinstein methodology.
 
     Classifies a stock into one of four stages based on weekly price bars and
@@ -32,6 +45,10 @@ type config = {
       (** MA slope deceleration threshold to flag late Stage 2 warning. A
           reading this much below the recent peak slope triggers [late=true].
           Default: 0.5 (50% deceleration from recent peak). *)
+  stage_method : stage_method;
+      (** Method for determining MA direction. Default: [MaSlope] (current
+          behavior). [Segmentation] enables the feature-flagged piecewise linear
+          regression path (see {!stage_method}). *)
 }
 [@@deriving sexp]
 (** Configuration for stage classification. All thresholds are configurable to
@@ -144,14 +161,11 @@ val classify_with_callbacks :
 
     {3 Segmentation-based MA direction}
 
-    MA direction is currently determined by a simple two-point slope comparison
-    ([MA_now] vs [MA_lookback_ago]). A more robust alternative would use the
-    piecewise linear segmentation in
-    [analysis/technical/trend/lib/segmentation.ml]: fit a regression to the MA
-    series over a rolling window and classify the most recent segment's slope as
-    Rising/Flat/Declining. This would reduce false direction flips from
-    short-term noise and better identify the transition out of Stage 1
-    base-building periods.
+    Wired as of M5.4 E2 behind the [stage_method = Segmentation] feature flag
+    (default remains [MaSlope] for byte-identical legacy behavior). The
+    [Segmentation] path runs piecewise linear regression over the MA series via
+    {!Trend.Segmentation.segment_by_trends} and uses the most recent segment's
+    trend. A/B sweep is tracked as a follow-up experiment.
 
     {3 Incremental [classify_step]}
 

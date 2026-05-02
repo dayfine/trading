@@ -13,6 +13,7 @@ open Weinstein_types
 (* ------------------------------------------------------------------ *)
 
 type ma_type = Sma | Wma | Ema [@@deriving show, eq, sexp]
+type stage_method = MaSlope | Segmentation [@@deriving show, eq, sexp]
 
 type config = {
   ma_period : int;
@@ -21,6 +22,7 @@ type config = {
   slope_lookback : int;
   confirm_weeks : int;
   late_stage2_decel : float;
+  stage_method : stage_method;
 }
 [@@deriving sexp]
 
@@ -32,6 +34,7 @@ let default_config =
     slope_lookback = 4;
     confirm_weeks = 6;
     late_stage2_decel = 0.5;
+    stage_method = MaSlope;
   }
 
 (* ------------------------------------------------------------------ *)
@@ -239,6 +242,75 @@ let _compute_ma_slope_callback ~get_ma ~slope_threshold ~slope_lookback
   _classify_direction ~threshold:slope_threshold ~current:current_ma
     ~lookback:lookback_ma
 
+(** Maximum number of weeks of MA history the segmentation path will scan
+    backward through callbacks. Bounded to keep the per-call cost predictable on
+    long-history panels; ~4 years of weekly bars is more than enough for
+    {!Trend.Segmentation.segment_by_trends} to identify a stable recent segment
+    given its [preferred_segment_length = 10] default. *)
+let _segmentation_max_history_weeks = 200
+
+(** Walk backwards from [week_offset:0] collecting consecutive defined MA
+    values. Returns the series in chronological order (oldest first, newest
+    last), suitable for piecewise linear segmentation. Stops at the first [None]
+    or at [max_offset] to bound work. *)
+let _collect_ma_series_callback ~get_ma ~max_offset : float array =
+  let rec walk off acc =
+    if off > max_offset then acc
+    else
+      match get_ma ~week_offset:off with
+      | Some v -> walk (off + 1) (v :: acc)
+      | None -> acc
+  in
+  (* Walk newest → oldest accumulating; the cons order produces oldest-first. *)
+  walk 0 [] |> Array.of_list
+
+(** Map a {!Trend.Trend_type.t} value into the Stage [ma_direction] domain. *)
+let _direction_of_trend (t : Trend.Trend_type.t) : ma_direction =
+  match t with
+  | Increasing -> Rising
+  | Decreasing -> Declining
+  | Flat | Unknown -> Flat
+
+(** Segmentation-driven MA direction. Runs
+    {!Trend.Segmentation.segment_by_trends} over the MA series and uses the most
+    recent segment's trend + slope.
+
+    [slope_pct] is reported as the most recent segment's [slope] divided by
+    [|current_ma|] (not by [|MA_lookback_ago|] as in the slope path), so the
+    units stay "fractional change per bar near current price level". When the MA
+    series is too short for any segment or [current_ma] is zero, falls back to
+    [(Flat, 0.0)].
+
+    Note: segmentation collects the full MA series back to the oldest defined
+    offset (capped by [max_offset]); a longer history gives the algorithm more
+    context to identify a stable recent trend, at O(n) cost per call. *)
+let _compute_ma_slope_segmentation ~get_ma ~current_ma ~max_offset :
+    ma_direction * float =
+  let ma_series = _collect_ma_series_callback ~get_ma ~max_offset in
+  let segments = Trend.Segmentation.segment_by_trends ma_series in
+  match List.last segments with
+  | None -> (Flat, 0.0)
+  | Some seg ->
+      let direction = _direction_of_trend seg.Trend.Segmentation.trend in
+      let slope_pct =
+        if Float.(current_ma = 0.0) then 0.0
+        else seg.Trend.Segmentation.slope /. Float.abs current_ma
+      in
+      (direction, slope_pct)
+
+(** Dispatch to the slope or segmentation MA-direction computation based on
+    [stage_method]. Both paths consume the same callbacks; only the way we
+    classify Rising/Flat/Declining differs. *)
+let _compute_ma_direction_dispatch ~stage_method ~get_ma ~slope_threshold
+    ~slope_lookback ~current_ma : ma_direction * float =
+  match stage_method with
+  | MaSlope ->
+      _compute_ma_slope_callback ~get_ma ~slope_threshold ~slope_lookback
+        ~current_ma
+  | Segmentation ->
+      _compute_ma_slope_segmentation ~get_ma ~current_ma
+        ~max_offset:_segmentation_max_history_weeks
+
 (** Count, over [week_offset] in [0; min(confirm_weeks, ma_depth) - 1], how many
     weeks have [close > ma]. Returns [(above, examined)] so the caller can
     derive [below_ma_count = examined - above]. Stops early on the first missing
@@ -326,7 +398,8 @@ let _build_result ~current_ma ~ma_dir ~ma_slope_pct ~prior_stage ~above_ma_count
 let _classify_signals ~config ~get_ma ~get_close ~prior_stage ~current_ma :
     result =
   let ma_dir, ma_slope_pct =
-    _compute_ma_slope_callback ~get_ma ~slope_threshold:config.slope_threshold
+    _compute_ma_direction_dispatch ~stage_method:config.stage_method ~get_ma
+      ~slope_threshold:config.slope_threshold
       ~slope_lookback:config.slope_lookback ~current_ma
   in
   let stop_at = max config.confirm_weeks (2 * config.slope_lookback) in
