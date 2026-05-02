@@ -251,3 +251,31 @@
   trading.portfolio
   types
   matchers))
+
+(test
+ (name test_distributional_computer)
+ (modules test_distributional_computer)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  types
+  matchers))
+
+(test
+ (name test_antifragility_computer)
+ (modules test_antifragility_computer)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  types
+  matchers))

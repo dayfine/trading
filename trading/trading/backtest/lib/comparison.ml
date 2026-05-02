@@ -79,6 +79,16 @@ let _metric_label : Metric_type.t -> string = function
   | UlcerIndex -> "ulcer_index"
   | PainIndex -> "pain_index"
   | UnderwaterCurveArea -> "underwater_curve_area"
+  (* M5.2d: distributional *)
+  | Skewness -> "skewness"
+  | Kurtosis -> "kurtosis"
+  | CVaR95 -> "cvar_95"
+  | CVaR99 -> "cvar_99"
+  | TailRatio -> "tail_ratio"
+  | GainToPain -> "gain_to_pain"
+  (* M5.2d: antifragility *)
+  | ConcavityCoef -> "concavity_coef"
+  | BucketAsymmetry -> "bucket_asymmetry"
 
 let _all_metric_types : Metric_type.t list =
   [
@@ -140,6 +150,16 @@ let _all_metric_types : Metric_type.t list =
     UlcerIndex;
     PainIndex;
     UnderwaterCurveArea;
+    (* M5.2d: distributional *)
+    Skewness;
+    Kurtosis;
+    CVaR95;
+    CVaR99;
+    TailRatio;
+    GainToPain;
+    (* M5.2d: antifragility *)
+    ConcavityCoef;
+    BucketAsymmetry;
   ]
 
 let _diff_for_metric ~baseline_set ~variant_set (mt : Metric_type.t) =

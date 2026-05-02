@@ -100,6 +100,22 @@ val drawdown_analytics_computer : unit -> Simulator.any_metric_computer
     MedianDrawdownPct, MaxDrawdownDurationDays, AvgDrawdownDurationDays,
     TimeInDrawdownPct, UlcerIndex, PainIndex, UnderwaterCurveArea. *)
 
+(** {1 Distributional Computer (M5.2d)} *)
+
+val distributional_computer : unit -> Simulator.any_metric_computer
+(** Computer that emits the M5.2d distributional-block group: Skewness, Kurtosis
+    (excess), CVaR95, CVaR99, TailRatio, GainToPain. See
+    {!Distributional_computer} for spec and edge-case behaviour. *)
+
+(** {1 Antifragility Computer (M5.2d)} *)
+
+val antifragility_computer :
+  ?benchmark_returns:float list -> unit -> Simulator.any_metric_computer
+(** Computer that emits ConcavityCoef and BucketAsymmetry. Both metrics require
+    a benchmark return series; when [benchmark_returns] is omitted they emit 0.0
+    (the documented default for stand-alone backtest runs). See
+    {!Antifragility_computer} for spec and benchmark-plumbing rationale. *)
+
 (** {1 Default Computer Set} *)
 
 val default_computers :
@@ -110,7 +126,9 @@ val default_computers :
 (** Returns all default step-based metric computers: summary (including profit
     factor), Sharpe ratio, max drawdown, CAGR, portfolio state, trade
     aggregates, the M5.2b returns-block group, the M5.2c Omega ratio computer,
-    and the M5.2c drawdown analytics group.
+    the M5.2c drawdown analytics group, the M5.2d distributional group, and the
+    M5.2d antifragility computer (no benchmark wired by default — its two
+    metrics emit 0.0 in this configuration).
 
     @param risk_free_rate
       Annual risk-free rate for Sharpe calculation (default: 0.0)
@@ -155,4 +173,10 @@ val create_computer :
 
     CalmarRatio, SortinoRatioAnnualized, and MarRatio are derived metrics — the
     factory returns a step-based stub that emits [0.0]; the real values come
-    from the corresponding entries in {!default_derived_computers}. *)
+    from the corresponding entries in {!default_derived_computers}.
+
+    Distributional metrics (Skewness, Kurtosis, CVaR95, CVaR99, TailRatio,
+    GainToPain) are produced together by [distributional_computer].
+    Antifragility metrics (ConcavityCoef, BucketAsymmetry) are produced by
+    [antifragility_computer] with no benchmark wired by default — both emit
+    [0.0] under that configuration. *)
