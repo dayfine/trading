@@ -15,6 +15,8 @@
   test_config_override
   test_comparison
   test_smoke_catalog
+  test_fuzz_spec
+  test_fuzz_distribution
   test_gc_trace
   test_panel_runner_gc_trace
   test_release_perf_report

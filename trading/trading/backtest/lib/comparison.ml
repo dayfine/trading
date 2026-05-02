@@ -99,6 +99,7 @@ let _metric_label_table : (Metric_type.t * string) list =
 let _metric_label (mt : Metric_type.t) : string =
   List.Assoc.find_exn _metric_label_table mt ~equal:Metric_type.equal
 
+let metric_label = _metric_label
 let all_metric_types : Metric_type.t list = List.map _metric_label_table ~f:fst
 
 let _diff_for_metric ~baseline_set ~variant_set (mt : Metric_type.t) =

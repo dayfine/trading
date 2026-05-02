@@ -129,6 +129,43 @@ None. Merged in main:
 
 ## Completed
 
+- [x] **Fuzz-runner CLI flag (`--fuzz <param>=<center>±<delta>:<n>`)**
+  (2026-05-02, `feat/fuzz-runner`). Generic parameter-jitter mode for
+  robustness testing — the same backtest run repeated N times with the
+  named parameter swept across `[center - delta .. center + delta]`,
+  with per-metric distribution stats (median, p25/p75, std, min, max)
+  written alongside per-variant artefacts. Surfaces path-dependency vs
+  robust-signal: a tight band across N runs says the metric is stable;
+  a wide band says the single-run number is one draw from a noisy
+  distribution.
+  - New `Backtest.Fuzz_spec` (`trading/trading/backtest/lib/fuzz_spec.{ml,mli}`)
+    parses the spec syntax and materialises N variants. Two value kinds:
+    date (`start_date=2019-05-01±5w:11`, units `d`/`w`/`m`) and numeric
+    (`stops_config.initial_stop_buffer=1.05±0.02:11`). Both `±` (UTF-8)
+    and `+/-` (ASCII) accepted as separators. Linear spacing across
+    `[center - delta, center + delta]` inclusive.
+  - New `Backtest.Fuzz_distribution` (`trading/trading/backtest/lib/fuzz_distribution.{ml,mli}`)
+    folds N labelled summaries into per-metric stats; sexp + markdown
+    rendering. Percentiles use Type-7 linear interpolation (R/NumPy
+    convention); std is sample (Bessel-corrected, n-1).
+  - Wired into `backtest_runner.exe`: new `--fuzz <spec>` flag,
+    mutually exclusive with `--baseline`/`--smoke`, requires
+    `--experiment-name`. Composes with `--override` (those apply to
+    every variant). Output structure:
+    `dev/experiments/<name>/variants/var-NN/{summary,trades,...}` plus
+    `fuzz_distribution.{sexp,md}` at the root.
+  - Tests: 18 in `test_fuzz_spec.ml` (date+numeric specs, error paths,
+    subdir naming), 8 in `test_fuzz_distribution.ml` (hand-pinned
+    percentiles + stats), 7 added to `test_backtest_runner_args.ml`
+    (flag wiring + exclusivity). All 60 backtest tests pass; nesting +
+    fn-length + magic-number linters clean on all new files. Also
+    exposes a small `val Comparison.metric_label` so the distribution
+    module shares the same metric-name registry instead of duplicating
+    it.
+
+  Verify: `dune runtest trading/backtest/test`. Manual:
+  `backtest_runner 2019-05-01 2019-12-31 --fuzz start_date=2019-05-01±5w:11 --experiment-name fuzz_demo`.
+
 - [x] **Experiment-runner overrides + comparison + smoke catalog (M5.2a)**
   (2026-05-02, `feat/backtest-experiment-runner-overrides`). Wires three
   new flags into `backtest_runner.exe` so experiment runs become
