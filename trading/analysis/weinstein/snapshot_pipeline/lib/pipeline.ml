@@ -18,120 +18,21 @@ let _stage_to_float (stage : Weinstein_types.stage) =
   | Stage3 _ -> 3.0
   | Stage4 _ -> 4.0
 
-(* Walk an array left-to-right summing the last [period] entries up to and
-   including index [i]. Mirrors the EMA warmup pattern used by [Sma_kernel] —
-   one [acc := !acc +. v] step per window slot — so a scalar reference written
-   the same way is bit-identical. *)
-let _sma_at ~closes ~period ~i =
-  if i + 1 < period then Float.nan
-  else
-    let acc = ref 0.0 in
-    for k = 0 to period - 1 do
-      let v = closes.(i - k) in
-      acc := !acc +. v
-    done;
-    !acc /. Float.of_int period
+(* Per-day scalar indicators are computed by [Indicator_arrays] in a single
+   forward pass; per-day weekly prefixes are computed by [Weekly_prefix] in a
+   single forward pass. Both replace the prior recompute-from-zero shape that
+   gave the writer O(N^2) per-symbol cost. *)
 
-(* Standard EMA recurrence built up in one pass to index [i] inclusive. The
-   first [period - 1] cells are NaN; cell [period - 1] is the simple mean of
-   the first [period] closes (warmup seed); each subsequent cell is the
-   recurrence [alpha * close + (1 - alpha) * prev]. The whole prefix is rebuilt
-   per call — Phase B is offline and per-day; Phase C will memoize. *)
-let _ema_at ~closes ~period ~i =
-  if i + 1 < period then Float.nan
-  else
-    let alpha = 2.0 /. (Float.of_int period +. 1.0) in
-    let one_minus_a = 1.0 -. alpha in
-    let prev = ref Float.nan in
-    let warmup_end = period - 1 in
-    let warmup_sum = ref 0.0 in
-    for k = 0 to warmup_end do
-      warmup_sum := !warmup_sum +. closes.(k)
-    done;
-    prev := !warmup_sum /. Float.of_int period;
-    for t = period to i do
-      let new_v = closes.(t) in
-      let p = !prev in
-      prev := (alpha *. new_v) +. (one_minus_a *. p)
-    done;
-    !prev
+(* ------------------------------------------------------------------ *)
+(* Stage / RS / Macro per-day values. Each takes the precomputed      *)
+(* weekly prefix and runs the analyser on a tail slice. The analysers *)
+(* themselves are O(lookback) so the total work stays O(N).           *)
+(* ------------------------------------------------------------------ *)
 
-(* Wilder True Range for column [t] in panel-shape arrays. [t = 0] is undefined
-   (no prior close). NaNs in any input propagate. *)
-let _true_range ~highs ~lows ~closes ~t =
-  if t = 0 then Float.nan
-  else
-    let h = highs.(t) in
-    let l = lows.(t) in
-    let prev_c = closes.(t - 1) in
-    let r1 = h -. l in
-    let r2 = Float.abs (h -. prev_c) in
-    let r3 = Float.abs (l -. prev_c) in
-    Float.max r1 (Float.max r2 r3)
-
-(* Wilder ATR at column [i]. NaN until [i = period]; seeded as the simple mean
-   of TR over the first window, then the Wilder recurrence. Mirrors the
-   reference shape in [Atr_kernel]. *)
-let _atr_at ~highs ~lows ~closes ~period ~i =
-  if i < period then Float.nan
-  else
-    let prev = ref Float.nan in
-    let seed_sum = ref 0.0 in
-    for k = 1 to period do
-      seed_sum := !seed_sum +. _true_range ~highs ~lows ~closes ~t:k
-    done;
-    prev := !seed_sum /. Float.of_int period;
-    let p_minus = Float.of_int (period - 1) in
-    let p_f = Float.of_int period in
-    for t = period + 1 to i do
-      let tr = _true_range ~highs ~lows ~closes ~t in
-      let prev_atr = !prev in
-      prev := ((prev_atr *. p_minus) +. tr) /. p_f
-    done;
-    !prev
-
-(* Wilder RSI at column [i]. Same warmup-then-recurrence shape as ATR. *)
-let _rsi_at ~closes ~period ~i =
-  if i < period then Float.nan
-  else
-    let avg_gain = ref 0.0 in
-    let avg_loss = ref 0.0 in
-    for k = 1 to period do
-      let diff = closes.(k) -. closes.(k - 1) in
-      let g = Float.max diff 0.0 in
-      let l = Float.max (Float.neg diff) 0.0 in
-      avg_gain := !avg_gain +. g;
-      avg_loss := !avg_loss +. l
-    done;
-    avg_gain := !avg_gain /. Float.of_int period;
-    avg_loss := !avg_loss /. Float.of_int period;
-    let p_minus = Float.of_int (period - 1) in
-    let p_f = Float.of_int period in
-    for t = period + 1 to i do
-      let diff = closes.(t) -. closes.(t - 1) in
-      let g = Float.max diff 0.0 in
-      let l = Float.max (Float.neg diff) 0.0 in
-      avg_gain := ((!avg_gain *. p_minus) +. g) /. p_f;
-      avg_loss := ((!avg_loss *. p_minus) +. l) /. p_f
-    done;
-    let g = !avg_gain in
-    let l = !avg_loss in
-    let rs = g /. l in
-    if not (Float.is_finite rs) then 100.0 else 100.0 -. (100.0 /. (1.0 +. rs))
-
-(* Aggregate the prefix [bars[0..i]] into weekly bars. Re-aggregates per call
-   for simplicity — Phase B accepts the offline cost in exchange for parity
-   with the runtime path that uses the same conversion. Phase C will memoize. *)
-let _weekly_prefix ~bars ~i =
-  let prefix = List.take bars (i + 1) in
-  Time_period.Conversion.daily_to_weekly ~include_partial_week:true prefix
-
-let _stage_value_for_prefix ~bars ~i =
-  let weekly = _weekly_prefix ~bars ~i in
+let _stage_value ~weekly_prefix ~day_idx =
   let recent =
-    let n = List.length weekly in
-    if n <= _stage_weekly_lookback then weekly
-    else List.drop weekly (n - _stage_weekly_lookback)
+    Weekly_prefix.window_for_day weekly_prefix ~day_idx
+      ~lookback:_stage_weekly_lookback
   in
   match recent with
   | [] -> Float.nan
@@ -142,31 +43,43 @@ let _stage_value_for_prefix ~bars ~i =
       in
       _stage_to_float result.stage
 
-let _rs_value_for_prefix ~bars ~i ~benchmark_bars =
-  let stock_weekly = _weekly_prefix ~bars ~i in
+(* Slice [arr[0..upto]] (inclusive) into a chronological-oldest-first list,
+   keeping only the last [lookback] entries. [upto < 0] yields the empty list.
+   Used to feed the analysers their lookback window without re-walking the
+   full benchmark prefix per call. *)
+let _bench_window arr ~upto ~lookback =
+  if upto < 0 then []
+  else
+    let start = Int.max 0 (upto - lookback + 1) in
+    let acc = ref [] in
+    for k = upto downto start do
+      acc := arr.(k) :: !acc
+    done;
+    !acc
+
+(* Largest index [k] in [arr] such that [arr.(k).date <= cutoff], or [-1] if
+   all dates exceed [cutoff]. [arr] is sorted chronologically (the
+   [daily_to_weekly] output is). Linear scan from a monotone start pointer
+   so the writer's running cost across all daily calls is O(M) total. *)
+let _advance_bench_idx arr ~from_idx ~cutoff =
+  let n = Array.length arr in
+  let i = ref from_idx in
+  while !i + 1 < n && Date.( <= ) arr.(!i + 1).Types.Daily_price.date cutoff do
+    incr i
+  done;
+  !i
+
+let _rs_value ~weekly_prefix ~day_idx ~bench_weekly_arr ~bench_idx =
   let stock_recent =
-    let n = List.length stock_weekly in
-    if n <= _rs_weekly_lookback then stock_weekly
-    else List.drop stock_weekly (n - _rs_weekly_lookback)
+    Weekly_prefix.window_for_day weekly_prefix ~day_idx
+      ~lookback:_rs_weekly_lookback
   in
-  let last_date =
-    match List.last stock_recent with
-    | None -> None
-    | Some (b : Types.Daily_price.t) -> Some b.date
-  in
-  match last_date with
-  | None -> Float.nan
-  | Some cutoff ->
-      let bench_weekly =
-        Time_period.Conversion.daily_to_weekly ~include_partial_week:true
-          benchmark_bars
-        |> List.filter ~f:(fun (b : Types.Daily_price.t) ->
-            Date.( <= ) b.date cutoff)
-      in
+  match stock_recent with
+  | [] -> Float.nan
+  | _ ->
       let bench_recent =
-        let n = List.length bench_weekly in
-        if n <= _rs_weekly_lookback then bench_weekly
-        else List.drop bench_weekly (n - _rs_weekly_lookback)
+        _bench_window bench_weekly_arr ~upto:bench_idx
+          ~lookback:_rs_weekly_lookback
       in
       let result =
         Rs.analyze ~config:Rs.default_config ~stock_bars:stock_recent
@@ -177,17 +90,10 @@ let _rs_value_for_prefix ~bars ~i ~benchmark_bars =
 
 (* Macro confidence from the benchmark's own bars only. A-D and global-index
    data are not threaded in Phase B — see plan §C1. *)
-let _macro_value_for_prefix ~benchmark_bars ~cutoff =
-  let bench_weekly =
-    Time_period.Conversion.daily_to_weekly ~include_partial_week:true
-      benchmark_bars
-    |> List.filter ~f:(fun (b : Types.Daily_price.t) ->
-        Date.( <= ) b.date cutoff)
-  in
+let _macro_value ~bench_weekly_arr ~bench_idx =
   let bench_recent =
-    let n = List.length bench_weekly in
-    if n <= _stage_weekly_lookback then bench_weekly
-    else List.drop bench_weekly (n - _stage_weekly_lookback)
+    _bench_window bench_weekly_arr ~upto:bench_idx
+      ~lookback:_stage_weekly_lookback
   in
   match bench_recent with
   | [] -> Float.nan
@@ -198,23 +104,34 @@ let _macro_value_for_prefix ~benchmark_bars ~cutoff =
       in
       result.confidence
 
-let _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~bars_arr ~date
-    ~benchmark_bars =
+(* ------------------------------------------------------------------ *)
+(* Per-row materialisation. Indicator arrays are precomputed once     *)
+(* outside the [List.init] loop, so [_value_for_field] is now O(1)    *)
+(* per cell.                                                          *)
+(* ------------------------------------------------------------------ *)
+
+(* Bundle of precomputed per-day arrays threaded through the row builder.
+   Field names mirror [Snapshot_schema.field] so the lookup in
+   [_value_for_field] stays one line per field. *)
+type _precomputed = {
+  ema : float array;
+  sma : float array;
+  atr : float array;
+  rsi : float array;
+  stage : float array;
+  rs : float array;
+  macro : float array;
+}
+
+let _value_for_field ~field ~precomputed ~bars_arr ~i =
   match (field : Snapshot_schema.field) with
-  | EMA_50 -> _ema_at ~closes ~period:_ema_period ~i
-  | SMA_50 -> _sma_at ~closes ~period:_sma_period ~i
-  | ATR_14 -> _atr_at ~highs ~lows ~closes ~period:_atr_period ~i
-  | RSI_14 -> _rsi_at ~closes ~period:_rsi_period ~i
-  | Stage -> _stage_value_for_prefix ~bars ~i
-  | RS_line -> (
-      match benchmark_bars with
-      | None -> Float.nan
-      | Some bench -> _rs_value_for_prefix ~bars ~i ~benchmark_bars:bench)
-  | Macro_composite -> (
-      match benchmark_bars with
-      | None -> Float.nan
-      | Some bench -> _macro_value_for_prefix ~benchmark_bars:bench ~cutoff:date
-      )
+  | EMA_50 -> precomputed.ema.(i)
+  | SMA_50 -> precomputed.sma.(i)
+  | ATR_14 -> precomputed.atr.(i)
+  | RSI_14 -> precomputed.rsi.(i)
+  | Stage -> precomputed.stage.(i)
+  | RS_line -> precomputed.rs.(i)
+  | Macro_composite -> precomputed.macro.(i)
   | Open -> bars_arr.(i).Types.Daily_price.open_price
   | High -> bars_arr.(i).Types.Daily_price.high_price
   | Low -> bars_arr.(i).Types.Daily_price.low_price
@@ -222,15 +139,70 @@ let _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~bars_arr ~date
   | Volume -> Float.of_int bars_arr.(i).Types.Daily_price.volume
   | Adjusted_close -> bars_arr.(i).Types.Daily_price.adjusted_close
 
-let _row_for_day ~symbol ~schema ~bars ~bars_arr ~closes ~highs ~lows ~i
-    ~benchmark_bars =
+let _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i =
   let date = bars_arr.(i).Types.Daily_price.date in
   let values =
     Array.of_list_map schema.Snapshot_schema.fields ~f:(fun field ->
-        _value_for_field ~field ~closes ~highs ~lows ~i ~bars ~bars_arr ~date
-          ~benchmark_bars)
+        _value_for_field ~field ~precomputed ~bars_arr ~i)
   in
   Snapshot.create ~schema ~symbol ~date ~values
+
+(* Resolve the usable benchmark index for daily index [i]. Returns [-1] when
+   the benchmark hasn't started yet (its earliest date is after [cutoff]). *)
+let _usable_bench_idx arr ~bench_idx ~cutoff =
+  if Array.length arr = 0 then -1
+  else if Date.( > ) arr.(0).Types.Daily_price.date cutoff then -1
+  else bench_idx
+
+(* Compute the per-day weekly-derived value arrays. When [benchmark_bars] is
+   [None], [rs] and [macro] stay all-NaN — matching the prior pipeline.
+   When supplied, the benchmark's weekly aggregate is computed once and a
+   monotone index pointer ([bench_idx]) advances with the daily cutoff so
+   the analysers see a [bench_recent] window of bounded length per call. *)
+let _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars =
+  let n = Array.length bars_arr in
+  let stage = Array.create ~len:n Float.nan in
+  let rs = Array.create ~len:n Float.nan in
+  let macro = Array.create ~len:n Float.nan in
+  let bench_weekly_arr =
+    Option.map benchmark_bars ~f:(fun bench ->
+        Time_period.Conversion.daily_to_weekly ~include_partial_week:true bench
+        |> Array.of_list)
+  in
+  let bench_idx = ref (-1) in
+  for i = 0 to n - 1 do
+    stage.(i) <- _stage_value ~weekly_prefix ~day_idx:i;
+    Option.iter bench_weekly_arr ~f:(fun arr ->
+        let cutoff = bars_arr.(i).Types.Daily_price.date in
+        bench_idx :=
+          _advance_bench_idx arr ~from_idx:(Int.max 0 !bench_idx) ~cutoff;
+        let usable_idx = _usable_bench_idx arr ~bench_idx:!bench_idx ~cutoff in
+        rs.(i) <-
+          _rs_value ~weekly_prefix ~day_idx:i ~bench_weekly_arr:arr
+            ~bench_idx:usable_idx;
+        macro.(i) <- _macro_value ~bench_weekly_arr:arr ~bench_idx:usable_idx)
+  done;
+  (stage, rs, macro)
+
+let _compute_precomputed ~bars_arr ~benchmark_bars =
+  let closes =
+    Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) -> b.adjusted_close)
+  in
+  let highs =
+    Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) -> b.high_price)
+  in
+  let lows =
+    Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) -> b.low_price)
+  in
+  let ema = Indicator_arrays.ema ~closes ~period:_ema_period in
+  let sma = Indicator_arrays.sma ~closes ~period:_sma_period in
+  let atr = Indicator_arrays.atr ~highs ~lows ~closes ~period:_atr_period in
+  let rsi = Indicator_arrays.rsi ~closes ~period:_rsi_period in
+  let weekly_prefix = Weekly_prefix.build bars_arr in
+  let stage, rs, macro =
+    _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars
+  in
+  { ema; sma; atr; rsi; stage; rs; macro }
 
 let build_for_symbol ~symbol ~bars ~schema ?benchmark_bars () =
   if String.is_empty symbol then
@@ -241,19 +213,9 @@ let build_for_symbol ~symbol ~bars ~schema ?benchmark_bars () =
     let n = Array.length bars_arr in
     if n = 0 then Ok []
     else
-      let closes =
-        Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) ->
-            b.adjusted_close)
-      in
-      let highs =
-        Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) -> b.high_price)
-      in
-      let lows =
-        Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) -> b.low_price)
-      in
+      let precomputed = _compute_precomputed ~bars_arr ~benchmark_bars in
       let rows =
         List.init n ~f:(fun i ->
-            _row_for_day ~symbol ~schema ~bars ~bars_arr ~closes ~highs ~lows ~i
-              ~benchmark_bars)
+            _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i)
       in
       Result.all rows
