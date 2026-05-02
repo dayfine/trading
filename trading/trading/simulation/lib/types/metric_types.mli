@@ -37,6 +37,68 @@ module Metric_type : sig
             (longs and shorts both fold in via signed quantity). Positive means
             paper gains on the open book; negative means paper losses. *)
     | TradeFrequency  (** Trades per month *)
+    (* ---- M5.2b returns block ---- *)
+    | TotalReturnPct
+        (** Total period return as a percent:
+            [(final - initial) / initial * 100]. Raw, not annualized — see
+            [CAGR] for the annualized counterpart. *)
+    | VolatilityPctAnnualized
+        (** Annualized standard deviation of step-over-step portfolio returns,
+            in percent. Multiplies the per-step stdev by [sqrt(252)] (assumes
+            daily steps). *)
+    | DownsideDeviationPctAnnualized
+        (** Annualized standard deviation of {b negative} step returns only
+            (returns above zero are treated as zero, in line with Sortino's
+            convention). Reported in percent. *)
+    | BestDayPct
+        (** Largest single-step (one trading day) return, in percent. *)
+    | WorstDayPct
+        (** Smallest single-step (one trading day) return, in percent. *)
+    | BestWeekPct
+        (** Largest cumulative return over a calendar week, in percent. *)
+    | WorstWeekPct
+        (** Smallest cumulative return over a calendar week, in percent. *)
+    | BestMonthPct  (** Largest cumulative return over a calendar month. *)
+    | WorstMonthPct  (** Smallest cumulative return over a calendar month. *)
+    | BestQuarterPct  (** Largest cumulative return over a calendar quarter. *)
+    | WorstQuarterPct
+        (** Smallest cumulative return over a calendar quarter. *)
+    | BestYearPct  (** Largest cumulative return over a calendar year. *)
+    | WorstYearPct  (** Smallest cumulative return over a calendar year. *)
+    (* ---- M5.2b trade aggregates ---- *)
+    | NumTrades  (** Total number of round-trip trades (= win + loss). *)
+    | LossRate  (** Loss percentage (0–100); equals [100 - WinRate]. *)
+    | AvgWinDollar  (** Mean P&L of winning round-trips, in dollars. *)
+    | AvgWinPct
+        (** Mean per-trade percent return of winning round-trips
+            (entry-price-relative), in percent. *)
+    | AvgLossDollar
+        (** Mean P&L of losing round-trips, in dollars (negative). *)
+    | AvgLossPct
+        (** Mean per-trade percent return of losing round-trips, in percent
+            (negative). *)
+    | LargestWinDollar  (** Single largest winning round-trip, in dollars. *)
+    | LargestLossDollar
+        (** Single largest losing round-trip, in dollars (most negative). *)
+    | AvgTradeSizeDollar
+        (** Mean entry notional ([entry_price × quantity]) across all
+            round-trips. *)
+    | AvgTradeSizePct  (** Mean entry notional as a percent of initial cash. *)
+    | AvgHoldingDaysWinners
+        (** Mean [days_held] across winning round-trips only. *)
+    | AvgHoldingDaysLosers
+        (** Mean [days_held] across losing round-trips only. *)
+    | Expectancy
+        (** Per-trade expected dollars:
+            [(win_rate × avg_win_dollar) - (loss_rate × |avg_loss_dollar|)]. *)
+    | WinLossRatio
+        (** [avg_win_dollar / |avg_loss_dollar|]; [Float.infinity] when there
+            are wins but no losses. *)
+    | MaxConsecutiveWins
+        (** Longest run of consecutive winning round-trips (chronologically by
+            entry date). *)
+    | MaxConsecutiveLosses
+        (** Longest run of consecutive losing round-trips. *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -58,6 +120,35 @@ type metric_type = Metric_type.t =
   | OpenPositionsValue
   | UnrealizedPnl
   | TradeFrequency
+  | TotalReturnPct
+  | VolatilityPctAnnualized
+  | DownsideDeviationPctAnnualized
+  | BestDayPct
+  | WorstDayPct
+  | BestWeekPct
+  | WorstWeekPct
+  | BestMonthPct
+  | WorstMonthPct
+  | BestQuarterPct
+  | WorstQuarterPct
+  | BestYearPct
+  | WorstYearPct
+  | NumTrades
+  | LossRate
+  | AvgWinDollar
+  | AvgWinPct
+  | AvgLossDollar
+  | AvgLossPct
+  | LargestWinDollar
+  | LargestLossDollar
+  | AvgTradeSizeDollar
+  | AvgTradeSizePct
+  | AvgHoldingDaysWinners
+  | AvgHoldingDaysLosers
+  | Expectancy
+  | WinLossRatio
+  | MaxConsecutiveWins
+  | MaxConsecutiveLosses
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)

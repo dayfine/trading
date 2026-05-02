@@ -62,15 +62,46 @@ val portfolio_state_computer : unit -> Simulator.any_metric_computer
       minus sum of position cost bases; signed-qty form covers longs + shorts)
     - TradeFrequency: Average trades per month *)
 
+(** {1 Trade Aggregates Computer (M5.2b)} *)
+
+val trade_aggregates_computer :
+  ?initial_cash:float -> unit -> Simulator.any_metric_computer
+(** Computer that emits the M5.2b trade-aggregate group: NumTrades, LossRate,
+    AvgWin/Loss (dollars + percent), Largest Win/Loss, AvgTradeSize (dollars +
+    percent), Avg holding days (winners / losers), Expectancy, WinLossRatio,
+    MaxConsecutiveWins / MaxConsecutiveLosses.
+
+    @param initial_cash
+      Used as the denominator for [AvgTradeSizePct]. Pass the simulator's
+      configured [initial_cash]; otherwise [AvgTradeSizePct] reports 0.0. *)
+
+(** {1 Return Basics Computer (M5.2b)} *)
+
+val return_basics_computer : unit -> Simulator.any_metric_computer
+(** Computer that emits the M5.2b returns-block group: TotalReturnPct,
+    VolatilityPctAnnualized, DownsideDeviationPctAnnualized, and best/worst
+    returns over day / week / month / quarter / year buckets.
+
+    Volatility uses the simulation's per-step (daily-cadence) returns annualized
+    via × sqrt(252); calendar bucketing pairs adjacent buckets' last
+    portfolio_value to compute compounded period returns. *)
+
 (** {1 Default Computer Set} *)
 
 val default_computers :
-  ?risk_free_rate:float -> unit -> Simulator.any_metric_computer list
+  ?risk_free_rate:float ->
+  ?initial_cash:float ->
+  unit ->
+  Simulator.any_metric_computer list
 (** Returns all default step-based metric computers: summary (including profit
-    factor), Sharpe ratio, max drawdown, CAGR, and portfolio state.
+    factor), Sharpe ratio, max drawdown, CAGR, portfolio state, trade
+    aggregates, and the M5.2b returns-block group.
 
     @param risk_free_rate
-      Annual risk-free rate for Sharpe calculation (default: 0.0) *)
+      Annual risk-free rate for Sharpe calculation (default: 0.0)
+    @param initial_cash
+      Initial portfolio cash, fed into the trade-aggregates computer for
+      [AvgTradeSizePct] (default: 0.0). *)
 
 (** {1 Derived Metric Computers} *)
 
@@ -82,9 +113,12 @@ val default_derived_computers : unit -> Simulator.derived_metric_computer list
 (** Returns all default derived metric computers (currently: CalmarRatio). *)
 
 val default_metric_suite :
-  ?risk_free_rate:float -> unit -> Simulator.metric_suite
+  ?risk_free_rate:float -> ?initial_cash:float -> unit -> Simulator.metric_suite
 (** Returns a complete metric suite with all step-based and derived computers.
-*)
+
+    @param initial_cash
+      Initial portfolio cash, used by the trade-aggregates computer for
+      [AvgTradeSizePct] (default: 0.0). *)
 
 (** {1 Factory} *)
 
@@ -94,5 +128,9 @@ val create_computer :
 (** Create a metric computer from a metric type.
 
     Note: Summary metrics (TotalPnl, AvgHoldingDays, WinCount, LossCount,
-    WinRate, ProfitFactor) are produced together by summary_computer.
-    CalmarRatio is a derived metric computed post-hoc by the simulator. *)
+    WinRate, ProfitFactor) are produced together by summary_computer. The
+    trade-aggregate group (NumTrades, LossRate, AvgWin/Loss, etc.) is produced
+    together by trade_aggregates_computer; the returns-block group
+    (TotalReturnPct, VolatilityPctAnnualized, BestDayPct, etc.) by
+    return_basics_computer. CalmarRatio is a derived metric computed post-hoc by
+    the simulator. *)
