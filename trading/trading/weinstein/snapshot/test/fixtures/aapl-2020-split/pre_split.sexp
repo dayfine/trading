@@ -1,0 +1,16 @@
+((schema_version 1)
+ (system_version "test-fixture")
+ (date 2020-08-28)
+ (macro ((regime Bullish) (score 0.72)))
+ (sectors_strong (XLK XLY))
+ (sectors_weak (XLE))
+ (long_candidates
+  (((symbol AAPL) (score 0.91) (grade A+) (entry 502.13) (stop 466.20)
+    (sector XLK) (rationale "Stage2 breakout above 30wk MA")
+    (rs_vs_spy (1.34)) (resistance_grade (A)))
+   ((symbol MSFT) (score 0.87) (grade A) (entry 215.50) (stop 200.10)
+    (sector XLK) (rationale "Continuation breakout") (rs_vs_spy (1.18))
+    (resistance_grade ()))))
+ (short_candidates ())
+ (held_positions
+  (((symbol AAPL) (entered 2020-06-19) (stop 466.20) (status Holding)))))

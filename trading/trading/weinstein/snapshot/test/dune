@@ -1,5 +1,5 @@
 (tests
- (names test_round_trip test_forward_trace)
+ (names test_round_trip test_forward_trace test_split_replay)
  (libraries
   weinstein_trading.snapshot
   status
@@ -10,4 +10,6 @@
   matchers
   types)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq)))
+  (pps ppx_deriving.show ppx_deriving.eq))
+ (deps
+  (glob_files_rec fixtures/*)))
