@@ -120,9 +120,9 @@ let test_symmetric_distribution _ =
 
 (* ==================== Right-skewed distribution ==================== *)
 
-(** Returns [-1, -1, -1, 3]. Mean = 0; variance = ((1 + 1 + 1 + 9) / 4) = 3.
-    m3 = (-1 -1 -1 + 27) / 4 = 24 / 4 = 6. Skewness = 6 / pow(3, 1.5) ≈ 1.1547.
-    m4 = (1 + 1 + 1 + 81) / 4 = 21. Kurtosis (excess) = 21 / 9 - 3 ≈ -0.6667.
+(** Returns [-1, -1, -1, 3]. Mean = 0; variance = ((1 + 1 + 1 + 9) / 4) = 3. m3
+    = (-1 -1 -1 + 27) / 4 = 24 / 4 = 6. Skewness = 6 / pow(3, 1.5) ≈ 1.1547. m4
+    = (1 + 1 + 1 + 81) / 4 = 21. Kurtosis (excess) = 21 / 9 - 3 ≈ -0.6667.
     GainToPain = 3 / 3 = 1.0. *)
 let test_right_skewed _ =
   let steps = _curve_from_returns [ -1.0; -1.0; -1.0; 3.0 ] in

@@ -74,8 +74,7 @@ let _aapl_2020_split : scenario =
     symbol = "AAPL";
     fixture_dir = "aapl-2020-split";
     pre_lot = { symbol = "AAPL"; quantity = 100.0; entry_price = 502.13 };
-    kind =
-      Split { split_date = Date.of_string "2020-08-31"; factor = 4.0 };
+    kind = Split { split_date = Date.of_string "2020-08-31"; factor = 4.0 };
   }
 
 let _tsla_2020_split : scenario =
@@ -84,8 +83,7 @@ let _tsla_2020_split : scenario =
     symbol = "TSLA";
     fixture_dir = "tsla-2020-split";
     pre_lot = { symbol = "TSLA"; quantity = 50.0; entry_price = 2213.40 };
-    kind =
-      Split { split_date = Date.of_string "2020-08-31"; factor = 5.0 };
+    kind = Split { split_date = Date.of_string "2020-08-31"; factor = 5.0 };
   }
 
 let _goog_2022_split : scenario =
@@ -94,8 +92,7 @@ let _goog_2022_split : scenario =
     symbol = "GOOG";
     fixture_dir = "goog-2022-split";
     pre_lot = { symbol = "GOOG"; quantity = 10.0; entry_price = 2255.00 };
-    kind =
-      Split { split_date = Date.of_string "2022-07-18"; factor = 20.0 };
+    kind = Split { split_date = Date.of_string "2022-07-18"; factor = 20.0 };
   }
 
 let _nvda_2024_split : scenario =
@@ -104,8 +101,7 @@ let _nvda_2024_split : scenario =
     symbol = "NVDA";
     fixture_dir = "nvda-2024-split";
     pre_lot = { symbol = "NVDA"; quantity = 10.0; entry_price = 1208.00 };
-    kind =
-      Split { split_date = Date.of_string "2024-06-10"; factor = 10.0 };
+    kind = Split { split_date = Date.of_string "2024-06-10"; factor = 10.0 };
   }
 
 let _ko_2024_dividend : scenario =
