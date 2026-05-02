@@ -129,6 +129,40 @@ None. Merged in main:
 
 ## Completed
 
+- [x] **Experiment-runner overrides + comparison + smoke catalog (M5.2a)**
+  (2026-05-02, `feat/backtest-experiment-runner-overrides`). Wires three
+  new flags into `backtest_runner.exe` so experiment runs become
+  structured + comparable:
+  - `--override key.path=value` — ergonomic key-path syntax, dispatched
+    via new `Backtest.Config_override` (parses
+    `stops_config.initial_stop_buffer=1.05` → partial-config sexp). The
+    legacy `--override <sexp>` form keeps working; both compose freely.
+  - `--baseline` — runs twice (default config + overrides), writes
+    `comparison.sexp` + `comparison.md` showing per-metric deltas via
+    new `Backtest.Comparison`. Output goes to
+    `dev/experiments/<name>/{baseline,variant}/` with `comparison.*` at
+    the experiment root.
+  - `--smoke` — loops over the new `Scenario_lib.Smoke_catalog` (Bull
+    2019-06–2019-12, Crash 2020-01–2020-06, Recovery 2023). Composes
+    with `--baseline` for per-window comparisons.
+  - `--experiment-name <name>` — required by the above two; routes
+    output to `dev/experiments/<name>/`.
+
+  Implementation: `backtest_runner_args` now stores overrides as
+  `string list` (was `Sexp.t list`); the executable dispatches via
+  `Config_override.is_key_path_form`. Override applies to exactly the
+  named field — all other config sourced from default — pinned by
+  the existing `_apply_overrides` deep-merge in `Runner`.
+
+  New tests: 21 (Config_override) + 8 (Comparison) + 7 (Smoke_catalog)
+  + 10 added to `test_backtest_runner_args` (27 total). All 251 tests
+  in `trading/backtest/test/` pass; nesting + fn-length linters clean
+  on all new files.
+
+  Verify: `dune runtest trading/backtest/test`. Manual: `backtest_runner
+  2019-06-01 2019-12-31 --baseline --override stops_config.initial_stop_buffer=1.05
+  --experiment-name stop_buffer_test`.
+
 - [x] **UnrealizedPnl rename + corrected metric** (2026-05-01,
   `feat/metrics-unrealized-pnl-rename`, PR #741). Bug surfaced via
   reconciler today: the existing `UnrealizedPnl` metric (=
@@ -310,18 +344,14 @@ input for any of the above experiments.
 
 ### Immediate: experiment framework
 
-No framework exists yet. For the first experiment we can hand-roll output
-files; formalization is a follow-up once we know what structure we actually
-want. Candidate conventions:
-
-- `dev/experiments/<name>/` — one directory per experiment
-- `hypothesis.md`, `variants/*.sexp` (reuse `Scenario.t` format),
-  `report.md` with comparative metrics table
-- Optional: an `experiment_runner` wrapper around `scenario_runner` that
-  emits the comparative report automatically
-
-Defer formalization until after the first 1-2 experiments so the structure
-is informed by actual needs.
+Phase-1 wiring landed 2026-05-02 (see Completed §Experiment-runner
+overrides + comparison + smoke catalog). The runner now supports
+`--override key.path=value`, `--baseline`, `--smoke`, and
+`--experiment-name`, with comparison artefacts written under
+`dev/experiments/<name>/`. Formalization (per-experiment hypothesis.md
+template, scenario-variant directory layout) still open — defer until
+after running the first 1-2 real experiments through the new wiring so
+the structure is informed by actual needs.
 
 ### Medium-term
 

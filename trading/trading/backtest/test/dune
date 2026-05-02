@@ -11,6 +11,9 @@
   test_runner_hypothesis_overrides
   test_panel_loader_parity
   test_backtest_runner_args
+  test_config_override
+  test_comparison
+  test_smoke_catalog
   test_gc_trace
   test_panel_runner_gc_trace
   test_release_perf_report

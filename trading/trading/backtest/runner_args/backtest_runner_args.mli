@@ -2,8 +2,6 @@
     parsing logic is unit-testable independently of the executable's
     side-effecting [main]. *)
 
-open Core
-
 type t = {
   start_date : string;
   end_date : string option;
@@ -11,9 +9,13 @@ type t = {
           omitted. Resolution to a {!Date.t} (defaulting to today) is the
           caller's responsibility — the parser stays free of clock reads so it
           remains a pure function. *)
-  overrides : Sexp.t list;
-      (** Override sexps in the order they were passed on the command line. Each
-          is the parsed sexp of one [--override <sexp>] argument. *)
+  overrides : string list;
+      (** Raw [--override <arg>] arguments in the order passed. The executable
+          interprets each entry: when the string matches the key-path form
+          ([key.path=value]) it routes to {!Backtest.Config_override.parse};
+          otherwise it parses the entry as a raw sexp blob (legacy form).
+          Storing raw strings here keeps [runner_args] independent of the
+          private [backtest] library. *)
   trace_path : string option;
       (** [None] when [--trace] was not passed (no trace file written).
           [Some path] when [--trace <path>] was passed; the runner constructs a
@@ -25,21 +27,27 @@ type t = {
           written, zero memprof overhead). [Some path] when [--memtrace <path>]
           was passed; the runner calls [Memtrace.start_tracing] before invoking
           the backtest, producing a [.ctf] file at [path] consumable by
-          [memtrace_viewer]. The tracer auto-stops at process exit via an
-          [at_exit] hook registered by [Memtrace] itself. Workstream B7 of
-          [dev/plans/backtest-perf-2026-04-24.md] — per-callsite allocation
-          attribution. *)
+          [memtrace_viewer]. *)
   gc_trace_path : string option;
       (** [None] when [--gc-trace] was not passed (no GC snapshots taken, zero
           overhead). [Some path] when [--gc-trace <path>] was passed; the runner
           builds a {!Backtest.Gc_trace.t} and records [Gc.stat] snapshots at
-          coarse phase boundaries (start, after universe load, after macro load,
-          after fill, after teardown, end), writing the accumulated CSV at
-          [path]. Phase 1 of the hybrid-tier architecture plan
-          ([dev/plans/hybrid-tier-architecture-2026-04-26.md]) — discriminates
-          among load-time / per-tick / Friday-cycle residency hypotheses.
-          Composes with [--trace] and [--memtrace] (independent measurement
-          planes). *)
+          coarse phase boundaries. *)
+  baseline : bool;
+      (** [true] when [--baseline] was passed: the runner runs twice (once with
+          overrides, once without) and writes [comparison.sexp] +
+          [comparison.md] alongside the per-run subdirs. Default [false]. *)
+  smoke : bool;
+      (** [true] when [--smoke] was passed: the runner ignores [start_date] /
+          [end_date] and instead runs each window in
+          {!Scenario_lib.Smoke_catalog.all}, with each variant going to a
+          per-window subdir. Default [false]. *)
+  experiment_name : string option;
+      (** [Some name] when [--experiment-name <name>] was passed. When set (and
+          only then), the runner writes outputs under [dev/experiments/<name>/]
+          instead of the legacy timestamped [dev/backtest/<...>/]. Required by
+          [--baseline] and [--smoke] so comparison artefacts have a stable home.
+      *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 
@@ -49,6 +57,14 @@ val parse : string list -> t Status.status_or
 
     Returns [Error status] (with [Status.code = Invalid_argument]) on any
     parsing problem (missing flag value, missing required positional, too many
-    positionals). The executable's [main] turns [Error _] into an [eprintf] +
-    [Stdlib.exit 1]; tests assert via the [Matchers] library's [is_ok_and_holds]
-    / [is_error]. *)
+    positionals, [--baseline]/[--smoke] without [--experiment-name]).
+
+    Override strings are NOT validated here — the executable runs them through
+    [Backtest.Config_override.parse] / [Sexp.of_string] downstream and surfaces
+    parse errors at that layer. Keeping arg-extraction simple lets the parser
+    stay independent of the [backtest] library.
+
+    For [--smoke], the [start_date] / [end_date] positionals are not required
+    and are ignored if supplied — the runner picks the dates from
+    {!Scenario_lib.Smoke_catalog}. For non-[--smoke] runs, [start_date] is still
+    required as before. *)

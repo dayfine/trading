@@ -1,6 +1,6 @@
 (library
  (name scenario_lib)
- (modules scenario universe_file fixtures_root)
+ (modules scenario universe_file fixtures_root smoke_catalog)
  (libraries core fpath weinstein.data_source)
  (preprocess
   (pps ppx_sexp_conv)))
