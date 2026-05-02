@@ -45,6 +45,8 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
       Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized);
     volume_quality =
       Option.map analysis.volume ~f:(fun (v : Volume.result) -> v.confirmation);
+    volume_ratio =
+      Option.map analysis.volume ~f:(fun (v : Volume.result) -> v.volume_ratio);
     resistance_quality =
       Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
           r.quality);

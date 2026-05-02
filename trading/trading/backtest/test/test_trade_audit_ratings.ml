@@ -40,6 +40,9 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     rs_trend;
     rs_value = Some 1.05;
     volume_quality;
+    volume_ratio =
+      Option.map volume_quality ~f:(function
+          | WT.Strong r | WT.Adequate r | WT.Weak r -> r);
     resistance_quality = Some WT.Clean;
     support_quality = Some WT.Clean;
     sector_name = "Information Technology";

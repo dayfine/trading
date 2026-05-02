@@ -453,6 +453,7 @@ let _make_audit_record ~symbol ~entry_date
       rs_trend;
       rs_value = Some 1.05;
       volume_quality = Some (Weinstein_types.Strong 2.4);
+      volume_ratio = Some 2.4;
       resistance_quality = Some Weinstein_types.Clean;
       support_quality = Some Weinstein_types.Clean;
       sector_name = "Tech";

@@ -95,6 +95,14 @@ type entry_decision = {
   rs_trend : Weinstein_types.rs_trend option;
   rs_value : float option;
   volume_quality : Weinstein_types.volume_confirmation option;
+  volume_ratio : float option;
+      (** Breakout-bar volume / 4-week average volume at entry, sourced from
+          {!Volume.result.volume_ratio}. [None] when no breakout volume event
+          could be classified for the entry tick (e.g. insufficient bar
+          history). M5.2e per-trade context — surfaced on [trades.csv] for ML
+          feature export and tuner consumption. The screener cascade uses
+          [volume_quality] for the coarse Strong/Adequate/Weak classification;
+          this field exposes the underlying float ratio that produced it. *)
   resistance_quality : Weinstein_types.overhead_quality option;
   support_quality : Weinstein_types.overhead_quality option;
   sector_name : string;

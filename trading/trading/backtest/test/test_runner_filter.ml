@@ -417,6 +417,7 @@ let _entry ~entry_date ~position_id ~symbol :
     rs_trend = None;
     rs_value = None;
     volume_quality = None;
+    volume_ratio = None;
     resistance_quality = None;
     support_quality = None;
     sector_name = "Tech";

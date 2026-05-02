@@ -7,6 +7,7 @@
   test_trade_audit_capture
   test_trade_audit_report
   test_trade_audit_ratings
+  test_trade_context
   test_result_writer
   test_runner_hypothesis_overrides
   test_panel_loader_parity

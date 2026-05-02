@@ -44,6 +44,54 @@ val exit_trigger_of_reason : Position.exit_reason -> exit_trigger
     backtest-side audit modules can produce the same mapping without duplicating
     the case-split. *)
 
+(** Granular classification of how a stop-driven exit fired, derived from the
+    {!exit_trigger} variant + the gap between trigger level and actual fill.
+    Surfaced on per-trade context exports for downstream tuner / ML use.
+
+    - [Gap_down]: actual fill was significantly worse than the stop level (more
+      than {!gap_down_threshold_pct} away from stop). For longs, the bar opened
+      or traded below the stop with a large gap; for shorts, the bar gapped up
+      through the stop. Indicates a price gap past the stop — not a clean
+      stop-hit.
+    - [Intraday]: actual fill at or near the stop level. The typical case where
+      the stop was hit during normal trading.
+    - [End_of_period]: position was force-closed at end-of-run by the simulator
+      without a strategy-emitted [TriggerExit] (matches
+      {!exit_trigger.End_of_period}).
+    - [Non_stop_exit]: the exit was not a stop trigger — take-profit,
+      signal-reversal, time-expiry, or rebalance. *)
+type stop_trigger_kind = Gap_down | Intraday | End_of_period | Non_stop_exit
+[@@deriving show, eq, sexp]
+
+val gap_down_threshold_pct : float
+(** Threshold gap (as a fraction of stop price) that distinguishes a {!Gap_down}
+    fill from an {!Intraday} fill. A long stop with
+    [actual_price < stop_price * (1 - threshold)] counts as a gap-down
+    (symmetric for shorts). Default 0.005 (50 basis points) — conservative
+    enough that typical bid-ask noise on liquid US equities does not trip it but
+    real overnight gaps do. *)
+
+val classify_stop_trigger_kind :
+  ?gap_threshold_pct:float ->
+  side:Trading_base.Types.position_side ->
+  exit_trigger ->
+  stop_trigger_kind
+(** Classify the kind of stop trigger from the trigger-level vs actual-fill gap
+    on a {!Stop_loss} variant.
+
+    For [Stop_loss { stop_price; actual_price }]:
+    - Long: [actual_price < stop_price * (1 - gap)] → [Gap_down]; else
+      [Intraday].
+    - Short: [actual_price > stop_price * (1 + gap)] → [Gap_down]; else
+      [Intraday].
+
+    The {!End_of_period} variant maps to {!stop_trigger_kind.End_of_period}. All
+    other variants ({!Take_profit}, {!Signal_reversal}, {!Time_expired},
+    {!Underperforming}, {!Portfolio_rebalancing}) classify as {!Non_stop_exit}.
+
+    [gap_threshold_pct] defaults to {!gap_down_threshold_pct}. Pure function —
+    same inputs always produce the same output. *)
+
 type stop_info = {
   position_id : string;  (** Strategy position ID *)
   symbol : string;  (** Ticker symbol *)
