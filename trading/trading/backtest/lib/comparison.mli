@@ -46,6 +46,17 @@ val all_metric_types : Trading_simulation_types.Metric_types.Metric_type.t list
     have to duplicate the registry. Production callers should never need this —
     use [compute] which iterates internally. *)
 
+val metric_label : Trading_simulation_types.Metric_types.Metric_type.t -> string
+(** [metric_label mt] returns the lowercase + underscored output label for
+    metric variant [mt] (e.g. [TotalPnl] → ["total_pnl"]). Stable across
+    refactors of the underlying [Metric_type] enum.
+
+    Exposed so sibling modules ({!Fuzz_distribution} in particular) that emit
+    per-metric outputs use the same label table without duplicating the
+    registry. Raises if [mt] is not in the registry — which would only happen
+    after adding a new variant without updating the table inside
+    [comparison.ml]. *)
+
 val to_sexp : t -> Sexp.t
 (** Render [t] as a machine-readable sexp suitable for diffing or downstream
     tooling. Shape:

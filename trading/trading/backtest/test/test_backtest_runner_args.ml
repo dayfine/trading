@@ -45,6 +45,9 @@ let test_minimal_start_date_only _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.experiment_name)
               (equal_to None);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_spec)
+              (equal_to None);
           ]))
 
 let test_override_key_path_form _ =
@@ -212,6 +215,109 @@ let test_shared_override_composes_with_override _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.overrides)
               (elements_are [ equal_to "shorts_enabled=false" ]);
+          ]))
+
+let test_fuzz_flag _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2019-05-01";
+        "--fuzz";
+        "start_date=2019-05-01\xC2\xB15w:11";
+        "--experiment-name";
+        "fuzz_run";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_spec)
+              (equal_to (Some "start_date=2019-05-01\xC2\xB15w:11"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.experiment_name)
+              (equal_to (Some "fuzz_run"));
+          ]))
+
+let test_fuzz_without_experiment_name_is_error _ =
+  let result =
+    Backtest_runner_args.parse [ "2019-05-01"; "--fuzz"; "x=1.0\xC2\xB10.1:3" ]
+  in
+  assert_that result is_error
+
+let test_fuzz_without_value_is_error _ =
+  let result =
+    Backtest_runner_args.parse
+      [ "2019-05-01"; "--fuzz"; "--experiment-name"; "x" ]
+  in
+  (* "--experiment-name" gets consumed as the fuzz spec value here, then
+     "x" becomes the positional. The parser then notices --experiment-name
+     was never set (its value got eaten), so it errors. *)
+  assert_that result is_error
+
+let test_fuzz_no_positional_uses_sentinel _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "--fuzz";
+        "start_date=2019-05-01\xC2\xB15w:3";
+        "--experiment-name";
+        "fuzz_run";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.start_date)
+          (equal_to "fuzz")))
+
+let test_fuzz_with_baseline_is_error _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2019-05-01";
+        "--fuzz";
+        "x=1.0\xC2\xB10.1:3";
+        "--baseline";
+        "--experiment-name";
+        "x";
+      ]
+  in
+  assert_that result is_error
+
+let test_fuzz_with_smoke_is_error _ =
+  let result =
+    Backtest_runner_args.parse
+      [ "--fuzz"; "x=1.0\xC2\xB10.1:3"; "--smoke"; "--experiment-name"; "x" ]
+  in
+  assert_that result is_error
+
+let test_fuzz_with_overrides_composes _ =
+  (* --fuzz composes with --override (overrides apply to every variant). *)
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2019-05-01";
+        "--fuzz";
+        "stops_config.initial_stop_buffer=1.05\xC2\xB10.02:11";
+        "--override";
+        "universe_cap=300";
+        "--experiment-name";
+        "fuzz_with_shared";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_spec)
+              (equal_to
+                 (Some "stops_config.initial_stop_buffer=1.05\xC2\xB10.02:11"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.overrides)
+              (elements_are [ equal_to "universe_cap=300" ]);
           ]))
 
 let test_baseline_and_smoke_compose _ =
@@ -516,6 +622,15 @@ let suite =
          "--shared-override composes with --override"
          >:: test_shared_override_composes_with_override;
          "--baseline + --smoke compose" >:: test_baseline_and_smoke_compose;
+         "--fuzz flag captures spec" >:: test_fuzz_flag;
+         "--fuzz without --experiment-name is error"
+         >:: test_fuzz_without_experiment_name_is_error;
+         "--fuzz without value is error" >:: test_fuzz_without_value_is_error;
+         "--fuzz no positional uses sentinel"
+         >:: test_fuzz_no_positional_uses_sentinel;
+         "--fuzz with --baseline is error" >:: test_fuzz_with_baseline_is_error;
+         "--fuzz with --smoke is error" >:: test_fuzz_with_smoke_is_error;
+         "--fuzz composes with --override" >:: test_fuzz_with_overrides_composes;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
        ]
 

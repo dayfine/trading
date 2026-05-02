@@ -11,6 +11,7 @@ type t = {
   baseline : bool;
   smoke : bool;
   experiment_name : string option;
+  fuzz_spec : string option;
 }
 
 type acc = {
@@ -23,6 +24,7 @@ type acc = {
   baseline : bool;
   smoke : bool;
   experiment_name : string option;
+  fuzz_spec : string option;
 }
 (** Accumulator for [_extract_flags]. Carries every flag the parser recognises
     plus the running list of positional args. *)
@@ -38,6 +40,7 @@ let _empty_acc =
     baseline = false;
     smoke = false;
     experiment_name = None;
+    fuzz_spec = None;
   }
 
 let _err msg = Error (Status.invalid_argument_error msg)
@@ -73,16 +76,24 @@ let rec _extract_flags args (acc : acc) =
   | "--experiment-name" :: value :: rest ->
       _extract_flags rest { acc with experiment_name = Some value }
   | [ "--experiment-name" ] -> _err "--experiment-name requires a name argument"
+  | "--fuzz" :: value :: rest ->
+      _extract_flags rest { acc with fuzz_spec = Some value }
+  | [ "--fuzz" ] -> _err "--fuzz requires a spec argument"
   | arg :: rest ->
       _extract_flags rest { acc with positional = arg :: acc.positional }
 
-(** Pull start/end dates off the positional list. With [--smoke], the runner
-    picks dates from the catalog so positionals are tolerated when present
-    (start_date defaults to ["smoke"] sentinel) and the count must be 0..2;
-    without [--smoke], at least [start_date] is required. *)
-let _split_positional ~smoke positional =
-  match (smoke, positional) with
-  | true, [] -> Ok ("smoke", None)
+(** Pull start/end dates off the positional list. With [--smoke] (or [--fuzz] on
+    a date key) the runner picks dates from the catalog / fuzz variants, so
+    positionals become optional in those modes — when omitted the [start_date]
+    field is filled with a sentinel atom (["smoke"] or ["fuzz"]) that the
+    executable replaces before invoking [Runner.run_backtest]. The parser stays
+    clock-free, so no validation that a fuzz on a non-date key actually has a
+    positional date — that surfaces at run-time. *)
+let _split_positional ~smoke ~fuzz_spec positional =
+  let sentinel = if smoke then "smoke" else "fuzz" in
+  let lenient = smoke || Option.is_some fuzz_spec in
+  match (lenient, positional) with
+  | true, [] -> Ok (sentinel, None)
   | true, [ s ] -> Ok (s, None)
   | true, [ s; e ] -> Ok (s, Some e)
   | true, _ -> _err "too many positional arguments"
@@ -91,33 +102,55 @@ let _split_positional ~smoke positional =
   | false, [ s; e ] -> Ok (s, Some e)
   | false, _ -> _err "too many positional arguments"
 
-(** Cross-flag validation: [--baseline] and [--smoke] require an explicit
-    [--experiment-name] so the comparison / per-window subdirs have a stable
-    home under [dev/experiments/<name>/]. *)
-let _validate_experiment_required ~baseline ~smoke ~experiment_name =
-  if (baseline || smoke) && Option.is_none experiment_name then
+(** Cross-flag validation: [--baseline], [--smoke], and [--fuzz] each require an
+    explicit [--experiment-name] so the comparison / per-window / per-variant
+    subdirs have a stable home under [dev/experiments/<name>/]. *)
+let _validate_experiment_required ~baseline ~smoke ~fuzz_spec ~experiment_name =
+  let need_name = baseline || smoke || Option.is_some fuzz_spec in
+  if need_name && Option.is_none experiment_name then
     _err
-      "--baseline and --smoke require --experiment-name <name> for output \
-       directory"
+      "--baseline, --smoke, and --fuzz require --experiment-name <name> for \
+       output directory"
   else Ok ()
+
+(** [--fuzz] is mutually exclusive with [--baseline] and [--smoke] for the first
+    cut. Composing them would require a 3-D output structure (per-window ×
+    per-variant × baseline-vs-variant) that the distribution renderer doesn't
+    yet handle. Recommended pattern: run a single fuzz invocation per window or
+    per baseline study. *)
+let _validate_fuzz_exclusivity ~baseline ~smoke ~fuzz_spec =
+  match fuzz_spec with
+  | None -> Ok ()
+  | Some _ when baseline -> _err "--fuzz is mutually exclusive with --baseline"
+  | Some _ when smoke -> _err "--fuzz is mutually exclusive with --smoke"
+  | Some _ -> Ok ()
+
+let _build_result (acc : acc) (start_date, end_date) =
+  Ok
+    {
+      start_date;
+      end_date;
+      overrides = acc.overrides;
+      shared_overrides = acc.shared_overrides;
+      trace_path = acc.trace_path;
+      memtrace_path = acc.memtrace_path;
+      gc_trace_path = acc.gc_trace_path;
+      baseline = acc.baseline;
+      smoke = acc.smoke;
+      experiment_name = acc.experiment_name;
+      fuzz_spec = acc.fuzz_spec;
+    }
 
 let parse args =
   Result.bind (_extract_flags args _empty_acc) ~f:(fun (acc : acc) ->
       Result.bind
         (_validate_experiment_required ~baseline:acc.baseline ~smoke:acc.smoke
-           ~experiment_name:acc.experiment_name) ~f:(fun () ->
-          Result.bind (_split_positional ~smoke:acc.smoke acc.positional)
-            ~f:(fun (start_date, end_date) ->
-              Ok
-                {
-                  start_date;
-                  end_date;
-                  overrides = acc.overrides;
-                  shared_overrides = acc.shared_overrides;
-                  trace_path = acc.trace_path;
-                  memtrace_path = acc.memtrace_path;
-                  gc_trace_path = acc.gc_trace_path;
-                  baseline = acc.baseline;
-                  smoke = acc.smoke;
-                  experiment_name = acc.experiment_name;
-                })))
+           ~fuzz_spec:acc.fuzz_spec ~experiment_name:acc.experiment_name)
+        ~f:(fun () ->
+          Result.bind
+            (_validate_fuzz_exclusivity ~baseline:acc.baseline ~smoke:acc.smoke
+               ~fuzz_spec:acc.fuzz_spec) ~f:(fun () ->
+              Result.bind
+                (_split_positional ~smoke:acc.smoke ~fuzz_spec:acc.fuzz_spec
+                   acc.positional)
+                ~f:(_build_result acc))))

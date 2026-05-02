@@ -63,8 +63,15 @@ type t = {
       (** [Some name] when [--experiment-name <name>] was passed. When set (and
           only then), the runner writes outputs under [dev/experiments/<name>/]
           instead of the legacy timestamped [dev/backtest/<...>/]. Required by
-          [--baseline] and [--smoke] so comparison artefacts have a stable home.
-      *)
+          [--baseline], [--smoke], and [--fuzz] so comparison/distribution
+          artefacts have a stable home. *)
+  fuzz_spec : string option;
+      (** [Some spec] when [--fuzz <param>=<center>±<delta>:<n>] was passed. The
+          runner parses [spec] via {!Backtest.Fuzz_spec.parse}, runs N variants
+          (one per generated value), and writes a per-metric distribution sexp +
+          markdown alongside the per-variant subdirs. The string is stored
+          verbatim — interpretation is the executable's job. Mutually exclusive
+          with [--baseline] and [--smoke] (validated at parse time). *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 
@@ -74,7 +81,8 @@ val parse : string list -> t Status.status_or
 
     Returns [Error status] (with [Status.code = Invalid_argument]) on any
     parsing problem (missing flag value, missing required positional, too many
-    positionals, [--baseline]/[--smoke] without [--experiment-name]).
+    positionals, [--baseline]/[--smoke]/[--fuzz] without [--experiment-name], or
+    [--fuzz] combined with [--baseline] or [--smoke]).
 
     Override strings are NOT validated here — the executable runs them through
     [Backtest.Config_override.parse] / [Sexp.of_string] downstream and surfaces

@@ -33,6 +33,26 @@
     constrains the loaded universe so the run fits inside the dev container's
     memory budget.
 
+    {1 Fuzz mode}
+
+    [backtest_runner [<start_date> [end_date]] --fuzz
+     <param>=<center>±<delta>:<n> --experiment-name <name> [--override <arg>]
+     ...]
+
+    Parses the spec via {!Backtest.Fuzz_spec.parse}, runs N variants, and writes
+    [fuzz_distribution.{sexp,md}] alongside per-variant subdirs at
+    [dev/experiments/<name>/variants/var-NN/]. Two example invocations:
+
+    {v
+      --fuzz start_date=2019-05-01±5w:11   # date jitter ±5 weeks, 11 variants
+      --fuzz stops_config.initial_stop_buffer=1.05±0.02:11  # numeric jitter
+    v}
+
+    Mutually exclusive with [--baseline] and [--smoke]; composes freely with
+    [--override] / [--shared-override] (those apply to every variant). For
+    date-key specs the positional [start_date] is overridden by the variant; for
+    numeric-key specs the positional [start_date] is required.
+
     {1 --override vs. --shared-override}
 
     Both flags accept the same syntax, freely composable:
@@ -58,7 +78,7 @@ open Core
 let _usage_msg =
   "Usage: backtest_runner <start_date> [end_date] [--override <arg>] \
    [--shared-override <arg>] [--trace <path>] [--memtrace <path>] [--gc-trace \
-   <path>] [--baseline] [--smoke] [--experiment-name <name>]"
+   <path>] [--baseline] [--smoke] [--fuzz <spec>] [--experiment-name <name>]"
 
 (** Convert each raw [--override <arg>] string into the partial-config sexp the
     runner deep-merges. Routes key-path strings through
@@ -234,6 +254,65 @@ let _smoke_window_sector_map ~fixtures_root
   Scenario_lib.Universe_file.to_sector_map_override
     (Scenario_lib.Universe_file.load resolved)
 
+(** Convert one fuzz variant into the (start_date, overrides) pair the
+    per-variant run consumes. Date variants substitute the start_date; numeric
+    variants are encoded as a partial-config sexp via {!Config_override} and
+    appended to the shared overrides. *)
+let _resolve_fuzz_variant ~base_start_date ~base_overrides
+    (v : Backtest.Fuzz_spec.variant) =
+  match v.value with
+  | V_date d -> (d, base_overrides)
+  | V_float f ->
+      let key_path = String.split v.key_path ~on:'.' in
+      let value_sexp = Sexp.Atom (sprintf "%g" f) in
+      let override_sexp =
+        Backtest.Config_override.to_sexp { key_path; value = value_sexp }
+      in
+      (base_start_date, base_overrides @ [ override_sexp ])
+
+(** Fuzz mode: parse the spec, run N variants under
+    [<output_root>/variants/var-NN/], collect each summary, and write
+    [fuzz_distribution.{sexp,md}] at [output_root]. The [overrides] list (which
+    already includes any [--shared-override] entries appended at the call site)
+    is passed unchanged to every variant — fuzz-mode treats override and
+    shared_override identically since there's no baseline to differentiate them.
+*)
+let _fuzz_run ~start_date ~end_date ~overrides ~output_root ~fuzz_spec_raw () =
+  let fuzz_spec =
+    match Backtest.Fuzz_spec.parse fuzz_spec_raw with
+    | Ok spec -> spec
+    | Error err ->
+        eprintf "Error: invalid --fuzz spec %S: %s\n" fuzz_spec_raw err.message;
+        Stdlib.exit 1
+  in
+  let variants_root = Filename.concat output_root "variants" in
+  Core_unix.mkdir_p variants_root;
+  let n = fuzz_spec.n in
+  let labelled_summaries =
+    List.map fuzz_spec.variants ~f:(fun v ->
+        let subdir = Backtest.Fuzz_spec.subdir_name ~n ~index:v.index in
+        let variant_dir = Filename.concat variants_root subdir in
+        Core_unix.mkdir_p variant_dir;
+        let v_start, v_overrides =
+          _resolve_fuzz_variant ~base_start_date:start_date
+            ~base_overrides:overrides v
+        in
+        eprintf "[fuzz %d/%d] %s = %s\n%!" v.index n v.key_path v.label;
+        let result =
+          _run_and_write ~start_date:v_start ~end_date ~overrides:v_overrides
+            ~output_dir:variant_dir ()
+        in
+        (v.label, result.summary))
+  in
+  let dist =
+    Backtest.Fuzz_distribution.compute ~fuzz_spec_raw labelled_summaries
+  in
+  let sexp_path = Filename.concat output_root "fuzz_distribution.sexp" in
+  let md_path = Filename.concat output_root "fuzz_distribution.md" in
+  Backtest.Fuzz_distribution.write_sexp ~output_path:sexp_path dist;
+  Backtest.Fuzz_distribution.write_markdown ~output_path:md_path dist;
+  eprintf "Fuzz distribution written to: %s and %s\n%!" sexp_path md_path
+
 (** Smoke mode: loop over every window in {!Scenario_lib.Smoke_catalog.all},
     delegating to either [_single_run] or [_baseline_run] per window depending
     on the [baseline] flag. Each window's [universe_path] is loaded into a
@@ -276,6 +355,25 @@ let _resolve_dates ~start_date_raw ~end_date_raw =
   in
   (start_date, end_date)
 
+(** Resolve dates safely for fuzz mode: when the user passed the [fuzz] sentinel
+    for the start_date positional (no positional given), fall back to a
+    placeholder [Date.t] — for date-key fuzz the variant supplies the real
+    start_date, for numeric-key fuzz the user is expected to have supplied a
+    positional. We surface a friendly error if a numeric-key fuzz runs without a
+    positional. *)
+let _resolve_dates_for_fuzz ~start_date_raw ~end_date_raw =
+  if String.equal start_date_raw "fuzz" then
+    (* Placeholder; date-key variants overwrite, numeric-key variants need a
+       real positional and we'll fail loudly downstream. *)
+    let placeholder = Date.create_exn ~y:2000 ~m:Month.Jan ~d:1 in
+    let end_date =
+      match end_date_raw with
+      | Some s -> Date.of_string s
+      | None -> Date.today ~zone:Time_float.Zone.utc
+    in
+    (placeholder, end_date)
+  else _resolve_dates ~start_date_raw ~end_date_raw
+
 let () =
   let parsed = _parse_args () in
   let overrides = _resolve_overrides parsed.overrides in
@@ -283,18 +381,29 @@ let () =
   let output_root =
     _make_output_root ?experiment_name:parsed.experiment_name ()
   in
-  match (parsed.smoke, parsed.baseline) with
-  | true, _ ->
+  match (parsed.fuzz_spec, parsed.smoke, parsed.baseline) with
+  | Some fuzz_spec_raw, _, _ ->
+      let start_date, end_date =
+        _resolve_dates_for_fuzz ~start_date_raw:parsed.start_date
+          ~end_date_raw:parsed.end_date
+      in
+      (* Fuzz mode treats override and shared_override identically — there's
+         no baseline to differentiate them, so flatten both into the per-variant
+         override list. *)
+      _fuzz_run ~start_date ~end_date
+        ~overrides:(shared_overrides @ overrides)
+        ~output_root ~fuzz_spec_raw ()
+  | None, true, _ ->
       _smoke_run ~shared_overrides ~overrides ~output_root
         ~baseline:parsed.baseline ()
-  | false, true ->
+  | None, false, true ->
       let start_date, end_date =
         _resolve_dates ~start_date_raw:parsed.start_date
           ~end_date_raw:parsed.end_date
       in
       _baseline_run ~start_date ~end_date ~shared_overrides ~overrides
         ~output_root ()
-  | false, false ->
+  | None, false, false ->
       let start_date, end_date =
         _resolve_dates ~start_date_raw:parsed.start_date
           ~end_date_raw:parsed.end_date
