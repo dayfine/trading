@@ -325,6 +325,107 @@ let test_parity_insufficient_data _ =
   let bars = List.init 10 ~f:(fun _ -> 50.0) |> bars_of_prices in
   assert_parity bars
 
+(* ------------------------------------------------------------------ *)
+(* Segmentation variant — feature-flagged Stage classifier (M5.4 E2)  *)
+(*                                                                      *)
+(* Goal: verify both [stage_method] variants produce a [Stage.t] for   *)
+(* each scenario and that the new [Segmentation] path identifies the   *)
+(* expected stage on clear-cut inputs (rising/declining series).       *)
+(* The default-on-MaSlope tests above guard the existing behavior.     *)
+(* ------------------------------------------------------------------ *)
+
+let cfg_segmentation = { default_config with stage_method = Segmentation }
+
+(** Default config preserves [MaSlope]: changing nothing else, the new field
+    must select the legacy path. *)
+let test_default_config_uses_ma_slope _ =
+  assert_that default_config.stage_method (equal_to MaSlope)
+
+(** Stage 2: clearly rising series with the segmentation variant should still
+    classify as Stage 2 with a Rising direction. *)
+let test_segmentation_stage2_rising _ =
+  let bars = rising_bars ~n:100 50.0 200.0 in
+  let result = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.stage) is_stage2;
+         field (fun r -> r.ma_direction) (equal_to Rising);
+       ])
+
+(** Stage 4: clearly declining series with the segmentation variant should
+    classify as Stage 4 with a Declining direction. *)
+let test_segmentation_stage4_declining _ =
+  let bars = declining_bars ~n:100 200.0 50.0 in
+  let result = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.stage) is_stage4;
+         field (fun r -> r.ma_direction) (equal_to Declining);
+       ])
+
+(** Insufficient data: the segmentation variant must take the same early-return
+    branch as the slope variant ([_stage1_default_result]). *)
+let test_segmentation_insufficient_data _ =
+  let bars = List.init 10 ~f:(fun _ -> 50.0) |> bars_of_prices in
+  let result = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.stage) is_stage1;
+         field (fun r -> r.ma_value) (float_equal 0.0);
+       ])
+
+(** Purity for the segmentation path: same inputs always produce the same
+    output. *)
+let test_segmentation_pure _ =
+  let bars = rising_bars ~n:80 50.0 150.0 in
+  let r1 = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  let r2 = classify ~config:cfg_segmentation ~bars ~prior_stage:None in
+  assert_that r2
+    (all_of
+       [
+         field (fun r -> r.stage) (equal_to (r1.stage : stage));
+         field (fun r -> r.ma_value) (float_equal r1.ma_value);
+         field
+           (fun r -> r.ma_direction)
+           (equal_to (r1.ma_direction : ma_direction));
+         field (fun r -> r.ma_slope_pct) (float_equal r1.ma_slope_pct);
+       ])
+
+(** Both methods return a valid [Stage.t] for the same bars.
+
+    Acceptance criterion from M5.4 E2: "Both methods produce a [Stage.t] for the
+    same input." We assert both produce *some* stage; we do not require them to
+    agree on which stage. *)
+let test_both_methods_return_a_stage _ =
+  let bars = rising_bars ~n:80 50.0 150.0 in
+  let r_slope =
+    classify
+      ~config:{ default_config with stage_method = MaSlope }
+      ~bars ~prior_stage:None
+  in
+  let r_seg =
+    classify
+      ~config:{ default_config with stage_method = Segmentation }
+      ~bars ~prior_stage:None
+  in
+  (* Both stage values should belong to one of the four stage variants —
+     since [stage] is a closed variant, just asserting equality of the
+     stage_number domain is enough to confirm both produced a valid value. *)
+  let stage_number = function
+    | Stage1 _ -> 1
+    | Stage2 _ -> 2
+    | Stage3 _ -> 3
+    | Stage4 _ -> 4
+  in
+  assert_that
+    (stage_number r_slope.stage)
+    (is_between (module Int_ord) ~low:1 ~high:4);
+  assert_that (stage_number r_seg.stage)
+    (is_between (module Int_ord) ~low:1 ~high:4)
+
 let suite =
   "stage_tests"
   >::: [
@@ -352,6 +453,15 @@ let suite =
          >:: test_parity_stage3_flat_after_advance;
          "test_parity_late_stage2" >:: test_parity_late_stage2;
          "test_parity_insufficient_data" >:: test_parity_insufficient_data;
+         "test_default_config_uses_ma_slope"
+         >:: test_default_config_uses_ma_slope;
+         "test_segmentation_stage2_rising" >:: test_segmentation_stage2_rising;
+         "test_segmentation_stage4_declining"
+         >:: test_segmentation_stage4_declining;
+         "test_segmentation_insufficient_data"
+         >:: test_segmentation_insufficient_data;
+         "test_segmentation_pure" >:: test_segmentation_pure;
+         "test_both_methods_return_a_stage" >:: test_both_methods_return_a_stage;
        ]
 
 let () = run_test_tt_main suite
