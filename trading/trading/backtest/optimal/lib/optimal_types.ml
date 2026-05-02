@@ -13,6 +13,7 @@ type candidate_entry = {
   risk_pct : float;
   sector : string;
   cascade_grade : Weinstein_types.grade;
+  cascade_score : int;
   passes_macro : bool;
 }
 [@@deriving sexp]
@@ -61,4 +62,5 @@ type optimal_summary = {
   variant : variant_label;
 }
 
-and variant_label = Constrained | Relaxed_macro [@@deriving sexp]
+and variant_label = Constrained | Score_picked | Relaxed_macro
+[@@deriving sexp]

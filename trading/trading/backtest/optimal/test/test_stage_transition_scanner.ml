@@ -125,6 +125,7 @@ let test_candidate_entry_sexp_round_trip _ =
       risk_pct = 0.08;
       sector = "Information Technology";
       cascade_grade = A;
+      cascade_score = 75;
       passes_macro = true;
     }
   in
@@ -153,6 +154,7 @@ let test_scored_candidate_sexp_round_trip _ =
       risk_pct = 0.08;
       sector = "Information Technology";
       cascade_grade = B;
+      cascade_score = 60;
       passes_macro = true;
     }
   in

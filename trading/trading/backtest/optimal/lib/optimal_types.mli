@@ -51,6 +51,13 @@ type candidate_entry = {
       (** Cascade grade the live screener would have assigned. Recorded for the
           per-Friday divergence report (PR-4) so the renderer can attribute
           missed entries to "filtered by grade threshold". *)
+  cascade_score : int;
+      (** Cascade score the live screener would have assigned at [entry_week] —
+          the integer composite score the cascade ranks candidates by before
+          applying the grade threshold. Recorded so the {!Score_picked}
+          counterfactual variant can sort by the same pre-trade signal the live
+          strategy uses, isolating cascade-ranking error from outcome-foresight
+          ordering. *)
   passes_macro : bool;
       (** Whether the macro gate at [entry_week] would have admitted this
           candidate. The scanner records both passes and fails so the renderer
@@ -167,12 +174,24 @@ type optimal_summary = {
     pipeline can split rows by variant without re-running Phase A. *)
 and variant_label =
   | Constrained
-      (** Macro gate honoured — counterfactual only enters candidates whose
-          [passes_macro] flag was [true] at the breakout week. The honest
-          comparison: "what's reachable if cascade ranking were perfect, all
-          else equal?" *)
+      (** Macro gate honoured AND candidates ordered by realised [r_multiple]
+          (descending). Picks winners with full outcome foresight — the upper
+          bound on "what's reachable if cascade ranking + sizing were perfectly
+          informed about future returns, with macro gate kept". Useful as a
+          ceiling, but {b not} a target the live strategy can hit (the live
+          filler can't peek at future R-multiples). *)
+  | Score_picked
+      (** Macro gate honoured AND candidates ordered by pre-trade
+          [cascade_score] (descending) — the same signal the actual strategy
+          uses. Closes the perfect-foresight contamination in {!Constrained} so
+          the gap "Strategy actual" → [Score_picked] reads cleanly as
+          {b cascade-ranking error} (closeable by improving the screener), and
+          the gap [Score_picked] → [Constrained] reads as
+          {b outcome-foresight bonus} (uncloseable; requires hindsight). Ties
+          broken by symbol ASC for determinism. *)
   | Relaxed_macro
-      (** Macro gate dropped — every candidate is eligible regardless of regime.
-          The upper bound: "what's reachable if we also relaxed the macro gate?"
-      *)
+      (** Macro gate dropped AND candidates ordered by realised [r_multiple]
+          (descending). The unconstrained upper bound: "what's reachable if we
+          also relaxed the macro gate?" The [Constrained] → [Relaxed_macro] gap
+          reads as macro-gate cost. *)
 [@@deriving sexp]

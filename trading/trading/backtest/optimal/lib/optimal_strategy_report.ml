@@ -27,6 +27,7 @@ type actual_run = {
 type input = {
   actual : actual_run;
   constrained : variant_pack;
+  score_picked : variant_pack;
   relaxed_macro : variant_pack;
 }
 
@@ -104,68 +105,113 @@ let _section_header (input : input) : string list =
 (* Section: headline comparison table                                 *)
 (* ---------------------------------------------------------------- *)
 
-let _comp_row label ~actual ~constrained_v ~relaxed ~delta =
-  sprintf "| %s | %s | %s | %s | %s |" label actual constrained_v relaxed delta
+let _comp_row label ~actual ~constrained_v ~score_picked_v ~relaxed ~delta =
+  sprintf "| %s | %s | %s | %s | %s | %s |" label actual constrained_v
+    score_picked_v relaxed delta
 
 let _delta_pp ~constrained_v ~actual = _fmt_pp (constrained_v -. actual)
+
+let _row_total_return ~actual_return ~c ~s ~r =
+  let constrained_return = _frac_to_pct c.summary.total_return_pct in
+  let score_picked_return = _frac_to_pct s.summary.total_return_pct in
+  let relaxed_return = _frac_to_pct r.summary.total_return_pct in
+  _comp_row "Total return"
+    ~actual:(_fmt_pct_signed actual_return)
+    ~constrained_v:(_fmt_pct_signed constrained_return)
+    ~score_picked_v:(_fmt_pct_signed score_picked_return)
+    ~relaxed:(_fmt_pct_signed relaxed_return)
+    ~delta:(_delta_pp ~constrained_v:constrained_return ~actual:actual_return)
+
+let _row_win_rate ~(a : actual_run) ~c ~s ~r =
+  _comp_row "Win rate"
+    ~actual:(_fmt_pct_unsigned a.win_rate_pct)
+    ~constrained_v:(_fmt_pct_unsigned (_wr_frac_to_pct c.summary.win_rate_pct))
+    ~score_picked_v:(_fmt_pct_unsigned (_wr_frac_to_pct s.summary.win_rate_pct))
+    ~relaxed:(_fmt_pct_unsigned (_wr_frac_to_pct r.summary.win_rate_pct))
+    ~delta:
+      (_delta_pp
+         ~constrained_v:(_wr_frac_to_pct c.summary.win_rate_pct)
+         ~actual:a.win_rate_pct)
+
+let _row_max_dd ~(a : actual_run) ~c ~s ~r =
+  _comp_row "MaxDD"
+    ~actual:(sprintf "-%.2f%%" a.max_drawdown_pct)
+    ~constrained_v:
+      (sprintf "-%.2f%%" (_dd_frac_to_pct c.summary.max_drawdown_pct))
+    ~score_picked_v:
+      (sprintf "-%.2f%%" (_dd_frac_to_pct s.summary.max_drawdown_pct))
+    ~relaxed:(sprintf "-%.2f%%" (_dd_frac_to_pct r.summary.max_drawdown_pct))
+    ~delta:
+      (_delta_pp
+         ~constrained_v:(-._dd_frac_to_pct c.summary.max_drawdown_pct)
+         ~actual:(-.a.max_drawdown_pct))
+
+let _row_sharpe ~(a : actual_run) =
+  _comp_row "Sharpe"
+    ~actual:(_fmt_float_2 a.sharpe_ratio)
+    ~constrained_v:"n/a" ~score_picked_v:"n/a" ~relaxed:"n/a" ~delta:"n/a"
+
+let _row_profit_factor ~(a : actual_run) ~c ~s ~r =
+  _comp_row "Profit factor"
+    ~actual:(_fmt_float_or_inf a.profit_factor)
+    ~constrained_v:(_fmt_float_or_inf c.summary.profit_factor)
+    ~score_picked_v:(_fmt_float_or_inf s.summary.profit_factor)
+    ~relaxed:(_fmt_float_or_inf r.summary.profit_factor)
+    ~delta:"—"
+
+let _row_round_trips ~(a : actual_run) ~c ~s ~r =
+  _comp_row "Round-trips"
+    ~actual:(_fmt_int (List.length a.round_trips))
+    ~constrained_v:(_fmt_int c.summary.total_round_trips)
+    ~score_picked_v:(_fmt_int s.summary.total_round_trips)
+    ~relaxed:(_fmt_int r.summary.total_round_trips)
+    ~delta:"—"
+
+let _row_avg_r ~actual_avg_r ~c ~s ~r =
+  _comp_row "Avg R-multiple"
+    ~actual:(_fmt_float_2 actual_avg_r)
+    ~constrained_v:(_fmt_float_2 c.summary.avg_r_multiple)
+    ~score_picked_v:(_fmt_float_2 s.summary.avg_r_multiple)
+    ~relaxed:(_fmt_float_2 r.summary.avg_r_multiple)
+    ~delta:"—"
+
+(** Header lines for the headline section: title, gap-decomposition narrative,
+    and table column header / divider. Pulled out so [_headline_section] stays
+    short enough to fit the function-length linter. *)
+let _headline_header_lines : string list =
+  [
+    "## Headline comparison";
+    "";
+    "Variant ordering reads left-to-right as a gap decomposition:";
+    "- **Actual → Score_picked** = cascade-ranking error (closeable: improve \
+     scoring).";
+    "- **Score_picked → Constrained** = outcome-foresight bonus (uncloseable: \
+     requires hindsight).";
+    "- **Constrained → Relaxed_macro** = macro-gate cost.";
+    "";
+    "| Metric | Actual | Optimal (constrained) | Optimal (score_picked) | \
+     Optimal (relaxed macro) | Δ to constrained |";
+    "|---|---:|---:|---:|---:|---:|";
+  ]
 
 let _headline_section (input : input) : string list =
   let a = input.actual in
   let c = input.constrained in
+  let s = input.score_picked in
   let r = input.relaxed_macro in
   let actual_return = _actual_total_return_pct a in
-  let constrained_return = _frac_to_pct c.summary.total_return_pct in
-  let relaxed_return = _frac_to_pct r.summary.total_return_pct in
   let actual_avg_r = _actual_avg_r a in
-  [
-    "## Headline comparison";
-    "";
-    "| Metric | Actual | Optimal (constrained) | Optimal (relaxed macro) | Δ \
-     to constrained |";
-    "|---|---:|---:|---:|---:|";
-    _comp_row "Total return"
-      ~actual:(_fmt_pct_signed actual_return)
-      ~constrained_v:(_fmt_pct_signed constrained_return)
-      ~relaxed:(_fmt_pct_signed relaxed_return)
-      ~delta:(_delta_pp ~constrained_v:constrained_return ~actual:actual_return);
-    _comp_row "Win rate"
-      ~actual:(_fmt_pct_unsigned a.win_rate_pct)
-      ~constrained_v:
-        (_fmt_pct_unsigned (_wr_frac_to_pct c.summary.win_rate_pct))
-      ~relaxed:(_fmt_pct_unsigned (_wr_frac_to_pct r.summary.win_rate_pct))
-      ~delta:
-        (_delta_pp
-           ~constrained_v:(_wr_frac_to_pct c.summary.win_rate_pct)
-           ~actual:a.win_rate_pct);
-    _comp_row "MaxDD"
-      ~actual:(sprintf "-%.2f%%" a.max_drawdown_pct)
-      ~constrained_v:
-        (sprintf "-%.2f%%" (_dd_frac_to_pct c.summary.max_drawdown_pct))
-      ~relaxed:(sprintf "-%.2f%%" (_dd_frac_to_pct r.summary.max_drawdown_pct))
-      ~delta:
-        (_delta_pp
-           ~constrained_v:(-._dd_frac_to_pct c.summary.max_drawdown_pct)
-           ~actual:(-.a.max_drawdown_pct));
-    _comp_row "Sharpe"
-      ~actual:(_fmt_float_2 a.sharpe_ratio)
-      ~constrained_v:"n/a" ~relaxed:"n/a" ~delta:"n/a";
-    _comp_row "Profit factor"
-      ~actual:(_fmt_float_or_inf a.profit_factor)
-      ~constrained_v:(_fmt_float_or_inf c.summary.profit_factor)
-      ~relaxed:(_fmt_float_or_inf r.summary.profit_factor)
-      ~delta:"—";
-    _comp_row "Round-trips"
-      ~actual:(_fmt_int (List.length a.round_trips))
-      ~constrained_v:(_fmt_int c.summary.total_round_trips)
-      ~relaxed:(_fmt_int r.summary.total_round_trips)
-      ~delta:"—";
-    _comp_row "Avg R-multiple"
-      ~actual:(_fmt_float_2 actual_avg_r)
-      ~constrained_v:(_fmt_float_2 c.summary.avg_r_multiple)
-      ~relaxed:(_fmt_float_2 r.summary.avg_r_multiple)
-      ~delta:"—";
-    "";
-  ]
+  _headline_header_lines
+  @ [
+      _row_total_return ~actual_return ~c ~s ~r;
+      _row_win_rate ~a ~c ~s ~r;
+      _row_max_dd ~a ~c ~s ~r;
+      _row_sharpe ~a;
+      _row_profit_factor ~a ~c ~s ~r;
+      _row_round_trips ~a ~c ~s ~r;
+      _row_avg_r ~actual_avg_r ~c ~s ~r;
+      "";
+    ]
 
 (* ---------------------------------------------------------------- *)
 (* Section: per-Friday divergence table                              *)

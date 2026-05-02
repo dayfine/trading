@@ -101,13 +101,19 @@ let test_all_sections_present _ =
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = [];
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = [];
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md
     (all_of
        [
@@ -124,12 +130,18 @@ let test_all_sections_present _ =
 (* Headline table cells                                                *)
 (* ------------------------------------------------------------------ *)
 
-let test_headline_includes_three_variants _ =
+let test_headline_includes_four_variants _ =
   let actual = _make_actual () in
   let constrained =
     {
       R.round_trips = [];
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
+    }
+  in
+  let score_picked =
+    {
+      R.round_trips = [];
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
     }
   in
   let relaxed_macro =
@@ -138,17 +150,21 @@ let test_headline_includes_three_variants _ =
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
-  (* +18.00% (actual) vs +30.00% (constrained) vs +45.00% (relaxed) *)
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
+  (* +18.00% (actual) vs +30.00% (constrained) vs +25.00% (score_picked)
+     vs +45.00% (relaxed). The Score_picked column header reads
+     "Optimal (score_picked)" in the rendered table. *)
   assert_that md
     (all_of
        [
          _has "+18.00%";
          _has "+30.00%";
+         _has "+25.00%";
          _has "+45.00%";
          _has "Total return";
          _has "MaxDD";
          _has "Round-trips";
+         _has "Optimal (score_picked)";
        ])
 
 (* ------------------------------------------------------------------ *)
@@ -178,13 +194,19 @@ let test_missed_trades_with_reason _ =
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = constrained_rts;
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = constrained_rts;
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md
     (all_of
        [
@@ -207,13 +229,19 @@ let test_implications_high_ratio _ =
       summary = _make_summary ~total_return_pct:0.60 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = [];
+      summary = _make_summary ~total_return_pct:0.50 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = [];
       summary = _make_summary ~total_return_pct:0.80 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md (_has "significantly mis-scoring")
 
 let test_implications_low_ratio _ =
@@ -226,13 +254,19 @@ let test_implications_low_ratio _ =
       summary = _make_summary ~total_return_pct:0.20 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = [];
+      summary = _make_summary ~total_return_pct:0.19 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = [];
       summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md (_has "near-optimal")
 
 let test_implications_degenerate _ =
@@ -249,13 +283,19 @@ let test_implications_degenerate _ =
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = [];
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = [];
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md (_has "non-positive")
 
 (* ------------------------------------------------------------------ *)
@@ -270,6 +310,12 @@ let test_render_is_deterministic _ =
         {
           R.round_trips = [];
           summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
+        };
+      score_picked =
+        {
+          R.round_trips = [];
+          summary =
+            _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
         };
       relaxed_macro =
         {
@@ -295,13 +341,19 @@ let test_ends_with_newline _ =
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = [];
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = [];
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md
     (field
        (fun s -> Char.equal (String.get s (String.length s - 1)) '\n')
@@ -356,13 +408,19 @@ let test_divergence_pins_specific_cells _ =
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = constrained_rts;
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = constrained_rts;
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md
     (all_of
        [
@@ -428,13 +486,19 @@ let test_missed_trades_ordered_by_pnl_descending _ =
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = constrained_rts;
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = constrained_rts;
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   (* Restrict the search to the missed-trades section so we don't pick up
      symbol mentions from the divergence section (which lists them by
      entry-week, not by P&L). *)
@@ -495,13 +559,19 @@ let test_empty_divergence_renders_sentinel _ =
       summary = _make_summary ~total_return_pct:0.30 ~variant:OT.Constrained;
     }
   in
+  let score_picked =
+    {
+      R.round_trips = constrained_rts;
+      summary = _make_summary ~total_return_pct:0.25 ~variant:OT.Score_picked;
+    }
+  in
   let relaxed_macro =
     {
       R.round_trips = constrained_rts;
       summary = _make_summary ~total_return_pct:0.45 ~variant:OT.Relaxed_macro;
     }
   in
-  let md = R.render { actual; constrained; relaxed_macro } in
+  let md = R.render { actual; constrained; score_picked; relaxed_macro } in
   assert_that md
     (all_of
        [
@@ -519,8 +589,8 @@ let suite =
   "Optimal_strategy_report"
   >::: [
          "all five sections present" >:: test_all_sections_present;
-         "headline shows three variant columns"
-         >:: test_headline_includes_three_variants;
+         "headline shows four variant columns"
+         >:: test_headline_includes_four_variants;
          "missed trades flag cascade-rejection reason"
          >:: test_missed_trades_with_reason;
          "implications: high ratio fires mis-scoring branch"

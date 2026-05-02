@@ -6,9 +6,11 @@
       equals this Friday closes — its proceeds accrue to cash before new entries
       are sized.
     - {b Then entries.} Candidates with [entry.entry_week = this Friday] are
-      ranked by R-multiple descending. Each is admitted only if it passes the
-      skip-already-held / concurrent-position-cap / sector-cap / cash checks.
-      Sizing is dollar-based:
+      ranked by the variant-specific key (R-multiple descending for
+      [Constrained] / [Relaxed_macro]; pre-trade [cascade_score] descending with
+      [symbol] tie-break for [Score_picked]). Each is admitted only if it passes
+      the skip-already-held / concurrent-position-cap / sector-cap / cash
+      checks. Sizing is dollar-based:
       [shares = risk_per_trade_dollars / initial_risk_per_share]. Cash is
       deducted at entry and accrued at exit.
 
@@ -32,10 +34,13 @@
     {1 Variant tagging}
 
     Every emitted round-trip carries the candidate's [passes_macro] flag
-    forward. The caller picks one variant per fill — PR-4's renderer emits two
-    summaries by invoking the filler twice (once with [variant = Constrained]
-    filtering candidates whose [passes_macro = true]; once with
-    [variant = Relaxed_macro] admitting all candidates).
+    forward. The caller picks one variant per fill — the renderer emits three
+    summaries by invoking the filler three times:
+    - [Constrained]: macro gate kept, sort by realised [r_multiple] DESC (full
+      outcome foresight; ceiling).
+    - [Score_picked]: macro gate kept, sort by pre-trade [cascade_score] DESC
+      (no outcome foresight; the same signal the live strategy uses).
+    - [Relaxed_macro]: macro gate dropped, sort by realised [r_multiple] DESC.
 
     {1 Purity}
 
@@ -84,12 +89,14 @@ type fill_input = {
       (** All scored candidates produced by Phase B, in any order — the filler
           sorts internally. Empty list yields an empty round-trip list. *)
   variant : Optimal_types.variant_label;
-      (** Which variant to fill. [Constrained] admits only candidates whose
-          [entry.passes_macro] is [true]; [Relaxed_macro] admits all. *)
+      (** Which variant to fill. [Constrained] / [Score_picked] admit only
+          candidates whose [entry.passes_macro] is [true]; [Relaxed_macro]
+          admits all. The variant also determines the per-Friday entry sort key
+          — see {!fill}. *)
 }
-(** Inputs to a single fill pass. The [variant] choice determines which subset
-    of candidates is admissible; everything else (sort key, sizing, caps) is
-    identical across variants. *)
+(** Inputs to a single fill pass. The [variant] choice determines both which
+    subset of candidates is admissible and the per-Friday entry sort key;
+    everything else (sizing, caps) is identical across variants. *)
 
 val fill : config:config -> fill_input -> Optimal_types.optimal_round_trip list
 (** [fill ~config input] runs the greedy Friday-by-Friday fill described above
@@ -98,8 +105,8 @@ val fill : config:config -> fill_input -> Optimal_types.optimal_round_trip list
 
     Algorithm:
     {ol
-     {- Filter [input.candidates] by variant. For [Constrained], drop any
-        candidate where [entry.passes_macro = false].
+     {- Filter [input.candidates] by variant. For [Constrained] /
+        [Score_picked], drop any candidate where [entry.passes_macro = false].
      }
      {- Group remaining candidates by [entry.entry_week] (Friday). }
      {- Walk Fridays in ascending date order. For each Friday:
@@ -108,8 +115,10 @@ val fill : config:config -> fill_input -> Optimal_types.optimal_round_trip list
             this Friday. Accrue [exit_price * shares] to cash. Open positions
             are tracked by symbol; sector counts and position counts decrement.
          }
-         {- {b Entry phase.} Sort the day's admissible candidates by R-multiple
-            descending. For each candidate in order:
+         {- {b Entry phase.} Sort the day's admissible candidates by the
+            variant's key — [r_multiple] DESC for [Constrained] /
+            [Relaxed_macro], [cascade_score] DESC ([symbol] ASC tie-break) for
+            [Score_picked]. For each candidate in order:
             + {b Skip if symbol already held.} The counterfactual mirrors the
               live strategy's "one position per symbol" rule.
             + {b Skip if at concurrent-position cap.}

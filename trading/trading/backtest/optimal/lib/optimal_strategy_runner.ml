@@ -343,23 +343,31 @@ let _scan_and_score ~(world : _world) : OT.scored_candidate list =
 
 let _emit_report ~output_dir ~(actual_run : Report.actual_run) ~scored : unit =
   let filler_config = Filler.default_config in
+  let starting_cash = actual_run.initial_cash in
   let constrained =
-    _build_variant ~filler_config ~variant:OT.Constrained ~scored
-      ~starting_cash:actual_run.initial_cash
+    _build_variant ~filler_config ~variant:OT.Constrained ~scored ~starting_cash
+  in
+  let score_picked =
+    _build_variant ~filler_config ~variant:OT.Score_picked ~scored
+      ~starting_cash
   in
   let relaxed_macro =
     _build_variant ~filler_config ~variant:OT.Relaxed_macro ~scored
-      ~starting_cash:actual_run.initial_cash
+      ~starting_cash
   in
   let input : Report.input =
-    { actual = actual_run; constrained; relaxed_macro }
+    { actual = actual_run; constrained; score_picked; relaxed_macro }
   in
   let md = Report.render input in
   let out_path = Filename.concat output_dir "optimal_strategy.md" in
   Out_channel.write_all out_path ~data:md;
   eprintf "optimal_strategy: wrote %s\n%!" out_path;
   Optimal_summary_artefact.write ~output_dir
-    { constrained = constrained.summary; relaxed_macro = relaxed_macro.summary }
+    {
+      constrained = constrained.summary;
+      score_picked = score_picked.summary;
+      relaxed_macro = relaxed_macro.summary;
+    }
 
 let run ~output_dir =
   eprintf "optimal_strategy: reading artefacts from %s\n%!" output_dir;

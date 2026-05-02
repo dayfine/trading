@@ -47,7 +47,7 @@ let _candidate_admissible ~(variant : Optimal_types.variant_label)
     (sc : Optimal_types.scored_candidate) : bool =
   match variant with
   | Relaxed_macro -> true
-  | Constrained -> sc.entry.passes_macro
+  | Constrained | Score_picked -> sc.entry.passes_macro
 
 (** All distinct entry-Fridays in [scored], in ascending order. Drives the walk.
 *)
@@ -58,19 +58,41 @@ let _distinct_entry_fridays (scored : Optimal_types.scored_candidate list) :
       sc.entry.entry_week)
   |> List.dedup_and_sort ~compare:Date.compare
 
-(** Candidates entering on [friday], sorted by R-multiple descending. *)
-let _entries_on (scored : Optimal_types.scored_candidate list) (friday : Date.t)
-    : Optimal_types.scored_candidate list =
+(** Comparator for sorting same-Friday candidates under [variant].
+
+    - [Constrained] / [Relaxed_macro] sort by realised [r_multiple] descending.
+      The R-multiple is computed forward from the candidate, so this picks
+      winners by hindsight — useful as a ceiling, contaminating as a target.
+    - [Score_picked] sorts by pre-trade [cascade_score] descending — the same
+      signal the actual strategy uses at decision time. Ties broken by [symbol]
+      ascending so the order is deterministic across runs. *)
+let _entry_comparator ~(variant : Optimal_types.variant_label) :
+    Optimal_types.scored_candidate -> Optimal_types.scored_candidate -> int =
+  match variant with
+  | Constrained | Relaxed_macro ->
+      fun (a : Optimal_types.scored_candidate)
+        (b : Optimal_types.scored_candidate)
+      -> Float.compare b.r_multiple a.r_multiple
+  | Score_picked ->
+      fun (a : Optimal_types.scored_candidate)
+        (b : Optimal_types.scored_candidate)
+      ->
+        let by_score =
+          Int.compare b.entry.cascade_score a.entry.cascade_score
+        in
+        if by_score <> 0 then by_score
+        else String.compare a.entry.symbol b.entry.symbol
+
+(** Candidates entering on [friday], sorted by the variant-specific key:
+    [r_multiple] DESC for [Constrained] / [Relaxed_macro], [cascade_score] DESC
+    (with [symbol] ASC tie-break) for [Score_picked]. *)
+let _entries_on ~(variant : Optimal_types.variant_label)
+    (scored : Optimal_types.scored_candidate list) (friday : Date.t) :
+    Optimal_types.scored_candidate list =
   scored
   |> List.filter ~f:(fun (sc : Optimal_types.scored_candidate) ->
       Date.equal sc.entry.entry_week friday)
-  |> List.sort
-       ~compare:(fun
-           (a : Optimal_types.scored_candidate)
-           (b : Optimal_types.scored_candidate)
-         ->
-         (* Descending: larger R first. *)
-         Float.compare b.r_multiple a.r_multiple)
+  |> List.sort ~compare:(_entry_comparator ~variant)
 
 (** Number of currently open positions in [sector] in [book]. *)
 let _sector_count (book : _book) (sector : string) : int =
@@ -206,7 +228,7 @@ let fill ~(config : config) (input : fill_input) :
     let fridays = _distinct_entry_fridays admissible in
     List.iter fridays ~f:(fun friday ->
         _close_due book friday;
-        let entries = _entries_on admissible friday in
+        let entries = _entries_on ~variant:input.variant admissible friday in
         _process_entries ~config book entries);
     _close_remaining book;
     _final_order book.closed
