@@ -15,7 +15,24 @@ type t = {
           ([key.path=value]) it routes to {!Backtest.Config_override.parse};
           otherwise it parses the entry as a raw sexp blob (legacy form).
           Storing raw strings here keeps [runner_args] independent of the
-          private [backtest] library. *)
+          private [backtest] library.
+
+          In [--baseline] mode, [overrides] are applied to the {b variant} run
+          only — the baseline run uses default config (modulo any
+          {!shared_overrides}). For non-baseline modes (single, smoke without
+          [--baseline]), [overrides] and [shared_overrides] both apply
+          identically to the single run. *)
+  shared_overrides : string list;
+      (** Raw [--shared-override <arg>] arguments in the order passed. Same
+          syntax as [overrides] (key-path form or legacy sexp blob).
+
+          Unlike [overrides], shared overrides apply to BOTH runs in
+          [--baseline] mode. The intended use is to constrain the comparison
+          environment in a way that's shared between baseline and variant —
+          e.g. capping the universe to a smaller size for memory while still
+          A/B-testing a different parameter via [--override]. Outside
+          [--baseline], shared overrides simply append to [overrides] before
+          handing them to the runner. *)
   trace_path : string option;
       (** [None] when [--trace] was not passed (no trace file written).
           [Some path] when [--trace <path>] was passed; the runner constructs a

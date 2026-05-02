@@ -4,6 +4,7 @@ type t = {
   start_date : string;
   end_date : string option;
   overrides : string list;
+  shared_overrides : string list;
   trace_path : string option;
   memtrace_path : string option;
   gc_trace_path : string option;
@@ -15,6 +16,7 @@ type t = {
 type acc = {
   positional : string list;
   overrides : string list;
+  shared_overrides : string list;
   trace_path : string option;
   memtrace_path : string option;
   gc_trace_path : string option;
@@ -29,6 +31,7 @@ let _empty_acc =
   {
     positional = [];
     overrides = [];
+    shared_overrides = [];
     trace_path = None;
     memtrace_path = None;
     gc_trace_path = None;
@@ -47,10 +50,15 @@ let rec _extract_flags args (acc : acc) =
           acc with
           positional = List.rev acc.positional;
           overrides = List.rev acc.overrides;
+          shared_overrides = List.rev acc.shared_overrides;
         }
   | "--override" :: arg :: rest ->
       _extract_flags rest { acc with overrides = arg :: acc.overrides }
   | [ "--override" ] -> _err "--override requires an argument"
+  | "--shared-override" :: arg :: rest ->
+      _extract_flags rest
+        { acc with shared_overrides = arg :: acc.shared_overrides }
+  | [ "--shared-override" ] -> _err "--shared-override requires an argument"
   | "--trace" :: value :: rest ->
       _extract_flags rest { acc with trace_path = Some value }
   | [ "--trace" ] -> _err "--trace requires a path argument"
@@ -105,6 +113,7 @@ let parse args =
                   start_date;
                   end_date;
                   overrides = acc.overrides;
+                  shared_overrides = acc.shared_overrides;
                   trace_path = acc.trace_path;
                   memtrace_path = acc.memtrace_path;
                   gc_trace_path = acc.gc_trace_path;
