@@ -661,6 +661,7 @@ let _make_runner_result ~start_date ~end_date ~round_trips :
     cascade_summaries = [];
     force_liquidations = [];
     final_prices = [];
+    universe = [];
   }
 
 let test_writer_reader_post_g2_round_trip _ =

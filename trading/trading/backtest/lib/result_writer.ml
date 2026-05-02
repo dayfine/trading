@@ -287,6 +287,19 @@ let _write_splits ~output_dir ~steps =
             (_format_split_factor e.factor)));
   Out_channel.close oc
 
+(** Write [universe.txt]: one symbol per line, no header. Captures the post-cap
+    universe the simulator actually traded over (excluding the primary index and
+    sector ETFs) so downstream counterfactual tooling — [optimal_strategy] in
+    particular — can scope its analysis to the same set rather than reading the
+    full [data/sectors.csv]. The file is always written, even when
+    [result.universe] is empty (header-less / row-less file in that degenerate
+    case). *)
+let _write_universe ~output_dir ~(universe : string list) =
+  let path = output_dir ^ "/universe.txt" in
+  let oc = Out_channel.create path in
+  List.iter universe ~f:(fun sym -> fprintf oc "%s\n" sym);
+  Out_channel.close oc
+
 let write ~output_dir (result : Runner.result) =
   _write_params ~output_dir result;
   Sexp.save_hum
@@ -303,4 +316,5 @@ let write ~output_dir (result : Runner.result) =
   _write_final_prices ~output_dir ~steps:result.steps
     ~final_prices:result.final_prices;
   _write_splits ~output_dir ~steps:result.steps;
+  _write_universe ~output_dir ~universe:result.universe;
   Macro_trend_writer.write ~output_dir result.cascade_summaries

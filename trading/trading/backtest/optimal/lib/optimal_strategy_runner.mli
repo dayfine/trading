@@ -10,10 +10,12 @@
     The orchestrator is divided into three phases, each surfaced as a named
     helper for testability + readability:
 
-    - {b Build world.} Loads the universe ([sectors.csv]), constructs the
-      trading-day calendar with a 210-day warm-up window before [start_date],
-      builds [Bar_panels.t] over the universe + benchmark index, and computes
-      the Friday calendar over the run window.
+    - {b Build world.} Loads the universe from [<output_dir>/universe.txt]
+      ([Backtest.Result_writer]'s artefact, scoped to the actual run's universe
+      — falls back to [Sector_map.load] over [data/sectors.csv] when the file is
+      absent), constructs the trading-day calendar with a 210-day warm-up window
+      before [start_date], builds [Bar_panels.t] over the universe + benchmark
+      index, and computes the Friday calendar over the run window.
     - {b Scan and score.} Walks every Friday in the run window, runs
       [Stock_analysis.analyze] per universe symbol, feeds the analyses into
       {!Stage_transition_scanner.scan_week} to emit [candidate_entry] records,

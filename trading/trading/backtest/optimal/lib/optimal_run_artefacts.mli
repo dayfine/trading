@@ -31,6 +31,14 @@ type actual_run_inputs = {
   start_date : Date.t;
   end_date : Date.t;
   universe_size : int;
+  universe : string list;
+      (** Sorted list of symbols the actual run traded over. Loaded from
+          [<output_dir>/universe.txt] (one symbol per line, no header) — the
+          file [Backtest.Result_writer] emits alongside the other artefacts.
+          When the file is absent (legacy artefacts), the loader falls back to
+          [Sector_map.load] over [data/sectors.csv] with a stderr warning;
+          callers that depend on the exact universe should treat the missing
+          file as a correctness regression rather than a soft fallback. *)
   initial_cash : float;
   final_portfolio_value : float;
   trades : Trading_simulation.Metrics.trade_metrics list;

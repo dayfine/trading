@@ -28,6 +28,14 @@ type result = {
   cascade_summaries : Trade_audit.cascade_summary list;
   force_liquidations : Portfolio_risk.Force_liquidation.event list;
   final_prices : (string * float) list;
+  universe : string list;
+      (** Post-cap, sorted list of symbols the simulator actually traded over
+          (excludes the primary index and sector ETFs). Persisted to
+          [universe.txt] by [Result_writer.write] so downstream counterfactual
+          tooling — [optimal_strategy] in particular — can scope its analysis to
+          the same universe rather than reloading [data/sectors.csv] (the full
+          ~10k-symbol set, which over-states what the strategy could have
+          picked). *)
 }
 
 (* Trading-day filter *)
@@ -97,6 +105,10 @@ let _apply_overrides (config : Weinstein_strategy.config) overrides =
 type _deps = {
   data_dir_fpath : Fpath.t;
   ticker_sectors : (string, string) Hashtbl.t;
+  universe : string list;
+      (** Post-cap, sorted list of universe symbols (excluding the primary index
+          and sector ETFs). Same set the runner trades over and the value
+          carried forward into [Runner.result.universe] / [universe.txt]. *)
   universe_size : int;
   ad_bars : Macro.ad_bar list;
   config : Weinstein_strategy.config;
@@ -214,6 +226,7 @@ let _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () =
   {
     data_dir_fpath;
     ticker_sectors;
+    universe;
     universe_size;
     ad_bars;
     config;
@@ -479,4 +492,5 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     cascade_summaries;
     force_liquidations;
     final_prices;
+    universe = deps.universe;
   }

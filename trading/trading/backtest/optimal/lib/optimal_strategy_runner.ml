@@ -293,12 +293,20 @@ type _world = {
     macro trends over the run window. Built once per invocation, consumed by
     scan + score. *)
 
-let _build_world ~output_dir ~(actual_run : Report.actual_run) : _world =
+(** Build the panels-and-context world.
+
+    The [universe] used here MUST match the actual run's universe (loaded from
+    [universe.txt] in [Optimal_run_artefacts.load]). Earlier revisions sourced
+    [universe] from [Sector_map.load] (the full ~10k-symbol [data/sectors.csv]
+    set), which let the counterfactual cherry-pick trades from symbols the
+    actual sp500-2019-2023 backtest never saw — yielding a meaningless ~1997%
+    optimal return. The sector_map is still loaded for
+    [_build_sector_context_map], but its keys are no longer the universe source.
+*)
+let _build_world ~output_dir ~(actual_run : Report.actual_run)
+    ~(universe : string list) : _world =
   let data_dir_fpath = Data_path.default_data_dir () in
   let sectors_tbl = Sector_map.load ~data_dir:data_dir_fpath in
-  let universe =
-    Hashtbl.keys sectors_tbl |> List.sort ~compare:String.compare
-  in
   let warmup_start = Date.add_days actual_run.start_date (-_warmup_days) in
   let calendar =
     _build_calendar ~start:warmup_start ~end_:actual_run.end_date
@@ -369,6 +377,6 @@ let run ~output_dir =
     (Date.to_string actual_run.start_date)
     (Date.to_string actual_run.end_date)
     actual_run.universe_size;
-  let world = _build_world ~output_dir ~actual_run in
+  let world = _build_world ~output_dir ~actual_run ~universe:inputs.universe in
   let scored = _scan_and_score ~world in
   _emit_report ~output_dir ~actual_run ~scored

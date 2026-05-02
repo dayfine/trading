@@ -165,6 +165,12 @@ type actual_run_inputs = {
   start_date : Date.t;
   end_date : Date.t;
   universe_size : int;
+  universe : string list;
+      (** Sorted list of symbols the actual run traded over, loaded from
+          [<output_dir>/universe.txt]. When [universe.txt] is absent (legacy
+          artefacts that pre-date the universe-pinning fix), the loader falls
+          back to [Sector_map.load] over [data/sectors.csv] with a stderr
+          warning — note that fallback over-states the universe. *)
   initial_cash : float;
   final_portfolio_value : float;
   trades : Trading_simulation.Metrics.trade_metrics list;
@@ -178,16 +184,44 @@ let _scenario_name_of_dir dir =
   let basename = Filename.basename dir in
   if String.is_empty basename then dir else basename
 
+(** Load the actual run's universe from [<output_dir>/universe.txt] — one symbol
+    per line, no header (the format {!Backtest.Result_writer} writes). Empty
+    lines are skipped, and the result is sorted by [String.compare] for
+    determinism. When the file is missing (legacy artefacts that pre-date the
+    universe-pinning fix), fall back to [Sector_map.load] over
+    [data/sectors.csv] with a stderr warning so callers know the universe is
+    over-stated relative to what the actual run could have picked. *)
+let _load_universe ~output_dir : string list =
+  let path = Filename.concat output_dir "universe.txt" in
+  if Sys_unix.file_exists_exn path then
+    In_channel.read_lines path
+    |> List.filter_map ~f:(fun line ->
+        let s = String.strip line in
+        if String.is_empty s then None else Some s)
+    |> List.sort ~compare:String.compare
+  else (
+    eprintf
+      "optimal_strategy: universe.txt absent at %s; falling back to \
+       Sector_map.load (over-stated universe — counterfactual will scan \
+       symbols outside the actual run's universe)\n\
+       %!"
+      path;
+    let data_dir = Data_path.default_data_dir () in
+    let sectors_tbl = Sector_map.load ~data_dir in
+    Hashtbl.keys sectors_tbl |> List.sort ~compare:String.compare)
+
 let load ~output_dir : actual_run_inputs =
   let actual = _load_actual_sexp ~output_dir in
   let summary = _load_summary_sexp ~output_dir in
   let trades = _load_trades ~output_dir in
   let cascade_rejections = _load_cascade_rejections ~output_dir in
+  let universe = _load_universe ~output_dir in
   {
     scenario_name = _scenario_name_of_dir output_dir;
     start_date = summary.start_date;
     end_date = summary.end_date;
     universe_size = summary.universe_size;
+    universe;
     initial_cash = summary.initial_cash;
     final_portfolio_value = summary.final_portfolio_value;
     trades;

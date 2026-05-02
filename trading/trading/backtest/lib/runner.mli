@@ -50,6 +50,14 @@ type result = {
           Consumed by [Result_writer] to emit [final_prices.csv] for the
           external [trading-reconciler] tool — see
           [~/Projects/trading-reconciler/PHASE_1_SPEC.md] §3.3. *)
+  universe : string list;
+      (** Post-cap, sorted list of symbols the simulator actually traded over
+          (excludes the primary index and sector ETFs). Persisted to
+          [universe.txt] by [Result_writer.write] so downstream counterfactual
+          tooling — [optimal_strategy] in particular — can scope its analysis to
+          the same universe rather than reloading [data/sectors.csv] (the full
+          ~10k-symbol set, which over-states what the strategy could have
+          picked). *)
 }
 
 val filter_stop_infos_in_window :
