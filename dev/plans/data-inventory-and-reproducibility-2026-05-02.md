@@ -189,3 +189,113 @@ P1 manifest ─→ P2 hash-verify
 ```
 
 P1 starts whenever queued. Independent of M5.x work in flight.
+
+## Pairing with M5.3 snapshot pipeline (added 2026-05-02)
+
+Per session conversation: data maintenance and snapshot generation are two sides of the same coin and should be designed together.
+
+### Why they pair
+
+- **CSV layer = source of truth**: per-symbol bars from EODHD. Manifest tracks sha256 + fetch metadata (this plan).
+- **Snapshot layer = derived artifacts**: pre-computed indicators + (post-A.1) OHLCV columns from `Snapshot_pipeline` (M5.3 Phase B). Snapshot manifest already tracks `schema_hash` per file.
+- **Reproducibility chain**: a backtest run depends on (a) which CSV bars existed at run time (covered by this plan's manifest) AND (b) which snapshot schema + content was loaded (covered by M5.3 snapshot manifest). To reproduce, both manifests need to round-trip.
+
+### Surface alignment
+
+| Concept | This plan (P1 manifest) | M5.3 snapshot_manifest (#781) |
+|---|---|---|
+| Per-file sha256 | yes (per CSV) | yes (per snapshot file) |
+| Schema/version tag | n/a (raw bars are just bars) | yes (`schema_hash` from Phase A) |
+| Fetched_at / built_at | yes (`fetched_at`) | yes (built_at on each snapshot file) |
+| Source identifier | yes (EODHD endpoint, api_key_id) | derived from CSV manifest entries |
+| Round-trip verifier | P4 reconciler (future) | M5.3 `Snapshot_verifier` (already shipped #781) |
+
+P1's manifest can either:
+- **Subsume** the snapshot manifest by tracking both raw + derived (one source of truth), OR
+- **Reference** the snapshot manifest via `schema_hash` field — let snapshot_manifest stay separate, this plan's manifest just adds a "this snapshot file was built from these CSV manifest entries" cross-reference.
+
+Recommend the second approach (loose coupling): P1 stays at the CSV layer; M5.3 snapshot_manifest stays at the indicators layer; a join key (CSV sha256 + schema_hash) lets a verifier prove "this snapshot was built from these specific CSV revisions under this specific schema."
+
+### Phase B addition: small-scale reproduction test
+
+Add a Phase B sub-acceptance: **reproduction round-trip at small scale**. Specifically:
+1. Build snapshots from a 5-symbol × 30-day fixture under `data_dir = /tmp/repro-test-A/`
+2. Capture the CSV manifest + snapshot manifest from that build
+3. Fetch the same 5 symbols/dates into a different `data_dir = /tmp/repro-test-B/` (simulating a clean re-fetch)
+4. Build snapshots from B
+5. Verify CSV sha256s match A's manifest (same source data)
+6. Verify snapshot files in A and B are byte-identical (same schema + same source data → identical output)
+7. **Failure path**: tamper one byte in B's CSV → snapshot for that symbol differs → reconciliation surfaces it loudly
+
+This is the smallest possible repro test. It pins:
+- Determinism of the pipeline (same input → same output)
+- Hash-verify catches corruption
+- Cross-`data_dir` portability (a backtest can be reproduced in a fresh environment)
+
+### Updated phasing
+
+| Phase | Scope | Coupling with M5.3 |
+|---|---|---|
+| **P0** (NEW) | Cross-reference contract: define how CSV manifest entries link to snapshot_manifest entries via sha256 + schema_hash. ~50 LOC + test. | Read-only on M5.3 surfaces. |
+| **P1** Manifest writer (CSV side) | as above | Independent. |
+| **P2** Hash-verify on load (CSV side) | as above | Independent. |
+| **P3** Fetch-log writer | as above | Independent. |
+| **P3.5** (NEW) Small-scale reproduction test | 2-fixture round-trip across distinct `data_dir`s; verifies CSV ↔ snapshot determinism end-to-end | Calls into both manifests. |
+| **P4** Reconciliation tooling | as above | Phase 4 reconciler can produce the cross-reference report. |
+
+P0 and P3.5 are small additions to the original plan reflecting the snapshot pairing.
+
+## Pairing with M5.3 snapshot pipeline (added 2026-05-02)
+
+Per session conversation: data maintenance and snapshot generation are two sides of the same coin and should be designed together.
+
+### Why they pair
+
+- **CSV layer = source of truth**: per-symbol bars from EODHD. Manifest tracks sha256 + fetch metadata (this plan).
+- **Snapshot layer = derived artifacts**: pre-computed indicators + (post-A.1) OHLCV columns from `Snapshot_pipeline` (M5.3 Phase B). Snapshot manifest already tracks `schema_hash` per file.
+- **Reproducibility chain**: a backtest run depends on (a) which CSV bars existed at run time (covered by this plan's manifest) AND (b) which snapshot schema + content was loaded (covered by M5.3 snapshot manifest). To reproduce, both manifests need to round-trip.
+
+### Surface alignment
+
+| Concept | This plan (P1 manifest) | M5.3 snapshot_manifest (#781) |
+|---|---|---|
+| Per-file sha256 | yes (per CSV) | yes (per snapshot file) |
+| Schema/version tag | n/a (raw bars are just bars) | yes (`schema_hash` from Phase A) |
+| Fetched_at / built_at | yes (`fetched_at`) | yes (built_at on each snapshot file) |
+| Source identifier | yes (EODHD endpoint, api_key_id) | derived from CSV manifest entries |
+| Round-trip verifier | P4 reconciler (future) | M5.3 `Snapshot_verifier` (already shipped #781) |
+
+P1's manifest can either:
+- **Subsume** the snapshot manifest by tracking both raw + derived (one source of truth), OR
+- **Reference** the snapshot manifest via `schema_hash` field — let snapshot_manifest stay separate, this plan's manifest just adds a "this snapshot file was built from these CSV manifest entries" cross-reference.
+
+Recommend the second approach (loose coupling): P1 stays at the CSV layer; M5.3 snapshot_manifest stays at the indicators layer; a join key (CSV sha256 + schema_hash) lets a verifier prove "this snapshot was built from these specific CSV revisions under this specific schema."
+
+### Phase B addition: small-scale reproduction test
+
+Add a Phase B sub-acceptance: **reproduction round-trip at small scale**. Specifically:
+1. Build snapshots from a 5-symbol × 30-day fixture under `data_dir = /tmp/repro-test-A/`
+2. Capture the CSV manifest + snapshot manifest from that build
+3. Fetch the same 5 symbols/dates into a different `data_dir = /tmp/repro-test-B/` (simulating a clean re-fetch)
+4. Build snapshots from B
+5. Verify CSV sha256s match A's manifest (same source data)
+6. Verify snapshot files in A and B are byte-identical (same schema + same source data → identical output)
+7. **Failure path**: tamper one byte in B's CSV → snapshot for that symbol differs → reconciliation surfaces it loudly
+
+This is the smallest possible repro test. It pins:
+- Determinism of the pipeline (same input → same output)
+- Hash-verify catches corruption
+- Cross-`data_dir` portability (a backtest can be reproduced in a fresh environment)
+
+### Updated phasing
+
+| Phase | Scope | Coupling with M5.3 |
+|---|---|---|
+| **P0** (NEW) | Cross-reference contract: define how CSV manifest entries link to snapshot_manifest entries via sha256 + schema_hash. ~50 LOC + test. | Read-only on M5.3 surfaces. |
+| **P1** Manifest writer (CSV side) | as above | Independent. |
+| **P2** Hash-verify on load (CSV side) | as above | Independent. |
+| **P3** Fetch-log writer | as above | Independent. |
+| **P3.5** (NEW) Small-scale reproduction test | 2-fixture round-trip across distinct `data_dir`s; verifies CSV ↔ snapshot determinism end-to-end | Calls into both manifests. |
+| **P4** Reconciliation tooling | as above | Phase 4 reconciler can produce the cross-reference report. |
+
+P0 and P3.5 are small additions to the original plan reflecting the snapshot pairing.
