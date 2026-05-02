@@ -99,38 +99,42 @@ let _float_opt_atom = function
 
 let _float_atom f = Sexp.Atom (sprintf "%.4f" f)
 
-let _metric_diff_to_sexp (d : metric_diff) =
+(** Build a single [(name value)] sexp pair. Pulled out to keep render functions
+    flat — the surrounding [Sexp.List] wrapping nests deeply enough on its own.
+*)
+let _pair name value = Sexp.List [ Sexp.Atom name; value ]
+
+(** Inner [(baseline ..) (variant ..) (delta ..)] sexp body of a metric diff
+    row. Returned as a [Sexp.t] (already wrapped in a list) for inclusion in the
+    outer pair. *)
+let _metric_diff_body (d : metric_diff) =
   Sexp.List
     [
-      Sexp.Atom d.name;
-      Sexp.List
-        [
-          Sexp.List [ Sexp.Atom "baseline"; _float_opt_atom d.baseline ];
-          Sexp.List [ Sexp.Atom "variant"; _float_opt_atom d.variant ];
-          Sexp.List [ Sexp.Atom "delta"; _float_opt_atom d.delta ];
-        ];
+      _pair "baseline" (_float_opt_atom d.baseline);
+      _pair "variant" (_float_opt_atom d.variant);
+      _pair "delta" (_float_opt_atom d.delta);
     ]
 
-let _scalar_diff_to_sexp (name, delta) =
-  Sexp.List [ Sexp.Atom name; _float_atom delta ]
+let _metric_diff_to_sexp (d : metric_diff) =
+  Sexp.List [ Sexp.Atom d.name; _metric_diff_body d ]
+
+let _scalar_diff_to_sexp (name, delta) = _pair name (_float_atom delta)
+
+let _metric_diffs_block (t : t) =
+  _pair "metric_diffs"
+    (Sexp.List (List.map t.metric_diffs ~f:_metric_diff_to_sexp))
+
+let _scalar_diffs_block (t : t) =
+  _pair "scalar_diffs"
+    (Sexp.List (List.map t.scalar_diffs ~f:_scalar_diff_to_sexp))
 
 let to_sexp t =
   Sexp.List
     [
-      Sexp.List
-        [ Sexp.Atom "baseline_summary"; Summary.sexp_of_t t.baseline_summary ];
-      Sexp.List
-        [ Sexp.Atom "variant_summary"; Summary.sexp_of_t t.variant_summary ];
-      Sexp.List
-        [
-          Sexp.Atom "metric_diffs";
-          Sexp.List (List.map t.metric_diffs ~f:_metric_diff_to_sexp);
-        ];
-      Sexp.List
-        [
-          Sexp.Atom "scalar_diffs";
-          Sexp.List (List.map t.scalar_diffs ~f:_scalar_diff_to_sexp);
-        ];
+      _pair "baseline_summary" (Summary.sexp_of_t t.baseline_summary);
+      _pair "variant_summary" (Summary.sexp_of_t t.variant_summary);
+      _metric_diffs_block t;
+      _scalar_diffs_block t;
     ]
 
 (* ----- Markdown rendering ----- *)

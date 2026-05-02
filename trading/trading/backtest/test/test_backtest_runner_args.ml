@@ -35,6 +35,146 @@ let test_minimal_start_date_only _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.gc_trace_path)
               (equal_to None);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.baseline)
+              (equal_to false);
+            field (fun (a : Backtest_runner_args.t) -> a.smoke) (equal_to false);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.experiment_name)
+              (equal_to None);
+          ]))
+
+let test_override_key_path_form _ =
+  (* The new key.path=value form is stored verbatim — interpretation is the
+     executable's job. *)
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--override"; "stops_config.initial_stop_buffer=1.05" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.overrides)
+          (elements_are [ equal_to "stops_config.initial_stop_buffer=1.05" ])))
+
+let test_override_legacy_sexp_form _ =
+  (* Backward compatibility: pre-existing scripts pass full sexp blobs. *)
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--override"; "((initial_stop_buffer 1.08))" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.overrides)
+          (elements_are [ equal_to "((initial_stop_buffer 1.08))" ])))
+
+let test_override_can_repeat _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2018-01-02";
+        "--override";
+        "initial_stop_buffer=1.05";
+        "--override";
+        "stage_config.ma_period=40";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.overrides)
+          (elements_are
+             [
+               equal_to "initial_stop_buffer=1.05";
+               equal_to "stage_config.ma_period=40";
+             ])))
+
+let test_baseline_flag _ =
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--baseline"; "--experiment-name"; "stop_buffer_test" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.baseline)
+              (equal_to true);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.experiment_name)
+              (equal_to (Some "stop_buffer_test"));
+          ]))
+
+let test_baseline_without_experiment_name_is_error _ =
+  let result = Backtest_runner_args.parse [ "2018-01-02"; "--baseline" ] in
+  assert_that result is_error
+
+let test_smoke_flag _ =
+  let result =
+    Backtest_runner_args.parse
+      [ "--smoke"; "--experiment-name"; "stop_buffer_smoke" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (a : Backtest_runner_args.t) -> a.smoke) (equal_to true);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.experiment_name)
+              (equal_to (Some "stop_buffer_smoke"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.start_date)
+              (equal_to "smoke");
+          ]))
+
+let test_smoke_without_experiment_name_is_error _ =
+  let result = Backtest_runner_args.parse [ "--smoke" ] in
+  assert_that result is_error
+
+let test_experiment_name_alone_is_allowed _ =
+  (* --experiment-name without --baseline / --smoke just renames the output
+     dir; both can be combined freely. *)
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--experiment-name"; "manual_run" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.experiment_name)
+          (equal_to (Some "manual_run"))))
+
+let test_experiment_name_missing_value_is_error _ =
+  let result =
+    Backtest_runner_args.parse [ "2018-01-02"; "--experiment-name" ]
+  in
+  assert_that result is_error
+
+let test_baseline_and_smoke_compose _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "--smoke";
+        "--baseline";
+        "--override";
+        "initial_stop_buffer=1.05";
+        "--experiment-name";
+        "stop_buffer_smoke_baseline";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.baseline)
+              (equal_to true);
+            field (fun (a : Backtest_runner_args.t) -> a.smoke) (equal_to true);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.overrides)
+              (elements_are [ equal_to "initial_stop_buffer=1.05" ]);
           ]))
 
 let test_start_and_end_date _ =
@@ -295,6 +435,20 @@ let suite =
          "--gc-trace without value is an error" >:: test_gc_trace_missing_value;
          "missing start_date is an error" >:: test_missing_start_date;
          "too many positionals is an error" >:: test_too_many_positionals;
+         "--override key.path=value form" >:: test_override_key_path_form;
+         "--override legacy sexp form" >:: test_override_legacy_sexp_form;
+         "--override can repeat" >:: test_override_can_repeat;
+         "--baseline flag" >:: test_baseline_flag;
+         "--baseline without --experiment-name is error"
+         >:: test_baseline_without_experiment_name_is_error;
+         "--smoke flag" >:: test_smoke_flag;
+         "--smoke without --experiment-name is error"
+         >:: test_smoke_without_experiment_name_is_error;
+         "--experiment-name alone is allowed"
+         >:: test_experiment_name_alone_is_allowed;
+         "--experiment-name without value is error"
+         >:: test_experiment_name_missing_value_is_error;
+         "--baseline + --smoke compose" >:: test_baseline_and_smoke_compose;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
        ]
 

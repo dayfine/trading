@@ -33,14 +33,19 @@ let _parse_value raw =
     | Error err ->
         _err (sprintf "value is not a valid sexp: %s" (Error.to_string_hum err))
 
+(** Build the parsed [t] from already-validated halves. Pulled out so [parse] is
+    a flat sequence of [Result.bind]s rather than a nested staircase. *)
+let _build_t key_path value = Ok { key_path; value }
+
 let parse s =
   match String.lsplit2 s ~on:'=' with
   | None -> _err (sprintf "missing '=' in override: %s" s)
   | Some (key, raw_value) ->
-      let components = String.split key ~on:'.' in
-      Result.bind (_validate_key_path components) ~f:(fun key_path ->
-          Result.bind (_parse_value raw_value) ~f:(fun value ->
-              Ok { key_path; value }))
+      let%bind.Result key_path =
+        _validate_key_path (String.split key ~on:'.')
+      in
+      let%bind.Result value = _parse_value raw_value in
+      _build_t key_path value
 
 (** Wrap [value] in a chain of single-field record sexps following [key_path].
     For [["a"; "b"; "c"]] and value [v] this returns [((a ((b ((c v))))))]. *)
