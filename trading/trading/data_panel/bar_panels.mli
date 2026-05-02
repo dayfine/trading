@@ -22,7 +22,30 @@
     threads through (typically: today's column index, derived from the primary
     index's date in the simulator tick). Out-of-range or all-NaN cells produce
     the empty list — the same semantics [Bar_history] uses for unknown symbols
-    or zero-bar histories. *)
+    or zero-bar histories.
+
+    {1 Deprecation trajectory (M5.3 Phase F)}
+
+    This module is on the path to retirement once the daily-snapshot streaming
+    pipeline (M5.3) covers the strategy's bar-shaped reads. Phases A–E (#779,
+    #781, #782, #786, #790, #791) wired the snapshot pipeline through the
+    simulator's per-tick OHLCV reads; the Weinstein strategy still reads bars
+    via [Bar_panels.t] (through [Bar_reader] / [Weekly_ma_cache] /
+    [Panel_callbacks]), so this module is still load-bearing today.
+
+    Phase F retires this module. Two sub-deliverables:
+
+    - {b F.1 — Deprecation marker} (this docstring): callers and reviewers see
+      the trajectory; no behaviour change.
+    - {b F.2 — Default flip + retirement}: switch the runner default to snapshot
+      mode (with auto-build of the snapshot directory), then port the strategy's
+      bar reads off [Bar_panels.t] onto [Snapshot_runtime.Snapshot_callbacks].
+      After several weeks of snapshot-mode-as-default running, delete this
+      module.
+
+    Do not add new callers; new bar-shaped reads should target
+    [Snapshot_runtime.Snapshot_callbacks] / [Snapshot_runtime.Daily_panels]. See
+    [dev/plans/daily-snapshot-streaming-2026-04-27.md] §Phasing Phase F. *)
 
 type t
 
