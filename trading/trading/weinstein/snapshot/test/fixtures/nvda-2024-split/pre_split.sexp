@@ -1,0 +1,16 @@
+((schema_version 1)
+ (system_version "test-fixture")
+ (date 2024-06-07)
+ (macro ((regime Bullish) (score 0.78)))
+ (sectors_strong (XLK XLC))
+ (sectors_weak (XLE))
+ (long_candidates
+  (((symbol NVDA) (score 0.95) (grade A+) (entry 1208.00) (stop 1100.00)
+    (sector XLK) (rationale "Stage2 breakout above 30wk MA")
+    (rs_vs_spy (1.74)) (resistance_grade (A)))
+   ((symbol AVGO) (score 0.86) (grade A) (entry 1430.00) (stop 1320.00)
+    (sector XLK) (rationale "Continuation breakout") (rs_vs_spy (1.22))
+    (resistance_grade ()))))
+ (short_candidates ())
+ (held_positions
+  (((symbol NVDA) (entered 2024-04-19) (stop 1100.00) (status Holding)))))

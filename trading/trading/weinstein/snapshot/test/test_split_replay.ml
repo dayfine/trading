@@ -1,8 +1,9 @@
-(** Split replay test — drives {!Round_trip_verifier.verify_split_round_trip}
-    against a fixture-backed historical scenario.
+(** Split / dividend replay test — drives the round-trip verifiers against
+    fixture-backed historical scenarios.
 
     Scope: AAPL 2020-08-31 4:1 split (PR-1), TSLA 2020-08-31 5:1 split (PR-2),
-    GOOG 2022-07-18 20:1 split (PR-3). Follow-up PRs add NVDA, KO. *)
+    GOOG 2022-07-18 20:1 split (PR-3), NVDA 2024-06-10 10:1 split + KO 2024
+    quarterly cash dividend (PR-4 — wraps M6.4). *)
 
 open Core
 open OUnit2
@@ -350,6 +351,161 @@ let test_goog_2022_split_tampered_stop_fails _ =
   assert_that failure_names
     (elements_are [ equal_to "position_carryover"; equal_to "stop_adjusted" ])
 
+(* --------- NVDA 2024-06-10 scenario (10:1 forward split) ---------
+
+   Cost-basis check: 10 * 1208.00 = 100 * 120.80 (factor=10).
+   Stop check: 1100.00 / 10 = 110.00. *)
+
+let _nvda_pre_lot : Round_trip_verifier.held_lot =
+  { symbol = "NVDA"; quantity = 10.0; entry_price = 1208.00 }
+
+let _nvda_split_factor = 10.0
+let _nvda_split_date = Date.of_string "2024-06-10"
+
+let _load_nvda_scenario () =
+  let dir = _fixture_dir "nvda-2024-split" in
+  let bars = _read_bars (Filename.concat dir "bars.csv") in
+  let pick_pre = _read_snapshot (Filename.concat dir "pre_split.sexp") in
+  let pick_post = _read_snapshot (Filename.concat dir "post_split.sexp") in
+  (bars, pick_pre, pick_post)
+
+let test_nvda_2024_split_all_checks_pass _ =
+  let bars, pick_pre, pick_post = _load_nvda_scenario () in
+  let result =
+    Round_trip_verifier.verify_split_round_trip ~symbol:"NVDA"
+      ~split_date:_nvda_split_date ~factor:_nvda_split_factor ~bars
+      ~pre_split_lot:_nvda_pre_lot ~pick_pre_split:pick_pre
+      ~pick_post_split:pick_post ()
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : Round_trip_verifier.Round_trip_result.t) -> r.checks)
+           (elements_are
+              [
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "adjusted_close_continuity");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "position_carryover");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "cost_basis_preserved");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "no_phantom_picks");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "stop_adjusted");
+              ]);
+         field
+           (fun (r : Round_trip_verifier.Round_trip_result.t) ->
+             Round_trip_verifier.Round_trip_result.failures r)
+           (equal_to []);
+       ])
+
+(* Negative test: tampered post-split snapshot with the wrong NVDA stop must
+   fail [position_carryover] and [stop_adjusted]. Mirrors AAPL/TSLA/GOOG
+   coverage so regressions in any scenario are caught. *)
+
+let _tampered_nvda_post_split (snapshot : Weekly_snapshot.t) =
+  let held' =
+    List.map snapshot.held_positions ~f:(fun h ->
+        if String.equal h.symbol "NVDA" then { h with stop = 999.99 } else h)
+  in
+  { snapshot with held_positions = held' }
+
+let test_nvda_2024_split_tampered_stop_fails _ =
+  let bars, pick_pre, pick_post = _load_nvda_scenario () in
+  let result =
+    Round_trip_verifier.verify_split_round_trip ~symbol:"NVDA"
+      ~split_date:_nvda_split_date ~factor:_nvda_split_factor ~bars
+      ~pre_split_lot:_nvda_pre_lot ~pick_pre_split:pick_pre
+      ~pick_post_split:(_tampered_nvda_post_split pick_post)
+      ()
+  in
+  let failure_names =
+    Round_trip_verifier.Round_trip_result.failures result
+    |> List.map ~f:(fun (c : Round_trip_verifier.check) -> c.name)
+  in
+  assert_that failure_names
+    (elements_are [ equal_to "position_carryover"; equal_to "stop_adjusted" ])
+
+(* --------- KO 2024-06-14 scenario (Q2 cash dividend) ---------
+
+   Drives [Round_trip_verifier.verify_dividend_round_trip].
+
+   Dividend math: KO Q2 2024 paid $0.485 per share. With 200 shares held,
+   cash credit = 200 * 0.485 = $97.00. Stop unchanged across the dividend
+   (book convention: cash dividends do not adjust stops). *)
+
+let _ko_pre_lot : Round_trip_verifier.held_lot =
+  { symbol = "KO"; quantity = 200.0; entry_price = 60.00 }
+
+let _ko_div_per_share = 0.485
+let _ko_ex_date = Date.of_string "2024-06-14"
+let _ko_cash_pre = 50000.00
+
+(* 50000.00 + 200 * 0.485 = 50097.00 *)
+let _ko_cash_post = 50097.00
+
+let _load_ko_scenario () =
+  let dir = _fixture_dir "ko-2024-divs" in
+  let pick_pre = _read_snapshot (Filename.concat dir "pre_dividend.sexp") in
+  let pick_post = _read_snapshot (Filename.concat dir "post_dividend.sexp") in
+  (pick_pre, pick_post)
+
+let test_ko_2024_dividend_all_checks_pass _ =
+  let pick_pre, pick_post = _load_ko_scenario () in
+  let result =
+    Round_trip_verifier.verify_dividend_round_trip ~symbol:"KO"
+      ~ex_date:_ko_ex_date ~amount_per_share:_ko_div_per_share
+      ~pre_lot:_ko_pre_lot ~pick_pre ~pick_post ~cash_pre:_ko_cash_pre
+      ~cash_post:_ko_cash_post ()
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : Round_trip_verifier.Round_trip_result.t) -> r.checks)
+           (elements_are
+              [
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "cash_credit");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "quantity_unchanged");
+                field
+                  (fun (c : Round_trip_verifier.check) -> c.name)
+                  (equal_to "stop_unchanged");
+              ]);
+         field
+           (fun (r : Round_trip_verifier.Round_trip_result.t) ->
+             Round_trip_verifier.Round_trip_result.failures r)
+           (equal_to []);
+       ])
+
+(* Negative test: a wrong cash_post (e.g. forgot to credit the dividend) must
+   fail [cash_credit]. Pins the verifier actually catches a regression in the
+   cash-credit pathway — silence on FAIL would be a critical bug. *)
+
+let test_ko_2024_dividend_missing_credit_fails _ =
+  let pick_pre, pick_post = _load_ko_scenario () in
+  let result =
+    Round_trip_verifier.verify_dividend_round_trip ~symbol:"KO"
+      ~ex_date:_ko_ex_date ~amount_per_share:_ko_div_per_share
+      ~pre_lot:_ko_pre_lot ~pick_pre ~pick_post ~cash_pre:_ko_cash_pre
+      ~cash_post:_ko_cash_pre (* tampered: dividend never credited *) ()
+  in
+  let failure_names =
+    Round_trip_verifier.Round_trip_result.failures result
+    |> List.map ~f:(fun (c : Round_trip_verifier.check) -> c.name)
+  in
+  assert_that failure_names (elements_are [ equal_to "cash_credit" ])
+
 let suite =
   "split_replay"
   >::: [
@@ -369,6 +525,14 @@ let suite =
          >:: test_goog_2022_split_all_checks_pass;
          "goog_2022_split_tampered_stop_fails"
          >:: test_goog_2022_split_tampered_stop_fails;
+         "nvda_2024_split_all_checks_pass"
+         >:: test_nvda_2024_split_all_checks_pass;
+         "nvda_2024_split_tampered_stop_fails"
+         >:: test_nvda_2024_split_tampered_stop_fails;
+         "ko_2024_dividend_all_checks_pass"
+         >:: test_ko_2024_dividend_all_checks_pass;
+         "ko_2024_dividend_missing_credit_fails"
+         >:: test_ko_2024_dividend_missing_credit_fails;
        ]
 
 let () = run_test_tt_main suite

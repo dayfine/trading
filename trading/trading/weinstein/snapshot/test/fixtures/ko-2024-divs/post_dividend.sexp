@@ -1,0 +1,16 @@
+((schema_version 1)
+ (system_version "test-fixture")
+ (date 2024-06-14)
+ (macro ((regime Bullish) (score 0.61)))
+ (sectors_strong (XLP XLV))
+ (sectors_weak (XLE))
+ (long_candidates
+  (((symbol KO) (score 0.77) (grade B+) (entry 61.62) (stop 58.00)
+    (sector XLP) (rationale "Stage2 continuation, low-vol staple")
+    (rs_vs_spy (0.91)) (resistance_grade (B)))
+   ((symbol PEP) (score 0.73) (grade B) (entry 173.10) (stop 162.50)
+    (sector XLP) (rationale "Continuation breakout") (rs_vs_spy (0.87))
+    (resistance_grade ()))))
+ (short_candidates ())
+ (held_positions
+  (((symbol KO) (entered 2024-02-09) (stop 58.00) (status Holding)))))
