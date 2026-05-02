@@ -221,6 +221,142 @@ let test_determinism_two_builds _ =
   let b = dump (build ()) in
   assert_that a (equal_to b)
 
+(* Schema with only the six OHLCV columns. Lets the OHLCV-pinned tests assert
+   on values without simultaneously paying for indicator warmup. *)
+let _ohlcv_columns_schema =
+  Snapshot_schema.create
+    ~fields:Snapshot_schema.[ Open; High; Low; Close; Volume; Adjusted_close ]
+
+(* Hand-traceable bar with every OHLCV field at a distinct value, so each
+   column read is independently observable. *)
+let _make_distinct_bar ~date ~i =
+  let f = Float.of_int i in
+  {
+    Types.Daily_price.date;
+    open_price = 100.0 +. f;
+    high_price = 110.0 +. f;
+    low_price = 90.0 +. f;
+    close_price = 105.0 +. f;
+    volume = 1_000 + i;
+    adjusted_close = 104.0 +. f;
+  }
+
+let _distinct_bars ~n =
+  let dates = _date_seq ~start:(Date.of_string "2024-01-02") ~n in
+  List.mapi dates ~f:(fun i d -> _make_distinct_bar ~date:d ~i)
+
+(* OHLCV scalars at row [i] equal the input bar's fields verbatim — for
+   {!Volume}, the input [int] is cast to [float]. Pin all six on a 30-bar
+   fixture's last row (i = 29). *)
+let test_ohlcv_columns_pinned_at_last_row _ =
+  let bars = _distinct_bars ~n:30 in
+  let result =
+    Pipeline.build_for_symbol ~symbol:"FOO" ~bars ~schema:_ohlcv_columns_schema
+      ()
+  in
+  let last_row =
+    Result.bind result ~f:(fun rows ->
+        match List.last rows with
+        | None -> Status.error_internal "no rows"
+        | Some r -> Ok r)
+  in
+  assert_that last_row
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Open)
+              (equal_to (Some 129.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.High)
+              (equal_to (Some 139.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Low)
+              (equal_to (Some 119.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Close)
+              (equal_to (Some 134.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Volume)
+              (equal_to (Some 1029.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Adjusted_close)
+              (equal_to (Some 133.0));
+          ]))
+
+(* OHLCV columns must populate from row 0 — no warmup. Spot-check the first
+   row of the same fixture. *)
+let test_ohlcv_columns_populated_at_first_row _ =
+  let bars = _distinct_bars ~n:30 in
+  let result =
+    Pipeline.build_for_symbol ~symbol:"FOO" ~bars ~schema:_ohlcv_columns_schema
+      ()
+  in
+  let first_row =
+    Result.bind result ~f:(fun rows ->
+        match List.hd rows with
+        | None -> Status.error_internal "no rows"
+        | Some r -> Ok r)
+  in
+  assert_that first_row
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Open)
+              (equal_to (Some 100.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.High)
+              (equal_to (Some 110.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Low)
+              (equal_to (Some 90.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Close)
+              (equal_to (Some 105.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Volume)
+              (equal_to (Some 1000.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Adjusted_close)
+              (equal_to (Some 104.0));
+          ]))
+
+(* Under the canonical 13-field default schema, OHLCV columns coexist with the
+   indicator columns: indicator scalars stay in their original positions and
+   OHLCV columns are populated alongside them on the same row. *)
+let test_default_schema_carries_indicators_and_ohlcv _ =
+  let bars = _distinct_bars ~n:50 in
+  let result =
+    Pipeline.build_for_symbol ~symbol:"FOO" ~bars
+      ~schema:Snapshot_schema.default ()
+  in
+  let last_row =
+    Result.bind result ~f:(fun rows ->
+        match List.last rows with
+        | None -> Status.error_internal "no rows"
+        | Some r -> Ok r)
+  in
+  assert_that last_row
+    (is_ok_and_holds
+       (all_of
+          [
+            (* SMA_50 of adjusted_close = mean of [104.0 .. 153.0] = 128.5. *)
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.SMA_50)
+              (equal_to (Some 128.5));
+            (* OHLCV columns mirror the last bar verbatim (i = 49). *)
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Open)
+              (equal_to (Some 149.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Adjusted_close)
+              (equal_to (Some 153.0));
+            field
+              (fun r -> Snapshot.get r Snapshot_schema.Volume)
+              (equal_to (Some 1049.0));
+          ]))
+
 let suite =
   "Snapshot_pipeline tests"
   >::: [
@@ -238,6 +374,12 @@ let suite =
          "dates carry through" >:: test_dates_carry_through;
          "symbol carries through" >:: test_symbol_carries_through;
          "determinism two builds" >:: test_determinism_two_builds;
+         "OHLCV columns pinned at last row"
+         >:: test_ohlcv_columns_pinned_at_last_row;
+         "OHLCV columns populated at first row"
+         >:: test_ohlcv_columns_populated_at_first_row;
+         "default schema carries indicators and OHLCV"
+         >:: test_default_schema_carries_indicators_and_ohlcv;
        ]
 
 let () = run_test_tt_main suite

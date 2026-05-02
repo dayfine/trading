@@ -25,7 +25,7 @@ let test_compute_hash_field_set_sensitive _ =
   let h_long = compute_hash [ EMA_50; SMA_50; ATR_14 ] in
   assert_that (String.equal h_short h_long) (equal_to false)
 
-let test_default_schema_locks_in_phase_a_fields _ =
+let test_default_schema_locks_in_canonical_fields _ =
   let open Snapshot_schema in
   assert_that default.fields
     (elements_are
@@ -37,10 +37,30 @@ let test_default_schema_locks_in_phase_a_fields _ =
          equal_to Stage;
          equal_to RS_line;
          equal_to Macro_composite;
+         equal_to Open;
+         equal_to High;
+         equal_to Low;
+         equal_to Close;
+         equal_to Volume;
+         equal_to Adjusted_close;
        ])
 
 let test_default_schema_n_fields _ =
-  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 7)
+  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 13)
+
+(* The Phase A → Phase A.1 OHLCV addition deliberately bumps the schema hash —
+   it is content-addressable, set-sensitive by construction. Pin both the
+   pre-OHLCV 7-field hash and the new 13-field hash so any drift surfaces
+   loudly. The Phase A hash was computed via [Sexp.to_string] of the original
+   field list and is stable across machines. *)
+let test_default_schema_hash_pinned_for_canonical_set _ =
+  let pre_ohlcv_hash =
+    Snapshot_schema.compute_hash
+      Snapshot_schema.
+        [ EMA_50; SMA_50; ATR_14; RSI_14; Stage; RS_line; Macro_composite ]
+  in
+  let canonical_hash = Snapshot_schema.default.schema_hash in
+  assert_that (String.equal pre_ohlcv_hash canonical_hash) (equal_to false)
 
 let test_index_of_present_and_absent _ =
   let open Snapshot_schema in
@@ -68,6 +88,12 @@ let test_field_name_round_trip _ =
          equal_to "Stage";
          equal_to "RS_line";
          equal_to "Macro_composite";
+         equal_to "Open";
+         equal_to "High";
+         equal_to "Low";
+         equal_to "Close";
+         equal_to "Volume";
+         equal_to "Adjusted_close";
        ])
 
 let suite =
@@ -77,9 +103,11 @@ let suite =
          "compute_hash order sensitive" >:: test_compute_hash_order_sensitive;
          "compute_hash field set sensitive"
          >:: test_compute_hash_field_set_sensitive;
-         "default schema locks in Phase A fields"
-         >:: test_default_schema_locks_in_phase_a_fields;
-         "default schema n_fields = 7" >:: test_default_schema_n_fields;
+         "default schema locks in canonical fields"
+         >:: test_default_schema_locks_in_canonical_fields;
+         "default schema n_fields = 13" >:: test_default_schema_n_fields;
+         "default schema hash differs from pre-OHLCV"
+         >:: test_default_schema_hash_pinned_for_canonical_set;
          "index_of present and absent" >:: test_index_of_present_and_absent;
          "create caches hash" >:: test_create_caches_hash;
          "field_name round trip" >:: test_field_name_round_trip;

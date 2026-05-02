@@ -33,6 +33,7 @@ let _write_then_read path rows =
 let test_round_trip_three_rows _ =
   let path = _tmp_path () in
   let rows = _sample_rows () in
+  let n = Snapshot_schema.n_fields Snapshot_schema.default in
   assert_that
     (_write_then_read path rows)
     (is_ok_and_holds
@@ -43,7 +44,7 @@ let test_round_trip_three_rows _ =
                 field (fun s -> s.Snapshot.symbol) (equal_to "AAPL");
                 field
                   (fun s -> Array.to_list s.Snapshot.values)
-                  (equal_to (Array.to_list (_values_for 7)));
+                  (equal_to (Array.to_list (_values_for n)));
               ];
             field (fun s -> s.Snapshot.symbol) (equal_to "MSFT");
             field (fun s -> s.Snapshot.symbol) (equal_to "GOOG");

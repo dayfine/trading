@@ -33,6 +33,10 @@
     - {!Macro_composite}: derived from the benchmark's own bars only —
       {!Weinstein.Macro.analyze} confidence (0.0–1.0). [Float.nan] when no
       benchmark is supplied.
+    - {!Open} / {!High} / {!Low} / {!Close} / {!Adjusted_close}: copied verbatim
+      from the input {!Types.Daily_price.t} for the row's bar.
+    - {!Volume}: input [int] volume cast to [float] (Float64 schema; integer
+      counts up to ~2^53 round-trip exactly).
 
     {2 Cross-symbol Macro_composite}
 
