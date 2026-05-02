@@ -22,6 +22,8 @@
   cagr_computer
   portfolio_state_computer
   trade_aggregates_computer
-  return_basics_computer)
+  return_basics_computer
+  risk_adjusted_computer
+  drawdown_analytics_computer)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

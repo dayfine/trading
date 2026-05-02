@@ -2,6 +2,7 @@ open OUnit2
 open Core
 open Trading_simulation.Metrics
 open Trading_simulation_types.Metric_types
+open Trading_simulation_types.Metric_info_registry
 open Trading_simulation.Metric_computers
 open Trading_simulation.Simulator
 open Matchers
@@ -582,8 +583,9 @@ let test_run_computers_combines_results _ =
 let test_default_computers _ =
   let computers = default_computers () in
   (* Default set: summary, sharpe, max_drawdown, cagr, portfolio_state,
-     trade_aggregates (M5.2b), return_basics (M5.2b). *)
-  assert_that computers (size_is 7)
+     trade_aggregates (M5.2b), return_basics (M5.2b), omega_ratio (M5.2c),
+     drawdown_analytics (M5.2c). *)
+  assert_that computers (size_is 9)
 
 (* ==================== Factory Tests ==================== *)
 

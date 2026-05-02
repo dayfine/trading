@@ -7,7 +7,9 @@
     - {!Cagr_computer}
     - {!Portfolio_state_computer}
     - {!Trade_aggregates_computer} (M5.2b)
-    - {!Return_basics_computer} (M5.2b) *)
+    - {!Return_basics_computer} (M5.2b)
+    - {!Risk_adjusted_computer} (M5.2c)
+    - {!Drawdown_analytics_computer} (M5.2c) *)
 
 open Core
 module Metric_types = Trading_simulation_types.Metric_types
@@ -22,6 +24,8 @@ let cagr_computer = Cagr_computer.computer
 let portfolio_state_computer = Portfolio_state_computer.computer
 let trade_aggregates_computer = Trade_aggregates_computer.computer
 let return_basics_computer = Return_basics_computer.computer
+let omega_ratio_computer = Risk_adjusted_computer.computer
+let drawdown_analytics_computer = Drawdown_analytics_computer.computer
 
 (** {1 Derived Metric Computers} *)
 
@@ -40,15 +44,22 @@ let calmar_ratio_derived : Simulator_types.derived_metric_computer =
 
 (** {1 Factory} *)
 
-let _calmar_stub () =
+(** Build a placeholder computer for a metric that's actually produced by a
+    derived computer (Calmar / Sortino / MAR). When [create_computer] is called
+    on a derived-only metric type, callers get a step-based computer that emits
+    [0.0]; the real value is computed by the corresponding derived computer in
+    {!default_derived_computers}. *)
+let _derived_only_stub ~name (metric_type : Metric_types.metric_type) =
   Simulator_types.wrap_computer
     {
-      name = "calmar_stub";
+      name;
       init = (fun ~config:_ -> ());
       update = (fun ~state:() ~step:_ -> ());
       finalize =
-        (fun ~state:() ~config:_ -> Metric_types.singleton CalmarRatio 0.0);
+        (fun ~state:() ~config:_ -> Metric_types.singleton metric_type 0.0);
     }
+
+let _calmar_stub () = _derived_only_stub ~name:"calmar_stub" CalmarRatio
 
 let create_computer (metric_type : Metric_types.metric_type) :
     Simulator_types.any_metric_computer =
@@ -71,6 +82,14 @@ let create_computer (metric_type : Metric_types.metric_type) :
   | WorstMonthPct | BestQuarterPct | WorstQuarterPct | BestYearPct
   | WorstYearPct ->
       return_basics_computer ()
+  | OmegaRatio -> omega_ratio_computer ()
+  | SortinoRatioAnnualized ->
+      _derived_only_stub ~name:"sortino_stub" SortinoRatioAnnualized
+  | MarRatio -> _derived_only_stub ~name:"mar_stub" MarRatio
+  | AvgDrawdownPct | MedianDrawdownPct | MaxDrawdownDurationDays
+  | AvgDrawdownDurationDays | TimeInDrawdownPct | UlcerIndex | PainIndex
+  | UnderwaterCurveArea ->
+      drawdown_analytics_computer ()
 
 (** {1 Default Computer Set} *)
 
@@ -83,9 +102,16 @@ let default_computers ?(risk_free_rate = 0.0) ?(initial_cash = 0.0) () =
     portfolio_state_computer ();
     trade_aggregates_computer ~initial_cash ();
     return_basics_computer ();
+    omega_ratio_computer ();
+    drawdown_analytics_computer ();
   ]
 
-let default_derived_computers () = [ calmar_ratio_derived ]
+let default_derived_computers () =
+  [
+    calmar_ratio_derived;
+    Risk_adjusted_computer.sortino_ratio_derived;
+    Risk_adjusted_computer.mar_ratio_derived;
+  ]
 
 let default_metric_suite ?(risk_free_rate = 0.0) ?(initial_cash = 0.0) () :
     Simulator_types.metric_suite =
