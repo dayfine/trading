@@ -48,6 +48,9 @@ let test_minimal_start_date_only _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.fuzz_spec)
               (equal_to None);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_window)
+              (equal_to None);
           ]))
 
 let test_override_key_path_form _ =
@@ -291,6 +294,47 @@ let test_fuzz_with_smoke_is_error _ =
     Backtest_runner_args.parse
       [ "--fuzz"; "x=1.0\xC2\xB10.1:3"; "--smoke"; "--experiment-name"; "x" ]
   in
+  assert_that result is_error
+
+let test_fuzz_window_with_fuzz _ =
+  (* --fuzz-window composes with --fuzz to constrain the per-variant universe
+     to a smoke-catalog window's universe_path (sp500 by default). *)
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2020-04-30";
+        "--fuzz";
+        "start_date=2020-01-02\xC2\xB12w:3";
+        "--fuzz-window";
+        "crash";
+        "--experiment-name";
+        "fuzz_window_test";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_spec)
+              (equal_to (Some "start_date=2020-01-02\xC2\xB12w:3"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_window)
+              (equal_to (Some "crash"));
+          ]))
+
+let test_fuzz_window_without_fuzz_is_error _ =
+  (* --fuzz-window outside fuzz mode is meaningless — the override would
+     have nowhere to apply. Surface it at parse time rather than silently
+     ignoring. *)
+  let result =
+    Backtest_runner_args.parse
+      [ "2020-01-02"; "--fuzz-window"; "crash"; "--experiment-name"; "x" ]
+  in
+  assert_that result is_error
+
+let test_fuzz_window_missing_value _ =
+  let result = Backtest_runner_args.parse [ "2020-01-02"; "--fuzz-window" ] in
   assert_that result is_error
 
 let test_fuzz_with_overrides_composes _ =
@@ -631,6 +675,11 @@ let suite =
          "--fuzz with --baseline is error" >:: test_fuzz_with_baseline_is_error;
          "--fuzz with --smoke is error" >:: test_fuzz_with_smoke_is_error;
          "--fuzz composes with --override" >:: test_fuzz_with_overrides_composes;
+         "--fuzz-window composes with --fuzz" >:: test_fuzz_window_with_fuzz;
+         "--fuzz-window without --fuzz is error"
+         >:: test_fuzz_window_without_fuzz_is_error;
+         "--fuzz-window without value is error"
+         >:: test_fuzz_window_missing_value;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
        ]
 

@@ -12,6 +12,7 @@ type t = {
   smoke : bool;
   experiment_name : string option;
   fuzz_spec : string option;
+  fuzz_window : string option;
 }
 
 type acc = {
@@ -25,6 +26,7 @@ type acc = {
   smoke : bool;
   experiment_name : string option;
   fuzz_spec : string option;
+  fuzz_window : string option;
 }
 (** Accumulator for [_extract_flags]. Carries every flag the parser recognises
     plus the running list of positional args. *)
@@ -41,6 +43,7 @@ let _empty_acc =
     smoke = false;
     experiment_name = None;
     fuzz_spec = None;
+    fuzz_window = None;
   }
 
 let _err msg = Error (Status.invalid_argument_error msg)
@@ -79,6 +82,9 @@ let rec _extract_flags args (acc : acc) =
   | "--fuzz" :: value :: rest ->
       _extract_flags rest { acc with fuzz_spec = Some value }
   | [ "--fuzz" ] -> _err "--fuzz requires a spec argument"
+  | "--fuzz-window" :: value :: rest ->
+      _extract_flags rest { acc with fuzz_window = Some value }
+  | [ "--fuzz-window" ] -> _err "--fuzz-window requires a name argument"
   | arg :: rest ->
       _extract_flags rest { acc with positional = arg :: acc.positional }
 
@@ -125,6 +131,15 @@ let _validate_fuzz_exclusivity ~baseline ~smoke ~fuzz_spec =
   | Some _ when smoke -> _err "--fuzz is mutually exclusive with --smoke"
   | Some _ -> Ok ()
 
+(** [--fuzz-window] only makes sense in fuzz mode — outside fuzz, the runner has
+    no per-variant pipeline to apply the universe override to. We surface a
+    parse-time error rather than silently ignoring the flag, since the silent
+    behaviour would mislead callers expecting a constrained universe. *)
+let _validate_fuzz_window_requires_fuzz ~fuzz_window ~fuzz_spec =
+  match (fuzz_window, fuzz_spec) with
+  | Some _, None -> _err "--fuzz-window requires --fuzz"
+  | _ -> Ok ()
+
 let _build_result (acc : acc) (start_date, end_date) =
   Ok
     {
@@ -139,6 +154,7 @@ let _build_result (acc : acc) (start_date, end_date) =
       smoke = acc.smoke;
       experiment_name = acc.experiment_name;
       fuzz_spec = acc.fuzz_spec;
+      fuzz_window = acc.fuzz_window;
     }
 
 let parse args =
@@ -151,6 +167,10 @@ let parse args =
             (_validate_fuzz_exclusivity ~baseline:acc.baseline ~smoke:acc.smoke
                ~fuzz_spec:acc.fuzz_spec) ~f:(fun () ->
               Result.bind
-                (_split_positional ~smoke:acc.smoke ~fuzz_spec:acc.fuzz_spec
-                   acc.positional)
-                ~f:(_build_result acc))))
+                (_validate_fuzz_window_requires_fuzz
+                   ~fuzz_window:acc.fuzz_window ~fuzz_spec:acc.fuzz_spec)
+                ~f:(fun () ->
+                  Result.bind
+                    (_split_positional ~smoke:acc.smoke ~fuzz_spec:acc.fuzz_spec
+                       acc.positional)
+                    ~f:(_build_result acc)))))
