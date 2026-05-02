@@ -147,31 +147,61 @@ let _build_sector_context_map (sectors : (string, string) Hashtbl.t) :
 (* Forward-walk outlooks for the scorer                                *)
 (* ---------------------------------------------------------------- *)
 
-(** Build a forward [Outcome_scorer.weekly_outlook list] for [symbol] starting
-    on the Friday {b after} [entry_friday]. Reads weekly bars + classifies Stage
-    at each Friday via [Stage.classify]. Empty list means the run ends at or
-    before [entry_friday]. *)
-let _forward_outlooks ~bar_panels ~all_fridays ~stage_config ~bar_lookback
-    ~symbol ~entry_friday : Scorer.weekly_outlook list =
-  let after =
-    List.drop_while all_fridays ~f:(fun d -> Date.( <= ) d entry_friday)
-  in
-  List.filter_map after ~f:(fun friday ->
-      match Bar_panels.column_of_date bar_panels friday with
+type forward_table = (string, Scorer.weekly_outlook list) Hashtbl.t
+(** Per-symbol chronologically-ordered [weekly_outlook list] across the run's
+    full Friday calendar. Built once per run (PR-1: optimal-strategy
+    improvements 2026-05-01) so per-candidate scoring becomes a list slice
+    rather than a fresh 130-week stage re-classification.
+
+    Key: symbol. Value: outlooks sorted ascending by [date], with one entry per
+    Friday for which the symbol has enough bars to classify a stage. Fridays
+    with insufficient history are simply absent from the list. *)
+
+(** Compute one [Scorer.weekly_outlook] for [symbol] at [friday], or [None] when
+    the symbol has no weekly bars at that Friday. Same shape as
+    [_analyze_symbol_on_friday] but emits the outlook record the scorer
+    consumes. *)
+let _outlook_at ~bar_panels ~stage_config ~bar_lookback ~symbol ~friday :
+    Scorer.weekly_outlook option =
+  match Bar_panels.column_of_date bar_panels friday with
+  | None -> None
+  | Some as_of_day -> (
+      let weekly =
+        Bar_panels.weekly_bars_for bar_panels ~symbol ~n:bar_lookback ~as_of_day
+      in
+      match List.last weekly with
       | None -> None
-      | Some as_of_day -> (
-          let weekly =
-            Bar_panels.weekly_bars_for bar_panels ~symbol ~n:bar_lookback
-              ~as_of_day
+      | Some bar ->
+          let stage_result =
+            Stage.classify ~config:stage_config ~bars:weekly ~prior_stage:None
           in
-          match List.last weekly with
-          | None -> None
-          | Some bar ->
-              let stage_result =
-                Stage.classify ~config:stage_config ~bars:weekly
-                  ~prior_stage:None
-              in
-              Some { Scorer.date = friday; bar; stage_result }))
+          Some { Scorer.date = friday; bar; stage_result })
+
+(** Build the per-symbol forward-outlook table (PR-1). Iterates [fridays] once
+    per symbol and memoizes the full chronological outlook list. Sized to
+    [List.length universe] for predictable hashtable growth. *)
+let _build_forward_table ~bar_panels ~fridays ~stage_config ~bar_lookback
+    ~universe : forward_table =
+  let table = Hashtbl.create ~size:(List.length universe) (module String) in
+  List.iter universe ~f:(fun symbol ->
+      let outlooks =
+        List.filter_map fridays ~f:(fun friday ->
+            _outlook_at ~bar_panels ~stage_config ~bar_lookback ~symbol ~friday)
+      in
+      Hashtbl.set table ~key:symbol ~data:outlooks);
+  table
+
+(** Slice the memoized per-symbol outlook list to keep only Fridays strictly
+    after [entry_friday]. Replaces the per-candidate Stage-classification loop
+    in the original [_forward_outlooks]. Returns [[]] for symbols absent from
+    the table (degenerate case — caller drops the candidate). *)
+let forward_outlooks_for ~forward_table ~symbol ~entry_friday :
+    Scorer.weekly_outlook list =
+  match Hashtbl.find forward_table symbol with
+  | None -> []
+  | Some outlooks ->
+      List.drop_while outlooks ~f:(fun (o : Scorer.weekly_outlook) ->
+          Date.( <= ) o.date entry_friday)
 
 (* ---------------------------------------------------------------- *)
 (* Macro-trend persistence (read side)                                *)
@@ -235,14 +265,15 @@ let _scan_all_fridays ~bar_panels ~fridays ~universe ~sector_map ~stock_config
       Scanner.scan_week ~config:scanner_config week)
 
 (** Score each candidate by forward-walking the panel. Drops candidates with no
-    forward bars (degenerate end-of-run). *)
-let _score_all_candidates ~bar_panels ~all_fridays ~scorer_config ~stage_config
-    ~bar_lookback (candidates : OT.candidate_entry list) :
-    OT.scored_candidate list =
+    forward bars (degenerate end-of-run). Uses the precomputed [forward_table]
+    so each candidate's forward outlooks are an O(N_fridays) slice of the
+    per-symbol memoized list rather than a fresh Stage-classification sweep. *)
+let _score_all_candidates ~forward_table ~scorer_config
+    (candidates : OT.candidate_entry list) : OT.scored_candidate list =
   List.filter_map candidates ~f:(fun (c : OT.candidate_entry) ->
       let forward =
-        _forward_outlooks ~bar_panels ~all_fridays ~stage_config ~bar_lookback
-          ~symbol:c.symbol ~entry_friday:c.entry_week
+        forward_outlooks_for ~forward_table ~symbol:c.symbol
+          ~entry_friday:c.entry_week
       in
       Scorer.score ~config:scorer_config ~candidate:c ~forward)
 
@@ -340,11 +371,13 @@ let _scan_and_score ~(world : _world) : OT.scored_candidate list =
   in
   eprintf "optimal_strategy: %d candidates emitted; scoring...\n%!"
     (List.length candidates);
-  let scored =
-    _score_all_candidates ~bar_panels:world.bar_panels
-      ~all_fridays:world.fridays ~scorer_config ~stage_config
-      ~bar_lookback:_bar_lookback_weeks candidates
+  let forward_table =
+    _build_forward_table ~bar_panels:world.bar_panels ~fridays:world.fridays
+      ~stage_config ~bar_lookback:_bar_lookback_weeks ~universe:world.universe
   in
+  eprintf "optimal_strategy: forward outlooks memoized (%d symbols)\n%!"
+    (Hashtbl.length forward_table);
+  let scored = _score_all_candidates ~forward_table ~scorer_config candidates in
   eprintf "optimal_strategy: %d scored candidates; filling variants...\n%!"
     (List.length scored);
   scored

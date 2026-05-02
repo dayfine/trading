@@ -64,6 +64,28 @@
 
 open Core
 
+type forward_table = (string, Outcome_scorer.weekly_outlook list) Hashtbl.t
+(** Per-symbol chronologically-ordered [Outcome_scorer.weekly_outlook list]
+    across the run's full Friday calendar. Built once per run by the scoring
+    phase so per-candidate scoring is a list slice rather than a fresh
+    Stage-classification sweep (PR-1: optimal-strategy improvements 2026-05-01).
+
+    Key: symbol. Value: outlooks sorted ascending by [date], with one entry per
+    Friday for which the symbol has enough bars to classify a stage. Fridays
+    with insufficient history are absent from the list. Exposed at module
+    boundary for direct unit testing; the runner itself consumes the table
+    inside {!run}. *)
+
+val forward_outlooks_for :
+  forward_table:forward_table ->
+  symbol:string ->
+  entry_friday:Date.t ->
+  Outcome_scorer.weekly_outlook list
+(** [forward_outlooks_for ~forward_table ~symbol ~entry_friday] returns the
+    per-symbol forward outlooks strictly after [entry_friday]. Returns the empty
+    list when [symbol] is absent from the table. Exposed for unit testing the
+    memoized-slice contract. *)
+
 val load_macro_trend :
   output_dir:string -> (Date.t, Weinstein_types.market_trend) Hashtbl.t
 (** [load_macro_trend ~output_dir] reads [<output_dir>/macro_trend.sexp] and
