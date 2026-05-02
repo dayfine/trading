@@ -42,6 +42,7 @@ val run :
   commission:Trading_engine.Types.commission_config ->
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
+  ?bar_data_source:Bar_data_source.t ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
@@ -71,4 +72,15 @@ val run :
     ([dev/plans/engine-layer-pooling-2026-04-27.md]) to confirm on real data
     that [Engine.update_market] dominates the per-tick allocator profile before
     the buffer-reuse refactors land. When [gc_trace] is omitted, the runner
-    takes no per-step snapshots and the cost is one [None] match per step. *)
+    takes no per-step snapshots and the cost is one [None] match per step.
+
+    [bar_data_source], when passed, selects the OHLCV backend the simulator's
+    per-tick price reads use. Default ({!Bar_data_source.Csv}) is the
+    pre-Phase-D behaviour: build a CSV-backed [Market_data_adapter] from
+    [input.data_dir_fpath]. {!Bar_data_source.Snapshot} switches to a
+    callback-mode adapter backed by [Daily_panels.t] over the snapshot directory
+    in the selector. The strategy's bar reads (via [Bar_panels.t]) are unchanged
+    in either mode — only the simulator's per-tick reads (engine
+    [update_market], split detection, MtM portfolio_value, benchmark return)
+    shift to the snapshot source. Phase D scope; see
+    [dev/plans/snapshot-engine-phase-d-2026-05-02.md]. *)

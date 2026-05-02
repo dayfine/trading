@@ -181,7 +181,8 @@ let _start_memtrace ~path =
     feed both runs into [Backtest.Comparison.compute] without re-reading the
     summary from disk. *)
 let _run_and_write ~start_date ~end_date ~overrides ~output_dir
-    ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path () =
+    ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
+    ?bar_data_source () =
   Option.iter memtrace_path ~f:(fun path -> _start_memtrace ~path);
   let trace = Option.map trace_path ~f:(fun _ -> Backtest.Trace.create ()) in
   let gc_trace =
@@ -190,7 +191,7 @@ let _run_and_write ~start_date ~end_date ~overrides ~output_dir
   Backtest.Gc_trace.record ?trace:gc_trace ~phase:"start" ();
   let result =
     Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
-      ?sector_map_override ?trace ?gc_trace ()
+      ?sector_map_override ?trace ?gc_trace ?bar_data_source ()
   in
   eprintf "Writing output to %s/\n%!" output_dir;
   Backtest.Result_writer.write ~output_dir result;
@@ -207,10 +208,12 @@ let _run_and_write ~start_date ~end_date ~overrides ~output_dir
     no-baseline case). [overrides] are pre-merged from [--shared-override] +
     [--override] by the caller. *)
 let _single_run ~start_date ~end_date ~overrides ~output_dir
-    ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path () =
+    ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
+    ?bar_data_source () =
   let result =
     _run_and_write ~start_date ~end_date ~overrides ~output_dir
-      ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path ()
+      ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
+      ?bar_data_source ()
   in
   Out_channel.output_string stdout
     (Sexp.to_string_hum (Backtest.Summary.sexp_of_t result.summary));
@@ -378,6 +381,27 @@ let _smoke_run ~shared_overrides ~overrides ~output_root ~baseline () =
           ~overrides:(shared_overrides @ overrides)
           ~output_dir:window_dir ?sector_map_override ())
 
+(** Resolve [parsed.snapshot_dir] into a [Bar_data_source.t option]. When set,
+    reads the manifest at [<snapshot_dir>/manifest.sexp] and constructs a
+    [Snapshot] selector. Exits 1 on a missing or corrupt manifest so the failure
+    mode (snapshot dir not yet built) surfaces immediately rather than as a
+    runner-internal error. *)
+let _resolve_bar_data_source snapshot_dir =
+  Option.map snapshot_dir ~f:(fun dir ->
+      let manifest_path = Filename.concat dir "manifest.sexp" in
+      match Snapshot_pipeline.Snapshot_manifest.read ~path:manifest_path with
+      | Ok manifest ->
+          eprintf
+            "[snapshot-mode] loaded manifest at %s (schema_hash=%s, %d entries)\n\
+             %!"
+            manifest_path manifest.schema_hash
+            (List.length manifest.entries);
+          Backtest.Bar_data_source.Snapshot { snapshot_dir = dir; manifest }
+      | Error err ->
+          eprintf "Error: failed to read snapshot manifest at %s: %s\n"
+            manifest_path (Status.show err);
+          Stdlib.exit 1)
+
 (** Resolve the raw start/end positionals into [Date.t]. Smoke mode supplies its
     own dates per window so the positionals are unused there; the caller only
     invokes this for non-smoke runs. *)
@@ -455,10 +479,11 @@ let () =
         _resolve_dates ~start_date_raw:parsed.start_date
           ~end_date_raw:parsed.end_date
       in
+      let bar_data_source = _resolve_bar_data_source parsed.snapshot_dir in
       (* Outside [--baseline], shared overrides are equivalent to overrides:
          applied identically to the (single) run. *)
       _single_run ~start_date ~end_date
         ~overrides:(shared_overrides @ overrides)
         ~output_dir:output_root ?trace_path:parsed.trace_path
         ?memtrace_path:parsed.memtrace_path ?gc_trace_path:parsed.gc_trace_path
-        ()
+        ?bar_data_source ()

@@ -13,6 +13,7 @@ type t = {
   experiment_name : string option;
   fuzz_spec : string option;
   fuzz_window : string option;
+  snapshot_dir : string option;
 }
 
 type acc = {
@@ -27,9 +28,13 @@ type acc = {
   experiment_name : string option;
   fuzz_spec : string option;
   fuzz_window : string option;
+  snapshot_mode : bool;
+  snapshot_dir : string option;
 }
 (** Accumulator for [_extract_flags]. Carries every flag the parser recognises
-    plus the running list of positional args. *)
+    plus the running list of positional args. The [snapshot_mode] /
+    [snapshot_dir] split exists so we can validate at parse time that the two
+    flags appear together (see [_validate_snapshot_flags]). *)
 
 let _empty_acc =
   {
@@ -44,6 +49,8 @@ let _empty_acc =
     experiment_name = None;
     fuzz_spec = None;
     fuzz_window = None;
+    snapshot_mode = false;
+    snapshot_dir = None;
   }
 
 let _err msg = Error (Status.invalid_argument_error msg)
@@ -85,6 +92,11 @@ let rec _extract_flags args (acc : acc) =
   | "--fuzz-window" :: value :: rest ->
       _extract_flags rest { acc with fuzz_window = Some value }
   | [ "--fuzz-window" ] -> _err "--fuzz-window requires a name argument"
+  | "--snapshot-mode" :: rest ->
+      _extract_flags rest { acc with snapshot_mode = true }
+  | "--snapshot-dir" :: value :: rest ->
+      _extract_flags rest { acc with snapshot_dir = Some value }
+  | [ "--snapshot-dir" ] -> _err "--snapshot-dir requires a path argument"
   | arg :: rest ->
       _extract_flags rest { acc with positional = arg :: acc.positional }
 
@@ -140,6 +152,16 @@ let _validate_fuzz_window_requires_fuzz ~fuzz_window ~fuzz_spec =
   | Some _, None -> _err "--fuzz-window requires --fuzz"
   | _ -> Ok ()
 
+(** [--snapshot-mode] and [--snapshot-dir <path>] must appear together. Either
+    alone is a likely user error: [--snapshot-mode] without a path has no way to
+    find snapshots; [--snapshot-dir] without [--snapshot-mode] silently drops
+    the flag in favour of CSV mode. *)
+let _validate_snapshot_flags ~snapshot_mode ~snapshot_dir =
+  match (snapshot_mode, snapshot_dir) with
+  | true, None -> _err "--snapshot-mode requires --snapshot-dir <path>"
+  | false, Some _ -> _err "--snapshot-dir requires --snapshot-mode"
+  | _ -> Ok ()
+
 let _build_result (acc : acc) (start_date, end_date) =
   Ok
     {
@@ -155,6 +177,7 @@ let _build_result (acc : acc) (start_date, end_date) =
       experiment_name = acc.experiment_name;
       fuzz_spec = acc.fuzz_spec;
       fuzz_window = acc.fuzz_window;
+      snapshot_dir = acc.snapshot_dir;
     }
 
 let parse args =
@@ -171,6 +194,9 @@ let parse args =
                    ~fuzz_window:acc.fuzz_window ~fuzz_spec:acc.fuzz_spec)
                 ~f:(fun () ->
                   Result.bind
-                    (_split_positional ~smoke:acc.smoke ~fuzz_spec:acc.fuzz_spec
-                       acc.positional)
-                    ~f:(_build_result acc)))))
+                    (_validate_snapshot_flags ~snapshot_mode:acc.snapshot_mode
+                       ~snapshot_dir:acc.snapshot_dir) ~f:(fun () ->
+                      Result.bind
+                        (_split_positional ~smoke:acc.smoke
+                           ~fuzz_spec:acc.fuzz_spec acc.positional)
+                        ~f:(_build_result acc))))))

@@ -38,6 +38,7 @@ val create_deps :
   commission:Trading_engine.Types.commission_config ->
   ?metric_suite:metric_suite ->
   ?benchmark_symbol:string ->
+  ?market_data_adapter:Trading_simulation_data.Market_data_adapter.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
@@ -46,7 +47,16 @@ val create_deps :
     @param benchmark_symbol
       Optional symbol used to populate [step_result.benchmark_return] (e.g.
       ["SPY"]). When omitted, the field is [None] on every step and the
-      antifragility metrics emit 0.0. *)
+      antifragility metrics emit 0.0.
+    @param market_data_adapter
+      Optional pre-built market data adapter. When supplied, it replaces the
+      default CSV-backed adapter that {!create_deps} would otherwise build from
+      [data_dir]. Used by the daily-snapshot streaming path (Phase D —
+      [dev/plans/daily-snapshot-streaming-2026-04-27.md]) where the caller
+      supplies a callback-mode adapter backed by [Daily_panels.t] instead of a
+      [Price_cache.t]. [data_dir] is still required for the
+      [dependencies.data_dir] field that downstream callers may read but is
+      unused for adapter construction when [market_data_adapter] is supplied. *)
 
 (** {1 Creation} *)
 

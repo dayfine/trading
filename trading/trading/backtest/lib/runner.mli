@@ -122,6 +122,7 @@ val run_backtest :
   ?sector_map_override:(string, string) Core.Hashtbl.t ->
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
+  ?bar_data_source:Bar_data_source.t ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -177,4 +178,12 @@ val run_backtest :
 
     Independent measurement plane from [trace]'s per-phase wall-time + RSS
     readings; both can be passed in the same run. When [gc_trace] is omitted, no
-    snapshots are taken. *)
+    snapshots are taken.
+
+    [bar_data_source], when passed, selects the OHLCV backend for the
+    simulator's per-tick price reads. Default is {!Bar_data_source.Csv} (the
+    pre-Phase-D behaviour). {!Bar_data_source.Snapshot} switches the simulator
+    to read OHLCV from a snapshot directory written by Phase B. See
+    {!Bar_data_source.t} and the Phase D plan
+    ([dev/plans/snapshot-engine-phase-d-2026-05-02.md]) for the full contract.
+*)

@@ -51,6 +51,9 @@ let test_minimal_start_date_only _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.fuzz_window)
               (equal_to None);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.snapshot_dir)
+              (equal_to None);
           ]))
 
 let test_override_key_path_form _ =
@@ -624,6 +627,37 @@ let test_trace_write_and_parse _ =
            (equal_to Backtest.Trace.Phase.Teardown);
        ])
 
+let test_snapshot_mode_with_dir _ =
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--snapshot-mode"; "--snapshot-dir"; "/tmp/snapshots/v1" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.snapshot_dir)
+          (equal_to (Some "/tmp/snapshots/v1"))))
+
+let test_snapshot_mode_without_dir_is_error _ =
+  (* --snapshot-mode without --snapshot-dir has no way to find the manifest;
+     we surface this at parse time rather than failing later inside the
+     runner. *)
+  let result = Backtest_runner_args.parse [ "2018-01-02"; "--snapshot-mode" ] in
+  assert_that result is_error
+
+let test_snapshot_dir_without_mode_is_error _ =
+  (* --snapshot-dir without --snapshot-mode would silently fall back to CSV
+     mode and ignore the path; surface that as an error so the user notices. *)
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--snapshot-dir"; "/tmp/snapshots/v1" ]
+  in
+  assert_that result is_error
+
+let test_snapshot_dir_missing_value _ =
+  let result = Backtest_runner_args.parse [ "2018-01-02"; "--snapshot-dir" ] in
+  assert_that result is_error
+
 let suite =
   "Backtest_runner_args"
   >::: [
@@ -680,6 +714,14 @@ let suite =
          >:: test_fuzz_window_without_fuzz_is_error;
          "--fuzz-window without value is error"
          >:: test_fuzz_window_missing_value;
+         "--snapshot-mode + --snapshot-dir compose"
+         >:: test_snapshot_mode_with_dir;
+         "--snapshot-mode without --snapshot-dir is error"
+         >:: test_snapshot_mode_without_dir_is_error;
+         "--snapshot-dir without --snapshot-mode is error"
+         >:: test_snapshot_dir_without_mode_is_error;
+         "--snapshot-dir without value is error"
+         >:: test_snapshot_dir_missing_value;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
        ]
 
