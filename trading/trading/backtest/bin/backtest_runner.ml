@@ -36,8 +36,8 @@
     {1 Fuzz mode}
 
     [backtest_runner [<start_date> [end_date]] --fuzz
-     <param>=<center>±<delta>:<n> --experiment-name <name> [--override <arg>]
-     ...]
+     <param>=<center>±<delta>:<n> [--fuzz-window <bull|crash|recovery>]
+     --experiment-name <name> [--override <arg>] ...]
 
     Parses the spec via {!Backtest.Fuzz_spec.parse}, runs N variants, and writes
     [fuzz_distribution.{sexp,md}] alongside per-variant subdirs at
@@ -52,6 +52,14 @@
     [--override] / [--shared-override] (those apply to every variant). For
     date-key specs the positional [start_date] is overridden by the variant; for
     numeric-key specs the positional [start_date] is required.
+
+    The optional [--fuzz-window <name>] flag points at a window in
+    {!Scenario_lib.Smoke_catalog} (currently [bull], [crash], [recovery]) and
+    constrains every variant to that window's [universe_path] (sp500 by
+    default). Without it, fuzz mode loads the full ~10K-symbol [sectors.csv] and
+    OOMs the 8 GB dev container — this is the same fix smoke mode received; the
+    runner now warns when [--fuzz-window] is omitted. Note: only the universe is
+    constrained; the window's start/end dates are NOT substituted into variants.
 
     {1 --override vs. --shared-override}
 
@@ -78,7 +86,8 @@ open Core
 let _usage_msg =
   "Usage: backtest_runner <start_date> [end_date] [--override <arg>] \
    [--shared-override <arg>] [--trace <path>] [--memtrace <path>] [--gc-trace \
-   <path>] [--baseline] [--smoke] [--fuzz <spec>] [--experiment-name <name>]"
+   <path>] [--baseline] [--smoke] [--fuzz <spec>] [--fuzz-window \
+   <bull|crash|recovery>] [--experiment-name <name>]"
 
 (** Convert each raw [--override <arg>] string into the partial-config sexp the
     runner deep-merges. Routes key-path strings through
@@ -254,6 +263,28 @@ let _smoke_window_sector_map ~fixtures_root
   Scenario_lib.Universe_file.to_sector_map_override
     (Scenario_lib.Universe_file.load resolved)
 
+(** Resolve a [--fuzz-window <name>] flag value into a [sector_map_override] by
+    looking up the named window in {!Scenario_lib.Smoke_catalog.all}. Exits 1
+    with a friendly error if the name doesn't match any catalog entry — that way
+    a typo surfaces immediately, not after the universe is already loaded. *)
+let _resolve_fuzz_window_override name =
+  match
+    List.find Scenario_lib.Smoke_catalog.all
+      ~f:(fun (w : Scenario_lib.Smoke_catalog.window) ->
+        String.equal w.name name)
+  with
+  | Some window ->
+      let fixtures_root = Scenario_lib.Fixtures_root.resolve () in
+      _smoke_window_sector_map ~fixtures_root window
+  | None ->
+      let known =
+        List.map Scenario_lib.Smoke_catalog.all
+          ~f:(fun (w : Scenario_lib.Smoke_catalog.window) -> w.name)
+        |> String.concat ~sep:", "
+      in
+      eprintf "Error: unknown --fuzz-window %S (known: %s)\n" name known;
+      Stdlib.exit 1
+
 (** Convert one fuzz variant into the (start_date, overrides) pair the
     per-variant run consumes. Date variants substitute the start_date; numeric
     variants are encoded as a partial-config sexp via {!Config_override} and
@@ -276,8 +307,12 @@ let _resolve_fuzz_variant ~base_start_date ~base_overrides
     already includes any [--shared-override] entries appended at the call site)
     is passed unchanged to every variant — fuzz-mode treats override and
     shared_override identically since there's no baseline to differentiate them.
-*)
-let _fuzz_run ~start_date ~end_date ~overrides ~output_root ~fuzz_spec_raw () =
+
+    [sector_map_override], when supplied (via [--fuzz-window <name>]), replaces
+    the default sector map for {b every} variant — same trick smoke mode uses to
+    keep the run inside the dev-container memory budget. *)
+let _fuzz_run ~start_date ~end_date ~overrides ~output_root ~fuzz_spec_raw
+    ?sector_map_override () =
   let fuzz_spec =
     match Backtest.Fuzz_spec.parse fuzz_spec_raw with
     | Ok spec -> spec
@@ -300,7 +335,7 @@ let _fuzz_run ~start_date ~end_date ~overrides ~output_root ~fuzz_spec_raw () =
         eprintf "[fuzz %d/%d] %s = %s\n%!" v.index n v.key_path v.label;
         let result =
           _run_and_write ~start_date:v_start ~end_date ~overrides:v_overrides
-            ~output_dir:variant_dir ()
+            ~output_dir:variant_dir ?sector_map_override ()
         in
         (v.label, result.summary))
   in
@@ -387,12 +422,24 @@ let () =
         _resolve_dates_for_fuzz ~start_date_raw:parsed.start_date
           ~end_date_raw:parsed.end_date
       in
+      let sector_map_override =
+        match parsed.fuzz_window with
+        | Some name -> _resolve_fuzz_window_override name
+        | None ->
+            eprintf
+              "[fuzz] WARNING: --fuzz-window not set; loading the full \
+               sector-map. This OOMs the 8 GB dev container at panel-load. \
+               Pass --fuzz-window <bull|crash|recovery> to constrain to the \
+               sp500 universe (~491 symbols).\n\
+               %!";
+            None
+      in
       (* Fuzz mode treats override and shared_override identically — there's
          no baseline to differentiate them, so flatten both into the per-variant
          override list. *)
       _fuzz_run ~start_date ~end_date
         ~overrides:(shared_overrides @ overrides)
-        ~output_root ~fuzz_spec_raw ()
+        ~output_root ~fuzz_spec_raw ?sector_map_override ()
   | None, true, _ ->
       _smoke_run ~shared_overrides ~overrides ~output_root
         ~baseline:parsed.baseline ()

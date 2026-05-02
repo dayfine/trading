@@ -72,6 +72,19 @@ type t = {
           markdown alongside the per-variant subdirs. The string is stored
           verbatim — interpretation is the executable's job. Mutually exclusive
           with [--baseline] and [--smoke] (validated at parse time). *)
+  fuzz_window : string option;
+      (** [Some name] when [--fuzz-window <bull|crash|recovery>] was passed.
+          Only meaningful in fuzz mode: the runner resolves the named window in
+          {!Scenario_lib.Smoke_catalog} and uses its [universe_path] to build a
+          [sector_map_override] for every variant — the same trick smoke mode
+          uses to keep the run inside the 8 GB dev-container memory budget
+          (avoids loading the full ~10K-symbol [sectors.csv]).
+
+          The window's start/end dates are {b not} substituted into fuzz
+          variants — only the universe is constrained. Fuzz date variants and
+          the positional [start_date] still drive the per-variant time range.
+
+          Validated at parse time: [--fuzz-window] requires [--fuzz]. *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 
@@ -81,8 +94,9 @@ val parse : string list -> t Status.status_or
 
     Returns [Error status] (with [Status.code = Invalid_argument]) on any
     parsing problem (missing flag value, missing required positional, too many
-    positionals, [--baseline]/[--smoke]/[--fuzz] without [--experiment-name], or
-    [--fuzz] combined with [--baseline] or [--smoke]).
+    positionals, [--baseline]/[--smoke]/[--fuzz] without [--experiment-name],
+    [--fuzz] combined with [--baseline] or [--smoke], or [--fuzz-window] without
+    [--fuzz]).
 
     Override strings are NOT validated here — the executable runs them through
     [Backtest.Config_override.parse] / [Sexp.of_string] downstream and surfaces
