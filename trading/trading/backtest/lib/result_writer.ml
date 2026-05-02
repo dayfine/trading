@@ -102,7 +102,28 @@ let _side_label = function
   | Trading_base.Types.Buy -> "LONG"
   | Trading_base.Types.Sell -> "SHORT"
 
-let _write_trade_row oc stop_index force_liq_index (t : Metrics.trade_metrics) =
+let _trades_csv_header =
+  let base =
+    [
+      "symbol";
+      "side";
+      "entry_date";
+      "exit_date";
+      "days_held";
+      "entry_price";
+      "exit_price";
+      "quantity";
+      "pnl_dollars";
+      "pnl_percent";
+      "entry_stop";
+      "exit_stop";
+      "exit_trigger";
+    ]
+  in
+  String.concat ~sep:"," (base @ Trade_context.csv_header_fields)
+
+let _write_trade_row oc stop_index force_liq_index ~audit ~stop_infos
+    (t : Metrics.trade_metrics) =
   let info = _pop_stop_info stop_index ~symbol:t.symbol in
   let entry_stop, exit_stop, base_exit_trigger = _stop_fields info in
   let force_liq_key = t.symbol ^ "|" ^ Date.to_string t.exit_date in
@@ -111,26 +132,38 @@ let _write_trade_row oc stop_index force_liq_index (t : Metrics.trade_metrics) =
     | Some reason -> _force_liq_label reason
     | None -> base_exit_trigger
   in
-  fprintf oc "%s,%s,%s,%s,%d,%.2f,%.2f,%.0f,%.2f,%.2f,%s,%s,%s\n" t.symbol
-    (_side_label t.side)
-    (Date.to_string t.entry_date)
-    (Date.to_string t.exit_date)
-    t.days_held t.entry_price t.exit_price t.quantity t.pnl_dollars
-    t.pnl_percent entry_stop exit_stop exit_trigger
+  let ctx = Trade_context.of_audit_and_stop_log ~audit ~stop_infos ~trade:t in
+  let base_cells =
+    [
+      t.symbol;
+      _side_label t.side;
+      Date.to_string t.entry_date;
+      Date.to_string t.exit_date;
+      Int.to_string t.days_held;
+      sprintf "%.2f" t.entry_price;
+      sprintf "%.2f" t.exit_price;
+      sprintf "%.0f" t.quantity;
+      sprintf "%.2f" t.pnl_dollars;
+      sprintf "%.2f" t.pnl_percent;
+      entry_stop;
+      exit_stop;
+      exit_trigger;
+    ]
+  in
+  let cells = base_cells @ Trade_context.csv_row_fields ctx in
+  fprintf oc "%s\n" (String.concat ~sep:"," cells)
 
 let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
     ~(stop_infos : Stop_log.stop_info list)
+    ~(audit : Trade_audit.audit_record list)
     ~(force_liquidations : Portfolio_risk.Force_liquidation.event list) =
   let path = output_dir ^ "/trades.csv" in
   let oc = Out_channel.create path in
-  let header =
-    "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,"
-    ^ "quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger"
-  in
-  fprintf oc "%s\n" header;
+  fprintf oc "%s\n" _trades_csv_header;
   let stop_index = ref (_build_stop_index stop_infos) in
   let force_liq_index = _build_force_liq_index force_liquidations in
-  List.iter round_trips ~f:(_write_trade_row oc stop_index force_liq_index);
+  List.iter round_trips
+    ~f:(_write_trade_row oc stop_index force_liq_index ~audit ~stop_infos);
   Out_channel.close oc
 
 let _write_equity_curve ~output_dir
@@ -306,7 +339,8 @@ let write ~output_dir (result : Runner.result) =
     (output_dir ^ "/summary.sexp")
     (Summary.sexp_of_t result.summary);
   _write_trades ~output_dir ~round_trips:result.round_trips
-    ~stop_infos:result.stop_infos ~force_liquidations:result.force_liquidations;
+    ~stop_infos:result.stop_infos ~audit:result.audit
+    ~force_liquidations:result.force_liquidations;
   _write_equity_curve ~output_dir ~steps:result.steps;
   _write_trade_audit ~output_dir ~audit:result.audit
     ~cascade_summaries:result.cascade_summaries;

@@ -523,6 +523,91 @@ let test_unset_current_date_leaves_entry_date_none _ =
     (elements_are
        [ field (fun (i : Backtest.Stop_log.stop_info) -> i.entry_date) is_none ])
 
+(* classify_stop_trigger_kind ------------------------------------------- *)
+
+let test_classify_long_stop_no_gap_is_intraday _ =
+  let trigger : Backtest.Stop_log.exit_trigger =
+    Stop_loss { stop_price = 100.0; actual_price = 99.99 }
+  in
+  let kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Long
+      trigger
+  in
+  assert_that kind (equal_to Backtest.Stop_log.Intraday)
+
+let test_classify_long_stop_with_gap_is_gap_down _ =
+  let trigger : Backtest.Stop_log.exit_trigger =
+    Stop_loss { stop_price = 100.0; actual_price = 90.0 }
+  in
+  let kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Long
+      trigger
+  in
+  assert_that kind (equal_to Backtest.Stop_log.Gap_down)
+
+let test_classify_short_stop_with_gap_is_gap_down _ =
+  let trigger : Backtest.Stop_log.exit_trigger =
+    Stop_loss { stop_price = 100.0; actual_price = 110.0 }
+  in
+  let kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Short
+      trigger
+  in
+  assert_that kind (equal_to Backtest.Stop_log.Gap_down)
+
+let test_classify_short_stop_no_gap_is_intraday _ =
+  let trigger : Backtest.Stop_log.exit_trigger =
+    Stop_loss { stop_price = 100.0; actual_price = 100.10 }
+  in
+  let kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Short
+      trigger
+  in
+  assert_that kind (equal_to Backtest.Stop_log.Intraday)
+
+let test_classify_end_of_period_passes_through _ =
+  let kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Long
+      Backtest.Stop_log.End_of_period
+  in
+  assert_that kind (equal_to Backtest.Stop_log.End_of_period)
+
+let test_classify_take_profit_is_non_stop_exit _ =
+  let trigger : Backtest.Stop_log.exit_trigger =
+    Take_profit { target_price = 110.0; actual_price = 110.0 }
+  in
+  let kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Long
+      trigger
+  in
+  assert_that kind (equal_to Backtest.Stop_log.Non_stop_exit)
+
+let test_classify_signal_reversal_is_non_stop_exit _ =
+  let trigger : Backtest.Stop_log.exit_trigger =
+    Signal_reversal { description = "Stage 4" }
+  in
+  let kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Long
+      trigger
+  in
+  assert_that kind (equal_to Backtest.Stop_log.Non_stop_exit)
+
+let test_classify_custom_threshold_changes_classification _ =
+  let trigger : Backtest.Stop_log.exit_trigger =
+    Stop_loss { stop_price = 100.0; actual_price = 99.95 }
+  in
+  let default_kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~side:Trading_base.Types.Long
+      trigger
+  in
+  let strict_kind =
+    Backtest.Stop_log.classify_stop_trigger_kind ~gap_threshold_pct:0.0001
+      ~side:Trading_base.Types.Long trigger
+  in
+  assert_that
+    (default_kind, strict_kind)
+    (equal_to (Backtest.Stop_log.Intraday, Backtest.Stop_log.Gap_down))
+
 let suite =
   "Stop_log"
   >::: [
@@ -542,6 +627,22 @@ let suite =
          >:: test_set_current_date_stamps_entry_date;
          "unset current_date leaves entry_date None"
          >:: test_unset_current_date_leaves_entry_date_none;
+         "classify long stop no gap = Intraday"
+         >:: test_classify_long_stop_no_gap_is_intraday;
+         "classify long stop with gap = Gap_down"
+         >:: test_classify_long_stop_with_gap_is_gap_down;
+         "classify short stop with gap = Gap_down"
+         >:: test_classify_short_stop_with_gap_is_gap_down;
+         "classify short stop no gap = Intraday"
+         >:: test_classify_short_stop_no_gap_is_intraday;
+         "classify End_of_period passes through"
+         >:: test_classify_end_of_period_passes_through;
+         "classify take_profit = Non_stop_exit"
+         >:: test_classify_take_profit_is_non_stop_exit;
+         "classify signal_reversal = Non_stop_exit"
+         >:: test_classify_signal_reversal_is_non_stop_exit;
+         "classify custom threshold changes outcome"
+         >:: test_classify_custom_threshold_changes_classification;
        ]
 
 let () = run_test_tt_main suite

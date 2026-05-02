@@ -29,6 +29,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     ?(ma_direction = Weinstein_types.Rising) ?(ma_slope_pct = 0.018)
     ?(rs_trend = Some Weinstein_types.Positive_rising) ?(rs_value = Some 1.05)
     ?(volume_quality = Some (Weinstein_types.Strong 2.4))
+    ?(volume_ratio = Some 2.4)
     ?(resistance_quality = Some Weinstein_types.Clean)
     ?(support_quality = Some Weinstein_types.Clean)
     ?(sector_name = "Information Technology") ?(sector_rating = Screener.Strong)
@@ -59,6 +60,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     rs_trend;
     rs_value;
     volume_quality;
+    volume_ratio;
     resistance_quality;
     support_quality;
     sector_name;

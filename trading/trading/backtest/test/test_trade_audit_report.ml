@@ -56,6 +56,7 @@ let make_entry_decision ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     rs_trend;
     rs_value = Some 1.05;
     volume_quality = Some (Weinstein_types.Strong 2.4);
+    volume_ratio = Some 2.4;
     resistance_quality = Some Weinstein_types.Clean;
     support_quality = Some Weinstein_types.Clean;
     sector_name = "Information Technology";
@@ -502,9 +503,12 @@ let test_load_missing_trades_csv_raises _ =
    schema drift on either side fails the parser tests below loudly. The legacy
    12-column tests above continue to exercise the fallback parser branch. *)
 
-(** Mirror of [Backtest.Result_writer._write_trades]'s post-G2 header. *)
+(** Mirror of [Backtest.Result_writer._write_trades]'s post-G2 header. M5.2e
+    adds 6 trailing per-trade context columns (entry_stage, entry_volume_ratio,
+    stop_initial_distance_pct, stop_trigger_kind, days_to_first_stop_trigger,
+    screener_score_at_entry). *)
 let _canonical_post_g2_header =
-  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger"
+  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry"
 
 (* AAPL LONG round-trip: bought at 280, sold at 404, +12 400 / +44.20%. *)
 let _post_g2_long_row =

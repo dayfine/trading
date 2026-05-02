@@ -367,64 +367,36 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
     pnl_percent = Float.of_string pnl_percent;
   }
 
-(** Match a post-G2 row layout (13 columns; [side] = [LONG]/[SHORT]). *)
+(** Match a post-G2 row layout (≥13 columns; [side] = [LONG]/[SHORT]). The head
+    13 columns carry the canonical metrics + side + stop columns; trailing
+    columns (added by M5.2e: entry_stage, entry_volume_ratio,
+    stop_initial_distance_pct, stop_trigger_kind, days_to_first_stop_trigger,
+    screener_score_at_entry; and by future schema additions) are tolerated and
+    ignored — this loader only consumes the round-trip P&L columns required by
+    [Trade_audit_report]. *)
 let _match_post_g2_csv_row cells :
     Trading_simulation.Metrics.trade_metrics option =
   match cells with
-  | [
-      symbol;
-      ("LONG" as side);
-      entry_date;
-      exit_date;
-      days_held;
-      entry_price;
-      exit_price;
-      quantity;
-      pnl_dollars;
-      pnl_percent;
-      _entry_stop;
-      _exit_stop;
-      _exit_trigger;
-    ]
-  | [
-      symbol;
-      ("SHORT" as side);
-      entry_date;
-      exit_date;
-      days_held;
-      entry_price;
-      exit_price;
-      quantity;
-      pnl_dollars;
-      pnl_percent;
-      _entry_stop;
-      _exit_stop;
-      _exit_trigger;
-    ] ->
+  | symbol
+    :: (("LONG" | "SHORT") as side)
+    :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
+    :: quantity :: pnl_dollars :: pnl_percent :: _entry_stop :: _exit_stop
+    :: _exit_trigger :: _rest ->
       Some
         (_trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date
            ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
            ~pnl_percent)
   | _ -> None
 
-(** Match a legacy (pre-G2) 12-column row layout. Defaults [side] to [Buy]. *)
+(** Match a legacy (pre-G2) row layout — leading 12 columns with no [side];
+    trailing columns ignored for the same forward-compat reason as the post-G2
+    matcher. Defaults [side] to [Buy]. *)
 let _match_legacy_csv_row cells :
     Trading_simulation.Metrics.trade_metrics option =
   match cells with
-  | [
-   symbol;
-   entry_date;
-   exit_date;
-   days_held;
-   entry_price;
-   exit_price;
-   quantity;
-   pnl_dollars;
-   pnl_percent;
-   _entry_stop;
-   _exit_stop;
-   _exit_trigger;
-  ] ->
+  | symbol :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
+    :: quantity :: pnl_dollars :: pnl_percent :: _entry_stop :: _exit_stop
+    :: _exit_trigger :: _rest ->
       Some
         (_trade_metrics_of_strings ~symbol ~side:"LONG" ~entry_date ~exit_date
            ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars

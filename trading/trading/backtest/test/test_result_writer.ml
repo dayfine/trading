@@ -524,6 +524,218 @@ let test_splits_csv_empty_writes_header_only _ =
       assert_that rows (elements_are []))
 
 (* ------------------------------------------------------------------ *)
+(* M5.2e — per-trade context columns in trades.csv                       *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a minimal entry_decision with a Stage2 entry, volume_ratio 2.4,
+    suggested_entry/installed_stop separated by 8% and cascade_score 75. Used by
+    the M5.2e tests below to drive {!Trade_context.of_audit_and_stop_log} via
+    {!Result_writer.write}. *)
+let _m5_2e_entry ~symbol ~entry_date ~position_id :
+    Backtest.Trade_audit.entry_decision =
+  {
+    symbol;
+    entry_date;
+    position_id;
+    macro_trend = Weinstein_types.Bullish;
+    macro_confidence = 0.72;
+    macro_indicators = [];
+    stage = Weinstein_types.Stage2 { weeks_advancing = 4; late = false };
+    ma_direction = Weinstein_types.Rising;
+    ma_slope_pct = 0.018;
+    rs_trend = Some Weinstein_types.Positive_rising;
+    rs_value = Some 1.05;
+    volume_quality = Some (Weinstein_types.Strong 2.4);
+    volume_ratio = Some 2.4;
+    resistance_quality = Some Weinstein_types.Clean;
+    support_quality = Some Weinstein_types.Clean;
+    sector_name = "Tech";
+    sector_rating = Screener.Strong;
+    cascade_score = 75;
+    cascade_grade = Weinstein_types.A;
+    cascade_score_components = [];
+    cascade_rationale = [];
+    side = Trading_base.Types.Long;
+    suggested_entry = 100.0;
+    suggested_stop = 92.0;
+    installed_stop = 92.0;
+    stop_floor_kind = Backtest.Trade_audit.Buffer_fallback;
+    risk_pct = 0.08;
+    initial_position_value = 10_000.0;
+    initial_risk_dollars = 800.0;
+    alternatives_considered = [];
+  }
+
+(** Header row for trades.csv ends with the M5.2e per-trade context column names
+    in canonical order. Pins schema drift on the writer side. *)
+let test_trades_csv_header_includes_m5_2e_columns _ =
+  let trade =
+    _make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-02")
+      ~exit_date:(_date "2024-04-29") ()
+  in
+  let result = _make_result ~round_trips:[ trade ] ~force_liquidations:[] () in
+  _with_writer_output ~result ~prefix:"/tmp/result_writer_m5_2e_header_"
+    (fun dir ->
+      let header, _rows = _read_trades_csv ~output_dir:dir in
+      assert_that header
+        (all_of
+           [
+             field
+               (fun cells -> List.exists cells ~f:(String.equal "entry_stage"))
+               (equal_to true);
+             field
+               (fun cells ->
+                 List.exists cells ~f:(String.equal "entry_volume_ratio"))
+               (equal_to true);
+             field
+               (fun cells ->
+                 List.exists cells ~f:(String.equal "stop_initial_distance_pct"))
+               (equal_to true);
+             field
+               (fun cells ->
+                 List.exists cells ~f:(String.equal "stop_trigger_kind"))
+               (equal_to true);
+             field
+               (fun cells ->
+                 List.exists cells
+                   ~f:(String.equal "days_to_first_stop_trigger"))
+               (equal_to true);
+             field
+               (fun cells ->
+                 List.exists cells ~f:(String.equal "screener_score_at_entry"))
+               (equal_to true);
+           ]))
+
+(** Look up the index of [name] in [header]; assert_failure if missing. *)
+let _col_idx header ~name =
+  match List.findi header ~f:(fun _ n -> String.equal n name) with
+  | Some (i, _) -> i
+  | None -> assert_failure ("column not present: " ^ name)
+
+(** With matching audit + stop_log, the 6 trailing context columns populate with
+    the canonical values: Stage2 / 2.4000 / 0.0800 / intraday / 117 / 75. Pins
+    the join + formatting end-to-end through Result_writer.write. *)
+let test_trades_csv_populates_context_from_audit_and_stop_log _ =
+  let entry_date = _date "2024-01-02" in
+  let exit_date = _date "2024-04-29" in
+  let trade = _make_trade ~symbol:"AAPL" ~entry_date ~exit_date () in
+  let entry =
+    _m5_2e_entry ~symbol:"AAPL" ~entry_date ~position_id:"AAPL-wein-1"
+  in
+  let audit : Backtest.Trade_audit.audit_record list =
+    [ { entry; exit_ = None } ]
+  in
+  let stop_info : Backtest.Stop_log.stop_info =
+    {
+      position_id = "AAPL-wein-1";
+      symbol = "AAPL";
+      entry_date = Some entry_date;
+      entry_stop = Some 92.0;
+      exit_stop = Some 92.0;
+      exit_trigger =
+        Some
+          (Backtest.Stop_log.Stop_loss
+             { stop_price = 92.0; actual_price = 91.99 });
+    }
+  in
+  let result : Backtest.Runner.result =
+    {
+      summary = _empty_summary ~start_date:entry_date ~end_date:exit_date;
+      round_trips = [ trade ];
+      steps = [];
+      overrides = [];
+      stop_infos = [ stop_info ];
+      audit;
+      cascade_summaries = [];
+      force_liquidations = [];
+      final_prices = [];
+      universe = [];
+    }
+  in
+  _with_writer_output ~result ~prefix:"/tmp/result_writer_m5_2e_row_"
+    (fun dir ->
+      let header, rows = _read_trades_csv ~output_dir:dir in
+      let stage_idx = _col_idx header ~name:"entry_stage" in
+      let volratio_idx = _col_idx header ~name:"entry_volume_ratio" in
+      let stopdist_idx = _col_idx header ~name:"stop_initial_distance_pct" in
+      let triggerkind_idx = _col_idx header ~name:"stop_trigger_kind" in
+      let days_idx = _col_idx header ~name:"days_to_first_stop_trigger" in
+      let score_idx = _col_idx header ~name:"screener_score_at_entry" in
+      assert_that rows
+        (elements_are
+           [
+             all_of
+               [
+                 field
+                   (fun cols -> List.nth_exn cols stage_idx)
+                   (equal_to "Stage2");
+                 field
+                   (fun cols -> List.nth_exn cols volratio_idx)
+                   (equal_to "2.4000");
+                 field
+                   (fun cols -> List.nth_exn cols stopdist_idx)
+                   (equal_to "0.0800");
+                 field
+                   (fun cols -> List.nth_exn cols triggerkind_idx)
+                   (equal_to "intraday");
+                 field
+                   (fun cols -> List.nth_exn cols days_idx)
+                   (equal_to (Int.to_string (Date.diff exit_date entry_date)));
+                 field (fun cols -> List.nth_exn cols score_idx) (equal_to "75");
+               ];
+           ]))
+
+(** Without an audit record, the audit-derived context cells render as empty
+    strings — no entry_stage label, no entry_volume_ratio, no
+    stop_initial_distance_pct, no screener_score_at_entry. Stop_log-derived
+    cells (stop_trigger_kind, days_to_first_stop_trigger) still populate. *)
+let test_trades_csv_context_falls_back_to_empty_when_no_audit _ =
+  let entry_date = _date "2024-01-02" in
+  let exit_date = _date "2024-04-29" in
+  let trade = _make_trade ~symbol:"AAPL" ~entry_date ~exit_date () in
+  let stop_info : Backtest.Stop_log.stop_info =
+    {
+      position_id = "AAPL-wein-1";
+      symbol = "AAPL";
+      entry_date = Some entry_date;
+      entry_stop = Some 92.0;
+      exit_stop = Some 92.0;
+      exit_trigger =
+        Some
+          (Backtest.Stop_log.Stop_loss
+             { stop_price = 92.0; actual_price = 91.99 });
+    }
+  in
+  let result =
+    _make_result ~round_trips:[ trade ] ~force_liquidations:[]
+      ~stop_infos:[ stop_info ] ()
+  in
+  _with_writer_output ~result ~prefix:"/tmp/result_writer_m5_2e_noaudit_"
+    (fun dir ->
+      let header, rows = _read_trades_csv ~output_dir:dir in
+      let stage_idx = _col_idx header ~name:"entry_stage" in
+      let volratio_idx = _col_idx header ~name:"entry_volume_ratio" in
+      let triggerkind_idx = _col_idx header ~name:"stop_trigger_kind" in
+      let days_idx = _col_idx header ~name:"days_to_first_stop_trigger" in
+      assert_that rows
+        (elements_are
+           [
+             all_of
+               [
+                 field (fun cols -> List.nth_exn cols stage_idx) (equal_to "");
+                 field
+                   (fun cols -> List.nth_exn cols volratio_idx)
+                   (equal_to "");
+                 field
+                   (fun cols -> List.nth_exn cols triggerkind_idx)
+                   (equal_to "intraday");
+                 field
+                   (fun cols -> List.nth_exn cols days_idx)
+                   (equal_to (Int.to_string (Date.diff exit_date entry_date)));
+               ];
+           ]))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -549,6 +761,12 @@ let suite =
          "splits.csv header and rows" >:: test_splits_csv_header_and_rows;
          "splits.csv empty writes header only"
          >:: test_splits_csv_empty_writes_header_only;
+         "trades.csv header includes M5.2e columns"
+         >:: test_trades_csv_header_includes_m5_2e_columns;
+         "trades.csv populates context from audit + stop_log"
+         >:: test_trades_csv_populates_context_from_audit_and_stop_log;
+         "trades.csv context falls back to empty when no audit"
+         >:: test_trades_csv_context_falls_back_to_empty_when_no_audit;
        ]
 
 let () = run_test_tt_main suite

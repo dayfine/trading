@@ -41,6 +41,7 @@ type entry_decision = {
   rs_trend : Weinstein_types.rs_trend option;
   rs_value : float option;
   volume_quality : Weinstein_types.volume_confirmation option;
+  volume_ratio : float option;
   resistance_quality : Weinstein_types.overhead_quality option;
   support_quality : Weinstein_types.overhead_quality option;
   sector_name : string;
