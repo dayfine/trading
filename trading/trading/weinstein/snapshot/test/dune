@@ -1,5 +1,5 @@
 (tests
- (names test_round_trip)
+ (names test_round_trip test_forward_trace)
  (libraries
   weinstein_trading.snapshot
   status
@@ -7,6 +7,7 @@
   core_unix
   core_unix.filename_unix
   ounit2
-  matchers)
+  matchers
+  types)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
