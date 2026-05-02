@@ -65,14 +65,9 @@ let test_parse_lowercase_suffix _ =
     (is_ok_and_holds
        (equal_to ({ ticker = "barc"; exchange = LSE } : parsed_symbol)))
 
-let test_parse_unknown_suffix _ =
-  assert_that (parse "FOO.XYZ") is_error
-
-let test_parse_empty_string _ =
-  assert_that (parse "") is_error
-
-let test_parse_empty_ticker _ =
-  assert_that (parse ".US") is_error
+let test_parse_unknown_suffix _ = assert_that (parse "FOO.XYZ") is_error
+let test_parse_empty_string _ = assert_that (parse "") is_error
+let test_parse_empty_ticker _ = assert_that (parse ".US") is_error
 
 (* --- canonical EODHD codes --- *)
 
@@ -90,7 +85,9 @@ let test_to_eodhd_code _ =
        ])
 
 let test_to_eodhd_symbol_round_trip _ =
-  let inputs = [ "AAPL.US"; "BARC.LSE"; "7203.TSE"; "BHP.AU"; "0700.HK"; "RY.TO" ] in
+  let inputs =
+    [ "AAPL.US"; "BARC.LSE"; "7203.TSE"; "BHP.AU"; "0700.HK"; "RY.TO" ]
+  in
   let round_tripped =
     List.map inputs ~f:(fun s ->
         match parse s with
@@ -167,7 +164,8 @@ let suite =
          "parse_empty_ticker" >:: test_parse_empty_ticker;
          "to_eodhd_code" >:: test_to_eodhd_code;
          "to_eodhd_symbol_round_trip" >:: test_to_eodhd_symbol_round_trip;
-         "to_eodhd_symbol_normalizes_alias" >:: test_to_eodhd_symbol_normalizes_alias;
+         "to_eodhd_symbol_normalizes_alias"
+         >:: test_to_eodhd_symbol_normalizes_alias;
          "currency_per_exchange" >:: test_currency_per_exchange;
          "calendar_per_exchange" >:: test_calendar_per_exchange;
          "all_distinct" >:: test_all_distinct;

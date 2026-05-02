@@ -1,16 +1,16 @@
-(** Stubbed multi-market integration test for the M7.0 Track 2 EODHD
-    expansion (LSE, TSE, ASX, HKEX, TSX).
+(** Stubbed multi-market integration test for the M7.0 Track 2 EODHD expansion
+    (LSE, TSE, ASX, HKEX, TSX).
 
-    Each case parses a market-suffixed symbol via {!Exchange_resolver},
-    drives {!Http_client.get_historical_price} with the canonical EODHD
-    symbol, and asserts:
+    Each case parses a market-suffixed symbol via {!Exchange_resolver}, drives
+    {!Http_client.get_historical_price} with the canonical EODHD symbol, and
+    asserts:
 
     - the request URL embeds the canonical [TICKER.SUFFIX];
     - the parsed price bars round-trip cleanly (3 rows, plausible OHLC);
     - the currency tag from the resolver matches expectations.
 
-    No network is involved — the fetch function is a fixture stub that
-    reads the same shared price JSON used by [test_http_client.ml]. *)
+    No network is involved — the fetch function is a fixture stub that reads the
+    same shared price JSON used by [test_http_client.ml]. *)
 
 open Core
 open Async
@@ -19,14 +19,13 @@ open Matchers
 open Eodhd
 
 let _make_stub ~expected_symbol_suffix =
-  fun uri ->
-    let uri_str = Uri.to_string uri in
-    assert_bool
-      (Printf.sprintf "URI should embed %S, got %S" expected_symbol_suffix
-         uri_str)
-      (String.is_substring uri_str ~substring:expected_symbol_suffix);
-    let body = In_channel.read_all "./data/get_historical_price.json" in
-    Deferred.return (Ok body)
+ fun uri ->
+  let uri_str = Uri.to_string uri in
+  assert_bool
+    (Printf.sprintf "URI should embed %S, got %S" expected_symbol_suffix uri_str)
+    (String.is_substring uri_str ~substring:expected_symbol_suffix);
+  let body = In_channel.read_all "./data/get_historical_price.json" in
+  Deferred.return (Ok body)
 
 let _params_for symbol : Http_client.historical_price_params =
   {
@@ -89,8 +88,8 @@ let _check_market ~input_symbol ~expected_exchange ~expected_currency =
     (is_ok_and_holds (all_of [ size_is 3; each _bar_is_plausible ]))
 
 let test_lse _ =
-  _check_market ~input_symbol:"BARC.LSE" ~expected_exchange:Exchange_resolver.LSE
-    ~expected_currency:"GBP"
+  _check_market ~input_symbol:"BARC.LSE"
+    ~expected_exchange:Exchange_resolver.LSE ~expected_currency:"GBP"
 
 let test_tse _ =
   _check_market ~input_symbol:"7203.T" ~expected_exchange:Exchange_resolver.TSE

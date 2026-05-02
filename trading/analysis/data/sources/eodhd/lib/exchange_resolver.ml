@@ -1,7 +1,9 @@
 open Core
 
 type exchange = US | LSE | TSE | ASX | HKEX | TSX [@@deriving show, eq]
-type parsed_symbol = { ticker : string; exchange : exchange } [@@deriving show, eq]
+
+type parsed_symbol = { ticker : string; exchange : exchange }
+[@@deriving show, eq]
 
 let all = [ US; LSE; TSE; ASX; HKEX; TSX ]
 
@@ -56,7 +58,8 @@ let _split_on_last_dot s =
   | None -> (s, None)
 
 let _resolve_explicit_suffix ~raw suffix =
-  Result.of_option (_exchange_of_suffix suffix)
+  Result.of_option
+    (_exchange_of_suffix suffix)
     ~error:
       (Status.invalid_argument_error
          (Printf.sprintf "Unknown exchange suffix %S in symbol %S" suffix raw))
@@ -83,5 +86,4 @@ let parse raw =
   let%bind exchange = _resolve_suffix ~raw suffix_opt in
   Ok { ticker; exchange }
 
-let to_eodhd_symbol { ticker; exchange } =
-  ticker ^ "." ^ to_eodhd_code exchange
+let to_eodhd_symbol { ticker; exchange } = ticker ^ "." ^ to_eodhd_code exchange
