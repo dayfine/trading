@@ -14,24 +14,28 @@
     {1 Baseline-comparison mode}
 
     [backtest_runner <start_date> [end_date] --baseline --experiment-name <name>
-     --override <arg> ...]
+     [--shared-override <arg> ...] [--override <arg> ...]]
 
-    Runs twice — once with the overrides ([variant/] subdir) and once without
-    ([baseline/] subdir) — then writes [comparison.sexp] + [comparison.md] at
-    the experiment root with per-metric deltas.
+    Runs twice — once with the variant overrides ([variant/] subdir) and once
+    without ([baseline/] subdir) — then writes [comparison.sexp] +
+    [comparison.md] at the experiment root with per-metric deltas. Any
+    [--shared-override] flags apply to {b both} runs.
 
     {1 Smoke mode}
 
-    [backtest_runner --smoke --experiment-name <name> [--override <arg>] ...
-     [--baseline]]
+    [backtest_runner --smoke --experiment-name <name> [--shared-override <arg>
+     ...] [--override <arg> ...] [--baseline]]
 
     Runs each window in {!Scenario_lib.Smoke_catalog.all} (Bull / Crash /
     Recovery), writing results under [dev/experiments/<name>/<window-name>/].
-    Composes with [--baseline] for per-window comparisons.
+    Composes with [--baseline] for per-window comparisons. Each window's
+    [universe_path] (sp500 by default; see {!Scenario_lib.Smoke_catalog})
+    constrains the loaded universe so the run fits inside the dev container's
+    memory budget.
 
-    {1 --override syntax}
+    {1 --override vs. --shared-override}
 
-    Two forms accepted, freely composable:
+    Both flags accept the same syntax, freely composable:
     - {b Key-path}: [stops_config.initial_stop_buffer=1.05] — ergonomic,
       dispatched via {!Backtest.Config_override}.
     - {b Raw sexp}: [((stops_config ((initial_stop_buffer 1.05))))] — legacy,
@@ -40,14 +44,21 @@
     The runner converts both forms to the [Sexp.t list] that
     [Backtest.Runner._apply_overrides] already deep-merges into the default
     {!Weinstein_strategy.config}. Overrides apply to exactly the named field;
-    every other config value comes from the default. *)
+    every other config value comes from the default.
+
+    Mode-dependent semantics:
+    - [--override] applies to the (single / variant / each-window) run; in
+      [--baseline] mode it does NOT apply to the baseline.
+    - [--shared-override] applies to BOTH runs in [--baseline] mode (e.g.
+      [universe_cap=500] to cap memory for both legs of the A/B). Outside
+      [--baseline], shared overrides are equivalent to [--override]. *)
 
 open Core
 
 let _usage_msg =
-  "Usage: backtest_runner <start_date> [end_date] [--override <arg>] [--trace \
-   <path>] [--memtrace <path>] [--gc-trace <path>] [--baseline] [--smoke] \
-   [--experiment-name <name>]"
+  "Usage: backtest_runner <start_date> [end_date] [--override <arg>] \
+   [--shared-override <arg>] [--trace <path>] [--memtrace <path>] [--gc-trace \
+   <path>] [--baseline] [--smoke] [--experiment-name <name>]"
 
 (** Convert each raw [--override <arg>] string into the partial-config sexp the
     runner deep-merges. Routes key-path strings through
@@ -133,11 +144,15 @@ let _start_memtrace ~path =
     side-effecting work (trace + memtrace + gc-trace plumbing) is folded in here
     so single-run / baseline / smoke modes all share the same per-run pipeline.
 
+    [sector_map_override], when supplied, replaces the sector map normally
+    loaded from [data/sectors.csv] — used by smoke mode to constrain each window
+    to the catalog's [universe_path]. See {!Backtest.Runner.run_backtest}.
+
     Returns the [Backtest.Runner.result] so callers (e.g. baseline mode) can
     feed both runs into [Backtest.Comparison.compute] without re-reading the
     summary from disk. *)
-let _run_and_write ~start_date ~end_date ~overrides ~output_dir ?trace_path
-    ?memtrace_path ?gc_trace_path () =
+let _run_and_write ~start_date ~end_date ~overrides ~output_dir
+    ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path () =
   Option.iter memtrace_path ~f:(fun path -> _start_memtrace ~path);
   let trace = Option.map trace_path ~f:(fun _ -> Backtest.Trace.create ()) in
   let gc_trace =
@@ -145,8 +160,8 @@ let _run_and_write ~start_date ~end_date ~overrides ~output_dir ?trace_path
   in
   Backtest.Gc_trace.record ?trace:gc_trace ~phase:"start" ();
   let result =
-    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides ?trace
-      ?gc_trace ()
+    Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
+      ?sector_map_override ?trace ?gc_trace ()
   in
   eprintf "Writing output to %s/\n%!" output_dir;
   Backtest.Result_writer.write ~output_dir result;
@@ -160,32 +175,43 @@ let _run_and_write ~start_date ~end_date ~overrides ~output_dir ?trace_path
 
 (** Single-run mode: one backtest, write to [output_dir], echo summary to
     stdout. This is the legacy code path (also reused by smoke mode for the
-    no-baseline case). *)
-let _single_run ~start_date ~end_date ~overrides ~output_dir ?trace_path
-    ?memtrace_path ?gc_trace_path () =
+    no-baseline case). [overrides] are pre-merged from [--shared-override] +
+    [--override] by the caller. *)
+let _single_run ~start_date ~end_date ~overrides ~output_dir
+    ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path () =
   let result =
-    _run_and_write ~start_date ~end_date ~overrides ~output_dir ?trace_path
-      ?memtrace_path ?gc_trace_path ()
+    _run_and_write ~start_date ~end_date ~overrides ~output_dir
+      ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path ()
   in
   Out_channel.output_string stdout
     (Sexp.to_string_hum (Backtest.Summary.sexp_of_t result.summary));
   Out_channel.newline stdout
 
-(** Baseline-comparison mode: run with [overrides] (variant) and again without
-    (baseline), then write [comparison.{sexp,md}] at [output_root]. *)
-let _baseline_run ~start_date ~end_date ~overrides ~output_root () =
+(** Baseline-comparison mode: run with [shared_overrides @ overrides] (variant)
+    and again with [shared_overrides] only (baseline), then write
+    [comparison.{sexp,md}] at [output_root]. The [shared_overrides] split is
+    what lets a caller cap the universe (or tweak any other env-shaping
+    parameter) for both legs of the A/B without contaminating the comparison
+    delta with the cap itself. *)
+let _baseline_run ~start_date ~end_date ~shared_overrides ~overrides
+    ~output_root ?sector_map_override () =
   let baseline_dir = Filename.concat output_root "baseline" in
   let variant_dir = Filename.concat output_root "variant" in
   Core_unix.mkdir_p baseline_dir;
   Core_unix.mkdir_p variant_dir;
-  eprintf "[baseline] running with default config...\n%!";
+  eprintf "[baseline] running with %d shared override(s)...\n%!"
+    (List.length shared_overrides);
   let baseline_result =
-    _run_and_write ~start_date ~end_date ~overrides:[] ~output_dir:baseline_dir
-      ()
+    _run_and_write ~start_date ~end_date ~overrides:shared_overrides
+      ~output_dir:baseline_dir ?sector_map_override ()
   in
-  eprintf "[variant] running with %d override(s)...\n%!" (List.length overrides);
+  eprintf "[variant] running with %d shared + %d variant override(s)...\n%!"
+    (List.length shared_overrides)
+    (List.length overrides);
   let variant_result =
-    _run_and_write ~start_date ~end_date ~overrides ~output_dir:variant_dir ()
+    _run_and_write ~start_date ~end_date
+      ~overrides:(shared_overrides @ overrides)
+      ~output_dir:variant_dir ?sector_map_override ()
   in
   let comparison =
     Backtest.Comparison.compute ~baseline:baseline_result.summary
@@ -197,23 +223,46 @@ let _baseline_run ~start_date ~end_date ~overrides ~output_root () =
   Backtest.Comparison.write_markdown ~output_path:md_path comparison;
   eprintf "Comparison written to: %s and %s\n%!" sexp_path md_path
 
+(** Resolve a smoke window's [universe_path] (relative to the fixtures root)
+    into a [sector_map_override] for {!Backtest.Runner.run_backtest}. Mirrors
+    the convention used by [scenario_runner.ml]: the path is documented as
+    relative to [TRADING_DATA_DIR/backtest_scenarios/], which is what
+    {!Scenario_lib.Fixtures_root.resolve} returns. *)
+let _smoke_window_sector_map ~fixtures_root
+    (window : Scenario_lib.Smoke_catalog.window) =
+  let resolved = Filename.concat fixtures_root window.universe_path in
+  Scenario_lib.Universe_file.to_sector_map_override
+    (Scenario_lib.Universe_file.load resolved)
+
 (** Smoke mode: loop over every window in {!Scenario_lib.Smoke_catalog.all},
     delegating to either [_single_run] or [_baseline_run] per window depending
-    on the [baseline] flag. Per-window subdirs sit under the experiment root. *)
-let _smoke_run ~overrides ~output_root ~baseline () =
+    on the [baseline] flag. Each window's [universe_path] is loaded into a
+    [sector_map_override] so the run stays inside the dev container's memory
+    budget rather than blowing up on the full ~10K-symbol [sectors.csv]. *)
+let _smoke_run ~shared_overrides ~overrides ~output_root ~baseline () =
+  let fixtures_root = Scenario_lib.Fixtures_root.resolve () in
   List.iter Scenario_lib.Smoke_catalog.all ~f:(fun window ->
       let window_dir = Filename.concat output_root window.name in
       Core_unix.mkdir_p window_dir;
-      eprintf "\n=== smoke window: %s (%s .. %s) — %s ===\n%!" window.name
+      let sector_map_override =
+        _smoke_window_sector_map ~fixtures_root window
+      in
+      let n_symbols =
+        Option.value_map sector_map_override ~default:0 ~f:Hashtbl.length
+      in
+      eprintf "\n=== smoke window: %s (%s .. %s, %d symbols) — %s ===\n%!"
+        window.name
         (Date.to_string window.start_date)
         (Date.to_string window.end_date)
-        window.description;
+        n_symbols window.description;
       if baseline then
         _baseline_run ~start_date:window.start_date ~end_date:window.end_date
-          ~overrides ~output_root:window_dir ()
+          ~shared_overrides ~overrides ~output_root:window_dir
+          ?sector_map_override ()
       else
         _single_run ~start_date:window.start_date ~end_date:window.end_date
-          ~overrides ~output_dir:window_dir ())
+          ~overrides:(shared_overrides @ overrides)
+          ~output_dir:window_dir ?sector_map_override ())
 
 (** Resolve the raw start/end positionals into [Date.t]. Smoke mode supplies its
     own dates per window so the positionals are unused there; the caller only
@@ -230,22 +279,30 @@ let _resolve_dates ~start_date_raw ~end_date_raw =
 let () =
   let parsed = _parse_args () in
   let overrides = _resolve_overrides parsed.overrides in
+  let shared_overrides = _resolve_overrides parsed.shared_overrides in
   let output_root =
     _make_output_root ?experiment_name:parsed.experiment_name ()
   in
   match (parsed.smoke, parsed.baseline) with
-  | true, _ -> _smoke_run ~overrides ~output_root ~baseline:parsed.baseline ()
+  | true, _ ->
+      _smoke_run ~shared_overrides ~overrides ~output_root
+        ~baseline:parsed.baseline ()
   | false, true ->
       let start_date, end_date =
         _resolve_dates ~start_date_raw:parsed.start_date
           ~end_date_raw:parsed.end_date
       in
-      _baseline_run ~start_date ~end_date ~overrides ~output_root ()
+      _baseline_run ~start_date ~end_date ~shared_overrides ~overrides
+        ~output_root ()
   | false, false ->
       let start_date, end_date =
         _resolve_dates ~start_date_raw:parsed.start_date
           ~end_date_raw:parsed.end_date
       in
-      _single_run ~start_date ~end_date ~overrides ~output_dir:output_root
-        ?trace_path:parsed.trace_path ?memtrace_path:parsed.memtrace_path
-        ?gc_trace_path:parsed.gc_trace_path ()
+      (* Outside [--baseline], shared overrides are equivalent to overrides:
+         applied identically to the (single) run. *)
+      _single_run ~start_date ~end_date
+        ~overrides:(shared_overrides @ overrides)
+        ~output_dir:output_root ?trace_path:parsed.trace_path
+        ?memtrace_path:parsed.memtrace_path ?gc_trace_path:parsed.gc_trace_path
+        ()

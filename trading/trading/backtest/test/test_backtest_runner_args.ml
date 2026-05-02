@@ -27,6 +27,9 @@ let test_minimal_start_date_only _ =
               (equal_to None);
             field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 0);
             field
+              (fun (a : Backtest_runner_args.t) -> a.shared_overrides)
+              (size_is 0);
+            field
               (fun (a : Backtest_runner_args.t) -> a.trace_path)
               (equal_to None);
             field
@@ -151,6 +154,65 @@ let test_experiment_name_missing_value_is_error _ =
     Backtest_runner_args.parse [ "2018-01-02"; "--experiment-name" ]
   in
   assert_that result is_error
+
+(** [--shared-override] is a sibling flag to [--override] that, in baseline
+    mode, applies to BOTH the baseline and variant runs (not just variant). The
+    parser stores raw strings the same way as [--override]; the executable's
+    main is responsible for the per-mode merge. Repeatable. *)
+let test_shared_override_can_repeat _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2018-01-02";
+        "--shared-override";
+        "universe_cap=500";
+        "--shared-override";
+        "skip_ad_breadth=true";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.shared_overrides)
+              (elements_are
+                 [
+                   equal_to "universe_cap=500"; equal_to "skip_ad_breadth=true";
+                 ]);
+            field (fun (a : Backtest_runner_args.t) -> a.overrides) (size_is 0);
+          ]))
+
+let test_shared_override_missing_value _ =
+  let result =
+    Backtest_runner_args.parse [ "2018-01-02"; "--shared-override" ]
+  in
+  assert_that result is_error
+
+(** Both flag families compose freely on the same command line. The executable
+    decides how to dispatch them per mode (single, baseline, smoke). *)
+let test_shared_override_composes_with_override _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2018-01-02";
+        "--shared-override";
+        "universe_cap=500";
+        "--override";
+        "shorts_enabled=false";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.shared_overrides)
+              (elements_are [ equal_to "universe_cap=500" ]);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.overrides)
+              (elements_are [ equal_to "shorts_enabled=false" ]);
+          ]))
 
 let test_baseline_and_smoke_compose _ =
   let result =
@@ -448,6 +510,11 @@ let suite =
          >:: test_experiment_name_alone_is_allowed;
          "--experiment-name without value is error"
          >:: test_experiment_name_missing_value_is_error;
+         "--shared-override can repeat" >:: test_shared_override_can_repeat;
+         "--shared-override without value is an error"
+         >:: test_shared_override_missing_value;
+         "--shared-override composes with --override"
+         >:: test_shared_override_composes_with_override;
          "--baseline + --smoke compose" >:: test_baseline_and_smoke_compose;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
        ]

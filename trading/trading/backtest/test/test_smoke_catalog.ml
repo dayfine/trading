@@ -80,6 +80,23 @@ let test_each_window_has_start_before_end _ =
          equal_to (true, "recovery");
        ])
 
+(* Pin the default universe path on every window. The smoke catalog must NOT
+   default to the full sector-map (~10K symbols) — that OOMs the 8 GB dev
+   container at panel-load time and defeats the "fast iteration" purpose of
+   smoke. sp500 (~491 symbols) keeps each window under the memory budget. *)
+let test_every_window_uses_sp500_universe _ =
+  let paths =
+    List.map Smoke_catalog.all ~f:(fun (w : Smoke_catalog.window) ->
+        w.universe_path)
+  in
+  assert_that paths
+    (elements_are
+       [
+         equal_to "universes/sp500.sexp";
+         equal_to "universes/sp500.sexp";
+         equal_to "universes/sp500.sexp";
+       ])
+
 let suite =
   "Scenario_lib.Smoke_catalog"
   >::: [
@@ -92,6 +109,8 @@ let suite =
          "each window has non-empty description"
          >:: test_each_window_has_nonempty_description;
          "each window has start < end" >:: test_each_window_has_start_before_end;
+         "every window uses sp500 universe by default"
+         >:: test_every_window_uses_sp500_universe;
        ]
 
 let () = run_test_tt_main suite
