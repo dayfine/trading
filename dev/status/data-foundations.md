@@ -98,8 +98,8 @@ including the V1/V2/V3 verification follow-ups that gate F.2.)
   module owns the accumulator + atomic-rename writer. Single-run mode only;
   baseline / smoke / fuzz modes ignore the flag. Resumability deferred per
   plan §"Open question 4". Plan §"PR 2 — backtest checkpointing".
-- **PR 3/4** (this session): ops-data dispatch entry-point + runbook —
-  extends `.claude/agents/ops-data.md` with §"Snapshot corpus refresh"
+- **#821** — Automation PR 3/4: ops-data dispatch entry-point + runbook
+  — extends `.claude/agents/ops-data.md` with §"Snapshot corpus refresh"
   documenting inputs (`--universe`, `--output-dir`, `--max-wall`),
   three-step workflow (probe → wrapper → re-probe), and the resume
   contract under `--max-wall`-bounded dispatches. Adds
@@ -109,6 +109,20 @@ including the V1/V2/V3 verification follow-ups that gate F.2.)
   ledger with `NOT_STARTED` / `PARTIAL` / `FRESH` / `STALE` states). No
   auto-cron yet — deferred to PR 4. Plan §"PR 3 — ops-data dispatch +
   runbook".
+- **PR 4/4** (this session): local cron / launchd recipes — adds
+  `dev/notes/local-automation-2026-05-03.md` covering (1) why local-only
+  (corpus is gitignored, no GHA path), (2) macOS launchd recipe with a
+  full `~/Library/LaunchAgents/com.dayfine.trading.snapshot-refresh.plist`
+  example (3am daily; `--max-wall 30m`; `plutil -lint` + `launchctl
+  load/list/kickstart/unload` cheatsheet), (3) Linux crontab one-liner
+  for the same wrapper, (4) freshness pre-flight gate using
+  `check_snapshot_freshness.sh --threshold-pct 5` to skip rebuild on
+  already-fresh nights, (5) audit / monitoring via
+  `snapshot-corpus-status.md` + an optional staleness-alert cron that
+  posts to Slack/mail after 7+ days without refresh (recommendation:
+  don't wire by default), (6) disable / full-rebuild recipes. Plan §"PR
+  4 — local-cron / launchd recipes". This closes the
+  data-pipeline-automation track.
 
 ### Merged (M5.3 streaming)
 
