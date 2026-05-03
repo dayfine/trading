@@ -30,8 +30,7 @@ let objective_metric_type = function
   | Concavity_coef -> Some Metric_types.ConcavityCoef
   | Composite _ -> None
 
-let _lookup_metric metrics mt =
-  Option.value (Map.find metrics mt) ~default:0.0
+let _lookup_metric metrics mt = Option.value (Map.find metrics mt) ~default:0.0
 
 let evaluate_objective objective metrics =
   match objective with
@@ -59,14 +58,15 @@ let cells_of_spec spec =
   if List.exists spec ~f:(fun (_, vs) -> List.is_empty vs) then []
   else _cartesian spec
 
-let cell_to_overrides cell =
-  List.map cell ~f:(fun (key, value) ->
-      let key_eq_value = sprintf "%s=%.17g" key value in
-      match Backtest.Config_override.parse_to_sexp key_eq_value with
-      | Ok sexp -> sexp
-      | Error err ->
-          failwithf "cell_to_overrides: failed to parse %s: %s" key_eq_value
-            (Status.show err) ())
+let _binding_to_sexp (key, value) =
+  let key_eq_value = sprintf "%s=%.17g" key value in
+  match Backtest.Config_override.parse_to_sexp key_eq_value with
+  | Ok sexp -> sexp
+  | Error err ->
+      failwithf "cell_to_overrides: failed to parse %s: %s" key_eq_value
+        (Status.show err) ()
+
+let cell_to_overrides cell = List.map cell ~f:_binding_to_sexp
 
 (** {1 Evaluation} *)
 
@@ -82,16 +82,21 @@ type row = {
 type result = { rows : row list; best_cell : cell; best_score : float }
 
 (** Build [(cell, [row; row; ...])] groups in cell-enumeration order. We build
-    this twice — once for [rows] (flattened) and once for [best_cell]
-    (per-cell mean) — but the same upstream evaluator call is reused via
-    [Hashtbl] keyed by cell index. *)
+    this twice — once for [rows] (flattened) and once for [best_cell] (per-cell
+    mean) — but the same upstream evaluator call is reused via [Hashtbl] keyed
+    by cell index. *)
+let _row_for cell scenario ~objective ~evaluator =
+  let metrics = evaluator cell ~scenario in
+  let objective_value = evaluate_objective objective metrics in
+  { cell; scenario; metrics; objective_value }
+
+let _rows_for_cell cell ~scenarios ~objective ~evaluator =
+  List.map scenarios ~f:(fun scenario ->
+      _row_for cell scenario ~objective ~evaluator)
+
 let _evaluate_grid spec ~scenarios ~objective ~evaluator =
   let cells = cells_of_spec spec in
-  List.concat_map cells ~f:(fun cell ->
-      List.map scenarios ~f:(fun scenario ->
-          let metrics = evaluator cell ~scenario in
-          let objective_value = evaluate_objective objective metrics in
-          { cell; scenario; metrics; objective_value }))
+  List.concat_map cells ~f:(_rows_for_cell ~scenarios ~objective ~evaluator)
 
 let _mean = function
   | [] -> Float.neg_infinity
@@ -138,10 +143,7 @@ let run spec ~scenarios ~objective ~evaluator =
 
 (** {1 Sensitivity analysis} *)
 
-type sensitivity_row = {
-  param : string;
-  varied_values : (float * float) list;
-}
+type sensitivity_row = { param : string; varied_values : (float * float) list }
 
 (** Find rows whose cell matches [best_cell] except possibly on [focus_param].
     Group by the focal param's value, average objectives across scenarios. *)
@@ -151,9 +153,7 @@ let _sensitivity_for_param ~focus_param ~best_cell rows =
         if String.equal bk rk && String.equal bk focus_param then true
         else String.equal bk rk && Float.equal bv rv)
   in
-  let filtered =
-    List.filter rows ~f:(fun r -> matches_except_focus r.cell)
-  in
+  let filtered = List.filter rows ~f:(fun r -> matches_except_focus r.cell) in
   let value_of_focus row =
     List.find_map_exn row.cell ~f:(fun (k, v) ->
         if String.equal k focus_param then Some v else None)
@@ -168,15 +168,17 @@ let _sensitivity_for_param ~focus_param ~best_cell rows =
   |> List.map ~f:(fun (v, scores) -> (v, _mean scores))
   |> List.sort ~compare:(fun (a, _) (b, _) -> Float.compare a b)
 
+let _sensitivity_row_for ~best_cell ~rows (param, _) =
+  let varied_values =
+    _sensitivity_for_param ~focus_param:param ~best_cell rows
+  in
+  { param; varied_values }
+
 let compute_sensitivity spec result =
   if List.is_empty spec || List.is_empty result.rows then []
   else
-    List.map spec ~f:(fun (param, _) ->
-        let varied_values =
-          _sensitivity_for_param ~focus_param:param
-            ~best_cell:result.best_cell result.rows
-        in
-        { param; varied_values })
+    List.map spec
+      ~f:(_sensitivity_row_for ~best_cell:result.best_cell ~rows:result.rows)
 
 (** {1 Output} *)
 
@@ -184,42 +186,45 @@ let _all_metric_types = Backtest.Comparison.all_metric_types
 
 let _csv_header_for_cell cell ~objective =
   let param_keys = List.map cell ~f:fst in
-  let metric_labels = List.map _all_metric_types ~f:Backtest.Comparison.metric_label in
+  let metric_labels =
+    List.map _all_metric_types ~f:Backtest.Comparison.metric_label
+  in
   let objective_col = "objective_" ^ objective_label objective in
   param_keys @ [ "scenario" ] @ metric_labels @ [ objective_col ]
+
+let _format_metric_value metrics mt =
+  match Map.find metrics mt with Some v -> sprintf "%.6f" v | None -> ""
 
 let _csv_row row ~objective:_ =
   let param_values = List.map row.cell ~f:(fun (_, v) -> sprintf "%.17g" v) in
   let metric_values =
-    List.map _all_metric_types ~f:(fun mt ->
-        match Map.find row.metrics mt with
-        | Some v -> sprintf "%.6f" v
-        | None -> "")
+    List.map _all_metric_types ~f:(_format_metric_value row.metrics)
   in
   param_values @ [ row.scenario ] @ metric_values
   @ [ sprintf "%.6f" row.objective_value ]
 
 let _quote_csv_field s =
-  if String.exists s ~f:(fun c -> Char.equal c ',' || Char.equal c '"' || Char.equal c '\n')
+  if
+    String.exists s ~f:(fun c ->
+        Char.equal c ',' || Char.equal c '"' || Char.equal c '\n')
   then "\"" ^ String.substr_replace_all s ~pattern:"\"" ~with_:"\"\"" ^ "\""
   else s
 
 let _csv_line fields =
-  String.concat ~sep:","
-    (List.map fields ~f:_quote_csv_field)
-  ^ "\n"
+  String.concat ~sep:"," (List.map fields ~f:_quote_csv_field) ^ "\n"
+
+let _header_cell_of_rows = function [] -> [] | r :: _ -> r.cell
+
+let _write_csv_to ~objective result oc =
+  let header =
+    _csv_header_for_cell (_header_cell_of_rows result.rows) ~objective
+  in
+  Out_channel.output_string oc (_csv_line header);
+  List.iter result.rows ~f:(fun r ->
+      Out_channel.output_string oc (_csv_line (_csv_row r ~objective)))
 
 let write_csv ~output_path ~objective result =
-  Out_channel.with_file output_path ~f:(fun oc ->
-      let header_cell =
-        match result.rows with
-        | [] -> []
-        | r :: _ -> r.cell
-      in
-      let header = _csv_header_for_cell header_cell ~objective in
-      Out_channel.output_string oc (_csv_line header);
-      List.iter result.rows ~f:(fun r ->
-          Out_channel.output_string oc (_csv_line (_csv_row r ~objective))))
+  Out_channel.with_file output_path ~f:(_write_csv_to ~objective result)
 
 let write_best_sexp ~output_path result =
   let sexps = cell_to_overrides result.best_cell in
@@ -230,7 +235,8 @@ let write_best_sexp ~output_path result =
 
 let _format_sensitivity_section row =
   let header =
-    sprintf "## Param: `%s`\n\n| Value | Mean objective |\n|---|---|\n" row.param
+    sprintf "## Param: `%s`\n\n| Value | Mean objective |\n|---|---|\n"
+      row.param
   in
   let body =
     List.map row.varied_values ~f:(fun (v, score) ->
@@ -239,14 +245,17 @@ let _format_sensitivity_section row =
   in
   header ^ body ^ "\n"
 
+let _sensitivity_title objective =
+  sprintf
+    "# Sensitivity report (objective: `%s`)\n\n\
+     Mean objective across scenarios as each param varies, with other params \
+     held at their best-cell value.\n\n"
+    (objective_label objective)
+
+let _write_sensitivity_to ~objective rows oc =
+  Out_channel.output_string oc (_sensitivity_title objective);
+  List.iter rows ~f:(fun row ->
+      Out_channel.output_string oc (_format_sensitivity_section row))
+
 let write_sensitivity_md ~output_path ~objective rows =
-  let title =
-    sprintf "# Sensitivity report (objective: `%s`)\n\nMean objective across \
-             scenarios as each param varies, with other params held at their \
-             best-cell value.\n\n"
-      (objective_label objective)
-  in
-  let sections = List.map rows ~f:_format_sensitivity_section in
-  Out_channel.with_file output_path ~f:(fun oc ->
-      Out_channel.output_string oc title;
-      List.iter sections ~f:(Out_channel.output_string oc))
+  Out_channel.with_file output_path ~f:(_write_sensitivity_to ~objective rows)
