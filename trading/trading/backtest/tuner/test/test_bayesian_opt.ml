@@ -73,6 +73,17 @@ let test_create_with_negative_initial_random_raises _ =
   assert_raises
     (Invalid_argument "Bayesian_opt.create: initial_random must be >= 0") f
 
+let test_create_with_negative_total_budget_raises _ =
+  let f () =
+    let _ =
+      BO.create
+        (BO.create_config ~bounds:[ ("x", (0.0, 1.0)) ] ~total_budget:(-1) ())
+    in
+    ()
+  in
+  assert_raises
+    (Invalid_argument "Bayesian_opt.create: total_budget must be >= 0") f
+
 (* ---------- Empty-state behaviour ---------- *)
 
 let test_best_is_none_when_no_observations _ =
@@ -383,6 +394,33 @@ let test_fit_gp_empty_observations_raises _ =
   in
   assert_raises (Invalid_argument "Bayesian_opt.fit_gp: no observations") f
 
+let test_fit_gp_y_length_mismatch_raises _ =
+  let f () =
+    let _ =
+      BO.fit_gp ~length_scales:[| 0.25 |] ~signal_variance:1.0
+        ~noise_variance:1e-6
+        ~observations_x:[| [| 0.0 |]; [| 1.0 |] |]
+        ~observations_y:[| 0.0 |]
+    in
+    ()
+  in
+  assert_raises (Invalid_argument "Bayesian_opt.fit_gp: y length disagrees with x") f
+
+let test_fit_gp_row_dim_mismatch_raises _ =
+  let f () =
+    let _ =
+      (* observations_x has 2-dim rows but length_scales has 1 entry *)
+      BO.fit_gp ~length_scales:[| 0.25 |] ~signal_variance:1.0
+        ~noise_variance:1e-6
+        ~observations_x:[| [| 0.0; 0.0 |] |]
+        ~observations_y:[| 0.0 |]
+    in
+    ()
+  in
+  assert_raises
+    (Invalid_argument
+       "Bayesian_opt.fit_gp: observation dim disagrees with length_scales") f
+
 let test_expected_improvement_zero_at_constant_posterior _ =
   (* If the posterior σ² is ~0 everywhere (i.e. the test point is essentially
      pinned by an observation), EI should be ~0. *)
@@ -435,6 +473,8 @@ let suite =
          >:: test_create_with_inverted_bounds_raises;
          "create with negative initial_random raises"
          >:: test_create_with_negative_initial_random_raises;
+         "create with negative total_budget raises"
+         >:: test_create_with_negative_total_budget_raises;
          "best is None when no observations"
          >:: test_best_is_none_when_no_observations;
          "all_observations is empty for fresh state"
@@ -473,6 +513,10 @@ let suite =
          >:: test_fit_gp_variance_far_from_observations_is_large;
          "fit_gp: empty observations raises"
          >:: test_fit_gp_empty_observations_raises;
+         "fit_gp: y length mismatch raises"
+         >:: test_fit_gp_y_length_mismatch_raises;
+         "fit_gp: row dim mismatch raises"
+         >:: test_fit_gp_row_dim_mismatch_raises;
          "expected_improvement: zero at constant posterior"
          >:: test_expected_improvement_zero_at_constant_posterior;
          "ucb: increases with beta" >:: test_ucb_increases_with_beta;
