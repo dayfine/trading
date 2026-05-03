@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-04-29
+## Last updated: 2026-05-03
 
 ## Status
 IN_PROGRESS
@@ -330,6 +330,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ### orchestrator-daily bundle-budget checkout fix
 
 - [x] GHA "Bundle budget into daily summary and auto-merge" step now resets the working tree before `git checkout "${DAILY_BRANCH}"`. Root cause: lead-orchestrator (jj) leaves modified `dev/reviews/*.md` and untracked `dev/audit/*` / `dev/health/*` files in the git working copy after pushing to the daily branch; `git checkout` refuses to overwrite them. Fix: `git reset --hard HEAD && git clean -fd` added immediately before `git fetch origin "${DAILY_BRANCH}"` with an explanatory comment. Failed run: https://github.com/dayfine/trading/actions/runs/25109871573. File: `.github/workflows/orchestrator.yml` (lines 374–382). Verify: next scheduled run (00:17 or 05:17 PT) completes the step without checkout error.
+
+### Track pacer agent
+
+- [x] `track-pacer` agent defined — `.claude/agents/track-pacer.md`; weekly work-pace and strategic-fit audit; reads all track status files + git log; writes to `dev/reviews/track-pacer-YYYY-MM-DD.md`. GHA workflow `.github/workflows/track-pacer-weekly.yml` — schedule: Sunday 06:00 UTC; branch `ops/track-pacer-<date>`; PR opened for human review (not auto-merged). Seven checks: P1 PR cadence (active/slowing/stalled), P2 Next Steps staleness, P3 `[info]` carryover age (≥3 reconciles), P4 new tracks without owner, P5 recurring discussion topics, P6 diminishing returns (maintenance-only PRs), P7 capability gaps vs milestone plan. Distinct from `health-scanner` (code health) — this agent audits *work pace and strategic fit*. Verify: `cat .claude/agents/track-pacer.md` — should have 7 checks, output format section, and Allowed Tools; `cat .github/workflows/track-pacer-weekly.yml` — should have `cron: "0 6 * * 0"` and push+PR step.
 
 ### POSIX shell portability linter
 
