@@ -1,0 +1,5 @@
+(library
+ (name tuner)
+ (libraries core fpath status backtest trading.simulation.types)
+ (preprocess
+  (pps ppx_let ppx_sexp_conv)))
