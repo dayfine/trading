@@ -1,6 +1,6 @@
 # Data Gaps — features blocked on missing data
 
-Last updated: 2026-04-14 (ADL source validation complete; sector ETF bars refreshed)
+Last updated: 2026-05-03 (sp500 universe coverage gap resolved; ADL source validation complete; sector ETF bars refreshed)
 
 ## A-D Breadth (ADL)
 
@@ -97,36 +97,41 @@ Probe scripts under `dev/scripts/probes/`. Full writeup in `dev/notes/adl-valida
 
 ## sp500 Universe Coverage — 12 Missing Symbols
 
-**Status**: Open (filed 2026-05-03; recurrence is structural, not one-off)
-**Blocks**: Nothing critical — the 491 symbols in `trading/test_data/backtest_scenarios/universes/sp500.sexp` are sufficient for current goldens. The 12 missing are recent additions or delistings without downloaded history.
-**Affects**: `goldens-sp500/` scenarios (slight under-coverage, pinned at generation time so reproducibility is preserved); future Wiki+EODHD replay (`dev/plans/wiki-eodhd-historical-universe-2026-05-03.md`) inherits the same pattern.
+**Status**: RESOLVED (2026-05-03)
+**Blocks**: Nothing critical — resolved. `sp500.sexp` now has all 503 symbols.
+**Affects**: `goldens-sp500/` scenarios — coverage now complete.
 
 ### Background
 
-S&P 500 actually has **503 securities** (5 dual-class: GOOG/GOOGL, NWSA/NWS, FOXA/FOX, BRK.A/BRK.B, etc). Today's `sp500.sexp` has 491 — i.e. 12 of 503 are not in our local CSV cache. Header comment on the file already notes this.
+S&P 500 actually has **503 securities** (5 dual-class: GOOG/GOOGL, NWSA/NWS, FOXA/FOX, BRK.A/BRK.B, etc). The original `sp500.sexp` had 491 — the 12 missing were already in the local bar-data cache but were dropped by the original join due to two issues:
+1. Single-letter symbols (A, C, D, F, J, L, O, Q, T, V) — the original regex `\w+` stopped at word boundaries and dropped single-char matches.
+2. Dot-notation symbols (BF.B, BRK.B) — the original join compared sp500.csv dot-form against inventory dash-form (BF-B, BRK-B) without normalisation.
 
-### Resolution
+No new data fetches were required. All 12 symbols had full bar history in the local cache.
 
-**ops-data dispatch**:
-1. Re-run the join script that produced `sp500.sexp` (currently inline; should be extracted to `dev/scripts/build_sp500_universe.sh` per the file's TODO).
-2. Identify the 12 symbols missing from the local cache.
-3. Fetch via `analysis/scripts/fetch_symbols.exe -- --symbols <comma-list>`.
-4. Rebuild inventory via `analysis/scripts/build_inventory/build_inventory.exe`.
-5. Regenerate `sp500.sexp` (now 503 symbols).
-6. Update this entry to **RESOLVED** with resolution date.
+### Resolution (2026-05-03)
 
-**Estimated effort**: ~30 min ops-data dispatch (mostly fetch wall + golden regen).
+1. Identified the 12 missing symbols: A, BF-B, BRK-B, C, D, F, J, L, O, Q, T, V.
+2. All 12 confirmed present in `data/inventory.sexp` with bar history.
+3. Extracted join logic into `dev/scripts/build_sp500_universe.sh` (closes the TODO in the original sp500.sexp header comment). The script handles:
+   - Single-letter tickers
+   - Dot-to-dash normalisation (BF.B → BF-B, BRK.B → BRK-B)
+   - Quoted CSV fields with embedded commas in Security names (e.g. "F5, Inc.", "Tapestry, Inc.") using sector-name scanning instead of fixed field indexing
+4. Ran `dev/scripts/build_sp500_universe.sh` — output: 503 / 503 symbols.
+5. `sp500.sexp` regenerated from 491 → 503 symbols.
+
+Symbols added: A (Health Care), BF-B (Consumer Staples), BRK-B (Financials), C (Financials), D (Utilities), F (Consumer Discretionary), J (Industrials), L (Financials), O (Real Estate), Q (Information Technology), T (Communication Services), V (Financials).
 
 ### Recurrence pattern (structural, not one-off)
 
 The same gap reappears at any historical date — when Wiki+EODHD replay (PR-A/B/C of `wiki-eodhd-historical-universe-2026-05-03.md`) lands and emits historical-date universe sexps, each will reference symbols not in the local cache (delisted issues, recent IPOs).
 
-Plan locks the fix into PR-C: `build_universe.exe --fetch-prices` auto-fetches on cache miss, closing the gap at construction time. **ops-data is not the routine resolver** for replay-driven universes — the build CLI itself fetches. ops-data still owns gap-by-symbol resolution for static `sp500.sexp` regeneration.
+Plan locks the fix into PR-C: `build_universe.exe --fetch-prices` auto-fetches on cache miss, closing the gap at construction time. **ops-data is not the routine resolver** for replay-driven universes — the build CLI itself fetches. `dev/scripts/build_sp500_universe.sh` is the tool for static `sp500.sexp` regeneration.
 
-### What's needed
+### What's needed going forward
 
-- **ops-data**: extract `dev/scripts/build_sp500_universe.sh` from inline join logic; fetch the 12 missing; regenerate `sp500.sexp`. Independent task — not blocked.
 - **feat-data** (downstream): build_universe.exe in PR-C (Wiki+EODHD plan) replicates this pattern with `--fetch-prices` auto-fetch.
+- **ops-data** (maintenance): re-run `dev/scripts/build_sp500_universe.sh` whenever `data/sp500.csv` is updated (S&P 500 adds/removes).
 
 ---
 
