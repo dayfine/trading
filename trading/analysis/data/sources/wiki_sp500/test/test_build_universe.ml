@@ -111,6 +111,63 @@ let test_universe_sexp_shape_matches_canonical _ =
   in
   assert_that outcome.universe_sexp (equal_to expected)
 
+(* CP4 pin: [run_with_fetch]'s docstring claims (a) auto-fetch on cache miss and
+   (b) 404-return → symbol skipped + omitted from universe_sexp. The [?fetch]
+   hook in the .mli is "for tests" — exercise it. *)
+let test_fetch_hook_pins_auto_fetch_and_404_skip _ =
+  let valid_json =
+    {|[{"date":"2010-01-04","open":10.0,"high":10.5,"low":9.8,"close":10.25,"adjusted_close":10.25,"volume":100000},{"date":"2010-01-05","open":10.3,"high":10.7,"low":10.1,"close":10.55,"adjusted_close":10.55,"volume":110000}]|}
+  in
+  let fetch (uri : Uri.t) : string Status.status_or Async.Deferred.t =
+    let path = Uri.path uri in
+    Async.return
+      (if String.is_substring path ~substring:"BAR" then Ok valid_json
+       else if String.is_substring path ~substring:"FOO" then
+         Error (Status.internal_error "HTTP 404: Not Found")
+       else Ok valid_json)
+  in
+  let csv_path =
+    _write_to_temp
+      ~contents:
+        "Symbol,Security,GICS Sector\n\
+         BAR,Bar Holdings,Industrials\n\
+         FOO,Foo Corp,Industrials\n"
+      ~suffix:".csv"
+  in
+  let html_path = _write_to_temp ~contents:_empty_html ~suffix:".html" in
+  let cache_dir = _empty_cache_dir () in
+  let outcome =
+    match
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Build_universe_lib.run_with_fetch ~as_of:_date_2010_01_01
+            ~current_csv_path:csv_path ~wiki_html_path:html_path ~cache_dir
+            ~token:"test-token" ~fetch ())
+    with
+    | Ok o -> o
+    | Error e -> assert_failure ("run_with_fetch: " ^ Status.show e)
+  in
+  let symbols = _symbols_of_universe_sexp outcome.universe_sexp in
+  assert_that outcome.fetched_count (equal_to 1);
+  assert_that outcome.skipped
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (w : Build_universe_lib.warning) -> w.symbol)
+               (equal_to "FOO");
+             field
+               (fun (w : Build_universe_lib.warning) -> w.reason)
+               (matching
+                  (fun reason ->
+                    if String.is_substring reason ~substring:"404" then Some ()
+                    else None)
+                  ~msg:"reason mentions 404" (equal_to ()));
+           ];
+       ]);
+  assert_that (Set.mem symbols "BAR") (equal_to true);
+  assert_that (Set.mem symbols "FOO") (equal_to false)
+
 let suite =
   "build_universe_test"
   >::: [
@@ -120,6 +177,8 @@ let suite =
          >:: test_emits_warning_when_local_csv_missing;
          "universe_sexp_shape_matches_canonical"
          >:: test_universe_sexp_shape_matches_canonical;
+         "fetch_hook_pins_auto_fetch_and_404_skip"
+         >:: test_fetch_hook_pins_auto_fetch_and_404_skip;
        ]
 
 let () = run_test_tt_main suite
