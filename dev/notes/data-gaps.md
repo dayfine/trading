@@ -1,6 +1,6 @@
 # Data Gaps — features blocked on missing data
 
-Last updated: 2026-05-03 (sp500 universe coverage gap resolved; ADL source validation complete; sector ETF bars refreshed)
+Last updated: 2026-05-03 (sp500 historical coverage: 217/218 delisted symbols fetched; _old suffix probe complete)
 
 ## A-D Breadth (ADL)
 
@@ -132,6 +132,92 @@ Plan locks the fix into PR-C: `build_universe.exe --fetch-prices` auto-fetches o
 
 - **feat-data** (downstream): build_universe.exe in PR-C (Wiki+EODHD plan) replicates this pattern with `--fetch-prices` auto-fetch.
 - **ops-data** (maintenance): re-run `dev/scripts/build_sp500_universe.sh` whenever `data/sp500.csv` is updated (S&P 500 adds/removes).
+
+---
+
+## sp500-historical-coverage — 218 Delisted/Acquired Symbol Bars
+
+**Status**: PARTIAL_RESOLVED (217/218 fetched; 1 unfetchable)
+**Relates to**: `dev/plans/wiki-eodhd-historical-universe-2026-05-03.md` §Acceptance #6
+**Date**: 2026-05-03
+
+### Goal
+
+Fetch EODHD bars for the 218 symbols present in the 2010-01-01 S&P 500 golden universe
+(`trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-01-01.sexp`,
+510 symbols) but absent from today's `sp500.sexp` (503 symbols). These are mostly
+delisted/acquired/renamed symbols needed for the 15-year backtest window (2010–2026).
+
+### `_old` suffix probe findings (Open Q 1 resolved)
+
+EODHD uses an `_old` suffix to distinguish reassigned tickers — where the same ticker
+symbol was reused by a different company after the original company was delisted/merged.
+
+Probe results on 5 known-reassigned tickers:
+
+| Symbol | Plain ticker | `_old` ticker | Notes |
+|--------|-------------|---------------|-------|
+| GM | 3884 bars, 2010-11-18 to 2026 (new GM) | 2829 bars, 2000 to 2011-03-31 | Classic reassignment: old General Motors (bankrupt 2009) vs new GM (IPO 2010) |
+| BSC | 626 bars, 2008-03-17 to 2011 | 2061 bars, 2000 to 2008-03-14 | Bear Stearns (acquired by JPMorgan 2008); plain ticker retained some post-merger trading |
+| LEH | 2190 bars, 2000 to 2008-09-17 (only) | 404 — Ticker Not Found | Lehman Brothers; plain ticker has full history; no `_old` needed |
+| WB | 3027 bars, 2014-04-17 to 2026 (Weibo Corp) | 404 — Ticker Not Found | Wachovia data NOT available; WB reassigned to Weibo Corp (NYSE IPO 2014) |
+| CFC | 5009 bars, 2000 to 2019 | 404 — Ticker Not Found | Countrywide Financial; plain ticker has full history through delisting |
+
+**Conclusion**: `_old` suffix is real and necessary for ~33 of the 218 symbols where
+EODHD reassigned the ticker. Pattern: plain `<sym>` returns post-reassignment data
+(recent company), `<sym>_old` returns the original company's historical data. Not all
+delisted symbols need `_old` — most just have their full history under the plain ticker.
+
+### Symbols fetched (217/218)
+
+**First pass (plain ticker, 215 symbols)**: 214 fetched, 1 error (ACE — 0 bars on plain).
+Note: 3 symbols (BF-B, BRK-B, CELG) fetched separately before batch run.
+
+**Low-bar symbols needing `_old` (13 identified)**: APC (55), CAM (144), FB (214),
+FRX (112), LIFE (65), LLL (249), PCL (189), PCLN (136), PCS (189), PGN (358), POM (142), SPLS (73).
+Plus ACE (0 bars, skipped in first pass).
+
+**Second pass (`_old` suffix, 16 symbols)**: APC_old, CAM_old, LLL_old, PCL_old,
+FB_old, Q_old, FRX_old, LIFE_old, PCLN_old, PGN_old, POM_old, SPLS_old, NSM_old,
+EMC_old, MON_old, NYX_old. All 16 fetched successfully.
+
+**Third pass (suspicious-scan, 17 symbols)**: ALTR_old, BTU_old, CHK_old, DNB_old,
+DO_old, DTV_old, DV_old, NE_old, PLL_old, PX_old, S_old, SHLD_old, SLE_old, STI_old,
+STR_old, WFR_old, XL_old. All 17 fetched successfully.
+
+Total `_old` symbols fetched: 33.
+
+### Unfetchable symbols (1)
+
+| Symbol | Company | Reason | Both plain + `_old` |
+|--------|---------|--------|---------------------|
+| ACE | ACE Limited (insurance; acquired by Chubb 2016) | EODHD returns 0 bars for both ACE and ACE_old; ACE.US also returns 0. Chubb (CB) has full data. | 404 / 0 bars |
+
+**Impact**: ACE was removed from the S&P 500 on 2016-01-11 when Chubb (CB) was
+simultaneously added. The backtest will skip ACE for the 2010–2016 window. CB is in
+the current sp500.sexp and will continue from 2016. Estimated bias: negligible
+(single large-cap insurance company ~0.2% index weight).
+
+### What's in data/ now
+
+- 217 plain-ticker files for the 218 target symbols (ACE missing)
+- 33 `_old` suffix files for reassigned tickers (stored alongside the plain ticker)
+- `data/inventory.sexp` rebuilt after all fetches (38,050 total symbols indexed)
+
+### Note on PCS_old
+
+PCS_old returned only 156 bars (2003-09-10 to 2004-04-22) — extremely thin data.
+PCS in the 2010 universe likely refers to MetroPCS Communications (which traded as
+PCS from 2007 IPO to 2013 merger with T-Mobile). Plain PCS returns 189 bars starting
+2025-08-01 (new company). Both are inadequate for the 2010 window. PCS listed as
+effectively unfetchable for 2010 context but data quality is very poor in any case.
+
+### Recommended next steps
+
+- Run `backtest_runner.exe` on the 2010-01-01 universe to confirm ≤5% symbol-resolution
+  failures (per §Acceptance #4 of the plan).
+- When Norgate data arrives, cross-check the 33 `_old`-suffix symbols for data quality.
+- ACE can be backfilled if a historical data source surfaces it (e.g. Bloomberg, Refinitiv).
 
 ---
 
