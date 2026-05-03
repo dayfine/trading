@@ -608,65 +608,57 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
             @ entry_transitions;
         }
 
+(* Resolve the strategy's [Bar_reader] from the optional [bar_panels] /
+   [bar_reader] inputs.
+
+   Phase F.2 PR 2: [bar_reader] takes precedence (snapshot-mode runs bypass
+   [Bar_panels.t] allocation entirely). Otherwise fall back to the
+   [bar_panels]-or-empty branches.
+
+   Stage 4 PR-D: when [bar_panels] is the chosen path, create a
+   [Weekly_ma_cache] scoped to this strategy and bundle it into the
+   [Bar_reader] so per-symbol weekly MA values are computed once, not per
+   Friday tick. Cache is opt-in: test fixtures using [Bar_reader.empty ()]
+   are unaffected. *)
+let _resolve_bar_reader ~bar_panels ~bar_reader =
+  match bar_reader with
+  | Some r -> r
+  | None -> (
+      match bar_panels with
+      | Some p ->
+          let ma_cache = Weekly_ma_cache.create p in
+          Bar_reader.of_panels ~ma_cache p
+      | None -> Bar_reader.empty ())
+
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels ?bar_reader
     ?(audit_recorder = Audit_recorder.noop) config =
   let stop_states = ref initial_stop_states in
-  (* Per-symbol last stop-out date — feeds [Screener.screen_with_cooldown]
-     for the cascade post-stop-out cooldown gate
-     ([cascade_post_stop_cooldown_weeks]). Mutated in place by
-     [_record_stop_outs] after each [Stops_runner.update] tick. Empty when
-     the strategy is constructed: an empty map is bit-equivalent to no
-     cooldown effect, so backtests / live runs that don't set the cooldown
-     knob continue to behave identically. *)
+  (* [last_stop_out_dates] feeds [Screener.screen_with_cooldown] for the
+     cascade post-stop-out cooldown gate. Mutated in place by
+     [_record_stop_outs] after each [Stops_runner.update] tick. Empty at
+     construction is bit-equivalent to no cooldown effect. *)
   let last_stop_out_dates : Date.t Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
   let prior_macro : Weinstein_types.market_trend ref =
     ref Weinstein_types.Neutral
   in
-  (* Force-liquidation peak tracker (G4). Lives in the strategy closure: each
-     [make] call yields an independent tracker so concurrent backtest /
-     paper / live instances don't pollute each other. The tracker is
-     observed every [_on_market_close] tick. *)
+  (* G4 force-liquidation peak tracker — per-strategy-instance state. *)
   let peak_tracker = Portfolio_risk.Force_liquidation.Peak_tracker.create () in
-  (* Cached full macro result for exit-time audit capture. Updated alongside
-     [prior_macro] inside [_run_screen]. Held as an option until the first
-     Friday so an exit firing before the first screen call gets a stable
+  (* Cached macro result for exit-time audit capture. Held as option until
+     first Friday so an exit firing before the first screen gets a stable
      [Neutral / 0.0] snapshot. *)
   let prior_macro_result : Macro.result option ref = ref None in
-  (* Stage 4 PR-D: when bar_panels are present, create a [Weekly_ma_cache]
-     scoped to this strategy and bundle it into the [Bar_reader]. The cache
-     is read by [Panel_callbacks.stage_callbacks_of_weekly_view] (and
-     transitively by Stock_analysis / Sector / Macro / Stops_runner) so
-     per-symbol weekly MA values are computed once, not per Friday tick.
-
-     The cache is opt-in (only when bar_panels are passed) so test
-     fixtures using [Bar_reader.empty ()] aren't affected.
-
-     Phase F.2 PR 2: [bar_reader] is an alternate path used by snapshot-mode
-     runs that bypasses the [Bar_panels.t] allocation entirely. When
-     [bar_reader] is provided it takes precedence; otherwise fall back to
-     the [bar_panels]-or-empty branches above. *)
-  let bar_reader =
-    match bar_reader with
-    | Some r -> r
-    | None -> (
-        match bar_panels with
-        | Some p ->
-            let ma_cache = Weekly_ma_cache.create p in
-            Bar_reader.of_panels ~ma_cache p
-        | None -> Bar_reader.empty ())
-  in
+  let bar_reader = _resolve_bar_reader ~bar_panels ~bar_reader in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
   let sector_prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
-  (* Macro.analyze requires weekly-cadence ad_bars (see Macro.ad_bar's
-     cadence contract). Loaders like Ad_bars.Unicorn return daily bars, so
-     normalize once at load time — not on every on_market_close call. *)
+  (* Macro.analyze requires weekly-cadence ad_bars; normalize once at load
+     time, not on every [on_market_close] call. *)
   let weekly_ad_bars = Ad_bars_aggregation.daily_to_weekly ad_bars in
   let module M = struct
     let name = name
