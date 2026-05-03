@@ -14,6 +14,7 @@ type t = {
   fuzz_spec : string option;
   fuzz_window : string option;
   snapshot_dir : string option;
+  progress_every : int option;
 }
 
 type acc = {
@@ -31,6 +32,7 @@ type acc = {
   snapshot_mode : bool;
   csv_mode : bool;
   snapshot_dir : string option;
+  progress_every : int option;
 }
 (** Accumulator for [_extract_flags]. Carries every flag the parser recognises
     plus the running list of positional args. Snapshot mode is the default since
@@ -55,6 +57,7 @@ let _empty_acc =
     snapshot_mode = false;
     csv_mode = false;
     snapshot_dir = None;
+    progress_every = None;
   }
 
 let _err msg = Error (Status.invalid_argument_error msg)
@@ -102,6 +105,13 @@ let rec _extract_flags args (acc : acc) =
   | "--snapshot-dir" :: value :: rest ->
       _extract_flags rest { acc with snapshot_dir = Some value }
   | [ "--snapshot-dir" ] -> _err "--snapshot-dir requires a path argument"
+  | "--progress-every" :: value :: rest -> (
+      match Int.of_string_opt value with
+      | Some n when n >= 1 ->
+          _extract_flags rest { acc with progress_every = Some n }
+      | _ -> _err "--progress-every requires a positive integer argument")
+  | [ "--progress-every" ] ->
+      _err "--progress-every requires a positive integer argument"
   | arg :: rest ->
       _extract_flags rest { acc with positional = arg :: acc.positional }
 
@@ -204,6 +214,7 @@ let _build_result (acc : acc) (start_date, end_date) =
       fuzz_spec = acc.fuzz_spec;
       fuzz_window = acc.fuzz_window;
       snapshot_dir = acc.snapshot_dir;
+      progress_every = acc.progress_every;
     }
 
 let parse args =

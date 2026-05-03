@@ -43,6 +43,7 @@ val run :
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
+  ?progress_emitter:Backtest_progress.emitter ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
@@ -73,6 +74,15 @@ val run :
     that [Engine.update_market] dominates the per-tick allocator profile before
     the buffer-reuse refactors land. When [gc_trace] is omitted, the runner
     takes no per-step snapshots and the cost is one [None] match per step.
+
+    [progress_emitter], when passed, threads a periodic-checkpoint hook into the
+    per-step loop. On every [emitter.every_n_fridays]-th Friday the runner
+    builds a {!Backtest_progress.t} reflecting cycles done / total / last
+    completed date / cumulative trade count / current equity, and invokes
+    [emitter.on_progress] with it. The final completed step also fires an
+    emission unconditionally so a [progress.sexp] always reflects the run's end
+    state. When [None], the runner takes no extra work — same zero-overhead
+    contract as the other optional plumbing.
 
     [bar_data_source], when passed, selects the OHLCV backend used by both the
     simulator's per-tick price reads AND the strategy's bar reads.

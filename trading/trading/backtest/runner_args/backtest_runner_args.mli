@@ -103,6 +103,14 @@ type t = {
           runner will fail loudly if the manifest is missing or schema-skewed.
           (Auto-build of the snapshot directory is deferred to a follow-up PR.)
       *)
+  progress_every : int option;
+      (** [Some n] when [--progress-every <n>] was passed; the runner emits a
+          [progress.sexp] checkpoint every [n] Friday cycles to the experiment
+          output directory, plus an unconditional final write at the end of the
+          run. [None] (the default) disables emission entirely — same
+          zero-overhead contract as the existing [--trace] / [--gc-trace]
+          plumbing. Validated at parse time: [n] must be [>= 1]. Single-run mode
+          only — baseline/smoke/fuzz modes ignore this flag. *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 

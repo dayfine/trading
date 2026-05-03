@@ -67,6 +67,9 @@ let test_minimal_start_date_only _ =
             field
               (fun (a : Backtest_runner_args.t) -> a.snapshot_dir)
               (equal_to None);
+            field
+              (fun (a : Backtest_runner_args.t) -> a.progress_every)
+              (equal_to None);
           ]))
 
 let test_override_key_path_form _ =
@@ -745,6 +748,26 @@ let test_snapshot_mode_with_fuzz _ =
               (equal_to (Some "/tmp/snapshots/v1"));
           ]))
 
+let test_progress_every_flag _ =
+  let result = _parse_csv [ "2018-01-02"; "--progress-every"; "25" ] in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.progress_every)
+          (equal_to (Some 25))))
+
+let test_progress_every_zero_is_error _ =
+  let result = _parse_csv [ "2018-01-02"; "--progress-every"; "0" ] in
+  assert_that result is_error
+
+let test_progress_every_non_numeric_is_error _ =
+  let result = _parse_csv [ "2018-01-02"; "--progress-every"; "fast" ] in
+  assert_that result is_error
+
+let test_progress_every_missing_value _ =
+  let result = _parse_csv [ "2018-01-02"; "--progress-every" ] in
+  assert_that result is_error
+
 let suite =
   "Backtest_runner_args"
   >::: [
@@ -819,6 +842,12 @@ let suite =
          >:: test_snapshot_dir_missing_value;
          "--snapshot-mode composes with --fuzz" >:: test_snapshot_mode_with_fuzz;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
+         "--progress-every captures positive int" >:: test_progress_every_flag;
+         "--progress-every 0 is rejected" >:: test_progress_every_zero_is_error;
+         "--progress-every non-numeric is rejected"
+         >:: test_progress_every_non_numeric_is_error;
+         "--progress-every without value is error"
+         >:: test_progress_every_missing_value;
        ]
 
 let () = run_test_tt_main suite

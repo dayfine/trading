@@ -83,6 +83,22 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 `dev/plans/snapshot-engine-phase-f-2026-05-03.md` for the F.2 + F.3 plan,
 including the V1/V2/V3 verification follow-ups that gate F.2.)
 
+### Merged (data-pipeline-automation track)
+
+- **#819** — Automation PR 1/4: snapshot build checkpointing
+  (`Snapshot_manifest.update_for_symbol` per-symbol atomic upsert + periodic
+  `progress.sexp` emission from `build_snapshots.exe` via `--progress-every N`,
+  plus `dev/scripts/build_broad_snapshot_incremental.sh` and
+  `dev/scripts/check_snapshot_freshness.sh`). Plan:
+  `dev/plans/data-pipeline-automation-2026-05-03.md` §"PR 1".
+- **PR 2/4** (this session): backtest progress checkpointing — extends
+  `backtest_runner.exe` with `--progress-every N` so a tail-able
+  `progress.sexp` is rewritten under the experiment output dir every N Friday
+  cycles plus an unconditional final write. New `Backtest.Backtest_progress`
+  module owns the accumulator + atomic-rename writer. Single-run mode only;
+  baseline / smoke / fuzz modes ignore the flag. Resumability deferred per
+  plan §"Open question 4". Plan §"PR 2 — backtest checkpointing".
+
 ### Merged (M5.3 streaming)
 
 - **#779** — Phase A: snapshot schema + file format.
