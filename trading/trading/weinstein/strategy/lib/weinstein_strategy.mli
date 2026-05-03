@@ -312,6 +312,7 @@ val make :
   ?ad_bars:Macro.ad_bar list ->
   ?ticker_sectors:(string, string) Hashtbl.t ->
   ?bar_panels:Data_panel.Bar_panels.t ->
+  ?bar_reader:Bar_reader.t ->
   ?audit_recorder:Audit_recorder.t ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
@@ -340,7 +341,14 @@ val make :
       When omitted, an empty reader is used — every read returns the empty list,
       which is sufficient for tests that exercise control paths where no
       panel-backed bar is ever consumed (empty universe, no held positions,
-      etc.). Production callers must always supply this.
+      etc.). Production callers must always supply this OR [bar_reader].
+    @param bar_reader
+      Optional pre-built {!Bar_reader.t}. When provided, takes precedence over
+      [bar_panels] — used by snapshot-mode runs (Phase F.2 PR 2) which build a
+      reader via {!Bar_reader.of_snapshot_views} instead of allocating a
+      {!Data_panel.Bar_panels.t}. The two parameters are mutually exclusive;
+      passing both is an unsupported combination (the strategy uses [bar_reader]
+      and ignores [bar_panels]).
     @param audit_recorder
       Optional callback bundle invoked at entry / exit decision sites
       ({!Audit_recorder.entry_event} / [exit_event]). When omitted defaults to

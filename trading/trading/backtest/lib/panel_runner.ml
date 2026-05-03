@@ -7,6 +7,8 @@ module Ohlcv_panels = Data_panel.Ohlcv_panels
 module Bar_panels = Data_panel.Bar_panels
 module Indicator_panels = Data_panel.Indicator_panels
 module Indicator_spec = Data_panel.Indicator_spec
+module Daily_panels = Snapshot_runtime.Daily_panels
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 
 type input = {
   data_dir_fpath : Fpath.t;
@@ -71,7 +73,7 @@ let _build_indicators ~ohlcv ~n_days =
 
 let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar
     ~audit_recorder =
-  (* The inner Weinstein strategy reads OHLCV bars from
+  (* CSV path: the inner Weinstein strategy reads OHLCV bars from
      {!Data_panel.Bar_panels} (populated up-front from CSV at runner start).
      Stage 3 PR-C deleted the Tiered tier system + parallel [Bar_history]
      cache; the strategy is wrapped only by [Panel_strategy_wrapper], which
@@ -92,6 +94,18 @@ let _build_strategy (input : input) ~bar_panels ~ohlcv ~indicators ~calendar
   in
   Panel_strategy_wrapper.wrap ~config:panel_config inner_strategy
 
+(* Snapshot path: the inner Weinstein strategy reads bars via a
+   pre-built [Bar_reader.t] backed by [Snapshot_runtime.Snapshot_callbacks].
+   No [Panel_strategy_wrapper] — the wrapper exists to inject a panel-backed
+   [get_indicator_fn], but the Weinstein strategy ignores [get_indicator]
+   (see [_on_market_close]'s [~get_indicator:_] argument), so wrapping is
+   pure overhead in this branch. The strategy is handed straight through
+   to the simulator. *)
+let _build_strategy_snapshot (input : input) ~bar_reader ~audit_recorder =
+  Weinstein_strategy.make ~ad_bars:input.ad_bars
+    ~ticker_sectors:input.ticker_sectors ~bar_reader ~audit_recorder
+    input.config
+
 (* LRU cap for the snapshot cache. Generous for the typical small-universe
    parity test (a few symbols × a few hundred days = handful of MB) and roomy
    for a five-year sp500 golden (universe size in the hundreds × ~1.3K days
@@ -111,14 +125,9 @@ let _build_market_data_adapter ~data_dir ?bar_data_source () =
       failwithf "Panel_runner: Bar_data_source.build_adapter failed: %s"
         (Status.show err) ()
 
-let _make_simulator (input : input) ~stop_log ~audit_recorder ~start_date
-    ~end_date ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators
-    ~calendar ~bar_panels ~market_data_adapter =
+let _make_simulator (input : input) ~stop_log ~start_date ~end_date ~warmup_days
+    ~initial_cash ~commission ~strategy ~market_data_adapter =
   let warmup_start = Date.add_days start_date (-warmup_days) in
-  let strategy =
-    _build_strategy input ~bar_panels ~ohlcv ~indicators ~calendar
-      ~audit_recorder
-  in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
@@ -204,7 +213,7 @@ let _run_simulator_with_gc_trace ?gc_trace ~stop_log sim =
     weekend, holiday, suspended, or pre-IPO) are dropped. Empty result when
     [n_days = 0]. The runner filters this alist to held symbols when populating
     [Runner.result.final_prices]. *)
-let _final_close_prices ~ohlcv =
+let _final_close_prices_csv ~ohlcv =
   let n_days = Ohlcv_panels.n_days ohlcv in
   if n_days <= 0 then []
   else
@@ -216,14 +225,31 @@ let _final_close_prices ~ohlcv =
         let v = close_panel.{row, last_col} in
         if Float.is_nan v then None else Some (symbol, v))
 
-let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
-    ~commission ?trace ?gc_trace ?bar_data_source () =
-  let warmup_start = Date.add_days start_date (-warmup_days) in
-  let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
-  let n_days = Array.length calendar in
-  eprintf "Panel_runner: calendar has %d trading days (%s..%s)\n%!" n_days
-    (Date.to_string warmup_start)
-    (Date.to_string end_date);
+(** Snapshot-mode counterpart of [_final_close_prices_csv]. Walks the universe
+    and reads the [Close] field from each symbol's snapshot row at [end_date]
+    via [Daily_panels.read_today]. Symbols not present, errored reads, or NaN
+    closes are dropped — same "missing → omit" contract as the CSV path. *)
+let _final_close_prices_snapshot ~daily_panels ~symbols ~end_date =
+  let schema = Daily_panels.schema daily_panels in
+  match
+    Data_panel_snapshot.Snapshot_schema.index_of schema
+      Data_panel_snapshot.Snapshot_schema.Close
+  with
+  | None -> []
+  | Some close_col ->
+      List.filter_map symbols ~f:(fun symbol ->
+          match Daily_panels.read_today daily_panels ~symbol ~date:end_date with
+          | Error _ -> None
+          | Ok snap ->
+              let v = snap.values.(close_col) in
+              if Float.is_nan v then None else Some (symbol, v))
+
+(* CSV path: build OHLCV + indicator panels + Bar_panels, build the
+   panel-wrapped strategy, build a CSV-backed market data adapter. Returns
+   the configured strategy and adapter plus a closure to read final-day
+   close prices when the run completes. *)
+let _setup_csv (input : input) ~calendar ~n_days ~audit_recorder
+    ~bar_data_source =
   let ohlcv = _build_ohlcv ~input ~calendar in
   let indicators = _build_indicators ~ohlcv ~n_days in
   let bar_panels =
@@ -237,6 +263,70 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     "Panel_runner: panels built (%d symbols × %d days, %d indicator specs)\n%!"
     (Ohlcv_panels.n ohlcv) n_days
     (List.length _default_specs);
+  let strategy =
+    _build_strategy input ~bar_panels ~ohlcv ~indicators ~calendar
+      ~audit_recorder
+  in
+  let adapter =
+    _build_market_data_adapter ~data_dir:input.data_dir_fpath ?bar_data_source
+      ()
+  in
+  let final_close_prices () = _final_close_prices_csv ~ohlcv in
+  (strategy, adapter, final_close_prices)
+
+(* Snapshot path: skip the OHLCV / Bar_panels / Indicator_panels build
+   entirely (the RAM-spike unblock — see eng-design Phase F.2). Build a
+   [Daily_panels.t] over the snapshot directory, derive a
+   [Snapshot_callbacks.t], then a [Bar_reader.t] over the callbacks; build
+   the strategy with that reader and the snapshot-backed adapter. *)
+let _setup_snapshot (input : input) ~snapshot_dir ~manifest ~end_date
+    ~audit_recorder =
+  let daily_panels =
+    match
+      Daily_panels.create ~snapshot_dir ~manifest
+        ~max_cache_mb:_snapshot_cache_mb
+    with
+    | Ok p -> p
+    | Error err ->
+        failwithf "Panel_runner: Daily_panels.create failed: %s"
+          (Status.show err) ()
+  in
+  let callbacks = Snapshot_callbacks.of_daily_panels daily_panels in
+  let bar_reader = Weinstein_strategy.Bar_reader.of_snapshot_views callbacks in
+  let strategy = _build_strategy_snapshot input ~bar_reader ~audit_recorder in
+  let adapter =
+    _build_market_data_adapter ~data_dir:input.data_dir_fpath
+      ~bar_data_source:(Bar_data_source.Snapshot { snapshot_dir; manifest })
+      ()
+  in
+  let final_close_prices () =
+    _final_close_prices_snapshot ~daily_panels ~symbols:input.all_symbols
+      ~end_date
+  in
+  (strategy, adapter, final_close_prices)
+
+(* Dispatch the per-mode setup. CSV is the default; Snapshot is the F.2
+   short-circuit that bypasses [Bar_panels.t]. The selector is the same
+   [Bar_data_source.t] the simulator already uses for per-tick price
+   reads — so passing [Snapshot _] flips both the strategy's bar reads
+   and the simulator's per-tick reads onto the snapshot backing in one
+   gesture. *)
+let _setup_for_mode (input : input) ~calendar ~n_days ~end_date ~audit_recorder
+    ~bar_data_source =
+  match bar_data_source with
+  | None | Some Bar_data_source.Csv ->
+      _setup_csv input ~calendar ~n_days ~audit_recorder ~bar_data_source
+  | Some (Bar_data_source.Snapshot { snapshot_dir; manifest }) ->
+      _setup_snapshot input ~snapshot_dir ~manifest ~end_date ~audit_recorder
+
+let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
+    ~commission ?trace ?gc_trace ?bar_data_source () =
+  let warmup_start = Date.add_days start_date (-warmup_days) in
+  let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
+  let n_days = Array.length calendar in
+  eprintf "Panel_runner: calendar has %d trading days (%s..%s)\n%!" n_days
+    (Date.to_string warmup_start)
+    (Date.to_string end_date);
   let stop_log = Stop_log.create () in
   let trade_audit = Trade_audit.create () in
   let force_liquidation_log = Force_liquidation_log.create () in
@@ -244,18 +334,17 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     Trade_audit_recorder.of_collector ~trade_audit ~force_liquidation_log
   in
   let n_all_symbols = List.length input.all_symbols in
-  let market_data_adapter =
-    _build_market_data_adapter ~data_dir:input.data_dir_fpath ?bar_data_source
-      ()
+  let strategy, market_data_adapter, final_close_prices_thunk =
+    _setup_for_mode input ~calendar ~n_days ~end_date ~audit_recorder
+      ~bar_data_source
   in
   let sim =
-    _make_simulator input ~stop_log ~audit_recorder ~start_date ~end_date
-      ~warmup_days ~initial_cash ~commission ~ohlcv ~indicators ~calendar
-      ~bar_panels ~market_data_adapter
+    _make_simulator input ~stop_log ~start_date ~end_date ~warmup_days
+      ~initial_cash ~commission ~strategy ~market_data_adapter
   in
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
         _run_simulator_with_gc_trace ?gc_trace ~stop_log sim)
   in
-  let final_close_prices = _final_close_prices ~ohlcv in
+  let final_close_prices = final_close_prices_thunk () in
   (sim_result, stop_log, trade_audit, force_liquidation_log, final_close_prices)

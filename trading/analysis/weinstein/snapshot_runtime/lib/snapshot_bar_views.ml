@@ -3,25 +3,14 @@
 
 open Core
 module BA1 = Bigarray.Array1
+module Bar_panels = Data_panel.Bar_panels
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
-type weekly_view = {
-  closes : float array;
-  raw_closes : float array;
-  highs : float array;
-  lows : float array;
-  volumes : float array;
-  dates : Core.Date.t array;
-  n : int;
-}
-
-type daily_view = {
-  highs : float array;
-  lows : float array;
-  closes : float array;
-  dates : Core.Date.t array;
-  n_days : int;
-}
+(* Phase F.2 PR 2: views are type-equal to [Bar_panels]'s — see the .mli. The
+   record definitions live in [Bar_panels] today; PR 3 (Phase F.3) hoists them
+   here when [Bar_panels] is deleted. *)
+type weekly_view = Bar_panels.weekly_view
+type daily_view = Bar_panels.daily_view
 
 let _empty_weekly_view : weekly_view =
   {
@@ -137,27 +126,61 @@ let _truncate_weekly_view (v : weekly_view) ~n : weekly_view =
       n;
     }
 
+(* Read OHLCV histories over [(from, as_of)] for [symbol] and assemble into
+   a [Daily_price.t list] in chronological order. Returns [] under the same
+   "missing → empty" contract as the rest of the module. Shared by
+   {!weekly_view_for}, {!daily_bars_for} and {!weekly_bars_for}. *)
+let _daily_bars_in_range cb ~symbol ~from ~as_of =
+  let read field =
+    _read_history_or_empty cb ~symbol ~from ~until:as_of ~field
+  in
+  let close = read Snapshot_schema.Close in
+  if List.is_empty close then []
+  else
+    let adj = read Snapshot_schema.Adjusted_close in
+    let high = read Snapshot_schema.High in
+    let low = read Snapshot_schema.Low in
+    let volume = read Snapshot_schema.Volume in
+    _assemble_daily_bars ~adj ~close ~high ~low ~volume
+
 let weekly_view_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of =
   if n <= 0 then _empty_weekly_view
   else
     let from = Date.add_days as_of (-_weekly_calendar_span ~n) in
-    let read field =
-      _read_history_or_empty cb ~symbol ~from ~until:as_of ~field
-    in
-    let close = read Snapshot_schema.Close in
-    if List.is_empty close then _empty_weekly_view
+    let bars = _daily_bars_in_range cb ~symbol ~from ~as_of in
+    if List.is_empty bars then _empty_weekly_view
     else
-      let adj = read Snapshot_schema.Adjusted_close in
-      let high = read Snapshot_schema.High in
-      let low = read Snapshot_schema.Low in
-      let volume = read Snapshot_schema.Volume in
-      let bars = _assemble_daily_bars ~adj ~close ~high ~low ~volume in
-      if List.is_empty bars then _empty_weekly_view
-      else
-        let weekly =
-          Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
-        in
-        _truncate_weekly_view (_weekly_view_of_bars weekly) ~n
+      let weekly =
+        Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
+      in
+      _truncate_weekly_view (_weekly_view_of_bars weekly) ~n
+
+(* History window for [daily_bars_for] / [weekly_bars_for]. The strategy
+   readers return everything from time-zero up to [as_of]; the snapshot
+   path is keyed by date so we walk back a fixed-width window large enough
+   to cover any practical backtest horizon (10 years / 3653 days). The
+   [_assemble_daily_bars] tail filter NaN-skips pre-IPO / suspended cells,
+   so the window doesn't need to align with [symbol]'s actual history. *)
+let _bar_list_history_days = 3653
+
+let daily_bars_for (cb : Snapshot_callbacks.t) ~symbol ~as_of :
+    Types.Daily_price.t list =
+  let from = Date.add_days as_of (-_bar_list_history_days) in
+  _daily_bars_in_range cb ~symbol ~from ~as_of
+
+let weekly_bars_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of :
+    Types.Daily_price.t list =
+  if n <= 0 then []
+  else
+    let from = Date.add_days as_of (-_bar_list_history_days) in
+    let bars = _daily_bars_in_range cb ~symbol ~from ~as_of in
+    if List.is_empty bars then []
+    else
+      let weekly =
+        Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
+      in
+      let len = List.length weekly in
+      if len <= n then weekly else List.drop weekly (len - n)
 
 (* Take the trailing [k] elements of a list. [k <= 0] yields []. *)
 let _take_trailing l k =

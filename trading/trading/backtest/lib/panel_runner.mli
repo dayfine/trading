@@ -74,13 +74,24 @@ val run :
     the buffer-reuse refactors land. When [gc_trace] is omitted, the runner
     takes no per-step snapshots and the cost is one [None] match per step.
 
-    [bar_data_source], when passed, selects the OHLCV backend the simulator's
-    per-tick price reads use. Default ({!Bar_data_source.Csv}) is the
-    pre-Phase-D behaviour: build a CSV-backed [Market_data_adapter] from
-    [input.data_dir_fpath]. {!Bar_data_source.Snapshot} switches to a
-    callback-mode adapter backed by [Daily_panels.t] over the snapshot directory
-    in the selector. The strategy's bar reads (via [Bar_panels.t]) are unchanged
-    in either mode — only the simulator's per-tick reads (engine
-    [update_market], split detection, MtM portfolio_value, benchmark return)
-    shift to the snapshot source. Phase D scope; see
-    [dev/plans/snapshot-engine-phase-d-2026-05-02.md]. *)
+    [bar_data_source], when passed, selects the OHLCV backend used by both the
+    simulator's per-tick price reads AND the strategy's bar reads.
+
+    - Default ({!Bar_data_source.Csv}) is the pre-Phase-D behaviour: build OHLCV
+      / Indicator / Bar panels up front from CSV; the strategy reads via
+      [Bar_panels.t] through [Bar_reader.of_panels]; the simulator's
+      [Market_data_adapter] reads from CSV.
+
+    - {!Bar_data_source.Snapshot} switches both surfaces to the snapshot
+      backing. Phase F.2 PR 2 (snapshot-engine plan) made this branch skip the
+      [Bar_panels.t] / [Ohlcv_panels.t] / [Indicator_panels.t] allocation
+      entirely — these were the dominant resident-set cost at tier-4 universe
+      sizes (~27 GB at N=5000 × 10y). The strategy reads via
+      [Bar_reader.of_snapshot_views] over [Snapshot_runtime.Daily_panels]
+      (LRU-bounded, [_snapshot_cache_mb] cap); the simulator's adapter is the
+      same callback-mode adapter Phase D introduced. The snapshot path keeps no
+      calendar-wide bigarray panel resident.
+
+    Phase D wired the simulator surface; Phase F.2 PR 2 wires the strategy
+    surface. See [dev/plans/snapshot-engine-phase-d-2026-05-02.md] and the Phase
+    F notes in [dev/plans/daily-snapshot-streaming-2026-04-27.md]. *)

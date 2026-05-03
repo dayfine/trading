@@ -8,6 +8,7 @@
   trading.base
   trading.data_panel
   trading.strategy
+  weinstein.snapshot_runtime
   weinstein.types
   weinstein_trading.stops
   weinstein_trading.portfolio_risk

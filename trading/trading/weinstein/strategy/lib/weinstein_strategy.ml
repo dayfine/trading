@@ -609,7 +609,7 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
         }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels
+    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels ?bar_reader
     ?(audit_recorder = Audit_recorder.noop) config =
   let stop_states = ref initial_stop_states in
   (* Per-symbol last stop-out date — feeds [Screener.screen_with_cooldown]
@@ -635,20 +635,28 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
      Friday so an exit firing before the first screen call gets a stable
      [Neutral / 0.0] snapshot. *)
   let prior_macro_result : Macro.result option ref = ref None in
-  (* Stage 4 PR-D: when bar_panels are present, also create a [Weekly_ma_cache]
+  (* Stage 4 PR-D: when bar_panels are present, create a [Weekly_ma_cache]
      scoped to this strategy and bundle it into the [Bar_reader]. The cache
      is read by [Panel_callbacks.stage_callbacks_of_weekly_view] (and
      transitively by Stock_analysis / Sector / Macro / Stops_runner) so
      per-symbol weekly MA values are computed once, not per Friday tick.
 
      The cache is opt-in (only when bar_panels are passed) so test
-     fixtures using [Bar_reader.empty ()] aren't affected. *)
+     fixtures using [Bar_reader.empty ()] aren't affected.
+
+     Phase F.2 PR 2: [bar_reader] is an alternate path used by snapshot-mode
+     runs that bypasses the [Bar_panels.t] allocation entirely. When
+     [bar_reader] is provided it takes precedence; otherwise fall back to
+     the [bar_panels]-or-empty branches above. *)
   let bar_reader =
-    match bar_panels with
-    | Some p ->
-        let ma_cache = Weekly_ma_cache.create p in
-        Bar_reader.of_panels ~ma_cache p
-    | None -> Bar_reader.empty ()
+    match bar_reader with
+    | Some r -> r
+    | None -> (
+        match bar_panels with
+        | Some p ->
+            let ma_cache = Weekly_ma_cache.create p in
+            Bar_reader.of_panels ~ma_cache p
+        | None -> Bar_reader.empty ())
   in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
