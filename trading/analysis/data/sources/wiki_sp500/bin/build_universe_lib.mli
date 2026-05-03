@@ -56,3 +56,29 @@ val write_outcome_to_file :
 (** Write [outcome.universe_sexp] to [path] prefixed with a comment header
     citing [as_of], the cardinality, and [outcome.skipped]. The consumer (e.g.
     {!Universe_file.load}) ignores the comment block. *)
+
+(** {1 Change-log output (PR-D)} *)
+
+type change_log_outcome = {
+  jsonl : string;
+  initial_size : int;
+      (** Membership cardinality at [from] (the seed-state line count). *)
+  event_count : int;  (** Number of change events with [from < date <= until]. *)
+}
+
+val run_change_log :
+  from:Date.t ->
+  until:Date.t ->
+  current_csv_path:string ->
+  wiki_html_path:string ->
+  change_log_outcome Status.status_or
+(** Read pinned fixtures and build a {!Wiki_sp500.Membership_replay.timeline}
+    over [[from..until]]. The returned [jsonl] is one event per line; see
+    {!Wiki_sp500.Membership_replay.timeline_to_jsonl} for the schema. Returns
+    [Error] on read/parse failures or [from > until]. Pure relative to the two
+    file reads — no network. *)
+
+val write_change_log_to_file :
+  path:string -> change_log_outcome -> unit Status.status_or
+(** Write [outcome.jsonl] to [path]. No header comments — the file must be valid
+    JSONL parseable by any line-oriented JSON consumer. *)

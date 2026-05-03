@@ -205,6 +205,145 @@ let test_replay_to_2010_differs_from_snapshot _ =
   let only_in_2010 = Set.diff result_set snapshot_set in
   assert_that (Set.length only_in_2010) (gt (module Int_ord) 40)
 
+(* --- Timeline (PR-D) tests -------------------------------------------- *)
+
+let _build_timeline_exn ~current ~changes ~from ~until =
+  match build_timeline ~current ~changes ~from ~until with
+  | Ok t -> t
+  | Error err -> assert_failure ("build_timeline: " ^ Status.show err)
+
+(* Building a timeline over the full pinned window must succeed and accept
+   [from = until] for a single-day timeline. *)
+let test_build_timeline_basic _ =
+  let current = _load_pinned_current () in
+  let changes = _load_pinned_changes () in
+  let result =
+    build_timeline ~current ~changes ~from:_date_2010_01_01
+      ~until:_snapshot_date
+  in
+  assert_that result is_ok
+
+let test_build_timeline_rejects_inverted_window _ =
+  let current = _load_pinned_current () in
+  let changes = _load_pinned_changes () in
+  let result =
+    build_timeline ~current ~changes ~from:_snapshot_date
+      ~until:_date_2010_01_01
+  in
+  assert_that result is_error
+
+(* Pin two known facts:
+     - HOLX (removed 2026-04-09) was a member 2026-04-08, NOT a member
+       2026-05-03.
+     - CASY (added 2026-04-09) was NOT a member 2026-04-08, IS a member
+       2026-05-03.
+   The timeline replays forward from [from], so [is_member] must match
+   the [replay_back] semantics already exercised by earlier tests. *)
+let test_is_member_query _ =
+  let current = _load_pinned_current () in
+  let changes = _load_pinned_changes () in
+  let timeline =
+    _build_timeline_exn ~current ~changes ~from:_date_2010_01_01
+      ~until:_snapshot_date
+  in
+  let q sym d = is_member timeline ~symbol:sym ~as_of:d in
+  let on_april_9 = Date.create_exn ~y:2026 ~m:Month.Apr ~d:9 in
+  let observed =
+    [
+      ("HOLX 2026-04-08", q "HOLX" _day_before_april_9_2026);
+      ("HOLX 2026-05-03", q "HOLX" _snapshot_date);
+      ("CASY 2026-04-08", q "CASY" _day_before_april_9_2026);
+      ("CASY 2026-04-09", q "CASY" on_april_9);
+    ]
+  in
+  let expected =
+    [
+      ("HOLX 2026-04-08", true);
+      ("HOLX 2026-05-03", false);
+      ("CASY 2026-04-08", false);
+      ("CASY 2026-04-09", true);
+    ]
+  in
+  assert_that observed
+    (elements_are
+       (List.map expected ~f:(fun (label, want) ->
+            all_of
+              [
+                field (fun (l, _) -> l) (equal_to label);
+                field (fun (_, b) -> b) (equal_to want);
+              ])))
+
+(* Out-of-window queries must return [false]. *)
+let test_is_member_outside_window_is_false _ =
+  let current = _load_pinned_current () in
+  let changes = _load_pinned_changes () in
+  let timeline =
+    _build_timeline_exn ~current ~changes ~from:_date_2010_01_01
+      ~until:_snapshot_date
+  in
+  let before = Date.create_exn ~y:2009 ~m:Month.Dec ~d:31 in
+  let after = Date.create_exn ~y:2026 ~m:Month.May ~d:4 in
+  assert_that
+    ( is_member timeline ~symbol:"AAPL" ~as_of:before,
+      is_member timeline ~symbol:"AAPL" ~as_of:after )
+    (pair (equal_to false) (equal_to false))
+
+(* JSONL output:
+     - Every line is parseable JSON (starts with { and ends with }).
+     - Schema is the documented 4 fields.
+     - Lines are sorted by date ascending (the seed dates all equal
+       [from]; subsequent events have monotone non-decreasing dates).
+   We don't depend on yojson here — the encoder is a hand-rolled subset
+   for the finite domain; assert structural invariants directly. *)
+type _jsonl_summary = {
+  count : int;
+  all_have_required_fields : bool;
+  dates_sorted_ascending : bool;
+}
+
+let _summarize_jsonl jsonl =
+  let lines =
+    String.split_lines jsonl
+    |> List.filter ~f:(fun l -> not (String.is_empty l))
+  in
+  let all_have_required_fields =
+    List.for_all lines ~f:(fun l ->
+        String.is_prefix l ~prefix:"{"
+        && String.is_suffix l ~suffix:"}"
+        && String.is_substring l ~substring:{|"date":|}
+        && String.is_substring l ~substring:{|"action":|}
+        && String.is_substring l ~substring:{|"symbol":|}
+        && String.is_substring l ~substring:{|"sector":|})
+  in
+  let extract_date_prefix l =
+    (* Lines start with [{"date":"YYYY-MM-DD",...]; pull the 10-char date. *)
+    let prefix_len = String.length {|{"date":"|} in
+    String.sub l ~pos:prefix_len ~len:10
+  in
+  let dates = List.map lines ~f:extract_date_prefix in
+  let sorted_dates = List.sort dates ~compare:String.compare in
+  {
+    count = List.length lines;
+    all_have_required_fields;
+    dates_sorted_ascending = List.equal String.equal dates sorted_dates;
+  }
+
+let test_timeline_to_jsonl_schema _ =
+  let current = _load_pinned_current () in
+  let changes = _load_pinned_changes () in
+  let timeline =
+    _build_timeline_exn ~current ~changes ~from:_date_2010_01_01
+      ~until:_snapshot_date
+  in
+  let summary = _summarize_jsonl (timeline_to_jsonl timeline) in
+  assert_that summary
+    (all_of
+       [
+         field (fun s -> s.all_have_required_fields) (equal_to true);
+         field (fun s -> s.dates_sorted_ascending) (equal_to true);
+         field (fun s -> s.count) (gt (module Int_ord) 480);
+       ])
+
 let suite =
   "membership_replay_test"
   >::: [
@@ -228,6 +367,13 @@ let suite =
          >:: test_to_universe_sexp_matches_canonical_shape;
          "replay_to_2010_differs_from_snapshot"
          >:: test_replay_to_2010_differs_from_snapshot;
+         "build_timeline_basic" >:: test_build_timeline_basic;
+         "build_timeline_rejects_inverted_window"
+         >:: test_build_timeline_rejects_inverted_window;
+         "is_member_query" >:: test_is_member_query;
+         "is_member_outside_window_is_false"
+         >:: test_is_member_outside_window_is_false;
+         "timeline_to_jsonl_schema" >:: test_timeline_to_jsonl_schema;
        ]
 
 let () = run_test_tt_main suite

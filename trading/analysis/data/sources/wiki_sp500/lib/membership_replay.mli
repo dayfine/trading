@@ -93,3 +93,47 @@ val to_universe_sexp : constituent list -> Core.Sexp.t
 
     Note: [security_name] is dropped from the output sexp because the consuming
     sexp schema (in [Universe.t]) only has [symbol] + [sector] fields. *)
+
+(* --- Dynamic universe (PR-D) ------------------------------------------- *)
+
+type timeline
+(** Pre-computed membership across the full window [[from..until]]. Built once
+    from [(current, changes)]; answers [is_member] queries at any date in O(log
+    k) where k = number of change events in the window. Sectors at re-add time
+    follow the same ["Unknown"] convention as {!replay_back}.
+
+    Companion plan: [dev/plans/wiki-eodhd-historical-universe-2026-05-03.md]
+    §PR-D and §Open questions #7. *)
+
+val build_timeline :
+  current:constituent list ->
+  changes:Changes_parser.change_event list ->
+  from:Core.Date.t ->
+  until:Core.Date.t ->
+  timeline Status.status_or
+(** [build_timeline ~current ~changes ~from ~until] computes membership at
+    [from] (via {!replay_back}) and indexes every change event with
+    [from < effective_date <= until] for forward replay.
+
+    Returns [Error] when [from > until].
+
+    Pre-condition: [changes] must be in source order (newest-first), which
+    {!Changes_parser.parse} guarantees. *)
+
+val is_member : timeline -> symbol:string -> as_of:Core.Date.t -> bool
+(** [is_member t ~symbol ~as_of] is [true] iff [symbol] is in the index on
+    [as_of]. Returns [false] for [as_of] outside the timeline window
+    [[from..until]]. Pure. *)
+
+val timeline_to_jsonl : timeline -> string
+(** [timeline_to_jsonl t] renders the timeline as JSONL — one event per line.
+
+    Schema for each line:
+    [{"date":"YYYY-MM-DD","action":"added"|"removed","symbol":"...","sector":"..."}]
+
+    Output ordering:
+    - One ["added"] line per member of the initial-window set, all dated [from]
+      and sorted by [symbol] ascending — these establish the seed state.
+    - One line per change event with [from < effective_date <= until], sorted by
+      [effective_date] ascending and (within a day) by [action] ascending
+      ([added] before [removed]) for stable diffs. *)
