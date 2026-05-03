@@ -3,8 +3,17 @@
   test_changes_parser
   test_reason_classifier
   test_membership_replay
-  test_ticker_aliases)
- (libraries wiki_sp500 core ounit2 matchers status)
+  test_ticker_aliases
+  test_build_universe)
+ (libraries
+  wiki_sp500
+  build_universe_lib
+  core
+  core_unix.filename_unix
+  core_unix
+  ounit2
+  matchers
+  status)
  (deps
   (glob_files ./data/*.html)
   (glob_files ./data/*.csv)
