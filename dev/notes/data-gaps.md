@@ -95,9 +95,45 @@ Probe scripts under `dev/scripts/probes/`. Full writeup in `dev/notes/adl-valida
 
 ---
 
+## sp500 Universe Coverage — 12 Missing Symbols
+
+**Status**: Open (filed 2026-05-03; recurrence is structural, not one-off)
+**Blocks**: Nothing critical — the 491 symbols in `trading/test_data/backtest_scenarios/universes/sp500.sexp` are sufficient for current goldens. The 12 missing are recent additions or delistings without downloaded history.
+**Affects**: `goldens-sp500/` scenarios (slight under-coverage, pinned at generation time so reproducibility is preserved); future Wiki+EODHD replay (`dev/plans/wiki-eodhd-historical-universe-2026-05-03.md`) inherits the same pattern.
+
+### Background
+
+S&P 500 actually has **503 securities** (5 dual-class: GOOG/GOOGL, NWSA/NWS, FOXA/FOX, BRK.A/BRK.B, etc). Today's `sp500.sexp` has 491 — i.e. 12 of 503 are not in our local CSV cache. Header comment on the file already notes this.
+
+### Resolution
+
+**ops-data dispatch**:
+1. Re-run the join script that produced `sp500.sexp` (currently inline; should be extracted to `dev/scripts/build_sp500_universe.sh` per the file's TODO).
+2. Identify the 12 symbols missing from the local cache.
+3. Fetch via `analysis/scripts/fetch_symbols.exe -- --symbols <comma-list>`.
+4. Rebuild inventory via `analysis/scripts/build_inventory/build_inventory.exe`.
+5. Regenerate `sp500.sexp` (now 503 symbols).
+6. Update this entry to **RESOLVED** with resolution date.
+
+**Estimated effort**: ~30 min ops-data dispatch (mostly fetch wall + golden regen).
+
+### Recurrence pattern (structural, not one-off)
+
+The same gap reappears at any historical date — when Wiki+EODHD replay (PR-A/B/C of `wiki-eodhd-historical-universe-2026-05-03.md`) lands and emits historical-date universe sexps, each will reference symbols not in the local cache (delisted issues, recent IPOs).
+
+Plan locks the fix into PR-C: `build_universe.exe --fetch-prices` auto-fetches on cache miss, closing the gap at construction time. **ops-data is not the routine resolver** for replay-driven universes — the build CLI itself fetches. ops-data still owns gap-by-symbol resolution for static `sp500.sexp` regeneration.
+
+### What's needed
+
+- **ops-data**: extract `dev/scripts/build_sp500_universe.sh` from inline join logic; fetch the 12 missing; regenerate `sp500.sexp`. Independent task — not blocked.
+- **feat-data** (downstream): build_universe.exe in PR-C (Wiki+EODHD plan) replicates this pattern with `--fetch-prices` auto-fetch.
+
+---
+
 ## Resolution ownership
 
-Data fetching and inventory: **ops-data** agent  
-EODHD API tier upgrade decision: **human**  
-Alternative ADL source research: **human** (or ops-data if a source is identified)  
+Data fetching and inventory: **ops-data** agent
+EODHD API tier upgrade decision: **human**
+Alternative ADL source research: **human** (or ops-data if a source is identified)
 Strategy wiring once data available: **feat-weinstein** agent
+Historical-universe replay infrastructure: **feat-data** agent
