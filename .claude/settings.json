@@ -9,6 +9,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/difan/Projects/trading-1/dev/scripts/cleanup_merged_worktrees.sh"
+          }
+        ]
+      }
     ]
   }
 }
