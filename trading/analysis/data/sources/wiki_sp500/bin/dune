@@ -1,0 +1,13 @@
+(library
+ (name build_universe_lib)
+ (modules build_universe_lib)
+ (libraries core async wiki_sp500 eodhd status types)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name build_universe)
+ (modules build_universe)
+ (libraries core core_unix.command_unix async async_unix build_universe_lib)
+ (preprocess
+  (pps ppx_jane)))
