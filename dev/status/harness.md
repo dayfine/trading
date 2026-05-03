@@ -58,6 +58,7 @@ Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. 
 - [x] T1-P: Add `## Refactor Mode` prompt variant to feat-agent definitions
 - [x] T1-Q: Cyclomatic complexity linter — extend `fn_length_linter` via `compiler-libs`; CC > 10 = warning; output to `dev/metrics/cc-YYYY-MM-DD.json`
 - [x] T1-Q: qc-behavioral quality score — add `## Quality Score` (1–5 + rationale) to output; tracked in audit trail
+- [x] T1-R: Auto-cleanup merged-PR worktrees on session end — `dev/scripts/cleanup_merged_worktrees.sh` (jj-state-driven; no registry; sweeps `.claude/worktrees/agent-*/` whose branch is gone from origin); wired via Stop hook in `.claude/settings.json`. Closes the disk-pressure gap during long interactive sessions where merged-PR worktrees idle for hours before the SessionStart sweep catches them. Verify: dry-run via `bash dev/scripts/cleanup_merged_worktrees.sh --dry-run`. Slash-command surface (`/cleanup-merged` for opt-in mid-session reclaim) deferred to follow-up.
 
 ## Tier 2 — Milestone-gated
 
