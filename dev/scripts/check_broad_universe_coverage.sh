@@ -78,25 +78,34 @@ fi
 have=0
 missing_list=""
 
-# Inventory: symbol path is data_dir/<L1>/<L2>/<symbol>/data.csv
-# Probe each. Symbols may have non-letter prefixes; only first two letters
-# are used as path segments so single-letter tickers are at data_dir/<L>/data.csv
-# (no second segment) — handle both shapes.
+# Probe each symbol using the storage module path convention:
+#   data_dir/<first_char>/<last_char>/<symbol>/data.csv
+# See csv_storage.ml: symbol_data_dir uses String.get 0 and String.get (len-1).
+# Dot-notation symbols (BF.A, BRK.B) are also checked with dots replaced by
+# dashes (BF-A, BRK-B) since EODHD returns dash-form for dual-class shares.
 while IFS= read -r sym; do
   [ -z "$sym" ] && continue
   l1=$(printf '%s' "$sym" | cut -c1)
-  l2=$(printf '%s' "$sym" | cut -c2)
+  sym_len=${#sym}
+  l2=$(printf '%s' "$sym" | cut -c"${sym_len}")
 
-  if [ ${#sym} -eq 1 ]; then
-    csv_path="$data_dir/$l1/$sym/data.csv"
+  csv_path="$data_dir/$l1/$l2/$sym/data.csv"
+
+  found=false
+  if [ -f "$csv_path" ]; then
+    found=true
   else
-    csv_path="$data_dir/$l1/$l2/$sym/data.csv"
+    # dot-notation fallback: also check dash form (e.g. BF.A -> BF-A)
+    sym_dash=$(printf '%s' "$sym" | tr '.' '-')
+    if [ "$sym_dash" != "$sym" ]; then
+      sym_dash_len=${#sym_dash}
+      l2d=$(printf '%s' "$sym_dash" | cut -c"${sym_dash_len}")
+      dash_path="$data_dir/$l1/$l2d/$sym_dash/data.csv"
+      [ -f "$dash_path" ] && found=true
+    fi
   fi
 
-  if [ -f "$csv_path" ]; then
-    have=$((have + 1))
-  elif [ -f "$data_dir/$l1/$sym/data.csv" ]; then
-    # Fallback: some single-segment cases (e.g. legacy)
+  if [ "$found" = "true" ]; then
     have=$((have + 1))
   else
     if [ "$list_missing" = "true" ]; then
