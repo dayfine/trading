@@ -185,8 +185,20 @@ Glue layer + CLI + first canonical golden universe.
   - The interim nature ("for full 1990-present, use Norgate per M7.0 Track 1")
 - Pinned golden: `goldens-sp500-historical/sp500-2010-01-01.sexp`. Optionally also 2013/2016/2019/2022 snapshots for incremental coverage; defer the latter four to a follow-up if PR-C is at the LOC ceiling.
 - Smoke test (CI-cheap): build the 2010-01-01 universe with `--fetch-prices` disabled and assert size + spot-check 5 known-removed symbols (e.g. `LEH`, `WB`, `CFC`, `AIG` was-still-in, `BSC`).
+- **Auto-fetch on cache miss**: with `--fetch-prices` set, if a replay-membership symbol has no local CSV under `dev/data/wiki_sp500/<sym>.csv` (or `analysis/data/sources/eodhd/cache/<sym>.csv`), invoke `Http_client.get_historical_price` to fetch and cache. Logs a single line per fetch. Without `--fetch-prices`, missing symbols produce a warning + are excluded with a `(skipped …)` comment in the output sexp. The "12 missing today" pattern (per `dev/notes/data-gaps.md` §sp500-universe-coverage) recurs at any historical date and is closed by this same flag.
 
 Acceptance: `goldens-sp500-historical/sp500-2010-01-01.sexp` checked into the repo; the existing backtester (`backtest_runner.exe`) can load it and run a 2010–2011 simulation end-to-end without symbol-resolution errors. Network-dependent acceptance (full price fetch for ~50 net-new delisted symbols) is local-only, not gated in CI.
+
+### PR-D (follow-up) — change-log output for dynamic universe (~200 LOC, optional)
+
+Static-sexp output of PR-C handles fixed-universe backtests. For mid-window rebalancing — where stocks join/leave the index *during* a backtest run — emit a change-log instead:
+
+- `bin/build_universe.ml --change-log --from YYYY-MM-DD --until YYYY-MM-DD --output <path>.jsonl` writes one event per line: `{"date": "...", "action": "added"|"removed", "symbol": "...", "sector": "..."}`
+- New `Membership_replay.is_member : t -> symbol:string -> as_of:Date.t -> bool` for runtime PIT lookup
+- Backtester integration: optional `--universe-change-log <path>` flag (separate PR; lives in `feat-backtest`); if present, screener filters candidates by `is_member` at each tick
+- This PR is OPT-IN — does not change static output behavior
+
+Out of scope for first delivery (PR-A/B/C). File when M5.x scenarios show appreciable drift between static and dynamic universes.
 
 ## Open questions
 
@@ -200,6 +212,7 @@ Acceptance: `goldens-sp500-historical/sp500-2010-01-01.sexp` checked into the re
    This is *not* equivalent to Norgate-grade ground truth; we accept that explicitly. When Norgate lands, a one-off cross-check job (Norgate vs Wiki-replay) becomes the definitive correctness test, and divergences seed `Ticker_aliases` updates.
 5. **Sector drift during the window.** The replay returns *current* GICS sector for each symbol — an XOM in 2010 was sector "Energy", which is correct, but a reclassified company would carry today's sector throughout. Documented as a known limitation; Norgate plan covers point-in-time sector if needed.
 6. **Refresh cadence.** Wikipedia gets edited continuously. Plan: pin an HTML snapshot (`changes_table_2026-05-03.html`), commit it, treat refresh as a manual session-level operation. PR-A documents the refresh recipe (curl + sed extract). No live web-fetch at backtest time.
+7. **Output shape — static sexp vs change-log.** PR-C ships the static sexp (one universe per `--as-of` date; matches existing `goldens-sp500/` format). For mid-window rebalancing — where a stock joins or leaves the index *during* a backtest — the static-universe approach is biased: stocks added mid-window aren't tradeable; stocks removed mid-window keep trading until delisted. For Weinstein (long-horizon, weekly cadence) the bias is small but real. PR-D (deferred follow-up; ~200 LOC) emits a change-log JSONL covering the full window, plus a backtester opt-in `--universe-change-log` flag that calls `Membership_replay.is_member` at each tick. File when M5.x scenarios show appreciable drift between static and dynamic universes.
 
 ## Acceptance
 
@@ -214,6 +227,16 @@ Measurable, end-to-end:
    - At least 10 such cases curated.
 4. **Backtest end-to-end**: `goldens-sp500-historical/sp500-2010-01-01.sexp` is loaded by `backtest_runner.exe` for a 2010-01-01 → 2011-12-31 window. **No symbol-resolution errors**, no missing-bar panics. Symbols with no available daily bars produce a warning + are skipped, not a fatal error. The number of fatal-skipped symbols is logged and ≤ 5% of the universe.
 5. **Diff vs current `sp500.sexp`**: the 2010-01-01 universe has ≥40 symbols not present in today's `sp500.sexp` (the survivorship-bias delta — these are exactly the names backtests on the current universe miss).
+6. **Universe completeness — auto-fetch closes data gaps**: at any `--as-of` date in `[2010, 2026]`, running `build_universe.exe --as-of <date> --fetch-prices` resolves every replay-membership symbol to a local CSV under `dev/data/wiki_sp500/<sym>.csv` (or skips with a `(skipped …)` annotation in the output sexp + a `dev/notes/data-gaps.md` log line). Without `--fetch-prices`, missing symbols produce warnings; the same "12 missing today" pattern recurs at any historical date (per the existing `sp500.sexp` header comment) and is closed by this same fetch path. ops-data agent owns gap resolution per `.claude/agents/ops-data.md` §"Known gaps".
+7. **Index-reconstruction verification — cap-weighted SPX cross-check**: compute cap-weighted total return of replay-membership × per-symbol EODHD prices × shares-outstanding (from EODHD fundamentals API; no float adjustment in tier-2) and compare to SPX historical. Quarterly absolute deviation ≤ 5% over 2010–2026 (tier-2 cap-weight; tier-3 with float + divisor would close to bps but requires separate vendor — out of scope). Divergences > 5% in a single quarter flag potential `Ticker_aliases` updates or missed change-events. Tier-1 fallback (equal-weight return correlation ρ > 0.95 vs SPX) when fundamentals data is unavailable.
+
+### Verification tiers (table)
+
+| Tier | Method | Vendor cost | Match quality | Use |
+|---|---|---|---|---|
+| 1 | Equal-weight monthly-return correlation vs SPX | none (already have prices) | ρ > 0.95 expected | smoke check; cheap |
+| 2 | Cap-weight (shares outstanding, no float) | EODHD fundamentals (existing tier) | within 2–5% per quarter | **canonical correctness oracle** |
+| 3 | Cap-weight + float-factor + S&P divisor | float + divisor vendor (separate) | within bps | overkill; deferred |
 
 ## Cross-links
 
