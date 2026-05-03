@@ -1,6 +1,6 @@
 # Data Gaps — features blocked on missing data
 
-Last updated: 2026-05-03 (sp500 historical coverage: 217/218 delisted symbols fetched; _old suffix probe complete)
+Last updated: 2026-05-03 (broad universe coverage RESOLVED 100%; coverage check script bug fixed; sp500 historical 217/218 delisted symbols fetched)
 
 ## A-D Breadth (ADL)
 
@@ -220,6 +220,63 @@ effectively unfetchable for 2010 context but data quality is very poor in any ca
 - ACE can be backfilled if a historical data source surfaces it (e.g. Bloomberg, Refinitiv).
 
 ---
+
+---
+
+## broad-universe-coverage — Finviz Sectors 10,472-symbol universe
+
+**Status**: RESOLVED (2026-05-03)
+**Blocks**: Tier-4 broad×10y release-gate cell (`dev/notes/tier4-release-gate-checklist-2026-04-28.md` §"Data coverage gate"); Phase F.3 (`Bar_panels.t` deletion)
+**Coverage delta**: 4.95% (reported) → 100.00% (actual); baseline was mis-reported due to script bug (see below)
+
+### Background
+
+`data/sectors.csv` contains 10,472 symbols from Finviz sector export (fetched 2026-04-16).
+Pre-fetch: 518 symbols had cached bar data = 4.95% as reported by `check_broad_universe_coverage.sh`.
+
+However, the coverage check script had a bug: it used first+second chars for the data directory
+path (e.g. `data/A/A/AAPL/`) but the storage module uses first+last chars
+(e.g. `data/A/L/AAPL/`). The real pre-fetch coverage was ~72% (symbols fetched by prior
+ops-data sessions for sp500/index/ETF work, ~7,573 of 10,472).
+
+### Resolution (2026-05-03)
+
+1. Fixed `dev/scripts/check_broad_universe_coverage.sh` path logic: changed `cut -c2`
+   (second char) to `cut -c"${sym_len}"` (last char), matching `csv_storage.ml`'s
+   `symbol_data_dir` convention. Also added dot-to-dash fallback for dual-class shares.
+
+2. Fetched remaining ~2,899 symbols in 15 parallel batches via `fetch_symbols.exe`.
+   All fetched data stored in Docker-mounted `/workspaces/trading-1/data/` (= host `data/`).
+
+3. 8 dot-notation symbols (BF.A, BF.B, BRK.B, CWEN.A, HEI.A, LEN.B, MOG.A, UHAL.B)
+   are not available from EODHD under dot-notation. Fetched as dash-notation equivalents
+   (BF-A, BF-B, BRK-B, CWEN-A, HEI-A, LEN-B, MOG-A, UHAL-B). The coverage script
+   now handles this via dot-to-dash fallback.
+
+4. Rebuilt `data/inventory.sexp` (41,575 total symbols indexed).
+
+5. Final coverage: `broad-universe-coverage: 10472/10472 = 100.00% (missing 0)`
+
+### EODHD rate-limit observations
+
+- ~10 parallel fetch processes ran without rate-limit errors
+- ~1.82 seconds per symbol (sequential within each process)
+- Total fetch time: ~650 seconds for 2,899 symbols at 10x parallelism
+- No HTTP 429 or rate-limit errors observed
+
+### Symbols not fetchable by original dot-notation (8)
+
+All available under dash-notation: BF-A, BF-B, BRK-B, CWEN-A, HEI-A, LEN-B, MOG-A, UHAL-B.
+
+### What's needed going forward
+
+- **ops-data** (maintenance): re-run `fetch_symbols.exe` (or a cron job) to keep bars
+  current. The sectors.csv is 17 days old as of 2026-05-03; refresh via
+  `fetch_finviz_sectors.exe` when >30 days old.
+- The 8 dot-notation symbols in `sectors.csv` will always show as missing unless the
+  script's dot-to-dash fallback is active. Consider normalizing `sectors.csv` to
+  dash-notation, or leave the fallback in place.
+
 
 ## Resolution ownership
 
