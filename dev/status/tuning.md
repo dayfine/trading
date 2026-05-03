@@ -3,14 +3,14 @@
 ## Last updated: 2026-05-03
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying plan with D1–D5 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02). Owner authorized: feat-backtest per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
+T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). T-B Bayesian-opt lib + tests landed in `feat/tuner-bayesian-opt`. Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying) + `dev/plans/bayesian-opt-2026-05-03.md` (T-B clarifying with D1–D8 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02). Owner authorized: feat-backtest per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 ## Interface stable
 YES
 
-For T-A. `Tuner.Grid_search` `.mli` is the canonical surface for grid-style tuning over the backtest runner. T-B (Bayesian) and T-C (ML) will live alongside without disturbing this one.
+For T-A and T-B. `Tuner.Grid_search` `.mli` is the canonical surface for grid-style tuning over the backtest runner. `Tuner.Bayesian_opt` `.mli` is the canonical surface for GP-driven tuning — opaque `t`, `create`/`observe`/`suggest_next`/`best`/`all_observations` form a small functional state-machine API. T-C (ML) will live alongside without disturbing either.
 
 ## Blocked on
 - `experiments` track M5.2 metrics catalog (need 35-metric scoring infra before tuning has objectives)
@@ -46,18 +46,22 @@ Features: from M5.2e per-trade context (Stage one-hot, MA slope, vol ratio, RS, 
 Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 
 ## In Progress
-- None. T-A lib + tests MERGED via PR #805 (2026-05-03 run-2; 1 rework iteration on P6 nested assert_that finding; final qc-structural+qc-behavioral both APPROVED quality_score 5).
+- None. T-A and T-B both shipped.
 
 ## Completed
+
+- [x] **T-B Bayesian-opt lib + tests** (~922 LOC including tests, ~439 lib; branch `feat/tuner-bayesian-opt`). Surface: `trading/trading/backtest/tuner/lib/bayesian_opt.{ml,mli}`. Pure functional GP-based optimiser using `owl` (`Owl.Linalg.D.chol` + `triangular_solve` for the Cholesky-factor linear system, `Owl.Mat` for matrix ops). Two-phase suggestion (initial random samples → GP-driven argmax of acquisition function over uniformly-sampled candidates). RBF kernel with default length scales `0.25` in normalised `[0,1]` parameter space; signal variance `1.0`; noise jitter `1e-6`. Two acquisition functions: `Expected_improvement` (default) and `Upper_confidence_bound β`. Determinism: same `Random.State.t` seed → byte-identical suggestion sequences. Convergence pinned by 1D parabola (`f(x) = -(x-3)²`) within 30 evals + 2D Branin within 50 evals. 27 tests including bounds enforcement, RBF/EI/UCB unit tests, GP-fit interpolation verification at observed points. Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/tuner/'` (27/27 pass). Design decisions in `dev/plans/bayesian-opt-2026-05-03.md` §D1–D8. Follow-up: CLI binary (deferred from T-B to keep PR ≤500 LOC; mirrors T-A's split). Hyperparameter learning (Type-II MLE on length scales) deferred — fixed-hyperparameter GP is sufficient for the dimensions and budgets the M5.5 spec calls out.
 
 - [x] **T-A grid_search lib + tests** (~440 LOC; PR #805 MERGED 2026-05-03). Surface: `trading/trading/backtest/tuner/lib/grid_search.{ml,mli}`. Cartesian product over a `(string * float list) list` param spec, configurable objective (`Sharpe | Calmar | TotalReturn | Concavity_coef | Composite of (metric_type * float) list`), pure evaluator callback so tests don't need to spin up a real backtest. Output writers for `grid.csv`, `best.sexp`, `sensitivity.md`. Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/tuner/` (24/24 pass). The 81-cell wall-time gate (<2hr on smoke scenarios) is deferred to a follow-up local verification — CI doesn't run smoke at scale.
 
 ## Next Steps
 
 1. Wire CLI binary at `trading/trading/backtest/tuner/bin/grid_search.ml` (deferred from T-A to keep PR ≤500 LOC). Hooks `Tuner.Grid_search.run` to a `Backtest.Runner.run_backtest`-backed evaluator + reads param spec from sexp.
-2. Run the 81-cell flagship sweep on `screening.weights.{rs,volume,breakout,sector}` once the binary lands; verify <2hr wall-time gate on smoke scenarios.
-3. T-B Bayesian after T-A surface settles and the 81-cell sweep shape exposes the objective surface.
-4. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
+2. Wire CLI binary at `trading/trading/backtest/tuner/bin/bayesian_sweep.ml` (deferred from T-B). Hooks `Tuner.Bayesian_opt.suggest_next`/`observe` into a `Backtest.Runner.run_backtest`-backed loop + reads bounds from sexp.
+3. Run the 81-cell flagship sweep on `screening.weights.{rs,volume,breakout,sector}` once the grid CLI binary lands; verify <2hr wall-time gate on smoke scenarios.
+4. After grid sweep results land, validate T-B converges to the same (or better) cell within ~30 evals using the same param surface — the convergence acceptance criterion in `m5-experiments-roadmap-2026-05-02.md` §M5.5 T-B.
+5. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
+6. Hyperparameter learning for T-B (Type-II MLE on length scales) — defer until 4-dim / 6-dim sweeps show that fixed length scales miss the optimum.
 
 ## Out of scope
 
