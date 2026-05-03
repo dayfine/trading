@@ -43,6 +43,43 @@ _(None yet — system just initialized.)_
 
 ## Direction Changes
 
+### 2026-05-03 — Agent scope: extend `feat-backtest` + create `feat-data`
+
+Maintainer authorization: extend `feat-backtest` scope to cover the four
+tracks created 2026-05-02 that lacked explicit agent ownership:
+
+- `experiments` (M5.x experiment-runner extensions, fuzz/sweep modes,
+  distributional/antifragility metrics, scoring-weight sweeps) →
+  **`feat-backtest`**
+- `tuning` (M5.5 grid_search, Bayesian opt, ML/HMM) → **`feat-backtest`**
+  (revisit if T-B/T-C surface justifies spinning out `feat-tuning`)
+- `backtest-perf` (release-gate scaffolding, RSS measurements, tier-4)
+  → **`feat-backtest`**
+- `data-foundations` (Norgate ingest, EODHD multi-market, Synth-v3,
+  Wiki+EODHD historical universe) → **new `feat-data` agent**
+
+Rationale:
+- `feat-backtest` already owns the `trading/trading/backtest/` surface
+  where experiments + tuning + perf work happens. Extension is
+  natural — no new agent needed.
+- `feat-data` is new because data-foundations lives entirely under
+  `analysis/data/`, a clean subtree with distinct concerns (vendor
+  ingest, synthetic generation, historical universe construction).
+  `ops-data` is operational (refresh fetches, inventory rebuild) and
+  explicitly **not a feature builder** per its agent definition;
+  conflating ops + feat dilutes both. New agent gets a clean scope +
+  A2 boundary (no `trading/trading/` writes).
+
+Decision item: `tuning` stays under `feat-backtest` for now. T-A
+grid_search (~400 LOC) is small. If T-B Bayesian opt or T-C ML/HMM
+grow the surface (different deps: GP libraries, HMM-GMM, train/test
+splits), spin out `feat-tuning` as a follow-up.
+
+Cross-reference: PR `docs/agent-scope-extension` (this commit) lands
+the agent-definition diffs + adds `dev/plans/wiki-eodhd-historical-universe-2026-05-03.md`
+(interim 2010–2026 historical universe via Wikipedia changes table +
+EODHD delisted-aware prices, while Norgate vendor signup is pending).
+
 ### 2026-04-29 — Split-day broker model: regression — strategy-side `Position.t` not split-adjusted
 
 PR-3 (#664) wired split detection + `Split_event.apply_to_portfolio` into `Simulator.step`, but only adjusted the broker-side `Trading_portfolio.Portfolio.t`. The strategy-side `Position.t String.Map.t` (`t.positions`, exposed to strategies via `Portfolio_view.positions`) was left at pre-split values. On a 4:1 split, `Holding.quantity` stays at 100 while the broker portfolio holds 400 shares; when the strategy emits `TriggerExit` post-split, `Order_generator` reads the stale 100 from `Exiting.quantity` and the engine sells 100 shares against the 400-share broker position, leaving 300 orphan shares. The strategy's `Position.t` transitions to `Closed`, so it never attempts to clear the orphans.
