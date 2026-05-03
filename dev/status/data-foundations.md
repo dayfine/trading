@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-03
+## Last updated: 2026-05-04
 
 ## Status
 IN_PROGRESS — M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03**: F.2 PR 1 (#797 Snapshot_bar_views shim), F.2 PR 2 (#800 strategy bar reads), F.2 PR 3 (#802 default-flip + `--csv-mode` opt-out) — snapshot mode is now the canonical runtime path. **Wiki+EODHD PR-A MERGED via #803** (Changes_parser + Reason_classifier; maintainer-driven on `feat/wiki-sp500-changes-parser`; orchestrator-dispatched feat-data agent on `feat/data-wiki-eodhd-pr-a` produced equivalent work but elected not to open a competing PR after detecting the duplication). Remaining: **Phase F.3 `Bar_panels.t` retirement** (gated on snapshot-mode-default soak); Wiki+EODHD PR-B/PR-C; Synth-v3; Norgate ingest. F.3 is gated on three verification follow-ups (V1 sp500 5y full-universe parity, V2 ±2w fuzz on snapshot mode, V3 numeric-key fuzz at scale paired with E3 sweep). Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
@@ -91,13 +91,24 @@ including the V1/V2/V3 verification follow-ups that gate F.2.)
   plus `dev/scripts/build_broad_snapshot_incremental.sh` and
   `dev/scripts/check_snapshot_freshness.sh`). Plan:
   `dev/plans/data-pipeline-automation-2026-05-03.md` §"PR 1".
-- **PR 2/4** (this session): backtest progress checkpointing — extends
+- **#820** — Automation PR 2/4: backtest progress checkpointing — extends
   `backtest_runner.exe` with `--progress-every N` so a tail-able
   `progress.sexp` is rewritten under the experiment output dir every N Friday
   cycles plus an unconditional final write. New `Backtest.Backtest_progress`
   module owns the accumulator + atomic-rename writer. Single-run mode only;
   baseline / smoke / fuzz modes ignore the flag. Resumability deferred per
   plan §"Open question 4". Plan §"PR 2 — backtest checkpointing".
+- **PR 3/4** (this session): ops-data dispatch entry-point + runbook —
+  extends `.claude/agents/ops-data.md` with §"Snapshot corpus refresh"
+  documenting inputs (`--universe`, `--output-dir`, `--max-wall`),
+  three-step workflow (probe → wrapper → re-probe), and the resume
+  contract under `--max-wall`-bounded dispatches. Adds
+  `dev/notes/snapshot-corpus-runbook-2026-05-03.md` (canonical user-facing
+  runbook with dispatch prompt template + outcome / failure-mode tables)
+  and `dev/notes/snapshot-corpus-status.md` (lightweight per-dispatch
+  ledger with `NOT_STARTED` / `PARTIAL` / `FRESH` / `STALE` states). No
+  auto-cron yet — deferred to PR 4. Plan §"PR 3 — ops-data dispatch +
+  runbook".
 
 ### Merged (M5.3 streaming)
 
