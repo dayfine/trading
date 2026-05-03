@@ -1,9 +1,9 @@
 # Status: experiments
 
-## Last updated: 2026-05-02
+## Last updated: 2026-05-03
 
 ## Status
-IN_PROGRESS — M5.2e per-trade context logging shipped (PR #769, READY_FOR_REVIEW); M5.2a–d still PLANNED, M5.4 blocked on M5.1.
+IN_PROGRESS — M5.2e per-trade context logging shipped (PR #769, READY_FOR_REVIEW); M5.4 E3 sweep harness landed (this PR); M5.2a–d still PLANNED, sweep runs blocked on M5.1.
 
 Track created 2026-05-02 to absorb M5.2 (experiment infra) + M5.4 (mechanical experiments). Plan: `dev/plans/m5-experiments-roadmap-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.2 + M5.4 (added 2026-05-02).
 
@@ -27,7 +27,7 @@ NO — track is brand-new.
 
 - **E1 — Short on/off A/B** (uses 2a `--baseline`)
 - **E2 — Segmentation-driven Stage classifier** (`stage_method = MaSlope | Segmentation` enum; lib already exists at `analysis/technical/trend/segmentation.{ml,mli}`)
-- **E3 — Stop-buffer sweep** (1.05 / 1.08 / 1.12 on smoke scenarios)
+- [x] **E3 — Stop-buffer sweep harness** (8 cells: 1.00 / 1.02 / 1.05 / 1.08 / 1.10 / 1.12 / 1.15 / 1.20 on `goldens-sp500/sp500-2019-2023`). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e3-stop-buffer-sweep/`; hypothesis + README at `dev/experiments/m5-4-e3-stop-buffer-sweep/`. Run via `dune exec backtest/scenarios/scenario_runner.exe -- --dir trading/test_data/backtest_scenarios/experiments/m5-4-e3-stop-buffer-sweep --parallel 5` (local-only; ~5×2h tier-3 budget). Sweep run + report.md is the follow-up.
 - **E4 — Scoring-weight sweep** (4-dim grid; manual prequel to M5.5 tuning)
 
 ## In Progress
@@ -35,6 +35,7 @@ NO — track is brand-new.
 
 ## Completed
 - M5.2e per-trade context logging (PR #769, 2026-05-02) — 6 new columns on trades.csv; `Trade_context` module + `Stop_log.classify_stop_trigger_kind` + `Trade_audit.entry_decision.volume_ratio`. Trade audit + stop_log pure-projection join. Verify via `dune runtest trading/backtest/test --force` (passes 14/14 in test_trade_context.ml + 18/18 in test_stop_log.ml + 26/26 in test_result_writer.ml).
+- M5.4 E3 stop-buffer sweep harness (this PR, 2026-05-03) — 8-cell grid on `goldens-sp500/sp500-2019-2023` window (`{1.00, 1.02, 1.05, 1.08, 1.10, 1.12, 1.15, 1.20}`). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e3-stop-buffer-sweep/buffer-1.XX.sexp`; hypothesis + README at `dev/experiments/m5-4-e3-stop-buffer-sweep/`. Verify parse via `dune build && dune runtest trading/backtest/scenarios/test/`. Sweep itself is local-only follow-up (~5×2h budget).
 
 ## Next Steps
 
