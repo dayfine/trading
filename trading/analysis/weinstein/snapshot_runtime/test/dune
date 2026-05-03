@@ -1,5 +1,5 @@
 (tests
- (names test_daily_panels test_snapshot_callbacks)
+ (names test_daily_panels test_snapshot_bar_views test_snapshot_callbacks)
  (libraries
   core
   core_unix
@@ -8,7 +8,9 @@
   matchers
   ounit2
   status
+  trading.data_panel
   trading.data_panel.snapshot
+  types
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime)
  (preprocess
