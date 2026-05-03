@@ -658,6 +658,42 @@ let test_snapshot_dir_missing_value _ =
   let result = Backtest_runner_args.parse [ "2018-01-02"; "--snapshot-dir" ] in
   assert_that result is_error
 
+(** [--snapshot-mode] composes freely with [--fuzz]. The fuzz harness loops over
+    N variants and threads the snapshot [Bar_data_source] into every per-variant
+    [Runner.run_backtest] — pinning this composition here guards against a
+    future parser change accidentally introducing a [--fuzz] vs.
+    [--snapshot-mode] exclusivity rule. *)
+let test_snapshot_mode_with_fuzz _ =
+  let result =
+    Backtest_runner_args.parse
+      [
+        "2019-05-01";
+        "--fuzz";
+        "start_date=2019-05-01\xC2\xB12w:3";
+        "--fuzz-window";
+        "bull";
+        "--snapshot-mode";
+        "--snapshot-dir";
+        "/tmp/snapshots/v1";
+        "--experiment-name";
+        "fuzz_snapshot_test";
+      ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_spec)
+              (equal_to (Some "start_date=2019-05-01\xC2\xB12w:3"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.fuzz_window)
+              (equal_to (Some "bull"));
+            field
+              (fun (a : Backtest_runner_args.t) -> a.snapshot_dir)
+              (equal_to (Some "/tmp/snapshots/v1"));
+          ]))
+
 let suite =
   "Backtest_runner_args"
   >::: [
@@ -722,6 +758,7 @@ let suite =
          >:: test_snapshot_dir_without_mode_is_error;
          "--snapshot-dir without value is error"
          >:: test_snapshot_dir_missing_value;
+         "--snapshot-mode composes with --fuzz" >:: test_snapshot_mode_with_fuzz;
          "trace pipeline write+parse round-trip" >:: test_trace_write_and_parse;
        ]
 
