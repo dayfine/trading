@@ -123,6 +123,7 @@ val run_backtest :
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
+  ?progress_emitter:Backtest_progress.emitter ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -132,10 +133,10 @@ val run_backtest :
     order. Each must be a record sexp with fields matching
     [Weinstein_strategy.config]. Example:
     {[
-    [
-      Sexp.of_string "((initial_stop_buffer 1.08))";
-      Sexp.of_string "((stage_config ((ma_period 40))))";
-    ]
+      [
+        Sexp.of_string "((initial_stop_buffer 1.08))";
+        Sexp.of_string "((stage_config ((ma_period 40))))";
+      ]
     ]}
 
     [sector_map_override], when passed, replaces the sector-map normally loaded
@@ -186,4 +187,12 @@ val run_backtest :
     to read OHLCV from a snapshot directory written by Phase B. See
     {!Bar_data_source.t} and the Phase D plan
     ([dev/plans/snapshot-engine-phase-d-2026-05-02.md]) for the full contract.
-*)
+
+    [progress_emitter], when passed, threads a Friday-cycle checkpoint hook
+    through the simulator step loop. See {!Backtest_progress.emitter}. Used by
+    [backtest_runner.exe]'s [--progress-every] flag to emit a tail-able
+    [progress.sexp] mid-run; tests install a recording emitter to pin emission
+    cadence. Resumability is intentionally NOT in this PR — the checkpoint is
+    read-only progress information; restartability of the simulator state is a
+    follow-up (deferred per the data-pipeline-automation plan, §"Open question
+    4"). *)

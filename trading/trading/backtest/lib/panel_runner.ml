@@ -174,36 +174,60 @@ let _step_failed e =
     (sprintf "Backtest.Panel_runner: simulation failed: %s" (Status.show e))
 
 (** One iteration of the step loop: snapshot before/after, dispatch on the
-    outcome. Returns [`Done r] when the simulator completes, or [`Continue sim']
-    with the next simulator state. *)
+    outcome. Returns [`Done r] when the simulator completes, or
+    [`Continue (sim', step_result)] with the next simulator state plus the
+    per-step result (used to advance progress counters). *)
 let _step_loop_iter ?gc_trace ~date sim =
   match _step_with_gc_trace ?gc_trace ~date sim with
   | Error e -> _step_failed e
   | Ok (Simulator.Completed result) -> `Done result
-  | Ok (Simulator.Stepped (sim', _step_result)) -> `Continue sim'
+  | Ok (Simulator.Stepped (sim', step_result)) -> `Continue (sim', step_result)
+
+(** Build a progress accumulator from the optional emitter. Extracted so the
+    [run] entry-point keeps low nesting. *)
+let _build_progress_acc ~progress_emitter ~warmup_start ~end_date =
+  match progress_emitter with
+  | None -> None
+  | Some emitter ->
+      let cycles_total =
+        Backtest_progress.count_fridays_in_range ~start_date:warmup_start
+          ~end_date
+      in
+      Some (Backtest_progress.create_accumulator ~cycles_total ~emitter ())
+
+(** Forward a completed step into [progress_acc]. Pulled out of the step loop so
+    the recursive [loop] body keeps low nesting. *)
+let _record_step_into_progress ~progress_acc ~date
+    ~(step_result : Trading_simulation_types.Simulator_types.step_result) =
+  match progress_acc with
+  | None -> ()
+  | Some acc ->
+      Backtest_progress.record_step acc ~date
+        ~trades_added:(List.length step_result.trades)
+        ~portfolio_value:step_result.portfolio_value
 
 (** Step-loop replacement for [Simulator.run] that snapshots [Gc.stat] before
     and after each [Simulator.step] call. One step = one calendar day in the
     [Daily] cadence used by the panel runner = one [Engine.update_market] call
     (the dominant per-tick allocator per the post-PR-A memtrace).
 
-    When [gc_trace = None] the loop is functionally identical to [Simulator.run]
-    modulo one [Option.is_some] check per step.
-
     [pending_date] is tracked locally in lockstep with the simulator's internal
     [current_date] so the [_before] snapshot can be labeled with the step's date
-    *before* [Simulator.step] is invoked. *)
-let _run_simulator_with_gc_trace ?gc_trace ~stop_log sim =
+    *before* [Simulator.step] is invoked.
+
+    [progress_acc], when passed, has [Backtest_progress.record_step] invoked
+    after every completed step. The accumulator owns the per-Friday emission
+    decision so the step-loop body stays simple. The caller is responsible for
+    the final {!Backtest_progress.emit_final} call after the loop returns. *)
+let _run_simulator_with_gc_trace ?gc_trace ?progress_acc ~stop_log sim =
   let start_date = (Simulator.get_config sim).start_date in
   let rec loop sim ~pending_date =
-    (* Stamp [pending_date] on [stop_log] so any [EntryComplete] transition
-       observed by the strategy wrapper during this step records the correct
-       entry_date. The runner reads this back at teardown to drop stop_infos
-       for positions opened during the warmup window. *)
     Stop_log.set_current_date stop_log pending_date;
     match _step_loop_iter ?gc_trace ~date:pending_date sim with
     | `Done result -> result
-    | `Continue sim' -> loop sim' ~pending_date:(Date.add_days pending_date 1)
+    | `Continue (sim', step_result) ->
+        _record_step_into_progress ~progress_acc ~date:pending_date ~step_result;
+        loop sim' ~pending_date:(Date.add_days pending_date 1)
   in
   loop sim ~pending_date:start_date
 
@@ -320,7 +344,7 @@ let _setup_for_mode (input : input) ~calendar ~n_days ~end_date ~audit_recorder
       _setup_snapshot input ~snapshot_dir ~manifest ~end_date ~audit_recorder
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
-    ~commission ?trace ?gc_trace ?bar_data_source () =
+    ~commission ?trace ?gc_trace ?bar_data_source ?progress_emitter () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let n_days = Array.length calendar in
@@ -342,9 +366,13 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     _make_simulator input ~stop_log ~start_date ~end_date ~warmup_days
       ~initial_cash ~commission ~strategy ~market_data_adapter
   in
+  let progress_acc =
+    _build_progress_acc ~progress_emitter ~warmup_start ~end_date
+  in
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
-        _run_simulator_with_gc_trace ?gc_trace ~stop_log sim)
+        _run_simulator_with_gc_trace ?gc_trace ?progress_acc ~stop_log sim)
   in
+  Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
   (sim_result, stop_log, trade_audit, force_liquidation_log, final_close_prices)

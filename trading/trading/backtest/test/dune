@@ -21,6 +21,7 @@
   test_fuzz_distribution
   test_gc_trace
   test_panel_runner_gc_trace
+  test_backtest_progress
   test_release_perf_report
   test_determinism
   test_macro_trend_writer)
