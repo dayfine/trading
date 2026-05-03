@@ -1,16 +1,16 @@
 ;; S&P 500 universe — joined from data/sp500.csv against the local
-;; bar-data inventory under data/. Generated 2026-04-26.
+;; bar-data inventory under data/. Generated 2026-05-03 by
+;; dev/scripts/build_sp500_universe.sh.
 ;;
-;; 491 / 503 S&P 500 symbols have bar data; the 12 missing are recent
-;; additions or delistings without downloaded history. Refresh by
-;; re-running the join script (TODO: extract into
-;; dev/scripts/build_sp500_universe.sh).
+;; 503 / 503 S&P 500 symbols have bar data.
 ;;
+;; Symbol convention: dots replaced with dashes (EODHD: BF.B -> BF-B).
 ;; Used by goldens-sp500/ scenarios as a regression-pinned trading +
 ;; performance benchmark. The S&P 500 is a moving target — this
 ;; snapshot is fixed at generation time so the golden trades are
 ;; reproducible across reruns of the same scenario.
 (Pinned (
+  ((symbol A      ) (sector "Health Care"))
   ((symbol AAPL   ) (sector "Information Technology"))
   ((symbol ABBV   ) (sector "Health Care"))
   ((symbol ABNB   ) (sector "Consumer Discretionary"))
@@ -68,6 +68,7 @@
   ((symbol BBY    ) (sector "Consumer Discretionary"))
   ((symbol BDX    ) (sector "Health Care"))
   ((symbol BEN    ) (sector "Financials"))
+  ((symbol BF-B   ) (sector "Consumer Staples"))
   ((symbol BG     ) (sector "Consumer Staples"))
   ((symbol BIIB   ) (sector "Health Care"))
   ((symbol BK     ) (sector "Financials"))
@@ -77,10 +78,12 @@
   ((symbol BLK    ) (sector "Financials"))
   ((symbol BMY    ) (sector "Health Care"))
   ((symbol BR     ) (sector "Industrials"))
+  ((symbol BRK-B  ) (sector "Financials"))
   ((symbol BRO    ) (sector "Financials"))
   ((symbol BSX    ) (sector "Health Care"))
   ((symbol BX     ) (sector "Financials"))
   ((symbol BXP    ) (sector "Real Estate"))
+  ((symbol C      ) (sector "Financials"))
   ((symbol CAG    ) (sector "Consumer Staples"))
   ((symbol CAH    ) (sector "Health Care"))
   ((symbol CARR   ) (sector "Industrials"))
@@ -136,6 +139,7 @@
   ((symbol CVNA   ) (sector "Consumer Discretionary"))
   ((symbol CVS    ) (sector "Health Care"))
   ((symbol CVX    ) (sector "Energy"))
+  ((symbol D      ) (sector "Utilities"))
   ((symbol DAL    ) (sector "Industrials"))
   ((symbol DASH   ) (sector "Consumer Discretionary"))
   ((symbol DD     ) (sector "Materials"))
@@ -188,6 +192,7 @@
   ((symbol EXPD   ) (sector "Industrials"))
   ((symbol EXPE   ) (sector "Consumer Discretionary"))
   ((symbol EXR    ) (sector "Real Estate"))
+  ((symbol F      ) (sector "Consumer Discretionary"))
   ((symbol FANG   ) (sector "Energy"))
   ((symbol FAST   ) (sector "Industrials"))
   ((symbol FCX    ) (sector "Materials"))
@@ -262,6 +267,7 @@
   ((symbol IT     ) (sector "Information Technology"))
   ((symbol ITW    ) (sector "Industrials"))
   ((symbol IVZ    ) (sector "Financials"))
+  ((symbol J      ) (sector "Industrials"))
   ((symbol JBHT   ) (sector "Industrials"))
   ((symbol JBL    ) (sector "Information Technology"))
   ((symbol JCI    ) (sector "Industrials"))
@@ -280,6 +286,7 @@
   ((symbol KO     ) (sector "Consumer Staples"))
   ((symbol KR     ) (sector "Consumer Staples"))
   ((symbol KVUE   ) (sector "Consumer Staples"))
+  ((symbol L      ) (sector "Financials"))
   ((symbol LDOS   ) (sector "Industrials"))
   ((symbol LEN    ) (sector "Consumer Discretionary"))
   ((symbol LH     ) (sector "Health Care"))
@@ -348,6 +355,7 @@
   ((symbol NWS    ) (sector "Communication Services"))
   ((symbol NWSA   ) (sector "Communication Services"))
   ((symbol NXPI   ) (sector "Information Technology"))
+  ((symbol O      ) (sector "Real Estate"))
   ((symbol ODFL   ) (sector "Industrials"))
   ((symbol OKE    ) (sector "Energy"))
   ((symbol OMC    ) (sector "Communication Services"))
@@ -386,6 +394,7 @@
   ((symbol PTC    ) (sector "Information Technology"))
   ((symbol PWR    ) (sector "Industrials"))
   ((symbol PYPL   ) (sector "Financials"))
+  ((symbol Q      ) (sector "Information Technology"))
   ((symbol QCOM   ) (sector "Information Technology"))
   ((symbol RCL    ) (sector "Consumer Discretionary"))
   ((symbol REG    ) (sector "Real Estate"))
@@ -428,6 +437,7 @@
   ((symbol SYF    ) (sector "Financials"))
   ((symbol SYK    ) (sector "Health Care"))
   ((symbol SYY    ) (sector "Consumer Staples"))
+  ((symbol T      ) (sector "Communication Services"))
   ((symbol TAP    ) (sector "Consumer Staples"))
   ((symbol TDG    ) (sector "Industrials"))
   ((symbol TDY    ) (sector "Information Technology"))
@@ -465,6 +475,7 @@
   ((symbol UPS    ) (sector "Industrials"))
   ((symbol URI    ) (sector "Industrials"))
   ((symbol USB    ) (sector "Financials"))
+  ((symbol V      ) (sector "Financials"))
   ((symbol VICI   ) (sector "Real Estate"))
   ((symbol VLO    ) (sector "Energy"))
   ((symbol VLTO   ) (sector "Industrials"))
