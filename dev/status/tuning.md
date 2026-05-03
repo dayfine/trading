@@ -1,14 +1,16 @@
 # Status: tuning
 
-## Last updated: 2026-05-02
+## Last updated: 2026-05-03
 
 ## Status
-PLANNED
+READY_FOR_REVIEW
 
-Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
+T-A grid_search lib + tests landed (this PR). Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
 
 ## Interface stable
-NO — track is brand-new.
+YES
+
+For T-A. `Tuner.Grid_search` `.mli` is the canonical surface for grid-style tuning over the backtest runner. T-B (Bayesian) and T-C (ML) will live alongside without disturbing this one.
 
 ## Blocked on
 - `experiments` track M5.2 metrics catalog (need 35-metric scoring infra before tuning has objectives)
@@ -44,15 +46,18 @@ Features: from M5.2e per-trade context (Stage one-hot, MA slope, vol ratio, RS, 
 Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 
 ## In Progress
-- None.
+- None — T-A lib + tests in `feat/backtest-tuning-grid-search` ready for review.
+
+## Completed
+
+- [x] **T-A grid_search lib + tests** (~440 LOC; PR `feat/backtest-tuning-grid-search`). Surface: `trading/trading/backtest/tuner/lib/grid_search.{ml,mli}`. Cartesian product over a `(string * float list) list` param spec, configurable objective (`Sharpe | Calmar | TotalReturn | Concavity_coef | Composite of (metric_type * float) list`), pure evaluator callback so tests don't need to spin up a real backtest. Output writers for `grid.csv`, `best.sexp`, `sensitivity.md`. Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/tuner/` (24/24 pass). The 81-cell wall-time gate (<2hr on smoke scenarios) is deferred to a follow-up local verification — CI doesn't run smoke at scale.
 
 ## Next Steps
 
-1. Wait for `experiments` track M5.2 metrics catalog (M5.2c includes Sharpe/Calmar/Sortino — primary objectives).
-2. Open T-A grid_search PR (~400 LOC) — smallest tuning artifact.
-3. Add 81-cell sweep on `screening.weights.{rs,volume,breakout,sector}` → sensitivity report.
-4. T-B Bayesian after T-A shows shape of objective surface.
-5. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
+1. Wire CLI binary at `trading/trading/backtest/tuner/bin/grid_search.ml` (deferred from T-A to keep PR ≤500 LOC). Hooks `Tuner.Grid_search.run` to a `Backtest.Runner.run_backtest`-backed evaluator + reads param spec from sexp.
+2. Run the 81-cell flagship sweep on `screening.weights.{rs,volume,breakout,sector}` once the binary lands; verify <2hr wall-time gate on smoke scenarios.
+3. T-B Bayesian after T-A surface settles and the 81-cell sweep shape exposes the objective surface.
+4. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
 
 ## Out of scope
 
