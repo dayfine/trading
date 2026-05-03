@@ -1,35 +1,45 @@
 #!/bin/sh
-# Tier-4 release-gate SCALE runner for N=5000 / N=10000 cells.
+# Tier-4 release-gate SCALE runner for full-broad × 10y cell.
 #
 # Distinct from `dev/scripts/perf_tier4_release_gate.sh`, which runs the
 # established N=1000 release-gate cells (`bull-crash-2015-2020`,
 # `covid-recovery-2020-2024`, `decade-2014-2023`, `six-year-2018-2023`)
 # tagged `;; perf-tier: 4`. This script discovers and runs the SCALE
-# variants tagged `;; perf-tier: 4-scale`:
-#   - tier4-N5000-5y   (5y × N=5000)
-#   - tier4-N5000-10y  (10y × N=5000)
-#   - tier4-N10000-5y  (5y × N=10000)
+# variant tagged `;; perf-tier: 4-scale`:
+#   - tier4-broad-10y  (10y × full broad ~10,472 symbols)
+#
+# (Earlier sub-cells tier4-N5000-5y / tier4-N5000-10y / tier4-N10000-5y
+# from the initial scaffolding PR #810 were obsoleted on 2026-05-03 PM —
+# the broad sentinel's actual size (10,472) is essentially N=10000 already,
+# so a single cell at the full broad universe captures the same signal.)
 #
 # Why a separate sub-tier:
 #   1. The N=1000 cells fit 8 GB under CSV mode and have pinned baselines.
 #      They run today via `perf_tier4_release_gate.sh` at every release cut.
-#   2. The N=5000 / N=10000 cells require snapshot-mode runtime (default
-#      since #802 / Phase F.2) + a pre-built snapshot corpus that is still
-#      being assembled (ops-data agent in flight on the 15y sp500 fetch).
-#      Tagging them with a distinct sub-tier keeps them OFF the standard
-#      tier-4 runner until both prereqs land.
+#   2. The full-broad cell requires snapshot-mode runtime (default since
+#      #802 / Phase F.2) + a pre-built snapshot corpus that does not yet
+#      exist + ≥90% data coverage of `data/sectors.csv` (verify via
+#      `dev/scripts/check_broad_universe_coverage.sh --threshold-pct 90`).
+#      Tagging it with a distinct sub-tier keeps it OFF the standard
+#      tier-4 runner until all prereqs land.
+#
+# BLOCKER (as of 2026-05-03): only ~5% of `data/sectors.csv` symbols
+# (518/10,472) have local CSV bars. ops-data dispatch needed to bulk-fetch
+# the missing ~9,954 before this cell can run end-to-end. See
+# `dev/notes/data-gaps.md` §broad-universe-coverage.
 #
 # Snapshot-mode is mandatory: CSV-mode upper bound (RSS ≈ 67 + 3.94·N +
-# 0.19·N·(T-1)) projects 24-47 GB peak for these cells, well beyond any
-# single runner. Snapshot mode (Phase E §F3 cache-bounded RSS ~50-200 MB)
-# is what makes them feasible on the user's 8 GB local box. The runner
-# below sets `--snapshot-mode` explicitly to be future-proof against the
-# F.2 default ever flipping back.
+# 0.19·N·(T-1)) projects ~28 GB peak for this cell, well beyond any single
+# runner. Snapshot mode (Phase E §F3 cache-bounded RSS ~50-200 MB) is what
+# makes it feasible on the user's 8 GB local box. The runner sets
+# `--snapshot-mode` explicitly to be future-proof against the F.2 default
+# ever flipping back.
 #
 # This script is SCAFFOLDING — the actual gate run is local-only on the
-# user's box once the 5000-symbol snapshot corpus is built. Until then
-# `--dry-run` is the expected invocation: it prints the discovered cells
-# + planned commands without executing them.
+# user's box once (a) coverage gate hits ≥90% and (b) the full-broad
+# snapshot corpus is built. Until then `--dry-run` is the expected
+# invocation: it prints the discovered cells + planned commands without
+# executing them.
 #
 # Exit status:
 #   0 if every tier-4-scale scenario completes within budget (or --dry-run)

@@ -123,33 +123,63 @@ on a runner-accessible volume, or (b) plumb a streaming data source
 does not need a full local mirror. At that point, reconstruct the
 workflow shape from `dev/scripts/perf_tier4_release_gate.sh`.
 
-## SCALE cells (N=5000 / N=10000) — scaffolded 2026-05-03
+## SCALE cells (broad × 10y) — revised 2026-05-03 (afternoon)
 
 The N=1000 cells covered above use the CSV-mode loader and run via
-`dev/scripts/perf_tier4_release_gate.sh`. The N=5000 / N=10000 SCALE
-cells are tagged `;; perf-tier: 4-scale` (distinct sub-tier) and run
-via a separate runner: `dev/scripts/run_tier4_release_gate.sh`.
+`dev/scripts/perf_tier4_release_gate.sh`. The SCALE cell at FULL broad
+universe (~10,472 symbols from `data/sectors.csv`) × 10y is tagged
+`;; perf-tier: 4-scale` and runs via a separate runner:
+`dev/scripts/run_tier4_release_gate.sh`.
 
-Cells:
-- `goldens-broad/tier4-N5000-5y.sexp`  (5y × N=5000, 2019-2023)
-- `goldens-broad/tier4-N5000-10y.sexp` (10y × N=5000, 2014-2023)
-- `goldens-broad/tier4-N10000-5y.sexp` (5y × N=10000, 2019-2023)
+Single SCALE cell (the earlier N=5000 / N=10000 sub-cells from #810
+were obsoleted — broad sentinel's actual size = ~10k already, no value
+in two cap variants):
+- `goldens-broad/tier4-broad-10y.sexp`  (10y × full broad, 2014-2023)
 
-Snapshot mode is mandatory: CSV-mode formula upper bounds are
-24-47 GB peak RSS for these cells, far beyond any single runner.
+Snapshot mode is mandatory: CSV-mode formula upper bound is
+~28 GB peak RSS for this cell, far beyond any single runner.
 Snapshot mode (Phase E §F3) caps RSS at the configured `max_cache_mb`
-(~50-200 MB) — this is what makes them feasible on the 8 GB local box.
+(~50-200 MB) — this is what makes it feasible on the 8 GB local box.
 
-Pre-flight (in addition to the N=1000 pre-flight above):
-- The 5000-symbol (or 10000-symbol) snapshot corpus must be pre-built
-  under `data/snapshots/<schema-hash>/`. F.2's `auto_build` mode
-  materializes this on first invocation but the initial build can take
-  hours at scale; expect to schedule the corpus build separately from
-  the gate run. The ops-data agent's 15y sp500 historical fetch
-  (in flight 2026-05-03) is the prerequisite.
-- `expected` ranges in the three SCALE sexps are intentionally
+### Data coverage gate (BLOCKER as of 2026-05-03)
+
+`data/sectors.csv` lists 10,472 symbols but **only ~5% of them have
+local CSV bars on disk** (518/10,472 verified by
+`dev/scripts/check_broad_universe_coverage.sh` 2026-05-03 19:00Z).
+Running tier4-broad-10y today would produce a ~95%-skipped run with
+no measurable trading metrics + RSS that doesn't reflect real load.
+
+**Pre-flight gate** (must hit before running the cell):
+```sh
+bash dev/scripts/check_broad_universe_coverage.sh --threshold-pct 90
+```
+Should report `broad-universe-coverage: ≥9425/10472 = ≥90%` and exit 0.
+
+The unblock is **ops-data dispatch**: bulk-fetch the missing ~9,954
+symbols via EODHD using the existing `fetch_symbols.exe` against the
+sectors-csv-derived list. Estimated wall: 30-60 min depending on
+EODHD rate limits. Filed as data-gap entry in
+`dev/notes/data-gaps.md` §broad-universe-coverage.
+
+### Pre-flight (post-coverage-fix, in addition to the N=1000 pre-flight above)
+
+- Coverage gate (above) must report ≥90%
+- The full-broad snapshot corpus must be pre-built under
+  `data/snapshots/<schema-hash>/`. F.2's auto-build path materializes
+  this on first invocation but the initial build is multi-minute at
+  scale; expect to schedule the corpus build separately from the gate run.
+- `expected` ranges in `tier4-broad-10y.sexp` are intentionally
   permissive (BASELINE_PENDING_AFTER_FIRST_RUN). First run produces
   the canonical baseline; tighten ranges via follow-up PR.
+
+### F.3 unblock chain
+
+This SCALE run is the prerequisite for **F.3 deletion of `Bar_panels.t`**
+(per `dev/plans/snapshot-engine-phase-f-2026-05-03.md` §F.3):
+  1. Coverage ≥90% (ops-data fix)
+  2. Snapshot corpus built for full broad
+  3. tier4-broad-10y run completes; RSS confirmed cache-bounded ~50-200 MB
+  4. F.3 deletion safe to ship
 
 Invocation (dry-run first to confirm discovery):
 
