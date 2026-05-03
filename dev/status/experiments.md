@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-03
 
 ## Status
-IN_PROGRESS — M5.2e per-trade context logging shipped (PR #769, READY_FOR_REVIEW); M5.4 E3 sweep harness landed (this PR); M5.2a–d still PLANNED, sweep runs blocked on M5.1.
+IN_PROGRESS — M5.2e per-trade context logging shipped (PR #769, READY_FOR_REVIEW); M5.4 E3 sweep harness landed (PR #815); M5.4 E4 scoring-weight sweep harness landed (this PR); M5.2a–d still PLANNED, sweep runs blocked on M5.1.
 
 Track created 2026-05-02 to absorb M5.2 (experiment infra) + M5.4 (mechanical experiments). Plan: `dev/plans/m5-experiments-roadmap-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.2 + M5.4 (added 2026-05-02).
 
@@ -28,14 +28,15 @@ NO — track is brand-new.
 - **E1 — Short on/off A/B** (uses 2a `--baseline`)
 - **E2 — Segmentation-driven Stage classifier** (`stage_method = MaSlope | Segmentation` enum; lib already exists at `analysis/technical/trend/segmentation.{ml,mli}`)
 - [x] **E3 — Stop-buffer sweep harness** (8 cells: 1.00 / 1.02 / 1.05 / 1.08 / 1.10 / 1.12 / 1.15 / 1.20 on `goldens-sp500/sp500-2019-2023`). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e3-stop-buffer-sweep/`; hypothesis + README at `dev/experiments/m5-4-e3-stop-buffer-sweep/`. Run via `dune exec backtest/scenarios/scenario_runner.exe -- --dir trading/test_data/backtest_scenarios/experiments/m5-4-e3-stop-buffer-sweep --parallel 5` (local-only; ~5×2h tier-3 budget). Sweep run + report.md is the follow-up.
-- **E4 — Scoring-weight sweep** (4-dim grid; manual prequel to M5.5 tuning)
+- [x] **E4 — Scoring-weight sweep harness** (8 cells on `goldens-sp500/sp500-2019-2023` — `baseline`, `equal-weights`, `stage-heavy`, `volume-heavy`, `rs-heavy`, `resistance-heavy`, `sector-heavy`, `late-stage-strict`). One-axis-at-a-time perturbations of `Screener.scoring_weights` (manual prequel to M5.5 T-A grid). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e4-scoring-weight-sweep/`; hypothesis + README at `dev/experiments/m5-4-e4-scoring-weight-sweep/`. Run via `dune exec backtest/scenarios/scenario_runner.exe -- --dir trading/test_data/backtest_scenarios/experiments/m5-4-e4-scoring-weight-sweep --parallel 5` (local-only; ~5×2h tier-3 budget). Sweep run + report.md is the follow-up.
 
 ## In Progress
 - M5.2e per-trade context logging — PR #769 awaiting review.
 
 ## Completed
 - M5.2e per-trade context logging (PR #769, 2026-05-02) — 6 new columns on trades.csv; `Trade_context` module + `Stop_log.classify_stop_trigger_kind` + `Trade_audit.entry_decision.volume_ratio`. Trade audit + stop_log pure-projection join. Verify via `dune runtest trading/backtest/test --force` (passes 14/14 in test_trade_context.ml + 18/18 in test_stop_log.ml + 26/26 in test_result_writer.ml).
-- M5.4 E3 stop-buffer sweep harness (this PR, 2026-05-03) — 8-cell grid on `goldens-sp500/sp500-2019-2023` window (`{1.00, 1.02, 1.05, 1.08, 1.10, 1.12, 1.15, 1.20}`). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e3-stop-buffer-sweep/buffer-1.XX.sexp`; hypothesis + README at `dev/experiments/m5-4-e3-stop-buffer-sweep/`. Verify parse via `dune build && dune runtest trading/backtest/scenarios/test/`. Sweep itself is local-only follow-up (~5×2h budget).
+- M5.4 E3 stop-buffer sweep harness (PR #815, 2026-05-03) — 8-cell grid on `goldens-sp500/sp500-2019-2023` window (`{1.00, 1.02, 1.05, 1.08, 1.10, 1.12, 1.15, 1.20}`). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e3-stop-buffer-sweep/buffer-1.XX.sexp`; hypothesis + README at `dev/experiments/m5-4-e3-stop-buffer-sweep/`. Verify parse via `dune build && dune runtest trading/backtest/scenarios/test/`. Sweep itself is local-only follow-up (~5×2h budget).
+- M5.4 E4 scoring-weight sweep harness (this PR, 2026-05-03) — 8-cell single-axis perturbation grid on `goldens-sp500/sp500-2019-2023` window (`baseline`, `equal-weights`, `stage-heavy`, `volume-heavy`, `rs-heavy`, `resistance-heavy`, `sector-heavy`, `late-stage-strict`). Each cell doubles a single weight from `Screener.default_scoring_weights`. Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e4-scoring-weight-sweep/<axis>.sexp`; hypothesis + README at `dev/experiments/m5-4-e4-scoring-weight-sweep/`. Verify parse via `dune build && dune runtest trading/backtest/scenarios/test/`. Sweep itself is local-only follow-up (~5×2h budget).
 
 ## Next Steps
 
