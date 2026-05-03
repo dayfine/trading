@@ -1,0 +1,5 @@
+(tests
+ (names test_changes_parser test_reason_classifier)
+ (libraries wiki_sp500 core ounit2 matchers status)
+ (deps
+  (glob_files ./data/*.html)))
