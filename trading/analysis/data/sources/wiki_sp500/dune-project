@@ -1,0 +1,10 @@
+(lang dune 3.17)
+
+(name wiki_sp500)
+
+(generate_opam_files true)
+
+(package
+ (name wiki_sp500)
+ (depends ocaml base core re ppx_deriving)
+ (tags ()))
