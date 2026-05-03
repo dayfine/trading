@@ -1,0 +1,131 @@
+# Weekly track-pacer run for the Weinstein Trading System.
+#
+# Dispatches the `track-pacer` agent every Sunday at 06:00 UTC. The resulting
+# dev/reviews/track-pacer-YYYY-MM-DD.md report lands on a branch
+# ops/track-pacer-<YYYY-MM-DD> and opens a PR for human review.
+#
+# Like the deep health scan, this is NOT auto-merged. The track pacer is
+# advisory — the maintainer reviews recommendations and acts on them (or
+# closes the PR if the scan is clean and no action is needed).
+#
+# Schedule: Sunday 06:00 UTC. Runs before the 07:17 UTC weekday orchestrator
+# slots so findings are visible at the start of the Monday work cycle.
+#
+# ----------------------------------------------------------------------------
+# SECRETS REQUIRED
+# ----------------------------------------------------------------------------
+#   CLAUDE_CODE_OAUTH_TOKEN — generated via `claude setup-token`.
+#   BOT_GITHUB_TOKEN        — fine-grained PAT; Contents R+W, Pull requests R+W.
+#   Both are already configured in the repo (shared with orchestrator.yml).
+# ----------------------------------------------------------------------------
+name: Weekly track pacer
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"    # Sunday 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: track-pacer-weekly
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  track-pacer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-devcontainer:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      TRADING_IN_CONTAINER: "1"
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Compute today's date
+        id: today
+        run: echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Run track-pacer
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          prompt: |
+            Run the track pacer. Today is ${{ steps.today.outputs.date }}.
+            Read .claude/agents/track-pacer.md and follow the instructions end to end.
+            Write the report to dev/reviews/track-pacer-${{ steps.today.outputs.date }}.md.
+            Do not modify source code, agent definitions, or status files.
+          claude_args: |
+            --agent track-pacer
+            --allowedTools Bash,Read,Write,Glob,Grep
+            --max-turns 60
+
+      - name: Push branch and open PR
+        if: always()
+        env:
+          DATE: ${{ steps.today.outputs.date }}
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="ops/track-pacer-${DATE}"
+          REPORT="dev/reviews/track-pacer-${DATE}.md"
+
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          git config user.email "bot@github-actions"
+          git config user.name "GitHub Actions Bot"
+
+          if git diff --quiet HEAD -- dev/reviews/ 2>/dev/null && \
+             ! git ls-files --others --exclude-standard dev/reviews/ | grep -q "track-pacer"; then
+            echo "No track-pacer report found in dev/reviews/ — agent produced no output."
+            exit 0
+          fi
+
+          git checkout -b "${BRANCH}"
+          git add "dev/reviews/track-pacer-${DATE}.md" || true
+          git commit -m "ops: weekly track pacer report ${DATE}" || {
+            echo "Nothing to commit (agent may have already committed)."
+          }
+          git push origin "${BRANCH}"
+
+          if [ -f "${REPORT}" ]; then
+            SUMMARY_LINE="$(grep -m1 '^- Tracks audited:' "${REPORT}" || echo '- (see report)')"
+            ACTIVE_LINE="$(grep -m1 '^- Active' "${REPORT}" || echo '')"
+            STALLED_LINE="$(grep -m1 '^- Stalled' "${REPORT}" || echo '')"
+            BODY="## Weekly track pacer — ${DATE}
+
+          ${SUMMARY_LINE}
+          ${ACTIVE_LINE}
+          ${STALLED_LINE}
+
+          Full report: [\`${REPORT}\`](https://github.com/${REPO}/blob/${BRANCH}/${REPORT})
+
+          > This PR is advisory. Review recommendations and merge (or close if clean)."
+          else
+            BODY="## Weekly track pacer — ${DATE}
+
+          The track-pacer agent ran but did not produce \`${REPORT}\`. Check the workflow log for details."
+          fi
+
+          PR_PAYLOAD=$(TITLE="ops: weekly track pacer ${DATE}" HEAD="${BRANCH}" BASE="main" BODY="${BODY}" \
+            python3 -c 'import json,os; print(json.dumps({"title":os.environ["TITLE"],"head":os.environ["HEAD"],"base":os.environ["BASE"],"body":os.environ["BODY"],"draft":False}))')
+          curl -s -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/pulls" \
+            -d "$PR_PAYLOAD"
