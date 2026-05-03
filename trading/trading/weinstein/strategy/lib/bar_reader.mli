@@ -60,6 +60,40 @@ val of_snapshot_views : Snapshot_runtime.Snapshot_callbacks.t -> t
     MA recomputation per call is bounded. The cache hook can be revisited if the
     snapshot hot path shows up in future profiles. *)
 
+val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
+(** [of_in_memory_bars symbol_bars] produces a snapshot-backed reader from a
+    list of in-memory [(symbol, bars)] pairs.
+
+    Phase F.3.a-1 step in retiring {!Data_panel.Bar_panels}. Tests and tools
+    that hold bar histories in memory (rather than reading them from a CSV
+    corpus) currently materialise a {!Bar_panels.t} via
+    {!Data_panel.Bar_panels.create} + {!of_panels}; this constructor lets the
+    same callers route through the snapshot path without any panel allocation.
+
+    Internally: 1. A fresh tmp directory is allocated via
+    [Stdlib.Filename.temp_dir]. 2. For each [(symbol, bars)] pair,
+    {!Snapshot_pipeline.Pipeline.build_for_symbol} computes per-day
+    {!Snapshot.t} rows under {!Snapshot_schema.default} and
+    {!Snapshot_format.write} serialises them to [<tmp>/<symbol>.snap]. No
+    benchmark is supplied, so [RS_line] / [Macro_composite] columns are
+    [Float.nan]; the bar-shaped views ({!Snapshot_bar_views}) only read the
+    OHLCV columns, so the strategy's bar reads are unaffected. 3. A directory
+    manifest is written to [<tmp>/manifest.sexp]. 4. A
+    {!Snapshot_runtime.Daily_panels.t} is opened over the tmp dir with a small
+    in-memory cache cap, and a {!Snapshot_runtime.Snapshot_callbacks.t} is built
+    over it. 5. The result is the same closure-shaped reader returned by
+    {!of_snapshot_views}.
+
+    The tmp directory is left in place after the function returns — the
+    [Daily_panels.t] reads from it lazily on each cache miss. Callers that care
+    about cleanup (long-running tests, perf rigs) should plumb a teardown hook;
+    for short-lived test usage the OS reaps it on reboot.
+
+    Returns a reader that fails-soft on bad inputs the same way
+    {!of_snapshot_views} does — unknown symbol returns the empty list / empty
+    view. Raises [Failure] only on filesystem / pipeline errors that indicate a
+    programming mistake (e.g., schema validation failed during write). *)
+
 val ma_cache : t -> Weekly_ma_cache.t option
 (** [ma_cache t] returns the cache the reader was constructed with, or [None]
     when no cache was provided. The strategy's panel-callback constructors check
@@ -67,10 +101,13 @@ val ma_cache : t -> Weekly_ma_cache.t option
     MA computation on [None]. *)
 
 val empty : unit -> t
-(** [empty ()] produces a reader with an empty universe / zero-day calendar. All
-    reads return the empty list. Useful for tests that exercise control paths
-    where the strategy never reaches a panel-backed read (e.g., empty universe,
-    no held positions). *)
+(** [empty ()] produces a reader whose every read returns the empty list / empty
+    view. Useful for tests that exercise control paths where the strategy never
+    reaches a bar read (e.g., empty universe, no held positions).
+
+    Allocates no {!Bar_panels.t} and opens no snapshot directory — the closures
+    are direct empty-returning lambdas. Phase F.3.a-1 made this panel-free as a
+    step toward retiring {!Bar_panels}. *)
 
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list
