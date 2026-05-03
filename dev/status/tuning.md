@@ -3,9 +3,9 @@
 ## Last updated: 2026-05-03
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
-T-A grid_search lib + tests landed (this PR). Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
+T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying plan with D1–D5 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02). Owner authorized: feat-backtest per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 ## Interface stable
 YES
@@ -46,11 +46,11 @@ Features: from M5.2e per-trade context (Stage one-hot, MA slope, vol ratio, RS, 
 Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 
 ## In Progress
-- None — T-A lib + tests in `feat/backtest-tuning-grid-search` ready for review.
+- None. T-A lib + tests MERGED via PR #805 (2026-05-03 run-2; 1 rework iteration on P6 nested assert_that finding; final qc-structural+qc-behavioral both APPROVED quality_score 5).
 
 ## Completed
 
-- [x] **T-A grid_search lib + tests** (~440 LOC; PR `feat/backtest-tuning-grid-search`). Surface: `trading/trading/backtest/tuner/lib/grid_search.{ml,mli}`. Cartesian product over a `(string * float list) list` param spec, configurable objective (`Sharpe | Calmar | TotalReturn | Concavity_coef | Composite of (metric_type * float) list`), pure evaluator callback so tests don't need to spin up a real backtest. Output writers for `grid.csv`, `best.sexp`, `sensitivity.md`. Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/tuner/` (24/24 pass). The 81-cell wall-time gate (<2hr on smoke scenarios) is deferred to a follow-up local verification — CI doesn't run smoke at scale.
+- [x] **T-A grid_search lib + tests** (~440 LOC; PR #805 MERGED 2026-05-03). Surface: `trading/trading/backtest/tuner/lib/grid_search.{ml,mli}`. Cartesian product over a `(string * float list) list` param spec, configurable objective (`Sharpe | Calmar | TotalReturn | Concavity_coef | Composite of (metric_type * float) list`), pure evaluator callback so tests don't need to spin up a real backtest. Output writers for `grid.csv`, `best.sexp`, `sensitivity.md`. Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/tuner/` (24/24 pass). The 81-cell wall-time gate (<2hr on smoke scenarios) is deferred to a follow-up local verification — CI doesn't run smoke at scale.
 
 ## Next Steps
 
