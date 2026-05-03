@@ -186,6 +186,38 @@ mechanics + release-gate procedure.
 
 ## Completed
 
+- **Tier-4 release-gate SCALE scaffolding for N=5k/10k × 5-10y** (2026-05-03,
+  `feat/backtest-tier4-scaffolding`). Adds three scenarios + a dedicated
+  runner script for the snapshot-mode-only N≥5000 release-gate cells.
+  Files:
+  - `trading/test_data/backtest_scenarios/goldens-broad/tier4-N5000-5y.sexp`
+    (5y × N=5000, 2019-2023).
+  - `trading/test_data/backtest_scenarios/goldens-broad/tier4-N5000-10y.sexp`
+    (10y × N=5000, 2014-2023; mirrors `decade-2014-2023.sexp` window).
+  - `trading/test_data/backtest_scenarios/goldens-broad/tier4-N10000-5y.sexp`
+    (5y × N=10000, 2019-2023; chose 5y over 10y to keep wall budget
+    reasonable at the widest cell).
+  - `dev/scripts/run_tier4_release_gate.sh` — auto-discovers
+    `;; perf-tier: 4-scale` scenarios, runs each via `scenario_runner.exe`
+    with `timeout 43200` (12 h default), `--snapshot-mode`, and
+    `--fixtures-root`. Supports `--dry-run` (prints discovered cells +
+    planned commands without executing) and `--help`.
+  Scaffolding only — `expected` ranges are intentionally permissive
+  (`BASELINE_PENDING_AFTER_FIRST_RUN`); first local run on the user's 8 GB
+  box (under snapshot mode + auto-built corpus) populates the canonical
+  baseline. Distinct sub-tier (`4-scale` vs the existing `4`) keeps these
+  cells OFF the standard `dev/scripts/perf_tier4_release_gate.sh` until
+  the snapshot corpus + 5-10k symbol data plumbing land. CSV-mode formula
+  upper bound: N=5000×5y ≈ 24 GB, N=5000×10y ≈ 28 GB, N=10000×5y ≈ 47 GB —
+  all far beyond any single runner; reachable only under snapshot mode
+  (Phase E §F3 cache-bounded RSS ~50-200 MB). Verify:
+  `dev/scripts/run_tier4_release_gate.sh --dry-run` (3 cells discovered),
+  `dune runtest trading/backtest/scenarios/test/` (scenarios parse, 10/10),
+  `PERF_CATALOG_CHECK_STRICT=1 sh trading/devtools/checks/perf_catalog_check.sh`
+  (20/20 tagged). The actual gate run is a follow-up local-only task,
+  blocked on (a) the ops-data 15y sp500 historical fetch in flight and
+  (b) the 5-10k symbol snapshot corpus not yet built.
+
 - **G6 — decade-2014-2023 non-determinism investigation + forward-guard test**
   (2026-04-30, `feat/backtest-g6-decade-nondeterminism`). Investigation note
   `dev/notes/g6-decade-nondeterminism-investigation-2026-04-30.md` audits the

@@ -123,6 +123,48 @@ on a runner-accessible volume, or (b) plumb a streaming data source
 does not need a full local mirror. At that point, reconstruct the
 workflow shape from `dev/scripts/perf_tier4_release_gate.sh`.
 
+## SCALE cells (N=5000 / N=10000) — scaffolded 2026-05-03
+
+The N=1000 cells covered above use the CSV-mode loader and run via
+`dev/scripts/perf_tier4_release_gate.sh`. The N=5000 / N=10000 SCALE
+cells are tagged `;; perf-tier: 4-scale` (distinct sub-tier) and run
+via a separate runner: `dev/scripts/run_tier4_release_gate.sh`.
+
+Cells:
+- `goldens-broad/tier4-N5000-5y.sexp`  (5y × N=5000, 2019-2023)
+- `goldens-broad/tier4-N5000-10y.sexp` (10y × N=5000, 2014-2023)
+- `goldens-broad/tier4-N10000-5y.sexp` (5y × N=10000, 2019-2023)
+
+Snapshot mode is mandatory: CSV-mode formula upper bounds are
+24-47 GB peak RSS for these cells, far beyond any single runner.
+Snapshot mode (Phase E §F3) caps RSS at the configured `max_cache_mb`
+(~50-200 MB) — this is what makes them feasible on the 8 GB local box.
+
+Pre-flight (in addition to the N=1000 pre-flight above):
+- The 5000-symbol (or 10000-symbol) snapshot corpus must be pre-built
+  under `data/snapshots/<schema-hash>/`. F.2's `auto_build` mode
+  materializes this on first invocation but the initial build can take
+  hours at scale; expect to schedule the corpus build separately from
+  the gate run. The ops-data agent's 15y sp500 historical fetch
+  (in flight 2026-05-03) is the prerequisite.
+- `expected` ranges in the three SCALE sexps are intentionally
+  permissive (BASELINE_PENDING_AFTER_FIRST_RUN). First run produces
+  the canonical baseline; tighten ranges via follow-up PR.
+
+Invocation (dry-run first to confirm discovery):
+
+```sh
+docker exec -it trading-1-dev bash -c \
+  'cd /workspaces/trading-1 && dev/scripts/run_tier4_release_gate.sh --dry-run'
+
+# When ready:
+docker exec -it trading-1-dev bash -c \
+  'cd /workspaces/trading-1 && dev/scripts/run_tier4_release_gate.sh'
+```
+
+Output dir: `dev/perf/tier4-scale-<UTC-timestamp>/` (separate from the
+N=1000 release-gate's `dev/perf/tier4-release-gate-<UTC-timestamp>/`).
+
 ## References
 
 - `dev/notes/session-followups-2026-04-28.md` §2 — full problem
@@ -130,7 +172,12 @@ workflow shape from `dev/scripts/perf_tier4_release_gate.sh`.
 - `dev/plans/perf-scenario-catalog-2026-04-25.md` §"Release-gate
   strategy" — strategy this implements operationally.
 - `dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md` —
-  source for the "8 GB at N=1000 fits" finding.
-- `dev/scripts/perf_tier4_release_gate.sh` — the runner script.
+  source for the "8 GB at N=1000 fits" finding (and 24-47 GB
+  CSV-mode upper bounds for the SCALE cells).
+- `dev/plans/snapshot-engine-phase-f-2026-05-03.md` — F.2 default-flip
+  and the cache-bounded snapshot-mode RSS context for SCALE cells.
+- `dev/scripts/perf_tier4_release_gate.sh` — the N=1000 runner script.
+- `dev/scripts/run_tier4_release_gate.sh` — the N=5000 / N=10000
+  SCALE runner script.
 - `trading/trading/backtest/bin/release_perf_report.ml` — comparison
   exe (built via `dune build trading/backtest/bin/release_perf_report.exe`).
