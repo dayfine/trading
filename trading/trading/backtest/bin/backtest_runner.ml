@@ -49,9 +49,11 @@
     v}
 
     Mutually exclusive with [--baseline] and [--smoke]; composes freely with
-    [--override] / [--shared-override] (those apply to every variant). For
-    date-key specs the positional [start_date] is overridden by the variant; for
-    numeric-key specs the positional [start_date] is required.
+    [--override] / [--shared-override] (those apply to every variant) and with
+    [--snapshot-mode --snapshot-dir <path>] (every variant reads from the
+    snapshot dir instead of the CSV [data_dir]). For date-key specs the
+    positional [start_date] is overridden by the variant; for numeric-key specs
+    the positional [start_date] is required.
 
     The optional [--fuzz-window <name>] flag points at a window in
     {!Scenario_lib.Smoke_catalog} (currently [bull], [crash], [recovery]) and
@@ -313,9 +315,15 @@ let _resolve_fuzz_variant ~base_start_date ~base_overrides
 
     [sector_map_override], when supplied (via [--fuzz-window <name>]), replaces
     the default sector map for {b every} variant — same trick smoke mode uses to
-    keep the run inside the dev-container memory budget. *)
+    keep the run inside the dev-container memory budget.
+
+    [bar_data_source], when supplied (via [--snapshot-mode --snapshot-dir]),
+    replaces the default CSV-mode market-data adapter for {b every} variant. The
+    same selector is reused across cells (the manifest is read once at parse
+    time); per-variant cache state is constructed inside the per-cell
+    [Runner.run_backtest]. *)
 let _fuzz_run ~start_date ~end_date ~overrides ~output_root ~fuzz_spec_raw
-    ?sector_map_override () =
+    ?sector_map_override ?bar_data_source () =
   let fuzz_spec =
     match Backtest.Fuzz_spec.parse fuzz_spec_raw with
     | Ok spec -> spec
@@ -338,7 +346,7 @@ let _fuzz_run ~start_date ~end_date ~overrides ~output_root ~fuzz_spec_raw
         eprintf "[fuzz %d/%d] %s = %s\n%!" v.index n v.key_path v.label;
         let result =
           _run_and_write ~start_date:v_start ~end_date ~overrides:v_overrides
-            ~output_dir:variant_dir ?sector_map_override ()
+            ~output_dir:variant_dir ?sector_map_override ?bar_data_source ()
         in
         (v.label, result.summary))
   in
@@ -458,12 +466,13 @@ let () =
                %!";
             None
       in
+      let bar_data_source = _resolve_bar_data_source parsed.snapshot_dir in
       (* Fuzz mode treats override and shared_override identically — there's
          no baseline to differentiate them, so flatten both into the per-variant
          override list. *)
       _fuzz_run ~start_date ~end_date
         ~overrides:(shared_overrides @ overrides)
-        ~output_root ~fuzz_spec_raw ?sector_map_override ()
+        ~output_root ~fuzz_spec_raw ?sector_map_override ?bar_data_source ()
   | None, true, _ ->
       _smoke_run ~shared_overrides ~overrides ~output_root
         ~baseline:parsed.baseline ()
