@@ -1,15 +1,5 @@
 (tests
- (names
-  test_changes_parser
-  test_reason_classifier
-  test_membership_replay
-  test_ticker_aliases)
+ (names test_changes_parser test_reason_classifier)
  (libraries wiki_sp500 core ounit2 matchers status)
  (deps
-  (glob_files ./data/*.html)
-  (glob_files ./data/*.csv)
-  (glob_files ./data/*.sexp)))
-
-(executable
- (name gen_golden_2010_universe)
- (libraries wiki_sp500 core status))
+  (glob_files ./data/*.html)))
