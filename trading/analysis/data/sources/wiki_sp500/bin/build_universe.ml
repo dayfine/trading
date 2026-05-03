@@ -64,19 +64,85 @@ let _run_with_fetch ~as_of ~current_csv_path ~wiki_html_path ~cache_dir ~output
           Stdlib.exit 1
       | Ok outcome -> _finish_outcome ~as_of ~output outcome)
 
+let _run_change_log ~from ~until ~current_csv_path ~wiki_html_path ~output =
+  match
+    Build_universe_lib.run_change_log ~from ~until ~current_csv_path
+      ~wiki_html_path
+  with
+  | Error e ->
+      eprintf "Error: %s\n" (Status.show e);
+      Stdlib.exit 1
+  | Ok outcome -> (
+      match
+        Build_universe_lib.write_change_log_to_file ~path:output outcome
+      with
+      | Error e ->
+          eprintf "Error writing JSONL: %s\n" (Status.show e);
+          Stdlib.exit 1
+      | Ok () ->
+          printf
+            "Wrote change-log JSONL: %d seed lines + %d events for window \
+             [%s..%s].\n"
+            outcome.initial_size outcome.event_count (Date.to_string from)
+            (Date.to_string until))
+
+let _dispatch_static ~as_of_str ~wiki_html_path ~current_csv_path ~cache_dir
+    ~output ~fetch_prices ~token_file =
+  let as_of = Date.of_string as_of_str in
+  if fetch_prices then
+    match token_file with
+    | None ->
+        eprintf "Error: --fetch-prices requires --token-file\n";
+        return (Stdlib.exit 1)
+    | Some token_file ->
+        _run_with_fetch ~as_of ~current_csv_path ~wiki_html_path ~cache_dir
+          ~output ~token_file
+  else (
+    _run_offline ~as_of ~current_csv_path ~wiki_html_path ~cache_dir ~output;
+    return ())
+
+let _dispatch_change_log ~from_str ~until_str ~wiki_html_path ~current_csv_path
+    ~output =
+  let from = Date.of_string from_str in
+  let until = Date.of_string until_str in
+  _run_change_log ~from ~until ~current_csv_path ~wiki_html_path ~output;
+  return ()
+
 let command =
   Command.async
     ~summary:
-      "Reconstruct historical S&P 500 universe and emit a (Pinned …) sexp."
+      "Reconstruct historical S&P 500 universe (static sexp or change-log \
+       JSONL)."
     ~readme:(fun () ->
-      "Replays pinned Wikipedia changes-table back from today's constituents \
-       to a target [--as-of] date. With [--fetch-prices], also auto-fetches \
-       any per-symbol CSV missing from [--cache-dir] via EODHD; 404s are \
-       skipped + omitted. See \
-       dev/plans/wiki-eodhd-historical-universe-2026-05-03.md §PR-C.")
-    (let%map_open.Command as_of_str =
-       flag "as-of" (required string)
-         ~doc:"YYYY-MM-DD historical date to reconstruct membership for"
+      "Two modes:\n\n\
+      \  Static (default): --as-of YYYY-MM-DD --output universe.sexp\n\
+      \  Replays pinned Wikipedia changes-table back from today's constituents.\n\
+      \  With --fetch-prices, also auto-fetches any per-symbol CSV missing from\n\
+      \  --cache-dir via EODHD; 404s are skipped + omitted.\n\n\
+      \  Change-log: --change-log --from YYYY-MM-DD --until YYYY-MM-DD \
+       --output events.jsonl\n\
+      \  Emits one JSON event per line (initial seed at --from + every \
+       add/remove\n\
+      \  in (from, until]) for dynamic-universe backtests.\n\n\
+       See dev/plans/wiki-eodhd-historical-universe-2026-05-03.md §PR-C/§PR-D.")
+    (let%map_open.Command change_log =
+       flag "change-log" no_arg
+         ~doc:" emit change-log JSONL instead of a static sexp"
+     and as_of_str =
+       flag "as-of" (optional string)
+         ~doc:
+           "YYYY-MM-DD historical date (static mode; required without \
+            --change-log)"
+     and from_str =
+       flag "from" (optional string)
+         ~doc:
+           "YYYY-MM-DD start of timeline window (change-log mode; required \
+            with --change-log)"
+     and until_str =
+       flag "until" (optional string)
+         ~doc:
+           "YYYY-MM-DD end of timeline window (change-log mode; required with \
+            --change-log)"
      and wiki_html_path =
        flag "wiki-html"
          (optional_with_default _default_wiki_html string)
@@ -86,10 +152,10 @@ let command =
          (optional_with_default _default_current_csv string)
          ~doc:"PATH pinned Wikipedia current-constituents CSV"
      and output =
-       flag "output" (required string) ~doc:"PATH where to write universe sexp"
+       flag "output" (required string) ~doc:"PATH where to write output"
      and fetch_prices =
        flag "fetch-prices" no_arg
-         ~doc:" auto-fetch missing per-symbol price CSVs via EODHD"
+         ~doc:" auto-fetch missing per-symbol price CSVs via EODHD (static)"
      and token_file =
        flag "token-file" (optional string)
          ~doc:"PATH EODHD API token file (required iff --fetch-prices)"
@@ -99,18 +165,21 @@ let command =
          ~doc:"PATH local CSV cache directory"
      in
      fun () ->
-       let as_of = Date.of_string as_of_str in
-       if fetch_prices then
-         match token_file with
+       if change_log then (
+         match (from_str, until_str) with
+         | Some f, Some u ->
+             _dispatch_change_log ~from_str:f ~until_str:u ~wiki_html_path
+               ~current_csv_path ~output
+         | _ ->
+             eprintf "Error: --change-log requires both --from and --until\n";
+             return (Stdlib.exit 1))
+       else
+         match as_of_str with
          | None ->
-             eprintf "Error: --fetch-prices requires --token-file\n";
+             eprintf "Error: --as-of is required (or pass --change-log)\n";
              return (Stdlib.exit 1)
-         | Some token_file ->
-             _run_with_fetch ~as_of ~current_csv_path ~wiki_html_path ~cache_dir
-               ~output ~token_file
-       else (
-         _run_offline ~as_of ~current_csv_path ~wiki_html_path ~cache_dir
-           ~output;
-         return ()))
+         | Some s ->
+             _dispatch_static ~as_of_str:s ~wiki_html_path ~current_csv_path
+               ~cache_dir ~output ~fetch_prices ~token_file)
 
 let () = Command_unix.run command

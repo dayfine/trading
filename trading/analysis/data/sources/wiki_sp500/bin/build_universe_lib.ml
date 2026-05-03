@@ -193,3 +193,44 @@ let run_with_fetch ~as_of ~current_csv_path ~wiki_html_path ~cache_dir ~token
   let kept = _drop_skipped constituents skipped in
   let universe_sexp = Wiki_sp500.Membership_replay.to_universe_sexp kept in
   Deferred.return (Ok { universe_sexp; warnings = []; skipped; fetched_count })
+
+(* --- Change-log mode (PR-D) ------------------------------------------- *)
+
+type change_log_outcome = {
+  jsonl : string;
+  initial_size : int;
+  event_count : int;
+}
+
+(* Count newlines in [jsonl] minus the seed-state lines to recover
+   [event_count] without re-exposing [Membership_replay.timeline]'s internals.
+   We avoid that here by computing [initial_size] from the replayed-back set
+   and [event_count] = (total_lines - initial_size). *)
+let _count_lines s = String.count s ~f:(fun c -> Char.equal c '\n')
+
+let run_change_log ~from ~until ~current_csv_path ~wiki_html_path =
+  let%bind.Result current_csv = _read_file current_csv_path in
+  let%bind.Result wiki_html = _read_file wiki_html_path in
+  let%bind.Result current =
+    Wiki_sp500.Membership_replay.parse_current_csv current_csv
+  in
+  let%bind.Result changes = Wiki_sp500.Changes_parser.parse wiki_html in
+  let%bind.Result timeline =
+    Wiki_sp500.Membership_replay.build_timeline ~current ~changes ~from ~until
+  in
+  let%bind.Result initial =
+    Wiki_sp500.Membership_replay.replay_back ~current ~changes ~as_of:from
+  in
+  let initial_size = List.length initial in
+  let jsonl = Wiki_sp500.Membership_replay.timeline_to_jsonl timeline in
+  let total_lines = _count_lines jsonl in
+  let event_count = total_lines - initial_size in
+  Ok { jsonl; initial_size; event_count }
+
+let write_change_log_to_file ~path (outcome : change_log_outcome) =
+  try
+    Out_channel.with_file path ~f:(fun oc ->
+        Out_channel.output_string oc outcome.jsonl);
+    Ok ()
+  with Sys_error msg ->
+    Status.error_internal (Printf.sprintf "failed to write %s: %s" path msg)

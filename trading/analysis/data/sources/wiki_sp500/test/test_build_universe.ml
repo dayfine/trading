@@ -168,6 +168,40 @@ let test_fetch_hook_pins_auto_fetch_and_404_skip _ =
   assert_that (Set.mem symbols "BAR") (equal_to true);
   assert_that (Set.mem symbols "FOO") (equal_to false)
 
+(* PR-D smoke: the change-log mode must produce non-trivial JSONL when run
+   over a multi-year window. We use the pinned 2024-01-01 → 2026-04-30
+   window because the pinned changes table has many add/remove events in
+   that range, easily clearing the >=10-line floor. *)
+let test_change_log_smoke _ =
+  let from = Date.create_exn ~y:2024 ~m:Month.Jan ~d:1 in
+  let until = Date.create_exn ~y:2026 ~m:Month.Apr ~d:30 in
+  let outcome =
+    match
+      Build_universe_lib.run_change_log ~from ~until
+        ~current_csv_path:_pinned_csv_path ~wiki_html_path:_pinned_html_path
+    with
+    | Ok o -> o
+    | Error e -> assert_failure ("run_change_log: " ^ Status.show e)
+  in
+  let lines =
+    String.split_lines outcome.jsonl
+    |> List.filter ~f:(fun l -> not (String.is_empty l))
+  in
+  assert_that outcome
+    (all_of
+       [
+         field
+           (fun (o : Build_universe_lib.change_log_outcome) -> o.initial_size)
+           (gt (module Int_ord) 480);
+         field
+           (fun (o : Build_universe_lib.change_log_outcome) -> o.event_count)
+           (gt (module Int_ord) 10);
+         field
+           (fun (_ : Build_universe_lib.change_log_outcome) ->
+             List.length lines)
+           (gt (module Int_ord) 490);
+       ])
+
 let suite =
   "build_universe_test"
   >::: [
@@ -179,6 +213,7 @@ let suite =
          >:: test_universe_sexp_shape_matches_canonical;
          "fetch_hook_pins_auto_fetch_and_404_skip"
          >:: test_fetch_hook_pins_auto_fetch_and_404_skip;
+         "change_log_smoke" >:: test_change_log_smoke;
        ]
 
 let () = run_test_tt_main suite
