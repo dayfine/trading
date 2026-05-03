@@ -99,6 +99,31 @@ let test_write_atomic_round_trip _ =
            (float_equal 152384.21);
        ])
 
+(* CP4 pin: [write_atomic]'s docstring guarantees "must never crash" on
+   filesystem errors. Exercise the guarded scenario by writing to a path
+   under a non-existent parent directory and asserting no exception
+   escapes. *)
+let test_write_atomic_does_not_crash_on_missing_parent _ =
+  let progress : Backtest_progress.t =
+    {
+      started_at = 1714780000.0;
+      updated_at = 1714780000.0;
+      cycles_done = 1;
+      cycles_total = 100;
+      last_completed_date = Date.create_exn ~y:2010 ~m:Month.Jan ~d:1;
+      trades_so_far = 0;
+      current_equity = 100000.0;
+    }
+  in
+  let bogus_path =
+    "/tmp/nonexistent_parent_dir_for_backtest_progress_test/progress.sexp"
+  in
+  (* The contract: write_atomic must NOT raise even when the destination
+     can't be written. Implementation should swallow Sys_error / Failure. *)
+  Backtest_progress.write_atomic ~path:bogus_path progress;
+  (* If we got here, the contract held. *)
+  assert_that () (equal_to ())
+
 let _run_with_emitter ~every_n_fridays ~recorder =
   let s = _load_scenario _scenario_rel in
   let sector_map_override = _sector_map_override s in
@@ -172,6 +197,8 @@ let suite =
          "count_fridays handles single-day ranges"
          >:: test_count_fridays_zero_range;
          "write_atomic produces parsable sexp" >:: test_write_atomic_round_trip;
+         "write_atomic does not crash on missing parent dir"
+         >:: test_write_atomic_does_not_crash_on_missing_parent;
          "emitter fires during a real run with every_n_fridays = 1"
          >:: test_emitter_fires_during_run;
          "emitter records monotonic progress"
