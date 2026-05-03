@@ -95,6 +95,75 @@ Builds `data/universe.sexp` from the local inventory. Sector/industry fields wil
 
 Read `data/inventory.sexp` and report: which symbols are present, their date ranges, and any gaps for a requested symbol/date range.
 
+### Snapshot corpus refresh
+
+Use this when the broad-universe daily-snapshot warehouse (consumed by
+backtests via `--snapshot-mode --snapshot-dir`) needs to catch up to
+fresher CSV bars. Trigger on direct user dispatch — there is no auto-cron
+yet (deferred to PR 4 of
+`dev/plans/data-pipeline-automation-2026-05-03.md`).
+
+**Inputs (dispatch-time flags):**
+
+- `--universe <path>` — pinned universe sexp. Default for the broad
+  10y warehouse: a sectors-derived universe sexp (build via
+  `bootstrap_universe.exe` against `data/sectors.csv` if you don't
+  already have one pinned).
+- `--output-dir <path>` — snapshot warehouse output. Default for the
+  broad 2014–2023 corpus: `dev/data/snapshots/broad-2014-2023/`.
+- `--max-wall <duration>` — wall-clock budget for one dispatch.
+  Default: `30m`. Accepts `30m` / `1h` / `90m` / `7200s`.
+- `--csv-data-dir <path>` — source CSV root. Default: `data`.
+- `--progress-every <N>` — `progress.sexp` cadence. Default: `50`.
+
+**Steps:**
+
+1. **Freshness probe** — read existing manifest staleness:
+   ```bash
+   dev/scripts/check_snapshot_freshness.sh \
+     --output-dir <output-dir> \
+     --csv-data-dir <csv-data-dir>
+   ```
+   Emits `snapshot-freshness: <stale>/<total> stale = <pct>%`. If the
+   probe exits 0 and stale% is below the agreed threshold (default 5%),
+   record the result in `dev/notes/snapshot-corpus-status.md` and exit
+   clean — no rebuild needed.
+2. **Incremental rebuild** — invoke the wrapper bounded by `--max-wall`:
+   ```bash
+   dev/scripts/build_broad_snapshot_incremental.sh \
+     --universe <path> \
+     --output-dir <output-dir> \
+     --csv-data-dir <csv-data-dir> \
+     --progress-every <N> \
+     --max-wall <duration>
+   ```
+   The wrapper acquires `<output-dir>/.build.lock` to prevent concurrent
+   runs (exits 75 / `EX_TEMPFAIL` if held). Per-symbol manifest update
+   (PR 1) makes the run resumable across invocations: a 2-hour rebuild
+   can be split across multiple dispatches.
+3. **Re-probe + record** — re-run the freshness probe to capture the
+   post-rebuild state and append a "Last refresh" block to
+   `dev/notes/snapshot-corpus-status.md` (started, wall, symbols built,
+   failures, exit code, current freshness%).
+
+**Acceptance:**
+
+- The corpus is fresh per the staleness threshold (`stale% ≤ 5`), OR
+- `dev/notes/snapshot-corpus-status.md` records partial-progress
+  (cycles done, exit code 124 if `--max-wall` truncated, ETA for
+  resume on next dispatch).
+
+**Resume contract.** The wrapper always passes `--incremental` to
+`build_snapshots.exe`; per PR 1, manifest entries are upserted atomically
+per symbol, so a `timeout 124` exit at symbol N/Total leaves
+N entries on disk and the next dispatch picks up at symbol N+1. A full
+broad×10y rebuild from cold cache takes ~2h wall under the post-#792
+writer; with `--max-wall 30m`, that's ~4 dispatches.
+
+**Runbook.** See `dev/notes/snapshot-corpus-runbook-2026-05-03.md` for
+the canonical user-facing runbook (when to dispatch, sample dispatch
+prompts, how to read the status file).
+
 ## API key
 
 `EODHD_API_KEY` must be set in the host environment before any fetch. `dev/lib/run-in-env.sh` forwards it into the container automatically; the OCaml script receives it via the `--api-key` flag and never reads env vars directly.
@@ -155,6 +224,12 @@ When asked to fetch new symbols and update the inventory:
 3. Run `build_inventory.exe` to regenerate `data/inventory.sexp`
 4. If universe needs updating: run `bootstrap_universe.exe`
 5. Report what was fetched, any errors, and updated coverage
+6. **Snapshot freshness check (broad-universe corpus only).** When the
+   refresh touched ≥N symbols of the broad-universe set, run
+   `dev/scripts/check_snapshot_freshness.sh --output-dir <broad-corpus-dir>`
+   to surface staleness. If stale% exceeds the threshold, run the
+   "Snapshot corpus refresh" workflow above (or note it in
+   `dev/notes/snapshot-corpus-status.md` for the next dispatch).
 
 ## Output format
 
