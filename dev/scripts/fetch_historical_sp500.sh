@@ -50,14 +50,9 @@ _bars_before_2014() {
   result=$(curl -s --max-time 15 \
     "${BASE_URL}/${sym}?api_token=${API_KEY}&fmt=json&from=2000-01-01&to=2013-12-31" \
     2>/dev/null) || true
-  echo "$result" | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    print(len(data) if isinstance(data, list) else 0)
-except Exception:
-    print(0)
-" 2>/dev/null || echo "0"
+  # Use jq (POSIX-portable; no Python per .claude/rules/no-python.md).
+  # Outputs the array length, or 0 on parse failure / non-array.
+  echo "$result" | jq 'if type == "array" then length else 0 end' 2>/dev/null || echo "0"
 }
 
 _fetch_sym() {
@@ -107,16 +102,10 @@ for SYM in "${SYMS[@]}"; do
       _fetch_sym "$OLD_SYM"
       FETCHED_OLD=$((FETCHED_OLD + 1))
     else
+      # jq instead of python3 per .claude/rules/no-python.md.
       BARS_TOTAL=$(curl -s --max-time 15 \
         "${BASE_URL}/${SYM}?api_token=${API_KEY}&fmt=json&from=2000-01-01&to=2026-04-30" \
-        2>/dev/null | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    print(len(data) if isinstance(data, list) else 0)
-except Exception:
-    print(0)
-" 2>/dev/null || echo "0")
+        2>/dev/null | jq 'if type == "array" then length else 0 end' 2>/dev/null || echo "0")
       if [[ "$BARS_TOTAL" -gt 0 ]]; then
         echo "  [${SYM}] has ${BARS_TOTAL} total bars (no pre-2014) — fetching plain (partial)"
         _fetch_sym "$SYM"
