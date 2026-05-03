@@ -1,0 +1,240 @@
+(** Bar-shaped views over [Snapshot_callbacks.t] — see [snapshot_bar_views.mli].
+*)
+
+open Core
+module BA1 = Bigarray.Array1
+module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+
+type weekly_view = {
+  closes : float array;
+  raw_closes : float array;
+  highs : float array;
+  lows : float array;
+  volumes : float array;
+  dates : Core.Date.t array;
+  n : int;
+}
+
+type daily_view = {
+  highs : float array;
+  lows : float array;
+  closes : float array;
+  dates : Core.Date.t array;
+  n_days : int;
+}
+
+let _empty_weekly_view : weekly_view =
+  {
+    closes = [||];
+    raw_closes = [||];
+    highs = [||];
+    lows = [||];
+    volumes = [||];
+    dates = [||];
+    n = 0;
+  }
+
+let _empty_daily_view : daily_view =
+  { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
+
+(* Calendar slack for date-keyed windows. The snapshot fan-out is per-field
+   over an inclusive [from, until] window; [from] is computed by walking back
+   from [as_of]. We need enough slack to cover weekends + holidays + partial
+   weeks. Empirically:
+   - daily lookback: 1.5x trading-day slack covers ~250-day weekend/holiday
+     ratios; we round up.
+   - weekly: 8x weeks-to-days conversion (7 weekdays + 1 holiday slack) covers
+     ISO-week buckets + a partial leading week. *)
+let _daily_calendar_span ~lookback = (lookback * 3 / 2) + 7
+let _weekly_calendar_span ~n = (n * 8) + 7
+
+(* Fetch one field's history; return [] (not an error) on any failure. The
+   shim's surface contract is "missing data → empty view" (matches Bar_panels
+   semantics); this helper enforces that at the per-field level. *)
+let _read_history_or_empty (cb : Snapshot_callbacks.t) ~symbol ~from ~until
+    ~field =
+  match cb.read_field_history ~symbol ~from ~until ~field with
+  | Ok rows -> rows
+  | Error _ -> []
+
+(* Align five field-histories ([Adjusted_close, Close, High, Low, Volume])
+   by date into a single chronologically-ordered [Daily_price.t list]. Each
+   input list is already chronologically sorted (Daily_panels.read_history
+   sort contract). A bar is included iff [Close] is non-NaN AND every other
+   field has a row for the same date.
+
+   Implementation: build hashtables per non-Close field keyed by date, then
+   walk the [Close] list once and look up the others. O(n_close + n_other);
+   no nested-loop blow-up. *)
+let _table_of (rows : (Date.t * float) list) =
+  let tbl = Hashtbl.create (module Date) in
+  List.iter rows ~f:(fun (d, v) ->
+      Hashtbl.set tbl ~key:d ~data:v |> (ignore : unit -> unit));
+  tbl
+
+let _round_volume v =
+  if Float.is_nan v then 0 else Int.of_float (Float.round_nearest v)
+
+let _assemble_daily_bars ~adj ~close ~high ~low ~volume :
+    Types.Daily_price.t list =
+  let adj_t = _table_of adj in
+  let high_t = _table_of high in
+  let low_t = _table_of low in
+  let vol_t = _table_of volume in
+  let bar_for (date, close_v) =
+    if Float.is_nan close_v then None
+    else
+      match
+        ( Hashtbl.find adj_t date,
+          Hashtbl.find high_t date,
+          Hashtbl.find low_t date,
+          Hashtbl.find vol_t date )
+      with
+      | Some adj_v, Some high_v, Some low_v, Some vol_v ->
+          Some
+            {
+              Types.Daily_price.date;
+              open_price = Float.nan;
+              high_price = high_v;
+              low_price = low_v;
+              close_price = close_v;
+              volume = _round_volume vol_v;
+              adjusted_close = adj_v;
+            }
+      | _ -> None
+  in
+  List.filter_map close ~f:bar_for
+
+(* Convert a weekly [Daily_price.t] list (output of daily_to_weekly) into the
+   [weekly_view] float-array shape. *)
+let _weekly_view_of_bars (weekly : Types.Daily_price.t list) : weekly_view =
+  let n = List.length weekly in
+  if n = 0 then _empty_weekly_view
+  else
+    let arr_of f = Array.of_list (List.map weekly ~f) in
+    {
+      closes = arr_of (fun b -> b.adjusted_close);
+      raw_closes = arr_of (fun b -> b.close_price);
+      highs = arr_of (fun b -> b.high_price);
+      lows = arr_of (fun b -> b.low_price);
+      volumes = arr_of (fun b -> Float.of_int b.volume);
+      dates = arr_of (fun b -> b.date);
+      n;
+    }
+
+let _truncate_weekly_view (v : weekly_view) ~n : weekly_view =
+  if v.n <= n then v
+  else
+    let drop = v.n - n in
+    let take a = Array.sub a ~pos:drop ~len:n in
+    {
+      closes = take v.closes;
+      raw_closes = take v.raw_closes;
+      highs = take v.highs;
+      lows = take v.lows;
+      volumes = take v.volumes;
+      dates = take v.dates;
+      n;
+    }
+
+let weekly_view_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of =
+  if n <= 0 then _empty_weekly_view
+  else
+    let from = Date.add_days as_of (-_weekly_calendar_span ~n) in
+    let read field =
+      _read_history_or_empty cb ~symbol ~from ~until:as_of ~field
+    in
+    let close = read Snapshot_schema.Close in
+    if List.is_empty close then _empty_weekly_view
+    else
+      let adj = read Snapshot_schema.Adjusted_close in
+      let high = read Snapshot_schema.High in
+      let low = read Snapshot_schema.Low in
+      let volume = read Snapshot_schema.Volume in
+      let bars = _assemble_daily_bars ~adj ~close ~high ~low ~volume in
+      if List.is_empty bars then _empty_weekly_view
+      else
+        let weekly =
+          Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
+        in
+        _truncate_weekly_view (_weekly_view_of_bars weekly) ~n
+
+(* Take the trailing [k] elements of a list. [k <= 0] yields []. *)
+let _take_trailing l k =
+  if k <= 0 then []
+  else
+    let n = List.length l in
+    if n <= k then l else List.drop l (n - k)
+
+let _daily_view_of_close_high_low ~close ~high ~low : daily_view =
+  let high_t = _table_of high in
+  let low_t = _table_of low in
+  (* Walk the close list once; emit a row iff close is non-NaN and the
+     high/low tables both contain the same date. *)
+  let rows =
+    List.filter_map close ~f:(fun (date, close_v) ->
+        if Float.is_nan close_v then None
+        else
+          match (Hashtbl.find high_t date, Hashtbl.find low_t date) with
+          | Some high_v, Some low_v -> Some (date, high_v, low_v, close_v)
+          | _ -> None)
+  in
+  let n = List.length rows in
+  if n = 0 then _empty_daily_view
+  else
+    let arr_of f = Array.of_list (List.map rows ~f) in
+    {
+      highs = arr_of (fun (_, h, _, _) -> h);
+      lows = arr_of (fun (_, _, l, _) -> l);
+      closes = arr_of (fun (_, _, _, c) -> c);
+      dates = arr_of (fun (d, _, _, _) -> d);
+      n_days = n;
+    }
+
+(* Bar_panels.daily_view_for walks the last [lookback] calendar columns
+   ending at [as_of_day], NaN-skips, returns the rest. The panel's calendar
+   is trading days, so "last [lookback] columns" = "last [lookback] trading
+   days". The snapshot has one row per trading day; we trim the [Close]
+   history to its trailing [lookback] rows BEFORE the NaN-skip so the count
+   matches the panel's "lookback - n_nan_skipped" semantics. *)
+let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback =
+  if lookback <= 0 then _empty_daily_view
+  else
+    let from = Date.add_days as_of (-_daily_calendar_span ~lookback) in
+    let read field =
+      _read_history_or_empty cb ~symbol ~from ~until:as_of ~field
+    in
+    let close_all = read Snapshot_schema.Close in
+    if List.is_empty close_all then _empty_daily_view
+    else
+      let close = _take_trailing close_all lookback in
+      let high = read Snapshot_schema.High in
+      let low = read Snapshot_schema.Low in
+      _daily_view_of_close_high_low ~close ~high ~low
+
+(* low_window: produce a Bigarray.Array1.t holding the last [len] daily Low
+   values ending at as_of. Bar_panels.low_window returns None when fewer than
+   [len] cells are available; we mirror that contract here.
+
+   Bar_panels' low_window does NOT NaN-skip — it returns a raw panel slice
+   that includes any NaN cells. We follow that contract here: if the snapshot
+   reports rows but some Low values are NaN, those NaNs are included. The
+   caller (the support-floor primitive) is the one that decides what to do
+   with NaN. *)
+let low_window (cb : Snapshot_callbacks.t) ~symbol ~as_of ~len =
+  if len <= 0 then None
+  else
+    let from = Date.add_days as_of (-_daily_calendar_span ~lookback:len) in
+    match
+      cb.read_field_history ~symbol ~from ~until:as_of
+        ~field:Snapshot_schema.Low
+    with
+    | Error _ -> None
+    | Ok rows ->
+        let n = List.length rows in
+        if n < len then None
+        else
+          let trailing = List.drop rows (n - len) in
+          let buf = BA1.create Bigarray.Float64 Bigarray.C_layout len in
+          List.iteri trailing ~f:(fun i (_, v) -> BA1.set buf i v);
+          Some buf
