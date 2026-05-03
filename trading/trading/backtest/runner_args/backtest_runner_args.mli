@@ -86,18 +86,22 @@ type t = {
 
           Validated at parse time: [--fuzz-window] requires [--fuzz]. *)
   snapshot_dir : string option;
-      (** [Some path] when [--snapshot-mode --snapshot-dir <path>] was passed
-          (both flags are required together): the simulator's per-tick OHLCV
+      (** [Some path] when snapshot mode is selected (the runner's default since
+          F.2 PR 3 — see [dev/plans/snapshot-engine-phase-f-2026-05-03.md]) and
+          [--snapshot-dir <path>] was passed: the simulator's per-tick OHLCV
           reads come from the snapshot directory at [path] instead of the CSV
           [data_dir]. The runner reads [<path>/manifest.sexp] and constructs a
           [Backtest.Bar_data_source.Snapshot {snapshot_dir; manifest}] which is
           forwarded into [Backtest.Runner.run_backtest ~bar_data_source:_].
-          Default [None] (CSV mode — pre-Phase-D behaviour). Phase D wiring; see
-          [dev/plans/snapshot-engine-phase-d-2026-05-02.md].
+
+          [None] when [--csv-mode] was passed (the explicit opt-out): the runner
+          stays on the legacy CSV [data_dir] code path. CSV mode is retained as
+          a fallback in F.2 and will be retired in F.3.
 
           The snapshot directory must be pre-built via the Phase B writer
           ([analysis/scripts/build_snapshots/build_snapshots.exe]); the backtest
           runner will fail loudly if the manifest is missing or schema-skewed.
+          (Auto-build of the snapshot directory is deferred to a follow-up PR.)
       *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
@@ -109,8 +113,15 @@ val parse : string list -> t Status.status_or
     Returns [Error status] (with [Status.code = Invalid_argument]) on any
     parsing problem (missing flag value, missing required positional, too many
     positionals, [--baseline]/[--smoke]/[--fuzz] without [--experiment-name],
-    [--fuzz] combined with [--baseline] or [--smoke], or [--fuzz-window] without
-    [--fuzz]).
+    [--fuzz] combined with [--baseline] or [--smoke], [--fuzz-window] without
+    [--fuzz], [--snapshot-mode] combined with [--csv-mode], [--csv-mode]
+    combined with [--snapshot-dir], or snapshot mode (the default, or explicit
+    [--snapshot-mode]) without [--snapshot-dir]).
+
+    Snapshot mode is the default since F.2 PR 3. Pass [--csv-mode] to opt out
+    onto the legacy CSV path. The legacy [--snapshot-mode] flag is still
+    accepted (no-op when paired with [--snapshot-dir]) so existing callers keep
+    working.
 
     Override strings are NOT validated here — the executable runs them through
     [Backtest.Config_override.parse] / [Sexp.of_string] downstream and surfaces

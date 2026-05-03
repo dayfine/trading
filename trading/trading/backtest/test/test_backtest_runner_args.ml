@@ -7,14 +7,27 @@
 
     After Stage 3 PR 3.4 of the columnar data-shape redesign deleted the
     [Loader_strategy] enum + the [--loader-strategy] CLI flag, only the flags
-    surviving on the panel-only path are pinned here. *)
+    surviving on the panel-only path are pinned here.
+
+    Since F.2 PR 3 (snapshot mode is the default; see
+    [dev/plans/snapshot-engine-phase-f-2026-05-03.md]), every successful parse
+    must specify a mode: either [--snapshot-dir <path>] (snapshot, the default)
+    or [--csv-mode] (the explicit opt-out). Tests that pin orthogonal flags
+    (overrides, fuzz, baseline, smoke, trace, memtrace, gc-trace, etc.) prepend
+    [--csv-mode] via the [_parse_csv] helper so the flag-parsing assertions
+    aren't entangled with snapshot validation. *)
 
 open OUnit2
 open Core
 open Matchers
 
+(** Parse with [--csv-mode] prepended. Use in tests that pin flag-parsing
+    behaviour orthogonal to snapshot mode — the explicit opt-out keeps the parse
+    Ok without forcing every test to fabricate a [--snapshot-dir] path. *)
+let _parse_csv args = Backtest_runner_args.parse ("--csv-mode" :: args)
+
 let test_minimal_start_date_only _ =
-  let result = Backtest_runner_args.parse [ "2018-01-02" ] in
+  let result = _parse_csv [ "2018-01-02" ] in
   assert_that result
     (is_ok_and_holds
        (all_of
@@ -60,7 +73,7 @@ let test_override_key_path_form _ =
   (* The new key.path=value form is stored verbatim — interpretation is the
      executable's job. *)
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [ "2018-01-02"; "--override"; "stops_config.initial_stop_buffer=1.05" ]
   in
   assert_that result
@@ -72,8 +85,7 @@ let test_override_key_path_form _ =
 let test_override_legacy_sexp_form _ =
   (* Backward compatibility: pre-existing scripts pass full sexp blobs. *)
   let result =
-    Backtest_runner_args.parse
-      [ "2018-01-02"; "--override"; "((initial_stop_buffer 1.08))" ]
+    _parse_csv [ "2018-01-02"; "--override"; "((initial_stop_buffer 1.08))" ]
   in
   assert_that result
     (is_ok_and_holds
@@ -83,7 +95,7 @@ let test_override_legacy_sexp_form _ =
 
 let test_override_can_repeat _ =
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2018-01-02";
         "--override";
@@ -104,7 +116,7 @@ let test_override_can_repeat _ =
 
 let test_baseline_flag _ =
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [ "2018-01-02"; "--baseline"; "--experiment-name"; "stop_buffer_test" ]
   in
   assert_that result
@@ -125,8 +137,7 @@ let test_baseline_without_experiment_name_is_error _ =
 
 let test_smoke_flag _ =
   let result =
-    Backtest_runner_args.parse
-      [ "--smoke"; "--experiment-name"; "stop_buffer_smoke" ]
+    _parse_csv [ "--smoke"; "--experiment-name"; "stop_buffer_smoke" ]
   in
   assert_that result
     (is_ok_and_holds
@@ -148,10 +159,7 @@ let test_smoke_without_experiment_name_is_error _ =
 let test_experiment_name_alone_is_allowed _ =
   (* --experiment-name without --baseline / --smoke just renames the output
      dir; both can be combined freely. *)
-  let result =
-    Backtest_runner_args.parse
-      [ "2018-01-02"; "--experiment-name"; "manual_run" ]
-  in
+  let result = _parse_csv [ "2018-01-02"; "--experiment-name"; "manual_run" ] in
   assert_that result
     (is_ok_and_holds
        (field
@@ -170,7 +178,7 @@ let test_experiment_name_missing_value_is_error _ =
     main is responsible for the per-mode merge. Repeatable. *)
 let test_shared_override_can_repeat _ =
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2018-01-02";
         "--shared-override";
@@ -202,7 +210,7 @@ let test_shared_override_missing_value _ =
     decides how to dispatch them per mode (single, baseline, smoke). *)
 let test_shared_override_composes_with_override _ =
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2018-01-02";
         "--shared-override";
@@ -225,7 +233,7 @@ let test_shared_override_composes_with_override _ =
 
 let test_fuzz_flag _ =
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2019-05-01";
         "--fuzz";
@@ -264,7 +272,7 @@ let test_fuzz_without_value_is_error _ =
 
 let test_fuzz_no_positional_uses_sentinel _ =
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "--fuzz";
         "start_date=2019-05-01\xC2\xB15w:3";
@@ -303,7 +311,7 @@ let test_fuzz_window_with_fuzz _ =
   (* --fuzz-window composes with --fuzz to constrain the per-variant universe
      to a smoke-catalog window's universe_path (sp500 by default). *)
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2020-04-30";
         "--fuzz";
@@ -343,7 +351,7 @@ let test_fuzz_window_missing_value _ =
 let test_fuzz_with_overrides_composes _ =
   (* --fuzz composes with --override (overrides apply to every variant). *)
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2019-05-01";
         "--fuzz";
@@ -369,7 +377,7 @@ let test_fuzz_with_overrides_composes _ =
 
 let test_baseline_and_smoke_compose _ =
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "--smoke";
         "--baseline";
@@ -393,7 +401,7 @@ let test_baseline_and_smoke_compose _ =
           ]))
 
 let test_start_and_end_date _ =
-  let result = Backtest_runner_args.parse [ "2018-01-02"; "2019-12-31" ] in
+  let result = _parse_csv [ "2018-01-02"; "2019-12-31" ] in
   assert_that result
     (is_ok_and_holds
        (all_of
@@ -407,9 +415,7 @@ let test_start_and_end_date _ =
           ]))
 
 let test_trace_flag _ =
-  let result =
-    Backtest_runner_args.parse [ "2018-01-02"; "--trace"; "/tmp/run.sexp" ]
-  in
+  let result = _parse_csv [ "2018-01-02"; "--trace"; "/tmp/run.sexp" ] in
   assert_that result
     (is_ok_and_holds
        (field
@@ -417,7 +423,7 @@ let test_trace_flag _ =
           (equal_to (Some "/tmp/run.sexp"))))
 
 let test_trace_default_is_none _ =
-  let result = Backtest_runner_args.parse [ "2018-01-02" ] in
+  let result = _parse_csv [ "2018-01-02" ] in
   assert_that result
     (is_ok_and_holds
        (field
@@ -428,7 +434,7 @@ let test_trace_with_other_flags _ =
   (* Verify that --trace composes with --override and end_date in a single
      command. Order should not matter. *)
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2018-01-02";
         "2019-12-31";
@@ -460,8 +466,7 @@ let test_trace_missing_value _ =
 
 let test_memtrace_flag _ =
   let result =
-    Backtest_runner_args.parse
-      [ "2018-01-02"; "--memtrace"; "/tmp/run.memtrace.ctf" ]
+    _parse_csv [ "2018-01-02"; "--memtrace"; "/tmp/run.memtrace.ctf" ]
   in
   assert_that result
     (is_ok_and_holds
@@ -470,7 +475,7 @@ let test_memtrace_flag _ =
           (equal_to (Some "/tmp/run.memtrace.ctf"))))
 
 let test_memtrace_default_is_none _ =
-  let result = Backtest_runner_args.parse [ "2018-01-02" ] in
+  let result = _parse_csv [ "2018-01-02" ] in
   assert_that result
     (is_ok_and_holds
        (field
@@ -483,7 +488,7 @@ let test_memtrace_with_other_flags _ =
      (--trace) and per-callsite allocation traces (--memtrace) in one run for
      cross-correlation. *)
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2018-01-02";
         "2019-12-31";
@@ -519,9 +524,7 @@ let test_memtrace_missing_value _ =
   assert_that result is_error
 
 let test_gc_trace_flag _ =
-  let result =
-    Backtest_runner_args.parse [ "2018-01-02"; "--gc-trace"; "/tmp/gc.csv" ]
-  in
+  let result = _parse_csv [ "2018-01-02"; "--gc-trace"; "/tmp/gc.csv" ] in
   assert_that result
     (is_ok_and_holds
        (field
@@ -529,7 +532,7 @@ let test_gc_trace_flag _ =
           (equal_to (Some "/tmp/gc.csv"))))
 
 let test_gc_trace_default_is_none _ =
-  let result = Backtest_runner_args.parse [ "2018-01-02" ] in
+  let result = _parse_csv [ "2018-01-02" ] in
   assert_that result
     (is_ok_and_holds
        (field
@@ -542,7 +545,7 @@ let test_gc_trace_with_other_flags _ =
      traces (--trace), per-callsite allocation traces (--memtrace), and GC
      phase-boundary snapshots (--gc-trace) in one run for cross-correlation. *)
   let result =
-    Backtest_runner_args.parse
+    _parse_csv
       [
         "2018-01-02";
         "2019-12-31";
@@ -627,7 +630,64 @@ let test_trace_write_and_parse _ =
            (equal_to Backtest.Trace.Phase.Teardown);
        ])
 
-let test_snapshot_mode_with_dir _ =
+(** Since F.2 PR 3, snapshot mode is the runner's default — passing
+    [--snapshot-dir <path>] alone (no mode flag) is the canonical invocation and
+    parses to a [Snapshot] selector. *)
+let test_default_is_snapshot_mode_with_dir _ =
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--snapshot-dir"; "/tmp/snapshots/v1" ]
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.snapshot_dir)
+          (equal_to (Some "/tmp/snapshots/v1"))))
+
+(** Default mode (snapshot) requires [--snapshot-dir] — the runner has no way to
+    find a manifest otherwise. Surface the missing flag at parse time rather
+    than letting the runner fail later. *)
+let test_default_requires_snapshot_dir _ =
+  let result = Backtest_runner_args.parse [ "2018-01-02" ] in
+  assert_that result is_error
+
+(** [--csv-mode] is the explicit opt-out onto the legacy CSV [data_dir] code
+    path. CSV mode parses to [snapshot_dir = None] regardless of whether the
+    user passed [--snapshot-dir] (combining the two is rejected — see below). *)
+let test_csv_mode_opt_out _ =
+  let result = Backtest_runner_args.parse [ "2018-01-02"; "--csv-mode" ] in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.snapshot_dir)
+          (equal_to None)))
+
+(** [--csv-mode] + [--snapshot-dir <path>] is rejected — the path would be
+    silently dropped, which is a likely user error worth surfacing at parse
+    time. *)
+let test_csv_mode_with_snapshot_dir_errors _ =
+  let result =
+    Backtest_runner_args.parse
+      [ "2018-01-02"; "--csv-mode"; "--snapshot-dir"; "/tmp/snapshots/v1" ]
+  in
+  assert_that result is_error
+
+(** [--snapshot-mode] (legacy, no-op since F.2 PR 3) and [--csv-mode] are
+    mutually exclusive: passing both means the user has contradicted themselves.
+*)
+let test_snapshot_mode_and_csv_mode_mutually_exclusive _ =
+  let result =
+    Backtest_runner_args.parse [ "2018-01-02"; "--snapshot-mode"; "--csv-mode" ]
+  in
+  assert_that result is_error
+
+(** Backward compatibility: existing callers with
+    [--snapshot-mode --snapshot-dir <path>] continue to parse to a [Snapshot]
+    selector exactly as before. The legacy [--snapshot-mode] flag is now a
+    documented no-op (snapshot mode is the default), but the runner does not
+    reject the flag — that would break in-tree scenario / fuzz scripts and CI
+    invocations landed before F.2 PR 3. *)
+let test_legacy_snapshot_mode_flag_still_accepted _ =
   let result =
     Backtest_runner_args.parse
       [ "2018-01-02"; "--snapshot-mode"; "--snapshot-dir"; "/tmp/snapshots/v1" ]
@@ -641,17 +701,8 @@ let test_snapshot_mode_with_dir _ =
 let test_snapshot_mode_without_dir_is_error _ =
   (* --snapshot-mode without --snapshot-dir has no way to find the manifest;
      we surface this at parse time rather than failing later inside the
-     runner. *)
+     runner. (Same rule applies under the default since F.2 PR 3.) *)
   let result = Backtest_runner_args.parse [ "2018-01-02"; "--snapshot-mode" ] in
-  assert_that result is_error
-
-let test_snapshot_dir_without_mode_is_error _ =
-  (* --snapshot-dir without --snapshot-mode would silently fall back to CSV
-     mode and ignore the path; surface that as an error so the user notices. *)
-  let result =
-    Backtest_runner_args.parse
-      [ "2018-01-02"; "--snapshot-dir"; "/tmp/snapshots/v1" ]
-  in
   assert_that result is_error
 
 let test_snapshot_dir_missing_value _ =
@@ -750,12 +801,20 @@ let suite =
          >:: test_fuzz_window_without_fuzz_is_error;
          "--fuzz-window without value is error"
          >:: test_fuzz_window_missing_value;
-         "--snapshot-mode + --snapshot-dir compose"
-         >:: test_snapshot_mode_with_dir;
+         "default mode (no flag) + --snapshot-dir parses to Snapshot"
+         >:: test_default_is_snapshot_mode_with_dir;
+         "default mode (no flag) without --snapshot-dir is error"
+         >:: test_default_requires_snapshot_dir;
+         "--csv-mode opts out onto the legacy CSV path"
+         >:: test_csv_mode_opt_out;
+         "--csv-mode + --snapshot-dir is error"
+         >:: test_csv_mode_with_snapshot_dir_errors;
+         "--snapshot-mode + --csv-mode are mutually exclusive"
+         >:: test_snapshot_mode_and_csv_mode_mutually_exclusive;
+         "legacy --snapshot-mode + --snapshot-dir still accepted (no-op)"
+         >:: test_legacy_snapshot_mode_flag_still_accepted;
          "--snapshot-mode without --snapshot-dir is error"
          >:: test_snapshot_mode_without_dir_is_error;
-         "--snapshot-dir without --snapshot-mode is error"
-         >:: test_snapshot_dir_without_mode_is_error;
          "--snapshot-dir without value is error"
          >:: test_snapshot_dir_missing_value;
          "--snapshot-mode composes with --fuzz" >:: test_snapshot_mode_with_fuzz;

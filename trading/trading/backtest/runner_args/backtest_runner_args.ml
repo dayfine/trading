@@ -29,12 +29,15 @@ type acc = {
   fuzz_spec : string option;
   fuzz_window : string option;
   snapshot_mode : bool;
+  csv_mode : bool;
   snapshot_dir : string option;
 }
 (** Accumulator for [_extract_flags]. Carries every flag the parser recognises
-    plus the running list of positional args. The [snapshot_mode] /
-    [snapshot_dir] split exists so we can validate at parse time that the two
-    flags appear together (see [_validate_snapshot_flags]). *)
+    plus the running list of positional args. Snapshot mode is the default since
+    F.2 PR 3; [csv_mode] tracks explicit [--csv-mode] opt-outs. The legacy
+    [--snapshot-mode] flag is still accepted (no-op) — see
+    [_validate_snapshot_flags] for the full mutual-exclusion + required-dir
+    rules. *)
 
 let _empty_acc =
   {
@@ -50,6 +53,7 @@ let _empty_acc =
     fuzz_spec = None;
     fuzz_window = None;
     snapshot_mode = false;
+    csv_mode = false;
     snapshot_dir = None;
   }
 
@@ -94,6 +98,7 @@ let rec _extract_flags args (acc : acc) =
   | [ "--fuzz-window" ] -> _err "--fuzz-window requires a name argument"
   | "--snapshot-mode" :: rest ->
       _extract_flags rest { acc with snapshot_mode = true }
+  | "--csv-mode" :: rest -> _extract_flags rest { acc with csv_mode = true }
   | "--snapshot-dir" :: value :: rest ->
       _extract_flags rest { acc with snapshot_dir = Some value }
   | [ "--snapshot-dir" ] -> _err "--snapshot-dir requires a path argument"
@@ -152,14 +157,35 @@ let _validate_fuzz_window_requires_fuzz ~fuzz_window ~fuzz_spec =
   | Some _, None -> _err "--fuzz-window requires --fuzz"
   | _ -> Ok ()
 
-(** [--snapshot-mode] and [--snapshot-dir <path>] must appear together. Either
-    alone is a likely user error: [--snapshot-mode] without a path has no way to
-    find snapshots; [--snapshot-dir] without [--snapshot-mode] silently drops
-    the flag in favour of CSV mode. *)
-let _validate_snapshot_flags ~snapshot_mode ~snapshot_dir =
-  match (snapshot_mode, snapshot_dir) with
-  | true, None -> _err "--snapshot-mode requires --snapshot-dir <path>"
-  | false, Some _ -> _err "--snapshot-dir requires --snapshot-mode"
+(** Snapshot mode is the default since F.2 PR 3. The flag matrix:
+
+    - Default (no mode flag): snapshot mode is on; [--snapshot-dir <path>] is
+      required so the runner has a manifest to read.
+    - [--snapshot-mode]: legacy explicit opt-in, still accepted as a no-op so
+      existing callers keep working. Same rules as the default.
+    - [--csv-mode]: explicit opt-out onto the legacy CSV path; [--snapshot-dir]
+      is meaningless here.
+
+    Three error conditions:
+
+    - [--snapshot-mode] AND [--csv-mode] are mutually exclusive (the user has
+      contradicted themselves).
+    - [--csv-mode] AND [--snapshot-dir <path>] together — the path would be
+      silently dropped, surface that as a parse-time error.
+    - Snapshot mode (default or explicit) without [--snapshot-dir] — the runner
+      has no way to find the manifest. *)
+let _validate_snapshot_flags ~snapshot_mode ~csv_mode ~snapshot_dir =
+  match (snapshot_mode, csv_mode, snapshot_dir) with
+  | true, true, _ ->
+      _err "--snapshot-mode and --csv-mode are mutually exclusive"
+  | false, true, Some _ ->
+      _err
+        "--snapshot-dir is meaningless with --csv-mode (CSV path has no \
+         manifest)"
+  | _, false, None ->
+      _err
+        "snapshot mode is the default; pass --snapshot-dir <path> or use \
+         --csv-mode to opt out onto the legacy CSV path"
   | _ -> Ok ()
 
 let _build_result (acc : acc) (start_date, end_date) =
@@ -195,7 +221,8 @@ let parse args =
                 ~f:(fun () ->
                   Result.bind
                     (_validate_snapshot_flags ~snapshot_mode:acc.snapshot_mode
-                       ~snapshot_dir:acc.snapshot_dir) ~f:(fun () ->
+                       ~csv_mode:acc.csv_mode ~snapshot_dir:acc.snapshot_dir)
+                    ~f:(fun () ->
                       Result.bind
                         (_split_positional ~smoke:acc.smoke
                            ~fuzz_spec:acc.fuzz_spec acc.positional)
