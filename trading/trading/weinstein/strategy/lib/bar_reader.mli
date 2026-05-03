@@ -1,16 +1,27 @@
 (** Bar source abstraction for the Weinstein strategy.
 
-    Thin wrapper over {!Data_panel.Bar_panels} — the panel-backed reader that
-    reconstructs OHLCV bars on the fly from the underlying [Ohlcv_panels]
-    columns. The strategy reads daily / weekly bars through this interface,
-    keyed on the strategy's notion of "current date" (the date of the primary
-    index bar).
+    Backend-agnostic facade over the OHLCV bar reads the strategy needs (daily
+    bar lists, weekly aggregates, daily / weekly views). Two backings are
+    available:
+
+    - {!of_panels} — backed by {!Data_panel.Bar_panels}, the in-memory panel
+      reader populated up-front from CSV at runner start. The default for
+      pre-Phase-F.2 runs.
+    - {!of_snapshot_views} — backed by {!Snapshot_runtime.Snapshot_callbacks},
+      the LRU-bounded daily-snapshot reader that streams rows from per-symbol
+      [.snap] files on demand. Used by snapshot-mode runs (Phase F.2 PR 2),
+      which skip the {!Bar_panels.t} build entirely.
+
+    Internally [Bar_reader.t] is a record of closures; the constructors capture
+    their backing's read primitives and produce identical-shape closures, so the
+    strategy's downstream callees see one bar-reading API regardless of backing.
 
     Stage 3 PR 3.2 collapsed the dual-backend ([Bar_history] | [Bar_panels])
-    abstraction into a single panel-backed reader. The [Bar_reader.t] type
-    survives as a slim seam so callers and the strategy share one bar-reading
-    API; future backend swaps (e.g. live-mode streaming reads) can be added by
-    extending this module rather than every reader site. *)
+    abstraction into a single panel-backed reader. Phase F.2 PR 2 generalised
+    [t] to closure-based and re-introduced a second backing — but this time the
+    backings are purely an internal swap (no variant in [t], no per-call
+    dispatch) so callers can stay backend-agnostic and the hot-path remains a
+    direct closure invocation. *)
 
 open Core
 
@@ -28,6 +39,26 @@ val of_panels : ?ma_cache:Weekly_ma_cache.t -> Data_panel.Bar_panels.t -> t
     strategy's hot-path callees can fetch per-symbol MA values from the cache
     without threading a separate parameter through every helper. Populated
     lazily by {!Weekly_ma_cache.ma_values_for} on first access. *)
+
+val of_snapshot_views : Snapshot_runtime.Snapshot_callbacks.t -> t
+(** [of_snapshot_views cb] produces a reader backed by
+    {!Snapshot_runtime.Snapshot_bar_views} over [cb]. Reads fan out through
+    {!Snapshot_runtime.Snapshot_callbacks.read_field_history} (LRU-bounded via
+    {!Snapshot_runtime.Daily_panels}); per-call cost is O(window-size) plus an
+    at-most-one-symbol disk read on cache miss.
+
+    Returns the empty view / empty list under the same conditions as
+    {!of_panels}: unknown symbol, [as_of] before any resident snapshot row, or
+    any underlying field-read failure. The view types
+    ({!Data_panel.Bar_panels.weekly_view} / [daily_view]) are the same as those
+    returned by {!of_panels}, so {!Panel_callbacks} consumes either backing's
+    views without modification.
+
+    No [?ma_cache] parameter — the snapshot path does not currently use a
+    pre-computed weekly MA cache because {!Snapshot_runtime.Daily_panels} is
+    symbol-keyed (loading a symbol's full history on first access is cheap), so
+    MA recomputation per call is bounded. The cache hook can be revisited if the
+    snapshot hot path shows up in future profiles. *)
 
 val ma_cache : t -> Weekly_ma_cache.t option
 (** [ma_cache t] returns the cache the reader was constructed with, or [None]

@@ -56,40 +56,39 @@
     owns its own buffer. Memory cost: at most [len * 8] bytes per call, freed by
     the GC. *)
 
-type weekly_view = {
-  closes : float array;
-      (** Adjusted close per weekly bar (chronological, oldest at index 0). *)
-  raw_closes : float array;
-      (** Raw (un-adjusted) close per weekly bar — the [Snapshot_schema.Close]
-          field's value at the last trading day of each weekly bucket. Used
-          together with [closes] to compute per-bar split-adjustment factors
-          ([closes.(i) /. raw_closes.(i)]). *)
-  highs : float array;  (** Max raw high within each weekly bucket. *)
-  lows : float array;  (** Min raw low within each weekly bucket. *)
-  volumes : float array;
-      (** Sum of raw daily volumes within each weekly bucket. Stored as float to
-          align with the snapshot column layout. *)
-  dates : Core.Date.t array;
-      (** Date of the last trading day in each weekly bucket (typically Friday
-          for complete weeks, last traded day for partial / holiday weeks). *)
-  n : int;  (** Length of every array. *)
-}
-(** Float-array view of weekly-aggregated bars for one symbol — same shape as
-    {!Data_panel.Bar_panels.weekly_view}. *)
+type weekly_view = Data_panel.Bar_panels.weekly_view
+(** Type-equal to {!Data_panel.Bar_panels.weekly_view} so the strategy's
+    panel-callback constructors
+    ({!Panel_callbacks.stage_callbacks_of_weekly_view} et al.) can consume views
+    produced by either backing without a per-call adapter or variant dispatch.
 
-type daily_view = {
-  highs : float array;
-      (** Daily raw high prices, oldest at index 0, newest at index
-          [n_days - 1]. *)
-  lows : float array;  (** Daily raw low prices, same indexing as [highs]. *)
-  closes : float array;
-      (** Daily raw closes (the [Snapshot_schema.Close] field), same indexing.
-      *)
-  dates : Core.Date.t array;  (** Daily dates, same indexing. *)
-  n_days : int;  (** Length of every array. *)
-}
-(** Float-array view of daily bars for one symbol within a lookback window —
-    same shape as {!Data_panel.Bar_panels.daily_view}. *)
+    Phase F.2 PR 2 uses this equality to wire snapshot reads through the
+    strategy in place of [Bar_panels.t]. PR 3 (Phase F.3) deletes
+    {!Data_panel.Bar_panels} and hoists the record definition into a neutral
+    location; the [type =] is the temporary bridge between PR 1 (this module
+    standalone) and PR 3 (sole owner of the record).
+
+    Field semantics — populated by {!weekly_view_for}:
+    - [closes] = adjusted close of the last trading day in each weekly bucket
+    - [raw_closes] = the [Snapshot_schema.Close] field's value at the last
+      trading day of each weekly bucket (the un-adjusted close)
+    - [highs] = max raw high within each weekly bucket
+    - [lows] = min raw low within each weekly bucket
+    - [volumes] = sum of raw daily volumes within each weekly bucket
+    - [dates] = date of the last trading day in each weekly bucket (typically
+      Friday for complete weeks, last traded day for partial / holiday weeks)
+    - [n] = length of every array. *)
+
+type daily_view = Data_panel.Bar_panels.daily_view
+(** Type-equal to {!Data_panel.Bar_panels.daily_view} for the same reason as
+    {!weekly_view}. Field semantics — populated by {!daily_view_for}:
+    - [highs] = daily raw high prices, oldest at index 0
+    - [lows] = daily raw low prices, same indexing
+    - [closes] = daily raw closes (the [Snapshot_schema.Close] field), same
+      indexing — matches {!Bar_panels.daily_view_for}, which also uses the raw
+      close panel rather than the adjusted close panel
+    - [dates] = daily dates, same indexing
+    - [n_days] = length of every array. *)
 
 val weekly_view_for :
   Snapshot_callbacks.t ->
@@ -133,6 +132,48 @@ val daily_view_for :
     - [symbol] is not in the snapshot manifest
     - no resident snapshot rows fall in the calendar window
     - any required field read fails. *)
+
+val daily_bars_for :
+  Snapshot_callbacks.t ->
+  symbol:string ->
+  as_of:Core.Date.t ->
+  Types.Daily_price.t list
+(** [daily_bars_for cb ~symbol ~as_of] returns daily bars for [symbol] up to and
+    including [as_of], in chronological order (oldest first). Used by
+    {!Bar_reader.of_snapshot_views} to satisfy the [Bar_reader.daily_bars_for]
+    surface (consumed by [Stops_split_runner._last_two_bars] for split detection
+    and [Entry_audit_capture._effective_entry_price]).
+
+    Reads the [Adjusted_close], [Close], [High], [Low], and [Volume] field
+    histories from [cb] over a fixed-width calendar window (10 years ≈ 3653
+    days, conservatively wide so historical strategies see the symbol's full
+    backtest history), aligns them by date, drops bars where [Close] is NaN, and
+    returns the assembled list.
+
+    {b open_price NaN.} The [Snapshot_schema.Open] field is not currently
+    surfaced — every returned bar has [open_price = Float.nan]. None of the
+    in-tree consumers of {!Bar_reader.daily_bars_for} read [open_price], so this
+    is sound today; if a future caller needs it, fold [Open] into
+    [_assemble_daily_bars]'s input set.
+
+    Returns the empty list when:
+    - [symbol] is not in the snapshot manifest
+    - no resident snapshot rows fall in the calendar window
+    - any required field read fails. *)
+
+val weekly_bars_for :
+  Snapshot_callbacks.t ->
+  symbol:string ->
+  n:int ->
+  as_of:Core.Date.t ->
+  Types.Daily_price.t list
+(** [weekly_bars_for cb ~symbol ~n ~as_of] returns the most recent [n]
+    weekly-aggregated bars for [symbol] as of [as_of], in chronological order.
+    Same aggregation rules as {!weekly_view_for} (ISO-week buckets,
+    [include_partial_week:true]).
+
+    Returns the empty list when [n <= 0] or under the same conditions as
+    {!daily_bars_for}. *)
 
 val low_window :
   Snapshot_callbacks.t ->
