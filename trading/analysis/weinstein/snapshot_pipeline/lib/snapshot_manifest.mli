@@ -76,3 +76,31 @@ val find : t -> symbol:string -> file_metadata option
 (** [find t ~symbol] returns the entry for [symbol], or [None] if absent. O(N)
     in the entry count — Phase B universes (≤ 10K) scan in microseconds; if
     Phase C demands faster lookup it can build a hashtable on top. *)
+
+val upsert_entry : t -> file_metadata -> t
+(** [upsert_entry t entry] returns a manifest with [entry] added (if no entry
+    matches its [symbol]) or replaced (if an entry for that symbol already
+    exists). Pure: does not touch disk. The relative order of other entries is
+    preserved; an inserted entry is appended at the end. *)
+
+val update_for_symbol :
+  path:string ->
+  schema:Data_panel_snapshot.Snapshot_schema.t ->
+  file_metadata ->
+  unit Status.status_or
+(** [update_for_symbol ~path ~schema entry] atomically updates the manifest at
+    [path] with [entry]. If no manifest exists at [path], a new one is created
+    with [schema] and [entry] as the only record. If a manifest exists, its
+    schema_hash is checked against [schema.schema_hash] — on mismatch returns
+    [Error Internal] (to refuse appending under a different indicator set). On
+    match, the manifest's entries are upserted via {!upsert_entry} and written
+    back.
+
+    Atomic-rename semantics: the new manifest is written to [path ^ ".tmp"]
+    first, then [Stdlib.Sys.rename] swaps it in. POSIX guarantees readers
+    observe either the old or new file, never a torn write. This is the
+    primitive the snapshot writer uses to checkpoint after every per-symbol
+    [.snap] file lands, so [--incremental] can resume from any interrupt
+    mid-run.
+
+    Returns [Error Internal] on filesystem error or schema mismatch. *)

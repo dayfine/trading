@@ -13,7 +13,21 @@
     {!Snapshot_schema.Macro_composite} are populated. Without it those columns
     are NaN per {!Snapshot_pipeline.Pipeline.build_for_symbol}'s contract.
 
-    See [dev/plans/daily-snapshot-streaming-2026-04-27.md] §Phasing Phase B. *)
+    Checkpointing (added per dev/plans/data-pipeline-automation-2026-05-03.md):
+
+    - Per-symbol atomic manifest update via
+      {!Snapshot_pipeline.Snapshot_manifest.update_for_symbol}: after each
+      [.snap] file lands, the directory manifest is rewritten via tempfile +
+      atomic rename. Crash mid-run leaves a well-formed manifest with N entries
+      where N is the number of symbols completed; [--incremental] on restart
+      resumes correctly.
+    - Periodic [progress.sexp] emission: every [--progress-every N] symbols
+      (default 50), an atomic [progress.sexp] is written to the output dir so a
+      tail-able tool can gauge progress mid-run.
+
+    See [dev/plans/daily-snapshot-streaming-2026-04-27.md] §Phasing Phase B and
+    [dev/plans/data-pipeline-automation-2026-05-03.md] for the checkpointing
+    contract. *)
 
 open Core
 module Pipeline = Snapshot_pipeline.Pipeline
@@ -21,6 +35,23 @@ module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
 module Snapshot_format = Data_panel_snapshot.Snapshot_format
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+
+(** Default progress.sexp emission cadence: write a progress checkpoint after
+    every 50 symbols. Configurable via [--progress-every N]. *)
+let _default_progress_every = 50
+
+type progress = {
+  symbols_total : int;
+  symbols_done : int;
+  last_completed : string;
+  started_at : float;
+  updated_at : float;
+}
+[@@deriving sexp]
+(** On-disk progress checkpoint shape. Atomically rewritten every
+    [progress_every] symbols. Tail-able via standard shell tooling (sexp print).
+    The fields use the canonical sexp serialization (Float.t ↔ "1234567890.5");
+    start/update times are unix seconds since epoch. *)
 
 let _csv_mtime ~data_dir ~symbol =
   let dir = Csv.Csv_storage.symbol_data_dir ~data_dir symbol in
@@ -79,8 +110,17 @@ let _maybe_reuse ~existing ~symbol =
   | None -> None
   | Some m -> Snapshot_manifest.find m ~symbol
 
+let _checkpoint_manifest ~manifest_path ~schema entry =
+  match
+    Snapshot_manifest.update_for_symbol ~path:manifest_path ~schema entry
+  with
+  | Ok () -> ()
+  | Error err ->
+      Printf.eprintf "manifest checkpoint failed for %s: %s\n%!"
+        entry.Snapshot_manifest.symbol (Status.show err)
+
 let _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
-    symbol =
+    ~manifest_path ~checkpoint symbol =
   match _csv_mtime ~data_dir ~symbol with
   | None ->
       Printf.eprintf "skip %s: no CSV\n%!" symbol;
@@ -98,7 +138,10 @@ let _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
               _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars
                 ~output_dir ~csv_mtime
             with
-            | Ok entry -> Some entry
+            | Ok entry ->
+                if checkpoint then
+                  _checkpoint_manifest ~manifest_path ~schema entry;
+                Some entry
             | Error err ->
                 Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
                 None))
@@ -147,31 +190,85 @@ let _verify_or_warn ~manifest_path =
 let _ensure_dir path =
   if not (Stdlib.Sys.file_exists path) then Stdlib.Sys.mkdir path 0o755
 
-let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~incremental
-    () =
-  _ensure_dir output_dir;
-  let schema = Snapshot_schema.default in
-  let symbols = _load_universe ~universe_path in
-  let data_dir = Fpath.v csv_data_dir in
-  let benchmark_bars = _benchmark_bars_opt ~data_dir ~benchmark_symbol in
-  let existing = if incremental then _existing_manifest ~output_dir else None in
-  let t0 = Time_ns.now () in
-  let entries =
-    List.filter_map symbols
-      ~f:
-        (_process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing)
-  in
-  let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
+(** Atomically write [progress.sexp] under [output_dir]. Tempfile + rename so a
+    tailing reader never observes a torn write. *)
+let _write_progress ~output_dir ~progress =
+  let path = Filename.concat output_dir "progress.sexp" in
+  let tmp = path ^ ".tmp" in
+  try
+    let data = Sexp.to_string_hum (sexp_of_progress progress) in
+    Out_channel.write_all tmp ~data;
+    Stdlib.Sys.rename tmp path
+  with Sys_error msg | Failure msg -> (
+    Printf.eprintf "progress write failed: %s\n%!" msg;
+    try Stdlib.Sys.remove tmp with _ -> ())
+
+let _maybe_emit_progress ~output_dir ~progress_every ~symbols_total
+    ~symbols_done ~last_completed ~started_at =
+  if symbols_done > 0 && symbols_done mod progress_every = 0 then
+    _write_progress ~output_dir
+      ~progress:
+        {
+          symbols_total;
+          symbols_done;
+          last_completed;
+          started_at;
+          updated_at = Core_unix.time ();
+        }
+
+let _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at =
+  _write_progress ~output_dir
+    ~progress:
+      {
+        symbols_total;
+        symbols_done = List.length entries;
+        last_completed =
+          (match List.last entries with
+          | Some e -> e.Snapshot_manifest.symbol
+          | None -> "");
+        started_at;
+        updated_at = Core_unix.time ();
+      }
+
+let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
   let manifest = Snapshot_manifest.create ~schema ~entries in
-  let manifest_path = Filename.concat output_dir "manifest.sexp" in
-  (match Snapshot_manifest.write ~path:manifest_path manifest with
+  match Snapshot_manifest.write ~path:manifest_path manifest with
   | Ok () ->
       Printf.printf "wrote %d entries to %s in %.2fs\n%!" (List.length entries)
         manifest_path
         (Time_ns.Span.to_sec elapsed)
   | Error err ->
       Printf.eprintf "manifest write failed: %s\n%!" (Status.show err);
-      exit 1);
+      exit 1
+
+let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~incremental
+    ~progress_every () =
+  _ensure_dir output_dir;
+  let schema = Snapshot_schema.default in
+  let symbols = _load_universe ~universe_path in
+  let symbols_total = List.length symbols in
+  let data_dir = Fpath.v csv_data_dir in
+  let benchmark_bars = _benchmark_bars_opt ~data_dir ~benchmark_symbol in
+  let existing = if incremental then _existing_manifest ~output_dir else None in
+  let manifest_path = Filename.concat output_dir "manifest.sexp" in
+  let started_at = Core_unix.time () in
+  let t0 = Time_ns.now () in
+  let entries =
+    List.foldi symbols ~init:[] ~f:(fun i acc symbol ->
+        match
+          _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir
+            ~existing ~manifest_path ~checkpoint:true symbol
+        with
+        | None -> acc
+        | Some entry ->
+            let symbols_done = i + 1 in
+            _maybe_emit_progress ~output_dir ~progress_every ~symbols_total
+              ~symbols_done ~last_completed:symbol ~started_at;
+            acc @ [ entry ])
+  in
+  let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
+  _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;
+  _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path
 
 let command =
@@ -195,9 +292,16 @@ let command =
        flag "incremental" no_arg
          ~doc:
            "Skip symbols whose CSV mtime <= the existing manifest's csv_mtime"
+     and progress_every =
+       flag "progress-every"
+         (optional_with_default _default_progress_every int)
+         ~doc:
+           (Printf.sprintf
+              "N Emit progress.sexp every N symbols processed (default %d)"
+              _default_progress_every)
      in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
-         ~incremental ())
+         ~incremental ~progress_every ())
 
 let () = Command_unix.run command
