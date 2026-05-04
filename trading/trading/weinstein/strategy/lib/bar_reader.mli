@@ -3,10 +3,16 @@
     Backend-agnostic facade over the OHLCV bar reads the strategy needs (daily
     bar lists, weekly aggregates, daily / weekly views).
 
+    - {!of_panels} — backed by a {!Data_panel.Bar_panels.t} loaded from CSV at
+      runner start. Restored by the partial revert of #828's strategy-side flip
+      (closes #843; see `dev/notes/parity-bisect-...md` for the bisect record).
+      The runner's strategy uses this reader; flipping back to
+      {!of_snapshot_views} requires resolving the path-dependent divergence
+      first.
     - {!of_snapshot_views} — backed by {!Snapshot_runtime.Snapshot_callbacks},
       the LRU-bounded daily-snapshot reader that streams rows from per-symbol
-      [.snap] files on demand. The canonical production constructor for runs
-      with a pre-built snapshot directory.
+      [.snap] files on demand. Used directly by parity / migration tests; the
+      runner does not use this for the strategy until the forward fix lands.
     - {!of_in_memory_bars} — convenience constructor that materialises a tmp
       snapshot directory from in-memory [(symbol, bars)] pairs. Used by tests
       and tools that hold bar histories in memory.
@@ -16,15 +22,28 @@
     Internally [Bar_reader.t] is a record of closures; the constructors capture
     their backing's read primitives and produce identical-shape closures, so the
     strategy's downstream callees see one bar-reading API regardless of backing.
-
-    Phase F.3.a-4 (2026-05-04) retired [of_panels] and the legacy
-    {!Data_panel.Bar_panels} backing — every reader now routes through the
-    snapshot path. *)
+*)
 
 open Core
 
 type t
 (** Opaque bar source. *)
+
+val of_panels : ?ma_cache:Weekly_ma_cache.t -> Data_panel.Bar_panels.t -> t
+(** [of_panels ?ma_cache panels] produces a reader backed by a
+    {!Data_panel.Bar_panels.t}.
+
+    All four readers ([daily_bars_for], [weekly_bars_for], [weekly_view_for],
+    [daily_view_for]) wrap the corresponding [Bar_panels] primitive plus a
+    [column_of_date] guard. Returns the empty list / empty view when [as_of] is
+    not in the panel's calendar.
+
+    [ma_cache], when supplied, is exposed via {!ma_cache} so the strategy's
+    cache-aware MA paths can read it without re-walking the panel.
+
+    Restored by the partial revert of #828's strategy-side flip (see module
+    docstring). This is the runner's strategy bar-reader path until the forward
+    fix lands. *)
 
 val of_snapshot_views : Snapshot_runtime.Snapshot_callbacks.t -> t
 (** [of_snapshot_views cb] produces a reader backed by
@@ -74,10 +93,9 @@ val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
 
 val ma_cache : t -> Weekly_ma_cache.t option
 (** [ma_cache t] returns the cache the reader was constructed with, or [None]
-    when no cache was provided. After Phase F.3.a-4 retired the panel-backed
-    [of_panels] constructor every reader sets this to [None]; the accessor and
-    the strategy's cache-aware paths remain wired but inactive until a follow-up
-    cleanup removes them. *)
+    when no cache was provided. Currently only {!of_panels} accepts a cache;
+    {!of_snapshot_views} / {!of_in_memory_bars} / {!empty} always set this to
+    [None]. *)
 
 val empty : unit -> t
 (** [empty ()] produces a reader whose every read returns the empty list / empty

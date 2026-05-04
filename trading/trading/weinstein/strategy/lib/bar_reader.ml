@@ -15,11 +15,9 @@ module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
    path invokes one of these closures per call site per tick — no backing
    dispatch, no variant match.
 
-   [ma_cache] is a vestige of the legacy [of_panels] path retired in Phase
-   F.3.a-4: every current constructor sets it to [None], so the strategy's
-   cache-aware MA paths are inactive. The field stays in the record (and the
-   {!ma_cache} accessor stays in the public API) until a follow-up cleanup
-   removes the cache-aware code paths from {!Weinstein_strategy}. *)
+   [ma_cache] is set by [of_panels] callers that build a cache up-front; the
+   other constructors leave it [None]. The strategy's cache-aware MA paths
+   key off [Some]. *)
 type t = {
   daily_bars_for : symbol:string -> as_of:Date.t -> Types.Daily_price.t list;
   weekly_bars_for :
@@ -50,6 +48,43 @@ let _empty_weekly_view : Bar_panels.weekly_view =
 
 let _empty_daily_view : Bar_panels.daily_view =
   { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
+
+(* {1 Panel-backed constructor (Bar_panels.t over a CSV-loaded calendar)}
+
+   Restored by the partial revert of the Phase F.3.a-3 strategy-side flip.
+   The runner's strategy bar reads stay on this constructor until the
+   path-dependent divergence in {!of_snapshot_views} is forward-fixed; see
+   [bar_reader.mli] module-doc for context. *)
+
+let _panel_daily_bars_for panels ~symbol ~as_of =
+  match Bar_panels.column_of_date panels as_of with
+  | None -> []
+  | Some as_of_day -> Bar_panels.daily_bars_for panels ~symbol ~as_of_day
+
+let _panel_weekly_bars_for panels ~symbol ~n ~as_of =
+  match Bar_panels.column_of_date panels as_of with
+  | None -> []
+  | Some as_of_day -> Bar_panels.weekly_bars_for panels ~symbol ~n ~as_of_day
+
+let _panel_weekly_view_for panels ~symbol ~n ~as_of =
+  match Bar_panels.column_of_date panels as_of with
+  | None -> _empty_weekly_view
+  | Some as_of_day -> Bar_panels.weekly_view_for panels ~symbol ~n ~as_of_day
+
+let _panel_daily_view_for panels ~symbol ~as_of ~lookback =
+  match Bar_panels.column_of_date panels as_of with
+  | None -> _empty_daily_view
+  | Some as_of_day ->
+      Bar_panels.daily_view_for panels ~symbol ~as_of_day ~lookback
+
+let of_panels ?ma_cache panels =
+  {
+    daily_bars_for = _panel_daily_bars_for panels;
+    weekly_bars_for = _panel_weekly_bars_for panels;
+    weekly_view_for = _panel_weekly_view_for panels;
+    daily_view_for = _panel_daily_view_for panels;
+    ma_cache;
+  }
 
 (* {1 Empty backing — used by tests where no read is expected}
 
