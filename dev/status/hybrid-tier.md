@@ -1,28 +1,32 @@
 # Status: hybrid-tier
 
-## Last updated: 2026-04-28
+## Last updated: 2026-05-04
 
 ## Status
-IN_PROGRESS
+MERGED — both options shipped; no active work in this track
 
 Phase 1 (measurement infra) merged (#609). Phase 2 was replanned via
 PR #611 into two separate plans after Phase 1 results showed the
-original 3-tier design wouldn't move RSS. Option 1 (engine-layer
-pooling) is DONE as of 2026-04-28; Option 2 (daily-snapshot streaming)
-remains P1 future work, so the track stays IN_PROGRESS rather than
-MERGED.
+original 3-tier design wouldn't move RSS. Both options have shipped:
 
 - **Option 1: Engine-layer pooling** — DONE 2026-04-28. Five PRs
   (#618 instrumentation, #626 Scratch type, #628 thread per-tick,
   #632 buffer pool, #633 matrix re-run). β: 4.30 → 3.94 MB/symbol
   (−8%, short of the 1-1.5 plan target). Wall: −36% at 292×6y.
-  Cumulative promoted_words 85.8M < 100M ceiling. Working set
-  unchanged — peak RSS dominated by major-heap steady-state, not
-  allocation churn. N=1000×10y now fits 8 GB. Plan complete.
-- **Option 2: Daily-snapshot streaming** — P1 future work.
-  `dev/plans/daily-snapshot-streaming-2026-04-27.md`, ~3,000 LOC
-  across 5-8 PRs. Required for tier-4 release-gate at N≥5,000.
-  Not yet started.
+  N=1000×10y now fits 8 GB.
+- **Option 2: Daily-snapshot streaming** — DELIVERED via the
+  `data-foundations` track's **M5.3 streaming** sequence (Phases
+  A–F.2 merged 2026-05-02..03 across PRs
+  #779/#781/#782/#786/#790/#791/#792/#793/#797/#800/#802; F.3
+  retirement of `Bar_panels.t` in flight as of 2026-05-04 with F.3.a
+  COMPLETE via #825/#827/#828/#829). Snapshot mode is now the
+  canonical runtime path; tier-4 release-gate at N≥5,000 is
+  structurally unblocked. Continuing snapshot work tracked under
+  `dev/status/data-foundations.md`.
+
+Track flips to MERGED. Future deliverables route to
+`data-foundations` (snapshot infra), `backtest-perf` (release-gate
+verification), or open as their own tracks.
 
 Phase 1 results (retained for reference):
 `dev/notes/hybrid-tier-phase1-results-2026-04-27.md`. Engine-pool

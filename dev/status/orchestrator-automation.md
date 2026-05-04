@@ -1,16 +1,27 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-04-18
+## Last updated: 2026-05-04
 
 ## Status
-IN_PROGRESS
-
-Phase 1 live; Phase 2 (background execution) pending.
+IN_PROGRESS — Phase 1 stable (~18 days uptime); Phase 2 deferred (no active dispatch)
 
 Phase 1 (scheduled daily orchestrator on GHA) has been producing daily
 summary PRs since 2026-04-16. See `.github/workflows/orchestrator.yml`
-and daily summary PRs #422/#423/#427 etc. All five §Open blockers below
-are resolved — section retained as the implementation record.
+and daily summary PRs #422/#423/#427 ... most recently #830 (2026-05-04).
+Cron currently runs 2 overnight slots (00:17 PT + 05:17 PT) per
+`project_orchestrator_off.md` user memory. Substantive work continues
+in local sessions; orchestrator handles QC pipelines + audits + cost
+capture for in-flight PRs and writes `dev/daily/<date>.md`.
+
+All five original §Open blockers (auth, GH App, OAuth token, prompt
+hygiene, run.sh harvest) are resolved — section retained as the
+implementation record.
+
+Phase 2 (background execution: dispatch agents to run while user is
+offline, harvest results next day) remains PLANNED. No active
+dispatch — the empirical tests in §"Phase 2 — pending" have not been
+prioritized. Track stays IN_PROGRESS pending those experiments; not
+blocking anything else.
 
 ## Blocked on
 - None. Phase 2 items are scoped-work, not blockers.
