@@ -24,8 +24,8 @@
     (callback mode, used by the Phase D daily-snapshot path — see
     [dev/plans/daily-snapshot-streaming-2026-04-27.md]). Indicator +
     finalize_period are degenerate in callback mode (return [None] / no-op); the
-    snapshot caller substitutes its own indicator backend at the strategy layer
-    (Panel_strategy_wrapper). *)
+    Weinstein strategy ignores [get_indicator] entirely, so no substitute
+    indicator backend is needed at the strategy layer. *)
 
 open Core
 

@@ -12,7 +12,6 @@
   test_runner_hypothesis_overrides
   test_panel_loader_parity
   test_snapshot_mode_parity
-  test_snapshot_mode_strategy_parity
   test_backtest_runner_args
   test_config_override
   test_comparison

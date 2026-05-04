@@ -3,11 +3,11 @@
  (libraries
   core
   core_unix
+  csv
   fpath
   status
   types
   weinstein.data_source
-  trading.data_panel
   trading.data_panel.snapshot
   trading.base
   trading.engine
