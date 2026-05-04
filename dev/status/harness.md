@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-05-03
+## Last updated: 2026-05-04
 
 ## Status
 IN_PROGRESS
@@ -169,6 +169,8 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   Source: `dev/daily/2026-04-14.md` end-of-day audit.
 - ~~**POSIX shell portability linter**~~ — DONE (harness/posix-sh-linter): `trading/devtools/checks/posix_sh_check.sh` runs `dash -n` over all #!/bin/sh scripts in `trading/devtools/checks/`, `trading/devtools/checks/deep_scan/`, and `dev/lib/`. Scripts with `#!/usr/bin/env bash` shebang are exempt. Smoke test: `trading/devtools/checks/posix_sh_check_test.sh`. Wired into `dune runtest`. Verify: `dune runtest devtools/checks/` — prints `OK: posix-sh linter -- N scripts clean.` Pre-existing violations found: `dev/lib/cleanup-stale-worktrees.sh` and `dev/run.sh` use `#!/usr/bin/env bash` and are exempt (intentionally bash). Source: run-4 daily summary follow-up.
 - ~~**`cc_linter.exe` overwrites its first `.ml` argument with the JSON report**~~ — DONE (PR-#570): JSON output now requires explicit `--out <path>` flag; extra positional args after the trading-root are silently ignored and never written to. Smoke test `trading/devtools/cc_linter/test/test_no_overwrite.ml` invokes the linter with two `.ml` paths and asserts byte-equality before/after. Verify: `dune runtest devtools/cc_linter/`.
+
+- ~~**`isolation: "worktree"` creates git-worktrees, not jj-workspaces — concurrent agents race shared `op_heads` + default WorkspaceName**~~ — **DONE (PR #839, Option A).** Root cause: Claude Code's `isolation: "worktree"` uses `git worktree add`, not `jj workspace add`. All git-worktree dirs share the same `.jj/repo/` backend; they collide on `WorkspaceName = "default"` and the same `@` slot, causing file leaks and silent edit-reverts (jj issue #8929). Fix implemented: `## Pre-Work Setup` boilerplate (20 lines) added to `feat-agent-template.md`, `feat-weinstein.md`, `feat-data.md`, `feat-backtest.md`, `harness-maintainer.md`, and `ops-data.md`. Each agent now runs `jj workspace add /tmp/agent-ws-${AGENT_ID} --name ${AGENT_ID} -r main@origin && cd "$AGENT_WS"` as its first step, giving each agent a distinct `WorkspaceName` and independent `@` slot. `worktree-isolation.md` extended with §"jj workspace isolation" documenting the root cause and fix. Option B (upstream Claude Code change) remains out of scope. Option C (≤1 concurrent jj-writer) remains the conservative fallback for un-upgraded sessions. Root cause reference: `memory/project_jj_worktree_root_cause.md`. Verify: `grep -l "Pre-Work Setup" .claude/agents/*.md` should list 6 files; `grep "jj workspace isolation" .claude/rules/worktree-isolation.md` should match.
 
 ---
 
