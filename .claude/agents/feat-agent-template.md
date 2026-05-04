@@ -14,6 +14,38 @@ sections. Do not omit required sections — the health-scanner checks for their 
 
 ## Required sections (every feat-agent must have all of these)
 
+### 0. Pre-Work Setup (required boilerplate — runs before any file reads)
+
+Every feat-agent (and harness-maintainer / ops-data) must include this block
+verbatim near the top. It creates an isolated jj workspace so concurrent agents
+don't race the shared `op_heads` / default `WorkspaceName`.
+See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for the
+root-cause explanation.
+
+```markdown
+## Pre-Work Setup
+
+**Skip this section if `$TRADING_IN_CONTAINER` is set** (GHA runs use plain git,
+no jj — this step is jj-local only).
+
+Before reading any file or writing any code, create an isolated jj workspace:
+
+```bash
+AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
+AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
+cd "$AGENT_WS"
+# Verify: @ should be an empty commit on top of main@origin
+jj log -n 1 -r @
+```
+
+After the session, clean up from the repo root:
+```bash
+jj workspace forget "$AGENT_ID"
+rm -rf "$AGENT_WS"
+```
+```
+
 ### 1. Frontmatter
 
 ```yaml

@@ -36,6 +36,30 @@ Distinct from:
   client wrapper) the feature work belongs here; if a one-off fetch
   needs running, that's `ops-data`.
 
+## Pre-Work Setup
+
+**Skip this section if `$TRADING_IN_CONTAINER` is set** (GHA runs use plain git,
+no jj — this step is jj-local only).
+
+Before reading any file or writing any code, create an isolated jj workspace:
+
+```bash
+AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
+AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
+cd "$AGENT_WS"
+# Verify: @ should be an empty commit on top of main@origin
+jj log -n 1 -r @
+```
+
+After the session, clean up from the repo root:
+```bash
+jj workspace forget "$AGENT_ID"
+rm -rf "$AGENT_WS"
+```
+
+See `.claude/rules/worktree-isolation.md` §"jj workspace isolation" for why this is needed.
+
 ## At the start of every session
 
 1. Read `dev/agent-feature-workflow.md` — shared workflow, commit discipline

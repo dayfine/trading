@@ -84,6 +84,57 @@ force-push — do not hand off a contaminated PR for review.
 - Git-mode dispatch inside `$TRADING_IN_CONTAINER` (GHA) — CI runners start
   from a fresh checkout, so contamination doesn't occur there.
 
+## jj workspace isolation
+
+The pre-commit / pre-push scrubbing above treats symptoms. The root cause is
+that Claude Code's `isolation: "worktree"` creates **git worktrees** (via
+`git worktree add`) — not jj workspaces. All git-worktree dirs share the same
+`.jj/repo/` backend (one `op_heads`, one shared view) and all default to
+`WorkspaceName = "default"`, so concurrent agents race the same `@` slot.
+Per the jj docs ([Git compatibility](https://docs.jj-vcs.dev/latest/git-compatibility/)),
+running jj inside a `git worktree add` directory with shared `.jj/` is
+**explicitly unsupported**.
+
+**Fix: every jj-writing agent should call `jj workspace add` as its first
+step, before reading any status file or making any edit.** This gives each
+agent a distinct `WorkspaceName` and an independent `@` slot, and op-merging
+between workspaces is well-defined per the
+[jj concurrency docs](https://docs.jj-vcs.dev/latest/technical/concurrency/).
+
+Standard boilerplate for every feat-* / harness-maintainer / ops-data agent:
+
+```bash
+# === Pre-work: create isolated jj workspace ===
+# Claude Code's isolation:"worktree" creates a git-worktree, NOT a jj-workspace.
+# Without this step, concurrent agents race the shared op_heads / default WorkspaceName.
+# See .claude/rules/worktree-isolation.md §"jj workspace isolation".
+
+AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
+AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
+cd "$AGENT_WS"
+
+# Verify isolation: the new workspace's @ should be off main@origin
+jj log -n 1 -r @
+```
+
+**After work is complete, clean up:**
+
+```bash
+# From the repo root (not inside AGENT_WS):
+jj workspace forget "$AGENT_ID"
+rm -rf "$AGENT_WS"
+```
+
+**Notes:**
+- `$AGENT_WS` is under `/tmp/` — outside the repo — so it cannot contaminate
+  the parent worktree's git index.
+- The `-r main@origin` flag ensures the new `@` starts from main, not from
+  whatever `@` the parent had at dispatch time.
+- This fix applies to local jj runs only. GHA runs use `$TRADING_IN_CONTAINER`
+  mode (plain git, no jj) and are unaffected.
+- Reference: `memory/project_jj_worktree_root_cause.md` (root cause writeup).
+
 ## Cleanup
 
 Stale `agent-*` worktrees accumulate in `.claude/worktrees/` after each session
