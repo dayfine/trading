@@ -2,8 +2,10 @@
 
 open Core
 open Trading_simulation
+module Symbol_index = Data_panel.Symbol_index
+module Ohlcv_panels = Data_panel.Ohlcv_panels
+module Bar_panels = Data_panel.Bar_panels
 module Daily_panels = Snapshot_runtime.Daily_panels
-module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 type input = {
@@ -15,21 +17,11 @@ type input = {
 }
 
 (* LRU cap for the snapshot cache. Sized so a tier-3 sp500 run at a long
-   horizon fits resident; the prior cap was the binding constraint on
-   long backtests (cache thrashing on every Friday's universe pass — every
-   symbol forced a disk reload of the LRU evictee). The current value
-   leaves headroom for the typical universe-horizon mix; tier-4 release
-   gates plumb this through [Runner.config] when they land. Memory budget
-   is best-effort — a single oversized symbol stays resident even when
-   its bytes exceed the cap (see [_enforce_budget]). *)
+   horizon fits resident; tier-4 release gates plumb this through
+   [Runner.config] when they land. Memory budget is best-effort — a single
+   oversized symbol stays resident even when its bytes exceed the cap. *)
 let _snapshot_cache_mb = 1024
 
-(* F.3.a-3 collapsed the previous CSV-vs-snapshot fork: both modes route
-   through the snapshot path, so the strategy receives one reader shape and
-   the [Panel_strategy_wrapper] (panel-backed [get_indicator_fn] injector)
-   is no longer needed. The Weinstein strategy ignores [get_indicator] (see
-   [_on_market_close]'s [~get_indicator:_]), so removing the wrapper is a
-   pure simplification. *)
 let _build_strategy (input : input) ~bar_reader ~audit_recorder =
   Weinstein_strategy.make ~ad_bars:input.ad_bars
     ~ticker_sectors:input.ticker_sectors ~bar_reader ~audit_recorder
@@ -127,18 +119,12 @@ let _record_step_into_progress ~progress_acc ~date
         ~portfolio_value:step_result.portfolio_value
 
 (** Step-loop replacement for [Simulator.run] that snapshots [Gc.stat] before
-    and after each [Simulator.step] call. One step = one calendar day in the
-    [Daily] cadence used by the panel runner = one [Engine.update_market] call
-    (the dominant per-tick allocator per the post-PR-A memtrace).
-
-    [pending_date] is tracked locally in lockstep with the simulator's internal
-    [current_date] so the [_before] snapshot can be labeled with the step's date
-    *before* [Simulator.step] is invoked.
-
-    [progress_acc], when passed, has [Backtest_progress.record_step] invoked
-    after every completed step. The accumulator owns the per-Friday emission
-    decision so the step-loop body stays simple. The caller is responsible for
-    the final {!Backtest_progress.emit_final} call after the loop returns. *)
+    and after each [Simulator.step] call. [pending_date] is tracked locally in
+    lockstep with the simulator's internal [current_date] so the [_before]
+    snapshot is labeled with the step's date *before* [Simulator.step] is
+    invoked. [progress_acc], when passed, has [Backtest_progress.record_step]
+    invoked after every completed step; the caller is responsible for the final
+    {!Backtest_progress.emit_final} call after the loop returns. *)
 let _run_simulator_with_gc_trace ?gc_trace ?progress_acc ~stop_log sim =
   let start_date = (Simulator.get_config sim).start_date in
   let rec loop sim ~pending_date =
@@ -160,11 +146,9 @@ let _read_close ~daily_panels ~close_col ~date symbol =
       let v = snap.values.(close_col) in
       if Float.is_nan v then None else Some (symbol, v)
 
-(** Snapshot of close prices on [end_date]. Walks the universe and reads the
-    [Close] field from each symbol's snapshot row at [end_date] via
-    [Daily_panels.read_today]. Symbols not present, errored reads, or NaN closes
-    are dropped — the runner filters the result alist to held symbols when
-    populating [Runner.result.final_prices]. *)
+(** Close prices on [end_date] for every universe symbol, read from the snapshot
+    via [Daily_panels.read_today]. Missing / NaN entries are dropped; the runner
+    filters to held symbols when populating [Runner.result.final_prices]. *)
 let _final_close_prices ~daily_panels ~symbols ~end_date =
   let schema = Daily_panels.schema daily_panels in
   match Snapshot_schema.index_of schema Snapshot_schema.Close with
@@ -173,11 +157,11 @@ let _final_close_prices ~daily_panels ~symbols ~end_date =
       List.filter_map symbols
         ~f:(_read_close ~daily_panels ~close_col ~date:end_date)
 
-(* Resolve the [(snapshot_dir, manifest)] pair the simulator + strategy will
-   read through. CSV mode delegates to [Csv_snapshot_builder.build] which
-   reads CSVs once, runs the same {!Snapshot_pipeline.Pipeline.build_for_symbol}
-   the offline writer uses, and serialises per-symbol [.snap] files under a
-   tmp directory. Snapshot mode reuses the caller-provided directory. *)
+(* Resolve the [(snapshot_dir, manifest)] pair the simulator will read through
+   for per-tick price reads + final-close lookups. CSV mode delegates to
+   [Csv_snapshot_builder.build]; Snapshot mode reuses the caller-provided
+   directory. The strategy's bar reads do NOT flow through this snapshot —
+   see [_build_panel_bar_reader] for the panel-backed strategy reader. *)
 let _resolve_snapshot_source (input : input) ~warmup_start ~end_date
     ~bar_data_source =
   match bar_data_source with
@@ -193,11 +177,70 @@ let _resolve_snapshot_source (input : input) ~warmup_start ~end_date
   | Some (Bar_data_source.Snapshot { snapshot_dir; manifest }) ->
       (snapshot_dir, manifest)
 
-(* Snapshot path: build a [Daily_panels.t] over the (pre-built or in-process)
-   snapshot directory, derive a [Snapshot_callbacks.t] and [Bar_reader.t],
-   and assemble the strategy + market-data adapter. *)
-let _setup_snapshot (input : input) ~snapshot_dir ~manifest ~end_date
-    ~audit_recorder =
+(* Generate the trading-day calendar: every weekday (Mon-Fri) in the inclusive
+   range [start..end_]. Holidays are not removed — the simulator already
+   tolerates "no bar on this day" via the [is_trading_day] filter, and the
+   panel cells stay NaN on holidays. Used for the strategy's [Bar_panels.t]
+   build. *)
+let _build_calendar ~start ~end_ : Date.t array =
+  let rec loop d acc =
+    if Date.( > ) d end_ then List.rev acc
+    else
+      let dow = Date.day_of_week d in
+      let is_weekend =
+        Day_of_week.equal dow Day_of_week.Sat
+        || Day_of_week.equal dow Day_of_week.Sun
+      in
+      let acc' = if is_weekend then acc else d :: acc in
+      loop (Date.add_days d 1) acc'
+  in
+  Array.of_list (loop start [])
+
+(* Build OHLCV panels from CSV using the calendar-aware loader. The universe is
+   exactly [input.all_symbols] so the panel covers every symbol the simulator
+   will fetch bars for (universe + index + sector ETFs + global indices). This
+   is the strategy's bar source; the simulator's per-tick reads still flow
+   through the snapshot adapter. See module-doc for the partial-revert
+   rationale. *)
+let _build_ohlcv ~(input : input) ~calendar =
+  let symbol_index =
+    match Symbol_index.create ~universe:input.all_symbols with
+    | Ok t -> t
+    | Error err ->
+        failwithf "Panel_runner: Symbol_index.create failed: %s"
+          err.Status.message ()
+  in
+  match
+    Ohlcv_panels.load_from_csv_calendar symbol_index
+      ~data_dir:input.data_dir_fpath ~calendar
+  with
+  | Ok t -> t
+  | Error err ->
+      failwithf "Panel_runner: Ohlcv_panels.load_from_csv_calendar failed: %s"
+        (Status.show err) ()
+
+(* Build a panel-backed [Bar_reader.t] for the strategy: load OHLCV from CSV
+   on [calendar], wrap in a [Bar_panels.t], wrap in a [Bar_reader]. This is
+   the partial-revert path; the strategy's reads route through the panel
+   backing rather than [Snapshot_callbacks] until the forward fix lands. *)
+let _build_panel_bar_reader (input : input) ~warmup_start ~end_date =
+  let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
+  let ohlcv = _build_ohlcv ~input ~calendar in
+  let bar_panels =
+    match Bar_panels.create ~ohlcv ~calendar with
+    | Ok p -> p
+    | Error err ->
+        failwithf "Panel_runner: Bar_panels.create failed: %s" (Status.show err)
+          ()
+  in
+  eprintf "Panel_runner: panels built (%d symbols × %d days) for strategy\n%!"
+    (Ohlcv_panels.n ohlcv) (Array.length calendar);
+  Weinstein_strategy.Bar_reader.of_panels bar_panels
+
+(* Hybrid setup: panel-backed strategy bar reader, snapshot-backed simulator
+   adapter, snapshot-backed final-close lookup. See module-doc. *)
+let _setup_hybrid (input : input) ~snapshot_dir ~manifest ~warmup_start
+    ~end_date ~audit_recorder =
   let daily_panels =
     match
       Daily_panels.create ~snapshot_dir ~manifest
@@ -208,8 +251,7 @@ let _setup_snapshot (input : input) ~snapshot_dir ~manifest ~end_date
         failwithf "Panel_runner: Daily_panels.create failed: %s"
           (Status.show err) ()
   in
-  let callbacks = Snapshot_callbacks.of_daily_panels daily_panels in
-  let bar_reader = Weinstein_strategy.Bar_reader.of_snapshot_views callbacks in
+  let bar_reader = _build_panel_bar_reader input ~warmup_start ~end_date in
   let strategy = _build_strategy input ~bar_reader ~audit_recorder in
   let adapter =
     _build_market_data_adapter ~data_dir:input.data_dir_fpath
@@ -237,7 +279,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
   in
   let strategy, market_data_adapter, final_close_prices_thunk =
-    _setup_snapshot input ~snapshot_dir ~manifest ~end_date ~audit_recorder
+    _setup_hybrid input ~snapshot_dir ~manifest ~warmup_start ~end_date
+      ~audit_recorder
   in
   let sim =
     _make_simulator input ~stop_log ~start_date ~end_date ~warmup_days

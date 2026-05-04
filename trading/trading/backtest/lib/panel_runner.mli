@@ -1,19 +1,23 @@
 (** Panel-loader execution path — runner-side seam for the simulator + Weinstein
     strategy.
 
-    F.3.a-3 collapsed the previous CSV-vs-snapshot fork: both modes now route
-    through a single snapshot-backed code path. The strategy reads OHLCV bars
-    via [Snapshot_runtime.Snapshot_callbacks] (LRU-bounded
-    [Snapshot_runtime.Daily_panels]); the simulator's per-tick price reads flow
-    through the same backing. CSV mode builds a snapshot directory in-process
-    from CSV bars at runner start; Snapshot mode reuses a pre-built directory.
+    The runner uses a hybrid setup (partial revert of #828, closes #843):
+
+    - The strategy's [Bar_reader] is panel-backed: an [Ohlcv_panels.t] is loaded
+      from CSV via [Ohlcv_panels.load_from_csv_calendar] at runner start,
+      wrapped in a [Bar_panels.t], and exposed via [Bar_reader.of_panels]. The
+      F.3.a-3 attempt to migrate the strategy's reads to [Snapshot_callbacks]
+      produced a path-dependent regression on sp500-2019-2023 (#843).
+    - The simulator's per-tick price reads flow through a snapshot-backed
+      [Market_data_adapter]. CSV mode builds the snapshot directory in-process
+      from CSV bars at runner start (via [Csv_snapshot_builder]); Snapshot mode
+      reuses a pre-built directory.
+    - Final close-price lookups read from the [Snapshot_runtime.Daily_panels]
+      via [Daily_panels.read_today].
 
     The [Panel_strategy_wrapper] (panel-backed [get_indicator_fn] injector) is
     gone — the Weinstein strategy ignores [get_indicator], so the wrapper was
-    pure overhead. The [Ohlcv_panels.t] / [Indicator_panels.t] / [Bar_panels.t]
-    allocations are no longer performed in either mode; the snapshot pipeline
-    ([Snapshot_pipeline.Pipeline.build_for_symbol]) is the canonical bar-row
-    builder. *)
+    pure overhead. The [Indicator_panels.t] allocation is also gone. *)
 
 open Core
 
@@ -79,18 +83,18 @@ val run :
     state. When [None], the runner takes no extra work — same zero-overhead
     contract as the other optional plumbing.
 
-    [bar_data_source], when passed, selects how the snapshot directory the
-    runner reads through is sourced.
+    [bar_data_source], when passed, selects how the simulator's snapshot
+    directory is sourced. (The strategy's panel-backed bar reader is unaffected
+    — it always loads from CSV at runner start.)
 
     - Default ({!Bar_data_source.Csv}) builds a snapshot directory in-process
-      from the universe's CSV bars at runner start, then routes the simulator +
-      strategy through it. This is the F.3.a-3 unification of what previously
-      was a CSV-only branch backed by [Bar_panels.t].
+      from the universe's CSV bars at runner start, then routes the simulator
+      through it.
 
     - {!Bar_data_source.Snapshot} reuses a caller-provided pre-built snapshot
       directory + manifest (typically written by [build_snapshots.exe]).
 
-    Both branches converge on the same simulator-strategy wiring; the only
-    difference is whether the snapshot directory was materialised in-process or
-    supplied externally. See [dev/plans/snapshot-engine-phase-f-2026-05-03.md]
-    §F.3 for the migration record. *)
+    Both branches use the same hybrid wiring (panel-backed strategy reader +
+    snapshot-backed simulator adapter); the only difference is whether the
+    snapshot directory was materialised in-process or supplied externally. See
+    `dev/notes/parity-bisect-...md` for the partial-revert bisect. *)
