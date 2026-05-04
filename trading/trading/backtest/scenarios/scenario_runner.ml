@@ -3,7 +3,7 @@
 
     Usage: scenario_runner
     [--goldens-small | --goldens-broad | --goldens | --smoke | --dir <path>]
-    [--parallel N] [--fixtures-root <path>]
+    [--parallel N] [--fixtures-root <path>] [--progress-every N]
 
     [--goldens-small] — small-universe goldens (~300 symbols; local-friendly).
     [--goldens-broad] — broad-universe goldens (full sector-map; nightly/GHA).
@@ -14,6 +14,13 @@
     perf-tier smoke scripts pass this explicitly because they stage the scenario
     sexp into a per-cell scratch dir, which loses the original fixtures-root
     context.
+
+    [--progress-every N] — emit a tail-able [progress.sexp] under each
+    scenario's output directory every [N] Friday cycles. Default is
+    {!Scenario_progress.default_every_n_fridays} (≈ monthly cadence) so
+    multi-hour multi-scenario runs (e.g. 15y SP500, broad-10k 10y) emit
+    checkpoints by default. Mirrors the [backtest_runner.exe --progress-every]
+    flag from PR #820, but threads one emitter per scenario into each child.
 
     Reads all *.sexp files from the selected directory, runs each via
     {!Backtest.Runner.run_backtest}, prints a pass/fail table, and writes
@@ -28,6 +35,7 @@ open Core
 module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
 module Fixtures_root = Scenario_lib.Fixtures_root
+module Scenario_progress = Scenario_lib.Scenario_progress
 
 (* Universe resolution *)
 
@@ -173,7 +181,8 @@ let _actual_path ~output_root (s : Scenario.t) =
 
 (* Run one scenario inside a child process *)
 
-let _run_scenario_in_child ~output_root ~fixtures_root (s : Scenario.t) =
+let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
+    (s : Scenario.t) =
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
     (Date.to_string s.period.start_date)
     (Date.to_string s.period.end_date);
@@ -182,10 +191,13 @@ let _run_scenario_in_child ~output_root ~fixtures_root (s : Scenario.t) =
   let sector_map_override =
     _sector_map_of_universe_file ~fixtures_root s.universe_path
   in
+  let progress_emitter =
+    Scenario_progress.make_emitter ~scenario_dir ~every_n_fridays:progress_every
+  in
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
-      ?sector_map_override ()
+      ?sector_map_override ~progress_emitter ()
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   let a = _actual_of_result result in
@@ -194,11 +206,12 @@ let _run_scenario_in_child ~output_root ~fixtures_root (s : Scenario.t) =
 (* Fork-based worker pool. Scenarios run in parallel child processes up to
    [parallel] at a time. *)
 
-let _fork_scenario ~output_root ~fixtures_root (s : Scenario.t) =
+let _fork_scenario ~output_root ~fixtures_root ~progress_every (s : Scenario.t)
+    =
   match Core_unix.fork () with
   | `In_the_child -> (
       try
-        _run_scenario_in_child ~output_root ~fixtures_root s;
+        _run_scenario_in_child ~output_root ~fixtures_root ~progress_every s;
         Stdlib.exit 0
       with e ->
         eprintf "Scenario %s crashed: %s\n%!" s.name (Exn.to_string e);
@@ -212,7 +225,7 @@ let _await_one running =
   match Core_unix.waitpid pid with Ok () -> Succeeded | Error _ -> Crashed
 
 let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
-    (scenarios : Scenario.t list) =
+    ~progress_every (scenarios : Scenario.t list) =
   let running = Queue.create () in
   let statuses = Hashtbl.create (module String) in
   let reap () =
@@ -223,7 +236,7 @@ let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
   in
   List.iter scenarios ~f:(fun s ->
       if Queue.length running >= parallel then reap ();
-      let pid = _fork_scenario ~output_root ~fixtures_root s in
+      let pid = _fork_scenario ~output_root ~fixtures_root ~progress_every s in
       Queue.enqueue running (s, pid));
   while not (Queue.is_empty running) do
     reap ()
@@ -260,18 +273,36 @@ let _process_result ~output_root (s, status) =
 
 (* CLI *)
 
-type _cli_args = { dir : string; parallel : int; fixtures_root : string option }
+type _cli_args = {
+  dir : string;
+  parallel : int;
+  fixtures_root : string option;
+  progress_every : int;
+      (* Friday-cycle cadence for [progress.sexp] emission, threaded into each
+         scenario's [Backtest.Runner.run_backtest] call. Always populated:
+         defaults to [Scenario_progress.default_every_n_fridays] (≈ monthly)
+         when [--progress-every] is omitted, so the long-running multi-scenario
+         exe gets recoverability by default. *)
+}
 
 let _default_parallel = 4
 
 let _usage () =
   eprintf
     "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
-     --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>]\n";
+     --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>] \
+     [--progress-every N]\n";
   Stdlib.exit 1
 
+let _parse_progress_every n_str =
+  match Int.of_string_opt n_str with
+  | Some n when n >= 1 -> n
+  | _ ->
+      eprintf "--progress-every requires a positive integer argument\n";
+      Stdlib.exit 1
+
 let _parse_flag args =
-  let rec loop args dir parallel fixtures_root =
+  let rec loop args dir parallel fixtures_root progress_every =
     match args with
     | [] ->
         let dir = Option.value dir ~default:(_goldens_small_dir ()) in
@@ -279,29 +310,42 @@ let _parse_flag args =
           dir;
           parallel = Option.value parallel ~default:_default_parallel;
           fixtures_root;
+          progress_every =
+            Option.value progress_every
+              ~default:Scenario_progress.default_every_n_fridays;
         }
     | "--goldens-small" :: rest ->
-        loop rest (Some (_goldens_small_dir ())) parallel fixtures_root
+        loop rest
+          (Some (_goldens_small_dir ()))
+          parallel fixtures_root progress_every
     | "--goldens-broad" :: rest ->
-        loop rest (Some (_goldens_broad_dir ())) parallel fixtures_root
+        loop rest
+          (Some (_goldens_broad_dir ()))
+          parallel fixtures_root progress_every
     | "--goldens" :: rest ->
-        loop rest (Some (_goldens_small_dir ())) parallel fixtures_root
+        loop rest
+          (Some (_goldens_small_dir ()))
+          parallel fixtures_root progress_every
     | "--smoke" :: rest ->
-        loop rest (Some (_smoke_dir ())) parallel fixtures_root
-    | "--dir" :: path :: rest -> loop rest (Some path) parallel fixtures_root
+        loop rest (Some (_smoke_dir ())) parallel fixtures_root progress_every
+    | "--dir" :: path :: rest ->
+        loop rest (Some path) parallel fixtures_root progress_every
     | "--parallel" :: n :: rest ->
-        loop rest dir (Some (Int.of_string n)) fixtures_root
-    | "--fixtures-root" :: path :: rest -> loop rest dir parallel (Some path)
+        loop rest dir (Some (Int.of_string n)) fixtures_root progress_every
+    | "--fixtures-root" :: path :: rest ->
+        loop rest dir parallel (Some path) progress_every
+    | "--progress-every" :: n :: rest ->
+        loop rest dir parallel fixtures_root (Some (_parse_progress_every n))
     | _ -> _usage ()
   in
-  loop args None None None
+  loop args None None None None
 
 let _parse_args () =
   let argv = Sys.get_argv () in
   _parse_flag (List.tl_exn (Array.to_list argv))
 
 let () =
-  let { dir; parallel; fixtures_root } = _parse_args () in
+  let { dir; parallel; fixtures_root; progress_every } = _parse_args () in
   let fixtures_root = Fixtures_root.resolve ?fixtures_root () in
   let files = _list_scenario_files dir in
   if List.is_empty files then (
@@ -311,11 +355,14 @@ let () =
   eprintf "Loading %d scenarios from %s (parallel=%d)\n%!" (List.length files)
     dir parallel;
   eprintf "Fixtures root: %s\n%!" fixtures_root;
+  eprintf "Progress emission: every %d Friday cycle(s) per scenario\n%!"
+    progress_every;
   let scenarios = List.map files ~f:Scenario.load in
   let output_root = _make_output_root () in
   eprintf "Output root: %s\n%!" output_root;
   let results =
-    _run_scenarios_parallel ~output_root ~fixtures_root ~parallel scenarios
+    _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
+      ~progress_every scenarios
   in
   _print_header ();
   let pass_flags = List.map results ~f:(_process_result ~output_root) in
