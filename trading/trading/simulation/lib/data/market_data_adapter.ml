@@ -55,10 +55,8 @@ let get_indicator t ~symbol ~indicator_name ~period ~cadence ~date =
       | Ok value -> value)
   | Callbacks _ ->
       (* Callback mode: indicators are not served through the adapter. The
-         panel-runner caller substitutes its own indicator backend at the
-         strategy layer (Panel_strategy_wrapper threads a panel-backed
-         get_indicator_fn into the strategy), so this surface is never
-         exercised in callback mode. *)
+         Weinstein strategy ignores [get_indicator] entirely, so this surface
+         is never exercised in callback mode. *)
       None
 
 let finalize_period t ~cadence ~end_date =
