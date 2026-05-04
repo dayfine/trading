@@ -12,9 +12,7 @@ open OUnit2
 open Core
 open Matchers
 open Trading_simulation
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
-module Bar_panels = Data_panel.Bar_panels
+module Bar_reader = Weinstein_strategy.Bar_reader
 
 (* ------------------------------------------------------------------ *)
 (* Constants                                                            *)
@@ -40,50 +38,33 @@ let conservative_portfolio_config =
 (* Helpers                                                              *)
 (* ------------------------------------------------------------------ *)
 
-(** Build the panel-backed bar reader for the universe + the requested date
-    range. Stage 3 PR 3.2 deleted [Bar_history]; the strategy reads bars from
-    [Bar_panels] now, so these integration tests must construct one before
-    calling [Weinstein_strategy.make]. *)
-let _build_calendar ~start ~end_ : Date.t array =
-  let rec loop d acc =
-    if Date.( > ) d end_ then List.rev acc
-    else
-      let dow = Date.day_of_week d in
-      let is_weekend =
-        Day_of_week.equal dow Day_of_week.Sat
-        || Day_of_week.equal dow Day_of_week.Sun
-      in
-      let acc' = if is_weekend then acc else d :: acc in
-      loop (Date.add_days d 1) acc'
+(** Build a [Bar_reader.t] from per-symbol CSVs in [data_dir] for the universe +
+    requested date range. Phase F.3.a-4 (`?bar_panels` retirement): previously
+    constructed a [Bar_panels.t] via {!Ohlcv_panels.load_from_csv_calendar} and
+    threaded it through [Weinstein_strategy.make ~bar_panels]. After the
+    optional [?bar_panels] parameter was removed, the integration test loads
+    each symbol's bars from CSV directly via {!Csv.Csv_storage.get} and routes
+    them through {!Bar_reader.of_in_memory_bars} — no panel allocation. *)
+let _build_bar_reader ~start_date ~end_date =
+  let symbol_bars =
+    List.map all_symbols ~f:(fun symbol ->
+        let storage =
+          match Csv.Csv_storage.create ~data_dir:(Fpath.v data_dir) symbol with
+          | Ok s -> s
+          | Error err ->
+              assert_failure ("Csv_storage.create: " ^ Status.show err)
+        in
+        match Csv.Csv_storage.get storage ~start_date ~end_date () with
+        | Ok bars -> (symbol, bars)
+        | Error err -> assert_failure ("Csv_storage.get: " ^ Status.show err))
   in
-  Array.of_list (loop start [])
-
-let _build_bar_panels ~start_date ~end_date =
-  let calendar = _build_calendar ~start:start_date ~end_:end_date in
-  let symbol_index =
-    match Symbol_index.create ~universe:all_symbols with
-    | Ok t -> t
-    | Error err -> assert_failure ("Symbol_index.create: " ^ err.Status.message)
-  in
-  let ohlcv =
-    match
-      Ohlcv_panels.load_from_csv_calendar symbol_index
-        ~data_dir:(Fpath.v data_dir) ~calendar
-    with
-    | Ok t -> t
-    | Error err ->
-        assert_failure
-          ("Ohlcv_panels.load_from_csv_calendar: " ^ Status.show err)
-  in
-  match Bar_panels.create ~ohlcv ~calendar with
-  | Ok p -> p
-  | Error err -> assert_failure ("Bar_panels.create: " ^ err.Status.message)
+  Bar_reader.of_in_memory_bars symbol_bars
 
 (** Build a Weinstein strategy configured for the 7-stock universe. The
-    [bar_panels] handle threads the panel-backed bar reader into the strategy so
-    its [Stage]/[RS]/[Stock_analysis]/[Stops_runner] reads have a populated
+    [bar_reader] handle threads the snapshot-backed bar reader into the strategy
+    so its [Stage]/[RS]/[Stock_analysis]/[Stops_runner] reads have a populated
     source. *)
-let _make_strategy ~bar_panels =
+let _make_strategy ~bar_reader =
   let ad_bars = Weinstein_strategy.Ad_bars.load ~data_dir in
   let ticker_sectors =
     Sector_map.load ~data_dir:(Data_path.default_data_dir ())
@@ -92,12 +73,12 @@ let _make_strategy ~bar_panels =
   let config =
     { base_config with portfolio_config = conservative_portfolio_config }
   in
-  Weinstein_strategy.make ~ad_bars ~ticker_sectors ~bar_panels config
+  Weinstein_strategy.make ~ad_bars ~ticker_sectors ~bar_reader config
 
 (** Create simulator deps and config, then run the simulation. *)
 let _run_backtest ~start_date ~end_date =
-  let bar_panels = _build_bar_panels ~start_date ~end_date in
-  let strategy = _make_strategy ~bar_panels in
+  let bar_reader = _build_bar_reader ~start_date ~end_date in
+  let strategy = _make_strategy ~bar_reader in
   let deps =
     Simulator.create_deps ~symbols:all_symbols ~data_dir:(Fpath.v data_dir)
       ~strategy ~commission:sample_commission ()

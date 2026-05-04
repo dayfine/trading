@@ -608,31 +608,17 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
             @ entry_transitions;
         }
 
-(* Resolve the strategy's [Bar_reader] from the optional [bar_panels] /
-   [bar_reader] inputs.
-
-   Phase F.2 PR 2: [bar_reader] takes precedence (snapshot-mode runs bypass
-   [Bar_panels.t] allocation entirely). Otherwise fall back to the
-   [bar_panels]-or-empty branches.
-
-   Stage 4 PR-D: when [bar_panels] is the chosen path, create a
-   [Weekly_ma_cache] scoped to this strategy and bundle it into the
-   [Bar_reader] so per-symbol weekly MA values are computed once, not per
-   Friday tick. Cache is opt-in: test fixtures using [Bar_reader.empty ()]
-   are unaffected. *)
-let _resolve_bar_reader ~bar_panels ~bar_reader =
-  match bar_reader with
-  | Some r -> r
-  | None -> (
-      match bar_panels with
-      | Some p ->
-          let ma_cache = Weekly_ma_cache.create p in
-          Bar_reader.of_panels ~ma_cache p
-      | None -> Bar_reader.empty ())
-
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
-    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_panels ?bar_reader
+    ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
     ?(audit_recorder = Audit_recorder.noop) config =
+  (* Phase F.3.a-4 retired the legacy [?bar_panels] parameter and its
+     [Bar_reader.of_panels] constructor. The strategy's bar reads now route
+     exclusively through the snapshot path; callers without a bar source
+     fall back to {!Bar_reader.empty}, which returns the empty list / empty
+     view on every read (safe for tests that never reach a bar consumer). *)
+  let bar_reader =
+    match bar_reader with Some r -> r | None -> Bar_reader.empty ()
+  in
   let stop_states = ref initial_stop_states in
   (* [last_stop_out_dates] feeds [Screener.screen_with_cooldown] for the
      cascade post-stop-out cooldown gate. Mutated in place by
@@ -650,7 +636,6 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
      first Friday so an exit firing before the first screen gets a stable
      [Neutral / 0.0] snapshot. *)
   let prior_macro_result : Macro.result option ref = ref None in
-  let bar_reader = _resolve_bar_reader ~bar_panels ~bar_reader in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in

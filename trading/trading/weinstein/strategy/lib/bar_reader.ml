@@ -13,7 +13,13 @@ module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 (* Closure-based representation: each constructor captures its backing's read
    primitives and packages them as same-shape closures. The strategy's hot
    path invokes one of these closures per call site per tick — no backing
-   dispatch, no variant match. *)
+   dispatch, no variant match.
+
+   [ma_cache] is a vestige of the legacy [of_panels] path retired in Phase
+   F.3.a-4: every current constructor sets it to [None], so the strategy's
+   cache-aware MA paths are inactive. The field stays in the record (and the
+   {!ma_cache} accessor stays in the public API) until a follow-up cleanup
+   removes the cache-aware code paths from {!Weinstein_strategy}. *)
 type t = {
   daily_bars_for : symbol:string -> as_of:Date.t -> Types.Daily_price.t list;
   weekly_bars_for :
@@ -28,8 +34,8 @@ type t = {
 let ma_cache t = t.ma_cache
 
 (* Empty views — used as the sentinel return when [as_of] falls outside the
-   panel's calendar or the snapshot has no rows. Match the empty literals
-   [Bar_panels] / [Snapshot_bar_views] use internally so consumers can rely
+   snapshot's calendar or the snapshot has no rows. Match the empty literals
+   {!Bar_panels} / {!Snapshot_bar_views} use internally so consumers can rely
    on [n = 0] / [n_days = 0] as the "missing" signal. *)
 let _empty_weekly_view : Bar_panels.weekly_view =
   {
@@ -45,44 +51,12 @@ let _empty_weekly_view : Bar_panels.weekly_view =
 let _empty_daily_view : Bar_panels.daily_view =
   { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
 
-(* {1 Panel-backed constructor} *)
-
-let _panel_daily_bars_for panels ~symbol ~as_of =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> []
-  | Some as_of_day -> Bar_panels.daily_bars_for panels ~symbol ~as_of_day
-
-let _panel_weekly_bars_for panels ~symbol ~n ~as_of =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> []
-  | Some as_of_day -> Bar_panels.weekly_bars_for panels ~symbol ~n ~as_of_day
-
-let _panel_weekly_view_for panels ~symbol ~n ~as_of =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> _empty_weekly_view
-  | Some as_of_day -> Bar_panels.weekly_view_for panels ~symbol ~n ~as_of_day
-
-let _panel_daily_view_for panels ~symbol ~as_of ~lookback =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> _empty_daily_view
-  | Some as_of_day ->
-      Bar_panels.daily_view_for panels ~symbol ~as_of_day ~lookback
-
-let of_panels ?ma_cache panels =
-  {
-    daily_bars_for = _panel_daily_bars_for panels;
-    weekly_bars_for = _panel_weekly_bars_for panels;
-    weekly_view_for = _panel_weekly_view_for panels;
-    daily_view_for = _panel_daily_view_for panels;
-    ma_cache;
-  }
-
 (* {1 Empty backing — used by tests where no read is expected}
 
-   Phase F.3.a-1 made [empty ()] panel-free: the closures simply return the
-   empty list / empty view directly, without allocating a [Bar_panels.t] or
-   opening a snapshot directory. This is the smallest constructor and
-   matches the "no read expected" contract precisely. *)
+   The closures simply return the empty list / empty view directly, without
+   allocating a [Bar_panels.t] or opening a snapshot directory. This is the
+   smallest constructor and matches the "no read expected" contract
+   precisely. *)
 let empty () =
   {
     daily_bars_for = (fun ~symbol:_ ~as_of:_ -> []);
