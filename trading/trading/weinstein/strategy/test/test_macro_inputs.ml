@@ -3,6 +3,12 @@ open Core
 open Matchers
 open Weinstein_strategy
 module Bar_panels = Data_panel.Bar_panels
+module Pipeline = Snapshot_pipeline.Pipeline
+module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
+module Snapshot_format = Data_panel_snapshot.Snapshot_format
+module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Daily_panels = Snapshot_runtime.Daily_panels
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                              *)
@@ -249,6 +255,319 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
     (is_some_and (fun _ -> ()))
 
 (* ------------------------------------------------------------------ *)
+(* Snapshot-views parity (Phase F.3.d)                                  *)
+(* ------------------------------------------------------------------ *)
+(* Pin that {!Macro_inputs.build_*_of_snapshot_views} produces bit-equal
+   output to the [bar_reader]-backed constructors on the same underlying
+   bar history. Since the [bar_reader]-backed path (after F.3.a-4) and
+   the new [_of_snapshot_views] path both ultimately fan out through
+   {!Snapshot_runtime.Snapshot_bar_views}, parity is the load-bearing
+   property — any drift between the two would surface as a regression
+   when callers migrate from one to the other in F.3.d's downstream PRs. *)
+
+let _build_snapshot_callbacks
+    (symbol_bars : (string * Types.Daily_price.t list) list) :
+    Snapshot_callbacks.t =
+  let dir = Stdlib.Filename.temp_dir "test_macro_inputs_" "" in
+  let entries =
+    List.map symbol_bars ~f:(fun (symbol, bars) ->
+        let rows =
+          match
+            Pipeline.build_for_symbol ~symbol ~bars
+              ~schema:Snapshot_schema.default ()
+          with
+          | Ok rs -> rs
+          | Error err ->
+              failwithf "Pipeline.build_for_symbol %s: %s" symbol
+                err.Status.message ()
+        in
+        let path = Filename.concat dir (symbol ^ ".snap") in
+        (match Snapshot_format.write ~path rows with
+        | Ok () -> ()
+        | Error err ->
+            failwithf "Snapshot_format.write %s: %s" symbol err.Status.message
+              ());
+        {
+          Snapshot_manifest.symbol;
+          path;
+          byte_size = 0;
+          payload_md5 = "ignored";
+          csv_mtime = 0.0;
+        })
+  in
+  let manifest =
+    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
+  in
+  let manifest_path = Filename.concat dir "manifest.sexp" in
+  (match Snapshot_manifest.write ~path:manifest_path manifest with
+  | Ok () -> ()
+  | Error err -> failwithf "Snapshot_manifest.write: %s" err.Status.message ());
+  let panels =
+    match Daily_panels.create ~snapshot_dir:dir ~manifest ~max_cache_mb:16 with
+    | Ok p -> p
+    | Error err -> failwithf "Daily_panels.create: %s" err.Status.message ()
+  in
+  Snapshot_callbacks.of_daily_panels panels
+
+(* Build a per-entry matcher for a (label, weekly_view) pair from an
+   expected entry: composes label equality + per-field array equality
+   under one [all_of]. Float arrays compare with epsilon=1e-9 — both
+   paths round-trip through {!Snapshot_bar_views} for the synthetic
+   in-memory fixture, so any drift larger than IEEE round-trip noise
+   would be a regression. Used in [elements_are] to validate the full
+   [(label, weekly_view) list] under one [assert_that]. *)
+let _global_view_entry_matcher
+    ((expected_label, expected_view) : string * Bar_panels.weekly_view) =
+  let float_array_matches arr =
+    elements_are (Array.to_list arr |> List.map ~f:(float_equal ~epsilon:1e-9))
+  in
+  let date_array_matches arr =
+    elements_are (Array.to_list arr |> List.map ~f:equal_to)
+  in
+  all_of
+    [
+      field fst (equal_to expected_label);
+      field
+        (fun ((_, v) : string * Bar_panels.weekly_view) -> v.n)
+        (equal_to expected_view.n);
+      field
+        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+          Array.to_list v.closes)
+        (float_array_matches expected_view.closes);
+      field
+        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+          Array.to_list v.raw_closes)
+        (float_array_matches expected_view.raw_closes);
+      field
+        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+          Array.to_list v.highs)
+        (float_array_matches expected_view.highs);
+      field
+        (fun ((_, v) : string * Bar_panels.weekly_view) -> Array.to_list v.lows)
+        (float_array_matches expected_view.lows);
+      field
+        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+          Array.to_list v.volumes)
+        (float_array_matches expected_view.volumes);
+      field
+        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+          Array.to_list v.dates)
+        (date_array_matches expected_view.dates);
+    ]
+
+(* Build a per-entry matcher for a (label, Daily_price.t list) pair from
+   an expected entry. Bar lists compare element-wise on the numeric fields
+   the bar-list path round-trips through [Snapshot_bar_views] (date,
+   adjusted_close, close, high, low, volume) — those are the load-bearing
+   fields the Macro callbacks read. *)
+let _global_bars_entry_matcher
+    ((expected_label, expected_bars) : string * Types.Daily_price.t list) =
+  let bar_matcher (b : Types.Daily_price.t) =
+    all_of
+      [
+        field (fun (x : Types.Daily_price.t) -> x.date) (equal_to b.date);
+        field
+          (fun (x : Types.Daily_price.t) -> x.adjusted_close)
+          (float_equal ~epsilon:1e-9 b.adjusted_close);
+        field
+          (fun (x : Types.Daily_price.t) -> x.close_price)
+          (float_equal ~epsilon:1e-9 b.close_price);
+        field
+          (fun (x : Types.Daily_price.t) -> x.high_price)
+          (float_equal ~epsilon:1e-9 b.high_price);
+        field
+          (fun (x : Types.Daily_price.t) -> x.low_price)
+          (float_equal ~epsilon:1e-9 b.low_price);
+        field
+          (fun (x : Types.Daily_price.t) -> Float.of_int x.volume)
+          (float_equal ~epsilon:1e-9 (Float.of_int b.volume));
+      ]
+  in
+  all_of
+    [
+      field fst (equal_to expected_label);
+      field snd (elements_are (List.map expected_bars ~f:bar_matcher));
+    ]
+
+let test_snapshot_parity_global_index_views _ =
+  let gdaxi_bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:_sufficient_daily_bars ~start_price:15000.0
+  in
+  let n225_bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:_sufficient_daily_bars ~start_price:30000.0
+  in
+  let as_of = (List.last_exn gdaxi_bars).date in
+  let symbols = [ ("GDAXI.INDX", gdaxi_bars); ("N225.INDX", n225_bars) ] in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols in
+  let cb = _build_snapshot_callbacks symbols in
+  let bar_reader_views =
+    Macro_inputs.build_global_index_views ~lookback_bars:52
+      ~global_index_symbols:Macro_inputs.default_global_indices ~bar_reader
+      ~as_of
+  in
+  let snapshot_views =
+    Macro_inputs.build_global_index_views_of_snapshot_views ~lookback_bars:52
+      ~global_index_symbols:Macro_inputs.default_global_indices ~cb ~as_of
+  in
+  assert_that snapshot_views
+    (elements_are (List.map bar_reader_views ~f:_global_view_entry_matcher))
+
+let test_snapshot_parity_global_index_views_drops_missing _ =
+  (* Only GDAXI present; N225 + FTSE missing → both paths drop them
+     identically and produce a single-entry list keyed by "DAX". *)
+  let bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:30 ~start_price:15000.0
+  in
+  let as_of = (List.last_exn bars).date in
+  let symbols = [ ("GDAXI.INDX", bars) ] in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols in
+  let cb = _build_snapshot_callbacks symbols in
+  let bar_reader_views =
+    Macro_inputs.build_global_index_views ~lookback_bars:52
+      ~global_index_symbols:Macro_inputs.default_global_indices ~bar_reader
+      ~as_of
+  in
+  let snapshot_views =
+    Macro_inputs.build_global_index_views_of_snapshot_views ~lookback_bars:52
+      ~global_index_symbols:Macro_inputs.default_global_indices ~cb ~as_of
+  in
+  assert_that snapshot_views
+    (elements_are (List.map bar_reader_views ~f:_global_view_entry_matcher))
+
+let test_snapshot_parity_global_index_bars _ =
+  let bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:_sufficient_daily_bars ~start_price:15000.0
+  in
+  let as_of = (List.last_exn bars).date in
+  let symbols = [ ("GDAXI.INDX", bars) ] in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols in
+  let cb = _build_snapshot_callbacks symbols in
+  let bar_reader_pairs =
+    Macro_inputs.build_global_index_bars ~lookback_bars:52
+      ~global_index_symbols:Macro_inputs.default_global_indices ~bar_reader
+      ~as_of
+  in
+  let snapshot_pairs =
+    Macro_inputs.build_global_index_bars_of_snapshot_views ~lookback_bars:52
+      ~global_index_symbols:Macro_inputs.default_global_indices ~cb ~as_of
+  in
+  assert_that snapshot_pairs
+    (elements_are (List.map bar_reader_pairs ~f:_global_bars_entry_matcher))
+
+let test_snapshot_parity_sector_map _ =
+  (* Both ETF + index have enough bars → both paths populate XLK with the
+     same {!Screener.sector_context} and update [sector_prior_stages]
+     identically. *)
+  let etf_bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:_sufficient_daily_bars ~start_price:100.0
+  in
+  let index_bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:_sufficient_daily_bars ~start_price:4500.0
+  in
+  let as_of = (List.last_exn etf_bars).date in
+  let symbols = [ ("XLK", etf_bars); ("INDEX", index_bars) ] in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols in
+  let cb = _build_snapshot_callbacks symbols in
+  let index_view =
+    Bar_reader.weekly_view_for bar_reader ~symbol:"INDEX" ~n:52 ~as_of
+  in
+  let bar_reader_prior_stages = Hashtbl.create (module String) in
+  let snapshot_prior_stages = Hashtbl.create (module String) in
+  let ticker_sectors =
+    Hashtbl.of_alist_exn (module String) [ ("XLK", "Information Technology") ]
+  in
+  let bar_reader_map =
+    Macro_inputs.build_sector_map ~stage_config:Stage.default_config
+      ~lookback_bars:52
+      ~sector_etfs:[ ("XLK", "Information Technology") ]
+      ~bar_reader ~as_of ~sector_prior_stages:bar_reader_prior_stages
+      ~index_view ~ticker_sectors ()
+  in
+  let snapshot_map =
+    Macro_inputs.build_sector_map_of_snapshot_views
+      ~stage_config:Stage.default_config ~lookback_bars:52
+      ~sector_etfs:[ ("XLK", "Information Technology") ]
+      ~cb ~as_of ~sector_prior_stages:snapshot_prior_stages ~index_view
+      ~ticker_sectors ()
+  in
+  let sorted_alist h =
+    Hashtbl.to_alist h
+    |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+  in
+  let expected_alist = sorted_alist bar_reader_map in
+  let expected_prior_alist =
+    Hashtbl.to_alist bar_reader_prior_stages
+    |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+  in
+  let snap_prior_alist =
+    Hashtbl.to_alist snapshot_prior_stages
+    |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+  in
+  let entry_matcher (k, (e : Screener.sector_context)) =
+    all_of
+      [
+        field fst (equal_to k);
+        field
+          (fun (_, (ctx : Screener.sector_context)) -> ctx.sector_name)
+          (equal_to e.sector_name);
+      ]
+  in
+  let prior_entry_matcher (k, _) = field fst (equal_to k) in
+  assert_that
+    (sorted_alist snapshot_map, snap_prior_alist)
+    (all_of
+       [
+         field fst (elements_are (List.map expected_alist ~f:entry_matcher));
+         field snd
+           (elements_are (List.map expected_prior_alist ~f:prior_entry_matcher));
+       ])
+
+let test_snapshot_parity_sector_map_drops_etfs_with_insufficient_bars _ =
+  (* 25 daily bars = ~5 weekly bars, below ma_period (30) → both paths
+     produce an empty map. *)
+  let etf_bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:25 ~start_price:100.0
+  in
+  let index_bars =
+    make_rising_bars
+      ~start_date:(Date.of_string "2024-01-01")
+      ~n:_sufficient_daily_bars ~start_price:4500.0
+  in
+  let as_of = (List.last_exn etf_bars).date in
+  let symbols = [ ("XLK", etf_bars); ("INDEX", index_bars) ] in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols in
+  let cb = _build_snapshot_callbacks symbols in
+  let index_view =
+    Bar_reader.weekly_view_for bar_reader ~symbol:"INDEX" ~n:52 ~as_of
+  in
+  let ticker_sectors =
+    Hashtbl.of_alist_exn (module String) [ ("XLK", "Information Technology") ]
+  in
+  let snapshot_map =
+    Macro_inputs.build_sector_map_of_snapshot_views
+      ~stage_config:Stage.default_config ~lookback_bars:52
+      ~sector_etfs:[ ("XLK", "Information Technology") ]
+      ~cb ~as_of
+      ~sector_prior_stages:(Hashtbl.create (module String))
+      ~index_view ~ticker_sectors ()
+  in
+  assert_that (Hashtbl.to_alist snapshot_map) is_empty
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -274,4 +593,14 @@ let () =
            >:: test_build_sector_map_drops_etfs_when_index_bars_empty;
            "build_sector_map populates entry for valid ETF"
            >:: test_build_sector_map_populates_entry_for_valid_etf;
+           "Snapshot parity: build_global_index_views"
+           >:: test_snapshot_parity_global_index_views;
+           "Snapshot parity: build_global_index_views drops missing"
+           >:: test_snapshot_parity_global_index_views_drops_missing;
+           "Snapshot parity: build_global_index_bars"
+           >:: test_snapshot_parity_global_index_bars;
+           "Snapshot parity: build_sector_map"
+           >:: test_snapshot_parity_sector_map;
+           "Snapshot parity: build_sector_map drops insufficient ETFs"
+           >:: test_snapshot_parity_sector_map_drops_etfs_with_insufficient_bars;
          ])
