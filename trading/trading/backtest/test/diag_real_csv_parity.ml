@@ -1,7 +1,7 @@
-(** Regression diagnostic: compare [Bar_panels] and [Snapshot_bar_views] on
-    REAL CSV data across the full sp500-2019-2023 universe to verify the two
-    readers produce bit-equal weekly/daily views on every (symbol, weekday)
-    cell the strategy queries.
+(** Regression diagnostic: compare [Bar_panels] and [Snapshot_bar_views] on REAL
+    CSV data across the full sp500-2019-2023 universe to verify the two readers
+    produce bit-equal weekly/daily views on every (symbol, weekday) cell the
+    strategy queries.
 
     Used during the 2026-05-04 sp500-2019-2023 parity bisect (issue #843,
     `dev/notes/parity-bisect-2026-05-04.md`) to confirm that the
@@ -145,9 +145,7 @@ let _diff_views ~symbol ~as_of (panel : Bar_panels.weekly_view)
       if i >= n then None
       else
         let date_eq = Date.equal panel.dates.(i) snap.dates.(i) in
-        let f_eq a b =
-          Float.equal a b || (Float.is_nan a && Float.is_nan b)
-        in
+        let f_eq a b = Float.equal a b || (Float.is_nan a && Float.is_nan b) in
         let close_eq = f_eq panel.closes.(i) snap.closes.(i) in
         let raw_eq = f_eq panel.raw_closes.(i) snap.raw_closes.(i) in
         let high_eq = f_eq panel.highs.(i) snap.highs.(i) in
@@ -156,7 +154,8 @@ let _diff_views ~symbol ~as_of (panel : Bar_panels.weekly_view)
         if not date_eq then
           Some
             (Printf.sprintf "%s %s [%d] dates differ: panel=%s snap=%s" symbol
-               (Date.to_string as_of) i (Date.to_string panel.dates.(i))
+               (Date.to_string as_of) i
+               (Date.to_string panel.dates.(i))
                (Date.to_string snap.dates.(i)))
         else if not (close_eq && raw_eq && high_eq && low_eq && vol_eq) then
           Some
@@ -195,7 +194,16 @@ let () =
   Printf.printf "Universe: %d symbols\n" (List.length universe);
   let sector_etfs =
     [
-      "XLK"; "XLF"; "XLE"; "XLV"; "XLI"; "XLP"; "XLY"; "XLU"; "XLB"; "XLRE";
+      "XLK";
+      "XLF";
+      "XLE";
+      "XLV";
+      "XLI";
+      "XLP";
+      "XLY";
+      "XLU";
+      "XLB";
+      "XLRE";
       "XLC";
     ]
   in
@@ -203,7 +211,8 @@ let () =
   let symbols = ("GSPC.INDX" :: universe) @ sector_etfs @ global_indices in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   Printf.printf "Calendar: %d trading days (%s..%s)\n" (Array.length calendar)
-    (Date.to_string warmup_start) (Date.to_string end_date);
+    (Date.to_string warmup_start)
+    (Date.to_string end_date);
   Printf.printf "Building Bar_panels...\n%!";
   let panel = _build_full_panel ~symbols ~calendar in
   Printf.printf "Building snapshot...\n%!";
@@ -255,9 +264,7 @@ let () =
             | Some as_of_day ->
                 Bar_panels.daily_bars_for panel ~symbol ~as_of_day
           in
-          let snap_bars =
-            Snapshot_bar_views.daily_bars_for cb ~symbol ~as_of
-          in
+          let snap_bars = Snapshot_bar_views.daily_bars_for cb ~symbol ~as_of in
           if List.length panel_bars <> List.length snap_bars then
             Int.incr dbars_diff
           else
