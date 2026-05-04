@@ -17,6 +17,8 @@
 
 open Core
 module Bar_panels = Data_panel.Bar_panels
+module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 
 (* ------------------------------------------------------------------ *)
 (* Helpers shared by all constructors                                   *)
@@ -345,3 +347,93 @@ let support_floor_callbacks_of_daily_view (view : Bar_panels.daily_view) :
         else Some view.dates.(n - 1 - day_offset));
     n_days = n;
   }
+
+(* ------------------------------------------------------------------ *)
+(* Snapshot-views constructors (Phase F.3.c)                            *)
+(* ------------------------------------------------------------------ *)
+(* Parallel constructors that take a {!Snapshot_callbacks.t} and fetch
+   the underlying bar view via {!Snapshot_bar_views.weekly_view_for} /
+   [daily_view_for] before delegating to the corresponding
+   [*_of_*_view] constructor above. The fetched [Snapshot_bar_views]
+   view types are type-equal to {!Bar_panels.weekly_view} /
+   [daily_view] (declared via [type =] in [snapshot_bar_views.mli]),
+   so the delegation requires no per-call adapter. Output is
+   bit-identical to the panel-backed path on the same underlying bar
+   history (parity test:
+   {!Test_panel_callbacks.Test_snapshot_parity}).
+
+   Phase F.3 plan: callers migrate from
+   [Bar_reader.weekly_view_for ... |> Panel_callbacks.X_of_weekly_view]
+   to [Panel_callbacks.X_of_snapshot_views ~cb ~symbol ~n ~as_of],
+   which folds the view fetch into the callback construction. After
+   every caller migrates, the [*_of_*_view] constructors above can be
+   removed in F.3 deletion. *)
+
+let stage_callbacks_of_snapshot_views ?ma_cache ~(config : Stage.config)
+    ~(cb : Snapshot_callbacks.t) ~symbol ~n ~as_of () : Stage.callbacks =
+  let weekly = Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of in
+  stage_callbacks_of_weekly_view ?ma_cache ~symbol ~config ~weekly ()
+
+let rs_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t) ~stock_symbol
+    ~benchmark_symbol ~n ~as_of : Rs.callbacks =
+  let stock =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:stock_symbol ~n ~as_of
+  in
+  let benchmark =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:benchmark_symbol ~n ~as_of
+  in
+  rs_callbacks_of_weekly_views ~stock ~benchmark
+
+let volume_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t) ~symbol ~n
+    ~as_of : Volume.callbacks =
+  let weekly = Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of in
+  volume_callbacks_of_weekly_view ~weekly
+
+let resistance_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t) ~symbol
+    ~n ~as_of : Resistance.callbacks =
+  let weekly = Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of in
+  resistance_callbacks_of_weekly_view ~weekly
+
+let stock_analysis_callbacks_of_snapshot_views ?ma_cache
+    ~(config : Stock_analysis.config) ~(cb : Snapshot_callbacks.t) ~stock_symbol
+    ~benchmark_symbol ~n ~as_of () : Stock_analysis.callbacks =
+  let stock =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:stock_symbol ~n ~as_of
+  in
+  let benchmark =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:benchmark_symbol ~n ~as_of
+  in
+  stock_analysis_callbacks_of_weekly_views ?ma_cache ~stock_symbol ~config
+    ~stock ~benchmark ()
+
+let sector_callbacks_of_snapshot_views ?ma_cache ~(config : Sector.config)
+    ~(cb : Snapshot_callbacks.t) ~sector_symbol ~benchmark_symbol ~n ~as_of () :
+    Sector.callbacks =
+  let sector =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:sector_symbol ~n ~as_of
+  in
+  let benchmark =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:benchmark_symbol ~n ~as_of
+  in
+  sector_callbacks_of_weekly_views ?ma_cache ~sector_symbol ~config ~sector
+    ~benchmark ()
+
+let macro_callbacks_of_snapshot_views ?ma_cache ~(config : Macro.config)
+    ~(cb : Snapshot_callbacks.t) ~index_symbol
+    ~(globals : (string * string) list) ~(ad_bars : Macro.ad_bar list) ~n ~as_of
+    () : Macro.callbacks =
+  let index =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:index_symbol ~n ~as_of
+  in
+  let global_views =
+    List.filter_map globals ~f:(fun (label, symbol) ->
+        let view = Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of in
+        if view.n = 0 then None else Some (label, view))
+  in
+  macro_callbacks_of_weekly_views ?ma_cache ~index_symbol ~config ~index
+    ~globals:global_views ~ad_bars ()
+
+let support_floor_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t)
+    ~symbol ~as_of ~lookback : Weinstein_stops.callbacks =
+  let view = Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback in
+  support_floor_callbacks_of_daily_view view
