@@ -6,7 +6,7 @@
 IN_PROGRESS
 
 ## Notes
-M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04**: a-1 (#825 `Bar_reader.of_in_memory_bars`), a-2 (#827 migrate 5 strategy test files / 17 callsites), a-3 (#828 `Panel_runner` CSV path through snapshot via `Csv_snapshot_builder`), a-4 (#829 delete `Bar_reader.of_panels` + `Weinstein_strategy.make ?bar_panels`). Remaining F.3 sub-PRs: **F.3.b** port `Weekly_ma_cache` off `Bar_panels.t`; **F.3.c** port `Panel_callbacks`; **F.3.d** port `Macro_inputs`; **F.3.e** delete `bar_panels.{ml,mli}` + tests. Plus: Synth-v3; Norgate ingest (vendor-blocked). F.3 is gated on three verification follow-ups (V1 sp500 5y full-universe parity, V2 ±2w fuzz on snapshot mode, V3 numeric-key fuzz at scale paired with E3 sweep). Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
+M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04**: a-1 (#825 `Bar_reader.of_in_memory_bars`), a-2 (#827 migrate 5 strategy test files / 17 callsites), a-3 (#828 `Panel_runner` CSV path through snapshot via `Csv_snapshot_builder`), a-4 (#829 delete `Bar_reader.of_panels` + `Weinstein_strategy.make ?bar_panels`). **F.3.b staged b-1 MERGED** (#833 `Weekly_ma_cache.of_snapshot_views`). **F.3.c staged c-1 MERGED** (#837 `Panel_callbacks.*_of_snapshot_views`). **F.3.d staged d-1 READY_FOR_REVIEW 2026-05-04** (#842 `Macro_inputs.*_of_snapshot_views` — 3 parallel constructors + 5 parity tests). Remaining F.3 sub-PRs: **F.3.b/c/d** caller migrations from `bar_reader`-backed → `*_of_snapshot_views` paths; **F.3.e** delete `bar_panels.{ml,mli}` + tests. Plus: Synth-v3; Norgate ingest (vendor-blocked). F.3 is gated on three verification follow-ups (V1 sp500 5y full-universe parity, V2 ±2w fuzz on snapshot mode, V3 numeric-key fuzz at scale paired with E3 sweep). Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 Track created 2026-05-02 to absorb M5.3 (scale infra: streaming + Norgate) + M7.0 (data foundations: Norgate, multi-market, synthetic). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` + `dev/plans/m7-data-and-tuning-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.3 + M7.0 (added 2026-05-02).
 
@@ -137,6 +137,13 @@ including the V1/V2/V3 verification follow-ups that gate F.2.)
 - **#790** — Phase D: simulator wire-in behind `--snapshot-mode --snapshot-dir`.
 - **#791** — Phase E: validation + tier-4 spike (parity-7sym fixture).
 - **#793** — Phase F.1: deprecation marker on `Bar_panels.t`'s docstring.
+- **#825/#827/#828/#829** — Phase F.3.a: `Bar_reader` migrated off `Bar_panels.t` (a-1 `of_in_memory_bars`, a-2 strategy test migrations, a-3 `Panel_runner` CSV → snapshot, a-4 delete `of_panels`).
+- **#833** — Phase F.3.b staged b-1: `Weekly_ma_cache.of_snapshot_views` parallel constructor.
+- **#837** — Phase F.3.c staged c-1: `Panel_callbacks.*_of_snapshot_views` parallel constructors (8 callees).
+
+### Ready for review
+
+- **#842** — Phase F.3.d staged d-1: `Macro_inputs.*_of_snapshot_views` parallel constructors (3 functions: `build_global_index_views_of_snapshot_views`, `build_global_index_bars_of_snapshot_views`, `build_sector_map_of_snapshot_views`) + 5 parity tests pinning bit-equal output. Verify: `dune exec trading/weinstein/strategy/test/test_macro_inputs.exe`.
 
 ### Pending (M5.3 Phase F.2 + F.3 + verification gates)
 

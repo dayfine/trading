@@ -106,3 +106,82 @@ val build_sector_map :
 
     Stage 4 PR-D: when [ma_cache] is passed, sector ETF MA values are fetched
     from the cache rather than recomputed per Friday. *)
+
+(** {1 Snapshot-views constructors (Phase F.3.d)}
+
+    Parallel constructors that take a {!Snapshot_runtime.Snapshot_callbacks.t}
+    and fetch the underlying bar views via
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} /
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_bars_for} before delegating to
+    the panel-shaped helpers above.
+
+    The fetched view types are type-equal to
+    {!Data_panel.Bar_panels.weekly_view} (declared via [type =] in
+    [snapshot_bar_views.mli]), so the delegation requires no per-call adapter
+    and the output is bit-identical to the [bar_reader]-backed path on the same
+    underlying bar history (parity tests:
+    [Test_macro_inputs.Test_snapshot_parity]).
+
+    Phase F.3.d plan: callers migrate from [Macro_inputs.X ~bar_reader] to
+    [Macro_inputs.X_of_snapshot_views ~cb], which folds the view fetch into the
+    input-assembly. After every caller migrates, the [bar_reader]-backed
+    constructors above can be removed alongside {!Data_panel.Bar_panels} in the
+    F.3 deletion PR. *)
+
+val build_global_index_views_of_snapshot_views :
+  lookback_bars:int ->
+  global_index_symbols:(string * string) list ->
+  cb:Snapshot_runtime.Snapshot_callbacks.t ->
+  as_of:Date.t ->
+  (string * Data_panel.Bar_panels.weekly_view) list
+(** [build_global_index_views_of_snapshot_views ~lookback_bars
+     ~global_index_symbols ~cb ~as_of] returns the [(label, weekly_view)] list
+    consumed by the macro callback bundle constructor for the global-consensus
+    indicator.
+
+    Same semantics as {!build_global_index_views} but the view fetch goes
+    through {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} over [cb]
+    instead of {!Bar_reader.weekly_view_for}. Indices with no resident bars
+    (empty view) are silently dropped. *)
+
+val build_global_index_bars_of_snapshot_views :
+  lookback_bars:int ->
+  global_index_symbols:(string * string) list ->
+  cb:Snapshot_runtime.Snapshot_callbacks.t ->
+  as_of:Date.t ->
+  (string * Types.Daily_price.t list) list
+(** [build_global_index_bars_of_snapshot_views ~lookback_bars
+     ~global_index_symbols ~cb ~as_of] is the bar-list shape of
+    {!build_global_index_views_of_snapshot_views}, retained for callers that
+    build {!Macro.callbacks} via {!Macro.callbacks_from_bars}. The bar fetch
+    goes through {!Snapshot_runtime.Snapshot_bar_views.weekly_bars_for}. *)
+
+val build_sector_map_of_snapshot_views :
+  ?ma_cache:Weekly_ma_cache.t ->
+  stage_config:Stage.config ->
+  lookback_bars:int ->
+  sector_etfs:(string * string) list ->
+  cb:Snapshot_runtime.Snapshot_callbacks.t ->
+  as_of:Date.t ->
+  sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
+  index_view:Data_panel.Bar_panels.weekly_view ->
+  ticker_sectors:(string, string) Hashtbl.t ->
+  unit ->
+  (string, Screener.sector_context) Hashtbl.t
+(** [build_sector_map_of_snapshot_views ?ma_cache ~stage_config ~lookback_bars
+     ~sector_etfs ~cb ~as_of ~sector_prior_stages ~index_view ~ticker_sectors
+     ()] is the snapshot-views variant of {!build_sector_map}: same ETF-level
+    analysis path through {!Panel_callbacks.sector_callbacks_of_weekly_views}
+    + {!Sector.analyze_with_callbacks} and the same ticker-level expansion via
+      [ticker_sectors], but the sector ETF weekly views are fetched via
+      {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} over [cb] instead
+      of {!Bar_reader.weekly_view_for}.
+
+    [index_view] is still passed as a {!Data_panel.Bar_panels.weekly_view}
+    because the strategy keeps the benchmark view in scope across the per-tick
+    screen and reuses it across both [build_sector_map_*] paths; callers that
+    have only a [Snapshot_callbacks.t] should fetch the benchmark view via
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} themselves.
+
+    [sector_prior_stages] is read and updated in place identically to
+    {!build_sector_map}. *)
