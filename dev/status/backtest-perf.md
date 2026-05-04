@@ -1,6 +1,6 @@
 # Status: backtest-perf
 
-## Last updated: 2026-04-29
+## Last updated: 2026-05-04
 
 ## Status
 IN_PROGRESS
@@ -74,6 +74,19 @@ mechanics + release-gate procedure.
 
 ## Open work
 
+- **`perf/daily-panels-binary-search`** (PR #845, addresses #844) — open
+  for review. Replaces `Daily_panels.read_today`'s `List.find` and
+  `read_history`'s `List.filter + List.sort` with binary-search slice
+  over a date-sorted `Snapshot.t array`. Bumps `_snapshot_cache_mb` from
+  256 to 1024 to fit a 15y × 500-symbol resident snapshot footprint
+  (the prior cap caused per-Friday cache thrashing). Measured 5y sp500
+  ~7 min → ~4 min (2× speedup); per-call cost ratio at 15y ~150×, so
+  the super-linear blow-up flagged by #844 collapses back to roughly
+  linear. Bit-identical metrics to the post-#828 baseline confirm the
+  fix is pure perf. Files: `daily_panels.ml`, `panel_runner.ml`. Verify:
+  `dune runtest analysis/weinstein/snapshot_runtime trading/backtest/test
+  trading/weinstein/strategy` — all 86+ tests pass; `scenario_runner.exe
+  --dir goldens-sp500 --parallel 1` finishes in ~4 min.
 - **`feat/trade-audit-cascade-rejections`** (trade-audit cascade-rejection
   counts, extension to PR-2) — open for review. Extends the per-trade audit
   shipped in #642 with per-Friday cascade-phase admission counts. Lets the
