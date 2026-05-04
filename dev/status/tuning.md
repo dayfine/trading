@@ -1,11 +1,16 @@
 # Status: tuning
 
-## Last updated: 2026-05-03
+## Last updated: 2026-05-04
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS — T-A + T-B libs MERGED; CLI binaries + walk-forward integration deferred
 
-T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). T-B Bayesian-opt lib + tests landed in `feat/tuner-bayesian-opt`. Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying) + `dev/plans/bayesian-opt-2026-05-03.md` (T-B clarifying with D1–D8 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02). Owner authorized: feat-backtest per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
+T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). T-B Bayesian-opt lib + tests landed via PR #817 (merged 2026-05-04). Both `.mli` surfaces are stable. Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying) + `dev/plans/bayesian-opt-2026-05-03.md` (T-B clarifying with D1–D8 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
+
+Remaining work:
+- **T-A CLI binary** — `tuner_runner.exe` wiring `Grid_search.run` to the real backtest runner. Larger PR; deferred.
+- **T-B CLI binary** — `bayesian_runner.exe` analogous to T-A. Deferred.
+- **T-C** (supervised ML walk-forward) — blocked on Norgate ingest (vendor signup) + experiments M5.2 metrics catalog + experiments M5.2e per-trade context (already shipped #769). Owner authorized: feat-backtest per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 ## Interface stable
 YES

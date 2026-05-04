@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-05-02
+## Last updated: 2026-05-04
 
 ## Status
 IN_PROGRESS
@@ -8,28 +8,15 @@ IN_PROGRESS
 Split-day broker-model redesign + regression follow-ups fully wrapped
 (PRs #658 / #662 / #664 / #667 broker-model; #678 strategy-side-position-map
 fix; #680 stop-state rescaling; #682 short-side flag for sp500 mitigation;
-all merged 2026-04-28..29). Slice 1+3 verdicts remain APPROVED. Track stays
-IN_PROGRESS for the M5 walk-forward + tuner catch-all items and the local
-sp500-2019-2023 baseline rerun (deferred — needs full 491-symbol universe
-data not present in GHA).
+all merged 2026-04-28..29). Slice 1+3 verdicts remain APPROVED. Track
+stays IN_PROGRESS for the M5 walk-forward + tuner catch-all items and the
+local sp500-2019-2023 baseline rerun (deferred — needs full 491-symbol
+universe data not present in GHA).
 
-**[P0 — RED CI 2026-05-02]** Failing test on `main`:
-`split_day_stop_exit:1:post_split_exit_no_orphan_equity` — exit cash =
-$99,600 vs $100,000 expected (Δ = $400 = 100 × $4). Run
-[25238889053](https://github.com/dayfine/trading/actions/runs/25238889053).
-Test landed via #678 with PR-body caveat "Do NOT merge until local
-`dune runtest` passes — Docker was unresponsive". Test was likely never
-verified against the fix. Sister tests `post_split_exit_clears_position`
-and `split_day_position_reflects_post_split` PASS, so split-event
-mechanics work; only the case where `trigger_exit_on_or_after` is the
-post-split day (not the split day itself) shows the $400 drift.
-Hypothesis: entry market order filling at day-2 close ($504) instead of
-day-2 open ($500) for that specific scenario. Engine `_would_fill_market`
-returns `path[0] = bar.open_price` invariantly so the hypothesis
-contradicts the static read — needs docker reproduction. Lives on the
-G14 split-adjustment surface already escalated as a scope-extension
-decision per the 2026-04-16 precedent. Action: bring docker up, repro,
-fix; this is the very next dispatchable item once the M5 plan docs land.
+**[Prior P0 RED CI — RESOLVED]** The 2026-05-02 P0
+(`split_day_stop_exit:1:post_split_exit_no_orphan_equity`, $400 drift)
+was resolved by PR #752 mid-April; CI green on `main` since. Section
+removed from active blockers; retained as historical entry below.
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)

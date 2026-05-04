@@ -1,12 +1,12 @@
 # Status: experiments
 
-## Last updated: 2026-05-03
+## Last updated: 2026-05-04
 
 ## Status
 IN_PROGRESS
 
 ## Notes
-M5.2e per-trade context logging shipped (PR #769); M5.4 E3 sweep harness landed (PR #815); M5.4 E4 scoring-weight sweep harness landed (PR #816); M5.2a–d still PLANNED, sweep runs blocked on M5.1.
+M5.2e per-trade context logging shipped (PR #769); M5.4 E3 sweep harness landed (PR #815); M5.4 E4 scoring-weight sweep harness landed (PR #816). **M5.2a–d still PLANNED — these are the next priority dispatches** (config-override + comparison + smoke flags → trade aggregates → risk-adjusted → distributional / antifragility).
 
 Track created 2026-05-02 to absorb M5.2 (experiment infra) + M5.4 (mechanical experiments). Plan: `dev/plans/m5-experiments-roadmap-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.2 + M5.4 (added 2026-05-02).
 
@@ -14,7 +14,7 @@ Track created 2026-05-02 to absorb M5.2 (experiment infra) + M5.4 (mechanical ex
 NO
 
 ## Blocked on
-- M5.1 foundation hardening (CI red on `main`: `split_day_stop_exit:1:post_split_exit_no_orphan_equity`; G14 split-adjust + G15 short-side risk surfaces). No experiment runs are interpretable until the foundation stops leaking.
+- None. Prior M5.1 blocker (`split_day_stop_exit:1:post_split_exit_no_orphan_equity`) was RESOLVED by PR #752 weeks ago; G14 split-adjust + G15 short-side risk surfaces also landed (see `dev/status/short-side-strategy.md`). Sweep runs are now interpretable — M5.4 E3/E4 sweep runs themselves remain local-only follow-ups (~5×2h tier-3 budget each).
 
 ## Scope
 

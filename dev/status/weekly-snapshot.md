@@ -1,11 +1,13 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-05-02
+## Last updated: 2026-05-04
 
 ## Status
-PLANNED
+PLANNED — owner moved to feat-weinstein per #778 scope expansion
 
 Track created 2026-05-02 to absorb M6.1–M6.5 (verification harness via incremental processing). Plan: `dev/plans/m6-weekly-snapshot-verification-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M6.1–M6.5 (added 2026-05-02).
+
+Per the 2026-05-04 daily summary (#830): M6.1–M6.5 absorbed into feat-weinstein scope; M6.6 live cycle DEFERRED.
 
 ## Interface stable
 NO — track is brand-new.
@@ -13,7 +15,7 @@ NO — track is brand-new.
 The reframe: **weekly picks are first-class durable artifacts before they're inputs to live trading.** This subsystem is a verification harness first; the M6.6 live cycle is wiring on top.
 
 ## Blocked on
-- M5.1 foundation hardening (CI red on `main`: `split_day_stop_exit:1:post_split_exit_no_orphan_equity`). The post-split-exit failure is the very kind of bug M6.4 (split/div verification) would catch deterministically.
+- None. Prior M5.1 blocker (`split_day_stop_exit:1:post_split_exit_no_orphan_equity`) was RESOLVED by PR #752. Track is owner-pending: feat-weinstein not currently dispatched on M6.x items.
 
 ## Scope
 
