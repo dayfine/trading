@@ -2,9 +2,13 @@
 
 open Core
 module Bar_panels = Data_panel.Bar_panels
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
 module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
+module Daily_panels = Snapshot_runtime.Daily_panels
+module Pipeline = Snapshot_pipeline.Pipeline
+module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
+module Snapshot_format = Data_panel_snapshot.Snapshot_format
+module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 (* Closure-based representation: each constructor captures its backing's read
    primitives and packages them as same-shape closures. The strategy's hot
@@ -73,28 +77,20 @@ let of_panels ?ma_cache panels =
     ma_cache;
   }
 
-(* {1 Empty backing — used by tests where no read is expected} *)
+(* {1 Empty backing — used by tests where no read is expected}
 
-(* Build an empty [Bar_panels.t] backed by a zero-symbol universe + zero-day
-   calendar. Used by [empty ()] for tests where no panel-backed read is
-   expected — exercising it through the panel-backed closure keeps the
-   "empty universe" fallback consistent with the panel path's semantics
-   (and means tests still see [Bar_panels]-shaped returns). *)
-let _empty_panels () =
-  let symbol_index =
-    match Symbol_index.create ~universe:[] with
-    | Ok t -> t
-    | Error err ->
-        failwithf "Bar_reader.empty: Symbol_index.create []: %s"
-          err.Status.message ()
-  in
-  let ohlcv = Ohlcv_panels.create symbol_index ~n_days:0 in
-  match Bar_panels.create ~ohlcv ~calendar:[||] with
-  | Ok p -> p
-  | Error err ->
-      failwithf "Bar_reader.empty: Bar_panels.create: %s" err.Status.message ()
-
-let empty () = of_panels (_empty_panels ())
+   Phase F.3.a-1 made [empty ()] panel-free: the closures simply return the
+   empty list / empty view directly, without allocating a [Bar_panels.t] or
+   opening a snapshot directory. This is the smallest constructor and
+   matches the "no read expected" contract precisely. *)
+let empty () =
+  {
+    daily_bars_for = (fun ~symbol:_ ~as_of:_ -> []);
+    weekly_bars_for = (fun ~symbol:_ ~n:_ ~as_of:_ -> []);
+    weekly_view_for = (fun ~symbol:_ ~n:_ ~as_of:_ -> _empty_weekly_view);
+    daily_view_for = (fun ~symbol:_ ~as_of:_ ~lookback:_ -> _empty_daily_view);
+    ma_cache = None;
+  }
 
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
 
@@ -129,6 +125,77 @@ let of_snapshot_views (cb : Snapshot_runtime.Snapshot_callbacks.t) =
     daily_view_for = _snapshot_daily_view_for cb;
     ma_cache = None;
   }
+
+(* {1 In-memory-bars constructor (Phase F.3.a-1)}
+
+   Materialise a snapshot directory under a tmp dir, then route reads through
+   [of_snapshot_views]. The Bar_panels alternative ([of_panels] composed with
+   a synthetic [Bar_panels.t] built from in-memory bars) is the path this
+   constructor replaces; keeping it here lets every Bar_panels-backed test
+   migrate to a panel-free reader without changing call sites. *)
+
+(* Cache cap for the in-memory case: small directories (handful of symbols
+   × thousands of days) easily fit in a few MB, but giving the LRU some
+   headroom avoids thrashing on tests that read across many symbols. *)
+let _in_memory_cache_mb = 16
+
+let _build_for_symbol_or_fail ~symbol ~bars =
+  match
+    Pipeline.build_for_symbol ~symbol ~bars ~schema:Snapshot_schema.default ()
+  with
+  | Ok rows -> rows
+  | Error err ->
+      failwithf "Bar_reader.of_in_memory_bars: Pipeline.build_for_symbol %s: %s"
+        symbol err.Status.message ()
+
+let _write_symbol_snap ~dir ~symbol rows =
+  let path = Filename.concat dir (symbol ^ ".snap") in
+  match Snapshot_format.write ~path rows with
+  | Ok () -> path
+  | Error err ->
+      failwithf "Bar_reader.of_in_memory_bars: Snapshot_format.write %s: %s"
+        symbol err.Status.message ()
+
+(* The directory manifest needs per-symbol metadata; for the in-memory case
+   the byte_size / payload_md5 / csv_mtime fields are observational only —
+   the runtime [Daily_panels] reader does not validate them at create time.
+   Filling sentinel values keeps the constructor stdlib-only (no
+   [Core_unix.stat]). *)
+let _file_metadata_of ~symbol ~path : Snapshot_manifest.file_metadata =
+  { symbol; path; byte_size = 0; payload_md5 = "ignored"; csv_mtime = 0.0 }
+
+let _open_daily_panels ~dir ~manifest =
+  match
+    Daily_panels.create ~snapshot_dir:dir ~manifest
+      ~max_cache_mb:_in_memory_cache_mb
+  with
+  | Ok p -> p
+  | Error err ->
+      failwithf "Bar_reader.of_in_memory_bars: Daily_panels.create: %s"
+        err.Status.message ()
+
+let _write_manifest_or_fail ~dir manifest =
+  let path = Filename.concat dir "manifest.sexp" in
+  match Snapshot_manifest.write ~path manifest with
+  | Ok () -> ()
+  | Error err ->
+      failwithf "Bar_reader.of_in_memory_bars: Snapshot_manifest.write: %s"
+        err.Status.message ()
+
+let of_in_memory_bars (symbol_bars : (string * Types.Daily_price.t list) list) =
+  let dir = Stdlib.Filename.temp_dir "bar_reader_in_memory_" "" in
+  let entries =
+    List.map symbol_bars ~f:(fun (symbol, bars) ->
+        let rows = _build_for_symbol_or_fail ~symbol ~bars in
+        let path = _write_symbol_snap ~dir ~symbol rows in
+        _file_metadata_of ~symbol ~path)
+  in
+  let manifest =
+    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
+  in
+  _write_manifest_or_fail ~dir manifest;
+  let panels = _open_daily_panels ~dir ~manifest in
+  of_snapshot_views (Snapshot_callbacks.of_daily_panels panels)
 
 (* {1 Public read API — direct closure invocations} *)
 

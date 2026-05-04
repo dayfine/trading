@@ -7,7 +7,9 @@
   status
   trading.base
   trading.data_panel
+  trading.data_panel.snapshot
   trading.strategy
+  weinstein.snapshot_pipeline
   weinstein.snapshot_runtime
   weinstein.types
   weinstein_trading.stops
