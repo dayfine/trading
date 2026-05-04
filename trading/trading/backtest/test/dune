@@ -1,3 +1,19 @@
+; Regression diagnostic exec (not a test) — see diag_real_csv_parity.ml
+; for usage. Invoked manually during F.3.x parity bisects to verify
+; Bar_panels and Snapshot_bar_views agree cell-by-cell on real CSV data.
+(executable
+ (name diag_real_csv_parity)
+ (libraries
+  core
+  fpath
+  csv
+  status
+  trading.data_panel
+  trading.data_panel.snapshot
+  weinstein.snapshot_pipeline
+  weinstein.snapshot_runtime
+  types))
+
 (tests
  (names
   test_stop_log
