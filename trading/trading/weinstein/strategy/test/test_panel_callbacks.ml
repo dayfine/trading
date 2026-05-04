@@ -533,6 +533,221 @@ let test_stage_callbacks_parity_with_cache _ =
            (equal_to inline_result.above_ma_count);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Snapshot-views parity (Phase F.3.c)                                  *)
+(* ------------------------------------------------------------------ *)
+(* Pin that {!Panel_callbacks.X_of_snapshot_views} produces bit-equal
+   callee-analysis output to {!Panel_callbacks.X_of_*_view} on the same
+   underlying bar history. The legacy [_of_*_view] constructors take a
+   pre-built {!Bar_panels.weekly_view} / [daily_view]; the new
+   [_of_snapshot_views] constructors take a {!Snapshot_callbacks.t}
+   plus the symbol / window the view should cover and fetch via
+   {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} /
+   [daily_view_for]. The view types are type-equal (declared via [type =]
+   in [snapshot_bar_views.mli]), so the delegation requires no per-call
+   adapter and the output is bit-identical. *)
+
+module Pipeline = Snapshot_pipeline.Pipeline
+module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
+module Snapshot_format = Data_panel_snapshot.Snapshot_format
+module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Daily_panels = Snapshot_runtime.Daily_panels
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
+
+(* Mirror of {!Test_weekly_ma_cache._build_snapshot_callbacks}: build a
+   {!Snapshot_callbacks.t} from in-memory [(symbol, bars)] pairs by
+   materialising a tmp snapshot directory under
+   {!Snapshot_schema.default}. Same setup as {!Bar_reader.of_in_memory_bars}
+   but exposes the {!Snapshot_callbacks.t} directly so the parity tests
+   can also drive {!Bar_panels.weekly_view_for} from the same input. *)
+let _build_snapshot_callbacks
+    (symbol_bars : (string * Types.Daily_price.t list) list) :
+    Snapshot_callbacks.t =
+  let dir = Stdlib.Filename.temp_dir "test_panel_callbacks_" "" in
+  let entries =
+    List.map symbol_bars ~f:(fun (symbol, bars) ->
+        let rows =
+          match
+            Pipeline.build_for_symbol ~symbol ~bars
+              ~schema:Snapshot_schema.default ()
+          with
+          | Ok rs -> rs
+          | Error err ->
+              failwithf "Pipeline.build_for_symbol %s: %s" symbol
+                err.Status.message ()
+        in
+        let path = Filename.concat dir (symbol ^ ".snap") in
+        (match Snapshot_format.write ~path rows with
+        | Ok () -> ()
+        | Error err ->
+            failwithf "Snapshot_format.write %s: %s" symbol err.Status.message
+              ());
+        {
+          Snapshot_manifest.symbol;
+          path;
+          byte_size = 0;
+          payload_md5 = "ignored";
+          csv_mtime = 0.0;
+        })
+  in
+  let manifest =
+    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
+  in
+  let manifest_path = Filename.concat dir "manifest.sexp" in
+  (match Snapshot_manifest.write ~path:manifest_path manifest with
+  | Ok () -> ()
+  | Error err -> failwithf "Snapshot_manifest.write: %s" err.Status.message ());
+  let panels =
+    match Daily_panels.create ~snapshot_dir:dir ~manifest ~max_cache_mb:16 with
+    | Ok p -> p
+    | Error err -> failwithf "Daily_panels.create: %s" err.Status.message ()
+  in
+  Snapshot_callbacks.of_daily_panels panels
+
+(* Stage parity (snapshot vs panel): same 60-bar fixture as the bar-list
+   parity test, run through {!Stage.classify_with_callbacks} via both
+   constructors. *)
+let test_stage_snapshot_parity _ =
+  let bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2024-01-05")
+      ~n:60 ~start_price:100.0 ~step:0.5
+  in
+  let panels = panels_of_symbols [ ("AAPL", bars) ] in
+  let panel_view =
+    Bar_panels.weekly_view_for panels ~symbol:"AAPL" ~n:60
+      ~as_of_day:(Bar_panels.n_days panels - 1)
+  in
+  let cb = _build_snapshot_callbacks [ ("AAPL", bars) ] in
+  let as_of = (List.last_exn bars).Types.Daily_price.date in
+  let config = Stage.default_config in
+  let panel_cbs =
+    Panel_callbacks.stage_callbacks_of_weekly_view ~config ~weekly:panel_view ()
+  in
+  let snap_cbs =
+    Panel_callbacks.stage_callbacks_of_snapshot_views ~config ~cb ~symbol:"AAPL"
+      ~n:60 ~as_of ()
+  in
+  let panel_result =
+    Stage.classify_with_callbacks ~config ~get_ma:panel_cbs.get_ma
+      ~get_close:panel_cbs.get_close ~prior_stage:None
+  in
+  let snap_result =
+    Stage.classify_with_callbacks ~config ~get_ma:snap_cbs.get_ma
+      ~get_close:snap_cbs.get_close ~prior_stage:None
+  in
+  assert_that snap_result
+    (all_of
+       [
+         field
+           (fun (r : Stage.result) -> r.ma_value)
+           (float_equal panel_result.ma_value);
+         field
+           (fun (r : Stage.result) -> r.ma_slope_pct)
+           (float_equal panel_result.ma_slope_pct);
+         field
+           (fun (r : Stage.result) -> r.above_ma_count)
+           (equal_to panel_result.above_ma_count);
+       ])
+
+(* Support_floor parity (snapshot vs panel): daily lookback over a
+   rally-then-pullback fixture; the daily_view fetch is the load-bearing
+   path for the daily_view-based snapshot constructor (the only daily
+   constructor; every other [_of_snapshot_views] uses [weekly_view_for]
+   which is exercised by {!test_stage_snapshot_parity}). *)
+let test_support_floor_snapshot_parity _ =
+  let dates =
+    List.init 30 ~f:(fun i -> Date.add_days (Date.of_string "2024-01-02") i)
+  in
+  let bars =
+    List.mapi dates ~f:(fun i date ->
+        let price =
+          if i < 20 then 100.0 +. (Float.of_int i *. 1.0)
+          else 120.0 -. (Float.of_int (i - 20) *. 0.5)
+        in
+        {
+          Types.Daily_price.date;
+          open_price = price;
+          high_price = price *. 1.01;
+          low_price = price *. 0.99;
+          close_price = price;
+          adjusted_close = price;
+          volume = 100_000;
+        })
+  in
+  let panels = panels_of_symbols [ ("AAPL", bars) ] in
+  let as_of_day = Bar_panels.n_days panels - 1 in
+  let panel_view =
+    Bar_panels.daily_view_for panels ~symbol:"AAPL" ~as_of_day ~lookback:30
+  in
+  let cb = _build_snapshot_callbacks [ ("AAPL", bars) ] in
+  let as_of = (List.last_exn bars).Types.Daily_price.date in
+  let panel_cbs =
+    Panel_callbacks.support_floor_callbacks_of_daily_view panel_view
+  in
+  let snap_cbs =
+    Panel_callbacks.support_floor_callbacks_of_snapshot_views ~cb ~symbol:"AAPL"
+      ~as_of ~lookback:30
+  in
+  let panel_result =
+    Weinstein_stops.Support_floor.find_recent_level_with_callbacks
+      ~callbacks:panel_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05
+  in
+  let snap_result =
+    Weinstein_stops.Support_floor.find_recent_level_with_callbacks
+      ~callbacks:snap_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05
+  in
+  match (panel_result, snap_result) with
+  | None, None -> ()
+  | Some r1, Some r2 -> assert_that r2 (float_equal r1)
+  | Some r, None ->
+      assert_failure
+        (Printf.sprintf "snapshot returned None; panel returned Some %f" r)
+  | None, Some r ->
+      assert_failure
+        (Printf.sprintf "panel returned None; snapshot returned Some %f" r)
+
+(* Edge case: macro globals filter — one valid + one missing symbol
+   in the [globals] list. The snapshot constructor's [filter_map] over
+   empty views must drop the missing entry and pass only the valid one
+   through to {!macro_callbacks_of_weekly_views}, matching
+   {!Macro_inputs.build_global_index_views}'s [view.n = 0] short-circuit. *)
+let test_macro_snapshot_globals_filter_missing _ =
+  let index_bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2024-01-05")
+      ~n:60 ~start_price:4000.0 ~step:5.0
+  in
+  let global_bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2024-01-05")
+      ~n:60 ~start_price:15000.0 ~step:2.0
+  in
+  let cb =
+    _build_snapshot_callbacks [ ("SPY", index_bars); ("GDAXI", global_bars) ]
+  in
+  let as_of = (List.last_exn index_bars).Types.Daily_price.date in
+  let ad_bars =
+    List.init 60 ~f:(fun i ->
+        {
+          Macro.date = Date.add_days (Date.of_string "2024-01-05") (i * 7);
+          advancing = 1500 + i;
+          declining = 1500 - i;
+        })
+  in
+  let config = Macro.default_config in
+  let snap_cbs =
+    Panel_callbacks.macro_callbacks_of_snapshot_views ~config ~cb
+      ~index_symbol:"SPY"
+      ~globals:[ ("DAX", "GDAXI"); ("MISSING", "MISSING_SYMBOL") ]
+      ~ad_bars ~n:60 ~as_of ()
+  in
+  (* Only DAX should be present in [global_index_stages]; MISSING is
+     filtered out at view-fetch time. *)
+  assert_that
+    (List.map snap_cbs.global_index_stages ~f:fst)
+    (elements_are [ equal_to "DAX" ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -547,6 +762,10 @@ let suite =
          >:: test_support_floor_callbacks_parity;
          "Volume parity" >:: test_volume_callbacks_parity;
          "Resistance parity" >:: test_resistance_callbacks_parity;
+         "Snapshot Stage parity" >:: test_stage_snapshot_parity;
+         "Snapshot Support_floor parity" >:: test_support_floor_snapshot_parity;
+         "Snapshot Macro globals filter missing"
+         >:: test_macro_snapshot_globals_filter_missing;
        ]
 
 let () = run_test_tt_main suite
