@@ -26,12 +26,15 @@
   fpath
   trading.base
   trading.data_panel
+  trading.data_panel.snapshot
   trading.engine
   trading.portfolio
   trading.simulation
   trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
+  weinstein.snapshot_pipeline
+  weinstein.snapshot_runtime
   weinstein.types
   weinstein.screener
   weinstein.stage

@@ -2,6 +2,8 @@
 
 open Core
 module Bar_panels = Data_panel.Bar_panels
+module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 
 (* Local mirror of [Stage.ma_type] so the cache key can derive [hash]
    without modifying the [Stage] module's preprocess attributes. The
@@ -27,9 +29,17 @@ module Key = struct
 end
 
 type cached_ma = { values : float array; dates : Date.t array }
-type t = { panels : Bar_panels.t; table : cached_ma Key.Table.t }
 
-let create panels = { panels; table = Key.Table.create () }
+(* Phase F.3.b-1: backing-agnostic representation. [weekly_history_fn] is
+   the single seam — both [create] (panels) and [of_snapshot_views]
+   (snapshot) produce a closure of this shape that returns the symbol's
+   full weekly history (closes + dates, oldest first). The cache table
+   then memoises MA computations over those arrays, identically for both
+   backings. *)
+type t = {
+  weekly_history_fn : string -> float array * Date.t array;
+  table : cached_ma Key.Table.t;
+}
 
 (* Compute the MA series via the same kernels [Stage._compute_ma] uses.
    Replicating the kernel selection here keeps the cache co-located with
@@ -64,7 +74,7 @@ let _compute_ma_array ~(ma_type : Stage.ma_type) ~(period : int)
    available [as_of_day] (the last column of the panel's calendar). Returns
    the chronological closes + dates arrays (oldest first). Empty arrays
    when the symbol has no resident bars or the panel has zero days. *)
-let _full_weekly_view (panels : Bar_panels.t) (symbol : string) :
+let _panels_weekly_history (panels : Bar_panels.t) (symbol : string) :
     float array * Date.t array =
   let n_days = Bar_panels.n_days panels in
   if n_days = 0 then ([||], [||])
@@ -75,8 +85,52 @@ let _full_weekly_view (panels : Bar_panels.t) (symbol : string) :
     in
     (view.closes, view.dates)
 
-let _build_entry panels (ma_type : Stage.ma_type) (key : Key.t) : cached_ma =
-  let closes, dates = _full_weekly_view panels key.symbol in
+(* Read the symbol's full weekly history via [Snapshot_bar_views] over a
+   [Snapshot_callbacks.t]. The semantics match the panel reader's: chronological
+   (oldest first), close = adjusted close of the last trading day in each
+   ISO-week bucket. We fetch every available weekly bucket ending on or before
+   [max_as_of] via {!Snapshot_bar_views.weekly_bars_for} with
+   [n = Int.max_value]; that helper walks back a fixed 10-year calendar
+   window (matching {!Snapshot_bar_views.daily_bars_for}'s convention),
+   wide enough for any realistic backtest horizon, and short-circuits the
+   trailing truncation when [n] exceeds the available count.
+
+   ([Snapshot_bar_views.weekly_view_for] would compute the calendar span from
+   [n] via [(n * 8) + 7], which overflows for [n = Int.max_value]; the
+   [weekly_bars_for] entrypoint sidesteps that overflow by using a fixed
+   window.) *)
+let _snapshot_weekly_history (cb : Snapshot_callbacks.t) ~(max_as_of : Date.t)
+    (symbol : string) : float array * Date.t array =
+  let weekly =
+    Snapshot_bar_views.weekly_bars_for cb ~symbol ~n:Int.max_value
+      ~as_of:max_as_of
+  in
+  if List.is_empty weekly then ([||], [||])
+  else
+    let closes =
+      Array.of_list
+        (List.map weekly ~f:(fun b -> b.Types.Daily_price.adjusted_close))
+    in
+    let dates =
+      Array.of_list (List.map weekly ~f:(fun b -> b.Types.Daily_price.date))
+    in
+    (closes, dates)
+
+let create panels =
+  {
+    weekly_history_fn = _panels_weekly_history panels;
+    table = Key.Table.create ();
+  }
+
+let of_snapshot_views cb ~max_as_of =
+  {
+    weekly_history_fn = _snapshot_weekly_history cb ~max_as_of;
+    table = Key.Table.create ();
+  }
+
+let _build_entry weekly_history_fn (ma_type : Stage.ma_type) (key : Key.t) :
+    cached_ma =
+  let closes, dates = weekly_history_fn key.symbol in
   let values, ma_dates =
     _compute_ma_array ~ma_type ~period:key.period ~closes ~dates
   in
@@ -87,7 +141,7 @@ let ma_values_for t ~symbol ~(ma_type : Stage.ma_type) ~period =
   let key : Key.t = { symbol; ma_type = tag; period } in
   let entry =
     Hashtbl.find_or_add t.table key ~default:(fun () ->
-        _build_entry t.panels ma_type key)
+        _build_entry t.weekly_history_fn ma_type key)
   in
   (entry.values, entry.dates)
 
