@@ -679,44 +679,17 @@ let _make_friday_bars ~start_friday ~n ~start_price ~step =
         volume = 1_000_000;
       })
 
-(** Pack [(symbol, bars)] pairs into a {!Bar_panels.t}. The calendar is the
-    union of all dates (sorted, deduped). Mirrors the helper in
-    {!test_panel_callbacks.ml}. *)
-let _panels_of_symbols
+(** Last date across every bar in [symbols_with_bars]. Mirrors the calendar's
+    [last_date] without materialising a {!Bar_panels.t}. *)
+let _last_date_of_symbols
     (symbols_with_bars : (string * Types.Daily_price.t list) list) =
-  let universe = List.map symbols_with_bars ~f:fst in
-  let symbol_index =
-    match Data_panel.Symbol_index.create ~universe with
-    | Ok t -> t
-    | Error err -> failwith ("Symbol_index.create: " ^ err.Status.message)
-  in
-  let calendar =
-    symbols_with_bars
-    |> List.concat_map ~f:(fun (_, bars) ->
-        List.map bars ~f:(fun b -> b.Types.Daily_price.date))
-    |> List.dedup_and_sort ~compare:Date.compare
-    |> Array.of_list
-  in
-  let ohlcv =
-    Data_panel.Ohlcv_panels.create symbol_index ~n_days:(Array.length calendar)
-  in
-  let date_to_col = Hashtbl.create (module Date) in
-  Array.iteri calendar ~f:(fun i d ->
-      Hashtbl.add date_to_col ~key:d ~data:i
-      |> (ignore : [ `Ok | `Duplicate ] -> unit));
-  List.iter symbols_with_bars ~f:(fun (symbol, bars) ->
-      match Data_panel.Symbol_index.to_row symbol_index symbol with
-      | None -> ()
-      | Some row ->
-          List.iter bars ~f:(fun bar ->
-              match Hashtbl.find date_to_col bar.Types.Daily_price.date with
-              | None -> ()
-              | Some day ->
-                  Data_panel.Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day
-                    bar));
-  match Data_panel.Bar_panels.create ~ohlcv ~calendar with
-  | Ok p -> p
-  | Error err -> failwith ("Bar_panels.create: " ^ err.Status.message)
+  symbols_with_bars
+  |> List.concat_map ~f:(fun (_, bars) ->
+      List.map bars ~f:(fun b -> b.Types.Daily_price.date))
+  |> List.max_elt ~compare:Date.compare
+  |> function
+  | Some d -> d
+  | None -> failwith "_last_date_of_symbols: empty input"
 
 (** Build a 60-week Friday-anchored series with the given start_price + step.
     Positive [step] yields a Stage2-classifying series (rising MA, price above
@@ -737,16 +710,15 @@ let test_survivors_for_screening_filters_by_stage _ =
   let declining_b =
     _trending_series ~start_friday ~start_price:180.0 ~step:(-1.0)
   in
-  let panels =
-    _panels_of_symbols
-      [
-        ("RISE_A", rising_a);
-        ("RISE_B", rising_b);
-        ("FALL_A", declining_a);
-        ("FALL_B", declining_b);
-      ]
+  let symbols_with_bars =
+    [
+      ("RISE_A", rising_a);
+      ("RISE_B", rising_b);
+      ("FALL_A", declining_a);
+      ("FALL_B", declining_b);
+    ]
   in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
   let cfg =
     default_config
       ~universe:[ "RISE_A"; "RISE_B"; "FALL_A"; "FALL_B" ]
@@ -755,16 +727,9 @@ let test_survivors_for_screening_filters_by_stage _ =
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
-  (* Use the panel's last date as the screening day — guaranteed to land in
-     the calendar so [weekly_view_for] returns a non-empty view. *)
-  let last_date =
-    let n = Data_panel.Bar_panels.n_days panels in
-    let cal_view =
-      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"RISE_A" ~n:1
-        ~as_of_day:(n - 1)
-    in
-    cal_view.dates.(cal_view.n - 1)
-  in
+  (* Use the bars' last date as the screening day — guaranteed to land in the
+     calendar so [weekly_view_for] returns a non-empty view. *)
+  let last_date = _last_date_of_symbols symbols_with_bars in
   let survivors =
     survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
       ~current_date:last_date ()
@@ -816,11 +781,10 @@ let test_survivors_for_screening_drops_stage1_and_stage3 _ =
   let stage4_bars =
     _trending_series ~start_friday ~start_price:200.0 ~step:(-1.5)
   in
-  let panels =
-    _panels_of_symbols
-      [ ("BASE", stage1_bars); ("TOP", stage3_bars); ("DECLINE", stage4_bars) ]
+  let symbols_with_bars =
+    [ ("BASE", stage1_bars); ("TOP", stage3_bars); ("DECLINE", stage4_bars) ]
   in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
   let cfg =
     default_config ~universe:[ "BASE"; "TOP"; "DECLINE" ] ~index_symbol:"GSPCX"
   in
@@ -834,14 +798,7 @@ let test_survivors_for_screening_drops_stage1_and_stage3 _ =
         ("TOP", Weinstein_types.Stage2 { weeks_advancing = 10; late = false });
       ]
   in
-  let last_date =
-    let n = Data_panel.Bar_panels.n_days panels in
-    let cal_view =
-      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"DECLINE" ~n:1
-        ~as_of_day:(n - 1)
-    in
-    cal_view.dates.(cal_view.n - 1)
-  in
+  let last_date = _last_date_of_symbols symbols_with_bars in
   let survivors =
     survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
       ~current_date:last_date ()
@@ -895,18 +852,17 @@ let test_phase2_call_count_equals_survivor_count _ =
   let stage4_bars seed =
     _trending_series ~start_friday ~start_price:(200.0 +. seed) ~step:(-1.5)
   in
-  let panels =
-    _panels_of_symbols
-      [
-        ("BASE_A", stage1_bars 0.0);
-        ("BASE_B", stage1_bars 1.0);
-        ("TOP_A", stage3_bars 0.0);
-        ("TOP_B", stage3_bars 1.0);
-        ("DECLINE_A", stage4_bars 0.0);
-        ("DECLINE_B", stage4_bars 5.0);
-      ]
+  let symbols_with_bars =
+    [
+      ("BASE_A", stage1_bars 0.0);
+      ("BASE_B", stage1_bars 1.0);
+      ("TOP_A", stage3_bars 0.0);
+      ("TOP_B", stage3_bars 1.0);
+      ("DECLINE_A", stage4_bars 0.0);
+      ("DECLINE_B", stage4_bars 5.0);
+    ]
   in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
   let cfg =
     default_config
       ~universe:
@@ -923,14 +879,7 @@ let test_phase2_call_count_equals_survivor_count _ =
         ("TOP_B", Weinstein_types.Stage2 { weeks_advancing = 10; late = false });
       ]
   in
-  let last_date =
-    let n = Data_panel.Bar_panels.n_days panels in
-    let cal_view =
-      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"DECLINE_A" ~n:1
-        ~as_of_day:(n - 1)
-    in
-    cal_view.dates.(cal_view.n - 1)
-  in
+  let last_date = _last_date_of_symbols symbols_with_bars in
   let loaded_count = List.length cfg.universe in
   let survivors =
     survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
@@ -975,11 +924,10 @@ let test_survivors_for_screening_sector_filter_drops_weak_long _ =
   let rising_weak =
     _trending_series ~start_friday ~start_price:60.0 ~step:1.0
   in
-  let panels =
-    _panels_of_symbols
-      [ ("RISE_STRONG", rising_strong); ("RISE_WEAK", rising_weak) ]
+  let symbols_with_bars =
+    [ ("RISE_STRONG", rising_strong); ("RISE_WEAK", rising_weak) ]
   in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
   let cfg =
     default_config
       ~universe:[ "RISE_STRONG"; "RISE_WEAK" ]
@@ -988,14 +936,7 @@ let test_survivors_for_screening_sector_filter_drops_weak_long _ =
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
-  let last_date =
-    let n = Data_panel.Bar_panels.n_days panels in
-    let cal_view =
-      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"RISE_STRONG" ~n:1
-        ~as_of_day:(n - 1)
-    in
-    cal_view.dates.(cal_view.n - 1)
-  in
+  let last_date = _last_date_of_symbols symbols_with_bars in
   let sector_map =
     _sector_map_of_pairs
       [ ("RISE_STRONG", Screener.Strong); ("RISE_WEAK", Screener.Weak) ]
@@ -1019,11 +960,10 @@ let test_survivors_for_screening_sector_filter_drops_strong_short _ =
   let declining_strong =
     _trending_series ~start_friday ~start_price:180.0 ~step:(-1.0)
   in
-  let panels =
-    _panels_of_symbols
-      [ ("FALL_WEAK", declining_weak); ("FALL_STRONG", declining_strong) ]
+  let symbols_with_bars =
+    [ ("FALL_WEAK", declining_weak); ("FALL_STRONG", declining_strong) ]
   in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
   let cfg =
     default_config
       ~universe:[ "FALL_WEAK"; "FALL_STRONG" ]
@@ -1032,14 +972,7 @@ let test_survivors_for_screening_sector_filter_drops_strong_short _ =
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
-  let last_date =
-    let n = Data_panel.Bar_panels.n_days panels in
-    let cal_view =
-      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"FALL_WEAK" ~n:1
-        ~as_of_day:(n - 1)
-    in
-    cal_view.dates.(cal_view.n - 1)
-  in
+  let last_date = _last_date_of_symbols symbols_with_bars in
   let sector_map =
     _sector_map_of_pairs
       [ ("FALL_WEAK", Screener.Weak); ("FALL_STRONG", Screener.Strong) ]
@@ -1056,20 +989,13 @@ let test_survivors_for_screening_sector_filter_unknown_ticker_passes _ =
      [Screener._resolve_sector]'s [Neutral] fallback. *)
   let start_friday = Date.of_string "2024-01-05" in
   let rising = _trending_series ~start_friday ~start_price:50.0 ~step:0.8 in
-  let panels = _panels_of_symbols [ ("UNKNOWN", rising) ] in
-  let bar_reader = Bar_reader.of_panels panels in
+  let symbols_with_bars = [ ("UNKNOWN", rising) ] in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
   let cfg = default_config ~universe:[ "UNKNOWN" ] ~index_symbol:"GSPCX" in
   let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
-  let last_date =
-    let n = Data_panel.Bar_panels.n_days panels in
-    let cal_view =
-      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"UNKNOWN" ~n:1
-        ~as_of_day:(n - 1)
-    in
-    cal_view.dates.(cal_view.n - 1)
-  in
+  let last_date = _last_date_of_symbols symbols_with_bars in
   (* Empty sector_map: every ticker is "unknown" → all PASS. *)
   let sector_map = Hashtbl.create (module String) in
   let survivors =
@@ -1095,18 +1021,17 @@ let test_survivors_for_screening_pr_b_counter _ =
   let declining seed =
     _trending_series ~start_friday ~start_price:(200.0 +. seed) ~step:(-1.5)
   in
-  let panels =
-    _panels_of_symbols
-      [
-        ("RISE_STRONG_A", rising 0.0);
-        ("RISE_STRONG_B", rising 1.0);
-        ("RISE_WEAK_A", rising 2.0);
-        ("RISE_WEAK_B", rising 3.0);
-        ("FALL_STRONG", declining 0.0);
-        ("FALL_WEAK", declining 1.0);
-      ]
+  let symbols_with_bars =
+    [
+      ("RISE_STRONG_A", rising 0.0);
+      ("RISE_STRONG_B", rising 1.0);
+      ("RISE_WEAK_A", rising 2.0);
+      ("RISE_WEAK_B", rising 3.0);
+      ("FALL_STRONG", declining 0.0);
+      ("FALL_WEAK", declining 1.0);
+    ]
   in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
   let cfg =
     default_config
       ~universe:
@@ -1120,14 +1045,7 @@ let test_survivors_for_screening_pr_b_counter _ =
         ]
       ~index_symbol:"GSPCX"
   in
-  let last_date =
-    let n = Data_panel.Bar_panels.n_days panels in
-    let cal_view =
-      Data_panel.Bar_panels.weekly_view_for panels ~symbol:"RISE_STRONG_A" ~n:1
-        ~as_of_day:(n - 1)
-    in
-    cal_view.dates.(cal_view.n - 1)
-  in
+  let last_date = _last_date_of_symbols symbols_with_bars in
   let sector_map =
     _sector_map_of_pairs
       [

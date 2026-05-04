@@ -3,8 +3,6 @@ open Core
 open Matchers
 open Weinstein_strategy
 module Bar_panels = Data_panel.Bar_panels
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
 
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                              *)
@@ -35,50 +33,15 @@ let make_rising_bars ~start_date ~n ~start_price =
         volume = 1_000_000;
       })
 
-(** Build a [Bar_reader.t] backed by [Bar_panels] over a synthetic universe.
+(** Build a snapshot-backed [Bar_reader.t] over a synthetic universe.
     [symbols_with_bars] is [(symbol, bars)] pairs; each bar's date must be a
-    weekday since the calendar is built from those dates. Symbols absent from
-    the list (e.g., ones referenced by a sector_etfs config but with no
-    synthetic series) read as empty — the same contract the deleted
-    [Bar_history.create ()] satisfied. *)
+    weekday. Symbols absent from the list (e.g., ones referenced by a
+    sector_etfs config but with no synthetic series) read as empty — the same
+    contract the deleted [Bar_history.create ()] satisfied. *)
 let make_bar_reader ~symbols_with_bars =
-  let universe = List.map symbols_with_bars ~f:fst in
-  match universe with
+  match symbols_with_bars with
   | [] -> Bar_reader.empty ()
-  | _ ->
-      let symbol_index =
-        match Symbol_index.create ~universe with
-        | Ok t -> t
-        | Error err -> failwith ("Symbol_index.create: " ^ err.Status.message)
-      in
-      let calendar =
-        symbols_with_bars
-        |> List.concat_map ~f:(fun (_, bars) ->
-            List.map bars ~f:(fun b -> b.Types.Daily_price.date))
-        |> List.dedup_and_sort ~compare:Date.compare
-        |> Array.of_list
-      in
-      let n_days = Array.length calendar in
-      let ohlcv = Ohlcv_panels.create symbol_index ~n_days in
-      let calendar_idx = Hashtbl.create (module Date) in
-      Array.iteri calendar ~f:(fun i d ->
-          Hashtbl.add calendar_idx ~key:d ~data:i
-          |> (ignore : [ `Ok | `Duplicate ] -> unit));
-      List.iter symbols_with_bars ~f:(fun (symbol, bars) ->
-          match Symbol_index.to_row symbol_index symbol with
-          | None -> ()
-          | Some row ->
-              List.iter bars ~f:(fun (bar : Types.Daily_price.t) ->
-                  match Hashtbl.find calendar_idx bar.date with
-                  | None -> ()
-                  | Some day ->
-                      Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day bar));
-      let panels =
-        match Bar_panels.create ~ohlcv ~calendar with
-        | Ok p -> p
-        | Error err -> failwith ("Bar_panels.create: " ^ err.Status.message)
-      in
-      Bar_reader.of_panels panels
+  | _ -> Bar_reader.of_in_memory_bars symbols_with_bars
 
 (* ------------------------------------------------------------------ *)
 (* Canonical constants                                                  *)
