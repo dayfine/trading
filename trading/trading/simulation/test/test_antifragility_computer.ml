@@ -122,12 +122,12 @@ let test_linear_strategy_gamma_zero _ =
 
 (* ==================== Bucket asymmetry ==================== *)
 
-(** Build 10 paired samples (2 per quintile when sorted by benchmark).
-    Benchmarks (sorted): [-5, -4, -3, -2, -1, 1, 2, 3, 4, 5]
-    Buckets (Q1..Q5):   {-5,-4} {-3,-2} {-1,1} {2,3} {4,5}
-    Strategy values constructed so that bucket means are
-      Q1=10, Q2=2, Q3=2, Q4=2, Q5=10
-    BucketAsymmetry = (10 + 10) / (2 + 2 + 2) = 20 / 6 ≈ 3.3333. *)
+(* Build 10 paired samples (2 per quintile when sorted by benchmark).
+   Benchmarks (sorted): [-5, -4, -3, -2, -1, 1, 2, 3, 4, 5]
+   Buckets (Q1..Q5):   [-5,-4] [-3,-2] [-1,1] [2,3] [4,5]
+   Strategy values constructed so that bucket means are
+     Q1=10, Q2=2, Q3=2, Q4=2, Q5=10
+   BucketAsymmetry = (10 + 10) / (2 + 2 + 2) = 20 / 6 ~= 3.3333. *)
 let test_bucket_asymmetry_barbell _ =
   let bench = [ -5.0; -4.0; -3.0; -2.0; -1.0; 1.0; 2.0; 3.0; 4.0; 5.0 ] in
   (* Strategy returns in the same chronological position as the benchmarks

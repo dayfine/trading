@@ -398,13 +398,13 @@ let test_fit_gp_y_length_mismatch_raises _ =
   let f () =
     let _ =
       BO.fit_gp ~length_scales:[| 0.25 |] ~signal_variance:1.0
-        ~noise_variance:1e-6
-        ~observations_x:[| [| 0.0 |]; [| 1.0 |] |]
+        ~noise_variance:1e-6 ~observations_x:[| [| 0.0 |]; [| 1.0 |] |]
         ~observations_y:[| 0.0 |]
     in
     ()
   in
-  assert_raises (Invalid_argument "Bayesian_opt.fit_gp: y length disagrees with x") f
+  assert_raises
+    (Invalid_argument "Bayesian_opt.fit_gp: y length disagrees with x") f
 
 let test_fit_gp_row_dim_mismatch_raises _ =
   let f () =
@@ -419,7 +419,8 @@ let test_fit_gp_row_dim_mismatch_raises _ =
   in
   assert_raises
     (Invalid_argument
-       "Bayesian_opt.fit_gp: observation dim disagrees with length_scales") f
+       "Bayesian_opt.fit_gp: observation dim disagrees with length_scales")
+    f
 
 let test_expected_improvement_zero_at_constant_posterior _ =
   (* If the posterior σ² is ~0 everywhere (i.e. the test point is essentially

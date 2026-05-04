@@ -3,12 +3,15 @@
 ## Last updated: 2026-05-04
 
 ## Status
-IN_PROGRESS — M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03**: F.2 PR 1 (#797 Snapshot_bar_views shim), F.2 PR 2 (#800 strategy bar reads), F.2 PR 3 (#802 default-flip + `--csv-mode` opt-out) — snapshot mode is now the canonical runtime path. **Wiki+EODHD PR-A MERGED via #803** (Changes_parser + Reason_classifier; maintainer-driven on `feat/wiki-sp500-changes-parser`; orchestrator-dispatched feat-data agent on `feat/data-wiki-eodhd-pr-a` produced equivalent work but elected not to open a competing PR after detecting the duplication). Remaining: **Phase F.3 `Bar_panels.t` retirement** (gated on snapshot-mode-default soak); Wiki+EODHD PR-B/PR-C; Synth-v3; Norgate ingest. F.3 is gated on three verification follow-ups (V1 sp500 5y full-universe parity, V2 ±2w fuzz on snapshot mode, V3 numeric-key fuzz at scale paired with E3 sweep). Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
+IN_PROGRESS
+
+## Notes
+M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03**: F.2 PR 1 (#797 Snapshot_bar_views shim), F.2 PR 2 (#800 strategy bar reads), F.2 PR 3 (#802 default-flip + `--csv-mode` opt-out) — snapshot mode is now the canonical runtime path. **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). Remaining: **Phase F.3 `Bar_panels.t` retirement** in 4 sub-PRs (a-1 #825 done; a-2/3/4 pending); Synth-v3; Norgate ingest. F.3 is gated on three verification follow-ups (V1 sp500 5y full-universe parity, V2 ±2w fuzz on snapshot mode, V3 numeric-key fuzz at scale paired with E3 sweep). Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 Track created 2026-05-02 to absorb M5.3 (scale infra: streaming + Norgate) + M7.0 (data foundations: Norgate, multi-market, synthetic). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` + `dev/plans/m7-data-and-tuning-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.3 + M7.0 (added 2026-05-02).
 
 ## Interface stable
-NO — track is brand-new.
+NO
 
 ## Blocked on
 - None for first PR (Synth-v1 block bootstrap is independent).
