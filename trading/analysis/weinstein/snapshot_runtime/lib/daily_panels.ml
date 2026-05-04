@@ -160,39 +160,22 @@ let schema t = t.expected_schema
 
 (* --- Binary search over chronologically-ordered rows ----------------- *)
 
-(* Lowest index [i] in [rows[lo..hi)] such that [rows.(i).date >= target].
-   Returns [hi] when every row in the half-open range is strictly before
-   [target]. Pure: caller must ensure [rows] is sorted ascending by date. *)
-let _lower_bound (rows : Snapshot.t array) ~lo ~hi ~target =
-  let lo = ref lo and hi = ref hi in
-  while !lo < !hi do
-    let mid = (!lo + !hi) / 2 in
-    if Date.( < ) rows.(mid).date target then lo := mid + 1 else hi := mid
-  done;
-  !lo
-
-(* Lowest index [i] in [rows[lo..hi)] such that [rows.(i).date > target].
-   Returns [hi] when every row in the half-open range is at or before
-   [target]. Combined with {!_lower_bound} this gives an inclusive
-   [from..until] slice in O(log N). *)
-let _upper_bound (rows : Snapshot.t array) ~lo ~hi ~target =
-  let lo = ref lo and hi = ref hi in
-  while !lo < !hi do
-    let mid = (!lo + !hi) / 2 in
-    if Date.( <= ) rows.(mid).date target then lo := mid + 1 else hi := mid
-  done;
-  !lo
+(* Compare a [Snapshot.t] row to a target [Date.t] by date — the comparator
+   shape Core's [Array.binary_search] expects. *)
+let _compare_row_date (r : Snapshot.t) (d : Date.t) = Date.compare r.date d
 
 let read_today t ~symbol ~date =
   let open Result.Let_syntax in
   let%bind entry = _ensure_loaded t ~symbol in
-  let n = Array.length entry.rows in
-  let i = _lower_bound entry.rows ~lo:0 ~hi:n ~target:date in
-  if i < n && Date.equal entry.rows.(i).date date then Ok entry.rows.(i)
-  else
-    Status.error_not_found
-      (Printf.sprintf "Daily_panels.read_today: %s has no row for %s" symbol
-         (Date.to_string date))
+  match
+    Array.binary_search entry.rows ~compare:_compare_row_date `First_equal_to
+      date
+  with
+  | Some i -> Ok entry.rows.(i)
+  | None ->
+      Status.error_not_found
+        (Printf.sprintf "Daily_panels.read_today: %s has no row for %s" symbol
+           (Date.to_string date))
 
 let read_history t ~symbol ~from ~until =
   let open Result.Let_syntax in
@@ -200,8 +183,16 @@ let read_history t ~symbol ~from ~until =
   let n = Array.length entry.rows in
   if Date.( > ) from until || n = 0 then Ok []
   else
-    let lo = _lower_bound entry.rows ~lo:0 ~hi:n ~target:from in
-    let hi = _upper_bound entry.rows ~lo ~hi:n ~target:until in
+    let lo =
+      Array.binary_search entry.rows ~compare:_compare_row_date
+        `First_greater_than_or_equal_to from
+      |> Option.value ~default:n
+    in
+    let hi =
+      Array.binary_search entry.rows ~compare:_compare_row_date
+        `First_strictly_greater_than until
+      |> Option.value ~default:n
+    in
     if hi <= lo then Ok []
     else Ok (Array.to_list (Array.sub entry.rows ~pos:lo ~len:(hi - lo)))
 
