@@ -21,9 +21,6 @@
 open OUnit2
 open Core
 open Matchers
-module Bar_panels = Data_panel.Bar_panels
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
 module Bar_reader = Weinstein_strategy.Bar_reader
 module Stops_split_runner = Weinstein_strategy.Stops_split_runner
 module Position = Trading_strategy.Position
@@ -44,27 +41,9 @@ let _make_bar ~date ~open_ ~high ~low ~close ~adjusted_close ~volume =
       volume;
     }
 
-(** Pack a single-symbol bar series into a {!Bar_panels.t}. *)
-let _panels_of_one_symbol ~symbol bars =
-  let symbol_index =
-    match Symbol_index.create ~universe:[ symbol ] with
-    | Ok t -> t
-    | Error err -> failwith ("Symbol_index.create: " ^ err.Status.message)
-  in
-  let calendar =
-    List.map bars ~f:(fun b -> b.Types.Daily_price.date) |> Array.of_list
-  in
-  let ohlcv =
-    Ohlcv_panels.create symbol_index ~n_days:(Array.length calendar)
-  in
-  (match Symbol_index.to_row symbol_index symbol with
-  | None -> failwith "row not found"
-  | Some row ->
-      List.iteri bars ~f:(fun day bar ->
-          Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day bar));
-  match Bar_panels.create ~ohlcv ~calendar with
-  | Ok p -> p
-  | Error err -> failwith ("Bar_panels.create: " ^ err.Status.message)
+(** Build a snapshot-backed [Bar_reader.t] from a single-symbol bar series. *)
+let _bar_reader_of_one_symbol ~symbol bars =
+  Bar_reader.of_in_memory_bars [ (symbol, bars) ]
 
 (** Build a Holding-state position for [symbol] — minimal scaffold to feed
     [Stops_split_runner.adjust]. We only need [symbol]; the state machine
@@ -155,8 +134,7 @@ let _flat_bars =
 (* Pin: on a non-split day the stop_state is unchanged. *)
 let test_no_split_leaves_stop_state_untouched _ =
   let symbol = "AAPL" in
-  let panels = _panels_of_one_symbol ~symbol _flat_bars in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = _bar_reader_of_one_symbol ~symbol _flat_bars in
   let pos =
     _make_holding_pos ~symbol ~entry_price:100.0
       ~entry_date:(Date.of_string "2024-08-26")
@@ -177,8 +155,7 @@ let test_no_split_leaves_stop_state_untouched _ =
    $112. *)
 let test_forward_4_to_1_scales_initial_stop _ =
   let symbol = "AAPL" in
-  let panels = _panels_of_one_symbol ~symbol (_split_bars ~symbol) in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = _bar_reader_of_one_symbol ~symbol (_split_bars ~symbol) in
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
@@ -201,8 +178,7 @@ let test_forward_4_to_1_scales_initial_stop _ =
    preserved. *)
 let test_forward_4_to_1_scales_trailing_stop _ =
   let symbol = "AAPL" in
-  let panels = _panels_of_one_symbol ~symbol (_split_bars ~symbol) in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = _bar_reader_of_one_symbol ~symbol (_split_bars ~symbol) in
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
@@ -246,8 +222,7 @@ let test_forward_4_to_1_scales_trailing_stop _ =
 let test_split_day_no_spurious_stop_hit _ =
   let symbol = "AAPL" in
   let bars = _split_bars ~symbol in
-  let panels = _panels_of_one_symbol ~symbol bars in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = _bar_reader_of_one_symbol ~symbol bars in
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
@@ -295,8 +270,7 @@ let test_real_adverse_move_after_split_still_triggers _ =
         ~volume:4_000_000;
     ]
   in
-  let panels = _panels_of_one_symbol ~symbol bars in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = _bar_reader_of_one_symbol ~symbol bars in
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")
@@ -323,8 +297,7 @@ let test_real_adverse_move_after_split_still_triggers _ =
    no-op and [stop_states] stays empty. *)
 let test_position_without_stop_state_is_noop _ =
   let symbol = "AAPL" in
-  let panels = _panels_of_one_symbol ~symbol (_split_bars ~symbol) in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = _bar_reader_of_one_symbol ~symbol (_split_bars ~symbol) in
   let pos =
     _make_holding_pos ~symbol ~entry_price:500.0
       ~entry_date:(Date.of_string "2024-08-26")

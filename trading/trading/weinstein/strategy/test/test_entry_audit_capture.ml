@@ -10,9 +10,6 @@ open OUnit2
 open Core
 open Matchers
 open Weinstein_strategy
-module Bar_panels = Data_panel.Bar_panels
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
 module Position = Trading_strategy.Position
 
 (* ------------------------------------------------------------------ *)
@@ -26,34 +23,18 @@ let _ticker = "ZZZZ"
     list with this bar; [_effective_entry_price] reads its [close_price] as the
     realised entry. *)
 let _bar_reader_with_current_close ~current_date ~current_close : Bar_reader.t =
-  let symbol_index =
-    match Symbol_index.create ~universe:[ _ticker ] with
-    | Ok t -> t
-    | Error err ->
-        OUnit2.assert_failure ("Symbol_index.create: " ^ err.Status.message)
+  let bar : Types.Daily_price.t =
+    {
+      date = current_date;
+      open_price = current_close;
+      high_price = current_close *. 1.01;
+      low_price = current_close *. 0.99;
+      close_price = current_close;
+      adjusted_close = current_close;
+      volume = 1_000_000;
+    }
   in
-  let calendar = [| current_date |] in
-  let ohlcv = Ohlcv_panels.create symbol_index ~n_days:1 in
-  (match Symbol_index.to_row symbol_index _ticker with
-  | None -> OUnit2.assert_failure "to_row failed"
-  | Some row ->
-      Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day:0
-        {
-          Types.Daily_price.date = current_date;
-          open_price = current_close;
-          high_price = current_close *. 1.01;
-          low_price = current_close *. 0.99;
-          close_price = current_close;
-          adjusted_close = current_close;
-          volume = 1_000_000;
-        });
-  let panels =
-    match Bar_panels.create ~ohlcv ~calendar with
-    | Ok p -> p
-    | Error err ->
-        OUnit2.assert_failure ("Bar_panels.create: " ^ err.Status.message)
-  in
-  Bar_reader.of_panels panels
+  Bar_reader.of_in_memory_bars [ (_ticker, [ bar ]) ]
 
 (** Construct a minimal [Stage.result] for the analysis bundle. The fields are
     required by [scored_candidate] but [make_entry_transition] doesn't read them

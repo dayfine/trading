@@ -22,9 +22,6 @@ open OUnit2
 open Matchers
 open Weinstein_strategy
 open Weinstein_types
-module Bar_panels = Data_panel.Bar_panels
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
 module FL = Portfolio_risk.Force_liquidation
 
 (* ------------------------------------------------------------------ *)
@@ -51,43 +48,6 @@ let _make_daily_bars ~start_date ~n ~start_price ~step =
       let date = Date.add_days start_date i in
       let price = start_price +. (Float.of_int i *. step) in
       _make_daily_bar ~date ~price)
-
-(** Build a [Bar_panels.t] from [(symbol, daily_bars)] pairs. Mirrors the
-    construction used by [test_panel_callbacks.ml]. *)
-let _panels_of_symbols
-    (symbols_with_bars : (string * Types.Daily_price.t list) list) =
-  let universe = List.map symbols_with_bars ~f:fst in
-  let symbol_index =
-    match Symbol_index.create ~universe with
-    | Ok t -> t
-    | Error err -> assert_failure ("Symbol_index.create: " ^ err.Status.message)
-  in
-  let calendar =
-    symbols_with_bars
-    |> List.concat_map ~f:(fun (_, bars) ->
-        List.map bars ~f:(fun b -> b.Types.Daily_price.date))
-    |> List.dedup_and_sort ~compare:Date.compare
-    |> Array.of_list
-  in
-  let ohlcv =
-    Ohlcv_panels.create symbol_index ~n_days:(Array.length calendar)
-  in
-  let date_to_col = Hashtbl.create (module Date) in
-  Array.iteri calendar ~f:(fun i d ->
-      Hashtbl.add date_to_col ~key:d ~data:i
-      |> (ignore : [ `Ok | `Duplicate ] -> unit));
-  List.iter symbols_with_bars ~f:(fun (symbol, bars) ->
-      match Symbol_index.to_row symbol_index symbol with
-      | None -> ()
-      | Some row ->
-          List.iter bars ~f:(fun bar ->
-              match Hashtbl.find date_to_col bar.Types.Daily_price.date with
-              | None -> ()
-              | Some day ->
-                  Ohlcv_panels.write_row ohlcv ~symbol_index:row ~day bar));
-  match Bar_panels.create ~ohlcv ~calendar with
-  | Ok p -> p
-  | Error err -> assert_failure ("Bar_panels.create: " ^ err.Status.message)
 
 (** Find a Friday close to [start_date] (i.e. the next Friday on or after). *)
 let _next_friday d =
@@ -189,8 +149,7 @@ let _rising_index_reader ~end_date =
   let bars =
     _make_daily_bars ~start_date ~n:n_days ~start_price:100.0 ~step:1.0
   in
-  let panels = _panels_of_symbols [ (_index_symbol, bars) ] in
-  Bar_reader.of_panels panels
+  Bar_reader.of_in_memory_bars [ (_index_symbol, bars) ]
 
 (** B1 regression: the halt-reset fires on Friday even when the peak tracker
     enters the tick already in [Halted]. Pre-fix [_on_market_close] returned
@@ -241,8 +200,7 @@ let test_halt_persists_when_macro_stays_bearish _ =
   let bars =
     _make_daily_bars ~start_date ~n:n_days ~start_price:200.0 ~step:(-0.5)
   in
-  let panels = _panels_of_symbols [ (_index_symbol, bars) ] in
-  let bar_reader = Bar_reader.of_panels panels in
+  let bar_reader = Bar_reader.of_in_memory_bars [ (_index_symbol, bars) ] in
   let state = _fresh_state ~bar_reader in
   FL.Peak_tracker.mark_halted state.peak_tracker;
   let config =
