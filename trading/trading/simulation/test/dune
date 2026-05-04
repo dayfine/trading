@@ -115,9 +115,9 @@
   types
   status
   fpath
+  csv
   weinstein.data_source
   trading.base
-  trading.data_panel
   trading.engine
   trading.portfolio
   trading.simulation

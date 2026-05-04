@@ -311,7 +311,6 @@ val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->
   ?ad_bars:Macro.ad_bar list ->
   ?ticker_sectors:(string, string) Hashtbl.t ->
-  ?bar_panels:Data_panel.Bar_panels.t ->
   ?bar_reader:Bar_reader.t ->
   ?audit_recorder:Audit_recorder.t ->
   config ->
@@ -335,20 +334,17 @@ val make :
       {!Sector_map.load}. Used to expand the ETF-level sector analysis to
       individual stock tickers in the screener. Default: empty table (sector
       gate degrades to Neutral for all tickers).
-    @param bar_panels
-      Optional [Bar_panels.t] (panel-backed bar reader). When provided, the
-      strategy reads OHLCV bars from panel columns via {!Bar_reader.of_panels}.
-      When omitted, an empty reader is used — every read returns the empty list,
-      which is sufficient for tests that exercise control paths where no
-      panel-backed bar is ever consumed (empty universe, no held positions,
-      etc.). Production callers must always supply this OR [bar_reader].
     @param bar_reader
-      Optional pre-built {!Bar_reader.t}. When provided, takes precedence over
-      [bar_panels] — used by snapshot-mode runs (Phase F.2 PR 2) which build a
-      reader via {!Bar_reader.of_snapshot_views} instead of allocating a
-      {!Data_panel.Bar_panels.t}. The two parameters are mutually exclusive;
-      passing both is an unsupported combination (the strategy uses [bar_reader]
-      and ignores [bar_panels]).
+      Optional pre-built {!Bar_reader.t}. When omitted defaults to
+      {!Bar_reader.empty} — every read returns the empty list, sufficient for
+      tests that exercise control paths where no bar is ever consumed (empty
+      universe, no held positions, etc.). Production callers always supply one —
+      built via {!Bar_reader.of_snapshot_views} for snapshot-mode runs or
+      {!Bar_reader.of_in_memory_bars} for tests with in-memory fixtures.
+
+    Phase F.3.a-4 (2026-05-04) retired the legacy [?bar_panels] parameter + its
+    underlying [Bar_reader.of_panels] constructor; all bar reads now route
+    through the snapshot path.
     @param audit_recorder
       Optional callback bundle invoked at entry / exit decision sites
       ({!Audit_recorder.entry_event} / [exit_event]). When omitted defaults to

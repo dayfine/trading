@@ -1,44 +1,30 @@
 (** Bar source abstraction for the Weinstein strategy.
 
     Backend-agnostic facade over the OHLCV bar reads the strategy needs (daily
-    bar lists, weekly aggregates, daily / weekly views). Two backings are
-    available:
+    bar lists, weekly aggregates, daily / weekly views).
 
-    - {!of_panels} — backed by {!Data_panel.Bar_panels}, the in-memory panel
-      reader populated up-front from CSV at runner start. The default for
-      pre-Phase-F.2 runs.
     - {!of_snapshot_views} — backed by {!Snapshot_runtime.Snapshot_callbacks},
       the LRU-bounded daily-snapshot reader that streams rows from per-symbol
-      [.snap] files on demand. Used by snapshot-mode runs (Phase F.2 PR 2),
-      which skip the {!Bar_panels.t} build entirely.
+      [.snap] files on demand. The canonical production constructor for runs
+      with a pre-built snapshot directory.
+    - {!of_in_memory_bars} — convenience constructor that materialises a tmp
+      snapshot directory from in-memory [(symbol, bars)] pairs. Used by tests
+      and tools that hold bar histories in memory.
+    - {!empty} — closures return the empty list / empty view on every call.
+      Useful for tests that never reach a bar consumer.
 
     Internally [Bar_reader.t] is a record of closures; the constructors capture
     their backing's read primitives and produce identical-shape closures, so the
     strategy's downstream callees see one bar-reading API regardless of backing.
 
-    Stage 3 PR 3.2 collapsed the dual-backend ([Bar_history] | [Bar_panels])
-    abstraction into a single panel-backed reader. Phase F.2 PR 2 generalised
-    [t] to closure-based and re-introduced a second backing — but this time the
-    backings are purely an internal swap (no variant in [t], no per-call
-    dispatch) so callers can stay backend-agnostic and the hot-path remains a
-    direct closure invocation. *)
+    Phase F.3.a-4 (2026-05-04) retired [of_panels] and the legacy
+    {!Data_panel.Bar_panels} backing — every reader now routes through the
+    snapshot path. *)
 
 open Core
 
 type t
 (** Opaque bar source. *)
-
-val of_panels : ?ma_cache:Weekly_ma_cache.t -> Data_panel.Bar_panels.t -> t
-(** [of_panels ?ma_cache p] produces a reader backed by [Bar_panels]. The
-    [as_of] parameter of the read functions is mapped to a panel column via
-    {!Data_panel.Bar_panels.column_of_date}; when [as_of] is not in the
-    underlying calendar (e.g., a date before the backtest start) the reader
-    returns the empty list.
-
-    Stage 4 PR-D: an optional [ma_cache] piggy-backs on the reader so the
-    strategy's hot-path callees can fetch per-symbol MA values from the cache
-    without threading a separate parameter through every helper. Populated
-    lazily by {!Weekly_ma_cache.ma_values_for} on first access. *)
 
 val of_snapshot_views : Snapshot_runtime.Snapshot_callbacks.t -> t
 (** [of_snapshot_views cb] produces a reader backed by
@@ -47,28 +33,20 @@ val of_snapshot_views : Snapshot_runtime.Snapshot_callbacks.t -> t
     {!Snapshot_runtime.Daily_panels}); per-call cost is O(window-size) plus an
     at-most-one-symbol disk read on cache miss.
 
-    Returns the empty view / empty list under the same conditions as
-    {!of_panels}: unknown symbol, [as_of] before any resident snapshot row, or
-    any underlying field-read failure. The view types
-    ({!Data_panel.Bar_panels.weekly_view} / [daily_view]) are the same as those
-    returned by {!of_panels}, so {!Panel_callbacks} consumes either backing's
-    views without modification.
-
-    No [?ma_cache] parameter — the snapshot path does not currently use a
-    pre-computed weekly MA cache because {!Snapshot_runtime.Daily_panels} is
-    symbol-keyed (loading a symbol's full history on first access is cheap), so
-    MA recomputation per call is bounded. The cache hook can be revisited if the
-    snapshot hot path shows up in future profiles. *)
+    Returns the empty view / empty list when the symbol is unknown, [as_of] is
+    before any resident snapshot row, or any underlying field-read failure
+    fires. The view types ({!Data_panel.Bar_panels.weekly_view} / [daily_view])
+    are shared with the panel module's view definitions for historical reasons;
+    {!Panel_callbacks} consumes them directly. *)
 
 val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
 (** [of_in_memory_bars symbol_bars] produces a snapshot-backed reader from a
     list of in-memory [(symbol, bars)] pairs.
 
-    Phase F.3.a-1 step in retiring {!Data_panel.Bar_panels}. Tests and tools
-    that hold bar histories in memory (rather than reading them from a CSV
-    corpus) currently materialise a {!Bar_panels.t} via
-    {!Data_panel.Bar_panels.create} + {!of_panels}; this constructor lets the
-    same callers route through the snapshot path without any panel allocation.
+    Convenience constructor for tests and tools that hold bar histories in
+    memory (rather than reading them from a CSV corpus). Materialises a tmp
+    snapshot directory and routes reads through {!of_snapshot_views} — no
+    {!Data_panel.Bar_panels.t} allocation.
 
     Internally: 1. A fresh tmp directory is allocated via
     [Stdlib.Filename.temp_dir]. 2. For each [(symbol, bars)] pair,
@@ -96,18 +74,18 @@ val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
 
 val ma_cache : t -> Weekly_ma_cache.t option
 (** [ma_cache t] returns the cache the reader was constructed with, or [None]
-    when no cache was provided. The strategy's panel-callback constructors check
-    this and dispatch to the cache-aware path on [Some], falling back to inline
-    MA computation on [None]. *)
+    when no cache was provided. After Phase F.3.a-4 retired the panel-backed
+    [of_panels] constructor every reader sets this to [None]; the accessor and
+    the strategy's cache-aware paths remain wired but inactive until a follow-up
+    cleanup removes them. *)
 
 val empty : unit -> t
 (** [empty ()] produces a reader whose every read returns the empty list / empty
     view. Useful for tests that exercise control paths where the strategy never
     reaches a bar read (e.g., empty universe, no held positions).
 
-    Allocates no {!Bar_panels.t} and opens no snapshot directory — the closures
-    are direct empty-returning lambdas. Phase F.3.a-1 made this panel-free as a
-    step toward retiring {!Bar_panels}. *)
+    Opens no snapshot directory — the closures are direct empty-returning
+    lambdas. *)
 
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list
