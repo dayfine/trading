@@ -14,12 +14,15 @@ type input = {
   all_symbols : string list;
 }
 
-(* LRU cap for the snapshot cache. Generous for the typical small-universe
-   parity test (a few symbols × a few hundred days = handful of MB) and roomy
-   for a five-year sp500 golden (universe size in the hundreds × ~1.3K days
-   ≈ tens of MB). Tier-4 release-gate scenarios will revisit this when the
-   tier-4 spike lands; for the current default it is hard-coded. *)
-let _snapshot_cache_mb = 256
+(* LRU cap for the snapshot cache. Sized so a tier-3 sp500 run at a long
+   horizon fits resident; the prior cap was the binding constraint on
+   long backtests (cache thrashing on every Friday's universe pass — every
+   symbol forced a disk reload of the LRU evictee). The current value
+   leaves headroom for the typical universe-horizon mix; tier-4 release
+   gates plumb this through [Runner.config] when they land. Memory budget
+   is best-effort — a single oversized symbol stays resident even when
+   its bytes exceed the cap (see [_enforce_budget]). *)
+let _snapshot_cache_mb = 1024
 
 (* F.3.a-3 collapsed the previous CSV-vs-snapshot fork: both modes route
    through the snapshot path, so the strategy receives one reader shape and

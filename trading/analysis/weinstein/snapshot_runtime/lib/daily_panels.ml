@@ -24,9 +24,11 @@ let _per_row_overhead_bytes = 64
 let _per_symbol_overhead_bytes = 128
 
 (* Cached, decoded snapshot file for one symbol. [rows] is held by date order
-   (the writer enumerates dates chronologically). [bytes] is the cache-budget
-   contribution recomputed at insert time and never revised. *)
-type cache_entry = { symbol : string; rows : Snapshot.t list; bytes : int }
+   (the writer enumerates dates chronologically) as an array so [read_today] /
+   [read_history] can binary-search by date in O(log N) instead of walking the
+   list. [bytes] is the cache-budget contribution recomputed at insert time and
+   never revised. *)
+type cache_entry = { symbol : string; rows : Snapshot.t array; bytes : int }
 
 type t = {
   snapshot_dir : string;
@@ -48,8 +50,8 @@ let _resolve_path ~snapshot_dir (entry : Snapshot_manifest.file_metadata) =
 
 (* --- Byte estimation -------------------------------------------------- *)
 
-let _estimate_bytes ~(schema : Snapshot_schema.t) (rows : Snapshot.t list) =
-  let n_rows = List.length rows in
+let _estimate_bytes ~(schema : Snapshot_schema.t) (rows : Snapshot.t array) =
+  let n_rows = Array.length rows in
   let row_value_bytes = Snapshot_schema.n_fields schema * _bytes_per_float in
   _per_symbol_overhead_bytes
   + (n_rows * (row_value_bytes + _per_row_overhead_bytes))
@@ -102,14 +104,23 @@ let _insert_into_cache t ~symbol ~rows =
   _enforce_budget t;
   entry
 
-(* Cache miss: look up the manifest entry, load + insert. *)
+(* Cache miss: look up the manifest entry, load + insert. The on-disk row
+   list is converted to an array on insert (and sorted chronologically by
+   date) so subsequent reads can binary-search by date. The writer is
+   expected to emit rows in chronological order; the explicit sort is
+   defensive. *)
+let _sort_rows_by_date (rows : Snapshot.t array) =
+  Array.sort rows ~compare:(fun a b -> Date.compare a.date b.date)
+
 let _load_and_insert t ~symbol =
   match Snapshot_manifest.find t.manifest ~symbol with
   | None ->
       Status.error_not_found
         (Printf.sprintf "Daily_panels: symbol %s not in manifest" symbol)
   | Some metadata ->
-      Result.map (_load_symbol_file t metadata) ~f:(fun rows ->
+      Result.map (_load_symbol_file t metadata) ~f:(fun rows_list ->
+          let rows = Array.of_list rows_list in
+          _sort_rows_by_date rows;
           _insert_into_cache t ~symbol ~rows)
 
 (* Cache hit: promote to MRU and return the resident entry. *)
@@ -147,11 +158,20 @@ let create ~snapshot_dir ~manifest ~max_cache_mb =
 
 let schema t = t.expected_schema
 
+(* --- Binary search over chronologically-ordered rows ----------------- *)
+
+(* Compare a [Snapshot.t] row to a target [Date.t] by date — the comparator
+   shape Core's [Array.binary_search] expects. *)
+let _compare_row_date (r : Snapshot.t) (d : Date.t) = Date.compare r.date d
+
 let read_today t ~symbol ~date =
   let open Result.Let_syntax in
   let%bind entry = _ensure_loaded t ~symbol in
-  match List.find entry.rows ~f:(fun r -> Date.equal r.date date) with
-  | Some row -> Ok row
+  match
+    Array.binary_search entry.rows ~compare:_compare_row_date `First_equal_to
+      date
+  with
+  | Some i -> Ok entry.rows.(i)
   | None ->
       Status.error_not_found
         (Printf.sprintf "Daily_panels.read_today: %s has no row for %s" symbol
@@ -160,11 +180,21 @@ let read_today t ~symbol ~date =
 let read_history t ~symbol ~from ~until =
   let open Result.Let_syntax in
   let%bind entry = _ensure_loaded t ~symbol in
-  let in_range (r : Snapshot.t) =
-    Date.( >= ) r.date from && Date.( <= ) r.date until
-  in
-  let filtered = List.filter entry.rows ~f:in_range in
-  Ok (List.sort filtered ~compare:(fun a b -> Date.compare a.date b.date))
+  let n = Array.length entry.rows in
+  if Date.( > ) from until || n = 0 then Ok []
+  else
+    let lo =
+      Array.binary_search entry.rows ~compare:_compare_row_date
+        `First_greater_than_or_equal_to from
+      |> Option.value ~default:n
+    in
+    let hi =
+      Array.binary_search entry.rows ~compare:_compare_row_date
+        `First_strictly_greater_than until
+      |> Option.value ~default:n
+    in
+    if hi <= lo then Ok []
+    else Ok (Array.to_list (Array.sub entry.rows ~pos:lo ~len:(hi - lo)))
 
 let cache_bytes t = t.bytes
 
