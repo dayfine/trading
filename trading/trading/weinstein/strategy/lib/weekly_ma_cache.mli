@@ -43,7 +43,23 @@
 
     Sized memory: [n_symbols] × (per-symbol full weekly history × 8 bytes ×
     n_distinct_(ma_type, period)_combos). For 300 symbols × 312 weeks × 1 combo
-    = ~750 KB total — negligible. *)
+    = ~750 KB total — negligible.
+
+    {2 Backings (Phase F.3.b-1)}
+
+    Two constructors today, semantically equivalent on bit-equal inputs:
+
+    - {!create} — legacy {!Data_panel.Bar_panels} backing. Reads weekly history
+      via [Bar_panels.weekly_view_for]. Slated for removal once every caller
+      migrates to {!of_snapshot_views}.
+    - {!of_snapshot_views} — snapshot backing. Reads weekly history via
+      {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} over a
+      {!Snapshot_runtime.Snapshot_callbacks.t}. The canonical production
+      constructor for runs with a pre-built snapshot directory.
+
+    Both produce bit-equal MA / dates arrays for the same
+    ([symbol, ma_type, period]) key when the underlying bar history is identical
+    (parity test: {!Test_weekly_ma_cache.Test_snapshot_parity}). *)
 
 open Core
 module Bar_panels = Data_panel.Bar_panels
@@ -54,7 +70,27 @@ type t
 val create : Bar_panels.t -> t
 (** [create panels] builds an empty cache backed by [panels]. The cache holds a
     reference to [panels] so subsequent [ma_values_for] calls can read the
-    symbol's full weekly history on demand. *)
+    symbol's full weekly history on demand.
+
+    Phase F.3.b-1: legacy backing; will be removed in F.3.b-N once every caller
+    migrates to {!of_snapshot_views}. *)
+
+val of_snapshot_views :
+  Snapshot_runtime.Snapshot_callbacks.t -> max_as_of:Date.t -> t
+(** [of_snapshot_views cb ~max_as_of] builds an empty cache backed by [cb]. The
+    cache holds a reference to [cb] so subsequent [ma_values_for] calls can read
+    the symbol's full weekly history on demand.
+
+    [max_as_of] is the upper-bound date for the weekly history reads — it is
+    passed as [as_of] to {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for}
+    along with [n = Int.max_value] to fetch every weekly bucket on or before
+    [max_as_of]. Callers typically pass the last calendar date of the backtest
+    (the snapshot directory's terminal date), matching the panel-backed path's
+    "use the last column of the calendar" convention.
+
+    The returned cache is semantically equivalent to {!create} on the same
+    underlying bar history: same MA values, same dates, same memoisation
+    behaviour. *)
 
 val ma_values_for :
   t ->
@@ -68,12 +104,10 @@ val ma_values_for :
     at least [period] weeks, otherwise both arrays are empty.
 
     On first call for [(symbol, ma_type, period)] the cache reads the symbol's
-    full weekly history from the underlying [Bar_panels] (using
-    [as_of_day = n_days - 1], the last column of the panel's calendar — which
-    holds the full backtest range), computes the MA via the same kernel
-    [Stage._compute_ma] uses ([Sma.calculate_sma] / [Sma.calculate_weighted_ma]
-    / [Ema.calculate_ema]), and stores the result. Subsequent calls return the
-    cached arrays directly.
+    full weekly history from the underlying backing (panels or snapshot),
+    computes the MA via the same kernel [Stage._compute_ma] uses
+    ([Sma.calculate_sma] / [Sma.calculate_weighted_ma] / [Ema.calculate_ema]),
+    and stores the result. Subsequent calls return the cached arrays directly.
 
     The returned arrays are owned by the cache; do not mutate them. *)
 
