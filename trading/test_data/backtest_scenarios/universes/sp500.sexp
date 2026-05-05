@@ -2,7 +2,12 @@
 ;; bar-data inventory under data/. Generated 2026-05-03 by
 ;; dev/scripts/build_sp500_universe.sh.
 ;;
-;; 503 / 503 S&P 500 symbols have bar data.
+;; 500 symbols (was 503; dropped GOOG/FOX/NWS share-class duplicates of
+;; GOOGL/FOXA/NWSA on 2026-05-04 to prevent the strategy from
+;; double-loading the same underlying issuer — Class-A voting symbol
+;; kept by convention).
+;;
+;; Original: 503 / 503 S&P 500 symbols have bar data (pre-dedup).
 ;;
 ;; Symbol convention: dots replaced with dashes (EODHD: BF.B -> BF-B).
 ;; Used by goldens-sp500/ scenarios as a regression-pinned trading +
@@ -205,7 +210,6 @@
   ((symbol FISV   ) (sector "Financials"))
   ((symbol FITB   ) (sector "Financials"))
   ((symbol FIX    ) (sector "Industrials"))
-  ((symbol FOX    ) (sector "Communication Services"))
   ((symbol FOXA   ) (sector "Communication Services"))
   ((symbol FRT    ) (sector "Real Estate"))
   ((symbol FSLR   ) (sector "Information Technology"))
@@ -223,7 +227,6 @@
   ((symbol GLW    ) (sector "Information Technology"))
   ((symbol GM     ) (sector "Consumer Discretionary"))
   ((symbol GNRC   ) (sector "Industrials"))
-  ((symbol GOOG   ) (sector "Communication Services"))
   ((symbol GOOGL  ) (sector "Communication Services"))
   ((symbol GPC    ) (sector "Consumer Discretionary"))
   ((symbol GPN    ) (sector "Financials"))
@@ -352,7 +355,6 @@
   ((symbol NUE    ) (sector "Materials"))
   ((symbol NVDA   ) (sector "Information Technology"))
   ((symbol NVR    ) (sector "Consumer Discretionary"))
-  ((symbol NWS    ) (sector "Communication Services"))
   ((symbol NWSA   ) (sector "Communication Services"))
   ((symbol NXPI   ) (sector "Information Technology"))
   ((symbol O      ) (sector "Real Estate"))
