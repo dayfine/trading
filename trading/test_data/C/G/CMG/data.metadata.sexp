@@ -1,0 +1,8 @@
+((symbol                      CMG)
+ (last_verified               2026-05-03)
+ (verification_status         Verified)
+ (data_start_date             2006-01-26)
+ (data_end_date               2026-05-01)
+ (has_volume                  true)
+ (last_n_prices_avg_below_10  false)
+ (last_n_prices_avg_above_500 false))

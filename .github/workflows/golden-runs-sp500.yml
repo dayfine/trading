@@ -1,0 +1,85 @@
+# SP500 golden-run postsubmit: runs sp500-2019-2023 (and any other
+# perf-tier: 3 scenarios under goldens-sp500/) on every push to main.
+#
+# This is a POSTSUBMIT gate — it runs after merge, not before. Its purpose
+# is to catch strategy regressions in the canonical benchmark within hours
+# of a merge, not to block PRs from landing.
+#
+# Non-blocking by design: continue-on-error: true for the initial soak period
+# (~4 weeks). Flip to false after 4 consecutive clean runs at ≤60 min wall
+# time. See dev/notes/ci-golden-runs-design-2026-05-06.md §Phase 1.
+#
+# Prerequisite: bar data for the SP500 universe must be committed under
+# trading/test_data/. See dev/scripts/prepare_ci_data.sh for the one-time
+# data preparation step. The data is a date-filtered snapshot (2009-01-01+)
+# of the full EODHD bars from /data/. Once committed, update quarterly or
+# when dev/scripts/build_sp500_universe.sh is re-run with new symbols.
+#
+# Expected runtimes (GHA ubuntu-latest, post-#845 panel perf fix):
+#   sp500-2019-2023:      ~15–25 min
+#   sp500-2019-2023-long-only: ~15–25 min (if present)
+# Budget: 120 min total covers both scenarios with 60 min headroom.
+#
+# Scenarios discovered: any *.sexp with ";; perf-tier: 3" under
+# trading/test_data/backtest_scenarios/goldens-sp500/
+# See dev/scripts/golden_sp500_postsubmit.sh for the runner logic.
+name: golden-runs-sp500
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  golden-sp500:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      TRADING_IN_CONTAINER: "1"
+      # TRADING_DATA_DIR points at trading/test_data/ which contains:
+      #   - Bar CSVs for 500 SP500 symbols (trimmed 2009+, ~84 MB committed)
+      #   - backtest_scenarios/ subdirectory with universe + scenario files
+      # The scenario_runner resolves bar data AND scenario fixtures from this dir.
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache _build
+        uses: actions/cache@v4
+        with:
+          path: trading/_build
+          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          restore-keys: |
+            dune-${{ runner.os }}-
+
+      - name: Run SP500 golden postsubmit
+        id: golden_sp500
+        # Non-blocking during initial soak. Flip to false after 4 clean runs.
+        continue-on-error: true
+        run: dev/scripts/golden_sp500_postsubmit.sh
+
+      - name: Publish summary
+        if: always()
+        run: |
+          summary_file=$(ls -1t dev/perf/golden-sp500-postsubmit-*/summary.txt 2>/dev/null | head -1)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            {
+              echo "## SP500 golden postsubmit"
+              echo ""
+              echo '```'
+              cat "$summary_file"
+              echo '```'
+            } >>"$GITHUB_STEP_SUMMARY"
+          else
+            echo "SP500 golden postsubmit: no summary produced." >>"$GITHUB_STEP_SUMMARY"
+          fi
