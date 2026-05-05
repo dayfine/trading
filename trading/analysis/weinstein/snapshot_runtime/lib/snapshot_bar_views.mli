@@ -118,17 +118,26 @@ val daily_view_for :
   symbol:string ->
   as_of:Core.Date.t ->
   lookback:int ->
+  calendar:Core.Date.t array ->
   daily_view
-(** [daily_view_for cb ~symbol ~as_of ~lookback] returns up to [lookback] daily
-    bars ending on or before [as_of] for [symbol].
+(** [daily_view_for cb ~symbol ~as_of ~lookback ~calendar] returns up to
+    [lookback] daily bars ending at [as_of] for [symbol], walking [calendar]'s
+    columns to determine which dates to include.
 
-    Reads the [High], [Low], [Close] field histories from [cb] over a calendar
-    window slightly longer than [lookback] (to account for weekends / holidays
-    in the date-keyed range), aligns them by date, drops bars where [Close] is
-    NaN, and truncates to the trailing [lookback] entries.
+    The [~calendar] parameter is the trading-day calendar (Mon–Fri including
+    holidays in the production runner — see [Panel_runner._build_calendar]) that
+    the panel-backed reader uses internally. Passing the same calendar here
+    makes the snapshot path's window definition bit-equal to
+    [Bar_panels.daily_view_for]'s, closing #848. The fix walks
+    [calendar.(as_of_idx - lookback + 1 .. as_of_idx)], looks up the snapshot
+    row for each calendar date (NaN-passthrough on missing rows), and NaN-skips
+    per close cell — the same per-cell semantics as the panel path's
+    [_read_row_cells].
 
     Returns the empty view ([n_days = 0], all arrays empty) when:
     - [lookback <= 0]
+    - [as_of] is not present in [calendar] (matches
+      [Bar_panels.column_of_date]'s exact-match contract)
     - [symbol] is not in the snapshot manifest
     - no resident snapshot rows fall in the calendar window
     - any required field read fails. *)
@@ -150,11 +159,12 @@ val daily_bars_for :
     backtest history), aligns them by date, drops bars where [Close] is NaN, and
     returns the assembled list.
 
-    {b open_price NaN.} The [Snapshot_schema.Open] field is not currently
-    surfaced — every returned bar has [open_price = Float.nan]. None of the
-    in-tree consumers of {!Bar_reader.daily_bars_for} read [open_price], so this
-    is sound today; if a future caller needs it, fold [Open] into
-    [_assemble_daily_bars]'s input set.
+    {b open_price.} The [Snapshot_schema.Open] field is read from the snapshot
+    row alongside the other OHLCV fields, so [open_price] matches the panel
+    path's [Bar_panels.daily_bars_for] cell-for-cell. Days where the snapshot
+    has no row degrade to [Float.nan], mirroring the panel's NaN cell. (Pre-#848
+    the field was hard-coded to NaN; the schema has included [Open] since Phase
+    A.1, the read just wasn't wired.)
 
     Returns the empty list when:
     - [symbol] is not in the snapshot manifest
@@ -180,10 +190,19 @@ val low_window :
   symbol:string ->
   as_of:Core.Date.t ->
   len:int ->
+  calendar:Core.Date.t array ->
   (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t option
-(** [low_window cb ~symbol ~as_of ~len] returns a freshly-allocated
-    [Bigarray.Array1.t] holding [len] daily [Low] values ending on [as_of]
-    (inclusive).
+(** [low_window cb ~symbol ~as_of ~len ~calendar] returns a freshly-allocated
+    [Bigarray.Array1.t] holding [len] daily [Low] values over the calendar
+    columns [as_of_idx - len + 1 .. as_of_idx], where [as_of_idx] is the index
+    of [as_of] in [calendar].
+
+    The [~calendar] parameter is the trading-day calendar (Mon–Fri including
+    holidays) the panel-backed reader uses internally — passing the same
+    calendar makes the snapshot path bit-equal to {!Bar_panels.low_window}'s
+    panel-slice semantics (#848 forward fix). Cells where the snapshot has no
+    row for the calendar date are filled with [Float.nan]; this matches the
+    panel's NaN-cell behaviour.
 
     Unlike {!Data_panel.Bar_panels.low_window}, the result is a copy, not a
     zero-copy panel slice — the snapshot path has no contiguous source array to
@@ -191,9 +210,10 @@ val low_window :
 
     Returns [None] when:
     - [len <= 0]
-    - [symbol] is not in the snapshot manifest
-    - the snapshot has fewer than [len] resident bars ending at [as_of]
-    - the [Low] field read fails.
+    - [as_of] is not present in [calendar]
+    - the window underflows the calendar's start ([as_of_idx - len + 1 < 0])
+    - [symbol] is not in the snapshot manifest (the underlying
+      {!Snapshot_callbacks.read_field_history} returns [Error]).
 
     [Some buf] guarantees [Bigarray.Array1.dim buf = len], with the most recent
     low at index [len - 1] (chronological order). *)

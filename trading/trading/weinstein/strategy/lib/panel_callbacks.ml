@@ -434,6 +434,8 @@ let macro_callbacks_of_snapshot_views ?ma_cache ~(config : Macro.config)
     ~globals:global_views ~ad_bars ()
 
 let support_floor_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t)
-    ~symbol ~as_of ~lookback : Weinstein_stops.callbacks =
-  let view = Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback in
+    ~symbol ~as_of ~lookback ~calendar : Weinstein_stops.callbacks =
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback ~calendar
+  in
   support_floor_callbacks_of_daily_view view

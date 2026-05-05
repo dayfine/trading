@@ -254,6 +254,7 @@ let test_daily_view_parity_full _ =
       in
       let snapshot_view =
         Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback:30
+          ~calendar:_calendar_60
       in
       _assert_daily_views_equal panel_view snapshot_view)
 
@@ -266,6 +267,7 @@ let test_daily_view_parity_short_lookback _ =
   in
   let snapshot_view =
     Snapshot_bar_views.daily_view_for cb ~symbol:"AAA" ~as_of ~lookback:7
+      ~calendar:_calendar_60
   in
   _assert_daily_views_equal panel_view snapshot_view
 
@@ -281,6 +283,7 @@ let test_low_window_parity _ =
   let panel = Bar_panels.low_window bp ~symbol:"CCC" ~as_of_day ~len:30 in
   let snapshot =
     Snapshot_bar_views.low_window cb ~symbol:"CCC" ~as_of ~len:30
+      ~calendar:_calendar_60
   in
   match (panel, snapshot) with
   | Some p, Some s ->
@@ -301,9 +304,13 @@ let test_unknown_symbol_yields_empty_views _ =
   assert_that weekly.n (equal_to 0);
   let daily =
     Snapshot_bar_views.daily_view_for cb ~symbol:"ZZZ" ~as_of ~lookback:10
+      ~calendar:_calendar_60
   in
   assert_that daily.n_days (equal_to 0);
-  let low = Snapshot_bar_views.low_window cb ~symbol:"ZZZ" ~as_of ~len:5 in
+  let low =
+    Snapshot_bar_views.low_window cb ~symbol:"ZZZ" ~as_of ~len:5
+      ~calendar:_calendar_60
+  in
   assert_that low is_none
 
 let test_pre_history_as_of_yields_empty_views _ =
@@ -315,9 +322,13 @@ let test_pre_history_as_of_yields_empty_views _ =
   assert_that weekly.n (equal_to 0);
   let daily =
     Snapshot_bar_views.daily_view_for cb ~symbol:"AAA" ~as_of:pre ~lookback:5
+      ~calendar:_calendar_60
   in
   assert_that daily.n_days (equal_to 0);
-  let low = Snapshot_bar_views.low_window cb ~symbol:"AAA" ~as_of:pre ~len:5 in
+  let low =
+    Snapshot_bar_views.low_window cb ~symbol:"AAA" ~as_of:pre ~len:5
+      ~calendar:_calendar_60
+  in
   assert_that low is_none
 
 let test_zero_n_or_lookback_yields_empty_views _ =
@@ -329,9 +340,13 @@ let test_zero_n_or_lookback_yields_empty_views _ =
   assert_that weekly.n (equal_to 0);
   let daily =
     Snapshot_bar_views.daily_view_for cb ~symbol:"AAA" ~as_of ~lookback:0
+      ~calendar:_calendar_60
   in
   assert_that daily.n_days (equal_to 0);
-  let low = Snapshot_bar_views.low_window cb ~symbol:"AAA" ~as_of ~len:0 in
+  let low =
+    Snapshot_bar_views.low_window cb ~symbol:"AAA" ~as_of ~len:0
+      ~calendar:_calendar_60
+  in
   assert_that low is_none
 
 (* NaN handling: build a fixture where one mid-history close is NaN. The
@@ -373,18 +388,154 @@ let test_nan_close_skipped_in_daily_view _ =
   in
   let snapshot_view =
     Snapshot_bar_views.daily_view_for cb ~symbol:"DDD" ~as_of ~lookback:30
+      ~calendar:_calendar_60
   in
-  (* Both should skip the NaN-close bar. The panel's lookback walks back 30
-     calendar columns; with one NaN-close skipped, both should report 30
-     trading days minus 1 = at most 30 entries actually present (since the
-     calendar has 31 columns ending at as_of, and one is NaN). The exact
-     count may differ from the panel impl by edge effects of the
-     [_daily_calendar_span] approximation; the load-bearing assertion is
-     that the snapshot view excludes the NaN date. *)
+  (* Both should skip the NaN-close bar. The panel walks back 30 calendar
+     columns from as_of; the snapshot path now walks the same calendar
+     (#848 forward fix), so both report exactly the same n_days = (calendar
+     columns in window) - (NaN-close cells in window). The load-bearing
+     assertion is bit-equal n_days plus the NaN date being excluded from
+     the snapshot view. *)
   assert_that snapshot_view.n_days (equal_to panel_view.n_days);
   let snapshot_dates_set = Date.Set.of_array snapshot_view.dates in
   assert_that (Set.mem snapshot_dates_set nan_date) (equal_to false);
   _assert_daily_views_equal panel_view snapshot_view
+
+(* --- #848 forward-fix regression tests ----------------------------- *)
+(* These tests pin the calendar-column-walking semantics introduced by
+   the #848 forward fix. The pre-fix snapshot path walked
+   [_daily_calendar_span(lookback)] calendar days then took the trailing
+   [lookback] actual rows; the panel path walks [lookback] calendar
+   columns of its own calendar and NaN-skips. The two definitions diverge
+   when the snapshot has fewer actual rows than the panel has calendar
+   columns (every holiday in the window). The fix makes the snapshot
+   take the panel's calendar as a parameter and walk it bit-identically.
+
+   The fixture below builds a calendar with a "holiday gap" — a calendar
+   weekday with no snapshot row for the symbol — and verifies:
+   - daily_view_for n_days < lookback by exactly the gap size, matching
+     panel semantics
+   - low_window includes a NaN cell at the gap day, matching panel slice
+     semantics (Bar_panels initialises panel cells to NaN via
+     Ohlcv_panels.create) *)
+
+(* A 20-weekday calendar starting Tue 2024-01-02. Within this calendar
+   we'll build snapshot bars for every weekday EXCEPT day index 10 (a
+   simulated holiday; symbol has no row there). The panel built from the
+   same fixture leaves a NaN cell at column 10 for the symbol. *)
+let _calendar_20 =
+  Array.of_list (_weekdays_starting ~start:_start ~n_trading_days:20)
+
+let _holiday_gap_idx = 10
+
+let _bars_with_holiday_gap ~symbol ~date =
+  let symbol_seed = match symbol with "EEE" -> 40 | _ -> -1000 in
+  if symbol_seed < 0 then None
+  else
+    match Array.findi _calendar_20 ~f:(fun _ d -> Date.equal d date) with
+    | Some (i, _) when i = _holiday_gap_idx -> None
+    | Some (i, _) -> Some (_make_bar ~date ~symbol_seed ~day_offset:i)
+    | None -> None
+
+let test_daily_view_walks_calendar_with_holiday_gap _ =
+  let symbols = [ "EEE" ] in
+  let bp =
+    _build_bar_panels ~symbols ~calendar:_calendar_20
+      ~bars_for_symbol:_bars_with_holiday_gap
+  in
+  let cb =
+    _build_snapshot_callbacks ~symbols ~calendar:_calendar_20
+      ~bars_for_symbol:_bars_with_holiday_gap
+  in
+  let as_of = _calendar_20.(15) in
+  let as_of_day = _column_of_date_exn bp as_of in
+  (* lookback=10 covers calendar indices 6..15; index 10 is the gap. The
+     panel produces 9 non-NaN bars; the snapshot must produce the same 9
+     bars with the same dates. *)
+  let panel_view =
+    Bar_panels.daily_view_for bp ~symbol:"EEE" ~as_of_day ~lookback:10
+  in
+  let snap_view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"EEE" ~as_of ~lookback:10
+      ~calendar:_calendar_20
+  in
+  assert_that snap_view.n_days (equal_to 9);
+  _assert_daily_views_equal panel_view snap_view;
+  let gap_date = _calendar_20.(_holiday_gap_idx) in
+  let snap_dates_set = Date.Set.of_array snap_view.dates in
+  assert_that (Set.mem snap_dates_set gap_date) (equal_to false)
+
+let test_low_window_walks_calendar_with_holiday_gap _ =
+  let symbols = [ "EEE" ] in
+  let bp =
+    _build_bar_panels ~symbols ~calendar:_calendar_20
+      ~bars_for_symbol:_bars_with_holiday_gap
+  in
+  let cb =
+    _build_snapshot_callbacks ~symbols ~calendar:_calendar_20
+      ~bars_for_symbol:_bars_with_holiday_gap
+  in
+  let as_of = _calendar_20.(15) in
+  let as_of_day = _column_of_date_exn bp as_of in
+  let panel = Bar_panels.low_window bp ~symbol:"EEE" ~as_of_day ~len:10 in
+  let snap =
+    Snapshot_bar_views.low_window cb ~symbol:"EEE" ~as_of ~len:10
+      ~calendar:_calendar_20
+  in
+  match (panel, snap) with
+  | Some p, Some s ->
+      let pa = Array.of_list (_bigarray_to_list p) in
+      let sa = Array.of_list (_bigarray_to_list s) in
+      _float_arrays_bit_equal pa sa ~msg:"low_window with gap";
+      (* The gap day at calendar index 10 is at offset (10 - 6) = 4 in
+         the [len:10] window starting at index 6. Both panel and snapshot
+         must report NaN at this offset. *)
+      assert_that (Float.is_nan sa.(4)) (equal_to true);
+      assert_that (Float.is_nan pa.(4)) (equal_to true)
+  | _ -> assert_failure "expected Some on both sides"
+
+let test_daily_bars_for_open_price_populated _ =
+  (* Pin the Open-field fix: pre-#848 the snapshot path returned bars
+     with [open_price = Float.nan]; the post-fix path reads
+     [Snapshot_schema.Open] from the snapshot row. For the standard
+     3-symbol fixture (no NaN, no gaps), every snapshot bar should match
+     the panel bar on every OHLCV field including [open_price]. *)
+  let bp, cb = _setup_3sym () in
+  let as_of = _calendar_60.(Array.length _calendar_60 - 1) in
+  let as_of_day = _column_of_date_exn bp as_of in
+  let panel_bars = Bar_panels.daily_bars_for bp ~symbol:"AAA" ~as_of_day in
+  let snap_bars = Snapshot_bar_views.daily_bars_for cb ~symbol:"AAA" ~as_of in
+  assert_that (List.length snap_bars) (equal_to (List.length panel_bars));
+  List.iter2_exn panel_bars snap_bars ~f:(fun p s ->
+      assert_that s.Types.Daily_price.open_price (float_equal p.open_price))
+
+let test_daily_bars_for_open_price_is_not_nan _ =
+  (* Stronger assertion: every bar's open_price is finite. This catches
+     a regression where Open is read but always returns NaN (e.g. the
+     wrong schema field was wired). *)
+  let _, cb = _setup_3sym () in
+  let as_of = _calendar_60.(Array.length _calendar_60 - 1) in
+  let snap_bars = Snapshot_bar_views.daily_bars_for cb ~symbol:"BBB" ~as_of in
+  assert_that (List.length snap_bars) (gt (module Int_ord) 0);
+  List.iter snap_bars ~f:(fun bar ->
+      assert_that
+        (Float.is_nan bar.Types.Daily_price.open_price)
+        (equal_to false))
+
+let test_daily_view_as_of_not_in_calendar_yields_empty _ =
+  let _, cb = _setup_3sym () in
+  (* A weekday that is NOT in the 60-day calendar (well past the end). *)
+  let post = Date.add_days _calendar_60.(Array.length _calendar_60 - 1) 30 in
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"AAA" ~as_of:post ~lookback:10
+      ~calendar:_calendar_60
+  in
+  assert_that view.n_days (equal_to 0);
+  let low =
+    Snapshot_bar_views.low_window cb ~symbol:"AAA" ~as_of:post ~len:5
+      ~calendar:_calendar_60
+  in
+  assert_that low is_none
 
 (* --- Suite ---------------------------------------------------------- *)
 
@@ -408,6 +559,16 @@ let suite =
          >:: test_zero_n_or_lookback_yields_empty_views;
          "NaN close skipped in daily_view"
          >:: test_nan_close_skipped_in_daily_view;
+         "daily_view_for walks calendar; holiday gap excluded"
+         >:: test_daily_view_walks_calendar_with_holiday_gap;
+         "low_window walks calendar; holiday gap is NaN cell"
+         >:: test_low_window_walks_calendar_with_holiday_gap;
+         "daily_bars_for open_price matches panel"
+         >:: test_daily_bars_for_open_price_populated;
+         "daily_bars_for open_price is finite (not NaN)"
+         >:: test_daily_bars_for_open_price_is_not_nan;
+         "daily_view_for as_of not in calendar yields empty"
+         >:: test_daily_view_as_of_not_in_calendar_yields_empty;
        ]
 
 let () = run_test_tt_main suite

@@ -117,21 +117,49 @@ let empty () =
 let _snapshot_weekly_view_for cb ~symbol ~n ~as_of =
   Snapshot_bar_views.weekly_view_for cb ~symbol ~n ~as_of
 
-let _snapshot_daily_view_for cb ~symbol ~as_of ~lookback =
-  Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback
-
 let _snapshot_daily_bars_for cb ~symbol ~as_of =
   Snapshot_bar_views.daily_bars_for cb ~symbol ~as_of
 
 let _snapshot_weekly_bars_for cb ~symbol ~n ~as_of =
   Snapshot_bar_views.weekly_bars_for cb ~symbol ~n ~as_of
 
-let of_snapshot_views (cb : Snapshot_runtime.Snapshot_callbacks.t) =
+(* Synthesize a Mon-Fri weekday calendar covering [as_of - lookback - slack
+   .. as_of] when [of_snapshot_views] is constructed without an explicit
+   [~calendar]. Used by tests and by the in-memory-bars convenience
+   constructor; the panel runner passes its real calendar through.
+
+   The slack is the same shape as the panel runner's calendar (every weekday
+   between warmup_start and end_date), but bounded to a single
+   [daily_view_for]/[low_window] call's window. This matches the panel
+   behaviour for any window contained in the snapshot's date range. *)
+let _synth_calendar ~as_of ~lookback : Date.t array =
+  let calendar_days = (lookback * 3 / 2) + 14 in
+  let from = Date.add_days as_of (-calendar_days) in
+  let rec loop d acc =
+    if Date.( > ) d as_of then List.rev acc
+    else
+      let dow = Date.day_of_week d in
+      let is_weekend =
+        Day_of_week.equal dow Day_of_week.Sat
+        || Day_of_week.equal dow Day_of_week.Sun
+      in
+      let acc' = if is_weekend then acc else d :: acc in
+      loop (Date.add_days d 1) acc'
+  in
+  Array.of_list (loop from [])
+
+let _snapshot_daily_view_for ?calendar cb ~symbol ~as_of ~lookback =
+  let calendar =
+    match calendar with Some c -> c | None -> _synth_calendar ~as_of ~lookback
+  in
+  Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback ~calendar
+
+let of_snapshot_views ?calendar (cb : Snapshot_runtime.Snapshot_callbacks.t) =
   {
     daily_bars_for = _snapshot_daily_bars_for cb;
     weekly_bars_for = _snapshot_weekly_bars_for cb;
     weekly_view_for = _snapshot_weekly_view_for cb;
-    daily_view_for = _snapshot_daily_view_for cb;
+    daily_view_for = _snapshot_daily_view_for ?calendar cb;
     ma_cache = None;
   }
 

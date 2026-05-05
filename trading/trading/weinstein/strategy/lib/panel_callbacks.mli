@@ -256,9 +256,14 @@ val support_floor_callbacks_of_snapshot_views :
   symbol:string ->
   as_of:Core.Date.t ->
   lookback:int ->
+  calendar:Core.Date.t array ->
   Weinstein_stops.callbacks
-(** [support_floor_callbacks_of_snapshot_views ~cb ~symbol ~as_of ~lookback]
-    fetches a daily view for [symbol] over the most recent [lookback] daily bars
-    ending on or before [as_of] via
+(** [support_floor_callbacks_of_snapshot_views ~cb ~symbol ~as_of ~lookback
+     ~calendar] fetches a daily view for [symbol] over the most recent
+    [lookback] daily bars ending on or before [as_of] via
     {!Snapshot_runtime.Snapshot_bar_views.daily_view_for}, then delegates to
-    {!support_floor_callbacks_of_daily_view}. *)
+    {!support_floor_callbacks_of_daily_view}.
+
+    The [~calendar] parameter is the trading-day calendar that the panel-backed
+    reader uses internally; passing it makes the resulting daily view bit-equal
+    to {!Data_panel.Bar_panels.daily_view_for}'s window (#848 forward fix). *)

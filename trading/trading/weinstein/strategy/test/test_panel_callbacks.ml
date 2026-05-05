@@ -685,9 +685,14 @@ let test_support_floor_snapshot_parity _ =
   let panel_cbs =
     Panel_callbacks.support_floor_callbacks_of_daily_view panel_view
   in
+  let calendar =
+    Array.of_list
+      (List.map bars ~f:(fun b -> b.Types.Daily_price.date)
+      |> List.dedup_and_sort ~compare:Date.compare)
+  in
   let snap_cbs =
     Panel_callbacks.support_floor_callbacks_of_snapshot_views ~cb ~symbol:"AAPL"
-      ~as_of ~lookback:30
+      ~as_of ~lookback:30 ~calendar
   in
   let panel_result =
     Weinstein_stops.Support_floor.find_recent_level_with_callbacks

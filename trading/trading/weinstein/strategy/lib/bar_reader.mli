@@ -45,12 +45,23 @@ val of_panels : ?ma_cache:Weekly_ma_cache.t -> Data_panel.Bar_panels.t -> t
     docstring). This is the runner's strategy bar-reader path until the forward
     fix lands. *)
 
-val of_snapshot_views : Snapshot_runtime.Snapshot_callbacks.t -> t
-(** [of_snapshot_views cb] produces a reader backed by
+val of_snapshot_views :
+  ?calendar:Date.t array -> Snapshot_runtime.Snapshot_callbacks.t -> t
+(** [of_snapshot_views ?calendar cb] produces a reader backed by
     {!Snapshot_runtime.Snapshot_bar_views} over [cb]. Reads fan out through
     {!Snapshot_runtime.Snapshot_callbacks.read_field_history} (LRU-bounded via
     {!Snapshot_runtime.Daily_panels}); per-call cost is O(window-size) plus an
     at-most-one-symbol disk read on cache miss.
+
+    The [?calendar] parameter is the trading-day calendar (Mon–Fri including
+    holidays) that the panel-backed reader uses internally. When supplied,
+    [daily_view_for] walks calendar columns identical to
+    {!Data_panel.Bar_panels.daily_view_for}'s window — the cell-by-cell parity
+    surface that closes #848. When omitted, the reader synthesizes a Mon–Fri
+    calendar bounded to each call's window; this is sufficient for tests and the
+    in-memory convenience constructor but does not guarantee bit-for-bit panel
+    parity at the boundary of long histories. The production runner should
+    always pass its real calendar.
 
     Returns the empty view / empty list when the symbol is unknown, [as_of] is
     before any resident snapshot row, or any underlying field-read failure
