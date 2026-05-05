@@ -46,13 +46,21 @@
  (description "S&P 500 over 2019-2023 — full Weinstein cycle benchmark")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
  (universe_path "universes/sp500.sexp")
- (universe_size 491)
+ (universe_size 500)
  (config_overrides ())
+ ;; Tight-pinned 2026-05-05 to 500-symbol universe (post-#851 share-class
+ ;; dedup) + #847 panel-strategy hybrid wiring. Measured baseline:
+ ;;   total_return_pct  58.34   total_trades 81   win_rate 19.75
+ ;;   sharpe_ratio       0.54   max_drawdown 33.60  avg_holding_days 84.10
+ ;;   open_positions_value 1,553,948.90
+ ;; Tolerances widened 10-15% around measured; tighten only on deliberate
+ ;; strategy work that re-shapes the profile (don't tighten reactively to
+ ;; absorb regressions).
  (expected
-  ((total_return_pct   ((min  30.0)       (max  70.0)))
-   (total_trades       ((min 70)          (max 110)))
-   (win_rate           ((min 15.0)        (max  35.0)))
-   (sharpe_ratio       ((min  0.30)       (max   0.70)))
-   (max_drawdown_pct   ((min 25.0)        (max  42.0)))
-   (avg_holding_days   ((min 65.0)        (max 115.0)))
-   (open_positions_value ((min 1200000.0) (max 1700000.0))))))
+  ((total_return_pct   ((min  45.0)       (max  72.0)))
+   (total_trades       ((min 70)          (max  95)))
+   (win_rate           ((min 15.0)        (max  28.0)))
+   (sharpe_ratio       ((min  0.35)       (max   0.70)))
+   (max_drawdown_pct   ((min 28.0)        (max  42.0)))
+   (avg_holding_days   ((min 70.0)        (max 110.0)))
+   (open_positions_value ((min 1300000.0) (max 1800000.0))))))

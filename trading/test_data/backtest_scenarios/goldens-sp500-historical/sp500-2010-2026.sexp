@@ -49,13 +49,22 @@
    ((portfolio_config ((max_position_pct_long 0.05))))
    ((portfolio_config ((max_long_exposure_pct 0.50))))
    ((portfolio_config ((min_cash_pct 0.30))))))
- ;; PINNED_AFTER_FIRST_RUN — wide ranges. First successful run on the
- ;; user's 8 GB box under snapshot mode produces the canonical baseline.
+ ;; Tight-pinned 2026-05-05 post-#855 with position-sizing overrides above.
+ ;; Measured baseline (510-sym Wiki-replayed universe + 0.05/0.50/0.30
+ ;; portfolio_config overrides; #847 panel-strategy hybrid wiring; #845
+ ;; Daily_panels perf fix; ~7-12 min wall):
+ ;;   total_return_pct   5.15   total_trades 102   win_rate 21.57
+ ;;   sharpe_ratio       0.40   max_drawdown 16.12  avg_holding_days 130.58
+ ;;   open_positions_value 1,026,057.64
+ ;; CAGR is anemic at 0.31% (issue #856 tracks return-tuning follow-up:
+ ;; only `max_position_pct_long` is the binding knob; other 2 overrides
+ ;; are inert per qc-behavioral #855 F1). Tolerances widened 15-25% around
+ ;; measured; tighten when #856 lands a real tuning sweep.
  (expected
-  ((total_return_pct   ((min -1000.0)        (max 1000000.0)))
-   (total_trades       ((min 0)              (max 100000)))
-   (win_rate           ((min 0.0)            (max 100.0)))
-   (sharpe_ratio       ((min -10.0)          (max 10.0)))
-   (max_drawdown_pct   ((min 0.0)            (max 100.0)))
-   (avg_holding_days   ((min 0.0)            (max 10000.0)))
-   (open_positions_value ((min -1000000000.0) (max 100000000000.0))))))
+  ((total_return_pct   ((min  -5.0)         (max  20.0)))
+   (total_trades       ((min  85)           (max 130)))
+   (win_rate           ((min  17.0)         (max  28.0)))
+   (sharpe_ratio       ((min   0.25)        (max   0.65)))
+   (max_drawdown_pct   ((min  10.0)         (max  25.0)))
+   (avg_holding_days   ((min 110.0)         (max 165.0)))
+   (open_positions_value ((min 800000.0)   (max 1300000.0))))))
