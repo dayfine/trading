@@ -108,6 +108,22 @@ val ma_cache : t -> Weekly_ma_cache.t option
     {!of_snapshot_views} / {!of_in_memory_bars} / {!empty} always set this to
     [None]. *)
 
+val snapshot_callbacks : t -> Snapshot_runtime.Snapshot_callbacks.t
+(** [snapshot_callbacks t] returns the underlying field-accessor shim for
+    snapshot-backed readers ({!of_snapshot_views} / {!of_in_memory_bars}).
+    Consumed by the strategy's macro / sector entry points (Phase F.3.b-2 / c-2
+    / d-2 caller migration) via the [*_of_snapshot_views] APIs on
+    {!Macro_inputs}.
+
+    For panel-backed and empty readers ({!of_panels} / {!empty}), returns a
+    sentinel cb whose every [read_field] / [read_field_history] returns
+    [Error NotFound]. {!Snapshot_runtime.Snapshot_bar_views} folds these
+    NotFound results to the empty view / empty list, so callers see the "no
+    bars" surface that matches these readers' contract. Production runs use only
+    snapshot-backed readers, so the sentinel is exercised only in tests that
+    never reach a macro / sector read (typically the no-primary-bar
+    short-circuit in [_on_market_close]). *)
+
 val empty : unit -> t
 (** [empty ()] produces a reader whose every read returns the empty list / empty
     view. Useful for tests that exercise control paths where the strategy never
