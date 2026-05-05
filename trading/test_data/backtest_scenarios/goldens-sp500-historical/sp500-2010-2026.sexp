@@ -33,7 +33,22 @@
  ;; enable_short_side disabled mirroring the existing sp500-2019-2023 +
  ;; goldens-broad/decade-2014-2023 cells (G1-G4 short-side gaps unresolved per
  ;; dev/notes/short-side-gaps-2026-04-29.md).
- (config_overrides (((enable_short_side false))))
+ ;;
+ ;; Position-sizing overrides per dev/notes/15y-trade-count-investigation-2026-05-05.md
+ ;; (PR #853 root-cause). Default sizing was calibrated against the 5y
+ ;; sp500-2019-2023 baseline; on a 15y window with 510 symbols + only $1M
+ ;; initial cash, the 0.30/0.90/0.10 defaults caused day-1 to lock up
+ ;; ~$993K across 4 oversized positions, with 8 long-runners pinning
+ ;; ~$949K cost basis for ~15 years. Skip ratio measured 271
+ ;; Insufficient_cash : 37 Stop_too_wide (7.3:1). The override below
+ ;; widens the entry funnel proportional to the window's longer horizon
+ ;; without modifying the default Portfolio_risk.config (which other
+ ;; goldens depend on).
+ (config_overrides
+  (((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.05))))
+   ((portfolio_config ((max_long_exposure_pct 0.50))))
+   ((portfolio_config ((min_cash_pct 0.30))))))
  ;; PINNED_AFTER_FIRST_RUN — wide ranges. First successful run on the
  ;; user's 8 GB box under snapshot mode produces the canonical baseline.
  (expected

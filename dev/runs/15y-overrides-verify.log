@@ -1,0 +1,12 @@
+Loading 1 scenarios from /workspaces/trading-1/data/backtest_scenarios/goldens-sp500-historical (parallel=1)
+Fixtures root: /workspaces/trading-1/data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-05-004535
+
+>>> Running sp500-2010-2026-historical: 15y sp500 historical backtest — survivorship-aware universe (510 symbols, replayed back to 2010-01-01), 2010-01-01 → 2026-04-30. Companion to goldens-sp500/sp500-2019-2023.sexp's 5y window. (2010-01-01 to 2026-04-30)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days)
