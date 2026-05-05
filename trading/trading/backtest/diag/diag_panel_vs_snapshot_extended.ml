@@ -278,8 +278,8 @@ let _maybe_progress ~name (c : counter) =
 let _maybe_diff_weekly_view (c : counter) ~symbol ~as_of (panel_view, snap_view)
     =
   c.total <- c.total + 1;
-  let panel_n = panel_view.Bar_panels.n in
-  let snap_n = snap_view.Bar_panels.n in
+  let panel_n = panel_view.Snapshot_bar_views.n in
+  let snap_n = snap_view.Snapshot_bar_views.n in
   (if panel_n <> snap_n then
      _record_diff c
        (Printf.sprintf "%s %s: panel.n=%d snap.n=%d" symbol
@@ -288,19 +288,23 @@ let _maybe_diff_weekly_view (c : counter) ~symbol ~as_of (panel_view, snap_view)
      let rec walk i =
        if i >= panel_n then ()
        else if
-         not (Date.equal panel_view.dates.(i) snap_view.Bar_panels.dates.(i))
+         not
+           (Date.equal panel_view.dates.(i)
+              snap_view.Snapshot_bar_views.dates.(i))
        then
          _record_diff c
            (Printf.sprintf "%s %s [%d] dates differ: panel=%s snap=%s" symbol
               (Date.to_string as_of) i
               (Date.to_string panel_view.dates.(i))
-              (Date.to_string snap_view.Bar_panels.dates.(i)))
-       else if not (_f_eq panel_view.closes.(i) snap_view.Bar_panels.closes.(i))
+              (Date.to_string snap_view.Snapshot_bar_views.dates.(i)))
+       else if
+         not
+           (_f_eq panel_view.closes.(i) snap_view.Snapshot_bar_views.closes.(i))
        then
          _record_diff c
            (Printf.sprintf "%s %s [%d] close differ: panel=%.10f snap=%.10f"
               symbol (Date.to_string as_of) i panel_view.closes.(i)
-              snap_view.Bar_panels.closes.(i))
+              snap_view.Snapshot_bar_views.closes.(i))
        else walk (i + 1)
      in
      walk 0);
@@ -437,7 +441,7 @@ let () =
             match Bar_panels.column_of_date panel as_of with
             | None ->
                 {
-                  Bar_panels.closes = [||];
+                  Snapshot_bar_views.closes = [||];
                   raw_closes = [||];
                   highs = [||];
                   lows = [||];
@@ -480,7 +484,7 @@ let () =
             match Bar_panels.column_of_date panel as_of with
             | None ->
                 {
-                  Bar_panels.highs = [||];
+                  Snapshot_bar_views.highs = [||];
                   lows = [||];
                   closes = [||];
                   dates = [||];

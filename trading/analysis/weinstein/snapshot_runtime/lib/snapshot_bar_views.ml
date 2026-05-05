@@ -3,14 +3,34 @@
 
 open Core
 module BA1 = Bigarray.Array1
-module Bar_panels = Data_panel.Bar_panels
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Panel_views = Data_panel_snapshot.Panel_views
 
-(* Phase F.2 PR 2: views are type-equal to [Bar_panels]'s — see the .mli. The
-   record definitions live in [Bar_panels] today; PR 3 (Phase F.3) hoists them
-   here when [Bar_panels] is deleted. *)
-type weekly_view = Bar_panels.weekly_view
-type daily_view = Bar_panels.daily_view
+(* Phase F.3.e-1 (revised): the canonical record definitions live in
+   [Data_panel_snapshot.Panel_views] — a neutral hub library that both
+   {!Data_panel.Bar_panels} and this module depend on. The manifest re-export
+   ([type =] with the record body) keeps the field-access syntax
+   ([v.Snapshot_bar_views.n]) working at every existing call site. The neutral
+   hub avoids the analysis→trading dune dep that the prior arrangement
+   introduced (A2 violation, see [.claude/rules/qc-structural-authority.md]
+   §A2). *)
+type weekly_view = Panel_views.weekly_view = {
+  closes : float array;
+  raw_closes : float array;
+  highs : float array;
+  lows : float array;
+  volumes : float array;
+  dates : Date.t array;
+  n : int;
+}
+
+type daily_view = Panel_views.daily_view = {
+  highs : float array;
+  lows : float array;
+  closes : float array;
+  dates : Date.t array;
+  n_days : int;
+}
 
 let _empty_weekly_view : weekly_view =
   {

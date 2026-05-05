@@ -10,6 +10,7 @@
   fpath
   indicators.time_period
   status
+  trading.data_panel.snapshot
   trading.strategy
   types
   unix)

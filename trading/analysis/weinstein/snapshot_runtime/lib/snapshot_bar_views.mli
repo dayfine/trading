@@ -56,39 +56,60 @@
     owns its own buffer. Memory cost: at most [len * 8] bytes per call, freed by
     the GC. *)
 
-type weekly_view = Data_panel.Bar_panels.weekly_view
-(** Type-equal to {!Data_panel.Bar_panels.weekly_view} so the strategy's
-    panel-callback constructors
-    ({!Panel_callbacks.stage_callbacks_of_weekly_view} et al.) can consume views
-    produced by either backing without a per-call adapter or variant dispatch.
+type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
+  closes : float array;
+      (** Adjusted close per weekly bar (chronological, oldest at index 0). *)
+  raw_closes : float array;
+      (** Raw (un-adjusted) close per weekly bar — the close panel's value at
+          the last trading day of each weekly bucket. Used together with
+          [closes] to compute per-bar split-adjustment factors
+          ([closes.(i) /. raw_closes.(i)]). The factor stays constant for spans
+          without splits and changes at split boundaries (G14 — see
+          [dev/notes/g14-deep-dive-2026-05-01.md]). *)
+  highs : float array;  (** Max high within each weekly bucket. *)
+  lows : float array;  (** Min low within each weekly bucket. *)
+  volumes : float array;
+      (** Sum of daily volumes within each weekly bucket. Stored as float to
+          align with the panel layout; consumers that need int can round-nearest
+          and convert. *)
+  dates : Core.Date.t array;
+      (** Date of the last trading day in each weekly bucket (Friday for
+          complete weeks). *)
+  n : int;  (** Length of every array. *)
+}
+(** Float-array view of weekly-aggregated bars for one symbol.
 
-    Phase F.2 PR 2 uses this equality to wire snapshot reads through the
-    strategy in place of [Bar_panels.t]. PR 3 (Phase F.3) deletes
-    {!Data_panel.Bar_panels} and hoists the record definition into a neutral
-    location; the [type =] is the temporary bridge between PR 1 (this module
-    standalone) and PR 3 (sole owner of the record).
+    Aggregation semantics match {!Time_period.Conversion.daily_to_weekly} with
+    [include_partial_week:true]: weeks are ISO weeks (Monday–Sunday); the
+    aggregate's date is the latest trading day in the week (typically Friday);
+    the trailing partial week is retained.
 
-    Field semantics — populated by {!weekly_view_for}:
-    - [closes] = adjusted close of the last trading day in each weekly bucket
-    - [raw_closes] = the [Snapshot_schema.Close] field's value at the last
-      trading day of each weekly bucket (the un-adjusted close)
-    - [highs] = max raw high within each weekly bucket
-    - [lows] = min raw low within each weekly bucket
-    - [volumes] = sum of raw daily volumes within each weekly bucket
-    - [dates] = date of the last trading day in each weekly bucket (typically
-      Friday for complete weeks, last traded day for partial / holiday weeks)
-    - [n] = length of every array. *)
+    {b Phase F.3.e-1 (revised 2026-05-06 — neutral hub)}: the canonical
+    definition lives in {!Data_panel_snapshot.Panel_views.weekly_view}. This
+    module re-exports it via a manifest type alias so existing callers (snapshot
+    side) keep their qualified field-access syntax. The panel side
+    ([Data_panel.Bar_panels]) re-exports the same type from the same hub. Both
+    consumers depend on [trading.data_panel.snapshot] (a neutral hub with no
+    [analysis/] dep), so the prior A2 violation (analysis→trading.data_panel) is
+    gone. *)
 
-type daily_view = Data_panel.Bar_panels.daily_view
-(** Type-equal to {!Data_panel.Bar_panels.daily_view} for the same reason as
-    {!weekly_view}. Field semantics — populated by {!daily_view_for}:
-    - [highs] = daily raw high prices, oldest at index 0
-    - [lows] = daily raw low prices, same indexing
-    - [closes] = daily raw closes (the [Snapshot_schema.Close] field), same
-      indexing — matches {!Bar_panels.daily_view_for}, which also uses the raw
-      close panel rather than the adjusted close panel
-    - [dates] = daily dates, same indexing
-    - [n_days] = length of every array. *)
+type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
+  highs : float array;
+      (** Daily high prices, oldest at index 0, newest at index [n_days - 1]. *)
+  lows : float array;  (** Daily low prices, same indexing as [highs]. *)
+  closes : float array;  (** Daily adjusted closes, same indexing. *)
+  dates : Core.Date.t array;  (** Daily dates, same indexing. *)
+  n_days : int;  (** Length of every array. *)
+}
+(** Float-array view of daily bars for one symbol within a lookback window.
+
+    Used by {!Weinstein_stops.compute_initial_stop_with_floor} via the
+    support-floor callbacks. The lookback windowing is applied at construction
+    time, so the consumer scans [0..n_days-1] without further bounds checks.
+
+    {b Phase F.3.e-1 (revised 2026-05-06)}: re-exported from
+    {!Data_panel_snapshot.Panel_views.daily_view} (neutral-hub canonical home)
+    via manifest type alias. *)
 
 val weekly_view_for :
   Snapshot_callbacks.t ->
