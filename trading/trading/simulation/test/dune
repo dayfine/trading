@@ -95,6 +95,25 @@
   simulation_test_helpers))
 
 (test
+ (name test_bah_benchmark_e2e)
+ (modules test_bah_benchmark_e2e)
+ (libraries
+  ounit2
+  core
+  core_unix
+  status
+  fpath
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
+
+(test
  (name test_metrics)
  (modules test_metrics)
  (libraries

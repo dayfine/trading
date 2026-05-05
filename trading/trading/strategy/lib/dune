@@ -8,6 +8,7 @@
   strategy_interface
   ema_strategy
   buy_and_hold_strategy
+  bah_benchmark_strategy
   strategy)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
