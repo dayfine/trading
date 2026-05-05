@@ -1,0 +1,15 @@
+(executable
+ (name diag_panel_vs_snapshot_extended)
+ (modules diag_panel_vs_snapshot_extended)
+ (libraries
+  core
+  core_unix.sys_unix
+  core_unix.filename_unix
+  fpath
+  csv
+  trading.data_panel
+  trading.data_panel.snapshot
+  weinstein.snapshot_pipeline
+  weinstein.snapshot_runtime
+  status
+  types))
