@@ -1,6 +1,6 @@
 ;; perf-tier: 3-historical
 ;; perf-tier-rationale: 15y sp500 historical backtest with survivorship-aware
-;; universe (510 symbols from goldens-sp500-historical/sp500-2010-01-01.sexp,
+;; universe (510 symbols from universes/sp500-historical/sp500-2010-01-01.sexp,
 ;; built via Wiki+EODHD replay PR-A/B/C #803/#808/#809). Window 2010-01-01 →
 ;; 2026-04-30 spans the full post-2010 cycle: post-GFC recovery, 2011 sideways,
 ;; 2015-16 correction, 2018 Q4 drawdown, COVID crash + recovery, 2022 bear,
@@ -28,7 +28,7 @@
  (description
    "15y sp500 historical backtest — survivorship-aware universe (510 symbols, replayed back to 2010-01-01), 2010-01-01 → 2026-04-30. Companion to goldens-sp500/sp500-2019-2023.sexp's 5y window.")
  (period ((start_date 2010-01-01) (end_date 2026-04-30)))
- (universe_path "goldens-sp500-historical/sp500-2010-01-01.sexp")
+ (universe_path "universes/sp500-historical/sp500-2010-01-01.sexp")
  (universe_size 510)
  ;; enable_short_side disabled mirroring the existing sp500-2019-2023 +
  ;; goldens-broad/decade-2014-2023 cells (G1-G4 short-side gaps unresolved per

@@ -44,13 +44,22 @@
  (description "S&P 500 over 2019-2023 — long-only counterpart to sp500-2019-2023")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
  (universe_path "universes/sp500.sexp")
- (universe_size 491)
+ (universe_size 503)
  (config_overrides (((enable_short_side false))))
+ ;; Re-pinned 2026-05-04 to 503-sym universe (post-#807 universe refresh) and
+ ;; post-#847 partial revert (Option-1: panel-backed strategy + snapshot-backed
+ ;; simulator). Measured baseline:
+ ;;   total_return_pct  79.74   total_trades 74   win_rate 27.03
+ ;;   sharpe_ratio       0.66   max_drawdown 30.79  avg_holding_days 94.55
+ ;;   open_positions_value 1,696,593
+ ;; Tolerances widened around the measured baseline; tighten if/when the
+ ;; long-only profile is re-shaped by deliberate strategy work (re-pin then,
+ ;; do not tighten reactively to absorb regressions).
  (expected
-  ((total_return_pct   ((min -15.0)       (max  15.0)))
-   (total_trades       ((min 27)          (max  37)))
-   (win_rate           ((min 31.0)        (max  44.0)))
-   (sharpe_ratio       ((min -0.5)        (max  0.5)))
-   (max_drawdown_pct   ((min 3.0)         (max  9.0)))
-   (avg_holding_days   ((min 37.0)        (max  50.0)))
-   (open_positions_value ((min 330000.0)  (max  450000.0))))))
+  ((total_return_pct   ((min  60.0)       (max 100.0)))
+   (total_trades       ((min  60)         (max  90)))
+   (win_rate           ((min  18.0)       (max  35.0)))
+   (sharpe_ratio       ((min   0.40)      (max   0.90)))
+   (max_drawdown_pct   ((min  20.0)       (max  40.0)))
+   (avg_holding_days   ((min  75.0)       (max 115.0)))
+   (open_positions_value ((min 1300000.0) (max 2100000.0))))))
