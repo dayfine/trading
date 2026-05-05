@@ -74,7 +74,9 @@
  (action
   (run sh %{dep:testing_only_check.sh})))
 
-; Agent definition compliance: every feat-*.md must have required sections.
+; Agent definition compliance: every feat-*.md must have required sections,
+; AND every jj-writing agent (feat-*, harness-maintainer, ops-data) must have
+; ## Pre-Work Setup. Read-only QC agents are exempt from the Pre-Work Setup rule.
 ; Reaches .claude/agents/ at the repo root via repo_root() in _check_lib.sh,
 ; which walks up from the sandboxed script's directory looking for .git.
 
@@ -83,6 +85,28 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:agent_compliance_check.sh})))
+
+; Smoke test for agent_compliance_check.sh: verifies (1) the as-checked-in tree
+; passes both Rule 1 (core sections) and Rule 2 (Pre-Work Setup), and (2) a
+; temp copy of feat-data.md with ## Pre-Work Setup stripped causes the check to FAIL.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:agent_compliance_test.sh})))
+
+; jj workspace boilerplate smoke test: execs the canonical Pre-Work Setup
+; boilerplate (jj workspace add + verify + cleanup) against a tmp-dir target.
+; Skips cleanly if jj is not on PATH (GHA runners don't have jj installed).
+; Pins the runtime semantics of the boilerplate so a future jj syntax change
+; breaks CI rather than silently breaking agent dispatches.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:jj_workspace_smoke.sh})))
 
 ; Status file integrity: each dev/status/*.md must declare Status, Last updated,
 ; and (for feature files) Interface stable. Invoked by health-scanner fast scan.
