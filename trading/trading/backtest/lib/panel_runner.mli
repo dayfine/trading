@@ -12,8 +12,7 @@
       trading-day calendar (Mon–Fri, holidays included) the runner builds for
       the warmup..end_date span; threading it through makes
       [Snapshot_bar_views.daily_view_for] walk calendar columns NaN-passthrough
-      identically to the prior [Bar_panels.daily_view_for] window definition.
-      This is the closing half of #848 — see
+      deterministically. This is the closing half of #848 — see
       `dev/notes/path-dependent-regression-848-investigation-2026-05-05.md` for
       the cell-by-cell parity surface.
     - The simulator's per-tick price reads flow through a snapshot-backed
@@ -23,9 +22,8 @@
     - Final close-price lookups read from the [Snapshot_runtime.Daily_panels]
       via [Daily_panels.read_today].
 
-    The runner no longer holds a parallel [Bar_panels.t] resident — the
-    partial-revert [_build_panel_bar_reader] is gone, along with the CSV
-    [Ohlcv_panels.load_from_csv_calendar] load. *)
+    The runner holds no parallel panel-backed bar storage — every read fans out
+    from the snapshot directory. *)
 
 open Core
 

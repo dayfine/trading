@@ -10,8 +10,9 @@
     dividends or splits the two diverge, and using raw close in indicator math
     silently changes behaviour. Stage 1's spike landed without the adjusted
     panel because the EMA kernel parity test used a synthetic feed where
-    adjclose = close; Stage 2 adds it as a prerequisite for Bar_panels-backed
-    bar reconstruction.
+    adjclose = close; Stage 2 added it as a prerequisite for the bar
+    reconstruction surface that the offline snapshot pipeline (Phase B) later
+    inherited.
 
     Layout choice (separate panels per field) is deliberate: cross-section reads
     ("today's close for all symbols") become a single panel column (stride [N]),

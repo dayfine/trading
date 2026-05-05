@@ -7,13 +7,11 @@ module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Panel_views = Data_panel_snapshot.Panel_views
 
 (* Phase F.3.e-1 (revised): the canonical record definitions live in
-   [Data_panel_snapshot.Panel_views] — a neutral hub library that both
-   {!Data_panel.Bar_panels} and this module depend on. The manifest re-export
-   ([type =] with the record body) keeps the field-access syntax
-   ([v.Snapshot_bar_views.n]) working at every existing call site. The neutral
-   hub avoids the analysis→trading dune dep that the prior arrangement
-   introduced (A2 violation, see [.claude/rules/qc-structural-authority.md]
-   §A2). *)
+   [Data_panel_snapshot.Panel_views] — a neutral hub library with no
+   [analysis/] dep. The manifest re-export ([type =] with the record body)
+   keeps the field-access syntax ([v.Snapshot_bar_views.n]) working at every
+   call site. The neutral hub satisfies the A2 architecture boundary, see
+   [.claude/rules/qc-structural-authority.md] §A2. *)
 type weekly_view = Panel_views.weekly_view = {
   closes : float array;
   raw_closes : float array;
@@ -52,8 +50,8 @@ let _empty_daily_view : daily_view =
 let _weekly_calendar_span ~n = (n * 8) + 7
 
 (* Fetch one field's history; return [] (not an error) on any failure. The
-   shim's surface contract is "missing data → empty view" (matches Bar_panels
-   semantics); this helper enforces that at the per-field level. *)
+   shim's surface contract is "missing data → empty view"; this helper
+   enforces that at the per-field level. *)
 let _read_history_or_empty (cb : Snapshot_callbacks.t) ~symbol ~from ~until
     ~field =
   match cb.read_field_history ~symbol ~from ~until ~field with
@@ -205,16 +203,16 @@ let weekly_bars_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of :
       let len = List.length weekly in
       if len <= n then weekly else List.drop weekly (len - n)
 
-(* Index of [as_of] in [calendar], or [-1] if absent. Mirrors
-   {!Bar_panels.column_of_date}'s exact-match contract: a date not in the
-   calendar (out-of-window, off-calendar holiday) yields no column. *)
+(* Index of [as_of] in [calendar], or [-1] if absent. Exact-match contract:
+   a date not in the calendar (out-of-window, off-calendar holiday) yields
+   no column. *)
 let _calendar_index_of (calendar : Date.t array) (as_of : Date.t) =
   Array.findi calendar ~f:(fun _ d -> Date.equal d as_of)
   |> Option.value_map ~default:(-1) ~f:fst
 
 (* Walk calendar columns [from_idx..as_of_idx], emit one row per non-NaN
-   close. Mirrors {!Bar_panels._read_row_cells}: missing snapshot rows
-   leave NaN in the close lookup, same as panel NaN-close skip. *)
+   close. Missing snapshot rows leave NaN in the close lookup, same NaN-close
+   skip semantics. *)
 let _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
     ~low_t : daily_view =
   let n_window = as_of_idx - from_idx + 1 in
@@ -254,11 +252,10 @@ let _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
       n_days = n;
     }
 
-(* The snapshot path takes the panel's calendar and walks the same column
-   set as {!Bar_panels.daily_view_for}. Without [~calendar] the window
-   would be ambiguous between "lookback weekdays" (panel) and "lookback
-   actual rows in the snapshot" (pre-#848 path) — the divergence root
-   cause per the #848 investigation. *)
+(* The snapshot path takes the runner's calendar and walks the same column
+   set deterministically. Without [~calendar] the window would be ambiguous
+   between "lookback weekdays" and "lookback actual rows in the snapshot"
+   (pre-#848 path) — the divergence root cause per the #848 investigation. *)
 let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback
     ~calendar =
   if lookback <= 0 then _empty_daily_view
@@ -284,9 +281,8 @@ let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback
         _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
           ~low_t
 
-(* Mirrors {!Bar_panels.low_window}'s zero-copy panel-slice semantics:
-   walk the calendar columns, NaN-passthrough on missing rows ({!Ohlcv_panels}
-   initialises panels to NaN). Returns [None] only on len<=0, as_of not in
+(* Walk the calendar columns and emit a fresh [Bigarray.Array1.t]. Missing
+   rows yield NaN cells. Returns [None] only on len<=0, as_of not in
    calendar, window underflow, or unknown symbol. *)
 let low_window (cb : Snapshot_callbacks.t) ~symbol ~as_of ~len ~calendar =
   if len <= 0 then None
