@@ -2,11 +2,11 @@ open OUnit2
 open Core
 open Matchers
 open Weinstein_strategy
-module Bar_panels = Data_panel.Bar_panels
 module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_format = Data_panel_snapshot.Snapshot_format
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 
@@ -126,7 +126,7 @@ let test_build_global_index_bars_drops_symbols_without_bars _ =
     weekly bars. 30 weeks × 5 weekdays = 150, so 250 is comfortably over. *)
 let _sufficient_daily_bars = 250
 
-let _empty_weekly_view : Bar_panels.weekly_view =
+let _empty_weekly_view : Snapshot_bar_views.weekly_view =
   {
     closes = [||];
     raw_closes = [||];
@@ -259,11 +259,10 @@ let test_build_sector_map_populates_entry_for_valid_etf _ =
 (* ------------------------------------------------------------------ *)
 (* Pin that {!Macro_inputs.build_*_of_snapshot_views} produces bit-equal
    output to the [bar_reader]-backed constructors on the same underlying
-   bar history. Since the [bar_reader]-backed path (after F.3.a-4) and
-   the new [_of_snapshot_views] path both ultimately fan out through
-   {!Snapshot_runtime.Snapshot_bar_views}, parity is the load-bearing
-   property — any drift between the two would surface as a regression
-   when callers migrate from one to the other in F.3.d's downstream PRs. *)
+   bar history. Both paths ultimately fan out through
+   {!Snapshot_runtime.Snapshot_bar_views} (the [bar_reader] is itself
+   snapshot-backed after F.3.a-4); parity is the load-bearing property
+   for migrating callers from one entry-point to the other. *)
 
 let _build_snapshot_callbacks
     (symbol_bars : (string * Types.Daily_price.t list) list) :
@@ -317,7 +316,8 @@ let _build_snapshot_callbacks
    would be a regression. Used in [elements_are] to validate the full
    [(label, weekly_view) list] under one [assert_that]. *)
 let _global_view_entry_matcher
-    ((expected_label, expected_view) : string * Bar_panels.weekly_view) =
+    ((expected_label, expected_view) : string * Snapshot_bar_views.weekly_view)
+    =
   let float_array_matches arr =
     elements_are (Array.to_list arr |> List.map ~f:(float_equal ~epsilon:1e-9))
   in
@@ -328,29 +328,30 @@ let _global_view_entry_matcher
     [
       field fst (equal_to expected_label);
       field
-        (fun ((_, v) : string * Bar_panels.weekly_view) -> v.n)
+        (fun ((_, v) : string * Snapshot_bar_views.weekly_view) -> v.n)
         (equal_to expected_view.n);
       field
-        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+        (fun ((_, v) : string * Snapshot_bar_views.weekly_view) ->
           Array.to_list v.closes)
         (float_array_matches expected_view.closes);
       field
-        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+        (fun ((_, v) : string * Snapshot_bar_views.weekly_view) ->
           Array.to_list v.raw_closes)
         (float_array_matches expected_view.raw_closes);
       field
-        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+        (fun ((_, v) : string * Snapshot_bar_views.weekly_view) ->
           Array.to_list v.highs)
         (float_array_matches expected_view.highs);
       field
-        (fun ((_, v) : string * Bar_panels.weekly_view) -> Array.to_list v.lows)
+        (fun ((_, v) : string * Snapshot_bar_views.weekly_view) ->
+          Array.to_list v.lows)
         (float_array_matches expected_view.lows);
       field
-        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+        (fun ((_, v) : string * Snapshot_bar_views.weekly_view) ->
           Array.to_list v.volumes)
         (float_array_matches expected_view.volumes);
       field
-        (fun ((_, v) : string * Bar_panels.weekly_view) ->
+        (fun ((_, v) : string * Snapshot_bar_views.weekly_view) ->
           Array.to_list v.dates)
         (date_array_matches expected_view.dates);
     ]

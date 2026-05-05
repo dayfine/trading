@@ -16,7 +16,6 @@
     ever materialised. *)
 
 open Core
-module Bar_panels = Data_panel.Bar_panels
 module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 
@@ -73,7 +72,7 @@ let _ma_values_of_closes ~(config : Stage.config) ~closes
 (** Build the inline [get_ma] from the view's closes (current allocational path;
     one allocation per call). Used as the cache-miss fallback and the
     bar-list-only path. *)
-let _inline_get_ma ~(config : Stage.config) ~(weekly : Bar_panels.weekly_view) :
+let _inline_get_ma ~(config : Stage.config) ~(weekly : Snapshot_bar_views.weekly_view) :
     week_offset:int -> float option =
   let ma_values =
     _ma_values_of_closes ~config ~closes:weekly.closes ~dates:weekly.dates
@@ -95,7 +94,7 @@ let _capped_get_ma ~(cached_values : float array) ~(end_idx : int)
 (** Try to build [get_ma] from the cache; return [None] on miss (empty view, no
     values for this key, or view's last date not in the cached dates array). *)
 let _cached_get_ma ~(cache : Weekly_ma_cache.t) ~(symbol : string)
-    ~(config : Stage.config) ~(weekly : Bar_panels.weekly_view) :
+    ~(config : Stage.config) ~(weekly : Snapshot_bar_views.weekly_view) :
     (week_offset:int -> float option) option =
   if weekly.n = 0 then None
   else
@@ -113,7 +112,7 @@ let _cached_get_ma ~(cache : Weekly_ma_cache.t) ~(symbol : string)
     both a registered cache AND a symbol to key on; either being [None]
     short-circuits to inline. *)
 let _stage_get_ma ?ma_cache ?symbol ~(config : Stage.config)
-    ~(weekly : Bar_panels.weekly_view) () : week_offset:int -> float option =
+    ~(weekly : Snapshot_bar_views.weekly_view) () : week_offset:int -> float option =
   match (ma_cache, symbol) with
   | Some cache, Some symbol -> (
       match _cached_get_ma ~cache ~symbol ~config ~weekly with
@@ -122,7 +121,7 @@ let _stage_get_ma ?ma_cache ?symbol ~(config : Stage.config)
   | _ -> _inline_get_ma ~config ~weekly
 
 let stage_callbacks_of_weekly_view ?ma_cache ?symbol ~(config : Stage.config)
-    ~(weekly : Bar_panels.weekly_view) () : Stage.callbacks =
+    ~(weekly : Snapshot_bar_views.weekly_view) () : Stage.callbacks =
   let get_ma = _stage_get_ma ?ma_cache ?symbol ~config ~weekly () in
   { get_ma; get_close = _get_from_float_array weekly.closes }
 
@@ -135,8 +134,8 @@ let stage_callbacks_of_weekly_view ?ma_cache ?symbol ~(config : Stage.config)
     views contribute (matches {!Rs._align_bars_for_wrapper}'s map+filter
     semantics). The two views are already chronologically ordered (oldest first)
     and same-cadence weekly buckets, so the alignment is a single pass. *)
-let _aligned_arrays ~(stock : Bar_panels.weekly_view)
-    ~(benchmark : Bar_panels.weekly_view) :
+let _aligned_arrays ~(stock : Snapshot_bar_views.weekly_view)
+    ~(benchmark : Snapshot_bar_views.weekly_view) :
     Date.t array * float array * float array =
   let bench_map =
     Array.foldi benchmark.dates ~init:Date.Map.empty ~f:(fun i m d ->
@@ -162,8 +161,8 @@ let _aligned_arrays ~(stock : Bar_panels.weekly_view)
   if n = 0 then ([||], [||], [||])
   else (take dates, take stock_closes, take bench_closes)
 
-let rs_callbacks_of_weekly_views ~(stock : Bar_panels.weekly_view)
-    ~(benchmark : Bar_panels.weekly_view) : Rs.callbacks =
+let rs_callbacks_of_weekly_views ~(stock : Snapshot_bar_views.weekly_view)
+    ~(benchmark : Snapshot_bar_views.weekly_view) : Rs.callbacks =
   let dates, stock_closes, bench_closes = _aligned_arrays ~stock ~benchmark in
   {
     get_stock_close = _get_from_float_array stock_closes;
@@ -175,7 +174,7 @@ let rs_callbacks_of_weekly_views ~(stock : Bar_panels.weekly_view)
 (* Volume — week-offset indexing over the view's [volumes] array        *)
 (* ------------------------------------------------------------------ *)
 
-let volume_callbacks_of_weekly_view ~(weekly : Bar_panels.weekly_view) :
+let volume_callbacks_of_weekly_view ~(weekly : Snapshot_bar_views.weekly_view) :
     Volume.callbacks =
   { get_volume = _get_from_float_array weekly.volumes }
 
@@ -193,7 +192,7 @@ let _get_by_bar_offset (arr : 'a array) : bar_offset:int -> 'a option =
     let idx = n - 1 - bar_offset in
     if idx < 0 || idx >= n then None else Some arr.(idx)
 
-let resistance_callbacks_of_weekly_view ~(weekly : Bar_panels.weekly_view) :
+let resistance_callbacks_of_weekly_view ~(weekly : Snapshot_bar_views.weekly_view) :
     Resistance.callbacks =
   {
     get_high = _get_by_bar_offset weekly.highs;
@@ -213,7 +212,7 @@ let resistance_callbacks_of_weekly_view ~(weekly : Bar_panels.weekly_view) :
     changes at split boundaries — used by
     {!Stock_analysis._scan_max_high_callback} / [_scan_min_low_callback] to
     truncate the lookback window at the most recent split (G14). *)
-let _split_factor_of_weekly_view (weekly : Bar_panels.weekly_view) :
+let _split_factor_of_weekly_view (weekly : Snapshot_bar_views.weekly_view) :
     week_offset:int -> float option =
   let n = Array.length weekly.raw_closes in
   let m = Array.length weekly.closes in
@@ -227,8 +226,8 @@ let _split_factor_of_weekly_view (weekly : Bar_panels.weekly_view) :
         if Float.( <= ) raw 0.0 then None else Some (weekly.closes.(idx) /. raw)
 
 let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
-    ~(config : Stock_analysis.config) ~(stock : Bar_panels.weekly_view)
-    ~(benchmark : Bar_panels.weekly_view) () : Stock_analysis.callbacks =
+    ~(config : Stock_analysis.config) ~(stock : Snapshot_bar_views.weekly_view)
+    ~(benchmark : Snapshot_bar_views.weekly_view) () : Stock_analysis.callbacks =
   {
     get_high = _get_from_float_array stock.highs;
     get_volume = _get_from_float_array stock.volumes;
@@ -246,8 +245,8 @@ let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
 (* ------------------------------------------------------------------ *)
 
 let sector_callbacks_of_weekly_views ?ma_cache ?sector_symbol
-    ~(config : Sector.config) ~(sector : Bar_panels.weekly_view)
-    ~(benchmark : Bar_panels.weekly_view) () : Sector.callbacks =
+    ~(config : Sector.config) ~(sector : Snapshot_bar_views.weekly_view)
+    ~(benchmark : Snapshot_bar_views.weekly_view) () : Sector.callbacks =
   {
     stage =
       stage_callbacks_of_weekly_view ?ma_cache ?symbol:sector_symbol
@@ -295,15 +294,15 @@ let _get_ad_momentum_ma (ma : float option) : week_offset:int -> float option =
    so the lost cache hit is negligible vs the universe-wide screener loop;
    pass-through is intentionally bar-list-only (cache-miss path). *)
 let _named_global_stage ?ma_cache (config : Macro.config)
-    ((name, view) : string * Bar_panels.weekly_view) : string * Stage.callbacks
+    ((name, view) : string * Snapshot_bar_views.weekly_view) : string * Stage.callbacks
     =
   ( name,
     stage_callbacks_of_weekly_view ?ma_cache ~config:config.stage_config
       ~weekly:view () )
 
 let macro_callbacks_of_weekly_views ?ma_cache ?index_symbol
-    ~(config : Macro.config) ~(index : Bar_panels.weekly_view)
-    ~(globals : (string * Bar_panels.weekly_view) list)
+    ~(config : Macro.config) ~(index : Snapshot_bar_views.weekly_view)
+    ~(globals : (string * Snapshot_bar_views.weekly_view) list)
     ~(ad_bars : Macro.ad_bar list) () : Macro.callbacks =
   let cum_ad_arr = _build_cumulative_ad_array ad_bars in
   let ma_scalar =
@@ -326,9 +325,9 @@ let macro_callbacks_of_weekly_views ?ma_cache ?index_symbol
 (* ------------------------------------------------------------------ *)
 
 (** {!Support_floor.callbacks} use the convention day_offset:0 = newest bar in
-    the eligible window. Our {!Bar_panels.daily_view} is laid out the other way
+    the eligible window. Our {!Snapshot_bar_views.daily_view} is laid out the other way
     (index 0 = oldest, n_days-1 = newest). The closure does the index flip. *)
-let support_floor_callbacks_of_daily_view (view : Bar_panels.daily_view) :
+let support_floor_callbacks_of_daily_view (view : Snapshot_bar_views.daily_view) :
     Weinstein_stops.callbacks =
   let n = view.n_days in
   let lookup f ~day_offset =
@@ -355,7 +354,7 @@ let support_floor_callbacks_of_daily_view (view : Bar_panels.daily_view) :
    the underlying bar view via {!Snapshot_bar_views.weekly_view_for} /
    [daily_view_for] before delegating to the corresponding
    [*_of_*_view] constructor above. The fetched [Snapshot_bar_views]
-   view types are type-equal to {!Bar_panels.weekly_view} /
+   view types are type-equal to {!Snapshot_bar_views.weekly_view} /
    [daily_view] (declared via [type =] in [snapshot_bar_views.mli]),
    so the delegation requires no per-call adapter. Output is
    bit-identical to the panel-backed path on the same underlying bar

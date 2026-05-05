@@ -241,7 +241,7 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     "previous Friday" snapshot. *)
 let _full_analysis_of_survivor ~bar_reader ~index_view
     ( ticker,
-      (stock_view : Data_panel.Bar_panels.weekly_view),
+      (stock_view : Snapshot_runtime.Snapshot_bar_views.weekly_view),
       prior_stage,
       (_stage_result : Stage.result) ) =
   let as_of_date = stock_view.dates.(stock_view.n - 1) in
@@ -275,7 +275,7 @@ let _commit_prior_stages ~prior_stages classified =
     the .mli for the full contract. *)
 let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
     ~current_date () :
-    (string * Data_panel.Bar_panels.weekly_view * Stage.result) list =
+    (string * Snapshot_runtime.Snapshot_bar_views.weekly_view * Stage.result) list =
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
@@ -352,7 +352,7 @@ let _screen_universe ~config ~index_view ~(macro_result : Macro.result)
     Stage 4 PR-A: takes the panel weekly view directly. The screening day is the
     date of the most recent bar in the view (the Friday of the latest week, by
     week-bucket aggregation). *)
-let _is_screening_day_view (view : Data_panel.Bar_panels.weekly_view) =
+let _is_screening_day_view (view : Snapshot_runtime.Snapshot_bar_views.weekly_view) =
   if view.n = 0 then false
   else
     Date.day_of_week view.dates.(view.n - 1)
@@ -481,7 +481,7 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
   let positions = portfolio.positions in
   (* G13: non-trading-day short-circuit. The simulator iterates calendar
      days (Mon-Fri including holidays), so [_on_market_close] is invoked on
-     days that have no bar in [Bar_panels]. When [get_price] returns [None]
+     days that have no bar in the snapshot. When [get_price] returns [None]
      for the primary index, every other [get_price] this tick also returns
      [None], so:
 

@@ -8,7 +8,6 @@
   test_force_liquidation_runner
   test_force_liquidation_strategy
   test_macro_inputs
-  test_macro_panel_callbacks_real_data
   test_panel_callbacks
   test_short_side_bear_window
   test_stops_runner

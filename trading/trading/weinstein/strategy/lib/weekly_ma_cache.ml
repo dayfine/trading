@@ -1,7 +1,6 @@
 (** See [weekly_ma_cache.mli]. *)
 
 open Core
-module Bar_panels = Data_panel.Bar_panels
 module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 
@@ -30,12 +29,10 @@ end
 
 type cached_ma = { values : float array; dates : Date.t array }
 
-(* Phase F.3.b-1: backing-agnostic representation. [weekly_history_fn] is
-   the single seam — both [create] (panels) and [of_snapshot_views]
-   (snapshot) produce a closure of this shape that returns the symbol's
-   full weekly history (closes + dates, oldest first). The cache table
-   then memoises MA computations over those arrays, identically for both
-   backings. *)
+(* [weekly_history_fn] is the single seam: [of_snapshot_views] produces a
+   closure of this shape that returns the symbol's full weekly history
+   (closes + dates, oldest first). The cache table memoises MA
+   computations over those arrays. *)
 type t = {
   weekly_history_fn : string -> float array * Date.t array;
   table : cached_ma Key.Table.t;
@@ -70,21 +67,6 @@ let _compute_ma_array ~(ma_type : Stage.ma_type) ~(period : int)
         date_arr.(i) <- iv.Indicator_types.date);
     (values, date_arr)
 
-(* Read the symbol's full weekly history from [panels] using the largest
-   available [as_of_day] (the last column of the panel's calendar). Returns
-   the chronological closes + dates arrays (oldest first). Empty arrays
-   when the symbol has no resident bars or the panel has zero days. *)
-let _panels_weekly_history (panels : Bar_panels.t) (symbol : string) :
-    float array * Date.t array =
-  let n_days = Bar_panels.n_days panels in
-  if n_days = 0 then ([||], [||])
-  else
-    let view =
-      Bar_panels.weekly_view_for panels ~symbol ~n:Int.max_value
-        ~as_of_day:(n_days - 1)
-    in
-    (view.closes, view.dates)
-
 (* Read the symbol's full weekly history via [Snapshot_bar_views] over a
    [Snapshot_callbacks.t]. The semantics match the panel reader's: chronological
    (oldest first), close = adjusted close of the last trading day in each
@@ -115,12 +97,6 @@ let _snapshot_weekly_history (cb : Snapshot_callbacks.t) ~(max_as_of : Date.t)
       Array.of_list (List.map weekly ~f:(fun b -> b.Types.Daily_price.date))
     in
     (closes, dates)
-
-let create panels =
-  {
-    weekly_history_fn = _panels_weekly_history panels;
-    table = Key.Table.create ();
-  }
 
 let of_snapshot_views cb ~max_as_of =
   {
