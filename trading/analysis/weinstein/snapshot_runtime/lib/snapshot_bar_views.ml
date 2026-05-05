@@ -26,15 +26,11 @@ let _empty_weekly_view : weekly_view =
 let _empty_daily_view : daily_view =
   { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
 
-(* Calendar slack for date-keyed windows. The snapshot fan-out is per-field
-   over an inclusive [from, until] window; [from] is computed by walking back
-   from [as_of]. We need enough slack to cover weekends + holidays + partial
-   weeks. Empirically:
-   - daily lookback: 1.5x trading-day slack covers ~250-day weekend/holiday
-     ratios; we round up.
-   - weekly: 8x weeks-to-days conversion (7 weekdays + 1 holiday slack) covers
-     ISO-week buckets + a partial leading week. *)
-let _daily_calendar_span ~lookback = (lookback * 3 / 2) + 7
+(* Calendar slack for date-keyed weekly windows. The snapshot fan-out is
+   per-field over an inclusive [from, until] window; [from] is computed by
+   walking back from [as_of]. We need enough slack to cover weekends +
+   holidays + partial weeks. 8x weeks-to-days conversion (7 weekdays + 1
+   holiday slack) covers ISO-week buckets + a partial leading week. *)
 let _weekly_calendar_span ~n = (n * 8) + 7
 
 (* Fetch one field's history; return [] (not an error) on any failure. The
@@ -64,11 +60,12 @@ let _table_of (rows : (Date.t * float) list) =
 let _round_volume v =
   if Float.is_nan v then 0 else Int.of_float (Float.round_nearest v)
 
-let _assemble_daily_bars ~adj ~close ~high ~low ~volume :
+let _assemble_daily_bars ~adj ~close ~high ~low ~open_ ~volume :
     Types.Daily_price.t list =
   let adj_t = _table_of adj in
   let high_t = _table_of high in
   let low_t = _table_of low in
+  let open_t = _table_of open_ in
   let vol_t = _table_of volume in
   let bar_for (date, close_v) =
     if Float.is_nan close_v then None
@@ -77,13 +74,14 @@ let _assemble_daily_bars ~adj ~close ~high ~low ~volume :
         ( Hashtbl.find adj_t date,
           Hashtbl.find high_t date,
           Hashtbl.find low_t date,
+          Hashtbl.find open_t date,
           Hashtbl.find vol_t date )
       with
-      | Some adj_v, Some high_v, Some low_v, Some vol_v ->
+      | Some adj_v, Some high_v, Some low_v, Some open_v, Some vol_v ->
           Some
             {
               Types.Daily_price.date;
-              open_price = Float.nan;
+              open_price = open_v;
               high_price = high_v;
               low_price = low_v;
               close_price = close_v;
@@ -140,8 +138,9 @@ let _daily_bars_in_range cb ~symbol ~from ~as_of =
     let adj = read Snapshot_schema.Adjusted_close in
     let high = read Snapshot_schema.High in
     let low = read Snapshot_schema.Low in
+    let open_ = read Snapshot_schema.Open in
     let volume = read Snapshot_schema.Volume in
-    _assemble_daily_bars ~adj ~close ~high ~low ~volume
+    _assemble_daily_bars ~adj ~close ~high ~low ~open_ ~volume
 
 let weekly_view_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of =
   if n <= 0 then _empty_weekly_view
@@ -182,82 +181,100 @@ let weekly_bars_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of :
       let len = List.length weekly in
       if len <= n then weekly else List.drop weekly (len - n)
 
-(* Take the trailing [k] elements of a list. [k <= 0] yields []. *)
-let _take_trailing l k =
-  if k <= 0 then []
-  else
-    let n = List.length l in
-    if n <= k then l else List.drop l (n - k)
+(* Mon-Fri only — no NYSE holiday calendar. The panel's runtime calendar
+   ([Panel_runner._build_calendar] / [diag_panel_vs_snapshot_extended._build_calendar])
+   is built the same way, so the two paths walk the same set of dates. *)
+let _is_weekday d =
+  match Date.day_of_week d with
+  | Day_of_week.Sat | Day_of_week.Sun -> false
+  | _ -> true
 
-let _daily_view_of_close_high_low ~close ~high ~low : daily_view =
-  let high_t = _table_of high in
-  let low_t = _table_of low in
-  (* Walk the close list once; emit a row iff close is non-NaN and the
-     high/low tables both contain the same date. *)
-  let rows =
-    List.filter_map close ~f:(fun (date, close_v) ->
-        if Float.is_nan close_v then None
-        else
-          match (Hashtbl.find high_t date, Hashtbl.find low_t date) with
-          | Some high_v, Some low_v -> Some (date, high_v, low_v, close_v)
-          | _ -> None)
+(* Build the [n] weekday dates ending at [as_of] (inclusive), in chronological
+   order. [as_of] must itself be a weekday (caller checks). Walks back day by
+   day, skipping Sat/Sun, until [n] dates have been collected. *)
+let _weekdays_ending_at ~as_of ~n =
+  let rec loop d acc remaining =
+    if remaining = 0 then acc
+    else if _is_weekday d then
+      loop (Date.add_days d (-1)) (d :: acc) (remaining - 1)
+    else loop (Date.add_days d (-1)) acc remaining
   in
-  let n = List.length rows in
-  if n = 0 then _empty_daily_view
-  else
-    let arr_of f = Array.of_list (List.map rows ~f) in
-    {
-      highs = arr_of (fun (_, h, _, _) -> h);
-      lows = arr_of (fun (_, _, l, _) -> l);
-      closes = arr_of (fun (_, _, _, c) -> c);
-      dates = arr_of (fun (d, _, _, _) -> d);
-      n_days = n;
-    }
+  loop as_of [] n
 
 (* Bar_panels.daily_view_for walks the last [lookback] calendar columns
-   ending at [as_of_day], NaN-skips, returns the rest. The panel's calendar
-   is trading days, so "last [lookback] columns" = "last [lookback] trading
-   days". The snapshot has one row per trading day; we trim the [Close]
-   history to its trailing [lookback] rows BEFORE the NaN-skip so the count
-   matches the panel's "lookback - n_nan_skipped" semantics. *)
+   ending at [as_of_day] (the panel calendar is all weekdays Mon-Fri,
+   including holidays — see [Panel_runner._build_calendar]) and NaN-skips
+   per cell. Result count = lookback − n_nan_cells_in_window.
+
+   Snapshot equivalent: build the same [lookback] weekday window ending at
+   [as_of], look up Close/High/Low per date in the snapshot, drop dates
+   missing from the snapshot (= holidays / no-data days, panel cell would
+   be NaN there) and dates whose Close field is NaN (matches panel's NaN
+   skip on the close panel). *)
 let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback =
-  if lookback <= 0 then _empty_daily_view
+  if lookback <= 0 || not (_is_weekday as_of) then _empty_daily_view
   else
-    let from = Date.add_days as_of (-_daily_calendar_span ~lookback) in
+    let weekdays = _weekdays_ending_at ~as_of ~n:lookback in
+    let from = match weekdays with [] -> as_of | d :: _ -> d in
     let read field =
       _read_history_or_empty cb ~symbol ~from ~until:as_of ~field
     in
-    let close_all = read Snapshot_schema.Close in
-    if List.is_empty close_all then _empty_daily_view
+    let close_t = _table_of (read Snapshot_schema.Close) in
+    let high_t = _table_of (read Snapshot_schema.High) in
+    let low_t = _table_of (read Snapshot_schema.Low) in
+    let rows =
+      List.filter_map weekdays ~f:(fun date ->
+          match Hashtbl.find close_t date with
+          | None -> None
+          | Some close_v when Float.is_nan close_v -> None
+          | Some close_v -> (
+              match (Hashtbl.find high_t date, Hashtbl.find low_t date) with
+              | Some high_v, Some low_v -> Some (date, high_v, low_v, close_v)
+              | _ -> None))
+    in
+    let n = List.length rows in
+    if n = 0 then _empty_daily_view
     else
-      let close = _take_trailing close_all lookback in
-      let high = read Snapshot_schema.High in
-      let low = read Snapshot_schema.Low in
-      _daily_view_of_close_high_low ~close ~high ~low
+      let arr_of f = Array.of_list (List.map rows ~f) in
+      {
+        highs = arr_of (fun (_, h, _, _) -> h);
+        lows = arr_of (fun (_, _, l, _) -> l);
+        closes = arr_of (fun (_, _, _, c) -> c);
+        dates = arr_of (fun (d, _, _, _) -> d);
+        n_days = n;
+      }
 
-(* low_window: produce a Bigarray.Array1.t holding the last [len] daily Low
-   values ending at as_of. Bar_panels.low_window returns None when fewer than
-   [len] cells are available; we mirror that contract here.
+(* low_window: produce a Bigarray.Array1.t holding the [len] daily Low values
+   ending at [as_of]. Bar_panels.low_window slices the raw Low panel over
+   [len] calendar columns and does NOT NaN-skip — NaN cells (holidays /
+   pre-IPO / suspended days) are passed through. The panel returns [None] only
+   when the symbol is not in the universe or the requested window falls
+   outside the panel's calendar.
 
-   Bar_panels' low_window does NOT NaN-skip — it returns a raw panel slice
-   that includes any NaN cells. We follow that contract here: if the snapshot
-   reports rows but some Low values are NaN, those NaNs are included. The
-   caller (the support-floor primitive) is the one that decides what to do
-   with NaN. *)
+   Snapshot equivalent: build [len] weekday dates ending at [as_of], look up
+   Low per date in the snapshot, fill missing dates (holidays / pre-IPO /
+   suspended days) with NaN. The snapshot's [Ok []] case (symbol is in the
+   manifest but has no rows in the window — typically pre-IPO) corresponds to
+   the panel's "row is all NaN in the window", so we return [Some all_nan]
+   rather than [None] to match panel parity.
+
+   Returns [None] when [len <= 0], [as_of] is not a weekday, or
+   [read_field_history] errors (symbol unknown, schema skew, etc.). *)
 let low_window (cb : Snapshot_callbacks.t) ~symbol ~as_of ~len =
-  if len <= 0 then None
+  if len <= 0 || not (_is_weekday as_of) then None
   else
-    let from = Date.add_days as_of (-_daily_calendar_span ~lookback:len) in
+    let weekdays = _weekdays_ending_at ~as_of ~n:len in
+    let from = match weekdays with [] -> as_of | d :: _ -> d in
     match
       cb.read_field_history ~symbol ~from ~until:as_of
         ~field:Snapshot_schema.Low
     with
     | Error _ -> None
     | Ok rows ->
-        let n = List.length rows in
-        if n < len then None
-        else
-          let trailing = List.drop rows (n - len) in
-          let buf = BA1.create Bigarray.Float64 Bigarray.C_layout len in
-          List.iteri trailing ~f:(fun i (_, v) -> BA1.set buf i v);
-          Some buf
+        let low_t = _table_of rows in
+        let buf = BA1.create Bigarray.Float64 Bigarray.C_layout len in
+        List.iteri weekdays ~f:(fun i d ->
+            match Hashtbl.find low_t d with
+            | Some v -> BA1.set buf i v
+            | None -> BA1.set buf i Float.nan);
+        Some buf

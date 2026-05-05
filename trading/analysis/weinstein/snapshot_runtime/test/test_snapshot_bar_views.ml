@@ -386,6 +386,141 @@ let test_nan_close_skipped_in_daily_view _ =
   assert_that (Set.mem snapshot_dates_set nan_date) (equal_to false);
   _assert_daily_views_equal panel_view snapshot_view
 
+(* --- Holiday-gap parity (issue #848 regression) -------------------------
+
+   The pre-#848 snapshot path computed [from] from a calendar-day delta and
+   took the trailing [lookback] CSV rows, which under-counted by zero
+   relative to the panel — but treated all-trading-day windows. For windows
+   that include market holidays (panel calendar is all weekdays Mon-Fri,
+   including holidays; panel cell on a holiday is NaN; snapshot has no row
+   for that date), the panel returned [n_days = lookback - n_holidays] while
+   the snapshot returned [n_days = lookback]. Same load-bearing divergence
+   for [low_window]: panel returned a slice of [len] cells with NaNs at
+   holiday positions; snapshot returned the trailing [len] real-row Lows.
+
+   The fix walks the same [lookback] / [len] weekday window in both paths
+   and skips/NaN-fills holiday positions on the snapshot side. These tests
+   exercise both. *)
+
+let _bars_skip_holiday ~holiday_date ~symbol ~date =
+  let symbol_seed = match symbol with "EEE" -> 40 | _ -> -1000 in
+  if symbol_seed < 0 then None
+  else if Date.equal date holiday_date then None
+  else
+    match Array.findi _calendar_60 ~f:(fun _ d -> Date.equal d date) with
+    | Some (i, _) -> Some (_make_bar ~date ~symbol_seed ~day_offset:i)
+    | None -> None
+
+let test_daily_view_holiday_gap_parity _ =
+  (* Place the holiday well inside the lookback window so both paths must
+     drop it from their bar set. *)
+  let holiday_date = _calendar_60.(20) in
+  let bars = _bars_skip_holiday ~holiday_date in
+  let symbols = [ "EEE" ] in
+  let bp =
+    _build_bar_panels ~symbols ~calendar:_calendar_60 ~bars_for_symbol:bars
+  in
+  let cb =
+    _build_snapshot_callbacks ~symbols ~calendar:_calendar_60
+      ~bars_for_symbol:bars
+  in
+  let as_of = _calendar_60.(30) in
+  let as_of_day = _column_of_date_exn bp as_of in
+  let panel_view =
+    Bar_panels.daily_view_for bp ~symbol:"EEE" ~as_of_day ~lookback:25
+  in
+  let snapshot_view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"EEE" ~as_of ~lookback:25
+  in
+  (* The panel's window is [as_of_day - 24 .. as_of_day] = 25 columns ending
+     at index 30, so columns 6..30. The holiday lives at column 20 → both
+     paths see exactly one missing weekday in the window → n_days = 24. The
+     load-bearing assertions: counts agree, holiday absent from result, and
+     every emitted row matches the panel cell-for-cell. *)
+  assert_that snapshot_view.n_days (equal_to panel_view.n_days);
+  assert_that snapshot_view.n_days (equal_to 24);
+  assert_that
+    (Set.mem (Date.Set.of_array snapshot_view.dates) holiday_date)
+    (equal_to false);
+  _assert_daily_views_equal panel_view snapshot_view
+
+let test_low_window_holiday_gap_parity _ =
+  let holiday_date = _calendar_60.(20) in
+  let bars = _bars_skip_holiday ~holiday_date in
+  let symbols = [ "EEE" ] in
+  let bp =
+    _build_bar_panels ~symbols ~calendar:_calendar_60 ~bars_for_symbol:bars
+  in
+  let cb =
+    _build_snapshot_callbacks ~symbols ~calendar:_calendar_60
+      ~bars_for_symbol:bars
+  in
+  let as_of = _calendar_60.(30) in
+  let as_of_day = _column_of_date_exn bp as_of in
+  let panel = Bar_panels.low_window bp ~symbol:"EEE" ~as_of_day ~len:25 in
+  let snapshot =
+    Snapshot_bar_views.low_window cb ~symbol:"EEE" ~as_of ~len:25
+  in
+  match (panel, snapshot) with
+  | Some p, Some s ->
+      let pa = Array.of_list (_bigarray_to_list p) in
+      let sa = Array.of_list (_bigarray_to_list s) in
+      _float_arrays_bit_equal pa sa ~msg:"low_window with holiday gap";
+      (* Holiday position in the window is column 20 - (30 - 25 + 1) + 1 =
+         index 14 (0-indexed). Both panel and snapshot must report NaN
+         there. Asserting on the snapshot side proves the NaN-passthrough. *)
+      assert_that (Float.is_nan sa.(14)) (equal_to true)
+  | _ -> assert_failure "low_window holiday-gap parity: one side returned None"
+
+let test_low_window_pre_ipo_returns_some_all_nan _ =
+  (* Symbol exists in the manifest but has zero rows in the requested
+     window — panel returns a slice over an all-NaN row → Some all-NaN.
+     Pre-fix: snapshot returned None (mis-mapping pre-IPO to "no history").
+     Post-fix: snapshot returns Some all-NaN to match. *)
+  let _, cb = _setup_3sym () in
+  (* Pick an as_of weekday far before the fixture starts so every weekday in
+     the lookup window is pre-history for AAA. _calendar_60 starts at
+     2024-01-02, so 2020-01-06 (Monday) is well before. *)
+  let pre_history_weekday = _ymd 2020 1 6 in
+  let snapshot =
+    Snapshot_bar_views.low_window cb ~symbol:"AAA" ~as_of:pre_history_weekday
+      ~len:5
+  in
+  let snapshot_arr =
+    match snapshot with
+    | None -> assert_failure "expected Some all-NaN, got None"
+    | Some buf ->
+        if Bigarray.Array1.dim buf <> 5 then
+          assert_failure
+            (sprintf "expected Bigarray dim=5, got %d" (Bigarray.Array1.dim buf));
+        Array.of_list (_bigarray_to_list buf)
+  in
+  let n_nan = Array.count snapshot_arr ~f:Float.is_nan in
+  assert_that n_nan (equal_to 5)
+
+let test_daily_bars_for_returns_non_nan_open _ =
+  (* Issue #848 finding 1: the snapshot path's [_assemble_daily_bars]
+     hardcoded [open_price = Float.nan]. Post-fix it reads
+     [Snapshot_schema.Open] alongside the other fields. *)
+  let _, cb = _setup_3sym () in
+  let as_of = _calendar_60.(Array.length _calendar_60 - 1) in
+  let bars = Snapshot_bar_views.daily_bars_for cb ~symbol:"AAA" ~as_of in
+  let n = List.length bars in
+  assert_that n (gt (module Int_ord) 0);
+  (* Every bar's open must be finite (matches the synthetic fixture, which
+     populates Open via [_make_bar.open_price]). *)
+  let n_nan_open = List.count bars ~f:(fun b -> Float.is_nan b.open_price) in
+  assert_that n_nan_open (equal_to 0);
+  (* Spot-check the first bar's open against the fixture formula. *)
+  let first = List.hd_exn bars in
+  let day_offset =
+    Array.findi_exn _calendar_60 ~f:(fun _ d -> Date.equal d first.date) |> fst
+  in
+  let expected =
+    (_make_bar ~date:first.date ~symbol_seed:0 ~day_offset).open_price
+  in
+  assert_that first.open_price (float_equal expected)
+
 (* --- Suite ---------------------------------------------------------- *)
 
 let suite =
@@ -408,6 +543,14 @@ let suite =
          >:: test_zero_n_or_lookback_yields_empty_views;
          "NaN close skipped in daily_view"
          >:: test_nan_close_skipped_in_daily_view;
+         "daily_view_for holiday gap parity (#848)"
+         >:: test_daily_view_holiday_gap_parity;
+         "low_window holiday gap parity (#848)"
+         >:: test_low_window_holiday_gap_parity;
+         "low_window pre-IPO returns Some all-NaN (#848)"
+         >:: test_low_window_pre_ipo_returns_some_all_nan;
+         "daily_bars_for returns non-NaN open (#848)"
+         >:: test_daily_bars_for_returns_non_nan_open;
        ]
 
 let () = run_test_tt_main suite

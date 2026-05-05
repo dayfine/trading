@@ -122,13 +122,18 @@ val daily_view_for :
 (** [daily_view_for cb ~symbol ~as_of ~lookback] returns up to [lookback] daily
     bars ending on or before [as_of] for [symbol].
 
-    Reads the [High], [Low], [Close] field histories from [cb] over a calendar
-    window slightly longer than [lookback] (to account for weekends / holidays
-    in the date-keyed range), aligns them by date, drops bars where [Close] is
-    NaN, and truncates to the trailing [lookback] entries.
+    Window definition matches {!Data_panel.Bar_panels.daily_view_for}: walks the
+    [lookback] weekday dates (Mon-Fri) ending at [as_of] inclusive — not the
+    NYSE-trading-day calendar — and looks each up in the snapshot. Dates absent
+    from the snapshot (holidays / pre-IPO / suspended days) and dates whose
+    [Close] field is NaN are skipped, so [n_days] = [lookback] −
+    [n_skipped_in_window]. The bar at index 0 is the oldest non-skipped bar.
 
     Returns the empty view ([n_days = 0], all arrays empty) when:
     - [lookback <= 0]
+    - [as_of] is a Saturday or Sunday (matches the panel calendar's "no weekend
+      columns" semantics — [Bar_panels.column_of_date] returns [None] for
+      weekends and the panel caller treats that as empty)
     - [symbol] is not in the snapshot manifest
     - no resident snapshot rows fall in the calendar window
     - any required field read fails. *)
@@ -144,17 +149,12 @@ val daily_bars_for :
     surface (consumed by [Stops_split_runner._last_two_bars] for split detection
     and [Entry_audit_capture._effective_entry_price]).
 
-    Reads the [Adjusted_close], [Close], [High], [Low], and [Volume] field
-    histories from [cb] over a fixed-width calendar window (10 years ≈ 3653
-    days, conservatively wide so historical strategies see the symbol's full
-    backtest history), aligns them by date, drops bars where [Close] is NaN, and
-    returns the assembled list.
-
-    {b open_price NaN.} The [Snapshot_schema.Open] field is not currently
-    surfaced — every returned bar has [open_price = Float.nan]. None of the
-    in-tree consumers of {!Bar_reader.daily_bars_for} read [open_price], so this
-    is sound today; if a future caller needs it, fold [Open] into
-    [_assemble_daily_bars]'s input set.
+    Reads the [Open], [Adjusted_close], [Close], [High], [Low], and [Volume]
+    field histories from [cb] over a fixed-width calendar window (10 years ≈
+    3653 days, conservatively wide so historical strategies see the symbol's
+    full backtest history), aligns them by date, drops bars where [Close] is NaN
+    or where any other read field has no row for the date, and returns the
+    assembled list.
 
     Returns the empty list when:
     - [symbol] is not in the snapshot manifest
@@ -189,10 +189,18 @@ val low_window :
     zero-copy panel slice — the snapshot path has no contiguous source array to
     slice. The buffer is owned by the caller; mutations are local.
 
+    Window definition matches {!Data_panel.Bar_panels.low_window}: walks the
+    [len] weekday dates (Mon-Fri) ending at [as_of] inclusive and fetches Low
+    per date. Dates absent from the snapshot (holidays / pre-IPO / suspended
+    days) are NaN-filled in the output (the panel slice contains the panel's NaN
+    cells; this matches that). NaN Low values from the snapshot are also passed
+    through. The caller (the support-floor primitive) decides what NaN means.
+
     Returns [None] when:
     - [len <= 0]
+    - [as_of] is a Saturday or Sunday
     - [symbol] is not in the snapshot manifest
-    - the snapshot has fewer than [len] resident bars ending at [as_of]
+    - no resident snapshot rows fall in the resulting weekday window
     - the [Low] field read fails.
 
     [Some buf] guarantees [Bigarray.Array1.dim buf = len], with the most recent
