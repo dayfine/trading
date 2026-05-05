@@ -3,16 +3,10 @@
     Backend-agnostic facade over the OHLCV bar reads the strategy needs (daily
     bar lists, weekly aggregates, daily / weekly views).
 
-    - {!of_panels} — backed by a {!Data_panel.Bar_panels.t} loaded from CSV at
-      runner start. Restored by the partial revert of #828's strategy-side flip
-      (closes #843; see `dev/notes/parity-bisect-...md` for the bisect record).
-      The runner's strategy uses this reader; flipping back to
-      {!of_snapshot_views} requires resolving the path-dependent divergence
-      first.
     - {!of_snapshot_views} — backed by {!Snapshot_runtime.Snapshot_callbacks},
       the LRU-bounded daily-snapshot reader that streams rows from per-symbol
-      [.snap] files on demand. Used directly by parity / migration tests; the
-      runner does not use this for the strategy until the forward fix lands.
+      [.snap] files on demand. The production runner uses this for the strategy
+      after the #848 forward fix landed (#864 + #866).
     - {!of_in_memory_bars} — convenience constructor that materialises a tmp
       snapshot directory from in-memory [(symbol, bars)] pairs. Used by tests
       and tools that hold bar histories in memory.
@@ -22,28 +16,15 @@
     Internally [Bar_reader.t] is a record of closures; the constructors capture
     their backing's read primitives and produce identical-shape closures, so the
     strategy's downstream callees see one bar-reading API regardless of backing.
-*)
+
+    {b Phase F.3.e-2}: the legacy {!Data_panel.Bar_panels}-backed [of_panels]
+    constructor + [_panel_*] helpers were deleted in this PR; production code
+    has been on {!of_snapshot_views} since #864/#866. *)
 
 open Core
 
 type t
 (** Opaque bar source. *)
-
-val of_panels : ?ma_cache:Weekly_ma_cache.t -> Data_panel.Bar_panels.t -> t
-(** [of_panels ?ma_cache panels] produces a reader backed by a
-    {!Data_panel.Bar_panels.t}.
-
-    All four readers ([daily_bars_for], [weekly_bars_for], [weekly_view_for],
-    [daily_view_for]) wrap the corresponding [Bar_panels] primitive plus a
-    [column_of_date] guard. Returns the empty list / empty view when [as_of] is
-    not in the panel's calendar.
-
-    [ma_cache], when supplied, is exposed via {!ma_cache} so the strategy's
-    cache-aware MA paths can read it without re-walking the panel.
-
-    Restored by the partial revert of #828's strategy-side flip (see module
-    docstring). This is the runner's strategy bar-reader path until the forward
-    fix lands. *)
 
 val of_snapshot_views :
   ?calendar:Date.t array -> Snapshot_runtime.Snapshot_callbacks.t -> t
@@ -65,9 +46,10 @@ val of_snapshot_views :
 
     Returns the empty view / empty list when the symbol is unknown, [as_of] is
     before any resident snapshot row, or any underlying field-read failure
-    fires. The view types ({!Data_panel.Bar_panels.weekly_view} / [daily_view])
-    are shared with the panel module's view definitions for historical reasons;
-    {!Panel_callbacks} consumes them directly. *)
+    fires. The view types ({!Snapshot_runtime.Snapshot_bar_views.weekly_view} /
+    [daily_view]) are shared with the panel module's view definitions
+    (re-exported from {!Data_panel.Bar_panels} until F.3.e-3 deletes that
+    module); {!Panel_callbacks} consumes them directly. *)
 
 val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
 (** [of_in_memory_bars symbol_bars] produces a snapshot-backed reader from a
@@ -75,8 +57,8 @@ val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
 
     Convenience constructor for tests and tools that hold bar histories in
     memory (rather than reading them from a CSV corpus). Materialises a tmp
-    snapshot directory and routes reads through {!of_snapshot_views} — no
-    {!Data_panel.Bar_panels.t} allocation.
+    snapshot directory and routes reads through {!of_snapshot_views} — no panel
+    allocation.
 
     Internally: 1. A fresh tmp directory is allocated via
     [Stdlib.Filename.temp_dir]. 2. For each [(symbol, bars)] pair,
@@ -104,9 +86,12 @@ val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
 
 val ma_cache : t -> Weekly_ma_cache.t option
 (** [ma_cache t] returns the cache the reader was constructed with, or [None]
-    when no cache was provided. Currently only {!of_panels} accepts a cache;
-    {!of_snapshot_views} / {!of_in_memory_bars} / {!empty} always set this to
-    [None]. *)
+    when no cache was provided. After F.3.e-2 every constructor sets this to
+    [None]; the strategy's cache-aware MA paths now route through
+    {!Panel_callbacks.X_of_snapshot_views}'s built-in caching. Kept on the
+    public surface so existing strategy callsites
+    ([Bar_reader.ma_cache bar_reader]) continue to compile and degrade to the
+    inline-MA path uniformly. *)
 
 val snapshot_callbacks : t -> Snapshot_runtime.Snapshot_callbacks.t
 (** [snapshot_callbacks t] returns the underlying field-accessor shim for
@@ -115,14 +100,13 @@ val snapshot_callbacks : t -> Snapshot_runtime.Snapshot_callbacks.t
     / d-2 caller migration) via the [*_of_snapshot_views] APIs on
     {!Macro_inputs}.
 
-    For panel-backed and empty readers ({!of_panels} / {!empty}), returns a
-    sentinel cb whose every [read_field] / [read_field_history] returns
-    [Error NotFound]. {!Snapshot_runtime.Snapshot_bar_views} folds these
-    NotFound results to the empty view / empty list, so callers see the "no
-    bars" surface that matches these readers' contract. Production runs use only
-    snapshot-backed readers, so the sentinel is exercised only in tests that
-    never reach a macro / sector read (typically the no-primary-bar
-    short-circuit in [_on_market_close]). *)
+    For empty readers ({!empty}), returns a sentinel cb whose every [read_field]
+    / [read_field_history] returns [Error NotFound].
+    {!Snapshot_runtime.Snapshot_bar_views} folds these NotFound results to the
+    empty view / empty list, so callers see the "no bars" surface that matches
+    {!empty}'s contract. Production runs use only snapshot-backed readers, so
+    the sentinel is exercised only in tests that never reach a macro / sector
+    read (typically the no-primary-bar short-circuit in [_on_market_close]). *)
 
 val empty : unit -> t
 (** [empty ()] produces a reader whose every read returns the empty list / empty
@@ -135,44 +119,39 @@ val empty : unit -> t
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list
 (** [daily_bars_for t ~symbol ~as_of] returns daily bars for [symbol] up to and
-    including [as_of], in chronological order (oldest first).
-
-    Bars are reconstructed from the panel columns [0..as_of_day]. Returns the
-    empty list when the symbol has no resident bars or [as_of] is out of the
-    panel calendar. *)
+    including [as_of], in chronological order (oldest first). Returns the empty
+    list when the symbol has no resident bars or [as_of] is before any resident
+    snapshot row. *)
 
 val weekly_bars_for :
   t -> symbol:string -> n:int -> as_of:Date.t -> Types.Daily_price.t list
 (** [weekly_bars_for t ~symbol ~n ~as_of] returns the most recent [n]
-    weekly-aggregated bars for [symbol] as of [as_of]. Same semantics as
-    {!Data_panel.Bar_panels.weekly_bars_for}.
-
-    Returns the empty list when the symbol has no resident bars or [as_of] is
-    out of the panel calendar. *)
+    weekly-aggregated bars for [symbol] as of [as_of]. Same aggregation
+    semantics as {!Snapshot_runtime.Snapshot_bar_views.weekly_bars_for}. *)
 
 (** {1 Float-array views (Stage 4 PR-A)}
 
-    Pass-throughs to the underlying {!Data_panel.Bar_panels} float-array
-    primitives. Use these in production hot paths to avoid materialising a
-    {!Types.Daily_price.t list} per call site per tick. *)
+    Pass-throughs to the underlying {!Snapshot_runtime.Snapshot_bar_views}
+    float-array primitives. Use these in production hot paths to avoid
+    materialising a {!Types.Daily_price.t list} per call site per tick. *)
 
 val weekly_view_for :
   t ->
   symbol:string ->
   n:int ->
   as_of:Date.t ->
-  Data_panel.Bar_panels.weekly_view
-(** [weekly_view_for t ~symbol ~n ~as_of] returns the panel weekly view of the
-    most recent [n] weeks ending at [as_of]. Maps [as_of] to a panel column via
-    {!Data_panel.Bar_panels.column_of_date}; returns the empty view when [as_of]
-    is not in the calendar. *)
+  Snapshot_runtime.Snapshot_bar_views.weekly_view
+(** [weekly_view_for t ~symbol ~n ~as_of] returns the snapshot weekly view of
+    the most recent [n] weeks ending at [as_of]. Returns the empty view when
+    [as_of] is before any resident snapshot row. *)
 
 val daily_view_for :
   t ->
   symbol:string ->
   as_of:Date.t ->
   lookback:int ->
-  Data_panel.Bar_panels.daily_view
-(** [daily_view_for t ~symbol ~as_of ~lookback] returns the panel daily view of
-    the most recent [lookback] days ending at [as_of]. Same calendar- fallback
-    semantics as {!weekly_view_for}. *)
+  Snapshot_runtime.Snapshot_bar_views.daily_view
+(** [daily_view_for t ~symbol ~as_of ~lookback] returns the snapshot daily view
+    of the most recent [lookback] days ending at [as_of]. Same calendar fallback
+    semantics as {!of_snapshot_views}'s [?calendar] parameter (uses a
+    synthesized Mon–Fri calendar when none was supplied at construction). *)

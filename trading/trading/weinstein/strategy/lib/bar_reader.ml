@@ -1,7 +1,6 @@
 (** Bar source abstraction — see [bar_reader.mli]. *)
 
 open Core
-module Bar_panels = Data_panel.Bar_panels
 module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Daily_panels = Snapshot_runtime.Daily_panels
@@ -15,26 +14,29 @@ module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
    path invokes one of these closures per call site per tick — no backing
    dispatch, no variant match.
 
-   [ma_cache] is set by [of_panels] callers that build a cache up-front; the
-   other constructors leave it [None]. The strategy's cache-aware MA paths
-   key off [Some].
+   [ma_cache] is left [None] by every constructor since F.3.e-2 deleted
+   [of_panels]; the field is retained on the public surface for source
+   compatibility ([Bar_reader.ma_cache] callers in [Weinstein_strategy] /
+   [Exit_audit_capture] still compile and read [None]).
 
    [snapshot_callbacks] is the underlying field-accessor shim for
    {!of_snapshot_views} / {!of_in_memory_bars}. The strategy's macro / sector
    entry points consume this directly via the [*_of_snapshot_views] APIs
    on {!Macro_inputs} (Phase F.3.b-2 / c-2 / d-2 caller migration). For
-   panel-backed and empty readers, this is a sentinel cb whose every read
-   returns [Error NotFound]; the macro / sector path then sees empty views,
-   matching the prior bar-list / panel-view behaviour for readers that were
-   never meant to back a real screening run. *)
+   the empty reader, this is a sentinel cb whose every read returns
+   [Error NotFound]; the macro / sector path then sees empty views,
+   matching the prior bar-list / panel-view behaviour for the empty reader. *)
 type t = {
   daily_bars_for : symbol:string -> as_of:Date.t -> Types.Daily_price.t list;
   weekly_bars_for :
     symbol:string -> n:int -> as_of:Date.t -> Types.Daily_price.t list;
   weekly_view_for :
-    symbol:string -> n:int -> as_of:Date.t -> Bar_panels.weekly_view;
+    symbol:string -> n:int -> as_of:Date.t -> Snapshot_bar_views.weekly_view;
   daily_view_for :
-    symbol:string -> as_of:Date.t -> lookback:int -> Bar_panels.daily_view;
+    symbol:string ->
+    as_of:Date.t ->
+    lookback:int ->
+    Snapshot_bar_views.daily_view;
   ma_cache : Weekly_ma_cache.t option;
   snapshot_callbacks : Snapshot_callbacks.t;
 }
@@ -43,12 +45,10 @@ let ma_cache t = t.ma_cache
 let snapshot_callbacks t = t.snapshot_callbacks
 
 (* Sentinel cb for readers that have no underlying snapshot directory
-   ({!of_panels} and {!empty}). Every [read_field] / [read_field_history] call
-   returns [Error NotFound], which {!Snapshot_bar_views.weekly_view_for} /
+   ({!empty}). Every [read_field] / [read_field_history] call returns
+   [Error NotFound], which {!Snapshot_bar_views.weekly_view_for} /
    {!Snapshot_bar_views.weekly_bars_for} fold to the empty view / empty list.
-   This matches the contract for these constructors today: panel-backed
-   readers are unused in production after Phase F.3.a-3 redo, and the empty
-   reader is documented to return empty results from every read. *)
+   This matches {!empty}'s "every read returns empty" contract. *)
 let _empty_snapshot_callbacks : Snapshot_callbacks.t =
   let not_found =
     Error
@@ -64,9 +64,9 @@ let _empty_snapshot_callbacks : Snapshot_callbacks.t =
 
 (* Empty views — used as the sentinel return when [as_of] falls outside the
    snapshot's calendar or the snapshot has no rows. Match the empty literals
-   {!Bar_panels} / {!Snapshot_bar_views} use internally so consumers can rely
-   on [n = 0] / [n_days = 0] as the "missing" signal. *)
-let _empty_weekly_view : Bar_panels.weekly_view =
+   {!Snapshot_bar_views} uses internally so consumers can rely on [n = 0] /
+   [n_days = 0] as the "missing" signal. *)
+let _empty_weekly_view : Snapshot_bar_views.weekly_view =
   {
     closes = [||];
     raw_closes = [||];
@@ -77,57 +77,14 @@ let _empty_weekly_view : Bar_panels.weekly_view =
     n = 0;
   }
 
-let _empty_daily_view : Bar_panels.daily_view =
+let _empty_daily_view : Snapshot_bar_views.daily_view =
   { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
-
-(* {1 Panel-backed constructor (Bar_panels.t over a CSV-loaded calendar)}
-
-   Restored by the partial revert of the Phase F.3.a-3 strategy-side flip.
-   The runner's strategy bar reads stay on this constructor until the
-   path-dependent divergence in {!of_snapshot_views} is forward-fixed; see
-   [bar_reader.mli] module-doc for context. *)
-
-let _panel_daily_bars_for panels ~symbol ~as_of =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> []
-  | Some as_of_day -> Bar_panels.daily_bars_for panels ~symbol ~as_of_day
-
-let _panel_weekly_bars_for panels ~symbol ~n ~as_of =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> []
-  | Some as_of_day -> Bar_panels.weekly_bars_for panels ~symbol ~n ~as_of_day
-
-let _panel_weekly_view_for panels ~symbol ~n ~as_of =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> _empty_weekly_view
-  | Some as_of_day -> Bar_panels.weekly_view_for panels ~symbol ~n ~as_of_day
-
-let _panel_daily_view_for panels ~symbol ~as_of ~lookback =
-  match Bar_panels.column_of_date panels as_of with
-  | None -> _empty_daily_view
-  | Some as_of_day ->
-      Bar_panels.daily_view_for panels ~symbol ~as_of_day ~lookback
-
-let of_panels ?ma_cache panels =
-  {
-    daily_bars_for = _panel_daily_bars_for panels;
-    weekly_bars_for = _panel_weekly_bars_for panels;
-    weekly_view_for = _panel_weekly_view_for panels;
-    daily_view_for = _panel_daily_view_for panels;
-    ma_cache;
-    (* Panel-backed readers have no underlying snapshot directory; the
-       sentinel cb yields empty views from {!Snapshot_bar_views}. Production
-       does not use this constructor (Phase F.3.a-3 redo flipped the runner
-       to {!of_snapshot_views}); F.3.e deletes [of_panels] entirely. *)
-    snapshot_callbacks = _empty_snapshot_callbacks;
-  }
 
 (* {1 Empty backing — used by tests where no read is expected}
 
    The closures simply return the empty list / empty view directly, without
-   allocating a [Bar_panels.t] or opening a snapshot directory. This is the
-   smallest constructor and matches the "no read expected" contract
-   precisely. *)
+   opening a snapshot directory. This is the smallest constructor and matches
+   the "no read expected" contract precisely. *)
 let empty () =
   {
     daily_bars_for = (fun ~symbol:_ ~as_of:_ -> []);
@@ -211,10 +168,10 @@ let of_snapshot_views ?calendar (cb : Snapshot_runtime.Snapshot_callbacks.t) =
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}
 
    Materialise a snapshot directory under a tmp dir, then route reads through
-   [of_snapshot_views]. The Bar_panels alternative ([of_panels] composed with
-   a synthetic [Bar_panels.t] built from in-memory bars) is the path this
-   constructor replaces; keeping it here lets every Bar_panels-backed test
-   migrate to a panel-free reader without changing call sites. *)
+   [of_snapshot_views]. The legacy [Bar_panels.t]-backed alternative
+   ([of_panels] composed with a synthetic panel built from in-memory bars)
+   was deleted in F.3.e-2; every test that previously used that path now
+   uses this constructor. *)
 
 (* Cache cap for the in-memory case: small directories (handful of symbols
    × thousands of days) easily fit in a few MB, but giving the LRU some
