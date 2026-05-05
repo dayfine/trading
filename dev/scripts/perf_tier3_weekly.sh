@@ -2,7 +2,8 @@
 # Tier-3 perf weekly runner.
 #
 # Discovers all scenarios with `;; perf-tier: 3` under
-# trading/test_data/backtest_scenarios/{goldens-small,goldens-broad,perf-sweep,smoke}/,
+# trading/test_data/backtest_scenarios/{goldens-small,goldens-broad,perf-sweep,smoke,
+# goldens-sp500,goldens-sp500-historical}/,
 # runs each via the scenario_runner binary with a per-scenario timeout
 # (default 7200s = 2 hours, per dev/plans/perf-scenario-catalog-2026-04-25.md
 # tier 3 budget), and prints a compact wall-time + peak-RSS table.
@@ -78,8 +79,13 @@ printf '  Per-cell timeout : %ss\n' "$TIMEOUT"
 printf '  GNU /usr/bin/time : %s\n\n' "$HAVE_GNU_TIME"
 
 # Discover tier-3 scenarios (full paths, sorted for determinism).
+# goldens-sp500 and goldens-sp500-historical require bar data committed under
+# trading/test_data/ (see dev/scripts/prepare_ci_data.sh). They are included
+# here so the weekly run picks them up when data is present; when running
+# locally without committed test data they silently produce NaN panels and
+# will FAIL the expected-ranges check — that's intentional (surfaces missing data).
 TIER3_PATHS=""
-for sub in goldens-small goldens-broad perf-sweep smoke; do
+for sub in goldens-small goldens-broad perf-sweep smoke goldens-sp500 goldens-sp500-historical; do
   dir="${SCENARIO_ROOT}/${sub}"
   [ -d "$dir" ] || continue
   for sexp in "$dir"/*.sexp; do

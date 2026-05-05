@@ -1,0 +1,8 @@
+((symbol                      MPWR)
+ (last_verified               2026-04-12)
+ (verification_status         Verified)
+ (data_start_date             2004-11-19)
+ (data_end_date               2026-04-10)
+ (has_volume                  true)
+ (last_n_prices_avg_below_10  false)
+ (last_n_prices_avg_above_500 true))
