@@ -89,7 +89,12 @@ strategy code (currently complete).
   - Fixture files at `trading/test_data/backtest_scenarios/{goldens,smoke}/`
 
 ## Open PRs
-None. Merged in main:
+- #853 `feat/15y-trade-count-investigation` — investigation note for
+  16-trade 15y run; dominant cause = position-sizing × cash exhaustion.
+  See `dev/notes/15y-trade-count-investigation-2026-05-05.md`. No code
+  changes; recommendation queued.
+
+Merged in main:
 - #399 Step 1 (two-tier universe) — 2026-04-17.
 - #393 unrealized_pnl pin fix — 2026-04-17.
 - #395 per-scenario `unrealized_pnl` range check — merged 2026-04-17.
@@ -129,6 +134,25 @@ None. Merged in main:
 
 ## Completed
 
+- [x] **15y SP500 trade-count investigation** (2026-05-05, PR #853).
+  Root-cause investigation: `goldens-sp500-historical/sp500-2010-2026.sexp`
+  produced 16 trades over 16y vs ~264 expected. **Dominant cause:
+  position-sizing exhausts $1M cash inside the first year (Day 1 commits
+  $993K across 4 positions hitting the 30%-of-portfolio per-position cap),
+  and 8 winners-that-never-stop tie up $0.95M cost basis for the
+  remaining 15 years.** From 2012 onward 728 weekly cycles each find
+  10-17 cascade-admitted candidates but every one is rejected on
+  Insufficient_cash (skip-reason ratio 271:37 over Stop_too_wide in the
+  24 audit entries). Hypotheses refuted with empirical numbers: sector
+  "Unknown" filter, indicator warmup, regime, data gaps, Wiki-replay
+  survivorship — none are dominant. Note at
+  `dev/notes/15y-trade-count-investigation-2026-05-05.md`.
+  Recommendation: scenario-level `config_overrides` on
+  `sp500-2010-2026.sexp` only (`max_position_pct_long 0.30 → 0.05`,
+  `min_cash_pct 0.10 → 0.30`) — preserves all other goldens' pinned
+  baselines. Also flagged 3 side-issues for follow-up (equity_curve
+  truncation, MRO-zombie in trades.csv ∧ open_positions.csv,
+  progress.sexp 10x equity mismatch).
 - [x] **Fuzz-runner CLI flag (`--fuzz <param>=<center>±<delta>:<n>`)**
   (2026-05-02, `feat/fuzz-runner`). Generic parameter-jitter mode for
   robustness testing — the same backtest run repeated N times with the
