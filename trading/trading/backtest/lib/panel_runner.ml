@@ -2,10 +2,8 @@
 
 open Core
 open Trading_simulation
-module Symbol_index = Data_panel.Symbol_index
-module Ohlcv_panels = Data_panel.Ohlcv_panels
-module Bar_panels = Data_panel.Bar_panels
 module Daily_panels = Snapshot_runtime.Daily_panels
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 type input = {
@@ -157,11 +155,11 @@ let _final_close_prices ~daily_panels ~symbols ~end_date =
       List.filter_map symbols
         ~f:(_read_close ~daily_panels ~close_col ~date:end_date)
 
-(* Resolve the [(snapshot_dir, manifest)] pair the simulator will read through
-   for per-tick price reads + final-close lookups. CSV mode delegates to
-   [Csv_snapshot_builder.build]; Snapshot mode reuses the caller-provided
-   directory. The strategy's bar reads do NOT flow through this snapshot —
-   see [_build_panel_bar_reader] for the panel-backed strategy reader. *)
+(* Resolve the [(snapshot_dir, manifest)] pair the runner reads through for
+   the strategy's bar reads (via [_build_snapshot_bar_reader]), the
+   simulator's per-tick price reads, and final-close lookups. CSV mode
+   delegates to [Csv_snapshot_builder.build]; Snapshot mode reuses the
+   caller-provided directory. *)
 let _resolve_snapshot_source (input : input) ~warmup_start ~end_date
     ~bar_data_source =
   match bar_data_source with
@@ -180,8 +178,9 @@ let _resolve_snapshot_source (input : input) ~warmup_start ~end_date
 (* Generate the trading-day calendar: every weekday (Mon-Fri) in the inclusive
    range [start..end_]. Holidays are not removed — the simulator already
    tolerates "no bar on this day" via the [is_trading_day] filter, and the
-   panel cells stay NaN on holidays. Used for the strategy's [Bar_panels.t]
-   build. *)
+   strategy's snapshot-backed [daily_view_for] walks calendar columns
+   identically to the prior panel path's [Bar_panels.daily_view_for] (PR1 of
+   the #848 forward fix; see [Bar_reader.of_snapshot_views]). *)
 let _build_calendar ~start ~end_ : Date.t array =
   let rec loop d acc =
     if Date.( > ) d end_ then List.rev acc
@@ -196,49 +195,35 @@ let _build_calendar ~start ~end_ : Date.t array =
   in
   Array.of_list (loop start [])
 
-(* Build OHLCV panels from CSV using the calendar-aware loader. The universe is
-   exactly [input.all_symbols] so the panel covers every symbol the simulator
-   will fetch bars for (universe + index + sector ETFs + global indices). This
-   is the strategy's bar source; the simulator's per-tick reads still flow
-   through the snapshot adapter. See module-doc for the partial-revert
-   rationale. *)
-let _build_ohlcv ~(input : input) ~calendar =
-  let symbol_index =
-    match Symbol_index.create ~universe:input.all_symbols with
-    | Ok t -> t
-    | Error err ->
-        failwithf "Panel_runner: Symbol_index.create failed: %s"
-          err.Status.message ()
-  in
-  match
-    Ohlcv_panels.load_from_csv_calendar symbol_index
-      ~data_dir:input.data_dir_fpath ~calendar
-  with
-  | Ok t -> t
-  | Error err ->
-      failwithf "Panel_runner: Ohlcv_panels.load_from_csv_calendar failed: %s"
-        (Status.show err) ()
+(* Build a snapshot-backed [Bar_reader.t] for the strategy: derive the
+   field-accessor [Snapshot_callbacks.t] from the same [Daily_panels.t] the
+   simulator + final-close lookup already use, then wrap in a
+   [Bar_reader.of_snapshot_views] passing the runner's [calendar]. The
+   calendar threads through to [Snapshot_bar_views.daily_view_for] /
+   [low_window], which walk calendar columns NaN-passthrough identically to
+   the old [Bar_panels.daily_view_for] window definition — closing the
+   path-dependent regression that motivated this rewiring.
 
-(* Build a panel-backed [Bar_reader.t] for the strategy: load OHLCV from CSV
-   on [calendar], wrap in a [Bar_panels.t], wrap in a [Bar_reader]. This is
-   the partial-revert path; the strategy's reads route through the panel
-   backing rather than [Snapshot_callbacks] until the forward fix lands. *)
-let _build_panel_bar_reader (input : input) ~warmup_start ~end_date =
-  let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
-  let ohlcv = _build_ohlcv ~input ~calendar in
-  let bar_panels =
-    match Bar_panels.create ~ohlcv ~calendar with
-    | Ok p -> p
-    | Error err ->
-        failwithf "Panel_runner: Bar_panels.create failed: %s" (Status.show err)
-          ()
-  in
-  eprintf "Panel_runner: panels built (%d symbols × %d days) for strategy\n%!"
-    (Ohlcv_panels.n ohlcv) (Array.length calendar);
-  Weinstein_strategy.Bar_reader.of_panels bar_panels
+   This replaces the partial-revert [_build_panel_bar_reader] that loaded a
+   parallel [Bar_panels.t] from CSV on the same calendar. The snapshot path
+   reuses the LRU-bounded [Daily_panels.t] for both strategy bar reads and
+   simulator price reads, so we no longer hold two full per-symbol bar
+   stores resident at the same time.
 
-(* Hybrid setup: panel-backed strategy bar reader, snapshot-backed simulator
-   adapter, snapshot-backed final-close lookup. See module-doc. *)
+   Refs: closes the regression on Bar_reader.of_snapshot_views (the
+   [~calendar] plumbing on the snapshot views that this constructor now
+   consumes was introduced in a separate prior PR). *)
+let _build_snapshot_bar_reader ~daily_panels ~calendar =
+  let callbacks = Snapshot_callbacks.of_daily_panels daily_panels in
+  eprintf
+    "Panel_runner: snapshot bar reader wired (calendar %d days) for strategy\n\
+     %!"
+    (Array.length calendar);
+  Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar callbacks
+
+(* Hybrid setup: snapshot-backed strategy bar reader, snapshot-backed
+   simulator adapter, snapshot-backed final-close lookup — all reading
+   through one [Daily_panels.t]. See module-doc. *)
 let _setup_hybrid (input : input) ~snapshot_dir ~manifest ~warmup_start
     ~end_date ~audit_recorder =
   let daily_panels =
@@ -251,7 +236,8 @@ let _setup_hybrid (input : input) ~snapshot_dir ~manifest ~warmup_start
         failwithf "Panel_runner: Daily_panels.create failed: %s"
           (Status.show err) ()
   in
-  let bar_reader = _build_panel_bar_reader input ~warmup_start ~end_date in
+  let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
+  let bar_reader = _build_snapshot_bar_reader ~daily_panels ~calendar in
   let strategy = _build_strategy input ~bar_reader ~audit_recorder in
   let adapter =
     _build_market_data_adapter ~data_dir:input.data_dir_fpath

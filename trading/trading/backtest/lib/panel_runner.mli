@@ -1,13 +1,21 @@
 (** Panel-loader execution path — runner-side seam for the simulator + Weinstein
     strategy.
 
-    The runner uses a hybrid setup (partial revert of #828, closes #843):
+    Post-#848 forward fix (PR2 of two; PR1 #861 added the [~calendar] plumbing
+    on [Snapshot_bar_views] / [Bar_reader.of_snapshot_views]). All three reader
+    surfaces fan out from one snapshot directory:
 
-    - The strategy's [Bar_reader] is panel-backed: an [Ohlcv_panels.t] is loaded
-      from CSV via [Ohlcv_panels.load_from_csv_calendar] at runner start,
-      wrapped in a [Bar_panels.t], and exposed via [Bar_reader.of_panels]. The
-      F.3.a-3 attempt to migrate the strategy's reads to [Snapshot_callbacks]
-      produced a path-dependent regression on sp500-2019-2023 (#843).
+    - The strategy's [Bar_reader] is snapshot-backed:
+      [Bar_reader.of_snapshot_views ~calendar] is built over a
+      [Snapshot_callbacks.of_daily_panels] shim around the same [Daily_panels.t]
+      the simulator and final-close lookup use. The [~calendar] argument is the
+      trading-day calendar (Mon–Fri, holidays included) the runner builds for
+      the warmup..end_date span; threading it through makes
+      [Snapshot_bar_views.daily_view_for] walk calendar columns NaN-passthrough
+      identically to the prior [Bar_panels.daily_view_for] window definition.
+      This is the closing half of #848 — see
+      `dev/notes/path-dependent-regression-848-investigation-2026-05-05.md` for
+      the cell-by-cell parity surface.
     - The simulator's per-tick price reads flow through a snapshot-backed
       [Market_data_adapter]. CSV mode builds the snapshot directory in-process
       from CSV bars at runner start (via [Csv_snapshot_builder]); Snapshot mode
@@ -15,9 +23,9 @@
     - Final close-price lookups read from the [Snapshot_runtime.Daily_panels]
       via [Daily_panels.read_today].
 
-    The [Panel_strategy_wrapper] (panel-backed [get_indicator_fn] injector) is
-    gone — the Weinstein strategy ignores [get_indicator], so the wrapper was
-    pure overhead. The [Indicator_panels.t] allocation is also gone. *)
+    The runner no longer holds a parallel [Bar_panels.t] resident — the
+    partial-revert [_build_panel_bar_reader] is gone, along with the CSV
+    [Ohlcv_panels.load_from_csv_calendar] load. *)
 
 open Core
 
@@ -83,9 +91,9 @@ val run :
     state. When [None], the runner takes no extra work — same zero-overhead
     contract as the other optional plumbing.
 
-    [bar_data_source], when passed, selects how the simulator's snapshot
-    directory is sourced. (The strategy's panel-backed bar reader is unaffected
-    — it always loads from CSV at runner start.)
+    [bar_data_source], when passed, selects how the snapshot directory is
+    sourced. The strategy's bar reader, the simulator adapter, and the
+    final-close lookup all read through this same snapshot.
 
     - Default ({!Bar_data_source.Csv}) builds a snapshot directory in-process
       from the universe's CSV bars at runner start, then routes the simulator
@@ -94,7 +102,9 @@ val run :
     - {!Bar_data_source.Snapshot} reuses a caller-provided pre-built snapshot
       directory + manifest (typically written by [build_snapshots.exe]).
 
-    Both branches use the same hybrid wiring (panel-backed strategy reader +
-    snapshot-backed simulator adapter); the only difference is whether the
-    snapshot directory was materialised in-process or supplied externally. See
-    `dev/notes/parity-bisect-...md` for the partial-revert bisect. *)
+    Both branches use the same wiring (snapshot-backed strategy reader +
+    snapshot-backed simulator adapter, fanning out from one [Daily_panels.t]);
+    the only difference is whether the snapshot directory was materialised
+    in-process or supplied externally. See
+    `dev/notes/path-dependent-regression-848-investigation-2026-05-05.md` for
+    the path-dependence surface this rewiring closes. *)
