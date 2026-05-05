@@ -124,33 +124,11 @@ val low_window :
     [Daily_price.t list] shape (notably {!Volume.analyze_breakout} and
     {!Resistance.analyze}, which still consume bar lists pending PR-B). *)
 
-type weekly_view = {
-  closes : float array;
-      (** Adjusted close per weekly bar (chronological, oldest at index 0). *)
-  raw_closes : float array;
-      (** Raw (un-adjusted) close per weekly bar — the close panel's value at
-          the last trading day of each weekly bucket. Used together with
-          [closes] to compute per-bar split-adjustment factors
-          ([closes.(i) /. raw_closes.(i)]). The factor stays constant for spans
-          without splits and changes at split boundaries (G14 — see
-          [dev/notes/g14-deep-dive-2026-05-01.md]). *)
-  highs : float array;  (** Max high within each weekly bucket. *)
-  lows : float array;  (** Min low within each weekly bucket. *)
-  volumes : float array;
-      (** Sum of daily volumes within each weekly bucket. Stored as float to
-          align with the panel layout; consumers that need int can round-nearest
-          and convert. *)
-  dates : Core.Date.t array;
-      (** Date of the last trading day in each weekly bucket (Friday for
-          complete weeks). *)
-  n : int;  (** Length of every array. *)
-}
-(** Float-array view of weekly-aggregated bars for one symbol.
-
-    Aggregation semantics match {!Time_period.Conversion.daily_to_weekly} with
-    [include_partial_week:true]: weeks are ISO weeks (Monday–Sunday); the
-    aggregate's date is the latest trading day in the week (typically Friday);
-    the trailing partial week is retained. *)
+type weekly_view = Snapshot_runtime.Snapshot_bar_views.weekly_view
+(** Type-alias for {!Snapshot_runtime.Snapshot_bar_views.weekly_view}, the
+    canonical record definition (moved 2026-05-06 in F.3.e-1). Kept here as a
+    re-export until F.3.e-3 deletes this module. New callers should reference
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} directly. *)
 
 val weekly_view_for :
   t -> symbol:string -> n:int -> as_of_day:int -> weekly_view
@@ -163,19 +141,11 @@ val weekly_view_for :
     [as_of_day] is early in the backtest). Raises [Invalid_argument] if
     [as_of_day] is out of range. *)
 
-type daily_view = {
-  highs : float array;
-      (** Daily high prices, oldest at index 0, newest at index [n_days - 1]. *)
-  lows : float array;  (** Daily low prices, same indexing as [highs]. *)
-  closes : float array;  (** Daily adjusted closes, same indexing. *)
-  dates : Core.Date.t array;  (** Daily dates, same indexing. *)
-  n_days : int;  (** Length of every array. *)
-}
-(** Float-array view of daily bars for one symbol within a lookback window.
-
-    Used by {!Weinstein_stops.compute_initial_stop_with_floor} via the
-    support-floor callbacks. The lookback windowing is applied at construction
-    time, so the consumer scans [0..n_days-1] without further bounds checks. *)
+type daily_view = Snapshot_runtime.Snapshot_bar_views.daily_view
+(** Type-alias for {!Snapshot_runtime.Snapshot_bar_views.daily_view}, the
+    canonical record definition (moved 2026-05-06 in F.3.e-1). Kept here as a
+    re-export until F.3.e-3 deletes this module. New callers should reference
+    {!Snapshot_runtime.Snapshot_bar_views.daily_view} directly. *)
 
 val daily_view_for :
   t -> symbol:string -> as_of_day:int -> lookback:int -> daily_view

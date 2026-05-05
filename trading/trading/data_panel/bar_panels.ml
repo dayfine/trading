@@ -121,23 +121,8 @@ let low_window t ~symbol ~as_of_day ~len =
 (* Sector / Macro / Stops callback bundles over the resulting arrays.   *)
 (* ------------------------------------------------------------------ *)
 
-type weekly_view = {
-  closes : float array;
-  raw_closes : float array;
-  highs : float array;
-  lows : float array;
-  volumes : float array;
-  dates : Date.t array;
-  n : int;
-}
-
-type daily_view = {
-  highs : float array;
-  lows : float array;
-  closes : float array;
-  dates : Date.t array;
-  n_days : int;
-}
+type weekly_view = Snapshot_runtime.Snapshot_bar_views.weekly_view
+type daily_view = Snapshot_runtime.Snapshot_bar_views.daily_view
 
 let _empty_weekly_view : weekly_view =
   {

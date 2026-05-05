@@ -3,14 +3,28 @@
 
 open Core
 module BA1 = Bigarray.Array1
-module Bar_panels = Data_panel.Bar_panels
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
-(* Phase F.2 PR 2: views are type-equal to [Bar_panels]'s — see the .mli. The
-   record definitions live in [Bar_panels] today; PR 3 (Phase F.3) hoists them
-   here when [Bar_panels] is deleted. *)
-type weekly_view = Bar_panels.weekly_view
-type daily_view = Bar_panels.daily_view
+(* Phase F.3.e-1: this module is now the canonical home of [weekly_view] and
+   [daily_view]. [Data_panel.Bar_panels.weekly_view] / [.daily_view] alias
+   these via [type =] until F.3.e-3 deletes {!Data_panel.Bar_panels}. *)
+type weekly_view = {
+  closes : float array;
+  raw_closes : float array;
+  highs : float array;
+  lows : float array;
+  volumes : float array;
+  dates : Date.t array;
+  n : int;
+}
+
+type daily_view = {
+  highs : float array;
+  lows : float array;
+  closes : float array;
+  dates : Date.t array;
+  n_days : int;
+}
 
 let _empty_weekly_view : weekly_view =
   {

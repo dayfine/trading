@@ -12,6 +12,7 @@
   status
   trading.strategy
   types
-  unix)
+  unix
+  weinstein.snapshot_runtime)
  (preprocess
   (pps ppx_compare ppx_deriving.eq ppx_hash ppx_let ppx_sexp_conv)))
