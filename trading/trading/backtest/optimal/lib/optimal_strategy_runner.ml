@@ -1,7 +1,7 @@
 open Core
-module Bar_panels = Data_panel.Bar_panels
-module Ohlcv_panels = Data_panel.Ohlcv_panels
-module Symbol_index = Data_panel.Symbol_index
+module Daily_panels = Snapshot_runtime.Daily_panels
+module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
+module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Scanner = Stage_transition_scanner
 module Scorer = Outcome_scorer
 module Filler = Optimal_portfolio_filler
@@ -20,51 +20,41 @@ let _warmup_days = 210
     30-week MA + breakout-base lookback in [Stock_analysis.default_config]. *)
 let _bar_lookback_weeks = 90
 
+(** LRU cache cap for the [Daily_panels.t] backing the strategy bar reads. Sized
+    for the optimal-strategy runner's typical universe (sp500 ≈ 500 symbols ×
+    ~140 KB per symbol full-history snapshot ≈ 70 MB). 256 MB is a comfortable
+    headroom. *)
+let _snapshot_cache_mb = 256
+
 (* ---------------------------------------------------------------- *)
-(* Calendar + panel construction                                      *)
+(* Snapshot construction                                              *)
 (* ---------------------------------------------------------------- *)
 
-(** Build the trading-day calendar (weekdays only, holidays kept) over
-    [start..end_]. Same shape [Panel_runner] uses. *)
-let _build_calendar ~start ~end_ : Date.t array =
-  let rec loop d acc =
-    if Date.( > ) d end_ then List.rev acc
-    else
-      let dow = Date.day_of_week d in
-      let is_weekend =
-        Day_of_week.equal dow Day_of_week.Sat
-        || Day_of_week.equal dow Day_of_week.Sun
-      in
-      let acc' = if is_weekend then acc else d :: acc in
-      loop (Date.add_days d 1) acc'
-  in
-  Array.of_list (loop start [])
-
-(** Build a [Bar_panels.t] over [universe ∪ {primary_index}] for the calendar.
-*)
-let _build_bar_panels ~data_dir_fpath ~universe ~calendar : Bar_panels.t =
+(** Build a [Snapshot_callbacks.t] over [universe ∪ {primary_index}] for the
+    [start..end_] window. Materialises a tmp snapshot directory via
+    [Csv_snapshot_builder.build] (the same in-process pipeline the CSV runner
+    mode uses), opens a [Daily_panels.t] over it with an LRU cache, and exposes
+    the field-accessor shim. The tmp directory is left in place; the OS reaps it
+    on reboot. *)
+let _build_snapshot_callbacks ~data_dir_fpath ~universe ~start ~end_ :
+    Snapshot_callbacks.t =
   let symbols =
     _index_symbol :: universe |> List.dedup_and_sort ~compare:String.compare
   in
-  let symbol_index =
-    match Symbol_index.create ~universe:symbols with
-    | Ok t -> t
-    | Error err ->
-        failwithf "Symbol_index.create failed: %s" err.Status.message ()
+  let snapshot_dir, manifest =
+    Backtest.Csv_snapshot_builder.build ~data_dir:data_dir_fpath
+      ~universe:symbols ~start_date:start ~end_date:end_
   in
-  let ohlcv =
+  let panels =
     match
-      Ohlcv_panels.load_from_csv_calendar symbol_index ~data_dir:data_dir_fpath
-        ~calendar
+      Daily_panels.create ~snapshot_dir ~manifest
+        ~max_cache_mb:_snapshot_cache_mb
     with
-    | Ok t -> t
+    | Ok p -> p
     | Error err ->
-        failwithf "Ohlcv_panels.load_from_csv_calendar failed: %s"
-          (Status.show err) ()
+        failwithf "Daily_panels.create failed: %s" (Status.show err) ()
   in
-  match Bar_panels.create ~ohlcv ~calendar with
-  | Ok p -> p
-  | Error err -> failwithf "Bar_panels.create failed: %s" (Status.show err) ()
+  Snapshot_callbacks.of_daily_panels panels
 
 (* ---------------------------------------------------------------- *)
 (* Friday calendar                                                    *)
@@ -104,25 +94,22 @@ let _fridays_in_range ~start ~end_ : Date.t list =
 
 (** Run [Stock_analysis.analyze] for one symbol on one Friday. Returns [None]
     when there are not enough bars for the analysis (e.g. early in the run). *)
-let _analyze_symbol_on_friday ~bar_panels ~friday ~stock_config ~bar_lookback
-    (symbol : string) : Stock_analysis.t option =
-  match Bar_panels.column_of_date bar_panels friday with
-  | None -> None
-  | Some as_of_day -> (
-      let weekly =
-        Bar_panels.weekly_bars_for bar_panels ~symbol ~n:bar_lookback ~as_of_day
-      in
-      let benchmark =
-        Bar_panels.weekly_bars_for bar_panels ~symbol:_index_symbol
-          ~n:bar_lookback ~as_of_day
-      in
-      match (weekly, benchmark) with
-      | [], _ | _, [] -> None
-      | _ ->
-          Some
-            (Stock_analysis.analyze ~config:stock_config ~ticker:symbol
-               ~bars:weekly ~benchmark_bars:benchmark ~prior_stage:None
-               ~as_of_date:friday))
+let _analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
+    ~bar_lookback (symbol : string) : Stock_analysis.t option =
+  let weekly =
+    Snapshot_bar_views.weekly_bars_for snapshot_callbacks ~symbol
+      ~n:bar_lookback ~as_of:friday
+  in
+  let benchmark =
+    Snapshot_bar_views.weekly_bars_for snapshot_callbacks ~symbol:_index_symbol
+      ~n:bar_lookback ~as_of:friday
+  in
+  match (weekly, benchmark) with
+  | [], _ | _, [] -> None
+  | _ ->
+      Some
+        (Stock_analysis.analyze ~config:stock_config ~ticker:symbol ~bars:weekly
+           ~benchmark_bars:benchmark ~prior_stage:None ~as_of_date:friday)
 
 (** Build a [sector_map] (symbol → [Screener.sector_context]) from a flat
     [sectors : (symbol → sector_name)] table. The screener's sector-context
@@ -161,32 +148,31 @@ type forward_table = (string, Scorer.weekly_outlook list) Hashtbl.t
     the symbol has no weekly bars at that Friday. Same shape as
     [_analyze_symbol_on_friday] but emits the outlook record the scorer
     consumes. *)
-let _outlook_at ~bar_panels ~stage_config ~bar_lookback ~symbol ~friday :
-    Scorer.weekly_outlook option =
-  match Bar_panels.column_of_date bar_panels friday with
+let _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol ~friday
+    : Scorer.weekly_outlook option =
+  let weekly =
+    Snapshot_bar_views.weekly_bars_for snapshot_callbacks ~symbol
+      ~n:bar_lookback ~as_of:friday
+  in
+  match List.last weekly with
   | None -> None
-  | Some as_of_day -> (
-      let weekly =
-        Bar_panels.weekly_bars_for bar_panels ~symbol ~n:bar_lookback ~as_of_day
+  | Some bar ->
+      let stage_result =
+        Stage.classify ~config:stage_config ~bars:weekly ~prior_stage:None
       in
-      match List.last weekly with
-      | None -> None
-      | Some bar ->
-          let stage_result =
-            Stage.classify ~config:stage_config ~bars:weekly ~prior_stage:None
-          in
-          Some { Scorer.date = friday; bar; stage_result })
+      Some { Scorer.date = friday; bar; stage_result }
 
 (** Build the per-symbol forward-outlook table (PR-1). Iterates [fridays] once
     per symbol and memoizes the full chronological outlook list. Sized to
     [List.length universe] for predictable hashtable growth. *)
-let _build_forward_table ~bar_panels ~fridays ~stage_config ~bar_lookback
-    ~universe : forward_table =
+let _build_forward_table ~snapshot_callbacks ~fridays ~stage_config
+    ~bar_lookback ~universe : forward_table =
   let table = Hashtbl.create ~size:(List.length universe) (module String) in
   List.iter universe ~f:(fun symbol ->
       let outlooks =
         List.filter_map fridays ~f:(fun friday ->
-            _outlook_at ~bar_panels ~stage_config ~bar_lookback ~symbol ~friday)
+            _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol
+              ~friday)
       in
       Hashtbl.set table ~key:symbol ~data:outlooks);
   table
@@ -247,12 +233,13 @@ let load_macro_trend ~output_dir :
     [macro_trend] is sourced from [macro_trend_table] (built from the run's
     [macro_trend.sexp]); Fridays absent from the table fall back to [Neutral].
 *)
-let _scan_all_fridays ~bar_panels ~fridays ~universe ~sector_map ~stock_config
-    ~scanner_config ~bar_lookback ~macro_trend_table : OT.candidate_entry list =
+let _scan_all_fridays ~snapshot_callbacks ~fridays ~universe ~sector_map
+    ~stock_config ~scanner_config ~bar_lookback ~macro_trend_table :
+    OT.candidate_entry list =
   List.concat_map fridays ~f:(fun friday ->
       let analyses =
         List.filter_map universe ~f:(fun sym ->
-            _analyze_symbol_on_friday ~bar_panels ~friday ~stock_config
+            _analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
               ~bar_lookback sym)
       in
       let macro_trend =
@@ -311,7 +298,7 @@ let _build_actual_run (inputs : Optimal_run_artefacts.actual_run_inputs) :
   }
 
 type _world = {
-  bar_panels : Bar_panels.t;
+  snapshot_callbacks : Snapshot_callbacks.t;
   sector_ctx_map : (string, Screener.sector_context) Hashtbl.t;
   fridays : Date.t list;
   universe : string list;
@@ -320,11 +307,11 @@ type _world = {
           {!load_macro_trend}; missing entries fall back to [Neutral] inside
           [_scan_all_fridays]. *)
 }
-(** Loaded panels + per-symbol sector context + Friday calendar + per-Friday
-    macro trends over the run window. Built once per invocation, consumed by
-    scan + score. *)
+(** Loaded snapshot callbacks + per-symbol sector context + Friday calendar +
+    per-Friday macro trends over the run window. Built once per invocation,
+    consumed by scan + score. *)
 
-(** Build the panels-and-context world.
+(** Build the snapshot-and-context world.
 
     The [universe] used here MUST match the actual run's universe (loaded from
     [universe.txt] in [Optimal_run_artefacts.load]). Earlier revisions sourced
@@ -339,13 +326,14 @@ let _build_world ~output_dir ~(actual_run : Report.actual_run)
   let data_dir_fpath = Data_path.default_data_dir () in
   let sectors_tbl = Sector_map.load ~data_dir:data_dir_fpath in
   let warmup_start = Date.add_days actual_run.start_date (-_warmup_days) in
-  let calendar =
-    _build_calendar ~start:warmup_start ~end_:actual_run.end_date
-  in
-  eprintf "optimal_strategy: building panels (%d symbols × %d days)\n%!"
+  eprintf "optimal_strategy: building snapshot (%d symbols, %s..%s)\n%!"
     (List.length universe + 1)
-    (Array.length calendar);
-  let bar_panels = _build_bar_panels ~data_dir_fpath ~universe ~calendar in
+    (Date.to_string warmup_start)
+    (Date.to_string actual_run.end_date);
+  let snapshot_callbacks =
+    _build_snapshot_callbacks ~data_dir_fpath ~universe ~start:warmup_start
+      ~end_:actual_run.end_date
+  in
   let sector_ctx_map = _build_sector_context_map sectors_tbl in
   let fridays =
     _fridays_in_range ~start:actual_run.start_date ~end_:actual_run.end_date
@@ -353,7 +341,7 @@ let _build_world ~output_dir ~(actual_run : Report.actual_run)
   let macro_trend_table = load_macro_trend ~output_dir in
   eprintf "optimal_strategy: macro_trend.sexp loaded (%d Friday entries)\n%!"
     (Hashtbl.length macro_trend_table);
-  { bar_panels; sector_ctx_map; fridays; universe; macro_trend_table }
+  { snapshot_callbacks; sector_ctx_map; fridays; universe; macro_trend_table }
 
 let _scan_and_score ~(world : _world) : OT.scored_candidate list =
   eprintf "optimal_strategy: scanning %d Fridays\n%!"
@@ -364,16 +352,18 @@ let _scan_and_score ~(world : _world) : OT.scored_candidate list =
   let scanner_config = Scanner.config_of_screener_config screener_config in
   let scorer_config = Scorer.default_config in
   let candidates =
-    _scan_all_fridays ~bar_panels:world.bar_panels ~fridays:world.fridays
-      ~universe:world.universe ~sector_map:world.sector_ctx_map ~stock_config
-      ~scanner_config ~bar_lookback:_bar_lookback_weeks
+    _scan_all_fridays ~snapshot_callbacks:world.snapshot_callbacks
+      ~fridays:world.fridays ~universe:world.universe
+      ~sector_map:world.sector_ctx_map ~stock_config ~scanner_config
+      ~bar_lookback:_bar_lookback_weeks
       ~macro_trend_table:world.macro_trend_table
   in
   eprintf "optimal_strategy: %d candidates emitted; scoring...\n%!"
     (List.length candidates);
   let forward_table =
-    _build_forward_table ~bar_panels:world.bar_panels ~fridays:world.fridays
-      ~stage_config ~bar_lookback:_bar_lookback_weeks ~universe:world.universe
+    _build_forward_table ~snapshot_callbacks:world.snapshot_callbacks
+      ~fridays:world.fridays ~stage_config ~bar_lookback:_bar_lookback_weeks
+      ~universe:world.universe
   in
   eprintf "optimal_strategy: forward outlooks memoized (%d symbols)\n%!"
     (Hashtbl.length forward_table);

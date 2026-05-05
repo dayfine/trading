@@ -3,12 +3,13 @@
  (libraries
   core
   core_unix.sys_unix
+  status
   trading.base
-  trading.data_panel
   trading.simulation
   types
   weinstein.data_source
   weinstein.screener
+  weinstein.snapshot_runtime
   weinstein.stage
   weinstein.stock_analysis
   weinstein.types

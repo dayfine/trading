@@ -33,8 +33,8 @@
     {1 Purity}
 
     Pure function. No I/O, no mutable state. The caller (PR-4 binary) is
-    responsible for materialising the [weekly_outlook list] from a panel — the
-    scorer never touches {!Bar_panels} or any indicator cache.
+    responsible for materialising the [weekly_outlook list] from the bar source
+    — the scorer never touches the snapshot cache or any indicator cache.
 
     See [dev/plans/optimal-strategy-counterfactual-2026-04-28.md] §Phase B. *)
 
