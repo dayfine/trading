@@ -124,10 +124,22 @@ val low_window :
     [Daily_price.t list] shape (notably {!Volume.analyze_breakout} and
     {!Resistance.analyze}, which still consume bar lists pending PR-B). *)
 
-type weekly_view = Snapshot_runtime.Snapshot_bar_views.weekly_view
-(** Type-alias for {!Snapshot_runtime.Snapshot_bar_views.weekly_view}, the
-    canonical record definition (moved 2026-05-06 in F.3.e-1). Kept here as a
-    re-export until F.3.e-3 deletes this module. New callers should reference
+type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
+  closes : float array;
+  raw_closes : float array;
+  highs : float array;
+  lows : float array;
+  volumes : float array;
+  dates : Core.Date.t array;
+  n : int;
+}
+(** Manifest re-export of {!Data_panel_snapshot.Panel_views.weekly_view}, the
+    canonical record definition (moved here 2026-05-06 in F.3.e-1, revised same
+    day to a neutral hub to satisfy A2 — see {!Data_panel_snapshot.Panel_views}
+    for the rationale). Kept here until F.3.e-3 deletes this module. The
+    manifest form ([type t = M.t = { ... }]) is what lets call sites construct
+    values via record literals against this alias. New callers should reference
+    {!Data_panel_snapshot.Panel_views.weekly_view} or
     {!Snapshot_runtime.Snapshot_bar_views.weekly_view} directly. *)
 
 val weekly_view_for :
@@ -141,11 +153,16 @@ val weekly_view_for :
     [as_of_day] is early in the backtest). Raises [Invalid_argument] if
     [as_of_day] is out of range. *)
 
-type daily_view = Snapshot_runtime.Snapshot_bar_views.daily_view
-(** Type-alias for {!Snapshot_runtime.Snapshot_bar_views.daily_view}, the
-    canonical record definition (moved 2026-05-06 in F.3.e-1). Kept here as a
-    re-export until F.3.e-3 deletes this module. New callers should reference
-    {!Snapshot_runtime.Snapshot_bar_views.daily_view} directly. *)
+type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
+  highs : float array;
+  lows : float array;
+  closes : float array;
+  dates : Core.Date.t array;
+  n_days : int;
+}
+(** Manifest re-export of {!Data_panel_snapshot.Panel_views.daily_view}, the
+    canonical record definition (neutral-hub home as of 2026-05-06; see sibling
+    {!weekly_view} docs for the F.3.e-1 architecture rationale). *)
 
 val daily_view_for :
   t -> symbol:string -> as_of_day:int -> lookback:int -> daily_view

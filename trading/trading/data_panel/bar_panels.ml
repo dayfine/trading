@@ -121,8 +121,31 @@ let low_window t ~symbol ~as_of_day ~len =
 (* Sector / Macro / Stops callback bundles over the resulting arrays.   *)
 (* ------------------------------------------------------------------ *)
 
-type weekly_view = Snapshot_runtime.Snapshot_bar_views.weekly_view
-type daily_view = Snapshot_runtime.Snapshot_bar_views.daily_view
+(* Phase F.3.e-1 (revised 2026-05-06): re-export the canonical record types
+   from the neutral hub [Data_panel_snapshot.Panel_views]. The manifest form
+   ([type =] with the record body) is required because consumers below
+   construct [weekly_view] / [daily_view] values via record literals
+   (e.g. [_empty_weekly_view] and the build-up in [_weekly_view_from_panel]);
+   without the manifest the compiler couldn't resolve the field set from the
+   type alone. {!Snapshot_runtime.Snapshot_bar_views} re-exports the same hub
+   type, so a [weekly_view] from either reader is the same OCaml value. *)
+type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
+  closes : float array;
+  raw_closes : float array;
+  highs : float array;
+  lows : float array;
+  volumes : float array;
+  dates : Core.Date.t array;
+  n : int;
+}
+
+type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
+  highs : float array;
+  lows : float array;
+  closes : float array;
+  dates : Core.Date.t array;
+  n_days : int;
+}
 
 let _empty_weekly_view : weekly_view =
   {

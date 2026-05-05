@@ -56,7 +56,7 @@
     owns its own buffer. Memory cost: at most [len * 8] bytes per call, freed by
     the GC. *)
 
-type weekly_view = {
+type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
   closes : float array;
       (** Adjusted close per weekly bar (chronological, oldest at index 0). *)
   raw_closes : float array;
@@ -84,11 +84,16 @@ type weekly_view = {
     aggregate's date is the latest trading day in the week (typically Friday);
     the trailing partial week is retained.
 
-    {b Phase F.3.e-1 (canonical home)}: this is now the canonical definition.
-    [Data_panel.Bar_panels.weekly_view] aliases this type via [type =] until
-    F.3.e-3 deletes {!Data_panel.Bar_panels} entirely. *)
+    {b Phase F.3.e-1 (revised 2026-05-06 — neutral hub)}: the canonical
+    definition lives in {!Data_panel_snapshot.Panel_views.weekly_view}. This
+    module re-exports it via a manifest type alias so existing callers (snapshot
+    side) keep their qualified field-access syntax. The panel side
+    ([Data_panel.Bar_panels]) re-exports the same type from the same hub. Both
+    consumers depend on [trading.data_panel.snapshot] (a neutral hub with no
+    [analysis/] dep), so the prior A2 violation (analysis→trading.data_panel) is
+    gone. *)
 
-type daily_view = {
+type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
   highs : float array;
       (** Daily high prices, oldest at index 0, newest at index [n_days - 1]. *)
   lows : float array;  (** Daily low prices, same indexing as [highs]. *)
@@ -102,8 +107,9 @@ type daily_view = {
     support-floor callbacks. The lookback windowing is applied at construction
     time, so the consumer scans [0..n_days-1] without further bounds checks.
 
-    {b Phase F.3.e-1 (canonical home)}: aliased by
-    [Data_panel.Bar_panels.daily_view] until F.3.e-3 deletes that module. *)
+    {b Phase F.3.e-1 (revised 2026-05-06)}: re-exported from
+    {!Data_panel_snapshot.Panel_views.daily_view} (neutral-hub canonical home)
+    via manifest type alias. *)
 
 val weekly_view_for :
   Snapshot_callbacks.t ->
