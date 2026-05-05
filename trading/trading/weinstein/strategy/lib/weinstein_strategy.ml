@@ -367,10 +367,17 @@ let _is_screening_day_view (view : Data_panel.Bar_panels.weekly_view) =
 let _run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result
     ~bar_reader ~prior_stages ~current_date ~index_view =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
+  (* Phase F.3.d-2 caller migration: the global-index view assembly reads
+     through {!Snapshot_runtime.Snapshot_callbacks} directly via the
+     [*_of_snapshot_views] API rather than re-routing through the
+     bar_reader's panel-shaped views. The cb is exposed by the
+     snapshot-backed [Bar_reader.t] (production runner uses
+     {!Bar_reader.of_snapshot_views} post-#864). *)
+  let cb = Bar_reader.snapshot_callbacks bar_reader in
   let global_index_views =
-    Macro_inputs.build_global_index_views ~lookback_bars:config.lookback_bars
-      ~global_index_symbols:config.indices.global ~bar_reader
-      ~as_of:current_date
+    Macro_inputs.build_global_index_views_of_snapshot_views
+      ~lookback_bars:config.lookback_bars
+      ~global_index_symbols:config.indices.global ~cb ~as_of:current_date
   in
   let ma_cache = Bar_reader.ma_cache bar_reader in
   let ad_bars =
@@ -398,11 +405,16 @@ let _run_screen_after_macro ~config ~stop_states ~last_stop_out_dates
     ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
     ~portfolio ~current_date ~index_view ~audit_recorder ~macro_result =
   let ma_cache = Bar_reader.ma_cache bar_reader in
+  (* Phase F.3.d-2 caller migration: the sector ETF analysis reads through
+     {!Snapshot_runtime.Snapshot_callbacks} directly via the
+     [*_of_snapshot_views] API. See [_run_macro_only] for context on the
+     cb-from-bar_reader plumbing. *)
+  let cb = Bar_reader.snapshot_callbacks bar_reader in
   let sector_map =
-    Macro_inputs.build_sector_map ?ma_cache ~stage_config:config.stage_config
-      ~lookback_bars:config.lookback_bars ~sector_etfs:config.sector_etfs
-      ~bar_reader ~as_of:current_date ~sector_prior_stages ~index_view
-      ~ticker_sectors ()
+    Macro_inputs.build_sector_map_of_snapshot_views ?ma_cache
+      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
+      ~sector_etfs:config.sector_etfs ~cb ~as_of:current_date
+      ~sector_prior_stages ~index_view ~ticker_sectors ()
   in
   _screen_universe ~config ~index_view ~macro_result ~sector_map ~stop_states
     ~last_stop_out_dates ~portfolio ~get_price ~bar_reader ~prior_stages

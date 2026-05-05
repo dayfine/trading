@@ -17,7 +17,16 @@ module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
    [ma_cache] is set by [of_panels] callers that build a cache up-front; the
    other constructors leave it [None]. The strategy's cache-aware MA paths
-   key off [Some]. *)
+   key off [Some].
+
+   [snapshot_callbacks] is the underlying field-accessor shim for
+   {!of_snapshot_views} / {!of_in_memory_bars}. The strategy's macro / sector
+   entry points consume this directly via the [*_of_snapshot_views] APIs
+   on {!Macro_inputs} (Phase F.3.b-2 / c-2 / d-2 caller migration). For
+   panel-backed and empty readers, this is a sentinel cb whose every read
+   returns [Error NotFound]; the macro / sector path then sees empty views,
+   matching the prior bar-list / panel-view behaviour for readers that were
+   never meant to back a real screening run. *)
 type t = {
   daily_bars_for : symbol:string -> as_of:Date.t -> Types.Daily_price.t list;
   weekly_bars_for :
@@ -27,9 +36,31 @@ type t = {
   daily_view_for :
     symbol:string -> as_of:Date.t -> lookback:int -> Bar_panels.daily_view;
   ma_cache : Weekly_ma_cache.t option;
+  snapshot_callbacks : Snapshot_callbacks.t;
 }
 
 let ma_cache t = t.ma_cache
+let snapshot_callbacks t = t.snapshot_callbacks
+
+(* Sentinel cb for readers that have no underlying snapshot directory
+   ({!of_panels} and {!empty}). Every [read_field] / [read_field_history] call
+   returns [Error NotFound], which {!Snapshot_bar_views.weekly_view_for} /
+   {!Snapshot_bar_views.weekly_bars_for} fold to the empty view / empty list.
+   This matches the contract for these constructors today: panel-backed
+   readers are unused in production after Phase F.3.a-3 redo, and the empty
+   reader is documented to return empty results from every read. *)
+let _empty_snapshot_callbacks : Snapshot_callbacks.t =
+  let not_found =
+    Error
+      {
+        Status.code = Status.NotFound;
+        message = "Bar_reader: snapshot_callbacks not available on this reader";
+      }
+  in
+  {
+    read_field = (fun ~symbol:_ ~date:_ ~field:_ -> not_found);
+    read_field_history = (fun ~symbol:_ ~from:_ ~until:_ ~field:_ -> not_found);
+  }
 
 (* Empty views — used as the sentinel return when [as_of] falls outside the
    snapshot's calendar or the snapshot has no rows. Match the empty literals
@@ -84,6 +115,11 @@ let of_panels ?ma_cache panels =
     weekly_view_for = _panel_weekly_view_for panels;
     daily_view_for = _panel_daily_view_for panels;
     ma_cache;
+    (* Panel-backed readers have no underlying snapshot directory; the
+       sentinel cb yields empty views from {!Snapshot_bar_views}. Production
+       does not use this constructor (Phase F.3.a-3 redo flipped the runner
+       to {!of_snapshot_views}); F.3.e deletes [of_panels] entirely. *)
+    snapshot_callbacks = _empty_snapshot_callbacks;
   }
 
 (* {1 Empty backing — used by tests where no read is expected}
@@ -99,6 +135,10 @@ let empty () =
     weekly_view_for = (fun ~symbol:_ ~n:_ ~as_of:_ -> _empty_weekly_view);
     daily_view_for = (fun ~symbol:_ ~as_of:_ ~lookback:_ -> _empty_daily_view);
     ma_cache = None;
+    (* The sentinel cb's "every read errors" semantics matches the
+       closures above's "every read returns empty" semantics through
+       {!Snapshot_bar_views}'s NotFound-to-empty fold. *)
+    snapshot_callbacks = _empty_snapshot_callbacks;
   }
 
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
@@ -161,6 +201,11 @@ let of_snapshot_views ?calendar (cb : Snapshot_runtime.Snapshot_callbacks.t) =
     weekly_view_for = _snapshot_weekly_view_for cb;
     daily_view_for = _snapshot_daily_view_for ?calendar cb;
     ma_cache = None;
+    (* Expose the underlying cb so the strategy's macro / sector path
+       (Phase F.3.b-2 / c-2 / d-2 caller migration) reads through the
+       snapshot directly via [Macro_inputs.*_of_snapshot_views] without
+       re-routing through the bar_reader's panel-shaped views. *)
+    snapshot_callbacks = cb;
   }
 
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}

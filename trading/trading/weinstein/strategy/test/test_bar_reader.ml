@@ -20,6 +20,8 @@ open OUnit2
 open Core
 open Matchers
 module Bar_reader = Weinstein_strategy.Bar_reader
+module Macro_inputs = Weinstein_strategy.Macro_inputs
+module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 (* ------------------------------------------------------------------ *)
 (* Synthetic OHLCV builders                                            *)
@@ -154,6 +156,36 @@ let test_of_in_memory_bars_multi_symbol _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* Sentinel-cb guard tests (CP4 — pin docstring claims on              *)
+(* [Bar_reader.snapshot_callbacks] for non-snapshot constructors)       *)
+(* ------------------------------------------------------------------ *)
+
+(* Pins guard G1: the sentinel cb on [Bar_reader.empty ()] returns
+   [Error NotFound] from every read. *)
+let test_empty_reader_snapshot_callbacks_yields_not_found _ =
+  let cb = Bar_reader.snapshot_callbacks (Bar_reader.empty ()) in
+  let result =
+    cb.read_field_history ~symbol:"ANY" ~from:(_ymd 2024 1 1)
+      ~until:(_ymd 2024 1 31) ~field:Snapshot_schema.Close
+  in
+  assert_that result
+    (matching ~msg:"Expected Error NotFound"
+       (function Error s -> Some s | Ok _ -> None)
+       (field (fun s -> s.Status.code) (equal_to Status.NotFound)))
+
+(* Pins guard G2: routing the sentinel-cb through
+   [Macro_inputs.build_global_index_views_of_snapshot_views] yields the
+   empty list (NotFound → [] cascades to "no resident bars → drop"). *)
+let test_empty_reader_routed_through_macro_inputs_yields_empty _ =
+  let cb = Bar_reader.snapshot_callbacks (Bar_reader.empty ()) in
+  let result =
+    Macro_inputs.build_global_index_views_of_snapshot_views ~lookback_bars:52
+      ~global_index_symbols:[ ("FOO.INDX", "Foo") ]
+      ~cb ~as_of:(_ymd 2024 1 31)
+  in
+  assert_that result (size_is 0)
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -170,6 +202,10 @@ let suite =
          >:: test_of_in_memory_bars_unknown_symbol_returns_empty;
          "of_in_memory_bars_multi_symbol"
          >:: test_of_in_memory_bars_multi_symbol;
+         "empty_reader_snapshot_callbacks_yields_not_found"
+         >:: test_empty_reader_snapshot_callbacks_yields_not_found;
+         "empty_reader_routed_through_macro_inputs_yields_empty"
+         >:: test_empty_reader_routed_through_macro_inputs_yields_empty;
        ]
 
 let () = run_test_tt_main suite
