@@ -50,6 +50,18 @@
   matchers))
 
 (test
+ (name test_bah_benchmark_strategy)
+ (modules test_bah_benchmark_strategy)
+ (libraries
+  ounit2
+  core
+  status
+  trading.strategy
+  trading.base
+  test_helpers
+  matchers))
+
+(test
  (name test_portfolio_view)
  (modules test_portfolio_view)
  (libraries ounit2 core trading.strategy types matchers))
