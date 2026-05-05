@@ -492,6 +492,7 @@ let () =
           in
           let snap_dv =
             Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback:60
+              ~calendar
           in
           _maybe_diff_daily_view ~tag:"daily_view" daily_view_cnt ~symbol ~as_of
             (panel_dv, snap_dv);
@@ -502,7 +503,7 @@ let () =
             | Some d -> Bar_panels.low_window panel ~symbol ~as_of_day:d ~len:60
           in
           let snap_lw =
-            Snapshot_bar_views.low_window cb ~symbol ~as_of ~len:60
+            Snapshot_bar_views.low_window cb ~symbol ~as_of ~len:60 ~calendar
           in
           _diff_low_window ~tag:"low_window" low_window_cnt ~symbol ~as_of
             panel_lw snap_lw));
