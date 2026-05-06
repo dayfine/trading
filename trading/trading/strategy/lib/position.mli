@@ -168,9 +168,9 @@ type exit_reason =
             backtest output (e.g. ["stage3_force_exit"], ["regime_change"]).
             Stable per strategy-side trigger so downstream tooling can group
             exits by reason.
-          - [detail]: optional free-form payload — typically a small
-            [key=value] string the strategy uses to encode salient context
-            (e.g. ["weeks_in_stage3=3"]). Consumers that only label the exit
+          - [detail]: optional free-form payload — typically a small [key=value]
+            string the strategy uses to encode salient context (e.g.
+            ["weeks_in_stage3=3"]). Consumers that only label the exit
             (trades.csv writer, audit report) ignore [detail]. *)
 [@@deriving show, eq]
 
