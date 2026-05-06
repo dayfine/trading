@@ -107,16 +107,24 @@ let test_build_trade_record_long _ =
     (all_of
        [
          field (fun (t : AE.trade_record) -> t.symbol) (equal_to "AAPL");
-         field (fun t -> t.signal_date) (equal_to (_date "2024-01-19"));
-         field (fun t -> t.exit_date) (equal_to (_date "2024-02-09"));
-         field (fun t -> t.entry_price) (float_equal 100.0);
-         field (fun t -> t.return_pct) (float_equal 0.30);
-         field (fun t -> t.hold_days) (equal_to 21);
-         field (fun t -> t.entry_dollars) (float_equal 10_000.0);
-         field (fun t -> t.shares) (float_equal 100.0);
-         field (fun t -> t.pnl_dollars) (float_equal 3000.0);
-         field (fun t -> t.exit_reason) (equal_to OT.End_of_run);
-         field (fun t -> t.cascade_score) (equal_to 50);
+         field
+           (fun (t : AE.trade_record) -> t.signal_date)
+           (equal_to (_date "2024-01-19"));
+         field
+           (fun (t : AE.trade_record) -> t.exit_date)
+           (equal_to (_date "2024-02-09"));
+         field (fun (t : AE.trade_record) -> t.entry_price) (float_equal 100.0);
+         field (fun (t : AE.trade_record) -> t.return_pct) (float_equal 0.30);
+         field (fun (t : AE.trade_record) -> t.hold_days) (equal_to 21);
+         field
+           (fun (t : AE.trade_record) -> t.entry_dollars)
+           (float_equal 10_000.0);
+         field (fun (t : AE.trade_record) -> t.shares) (float_equal 100.0);
+         field (fun (t : AE.trade_record) -> t.pnl_dollars) (float_equal 3000.0);
+         field
+           (fun (t : AE.trade_record) -> t.exit_reason)
+           (equal_to OT.End_of_run);
+         field (fun (t : AE.trade_record) -> t.cascade_score) (equal_to 50);
        ])
 
 let test_build_trade_record_short _ =
@@ -131,11 +139,14 @@ let test_build_trade_record_short _ =
   assert_that trade
     (all_of
        [
-         field (fun (t : AE.trade_record) -> t.side)
+         field
+           (fun (t : AE.trade_record) -> t.side)
            (equal_to Trading_base.Types.Short);
-         field (fun t -> t.return_pct) (float_equal 0.20);
-         field (fun t -> t.pnl_dollars) (float_equal 2000.0);
-         field (fun t -> t.exit_reason) (equal_to OT.Stop_hit);
+         field (fun (t : AE.trade_record) -> t.return_pct) (float_equal 0.20);
+         field (fun (t : AE.trade_record) -> t.pnl_dollars) (float_equal 2000.0);
+         field
+           (fun (t : AE.trade_record) -> t.exit_reason)
+           (equal_to OT.Stop_hit);
        ])
 
 let test_custom_entry_dollars _ =
@@ -152,9 +163,11 @@ let test_custom_entry_dollars _ =
     (all_of
        [
          field (fun (t : AE.trade_record) -> t.shares) (float_equal 250.0);
-         field (fun t -> t.pnl_dollars) (float_equal 5000.0);
-         field (fun t -> t.return_pct) (float_equal 0.10);
-         field (fun t -> t.entry_dollars) (float_equal 50_000.0);
+         field (fun (t : AE.trade_record) -> t.pnl_dollars) (float_equal 5000.0);
+         field (fun (t : AE.trade_record) -> t.return_pct) (float_equal 0.10);
+         field
+           (fun (t : AE.trade_record) -> t.entry_dollars)
+           (float_equal 50_000.0);
        ])
 
 (* ------------------------------------------------------------------ *)
@@ -189,23 +202,37 @@ let test_three_signals_all_taken_no_cash_gate _ =
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "AAA");
-             field (fun t -> t.return_pct) (float_equal 0.20);
-             field (fun t -> t.exit_reason) (equal_to OT.End_of_run);
-             field (fun t -> t.pnl_dollars) (float_equal 2000.0);
+             field (fun (t : AE.trade_record) -> t.return_pct) (float_equal 0.20);
+             field
+               (fun (t : AE.trade_record) -> t.exit_reason)
+               (equal_to OT.End_of_run);
+             field
+               (fun (t : AE.trade_record) -> t.pnl_dollars)
+               (float_equal 2000.0);
            ];
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "BBB");
-             field (fun t -> t.return_pct) (float_equal (-0.10));
-             field (fun t -> t.exit_reason) (equal_to OT.Stop_hit);
-             field (fun t -> t.pnl_dollars) (float_equal (-1000.0));
+             field
+               (fun (t : AE.trade_record) -> t.return_pct)
+               (float_equal (-0.10));
+             field
+               (fun (t : AE.trade_record) -> t.exit_reason)
+               (equal_to OT.Stop_hit);
+             field
+               (fun (t : AE.trade_record) -> t.pnl_dollars)
+               (float_equal (-1000.0));
            ];
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "CCC");
-             field (fun t -> t.return_pct) (float_equal 0.15);
-             field (fun t -> t.exit_reason) (equal_to OT.Stage3_transition);
-             field (fun t -> t.pnl_dollars) (float_equal 1500.0);
+             field (fun (t : AE.trade_record) -> t.return_pct) (float_equal 0.15);
+             field
+               (fun (t : AE.trade_record) -> t.exit_reason)
+               (equal_to OT.Stage3_transition);
+             field
+               (fun (t : AE.trade_record) -> t.pnl_dollars)
+               (float_equal 1500.0);
            ];
        ])
 
@@ -233,14 +260,20 @@ let test_three_signals_aggregate_matches_sum _ =
     (all_of
        [
          field (fun (a : AE.aggregate) -> a.trade_count) (equal_to 3);
-         field (fun a -> a.winners) (equal_to 2);
-         field (fun a -> a.losers) (equal_to 1);
-         field (fun a -> a.win_rate_pct)
+         field (fun (a : AE.aggregate) -> a.winners) (equal_to 2);
+         field (fun (a : AE.aggregate) -> a.losers) (equal_to 1);
+         field
+           (fun (a : AE.aggregate) -> a.win_rate_pct)
            (float_equal ~epsilon:1e-9 (2.0 /. 3.0));
-         field (fun a -> a.mean_return_pct)
+         field
+           (fun (a : AE.aggregate) -> a.mean_return_pct)
            (float_equal ~epsilon:1e-9 (0.25 /. 3.0));
-         field (fun a -> a.median_return_pct) (float_equal 0.15);
-         field (fun a -> a.total_pnl_dollars) (float_equal 2500.0);
+         field
+           (fun (a : AE.aggregate) -> a.median_return_pct)
+           (float_equal 0.15);
+         field
+           (fun (a : AE.aggregate) -> a.total_pnl_dollars)
+           (float_equal 2500.0);
        ])
 
 (* ------------------------------------------------------------------ *)
@@ -254,16 +287,24 @@ let test_empty_scored_input _ =
        [
          field (fun (r : AE.result) -> r.trades) is_empty;
          field
-           (fun r -> r.aggregate)
+           (fun (r : AE.result) -> r.aggregate)
            (all_of
               [
                 field (fun (a : AE.aggregate) -> a.trade_count) (equal_to 0);
-                field (fun a -> a.winners) (equal_to 0);
-                field (fun a -> a.losers) (equal_to 0);
-                field (fun a -> a.win_rate_pct) (float_equal 0.0);
-                field (fun a -> a.mean_return_pct) (float_equal 0.0);
-                field (fun a -> a.median_return_pct) (float_equal 0.0);
-                field (fun a -> a.total_pnl_dollars) (float_equal 0.0);
+                field (fun (a : AE.aggregate) -> a.winners) (equal_to 0);
+                field (fun (a : AE.aggregate) -> a.losers) (equal_to 0);
+                field
+                  (fun (a : AE.aggregate) -> a.win_rate_pct)
+                  (float_equal 0.0);
+                field
+                  (fun (a : AE.aggregate) -> a.mean_return_pct)
+                  (float_equal 0.0);
+                field
+                  (fun (a : AE.aggregate) -> a.median_return_pct)
+                  (float_equal 0.0);
+                field
+                  (fun (a : AE.aggregate) -> a.total_pnl_dollars)
+                  (float_equal 0.0);
               ]);
        ])
 
@@ -285,7 +326,9 @@ let test_median_even_count _ =
     (all_of
        [
          field (fun (a : AE.aggregate) -> a.trade_count) (equal_to 4);
-         field (fun a -> a.median_return_pct) (float_equal 0.25);
+         field
+           (fun (a : AE.aggregate) -> a.median_return_pct)
+           (float_equal 0.25);
        ])
 
 let test_flat_trade_neither_winner_nor_loser _ =
@@ -302,10 +345,12 @@ let test_flat_trade_neither_winner_nor_loser _ =
     (all_of
        [
          field (fun (a : AE.aggregate) -> a.trade_count) (equal_to 1);
-         field (fun a -> a.winners) (equal_to 0);
-         field (fun a -> a.losers) (equal_to 0);
-         field (fun a -> a.win_rate_pct) (float_equal 0.0);
-         field (fun a -> a.total_pnl_dollars) (float_equal 0.0);
+         field (fun (a : AE.aggregate) -> a.winners) (equal_to 0);
+         field (fun (a : AE.aggregate) -> a.losers) (equal_to 0);
+         field (fun (a : AE.aggregate) -> a.win_rate_pct) (float_equal 0.0);
+         field
+           (fun (a : AE.aggregate) -> a.total_pnl_dollars)
+           (float_equal 0.0);
        ])
 
 let test_return_buckets_default _ =
@@ -399,12 +444,16 @@ let test_passes_macro_carried_through _ =
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "BULL");
-             field (fun t -> t.passes_macro) (equal_to true);
+             field
+               (fun (t : AE.trade_record) -> t.passes_macro)
+               (equal_to true);
            ];
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "BEAR");
-             field (fun t -> t.passes_macro) (equal_to false);
+             field
+               (fun (t : AE.trade_record) -> t.passes_macro)
+               (equal_to false);
            ];
        ])
 

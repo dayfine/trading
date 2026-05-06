@@ -92,9 +92,10 @@ type trade_record = {
   exit_date : Date.t;
       (** Friday on which the position closed under the natural exit rule
           (stop hit, Stage-3 transition confirmed, or end of run). *)
-  exit_reason : Optimal_types.exit_trigger;
-      (** Which natural exit fired. Same {!Optimal_types.exit_trigger}
-          variants as the optimal-strategy track. *)
+  exit_reason : Backtest_optimal.Optimal_types.exit_trigger;
+      (** Which natural exit fired. Same
+          {!Backtest_optimal.Optimal_types.exit_trigger} variants as the
+          optimal-strategy track. *)
   return_pct : float;
       (** Per-trade return as a decimal fraction. For longs:
           [(exit_price -. entry_price) /. entry_price]. For shorts: the
@@ -168,7 +169,9 @@ type result = { trades : trade_record list; aggregate : aggregate }
     candidates — no re-sorting. *)
 
 val grade :
-  config:config -> scored:Optimal_types.scored_candidate list -> result
+  config:config ->
+  scored:Backtest_optimal.Optimal_types.scored_candidate list ->
+  result
 (** [grade ~config ~scored] projects each scored candidate into a
     {!trade_record} using [config.entry_dollars] for sizing, computes the
     {!aggregate}, and returns both as a {!result}.
@@ -179,7 +182,9 @@ val grade :
     Pure function. *)
 
 val build_trade_record :
-  config:config -> Optimal_types.scored_candidate -> trade_record
+  config:config ->
+  Backtest_optimal.Optimal_types.scored_candidate ->
+  trade_record
 (** [build_trade_record ~config sc] is the per-candidate projection helper.
     Exposed for unit-testing the per-trade arithmetic in isolation; the
     aggregator at {!grade} uses it internally. *)

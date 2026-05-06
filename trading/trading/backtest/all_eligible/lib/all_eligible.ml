@@ -3,7 +3,7 @@
     See [all_eligible.mli] for the API contract. *)
 
 open Core
-module OT = Optimal_types
+module OT = Backtest_optimal.Optimal_types
 
 (* ------------------------------------------------------------------ *)
 (* Defaults                                                             *)
