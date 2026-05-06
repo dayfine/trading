@@ -190,12 +190,22 @@ let test_candidate_has_suggested_entry _ =
     screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
       ~stocks ~held_tickers:[]
   in
-  match result.buy_candidates with
-  | [] -> assert_failure "Expected at least one buy candidate"
-  | c :: _ ->
-      assert_that c.suggested_entry (gt (module Float_ord) 0.0);
-      assert_that c.suggested_stop (lt (module Float_ord) c.suggested_entry);
-      assert_that c.risk_pct (gt (module Float_ord) 0.0)
+  assert_that result.buy_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
+           [
+             all_of
+               [
+                 field (fun c -> c.suggested_entry) (gt (module Float_ord) 0.0);
+                 field
+                   (fun c -> c.suggested_entry -. c.suggested_stop)
+                   (gt (module Float_ord) 0.0);
+                 field (fun c -> c.risk_pct) (gt (module Float_ord) 0.0);
+               ];
+           ];
+       ])
 
 (* ------------------------------------------------------------------ *)
 (* Purity                                                               *)
@@ -241,12 +251,22 @@ let test_scores_drive_sort_order _ =
   let result =
     screen ~config:cfg ~macro_trend:Bullish ~sector_map ~stocks ~held_tickers:[]
   in
-  match result.buy_candidates with
-  | c1 :: c2 :: _ ->
-      assert_that c1.ticker (equal_to "A");
-      assert_that c2.ticker (equal_to "B");
-      assert_that c1.score (gt (module Int_ord) c2.score)
-  | _ -> assert_failure "Expected at least two buy candidates"
+  assert_that result.buy_candidates
+    (all_of
+       [
+         size_is 2;
+         elements_are
+           [
+             field (fun c -> c.ticker) (equal_to "A");
+             field (fun c -> c.ticker) (equal_to "B");
+           ];
+         field
+           (fun cs ->
+             let c1 = List.nth_exn cs 0 in
+             let c2 = List.nth_exn cs 1 in
+             c1.score - c2.score)
+           (gt (module Int_ord) 0);
+       ])
 
 (* ------------------------------------------------------------------ *)
 (* Max cap: only top-N returned                                        *)
@@ -293,6 +313,119 @@ let test_watchlist_captures_low_grade _ =
     (List.exists result.watchlist ~f:(fun (t, _) -> String.(t = "LOW")))
 
 (* ------------------------------------------------------------------ *)
+(* min_score_override: numeric threshold gate                           *)
+(* ------------------------------------------------------------------ *)
+
+(** Build two breakout candidates with distinct scores by varying volume
+    confirmation: [LOW] uses Adequate-volume bars (spike_volume 1500 → ratio
+    1.5, [w_adequate_volume = 10]); [HIGH] uses Strong-volume bars (spike_volume
+    3000 → ratio 3.0, [w_strong_volume = 20]). Both share the Stage1→Stage2 stem
+    so the score delta isolates the volume signal. The exact integer scores
+    depend on additional analyzer signals (RS, resistance) — tests below probe
+    the [min_score_override] gate by comparing scores from the screener output
+    rather than pinning specific integers. *)
+let _two_breakouts () =
+  let bars_low =
+    rising_bars_with_custom_spike ~n:35 50.0 100.0 ~spike_idx:31
+      ~spike_volume:1500
+  in
+  let bars_high = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let prior = Some (Stage1 { weeks_in_base = 10 }) in
+  [ make_analysis "LOW" prior bars_low; make_analysis "HIGH" prior bars_high ]
+
+(** Probe scores by running the screener with [min_grade = F] and no override —
+    every breakout that passes the per-stock filters lands in the output, and we
+    can read [score] for each ticker. *)
+let _scores_by_ticker stocks =
+  let probe_cfg = { cfg with min_grade = F; min_score_override = None } in
+  let result =
+    screen ~config:probe_cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  String.Map.of_alist_reduce
+    (List.map result.buy_candidates ~f:(fun (c : scored_candidate) ->
+         (c.ticker, c.score)))
+    ~f:(fun a _ -> a)
+
+(** [min_score_override = Some n] strictly above LOW's score and at-or-below
+    HIGH's score admits only HIGH — pure numeric gate, not grade-dependent. *)
+let test_min_score_override_filters_below_threshold _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let low_score = Map.find_exn scores "LOW" in
+  let high_score = Map.find_exn scores "HIGH" in
+  assert_that high_score (gt (module Int_ord) low_score);
+  let threshold = low_score + 1 in
+  let cfg_override = { cfg with min_score_override = Some threshold } in
+  let result =
+    screen ~config:cfg_override ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates
+    (elements_are
+       [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "HIGH") ])
+
+(** [min_score_override = Some n] equal to HIGH's exact score still admits HIGH
+    — the gate is [>=], not [>]. *)
+let test_min_score_override_inclusive_at_boundary _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let high_score = Map.find_exn scores "HIGH" in
+  let cfg_override = { cfg with min_score_override = Some high_score } in
+  let result =
+    screen ~config:cfg_override ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates
+    (elements_are
+       [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "HIGH") ])
+
+(** [min_score_override] strictly above HIGH's score excludes both — pins the
+    [>=] semantics from above (no candidate strictly less than the threshold
+    passes). *)
+let test_min_score_override_strict_above_score _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let high_score = Map.find_exn scores "HIGH" in
+  let cfg_override = { cfg with min_score_override = Some (high_score + 1) } in
+  let result =
+    screen ~config:cfg_override ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates is_empty
+
+(** [min_score_override = None] (default) is bit-equal to the legacy
+    {!min_grade}-based filter — for each [min_grade] level, the override-off run
+    admits exactly the same candidates as the override-off run did before this
+    field existed. Probed by running both LOW (grade C) and HIGH (grade B+)
+    under [min_grade = C] — both are admitted. *)
+let test_min_score_override_default_preserves_min_grade _ =
+  let stocks = _two_breakouts () in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  assert_that (List.length result.buy_candidates) (equal_to 2)
+
+(** When [min_score_override] is set, {!min_grade} is ignored — a configuration
+    that would block both candidates under [min_grade = A_plus] still admits the
+    HIGH candidate when the numeric override is at-or-below HIGH's score. *)
+let test_min_score_override_supersedes_min_grade _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let low_score = Map.find_exn scores "LOW" in
+  let cfg_override =
+    { cfg with min_grade = A_plus; min_score_override = Some (low_score + 1) }
+  in
+  let result =
+    screen ~config:cfg_override ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates
+    (elements_are
+       [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "HIGH") ])
+
+(* ------------------------------------------------------------------ *)
 (* Short candidates in Neutral market                                  *)
 (* ------------------------------------------------------------------ *)
 
@@ -325,11 +458,21 @@ let test_short_candidate_stop_above_entry _ =
   let result =
     screen ~config:cfg ~macro_trend:Bearish ~sector_map ~stocks ~held_tickers:[]
   in
-  match result.short_candidates with
-  | [] -> assert_failure "Expected a short candidate"
-  | c :: _ ->
-      assert_that c.suggested_stop (gt (module Float_ord) c.suggested_entry);
-      assert_that c.risk_pct (gt (module Float_ord) 0.0)
+  assert_that result.short_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
+           [
+             all_of
+               [
+                 field
+                   (fun c -> c.suggested_stop -. c.suggested_entry)
+                   (gt (module Float_ord) 0.0);
+                 field (fun c -> c.risk_pct) (gt (module Float_ord) 0.0);
+               ];
+           ];
+       ])
 
 (* ------------------------------------------------------------------ *)
 (* Candidate grade field matches score                                 *)
@@ -339,22 +482,31 @@ let test_candidate_grade_matches_score _ =
   let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
   let prior = Some (Stage1 { weeks_in_base = 10 }) in
   let stocks = [ make_analysis "G" prior bars ] in
+  let grade_for_score score : grade =
+    if score >= 85 then A_plus
+    else if score >= 70 then A
+    else if score >= 55 then B
+    else if score >= 40 then C
+    else if score >= 25 then D
+    else F
+  in
   let result =
     screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
       ~stocks ~held_tickers:[]
   in
-  match result.buy_candidates with
-  | [] -> assert_failure "Expected a buy candidate"
-  | c :: _ ->
-      let expected_grade =
-        if c.score >= 85 then A_plus
-        else if c.score >= 70 then A
-        else if c.score >= 55 then B
-        else if c.score >= 40 then C
-        else if c.score >= 25 then D
-        else F
-      in
-      assert_that c.grade (equal_to (expected_grade : grade))
+  assert_that result.buy_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
+           [
+             matching ~msg:"grade matches score-derived grade"
+               (fun c ->
+                 if Poly.equal c.grade (grade_for_score c.score) then Some ()
+                 else None)
+               (equal_to ());
+           ];
+       ])
 
 (* ------------------------------------------------------------------ *)
 (* Candidate side: buy_candidates are Long, short_candidates are Short *)
@@ -368,9 +520,13 @@ let test_buy_candidates_are_long _ =
     screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
       ~stocks ~held_tickers:[]
   in
-  match result.buy_candidates with
-  | [] -> assert_failure "Expected a buy candidate"
-  | c :: _ -> assert_that c.side (equal_to Trading_base.Types.Long)
+  assert_that result.buy_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
+           [ field (fun c -> c.side) (equal_to Trading_base.Types.Long) ];
+       ])
 
 let test_short_candidates_are_short _ =
   let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
@@ -382,9 +538,13 @@ let test_short_candidates_are_short _ =
   let result =
     screen ~config:cfg ~macro_trend:Bearish ~sector_map ~stocks ~held_tickers:[]
   in
-  match result.short_candidates with
-  | [] -> assert_failure "Expected a short candidate"
-  | c :: _ -> assert_that c.side (equal_to Trading_base.Types.Short)
+  assert_that result.short_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
+           [ field (fun c -> c.side) (equal_to Trading_base.Types.Short) ];
+       ])
 
 (* ------------------------------------------------------------------ *)
 (* Short-side volume confirmation (mirror of long-side)                *)
@@ -424,26 +584,31 @@ let test_short_side_volume_confirmation_strong _ =
     screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
       ~stocks:[ with_neg_rs ] ~held_tickers:[]
   in
-  match result.short_candidates with
-  | [] -> assert_failure "Expected a short candidate"
-  | c :: _ ->
-      assert_that c
-        (all_of
+  assert_that result.short_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
            [
-             field (fun c -> c.ticker) (equal_to "VOL_STRONG");
-             field (fun c -> c.score) (equal_to 85);
-             field (fun c -> c.grade) (equal_to (A_plus : grade));
-             field
-               (fun c -> c.rationale)
-               (matching ~msg:"rationale contains breakdown-volume label"
-                  (fun rs ->
-                    if
-                      List.exists rs ~f:(fun r ->
-                          String.is_substring r ~substring:"breakdown volume")
-                    then Some ()
-                    else None)
-                  (equal_to ()));
-           ])
+             all_of
+               [
+                 field (fun c -> c.ticker) (equal_to "VOL_STRONG");
+                 field (fun c -> c.score) (equal_to 85);
+                 field (fun c -> c.grade) (equal_to (A_plus : grade));
+                 field
+                   (fun c -> c.rationale)
+                   (matching ~msg:"rationale contains breakdown-volume label"
+                      (fun rs ->
+                        if
+                          List.exists rs ~f:(fun r ->
+                              String.is_substring r
+                                ~substring:"breakdown volume")
+                        then Some ()
+                        else None)
+                      (equal_to ()));
+               ];
+           ];
+       ])
 
 (** Adequate breakdown volume (1.5x average) adds [w_adequate_volume = 10]
     points, lifting a Stage-4 candidate that would otherwise score 30 + 0 + 0
@@ -474,15 +639,21 @@ let test_short_side_volume_adequate_label _ =
     screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
       ~stocks:[ with_neg_rs ] ~held_tickers:[]
   in
-  match result.short_candidates with
-  | [] -> assert_failure "Expected a short candidate"
-  | c :: _ ->
-      assert_that c.rationale
-        (matching ~msg:"contains 'Adequate breakdown volume'"
-           (fun rs ->
-             List.find rs ~f:(fun r ->
-                 String.equal r "Adequate breakdown volume"))
-           (equal_to "Adequate breakdown volume"))
+  assert_that result.short_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
+           [
+             field
+               (fun c -> c.rationale)
+               (matching ~msg:"contains 'Adequate breakdown volume'"
+                  (fun rs ->
+                    List.find rs ~f:(fun r ->
+                        String.equal r "Adequate breakdown volume"))
+                  (equal_to "Adequate breakdown volume"));
+           ];
+       ])
 
 (** Inject a [Support.result] directly onto an otherwise-identical candidate and
     assert the screener's [_support_signal] picks it up as a clean-space- below
@@ -810,6 +981,16 @@ let suite =
          "test_max_buy_candidates_cap" >:: test_max_buy_candidates_cap;
          "test_watchlist_captures_low_grade"
          >:: test_watchlist_captures_low_grade;
+         "test_min_score_override_filters_below_threshold"
+         >:: test_min_score_override_filters_below_threshold;
+         "test_min_score_override_inclusive_at_boundary"
+         >:: test_min_score_override_inclusive_at_boundary;
+         "test_min_score_override_strict_above_score"
+         >:: test_min_score_override_strict_above_score;
+         "test_min_score_override_default_preserves_min_grade"
+         >:: test_min_score_override_default_preserves_min_grade;
+         "test_min_score_override_supersedes_min_grade"
+         >:: test_min_score_override_supersedes_min_grade;
          "test_neutral_macro_produces_shorts"
          >:: test_neutral_macro_produces_shorts;
          "test_short_candidate_stop_above_entry"

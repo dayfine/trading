@@ -44,7 +44,25 @@ type param_spec = (string * param_values) list
     ]
     ]}
 
-    yields a 3 × 3 × 3 × 3 = 81-cell grid. *)
+    yields a 3 × 3 × 3 × 3 = 81-cell grid.
+
+    {2 Cascade score-floor sweep (issue #888)}
+
+    The cascade score gate is exposed as [screening_config.min_score_override]
+    (see [Screener.config.min_score_override] in
+    [analysis/weinstein/screener/lib/screener.mli]). When set to [Some n], it
+    replaces the grade-based filter with a strict numeric [score >= n] gate.
+    Sweep example:
+    {[
+    [
+      ( "screening_config.min_score_override",
+        [ 38.0; 39.0; 40.0; 41.0; 42.0; 43.0 ] );
+    ]
+    ]}
+    Note: although the field is [int option] in the OCaml record, the grid spec
+    carries floats. The override sexp emitted by
+    {!Backtest.Config_override.parse_to_sexp} for [40.0] is the atom [40.],
+    which sexp-parses back to [Some 40] when deep-merged into the config. *)
 
 type cell = (string * float) list
 (** A single point in parameter space — one value per key, in the same order as

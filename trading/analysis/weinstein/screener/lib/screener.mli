@@ -84,7 +84,24 @@ type config = {
       (** Per-candidate price parameters. Default: [default_candidate_params].
       *)
   min_grade : Weinstein_types.grade;
-      (** Minimum grade to include in output. Default: C. *)
+      (** Minimum grade to include in output. Default: C. Used unless
+          [min_score_override] is [Some _] — in that case the numeric override
+          takes precedence and the grade ladder is bypassed. *)
+  min_score_override : int option; [@sexp.default None]
+      (** Optional numeric score floor that, when [Some n], replaces the
+          {!min_grade} filter with a strict [score >= n] gate on the cascade
+          output. The numeric form is the natural tuning knob — sweepers can
+          vary a single integer (e.g. 38..50) without having to also adjust the
+          grade ladder ordering implied by {!grade_thresholds}.
+
+          Default: [None] — preserves the {!min_grade} grade-based filter
+          bit-equally. The grade label on each surviving candidate is still
+          computed from {!grade_thresholds} regardless.
+
+          Authority: GitHub issue #888 — "expose threshold as a config
+          parameter; add to the M5.5 grid_search sweep parameter list". The
+          design intent is to make the cascade score gate a single tunable
+          dimension. *)
   max_buy_candidates : int;
       (** Maximum number of buy candidates returned. Default: 20. *)
   max_short_candidates : int;

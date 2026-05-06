@@ -1,6 +1,6 @@
 # Status: tuning
 
-## Last updated: 2026-05-04
+## Last updated: 2026-05-06
 
 ## Status
 IN_PROGRESS — T-A + T-B libs MERGED; CLI binaries + walk-forward integration deferred
@@ -54,6 +54,8 @@ Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 - None. T-A and T-B both shipped.
 
 ## Completed
+
+- [x] **#888 cascade score-floor knob exposed for grid sweep** (~250 LOC; branch `feat/screener/888-threshold-param`). Added `min_score_override : int option` to `Screener.config` (default `None` preserves grade-based filter bit-equally; `Some n` replaces with strict `score >= n` numeric gate). Threaded via `_passes_score_floor` helper through `_score_and_build`, `_long_admission`/`_short_admission`, and the diagnostics-counting path (single source of truth). Registered in `Tuner.Grid_search.param_spec` docstring as a sweepable dimension at `screening_config.min_score_override`. Override deep-merge pinned by `test_override_screening_min_score_override` in `test_runner_hypothesis_overrides.ml`. 5 new unit tests in `test_screener.ml` pin the gate's `>=` semantics + bit-equal-default contract. 3-cell quick-look on sp500-2019-2023 (cells: default / 41 / 42) documented in `dev/notes/888-score-threshold-quick-look-2026-05-06.md` — finding consistent with #871's "cascade is at no-look-ahead ceiling" verdict; full sweep deferred until #872 / #887 capital-recycling lands. Verify: `dev/lib/run-in-env.sh dune runtest analysis/weinstein/screener/test/` + `dev/lib/run-in-env.sh dune exec trading/backtest/test/test_runner_hypothesis_overrides.exe`.
 
 - [x] **T-B Bayesian-opt lib + tests** (~922 LOC including tests, ~439 lib; branch `feat/tuner-bayesian-opt`). Surface: `trading/trading/backtest/tuner/lib/bayesian_opt.{ml,mli}`. Pure functional GP-based optimiser using `owl` (`Owl.Linalg.D.chol` + `triangular_solve` for the Cholesky-factor linear system, `Owl.Mat` for matrix ops). Two-phase suggestion (initial random samples → GP-driven argmax of acquisition function over uniformly-sampled candidates). RBF kernel with default length scales `0.25` in normalised `[0,1]` parameter space; signal variance `1.0`; noise jitter `1e-6`. Two acquisition functions: `Expected_improvement` (default) and `Upper_confidence_bound β`. Determinism: same `Random.State.t` seed → byte-identical suggestion sequences. Convergence pinned by 1D parabola (`f(x) = -(x-3)²`) within 30 evals + 2D Branin within 50 evals. 27 tests including bounds enforcement, RBF/EI/UCB unit tests, GP-fit interpolation verification at observed points. Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/tuner/'` (27/27 pass). Design decisions in `dev/plans/bayesian-opt-2026-05-03.md` §D1–D8. Follow-up: CLI binary (deferred from T-B to keep PR ≤500 LOC; mirrors T-A's split). Hyperparameter learning (Type-II MLE on length scales) deferred — fixed-hyperparameter GP is sufficient for the dimensions and budgets the M5.5 spec calls out.
 
