@@ -1,0 +1,40 @@
+Loading 4 scenarios from /workspaces/trading-1/.claude/worktrees/stage3-impact-perm/dev/experiments/stage3-force-exit-impact-2026-05-06/scenarios-15y (parallel=2)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/stage3-impact-perm/trading/test_data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-06-205219
+
+>>> Running sp500-15y-stage3-on-h1: 15y SP500 historical + Stage-3 force-exit ON, hysteresis_weeks=1 (2010-01-01 to 2026-04-30)
+
+>>> Running sp500-15y-stage3-on-h2: 15y SP500 historical + Stage-3 force-exit ON, hysteresis_weeks=2 (default) (2010-01-01 to 2026-04-30)
+Using scenario-provided sector map (510 symbols)...
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_ec1421)
+Panel_runner: snapshot bar reader wired (calendar 4410 days) for strategy
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_3cab5a)
+Panel_runner: snapshot bar reader wired (calendar 4410 days) for strategy
+
+>>> Running sp500-15y-stage3-on-h3: 15y SP500 historical + Stage-3 force-exit ON, hysteresis_weeks=3 (2010-01-01 to 2026-04-30)
+
+>>> Running sp500-15y-stage3-on-h4: 15y SP500 historical + Stage-3 force-exit ON, hysteresis_weeks=4 (2010-01-01 to 2026-04-30)
+Using scenario-provided sector map (510 symbols)...
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
