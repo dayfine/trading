@@ -307,6 +307,71 @@ let test_resolve_out_dir_explicit _ =
     (Runner.resolve_out_dir ~scenario_name:"sp500-2019-2023" args)
     (equal_to "/tmp/explicit")
 
+(* ------------------------------------------------------------------ *)
+(* Negative-path tests for parse_argv                                   *)
+(*                                                                      *)
+(* Pins the three [Raises [Failure]] paths documented at                *)
+(* all_eligible_runner.mli:86 ("Raises [Failure] on missing [--scenario]*)
+(* or malformed flag values."). Pattern follows                         *)
+(* test_grid_search_bin.ml:test_build_unknown_scenario_raises (try/with *)
+(* capture + substring assertion).                                      *)
+(* ------------------------------------------------------------------ *)
+
+let _failure_with_substring (f : unit -> unit) ~substring : bool =
+  try
+    f ();
+    false
+  with Failure msg -> String.is_substring msg ~substring
+
+let test_parse_argv_missing_scenario_raises _ =
+  (* Pins all_eligible_runner.ml:86 [_fail_usage "Missing required flag:
+     --scenario"]. *)
+  let argv = [| "all_eligible_runner.exe" |] in
+  let raised =
+    _failure_with_substring
+      (fun () ->
+        let _ = Runner.parse_argv argv in
+        ())
+      ~substring:"Missing required flag: --scenario"
+  in
+  assert_that raised (equal_to true)
+
+let test_parse_argv_unknown_flag_raises _ =
+  (* Pins all_eligible_runner.ml:81 [_fail_usage "Unknown flag: <name>"]. *)
+  let argv =
+    [| "all_eligible_runner.exe"; "--scenario"; "x.sexp"; "--bogus"; "y" |]
+  in
+  let raised =
+    _failure_with_substring
+      (fun () ->
+        let _ = Runner.parse_argv argv in
+        ())
+      ~substring:"Unknown flag: --bogus"
+  in
+  assert_that raised (equal_to true)
+
+let test_parse_argv_malformed_overrides_raises _ =
+  (* Pins the [--config-overrides] malformed-sexp path. The runner calls
+     [Sexp.of_string] inside [_parse_overrides]; an incomplete S-expression
+     raises [Failure] from sexplib whose message contains "of_string". *)
+  let argv =
+    [|
+      "all_eligible_runner.exe";
+      "--scenario";
+      "x.sexp";
+      "--config-overrides";
+      "((bad-sexp";
+    |]
+  in
+  let raised =
+    _failure_with_substring
+      (fun () ->
+        let _ = Runner.parse_argv argv in
+        ())
+      ~substring:"of_string"
+  in
+  assert_that raised (equal_to true)
+
 let test_format_summary_md_pins_table_header _ =
   let result : All_eligible.result =
     {
@@ -354,6 +419,12 @@ let suite =
          "config.sexp round-trips" >:: test_config_sexp_round_trips;
          "parse_argv minimum required flags" >:: test_parse_argv_minimum;
          "parse_argv all flags populated" >:: test_parse_argv_all_flags;
+         "parse_argv missing --scenario raises Failure"
+         >:: test_parse_argv_missing_scenario_raises;
+         "parse_argv unknown flag raises Failure"
+         >:: test_parse_argv_unknown_flag_raises;
+         "parse_argv malformed --config-overrides raises Failure"
+         >:: test_parse_argv_malformed_overrides_raises;
          "resolve_out_dir default" >:: test_resolve_out_dir_default;
          "resolve_out_dir explicit" >:: test_resolve_out_dir_explicit;
          "format_summary_md pins table header"
