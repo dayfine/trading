@@ -1,0 +1,4 @@
+(executable
+ (name all_eligible_runner)
+ (modules all_eligible_runner)
+ (libraries core backtest_all_eligible))
