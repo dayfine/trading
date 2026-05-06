@@ -49,10 +49,10 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     passes_macro;
   }
 
-(** Build a synthetic [scored_candidate] from explicit per-trade outcome
-    fields. Mirrors [Outcome_scorer._build_scored] arithmetic for [Long]
-    side: callers provide [entry_price], [suggested_stop], [exit_price],
-    [exit_week] and the helper computes the dependent fields. *)
+(** Build a synthetic [scored_candidate] from explicit per-trade outcome fields.
+    Mirrors [Outcome_scorer._build_scored] arithmetic for [Long] side: callers
+    provide [entry_price], [suggested_stop], [exit_price], [exit_week] and the
+    helper computes the dependent fields. *)
 let make_scored ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     ?(side = Trading_base.Types.Long) ?(entry_price = 100.0)
     ?(suggested_stop = 92.0) ?(cascade_score = 50) ?(passes_macro = true)
@@ -190,9 +190,8 @@ let test_three_signals_all_taken_no_cash_gate _ =
         ~entry_price:50.0 ~suggested_stop:46.0 ~exit_week:(_date "2024-02-02")
         ~exit_price:45.0 ~exit_trigger:OT.Stop_hit ();
       make_scored ~symbol:"CCC" ~entry_week:(_date "2024-01-26")
-        ~entry_price:200.0 ~suggested_stop:184.0
-        ~exit_week:(_date "2024-03-01") ~exit_price:230.0
-        ~exit_trigger:OT.Stage3_transition ();
+        ~entry_price:200.0 ~suggested_stop:184.0 ~exit_week:(_date "2024-03-01")
+        ~exit_price:230.0 ~exit_trigger:OT.Stage3_transition ();
     ]
   in
   let result = AE.grade ~config:AE.default_config ~scored in
@@ -202,7 +201,9 @@ let test_three_signals_all_taken_no_cash_gate _ =
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "AAA");
-             field (fun (t : AE.trade_record) -> t.return_pct) (float_equal 0.20);
+             field
+               (fun (t : AE.trade_record) -> t.return_pct)
+               (float_equal 0.20);
              field
                (fun (t : AE.trade_record) -> t.exit_reason)
                (equal_to OT.End_of_run);
@@ -226,7 +227,9 @@ let test_three_signals_all_taken_no_cash_gate _ =
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "CCC");
-             field (fun (t : AE.trade_record) -> t.return_pct) (float_equal 0.15);
+             field
+               (fun (t : AE.trade_record) -> t.return_pct)
+               (float_equal 0.15);
              field
                (fun (t : AE.trade_record) -> t.exit_reason)
                (equal_to OT.Stage3_transition);
@@ -348,9 +351,7 @@ let test_flat_trade_neither_winner_nor_loser _ =
          field (fun (a : AE.aggregate) -> a.winners) (equal_to 0);
          field (fun (a : AE.aggregate) -> a.losers) (equal_to 0);
          field (fun (a : AE.aggregate) -> a.win_rate_pct) (float_equal 0.0);
-         field
-           (fun (a : AE.aggregate) -> a.total_pnl_dollars)
-           (float_equal 0.0);
+         field (fun (a : AE.aggregate) -> a.total_pnl_dollars) (float_equal 0.0);
        ])
 
 let test_return_buckets_default _ =
@@ -444,9 +445,7 @@ let test_passes_macro_carried_through _ =
          all_of
            [
              field (fun (t : AE.trade_record) -> t.symbol) (equal_to "BULL");
-             field
-               (fun (t : AE.trade_record) -> t.passes_macro)
-               (equal_to true);
+             field (fun (t : AE.trade_record) -> t.passes_macro) (equal_to true);
            ];
          all_of
            [

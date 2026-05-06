@@ -107,9 +107,9 @@ let _median (xs : float list) : float =
         let hi = sorted.(n / 2) in
         (lo +. hi) /. 2.0
 
-(** Build the [(low, high)] bucket boundary pairs from
-    [config.return_buckets]. Prepends [neg_infinity] and appends [infinity]
-    so the first / last buckets are unbounded. *)
+(** Build the [(low, high)] bucket boundary pairs from [config.return_buckets].
+    Prepends [neg_infinity] and appends [infinity] so the first / last buckets
+    are unbounded. *)
 let _bucket_bounds (boundaries : float list) : (float * float) list =
   let starts = Float.neg_infinity :: boundaries in
   let ends = boundaries @ [ Float.infinity ] in
@@ -123,7 +123,8 @@ let _bucketize ~(boundaries : float list) (returns : float list) :
   let bounds = _bucket_bounds boundaries in
   List.map bounds ~f:(fun (low, high) ->
       let count =
-        List.count returns ~f:(fun r -> Float.( >= ) r low && Float.( < ) r high)
+        List.count returns ~f:(fun r ->
+            Float.( >= ) r low && Float.( < ) r high)
       in
       (low, high, count))
 
