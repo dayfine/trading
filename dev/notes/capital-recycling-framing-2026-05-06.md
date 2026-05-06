@@ -26,13 +26,16 @@ characterizes the gap directly:
 > is mostly idling… The recommendation isn't to re-tune the cascade thresholds;
 > it's to make the portfolio recycle capital faster."
 
-That note also called the symptom "the highest-leverage gap in the current
-strategy implementation per the diagnostic. It dwarfs cascade-tuning,
-screener-threshold-tuning, and position-sizing-tuning." The 3-cell threshold
-quick-look in `dev/notes/888-score-threshold-quick-look-2026-05-06.md`
-corroborates: tightening the cascade score from 40 → 41/42 dropped return by
-3.8 pp on the 5y baseline because the marginal candidates dropped weren't the
-losers, and the cash those losers tied up isn't being recycled productively.
+That note's §Recommendation frames the priority order accordingly: tune the
+portfolio surface (capital-recycling levers — Stage-3 detection exits,
+position-sizing reductions, fractional sizing on `Insufficient_cash`) rather
+than the screener cascade, and explicitly de-prioritizes cascade-threshold
+tuning, stop-distance-gate tuning, and macro-gate tuning since the cascade
+isn't the bottleneck. The 3-cell threshold quick-look in
+`dev/notes/888-score-threshold-quick-look-2026-05-06.md` corroborates:
+tightening the cascade score from 40 → 41/42 dropped return by 3.8 pp on the
+5y baseline because the marginal candidates dropped weren't the losers, and
+the cash those losers tied up isn't being recycled productively.
 
 The leverage point — empirically — is **how a long position exits, not how
 candidates enter**. Two issues have been opened to attack that point:
@@ -316,8 +319,8 @@ The following adjacent threads are deliberately not addressed here:
   triggers on already-trending stocks. Different problem class
   (entry surface, not exit surface).
 - **Tuning weights (M5.5 T-A grid_search)** — the cascade
-  scoring-weight sweep was deferred per #871's "highest-leverage gap"
-  ranking; it remains downstream of A landing.
+  scoring-weight sweep was deferred per #871's capital-recycling
+  priority ranking; it remains downstream of A landing.
 - **Initial-cash sweep / synthetic-portfolio runs** — recommendation 4
   in the optimal-strategy diagnostic (raise to $5M starting cash) is a
   fixture-only change with no behaviour delta; it tests whether the
