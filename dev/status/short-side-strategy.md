@@ -162,6 +162,37 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
    likely needed. See `dev/notes/force-liq-cascade-findings-2026-05-01.md`
    §G15. Owner: `feat-weinstein` — same scope-extension prereq as G14.
 
+8. **#872 — Stage-3 force-exit detector for capital recycling on the
+   long side** (filed 2026-05-06, PR #902, `feat-weinstein` scope).
+   Implements an opt-in mechanism that liberates portfolio cash from
+   mature long-runners whose 30-week MA has flattened. Empirical
+   motivation: the 15y SP500 baseline locks ~$1M in 18 long-runners
+   opened in Q1 2010 for the entire 16-year window; cascade idles
+   90.7% of Fridays with `Insufficient_cash` (per
+   `dev/notes/856-optimal-strategy-diagnostic-15y-2026-05-06.md`).
+   - **Pure detector**: `analysis/weinstein/stage3_force_exit/` —
+     reuses `Stage.classify` authority; emits `Force_exit` after K=2
+     consecutive Friday Stage-3 reads on a held long position
+     (configurable). 16 unit tests pinning hysteresis and reset
+     semantics.
+   - **Strategy wiring**: new
+     `Stage3_force_exit_runner` between `Stops_runner.update` and
+     `Force_liquidation_runner.update`. Friday cadence; long-only;
+     skips positions already exiting via stops on the same tick.
+     9 unit tests pinning the wiring contract.
+   - **New `exit_reason` variant**: `Position.Stage3ForceExit
+     { weeks_in_stage3 : int }` — separate per-trade attribution in
+     `trades.csv` as `stage3_force_exit`.
+   - **Opt-in via** `enable_stage3_force_exit : bool` config field
+     (default `false`). 5y baseline `sp500-2019-2023` PASSes scenario_runner
+     unchanged with default off (53.4% / 73 trades, inside pinned
+     [45.0-72.0%, 70-95 trades] band).
+   - Re-pinning under `enable=true` is a separate post-merge step per
+     `dev/notes/capital-recycling-framing-2026-05-06.md` §3.
+   - Reserved knob `stage3_reentry_cooldown_weeks` defaults to 0 and
+     is currently unwired — placeholder for future RS-conditioned
+     tuning.
+
 ## References
 
 - `docs/design/weinstein-book-reference.md` Ch. 11 — bear-market shorting rules (never short Stage 2; only Stage 4 with negative RS + bearish macro).

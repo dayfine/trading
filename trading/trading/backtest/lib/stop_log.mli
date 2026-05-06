@@ -27,6 +27,11 @@ type exit_trigger =
   | Underperforming of { days_held : int; current_return : float }
       (** Position underperformed *)
   | Portfolio_rebalancing  (** Closed for rebalancing *)
+  | Stage3_force_exit of { weeks_in_stage3 : int }
+      (** Strategy-driven force exit fired after the position was classified as
+          Stage 3 for [weeks_in_stage3] consecutive Friday classifications (≥
+          the configured hysteresis window). Capital-recycling exit per
+          Weinstein Ch. 6 §5.2 (issue #872). *)
   | End_of_period
       (** Position was force-closed at the end of the backtest period without a
           preceding strategy-emitted [TriggerExit]. The simulator's end-of-run

@@ -66,6 +66,7 @@ type _strategy_state = {
   prior_stages : stage Hashtbl.M(String).t;
   sector_prior_stages : stage Hashtbl.M(String).t;
   ticker_sectors : (string, string) Hashtbl.t;
+  stage3_streaks : int Hashtbl.M(String).t;
   bar_reader : Bar_reader.t;
 }
 (** Build a fresh closure-state bundle that mirrors what {!make} constructs
@@ -82,6 +83,7 @@ let _fresh_state ~bar_reader =
     prior_stages = Hashtbl.create (module String);
     sector_prior_stages = Hashtbl.create (module String);
     ticker_sectors = Hashtbl.create (module String);
+    stage3_streaks = Hashtbl.create (module String);
     bar_reader;
   }
 
@@ -102,7 +104,8 @@ let _drive_tick state ~config ~current_date ~portfolio =
     ~peak_tracker:state.peak_tracker ~bar_reader:state.bar_reader
     ~prior_stages:state.prior_stages
     ~sector_prior_stages:state.sector_prior_stages
-    ~ticker_sectors:state.ticker_sectors ~audit_recorder:Audit_recorder.noop
+    ~ticker_sectors:state.ticker_sectors ~stage3_streaks:state.stage3_streaks
+    ~audit_recorder:Audit_recorder.noop
     ~get_price:(_get_price_of_state state ~current_date)
     ~get_indicator:(fun _ _ _ _ -> None)
     ~portfolio

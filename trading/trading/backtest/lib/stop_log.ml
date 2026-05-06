@@ -10,6 +10,7 @@ type exit_trigger =
   | Time_expired of { days_held : int; max_days : int }
   | Underperforming of { days_held : int; current_return : float }
   | Portfolio_rebalancing
+  | Stage3_force_exit of { weeks_in_stage3 : int }
   | End_of_period
 [@@deriving show, eq, sexp]
 
@@ -52,6 +53,7 @@ let exit_trigger_of_reason (reason : Position.exit_reason) : exit_trigger =
   | Underperforming { days_held; current_return } ->
       Underperforming { days_held; current_return }
   | PortfolioRebalancing -> Portfolio_rebalancing
+  | Stage3ForceExit { weeks_in_stage3 } -> Stage3_force_exit { weeks_in_stage3 }
 
 type stop_trigger_kind = Gap_down | Intraday | End_of_period | Non_stop_exit
 [@@deriving show, eq, sexp]
@@ -73,7 +75,7 @@ let classify_stop_trigger_kind ?(gap_threshold_pct = gap_down_threshold_pct)
       else Intraday
   | End_of_period -> End_of_period
   | Take_profit _ | Signal_reversal _ | Time_expired _ | Underperforming _
-  | Portfolio_rebalancing ->
+  | Portfolio_rebalancing | Stage3_force_exit _ ->
       Non_stop_exit
 
 let _fresh_record ~symbol =

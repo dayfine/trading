@@ -158,6 +158,14 @@ type exit_reason =
   | TimeExpired of { days_held : int; max_days : int }
   | Underperforming of { days_held : int; current_return : float }
   | PortfolioRebalancing
+  | Stage3ForceExit of { weeks_in_stage3 : int }
+      (** Strategy-driven exit fired after a held position has been classified
+          as Stage 3 ("topping / distribution" — 30-week MA flattening) for at
+          least the configured hysteresis window. Capital-recycling mechanism
+          per Weinstein Ch. 6 §5.2 (STAGE3_TIGHTENING) extended to a full exit
+          rather than a stop tighten — frees cash for fresh Stage-2 candidates
+          (issue #872). [weeks_in_stage3] is the consecutive count of Stage-3
+          classifications observed at the moment the exit fires. *)
 [@@deriving show, eq]
 
 (** Position state variants - only state-specific data *)

@@ -10,6 +10,7 @@
   test_macro_inputs
   test_panel_callbacks
   test_short_side_bear_window
+  test_stage3_force_exit_runner
   test_stops_runner
   test_stops_split_runner
   test_weekly_ma_cache
