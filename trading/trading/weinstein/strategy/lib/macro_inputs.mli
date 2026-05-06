@@ -4,7 +4,7 @@
 
     Stage 4 PR-A: the strategy's hot-path entry points
     ({!build_global_index_views}, {!build_sector_map}) take and return
-    panel-shaped {!Bar_panels.weekly_view} values rather than
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} values rather than
     {!Daily_price.t list}, eliminating the per-tick list allocation. The legacy
     bar-list assembly {!build_global_index_bars} survives for callers that
     haven't switched.
@@ -53,7 +53,7 @@ val build_global_index_views :
   global_index_symbols:(string * string) list ->
   bar_reader:Bar_reader.t ->
   as_of:Date.t ->
-  (string * Data_panel.Bar_panels.weekly_view) list
+  (string * Snapshot_runtime.Snapshot_bar_views.weekly_view) list
 (** [build_global_index_views] returns the [(label, weekly_view)] list consumed
     by the macro callback bundle constructor for the global-consensus indicator.
     Each entry is the panel weekly view of the most recent [lookback_bars]
@@ -83,7 +83,7 @@ val build_sector_map :
   bar_reader:Bar_reader.t ->
   as_of:Date.t ->
   sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
-  index_view:Data_panel.Bar_panels.weekly_view ->
+  index_view:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   ticker_sectors:(string, string) Hashtbl.t ->
   unit ->
   (string, Screener.sector_context) Hashtbl.t
@@ -116,7 +116,7 @@ val build_sector_map :
     the panel-shaped helpers above.
 
     The fetched view types are type-equal to
-    {!Data_panel.Bar_panels.weekly_view} (declared via [type =] in
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} (declared via [type =] in
     [snapshot_bar_views.mli]), so the delegation requires no per-call adapter
     and the output is bit-identical to the [bar_reader]-backed path on the same
     underlying bar history (parity tests:
@@ -124,16 +124,14 @@ val build_sector_map :
 
     Phase F.3.d plan: callers migrate from [Macro_inputs.X ~bar_reader] to
     [Macro_inputs.X_of_snapshot_views ~cb], which folds the view fetch into the
-    input-assembly. After every caller migrates, the [bar_reader]-backed
-    constructors above can be removed alongside {!Data_panel.Bar_panels} in the
-    F.3 deletion PR. *)
+    input-assembly. *)
 
 val build_global_index_views_of_snapshot_views :
   lookback_bars:int ->
   global_index_symbols:(string * string) list ->
   cb:Snapshot_runtime.Snapshot_callbacks.t ->
   as_of:Date.t ->
-  (string * Data_panel.Bar_panels.weekly_view) list
+  (string * Snapshot_runtime.Snapshot_bar_views.weekly_view) list
 (** [build_global_index_views_of_snapshot_views ~lookback_bars
      ~global_index_symbols ~cb ~as_of] returns the [(label, weekly_view)] list
     consumed by the macro callback bundle constructor for the global-consensus
@@ -164,7 +162,7 @@ val build_sector_map_of_snapshot_views :
   cb:Snapshot_runtime.Snapshot_callbacks.t ->
   as_of:Date.t ->
   sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
-  index_view:Data_panel.Bar_panels.weekly_view ->
+  index_view:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   ticker_sectors:(string, string) Hashtbl.t ->
   unit ->
   (string, Screener.sector_context) Hashtbl.t
@@ -177,10 +175,11 @@ val build_sector_map_of_snapshot_views :
       {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} over [cb] instead
       of {!Bar_reader.weekly_view_for}.
 
-    [index_view] is still passed as a {!Data_panel.Bar_panels.weekly_view}
-    because the strategy keeps the benchmark view in scope across the per-tick
-    screen and reuses it across both [build_sector_map_*] paths; callers that
-    have only a [Snapshot_callbacks.t] should fetch the benchmark view via
+    [index_view] is still passed as a
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} because the strategy
+    keeps the benchmark view in scope across the per-tick screen and reuses it
+    across both [build_sector_map_*] paths; callers that have only a
+    [Snapshot_callbacks.t] should fetch the benchmark view via
     {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} themselves.
 
     [sector_prior_stages] is read and updated in place identically to

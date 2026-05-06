@@ -8,12 +8,14 @@
     site per tick — the dominant allocator on the panel-mode hot path (see
     [dev/notes/panels-rss-spike-2026-04-25.md]).
 
-    This module's constructors take {!Bar_panels.weekly_view} or
-    {!Bar_panels.daily_view} (float-array views over panel cells) and return the
-    same callback bundles, without ever materialising a {!Daily_price.t} record.
-    The resulting bundles are bit-identical to those built by
-    [callbacks_from_bars] for the same underlying bars, so the strategy can swap
-    call sites one-for-one with no behavioural change.
+    This module's constructors take
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} or
+    {!Snapshot_runtime.Snapshot_bar_views.daily_view} (float-array views over
+    snapshot rows) and return the same callback bundles, without ever
+    materialising a {!Daily_price.t} record. The resulting bundles are
+    bit-identical to those built by [callbacks_from_bars] for the same
+    underlying bars, so the strategy can swap call sites one-for-one with no
+    behavioural change.
 
     Stage 4 PR-B: {!Volume.analyze_breakout} and {!Resistance.analyze} now also
     consume callback bundles, so {!stock_analysis_callbacks_of_weekly_views}
@@ -24,7 +26,7 @@ val stage_callbacks_of_weekly_view :
   ?ma_cache:Weekly_ma_cache.t ->
   ?symbol:string ->
   config:Stage.config ->
-  weekly:Data_panel.Bar_panels.weekly_view ->
+  weekly:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   unit ->
   Stage.callbacks
 (** [stage_callbacks_of_weekly_view ?ma_cache ?symbol ~config ~weekly ()] builds
@@ -45,22 +47,22 @@ val stage_callbacks_of_weekly_view :
     argument cannot be erased"). *)
 
 val rs_callbacks_of_weekly_views :
-  stock:Data_panel.Bar_panels.weekly_view ->
-  benchmark:Data_panel.Bar_panels.weekly_view ->
+  stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   Rs.callbacks
 (** [rs_callbacks_of_weekly_views ~stock ~benchmark] builds a {!Rs.callbacks}
     bundle by date-aligning the two views (same join-on-date semantics as
     {!Rs.callbacks_from_bars}) and indexing the resulting aligned arrays. *)
 
 val volume_callbacks_of_weekly_view :
-  weekly:Data_panel.Bar_panels.weekly_view -> Volume.callbacks
+  weekly:Snapshot_runtime.Snapshot_bar_views.weekly_view -> Volume.callbacks
 (** [volume_callbacks_of_weekly_view ~weekly] builds a {!Volume.callbacks}
     bundle backed by the view's [volumes] array (the same encoding
     {!Volume.callbacks_from_bars} produces). [week_offset:0] is the newest
     weekly bar; offsets past the view's depth return [None]. *)
 
 val resistance_callbacks_of_weekly_view :
-  weekly:Data_panel.Bar_panels.weekly_view -> Resistance.callbacks
+  weekly:Snapshot_runtime.Snapshot_bar_views.weekly_view -> Resistance.callbacks
 (** [resistance_callbacks_of_weekly_view ~weekly] builds a
     {!Resistance.callbacks} bundle backed by the view's [highs], [lows], and
     [dates] arrays. The bar-offset indexing matches
@@ -71,8 +73,8 @@ val stock_analysis_callbacks_of_weekly_views :
   ?ma_cache:Weekly_ma_cache.t ->
   ?stock_symbol:string ->
   config:Stock_analysis.config ->
-  stock:Data_panel.Bar_panels.weekly_view ->
-  benchmark:Data_panel.Bar_panels.weekly_view ->
+  stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   unit ->
   Stock_analysis.callbacks
 (** [stock_analysis_callbacks_of_weekly_views ~config ~stock ~benchmark] builds
@@ -89,8 +91,8 @@ val sector_callbacks_of_weekly_views :
   ?ma_cache:Weekly_ma_cache.t ->
   ?sector_symbol:string ->
   config:Sector.config ->
-  sector:Data_panel.Bar_panels.weekly_view ->
-  benchmark:Data_panel.Bar_panels.weekly_view ->
+  sector:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   unit ->
   Sector.callbacks
 (** [sector_callbacks_of_weekly_views ~config ~sector ~benchmark] builds a
@@ -101,8 +103,8 @@ val macro_callbacks_of_weekly_views :
   ?ma_cache:Weekly_ma_cache.t ->
   ?index_symbol:string ->
   config:Macro.config ->
-  index:Data_panel.Bar_panels.weekly_view ->
-  globals:(string * Data_panel.Bar_panels.weekly_view) list ->
+  index:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  globals:(string * Snapshot_runtime.Snapshot_bar_views.weekly_view) list ->
   ad_bars:Macro.ad_bar list ->
   unit ->
   Macro.callbacks
@@ -119,7 +121,7 @@ val macro_callbacks_of_weekly_views :
     - [global_index_stages] = each (name, view) -> Stage.callbacks. *)
 
 val support_floor_callbacks_of_daily_view :
-  Data_panel.Bar_panels.daily_view -> Weinstein_stops.callbacks
+  Snapshot_runtime.Snapshot_bar_views.daily_view -> Weinstein_stops.callbacks
 (** [support_floor_callbacks_of_daily_view view] builds a
     {!Weinstein_stops.callbacks} (= {!Support_floor.callbacks}) bundle keyed by
     day offset. The view is already pre-windowed (by the caller's chosen
@@ -137,18 +139,17 @@ val support_floor_callbacks_of_daily_view :
     the panel-shaped constructors above.
 
     The fetched view types are type-equal to
-    {!Data_panel.Bar_panels.weekly_view} / {!Data_panel.Bar_panels.daily_view}
-    (declared via [type =] in [snapshot_bar_views.mli]), so the delegation
-    requires no per-call adapter and the output is bit-identical to the
-    panel-backed path on the same underlying bar history (parity test:
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} /
+    {!Snapshot_runtime.Snapshot_bar_views.daily_view} (declared via [type =] in
+    [snapshot_bar_views.mli]), so the delegation requires no per-call adapter
+    and the output is bit-identical to the panel-backed path on the same
+    underlying bar history (parity test:
     [Test_panel_callbacks.Test_snapshot_parity]).
 
     Phase F.3 plan: callers migrate from
     [Bar_reader.weekly_view_for ... |> Panel_callbacks.X_of_weekly_view] to
     [Panel_callbacks.X_of_snapshot_views ~cb ~symbol ~n ~as_of], which folds the
-    view fetch into the callback construction. After every caller migrates, the
-    [*_of_*_view] constructors above can be removed alongside
-    {!Data_panel.Bar_panels} in the F.3 deletion PR. *)
+    view fetch into the callback construction. *)
 
 val stage_callbacks_of_snapshot_views :
   ?ma_cache:Weekly_ma_cache.t ->
@@ -266,4 +267,5 @@ val support_floor_callbacks_of_snapshot_views :
 
     The [~calendar] parameter is the trading-day calendar that the panel-backed
     reader uses internally; passing it makes the resulting daily view bit-equal
-    to {!Data_panel.Bar_panels.daily_view_for}'s window (#848 forward fix). *)
+    to {!Snapshot_runtime.Snapshot_bar_views.daily_view_for}'s window (#848
+    forward fix). *)

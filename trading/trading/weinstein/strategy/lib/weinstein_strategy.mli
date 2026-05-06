@@ -230,7 +230,7 @@ val survivors_for_screening :
   prior_stages:Weinstein_types.stage Core.Hashtbl.M(String).t ->
   current_date:Date.t ->
   unit ->
-  (string * Data_panel.Bar_panels.weekly_view * Stage.result) list
+  (string * Snapshot_runtime.Snapshot_bar_views.weekly_view * Stage.result) list
 (** Stage 4-5 PR-A / PR-B: cheap-cascade survivors of the lazy screener. For
     every ticker in [config.universe], reads a panel weekly view and classifies
     the current stage via the cheap stage-only callback bundle (cache-aware via
