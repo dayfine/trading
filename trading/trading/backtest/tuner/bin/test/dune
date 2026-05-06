@@ -1,0 +1,13 @@
+(tests
+ (names test_grid_search_bin)
+ (libraries
+  ounit2
+  core
+  core_unix.filename_unix
+  core_unix.sys_unix
+  matchers
+  tuner
+  tuner_bin
+  trading.simulation.types)
+ (preprocess
+  (pps ppx_sexp_conv)))

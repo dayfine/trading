@@ -1,0 +1,17 @@
+(library
+ (name tuner_bin)
+ (modules grid_search_spec grid_search_evaluator grid_search_runner)
+ (libraries
+  core
+  core_unix.filename_unix
+  tuner
+  backtest
+  scenario_lib
+  trading.simulation.types)
+ (preprocess
+  (pps ppx_sexp_conv)))
+
+(executable
+ (name grid_search)
+ (modules grid_search)
+ (libraries core core_unix tuner backtest scenario_lib tuner_bin))
