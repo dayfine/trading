@@ -54,9 +54,10 @@ val update :
     - Skips the position if its [position_id] is in [stop_exit_position_ids] —
       the stops runner already exited it this tick.
     - Otherwise emits a [TriggerExit] transition with
-      [exit_reason = Stage3ForceExit { weeks_in_stage3 }] and
-      [exit_price = bar.close_price] from [get_price]. When [get_price] returns
-      [None] the position is silently skipped.
+      [exit_reason = StrategySignal { label = "stage3_force_exit"; detail = Some
+       "weeks_in_stage3=N" }] and [exit_price = bar.close_price] from
+      [get_price]. When [get_price] returns [None] the position is silently
+      skipped.
     - Short positions and non-Holding states are skipped without emitting, and
       their entry in [stage3_streaks] is left untouched. This keeps the streak
       counter accurate if the position later transitions back into Holding.

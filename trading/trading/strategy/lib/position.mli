@@ -158,14 +158,20 @@ type exit_reason =
   | TimeExpired of { days_held : int; max_days : int }
   | Underperforming of { days_held : int; current_return : float }
   | PortfolioRebalancing
-  | Stage3ForceExit of { weeks_in_stage3 : int }
-      (** Strategy-driven exit fired after a held position has been classified
-          as Stage 3 ("topping / distribution" — 30-week MA flattening) for at
-          least the configured hysteresis window. Capital-recycling mechanism
-          per Weinstein Ch. 6 §5.2 (STAGE3_TIGHTENING) extended to a full exit
-          rather than a stop tighten — frees cash for fresh Stage-2 candidates
-          (issue #872). [weeks_in_stage3] is the consecutive count of Stage-3
-          classifications observed at the moment the exit fires. *)
+  | StrategySignal of { label : string; detail : string option }
+      (** Strategy-emitted exit reason for cases that don't map onto one of the
+          generic variants above. The shared core stays strategy-agnostic: any
+          strategy can emit a {!StrategySignal} without adding a new variant
+          here.
+
+          - [label]: short identifier suitable for the [exit_trigger] column of
+            backtest output (e.g. ["stage3_force_exit"], ["regime_change"]).
+            Stable per strategy-side trigger so downstream tooling can group
+            exits by reason.
+          - [detail]: optional free-form payload — typically a small [key=value]
+            string the strategy uses to encode salient context (e.g.
+            ["weeks_in_stage3=3"]). Consumers that only label the exit
+            (trades.csv writer, audit report) ignore [detail]. *)
 [@@deriving show, eq]
 
 (** Position state variants - only state-specific data *)

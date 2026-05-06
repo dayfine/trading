@@ -164,21 +164,26 @@ let test_stage3_at_hysteresis_emits_exit _ =
                (equal_to _friday);
              field
                (fun (t : Trading_strategy.Position.transition) -> t.kind)
-               (matching ~msg:"Expected TriggerExit with Stage3ForceExit"
+               (matching
+                  ~msg:
+                    "Expected TriggerExit with StrategySignal stage3_force_exit"
                   (function
                     | Trading_strategy.Position.TriggerExit
                         {
                           exit_reason =
-                            Trading_strategy.Position.Stage3ForceExit
-                              { weeks_in_stage3 };
+                            Trading_strategy.Position.StrategySignal
+                              { label; detail };
                           exit_price;
                         } ->
-                        Some (weeks_in_stage3, exit_price)
+                        Some (label, detail, exit_price)
                     | _ -> None)
                   (all_of
                      [
-                       field (fun (w, _) -> w) (equal_to 2);
-                       field (fun (_, p) -> p) (float_equal 97.5);
+                       field (fun (l, _, _) -> l) (equal_to "stage3_force_exit");
+                       field
+                         (fun (_, d, _) -> d)
+                         (is_some_and (equal_to "weeks_in_stage3=2"));
+                       field (fun (_, _, p) -> p) (float_equal 97.5);
                      ]));
            ];
        ])
@@ -315,7 +320,8 @@ let suite =
          >:: test_empty_positions_returns_empty;
          "Stage 3 below hysteresis: no exit, streak advances to 1"
          >:: test_stage3_below_hysteresis_no_exit;
-         "Stage 3 at hysteresis: emits TriggerExit with Stage3ForceExit"
+         "Stage 3 at hysteresis: emits TriggerExit with \
+          StrategySignal(stage3_force_exit)"
          >:: test_stage3_at_hysteresis_emits_exit;
          "short position never emits exit, streak counter not touched"
          >:: test_short_position_never_emits_exit;

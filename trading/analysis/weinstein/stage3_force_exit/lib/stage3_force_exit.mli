@@ -30,8 +30,8 @@
       variants) and pass the result in.
     - Does NOT generate the [Position.transition] — the strategy wiring layer
       builds the {!Position.TriggerExit} with the
-      {!Position.exit_reason.Stage3ForceExit} variant once this detector decides
-      [Force_exit].
+      {!Position.exit_reason.StrategySignal} variant
+      ([label = "stage3_force_exit"]) once this detector decides [Force_exit].
     - Does NOT touch trailing-stop state. A position force-exited under this
       mechanism leaves its stop state stale; the wiring layer is responsible for
       the cleanup (typically by removing the stop-state entry on exit).
@@ -68,7 +68,8 @@ type decision =
       (** Stage 3 has been observed for [weeks_in_stage3] consecutive Friday
           classifications and [weeks_in_stage3 >= config.hysteresis_weeks]. The
           strategy wiring layer should emit a [Position.TriggerExit] with
-          [exit_reason = Stage3ForceExit { weeks_in_stage3 }]. *)
+          [exit_reason = StrategySignal { label = "stage3_force_exit"; detail }]
+          where [detail] encodes [weeks_in_stage3]. *)
 [@@deriving show, eq]
 
 val observe :

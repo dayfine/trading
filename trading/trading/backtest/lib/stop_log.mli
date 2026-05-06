@@ -27,11 +27,13 @@ type exit_trigger =
   | Underperforming of { days_held : int; current_return : float }
       (** Position underperformed *)
   | Portfolio_rebalancing  (** Closed for rebalancing *)
-  | Stage3_force_exit of { weeks_in_stage3 : int }
-      (** Strategy-driven force exit fired after the position was classified as
-          Stage 3 for [weeks_in_stage3] consecutive Friday classifications (≥
-          the configured hysteresis window). Capital-recycling exit per
-          Weinstein Ch. 6 §5.2 (issue #872). *)
+  | Strategy_signal of { label : string; detail : string option }
+      (** Strategy-emitted exit reason — mirrors
+          {!Position.exit_reason.StrategySignal}. [label] is the stable string
+          identifier surfaced as the [exit_trigger] column value in [trades.csv]
+          (e.g. ["stage3_force_exit"]). [detail] carries an optional
+          strategy-side payload that downstream tuner / audit tools can inspect
+          (e.g. ["weeks_in_stage3=3"]) — the trades.csv writer ignores it. *)
   | End_of_period
       (** Position was force-closed at the end of the backtest period without a
           preceding strategy-emitted [TriggerExit]. The simulator's end-of-run
@@ -92,7 +94,8 @@ val classify_stop_trigger_kind :
 
     The {!End_of_period} variant maps to {!stop_trigger_kind.End_of_period}. All
     other variants ({!Take_profit}, {!Signal_reversal}, {!Time_expired},
-    {!Underperforming}, {!Portfolio_rebalancing}) classify as {!Non_stop_exit}.
+    {!Underperforming}, {!Portfolio_rebalancing}, {!Strategy_signal}) classify
+    as {!Non_stop_exit}.
 
     [gap_threshold_pct] defaults to {!gap_down_threshold_pct}. Pure function —
     same inputs always produce the same output. *)
