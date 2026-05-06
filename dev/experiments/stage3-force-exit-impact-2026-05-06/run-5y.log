@@ -1,0 +1,52 @@
+Loading 4 scenarios from /workspaces/trading-1/.claude/worktrees/stage3-impact-perm/dev/experiments/stage3-force-exit-impact-2026-05-06/scenarios-5y (parallel=4)
+Fixtures root: /workspaces/trading-1/.claude/worktrees/stage3-impact-perm/trading/test_data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-06-205211
+
+>>> Running sp500-5y-stage3-on-h1: 5y SP500 + Stage-3 force-exit ON, hysteresis_weeks=1 (2019-01-02 to 2023-12-29)
+
+>>> Running sp500-5y-stage3-on-h3: 5y SP500 + Stage-3 force-exit ON, hysteresis_weeks=3 (2019-01-02 to 2023-12-29)
+
+>>> Running sp500-5y-stage3-on-h2: 5y SP500 + Stage-3 force-exit ON, hysteresis_weeks=2 (default) (2019-01-02 to 2023-12-29)
+
+>>> Running sp500-5y-stage3-on-h4: 5y SP500 + Stage-3 force-exit ON, hysteresis_weeks=4 (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_9b4290)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_4f0df7)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_be6854)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_8ef3c5)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+sp500-5y-stage3-on-h1               -       -        -        -   FAIL (scenario crashed or did not write actual.sexp)
+sp500-5y-stage3-on-h2           54.9%     128    26.6%    28.9%   PASS
+sp500-5y-stage3-on-h3           48.5%     100    28.0%    32.6%   PASS
+sp500-5y-stage3-on-h4           55.3%     103    26.2%    30.1%   PASS
+
+3/4 scenarios passed.
