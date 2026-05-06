@@ -34,6 +34,7 @@ type exit_reason =
   | TimeExpired of { days_held : int; max_days : int }
   | Underperforming of { days_held : int; current_return : float }
   | PortfolioRebalancing
+  | Stage3ForceExit of { weeks_in_stage3 : int }
 [@@deriving show, eq]
 
 type position_state =

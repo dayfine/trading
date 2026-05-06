@@ -55,6 +55,19 @@ module Force_liquidation_runner = Force_liquidation_runner
     [dev/notes/short-side-gaps-2026-04-29.md]. See {!Force_liquidation_runner}.
 *)
 
+module Stage3_force_exit_runner = Stage3_force_exit_runner
+(** Stage-3 force-exit runner — capital recycling on the long side (issue #872).
+    Invoked AFTER {!Stops_runner.update} and BEFORE
+    {!Force_liquidation_runner.update} on Friday ticks when
+    [config.enable_stage3_force_exit = true]. See {!Stage3_force_exit_runner}.
+*)
+
+module Stage3_force_exit = Stage3_force_exit
+(** Pure Stage-3 force-exit detector (issue #872). Re-exposed from
+    [analysis/weinstein/stage3_force_exit] so callers building a
+    {!Weinstein_strategy.config} can reference {!Stage3_force_exit.config} and
+    {!Stage3_force_exit.default_config} without a separate library import. *)
+
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
     canonical {!Macro_inputs.spdr_sector_etfs} and
@@ -187,6 +200,32 @@ type config = {
           [dev/notes/sp500-trade-quality-findings-2026-04-30.md] §G11. The
           comparison run is a follow-up; this field exists so the experiment
           becomes a config flip rather than a code change. *)
+  stage3_force_exit_config : Stage3_force_exit.config;
+      [@sexp.default Stage3_force_exit.default_config]
+      (** Stage-3 force-exit detector parameters (issue #872). Default
+          [{ hysteresis_weeks = 2 }] — fires on the second consecutive Friday
+          Stage-3 classification of a held long position. *)
+  enable_stage3_force_exit : bool; [@sexp.default false]
+      (** Master switch for the Stage-3 force-exit runner (issue #872). Default
+          [false] preserves all existing baselines: the runner is a no-op and
+          the strategy emits no [Stage3ForceExit] transitions. Flipping to
+          [true] activates {!Stage3_force_exit_runner.update} on every Friday
+          tick.
+
+          The opt-in default is intentional: enabling the mechanism produces new
+          exits and shifts every existing fixture's pinned numbers (trade count,
+          return, MaxDD). Re-pinning every goldens-sp500-historical scenario is
+          a separate post-merge step per the framing note's "Recommended
+          sequencing" (§3) in
+          [dev/notes/capital-recycling-framing-2026-05-06.md]. *)
+  stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
+      (** Reserved for future tuning — currently unwired (default [0] = no
+          cooldown applied). Once wired, would suppress cascade re-admission of
+          a symbol force-exited under Stage 3 for [N] weeks beyond the existing
+          stop-out cooldown surface (#718). [0] is the book-aligned default
+          (§5.2 "STATE: EXITED — IF whipsaw … acceptable to re-buy"). The knob
+          exists on [config] so future tuning can flip it via sexp override
+          without a code change. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -372,6 +411,7 @@ module Internal_for_test : sig
     prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
     sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
     ticker_sectors:(string, string) Hashtbl.t ->
+    stage3_streaks:int Hashtbl.M(String).t ->
     audit_recorder:Audit_recorder.t ->
     get_price:Trading_strategy.Strategy_interface.get_price_fn ->
     get_indicator:Trading_strategy.Strategy_interface.get_indicator_fn ->
@@ -380,8 +420,8 @@ module Internal_for_test : sig
   (** Drives [_on_market_close] with all closure-scoped state passed in
       explicitly. Mutates [stop_states] / [last_stop_out_dates] / [prior_macro]
       / [prior_macro_result] / [peak_tracker] / [prior_stages] /
-      [sector_prior_stages] in place, mirroring the closure semantics in
-      {!make}. *)
+      [sector_prior_stages] / [stage3_streaks] in place, mirroring the closure
+      semantics in {!make}. *)
 
   val maybe_reset_halt :
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->

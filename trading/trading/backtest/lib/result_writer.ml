@@ -56,6 +56,7 @@ let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   | Time_expired _ -> "time_expired"
   | Underperforming _ -> "underperforming"
   | Portfolio_rebalancing -> "rebalancing"
+  | Stage3_force_exit _ -> "stage3_force_exit"
   | End_of_period -> "end_of_period"
 
 (** Build a (symbol, exit_date) -> reason map from force-liquidation events.

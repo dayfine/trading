@@ -8,6 +8,11 @@ module Bar_reader = Bar_reader
 module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
 module Force_liquidation_runner = Force_liquidation_runner
+module Stage3_force_exit_runner = Stage3_force_exit_runner
+
+module Stage3_force_exit = Stage3_force_exit
+(** Pure Stage-3 force-exit detector (issue #872). See [stage3_force_exit.mli]
+    for the contract. *)
 
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. Exposed as a top-level submodule
@@ -63,6 +68,24 @@ type config = {
           every daily bar. [Weekly] only advances the state machine on Friday
           ticks, matching Weinstein Ch. 6 §Stop-Loss Rules ("trail moves only on
           weekly close"). Trigger logic stays continuous in both modes. *)
+  stage3_force_exit_config : Stage3_force_exit.config;
+      [@sexp.default Stage3_force_exit.default_config]
+      (** Stage-3 force-exit detector parameters (issue #872). Default
+          [{ hysteresis_weeks = 2 }] — fires on the second consecutive Friday
+          Stage-3 classification of a held long position. *)
+  enable_stage3_force_exit : bool; [@sexp.default false]
+      (** Master switch for the Stage-3 force-exit runner. Default [false]
+          preserves all existing baselines: the runner is a no-op and the
+          strategy emits no [Stage3ForceExit] transitions. Flipping to [true]
+          activates {!Stage3_force_exit_runner.update} on every Friday tick. *)
+  stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
+      (** Reserved for future tuning — currently unwired (default [0] = no
+          cooldown applied). Once wired, would suppress cascade re-admission of
+          a symbol force-exited under Stage 3 for [N] weeks beyond the existing
+          stop-out cooldown surface (#718). [0] is the book-aligned default
+          (§5.2 "STATE: EXITED — IF whipsaw … acceptable to re-buy"). The knob
+          exists on [config] so future tuning can flip it via sexp override
+          without a code change. *)
 }
 [@@deriving sexp]
 
@@ -85,6 +108,9 @@ let default_config ~universe ~index_symbol =
     full_compute_tail_days = None;
     enable_short_side = true;
     stop_update_cadence = Stops_runner.Daily;
+    stage3_force_exit_config = Stage3_force_exit.default_config;
+    enable_stage3_force_exit = false;
+    stage3_reentry_cooldown_weeks = 0;
   }
 
 let name = "Weinstein"
@@ -478,8 +504,8 @@ let _record_stop_outs ~last_stop_out_dates
 
 let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
     ~prior_macro ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
-    ~sector_prior_stages ~ticker_sectors ~audit_recorder ~get_price
-    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
+    ~sector_prior_stages ~ticker_sectors ~stage3_streaks ~audit_recorder
+    ~get_price ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let positions = portfolio.positions in
   (* G13: non-trading-day short-circuit. The simulator iterates calendar
      days (Mon-Fri including holidays), so [_on_market_close] is invoked on
@@ -578,6 +604,43 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
         Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary
           ~n:config.lookback_bars ~as_of:current_date
       in
+      (* Stage-3 force-exit pass (issue #872). Reads per-position stages from
+     [prior_stages] (just refreshed by [Stops_runner.update]) and emits
+     [TriggerExit] transitions for held longs whose Stage-3 streak has
+     reached [config.stage3_force_exit_config.hysteresis_weeks]. The runner
+     filters out positions already exiting via stops on this tick (see
+     [stop_exited_ids]) so a stop-out and a Stage-3 fire on the same
+     position the same week resolve to a single exit. The runner is
+     conditionally enabled via [config.enable_stage3_force_exit] (default
+     [false]) so existing baselines are bit-equivalent until callers opt
+     in. *)
+      let stage3_force_exit_transitions =
+        if config.enable_stage3_force_exit then
+          let is_screening_day = _is_screening_day_view index_view in
+          Stage3_force_exit_runner.update
+            ~config:config.stage3_force_exit_config ~is_screening_day ~positions
+            ~get_price ~prior_stages ~stage3_streaks
+            ~stop_exit_position_ids:stop_exited_ids ~current_date
+        else []
+      in
+      (* Strip force-liq transitions for positions the Stage-3 runner just
+     exited — same double-exit hazard the [stop_exited_ids] filter handles
+     for stops above. Re-using a fresh union of exited ids covers both. *)
+      let stage3_exited_ids =
+        List.filter_map stage3_force_exit_transitions
+          ~f:(fun (t : Position.transition) ->
+            match t.kind with
+            | Position.TriggerExit _ -> Some t.position_id
+            | _ -> None)
+        |> String.Set.of_list
+      in
+      let force_exit_transitions =
+        if Set.is_empty stage3_exited_ids then force_exit_transitions
+        else
+          List.filter force_exit_transitions
+            ~f:(fun (t : Position.transition) ->
+              not (Set.mem stage3_exited_ids t.position_id))
+      in
       (* On every Friday — including Fridays where the force-liquidation halt is
      active — run the cheap macro-only path and consult [_maybe_reset_halt]
      BEFORE deciding whether to invoke the universe screen. This preserves the
@@ -618,8 +681,8 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
       Ok
         {
           Strategy_interface.transitions =
-            exit_transitions @ force_exit_transitions @ adjust_transitions
-            @ entry_transitions;
+            exit_transitions @ stage3_force_exit_transitions
+            @ force_exit_transitions @ adjust_transitions @ entry_transitions;
         }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
@@ -656,6 +719,13 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
   let sector_prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
+  (* Per-symbol consecutive-Stage-3-Friday counter consumed by
+     {!Stage3_force_exit_runner} (issue #872). Empty at construction →
+     every position starts with a streak of zero, matching the no-stage-3
+     baseline. *)
+  let stage3_streaks : int Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
   (* Macro.analyze requires weekly-cadence ad_bars; normalize once at load
      time, not on every [on_market_close] call. *)
   let weekly_ad_bars = Ad_bars_aggregation.daily_to_weekly ad_bars in
@@ -666,7 +736,7 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
       _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
         ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-        ~audit_recorder
+        ~stage3_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 
