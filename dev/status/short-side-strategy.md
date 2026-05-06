@@ -193,6 +193,38 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
      is currently unwired — placeholder for future RS-conditioned
      tuning.
 
+9. **#887 — Laggard rotation detector for capital recycling on the
+   long side** (filed 2026-05-06, PR #909, `feat-weinstein` scope).
+   Implements Weinstein Ch.4 §portfolio sizing rotation rule (book-ref
+   §5.6): "if it's lagging badly and acting poorly, lighten up on that
+   position even if the sell-stop isn't hit. Move the proceeds into a
+   new Stage 2 stock with greater promise." Distinct from #872 — fires
+   mid-Stage-2 on weak RS-vs-benchmark behaviour alone, before the
+   30-week MA flattens. Complementary mechanism per the framing-note
+   table (Stage-2-weak-RS region in the position-state matrix).
+   - **Pure detector**: `analysis/weinstein/laggard_rotation/` —
+     observes position 13-week return vs benchmark 13-week return,
+     emits `Laggard_exit` after K=4 consecutive Friday negative-RS
+     reads (configurable). 19 unit tests pinning hysteresis edges
+     (K=1/4/6/0/negative defensive), tied-RS reset, whipsaw reset,
+     bear-market both-negative comparison, per-symbol wrapper isolation.
+   - **Strategy wiring**: new `Laggard_rotation_runner` between
+     `Stage3_force_exit_runner.update` and the entry walk. Friday
+     cadence; long-only; skips positions already exiting via stops or
+     Stage-3 on the same tick (skip-list = `stop_exited_ids ∪
+     stage3_exited_ids`). 11 unit tests pinning the wiring contract.
+   - **Generic `StrategySignal` exit_reason**: emitted with
+     `label = "laggard_rotation"; detail = Some "rs_13w_neg_weeks=N"`
+     — no new variant added (per framing-note Q4 + PR #907 plumbing).
+   - **Opt-in via** `enable_laggard_rotation : bool` config field
+     (default `false`). 5y baseline `sp500-2019-2023` runs path-
+     equivalent at default OFF (runner is a no-op without code-path
+     entry); pinned baseline 58.34% / 81 trades preserved.
+   - Reserved knob `laggard_reentry_cooldown_weeks` defaults to 0 and
+     is currently unwired — placeholder for future tuning.
+   - Re-pinning under `enable=true` is a separate post-merge step per
+     `dev/notes/capital-recycling-framing-2026-05-06.md` §3.
+
 ## References
 
 - `docs/design/weinstein-book-reference.md` Ch. 11 — bear-market shorting rules (never short Stage 2; only Stage 4 with negative RS + bearish macro).

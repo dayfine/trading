@@ -1,0 +1,3 @@
+(test
+ (name test_laggard_rotation)
+ (libraries weinstein.laggard_rotation core ounit2 matchers))
