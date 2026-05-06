@@ -87,6 +87,112 @@ let test_default_global_indices_is_canonical_triple _ =
        [ ("GDAXI.INDX", "DAX"); ("N225.INDX", "Nikkei"); ("ISF.LSE", "FTSE") ])
 
 (* ------------------------------------------------------------------ *)
+(* ad_bars_at_or_before                                                 *)
+(* ------------------------------------------------------------------ *)
+(* Regression coverage for the future-leak guard introduced in #612.
+   The guard trims the composer-loaded synthetic A-D series
+   ([Ad_bars.load], whose Synthetic tail typically extends to the most
+   recent [compute_synthetic_adl.exe] run) to dates [<= as_of] before
+   the macro callbacks read [get_cumulative_ad ~week_offset:0]. Without
+   the trim, the cumulative-as-of-last-bar would be ~years past the
+   simulator's current tick — breaking the [Bearish] composite during
+   real bear-market replays.
+
+   The deleted [test_macro_panel_callbacks_real_data.ml] (per #876) was
+   the sole direct integration test pinning this contract; this block
+   restores it as focused unit tests against {!Macro_inputs.ad_bars_at_or_before}
+   directly. The function is still called from production at
+   [weinstein_strategy.ml] inside [_run_macro_screen]. *)
+
+let _make_ad_bar ~date ~advancing ~declining : Macro.ad_bar =
+  { date; advancing; declining }
+
+(* Build a span of weekly A-D bars with monotone-increasing dates,
+   straddling the [as_of] boundary so the filter has both retained and
+   stripped bars to discriminate. The advancing/declining counts are
+   arbitrary fixed values — only the date field drives the filter. *)
+let _ad_bars_straddling_as_of ~as_of =
+  let weeks_before = [ -21; -14; -7; 0 ] in
+  let weeks_after = [ 7; 14; 21 ] in
+  List.map (weeks_before @ weeks_after) ~f:(fun offset ->
+      _make_ad_bar
+        ~date:(Date.add_days as_of offset)
+        ~advancing:1500 ~declining:1500)
+
+let test_ad_bars_at_or_before_strips_future_bars _ =
+  let as_of = Date.of_string "2022-10-14" in
+  let ad_bars = _ad_bars_straddling_as_of ~as_of in
+  let result = Macro_inputs.ad_bars_at_or_before ~ad_bars ~as_of in
+  (* Every retained bar's date must be [<= as_of]; the post-as_of
+     trio (offsets +7, +14, +21) must be stripped. The retained
+     prefix is deterministic because the input is sorted ascending. *)
+  assert_that result
+    (elements_are
+       [
+         field
+           (fun (b : Macro.ad_bar) -> b.date)
+           (equal_to (Date.add_days as_of (-21)));
+         field
+           (fun (b : Macro.ad_bar) -> b.date)
+           (equal_to (Date.add_days as_of (-14)));
+         field
+           (fun (b : Macro.ad_bar) -> b.date)
+           (equal_to (Date.add_days as_of (-7)));
+         field (fun (b : Macro.ad_bar) -> b.date) (equal_to as_of);
+       ])
+
+let test_ad_bars_at_or_before_keeps_boundary_bar _ =
+  (* Inclusivity: a bar exactly on [as_of] is retained ([<=], not [<]). *)
+  let as_of = Date.of_string "2022-10-14" in
+  let ad_bars =
+    [
+      _make_ad_bar ~date:(Date.add_days as_of (-7)) ~advancing:1500
+        ~declining:1500;
+      _make_ad_bar ~date:as_of ~advancing:1500 ~declining:1500;
+      _make_ad_bar ~date:(Date.add_days as_of 1) ~advancing:1500 ~declining:1500;
+    ]
+  in
+  let result = Macro_inputs.ad_bars_at_or_before ~ad_bars ~as_of in
+  assert_that result
+    (elements_are
+       [
+         field
+           (fun (b : Macro.ad_bar) -> b.date)
+           (equal_to (Date.add_days as_of (-7)));
+         field (fun (b : Macro.ad_bar) -> b.date) (equal_to as_of);
+       ])
+
+let test_ad_bars_at_or_before_passthrough_when_all_in_range _ =
+  (* Production-tail fast path: the input list is returned unchanged
+     when its last bar already lies on or before [as_of]. *)
+  let as_of = Date.of_string "2022-10-14" in
+  let ad_bars =
+    [
+      _make_ad_bar
+        ~date:(Date.add_days as_of (-14))
+        ~advancing:1500 ~declining:1500;
+      _make_ad_bar ~date:(Date.add_days as_of (-7)) ~advancing:1500
+        ~declining:1500;
+    ]
+  in
+  let result = Macro_inputs.ad_bars_at_or_before ~ad_bars ~as_of in
+  assert_that result
+    (elements_are
+       [
+         field
+           (fun (b : Macro.ad_bar) -> b.date)
+           (equal_to (Date.add_days as_of (-14)));
+         field
+           (fun (b : Macro.ad_bar) -> b.date)
+           (equal_to (Date.add_days as_of (-7)));
+       ])
+
+let test_ad_bars_at_or_before_empty_input _ =
+  let as_of = Date.of_string "2022-10-14" in
+  let result = Macro_inputs.ad_bars_at_or_before ~ad_bars:[] ~as_of in
+  assert_that result is_empty
+
+(* ------------------------------------------------------------------ *)
 (* build_global_index_bars                                              *)
 (* ------------------------------------------------------------------ *)
 
@@ -582,6 +688,14 @@ let () =
            >:: test_spdr_sector_etfs_names_are_valid_gics;
            "default_global_indices is the canonical triple"
            >:: test_default_global_indices_is_canonical_triple;
+           "ad_bars_at_or_before strips bars dated after as_of"
+           >:: test_ad_bars_at_or_before_strips_future_bars;
+           "ad_bars_at_or_before keeps boundary bar (date = as_of)"
+           >:: test_ad_bars_at_or_before_keeps_boundary_bar;
+           "ad_bars_at_or_before passes through when all bars in range"
+           >:: test_ad_bars_at_or_before_passthrough_when_all_in_range;
+           "ad_bars_at_or_before returns empty for empty input"
+           >:: test_ad_bars_at_or_before_empty_input;
            "build_global_index_bars returns empty for empty bar history"
            >:: test_build_global_index_bars_empty;
            "build_global_index_bars drops symbols without bars"
