@@ -452,7 +452,10 @@ let run_with_args (args : cli_args) : unit =
   let scored =
     _scan_and_score ~snapshot_callbacks ~sector_ctx_map ~fridays ~universe
   in
-  eprintf "all_eligible: %d scored candidates; grading...\n%!"
+  eprintf "all_eligible: %d scored candidates pre-dedup; deduping...\n%!"
     (List.length scored);
-  let result = All_eligible.grade ~config ~scored in
+  let deduped = All_eligible.dedup_first_admission scored in
+  eprintf "all_eligible: %d candidates post-dedup; grading...\n%!"
+    (List.length deduped);
+  let result = All_eligible.grade ~config ~scored:deduped in
   _emit_artefacts ~out_dir ~scenario ~config ~result

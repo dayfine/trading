@@ -159,6 +159,57 @@ let compute_aggregate ~(config : config) (trades : trade_record list) :
   }
 
 (* ------------------------------------------------------------------ *)
+(* First-admission dedup                                                *)
+(* ------------------------------------------------------------------ *)
+
+(** Total order on scored candidates: [(entry_week, symbol, side)] ascending,
+    side ordered Long < Short. The walk relies on chronological order; the
+    secondary keys are deterministic tiebreakers for same-day cascade emissions
+    so the dedup is reproducible across runs. *)
+let _compare_scored_for_dedup (a : OT.scored_candidate)
+    (b : OT.scored_candidate) : int =
+  let by_date = Date.compare a.entry.entry_week b.entry.entry_week in
+  if by_date <> 0 then by_date
+  else
+    let by_symbol = String.compare a.entry.symbol b.entry.symbol in
+    if by_symbol <> 0 then by_symbol
+    else
+      (* Long < Short — purely a tiebreaker. *)
+      match (a.entry.side, b.entry.side) with
+      | Long, Long | Short, Short -> 0
+      | Long, Short -> -1
+      | Short, Long -> 1
+
+(** Render a [(symbol, side)] pair as a string key for the watermark table. The
+    pipe character is reserved (never appears in tickers) so the encoding is
+    unambiguous. *)
+let _key_of (sc : OT.scored_candidate) : string =
+  let side_str =
+    match sc.entry.side with Trading_base.Types.Long -> "L" | Short -> "S"
+  in
+  sc.entry.symbol ^ "|" ^ side_str
+
+(** True iff [c] should be dropped given [watermark] (the [exit_week] of the
+    most recently kept candidate for the same [(symbol, side)]). The "active
+    window" semantics are inclusive of [exit_week] — a re-fire on the exact
+    Friday the prior trade exits is treated as the same window, not a fresh
+    admission. *)
+let _is_within_active_window ~watermark ~(c : OT.scored_candidate) : bool =
+  Date.( <= ) c.entry.entry_week watermark
+
+let dedup_first_admission (scored : OT.scored_candidate list) :
+    OT.scored_candidate list =
+  let sorted = List.sort scored ~compare:_compare_scored_for_dedup in
+  let watermarks = Hashtbl.create (module String) in
+  List.filter sorted ~f:(fun (c : OT.scored_candidate) ->
+      let key = _key_of c in
+      match Hashtbl.find watermarks key with
+      | Some watermark when _is_within_active_window ~watermark ~c -> false
+      | _ ->
+          Hashtbl.set watermarks ~key ~data:c.exit_week;
+          true)
+
+(* ------------------------------------------------------------------ *)
 (* Public entry point                                                   *)
 (* ------------------------------------------------------------------ *)
 

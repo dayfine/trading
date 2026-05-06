@@ -457,6 +457,198 @@ let test_passes_macro_carried_through _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* First-admission dedup                                                *)
+(* ------------------------------------------------------------------ *)
+
+let test_dedup_collapses_consecutive_friday_emissions _ =
+  (* Pin the headline regression: one symbol whose breakout predicate fires on
+     5 consecutive Fridays during a single Stage-2 advance must produce
+     exactly 1 trade after dedup, not 5. All five candidates share the same
+     [exit_week] (the actual end-of-trade), so the dedup walks them in order
+     and drops 4 — keeping only the earliest entry_week. *)
+  let exit_week = _date "2024-04-19" in
+  let scored =
+    List.map
+      [ "2024-01-19"; "2024-01-26"; "2024-02-02"; "2024-02-09"; "2024-02-16" ]
+      ~f:(fun d ->
+        make_scored ~symbol:"AAA" ~entry_week:(_date d) ~entry_price:100.0
+          ~suggested_stop:92.0 ~exit_week ~exit_price:110.0
+          ~exit_trigger:OT.End_of_run ())
+  in
+  let deduped = AE.dedup_first_admission scored in
+  assert_that deduped
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+               (equal_to "AAA");
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.entry_week)
+               (equal_to (_date "2024-01-19"));
+             field
+               (fun (sc : OT.scored_candidate) -> sc.exit_week)
+               (equal_to exit_week);
+           ];
+       ])
+
+let test_dedup_preserves_distinct_symbols _ =
+  (* Two different symbols on the same Friday — neither gets dropped. *)
+  let scored =
+    [
+      make_scored ~symbol:"AAA" ~entry_week:(_date "2024-01-19")
+        ~entry_price:100.0 ~suggested_stop:92.0 ~exit_week:(_date "2024-04-19")
+        ~exit_price:110.0 ~exit_trigger:OT.End_of_run ();
+      make_scored ~symbol:"BBB" ~entry_week:(_date "2024-01-19")
+        ~entry_price:50.0 ~suggested_stop:46.0 ~exit_week:(_date "2024-04-19")
+        ~exit_price:55.0 ~exit_trigger:OT.End_of_run ();
+    ]
+  in
+  let deduped = AE.dedup_first_admission scored in
+  assert_that deduped
+    (elements_are
+       [
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "BBB");
+       ])
+
+let test_dedup_readmits_after_exit _ =
+  (* Same symbol, two distinct Stage-2 advances separated by an exit. The first
+     window runs 2024-01-19..2024-03-29; the second window starts 2024-04-05 —
+     strictly after the first's exit_week, so it's a fresh admission. *)
+  let scored =
+    [
+      make_scored ~symbol:"AAA" ~entry_week:(_date "2024-01-19")
+        ~entry_price:100.0 ~suggested_stop:92.0 ~exit_week:(_date "2024-03-29")
+        ~exit_price:130.0 ~exit_trigger:OT.Stop_hit ();
+      (* Re-fire after the first trade has exited. *)
+      make_scored ~symbol:"AAA" ~entry_week:(_date "2024-04-05")
+        ~entry_price:140.0 ~suggested_stop:128.0 ~exit_week:(_date "2024-06-28")
+        ~exit_price:155.0 ~exit_trigger:OT.End_of_run ();
+    ]
+  in
+  let deduped = AE.dedup_first_admission scored in
+  assert_that deduped
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.entry_week)
+               (equal_to (_date "2024-01-19"));
+             field
+               (fun (sc : OT.scored_candidate) -> sc.exit_week)
+               (equal_to (_date "2024-03-29"));
+           ];
+         all_of
+           [
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.entry_week)
+               (equal_to (_date "2024-04-05"));
+             field
+               (fun (sc : OT.scored_candidate) -> sc.exit_week)
+               (equal_to (_date "2024-06-28"));
+           ];
+       ])
+
+let test_dedup_does_not_readmit_on_exit_week _ =
+  (* A re-fire on the exact Friday the prior trade exits is treated as the
+     same window (inclusive watermark), not a fresh admission. This preserves
+     the strict "one trade per Stage-2 advance" semantics — a Stage-3 exit
+     and a same-week re-classify shouldn't count as two trades. *)
+  let scored =
+    [
+      make_scored ~symbol:"AAA" ~entry_week:(_date "2024-01-19")
+        ~entry_price:100.0 ~suggested_stop:92.0 ~exit_week:(_date "2024-03-29")
+        ~exit_price:130.0 ~exit_trigger:OT.Stop_hit ();
+      make_scored ~symbol:"AAA" ~entry_week:(_date "2024-03-29")
+        ~entry_price:130.0 ~suggested_stop:120.0 ~exit_week:(_date "2024-06-28")
+        ~exit_price:140.0 ~exit_trigger:OT.End_of_run ();
+    ]
+  in
+  let deduped = AE.dedup_first_admission scored in
+  assert_that deduped
+    (elements_are
+       [
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.entry_week)
+           (equal_to (_date "2024-01-19"));
+       ])
+
+let test_dedup_independent_per_side _ =
+  (* Long and Short for the same symbol overlap in time but dedup
+     independently — they're different positions in opposite directions. *)
+  let scored =
+    [
+      make_scored ~symbol:"AAA" ~side:Trading_base.Types.Long
+        ~entry_week:(_date "2024-01-19") ~entry_price:100.0 ~suggested_stop:92.0
+        ~exit_week:(_date "2024-04-19") ~exit_price:110.0
+        ~exit_trigger:OT.End_of_run ();
+      make_scored ~symbol:"AAA" ~side:Trading_base.Types.Short
+        ~entry_week:(_date "2024-02-09") ~entry_price:105.0
+        ~suggested_stop:113.0 ~exit_week:(_date "2024-05-10") ~exit_price:95.0
+        ~exit_trigger:OT.End_of_run ();
+    ]
+  in
+  let deduped = AE.dedup_first_admission scored in
+  assert_that deduped
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+               (equal_to "AAA");
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.side)
+               (equal_to Trading_base.Types.Long);
+           ];
+         all_of
+           [
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+               (equal_to "AAA");
+             field
+               (fun (sc : OT.scored_candidate) -> sc.entry.side)
+               (equal_to Trading_base.Types.Short);
+           ];
+       ])
+
+let test_dedup_emits_chronological_order _ =
+  (* Input is shuffled (B before A) — output is sorted by entry_week. Pin
+     this so downstream consumers can rely on a deterministic order. *)
+  let scored =
+    [
+      make_scored ~symbol:"BBB" ~entry_week:(_date "2024-02-09")
+        ~entry_price:50.0 ~suggested_stop:46.0 ~exit_week:(_date "2024-05-10")
+        ~exit_price:55.0 ~exit_trigger:OT.End_of_run ();
+      make_scored ~symbol:"AAA" ~entry_week:(_date "2024-01-19")
+        ~entry_price:100.0 ~suggested_stop:92.0 ~exit_week:(_date "2024-04-19")
+        ~exit_price:110.0 ~exit_trigger:OT.End_of_run ();
+    ]
+  in
+  let deduped = AE.dedup_first_admission scored in
+  assert_that deduped
+    (elements_are
+       [
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "BBB");
+       ])
+
+let test_dedup_empty_input _ =
+  let deduped = AE.dedup_first_admission [] in
+  assert_that deduped is_empty
+
+(* ------------------------------------------------------------------ *)
 (* Test suite                                                          *)
 (* ------------------------------------------------------------------ *)
 
@@ -478,6 +670,19 @@ let suite =
          "return buckets count exactly" >:: test_return_buckets_default;
          "passes_macro carried through to trade record"
          >:: test_passes_macro_carried_through;
+         "dedup — 5 consecutive Friday emissions collapse to 1 trade"
+         >:: test_dedup_collapses_consecutive_friday_emissions;
+         "dedup — distinct symbols are preserved"
+         >:: test_dedup_preserves_distinct_symbols;
+         "dedup — re-fire after exit is a fresh trade"
+         >:: test_dedup_readmits_after_exit;
+         "dedup — re-fire on exit week is the same window"
+         >:: test_dedup_does_not_readmit_on_exit_week;
+         "dedup — long and short dedup independently"
+         >:: test_dedup_independent_per_side;
+         "dedup — output is chronological"
+         >:: test_dedup_emits_chronological_order;
+         "dedup — empty input → empty output" >:: test_dedup_empty_input;
        ]
 
 let () = run_test_tt_main suite
