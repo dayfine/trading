@@ -1,0 +1,5 @@
+(library
+ (name backtest_all_eligible)
+ (libraries core trading.base backtest_optimal)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
