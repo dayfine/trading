@@ -139,10 +139,11 @@ val support_floor_callbacks_of_daily_view :
     the panel-shaped constructors above.
 
     The fetched view types are type-equal to
-    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} / {!Snapshot_runtime.Snapshot_bar_views.daily_view}
-    (declared via [type =] in [snapshot_bar_views.mli]), so the delegation
-    requires no per-call adapter and the output is bit-identical to the
-    panel-backed path on the same underlying bar history (parity test:
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} /
+    {!Snapshot_runtime.Snapshot_bar_views.daily_view} (declared via [type =] in
+    [snapshot_bar_views.mli]), so the delegation requires no per-call adapter
+    and the output is bit-identical to the panel-backed path on the same
+    underlying bar history (parity test:
     [Test_panel_callbacks.Test_snapshot_parity]).
 
     Phase F.3 plan: callers migrate from
@@ -266,4 +267,5 @@ val support_floor_callbacks_of_snapshot_views :
 
     The [~calendar] parameter is the trading-day calendar that the panel-backed
     reader uses internally; passing it makes the resulting daily view bit-equal
-    to {!Snapshot_runtime.Snapshot_bar_views.daily_view_for}'s window (#848 forward fix). *)
+    to {!Snapshot_runtime.Snapshot_bar_views.daily_view_for}'s window (#848
+    forward fix). *)

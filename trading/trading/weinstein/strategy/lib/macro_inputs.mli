@@ -175,10 +175,11 @@ val build_sector_map_of_snapshot_views :
       {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} over [cb] instead
       of {!Bar_reader.weekly_view_for}.
 
-    [index_view] is still passed as a {!Snapshot_runtime.Snapshot_bar_views.weekly_view}
-    because the strategy keeps the benchmark view in scope across the per-tick
-    screen and reuses it across both [build_sector_map_*] paths; callers that
-    have only a [Snapshot_callbacks.t] should fetch the benchmark view via
+    [index_view] is still passed as a
+    {!Snapshot_runtime.Snapshot_bar_views.weekly_view} because the strategy
+    keeps the benchmark view in scope across the per-tick screen and reuses it
+    across both [build_sector_map_*] paths; callers that have only a
+    [Snapshot_callbacks.t] should fetch the benchmark view via
     {!Snapshot_runtime.Snapshot_bar_views.weekly_view_for} themselves.
 
     [sector_prior_stages] is read and updated in place identically to

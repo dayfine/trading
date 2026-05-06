@@ -275,7 +275,8 @@ let _commit_prior_stages ~prior_stages classified =
     the .mli for the full contract. *)
 let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
     ~current_date () :
-    (string * Snapshot_runtime.Snapshot_bar_views.weekly_view * Stage.result) list =
+    (string * Snapshot_runtime.Snapshot_bar_views.weekly_view * Stage.result)
+    list =
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
@@ -352,7 +353,8 @@ let _screen_universe ~config ~index_view ~(macro_result : Macro.result)
     Stage 4 PR-A: takes the panel weekly view directly. The screening day is the
     date of the most recent bar in the view (the Friday of the latest week, by
     week-bucket aggregation). *)
-let _is_screening_day_view (view : Snapshot_runtime.Snapshot_bar_views.weekly_view) =
+let _is_screening_day_view
+    (view : Snapshot_runtime.Snapshot_bar_views.weekly_view) =
   if view.n = 0 then false
   else
     Date.day_of_week view.dates.(view.n - 1)

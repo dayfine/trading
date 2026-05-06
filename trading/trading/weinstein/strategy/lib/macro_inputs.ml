@@ -85,8 +85,8 @@ let build_global_index_bars ~lookback_bars ~global_index_symbols ~bar_reader
     per-symbol cached MA values rather than recomputing per Friday tick. *)
 let _sector_context_from_views ?ma_cache ~(stage_config : Stage.config)
     ~lookback_bars ~bar_reader ~as_of ~sector_prior_stages
-    ~(index_view : Snapshot_bar_views.weekly_view) ~etf_symbol ~sector_name
-    () : (string * Screener.sector_context) option =
+    ~(index_view : Snapshot_bar_views.weekly_view) ~etf_symbol ~sector_name () :
+    (string * Screener.sector_context) option =
   let sector_view =
     Bar_reader.weekly_view_for bar_reader ~symbol:etf_symbol ~n:lookback_bars
       ~as_of
@@ -166,8 +166,8 @@ let build_global_index_bars_of_snapshot_views ~lookback_bars
     {!Sector.analyze_with_callbacks}. *)
 let _sector_context_of_snapshot_views ?ma_cache ~(stage_config : Stage.config)
     ~lookback_bars ~(cb : Snapshot_callbacks.t) ~as_of ~sector_prior_stages
-    ~(index_view : Snapshot_bar_views.weekly_view) ~etf_symbol ~sector_name
-    () : (string * Screener.sector_context) option =
+    ~(index_view : Snapshot_bar_views.weekly_view) ~etf_symbol ~sector_name () :
+    (string * Screener.sector_context) option =
   let sector_view =
     Snapshot_bar_views.weekly_view_for cb ~symbol:etf_symbol ~n:lookback_bars
       ~as_of
