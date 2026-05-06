@@ -13,15 +13,18 @@
     - {b Build world.} Loads the universe from [<output_dir>/universe.txt]
       ([Backtest.Result_writer]'s artefact, scoped to the actual run's universe
       — falls back to [Sector_map.load] over [data/sectors.csv] when the file is
-      absent), constructs the trading-day calendar with a 210-day warm-up window
-      before [start_date], builds [Bar_panels.t] over the universe + benchmark
-      index, and computes the Friday calendar over the run window.
+      absent), builds an in-process snapshot directory over the universe +
+      benchmark index via {!Backtest.Csv_snapshot_builder.build} (210-day
+      warm-up window before [start_date]), opens a
+      {!Snapshot_runtime.Daily_panels.t} over it, and computes the Friday
+      calendar over the run window.
     - {b Scan and score.} Walks every Friday in the run window, runs
-      [Stock_analysis.analyze] per universe symbol, feeds the analyses into
-      {!Stage_transition_scanner.scan_week} to emit [candidate_entry] records,
-      then walks each candidate's forward weekly bars + stage classifications
-      via {!Outcome_scorer.score} to produce [scored_candidate] records with
-      realised exits.
+      [Stock_analysis.analyze] per universe symbol over weekly aggregates read
+      via {!Snapshot_runtime.Snapshot_bar_views.weekly_bars_for}, feeds the
+      analyses into {!Stage_transition_scanner.scan_week} to emit
+      [candidate_entry] records, then walks each candidate's forward weekly bars
+      \+ stage classifications via {!Outcome_scorer.score} to produce
+      [scored_candidate] records with realised exits.
     - {b Emit report.} Runs {!Optimal_portfolio_filler.fill} twice (Constrained
       and Relaxed_macro variants), summarises each pack via
       {!Optimal_summary.summarize}, and renders the markdown via
@@ -109,7 +112,7 @@ val run : output_dir:string -> unit
     report, and writes it to [<output_dir>/optimal_strategy.md].
 
     Raises [Failure] if [summary.sexp] or [actual.sexp] is missing / malformed,
-    or if panel construction fails (corrupt CSVs, missing benchmark, etc.).
+    or if snapshot construction fails (corrupt CSVs, missing benchmark, etc.).
     Tolerates a missing [trades.csv] (renders with no actual round-trips) and
     missing [trade_audit.sexp] (no cascade-rejection annotations on missed
     trades). *)
