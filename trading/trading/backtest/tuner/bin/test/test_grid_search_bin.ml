@@ -178,9 +178,7 @@ let test_build_unknown_scenario_raises _ =
      path returns before any backtest is invoked, so an empty cache + a
      known-unknown key suffices. *)
   let scenarios_by_path = Hashtbl.create (module String) in
-  let evaluator =
-    Evaluator.build ~fixtures_root:"/unused" ~scenarios_by_path
-  in
+  let evaluator = Evaluator.build ~fixtures_root:"/unused" ~scenarios_by_path in
   let raised =
     try
       let _ = evaluator [ ("a", 1.0) ] ~scenario:"path/to/missing.sexp" in
