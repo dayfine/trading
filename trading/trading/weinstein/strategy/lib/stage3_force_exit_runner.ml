@@ -5,11 +5,22 @@ open Trading_strategy
     at the close of the current bar — same convention as a stop hit that fills
     at the bar's worst-case price (book §5.2 reads: "stop is hit → sell, no
     questions asked"). For a discretionary force exit at the close,
-    [bar.close_price] is the most defensible fill marker. *)
+    [bar.close_price] is the most defensible fill marker.
+
+    The emitted [exit_reason] uses the generic
+    {!Position.exit_reason.StrategySignal} variant with
+    [label = "stage3_force_exit"] — this label is the value surfaced in the
+    [exit_trigger] column of [trades.csv]. *)
 let _make_exit_transition ~(pos : Position.t) ~current_date ~bar
     ~weeks_in_stage3 =
   let exit_price = bar.Types.Daily_price.close_price in
-  let exit_reason = Position.Stage3ForceExit { weeks_in_stage3 } in
+  let exit_reason =
+    Position.StrategySignal
+      {
+        label = "stage3_force_exit";
+        detail = Some (Printf.sprintf "weeks_in_stage3=%d" weeks_in_stage3);
+      }
+  in
   {
     Position.position_id = pos.id;
     date = current_date;

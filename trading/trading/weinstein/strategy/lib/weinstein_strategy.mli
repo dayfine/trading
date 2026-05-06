@@ -208,9 +208,9 @@ type config = {
   enable_stage3_force_exit : bool; [@sexp.default false]
       (** Master switch for the Stage-3 force-exit runner (issue #872). Default
           [false] preserves all existing baselines: the runner is a no-op and
-          the strategy emits no [Stage3ForceExit] transitions. Flipping to
-          [true] activates {!Stage3_force_exit_runner.update} on every Friday
-          tick.
+          the strategy emits no [StrategySignal "stage3_force_exit"]
+          transitions. Flipping to [true] activates
+          {!Stage3_force_exit_runner.update} on every Friday tick.
 
           The opt-in default is intentional: enabling the mechanism produces new
           exits and shifts every existing fixture's pinned numbers (trade count,

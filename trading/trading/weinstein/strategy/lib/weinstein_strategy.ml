@@ -76,8 +76,9 @@ type config = {
   enable_stage3_force_exit : bool; [@sexp.default false]
       (** Master switch for the Stage-3 force-exit runner. Default [false]
           preserves all existing baselines: the runner is a no-op and the
-          strategy emits no [Stage3ForceExit] transitions. Flipping to [true]
-          activates {!Stage3_force_exit_runner.update} on every Friday tick. *)
+          strategy emits no [StrategySignal "stage3_force_exit"] transitions.
+          Flipping to [true] activates {!Stage3_force_exit_runner.update} on
+          every Friday tick. *)
   stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
       (** Reserved for future tuning — currently unwired (default [0] = no
           cooldown applied). Once wired, would suppress cascade re-admission of
