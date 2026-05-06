@@ -1,32 +1,30 @@
-(** Bar-shaped view records shared by panel and snapshot bar readers.
+(** Bar-shaped view records shared by panel-shaped consumers.
 
     Phase F.3.e-1 placement (2026-05-06): the [weekly_view] and [daily_view]
     record types live here, in [trading.data_panel.snapshot] — a neutral hub
     library that depends only on [core] + [status] and has no edge to any
-    [analysis/] code. Both consumers — {!Data_panel.Bar_panels} (the
-    panel-backed bar reader, in [trading/trading/data_panel/]) and
+    [analysis/] code. The canonical consumer is
     {!Snapshot_runtime.Snapshot_bar_views} (the snapshot-backed bar reader, in
-    [trading/analysis/weinstein/snapshot_runtime/]) — re-export these record
-    types via manifest type aliases so callers can keep using the names they
-    already know.
+    [trading/analysis/weinstein/snapshot_runtime/]), which re-exports these
+    record types via manifest type aliases so callers can keep using
+    [Snapshot_bar_views.weekly_view] / [.daily_view] qualified names.
 
-    Putting the records here avoids the otherwise-required [analysis/weinstein/]
-    → [trading/trading/data_panel/] dune dep that would cross the A2
-    architecture boundary (see [.claude/rules/qc-structural-authority.md] §A2).
-    The previous arrangement had {!Snapshot_runtime.Snapshot_bar_views} as the
-    canonical home and [Data_panel.Bar_panels] re-exporting from it; that
-    introduced an [analysis/] → [trading/] import. The neutral-hub arrangement
-    here removes the bad edge while keeping a single canonical record
-    definition.
+    Putting the records in this neutral hub avoids the otherwise-required
+    [analysis/weinstein/] → [trading/trading/data_panel/] dune dep that would
+    cross the A2 architecture boundary (see
+    [.claude/rules/qc-structural-authority.md] §A2). The pre-F.3.e-1 arrangement
+    had {!Snapshot_runtime.Snapshot_bar_views} as the canonical home; that
+    introduced an [analysis/] → [trading/] import. F.3.e-3 (which deleted the
+    [Data_panel.Bar_panels] panel-backed reader) leaves only the snapshot
+    consumer alive — the records still live here so the type definition stays in
+    a no-[analysis/]-dep library.
 
     {2 Record-shape contract}
 
     These are pure data shapes — float-array snapshots of bar history for one
-    symbol over one window. The two consumer modules implement matching
-    aggregation semantics ({!Time_period.Conversion.daily_to_weekly} with
-    [include_partial_week:true]) so a [weekly_view] from the panel reader and a
-    [weekly_view] from the snapshot reader for the same input data are
-    bit-equal. *)
+    symbol over one window. The consumer module's aggregation semantics use
+    {!Time_period.Conversion.daily_to_weekly} with [include_partial_week:true]
+    so the resulting buckets are deterministic over a given input. *)
 
 type weekly_view = {
   closes : float array;

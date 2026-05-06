@@ -78,7 +78,9 @@ let test_empty_weekly_view_has_zero_n _ =
   let date = _ymd 2024 1 2 in
   assert_that
     (Bar_reader.weekly_view_for r ~symbol:"AAPL" ~n:30 ~as_of:date)
-    (field (fun (v : Data_panel.Bar_panels.weekly_view) -> v.n) (equal_to 0))
+    (field
+       (fun (v : Snapshot_runtime.Snapshot_bar_views.weekly_view) -> v.n)
+       (equal_to 0))
 
 let test_empty_daily_view_has_zero_n_days _ =
   let r = Bar_reader.empty () in
@@ -86,7 +88,7 @@ let test_empty_daily_view_has_zero_n_days _ =
   assert_that
     (Bar_reader.daily_view_for r ~symbol:"AAPL" ~as_of:date ~lookback:50)
     (field
-       (fun (v : Data_panel.Bar_panels.daily_view) -> v.n_days)
+       (fun (v : Snapshot_runtime.Snapshot_bar_views.daily_view) -> v.n_days)
        (equal_to 0))
 
 (* ------------------------------------------------------------------ *)

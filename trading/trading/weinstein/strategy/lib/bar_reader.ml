@@ -101,8 +101,8 @@ let empty () =
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
 
    Reads fan out through [Snapshot_bar_views] over a [Snapshot_callbacks.t].
-   The shim's "missing data → empty view" contract matches [Bar_panels]', so
-   the strategy's downstream callees see the same fallback semantics.
+   The shim follows a "missing data → empty view" contract, so the strategy's
+   downstream callees handle unknown / unfilled symbols uniformly.
 
    All four readers ([daily_bars_for], [weekly_bars_for], [weekly_view_for],
    [daily_view_for]) are backed by [Snapshot_bar_views] helpers. The
@@ -168,10 +168,7 @@ let of_snapshot_views ?calendar (cb : Snapshot_runtime.Snapshot_callbacks.t) =
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}
 
    Materialise a snapshot directory under a tmp dir, then route reads through
-   [of_snapshot_views]. The legacy [Bar_panels.t]-backed alternative
-   ([of_panels] composed with a synthetic panel built from in-memory bars)
-   was deleted in F.3.e-2; every test that previously used that path now
-   uses this constructor. *)
+   [of_snapshot_views]. *)
 
 (* Cache cap for the in-memory case: small directories (handful of symbols
    × thousands of days) easily fit in a few MB, but giving the LRU some

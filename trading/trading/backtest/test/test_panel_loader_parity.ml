@@ -2,12 +2,13 @@
     [dev/plans/data-panels-stage3-2026-04-25.md] §PR 3.1.
 
     Stage 3 PR 3.1 wired [~bar_panels] into [Panel_runner._build_strategy] so
-    the inner Weinstein strategy reads bars from {!Data_panel.Bar_panels}
-    instead of the parallel {!Bar_history} cache. Stage 3 PR 3.3 then deleted
-    the Tiered runner + bar_loader subsystem entirely. Stage 3 PR 3.4 deleted
-    the Legacy runner path + the [Loader_strategy] enum, leaving the
-    panel-backed runner as the single execution path; this golden gate pins its
-    round_trips against checked-in goldens.
+    the inner Weinstein strategy reads bars from a shared bar source instead of
+    the parallel {!Bar_history} cache. Stage 3 PR 3.3 then deleted the Tiered
+    runner + bar_loader subsystem entirely. Stage 3 PR 3.4 deleted the Legacy
+    runner path + the [Loader_strategy] enum, leaving the panel runner as the
+    single execution path. F.3 then migrated the strategy onto the
+    snapshot-backed bar reader; this golden gate pins runner round_trips against
+    checked-in goldens across that migration.
 
     This test pins runner behaviour to a checked-in golden sexp. For each
     scenario the test:

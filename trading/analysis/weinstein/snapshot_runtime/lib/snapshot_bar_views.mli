@@ -1,28 +1,23 @@
 (** Bar-shaped views over {!Snapshot_callbacks.t}.
 
-    Phase F.2 PR 1 of the daily-snapshot streaming pipeline (see
-    [dev/plans/daily-snapshot-streaming-2026-04-27.md] §Phasing Phase F).
-    Reproduces the {!Data_panel.Bar_panels} view shapes ([weekly_view] /
-    [daily_view] / [low_window]) on top of {!Snapshot_callbacks.t}, which is
-    backed by an LRU-bounded {!Daily_panels.t} cache rather than a whole-
-    universe × all-days bigarray panel.
+    The canonical bar-reader for the Weinstein strategy (since F.3.e-3 deleted
+    the legacy panel-backed alternative). Reproduces the bar-shaped view types
+    ([weekly_view] / [daily_view] / [low_window]) on top of
+    {!Snapshot_callbacks.t}, which is backed by an LRU-bounded {!Daily_panels.t}
+    cache rather than a whole-universe × all-days bigarray panel.
 
-    {2 Why a separate module}
+    {2 Memory bound}
 
-    {!Bar_panels.t} allocates an [N x T] bigarray per OHLCV field at runner
-    startup. At N = 5000 symbols × T ~= 2520 trading days × 6 fields × 8 bytes
-    that is ~27 GB of resident memory and OOMs an 8 GB host. The snapshot path
-    holds at most [max_cache_mb] of decoded snapshot rows at once; bar reads fan
-    out through {!Snapshot_callbacks.read_field_history}.
+    A whole-universe × all-days bigarray would need an [N x T] panel per OHLCV
+    field at runner startup. At N = 5000 symbols × T ~= 2520 trading days × 6
+    fields × 8 bytes that is ~27 GB of resident memory and OOMs an 8 GB host.
+    The snapshot path holds at most [max_cache_mb] of decoded snapshot rows at
+    once; bar reads fan out through {!Snapshot_callbacks.read_field_history}.
 
-    PR 1 (this module) builds the shim + tests. PR 2 wires it through
-    [Panel_runner] / [Weinstein_strategy] in place of [Bar_panels.t].
-
-    {2 Semantics — match {!Bar_panels} bit-for-bit}
+    {2 Aggregation semantics}
 
     The weekly view uses ISO-week buckets via
-    {!Time_period.Conversion.daily_to_weekly} with [include_partial_week:true],
-    matching {!Bar_panels.weekly_view_for}'s aggregation rules:
+    {!Time_period.Conversion.daily_to_weekly} with [include_partial_week:true]:
 
     - [closes] = adjusted close of the last trading day in the week
     - [raw_closes] = raw close of the last trading day in the week
@@ -31,30 +26,24 @@
     - [volumes] = sum of raw volumes within the week
     - [dates] = date of the last trading day in the week
 
-    The daily view drops bars where the raw [Close] field is NaN (matching
-    {!Bar_panels.daily_view_for}'s NaN-skip), and exposes raw OHLC plus dates.
+    The daily view drops bars where the raw [Close] field is NaN, and exposes
+    raw OHLC plus dates.
 
     Unknown symbols, empty date ranges, or otherwise-unreadable snapshot rows
-    yield the empty view. This matches {!Bar_panels}'s "missing data → empty
-    list" surface — the strategy already handles empty bar histories. The shim
-    does not surface schema-skew or filesystem errors to the caller; those
-    failures degrade to "no bars" here. (PR 2 wiring sites can re-add explicit
-    error handling if needed; today's [Bar_panels] callers don't have it
-    either.)
+    yield the empty view. The strategy already handles empty bar histories. The
+    shim does not surface schema-skew or filesystem errors to the caller; those
+    failures degrade to "no bars" here.
 
-    {2 Calling convention vs {!Bar_panels}}
+    {2 Calling convention}
 
-    {!Bar_panels} takes [as_of_day:int] (a calendar column index). The snapshot
-    path is keyed by date, so this module takes [as_of:Core.Date.t]. The
-    strategy already has the date in scope (read from the primary index bar each
-    tick), so the swap at the call site is straightforward.
+    {!weekly_view_for} / {!daily_view_for} / {!low_window} are keyed by date
+    ([as_of:Core.Date.t]). The strategy already has the date in scope (read from
+    the primary index bar each tick).
 
     {!low_window} returns a freshly-allocated {!Bigarray.Array1.t} (a copy of
-    the relevant Low-field history). {!Bar_panels.low_window} returned a
-    zero-copy [Bigarray.Array2.sub_left] slice over its panel; the snapshot
-    backing has no equivalent contiguous panel to slice, so the snapshot version
-    owns its own buffer. Memory cost: at most [len * 8] bytes per call, freed by
-    the GC. *)
+    the relevant Low-field history). The snapshot backing has no contiguous
+    panel to slice, so the buffer is owned by the caller. Memory cost: at most
+    [len * 8] bytes per call, freed by the GC. *)
 
 type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
   closes : float array;
@@ -86,12 +75,9 @@ type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
 
     {b Phase F.3.e-1 (revised 2026-05-06 — neutral hub)}: the canonical
     definition lives in {!Data_panel_snapshot.Panel_views.weekly_view}. This
-    module re-exports it via a manifest type alias so existing callers (snapshot
-    side) keep their qualified field-access syntax. The panel side
-    ([Data_panel.Bar_panels]) re-exports the same type from the same hub. Both
-    consumers depend on [trading.data_panel.snapshot] (a neutral hub with no
-    [analysis/] dep), so the prior A2 violation (analysis→trading.data_panel) is
-    gone. *)
+    module re-exports it via a manifest type alias so callers keep their
+    qualified field-access syntax. The hub library [trading.data_panel.snapshot]
+    has no [analysis/] dep, satisfying the A2 architecture boundary. *)
 
 type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
   highs : float array;
@@ -146,19 +132,16 @@ val daily_view_for :
     columns to determine which dates to include.
 
     The [~calendar] parameter is the trading-day calendar (Mon–Fri including
-    holidays in the production runner — see [Panel_runner._build_calendar]) that
-    the panel-backed reader uses internally. Passing the same calendar here
-    makes the snapshot path's window definition bit-equal to
-    [Bar_panels.daily_view_for]'s, closing #848. The fix walks
-    [calendar.(as_of_idx - lookback + 1 .. as_of_idx)], looks up the snapshot
-    row for each calendar date (NaN-passthrough on missing rows), and NaN-skips
-    per close cell — the same per-cell semantics as the panel path's
-    [_read_row_cells].
+    holidays in the production runner — see [Panel_runner._build_calendar]). The
+    walker traverses [calendar.(as_of_idx - lookback + 1 .. as_of_idx)], looks
+    up the snapshot row for each calendar date (NaN-passthrough on missing
+    rows), and NaN-skips per close cell. Threading the same calendar used by the
+    runner everywhere ensures deterministic window definition across calls (#848
+    forward fix).
 
     Returns the empty view ([n_days = 0], all arrays empty) when:
     - [lookback <= 0]
-    - [as_of] is not present in [calendar] (matches
-      [Bar_panels.column_of_date]'s exact-match contract)
+    - [as_of] is not present in [calendar] (exact-match contract)
     - [symbol] is not in the snapshot manifest
     - no resident snapshot rows fall in the calendar window
     - any required field read fails. *)
@@ -181,11 +164,9 @@ val daily_bars_for :
     returns the assembled list.
 
     {b open_price.} The [Snapshot_schema.Open] field is read from the snapshot
-    row alongside the other OHLCV fields, so [open_price] matches the panel
-    path's [Bar_panels.daily_bars_for] cell-for-cell. Days where the snapshot
-    has no row degrade to [Float.nan], mirroring the panel's NaN cell. (Pre-#848
-    the field was hard-coded to NaN; the schema has included [Open] since Phase
-    A.1, the read just wasn't wired.)
+    row alongside the other OHLCV fields. Days where the snapshot has no row
+    degrade to [Float.nan]. (Pre-#848 the field was hard-coded to NaN; the
+    schema has included [Open] since Phase A.1, the read just wasn't wired.)
 
     Returns the empty list when:
     - [symbol] is not in the snapshot manifest
@@ -219,15 +200,13 @@ val low_window :
     of [as_of] in [calendar].
 
     The [~calendar] parameter is the trading-day calendar (Mon–Fri including
-    holidays) the panel-backed reader uses internally — passing the same
-    calendar makes the snapshot path bit-equal to {!Bar_panels.low_window}'s
-    panel-slice semantics (#848 forward fix). Cells where the snapshot has no
-    row for the calendar date are filled with [Float.nan]; this matches the
-    panel's NaN-cell behaviour.
+    holidays) used by the production runner. Threading it through ensures
+    deterministic window definition across calls (#848 forward fix). Cells where
+    the snapshot has no row for the calendar date are filled with [Float.nan].
 
-    Unlike {!Data_panel.Bar_panels.low_window}, the result is a copy, not a
-    zero-copy panel slice — the snapshot path has no contiguous source array to
-    slice. The buffer is owned by the caller; mutations are local.
+    The result is a freshly-allocated buffer — the snapshot path has no
+    contiguous source array to zero-copy slice. The buffer is owned by the
+    caller; mutations are local.
 
     Returns [None] when:
     - [len <= 0]

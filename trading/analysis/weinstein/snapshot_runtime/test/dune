@@ -8,7 +8,6 @@
   matchers
   ounit2
   status
-  trading.data_panel
   trading.data_panel.snapshot
   types
   weinstein.snapshot_pipeline

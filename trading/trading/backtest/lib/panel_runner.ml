@@ -179,8 +179,8 @@ let _resolve_snapshot_source (input : input) ~warmup_start ~end_date
    range [start..end_]. Holidays are not removed — the simulator already
    tolerates "no bar on this day" via the [is_trading_day] filter, and the
    strategy's snapshot-backed [daily_view_for] walks calendar columns
-   identically to the prior panel path's [Bar_panels.daily_view_for] (PR1 of
-   the #848 forward fix; see [Bar_reader.of_snapshot_views]). *)
+   deterministically (PR1 of the #848 forward fix; see
+   [Bar_reader.of_snapshot_views]). *)
 let _build_calendar ~start ~end_ : Date.t array =
   let rec loop d acc =
     if Date.( > ) d end_ then List.rev acc
@@ -200,15 +200,13 @@ let _build_calendar ~start ~end_ : Date.t array =
    simulator + final-close lookup already use, then wrap in a
    [Bar_reader.of_snapshot_views] passing the runner's [calendar]. The
    calendar threads through to [Snapshot_bar_views.daily_view_for] /
-   [low_window], which walk calendar columns NaN-passthrough identically to
-   the old [Bar_panels.daily_view_for] window definition — closing the
-   path-dependent regression that motivated this rewiring.
+   [low_window], which walk calendar columns NaN-passthrough deterministically
+   — the same window definition that closes the #848 path-dependent
+   regression.
 
-   This replaces the partial-revert [_build_panel_bar_reader] that loaded a
-   parallel [Bar_panels.t] from CSV on the same calendar. The snapshot path
-   reuses the LRU-bounded [Daily_panels.t] for both strategy bar reads and
-   simulator price reads, so we no longer hold two full per-symbol bar
-   stores resident at the same time.
+   The snapshot path reuses the LRU-bounded [Daily_panels.t] for both strategy
+   bar reads and simulator price reads, so we hold one shared bar store
+   resident.
 
    Refs: closes the regression on Bar_reader.of_snapshot_views (the
    [~calendar] plumbing on the snapshot views that this constructor now

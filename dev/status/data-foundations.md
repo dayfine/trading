@@ -1,12 +1,12 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-05 (b-2/c-2/d-2 caller migration READY_FOR_REVIEW)
+## Last updated: 2026-05-06
 
 ## Status
 IN_PROGRESS
 
 ## Notes
-M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04**: a-1 (#825 `Bar_reader.of_in_memory_bars`), a-2 (#827 migrate 5 strategy test files / 17 callsites), a-3 (#828 `Panel_runner` CSV path through snapshot via `Csv_snapshot_builder`), a-4 (#829 delete `Bar_reader.of_panels` + `Weinstein_strategy.make ?bar_panels`). **F.3.a-3 PARTIALLY REVERTED 2026-05-04** (closes #843): the runner's strategy bar_reader is back on `Bar_reader.of_panels` over a CSV-loaded `Bar_panels.t`; the simulator's `Market_data_adapter` stays snapshot-backed (F.2 RAM bound preserved). **F.3.b staged b-1 MERGED** (#833 `Weekly_ma_cache.of_snapshot_views`). **F.3.c staged c-1 MERGED** (#837 `Panel_callbacks.*_of_snapshot_views`). **F.3.d staged d-1 READY_FOR_REVIEW 2026-05-04** (#842 `Macro_inputs.*_of_snapshot_views` — 3 parallel constructors + 5 parity tests). **#848 forward fix COMPLETE 2026-05-05** (PR1 #861 + PR2 #864): PR1 added `~calendar` plumbing on `Snapshot_bar_views.daily_view_for` / `low_window` and exposed it via `Bar_reader.of_snapshot_views ~?calendar` + `Panel_callbacks.support_floor_callbacks_of_snapshot_views ~calendar`; `_assemble_daily_bars` reads `Snapshot_schema.Open` instead of returning NaN. PR2 rewired `Panel_runner._setup_hybrid` to use `Bar_reader.of_snapshot_views` over the shared `Daily_panels.t` (drops parallel CSV-loaded `Bar_panels.t`). sp500-2019-2023 baseline: 58.34%/81 trades, bit-equal to post-#857 fixture. Investigation: `dev/notes/path-dependent-regression-848-investigation-2026-05-05.md`; bisect: `dev/notes/parity-bisect-2026-05-04.md`. **F.3.a-3 redo COMPLETE**; **F.3.b-2/c-2/d-2 caller migration READY_FOR_REVIEW 2026-05-05** (this PR — flips `Weinstein_strategy._run_macro_only` + `_run_screen_after_macro` off `Macro_inputs.{build_global_index_views, build_sector_map} ~bar_reader` onto the `*_of_snapshot_views ~cb` variants; threads cb via new `Bar_reader.snapshot_callbacks` accessor). F.3.e `bar_panels.{ml,mli}` deletion now unblocked. Multi-week soak gate per #864 PR body overridden by user request. Plus: Synth-v3; Norgate ingest (vendor-blocked). Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
+M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04**: a-1 (#825 `Bar_reader.of_in_memory_bars`), a-2 (#827 migrate 5 strategy test files / 17 callsites), a-3 (#828 `Panel_runner` CSV path through snapshot via `Csv_snapshot_builder`), a-4 (#829 delete `Bar_reader.of_panels` + `Weinstein_strategy.make ?bar_panels`). **F.3.b staged b-1 MERGED** (#833 `Weekly_ma_cache.of_snapshot_views`). **F.3.c staged c-1 MERGED** (#837 `Panel_callbacks.*_of_snapshot_views`). **F.3.d staged d-1 MERGED** (#842 `Macro_inputs.*_of_snapshot_views`). **#848 forward fix COMPLETE 2026-05-05** (PR1 #861 + PR2 #864). **F.3.b-2/c-2/d-2 caller migration MERGED 2026-05-05** (#866 — flips `Weinstein_strategy._run_macro_only` + `_run_screen_after_macro` onto the `*_of_snapshot_views ~cb` variants). **F.3.e-1 / e-2 MERGED 2026-05-06** (#868 / #869 — relocate view types to `Data_panel_snapshot.Panel_views` neutral hub; delete `Bar_reader.of_panels` + 4 `_panel_*` helpers). **F.3.e-3 READY_FOR_REVIEW 2026-05-06** (this PR-stack — 3a port `optimal_strategy_runner` off `Bar_panels`; 3b rename `Bar_panels.{weekly,daily}_view` to `Snapshot_bar_views` in production + migrate panel-callback / weekly-MA / macro-inputs / snapshot-bar-views tests off `Bar_panels`; 3c DELETE `bar_panels.{ml,mli}` + the panel-vs-snapshot diag harness + dune cleanups + flip status). **M5.3 streaming Phase F COMPLETE.** Plus: Synth-v3; Norgate ingest (vendor-blocked). Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 Track created 2026-05-02 to absorb M5.3 (scale infra: streaming + Norgate) + M7.0 (data foundations: Norgate, multi-market, synthetic). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` + `dev/plans/m7-data-and-tuning-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.3 + M7.0 (added 2026-05-02).
 
@@ -137,30 +137,32 @@ including the V1/V2/V3 verification follow-ups that gate F.2.)
 - **#790** — Phase D: simulator wire-in behind `--snapshot-mode --snapshot-dir`.
 - **#791** — Phase E: validation + tier-4 spike (parity-7sym fixture).
 - **#793** — Phase F.1: deprecation marker on `Bar_panels.t`'s docstring.
-- **#825/#827/#828/#829** — Phase F.3.a: `Bar_reader` migrated off `Bar_panels.t` (a-1 `of_in_memory_bars`, a-2 strategy test migrations, a-3 `Panel_runner` CSV → snapshot, a-4 delete `of_panels`). **Note: F.3.a-3's strategy-side flip was partially reverted 2026-05-04** (closes #843). The runner's strategy bar_reader is back on `Bar_reader.of_panels`; `of_panels` was restored. The simulator's snapshot adapter stays. Forward fix tracked separately.
+- **#825/#827/#828/#829** — Phase F.3.a: `Bar_reader` migrated off `Bar_panels.t` (a-1 `of_in_memory_bars`, a-2 strategy test migrations, a-3 `Panel_runner` CSV → snapshot, a-4 delete `of_panels`). F.3.a-3's strategy-side flip was partially reverted 2026-05-04 (closes #843); the forward fix landed via #861/#864.
 - **#833** — Phase F.3.b staged b-1: `Weekly_ma_cache.of_snapshot_views` parallel constructor.
 - **#837** — Phase F.3.c staged c-1: `Panel_callbacks.*_of_snapshot_views` parallel constructors (8 callees).
+- **#842** — Phase F.3.d staged d-1: `Macro_inputs.*_of_snapshot_views` parallel constructors (3 functions) + 5 parity tests pinning bit-equal output.
+- **#861** — #848 forward fix PR1: `Snapshot_bar_views.{daily_view_for,low_window}` take a `~calendar` parameter and walk panel-style calendar columns; `_assemble_daily_bars` reads `Snapshot_schema.Open` instead of returning NaN. Closes the cell-by-cell parity gap.
+- **#864** — #848 forward fix PR2: rewired `Panel_runner._setup_hybrid` to use `Bar_reader.of_snapshot_views` over the shared `Daily_panels.t`.
+- **#866** — F.3.b-2 + c-2 + d-2 caller migration: `Weinstein_strategy._run_macro_only` + `_run_screen_after_macro` migrated off `Macro_inputs.{build_global_index_views, build_sector_map} ~bar_reader` onto the `*_of_snapshot_views ~cb` variants. New `Bar_reader.snapshot_callbacks` accessor.
+- **#868** — F.3.e-1: relocate `weekly_view` / `daily_view` types to `Data_panel_snapshot.Panel_views` neutral hub; `Bar_panels` retains alias re-exports.
+- **#869** — F.3.e-2: delete `Bar_reader.of_panels` + 4 `_panel_*` helpers (zero live callers).
 
 ### Ready for review
 
-- **#866** — F.3.b-2 + c-2 + d-2 caller migration (2026-05-05) — `Weinstein_strategy._run_macro_only` + `_run_screen_after_macro` migrated off `Macro_inputs.{build_global_index_views, build_sector_map} ~bar_reader` onto the `*_of_snapshot_views ~cb` variants from #842. New `Bar_reader.snapshot_callbacks` accessor (option-2 design — paired with the cb on the `Bar_reader.t` itself, mirroring the existing `Weekly_ma_cache.t` accessor pattern). After this PR no production code path constructs `Macro_inputs` inputs from a `Bar_reader`-derived view; the strategy reads through `Snapshot_runtime.Snapshot_callbacks.t` directly. F.3.e (delete `bar_panels.{ml,mli}` + `Bar_reader.of_panels`) unblocked next. Verify: `dune runtest trading/weinstein/strategy/test/`. sp500-2019-2023 baseline: 58.343651690000044%/81 trades, **bit-equal to post-#864 baseline** across every metric (total_return_pct, total_trades, win_rate, sharpe_ratio, max_drawdown_pct, avg_holding_days, open_positions_value, unrealized_pnl).
-- **#842** — Phase F.3.d staged d-1: `Macro_inputs.*_of_snapshot_views` parallel constructors (3 functions: `build_global_index_views_of_snapshot_views`, `build_global_index_bars_of_snapshot_views`, `build_sector_map_of_snapshot_views`) + 5 parity tests pinning bit-equal output. Verify: `dune exec trading/weinstein/strategy/test/test_macro_inputs.exe`.
-- **#861** — #848 forward fix: `Snapshot_bar_views.{daily_view_for,low_window}` take a `~calendar` parameter and walk panel-style calendar columns (Bug 1 fix); `_assemble_daily_bars` reads `Snapshot_schema.Open` instead of returning NaN (Bug 2 fix). Closes the cell-by-cell parity gap between snapshot and panel paths driving #848's regression. Threaded through `Bar_reader.of_snapshot_views` (`?calendar` with synth Mon-Fri fallback) and `Panel_callbacks.support_floor_callbacks_of_snapshot_views` (`~calendar` required). New tests pin calendar-walking + Open-field semantics. Verify: `dune exec analysis/weinstein/snapshot_runtime/test/test_snapshot_bar_views.exe` (14 tests). Diag exec parity verification (5 primitives → 0 cell diffs) requires the local CSV corpus and is a manual offline check. Plan: `dev/plans/snapshot-engine-phase-f-2026-05-03.md` §F.3; investigation: `dev/notes/path-dependent-regression-848-investigation-2026-05-05.md`.
+- **F.3.e-3 PR-stack** (this session, 3 stacked PRs): final retirement of `Bar_panels`.
+  - **3a (`feat/snapshot/f3-e-3a`)**: port `optimal_strategy_runner.ml` off `Bar_panels` onto `Snapshot_callbacks` via `Csv_snapshot_builder.build` + `Snapshot_bar_views.weekly_bars_for`. Drops `Bar_panels.column_of_date` / `weekly_bars_for` / `_build_calendar` from the runner; the `_world` carries a `Snapshot_callbacks.t` instead of a `Bar_panels.t`. ~150 LOC.
+  - **3b (`feat/snapshot/f3-e-3b`)**: rename `Bar_panels.{weekly,daily}_view` → `Snapshot_runtime.Snapshot_bar_views.{weekly,daily}_view` in production (`panel_callbacks`, `macro_inputs`, `weinstein_strategy`); drop `Weekly_ma_cache.create panels` (only tests used it). Migrate `test_panel_callbacks.ml`, `test_weekly_ma_cache.ml`, `test_macro_inputs.ml`, `test_snapshot_bar_views.ml` off `panels_of_symbols` onto snapshot-callbacks helpers. Delete `bar_panels_test.ml` and `test_macro_panel_callbacks_real_data.ml` (panel-only tests). ~485 insertions, 1636 deletions.
+  - **3c (this PR — `feat/snapshot/f3-e-3c`)**: DELETE `trading/trading/data_panel/bar_panels.{ml,mli}`; drop `trading/trading/backtest/diag/diag_panel_vs_snapshot_extended.ml` (panel-vs-snapshot diag — moot post-F.3); fix remaining test file references; clean up docstrings throughout.
 
-### Pending (M5.3 Phase F.2 + F.3 + verification gates)
+After PR-3c lands: `grep -rn "Bar_panels" trading/ analysis/ --include="*.ml" --include="*.mli"` returns only docstring/comment references. **M5.3 streaming Phase F COMPLETE.**
 
-Per `dev/plans/snapshot-engine-phase-f-2026-05-03.md`. Three verification
-follow-ups gate F.2's default-flip merge:
+### Pending (post-F.3)
 
-- **V1 — sp500 5y full-universe parity** (CSV ≡ snapshot bit-equality on
-  `goldens-sp500/sp500-2019-2023`; previously intractable under the O(N²)
-  writer — unblocked by #792). Local-only.
-- **V2 — ±2w start-date fuzz on snapshot mode** (re-run #788's fuzz spec
-  under snapshot mode; CSV-mode-only baseline ran before Phase D wired
-  snapshot reads).
-- **V3 — Numeric-key fuzz at scale paired with E3 sweep** (PR #788
-  follow-up #3 + M5.4 E3 stop-buffer sweep both run on snapshot mode
-  natively).
+M5.3 Phase F is COMPLETE post-F.3.e-3. Remaining track items:
+
+- **Synth-v3** multi-symbol factor model (~1000 LOC, plan in M7.0 Track 3).
+- **EODHD multi-market expansion** (small, parallel).
+- **Norgate ingest** (vendor-blocked).
 
 ### Detail (kept for reference; all entries below are MERGED on main)
 
@@ -237,12 +239,6 @@ aggregates. Manifest schema-hash drives incremental rebuild.
 2. EODHD multi-market expansion (parallel; small).
 3. Norgate ingest after user signs up + decides which Norgate plan.
 4. Synth-v2 + v3 in subsequent sessions, in order.
-5. **M5.3 verification gates V1 / V2 / V3** before Phase F.2 default-flip lands. See `dev/plans/snapshot-engine-phase-f-2026-05-03.md`:
-   - **V1 — sp500 5y full-universe parity**: re-run `goldens-sp500/sp500-2019-2023` under both modes (CSV ≡ snapshot bit-equality across all output files). Unblocked by #792 (Phase B writer perf fix). Local-only.
-   - **V2 — ±2w start-date fuzz on snapshot mode**: re-run #788's fuzz spec under snapshot mode; CSV-mode-only baseline ran before Phase D wired snapshot reads.
-   - **V3 — Numeric-key fuzz at scale paired with E3 sweep**: PR #788 follow-up #3 + M5.4 E3 stop-buffer sweep both run on snapshot mode natively.
-6. **M5.3 Phase F.2 — runner default flip + auto-build** (gated on V1 + V2). Two sub-tasks: (a) extend `build_snapshots.exe` to accept the runner's universe shape (today the writer requires `Pinned`; runners use `sector_map_override` built from `sectors.csv`); (b) add an `auto_build` mode to `Backtest_runner_args` that calls the writer when `--snapshot-mode` is set without `--snapshot-dir`, with a stable conventional output path under `data/snapshots/<schema-hash>/`. (c) flip the runner default; add `--csv-mode` opt-out. Acceptance: existing baseline / smoke / fuzz scenarios run cleanly under snapshot-mode default with no flag changes from the user. Estimated 300–500 LOC.
-7. **M5.3 Phase F.3 — `Bar_panels.t` retirement** (follow-up to F.2). Port `Bar_reader` / `Weekly_ma_cache` / `Panel_callbacks` / `Macro_inputs` off `Bar_panels.t` onto `Snapshot_runtime.Snapshot_callbacks` (or a thin compat shim). Then delete `trading/trading/data_panel/bar_panels.{ml,mli}` + tests. Gate: snapshot-mode-as-default has run uneventfully for several weeks across all baseline + tier-3 + tier-4 scenarios. Estimated 800–1200 LOC across multiple PRs.
 
 ## CRSP defer
 ~$5k/yr institutional. Only viable for 100-year NYSE data (1925+). Skip until M7.1 ML training shows scale matters.

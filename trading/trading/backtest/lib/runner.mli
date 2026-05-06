@@ -43,8 +43,8 @@ type result = {
           a release run flag a regression. *)
   final_prices : (string * float) list;
       (** Snapshot of close prices on the run's final calendar day, keyed by
-          symbol. Populated by [Panel_runner.run] from the [Bar_panels.t] last
-          column for every symbol still held in
+          symbol. Populated by [Panel_runner.run] from the snapshot's [Close]
+          field at [end_date] for every symbol still held in
           [(List.last_exn steps).portfolio.positions]; empty when the simulation
           never reached the final calendar day or no positions were held at end.
           Consumed by [Result_writer] to emit [final_prices.csv] for the

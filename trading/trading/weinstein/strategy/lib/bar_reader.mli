@@ -17,9 +17,12 @@
     their backing's read primitives and produce identical-shape closures, so the
     strategy's downstream callees see one bar-reading API regardless of backing.
 
-    {b Phase F.3.e-2}: the legacy {!Data_panel.Bar_panels}-backed [of_panels]
-    constructor + [_panel_*] helpers were deleted in this PR; production code
-    has been on {!of_snapshot_views} since #864/#866. *)
+    {b Phase F.3.e-2 (#869)}: the legacy [Data_panel.Bar_panels]-backed
+    [of_panels] constructor + [_panel_*] helpers were deleted; production code
+    has been on {!of_snapshot_views} since #864/#866.
+
+    {b Phase F.3.e-3}: [Data_panel.Bar_panels] itself was deleted; every reader
+    is now snapshot-backed. *)
 
 open Core
 
@@ -35,21 +38,19 @@ val of_snapshot_views :
     at-most-one-symbol disk read on cache miss.
 
     The [?calendar] parameter is the trading-day calendar (Mon–Fri including
-    holidays) that the panel-backed reader uses internally. When supplied,
-    [daily_view_for] walks calendar columns identical to
-    {!Data_panel.Bar_panels.daily_view_for}'s window — the cell-by-cell parity
-    surface that closes #848. When omitted, the reader synthesizes a Mon–Fri
-    calendar bounded to each call's window; this is sufficient for tests and the
-    in-memory convenience constructor but does not guarantee bit-for-bit panel
-    parity at the boundary of long histories. The production runner should
+    holidays) the production runner uses. When supplied, [daily_view_for] walks
+    calendar columns deterministically — the cell-by-cell parity surface that
+    closed #848. When omitted, the reader synthesizes a Mon–Fri calendar bounded
+    to each call's window; this is sufficient for tests and the in-memory
+    convenience constructor but does not guarantee deterministic window
+    definition at the boundary of long histories. The production runner should
     always pass its real calendar.
 
     Returns the empty view / empty list when the symbol is unknown, [as_of] is
     before any resident snapshot row, or any underlying field-read failure
-    fires. The view types ({!Snapshot_runtime.Snapshot_bar_views.weekly_view} /
-    [daily_view]) are shared with the panel module's view definitions
-    (re-exported from {!Data_panel.Bar_panels} until F.3.e-3 deletes that
-    module); {!Panel_callbacks} consumes them directly. *)
+    fires. {!Panel_callbacks} consumes the view types
+    ({!Snapshot_runtime.Snapshot_bar_views.weekly_view} / [daily_view])
+    directly. *)
 
 val of_in_memory_bars : (string * Types.Daily_price.t list) list -> t
 (** [of_in_memory_bars symbol_bars] produces a snapshot-backed reader from a
