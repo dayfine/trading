@@ -195,6 +195,30 @@ A stock gets A+ rating if ALL THREE present:
 
 "When you find one of these special big-winner patterns, invest much more heavily in it because the probabilities are great that you have a grand-slam home run on your hands."
 
+### 4.6 Continuation Buys (Ch. 3, ~lines 2214–2238)
+
+A second category of buy signal that occurs within an established Stage 2 uptrend — distinct from the initial breakout.
+
+> "There is one other very profitable time to do new buying. It occurs after a Stage 2 advance is well underway, when the stock drops back close to its MA and consolidates. It then breaks out anew above the top of its resistance zone... This is called a continuation buy."
+
+**Trader-vs-investor framing:**
+
+> "This type of buy is more suited to traders than investors. But investors, too, should be willing to do some late Stage 2 buying when the overall market is very strong and there aren't many initial breakout opportunities left."
+
+**MA-trending-up requirement (mandatory):**
+
+> "The moving average should be clearly trending higher. This is important! Just as a marathon runner needs something left in reserve for the finish, so does a Stage 2 advancing stock. If the MA starts to roll over and flatten out, you don't want that stock."
+
+**Key distinctions from initial breakout:**
+
+- Greater risk of false breakout (stock is further along in Stage 2).
+- Probabilities are "overwhelmingly high" that the advance will be rapid if conditions hold.
+- Volume confirmation still required; pullback-to-MA on low volume is the setup.
+- **Inapplicable in early bull markets** (plenty of initial breakouts; no need to chase continuation buys).
+- **Most relevant in late bull markets** (1986–1987 example: few first-time Stage 2 buys left, continuation variety still occurring).
+
+**Implementation note:** Continuation buys are a distinct buy_reason enum value from initial breakouts — they share the same volume + RS checks but the MA-slope check is stricter (MA must be *clearly* trending higher, not merely flat-to-rising). Source: Ch. 3, ~lines 2214–2238.
+
 ## 5. Stop-Loss and Selling Rules (Ch. 6)
 
 ### 5.1 Initial Stop Placement
@@ -275,6 +299,23 @@ SHORT target: high_in_top (B) → drops to low (A)
 ```
 
 "Usually quite accurate" — use to know when to take partial profits.
+
+### 5.6 Laggard Rotation (Ch. 4, ~lines 4929–4933)
+
+An active position-management rule that fires *before* the trailing stop is hit — exits a lagging position mid-Stage-2 to redeploy into a stronger candidate. Complements §5.2 STAGE3_TIGHTENING, which tightens the stop once the MA flattens; laggard rotation operates earlier in the position lifecycle, while the MA is still rising.
+
+**Surrounding context:**
+
+> "The proper way to look at your stocks is to make believe that each position is the only one you have. If it's acting fine, great, ride with it. But if it's lagging badly and acting poorly, lighten up on that position even if the sell-stop isn't hit. Move the proceeds into a new Stage 2 stock with greater promise."
+
+**Key rules:**
+
+- Evaluate each position in isolation — do not let winners subsidize laggards.
+- "Lagging badly and acting poorly" is the trigger, not a stop breach. Poor relative action mid-Stage-2 is sufficient.
+- Proceeds move immediately into a fresh Stage 2 breakout with better RS and volume characteristics.
+- Does NOT replace the trailing stop — the stop remains in place; this rule fires earlier as a discretionary exit.
+
+**Implementation note:** Laggard rotation is a separate exit_reason from stop_hit and stage3_tightening. It is optionally configurable (some investors prefer to let stops do all the work); the default Weinstein method uses it. Source: Ch. 4 §portfolio sizing, ~lines 4929–4933.
 
 ## 6. Short-Selling Criteria (Ch. 7)
 
