@@ -110,6 +110,7 @@ let test_all_scenario_files_parse _ =
         @ collect (Filename.concat root "goldens-broad")
         @ collect (Filename.concat root "smoke")
         @ collect (Filename.concat root "goldens-hybrid-tier-experiment")
+        @ collect (Filename.concat root "goldens-sp500")
       in
       (* Sanity: at least the three smokes + three goldens-small + some
          goldens-broad should be there. *)
