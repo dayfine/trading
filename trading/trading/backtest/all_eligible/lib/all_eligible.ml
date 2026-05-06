@@ -11,18 +11,24 @@ module OT = Backtest_optimal.Optimal_types
 
 let _default_entry_dollars = 10_000.0
 let _default_return_buckets : float list = [ -0.5; -0.2; 0.0; 0.2; 0.5; 1.0 ]
+let _default_min_grade : Weinstein_types.grade = C
 
 (* ------------------------------------------------------------------ *)
 (* Types                                                                *)
 (* ------------------------------------------------------------------ *)
 
-type config = { entry_dollars : float; return_buckets : float list }
+type config = {
+  entry_dollars : float;
+  return_buckets : float list;
+  min_grade : Weinstein_types.grade; [@sexp.default Weinstein_types.C]
+}
 [@@deriving sexp]
 
 let default_config : config =
   {
     entry_dollars = _default_entry_dollars;
     return_buckets = _default_return_buckets;
+    min_grade = _default_min_grade;
   }
 
 type trade_record = {
@@ -208,6 +214,21 @@ let dedup_first_admission (scored : OT.scored_candidate list) :
       | _ ->
           Hashtbl.set watermarks ~key ~data:c.exit_week;
           true)
+
+(* ------------------------------------------------------------------ *)
+(* Min-grade quality gate                                               *)
+(* ------------------------------------------------------------------ *)
+
+(** Whether [actual] meets-or-beats [floor] in the standard cascade quality
+    ordering [A_plus > A > B > C > D > F]. Mirrors the gate
+    [Screener._passes_score_floor] uses with [min_score_override = None]. *)
+let _grade_passes ~floor (actual : Weinstein_types.grade) : bool =
+  Weinstein_types.compare_grade actual floor <= 0
+
+let filter_by_min_grade ~(min_grade : Weinstein_types.grade)
+    (scored : OT.scored_candidate list) : OT.scored_candidate list =
+  List.filter scored ~f:(fun (c : OT.scored_candidate) ->
+      _grade_passes ~floor:min_grade c.entry.cascade_grade)
 
 (* ------------------------------------------------------------------ *)
 (* Public entry point                                                   *)

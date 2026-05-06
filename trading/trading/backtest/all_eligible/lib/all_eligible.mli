@@ -8,15 +8,24 @@
 
     {1 What this measures}
 
-    Raw signal alpha — what each Stage-2 breakout signal would have returned if
-    we'd taken every one. Separates {b signal quality} from
-    {b portfolio mechanism}:
+    Opportunity cost — what each cascade-admissible Stage-2 breakout signal
+    would have returned if we'd taken every one, after applying the live
+    cascade's {b quality gates} ([min_grade], breakout predicate, sector filter)
+    but skipping every {b portfolio gate} (cash availability, top-N cap,
+    sector-concentration cap). Separates {b signal quality + cascade quality}
+    from {b portfolio mechanism}:
 
-    - High signal alpha + many portfolio rejections in the actual run →
-      portfolio surface needs loosening.
-    - Low signal alpha + few rejections → screener cascade needs tightening.
+    - Many portfolio rejections in the actual run → portfolio surface needs
+      loosening.
+    - Few rejections + low alpha across cascade-admissible signals → cascade
+      needs tightening (the [min_grade] sweep falsifies this directly).
     - High alpha + few rejections + low actual return → optimal-strategy picking
       gap (orderings differ from realised outcome).
+
+    {b Note.} The default [config.min_grade] is [C] — i.e., the same gate the
+    live cascade uses. Set [min_grade = F] to recover the prior "raw signal
+    floor" semantics (admit every breakout regardless of grade); set [min_grade]
+    to [A] / [A_plus] for marginal-quality bounds.
 
     {1 Pipeline}
 
@@ -64,15 +73,23 @@ type config = {
           [(-inf, b0)], [\[b0, b1)], ..., [\[bn, +inf)]. Default:
           [[-0.5; -0.2; 0.0; 0.2; 0.5; 1.0]] — yields seven buckets: [<-50%],
           [-50..-20%], [-20..0%], [0..20%], [20..50%], [50..100%], [>100%]. *)
+  min_grade : Weinstein_types.grade; [@sexp.default Weinstein_types.C]
+      (** Minimum cascade grade a breakout must achieve to be admitted. Default
+          [C] — matches {!Screener.default_config.min_grade}, so the diagnostic
+          measures opportunity cost against the live cascade's quality bar
+          rather than the raw breakout-predicate floor. Set to [F] to recover
+          the prior "every Stage-2 first-admission" floor; set to [A] or
+          [A_plus] for tighter quality bounds. *)
 }
 [@@deriving sexp]
-(** Diagnostic configuration. Both knobs configurable per {!default_config} — no
+(** Diagnostic configuration. All knobs configurable per {!default_config} — no
     magic numbers in the implementation. *)
 
 val default_config : config
 (** [default_config] =
     [{ entry_dollars = 10_000.0; return_buckets = [-0.5; -0.2; 0.0; 0.2; 0.5;
-     1.0] }]. *)
+     1.0]; min_grade = C }]. The [min_grade = C] default matches the live
+    cascade's {!Screener.default_config}. *)
 
 type trade_record = {
   signal_date : Date.t;
@@ -175,13 +192,28 @@ val grade :
     Trade order matches [scored] order — no resorting. Empty input yields a
     result with [trade_count = 0] and zeroed metrics (no exception).
 
-    {b Note.} [grade] does {b not} dedup. Callers that want one trade per
-    breakout-event (rather than one trade per Friday-cycle pass-through of a
-    still-eligible candidate) must apply {!dedup_first_admission} first. The
-    {!All_eligible_runner} pipeline does this; in-process tests with hand-built
-    scored candidates can skip dedup for arithmetic pinning.
+    {b Note.} [grade] does {b not} dedup or apply [config.min_grade]. Callers
+    that want one trade per breakout-event (rather than one trade per
+    Friday-cycle pass-through of a still-eligible candidate) must apply
+    {!dedup_first_admission} first; callers that want the cascade's quality gate
+    enforced must apply {!filter_by_min_grade} first. The {!All_eligible_runner}
+    pipeline does both; in-process tests with hand-built scored candidates can
+    skip them for arithmetic pinning.
 
     Pure function. *)
+
+val filter_by_min_grade :
+  min_grade:Weinstein_types.grade ->
+  Backtest_optimal.Optimal_types.scored_candidate list ->
+  Backtest_optimal.Optimal_types.scored_candidate list
+(** [filter_by_min_grade ~min_grade scored] retains only those scored candidates
+    whose [entry.cascade_grade] is at-or-better than [min_grade] in the standard
+    quality ordering [A_plus > A > B > C > D > F].
+
+    Uses {!Weinstein_types.compare_grade}, the same ordering the live cascade
+    uses internally for its [min_grade] gate (see
+    {!Screener._passes_score_floor}). Pure function; preserves input order;
+    passing [min_grade = F] is the identity (every grade passes). *)
 
 val dedup_first_admission :
   Backtest_optimal.Optimal_types.scored_candidate list ->

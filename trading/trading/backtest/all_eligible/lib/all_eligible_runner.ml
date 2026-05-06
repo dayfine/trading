@@ -1,3 +1,11 @@
+(* @large-module: pipeline orchestrator covers CLI parsing (~80 LOC), out-dir
+   + config resolution, snapshot construction, Friday calendar, per-symbol
+   weekly analysis, scan + score over the panel, forward-walk outlooks,
+   universe resolution, plus the public CSV + Markdown renderers consumed by
+   tests and the per-cell emission in [Grade_sweep]. The grade-sweep + cell
+   emission lives in [Grade_sweep]; the public renderers stay here so the
+   runner module remains the single API surface for external consumers. *)
+
 (** All-eligible runner — see [all_eligible_runner.mli] for the API contract. *)
 
 open Core
@@ -26,6 +34,8 @@ type cli_args = {
   out_dir : string option;
   entry_dollars : float option;
   return_buckets : float list option;
+  min_grade : Weinstein_types.grade option;
+  grade_sweep : bool;
   config_overrides : Sexp.t list;
 }
 
@@ -39,6 +49,9 @@ let _usage () =
       "  --entry-dollars <float>      Override entry-dollar sizing.";
       "  --return-buckets <csv>       Override return-bucket boundaries (e.g. \
        -0.5,0.0,0.5).";
+      "  --min-grade <F|D|C|B|A|A+>   Cascade grade floor (default: C).";
+      "  --grade-sweep                Run F/D/C/B/A as a sweep; emit one \
+       subdir per grade plus a top-level cross-grade summary.";
       "  --config-overrides <sexp>    Extra config overrides (sexp list, \
        passthrough).";
     ]
@@ -49,6 +62,19 @@ let _parse_buckets s : float list =
   String.split s ~on:',' |> List.map ~f:String.strip
   |> List.filter ~f:(fun cell -> not (String.is_empty cell))
   |> List.map ~f:Float.of_string
+
+let _parse_grade s : Weinstein_types.grade =
+  match String.uppercase (String.strip s) with
+  | "A+" | "APLUS" -> A_plus
+  | "A" -> A
+  | "B" -> B
+  | "C" -> C
+  | "D" -> D
+  | "F" -> F
+  | other ->
+      _fail_usage
+        (Printf.sprintf "--min-grade expects one of {F,D,C,B,A,A+}, got %s"
+           other)
 
 let _parse_overrides s : Sexp.t list =
   match Sexp.of_string s with
@@ -65,6 +91,8 @@ let parse_argv argv =
       out_dir = None;
       entry_dollars = None;
       return_buckets = None;
+      min_grade = None;
+      grade_sweep = false;
       config_overrides = [];
     }
   in
@@ -76,6 +104,9 @@ let parse_argv argv =
         loop { acc with entry_dollars = Some (Float.of_string v) } rest
     | "--return-buckets" :: v :: rest ->
         loop { acc with return_buckets = Some (_parse_buckets v) } rest
+    | "--min-grade" :: v :: rest ->
+        loop { acc with min_grade = Some (_parse_grade v) } rest
+    | "--grade-sweep" :: rest -> loop { acc with grade_sweep = true } rest
     | "--config-overrides" :: v :: rest ->
         loop { acc with config_overrides = _parse_overrides v } rest
     | flag :: _ -> _fail_usage (Printf.sprintf "Unknown flag: %s" flag)
@@ -113,7 +144,8 @@ let resolve_config (args : cli_args) : All_eligible.config =
   let return_buckets =
     Option.value args.return_buckets ~default:base.return_buckets
   in
-  { entry_dollars; return_buckets }
+  let min_grade = Option.value args.min_grade ~default:base.min_grade in
+  { entry_dollars; return_buckets; min_grade }
 
 (* ---------------------------------------------------------------- *)
 (* Snapshot construction (mirror of optimal-strategy runner's                *)
@@ -370,9 +402,6 @@ let format_summary_md ~scenario_name ~start_date ~end_date
   String.concat ~sep:"\n"
     (header_lines @ stats_lines @ bucket_header @ bucket_lines @ [ "" ])
 
-let _write_config_sexp ~path (config : All_eligible.config) : unit =
-  Sexp.save_hum path (All_eligible.sexp_of_config config)
-
 (* ---------------------------------------------------------------- *)
 (* Pipeline                                                            *)
 (* ---------------------------------------------------------------- *)
@@ -423,20 +452,16 @@ let _scan_and_score ~snapshot_callbacks ~sector_ctx_map ~fridays ~universe :
   in
   _score_all_candidates ~forward_table ~scorer_config candidates
 
-let _emit_artefacts ~out_dir ~scenario ~config ~result : unit =
-  let trades_path = Filename.concat out_dir "trades.csv" in
-  let summary_path = Filename.concat out_dir "summary.md" in
-  let config_path = Filename.concat out_dir "config.sexp" in
-  write_trades_csv ~path:trades_path result;
-  let md =
-    format_summary_md ~scenario_name:scenario.Scenario_lib.Scenario.name
-      ~start_date:scenario.period.start_date ~end_date:scenario.period.end_date
-      ~result
-  in
-  Out_channel.write_all summary_path ~data:md;
-  _write_config_sexp ~path:config_path config;
-  eprintf "all_eligible: wrote %s, %s, %s\n%!" trades_path summary_path
-    config_path
+let _build_cell_inputs ~base_config ~scored ~scenario ~out_dir :
+    Grade_sweep.cell_inputs =
+  {
+    base_config;
+    scored;
+    scenario;
+    out_dir;
+    write_trades_csv;
+    format_summary_md;
+  }
 
 let run_with_args (args : cli_args) : unit =
   eprintf "all_eligible: loading scenario %s\n%!" args.scenario_path;
@@ -445,17 +470,15 @@ let run_with_args (args : cli_args) : unit =
   let universe, sectors_tbl = _resolve_universe ~fixtures_root scenario in
   let out_dir = resolve_out_dir ~scenario_name:scenario.name args in
   Core_unix.mkdir_p out_dir;
-  let config = resolve_config args in
+  let base_config = resolve_config args in
   let snapshot_callbacks, sector_ctx_map, fridays =
     _build_world ~scenario ~universe ~sectors_tbl
   in
   let scored =
     _scan_and_score ~snapshot_callbacks ~sector_ctx_map ~fridays ~universe
   in
-  eprintf "all_eligible: %d scored candidates pre-dedup; deduping...\n%!"
+  eprintf "all_eligible: %d scored candidates (pre filter+dedup)\n%!"
     (List.length scored);
-  let deduped = All_eligible.dedup_first_admission scored in
-  eprintf "all_eligible: %d candidates post-dedup; grading...\n%!"
-    (List.length deduped);
-  let result = All_eligible.grade ~config ~scored:deduped in
-  _emit_artefacts ~out_dir ~scenario ~config ~result
+  let inputs = _build_cell_inputs ~base_config ~scored ~scenario ~out_dir in
+  if args.grade_sweep then Grade_sweep.emit_grade_sweep ~inputs
+  else Grade_sweep.emit_single_cell ~inputs

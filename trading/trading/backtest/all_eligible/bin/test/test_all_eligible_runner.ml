@@ -132,23 +132,44 @@ let _mk_tmpdirs prefix =
 let _has substring : string matcher =
   field (fun s -> String.is_substring s ~substring) (equal_to true)
 
+(** Runs [f] under a try/with capturing [Failure] and returns true iff the
+    raised message contains [substring]. Used by the [parse_argv] negative-path
+    tests below. Defined here (rather than alongside those tests) so the
+    [--min-grade] negative-path test above can also use it. *)
+let _failure_with_substring (f : unit -> unit) ~substring : bool =
+  try
+    f ();
+    false
+  with Failure msg -> String.is_substring msg ~substring
+
 let _make_args ~scenario_path ~out_dir : Runner.cli_args =
   {
     scenario_path;
     out_dir = Some out_dir;
     entry_dollars = None;
     return_buckets = None;
+    min_grade = None;
+    grade_sweep = false;
     config_overrides = [];
   }
+
+(** Default-mode runs land artefacts under [out_dir/grade-C/] (the default
+    cell). Sweep-mode runs add per-grade subdirs and a top-level cross-grade
+    [summary.md]. The path helpers below thread the cell-subdir without
+    spreading the literal across every test. *)
+let _cell_dir ~out_dir grade_dirname = Filename.concat out_dir grade_dirname
+
+let _default_cell_dir ~out_dir = _cell_dir ~out_dir "grade-C"
 
 let test_run_emits_three_artefacts _ =
   let data_dir, out_dir = _mk_tmpdirs "all_elig_smoke" in
   let scenario_path = _stage_fixture ~data_dir in
   let args = _make_args ~scenario_path ~out_dir in
   _with_data_dir ~data_dir (fun () -> Runner.run_with_args args);
-  let trades = Filename.concat out_dir "trades.csv" in
-  let summary = Filename.concat out_dir "summary.md" in
-  let config = Filename.concat out_dir "config.sexp" in
+  let cell = _default_cell_dir ~out_dir in
+  let trades = Filename.concat cell "trades.csv" in
+  let summary = Filename.concat cell "summary.md" in
+  let config = Filename.concat cell "config.sexp" in
   assert_that
     ( Sys_unix.file_exists_exn trades,
       Sys_unix.file_exists_exn summary,
@@ -169,7 +190,10 @@ let test_summary_md_contains_aggregate_fields _ =
   let scenario_path = _stage_fixture ~data_dir in
   let args = _make_args ~scenario_path ~out_dir in
   _with_data_dir ~data_dir (fun () -> Runner.run_with_args args);
-  let body = In_channel.read_all (Filename.concat out_dir "summary.md") in
+  let body =
+    In_channel.read_all
+      (Filename.concat (_default_cell_dir ~out_dir) "summary.md")
+  in
   assert_that body
     (all_of
        [
@@ -191,7 +215,10 @@ let test_trades_csv_has_header_only_when_no_trades _ =
   let scenario_path = _stage_fixture ~data_dir in
   let args = _make_args ~scenario_path ~out_dir in
   _with_data_dir ~data_dir (fun () -> Runner.run_with_args args);
-  let lines = In_channel.read_lines (Filename.concat out_dir "trades.csv") in
+  let lines =
+    In_channel.read_lines
+      (Filename.concat (_default_cell_dir ~out_dir) "trades.csv")
+  in
   assert_that lines
     (all_of
        [
@@ -215,7 +242,7 @@ let test_config_sexp_round_trips _ =
     }
   in
   _with_data_dir ~data_dir (fun () -> Runner.run_with_args args);
-  let path = Filename.concat out_dir "config.sexp" in
+  let path = Filename.concat (_default_cell_dir ~out_dir) "config.sexp" in
   let parsed = All_eligible.config_of_sexp (Sexp.load_sexp path) in
   assert_that parsed
     (all_of
@@ -238,8 +265,81 @@ let test_parse_argv_minimum _ =
          field (fun a -> a.Runner.out_dir) is_none;
          field (fun a -> a.Runner.entry_dollars) is_none;
          field (fun a -> a.Runner.return_buckets) is_none;
+         field (fun a -> a.Runner.min_grade) is_none;
+         field (fun a -> a.Runner.grade_sweep) (equal_to false);
          field (fun a -> a.Runner.config_overrides) (size_is 0);
        ])
+
+let test_parse_argv_min_grade _ =
+  (* All five primary grade strings parse. The numeric-vs-letter [A]+plus form
+     is also accepted (case-insensitive) so callers don't need to escape the
+     [+] in shells. *)
+  let cases : (string * Weinstein_types.grade) list =
+    [
+      ("F", F);
+      ("D", D);
+      ("C", C);
+      ("B", B);
+      ("A", A);
+      ("A+", A_plus);
+      ("a+", A_plus);
+      ("APLUS", A_plus);
+      ("aplus", A_plus);
+    ]
+  in
+  let parsed_grades =
+    List.map cases ~f:(fun (s, _) ->
+        let argv =
+          [|
+            "all_eligible_runner.exe";
+            "--scenario";
+            "/tmp/foo.sexp";
+            "--min-grade";
+            s;
+          |]
+        in
+        (Runner.parse_argv argv).Runner.min_grade)
+  in
+  let expected_grades =
+    (List.map cases ~f:(fun (_, g) -> Some g) [@warning "-32-27"])
+  in
+  assert_that parsed_grades
+    (elements_are
+       (List.map expected_grades ~f:(fun g ->
+            is_some_and (equal_to (Option.value_exn g)))))
+
+let test_parse_argv_grade_sweep _ =
+  let argv =
+    [|
+      "all_eligible_runner.exe"; "--scenario"; "/tmp/foo.sexp"; "--grade-sweep";
+    |]
+  in
+  let parsed = Runner.parse_argv argv in
+  assert_that parsed
+    (all_of
+       [
+         field (fun a -> a.Runner.grade_sweep) (equal_to true);
+         field (fun a -> a.Runner.min_grade) is_none;
+       ])
+
+let test_parse_argv_invalid_min_grade_raises _ =
+  let argv =
+    [|
+      "all_eligible_runner.exe";
+      "--scenario";
+      "/tmp/foo.sexp";
+      "--min-grade";
+      "Z";
+    |]
+  in
+  let raised =
+    _failure_with_substring
+      (fun () ->
+        let _ = Runner.parse_argv argv in
+        ())
+      ~substring:"--min-grade expects one of"
+  in
+  assert_that raised (equal_to true)
 
 let test_parse_argv_all_flags _ =
   let argv =
@@ -280,6 +380,8 @@ let test_resolve_out_dir_default _ =
       out_dir = None;
       entry_dollars = None;
       return_buckets = None;
+      min_grade = None;
+      grade_sweep = false;
       config_overrides = [];
     }
   in
@@ -300,6 +402,8 @@ let test_resolve_out_dir_explicit _ =
       out_dir = Some "/tmp/explicit";
       entry_dollars = None;
       return_buckets = None;
+      min_grade = None;
+      grade_sweep = false;
       config_overrides = [];
     }
   in
@@ -310,18 +414,12 @@ let test_resolve_out_dir_explicit _ =
 (* ------------------------------------------------------------------ *)
 (* Negative-path tests for parse_argv                                   *)
 (*                                                                      *)
-(* Pins the three [Raises [Failure]] paths documented at                *)
-(* all_eligible_runner.mli:86 ("Raises [Failure] on missing [--scenario]*)
+(* Pins the [Raises [Failure]] paths documented at                      *)
+(* all_eligible_runner.mli ("Raises [Failure] on missing [--scenario]   *)
 (* or malformed flag values."). Pattern follows                         *)
 (* test_grid_search_bin.ml:test_build_unknown_scenario_raises (try/with *)
 (* capture + substring assertion).                                      *)
 (* ------------------------------------------------------------------ *)
-
-let _failure_with_substring (f : unit -> unit) ~substring : bool =
-  try
-    f ();
-    false
-  with Failure msg -> String.is_substring msg ~substring
 
 let test_parse_argv_missing_scenario_raises _ =
   (* Pins all_eligible_runner.ml:86 [_fail_usage "Missing required flag:
@@ -372,6 +470,49 @@ let test_parse_argv_malformed_overrides_raises _ =
   in
   assert_that raised (equal_to true)
 
+(** Pin sweep-mode shape: each grade cell gets its own subdir with the three
+    artefacts, and the top-level [out_dir/summary.md] carries the cross-grade
+    table. The flat-price fixture again yields zero trades, so every cell
+    renders the empty-trades branch — the test is robust against scanner /
+    scorer drift. *)
+let test_grade_sweep_emits_per_grade_subdirs _ =
+  let data_dir, out_dir = _mk_tmpdirs "all_elig_sweep" in
+  let scenario_path = _stage_fixture ~data_dir in
+  let args = { (_make_args ~scenario_path ~out_dir) with grade_sweep = true } in
+  _with_data_dir ~data_dir (fun () -> Runner.run_with_args args);
+  let cell_subdirs =
+    [ "grade-F"; "grade-D"; "grade-C"; "grade-B"; "grade-A"; "grade-A_plus" ]
+  in
+  let cell_files_present =
+    List.map cell_subdirs ~f:(fun cell ->
+        let dir = Filename.concat out_dir cell in
+        Sys_unix.file_exists_exn (Filename.concat dir "trades.csv")
+        && Sys_unix.file_exists_exn (Filename.concat dir "summary.md")
+        && Sys_unix.file_exists_exn (Filename.concat dir "config.sexp"))
+  in
+  let top_summary_body =
+    In_channel.read_all (Filename.concat out_dir "summary.md")
+  in
+  assert_that
+    (cell_files_present, top_summary_body)
+    (all_of
+       [
+         field
+           (fun (xs, _) -> xs)
+           (elements_are (List.map cell_subdirs ~f:(fun _ -> equal_to true)));
+         field
+           (fun (_, body) -> body)
+           (all_of
+              [
+                _has "opportunity-cost grade sweep — test_all_eligible";
+                _has "| min_grade | trade_count |";
+                _has "| F |";
+                _has "| C |";
+                _has "| A |";
+                _has "| A+ |";
+              ]);
+       ])
+
 let test_format_summary_md_pins_table_header _ =
   let result : All_eligible.result =
     {
@@ -419,6 +560,10 @@ let suite =
          "config.sexp round-trips" >:: test_config_sexp_round_trips;
          "parse_argv minimum required flags" >:: test_parse_argv_minimum;
          "parse_argv all flags populated" >:: test_parse_argv_all_flags;
+         "parse_argv --min-grade variants" >:: test_parse_argv_min_grade;
+         "parse_argv --grade-sweep" >:: test_parse_argv_grade_sweep;
+         "parse_argv invalid --min-grade raises Failure"
+         >:: test_parse_argv_invalid_min_grade_raises;
          "parse_argv missing --scenario raises Failure"
          >:: test_parse_argv_missing_scenario_raises;
          "parse_argv unknown flag raises Failure"
@@ -429,6 +574,8 @@ let suite =
          "resolve_out_dir explicit" >:: test_resolve_out_dir_explicit;
          "format_summary_md pins table header"
          >:: test_format_summary_md_pins_table_header;
+         "grade-sweep emits per-grade subdirs + top-level summary"
+         >:: test_grade_sweep_emits_per_grade_subdirs;
        ]
 
 let () = run_test_tt_main suite
