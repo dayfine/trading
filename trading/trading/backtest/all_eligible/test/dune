@@ -5,6 +5,7 @@
   core
   matchers
   trading.base
+  weinstein.types
   backtest_optimal
   backtest_all_eligible)
  (preprocess

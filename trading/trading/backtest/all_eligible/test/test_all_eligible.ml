@@ -649,6 +649,138 @@ let test_dedup_empty_input _ =
   assert_that deduped is_empty
 
 (* ------------------------------------------------------------------ *)
+(* Min-grade filter                                                     *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a synthetic scored-candidate set spanning every grade label so the
+    filter tests can pin the exact survival set under each [min_grade]. Each
+    candidate is on a distinct symbol + entry_week so dedup never deletes them.
+*)
+let _scored_one_per_grade () : OT.scored_candidate list =
+  let grades : (string * Weinstein_types.grade) list =
+    [
+      ("AAA_PLUS", Weinstein_types.A_plus);
+      ("AAA", Weinstein_types.A);
+      ("BBB", Weinstein_types.B);
+      ("CCC", Weinstein_types.C);
+      ("DDD", Weinstein_types.D);
+      ("FFF", Weinstein_types.F);
+    ]
+  in
+  List.mapi grades ~f:(fun i (symbol, g) ->
+      let cand =
+        make_candidate ~symbol
+          ~entry_week:(Date.add_days (_date "2024-01-19") (i * 7))
+          ~cascade_grade:g ()
+      in
+      let scored =
+        make_scored ~symbol ~entry_week:cand.entry_week ~entry_price:100.0
+          ~suggested_stop:92.0 ~exit_week:(_date "2024-04-19") ~exit_price:110.0
+          ~exit_trigger:OT.End_of_run ()
+      in
+      (* Splice the desired cascade_grade onto the scored candidate's entry. *)
+      { scored with entry = cand })
+
+let test_filter_min_grade_a_only_keeps_top_two _ =
+  (* min_grade = A admits only A_plus and A grades. The synthetic set has six
+     candidates one per grade — exactly two survive. *)
+  let scored = _scored_one_per_grade () in
+  let kept = AE.filter_by_min_grade ~min_grade:Weinstein_types.A scored in
+  assert_that kept
+    (elements_are
+       [
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA_PLUS");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA");
+       ])
+
+let test_filter_min_grade_c_keeps_top_four _ =
+  (* min_grade = C is the live cascade default — A_plus, A, B, C survive. *)
+  let scored = _scored_one_per_grade () in
+  let kept = AE.filter_by_min_grade ~min_grade:Weinstein_types.C scored in
+  assert_that kept
+    (elements_are
+       [
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA_PLUS");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "BBB");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "CCC");
+       ])
+
+let test_filter_min_grade_a_strict_subset_of_c _ =
+  (* The headline opportunity-cost invariant: min_grade=A produces strictly
+     fewer trades than min_grade=C on the same input. The trick is that
+     filter+dedup is monotone in [min_grade] order [A_plus > A > B > C > D > F]
+     when applied to the same scored input — a tighter floor never admits a
+     candidate the looser floor rejects. *)
+  let scored = _scored_one_per_grade () in
+  let kept_c = AE.filter_by_min_grade ~min_grade:Weinstein_types.C scored in
+  let kept_a = AE.filter_by_min_grade ~min_grade:Weinstein_types.A scored in
+  assert_that
+    (List.length kept_a, List.length kept_c)
+    (all_of
+       [
+         field (fun (na, _) -> na) (equal_to 2);
+         field (fun (_, nc) -> nc) (equal_to 4);
+         field (fun (na, nc) -> na < nc) (equal_to true);
+       ])
+
+let test_filter_min_grade_f_is_identity _ =
+  (* F is the lowest floor — every grade passes. The filter is the identity
+     on grade content. We pin both the count and the grade-label set so the
+     test would catch a future drift to a different ordering. *)
+  let scored = _scored_one_per_grade () in
+  let kept = AE.filter_by_min_grade ~min_grade:Weinstein_types.F scored in
+  let grade_strings =
+    List.map kept ~f:(fun (sc : OT.scored_candidate) ->
+        Weinstein_types.grade_to_string sc.entry.cascade_grade)
+  in
+  assert_that grade_strings
+    (elements_are
+       [
+         equal_to "A+";
+         equal_to "A";
+         equal_to "B";
+         equal_to "C";
+         equal_to "D";
+         equal_to "F";
+       ])
+
+let test_filter_min_grade_preserves_order _ =
+  (* The filter is order-preserving — input shuffled into reverse order is
+     emitted in reverse order. *)
+  let scored = List.rev (_scored_one_per_grade ()) in
+  let kept = AE.filter_by_min_grade ~min_grade:Weinstein_types.B scored in
+  assert_that kept
+    (elements_are
+       [
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "BBB");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA");
+         field
+           (fun (sc : OT.scored_candidate) -> sc.entry.symbol)
+           (equal_to "AAA_PLUS");
+       ])
+
+let test_filter_min_grade_empty_input _ =
+  let kept = AE.filter_by_min_grade ~min_grade:Weinstein_types.A [] in
+  assert_that kept is_empty
+
+(* ------------------------------------------------------------------ *)
 (* Test suite                                                          *)
 (* ------------------------------------------------------------------ *)
 
@@ -683,6 +815,18 @@ let suite =
          "dedup — output is chronological"
          >:: test_dedup_emits_chronological_order;
          "dedup — empty input → empty output" >:: test_dedup_empty_input;
+         "filter — min_grade=A keeps A+/A only"
+         >:: test_filter_min_grade_a_only_keeps_top_two;
+         "filter — min_grade=C keeps A+/A/B/C"
+         >:: test_filter_min_grade_c_keeps_top_four;
+         "filter — min_grade=A produces strictly fewer than min_grade=C"
+         >:: test_filter_min_grade_a_strict_subset_of_c;
+         "filter — min_grade=F admits every grade"
+         >:: test_filter_min_grade_f_is_identity;
+         "filter — preserves input order"
+         >:: test_filter_min_grade_preserves_order;
+         "filter — empty input → empty output"
+         >:: test_filter_min_grade_empty_input;
        ]
 
 let () = run_test_tt_main suite

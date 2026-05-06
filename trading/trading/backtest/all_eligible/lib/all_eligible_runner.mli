@@ -3,14 +3,22 @@
     Loads a {!Scenario_lib.Scenario.t} sexp file, builds the bar-panel world
     from [Data_path.default_data_dir ()], scans every Friday in the scenario
     window for Stage-1→2 breakouts, scores each candidate by forward-walking the
-    panel via {!Backtest_optimal.Outcome_scorer.score}, projects each scored
-    candidate into a fixed-dollar {!All_eligible.trade_record} via
-    {!All_eligible.grade}, and writes three artefacts to [out_dir]:
+    panel via {!Backtest_optimal.Outcome_scorer.score}, applies the cascade
+    [min_grade] quality gate, dedups consecutive-Friday re-firings, projects
+    each surviving scored candidate into a fixed-dollar
+    {!All_eligible.trade_record} via {!All_eligible.grade}, and writes three
+    per-grade artefacts under [out_dir/grade-<G>/]:
 
     - [trades.csv] — one row per signal with the per-trade fields.
     - [summary.md] — Markdown table summarising the {!All_eligible.aggregate}.
     - [config.sexp] — the resolved {!All_eligible.config} used (so the run is
       reproducible).
+
+    {b Grade-sweep mode.} When [args.grade_sweep = true] the runner emits one
+    [grade-<G>/] subdir per [F → D → C → B → A → A_plus] cell {b plus} a
+    top-level [out_dir/summary.md] with the cross-grade table — trade counts,
+    win rates, and mean returns at each cascade-quality floor. The expensive
+    scan + score phase runs once and is reused across cells.
 
     {1 Pipeline phases}
 
@@ -27,14 +35,18 @@
       each candidate's weekly outlooks via
       {!Backtest_optimal.Outcome_scorer.score} to produce
       {!Backtest_optimal.Optimal_types.scored_candidate}s.
-    - {b Dedup.} Applies {!All_eligible.dedup_first_admission} to collapse the
-      multiple consecutive-Friday emissions a single Stage 1→2 transition
-      produces (the breakout predicate stays true for the first ~four weeks of a
-      Stage 2 advance) into one trade per first admission. Without this step the
-      trade count is inflated ~5x relative to the actual number of breakout
-      events.
-    - {b Grade + emit.} Calls {!All_eligible.grade} with the configured
-      [entry_dollars] / [return_buckets] and writes the three artefacts.
+    - {b Grade gate + dedup (per cell).} For each grade cell — either the single
+      [args.min_grade] (default [C]) or the full sweep when [args.grade_sweep] —
+      filters scored candidates via {!All_eligible.filter_by_min_grade}, then
+      dedups via {!All_eligible.dedup_first_admission}. Filter-then-dedup
+      mirrors the live cascade's ordering (gate by grade, then exclude
+      already-held), so a high-grade re-fire whose primary lower-grade trade was
+      filtered out becomes the first admission at this cell. Without dedup the
+      trade count is inflated ~5x because the breakout predicate stays true for
+      the first ~four weeks of a Stage 2 advance.
+    - {b Grade + emit (per cell).} Calls {!All_eligible.grade} and writes the
+      three artefacts under [out_dir/grade-<G>/]. The cell-emission
+      orchestration lives in {!Grade_sweep}.
 
     {1 Reuse, not duplication}
 
@@ -49,7 +61,8 @@
     - Reads the universe-file sexp referenced by the scenario.
     - Reads OHLCV CSVs and [sectors.csv] under [Data_path.default_data_dir ()]
       (overridable via [TRADING_DATA_DIR]).
-    - Writes [out_dir/{trades.csv,summary.md,config.sexp}].
+    - Writes [out_dir/grade-<G>/{trades.csv,summary.md,config.sexp}] per cell;
+      in sweep mode also writes [out_dir/summary.md] (cross-grade table).
     - Writes progress messages to stderr. *)
 
 open Core
@@ -65,6 +78,15 @@ type cli_args = {
   return_buckets : float list option;
       (** Override for [All_eligible.config.return_buckets]. [None] keeps the
           library default. *)
+  min_grade : Weinstein_types.grade option;
+      (** Override for [All_eligible.config.min_grade]. [None] keeps the library
+          default ([C], matching the live cascade). Ignored when
+          [grade_sweep = true]. *)
+  grade_sweep : bool;
+      (** When [true], iterate the grade ladder [F → D → C → B → A → A_plus] and
+          emit one [grade-<G>/] subdir per cell plus a top-level [summary.md]
+          with the cross-grade table. The single-grade flag [min_grade] is
+          ignored in this mode. Default [false]. *)
   config_overrides : Sexp.t list;
       (** Additional sexp config-overrides to deep-merge over the scenario's own
           [config_overrides] field (themselves applied over the live screener
@@ -87,9 +109,12 @@ val parse_argv : string array -> cli_args
     - [--out-dir <path>] (optional)
     - [--entry-dollars <float>] (optional)
     - [--return-buckets <csv-floats>] (optional, e.g. [-0.5,0.0,0.5])
+    - [--min-grade <F|D|C|B|A|A+>] (optional; default [C])
+    - [--grade-sweep] (optional flag; runs the F→A+ sweep)
     - [--config-overrides <sexp-list>] (optional, parsed as a sexp list)
 
-    Raises [Failure] on missing [--scenario] or malformed flag values. *)
+    Raises [Failure] on missing [--scenario] or malformed flag values (including
+    an unrecognised [--min-grade] string). *)
 
 val resolve_out_dir : scenario_name:string -> cli_args -> string
 (** [resolve_out_dir ~scenario_name args] returns [args.out_dir] when set, else
@@ -98,7 +123,10 @@ val resolve_out_dir : scenario_name:string -> cli_args -> string
 
 val resolve_config : cli_args -> All_eligible.config
 (** [resolve_config args] starts from {!All_eligible.default_config} and applies
-    [args.entry_dollars] / [args.return_buckets] when present. *)
+    [args.entry_dollars] / [args.return_buckets] / [args.min_grade] when
+    present. The returned config is the {b base} config used for non-sweep runs
+    and as the template for each sweep cell (the per-cell [config.min_grade] is
+    overwritten in sweep mode). *)
 
 val format_summary_md :
   scenario_name:string ->
@@ -120,11 +148,14 @@ val run_with_args : cli_args -> unit
 (** [run_with_args args] executes the full pipeline:
 
     1. Loads the scenario sexp and resolves its universe. 2. Builds the
-    bar-panel world. 3. Scans + scores all Fridays in the scenario window. 4.
-    Dedups consecutive-Friday re-firings via
-    {!All_eligible.dedup_first_admission}. 5. Grades each surviving candidate
-    via {!All_eligible.grade}. 6. Writes [trades.csv] / [summary.md] /
-    [config.sexp] to the resolved [out_dir].
+    bar-panel world. 3. Scans + scores all Fridays in the scenario window (the
+    expensive phase, run once). 4. For each grade cell — either the single
+    [args.min_grade] (default [C]) or the full sweep when [args.grade_sweep] —
+    filters via {!All_eligible.filter_by_min_grade}, dedups via
+    {!All_eligible.dedup_first_admission}, grades via {!All_eligible.grade}, and
+    writes [trades.csv] / [summary.md] / [config.sexp] under
+    [out_dir/grade-<G>/]. 5. In sweep mode, also writes a top-level
+    [out_dir/summary.md] with the cross-grade table.
 
     Raises [Failure] when the scenario file is malformed, when the universe file
     is unresolved, or when snapshot construction fails. *)
