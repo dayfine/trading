@@ -18,10 +18,10 @@
     semantics for "topping" differ (see book §6.3) and short-side capital
     recycling has separate gaps.
 
-    Invoked AFTER {!Stops_runner.update} (so stop-outs have priority — a
-    position already exiting via a stop hit is not re-exited under Stage 3) and
-    BEFORE the entry walk + {!Force_liquidation_runner.update} on the same tick
-    (so freed cash is visible to the entry walk). *)
+    Invoked AFTER {!Stops_runner.update} and {!Force_liquidation_runner.update}
+    (so both stop-outs and force-liquidations have priority — a position already
+    exiting via either path is not re-exited under Stage 3) and BEFORE the entry
+    walk on the same tick (so freed cash is visible to the entry walk). *)
 
 open Core
 open Trading_strategy
