@@ -17,6 +17,7 @@ open Core
 open Matchers
 module Spec = Tuner_bin.Grid_search_spec
 module Runner = Tuner_bin.Grid_search_runner
+module Evaluator = Tuner_bin.Grid_search_evaluator
 module GS = Tuner.Grid_search
 module Metric_types = Trading_simulation_types.Metric_types
 
@@ -169,6 +170,26 @@ let test_run_and_write_creates_missing_out_dir _ =
       in
       assert_that (Sys_unix.is_directory_exn out_dir) (equal_to true))
 
+(* ---------- evaluator cache-miss guard ---------- *)
+
+let test_build_unknown_scenario_raises _ =
+  (* Pins the documented guard at grid_search_evaluator.mli:25 ("looks up
+     [path] in [scenarios_by_path] (raises [Failure] on miss)"). The miss
+     path returns before any backtest is invoked, so an empty cache + a
+     known-unknown key suffices. *)
+  let scenarios_by_path = Hashtbl.create (module String) in
+  let evaluator =
+    Evaluator.build ~fixtures_root:"/unused" ~scenarios_by_path
+  in
+  let raised =
+    try
+      let _ = evaluator [ ("a", 1.0) ] ~scenario:"path/to/missing.sexp" in
+      false
+    with Failure msg ->
+      String.is_substring msg ~substring:"unknown scenario path"
+  in
+  assert_that raised (equal_to true)
+
 let suite =
   "Tuner_bin.Grid_search"
   >::: [
@@ -184,6 +205,8 @@ let suite =
          >:: test_run_and_write_emits_three_artefacts;
          "Runner.run_and_write: creates missing out-dir tree"
          >:: test_run_and_write_creates_missing_out_dir;
+         "Evaluator.build: unknown scenario path raises Failure"
+         >:: test_build_unknown_scenario_raises;
        ]
 
 let () = run_test_tt_main suite
