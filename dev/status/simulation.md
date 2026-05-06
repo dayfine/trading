@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-05-04
+## Last updated: 2026-05-06
 
 ## Status
 IN_PROGRESS
@@ -13,10 +13,8 @@ stays IN_PROGRESS for the M5 walk-forward + tuner catch-all items and the
 local sp500-2019-2023 baseline rerun (deferred — needs full 491-symbol
 universe data not present in GHA).
 
-**[Prior P0 RED CI — RESOLVED]** The 2026-05-02 P0
-(`split_day_stop_exit:1:post_split_exit_no_orphan_equity`, $400 drift)
-was resolved by PR #752 mid-April; CI green on `main` since. Section
-removed from active blockers; retained as historical entry below.
+P0 CI RED (`split_day_stop_exit:1:post_split_exit_no_orphan_equity`, $400 drift)
+was resolved by PR #752 (2026-05-02); CI green on `main` since.
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)
@@ -183,10 +181,6 @@ favour of a discrete event on the position ledger. Four PRs landed:
 - Trade assertions deferred to Slice 3 (see Follow-up)
 
 ## Next Steps
-
-### QC review for Slice 2+3
-
-Both Slice 2 (merged PRs #237, #240, #241, #242) and Slice 3 (feat/simulation branch) need fresh QC review.
 
 ### Future slices
 
