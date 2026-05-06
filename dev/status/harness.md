@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-05-05
+## Last updated: 2026-05-06
 
 ## Status
 IN_PROGRESS
@@ -59,6 +59,7 @@ Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. 
 - [x] T1-Q: Cyclomatic complexity linter — extend `fn_length_linter` via `compiler-libs`; CC > 10 = warning; output to `dev/metrics/cc-YYYY-MM-DD.json`
 - [x] T1-Q: qc-behavioral quality score — add `## Quality Score` (1–5 + rationale) to output; tracked in audit trail
 - [x] T1-R: Auto-cleanup merged-PR worktrees on session end — `dev/scripts/cleanup_merged_worktrees.sh` (jj-state-driven; no registry; sweeps `.claude/worktrees/agent-*/` whose branch is gone from origin); wired via Stop hook in `.claude/settings.json`. Closes the disk-pressure gap during long interactive sessions where merged-PR worktrees idle for hours before the SessionStart sweep catches them. Verify: dry-run via `bash dev/scripts/cleanup_merged_worktrees.sh --dry-run`. Slash-command surface (`/cleanup-merged` for opt-in mid-session reclaim) deferred to follow-up.
+- [x] T1-S: GitHub branch protection on `main` — required status checks `build-and-test` + `perf-tier1-smoke`, `enforce_admins: true`, no force-pushes, no deletions; `strict: true` (branch must be up-to-date before merge). Applied via `gh api repos/dayfine/trading/branches/main/protection`. Closes issue #885. Verify: `gh api repos/dayfine/trading/branches/main/protection | jq '.required_status_checks.checks'` — should show both check names; `gh pr merge --squash` on a PR with failed CI now returns an error. PR: harness/ci-merge-gate.
 
 ## Tier 2 — Milestone-gated
 
