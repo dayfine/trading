@@ -13,8 +13,15 @@ let index_symbol = "GSPC.INDX"
 let initial_cash = 1_000_000.0
 let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
-(** Number of calendar days to prepend for 30-week MA warmup. *)
-let warmup_days = 210
+(** Number of calendar days to prepend before [start_date] when the simulator
+    runs. The Weinstein strategy needs 30 weeks (~210 days) of bar history to
+    classify stages; the Buy-and-Hold benchmark is stateless and would otherwise
+    enter its single position at [warmup_start] instead of [start_date], which
+    corrupts the day-1-entry semantics the BAH baseline is pinned against.
+    Strategy-dispatched (#882) rather than a single constant. *)
+let _warmup_days_for : Strategy_choice.t -> int = function
+  | Weinstein -> 210
+  | Bah_benchmark _ -> 0
 
 (* Public types *)
 
@@ -246,12 +253,12 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
     all_symbols = deps.all_symbols;
   }
 
-let _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace
-    ?bar_data_source ?progress_emitter () =
+let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
+    ?strategy_choice ?trace ?gc_trace ?bar_data_source ?progress_emitter () =
   Panel_runner.run
     ~input:(_panel_input_of_deps deps)
-    ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?trace
-    ?gc_trace ?bar_data_source ?progress_emitter ()
+    ~start_date ~end_date ~warmup_days ~initial_cash ~commission
+    ?strategy_choice ?trace ?gc_trace ?bar_data_source ?progress_emitter ()
 
 (** Re-run the step-based metric computers ([SharpeRatio], [MaxDrawdown],
     [CAGR]) on the in-window step list with a config whose [start_date] is the
@@ -424,10 +431,12 @@ let _final_prices_for_held_symbols ~steps ~final_close_prices =
       List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
 
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
-    ?trace ?gc_trace ?bar_data_source ?progress_emitter () =
+    ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
+    ?bar_data_source ?progress_emitter () =
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
   eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
     (List.length deps.all_symbols);
+  let warmup_days = _warmup_days_for strategy_choice in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   eprintf "Running backtest (%s to %s, warmup from %s)...\n%!"
     (Date.to_string start_date)
@@ -438,8 +447,8 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         trade_audit,
         force_liquidation_log,
         final_close_prices ) =
-    _run_panel_backtest ~deps ~start_date ~end_date ?trace ?gc_trace
-      ?bar_data_source ?progress_emitter ()
+    _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
+      ~strategy_choice ?trace ?gc_trace ?bar_data_source ?progress_emitter ()
   in
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
   (* Steps in the requested date range, all days included. Round-trip

@@ -62,6 +62,14 @@ type t = {
   config_overrides : Sexp.t list;
       (** Partial config sexps deep-merged into the default Weinstein config, in
           order. Empty list means the default config. *)
+  strategy : Backtest.Strategy_choice.t;
+      [@sexp.default Backtest.Strategy_choice.default]
+      (** Which trading strategy {!Backtest.Runner.run_backtest} instantiates
+          for this scenario (#882). Defaults to
+          {!Backtest.Strategy_choice.Weinstein} when omitted, preserving
+          back-compat with every pre-#882 scenario file. Set to e.g.
+          [(Bah_benchmark (symbol SPY))] to swap in a Buy-and-Hold benchmark
+          run. *)
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
@@ -78,4 +86,9 @@ val load : string -> t
 (** Load and parse a scenario sexp file. Raises [Failure] on malformed input. *)
 
 val in_range : range -> float -> bool
-(** [in_range r v] is [true] iff [v] lies in the closed interval [r]. *)
+(** [in_range r v] is [true] iff [v] lies in the closed interval [r], OR [v] is
+    [NaN] (treated as "no measurement available, skip the check"). The NaN
+    allowance was added in #882 for metrics that the simulator can't define when
+    their inputs are empty (e.g. [WinRate] / [AvgHoldingDays] for a strategy
+    that never closes a round-trip such as the BAH benchmark). For the
+    well-defined case the comparison is unchanged. *)

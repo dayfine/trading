@@ -45,6 +45,7 @@ val run :
   warmup_days:int ->
   initial_cash:float ->
   commission:Trading_engine.Types.commission_config ->
+  ?strategy_choice:Strategy_choice.t ->
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
@@ -88,6 +89,14 @@ val run :
     emission unconditionally so a [progress.sexp] always reflects the run's end
     state. When [None], the runner takes no extra work — same zero-overhead
     contract as the other optional plumbing.
+
+    [strategy_choice], when passed, selects which strategy module the simulator
+    runs (#882). Defaults to {!Strategy_choice.Weinstein} —
+    {!Weinstein_strategy.make} with the runner's deps-loaded inputs (AD bars,
+    sector map, config). {!Strategy_choice.Bah_benchmark} swaps in
+    {!Trading_strategy.Bah_benchmark_strategy.make} on the configured symbol;
+    the runner's bar_reader / audit_recorder / ad_bars / ticker_sectors / config
+    are dropped on that branch (BAH ignores them).
 
     [bar_data_source], when passed, selects how the snapshot directory is
     sourced. The strategy's bar reader, the simulator adapter, and the

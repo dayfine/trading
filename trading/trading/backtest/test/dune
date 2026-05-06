@@ -23,6 +23,7 @@
   test_backtest_progress
   test_release_perf_report
   test_determinism
+  test_bah_runner_e2e
   test_macro_trend_writer)
  (libraries
   ounit2

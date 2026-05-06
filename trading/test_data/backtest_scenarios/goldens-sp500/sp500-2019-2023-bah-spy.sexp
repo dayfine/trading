@@ -1,11 +1,13 @@
-;; perf-tier: SKIP
-;; perf-tier-rationale: Scenario fixture defines a Buy-and-Hold-SPY benchmark
-;; over the same 2019-2023 window as [sp500-2019-2023.sexp]. Currently NOT
-;; runnable via [scenario_runner] because [Backtest.Runner.run_backtest] is
-;; hardcoded to [Weinstein_strategy.make] (see runner.ml § "Configuration
-;; constants" and panel_runner.ml § "_build_strategy"). Promote to
-;; [perf-tier: 3] once a strategy-selector field is plumbed through the
-;; scenario format and the runner — see "Wiring follow-up" below.
+;; perf-tier: 3
+;; perf-tier-rationale: Buy-and-Hold-SPY benchmark over the canonical
+;; 2019-2023 window. Single-symbol, single-trade — fastest possible run on
+;; the SP500 surface. Wired through [Backtest.Runner.run_backtest] via the
+;; [strategy] field added in #882; the runner dispatches on
+;; [Strategy_choice.Bah_benchmark] and constructs
+;; [Trading_strategy.Bah_benchmark_strategy.make] in place of Weinstein.
+;; Tagged [perf-tier: 3] so [golden_sp500_postsubmit.sh] picks it up
+;; alongside [sp500-2019-2023.sexp] — running both per postsubmit makes the
+;; alpha gap visible at every PR.
 ;;
 ;; Buy-and-Hold-SPY benchmark — pinned for the canonical 2019-2023 window.
 ;;
@@ -20,8 +22,9 @@
 ;;      the same window must beat this number to claim alpha. The pinned
 ;;      [total_return_pct] here is the bar [sp500-2019-2023.sexp] is measured
 ;;      against (sp500-2019-2023 currently pins +58.34%; SPY BAH posts
-;;      +89.99%, so the active strategy is currently ~32 pp behind passive
-;;      SPY over this window — a finding the BAH-SPY pin makes visible).
+;;      +91.31% via Backtest.Runner, so the active strategy is currently
+;;      ~33 pp behind passive SPY over this window — a finding the BAH-SPY
+;;      pin makes visible at every postsubmit run).
 ;;
 ;; {1 Strategy}
 ;;
@@ -30,119 +33,109 @@
 ;; cash; holds indefinitely; never sells, rebalances, or adjusts. Single
 ;; CreateEntering transition followed by a stationary position.
 ;;
-;; {1 Measurement (2026-05-06, $1,000,000 initial cash)}
+;; {1 Measurement (2026-05-06, $1,000,000 initial cash, via Backtest.Runner)}
 ;;
-;; Verified two ways:
+;; Verified through {!Backtest.Runner.run_backtest} with [strategy_choice =
+;; Bah_benchmark { symbol = "SPY" }]. Entry sizing happens at day-1 close,
+;; trade fills at next-day open (the simulator's standard order-routing
+;; semantics — orders placed in [on_market_close] execute against the
+;; next bar). The simulator stops one bar before [end_date] (the
+;; [is_complete] check fires when [current_date >= end_date]), so the final
+;; mark-to-market uses [end_date - 1 trading day]'s close.
 ;;
-;;   a. Closed-form (raw price arithmetic):
-;;        entry close 2019-01-02:  $250.18
-;;        final close 2023-12-29:  $475.31
-;;        shares bought:           3997 (= floor(1,000,000 / 250.18))
-;;        leftover cash:           $30.54
-;;        entry commission:        $39.97 ($0.01/sh * 3997)
-;;        expected final equity:   $1,899,804.64
-;;        total_return_pct:        +89.9805%
-;;        SPY price-only return:   +89.9872% (= 475.31/250.18 - 1)
-;;        commission drag:         -0.004% (entry trade only)
+;;   sizing close 2019-01-02:  $250.18
+;;   shares bought:            3997 (= floor(1,000,000 / 250.18))
+;;   fill open  2019-01-03:    $248.23
+;;   entry commission:         $39.97 ($0.01/share * 3997)
+;;   leftover cash:            $7,784.72
+;;     (= 1,000,000 - 3997 * 248.23 - 39.97)
+;;   final close 2023-12-28:   $476.69
+;;     (last bar processed; end_date 2023-12-29 is not stepped)
+;;   final equity:             $1,913,114.65
+;;     (= 7,784.72 + 3997 * 476.69)
+;;   total_return_pct:         +91.3115%
+;;   SPY raw return (sizing 2019-01-02 close to MtM 2023-12-28 close):
+;;                             +90.5%  (= 476.69 / 250.18 - 1)
 ;;
-;;   b. Simulator-actual (BAH strategy through standard simulator, same
-;;      pipeline used by Backtest.Runner — but invoked directly via
-;;      Trading_simulation.Simulator.create + run, since
-;;      Backtest.Runner.run_backtest is currently Weinstein-hardcoded):
-;;        actual final equity:     $1,899,922.50
-;;        total_return_pct:        +89.9923%
-;;        drift vs closed-form:    +0.0062%
-;;        (drift is sub-basis-point — accounting matches.)
+;; The +$1.5k delta vs the closed-form using same-day fill is the day-2
+;; open ($248.23) being lower than the day-1 close ($250.18), giving the
+;; strategy a slightly cheaper effective entry with leftover cash carried
+;; through to end-of-window MtM. The +0.7% delta vs SPY raw return reflects
+;; the leftover cash sitting idle (no money-market interest modeled) plus
+;; the commission drag.
 ;;
-;; The +$117.86 simulator-vs-closed-form discrepancy reflects rounding /
-;; mark-to-market timing differences across the 5-year run. Same drift
-;; magnitude observed at 2024 calendar year scale in
-;; [test_bah_benchmark_e2e] ($100k cash, drift -$0.88 / -0.0007%).
+;; Day-2 fill semantics also explain why a closed-form spreadsheet using
+;; "buy at sizing-day close" arithmetic ($1,899,804.64) underestimates the
+;; runner output by ~$13k; the runner is not buggy, the spreadsheet just
+;; doesn't model the next-day-open fill the simulator actually performs.
 ;;
 ;; {1 Accounting findings}
 ;;
-;; None. BAH-SPY equity tracks SPY raw close-to-close arithmetic to
-;; sub-basis-point fidelity over a 5-year horizon. The two drift sources
-;; we accept are documented in [test_bah_benchmark_e2e.ml]:
+;; None. Day-1 commission (~$40) and next-day-open fill behavior are both
+;; deterministic against the pinned SPY data. Both are pinned into
+;; [total_return_pct] so a regression that drops commission or changes
+;; fill semantics would surface here.
 ;;
-;;   - Day-1 entry commission (~$40 here, 0.004% of initial cash). Pinned
-;;     into [total_return_pct] so a regression that drops the commission
-;;     would be caught.
-;;   - Raw close vs adjusted close. SPY's adjusted_close back-rolls
-;;     dividends — the strategy uses raw close, and the comparison above
-;;     uses raw close on both sides, so dividend-treatment is not a drift
-;;     source. (Adjusted close 2019-01-02 = $224.38 -> 2023-12-29 = $462.57
-;;     = +106.16%, the dividend-reinvested return; we do NOT pin against
-;;     this number.)
+;; Adjusted close 2019-01-02 = $224.38 -> 2023-12-29 = $462.57 = +106.16%
+;; is the dividend-reinvested return; we do NOT pin against this number
+;; since BAH uses raw close throughout.
 ;;
 ;; {1 Pinned ranges}
 ;;
-;; total_return_pct: +/- 2 pp around the simulator-actual +89.99% (i.e.
-;; 88.0..92.0). Tighter than the Weinstein scenario's +/- 13 pp because BAH
-;; is mechanical — there is no parameter sensitivity, no stop slippage, no
-;; cash-deployment timing. The only sources of drift are the day-1 close
-;; price (deterministic against pinned data files) and commission tier
-;; changes (a config-level decision that should re-pin this file).
+;; total_return_pct: +/- 2 pp around the runner-actual +91.31% (89.0..93.0).
+;; Tighter than the Weinstein scenario's +/- 13 pp because BAH is mechanical
+;; — no parameter sensitivity, no stop slippage, no cash-deployment timing.
+;; The only sources of drift are SPY's day-1 close (deterministic against
+;; pinned data files) and commission tier changes (a config-level decision
+;; that should re-pin this file).
 ;;
-;; total_trades = 1: one Buy on day 1, zero exits. Pinned exactly via a
-;; tight [(min 0.5) (max 1.5)] band — [total_trades] is float-typed.
+;; total_round_trips = 0: BAH never sells, so 0 closed round-trips on the
+;; total_trades field (which counts ROUND-TRIPS, not fills). Note that the
+;; simulator records exactly 1 ENTRY trade in trades.csv that does not
+;; produce a closed round-trip. Pinned via a tight [(min 0) (max 0.5)]
+;; band; the existing ranges in [scenario_runner._actual_of_result]
+;; populate this from [List.length r.round_trips], not from raw fill count.
 ;;
 ;; sharpe_ratio / max_drawdown_pct / avg_holding_days: tracked but loosely
-;; pinned — these are only computed when the scenario actually runs through
-;; [Backtest.Runner], which is gated by the wiring follow-up. The bands
-;; below reflect SPY's 2019-2023 reality (peak drawdown ~34% during the
-;; COVID crash; ~25% during the 2022 bear) and will be tightened once the
-;; runner produces actual numbers.
+;; pinned. The bands below reflect SPY's 2019-2023 reality (peak drawdown
+;; ~34% during the COVID crash; ~25% during the 2022 bear) and will be
+;; tightened in a follow-up once the postsubmit run reports actuals.
+;; avg_holding_days defaults to 0 when there are no closed round-trips
+;; (BAH's case), so it's pinned tight at [(min 0) (max 1)] to catch any
+;; regression that flips it to a non-zero value via a phantom round-trip.
 ;;
-;; open_positions_value: 3997 shares * $475.31 = $1,899,814.07 marked to
-;; market on 2023-12-29. +/- 2% band = 1.86M..1.94M.
+;; open_positions_value: 3997 shares * $476.69 = $1,905,330.93 marked to
+;; market on 2023-12-28 (last bar processed). +/- 2% band = 1.87M..1.94M.
 ;;
 ;; {1 Universe}
 ;;
-;; The [universe_path] field below is a placeholder — BAH-SPY is
-;; single-symbol and doesn't need a multi-symbol universe. The runner-side
-;; wiring follow-up should either (a) add a one-symbol [spy-only.sexp]
-;; universe file, or (b) lift the universe-path requirement for
-;; single-symbol strategies. Leaving the placeholder in lets [Scenario.load]
-;; parse the file today.
+;; [universes/spy-only.sexp] is a one-symbol pinned universe (SPY).
+;; The runner's [Csv_snapshot_builder.build] tolerates missing CSVs for the
+;; sector ETFs / global indices the runner pulls in alongside the universe,
+;; so SPY's bars are loaded and other symbols stay NaN — the BAH strategy
+;; only ever calls [get_price "SPY"] anyway.
 ;;
-;; {1 Wiring follow-up (required to make this file runnable)}
+;; {1 Wiring (#882)}
 ;;
-;; To promote [perf-tier: SKIP] -> [perf-tier: 3] and let
-;; [golden_sp500_postsubmit.sh] pick this file up:
-;;
-;;   1. Add an optional [strategy] field to [Scenario.t] (default
-;;      [Weinstein] for back-compat) with a [BahBenchmark { symbol }]
-;;      variant.
-;;   2. Plumb through [Backtest.Runner.run_backtest] to dispatch on the
-;;      strategy choice — likely a separate [Bah_runner.run] entry point
-;;      since the Weinstein runner's ad_bars / sector_etfs / panel_runner
-;;      machinery is not needed for BAH (single-symbol, no indicators).
-;;   3. Wire [scenario_runner.ml] § [_run_scenario_in_child] to dispatch.
-;;   4. Add a [universes/spy-only.sexp] one-symbol fixture and switch
-;;      [universe_path] below from [universes/parity-7sym.sexp] to it.
-;;
-;; Estimated surface: ~200-400 LOC across Scenario.t + a new Bah_runner +
-;; the dispatch site, plus a parity test confirming BAH-SPY 2019-2023 via
-;; the runner matches the closed-form expectation pinned here.
-;;
-;; Until then, this file documents the pinned target. The
-;; [test_bah_benchmark_e2e] suite (under
-;; trading/trading/simulation/test/) provides the live sanity check at
-;; the simulator level — temporarily editing its dates to (2019-01-02 ..
-;; 2023-12-29) and initial_cash to $1,000,000 reproduces the
-;; simulator-actual numbers above (verified 2026-05-06).
+;; The [strategy] field below selects {!Strategy_choice.Bah_benchmark} —
+;; the runner dispatches in [Panel_runner._build_strategy] and constructs
+;; {!Trading_strategy.Bah_benchmark_strategy.make { symbol = "SPY" }} in
+;; place of {!Weinstein_strategy.make}. End-to-end coverage lives in
+;; [trading/trading/backtest/test/test_bah_runner_e2e.ml] (skips when SPY
+;; data is unavailable in [test_data/]; runs locally with the full [data/]
+;; mount).
 ((name "sp500-2019-2023-bah-spy")
  (description "Buy-and-Hold SPY 2019-2023 — accounting sanity + alpha bar")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
- (universe_path "universes/parity-7sym.sexp")
+ (universe_path "universes/spy-only.sexp")
  (universe_size 1)
  (config_overrides ())
+ (strategy (Bah_benchmark (symbol SPY)))
  (expected
-  ((total_return_pct       ((min  88.00)      (max   92.00)))
-   (total_trades           ((min   0.5)       (max    1.5)))
+  ((total_return_pct       ((min  89.00)      (max   93.00)))
+   (total_trades           ((min   0.0)       (max    0.5)))
    (win_rate               ((min   0.0)       (max  100.0)))
    (sharpe_ratio           ((min   0.40)      (max    0.85)))
    (max_drawdown_pct       ((min  23.0)       (max   36.0)))
-   (avg_holding_days       ((min 1100.0)      (max  1300.0)))
-   (open_positions_value   ((min 1860000.0)   (max  1940000.0))))))
+   (avg_holding_days       ((min   0.0)       (max    1.0)))
+   (open_positions_value   ((min 1870000.0)   (max  1940000.0))))))

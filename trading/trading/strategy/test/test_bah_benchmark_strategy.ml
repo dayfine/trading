@@ -8,11 +8,14 @@ open Matchers
 let date_of_string = Date.of_string
 
 (** Apply a [CreateEntering] transition into the positions map — the engine
-    would normally do this. Used to construct day-2+ portfolios that hold the
-    position. *)
+    would normally do this. Keyed by [Position.id] (the unique [position_id]
+    string), matching what [Trading_simulation.Simulator._apply_transitions]
+    does. The strategy must look up by [pos.symbol] not by map key — see #882,
+    where keying by symbol masked a re-entry bug that only surfaced when the
+    simulator keyed by [position_id]. *)
 let apply_create_entering positions transition =
   match Position.create_entering transition with
-  | Ok p -> Map.set positions ~key:p.Position.symbol ~data:p
+  | Ok p -> Map.set positions ~key:p.Position.id ~data:p
   | Error err -> assert_failure ("CreateEntering failed: " ^ Status.show err)
 
 let run_strategy strategy ~market_data ~portfolio =
