@@ -224,6 +224,25 @@ let test_skip_sector_etf_load_runs_to_completion _ =
   in
   assert_that (List.length result.steps) (gt (module Int_ord) 0)
 
+(** Pin the deep-merge path for [screening_config.min_score_override] — [(41)]
+    as the value sexp parses back to [Some 41] once the partial-config overlay
+    is merged into the default config. Issue #888 wires this knob into the M5.5
+    grid_search sweep via [Tuner.Grid_search.param_spec], so the runner must
+    accept it. *)
+let test_override_screening_min_score_override _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string "((screening_config ((min_score_override (41)))))")
+  in
+  assert_that merged.screening_config.min_score_override
+    (is_some_and (equal_to 41))
+
+(** [None] (the default) is preserved when no override is applied. Pins the
+    bit-equality contract documented in [Screener.config.min_score_override]. *)
+let test_default_screening_min_score_override_is_none _ =
+  let cfg = _default_config () in
+  assert_that cfg.screening_config.min_score_override is_none
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -249,6 +268,10 @@ let suite =
          >:: test_skip_ad_breadth_runs_to_completion;
          "skip_sector_etf_load = true runs to completion (degraded mode)"
          >:: test_skip_sector_etf_load_runs_to_completion;
+         "override: screening_config.min_score_override round-trips through \
+          sexp" >:: test_override_screening_min_score_override;
+         "default: screening_config.min_score_override = None"
+         >:: test_default_screening_min_score_override_is_none;
        ]
 
 let () = run_test_tt_main suite

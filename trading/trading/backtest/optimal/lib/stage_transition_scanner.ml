@@ -42,6 +42,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     grade_thresholds = config.grade_thresholds;
     candidate_params = config.candidate_params;
     min_grade = F;
+    min_score_override = None;
     max_buy_candidates = Int.max_value;
     max_short_candidates = Int.max_value;
     cascade_post_stop_cooldown_weeks = 0;
