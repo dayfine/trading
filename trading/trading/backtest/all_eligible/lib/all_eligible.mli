@@ -175,7 +175,56 @@ val grade :
     Trade order matches [scored] order — no resorting. Empty input yields a
     result with [trade_count = 0] and zeroed metrics (no exception).
 
+    {b Note.} [grade] does {b not} dedup. Callers that want one trade per
+    breakout-event (rather than one trade per Friday-cycle pass-through of a
+    still-eligible candidate) must apply {!dedup_first_admission} first. The
+    {!All_eligible_runner} pipeline does this; in-process tests with hand-built
+    scored candidates can skip dedup for arithmetic pinning.
+
     Pure function. *)
+
+val dedup_first_admission :
+  Backtest_optimal.Optimal_types.scored_candidate list ->
+  Backtest_optimal.Optimal_types.scored_candidate list
+(** [dedup_first_admission scored] retains, for each [(symbol, side)] pair, only
+    one scored candidate per {b active trade window}: the earliest candidate,
+    where "active" means [entry_week <= prior.exit_week].
+
+    {1 Why}
+
+    The {!Backtest_optimal.Stage_transition_scanner} emits one candidate per
+    [(symbol, week)] where the structural breakout predicate fires. Per
+    {!Stock_analysis.is_breakout_candidate}, the predicate is true while a stock
+    sits in the first ~four weeks of Stage 2 with adequate volume — so a single
+    Stage 1→2 transition typically produces several consecutive Friday
+    emissions, inflating the all-eligible trade count by a factor of roughly 4×.
+
+    A real entry is a {b one-time event per cascade admission}: the strategy
+    enters once, then either stops out or exits on Stage-3 transition. Only
+    after that exit can the same symbol legitimately be re-admitted as a fresh
+    trade. This function enforces that semantics by walking chronologically and
+    dropping any candidate whose [entry_week] falls on or before the
+    previously-kept candidate's [exit_week].
+
+    {1 Algorithm}
+
+    Sort by [(entry_week, symbol, side)] ascending. Walk in order, keeping a
+    per-[(symbol, side)] watermark of the last-kept candidate's [exit_week]. For
+    each candidate [c]:
+    - drop if [c.entry_week <= watermark]
+    - otherwise keep, and update the watermark to [c.exit_week].
+
+    Different symbols / sides do not dedup against each other.
+
+    {1 What this preserves vs. drops}
+
+    - Preserves: 1 trade per first-time-admitted [(symbol, side)] window.
+    - Drops: re-firings of the same name on consecutive Fridays during the first
+      window's life.
+    - Re-admits: a fresh firing strictly after the prior trade's exit.
+
+    Output order is sorted by [(entry_week, symbol, side)] — chronological,
+    deterministic. Pure function. *)
 
 val build_trade_record :
   config:config ->

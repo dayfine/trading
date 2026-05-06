@@ -27,6 +27,12 @@
       each candidate's weekly outlooks via
       {!Backtest_optimal.Outcome_scorer.score} to produce
       {!Backtest_optimal.Optimal_types.scored_candidate}s.
+    - {b Dedup.} Applies {!All_eligible.dedup_first_admission} to collapse the
+      multiple consecutive-Friday emissions a single Stage 1→2 transition
+      produces (the breakout predicate stays true for the first ~four weeks of a
+      Stage 2 advance) into one trade per first admission. Without this step the
+      trade count is inflated ~5x relative to the actual number of breakout
+      events.
     - {b Grade + emit.} Calls {!All_eligible.grade} with the configured
       [entry_dollars] / [return_buckets] and writes the three artefacts.
 
@@ -115,8 +121,10 @@ val run_with_args : cli_args -> unit
 
     1. Loads the scenario sexp and resolves its universe. 2. Builds the
     bar-panel world. 3. Scans + scores all Fridays in the scenario window. 4.
-    Grades each candidate via {!All_eligible.grade}. 5. Writes [trades.csv] /
-    [summary.md] / [config.sexp] to the resolved [out_dir].
+    Dedups consecutive-Friday re-firings via
+    {!All_eligible.dedup_first_admission}. 5. Grades each surviving candidate
+    via {!All_eligible.grade}. 6. Writes [trades.csv] / [summary.md] /
+    [config.sexp] to the resolved [out_dir].
 
     Raises [Failure] when the scenario file is malformed, when the universe file
     is unresolved, or when snapshot construction fails. *)
