@@ -80,3 +80,35 @@ Categories are parsed from the Conventional-Commits prefix in the PR title (the 
 | 2026-05 (1-6) | 160 | 2,145,482 | 2,099,298 | feat(69), docs(23), fix(20) |
 
 April was the project's highest-velocity month, averaging 17.3 PRs/calendar day across 30 days. May's outsized raw/net LOC is driven entirely by PR #873 (generated test fixtures); excluding it, May 1–6 shows ~76,000 raw LOC across 159 PRs — roughly in line with April's pace.
+
+## By language
+
+**Source:** per-file `{path, additions, deletions}` from `gh pr list --json number,files` + REST API pagination for PR #873 (which hits the 100-file truncation in the GraphQL `files` field). 733 PRs, 4,925 file-change records.
+
+**Note on LOC outlier:** PR #873 contributed 997 CSV files (generated SP500 golden-run fixtures), adding 2,038,990 lines to the CSV bucket. The table below includes it as-is; the "(ex-#873)" row gives adjusted CSV totals.
+
+| Language | PRs touched | Files touched | Additions | Deletions | Raw LOC | Net LOC |
+|---|---:|---:|---:|---:|---:|---:|
+| CSV | 14 | 568 | 2,074,900 | 14,912 | 2,089,812 | 2,059,988 |
+| CSV (ex-#873) | 13 | 75 | 35,910 | 44 | 35,954 | 35,866 |
+| OCaml source | 337 | 619 | 116,702 | 22,402 | 139,104 | 94,300 |
+| Markdown | 476 | 370 | 66,116 | 5,825 | 71,941 | 60,291 |
+| Sexp / scenario | 58 | 686 | 24,222 | 631 | 24,853 | 23,591 |
+| Shell | 63 | 70 | 11,355 | 2,596 | 13,951 | 8,759 |
+| Other | 33 | 19 | 5,329 | 826 | 6,155 | 4,503 |
+| Dune | 210 | 137 | 2,426 | 357 | 2,783 | 2,069 |
+| YAML / GHA | 46 | 13 | 1,991 | 576 | 2,567 | 1,415 |
+| JSON | 49 | 51 | 2,055 | 159 | 2,214 | 1,896 |
+| Docker | 7 | 1 | 143 | 82 | 225 | 61 |
+| **TOTAL** | **733** | **4,925** | **2,305,239** | **48,366** | **2,353,605** | **2,256,873** |
+
+_"PRs touched" = unique PR count where at least one file in the bucket was modified. "Files touched" = unique file paths. Buckets: OCaml = `*.ml`/`*.mli`; Dune = `dune`, `dune-project`, `*.opam`; Sexp = `*.sexp`; Shell = `*.sh`/`*.bash`; YAML = `*.yml`/`*.yaml`; Docker = `Dockerfile`/`*.dockerignore`; Other = everything else._
+
+Top 5 paths in the Other bucket (by raw LOC): `wiki_sp500/.../changes_table_2026-05-03.html` (3,273), `panel-golden-divergence-trace-linux.txt` (708), `perf_sweep_report.py` (414 — two PRs), `perf_hypothesis_report.py` (336), `linter_exceptions.conf` (282).
+
+### Observations
+
+- **OCaml source is the effort core:** excluding PR #873, OCaml accounts for 47% of raw LOC (139,104 / 295,028) despite representing 46% of PRs. Additions heavily outweigh deletions (116,702 vs. 22,402), reflecting net new capability rather than churn. The deletions share (16% of OCaml raw LOC) is the highest non-Docker ratio, consistent with active refactoring cycles.
+- **Markdown volume tracks docs investment closely:** 476 PRs touched a `.md` file (65% of all PRs), contributing 71,941 raw LOC — 24% of the ex-#873 total. The near-parity between docs PRs (105 by category) and the 476 PRs touching Markdown reveals that most feature and harness PRs also update a status or design doc, not just the dedicated `docs:` commits.
+- **Sexp / scenario fixtures are a meaningful second-tier signal:** 686 unique `.sexp` files across 58 PRs, producing 24,853 raw LOC. These are all test-scenario inputs for the Weinstein stage/stop/screener subsystems — an unusually high fixture-to-implementation ratio that reflects the golden-scenario test strategy. The CSV outlier (PR #873) aside, generated sexp fixtures represent the largest non-OCaml, non-Markdown LOC category.
+- **CSV / generated data:** PR #873 alone contributes 2,038,990 lines (99.5% of the CSV bucket), dwarfing all other categories. Excluding it, CSV drops to 35,954 raw LOC across 13 PRs — primarily backtest output artifacts committed alongside investigation runs.
