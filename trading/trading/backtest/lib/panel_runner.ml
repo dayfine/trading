@@ -20,10 +20,25 @@ type input = {
    oversized symbol stays resident even when its bytes exceed the cap. *)
 let _snapshot_cache_mb = 1024
 
-let _build_strategy (input : input) ~bar_reader ~audit_recorder =
-  Weinstein_strategy.make ~ad_bars:input.ad_bars
-    ~ticker_sectors:input.ticker_sectors ~bar_reader ~audit_recorder
-    input.config
+(** Construct the strategy module the simulator will run.
+
+    The Weinstein branch threads the runner's deps-loaded inputs (AD bars,
+    sector map, config) through {!Weinstein_strategy.make}. The [Bah_benchmark]
+    branch ignores all of that machinery — BAH is a single-symbol passive
+    strategy that needs only its own [config.symbol] — and constructs
+    {!Trading_strategy.Bah_benchmark_strategy.make}. The [bar_reader] /
+    [audit_recorder] are intentionally dropped on the BAH branch: BAH reads
+    prices via [get_price] (the simulator's per-tick callback, wired through the
+    snapshot-backed [Market_data_adapter]) and emits no audit events. *)
+let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
+    =
+  match (strategy_choice : Strategy_choice.t) with
+  | Weinstein ->
+      Weinstein_strategy.make ~ad_bars:input.ad_bars
+        ~ticker_sectors:input.ticker_sectors ~bar_reader ~audit_recorder
+        input.config
+  | Bah_benchmark { symbol } ->
+      Trading_strategy.Bah_benchmark_strategy.make { symbol }
 
 let _build_market_data_adapter ~data_dir ~bar_data_source =
   match
@@ -222,8 +237,8 @@ let _build_snapshot_bar_reader ~daily_panels ~calendar =
 (* Hybrid setup: snapshot-backed strategy bar reader, snapshot-backed
    simulator adapter, snapshot-backed final-close lookup — all reading
    through one [Daily_panels.t]. See module-doc. *)
-let _setup_hybrid (input : input) ~snapshot_dir ~manifest ~warmup_start
-    ~end_date ~audit_recorder =
+let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
+    ~warmup_start ~end_date ~audit_recorder =
   let daily_panels =
     match
       Daily_panels.create ~snapshot_dir ~manifest
@@ -236,7 +251,9 @@ let _setup_hybrid (input : input) ~snapshot_dir ~manifest ~warmup_start
   in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader = _build_snapshot_bar_reader ~daily_panels ~calendar in
-  let strategy = _build_strategy input ~bar_reader ~audit_recorder in
+  let strategy =
+    _build_strategy input ~strategy_choice ~bar_reader ~audit_recorder
+  in
   let adapter =
     _build_market_data_adapter ~data_dir:input.data_dir_fpath
       ~bar_data_source:(Bar_data_source.Snapshot { snapshot_dir; manifest })
@@ -247,11 +264,14 @@ let _setup_hybrid (input : input) ~snapshot_dir ~manifest ~warmup_start
   (strategy, adapter, final_close_prices)
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
-    ~commission ?trace ?gc_trace ?bar_data_source ?progress_emitter () =
+    ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
+    ?bar_data_source ?progress_emitter () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
-  eprintf "Panel_runner: simulator window %s..%s (warmup %d days)\n%!"
+  eprintf
+    "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
     (Date.to_string warmup_start)
-    (Date.to_string end_date) warmup_days;
+    (Date.to_string end_date) warmup_days
+    (Strategy_choice.name strategy_choice);
   let stop_log = Stop_log.create () in
   let trade_audit = Trade_audit.create () in
   let force_liquidation_log = Force_liquidation_log.create () in
@@ -263,8 +283,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
   in
   let strategy, market_data_adapter, final_close_prices_thunk =
-    _setup_hybrid input ~snapshot_dir ~manifest ~warmup_start ~end_date
-      ~audit_recorder
+    _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~warmup_start
+      ~end_date ~audit_recorder
   in
   let sim =
     _make_simulator input ~stop_log ~start_date ~end_date ~warmup_days

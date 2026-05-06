@@ -55,9 +55,20 @@ type t = {
   period : period;
   universe_path : string; [@sexp.default default_universe_path]
   config_overrides : Sexp.t list;
+  strategy : Backtest.Strategy_choice.t;
+      [@sexp.default Backtest.Strategy_choice.default]
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 
 let load path = t_of_sexp (Sexp.load_sexp path)
-let in_range (r : range) v = Float.(v >= r.min_f && v <= r.max_f)
+
+(** Treat [NaN] as "no measurement available, skip the check" — required for
+    metrics that the simulator can't define when their inputs are empty (e.g.
+    [WinRate] / [AvgHoldingDays] when the strategy never closes a round-trip,
+    such as the Buy-and-Hold benchmark in #882). Without this guard NaN fails
+    every range comparison and BAH-shaped scenarios can't pass. The invariant
+    for non-BAH scenarios is unaffected: when the simulator does define the
+    metric, the comparison is the same closed-interval check it always was. *)
+let in_range (r : range) v =
+  Float.is_nan v || Float.(v >= r.min_f && v <= r.max_f)

@@ -149,6 +149,18 @@ let test_near_zero_range_accepts_zero _ =
   assert_that (Scenario.in_range r 0.0) (equal_to true);
   assert_that (Scenario.in_range r 5000.0) (equal_to false)
 
+(* #882: a NaN actual must pass any range, since NaN means "metric
+   undefined" (e.g. [WinRate] / [AvgHoldingDays] for a strategy that never
+   closes a round-trip such as the BAH benchmark). Without this guard,
+   BAH-shaped scenarios can't pass those range checks. The well-defined
+   case (non-NaN) is unaffected — the same closed-interval semantics apply
+   and is exercised by the prior two tests. *)
+let test_nan_value_passes_any_range _ =
+  let r = { Scenario.min_f = 0.0; max_f = 100.0 } in
+  assert_that (Scenario.in_range r Float.nan) (equal_to true);
+  let narrow = { Scenario.min_f = 50.0; max_f = 50.0 } in
+  assert_that (Scenario.in_range narrow Float.nan) (equal_to true)
+
 (* A scenario sexp that omits [universe_path] should receive the default,
    preserving backward compatibility with pre-migration scenario files. *)
 let test_universe_path_absent_uses_default _ =
@@ -219,6 +231,8 @@ let suite =
          "unrealized_pnl sexp round-trips" >:: test_unrealized_pnl_roundtrip;
          "non-zero range rejects zero" >:: test_non_zero_range_rejects_zero;
          "near-zero range accepts zero" >:: test_near_zero_range_accepts_zero;
+         "NaN actual passes any range (#882)"
+         >:: test_nan_value_passes_any_range;
          "universe_path absent => default"
          >:: test_universe_path_absent_uses_default;
          "universe_path present => round-trips" >:: test_universe_path_present;

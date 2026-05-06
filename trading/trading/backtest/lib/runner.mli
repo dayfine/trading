@@ -120,6 +120,7 @@ val run_backtest :
   end_date:Date.t ->
   ?overrides:Sexp.t list ->
   ?sector_map_override:(string, string) Core.Hashtbl.t ->
+  ?strategy_choice:Strategy_choice.t ->
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
@@ -133,10 +134,10 @@ val run_backtest :
     order. Each must be a record sexp with fields matching
     [Weinstein_strategy.config]. Example:
     {[
-    [
-      Sexp.of_string "((initial_stop_buffer 1.08))";
-      Sexp.of_string "((stage_config ((ma_period 40))))";
-    ]
+      [
+        Sexp.of_string "((initial_stop_buffer 1.08))";
+        Sexp.of_string "((stage_config ((ma_period 40))))";
+      ]
     ]}
 
     [sector_map_override], when passed, replaces the sector-map normally loaded
@@ -180,6 +181,17 @@ val run_backtest :
     Independent measurement plane from [trace]'s per-phase wall-time + RSS
     readings; both can be passed in the same run. When [gc_trace] is omitted, no
     snapshots are taken.
+
+    [strategy_choice], when passed, selects which trading strategy the simulator
+    runs (#882). Defaults to {!Strategy_choice.Weinstein} — behaviour-preserving
+    for every pre-#882 caller. Set to {!Strategy_choice.Bah_benchmark} to swap
+    in a Buy-and-Hold benchmark on a single symbol; the runner still loads the
+    standard universe / sector-map / AD-bars machinery (wasted work for BAH but
+    minimally invasive), and the [Panel_runner] dispatch picks
+    {!Trading_strategy.Bah_benchmark_strategy.make} in place of
+    {!Weinstein_strategy.make}. The BAH symbol must be present in the resolved
+    [sector_map_override] so its CSV gets staged into the snapshot — see
+    [universes/spy-only.sexp].
 
     [bar_data_source], when passed, selects the OHLCV backend for the
     simulator's per-tick price reads. Default is {!Bar_data_source.Csv} (the

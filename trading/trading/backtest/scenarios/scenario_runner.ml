@@ -197,7 +197,7 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
-      ?sector_map_override ~progress_emitter ()
+      ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter ()
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   let a = _actual_of_result result in

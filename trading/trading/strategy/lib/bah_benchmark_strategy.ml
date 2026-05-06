@@ -58,6 +58,17 @@ let _entry_from_price (price : Types.Daily_price.t) ~(symbol : string)
   | Some target_quantity ->
       Some (_build_entry_transition ~symbol ~price ~target_quantity)
 
+(** True if any value in [positions] points at [symbol]. The simulator keys its
+    position map by [position_id] (e.g. ["SPY-bah-benchmark"]) — not by symbol —
+    so a [Map.mem positions symbol] check would never fire and the strategy
+    would re-enter on every subsequent day with leftover cash >= one share's
+    worth. Walking the values once per call is cheap (the map holds at most one
+    entry for a single-symbol strategy). *)
+let _has_position_for_symbol ~(positions : Position.t String.Map.t)
+    ~(symbol : string) : bool =
+  Map.exists positions ~f:(fun (pos : Position.t) ->
+      String.equal pos.symbol symbol)
+
 (** Single-symbol entry decision. Returns [None] when:
     - the position already exists in [positions] (don't double-enter), or
     - no price is available for [symbol] today (skip until data arrives), or
@@ -65,7 +76,7 @@ let _entry_from_price (price : Types.Daily_price.t) ~(symbol : string)
 let _maybe_enter ~(symbol : string)
     ~(get_price : Strategy_interface.get_price_fn) ~(cash : float)
     ~(positions : Position.t String.Map.t) : Position.transition option =
-  if Map.mem positions symbol then None
+  if _has_position_for_symbol ~positions ~symbol then None
   else
     match get_price symbol with
     | None -> None
