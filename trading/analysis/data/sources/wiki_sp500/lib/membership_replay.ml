@@ -36,22 +36,25 @@ let _find_column_index headers name =
       String.equal (String.lowercase (String.strip h)) name)
   |> Option.map ~f:fst
 
+let _resolve_sector_index headers =
+  match _find_column_index headers _sector_header_primary with
+  | Some i -> Some i
+  | None -> _find_column_index headers _sector_header_alt
+
+let _missing_headers_error headers =
+  let got = String.concat ~sep:"," headers in
+  Status.error_invalid_argument
+    (Printf.sprintf
+       "current-constituents CSV missing required header(s); need \
+        Symbol/Security/Sector, got: %s" got)
+
 let _resolve_column_indices headers =
   let symbol_idx = _find_column_index headers _symbol_header in
   let security_idx = _find_column_index headers _security_header in
-  let sector_idx =
-    match _find_column_index headers _sector_header_primary with
-    | Some i -> Some i
-    | None -> _find_column_index headers _sector_header_alt
-  in
+  let sector_idx = _resolve_sector_index headers in
   match (symbol_idx, security_idx, sector_idx) with
   | Some s, Some sec, Some sector -> Ok (s, sec, sector)
-  | _ ->
-      Status.error_invalid_argument
-        (Printf.sprintf
-           "current-constituents CSV missing required header(s); need \
-            Symbol/Security/Sector, got: %s"
-           (String.concat ~sep:"," headers))
+  | _ -> _missing_headers_error headers
 
 let _parse_data_row ~symbol_idx ~security_idx ~sector_idx ~row_num row =
   let cells = _split_csv_line row in
@@ -69,6 +72,16 @@ let _parse_data_row ~symbol_idx ~security_idx ~sector_idx ~row_num row =
         sector = cell sector_idx;
       }
 
+let _parse_data_rows ~header data_rows =
+  let headers = _split_csv_line header in
+  let%bind.Result symbol_idx, security_idx, sector_idx =
+    _resolve_column_indices headers
+  in
+  List.mapi data_rows ~f:(fun i row ->
+      _parse_data_row ~symbol_idx ~security_idx ~sector_idx ~row_num:(i + 2)
+        row)
+  |> Result.all
+
 let parse_current_csv csv_text =
   let lines =
     String.split_lines csv_text
@@ -76,15 +89,7 @@ let parse_current_csv csv_text =
   in
   match lines with
   | [] -> Status.error_invalid_argument "current-constituents CSV is empty"
-  | header :: data_rows ->
-      let headers = _split_csv_line header in
-      let%bind.Result symbol_idx, security_idx, sector_idx =
-        _resolve_column_indices headers
-      in
-      List.mapi data_rows ~f:(fun i row ->
-          _parse_data_row ~symbol_idx ~security_idx ~sector_idx ~row_num:(i + 2)
-            row)
-      |> Result.all
+  | header :: data_rows -> _parse_data_rows ~header data_rows
 
 (* --- Replay ------------------------------------------------------------- *)
 
@@ -104,16 +109,19 @@ let _from_table table =
 (* Apply the inverse of one change event: drop [added], restore [removed].
    Tolerant of [added] not being in the working set (see .mli docstring on
    why we choose silent-skip over hard error). *)
+let _restore_removed table (r : Changes_parser.ticker_id) =
+  let entry =
+    {
+      symbol = r.symbol;
+      security_name = r.security_name;
+      sector = _unknown_sector;
+    }
+  in
+  Hashtbl.set table ~key:r.symbol ~data:entry
+
 let _undo_event table (event : Changes_parser.change_event) =
   Option.iter event.added ~f:(fun a -> Hashtbl.remove table a.symbol);
-  Option.iter event.removed ~f:(fun r ->
-      Hashtbl.set table ~key:r.symbol
-        ~data:
-          {
-            symbol = r.symbol;
-            security_name = r.security_name;
-            sector = _unknown_sector;
-          })
+  Option.iter event.removed ~f:(_restore_removed table)
 
 let replay_back ~current ~changes ~as_of =
   let table = _to_table current in
@@ -163,12 +171,13 @@ let _action_rank = function `Added -> 0 | `Removed -> 1
 
 let _compare_events a b =
   let date_cmp = Date.compare a.date b.date in
-  if date_cmp <> 0 then date_cmp
-  else
-    let action_cmp =
-      Int.compare (_action_rank a.action) (_action_rank b.action)
-    in
-    if action_cmp <> 0 then action_cmp else String.compare a.symbol b.symbol
+  let action_cmp () =
+    Int.compare (_action_rank a.action) (_action_rank b.action)
+  in
+  let symbol_cmp () = String.compare a.symbol b.symbol in
+  match date_cmp with
+  | n when n <> 0 -> n
+  | _ -> ( match action_cmp () with n when n <> 0 -> n | _ -> symbol_cmp ())
 
 (* Each Wikipedia change-event yields up to two timeline events: one
    [`Added] line for the new ticker and one [`Removed] line for the
@@ -177,36 +186,33 @@ let _compare_events a b =
    forward-replay through the window, post-[from] additions don't have a
    GICS sector available. We use ["Unknown"] there, matching the
    convention in [_undo_event]. *)
+let _added_timeline_event ~current_sectors ~date (a : Changes_parser.ticker_id)
+    =
+  let sector =
+    Option.value
+      (Hashtbl.find current_sectors a.symbol)
+      ~default:_unknown_sector
+  in
+  { date; action = `Added; symbol = a.symbol; sector }
+
+let _removed_timeline_event ~date (r : Changes_parser.ticker_id) =
+  { date; action = `Removed; symbol = r.symbol; sector = _unknown_sector }
+
+let _change_event_to_timeline ~current_sectors
+    (e : Changes_parser.change_event) =
+  let date = e.effective_date in
+  let added_evt =
+    Option.map e.added ~f:(_added_timeline_event ~current_sectors ~date)
+  in
+  let removed_evt = Option.map e.removed ~f:(_removed_timeline_event ~date) in
+  List.filter_opt [ added_evt; removed_evt ]
+
 let _events_in_window ~current_sectors ~from ~until
     (changes : Changes_parser.change_event list) =
   List.concat_map changes ~f:(fun (e : Changes_parser.change_event) ->
       if Date.( <= ) e.effective_date from || Date.( > ) e.effective_date until
       then []
-      else
-        let added_evt =
-          Option.map e.added ~f:(fun (a : Changes_parser.ticker_id) ->
-              let sector =
-                Option.value
-                  (Hashtbl.find current_sectors a.symbol)
-                  ~default:_unknown_sector
-              in
-              {
-                date = e.effective_date;
-                action = `Added;
-                symbol = a.symbol;
-                sector;
-              })
-        in
-        let removed_evt =
-          Option.map e.removed ~f:(fun (r : Changes_parser.ticker_id) ->
-              {
-                date = e.effective_date;
-                action = `Removed;
-                symbol = r.symbol;
-                sector = _unknown_sector;
-              })
-        in
-        List.filter_opt [ added_evt; removed_evt ])
+      else _change_event_to_timeline ~current_sectors e)
   |> List.sort ~compare:_compare_events
 
 let build_timeline ~current ~changes ~from ~until =
