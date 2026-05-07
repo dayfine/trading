@@ -15,7 +15,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [~] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — 312 lines (limit 300) + bare literals in comments (source: dispatch 2026-05-07)
+- [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
