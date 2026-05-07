@@ -1,0 +1,13 @@
+((code_version unknown) (start_date 2010-01-01) (end_date 2026-04-30)
+ (initial_cash 1000000.00) (universe_size 510)
+ (data_dir /workspaces/trading-1/data)
+ (commission ((per_share 0.01) (minimum 1.00)))
+ (overrides
+  (((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.05))))
+   ((portfolio_config ((max_long_exposure_pct 0.50))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2)))))))
