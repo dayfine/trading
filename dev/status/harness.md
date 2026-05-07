@@ -2,6 +2,11 @@
 
 ## Last updated: 2026-05-08
 
+## sweep-honor-locks (2026-05-08 incident)
+- **Incident (2026-05-08):** Operator ran `--force --stale-hours 0` while two cleanup agents were mid-flight. The script removed their worktrees, killing both agents' work in progress. Root cause: script used `git worktree remove --force` (overrides lock) and `rm -rf` fallback unconditionally; did not read lock state from `git worktree list --porcelain`.
+- **Fix (PR harness/sweep-honor-locks):** (1) Parse `git worktree list --porcelain` once per run; build locked-paths set; skip any locked candidate unless `--include-active` is passed. (2) Reject `--stale-hours 0` with exit 1. (3) Drop `--force` from `git worktree remove` so git's own lock check fires. (4) Log each skipped locked worktree. New `--include-active` flag for emergency override (must be combined with `--stale-hours >= 1`). Smoke test: `trading/devtools/checks/sweep_worktrees_smoke.sh` (wired into `dune runtest`). `.claude/rules/worktree-isolation.md §Cleanup` updated with new flags and lock-honoring behavior.
+- **Verify:** `dune runtest devtools/checks/` — prints `OK: sweep_worktrees_smoke — 3 assertion(s) passed, 0 failed.`; `bash dev/scripts/sweep_stale_worktrees.sh --stale-hours 0` exits 1 with error message.
+
 ## Status
 IN_PROGRESS
 

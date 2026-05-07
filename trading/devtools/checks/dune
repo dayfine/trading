@@ -346,6 +346,18 @@
  (action
   (run sh %{dep:no_python_check.sh})))
 
+; Sweep stale worktrees smoke test: verifies (1) --stale-hours 0 is rejected,
+; (2) locked worktrees appear as "skip" in dry-run mode, (3) --stale-hours 0
+; combined with --include-active is also rejected. Uses a tmp git repo so it
+; does not touch real worktrees. Skips if bash is not on PATH.
+; No glob dep needed: the test creates its own tmp fixtures at runtime.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:sweep_worktrees_smoke.sh})))
+
 ; Perf-catalog integrity check: verifies every scenario sexp under
 ; trading/test_data/backtest_scenarios/{goldens-small,goldens-broad,perf-sweep,smoke}/
 ; carries a [;; perf-tier: <1|2|3|4>] header line, AND that paths
