@@ -1,5 +1,5 @@
 (tests
- (names test_grid_search_bin)
+ (names test_grid_search_bin test_bayesian_runner_bin)
  (libraries
   ounit2
   core
