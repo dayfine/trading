@@ -1,6 +1,6 @@
 # Status: cleanup
 
-## Last updated: 2026-04-27
+## Last updated: 2026-05-07
 
 ## Status
 IN_PROGRESS
@@ -21,6 +21,7 @@ Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here 
 
 - [x] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — extracted `_parse_and_accumulate` and `_read_next_line` helpers; nesting linter now passes (835 fns, all OK). (source: 2026-04-26-fast.md, PR #578 merged 2026-04-26T16:04Z)
 - [x] fn_length / file_length: weinstein_strategy.ml — added @large-module annotation; file length linter now passes. (source: 2026-04-19-fast.md, PR #453, 2026-04-19)
+- [x] file_length: trading/analysis/weinstein/screener/lib/screener.ml — extracted sector_rating/scoring_weights/grade_thresholds types + signal helpers + price helpers to Screener_scoring; 708→485 lines (under 500 hard limit). (source: dispatch 2026-05-07, branch cleanup/screener-large)
 
 ## Out of scope
 

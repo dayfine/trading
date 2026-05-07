@@ -12,48 +12,11 @@
 
     All functions are pure. *)
 
-(** Sector health rating used by the screener gate. *)
-type sector_rating = Strong | Neutral | Weak [@@deriving show, eq, sexp]
-
-type sector_context = {
-  sector_name : string;
-  rating : sector_rating;
-  stage : Weinstein_types.stage;
-}
-[@@deriving sexp]
-(** Minimal sector context the screener needs per stock. *)
-
-type scoring_weights = {
-  w_stage2_breakout : int;
-      (** Weight for a clean Stage2 transition from Stage1. Default: 30. *)
-  w_strong_volume : int;
-      (** Weight for Strong volume confirmation. Default: 20. *)
-  w_adequate_volume : int;
-      (** Weight for Adequate volume confirmation. Default: 10. *)
-  w_positive_rs : int;
-      (** Weight for positive RS trend (Positive_rising or Bullish_crossover).
-          Default: 20. *)
-  w_bullish_rs_crossover : int;
-      (** Additional weight for RS crossing from negative to positive. Default:
-          10. *)
-  w_clean_resistance : int;
-      (** Weight for Virgin_territory or Clean overhead. Default: 15. *)
-  w_sector_strong : int;  (** Weight bonus for a Strong sector. Default: 10. *)
-  w_late_stage2_penalty : int;
-      (** Negative weight for late Stage2 flag. Default: -15. *)
-}
-[@@deriving sexp]
-(** Scoring weights for each positive signal. All are configurable. *)
-
-val default_scoring_weights : scoring_weights
-(** [default_scoring_weights] provides the reference weights. *)
-
-type grade_thresholds = { a_plus : int; a : int; b : int; c : int; d : int }
-[@@deriving sexp]
-(** Score cutoffs for each grade. All are configurable. *)
-
-val default_grade_thresholds : grade_thresholds
-(** [default_grade_thresholds] provides the reference thresholds. *)
+include module type of Screener_scoring
+(** Scoring types, signal functions, and price utilities — re-exported from
+    {!Screener_scoring} so callers can use [Screener.sector_rating],
+    [Screener.scoring_weights], etc. without importing the sub-module directly.
+*)
 
 type candidate_params = {
   entry_buffer_pct : float;
