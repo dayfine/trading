@@ -1,15 +1,15 @@
 # Status: tuning
 
-## Last updated: 2026-05-06
+## Last updated: 2026-05-07
 
 ## Status
-IN_PROGRESS — T-A lib + CLI binary MERGED; T-B CLI + walk-forward integration deferred
+READY_FOR_REVIEW — T-A lib + CLI MERGED; T-B lib MERGED; T-B CLI READY_FOR_REVIEW; walk-forward integration deferred
 
-T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). T-A CLI binary landed via PR #893 (merged 2026-05-06). T-B Bayesian-opt lib + tests landed via PR #817 (merged 2026-05-04). All `.mli` surfaces are stable. Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying) + `dev/plans/bayesian-opt-2026-05-03.md` (T-B clarifying with D1–D8 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
+T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). T-A CLI binary landed via PR #893 (merged 2026-05-06). T-B Bayesian-opt lib + tests landed via PR #817 (merged 2026-05-04). T-B CLI binary `bayesian_runner.exe` ready for review on branch `feat/backtest-tuning-bayesian-opt-cli` (this PR). All `.mli` surfaces are stable. Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying) + `dev/plans/bayesian-opt-2026-05-03.md` (T-B clarifying with D1–D8 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
 
 Remaining work:
-- **T-B CLI binary** — `bayesian_runner.exe` analogous to T-A CLI binary. Deferred.
 - **81-cell flagship sweep** — run `grid_search.exe` on `screening.weights.{rs,volume,breakout,sector}`; deferred until sweep budget available.
+- **T-B convergence cross-check** — once the 81-cell flagship sweep result lands, validate `bayesian_runner.exe` converges to the same (or better) cell within ~30 evals over the same 4-D bounds (acceptance criterion in `m5-experiments-roadmap-2026-05-02.md` §M5.5 T-B).
 - **T-C** (supervised ML walk-forward) — blocked on Norgate ingest (vendor signup) + experiments M5.2 metrics catalog + experiments M5.2e per-trade context (already shipped #769). Owner authorized: feat-backtest per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 ## Interface stable
@@ -51,9 +51,11 @@ Features: from M5.2e per-trade context (Stage one-hot, MA slope, vol ratio, RS, 
 Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 
 ## In Progress
-- None. T-A lib, CLI binary, and min_score_override knob all shipped. Next queued: 81-cell flagship sweep on `screening.weights.*`; T-B CLI binary.
+- None. T-A lib + CLI, T-B lib + CLI, and min_score_override knob all shipped or ready-for-review. Next queued: 81-cell flagship sweep on `screening.weights.*`; T-B convergence cross-check (after the sweep lands).
 
 ## Completed
+
+- [x] **T-B Bayesian-opt CLI binary + tests** (READY_FOR_REVIEW 2026-05-07; ~775 LOC including tests; branch `feat/backtest-tuning-bayesian-opt-cli`). Closes the deferred T-B CLI follow-up from PR #817. Three new modules under `trading/trading/backtest/tuner/bin/`: `Bayesian_runner_spec` (sexp-driven param-bounds + acquisition + objective + budget parser, with `to_grid_objective` / `to_acquisition` / `to_bo_config` projections), `Bayesian_runner_evaluator` (adapts `Backtest.Runner.run_backtest` to the BO loop's per-suggestion callback, scalarises with `Tuner.Grid_search.evaluate_objective`, walks scenarios in spec order), `Bayesian_runner_runner` (drives the `Tuner.Bayesian_opt.suggest_next`/`observe` ask/tell loop for `total_budget` iters, emits `bo_log.csv` + `best.sexp` + `convergence.md` per the M5.5 T-B spec). CLI binary `bayesian_runner.exe` with flags `--spec <path> --out-dir <dir> [--fixtures-root <path>]`. 11 unit tests pin every non-trivial `.mli` claim: spec parsing (simple Expected_improvement spec + UCB acquisition with Composite objective + malformed-raises), `to_grid_objective`/`to_acquisition` round-trips, `to_bo_config` field propagation, `run_and_write` plumbing against a 1D-parabola stub evaluator (three-artefact emission + mkdir-p + convergence within tol 0.5 + byte-identical bo_log under fixed seed), evaluator unknown-scenario `Failure` guard. Smoke-scenario integration deferred (mirrors PR #893's deferral; full-universe single eval ~5–10 min, run locally before the convergence cross-check). Lib at `trading/trading/backtest/tuner/lib/` is unchanged. Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/tuner/ --force` (72/72 pass) + `dev/lib/run-in-env.sh dune exec trading/backtest/tuner/bin/bayesian_runner.exe -- --help`. Hyperparameter learning (Type-II MLE on length scales) remains deferred per `dev/plans/bayesian-opt-2026-05-03.md` §"Out of scope".
 
 - [x] **#892 cascade score-floor knob exposed for grid sweep** (MERGED 2026-05-06; ~250 LOC; branch `feat/screener/888-threshold-param`). Added `min_score_override : int option` to `Screener.config` (default `None` preserves grade-based filter bit-equally; `Some n` replaces with strict `score >= n` numeric gate). Threaded via `_passes_score_floor` helper through `_score_and_build`, `_long_admission`/`_short_admission`, and the diagnostics-counting path (single source of truth). Registered in `Tuner.Grid_search.param_spec` docstring as a sweepable dimension at `screening_config.min_score_override`. Override deep-merge pinned by `test_override_screening_min_score_override` in `test_runner_hypothesis_overrides.ml`. 5 new unit tests in `test_screener.ml` pin the gate's `>=` semantics + bit-equal-default contract. 3-cell quick-look on sp500-2019-2023 (cells: default / 41 / 42) documented in `dev/notes/888-score-threshold-quick-look-2026-05-06.md` — finding consistent with #871's "cascade is at no-look-ahead ceiling" verdict; full sweep deferred until #872 / #887 capital-recycling lands. Verify: `dev/lib/run-in-env.sh dune runtest analysis/weinstein/screener/test/` + `dev/lib/run-in-env.sh dune exec trading/backtest/test/test_runner_hypothesis_overrides.exe`.
 
@@ -66,7 +68,7 @@ Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 
 1. ~~Wire CLI binary at `trading/trading/backtest/tuner/bin/grid_search.ml`~~ — done (#893).
 2. Run the 81-cell flagship sweep on `screening.weights.{rs,volume,breakout,sector}` using `grid_search.exe`; verify <2hr wall-time gate on smoke scenarios (local-only).
-3. Wire CLI binary at `trading/trading/backtest/tuner/bin/bayesian_sweep.ml` (deferred from T-B). Hooks `Tuner.Bayesian_opt.suggest_next`/`observe` into a `Backtest.Runner.run_backtest`-backed loop + reads bounds from sexp.
+3. ~~Wire CLI binary at `trading/trading/backtest/tuner/bin/bayesian_runner.ml`~~ — done (this PR; binary named `bayesian_runner.ml` to mirror the lib module `Tuner.Bayesian_opt`, not `bayesian_sweep.ml` as the prior status text proposed). Hooks `Tuner.Bayesian_opt.suggest_next`/`observe` into a `Backtest.Runner.run_backtest`-backed loop + reads bounds from sexp.
 4. After grid sweep results land, validate T-B converges to the same (or better) cell within ~30 evals using the same param surface — the convergence acceptance criterion in `m5-experiments-roadmap-2026-05-02.md` §M5.5 T-B.
 5. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
 6. Hyperparameter learning for T-B (Type-II MLE on length scales) — defer until 4-dim / 6-dim sweeps show that fixed length scales miss the optimum.
