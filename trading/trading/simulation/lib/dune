@@ -12,6 +12,7 @@
   core)
  (modules
   simulator
+  split_handler
   order_generator
   metrics
   metric_computers
