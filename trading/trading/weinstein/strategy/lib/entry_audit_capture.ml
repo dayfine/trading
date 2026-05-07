@@ -165,6 +165,48 @@ let check_short_notional_cap ~short_notional_acc ~short_notional_cap
         short_notional_acc := projected;
         Some (trans, meta))
 
+(* Refund the cash tentatively deducted by [check_cash_and_deduct] when the
+   notional-cap gate subsequently rejects the candidate. This keeps the running
+   cash balance correct for later candidates in the same walk. *)
+let _refund_cash_for_trans ~remaining_cash (trans : Position.transition) =
+  remaining_cash :=
+    !remaining_cash
+    +.
+    match trans.kind with
+    | Position.CreateEntering e -> e.target_quantity *. e.entry_price
+    | _ -> 0.0
+
+(** Check the short-notional cap for a cash-cleared entry. Returns [Kept] or
+    [Skipped Short_notional_cap], refunding the tentatively deducted cash on
+    rejection so subsequent cash gates see the correct running balance. *)
+let _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
+    ~short_notional_cap ~emit (cand : Screener.scored_candidate) trans meta :
+    candidate_decision =
+  match
+    check_short_notional_cap ~short_notional_acc ~short_notional_cap
+      (trans, meta) cand
+  with
+  | Some (trans, meta) ->
+      emit "Kept";
+      Kept (trans, meta)
+  | None ->
+      _refund_cash_for_trans ~remaining_cash trans;
+      emit "Short_notional_cap";
+      Skipped Short_notional_cap
+
+(** Apply the cash and short-notional-cap gates to an [Entry_ok] result. Returns
+    [Kept] on double-pass or the appropriate [Skipped] variant. *)
+let _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
+    ~short_notional_cap ~emit ~(cand : Screener.scored_candidate) trans meta :
+    candidate_decision =
+  match check_cash_and_deduct ~remaining_cash (trans, meta) with
+  | None ->
+      emit "Insufficient_cash";
+      Skipped Insufficient_cash
+  | Some (trans, meta) ->
+      _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
+        ~short_notional_cap ~emit cand trans meta
+
 let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
     ~short_notional_cap (c : Screener.scored_candidate) : candidate_decision =
   let emit decision =
@@ -183,42 +225,20 @@ let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
     | Sized_zero ->
         emit "Sized_to_zero";
         Skipped Sized_to_zero
-    | Entry_ok (trans, meta) -> (
-        match check_cash_and_deduct ~remaining_cash (trans, meta) with
-        | None ->
-            emit "Insufficient_cash";
-            Skipped Insufficient_cash
-        | Some (trans, meta) -> (
-            match
-              check_short_notional_cap ~short_notional_acc ~short_notional_cap
-                (trans, meta) c
-            with
-            | Some (trans, meta) ->
-                emit "Kept";
-                Kept (trans, meta)
-            | None ->
-                (* Refund the cash we tentatively deducted in the cash check
-                   so subsequent candidates' cash gates see the correct
-                   running balance. The candidate was admissible on cash
-                   grounds but is being dropped on the short-notional cap. *)
-                (remaining_cash :=
-                   !remaining_cash
-                   +.
-                   match trans.kind with
-                   | Position.CreateEntering e ->
-                       e.target_quantity *. e.entry_price
-                   | _ -> 0.0);
-                emit "Short_notional_cap";
-                Skipped Short_notional_cap))
+    | Entry_ok (trans, meta) ->
+        _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
+          ~short_notional_cap ~emit ~cand:c trans meta
+
+let _alternative_of_decision ~exclude_position_id (candidate, decision) :
+    Audit_recorder.alternative_input option =
+  match decision with
+  | Skipped reason -> Some { Audit_recorder.candidate; reason }
+  | Kept (_, meta) ->
+      if String.equal meta.position_id exclude_position_id then None else None
 
 let alternatives_of_decisions ~decisions ~exclude_position_id :
     Audit_recorder.alternative_input list =
-  List.filter_map decisions ~f:(fun (candidate, decision) ->
-      match decision with
-      | Skipped reason -> Some { Audit_recorder.candidate; reason }
-      | Kept (_, meta) ->
-          if String.equal meta.position_id exclude_position_id then None
-          else None)
+  List.filter_map decisions ~f:(_alternative_of_decision ~exclude_position_id)
 
 let build_entry_event ~(macro : Macro.result) ~current_date
     ~(candidate : Screener.scored_candidate) ~(meta : entry_meta)
@@ -252,21 +272,34 @@ let build_entry_event ~(macro : Macro.result) ~current_date
     alternatives;
   }
 
+(** Record one audit entry for a [Kept] decision. [Skipped] decisions are
+    silently ignored — they appear only in the [alternatives] lists of other
+    entries. *)
+let _emit_kept_decision ~(audit_recorder : Audit_recorder.t) ~macro
+    ~current_date ~decisions candidate meta =
+  let alternatives =
+    alternatives_of_decisions ~decisions ~exclude_position_id:meta.position_id
+  in
+  let event =
+    build_entry_event ~macro ~current_date ~candidate ~meta ~alternatives
+  in
+  audit_recorder.record_entry event
+
+(** Dispatch one decision: emit an audit entry if [Kept], skip if [Skipped]. *)
+let _dispatch_one_decision ~audit_recorder ~macro ~current_date ~decisions
+    (candidate, d) =
+  match d with
+  | Skipped _ -> ()
+  | Kept (_, meta) ->
+      _emit_kept_decision ~audit_recorder ~macro ~current_date ~decisions
+        candidate meta
+
 let emit_entries ~(audit_recorder : Audit_recorder.t)
     ~(macro : Macro.result option) ~current_date ~decisions =
   match macro with
   | None -> ()
   | Some macro ->
-      List.iter decisions ~f:(fun (candidate, d) ->
-          match d with
-          | Skipped _ -> ()
-          | Kept (_, meta) ->
-              let alternatives =
-                alternatives_of_decisions ~decisions
-                  ~exclude_position_id:meta.position_id
-              in
-              let event =
-                build_entry_event ~macro ~current_date ~candidate ~meta
-                  ~alternatives
-              in
-              audit_recorder.record_entry event)
+      let dispatch =
+        _dispatch_one_decision ~audit_recorder ~macro ~current_date ~decisions
+      in
+      List.iter decisions ~f:dispatch
