@@ -40,11 +40,14 @@ type dependencies = {
           benchmark does not need to be in [symbols] — bars are fetched
           independently via [market_data_adapter]. When [None] the field is left
           as [None] on every step (default; preserves prior behaviour). *)
+  stale_hold_policy : Stale_hold.config;
+  stale_hold_log : Stale_hold.Log.t;
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
-    ?market_data_adapter () =
+    ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
+    ?stale_hold_log () =
   let engine_config = { Trading_engine.Types.commission } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -52,6 +55,9 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     match market_data_adapter with
     | Some adapter -> adapter
     | None -> Trading_simulation_data.Market_data_adapter.create ~data_dir
+  in
+  let stale_hold_log =
+    Option.value stale_hold_log ~default:(Stale_hold.Log.create ())
   in
   {
     symbols;
@@ -62,6 +68,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     market_data_adapter;
     metric_suite;
     benchmark_symbol;
+    stale_hold_policy;
+    stale_hold_log;
   }
 
 (** {1 Simulator State} *)
@@ -152,11 +160,44 @@ let _get_today_bars t =
   in
   List.filter_map t.deps.symbols ~f:get_bar
 
-(** Compute total portfolio value (cash + position market values). *)
-let _compute_portfolio_value ~portfolio ~today_bars =
-  let prices =
+(** Build a [(symbol, close_price)] alist covering every position in
+    [portfolio]. Today's bar (from [today_bars]) is preferred; for any held
+    symbol with no bar today, fall back to the most recent prior bar via
+    [adapter.get_previous_bar] (forward-fill of last-known close). Symbols with
+    neither today's bar nor any prior bar are dropped — the downstream
+    [Calculations.portfolio_value] errors when this happens, and the caller
+    falls back to cash-only valuation. The forward-fill matters when a held
+    symbol stops trading mid-run (corporate action, suspension): without it,
+    [Calculations.portfolio_value] errors, the caller silently substitutes
+    [current_cash], the equity curve flatlines, and the
+    [Backtest.Runner.is_trading_day] heuristic that gates equity-curve rows
+    drops every subsequent step. *)
+let _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars =
+  let today_prices =
     List.map today_bars ~f:(fun bar ->
         (bar.Trading_engine.Types.symbol, bar.close_price))
+  in
+  let today_set = today_prices |> List.map ~f:fst |> String.Set.of_list in
+  let fallback_prices =
+    List.filter_map portfolio.Trading_portfolio.Portfolio.positions
+      ~f:(fun (pos : Trading_portfolio.Types.portfolio_position) ->
+        if Set.mem today_set pos.symbol then None
+        else
+          let%map.Option prev =
+            Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
+              ~symbol:pos.symbol ~date
+          in
+          (pos.symbol, prev.Types.Daily_price.close_price))
+  in
+  today_prices @ fallback_prices
+
+(** Compute total portfolio value (cash + position market values). Forward-
+    fills missing prices for held positions via [_prices_for_held_positions];
+    when even the forward-fill cannot resolve a price (no prior bar ever), falls
+    back to cash-only valuation rather than crashing the run. *)
+let _compute_portfolio_value ~adapter ~date ~portfolio ~today_bars =
+  let prices =
+    _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars
   in
   match
     Trading_portfolio.Calculations.portfolio_value
@@ -416,6 +457,16 @@ let step t =
     let portfolio = _apply_split_events t.portfolio split_events in
     let positions = _apply_splits_to_positions t.positions split_events in
     let today_bars = _get_today_bars t in
+    (* Record stale-held positions (symbols without bars for K+ days) into
+       the per-run log. Detector only — no force-close; see [Stale_hold].
+       Runs only on bar-bearing days so weekend/holiday gaps don't trigger
+       false-positives every Saturday. *)
+    if not (List.is_empty today_bars) then
+      List.iter
+        (Stale_hold.detect_stale ~adapter:t.deps.market_data_adapter
+           ~date:t.current_date ~portfolio ~today_bars
+           ~config:t.deps.stale_hold_policy)
+        ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
     Trading_engine.Engine.update_market t.deps.engine today_bars;
     let%bind execution_reports =
       Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
@@ -435,11 +486,14 @@ let step t =
       {
         date = t.current_date;
         portfolio;
-        portfolio_value = _compute_portfolio_value ~portfolio ~today_bars;
+        portfolio_value =
+          _compute_portfolio_value ~adapter:t.deps.market_data_adapter
+            ~date:t.current_date ~portfolio ~today_bars;
         trades;
         orders_submitted = _submit_orders t orders;
         splits_applied = split_events;
         benchmark_return = _compute_benchmark_return t;
+        had_market_bars = not (List.is_empty today_bars);
       }
     in
     let t' =

@@ -50,15 +50,16 @@ let _build_market_data_adapter ~data_dir ~bar_data_source =
       failwithf "Panel_runner: Bar_data_source.build_adapter failed: %s"
         (Status.show err) ()
 
-let _make_simulator (input : input) ~stop_log ~start_date ~end_date ~warmup_days
-    ~initial_cash ~commission ~strategy ~market_data_adapter =
+let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
+    ~end_date ~warmup_days ~initial_cash ~commission ~strategy
+    ~market_data_adapter =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission
       ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
-      ~market_data_adapter ()
+      ~market_data_adapter ~stale_hold_log ()
   in
   let sim_config =
     Simulator.
@@ -275,6 +276,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   let stop_log = Stop_log.create () in
   let trade_audit = Trade_audit.create () in
   let force_liquidation_log = Force_liquidation_log.create () in
+  let stale_hold_log = Trading_simulation.Stale_hold.Log.create () in
   let audit_recorder =
     Trade_audit_recorder.of_collector ~trade_audit ~force_liquidation_log
   in
@@ -287,8 +289,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
       ~end_date ~audit_recorder
   in
   let sim =
-    _make_simulator input ~stop_log ~start_date ~end_date ~warmup_days
-      ~initial_cash ~commission ~strategy ~market_data_adapter
+    _make_simulator input ~stop_log ~stale_hold_log ~start_date ~end_date
+      ~warmup_days ~initial_cash ~commission ~strategy ~market_data_adapter
   in
   let progress_acc =
     _build_progress_acc ~progress_emitter ~warmup_start ~end_date
@@ -299,4 +301,9 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
-  (sim_result, stop_log, trade_audit, force_liquidation_log, final_close_prices)
+  ( sim_result,
+    stop_log,
+    trade_audit,
+    force_liquidation_log,
+    stale_hold_log,
+    final_close_prices )

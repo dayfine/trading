@@ -5,7 +5,8 @@
 val write : output_dir:string -> Runner.result -> unit
 (** Write [params.sexp], [summary.sexp], [trades.csv], [equity_curve.csv],
     [open_positions.csv], [final_prices.csv], [splits.csv], [universe.txt], and
-    [macro_trend.sexp] into [output_dir]. The directory must already exist.
+    [macro_trend.sexp] into [output_dir]. Also writes [stale_holds.sexp] iff
+    [result.stale_holds] is non-empty. The directory must already exist.
 
     Additionally writes [trade_audit.sexp] iff [result.audit] is non-empty.
     Empty audit lists (the pre-PR-2 default, capture sites not yet wired)

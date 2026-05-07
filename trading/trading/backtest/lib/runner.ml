@@ -34,6 +34,14 @@ type result = {
   audit : Trade_audit.audit_record list;
   cascade_summaries : Trade_audit.cascade_summary list;
   force_liquidations : Portfolio_risk.Force_liquidation.event list;
+  stale_holds : Trading_simulation.Stale_hold.event list;
+      (** Per-step records of held positions whose underlying bars stopped
+          arriving (typical signature of a corporate action — cash merger, stock
+          merger, bankruptcy delisting, suspension — the strategy did not
+          anticipate). One event per (held position, step) pair while the
+          position remains stale. Filtered to events whose [date >= start_date]
+          (i.e. dropping warmup-window staleness). Persisted to
+          [stale_holds.sexp]. See {!Trading_simulation.Stale_hold}. *)
   final_prices : (string * float) list;
   universe : string list;
       (** Post-cap, sorted list of symbols the simulator actually traded over
@@ -47,28 +55,25 @@ type result = {
 
 (* Trading-day filter *)
 
-(** True if [step] represents a real trading day. On non-trading days (weekends,
-    holidays) the simulator has no price bars and reports
-    [portfolio_value = cash] even when positions are open.
+(** True if [step] represents a real trading day — i.e. the simulator saw at
+    least one bar for any symbol on [step.date]. Reads the authoritative
+    [step_result.had_market_bars] flag set in {!Trading_simulation.Simulator}
+    from the per-tick [today_bars] list.
 
-    Important: this heuristic exists only for mark-to-market aware consumers
-    such as [OpenPositionsValue] / [UnrealizedPnl]. It must NOT be applied to
-    round-trip extraction — round-trips are derived from position-state
-    transitions (fills), which are recorded independently of whether the
-    portfolio's mark-to-market view is populated that day. Applying this filter
-    before [Metrics.extract_round_trips] silently drops every trade whose entry
-    *and* exit landed on steps where [portfolio_value ~ cash], which happens for
-    instance when the only non-[Holding] positions are [Entering]/[Closed] (they
-    contribute 0.0 to [Portfolio_view.portfolio_value]). *)
+    Replaces the prior portfolio-value-vs-cash heuristic, which falsely
+    classified post-corporate-action days (held symbol with no further bars →
+    [Calculations.portfolio_value] errors → caller silently substitutes [cash])
+    as non-trading and silently truncated [equity_curve.csv]
+    /[summary.final_portfolio_value] at the day before the gap.
+
+    Must NOT be applied to round-trip extraction — round-trips derive from
+    position-state transitions (fills) recorded independently of bar presence.
+    Applying this filter before [Metrics.extract_round_trips] silently drops
+    every trade whose entry *and* exit landed on steps where
+    [had_market_bars = false]. *)
 let is_trading_day (step : Trading_simulation_types.Simulator_types.step_result)
     =
-  let has_positions =
-    not (List.is_empty step.portfolio.Trading_portfolio.Portfolio.positions)
-  in
-  if has_positions then
-    let cash = step.portfolio.Trading_portfolio.Portfolio.current_cash in
-    Float.(abs (step.portfolio_value -. cash) > 1e-2)
-  else true
+  step.had_market_bars
 
 (* Config overrides via sexp deep-merge *)
 
@@ -398,7 +403,12 @@ let filter_cascade_summaries_in_window summaries ~start_date =
       Date.( >= ) s.date start_date)
 
 let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
-    ~final_value ~round_trips ~sim_result : Summary.t =
+    ~final_value ~round_trips ~sim_result ~stale_holds : Summary.t =
+  let stale_held_symbols =
+    stale_holds
+    |> List.map ~f:(fun (e : Trading_simulation.Stale_hold.event) -> e.symbol)
+    |> List.dedup_and_sort ~compare:String.compare
+  in
   {
     start_date;
     end_date;
@@ -407,6 +417,7 @@ let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
     initial_cash;
     final_portfolio_value = final_value;
     n_round_trips = List.length round_trips;
+    stale_held_symbols;
     metrics =
       _align_summary_metrics ~sim_result ~round_trips ~steps_in_range
         ~start_date ~end_date;
@@ -446,6 +457,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         stop_log,
         trade_audit,
         force_liquidation_log,
+        stale_hold_log,
         final_close_prices ) =
     _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
       ~strategy_choice ?trace ?gc_trace ?bar_data_source ?progress_emitter ()
@@ -486,9 +498,14 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
             ~start_date ))
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
+  let stale_holds =
+    Trading_simulation.Stale_hold.Log.events stale_hold_log
+    |> List.filter ~f:(fun (e : Trading_simulation.Stale_hold.event) ->
+        Date.( >= ) e.date start_date)
+  in
   let summary =
     _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
-      ~final_value ~round_trips ~sim_result
+      ~final_value ~round_trips ~sim_result ~stale_holds
   in
   let final_prices =
     _final_prices_for_held_symbols ~steps ~final_close_prices
@@ -502,6 +519,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     audit;
     cascade_summaries;
     force_liquidations;
+    stale_holds;
     final_prices;
     universe = deps.universe;
   }

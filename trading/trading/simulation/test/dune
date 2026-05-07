@@ -298,3 +298,21 @@
   trading.portfolio
   types
   matchers))
+
+(test
+ (name test_stale_hold)
+ (modules test_stale_hold)
+ (libraries
+  ounit2
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.time_ns_unix
+  status
+  trading.simulation
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.portfolio
+  types
+  matchers))

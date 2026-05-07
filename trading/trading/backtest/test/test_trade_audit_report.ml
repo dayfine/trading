@@ -655,6 +655,7 @@ let _make_runner_result ~start_date ~end_date ~round_trips :
                ~f:(fun acc (t : Trading_simulation.Metrics.trade_metrics) ->
                  acc +. t.pnl_dollars);
         n_round_trips = List.length round_trips;
+        stale_held_symbols = [];
         metrics = Trading_simulation_types.Metric_types.empty;
       };
     round_trips;
@@ -664,6 +665,7 @@ let _make_runner_result ~start_date ~end_date ~round_trips :
     audit = [];
     cascade_summaries = [];
     force_liquidations = [];
+    stale_holds = [];
     final_prices = [];
     universe = [];
   }

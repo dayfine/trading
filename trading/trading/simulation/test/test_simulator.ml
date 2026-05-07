@@ -48,8 +48,8 @@ let make_deps data_dir =
 (* Helper to create expected step_result for comparison.
    portfolio_value defaults to the portfolio's current_cash if not specified,
    which is correct for portfolios with no positions. *)
-let make_expected_step_result ~date ~portfolio ?portfolio_value ~trades
-    ~orders_submitted () =
+let make_expected_step_result ~date ~portfolio ?portfolio_value
+    ?(had_market_bars = true) ~trades ~orders_submitted () =
   let portfolio_value =
     Option.value portfolio_value
       ~default:portfolio.Trading_portfolio.Portfolio.current_cash
@@ -62,6 +62,7 @@ let make_expected_step_result ~date ~portfolio ?portfolio_value ~trades
     orders_submitted;
     splits_applied = [];
     benchmark_return = None;
+    had_market_bars;
   }
 
 (* Custom matchers for step_outcome *)
@@ -107,7 +108,8 @@ let test_create_with_empty_symbols _ =
       let expected_result =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ()
+          ~portfolio:expected_portfolio ~had_market_bars:false ~trades:[]
+          ~orders_submitted:[] ()
       in
       assert_that (step sim)
         (is_ok_and_holds
@@ -784,6 +786,72 @@ let test_weekly_cadence_calls_strategy_only_on_fridays _ =
       (* Strategy should only be called on the two Fridays (Jan 12 and Jan 19) *)
       assert_that !call_count (equal_to 2))
 
+(* ==================== Forward-fill valuation ==================== *)
+
+(** Pins the prior-bar-exists branch of [_prices_for_held_positions] in the
+    simulator (PR #916, qc-behavioral CP4). When a held position's symbol has no
+    bar today but the adapter has a prior bar, [_compute_portfolio_value] must
+    forward-fill at the last-known close — otherwise mark-to-market on
+    post-corporate-action days incorrectly snaps to cash-only and the equity
+    curve flatlines.
+
+    Setup: AAPL has bars on Jan 2 + Jan 3 only. [Long_strategy] enters day 1
+    (Jan 2), so a buy order submits and fills on day 2 (Jan 3) at open=154,
+    leaving 10 shares in the broker portfolio. The strategy issues an exit on
+    day 2, but day 3 (Jan 4) has no AAPL bar so the sell does not fill — the
+    broker portfolio still holds 10 shares. The day-3 step must value the held
+    position at the day-2 close (157.0), NOT at zero (the bug path). *)
+let test_forward_fill_uses_last_known_close_when_held_symbol_has_no_bar _ =
+  let prices_through_jan_3 = List.take sample_aapl_prices 2 in
+  with_test_data "simulator_forward_fill"
+    [ ("AAPL", prices_through_jan_3) ]
+    ~f:(fun data_dir ->
+      let deps = make_deps data_dir in
+      let config =
+        { sample_config with end_date = date_of_string "2024-01-05" }
+      in
+      (* Submit a market buy directly so the test pins forward-fill at the
+         valuation layer without coupling to a strategy implementation. *)
+      let order_params =
+        Trading_orders.Create_order.
+          {
+            symbol = "AAPL";
+            side = Trading_base.Types.Buy;
+            quantity = 10.0;
+            order_type = Trading_base.Types.Market;
+            time_in_force = Trading_orders.Types.GTC;
+          }
+      in
+      let order =
+        match Trading_orders.Create_order.create_order order_params with
+        | Ok o -> o
+        | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+      in
+      Trading_orders.Manager.submit_orders deps.order_manager [ order ]
+      |> ignore;
+      let sim = Test_helpers.create_exn ~config ~deps in
+      (* Day 1 (Jan 2): market buy fills at open=150; cash = 10000 - 1500 - 1.   *)
+      let sim, result1 = step_exn sim in
+      assert_that result1.trades (size_is 1);
+      let cash_after_buy = result1.portfolio.current_cash in
+      (* Day 2 (Jan 3): bar present, position still held, mark-to-market.  *)
+      let sim, result2 = step_exn sim in
+      assert_that result2.had_market_bars (equal_to true);
+      (* Day 3 (Jan 4): NO AAPL bar today. The broker portfolio still
+         holds 10 shares of AAPL. portfolio_value must use the Jan-3
+         close (157.0) via forward-fill, NOT collapse to cash-only. *)
+      let _, result3 = step_exn sim in
+      assert_that result3.had_market_bars (equal_to false);
+      let expected_with_forward_fill = cash_after_buy +. (10.0 *. 157.0) in
+      assert_that result3.portfolio_value
+        (float_equal ~epsilon:1.0 expected_with_forward_fill);
+      (* Bug-path: portfolio_value would collapse to cash_after_buy
+         (~$8499) — diverging from the forward-fill expectation by ~$1570.
+         Pin the gap explicitly so a regression in the fallback branch
+         fails this row even if the forward-fill formula drifts. *)
+      assert_that result3.portfolio_value
+        (gt (module Float_ord) (cash_after_buy +. 100.0)))
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -791,6 +859,9 @@ let suite =
   >::: [
          "create returns simulator" >:: test_create_returns_simulator;
          "create with empty symbols" >:: test_create_with_empty_symbols;
+         "forward-fill: held symbol with no bar today values at last-known \
+          close (PR #916 CP4)"
+         >:: test_forward_fill_uses_last_known_close_when_held_symbol_has_no_bar;
          "step executes market order" >:: test_step_executes_market_order;
          "limit order executes on later day"
          >:: test_limit_order_executes_on_later_day;
