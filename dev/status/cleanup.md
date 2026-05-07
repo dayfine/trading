@@ -15,7 +15,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [~] nesting: analysis/data/sources/wiki_sp500/lib/membership_replay.ml — _events_in_window avg 5.83 max 9; _undo_event avg 4.11 max 6; parse_current_csv max 6; _resolve_column_indices max 6; _compare_events nested-else 1 (source: dispatch 2026-05-07)
+- [x] nesting: analysis/data/sources/wiki_sp500/lib/membership_replay.ml — extracted 6 helpers; all 5 violations eliminated; 51 tests pass. (branch cleanup/nesting-membership-replay, 2026-05-08)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
