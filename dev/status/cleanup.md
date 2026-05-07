@@ -17,6 +17,8 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
+- [~] fn_length + file_length: trading/trading/backtest/lib/runner.ml — `run_backtest` 83 lines, file 528 lines; extract metric-overlay helpers + sub-functions (source: dispatch 2026-05-07)
+
 ## Completed
 
 - [x] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — extracted `_parse_and_accumulate` and `_read_next_line` helpers; nesting linter now passes (835 fns, all OK). (source: 2026-04-26-fast.md, PR #578 merged 2026-04-26T16:04Z)
