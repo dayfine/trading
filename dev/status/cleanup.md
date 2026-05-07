@@ -15,7 +15,8 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [~] nesting: trading/trading/weinstein/snapshot/lib/round_trip_verifier.ml — _check_adjusted_close_continuity avg 4.46 max 9 (source: dispatch 2026-05-07)
+- [x] nesting: trading/trading/weinstein/snapshot/lib/round_trip_verifier.ml — extracted _bar_mismatch + _continuity_check_result; fn avg 4.46→resolved, file avg 2.60→below 2.5 (PR #936, 2026-05-07)
+- [ ] nesting: trading/trading/weinstein/snapshot/lib/round_trip_verifier.ml — _check_position_carryover avg 3.62 max 6, _check_stop_adjusted avg 3.50 max 6, _check_stop_unchanged avg 3.59 max 6 (source: dispatch 2026-05-07, pre-existing, separate PR)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
