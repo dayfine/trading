@@ -15,7 +15,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [~] nesting: trading/trading/weinstein/strategy/lib/stage3_force_exit_runner.ml — _process_position avg 5.00 max 11 (limits avg 3.0 max 5); extract nested match chains into helpers (source: dispatch 2026-05-07)
+- [x] nesting: trading/trading/weinstein/strategy/lib/stage3_force_exit_runner.ml — extracted _find_force_exit + _emit_if_eligible; _process_position nesting flattened (PR #935, 2026-05-07)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
