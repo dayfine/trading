@@ -89,6 +89,33 @@ type _walk_state = {
     Stage-3 streak began. The exit week of a Stage-3 transition is [f] (the
     earliest signal), not the streak's confirmation week. *)
 
+(** Advance the Stage-3 streak and decide Continue vs Stage-3 exit. Called by
+    [_step] after the stop-hit check has already been resolved to [false]. *)
+let _step_stage3 ~(config : config)
+    ~(new_stop_state : Weinstein_stops.stop_state) ~(state : _walk_state)
+    ~(outlook : weekly_outlook) :
+    [ `Exit of weekly_outlook * Optimal_types.exit_trigger
+    | `Continue of _walk_state ] =
+  let stage3 = _is_stage3 outlook in
+  let new_streak_start, new_streak_len, exit_anchor =
+    match (stage3, state.stage3_streak_start) with
+    | true, None -> (Some (outlook.date, outlook), 1, outlook)
+    | true, Some (start_date, start_outlook) ->
+        ( Some (start_date, start_outlook),
+          state.stage3_streak_len + 1,
+          start_outlook )
+    | false, _ -> (None, 0, outlook)
+  in
+  if stage3 && new_streak_len >= config.stage3_confirm_weeks then
+    `Exit (exit_anchor, Optimal_types.Stage3_transition)
+  else
+    `Continue
+      {
+        stop_state = new_stop_state;
+        stage3_streak_start = new_streak_start;
+        stage3_streak_len = new_streak_len;
+      }
+
 (** Process a single weekly outlook, returning either an exit decision or the
     advanced walk state. Splits the per-step logic out of the recursive walker
     so each path stays under the function-length budget. *)
@@ -105,26 +132,7 @@ let _step ~(config : config) ~(side : Trading_base.Types.position_side)
   in
   let stop_hit = match stop_event with Stop_hit _ -> true | _ -> false in
   if stop_hit then `Exit (outlook, Optimal_types.Stop_hit)
-  else
-    let stage3 = _is_stage3 outlook in
-    let new_streak_start, new_streak_len, exit_anchor =
-      match (stage3, state.stage3_streak_start) with
-      | true, None -> (Some (outlook.date, outlook), 1, outlook)
-      | true, Some (start_date, start_outlook) ->
-          ( Some (start_date, start_outlook),
-            state.stage3_streak_len + 1,
-            start_outlook )
-      | false, _ -> (None, 0, outlook)
-    in
-    if stage3 && new_streak_len >= config.stage3_confirm_weeks then
-      `Exit (exit_anchor, Optimal_types.Stage3_transition)
-    else
-      `Continue
-        {
-          stop_state = new_stop_state;
-          stage3_streak_start = new_streak_start;
-          stage3_streak_len = new_streak_len;
-        }
+  else _step_stage3 ~config ~new_stop_state ~state ~outlook
 
 (** Walk [forward] week by week. Returns the chosen [(exit_outlook, trigger)]
     pair, or [None] when the walk runs to the end without firing — caller
@@ -139,6 +147,29 @@ let rec _walk ~config ~side ~state ~forward :
       | `Continue new_state ->
           _walk ~config ~side ~state:new_state ~forward:rest)
 
+(** Build the initial per-symbol walk state from the candidate's suggested stop.
+*)
+let _make_initial_state (candidate : Optimal_types.candidate_entry) :
+    _walk_state =
+  {
+    stop_state = _seed_state candidate;
+    stage3_streak_start = None;
+    stage3_streak_len = 0;
+  }
+
+(** Walk [forward] and resolve the exit, defaulting to [End_of_run] when the
+    walk exhausts the list without triggering a stop or Stage-3 exit. *)
+let _resolve_exit ~config ~(candidate : Optimal_types.candidate_entry)
+    ~(forward : weekly_outlook list) :
+    weekly_outlook * Optimal_types.exit_trigger =
+  let initial_state = _make_initial_state candidate in
+  match _walk ~config ~side:candidate.side ~state:initial_state ~forward with
+  | Some chosen -> chosen
+  | None ->
+      (* End of run: exit at the last forward outlook. *)
+      let last = List.last_exn forward in
+      (last, Optimal_types.End_of_run)
+
 let score ~config ~(candidate : Optimal_types.candidate_entry)
     ~(forward : weekly_outlook list) : Optimal_types.scored_candidate option =
   if not (_candidate_valid candidate) then None
@@ -146,21 +177,7 @@ let score ~config ~(candidate : Optimal_types.candidate_entry)
     match forward with
     | [] -> None
     | _ ->
-        let initial_state =
-          {
-            stop_state = _seed_state candidate;
-            stage3_streak_start = None;
-            stage3_streak_len = 0;
-          }
-        in
         let exit_outlook, exit_trigger =
-          match
-            _walk ~config ~side:candidate.side ~state:initial_state ~forward
-          with
-          | Some chosen -> chosen
-          | None ->
-              (* End of run: exit at the last forward outlook. *)
-              let last = List.last_exn forward in
-              (last, Optimal_types.End_of_run)
+          _resolve_exit ~config ~candidate ~forward
         in
         Some (_build_scored ~candidate ~exit_outlook ~exit_trigger)
