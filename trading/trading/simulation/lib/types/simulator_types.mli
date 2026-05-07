@@ -46,6 +46,16 @@ type step_result = {
           first appearance of the benchmark in the simulation window). The
           antifragility computer reads this field per step to assemble its
           benchmark series. *)
+  had_market_bars : bool;
+      (** [true] iff at least one symbol in [dependencies.symbols] had a bar for
+          [date]. Authoritative trading-day signal: weekends, holidays, and
+          pre-listing days produce [false]; any real session produces [true].
+          Replaces the prior portfolio-value-vs-cash heuristic in
+          {!Backtest.Runner.is_trading_day} and
+          {!Trading_simulation.Metric_computer_utils.is_trading_day_step}, which
+          falsely classified post-corporate-action days (held symbol with no
+          further bars) as non-trading and silently truncated the equity curve.
+      *)
 }
 [@@deriving show, eq]
 (** Result of a single simulation step *)

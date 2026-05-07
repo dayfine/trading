@@ -35,6 +35,7 @@ let _step_with_trades ~date ~trades : Simulator_types.step_result =
     orders_submitted = [];
     splits_applied = [];
     benchmark_return = None;
+    had_market_bars = true;
   }
 
 let _config =

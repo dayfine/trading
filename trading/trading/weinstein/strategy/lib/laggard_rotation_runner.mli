@@ -23,10 +23,25 @@
 
     Invoked AFTER {!Stops_runner.update}, AFTER
     {!Force_liquidation_runner.update}, AND AFTER
-    {!Stage3_force_exit_runner.update} (so the three earlier exit channels have
-    priority — a position already exiting via any of them is not re-exited under
-    laggard rotation) and BEFORE the entry walk on the same tick (so freed cash
-    is visible to the entry walk).
+    {!Stage3_force_exit_runner.update}, and BEFORE the entry walk on the same
+    tick (so freed cash is visible to the entry walk).
+
+    Single-exit invariant — at most one [TriggerExit] per position per tick — is
+    enforced two ways depending on which earlier channel fired:
+
+    - {b Stops + Stage-3}: the laggard runner sees their position_ids in
+      [skip_position_ids] and emits no laggard transition for them. The stop /
+      Stage-3 label is the surviving exit reason.
+    - {b Force-liquidation}: NOT included in [skip_position_ids]. Instead, the
+      caller post-strips colliding force-liq transitions after the laggard
+      runner returns — see [weinstein_strategy.ml] around line 691. When both
+      channels fire for the same position on the same tick, the surviving label
+      is [laggard_rotation], not [force_liquidation_*]. The single-exit
+      invariant still holds; only the reason attribution differs from a strict
+      "earlier-wins" reading. This was a deliberate choice when laggard rotation
+      landed (PR #909) — the laggard signal is strategy-driven, the force-liq is
+      defense-in-depth, so attributing the exit to the strategy signal carries
+      more diagnostic value.
 
     {1 RS computation}
 
@@ -81,14 +96,23 @@ val update :
       {!Laggard_rotation.observe_position} — the detector mutates
       [laggard_streaks] in place to maintain the consecutive-negative-RS count.
       4. On [Laggard_exit { rs_13w_neg_weeks }]:
-    - Skips the position if its [position_id] is in [skip_position_ids] —
-      another exit channel (stops, force-liq, Stage-3) already exited it this
-      tick.
+    - Skips the position if its [position_id] is in [skip_position_ids] — a stop
+      or Stage-3 force-exit already exited it this tick. Force-liquidation is
+      intentionally NOT in this set; collisions there are resolved by the
+      caller's post-strip path documented in the module-level "Side & ordering"
+      section.
     - Otherwise emits a [TriggerExit] transition with
       [exit_reason = StrategySignal { label = "laggard_rotation"; detail = Some
        "rs_13w_neg_weeks=N" }] and [exit_price = bar.close_price] from
       [get_price]. When [get_price] returns [None] the position is silently
       skipped (no transition emitted).
+    - {b Exit semantics}: the emitted [TriggerExit] closes the {e entire}
+      position, not a partial slice. The book authority §5.6 ("lighten up") is
+      ambiguous between full and partial exits; the framing note (#896) flagged
+      partial-exit as an open question. PR #909 took the simpler full-exit
+      interpretation as the chosen semantics. Partial-exit ("lighten up by N%")
+      is future scope — would require a [TriggerPartialExit] transition kind
+      that the position state machine does not currently support.
     - Short positions and non-Holding states are skipped without emitting, and
       their entry in [laggard_streaks] is left untouched.
 

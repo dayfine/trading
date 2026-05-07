@@ -29,6 +29,15 @@ type dependencies = {
           outside [symbols] — bars are fetched independently. The antifragility
           computer reads these per-step values to compute ConcavityCoef and
           BucketAsymmetry. *)
+  stale_hold_policy : Stale_hold.config;
+      (** Stale-held-position detection policy. Default
+          {!Stale_hold.default_config} (enabled, K=5 days). Each step queries
+          {!Stale_hold.detect_stale} and appends events to [stale_hold_log]. The
+          detector is a recorder, not a force-closer — see {!Stale_hold} for the
+          deferred-M&A rationale. *)
+  stale_hold_log : Stale_hold.Log.t;
+      (** Per-run collector populated by every step where at least one held
+          position is stale. Drained by the runner at end-of-run. *)
 }
 
 val create_deps :
@@ -39,6 +48,8 @@ val create_deps :
   ?metric_suite:metric_suite ->
   ?benchmark_symbol:string ->
   ?market_data_adapter:Trading_simulation_data.Market_data_adapter.t ->
+  ?stale_hold_policy:Stale_hold.config ->
+  ?stale_hold_log:Stale_hold.Log.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
@@ -56,7 +67,12 @@ val create_deps :
       supplies a callback-mode adapter backed by [Daily_panels.t] instead of a
       [Price_cache.t]. [data_dir] is still required for the
       [dependencies.data_dir] field that downstream callers may read but is
-      unused for adapter construction when [market_data_adapter] is supplied. *)
+      unused for adapter construction when [market_data_adapter] is supplied.
+    @param stale_hold_log
+      Per-run collector populated by every step where at least one held position
+      is stale. Defaults to a fresh log; pass a pre-built one when the caller
+      wants to drain events at run end (the backtest runner does this to persist
+      [stale_holds.sexp]). *)
 
 (** {1 Creation} *)
 

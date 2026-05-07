@@ -23,6 +23,7 @@ let _make_summary ?(metrics = Metric_types.empty) ?(final = 1_010_000.0)
     initial_cash = 1_000_000.0;
     final_portfolio_value = final;
     n_round_trips;
+    stale_held_symbols = [];
     metrics;
   }
 

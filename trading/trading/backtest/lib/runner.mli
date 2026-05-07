@@ -41,6 +41,17 @@ type result = {
           persists it as [force_liquidations.sexp]. Each event is evidence the
           primary stop machinery failed to protect a trade — non-zero counts on
           a release run flag a regression. *)
+  stale_holds : Trading_simulation.Stale_hold.event list;
+      (** Per-step records of held positions whose underlying bars stopped
+          arriving (typical signature of a corporate action — cash merger, stock
+          merger, bankruptcy delisting, suspension — the strategy did not
+          anticipate). One event per (held position, step) pair while the
+          position remains stale. Filtered to events whose [date >= start_date].
+          Persisted to [stale_holds.sexp] by [Result_writer.write] when
+          non-empty. The detector is a recorder, not a force-closer; the
+          position continues to be valued via forward-fill of the last-known
+          close in {!Trading_simulation.Simulator}'s portfolio-value
+          computation. *)
   final_prices : (string * float) list;
       (** Snapshot of close prices on the run's final calendar day, keyed by
           symbol. Populated by [Panel_runner.run] from the snapshot's [Close]
@@ -103,17 +114,19 @@ val filter_cascade_summaries_in_window :
 
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
-(** True if [step] represents a real trading day — i.e. the portfolio's
-    mark-to-market value materially differs from its cash balance when any
-    positions are open, or if no positions are open. On non-trading days
-    (weekends, holidays) the simulator has no price bars and reports
-    [portfolio_value = cash] even when positions exist.
+(** True if [step] represents a real trading day — i.e. the simulator saw at
+    least one bar for any symbol on [step.date]. Reads the authoritative
+    [step_result.had_market_bars] flag set in {!Trading_simulation.Simulator}.
 
-    This filter is appropriate for mark-to-market aware consumers (the equity
-    curve, [UnrealizedPnl]) but MUST NOT be applied before round-trip extraction
-    — doing so silently drops trades whose entry/exit steps had no
-    mark-to-market view. See PR #393 (filter introduction) and the trades.csv
-    fix note in [runner.ml]. *)
+    Replaces the prior portfolio-value-vs-cash heuristic, which falsely
+    classified post-corporate-action days (held symbol with no further bars) as
+    non-trading and silently truncated [equity_curve.csv] /
+    [summary.final_portfolio_value] at the day before the gap.
+
+    Must NOT be applied before [Metrics.extract_round_trips] — round-trips
+    derive from position-state transitions recorded independently of bar
+    presence; filtering on [had_market_bars = false] silently drops trades whose
+    entry/exit landed on bar-less days. *)
 
 val run_backtest :
   start_date:Date.t ->

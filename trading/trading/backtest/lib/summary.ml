@@ -26,6 +26,13 @@ type t = {
   initial_cash : Money.t;
   final_portfolio_value : Money.t;
   n_round_trips : int;
+  stale_held_symbols : string list;
+      (** Distinct symbols whose underlying bars stopped arriving while the run
+          still held the position — typical signature of an unanticipated
+          corporate action (cash merger, stock merger, bankruptcy delisting,
+          suspension). Sorted ascending. Empty list on a clean run. Surfaced
+          here so a release-gate consumer can flag ghost-position exposure
+          without parsing [stale_holds.sexp] separately. *)
   metrics : Metric_set.t;
 }
 [@@deriving sexp_of]

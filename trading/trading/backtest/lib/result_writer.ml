@@ -211,6 +211,22 @@ let _write_force_liquidations ~output_dir
         (output_dir ^ "/force_liquidations.sexp")
         (Force_liquidation_log.sexp_of_artefact blob)
 
+(** Persist [result.stale_holds] as [stale_holds.sexp] when non-empty. Empty
+    list (the common case — every held position kept producing bars through
+    end-of-run) produces no file. Each event records (symbol, step date,
+    last_bar_date, last_close, days_since_last_bar, quantity, cost_basis) so a
+    release-gate consumer can audit corporate-action exposure without re-running
+    the simulator. See {!Trading_simulation.Stale_hold}. *)
+let _write_stale_holds ~output_dir
+    ~(stale_holds : Trading_simulation.Stale_hold.event list) =
+  match stale_holds with
+  | [] -> ()
+  | evs ->
+      let blob : Trading_simulation.Stale_hold.artefact = { events = evs } in
+      Sexp.save_hum
+        (output_dir ^ "/stale_holds.sexp")
+        (Trading_simulation.Stale_hold.sexp_of_artefact blob)
+
 (* ------------------------------------------------------------------ *)
 (* Reconciler-producer artefacts                                        *)
 (*                                                                      *)
@@ -347,6 +363,7 @@ let write ~output_dir (result : Runner.result) =
     ~cascade_summaries:result.cascade_summaries;
   _write_force_liquidations ~output_dir
     ~force_liquidations:result.force_liquidations;
+  _write_stale_holds ~output_dir ~stale_holds:result.stale_holds;
   _write_open_positions ~output_dir ~steps:result.steps;
   _write_final_prices ~output_dir ~steps:result.steps
     ~final_prices:result.final_prices;
