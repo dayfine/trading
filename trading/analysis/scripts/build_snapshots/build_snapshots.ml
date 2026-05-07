@@ -75,35 +75,38 @@ let _existing_manifest ~output_dir =
   let path = Filename.concat output_dir "manifest.sexp" in
   match Snapshot_manifest.read ~path with Ok m -> Some m | Error _ -> None
 
+let _entry_is_current ~csv_mtime (e : Snapshot_manifest.file_metadata) =
+  Float.( <= ) csv_mtime e.csv_mtime && Stdlib.Sys.file_exists e.path
+
 let _should_skip ~existing ~symbol ~csv_mtime ~schema =
   match existing with
   | None -> false
   | Some (m : Snapshot_manifest.t) ->
-      if not (String.equal m.schema_hash schema.Snapshot_schema.schema_hash)
-      then false
-      else
-        Option.value_map (Snapshot_manifest.find m ~symbol) ~default:false
-          ~f:(fun e ->
-            Float.( <= ) csv_mtime e.csv_mtime && Stdlib.Sys.file_exists e.path)
+      String.equal m.schema_hash schema.Snapshot_schema.schema_hash
+      && Option.value_map (Snapshot_manifest.find m ~symbol) ~default:false
+           ~f:(_entry_is_current ~csv_mtime)
+
+let _file_metadata ~symbol ~path ~csv_mtime =
+  let bytes = In_channel.read_all path in
+  {
+    Snapshot_manifest.symbol;
+    path;
+    byte_size = String.length bytes;
+    payload_md5 = Stdlib.Digest.to_hex (Stdlib.Digest.string bytes);
+    csv_mtime;
+  }
+
+let _write_and_checksum ~symbol ~path ~csv_mtime rows =
+  match Snapshot_format.write ~path rows with
+  | Error err -> Error err
+  | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime)
 
 let _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars ~output_dir
     ~csv_mtime =
+  let path = _file_path ~output_dir ~symbol in
   match Pipeline.build_for_symbol ~symbol ~bars ~schema ?benchmark_bars () with
   | Error err -> Error err
-  | Ok rows -> (
-      let path = _file_path ~output_dir ~symbol in
-      match Snapshot_format.write ~path rows with
-      | Error err -> Error err
-      | Ok () ->
-          let bytes = In_channel.read_all path in
-          Ok
-            {
-              Snapshot_manifest.symbol;
-              path;
-              byte_size = String.length bytes;
-              payload_md5 = Stdlib.Digest.to_hex (Stdlib.Digest.string bytes);
-              csv_mtime;
-            })
+  | Ok rows -> _write_and_checksum ~symbol ~path ~csv_mtime rows
 
 let _maybe_reuse ~existing ~symbol =
   match existing with
@@ -119,6 +122,19 @@ let _checkpoint_manifest ~manifest_path ~schema entry =
       Printf.eprintf "manifest checkpoint failed for %s: %s\n%!"
         entry.Snapshot_manifest.symbol (Status.show err)
 
+let _build_or_log ~symbol ~bars ~schema ~benchmark_bars ~output_dir ~csv_mtime
+    ~manifest_path ~checkpoint =
+  match
+    _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars ~output_dir
+      ~csv_mtime
+  with
+  | Error err ->
+      Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
+      None
+  | Ok entry ->
+      if checkpoint then _checkpoint_manifest ~manifest_path ~schema entry;
+      Some entry
+
 (** Load bars for [symbol] and build its snapshot entry. Returns [None] on load
     or build failure (logs the error). On success, optionally checkpoints the
     manifest entry if [checkpoint] is set. *)
@@ -128,17 +144,9 @@ let _try_build_and_checkpoint ~data_dir ~schema ~benchmark_bars ~output_dir
   | Error err ->
       Printf.eprintf "skip %s: load: %s\n%!" symbol (Status.show err);
       None
-  | Ok bars -> (
-      match
-        _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars ~output_dir
-          ~csv_mtime
-      with
-      | Error err ->
-          Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
-          None
-      | Ok entry ->
-          if checkpoint then _checkpoint_manifest ~manifest_path ~schema entry;
-          Some entry)
+  | Ok bars ->
+      _build_or_log ~symbol ~bars ~schema ~benchmark_bars ~output_dir ~csv_mtime
+        ~manifest_path ~checkpoint
 
 let _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
     ~manifest_path ~checkpoint symbol =
@@ -173,16 +181,16 @@ let _load_universe ~universe_path =
         "build_snapshots: Full_sector_map universes are not supported in Phase \
          B; pass a Pinned universe sexp"
 
+let _load_benchmark_bars ~data_dir sym =
+  match _load_bars ~data_dir ~symbol:sym with
+  | Ok bars -> Some bars
+  | Error err ->
+      Printf.eprintf "warning: benchmark %s load failed: %s\n%!" sym
+        (Status.show err);
+      None
+
 let _benchmark_bars_opt ~data_dir ~benchmark_symbol =
-  match benchmark_symbol with
-  | None -> None
-  | Some sym -> (
-      match _load_bars ~data_dir ~symbol:sym with
-      | Ok bars -> Some bars
-      | Error err ->
-          Printf.eprintf "warning: benchmark %s load failed: %s\n%!" sym
-            (Status.show err);
-          None)
+  Option.bind benchmark_symbol ~f:(_load_benchmark_bars ~data_dir)
 
 let _verify_or_warn ~manifest_path =
   match Snapshot_verifier.verify_directory ~manifest_path with
@@ -210,32 +218,33 @@ let _write_progress ~output_dir ~progress =
     Printf.eprintf "progress write failed: %s\n%!" msg;
     try Stdlib.Sys.remove tmp with _ -> ())
 
+let _make_progress ~symbols_total ~symbols_done ~last_completed ~started_at =
+  {
+    symbols_total;
+    symbols_done;
+    last_completed;
+    started_at;
+    updated_at = Core_unix.time ();
+  }
+
 let _maybe_emit_progress ~output_dir ~progress_every ~symbols_total
     ~symbols_done ~last_completed ~started_at =
   if symbols_done > 0 && symbols_done mod progress_every = 0 then
     _write_progress ~output_dir
       ~progress:
-        {
-          symbols_total;
-          symbols_done;
-          last_completed;
-          started_at;
-          updated_at = Core_unix.time ();
-        }
+        (_make_progress ~symbols_total ~symbols_done ~last_completed ~started_at)
+
+let _last_symbol entries =
+  match List.last entries with
+  | Some e -> e.Snapshot_manifest.symbol
+  | None -> ""
 
 let _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at =
+  let symbols_done = List.length entries in
+  let last_completed = _last_symbol entries in
   _write_progress ~output_dir
     ~progress:
-      {
-        symbols_total;
-        symbols_done = List.length entries;
-        last_completed =
-          (match List.last entries with
-          | Some e -> e.Snapshot_manifest.symbol
-          | None -> "");
-        started_at;
-        updated_at = Core_unix.time ();
-      }
+      (_make_progress ~symbols_total ~symbols_done ~last_completed ~started_at)
 
 let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
   let manifest = Snapshot_manifest.create ~schema ~entries in
@@ -247,6 +256,19 @@ let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
   | Error err ->
       Printf.eprintf "manifest write failed: %s\n%!" (Status.show err);
       exit 1
+
+let _fold_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
+    ~manifest_path ~progress_every ~symbols_total ~started_at i acc symbol =
+  match
+    _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
+      ~manifest_path ~checkpoint:true symbol
+  with
+  | None -> acc
+  | Some entry ->
+      let symbols_done = i + 1 in
+      _maybe_emit_progress ~output_dir ~progress_every ~symbols_total
+        ~symbols_done ~last_completed:symbol ~started_at;
+      acc @ [ entry ]
 
 let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~incremental
     ~progress_every () =
@@ -261,17 +283,9 @@ let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~incremental
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in
   let entries =
-    List.foldi symbols ~init:[] ~f:(fun i acc symbol ->
-        match
-          _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir
-            ~existing ~manifest_path ~checkpoint:true symbol
-        with
-        | None -> acc
-        | Some entry ->
-            let symbols_done = i + 1 in
-            _maybe_emit_progress ~output_dir ~progress_every ~symbols_total
-              ~symbols_done ~last_completed:symbol ~started_at;
-            acc @ [ entry ])
+    List.foldi symbols ~init:[] ~f:
+      (_fold_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
+         ~manifest_path ~progress_every ~symbols_total ~started_at)
   in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
   _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;
