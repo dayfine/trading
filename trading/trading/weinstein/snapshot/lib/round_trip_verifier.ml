@@ -46,6 +46,27 @@ let _candidate_symbols (snapshot : Weekly_snapshot.t) =
 
 (* --------- Split checks --------- *)
 
+(* Check whether a single bar's adjusted_close * factor recovers close_price. *)
+let _bar_mismatch ~symbol ~factor ~tolerance (b : Types.Daily_price.t) =
+  let recovered = b.adjusted_close *. factor in
+  if _approximately_equal ~tolerance recovered b.close_price then None
+  else
+    Some
+      (Printf.sprintf "%s on %s: adjusted_close*factor=%.6f, close_price=%.6f"
+         symbol (Date.to_string b.date) recovered b.close_price)
+
+(* Build the pass/fail check from the collected mismatch strings. *)
+let _continuity_check_result ~symbol ~factor ~tolerance pre_bars mismatches =
+  if List.is_empty mismatches then
+    _pass ~name:"adjusted_close_continuity"
+      (Printf.sprintf
+         "%s: all %d pre-split bars reconcile (factor=%.4f, tol=%.1e)" symbol
+         (List.length pre_bars) factor tolerance)
+  else
+    _fail ~name:"adjusted_close_continuity"
+      (Printf.sprintf "%s: %d bar(s) failed; first: %s" symbol
+         (List.length mismatches) (List.hd_exn mismatches))
+
 let _check_adjusted_close_continuity ~symbol ~split_date ~factor ~tolerance
     (bars : Types.Daily_price.t list) =
   let pre_bars = List.filter bars ~f:(fun b -> Date.( < ) b.date split_date) in
@@ -55,24 +76,9 @@ let _check_adjusted_close_continuity ~symbol ~split_date ~factor ~tolerance
         (Printf.sprintf "%s: no pre-split bars present in fixture" symbol)
   | _ ->
       let mismatches =
-        List.filter_map pre_bars ~f:(fun b ->
-            let recovered = b.adjusted_close *. factor in
-            if _approximately_equal ~tolerance recovered b.close_price then None
-            else
-              Some
-                (Printf.sprintf
-                   "%s on %s: adjusted_close*factor=%.6f, close_price=%.6f"
-                   symbol (Date.to_string b.date) recovered b.close_price))
+        List.filter_map pre_bars ~f:(_bar_mismatch ~symbol ~factor ~tolerance)
       in
-      if List.is_empty mismatches then
-        _pass ~name:"adjusted_close_continuity"
-          (Printf.sprintf
-             "%s: all %d pre-split bars reconcile (factor=%.4f, tol=%.1e)"
-             symbol (List.length pre_bars) factor tolerance)
-      else
-        _fail ~name:"adjusted_close_continuity"
-          (Printf.sprintf "%s: %d bar(s) failed; first: %s" symbol
-             (List.length mismatches) (List.hd_exn mismatches))
+      _continuity_check_result ~symbol ~factor ~tolerance pre_bars mismatches
 
 let _check_position_carryover ~symbol ~factor ~(pre_lot : held_lot)
     (pick_pre : Weekly_snapshot.t) (pick_post : Weekly_snapshot.t) =
