@@ -3,7 +3,9 @@
 ## Last updated: 2026-05-04
 
 ## Status
-IN_PROGRESS — Phase 1 stable (~18 days uptime); Phase 2 deferred (no active dispatch)
+IN_PROGRESS
+
+(Phase 1 stable, ~18 days uptime; Phase 2 deferred, no active dispatch.)
 
 Phase 1 (scheduled daily orchestrator on GHA) has been producing daily
 summary PRs since 2026-04-16. See `.github/workflows/orchestrator.yml`
