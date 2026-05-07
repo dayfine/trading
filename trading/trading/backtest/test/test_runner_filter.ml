@@ -1,17 +1,16 @@
 (** Regression tests for the [Runner] step-filtering boundary.
 
-    The [is_trading_day] heuristic was introduced by PR #393 so that
-    mark-to-market aware metrics like [OpenPositionsValue] / [UnrealizedPnl]
-    ignore weekend/holiday steps where the simulator falls back to
-    [portfolio_value = cash]. The heuristic was subsequently mis-applied to
-    round-trip extraction, silently dropping ~95% of trades from [trades.csv] on
-    large multi-year runs when entry+exit happened to land on steps that look
-    "non-trading" to the heuristic (e.g. because the only non-[Holding]
-    positions are [Entering]/[Closed], which contribute 0.0 to the
-    mark-to-market portfolio value).
+    [is_trading_day] reads the authoritative [step_result.had_market_bars] flag
+    set by the simulator from the per-tick [today_bars] list. Replaced the prior
+    portfolio-value-vs-cash heuristic, which falsely classified
+    post-corporate-action days (held symbol with no further bars →
+    [Calculations.portfolio_value] errors → caller silently substitutes [cash])
+    as non-trading and silently truncated [equity_curve.csv] /
+    [summary.final_portfolio_value] at the day before the gap.
 
-    These tests pin the invariant that round-trip extraction must see steps
-    flagged as non-trading by [is_trading_day]. *)
+    These tests pin two invariants: 1. [is_trading_day] mirrors
+    [had_market_bars] exactly. 2. Round-trip extraction operates on the
+    unfiltered in-range step list (must not be gated on [is_trading_day]). *)
 
 open OUnit2
 open Core
@@ -35,10 +34,11 @@ let _make_trade ~id ~order_id ~symbol ~side ~quantity ~price =
     timestamp = Time_ns_unix.now ();
   }
 
-(** Build a synthetic step with no mark-to-market signal
-    ([portfolio_value = current_cash]) — the exact shape [is_trading_day]
-    classifies as non-trading when positions are open. *)
-let _make_step_with_trades ~date ~portfolio ~trades =
+(** Build a synthetic step. [had_market_bars] defaults to [true] since most
+    tests want trading-day semantics; the non-trading-day case sets it
+    explicitly to [false]. *)
+let _make_step_with_trades ?(had_market_bars = true) ~date ~portfolio ~trades ()
+    =
   {
     Trading_simulation_types.Simulator_types.date;
     portfolio;
@@ -47,32 +47,47 @@ let _make_step_with_trades ~date ~portfolio ~trades =
     orders_submitted = [];
     splits_applied = [];
     benchmark_return = None;
+    had_market_bars;
   }
 
 (* -------------------------------------------------------------------- *)
-(* Phase 1: [is_trading_day] classifies our synthetic steps correctly    *)
+(* Phase 1: [is_trading_day] mirrors [had_market_bars] exactly           *)
 (* -------------------------------------------------------------------- *)
 
-(** An empty portfolio (no positions) is treated as a trading day — the
-    mark-to-market heuristic only kicks in once there is something to mark. *)
-let test_is_trading_day_empty_portfolio _ =
+(** A step the simulator marked as bar-bearing is a trading day, regardless of
+    portfolio state. *)
+let test_is_trading_day_with_bars _ =
   let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
   let step =
-    _make_step_with_trades
-      ~date:(date_of_string "2024-01-06") (* Saturday, no price bars *)
-      ~portfolio ~trades:[]
+    _make_step_with_trades ~had_market_bars:true
+      ~date:(date_of_string "2024-01-08") (* Monday *)
+      ~portfolio ~trades:[] ()
   in
   assert_that (Backtest.Runner.is_trading_day step) (equal_to true)
 
-(** Once we hold a real position but [portfolio_value = cash] (the simulator's
-    fallback on weekends/holidays), the heuristic marks the step as non-trading.
-    This is the exact state that used to hide trade fills from [trades.csv]. *)
-let test_is_trading_day_flat_value_with_positions _ =
+(** A step with no bars (weekend/holiday/pre-listing) is not a trading day,
+    regardless of portfolio state. *)
+let test_is_trading_day_without_bars _ =
+  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  let step =
+    _make_step_with_trades ~had_market_bars:false
+      ~date:(date_of_string "2024-01-06") (* Saturday *)
+      ~portfolio ~trades:[] ()
+  in
+  assert_that (Backtest.Runner.is_trading_day step) (equal_to false)
+
+(** Post-corporate-action regression: the run holds a position whose symbol has
+    no further bars (delisting / merger / suspension) but the broader market is
+    still trading, so [had_market_bars = true]. The prior value-vs-cash
+    heuristic dropped these days from [equity_curve.csv] because
+    [Calculations.portfolio_value] errored and the fallback returned cash. The
+    new contract keeps the day. *)
+let test_is_trading_day_held_symbol_with_no_bar _ =
   let portfolio_with_position =
     let initial = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
     match
       Trading_portfolio.Portfolio.apply_single_trade initial
-        (_make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL"
+        (_make_trade ~id:"t1" ~order_id:"o1" ~symbol:"ANDV"
            ~side:Trading_base.Types.Buy ~quantity:10.0 ~price:100.0)
     with
     | Ok p -> p
@@ -81,25 +96,22 @@ let test_is_trading_day_flat_value_with_positions _ =
           ("portfolio apply_trades failed: " ^ Status.show err)
   in
   let step =
-    _make_step_with_trades
-      ~date:(date_of_string "2024-01-06")
-      ~portfolio:portfolio_with_position ~trades:[]
+    _make_step_with_trades ~had_market_bars:true
+      ~date:(date_of_string "2018-10-01")
+      ~portfolio:portfolio_with_position ~trades:[] ()
   in
-  (* portfolio has an open position but portfolio_value = cash — the
-     heuristic classifies this as a non-trading day, which is the exact
-     gotcha that used to drop round-trips. *)
-  assert_that (Backtest.Runner.is_trading_day step) (equal_to false)
+  assert_that (Backtest.Runner.is_trading_day step) (equal_to true)
 
 (* -------------------------------------------------------------------- *)
 (* Phase 2: round-trip extraction must NOT be gated on is_trading_day    *)
 (* -------------------------------------------------------------------- *)
 
-(** The core regression. Build two steps, each with a trade fill on a step the
-    [is_trading_day] heuristic flags as non-trading. Pre-fix, pairing
-    [steps = List.filter ~f:is_trading_day] with [extract_round_trips] discards
-    both steps, so the resulting [round_trips] list is empty even though one
-    buy/sell pair completed. Post-fix, round-trip extraction operates on the
-    unfiltered in-range step list and returns the expected pair. *)
+(** Round-trip extraction operates on the unfiltered in-range step list. The
+    [is_trading_day] filter is only valid for mark-to-market consumers (the
+    equity curve, [UnrealizedPnl]) — applying it before
+    [Metrics.extract_round_trips] silently drops trades whose entry+exit landed
+    on bar-less days. This pins that round-trip extraction sees every step
+    regardless of [had_market_bars]. *)
 let test_round_trip_extraction_survives_non_trading_day_filter _ =
   let portfolio_flat =
     Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
@@ -116,31 +128,35 @@ let test_round_trip_extraction_survives_non_trading_day_filter _ =
   in
   let steps_in_range =
     [
-      _make_step_with_trades
+      (* Both steps simulate the failure-mode path: trade fills happened on
+         days the simulator marked as non-trading (had_market_bars=false). *)
+      _make_step_with_trades ~had_market_bars:false
         ~date:(date_of_string "2024-01-02")
         ~portfolio:portfolio_flat
         ~trades:
           [
             _make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL"
               ~side:Trading_base.Types.Buy ~quantity:10.0 ~price:100.0;
-          ];
-      _make_step_with_trades
+          ]
+        ();
+      _make_step_with_trades ~had_market_bars:false
         ~date:(date_of_string "2024-01-15")
         ~portfolio:portfolio_with_position
         ~trades:
           [
             _make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL"
               ~side:Trading_base.Types.Sell ~quantity:10.0 ~price:110.0;
-          ];
+          ]
+        ();
     ]
   in
-  (* Sanity: with positions open but portfolio_value = cash, the heuristic
-     rejects at least the second step — simulating the exact bug path. *)
+  (* Sanity: every step is non-trading by [is_trading_day] — the exact bug
+     path. *)
   let filtered_out =
     List.filter steps_in_range ~f:(fun s ->
         not (Backtest.Runner.is_trading_day s))
   in
-  assert_that (List.length filtered_out) (gt (module Int_ord) 0);
+  assert_that (List.length filtered_out) (equal_to 2);
   (* The in-range (unfiltered) list still produces one round-trip. *)
   let round_trips = Metrics.extract_round_trips steps_in_range in
   assert_that round_trips
@@ -162,16 +178,13 @@ let test_round_trip_extraction_survives_non_trading_day_filter _ =
                (float_equal 10.0);
            ];
        ]);
-  (* The bug: applying is_trading_day before round-trip extraction drops
-     the pair entirely. Pinning the pre-fix behaviour here guards against
-     re-regression if someone "helpfully" reintroduces the filter. *)
+  (* If is_trading_day is mis-applied before round-trip extraction, the pair
+     is dropped entirely. Pin that mis-use produces zero round-trips. *)
   let filtered_steps =
     List.filter steps_in_range ~f:Backtest.Runner.is_trading_day
   in
   let buggy_round_trips = Metrics.extract_round_trips filtered_steps in
-  assert_that
-    (List.length round_trips - List.length buggy_round_trips)
-    (gt (module Int_ord) 0)
+  assert_that buggy_round_trips (size_is 0)
 
 (* -------------------------------------------------------------------- *)
 (* Phase 3: summary metrics overlay matches range-filtered round_trips    *)
@@ -505,10 +518,13 @@ let test_filter_cascade_summaries_drops_warmup _ =
 let suite =
   "Runner_filter"
   >::: [
-         "is_trading_day: empty portfolio returns true"
-         >:: test_is_trading_day_empty_portfolio;
-         "is_trading_day: flat-value + open position returns false"
-         >:: test_is_trading_day_flat_value_with_positions;
+         "is_trading_day: had_market_bars=true returns true"
+         >:: test_is_trading_day_with_bars;
+         "is_trading_day: had_market_bars=false returns false"
+         >:: test_is_trading_day_without_bars;
+         "is_trading_day: held symbol with no bar but market open returns true \
+          (post-corporate-action regression)"
+         >:: test_is_trading_day_held_symbol_with_no_bar;
          "round-trip extraction must not be gated on is_trading_day"
          >:: test_round_trip_extraction_survives_non_trading_day_filter;
          "summary metrics overlay aligns with range-filtered round_trips"

@@ -29,6 +29,7 @@ let _make_step ?benchmark_return ~date ~portfolio_value () :
     orders_submitted = [];
     splits_applied = [];
     benchmark_return;
+    had_market_bars = true;
   }
 
 let _config =

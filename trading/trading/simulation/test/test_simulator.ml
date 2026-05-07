@@ -48,8 +48,8 @@ let make_deps data_dir =
 (* Helper to create expected step_result for comparison.
    portfolio_value defaults to the portfolio's current_cash if not specified,
    which is correct for portfolios with no positions. *)
-let make_expected_step_result ~date ~portfolio ?portfolio_value ~trades
-    ~orders_submitted () =
+let make_expected_step_result ~date ~portfolio ?portfolio_value
+    ?(had_market_bars = true) ~trades ~orders_submitted () =
   let portfolio_value =
     Option.value portfolio_value
       ~default:portfolio.Trading_portfolio.Portfolio.current_cash
@@ -62,6 +62,7 @@ let make_expected_step_result ~date ~portfolio ?portfolio_value ~trades
     orders_submitted;
     splits_applied = [];
     benchmark_return = None;
+    had_market_bars;
   }
 
 (* Custom matchers for step_outcome *)
@@ -107,7 +108,8 @@ let test_create_with_empty_symbols _ =
       let expected_result =
         make_expected_step_result
           ~date:(date_of_string "2024-01-02")
-          ~portfolio:expected_portfolio ~trades:[] ~orders_submitted:[] ()
+          ~portfolio:expected_portfolio ~had_market_bars:false ~trades:[]
+          ~orders_submitted:[] ()
       in
       assert_that (step sim)
         (is_ok_and_holds

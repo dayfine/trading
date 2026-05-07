@@ -25,6 +25,10 @@ type t = {
   initial_cash : Money.t;
   final_portfolio_value : Money.t;
   n_round_trips : int;
+  stale_held_symbols : string list;
+      (** Distinct symbols flagged as stale-held (underlying bars stopped
+          arriving) at any point during the run. Sorted ascending; empty on a
+          clean run. *)
   metrics : Metric_set.t;
 }
 [@@deriving sexp_of]

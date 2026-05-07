@@ -74,6 +74,7 @@ let _empty_summary ~start_date ~end_date : Backtest.Summary.t =
     initial_cash = 100_000.0;
     final_portfolio_value = 100_000.0;
     n_round_trips = 1;
+    stale_held_symbols = [];
     metrics = Trading_simulation_types.Metric_types.empty;
   }
 
@@ -91,6 +92,7 @@ let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
     audit = [];
     cascade_summaries = [];
     force_liquidations;
+    stale_holds = [];
     final_prices;
     universe;
   }
@@ -141,6 +143,7 @@ let _make_step ~date ~portfolio ?(splits_applied = []) () :
     orders_submitted = [];
     splits_applied;
     benchmark_return = None;
+    had_market_bars = true;
   }
 
 (** Read a header-and-rows CSV back as [(header_columns, row_columns_list)].
@@ -649,6 +652,7 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
       audit;
       cascade_summaries = [];
       force_liquidations = [];
+      stale_holds = [];
       final_prices = [];
       universe = [];
     }

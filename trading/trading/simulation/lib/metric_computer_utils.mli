@@ -5,4 +5,6 @@ val trading_days_per_year : float
 
 val is_trading_day_step :
   Trading_simulation_types.Simulator_types.step_result -> bool
-(** True if the step has real market data (not a weekend/holiday). *)
+(** True if the step has real market data — i.e. the simulator saw at least one
+    bar for any symbol on [step.date]. Reads [step_result.had_market_bars]
+    directly. *)
