@@ -200,7 +200,7 @@ let _make_progress_emitter ~progress_every ~output_dir =
     summary from disk. *)
 let _run_and_write ~start_date ~end_date ~overrides ~output_dir
     ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
-    ?bar_data_source ?progress_every () =
+    ?bar_data_source ?progress_every ?slippage_bps () =
   Option.iter memtrace_path ~f:(fun path -> _start_memtrace ~path);
   let trace = Option.map trace_path ~f:(fun _ -> Backtest.Trace.create ()) in
   let gc_trace =
@@ -211,7 +211,7 @@ let _run_and_write ~start_date ~end_date ~overrides ~output_dir
   let result =
     Backtest.Runner.run_backtest ~start_date ~end_date ~overrides
       ?sector_map_override ?trace ?gc_trace ?bar_data_source ?progress_emitter
-      ()
+      ?slippage_bps ()
   in
   eprintf "Writing output to %s/\n%!" output_dir;
   Backtest.Result_writer.write ~output_dir result;
@@ -229,11 +229,11 @@ let _run_and_write ~start_date ~end_date ~overrides ~output_dir
     [--override] by the caller. *)
 let _single_run ~start_date ~end_date ~overrides ~output_dir
     ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
-    ?bar_data_source ?progress_every () =
+    ?bar_data_source ?progress_every ?slippage_bps () =
   let result =
     _run_and_write ~start_date ~end_date ~overrides ~output_dir
       ?sector_map_override ?trace_path ?memtrace_path ?gc_trace_path
-      ?bar_data_source ?progress_every ()
+      ?bar_data_source ?progress_every ?slippage_bps ()
   in
   Out_channel.output_string stdout
     (Sexp.to_string_hum (Backtest.Summary.sexp_of_t result.summary));
@@ -513,4 +513,5 @@ let () =
         ~overrides:(shared_overrides @ overrides)
         ~output_dir:output_root ?trace_path:parsed.trace_path
         ?memtrace_path:parsed.memtrace_path ?gc_trace_path:parsed.gc_trace_path
-        ?bar_data_source ?progress_every:parsed.progress_every ()
+        ?bar_data_source ?progress_every:parsed.progress_every
+        ?slippage_bps:parsed.slippage_bps ()

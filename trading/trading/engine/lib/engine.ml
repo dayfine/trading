@@ -68,6 +68,16 @@ let update_market ?(path_config = Price_path.default_config) engine bars =
 let _calculate_commission config quantity =
   Float.max (quantity *. config.commission.per_share) config.commission.minimum
 
+(** Apply explicit basis-points slippage to a clean fill price. Buys pay up
+    (price increases), sells receive less (price decreases) — symmetric around
+    the underlying execution mid. [bps = 0] is a pure pass-through. Pure /
+    referentially transparent. *)
+let _apply_slippage ~slippage_bps ~side fill_price =
+  if slippage_bps = 0 then fill_price
+  else
+    let factor = 1.0 +. (Float.of_int slippage_bps /. 10_000.0) in
+    match side with Buy -> fill_price *. factor | Sell -> fill_price /. factor
+
 let _generate_trade_id order_id = "trade_" ^ order_id
 
 (** {1 Path-based Fill Checking}
@@ -196,14 +206,20 @@ let _create_trade order_id symbol side quantity price commission =
     timestamp = Time_ns_unix.now ();
   }
 
+(** Adjust [fill.price] by the configured [slippage_bps]. Centralised so every
+    order-type path applies the same cost in lockstep. *)
+let _apply_slippage_to_fill engine ~side (fill : fill_result) : float =
+  _apply_slippage ~slippage_bps:engine.config.slippage_bps ~side fill.price
+
 (* Execute market order - returns Some trade if successful, None otherwise *)
 let _execute_market_order engine (ord : Trading_orders.Types.order) =
   let open Option.Let_syntax in
   let%bind path = Hashtbl.find engine.market_state ord.symbol in
   let%bind fill = _would_fill_market path in
   let commission = _calculate_commission engine.config ord.quantity in
+  let price = _apply_slippage_to_fill engine ~side:ord.side fill in
   return
-    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
+    (_create_trade ord.id ord.symbol ord.side ord.quantity price commission)
 
 (* Execute limit order - returns Some trade if successful, None otherwise *)
 let _execute_limit_order engine (ord : Trading_orders.Types.order) limit_price =
@@ -211,8 +227,9 @@ let _execute_limit_order engine (ord : Trading_orders.Types.order) limit_price =
   let%bind path = Hashtbl.find engine.market_state ord.symbol in
   let%bind fill = _would_fill_limit ~path ~side:ord.side ~limit_price in
   let commission = _calculate_commission engine.config ord.quantity in
+  let price = _apply_slippage_to_fill engine ~side:ord.side fill in
   return
-    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
+    (_create_trade ord.id ord.symbol ord.side ord.quantity price commission)
 
 let _create_execution_report order_id trade =
   { order_id; status = Filled; trades = [ trade ] }
@@ -241,8 +258,9 @@ let _execute_stop_order engine (ord : Trading_orders.Types.order) stop_price =
   let%bind path = Hashtbl.find engine.market_state ord.symbol in
   let%bind fill = _would_fill_stop ~path ~side:ord.side ~stop_price in
   let commission = _calculate_commission engine.config ord.quantity in
+  let price = _apply_slippage_to_fill engine ~side:ord.side fill in
   return
-    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
+    (_create_trade ord.id ord.symbol ord.side ord.quantity price commission)
 
 let _process_stop_order engine order_mgr order stop_price =
   _process_order_with_execution order_mgr order (fun () ->
@@ -259,8 +277,9 @@ let _execute_stop_limit_order engine (ord : Trading_orders.Types.order)
     _would_fill_stop_limit ~path ~side:ord.side ~stop_price ~limit_price
   in
   let commission = _calculate_commission engine.config ord.quantity in
+  let price = _apply_slippage_to_fill engine ~side:ord.side fill in
   return
-    (_create_trade ord.id ord.symbol ord.side ord.quantity fill.price commission)
+    (_create_trade ord.id ord.symbol ord.side ord.quantity price commission)
 
 let _process_stop_limit_order engine order_mgr order stop_price limit_price =
   _process_order_with_execution order_mgr order (fun () ->

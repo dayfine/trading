@@ -21,8 +21,8 @@ type report = Trading_engine.Types.execution_report = {
 (* Test helpers *)
 let test_timestamp = Time_ns_unix.of_string "2024-01-15 10:30:00Z"
 
-let make_config ?(per_share = 0.01) ?(minimum = 1.0) () =
-  { commission = { per_share; minimum } }
+let make_config ?(per_share = 0.01) ?(minimum = 1.0) ?(slippage_bps = 0) () =
+  { commission = { per_share; minimum }; slippage_bps }
 
 let make_bar symbol ~open_price ~high_price ~low_price ~close_price =
   { symbol; open_price; high_price; low_price; close_price }
@@ -1030,10 +1030,82 @@ let test_engine_scratch_threading_parity _ =
   assert_that reused_prices
     (elements_are (List.map fresh_prices ~f:(fun p -> equal_to p)))
 
+(* ==================== Slippage tests (P4) ==================== *)
+
+(** Pins the cost-overlay knob: [engine_config.slippage_bps] applied at fill
+    time produces a buy-side price uplift and a sell-side price discount.
+    Default 0 preserves the no-friction baseline byte-for-byte. *)
+let test_slippage_bps_zero_preserves_fill_price _ =
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:101.0 ~low_price:99.5
+      ~close_price:100.5
+  in
+  let engine, order_mgr, order =
+    setup_order_test ~order_type:Market ~side:Buy ~quote:bar ()
+  in
+  assert_order_executed engine order_mgr order ~price:bar.open_price
+
+let test_slippage_bps_buy_pays_more _ =
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:101.0 ~low_price:99.5
+      ~close_price:100.5
+  in
+  let config = make_config ~slippage_bps:10 () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Buy ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  update_market
+    ~path_config:{ default_config with seed = Some 42 }
+    engine [ bar ];
+  (* Buy at 10 bps = 0.10% above bar open = 100.10. *)
+  assert_order_executed engine order_mgr order ~price:100.10
+
+let test_slippage_bps_sell_receives_less _ =
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:101.0 ~low_price:99.5
+      ~close_price:100.5
+  in
+  let config = make_config ~slippage_bps:10 () in
+  let engine = create config in
+  let order_mgr = OrderManager.create () in
+  let params =
+    make_order_params ~symbol:"AAPL" ~side:Sell ~order_type:Market
+      ~quantity:100.0 ()
+  in
+  let order =
+    match create_order ~now_time:test_timestamp params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  submit_single_order order_mgr order;
+  update_market
+    ~path_config:{ default_config with seed = Some 42 }
+    engine [ bar ];
+  (* Sell at 10 bps = 0.10% below bar open = 100.0 / 1.001 ≈ 99.9001. *)
+  match process_orders engine order_mgr with
+  | Ok [ report ] ->
+      let trade = List.hd_exn report.trades in
+      assert_that trade.price (float_equal ~epsilon:1e-3 99.9001)
+  | _ -> assert_failure "Expected one filled report"
+
 (* Test suite *)
 let suite =
   "Engine Tests"
   >::: [
+         "slippage_bps=0 preserves fill price"
+         >:: test_slippage_bps_zero_preserves_fill_price;
+         "slippage_bps=10 buy pays more" >:: test_slippage_bps_buy_pays_more;
+         "slippage_bps=10 sell receives less"
+         >:: test_slippage_bps_sell_receives_less;
          "test_engine_scratch_threading_parity"
          >:: test_engine_scratch_threading_parity;
          "test_create_engine" >:: test_create_engine;

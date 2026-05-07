@@ -138,6 +138,7 @@ val run_backtest :
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
   ?progress_emitter:Backtest_progress.emitter ->
+  ?slippage_bps:int ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the

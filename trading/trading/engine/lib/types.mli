@@ -68,10 +68,17 @@ type commission_config = {
 (** Commission configuration for calculating trading costs. Commissions are
     calculated as: max(per_share * quantity, minimum) *)
 
-type engine_config = { commission : commission_config } [@@deriving show, eq]
-(** Engine configuration controlling execution behavior and costs.
-
-    Note: Slippage is naturally modeled by the granularity of the intraday price
-    path (~390 points per day). Stop and market orders fill at the current path
-    point price when triggered, giving realistic slippage based on path
-    resolution. *)
+type engine_config = {
+  commission : commission_config;
+  slippage_bps : int;
+      (** Explicit basis-points slippage applied at trade-fill time. Default [0]
+          preserves the pre-cost-knob baseline byte-for-byte. Use non-zero for
+          cost-overlay runs (P4). Buy fills at [price * (1 + bps/10000)], sell
+          fills at [price / (1 + bps/10000)] (symmetric round-trip). The trade
+          record's [price] field reflects the post-slippage fill; the
+          [commission] field is unchanged. Stacks on top of the implicit
+          path-granularity slippage already present in the intraday-path model.
+      *)
+}
+[@@deriving show, eq]
+(** Engine configuration controlling execution behavior and costs. *)
