@@ -7,58 +7,93 @@
 ; scripts must declare _check_lib.sh as a dep so dune sandboxes it
 ; alongside the script; the script's `. "$(dirname "$0")/_check_lib.sh"`
 ; then finds it at the sandboxed location.
+;
+; Cache-invalidation deps: every rule that walks .ml/.mli source files at
+; runtime (via find or Sys.readdir) must declare (glob_files_rec ...) so
+; dune invalidates the rule's cache key when source content changes.
+; Without these deps, `dune runtest` returns a cached PASS on a clean tree
+; even after a new violation is introduced — the bug that caused incident
+; PR #919 (linter cache hid violations; CI on a fresh checkout caught them).
+;
+; Scripts that use repo_root() to read files outside the dune workspace
+; (e.g. .claude/agents/*.md, dev/status/*.md) still need explicit deps
+; for cache invalidation — dune cannot infer cross-boundary reads.
 
 ; Architecture layer boundary: analysis/ must not import trading/trading/
+; Scans dune files under analysis/ for forbidden cross-layer deps.
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps
+  _check_lib.sh
+  (glob_files_rec %{workspace_root}/analysis/dune))
  (action
   (run sh %{dep:arch_layer_test.sh} %{dep:linter_exceptions.conf})))
 
 ; File length: 300-line soft limit, 500-line declared-large limit (11% cap)
+; Scans all lib/*.ml files across the workspace.
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps
+  _check_lib.sh
+  (glob_files_rec %{workspace_root}/*.ml))
  (action
   (run sh %{dep:linter_file_length.sh})))
 
 ; .mli coverage: every lib/*.ml must have a matching .mli
+; Scans lib/*.ml and lib/*.mli files across the workspace.
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps
+  _check_lib.sh
+  (glob_files_rec %{workspace_root}/*.ml)
+  (glob_files_rec %{workspace_root}/*.mli))
  (action
   (run sh %{dep:linter_mli_coverage.sh} %{dep:linter_exceptions.conf})))
 
 ; Magic numbers: numeric literals must be routed through config records
+; Scans all lib/*.ml files across the workspace.
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps
+  _check_lib.sh
+  (glob_files_rec %{workspace_root}/*.ml))
  (action
   (run sh %{dep:linter_magic_numbers.sh} %{dep:linter_exceptions.conf})))
 
 ; Function length: no top-level function body may exceed 50 lines (AST-based)
+; Scans all .ml files across the workspace via Sys.readdir at runtime.
 
 (rule
  (alias runtest)
+ (deps
+  (glob_files_rec %{workspace_root}/*.ml))
  (action
   (run %{exe:../fn_length_linter/fn_length_linter.exe} %{workspace_root})))
 
 ; Formatting gate: all .ml/.mli files must be formatted with ocamlformat
+; Scans all .ml and .mli source files across the workspace.
 
 (rule
  (alias runtest)
+ (deps
+  (glob_files_rec %{workspace_root}/*.ml)
+  (glob_files_rec %{workspace_root}/*.mli))
  (action
   (run sh %{dep:fmt_check.sh})))
 
 ; Nesting depth: fn avg > 3.0 or max > 5, file avg > 2.5 → FAIL (AST-based)
 ; Exempt a function with (* @nesting-ok: reason *) before the let keyword.
+; Scans all .ml files across the workspace via Sys.readdir at runtime.
 
 (rule
  (alias runtest)
+ (deps
+  (glob_files_rec %{workspace_root}/*.ml)
+  %{dep:linter_exceptions.conf})
  (action
   (run
    %{exe:../nesting_linter/nesting_linter.exe}
@@ -67,10 +102,13 @@
 
 ; @testing-only enforcement: libraries annotated "; @testing-only" must not
 ; appear in (library ...) stanza dependencies — only (test ...) / (tests ...)
+; Scans all dune files across the workspace.
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps
+  _check_lib.sh
+  (glob_files_rec %{workspace_root}/dune))
  (action
   (run sh %{dep:testing_only_check.sh})))
 
@@ -79,6 +117,10 @@
 ; ## Pre-Work Setup. Read-only QC agents are exempt from the Pre-Work Setup rule.
 ; Reaches .claude/agents/ at the repo root via repo_root() in _check_lib.sh,
 ; which walks up from the sandboxed script's directory looking for .git.
+; Note: .claude/agents/*.md is outside the dune workspace root; dune cannot
+; track those files via glob_files. Cache is invalidated when _check_lib.sh or
+; the check script itself changes. Agents rarely change; the cost of a missed
+; cache invalidation is one stale PASS until the next script edit.
 
 (rule
  (alias runtest)
@@ -113,6 +155,9 @@
 ; dev/status/ lives at the repo root (above trading/), outside the dune
 ; workspace — the script uses repo_root (git rev-parse) from _check_lib.sh
 ; to find it.
+; Note: dev/status/*.md is outside the dune workspace root; dune cannot track
+; those files via glob_files. Cache is invalidated when _check_lib.sh or the
+; check script itself changes.
 
 (rule
  (alias runtest)
@@ -124,6 +169,9 @@
 ; required Plan Mode section + --plan trigger + output path docs. Structural
 ; check only — we do not invoke `claude -p` from dune runtest (credentials,
 ; network, flakiness).
+; Note: lead-orchestrator.md is outside the dune workspace root; dune cannot
+; track it via a dep expression. Cache is invalidated when _check_lib.sh or
+; the check script itself changes.
 
 (rule
  (alias runtest)
@@ -135,9 +183,12 @@
 ; To generate the per-function JSON for trend analysis, run:
 ;   cc_linter <trading-root> dev/metrics/cc-latest.json
 ; (deep_scan.sh writes to the same rolling file on each run.)
+; Scans all .ml files across the workspace via Sys.readdir at runtime.
 
 (rule
  (alias runtest)
+ (deps
+  (glob_files_rec %{workspace_root}/*.ml))
  (action
   (run %{exe:../cc_linter/cc_linter.exe} %{workspace_root})))
 
@@ -257,10 +308,15 @@
 ; Catches parse-time bash-isms: arrays arr=(...), here-strings <<<, process
 ; substitution <(...). Introduced to prevent the class of rework that hit
 ; PR #483 (bash-isms in scripts expected to run under sh in GHA devcontainer).
+; Deps: .sh files within the workspace (devtools/checks/ and deep_scan/).
+; Note: dev/lib/*.sh and dev/scripts/*.sh are outside the dune workspace root
+; and cannot be tracked via glob_files here; those dirs are read via repo_root().
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps
+  _check_lib.sh
+  (glob_files_rec %{workspace_root}/*.sh))
  (action
   (run sh %{dep:posix_sh_check.sh})))
 
@@ -279,6 +335,10 @@
 ; grandfathered scripts (perf_sweep_report.py, perf_hypothesis_report.py) were
 ; deleted in cleanup/no-more-python when the Legacy loader_strategy was removed.
 ; See .claude/rules/no-python.md for the policy.
+; No glob dep needed: the check expects zero *.py files; it reads repo_root()
+; directly. Adding a glob_files_rec for *.py would itself fail the no-python
+; linter if any .py file existed. Cache is invalidated whenever _check_lib.sh
+; changes (which is the script boundary).
 
 (rule
  (alias runtest)

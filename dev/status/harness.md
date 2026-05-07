@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-05-06
+## Last updated: 2026-05-08
 
 ## Status
 IN_PROGRESS
@@ -103,6 +103,8 @@ Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. 
 ## Follow-up / Known Improvements
 
 Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
+
+- [x] **Dune linter dep tracking** (PR #943, harness/dune-linter-deps): `trading/devtools/checks/dune` rules for nesting_linter, fn_length_linter, cc_linter, linter_magic_numbers.sh, linter_mli_coverage.sh, linter_file_length.sh, fmt_check.sh, arch_layer_test.sh, testing_only_check.sh, posix_sh_check.sh did not declare `(deps (glob_files_rec ...))` for the source files they scan. Dune's cache key therefore only invalidated on the linter script/exe change — NOT on .ml content changes anywhere else. Root cause of incident PR #919 (linter cache hid violations; CI on fresh checkout caught them). Fix: add `(glob_files_rec %{workspace_root}/*.ml)`, `(glob_files_rec %{workspace_root}/*.mli)`, `(glob_files_rec %{workspace_root}/dune)`, `(glob_files_rec %{workspace_root}/*.sh)` deps as appropriate per linter. Files outside workspace (`.claude/agents/*.md`, `dev/status/*.md`) cannot be tracked via glob_files due to dune workspace boundary; those rules retain comment explaining the limitation. Verify: `dune build devtools/checks/` passes; introducing a new `.ml` violation should make `dune runtest` fail on next run.
 
 - ~~**A2 rule stale — false-positive NEEDS_REWORK verdicts**~~ — DONE (harness/a2-rule-update): `.claude/rules/qc-structural-authority.md` §A2 updated from blanket ban to explicit allow-list. `trading/trading/backtest/**/dune` files may declare `weinstein.*` dependencies (established practice: 5+ dune files verified). Still FAIL: (1) non-`weinstein.*` analysis imports; (2) `weinstein.*` imports outside `trading/trading/backtest/**`. Source: orchestrator override notes in `dev/reviews/optimal-strategy.md` (PRs #652, #666). Verify: read `A2` row in `.claude/rules/qc-structural-authority.md`.
 
