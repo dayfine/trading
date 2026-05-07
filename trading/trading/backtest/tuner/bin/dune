@@ -1,6 +1,12 @@
 (library
  (name tuner_bin)
- (modules grid_search_spec grid_search_evaluator grid_search_runner)
+ (modules
+  grid_search_spec
+  grid_search_evaluator
+  grid_search_runner
+  bayesian_runner_spec
+  bayesian_runner_evaluator
+  bayesian_runner_runner)
  (libraries
   core
   core_unix.filename_unix
@@ -14,4 +20,9 @@
 (executable
  (name grid_search)
  (modules grid_search)
+ (libraries core core_unix tuner backtest scenario_lib tuner_bin))
+
+(executable
+ (name bayesian_runner)
+ (modules bayesian_runner)
  (libraries core core_unix tuner backtest scenario_lib tuner_bin))
