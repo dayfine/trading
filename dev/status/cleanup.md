@@ -17,10 +17,9 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
-- [~] fn_length + file_length: trading/trading/backtest/lib/runner.ml — `run_backtest` 83 lines, file 528 lines; extract metric-overlay helpers + sub-functions (source: dispatch 2026-05-07)
-
 ## Completed
 
+- [x] fn_length + file_length: trading/trading/backtest/lib/runner.ml — extracted `Runner_metrics` module + `_filter_steps`/`_extract_filtered_logs` helpers; runner.ml 528→468 lines, `run_backtest` 83→49 lines. Branch cleanup/runner-fn-length (2026-05-07)
 - [x] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — extracted `_parse_and_accumulate` and `_read_next_line` helpers; nesting linter now passes (835 fns, all OK). (source: 2026-04-26-fast.md, PR #578 merged 2026-04-26T16:04Z)
 - [x] fn_length / file_length: weinstein_strategy.ml — added @large-module annotation; file length linter now passes. (source: 2026-04-19-fast.md, PR #453, 2026-04-19)
 
