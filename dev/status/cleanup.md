@@ -15,12 +15,12 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [~] nesting: trading/trading/weinstein/strategy/lib/exit_audit_capture.ml — emit_exit_audit avg 5.19 max 8, file avg 3.54 (source: dispatch 2026-05-07)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed
 
+- [x] nesting: trading/trading/weinstein/strategy/lib/exit_audit_capture.ml — extracted _pct_distance_from_callbacks, _make_exit_event, _handle_trigger_exit helpers; nesting linter now passes. (branch cleanup/nesting-exit-audit-capture, 2026-05-07)
 - [x] fn_length + file_length: trading/trading/backtest/lib/runner.ml — extracted `Runner_metrics` module + `_filter_steps`/`_extract_filtered_logs` helpers; runner.ml 528→468 lines, `run_backtest` 83→49 lines. Branch cleanup/runner-fn-length (2026-05-07)
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 8 helpers to Optimal_friday_helpers; 413→270 lines (branch cleanup/optimal-strategy-runner, 2026-05-07)
 - [x] file_length: trading/trading/backtest/optimal/lib/optimal_strategy_report.ml — extracted divergence + missed-trades sections to Optimal_strategy_report_sections; 488→281 lines (source: dispatch 2026-05-07, PR #928)
