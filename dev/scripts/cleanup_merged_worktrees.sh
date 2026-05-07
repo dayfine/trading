@@ -7,22 +7,29 @@
 #
 # Flags:
 #   --dry-run           Print what would be removed; make no deletions.
-#   --stale-hours N     Only remove worktrees older than N hours (default: 0,
-#                       i.e. any merged-branch worktree is eligible immediately).
-#                       Use a positive value to preserve very-recent failed-push
-#                       agent work for manual inspection.
+#   --stale-hours N     Only remove worktrees older than N hours
+#                       (default: 1). The default protects in-flight agents
+#                       whose branches have not yet been pushed to origin —
+#                       [git ls-remote] returns empty for them, which would
+#                       otherwise classify them as "merged + branch deleted"
+#                       and reap them mid-run. Set to 0 to override (e.g.
+#                       in CI cleanup where no agents are running). Set
+#                       higher to retain failed-push artefacts longer for
+#                       manual inspection.
 #
 # How it works:
 #   For each .claude/worktrees/agent-*/ directory:
 #     1. Determine the branch name from jj bookmarks (preferred) or git HEAD.
 #     2. If the branch is still present on origin → keep (PR not yet merged).
-#     3. If the branch is gone from origin → remove (PR merged, branch deleted).
+#     3. If the branch is gone from origin and the worktree is older than
+#        --stale-hours → remove (either: PR merged + branch deleted, or:
+#        long-abandoned failed-push).
 #     4. If no branch can be determined → skip with a warning (can't decide).
 #
-# This is safe to run mid-session: live branches are always preserved.
-# Failed-push agents (never pushed) have no origin branch → treated as merged
-# and are removed after --stale-hours (default 0, so immediately). Pass
-# --stale-hours 1 to retain them for manual inspection.
+# This is safe to run mid-session: live branches are always preserved, and
+# the 1-hour default protects in-flight agents whose first push has not yet
+# completed. The previous default (0) reaped such agents — see PR #916
+# follow-up + dev/notes/next-session-priorities-2026-05-07.md §P6.
 #
 # Logs to: dev/logs/worktree-cleanup-YYYY-MM-DD.log (appended)
 
@@ -38,7 +45,7 @@ REPO_ROOT="${REPO_ROOT:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 # Defaults
 # ---------------------------------------------------------------------------
 DRY_RUN=0
-STALE_HOURS=0
+STALE_HOURS=1
 
 # ---------------------------------------------------------------------------
 # Argument parsing
