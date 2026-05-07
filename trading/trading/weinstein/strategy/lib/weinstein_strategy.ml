@@ -9,10 +9,15 @@ module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
 module Force_liquidation_runner = Force_liquidation_runner
 module Stage3_force_exit_runner = Stage3_force_exit_runner
+module Laggard_rotation_runner = Laggard_rotation_runner
 
 module Stage3_force_exit = Stage3_force_exit
 (** Pure Stage-3 force-exit detector (issue #872). See [stage3_force_exit.mli]
     for the contract. *)
+
+module Laggard_rotation = Laggard_rotation
+(** Pure laggard-rotation detector (issue #887). See [laggard_rotation.mli] for
+    the contract. *)
 
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. Exposed as a top-level submodule
@@ -87,6 +92,22 @@ type config = {
           (§5.2 "STATE: EXITED — IF whipsaw … acceptable to re-buy"). The knob
           exists on [config] so future tuning can flip it via sexp override
           without a code change. *)
+  laggard_rotation_config : Laggard_rotation.config;
+      [@sexp.default Laggard_rotation.default_config]
+      (** Laggard-rotation detector parameters (issue #887). Default
+          [{ hysteresis_weeks = 4; rs_window_weeks = 13 }] — fires on the fourth
+          consecutive Friday observation of negative
+          relative-strength-vs-benchmark over a rolling 13-week window. *)
+  enable_laggard_rotation : bool; [@sexp.default false]
+      (** Master switch for the laggard-rotation runner (issue #887). Default
+          [false] preserves all existing baselines: the runner is a no-op and
+          the strategy emits no [StrategySignal "laggard_rotation"] transitions.
+      *)
+  laggard_reentry_cooldown_weeks : int; [@sexp.default 0]
+      (** Reserved for future tuning — currently unwired (default [0] = no
+          cooldown applied beyond the existing stop-out cooldown surface #718).
+          The knob exists on [config] so future tuning can flip it via sexp
+          override without a code change. *)
 }
 [@@deriving sexp]
 
@@ -112,6 +133,9 @@ let default_config ~universe ~index_symbol =
     stage3_force_exit_config = Stage3_force_exit.default_config;
     enable_stage3_force_exit = false;
     stage3_reentry_cooldown_weeks = 0;
+    laggard_rotation_config = Laggard_rotation.default_config;
+    enable_laggard_rotation = false;
+    laggard_reentry_cooldown_weeks = 0;
   }
 
 let name = "Weinstein"
@@ -505,8 +529,9 @@ let _record_stop_outs ~last_stop_out_dates
 
 let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
     ~prior_macro ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
-    ~sector_prior_stages ~ticker_sectors ~stage3_streaks ~audit_recorder
-    ~get_price ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
+    ~sector_prior_stages ~ticker_sectors ~stage3_streaks ~laggard_streaks
+    ~audit_recorder ~get_price ~get_indicator:_ ~(portfolio : Portfolio_view.t)
+    =
   let positions = portfolio.positions in
   (* G13: non-trading-day short-circuit. The simulator iterates calendar
      days (Mon-Fri including holidays), so [_on_market_close] is invoked on
@@ -642,6 +667,45 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
             ~f:(fun (t : Position.transition) ->
               not (Set.mem stage3_exited_ids t.position_id))
       in
+      (* Laggard-rotation pass (issue #887). Reads per-position 13-week
+     returns vs the primary index over the rolling
+     [config.laggard_rotation_config.rs_window_weeks] window and emits
+     [TriggerExit] transitions for held longs whose consecutive-negative-
+     RS streak has reached [config.laggard_rotation_config.hysteresis_weeks].
+     The runner skips positions already exiting via stops or Stage-3
+     force-exit on this tick (see the [skip_position_ids] union below) so a
+     collision the same week resolves to a single exit. The runner is
+     conditionally enabled via [config.enable_laggard_rotation] (default
+     [false]) so existing baselines are bit-equivalent until callers opt
+     in. *)
+      let laggard_rotation_transitions =
+        if config.enable_laggard_rotation then
+          let is_screening_day = _is_screening_day_view index_view in
+          let skip_position_ids = Set.union stop_exited_ids stage3_exited_ids in
+          Laggard_rotation_runner.update ~config:config.laggard_rotation_config
+            ~benchmark_symbol:config.indices.primary ~is_screening_day
+            ~positions ~bar_reader ~get_price ~laggard_streaks
+            ~skip_position_ids ~current_date
+        else []
+      in
+      (* Strip force-liq transitions for positions the laggard runner just
+     exited — same double-exit hazard the [stop_exited_ids] /
+     [stage3_exited_ids] filters handle above. *)
+      let laggard_exited_ids =
+        List.filter_map laggard_rotation_transitions
+          ~f:(fun (t : Position.transition) ->
+            match t.kind with
+            | Position.TriggerExit _ -> Some t.position_id
+            | _ -> None)
+        |> String.Set.of_list
+      in
+      let force_exit_transitions =
+        if Set.is_empty laggard_exited_ids then force_exit_transitions
+        else
+          List.filter force_exit_transitions
+            ~f:(fun (t : Position.transition) ->
+              not (Set.mem laggard_exited_ids t.position_id))
+      in
       (* On every Friday — including Fridays where the force-liquidation halt is
      active — run the cheap macro-only path and consult [_maybe_reset_halt]
      BEFORE deciding whether to invoke the universe screen. This preserves the
@@ -683,7 +747,8 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
         {
           Strategy_interface.transitions =
             exit_transitions @ stage3_force_exit_transitions
-            @ force_exit_transitions @ adjust_transitions @ entry_transitions;
+            @ laggard_rotation_transitions @ force_exit_transitions
+            @ adjust_transitions @ entry_transitions;
         }
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
@@ -727,6 +792,13 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
   let stage3_streaks : int Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
+  (* Per-symbol consecutive-negative-RS-Friday counter consumed by
+     {!Laggard_rotation_runner} (issue #887). Empty at construction →
+     every position starts with a streak of zero, matching the no-laggard
+     baseline. *)
+  let laggard_streaks : int Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
   (* Macro.analyze requires weekly-cadence ad_bars; normalize once at load
      time, not on every [on_market_close] call. *)
   let weekly_ad_bars = Ad_bars_aggregation.daily_to_weekly ad_bars in
@@ -737,7 +809,7 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
       _on_market_close ~config ~ad_bars:weekly_ad_bars ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
         ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-        ~stage3_streaks ~audit_recorder
+        ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 

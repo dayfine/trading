@@ -16,6 +16,7 @@
   weinstein_trading.portfolio_risk
   weinstein.stage
   weinstein.stage3_force_exit
+  weinstein.laggard_rotation
   weinstein.macro
   weinstein.rs
   weinstein.sector
