@@ -30,13 +30,13 @@ type t = {
 [@@deriving sexp]
 (** A grid-search spec on disk. Example sexp:
     {[
-    (params
-       (("screening.weights.rs" (0.2 0.3 0.4))
-          ("screening.weights.volume" (0.2 0.3 0.4))))
-      (objective Sharpe)
-      (scenarios
-         ("trading/test_data/backtest_scenarios/smoke/bull-2019.sexp"
-            "trading/test_data/backtest_scenarios/smoke/crash-2008.sexp"))
+      (params
+         (("screening.weights.rs" (0.2 0.3 0.4))
+            ("screening.weights.volume" (0.2 0.3 0.4))))
+        (objective Sharpe)
+        (scenarios
+           ("trading/test_data/backtest_scenarios/smoke/bull-2019.sexp"
+              "trading/test_data/backtest_scenarios/smoke/crash-2008.sexp"))
     ]} *)
 
 val load : string -> t
