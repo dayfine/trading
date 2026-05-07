@@ -67,6 +67,17 @@ type actual = {
   force_liquidations_count : int; [@sexp.default 0]
       (* G4 (force-liquidation policy). Defaults to 0 on read so pre-G4
          actual.sexp files that don't carry the field still parse. *)
+  crashed : bool; [@sexp.default false]
+      (* True when the backtest's [Backtest.Runner.run_backtest] raised an
+         exception (e.g. an unhandled simulator-state invariant trip). The
+         child writes a sentinel [actual.sexp] in that case so the parent
+         row reports a meaningful FAIL with metrics filled with sentinel
+         values rather than the silent "did not write actual.sexp" path.
+         Defaults to [false] on read so pre-flag actual.sexp files that
+         don't carry the field still parse. *)
+  crash_message : string; [@sexp.default ""]
+      (* Human-readable [Exn.to_string] of the exception that crashed the
+         child, for diagnosis. Empty string when [crashed = false]. *)
 }
 [@@deriving sexp]
 
@@ -85,6 +96,28 @@ let _actual_of_result (r : Backtest.Runner.result) =
     open_positions_value = get OpenPositionsValue;
     unrealized_pnl = get UnrealizedPnl;
     force_liquidations_count = List.length r.force_liquidations;
+    crashed = false;
+    crash_message = "";
+  }
+
+(** Build a sentinel [actual] for a crashed run. Uses out-of-range numeric
+    values (-100% return, 0 trades, very large drawdown) so the parent's range
+    checks fail explicitly rather than passing on NaN. The [crashed] flag
+    distinguishes a genuine "strategy lost almost everything" run from a true
+    unhandled-exception abort. *)
+let _crashed_actual ~msg =
+  {
+    total_return_pct = -100.0;
+    total_trades = 0.0;
+    win_rate = 0.0;
+    sharpe_ratio = 0.0;
+    max_drawdown_pct = 100.0;
+    avg_holding_days = 0.0;
+    open_positions_value = 0.0;
+    unrealized_pnl = 0.0;
+    force_liquidations_count = 0;
+    crashed = true;
+    crash_message = msg;
   }
 
 (* Range checking *)
@@ -136,11 +169,13 @@ let _print_header () =
 let _format_row (s : Scenario.t) (a : actual) checks =
   let all_ok = List.for_all checks ~f:(fun c -> c.ok) in
   let result_str =
-    if all_ok then "PASS" else sprintf "FAIL (%s)" (_failure_message checks)
+    if a.crashed then sprintf "FAIL (scenario crashed: %s)" a.crash_message
+    else if all_ok then "PASS"
+    else sprintf "FAIL (%s)" (_failure_message checks)
   in
   printf "%-28s %7.1f%% %7.0f %7.1f%% %7.1f%%   %s\n" s.name a.total_return_pct
     a.total_trades a.win_rate a.max_drawdown_pct result_str;
-  all_ok
+  all_ok && not a.crashed
 
 (* Directories *)
 
@@ -206,6 +241,19 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
 (* Fork-based worker pool. Scenarios run in parallel child processes up to
    [parallel] at a time. *)
 
+(** Write a sentinel [actual.sexp] for a crashed child so the parent's row
+    reports a meaningful FAIL (with [-100%] return / [100%] drawdown sentinels
+    and the exception message) rather than the silent "did not write
+    actual.sexp" path that loses the failure mode in CI logs. The [scenario_dir]
+    is created defensively in case the crash predates the
+    [_run_scenario_in_child] mkdir call. *)
+let _write_crashed_actual ~output_root (s : Scenario.t) ~msg =
+  let scenario_dir = _scenario_dir ~output_root s in
+  Core_unix.mkdir_p scenario_dir;
+  Sexp.save_hum
+    (_actual_path ~output_root s)
+    (sexp_of_actual (_crashed_actual ~msg))
+
 let _fork_scenario ~output_root ~fixtures_root ~progress_every (s : Scenario.t)
     =
   match Core_unix.fork () with
@@ -214,7 +262,17 @@ let _fork_scenario ~output_root ~fixtures_root ~progress_every (s : Scenario.t)
         _run_scenario_in_child ~output_root ~fixtures_root ~progress_every s;
         Stdlib.exit 0
       with e ->
-        eprintf "Scenario %s crashed: %s\n%!" s.name (Exn.to_string e);
+        let msg = Exn.to_string e in
+        eprintf "Scenario %s crashed: %s\n%!" s.name msg;
+        (* Write a sentinel actual.sexp so the parent row reports a
+           meaningful FAIL with crash metadata instead of the silent
+           "did not write actual.sexp" path. Wrap in its own try/with
+           because a writer failure on a crash path must still exit
+           cleanly. *)
+        (try _write_crashed_actual ~output_root s ~msg
+         with e2 ->
+           eprintf "Scenario %s: failed to write crashed actual.sexp: %s\n%!"
+             s.name (Exn.to_string e2));
         Stdlib.exit 1)
   | `In_the_parent pid -> pid
 
@@ -257,19 +315,21 @@ let _print_crashed_row (s : Scenario.t) =
   printf "%-28s %8s %7s %8s %8s   %s\n" s.name "-" "-" "-" "-"
     "FAIL (scenario crashed or did not write actual.sexp)"
 
-let _process_result ~output_root (s, status) =
-  match status with
-  | Crashed ->
+let _process_result ~output_root (s, _status) =
+  (* On both [Succeeded] and [Crashed] statuses, attempt to load the child's
+     [actual.sexp] first. The child now writes a sentinel actual.sexp (with
+     [crashed = true]) on the unhandled-exception path before exiting non-zero,
+     so a [Crashed] status with a parseable actual.sexp is the new graceful-
+     degradation path. The fallback [_print_crashed_row] is kept for genuinely
+     silent failures (e.g. SIGKILL, child exit before [_run_scenario_in_child]'s
+     mkdir, or filesystem errors during the sentinel write). *)
+  match _load_actual ~output_root s with
+  | Some a ->
+      let checks = _run_checks a s.expected in
+      _format_row s a checks
+  | None ->
       _print_crashed_row s;
       false
-  | Succeeded -> (
-      match _load_actual ~output_root s with
-      | None ->
-          _print_crashed_row s;
-          false
-      | Some a ->
-          let checks = _run_checks a s.expected in
-          _format_row s a checks)
 
 (* CLI *)
 

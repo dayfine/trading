@@ -743,6 +743,44 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
               ~macro_result
         | _ -> []
       in
+      (* Strip [UpdateRiskParams] adjusts whose [position_id] is also exiting
+         this tick via any exit channel (stops [Stop_hit], Stage-3 force-exit,
+         laggard rotation, or force-liquidation). Without this filter, the
+         simulator applies transitions in declaration order — exits first,
+         adjusts last — and the trailing adjust hits an [Exiting]-state
+         position, which [Trading_strategy.Position.apply_transition] rejects
+         with [Invalid transition UpdateRiskParams for current state]. The
+         resulting [Error] propagates out of [Simulator.step], converts into
+         a [failwith] at [Backtest.Panel_runner._step_failed], and aborts the
+         scenario_runner child without an [actual.sexp]. The collision is
+         possible whenever stops emit [Stop_raised] (an adjust) for a position
+         that one of the other exit channels also fires for on the same bar
+         — which the 15y SP500 + [enable_stage3_force_exit = true] regime
+         hits within ~60 weekly cycles (PR #906 follow-up). *)
+      let force_liq_exited_ids =
+        List.filter_map force_exit_transitions
+          ~f:(fun (t : Position.transition) ->
+            match t.kind with
+            | Position.TriggerExit _ -> Some t.position_id
+            | _ -> None)
+        |> String.Set.of_list
+      in
+      let all_exited_ids =
+        Set.union_list
+          (module String)
+          [
+            stop_exited_ids;
+            stage3_exited_ids;
+            laggard_exited_ids;
+            force_liq_exited_ids;
+          ]
+      in
+      let adjust_transitions =
+        if Set.is_empty all_exited_ids then adjust_transitions
+        else
+          List.filter adjust_transitions ~f:(fun (t : Position.transition) ->
+              not (Set.mem all_exited_ids t.position_id))
+      in
       Ok
         {
           Strategy_interface.transitions =
