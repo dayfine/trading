@@ -4,12 +4,14 @@
   test_universe_file
   test_fixtures_root
   test_scenario_runner_isolation
+  test_scenario_runner_actual_sexp
   test_scenario_progress)
  (modules
   test_scenario
   test_universe_file
   test_fixtures_root
   test_scenario_runner_isolation
+  test_scenario_runner_actual_sexp
   test_scenario_progress)
  (libraries
   ounit2

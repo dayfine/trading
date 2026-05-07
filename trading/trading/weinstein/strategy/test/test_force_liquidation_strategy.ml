@@ -278,6 +278,185 @@ let test_no_primary_index_bar_short_circuits _ =
     (equal_to FL.Active)
 
 (* ------------------------------------------------------------------ *)
+(* Adjust-vs-exit dedup invariant (PR #911 follow-up)                  *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a [Holding] long position via the canonical entry chain so the result
+    is bit-equal to what the simulator would have produced. Reused by the dedup
+    test below. *)
+let _make_holding_long ~symbol ~position_id ~entry_date ~quantity ~entry_price =
+  let unwrap = function
+    | Ok p -> p
+    | Error err -> assert_failure ("position setup failed: " ^ Status.show err)
+  in
+  let trans kind =
+    { Trading_strategy.Position.position_id; date = entry_date; kind }
+  in
+  let p =
+    Trading_strategy.Position.create_entering
+      (trans
+         (Trading_strategy.Position.CreateEntering
+            {
+              symbol;
+              side = Trading_base.Types.Long;
+              target_quantity = quantity;
+              entry_price;
+              reasoning =
+                Trading_strategy.Position.TechnicalSignal
+                  { indicator = "test"; description = "dedup test entry" };
+            }))
+    |> unwrap
+  in
+  let p =
+    Trading_strategy.Position.apply_transition p
+      (trans
+         (Trading_strategy.Position.EntryFill
+            { filled_quantity = quantity; fill_price = entry_price }))
+    |> unwrap
+  in
+  Trading_strategy.Position.apply_transition p
+    (trans
+       (Trading_strategy.Position.EntryComplete
+          {
+            risk_params =
+              {
+                stop_loss_price = Some 50.0;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          }))
+  |> unwrap
+
+(** Regression for the (Exiting, UpdateRiskParams) collision pinned by the dedup
+    pass at [weinstein_strategy.ml] lines 746–783.
+
+    The strategy's transition assembly previously concatenated
+    [adjust_transitions] (UpdateRiskParams from {!Stops_runner}) AFTER the exit
+    channels. When the same [position_id] appeared in both — a [Stop_raised]
+    event from {!Weinstein_stops} producing an adjust, AND a
+    {!Force_liquidation_runner} fire producing a [TriggerExit] on the same bar —
+    the simulator applied transitions in declaration order: exits first, then
+    adjusts. The trailing UpdateRiskParams hit a position whose state had just
+    been advanced to [Exiting], which
+    {!Trading_strategy.Position.apply_transition} rejects as
+    [Invalid transition UpdateRiskParams for current state]. The resulting
+    [Error] propagated out of [Simulator.step], surfaced as a [failwith] at
+    [Backtest.Panel_runner._step_failed], and aborted the scenario_runner child
+    without an [actual.sexp].
+
+    The dedup invariant pinned here: a [position_id] present in any exit-channel
+    id-set (stops [Stop_hit], Stage-3 force-exit, laggard rotation, or
+    force-liquidation) must NOT appear in the post-filter [adjust_transitions]
+    returned by {!Internal_for_test.on_market_close}.
+
+    Test construction:
+    - Long AAPL position, entry $100 × 100, [stop_state = Tightened] seeded with
+      [stop_level = 50.0, last_correction_extreme = 90.0].
+    - Tick bar at close = $70: bar.low = 70 < last_correction_extreme = 90, so
+      [Weinstein_stops._ratchet_tightened] computes a tighter candidate stop and
+      emits [Stop_raised] → [Stops_runner] turns this into an [UpdateRiskParams]
+      adjust transition for position_id "AAPL-1".
+    - The same tick: entry $100 → current $70 = 30% loss (above the 25%
+      [max_long_unrealized_loss_fraction] default), so
+      {!Force_liquidation_runner.update} emits a per-position [TriggerExit] for
+      "AAPL-1".
+    - bar.low = 70 > stop_level = 50, so [check_stop_hit] returns false — stops
+      do NOT also emit a trigger; the only exit channel firing is
+      force-liquidation.
+    - The output transition list must contain the force-liq [TriggerExit] for
+      "AAPL-1" and zero [UpdateRiskParams] entries for "AAPL-1".
+
+    Pre-dedup the test would observe both transitions; post-dedup only the
+    [TriggerExit] survives. *)
+let test_adjust_dedup_against_force_liq_exit _ =
+  let symbol = "AAPL" in
+  let position_id = "AAPL-1" in
+  let entry_date = Date.of_string "2024-01-02" in
+  let current_date = Date.of_string "2024-04-29" in
+  let pos =
+    _make_holding_long ~symbol ~position_id ~entry_date ~quantity:100.0
+      ~entry_price:100.0
+  in
+  let positions = String.Map.singleton symbol pos in
+  (* Single-bar reader: AAPL drops to $70 (30% loss → fires per-position
+     force-liq); the primary index sits at $100 so the Friday macro pass
+     and the [_compute_ma_and_stage] warmup default both stay quiet. *)
+  let aapl_bar =
+    {
+      (_make_daily_bar ~date:current_date ~price:70.0) with
+      Types.Daily_price.low_price = 70.0;
+      close_price = 70.0;
+    }
+  in
+  let index_bar = _make_daily_bar ~date:current_date ~price:100.0 in
+  let bar_reader =
+    Bar_reader.of_in_memory_bars
+      [ (symbol, [ aapl_bar ]); (_index_symbol, [ index_bar ]) ]
+  in
+  let state = _fresh_state ~bar_reader in
+  (* Seed the Tightened stop_state. Bar low = 70 stays above stop_level = 50
+     (no trigger), but 70 < last_correction_extreme = 90, so the ratchet
+     fires Stop_raised with a candidate stop above the current 50.0. *)
+  state.stop_states :=
+    Map.set !(state.stop_states) ~key:symbol
+      ~data:
+        (Weinstein_stops.Tightened
+           {
+             stop_level = 50.0;
+             last_correction_extreme = 90.0;
+             reason = "test setup — primed for ratchet";
+           });
+  let config =
+    Weinstein_strategy.default_config ~universe:[] ~index_symbol:_index_symbol
+  in
+  let portfolio : Trading_strategy.Portfolio_view.t =
+    { cash = 100_000.0; positions }
+  in
+  let result = _drive_tick state ~config ~current_date ~portfolio in
+  (* Assertion: the position's TriggerExit (from force-liq) is in the
+     transition list, and no UpdateRiskParams transition for the same
+     position_id appears. Pre-dedup, both would be present and the
+     simulator would error on the second.
+
+     Counts are extracted via [field] composition (one [assert_that] per
+     value) per .claude/rules/test-patterns.md — the [all_of] tree pins
+     both [TriggerExit = 1] and [UpdateRiskParams = 0] for the
+     position_id under test. *)
+  let count_for transitions ~is_kind =
+    List.count transitions ~f:(fun (t : Trading_strategy.Position.transition) ->
+        String.equal t.position_id position_id && is_kind t.kind)
+  in
+  let is_trigger_exit = function
+    | Trading_strategy.Position.TriggerExit _ -> true
+    | _ -> false
+  in
+  let is_update_risk_params = function
+    | Trading_strategy.Position.UpdateRiskParams _ -> true
+    | _ -> false
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (o : Trading_strategy.Strategy_interface.output) ->
+            o.transitions)
+          (all_of
+             [
+               (* Exactly one TriggerExit for the position — the force-liq
+                  one. Pre-fix this would also be 1 (force-liq still fires);
+                  this assertion just pins that the exit is preserved. *)
+               field
+                 (fun ts -> count_for ts ~is_kind:is_trigger_exit)
+                 (equal_to 1);
+               (* Zero UpdateRiskParams for the position. Pre-dedup this
+                  would be 1 (the Stop_raised adjust). The dedup filter
+                  strips it because the position is in [force_liq_exited_ids].
+                  This is the load-bearing assertion. *)
+               field
+                 (fun ts -> count_for ts ~is_kind:is_update_risk_params)
+                 (equal_to 0);
+             ])))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -296,6 +475,8 @@ let suite =
          >:: test_halt_persists_when_macro_stays_bearish;
          "G13 — no primary index bar short-circuits without observing peak"
          >:: test_no_primary_index_bar_short_circuits;
+         "PR #911 dedup — adjust transitions stripped when force-liq exits"
+         >:: test_adjust_dedup_against_force_liq_exit;
        ]
 
 let () = run_test_tt_main suite
