@@ -162,6 +162,23 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
+(** Entry-price notional for a single [Holding] short position; 0.0 for all
+    other position types. Used by [_initial_short_notional] to fold over the
+    position map without introducing a deep nested match. *)
+let _short_holding_notional (pos : Position.t) =
+  match (pos.side, pos.state) with
+  | Trading_base.Types.Short, Position.Holding { quantity; entry_price; _ } ->
+      Float.abs quantity *. entry_price
+  | _ -> 0.0
+
+(** Sum entry-price-denominated short notional across all open [Holding]
+    shorts. Used to seed the per-Friday accumulator in [entries_from_candidates]
+    before the entry walk begins. Entry-price-denominated rather than
+    current-price so the cap measures committed-at-entry exposure. *)
+let _initial_short_notional (positions : Position.t Map.M(String).t) =
+  Map.fold positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
+      acc +. _short_holding_notional pos)
+
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
@@ -187,15 +204,7 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
      so the cap measures committed-at-entry exposure (which is what we know
      when sizing), not mtm liability. The strategy bumps the accumulator
      each time a short is admitted within this Friday's entry walk. *)
-  let short_notional_acc =
-    ref
-      (Map.fold portfolio.positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
-           match (pos.side, pos.state) with
-           | ( Trading_base.Types.Short,
-               Position.Holding { quantity; entry_price; _ } ) ->
-               acc +. (Float.abs quantity *. entry_price)
-           | _ -> acc))
-  in
+  let short_notional_acc = ref (_initial_short_notional portfolio.positions) in
   let short_notional_cap =
     portfolio_value *. config.portfolio_config.max_short_notional_fraction
   in
@@ -206,12 +215,12 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
       ~portfolio_value ~current_date
   in
-  let decisions =
-    List.map candidates ~f:(fun c ->
-        ( c,
-          Entry_audit_capture.classify_candidate ~held_set ~make_entry
-            ~remaining_cash ~short_notional_acc ~short_notional_cap c ))
+  let classify c =
+    ( c,
+      Entry_audit_capture.classify_candidate ~held_set ~make_entry
+        ~remaining_cash ~short_notional_acc ~short_notional_cap c )
   in
+  let decisions = List.map candidates ~f:classify in
   let kept =
     List.filter_map decisions ~f:(fun (_, d) ->
         match d with
@@ -504,6 +513,45 @@ let _maybe_reset_halt ~peak_tracker
   | Weinstein_types.Bullish | Weinstein_types.Neutral ->
       Portfolio_risk.Force_liquidation.Peak_tracker.reset peak_tracker
 
+(** Collect position IDs from all [TriggerExit] transitions in [ts]. Used to
+    build the per-channel exited-ID sets that guard against double-exit. *)
+let _trigger_exit_ids_of (ts : Position.transition list) : String.Set.t =
+  List.filter_map ts ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.TriggerExit _ -> Some t.position_id
+      | _ -> None)
+  |> String.Set.of_list
+
+(** Remove transitions whose [position_id] is in [exited_ids]. When [exited_ids]
+    is empty the list is returned unchanged (no allocation). *)
+let _filter_out_exited_ids exited_ids (ts : Position.transition list) :
+    Position.transition list =
+  if Set.is_empty exited_ids then ts
+  else
+    List.filter ts ~f:(fun (t : Position.transition) ->
+        not (Set.mem exited_ids t.position_id))
+
+(** Look up the symbol of the position matching [id] in [positions]. Returns
+    [None] when the position is absent (e.g. already cleaned up). *)
+let _symbol_of_position_id ~(positions : Position.t Map.M(String).t) id =
+  Map.data positions
+  |> List.find ~f:(fun (p : Position.t) -> String.equal p.id id)
+  |> Option.map ~f:(fun (p : Position.t) -> p.symbol)
+
+(** Process a single exit transition for stop-out tracking. Records the
+    [current_date] in [last_stop_out_dates] if and only if [t] is a
+    [StopLoss]-triggered [TriggerExit] whose position symbol is found in
+    [positions]. No-ops for all other transition kinds. *)
+let _handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date
+    (t : Position.transition) =
+  match t.kind with
+  | Position.TriggerExit { exit_reason = Position.StopLoss _; _ } -> (
+      match _symbol_of_position_id ~positions t.position_id with
+      | Some symbol ->
+          Hashtbl.set last_stop_out_dates ~key:symbol ~data:current_date
+      | None -> ())
+  | _ -> ()
+
 (** Update [last_stop_out_dates] from any [TriggerExit] transitions whose
     [exit_reason] is [StopLoss] — i.e. only stop-machinery exits, not
     take-profit / signal-reversal / time-expired / force-liquidation /
@@ -514,18 +562,25 @@ let _maybe_reset_halt ~peak_tracker
 let _record_stop_outs ~last_stop_out_dates
     ~(positions : Position.t Map.M(String).t)
     ~(exit_transitions : Position.transition list) ~current_date =
-  List.iter exit_transitions ~f:(fun (t : Position.transition) ->
-      match t.kind with
-      | Position.TriggerExit { exit_reason = Position.StopLoss _; _ } -> (
-          match
-            Map.data positions
-            |> List.find ~f:(fun (p : Position.t) ->
-                String.equal p.id t.position_id)
-          with
-          | Some pos ->
-              Hashtbl.set last_stop_out_dates ~key:pos.symbol ~data:current_date
-          | None -> ())
-      | _ -> ())
+  List.iter exit_transitions
+    ~f:
+      (_handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date)
+
+(** Run the universe screen when the strategy is active (not halted, on a
+    Friday, with a valid macro result). Returns the list of entry transitions,
+    or [[]] when any guard is false. Extracted from [_on_market_close] to keep
+    the entry-transition branch at a shallower nesting level. *)
+let _entry_transitions_if_active ~halted ~is_screening_day ~macro_result_opt
+    ~config ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder =
+  match (halted, is_screening_day, macro_result_opt) with
+  | false, true, Some macro_result ->
+      _run_screen_after_macro ~config ~stop_states ~last_stop_out_dates
+        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+        ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
+        ~macro_result
+  | _ -> []
 
 let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
     ~prior_macro ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
@@ -609,19 +664,9 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
           ~get_price ~cash:portfolio.cash ~current_date ~peak_tracker
           ~audit_recorder
       in
-      let stop_exited_ids =
-        List.filter_map exit_transitions ~f:(fun (t : Position.transition) ->
-            match t.kind with
-            | Position.TriggerExit _ -> Some t.position_id
-            | _ -> None)
-        |> String.Set.of_list
-      in
+      let stop_exited_ids = _trigger_exit_ids_of exit_transitions in
       let force_exit_transitions =
-        if Set.is_empty stop_exited_ids then raw_force_exit_transitions
-        else
-          List.filter raw_force_exit_transitions
-            ~f:(fun (t : Position.transition) ->
-              not (Set.mem stop_exited_ids t.position_id))
+        _filter_out_exited_ids stop_exited_ids raw_force_exit_transitions
       in
       (* Stage 4 PR-A: read the primary index as a weekly view directly. The
      Friday detection uses the view's latest date; the screener path consumes
@@ -652,20 +697,9 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
       (* Strip force-liq transitions for positions the Stage-3 runner just
      exited — same double-exit hazard the [stop_exited_ids] filter handles
      for stops above. Re-using a fresh union of exited ids covers both. *)
-      let stage3_exited_ids =
-        List.filter_map stage3_force_exit_transitions
-          ~f:(fun (t : Position.transition) ->
-            match t.kind with
-            | Position.TriggerExit _ -> Some t.position_id
-            | _ -> None)
-        |> String.Set.of_list
-      in
+      let stage3_exited_ids = _trigger_exit_ids_of stage3_force_exit_transitions in
       let force_exit_transitions =
-        if Set.is_empty stage3_exited_ids then force_exit_transitions
-        else
-          List.filter force_exit_transitions
-            ~f:(fun (t : Position.transition) ->
-              not (Set.mem stage3_exited_ids t.position_id))
+        _filter_out_exited_ids stage3_exited_ids force_exit_transitions
       in
       (* Laggard-rotation pass (issue #887). Reads per-position 13-week
      returns vs the primary index over the rolling
@@ -691,20 +725,9 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
       (* Strip force-liq transitions for positions the laggard runner just
      exited — same double-exit hazard the [stop_exited_ids] /
      [stage3_exited_ids] filters handle above. *)
-      let laggard_exited_ids =
-        List.filter_map laggard_rotation_transitions
-          ~f:(fun (t : Position.transition) ->
-            match t.kind with
-            | Position.TriggerExit _ -> Some t.position_id
-            | _ -> None)
-        |> String.Set.of_list
-      in
+      let laggard_exited_ids = _trigger_exit_ids_of laggard_rotation_transitions in
       let force_exit_transitions =
-        if Set.is_empty laggard_exited_ids then force_exit_transitions
-        else
-          List.filter force_exit_transitions
-            ~f:(fun (t : Position.transition) ->
-              not (Set.mem laggard_exited_ids t.position_id))
+        _filter_out_exited_ids laggard_exited_ids force_exit_transitions
       in
       (* On every Friday — including Fridays where the force-liquidation halt is
      active — run the cheap macro-only path and consult [_maybe_reset_halt]
@@ -735,13 +758,10 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
         | Active -> false
       in
       let entry_transitions =
-        match (halted, is_screening_day, macro_result_opt) with
-        | false, true, Some macro_result ->
-            _run_screen_after_macro ~config ~stop_states ~last_stop_out_dates
-              ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-              ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
-              ~macro_result
-        | _ -> []
+        _entry_transitions_if_active ~halted ~is_screening_day ~macro_result_opt
+          ~config ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
+          ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
+          ~current_date ~index_view ~audit_recorder
       in
       (* Strip [UpdateRiskParams] adjusts whose [position_id] is also exiting
          this tick via any exit channel (stops [Stop_hit], Stage-3 force-exit,
@@ -757,14 +777,7 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
          that one of the other exit channels also fires for on the same bar
          — which the 15y SP500 + [enable_stage3_force_exit = true] regime
          hits within ~60 weekly cycles (PR #906 follow-up). *)
-      let force_liq_exited_ids =
-        List.filter_map force_exit_transitions
-          ~f:(fun (t : Position.transition) ->
-            match t.kind with
-            | Position.TriggerExit _ -> Some t.position_id
-            | _ -> None)
-        |> String.Set.of_list
-      in
+      let force_liq_exited_ids = _trigger_exit_ids_of force_exit_transitions in
       let all_exited_ids =
         Set.union_list
           (module String)
@@ -776,10 +789,7 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
           ]
       in
       let adjust_transitions =
-        if Set.is_empty all_exited_ids then adjust_transitions
-        else
-          List.filter adjust_transitions ~f:(fun (t : Position.transition) ->
-              not (Set.mem all_exited_ids t.position_id))
+        _filter_out_exited_ids all_exited_ids adjust_transitions
       in
       Ok
         {
