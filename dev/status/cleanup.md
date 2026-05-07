@@ -15,7 +15,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [~] nesting: trading/trading/weinstein/strategy/lib/force_liquidation_runner.ml — `_position_input_of_holding` avg 4.56 max 7, nested match-in-match (source: 2026-05-02-fast-run2.md)
+- [x] nesting: trading/trading/weinstein/strategy/lib/force_liquidation_runner.ml — extracted _make_position_input; Option.map replaces nested match; nesting linter clean (branch cleanup/nesting-force-liq-runner, 2026-05-07)
 - [~] nesting: analysis/scripts/build_snapshots/build_snapshots.ml — _process_symbol avg 5.00 max 9, file avg 2.58 (source: dispatch 2026-05-07)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
