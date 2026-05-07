@@ -148,17 +148,42 @@ every Claude Code session.
 usage on the repo filesystem is ≥ 85% **and** the worktree mtime is older than
 24 hours. Both thresholds are configurable via CLI flags.
 
+**Lock honoring (2026-05-08):** Claude Code marks active agent worktrees as
+`locked` via `git worktree add --lock`. The sweep script parses
+`git worktree list --porcelain` once per run and skips any candidate in the
+locked set, regardless of age. This prevents the script from removing worktrees
+that belong to in-progress agents. When a worktree is skipped, the log records:
+`skipping locked worktree: <path> (active subagent)`.
+
+**Flags:**
+
+| Flag | Default | Notes |
+|---|---|---|
+| `--threshold-percent N` | 85 | Sweep only when disk ≥ N% (unless --force) |
+| `--stale-hours H` | 24 | Remove worktrees older than H hours. Must be ≥ 1. |
+| `--dry-run` | off | Print candidates without deleting |
+| `--force` | off | Skip the disk-threshold check |
+| `--include-active` | off | Emergency override: also remove locked worktrees. Must be combined with `--stale-hours >= 1`. |
+
+**`--stale-hours 0` is rejected** (exits 1). A value of 0 would capture every
+worktree including ones created moments ago by a live agent. Operators who need
+an emergency removal of active worktrees should use `--include-active` with a
+real `--stale-hours` value.
+
 **Manual invocation:**
 
 ```bash
-# Dry-run: see what would be removed (no deletions)
+# Dry-run: see what would be removed (no deletions, locked worktrees flagged)
 bash dev/scripts/sweep_stale_worktrees.sh --dry-run --force
 
-# Force sweep regardless of disk level, 24h+ stale
+# Force sweep regardless of disk level, 24h+ stale (locked worktrees skipped)
 bash dev/scripts/sweep_stale_worktrees.sh --force
 
 # Custom thresholds
 bash dev/scripts/sweep_stale_worktrees.sh --threshold-percent 70 --stale-hours 48
+
+# Emergency: sweep even active/locked worktrees (use with caution)
+bash dev/scripts/sweep_stale_worktrees.sh --force --include-active --stale-hours 1
 ```
 
 Logs append to `dev/logs/worktree-sweep-YYYY-MM-DD.log`.
