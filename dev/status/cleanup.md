@@ -1,6 +1,6 @@
 # Status: cleanup
 
-## Last updated: 2026-04-27
+## Last updated: 2026-05-07
 
 ## Status
 IN_PROGRESS
@@ -14,6 +14,8 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 `code-health` agent — see `.claude/agents/code-health.md`. Dispatched by `lead-orchestrator` Step 2e on health-scan findings, one finding per dispatch, ≤200 LOC, no behavior change.
 
 ## Backlog
+
+- [~] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — 312 lines (limit 300) + bare literals in comments (source: dispatch 2026-05-07)
 
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
