@@ -5,25 +5,28 @@ open Core
 open Trading_strategy
 module FL = Portfolio_risk.Force_liquidation
 
+(** Construct a [Force_liquidation.position_input] from holding fields and a
+    price bar. Called once per [Holding] position that has a price this tick. *)
+let _make_position_input ~(pos : Position.t) ~entry_price ~quantity
+    (bar : Types.Daily_price.t) : FL.position_input =
+  {
+    symbol = pos.symbol;
+    position_id = pos.id;
+    side = pos.side;
+    entry_price;
+    current_price = bar.close_price;
+    quantity;
+  }
+
 (** Build a [Force_liquidation.position_input] for one Holding position when a
     current price is available. Returns [None] for non-Holding positions and for
     symbols without a price feed this tick. *)
 let _position_input_of_holding ~get_price (pos : Position.t) :
     FL.position_input option =
   match pos.state with
-  | Position.Holding { quantity; entry_price; _ } -> (
-      match get_price pos.symbol with
-      | Some (bar : Types.Daily_price.t) ->
-          Some
-            {
-              symbol = pos.symbol;
-              position_id = pos.id;
-              side = pos.side;
-              entry_price;
-              current_price = bar.close_price;
-              quantity;
-            }
-      | None -> None)
+  | Position.Holding { quantity; entry_price; _ } ->
+      Option.map (get_price pos.symbol)
+        ~f:(_make_position_input ~pos ~entry_price ~quantity)
   | _ -> None
 
 (** Compute portfolio mark-to-market value via the canonical

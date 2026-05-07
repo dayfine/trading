@@ -15,7 +15,8 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [x] nesting: analysis/scripts/build_snapshots/build_snapshots.ml — extracted _try_build_and_checkpoint; _process_symbol no longer flagged (PR #937, 2026-05-07)
+- [x] nesting: trading/trading/weinstein/strategy/lib/force_liquidation_runner.ml — extracted _make_position_input; Option.map replaces nested match; nesting linter clean (branch cleanup/nesting-force-liq-runner, 2026-05-07)
+- [~] nesting: analysis/scripts/build_snapshots/build_snapshots.ml — _process_symbol avg 5.00 max 9, file avg 2.58 (source: dispatch 2026-05-07)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
@@ -24,7 +25,7 @@ Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here 
 - [x] fn_length + file_length: trading/trading/backtest/lib/runner.ml — extracted `Runner_metrics` module + `_filter_steps`/`_extract_filtered_logs` helpers; runner.ml 528→468 lines, `run_backtest` 83→49 lines. Branch cleanup/runner-fn-length (2026-05-07)
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 8 helpers to Optimal_friday_helpers; 413→270 lines (branch cleanup/optimal-strategy-runner, 2026-05-07)
 - [x] file_length: trading/trading/backtest/optimal/lib/optimal_strategy_report.ml — extracted divergence + missed-trades sections to Optimal_strategy_report_sections; 488→281 lines (source: dispatch 2026-05-07, PR #928)
-- [x] file_length: trading/trading/backtest/lib/panel_runner.ml — extracted step-loop helpers to Panel_step_loop module; 309→237 lines (source: dispatch 2026-05-07, branch cleanup/file-length-panel-runner)
+- [x] file_length: trading/trading/backtest/lib/panel_runner.ml — extracted step-loop helpers to Panel_step_loop module; 309→182 lines (source: dispatch 2026-05-07, branch cleanup/file-length-panel-runner)
 - [x] file_length: trading/trading/backtest/lib/result_writer.ml — extracted trades-CSV cluster to Trades_writer module; 372→245 lines (source: dispatch 2026-05-07, PR #929)
 - [x] fn_length + file_length: trading/trading/weinstein/strategy/lib/entry_audit_capture.ml — extracted entry construction + debug trace helpers to entry_audit_helpers.ml; 383→272 lines; make_entry_transition 54→31 lines (PR #930, 2026-05-07)
 - [x] nesting: trading/analysis/data/storage/csv/lib/csv_storage.ml — extracted `_parse_and_accumulate` and `_read_next_line` helpers; nesting linter now passes (835 fns, all OK). (source: 2026-04-26-fast.md, PR #578 merged 2026-04-26T16:04Z)
