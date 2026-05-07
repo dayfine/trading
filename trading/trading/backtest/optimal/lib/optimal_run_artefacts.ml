@@ -130,6 +130,23 @@ let _load_trades ~output_dir : Trading_simulation.Metrics.trade_metrics list =
     | [] -> []
     | _header :: rows -> List.filter_map rows ~f:_parse_trade_row
 
+(** Convert one [alternative_candidate] to a [(symbol, reason)] pair.
+    Renders the [skip_reason] variant via its sexp atom name. *)
+let _rejection_pair_of_alternative
+    (alt : Backtest.Trade_audit.alternative_candidate) : string * string =
+  let reason =
+    Sexp.to_string
+      (Backtest.Trade_audit.sexp_of_skip_reason alt.reason_skipped)
+  in
+  (alt.symbol, reason)
+
+(** Flatten one [audit_record]'s [alternatives_considered] list into rejection
+    pairs. *)
+let _pairs_of_audit_record (rec_ : Backtest.Trade_audit.audit_record) :
+    (string * string) list =
+  List.map rec_.entry.alternatives_considered
+    ~f:_rejection_pair_of_alternative
+
 (** Harvest one [(symbol, reason)] pair per alternative-skip across the audit.
     Renders the [skip_reason] variant via its sexp atom name. Renderer attaches
     these inline against missed-trade rows; missing audit ⇒ empty list ⇒ rows
@@ -142,15 +159,7 @@ let _load_cascade_rejections ~output_dir : (string * string) list =
       let blob =
         Backtest.Trade_audit.audit_blob_of_sexp (Sexp.load_sexp path)
       in
-      List.concat_map blob.audit_records
-        ~f:(fun (rec_ : Backtest.Trade_audit.audit_record) ->
-          List.map rec_.entry.alternatives_considered
-            ~f:(fun (alt : Backtest.Trade_audit.alternative_candidate) ->
-              let reason =
-                Sexp.to_string
-                  (Backtest.Trade_audit.sexp_of_skip_reason alt.reason_skipped)
-              in
-              (alt.symbol, reason)))
+      List.concat_map blob.audit_records ~f:_pairs_of_audit_record
     with exn ->
       eprintf "optimal_strategy: failed to read trade_audit.sexp (%s)\n%!"
         (Exn.to_string exn);
