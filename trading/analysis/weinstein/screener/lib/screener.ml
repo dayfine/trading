@@ -1,45 +1,7 @@
 (* @large-module: screener cascade integrates multiple analysis passes in a single pipeline *)
 open Core
 open Weinstein_types
-
-type sector_rating = Strong | Neutral | Weak [@@deriving show, eq, sexp]
-
-type sector_context = {
-  sector_name : string;
-  rating : sector_rating;
-  stage : stage;
-}
-[@@deriving sexp]
-
-type scoring_weights = {
-  w_stage2_breakout : int;
-  w_strong_volume : int;
-  w_adequate_volume : int;
-  w_positive_rs : int;
-  w_bullish_rs_crossover : int;
-  w_clean_resistance : int;
-  w_sector_strong : int;
-  w_late_stage2_penalty : int;
-}
-[@@deriving sexp]
-
-let default_scoring_weights =
-  {
-    w_stage2_breakout = 30;
-    w_strong_volume = 20;
-    w_adequate_volume = 10;
-    w_positive_rs = 20;
-    w_bullish_rs_crossover = 10;
-    w_clean_resistance = 15;
-    w_sector_strong = 10;
-    w_late_stage2_penalty = -15;
-  }
-
-type grade_thresholds = { a_plus : int; a : int; b : int; c : int; d : int }
-[@@deriving sexp]
-(** Score cutoffs for each grade. All are configurable. *)
-
-let default_grade_thresholds = { a_plus = 85; a = 70; b = 55; c = 40; d = 25 }
+include Screener_scoring
 
 type candidate_params = {
   entry_buffer_pct : float;
@@ -133,190 +95,8 @@ type result = {
 }
 
 (* ------------------------------------------------------------------ *)
-(* Scoring signal helpers                                               *)
+(* Per-candidate filters                                               *)
 (* ------------------------------------------------------------------ *)
-
-(** Stage signal for long setups: Stage1→2 transition or early Stage2. *)
-let _stage_long_signal ~w ~(a : Stock_analysis.t) =
-  match (a.stage.stage, a.prior_stage) with
-  | Stage2 _, Some (Stage1 _) ->
-      [ (w.w_stage2_breakout, "Stage1→Stage2 breakout") ]
-  | Stage2 { weeks_advancing; _ }, _ when weeks_advancing <= 4 ->
-      [ (w.w_stage2_breakout / 2, "Early Stage2") ]
-  | _ -> []
-
-(** Late Stage2 deceleration penalty. *)
-let _late_stage2_signal ~w ~(a : Stock_analysis.t) =
-  match a.stage.stage with
-  | Stage2 { late = true; _ } ->
-      [ (w.w_late_stage2_penalty, "Late Stage2 (penalty)") ]
-  | _ -> []
-
-(** Volume confirmation signal for long setups (Stage 2 breakout). *)
-let _volume_signal ~w ~(a : Stock_analysis.t) =
-  match a.volume with
-  | Some { confirmation = Strong _; _ } ->
-      [ (w.w_strong_volume, "Strong volume") ]
-  | Some { confirmation = Adequate _; _ } ->
-      [ (w.w_adequate_volume, "Adequate volume") ]
-  | _ -> []
-
-(** Volume confirmation signal for short setups (Stage 4 breakdown). Per
-    Weinstein, volume is NOT required for a valid breakdown — stocks can fall of
-    their own weight. Volume increase on breakdown is even more bearish, but
-    absence doesn't invalidate the setup. Therefore [Strong] / [Adequate] add
-    positive weight; [Weak] / no-data adds zero — never a penalty. Mirrors
-    [_volume_signal]'s shape with breakdown-specific rationale labels. *)
-let _volume_short_signal ~w ~(a : Stock_analysis.t) =
-  match a.volume with
-  | Some { confirmation = Strong _; _ } ->
-      [ (w.w_strong_volume, "Strong breakdown volume") ]
-  | Some { confirmation = Adequate _; _ } ->
-      [ (w.w_adequate_volume, "Adequate breakdown volume") ]
-  | _ -> []
-
-(** Bullish RS signal for long setups. *)
-let _rs_long_signal ~w ~(a : Stock_analysis.t) =
-  match a.rs with
-  | Some { trend = Bullish_crossover; _ } ->
-      [ (w.w_positive_rs + w.w_bullish_rs_crossover, "RS bullish crossover") ]
-  | Some { trend = Positive_rising; _ } ->
-      [ (w.w_positive_rs, "RS positive & rising") ]
-  | Some { trend = Positive_flat; _ } ->
-      [ (w.w_positive_rs / 2, "RS positive") ]
-  | _ -> []
-
-(** Bearish RS signal for short setups. *)
-let _rs_short_signal ~w ~(a : Stock_analysis.t) =
-  match a.rs with
-  | Some { trend = Bearish_crossover; _ } ->
-      [ (w.w_positive_rs + w.w_bullish_rs_crossover, "RS bearish crossover") ]
-  | Some { trend = Negative_declining; _ } ->
-      [ (w.w_positive_rs, "RS negative & declining") ]
-  | Some { trend = Negative_improving; _ } ->
-      [ (w.w_positive_rs / 2, "RS negative") ]
-  | _ -> []
-
-(** Overhead resistance signal. *)
-let _resistance_signal ~w ~(a : Stock_analysis.t) =
-  match a.resistance with
-  | Some { quality = Virgin_territory; _ } ->
-      [ (w.w_clean_resistance, "Virgin territory") ]
-  | Some { quality = Clean; _ } -> [ (w.w_clean_resistance, "Clean overhead") ]
-  | Some { quality = Moderate_resistance; _ } ->
-      [ (w.w_clean_resistance / 2, "Moderate resistance") ]
-  | _ -> []
-
-(** Below-breakdown clean-space signal for short setups. Mirror of
-    [_resistance_signal] for the short-side cascade. Per Weinstein, the Short
-    Entry Checklist requires "minimal nearby support below breakdown point" — a
-    steep prior advance with small congestion is ideal. Heavy support below
-    means the decline will struggle through prior congestion zones; minimal /
-    virgin support below means the stock can fall freely. The shared
-    [overhead_quality] variant carries side-flipped semantics — see [Support]
-    module-level doc. *)
-let _support_signal ~w ~(a : Stock_analysis.t) =
-  match a.support with
-  | Some { quality = Virgin_territory; _ } ->
-      [ (w.w_clean_resistance, "Virgin support below") ]
-  | Some { quality = Clean; _ } ->
-      [ (w.w_clean_resistance, "Clean support below") ]
-  | Some { quality = Moderate_resistance; _ } ->
-      [ (w.w_clean_resistance / 2, "Moderate support below") ]
-  | _ -> []
-
-(** Sector bonus/penalty for long setups. *)
-let _sector_long_signal ~w ~sector =
-  match sector.rating with
-  | Strong -> [ (w.w_sector_strong, "Strong sector") ]
-  | Neutral -> []
-  | Weak -> [ (-w.w_sector_strong, "Weak sector (penalty)") ]
-
-(** Sector bonus/penalty for short setups. *)
-let _sector_short_signal ~w ~sector =
-  match sector.rating with
-  | Weak -> [ (w.w_sector_strong, "Weak sector") ]
-  | Neutral -> []
-  | Strong -> [ (-w.w_sector_strong, "Strong sector (penalty)") ]
-
-(** Stage signal for short setups: Stage3→4 transition or early Stage4. *)
-let _stage_short_signal ~w ~(a : Stock_analysis.t) =
-  match (a.stage.stage, a.prior_stage) with
-  | Stage4 _, Some (Stage3 _) ->
-      [ (w.w_stage2_breakout, "Stage3→Stage4 breakdown") ]
-  | Stage4 { weeks_declining }, _ when weeks_declining <= 4 ->
-      [ (w.w_stage2_breakout / 2, "Early Stage4") ]
-  | _ -> []
-
-(** Reduce a list of (points, label) signals to (total_score, rationale list).
-    Zero-point entries are dropped from both the total and the rationale. Was:
-    List.filter materialised a [non_zero] intermediate, then List.sum walked it
-    once for points and List.map walked it again for labels — three list
-    traversals and two intermediate lists per call. Now: a single
-    List.fold_right accumulates both the total score and the rationale list in
-    one pass with no intermediate. fold_right preserves the original signal
-    order in the rationale, matching the prior List.map behaviour. Called twice
-    per scored candidate (long + short). *)
-let _tally signals =
-  List.fold_right signals ~init:(0, []) ~f:(fun (pts, label) (sum, labels) ->
-      if pts = 0 then (sum, labels) else (sum + pts, label :: labels))
-
-(* ------------------------------------------------------------------ *)
-(* Scoring                                                              *)
-(* ------------------------------------------------------------------ *)
-
-(** Compute a long-side score for a stock analysis. *)
-let _score_long ~weights ~sector (a : Stock_analysis.t) : int * string list =
-  let w = weights in
-  _tally
-    (_stage_long_signal ~w ~a @ _late_stage2_signal ~w ~a @ _volume_signal ~w ~a
-   @ _rs_long_signal ~w ~a @ _resistance_signal ~w ~a
-    @ _sector_long_signal ~w ~sector)
-
-(** Compute a short-side score for a stock analysis. *)
-let _score_short ~weights ~sector (a : Stock_analysis.t) : int * string list =
-  let w = weights in
-  _tally
-    (_stage_short_signal ~w ~a @ _volume_short_signal ~w ~a
-   @ _rs_short_signal ~w ~a @ _support_signal ~w ~a
-    @ _sector_short_signal ~w ~sector)
-
-(** Convert score to grade using configurable thresholds. *)
-let _grade_of_score ~thresholds score =
-  if score >= thresholds.a_plus then A_plus
-  else if score >= thresholds.a then A
-  else if score >= thresholds.b then B
-  else if score >= thresholds.c then C
-  else if score >= thresholds.d then D
-  else F
-
-(* ------------------------------------------------------------------ *)
-(* Price and candidate helpers                                          *)
-(* ------------------------------------------------------------------ *)
-
-(** Suggested entry: breakout price plus a configurable buffer. *)
-let _suggested_entry ~entry_buffer_pct breakout_price =
-  let raw = breakout_price *. (1.0 +. entry_buffer_pct) in
-  Float.round_nearest (raw *. 100.0) /. 100.0
-
-(** Long stop: configurable fraction below entry. *)
-let _suggested_stop ~initial_stop_pct entry = entry *. (1.0 -. initial_stop_pct)
-
-(** Estimate swing target using simplified Weinstein swing rule: target =
-    breakout + (breakout - base_low). *)
-let _swing_target ~breakout ~base_low_opt =
-  match base_low_opt with
-  | None -> None
-  | Some base_low ->
-      if Float.(breakout > base_low) then
-        Some (breakout +. (breakout -. base_low))
-      else None
-
-(** Proxy for the prior base low: configurable fraction below the 30-week MA. *)
-let _base_low ~base_low_proxy_pct (a : Stock_analysis.t) : float option =
-  match a.stage.ma_value with
-  | v when Float.(v > 0.0) -> Some (v *. (1.0 -. base_low_proxy_pct))
-  | _ -> None
 
 let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     ~thresholds ~is_short : scored_candidate =
@@ -325,18 +105,18 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
       ~default:(a.stage.ma_value *. (1.0 +. params.breakout_fallback_pct))
   in
   let entry =
-    _suggested_entry ~entry_buffer_pct:params.entry_buffer_pct breakout
+    suggested_entry ~entry_buffer_pct:params.entry_buffer_pct breakout
   in
   let stop_ =
     if is_short then entry *. (1.0 +. params.short_stop_pct)
-    else _suggested_stop ~initial_stop_pct:params.initial_stop_pct entry
+    else suggested_stop ~initial_stop_pct:params.initial_stop_pct entry
   in
   let risk_pct =
     if Float.(entry = 0.0) then 0.0 else Float.abs ((entry -. stop_) /. entry)
   in
-  let base_low = _base_low ~base_low_proxy_pct:params.base_low_proxy_pct a in
+  let base_low_val = base_low ~base_low_proxy_pct:params.base_low_proxy_pct a in
   let swing =
-    if is_short then None else _swing_target ~breakout ~base_low_opt:base_low
+    if is_short then None else swing_target ~breakout ~base_low_opt:base_low_val
   in
   let side : Trading_base.Types.position_side =
     if is_short then Short else Long
@@ -346,7 +126,7 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     analysis = a;
     sector;
     side;
-    grade = _grade_of_score ~thresholds score;
+    grade = grade_of_score ~thresholds score;
     score;
     suggested_entry = entry;
     suggested_stop = stop_;
@@ -354,10 +134,6 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     swing_target = swing;
     rationale = reasons;
   }
-
-(* ------------------------------------------------------------------ *)
-(* Per-candidate filters                                               *)
-(* ------------------------------------------------------------------ *)
 
 (** Score gate: [true] iff [score] passes the configured floor. When
     [min_score_override] is [Some n], the floor is the strict numeric gate
@@ -370,7 +146,7 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
 let _passes_score_floor ~thresholds ~min_grade ~min_score_override score =
   match min_score_override with
   | Some n -> score >= n
-  | None -> compare_grade (_grade_of_score ~thresholds score) min_grade <= 0
+  | None -> compare_grade (grade_of_score ~thresholds score) min_grade <= 0
 
 (** Score, grade, and build a candidate after passing preliminary gates. Returns
     [None] if [score] does not pass {!_passes_score_floor}. *)
@@ -391,7 +167,7 @@ let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
   else if not (Stock_analysis.is_breakout_candidate a) then None
   else
     _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
-      ~is_short:false ~scorer:_score_long ~sector a
+      ~is_short:false ~scorer:score_long ~sector a
 
 (** Hard gate per Weinstein Ch. 11: never short a stock with strong relative
     strength, even if it breaks down. Rejects candidates whose RS trend is
@@ -414,13 +190,13 @@ let _short_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
   else if _rs_blocks_short a.Stock_analysis.rs then None
   else
     _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
-      ~is_short:true ~scorer:_score_short ~sector a
+      ~is_short:true ~scorer:score_short ~sector a
 
 (** Check watchlist eligibility after the breakout gate. Returns [None] if the
     ticker is already in [buy_candidates] or the grade is above C/D. *)
 let _check_watchlist_grade ~thresholds ~buy_candidates ~score
     (sa : Stock_analysis.t) =
-  let grade = _grade_of_score ~thresholds score in
+  let grade = grade_of_score ~thresholds score in
   let in_buy_list =
     List.exists buy_candidates ~f:(fun c -> String.(c.ticker = sa.ticker))
   in
@@ -437,7 +213,7 @@ let _check_watchlist_grade ~thresholds ~buy_candidates ~score
 let _watchlist_entry ~weights ~thresholds ~buy_candidates (sa, sector) =
   if not (Stock_analysis.is_breakout_candidate sa) then None
   else
-    let score, _ = _score_long ~weights ~sector sa in
+    let score, _ = score_long ~weights ~sector sa in
     _check_watchlist_grade ~thresholds ~buy_candidates ~score sa
 
 (* ------------------------------------------------------------------ *)
@@ -470,7 +246,7 @@ let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
   let passes_grade =
     if not passes_sector then false
     else
-      let score, _ = _score_long ~weights ~sector a in
+      let score, _ = score_long ~weights ~sector a in
       _passes_score_floor ~thresholds ~min_grade ~min_score_override score
   in
   (passes_breakout, passes_sector, passes_grade)
@@ -501,7 +277,7 @@ let _short_admission ~weights ~thresholds ~min_grade ~min_score_override
   let passes_grade =
     if not passes_rs then false
     else
-      let score, _ = _score_short ~weights ~sector a in
+      let score, _ = score_short ~weights ~sector a in
       _passes_score_floor ~thresholds ~min_grade ~min_score_override score
   in
   (passes_breakdown, passes_sector, passes_rs, passes_grade)

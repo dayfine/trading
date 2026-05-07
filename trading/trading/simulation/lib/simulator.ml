@@ -349,103 +349,7 @@ let _apply_trades_best_effort portfolio trades =
       | Ok p -> (p, accepted @ [ trade ])
       | Error _ -> (portfolio, accepted))
 
-(* Detect a split for [symbol] between the prior trading day's bar and
-   today's bar. Returns [Some event] when both bars exist and the detector
-   fires, otherwise [None]. Pure with respect to the adapter's cache. *)
-let _detect_split_for_held_symbol ~adapter ~date ~symbol =
-  let curr =
-    Trading_simulation_data.Market_data_adapter.get_price adapter ~symbol ~date
-  in
-  let prev =
-    Trading_simulation_data.Market_data_adapter.get_previous_bar adapter ~symbol
-      ~date
-  in
-  let%bind.Option curr = curr in
-  let%bind.Option prev = prev in
-  let%map.Option factor = Types.Split_detector.detect_split ~prev ~curr () in
-  { Trading_portfolio.Split_event.symbol; date; factor }
-
-(* For every symbol currently held in [portfolio], compare the prior
-   trading day's bar against the current day's bar and return the list of
-   detected split events. Symbols with no current bar (weekends/holidays)
-   or no prior bar (first appearance) yield no event. Order follows
-   [portfolio.positions] (sorted by symbol). *)
-let _detect_splits_for_held_positions t =
-  let adapter = t.deps.market_data_adapter in
-  let date = t.current_date in
-  List.filter_map t.portfolio.Trading_portfolio.Portfolio.positions
-    ~f:(fun (pos : Trading_portfolio.Types.portfolio_position) ->
-      _detect_split_for_held_symbol ~adapter ~date ~symbol:pos.symbol)
-
-(* Apply each detected split event to [portfolio] in order. Pure: returns
-   the updated portfolio with all events folded in. *)
-let _apply_split_events portfolio events =
-  List.fold events ~init:portfolio ~f:(fun acc event ->
-      Trading_portfolio.Split_event.apply_to_portfolio event acc)
-
-(* Apply a split factor to a strategy-side [Position.t]'s share-count and
-   per-share-price fields. Long-only path: [Holding.quantity] multiplies by
-   [factor] and [Holding.entry_price] divides by [factor], preserving total
-   cost basis. [Exiting] mirrors the same scaling on its share-count fields
-   ([quantity], [target_quantity], [filled_quantity]) and per-share-price
-   fields ([entry_price], [exit_price]). [Entering] (in-flight entry order)
-   and [Closed] (historical) pass through unchanged: an entry order spanning
-   a split is exotic and out of scope for the broker-model fix; closed
-   positions have no live state to scale.
-
-   Pure: returns a new [Position.t] with [state] replaced. The position's
-   [id], [symbol], [side], [entry_reasoning], [exit_reason], [last_updated],
-   and [portfolio_lot_ids] are unchanged. *)
-let _apply_split_to_position (factor : float)
-    (pos : Trading_strategy.Position.t) : Trading_strategy.Position.t =
-  let open Trading_strategy.Position in
-  let new_state =
-    match pos.state with
-    | Holding { quantity; entry_price; entry_date; risk_params } ->
-        Holding
-          {
-            quantity = quantity *. factor;
-            entry_price = entry_price /. factor;
-            entry_date;
-            risk_params;
-          }
-    | Exiting
-        {
-          quantity;
-          entry_price;
-          entry_date;
-          target_quantity;
-          exit_price;
-          filled_quantity;
-          started_date;
-        } ->
-        Exiting
-          {
-            quantity = quantity *. factor;
-            entry_price = entry_price /. factor;
-            entry_date;
-            target_quantity = target_quantity *. factor;
-            exit_price = exit_price /. factor;
-            filled_quantity = filled_quantity *. factor;
-            started_date;
-          }
-    | (Entering _ | Closed _) as s -> s
-  in
-  { pos with state = new_state }
-
-(* Apply detected split events to the strategy-side [Position.t] map. Each
-   event matches positions by symbol; multiple positions on the same symbol
-   (lots reopened after a prior close) all get scaled. Order matches
-   [_apply_split_events]: events are folded in detection order. Pure. *)
-let _apply_splits_to_positions
-    (positions : Trading_strategy.Position.t String.Map.t)
-    (events : Trading_portfolio.Split_event.t list) :
-    Trading_strategy.Position.t String.Map.t =
-  List.fold events ~init:positions ~f:(fun acc event ->
-      Map.map acc ~f:(fun pos ->
-          if String.equal pos.Trading_strategy.Position.symbol event.symbol then
-            _apply_split_to_position event.factor pos
-          else pos))
+(* Split-handling helpers extracted to {!Split_handler}. *)
 
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
@@ -453,9 +357,13 @@ let step t =
     let open Result.Let_syntax in
     (* Detect splits first; then scale BOTH the broker portfolio and the
        strategy-side [Position.t] map in lockstep — see the helper docs. *)
-    let split_events = _detect_splits_for_held_positions t in
-    let portfolio = _apply_split_events t.portfolio split_events in
-    let positions = _apply_splits_to_positions t.positions split_events in
+    let split_events =
+      Split_handler.detect_for_held_positions
+        ~adapter:t.deps.market_data_adapter ~date:t.current_date
+        ~portfolio:t.portfolio
+    in
+    let portfolio = Split_handler.apply_events t.portfolio split_events in
+    let positions = Split_handler.apply_to_positions t.positions split_events in
     let today_bars = _get_today_bars t in
     (* Record stale-held positions (symbols without bars for K+ days) into
        the per-run log. Detector only — no force-close; see [Stale_hold].

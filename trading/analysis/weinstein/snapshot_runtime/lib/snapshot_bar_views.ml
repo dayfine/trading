@@ -58,15 +58,6 @@ let _read_history_or_empty (cb : Snapshot_callbacks.t) ~symbol ~from ~until
   | Ok rows -> rows
   | Error _ -> []
 
-(* Align five field-histories ([Adjusted_close, Close, High, Low, Volume])
-   by date into a single chronologically-ordered [Daily_price.t list]. Each
-   input list is already chronologically sorted (Daily_panels.read_history
-   sort contract). A bar is included iff [Close] is non-NaN AND every other
-   field has a row for the same date.
-
-   Implementation: build hashtables per non-Close field keyed by date, then
-   walk the [Close] list once and look up the others. O(n_close + n_other);
-   no nested-loop blow-up. *)
 let _table_of (rows : (Date.t * float) list) =
   let tbl = Hashtbl.create (module Date) in
   List.iter rows ~f:(fun (d, v) ->
@@ -76,10 +67,9 @@ let _table_of (rows : (Date.t * float) list) =
 let _round_volume v =
   if Float.is_nan v then 0 else Int.of_float (Float.round_nearest v)
 
-(* Open is read like the other field histories so the assembled bar matches
-   the panel path's [_read_bar] bit-for-bit. The schema includes
-   [Snapshot_schema.Open] since Phase A.1 (#786); missing rows degrade to
-   NaN, mirroring the panel's NaN cell on a day the symbol has no bar. *)
+(* Align OHLCV field-histories by date → [Daily_price.t list]. Builds one
+   hashtable per non-Close field, walks [Close] once (O(n)), skips NaN-close
+   bars. [Open] included since Phase A.1; missing rows degrade to NaN. *)
 let _assemble_daily_bars ~open_ ~adj ~close ~high ~low ~volume :
     Types.Daily_price.t list =
   let open_t = _table_of open_ in
@@ -176,12 +166,9 @@ let weekly_view_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of =
       in
       _truncate_weekly_view (_weekly_view_of_bars weekly) ~n
 
-(* History window for [daily_bars_for] / [weekly_bars_for]. The strategy
-   readers return everything from time-zero up to [as_of]; the snapshot
-   path is keyed by date so we walk back a fixed-width window large enough
-   to cover any practical backtest horizon (10 years / 3653 days). The
-   [_assemble_daily_bars] tail filter NaN-skips pre-IPO / suspended cells,
-   so the window doesn't need to align with [symbol]'s actual history. *)
+(* Fixed-width lookback window for [daily_bars_for] / [weekly_bars_for]:
+   10 years × ~365.3 calendar days = 3653. Wide enough for any backtest
+   horizon; NaN-skip in [_assemble_daily_bars] handles pre-IPO cells. *)
 let _bar_list_history_days = 3653
 
 let daily_bars_for (cb : Snapshot_callbacks.t) ~symbol ~as_of :
@@ -252,10 +239,8 @@ let _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
       n_days = n;
     }
 
-(* The snapshot path takes the runner's calendar and walks the same column
-   set deterministically. Without [~calendar] the window would be ambiguous
-   between "lookback weekdays" and "lookback actual rows in the snapshot"
-   (pre-#848 path) — the divergence root cause per the #848 investigation. *)
+(* [~calendar] pins the window deterministically (pre-#848 path used
+   ambiguous "lookback rows" semantics that diverged from the panel path). *)
 let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback
     ~calendar =
   if lookback <= 0 then _empty_daily_view
@@ -281,9 +266,9 @@ let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback
         _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
           ~low_t
 
-(* Walk the calendar columns and emit a fresh [Bigarray.Array1.t]. Missing
-   rows yield NaN cells. Returns [None] only on len<=0, as_of not in
-   calendar, window underflow, or unknown symbol. *)
+(* Walk calendar columns → fresh [Bigarray.Array1.t]; missing rows → NaN.
+   Returns [None] on len≤0, as_of absent from calendar, window underflow,
+   or unknown symbol. *)
 let low_window (cb : Snapshot_callbacks.t) ~symbol ~as_of ~len ~calendar =
   if len <= 0 then None
   else

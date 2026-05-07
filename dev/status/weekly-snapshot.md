@@ -3,14 +3,16 @@
 ## Last updated: 2026-05-04
 
 ## Status
-PLANNED — owner moved to feat-weinstein per #778 scope expansion
+PENDING
+
+(Owner moved to feat-weinstein per #778 scope expansion.)
 
 Track created 2026-05-02 to absorb M6.1–M6.5 (verification harness via incremental processing). Plan: `dev/plans/m6-weekly-snapshot-verification-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M6.1–M6.5 (added 2026-05-02).
 
 Per the 2026-05-04 daily summary (#830): M6.1–M6.5 absorbed into feat-weinstein scope; M6.6 live cycle DEFERRED.
 
 ## Interface stable
-NO — track is brand-new.
+N/A
 
 The reframe: **weekly picks are first-class durable artifacts before they're inputs to live trading.** This subsystem is a verification harness first; the M6.6 live cycle is wiring on top.
 

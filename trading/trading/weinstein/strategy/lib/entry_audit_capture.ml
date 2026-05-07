@@ -49,135 +49,67 @@ let gen_position_id symbol =
 let _sizing_side_of_cand_side (side : Trading_base.Types.position_side) =
   match side with Long -> `Long | Short -> `Short
 
-(** G14 fix B: pin the entry price the strategy installs into [Position.t] state
-    to the most recent raw close from [bar_reader]. The screener's
-    [cand.suggested_entry] is a buffered breakout level (typically dollars above
-    the actual current price) and historically diverged sharply from the
-    broker's fill price for symbols whose lookback spanned a split boundary
-    (e.g. PANW pre-split [cand.suggested_entry] in pre-split raw space vs broker
-    fill in current raw space — see the G14 deep-dive in [dev/notes/] for the
-    cascade timeline).
-
-    Falls back to [cand.suggested_entry] when [bar_reader] returns no bars for
-    [cand.ticker] (preserves the test/empty-bars edge). The
-    [cand.suggested_entry] field itself remains the screener's audit metadata in
-    [build_entry_event]; only the position-state and sizing/stop dollar
-    quantities switch to the realised entry. *)
-let _effective_entry_price ~bar_reader ~current_date
-    (cand : Screener.scored_candidate) : float =
-  let bars =
-    Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker ~as_of:current_date
+(** Size the candidate and, on success, register the stop and build the
+    transition + meta. Returns [Sized_zero] when share count rounds to 0. *)
+let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
+    ~current_date ~effective_entry ~initial_stop ~stop_floor_kind ~id
+    ~stop_distance_pct ~max_stop_distance_pct (cand : Screener.scored_candidate)
+    : entry_attempt_result =
+  let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
+  let sizing =
+    Portfolio_risk.compute_position_size ~config:portfolio_risk_config
+      ~portfolio_value
+      ~side:(_sizing_side_of_cand_side cand.side)
+      ~entry_price:effective_entry ~stop_price:installed_stop_level ()
   in
-  match List.last bars with
-  | None -> cand.suggested_entry
-  | Some bar -> bar.Types.Daily_price.close_price
-
-(** Compute the support-floor-aware initial stop for [cand] entering at
-    [effective_entry], plus the [stop_floor_kind] tag for audit. *)
-let _initial_stop_and_kind ~stops_config ~initial_stop_buffer ~bar_reader
-    ~current_date ~effective_entry (cand : Screener.scored_candidate) =
-  let daily_view =
-    Bar_reader.daily_view_for bar_reader ~symbol:cand.ticker ~as_of:current_date
-      ~lookback:stops_config.Weinstein_stops.support_floor_lookback_bars
-  in
-  let callbacks =
-    Panel_callbacks.support_floor_callbacks_of_daily_view daily_view
-  in
-  let initial_stop =
-    Weinstein_stops.compute_initial_stop_with_floor_with_callbacks
-      ~config:stops_config ~side:cand.side ~entry_price:effective_entry
-      ~callbacks ~fallback_buffer:initial_stop_buffer
-  in
-  let stop_floor_kind =
-    classify_stop_floor_kind ~stops_config ~callbacks ~side:cand.side
-  in
-  (initial_stop, stop_floor_kind)
-
-(** Build the [CreateEntering] transition + [entry_meta] given the pre-computed
-    sizing, initial stop, and effective entry. *)
-let _build_transition_and_meta ~id ~current_date ~effective_entry ~shares
-    ~initial_stop ~stop_floor_kind (cand : Screener.scored_candidate) =
-  let description =
-    Printf.sprintf "Weinstein %s: %s"
-      (Weinstein_types.grade_to_string cand.grade)
-      (String.concat ~sep:"; " cand.rationale)
-  in
-  let kind =
-    Position.CreateEntering
+  if sizing.shares = 0 then (
+    Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker
+      ~score:cand.score ~rationale:cand.rationale ~effective_entry
+      ~installed_stop:installed_stop_level ~stop_distance_pct
+      ~max_stop_distance_pct ~outcome:"Sized_zero";
+    Sized_zero)
+  else (
+    Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker
+      ~score:cand.score ~rationale:cand.rationale ~effective_entry
+      ~installed_stop:installed_stop_level ~stop_distance_pct
+      ~max_stop_distance_pct ~outcome:"Pass";
+    stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
+    let trans =
+      Entry_audit_helpers.build_entry_transition ~id ~current_date
+        ~effective_entry ~shares:sizing.shares cand
+    in
+    let meta : entry_meta =
       {
-        symbol = cand.ticker;
-        side = cand.side;
-        target_quantity = Float.of_int shares;
-        entry_price = effective_entry;
-        reasoning = Position.ManualDecision { description };
+        position_id = id;
+        shares = sizing.shares;
+        installed_stop = installed_stop_level;
+        stop_floor_kind;
+        effective_entry_price = effective_entry;
       }
-  in
-  let transition = { Position.position_id = id; date = current_date; kind } in
-  let meta : entry_meta =
-    {
-      position_id = id;
-      shares;
-      installed_stop = Weinstein_stops.get_stop_level initial_stop;
-      stop_floor_kind;
-      effective_entry_price = effective_entry;
-    }
-  in
-  (transition, meta)
-
-(** G15 step 3: distance between [installed_stop] and [effective_entry] as a
-    fraction of [effective_entry]. Symmetric for longs and shorts — both can
-    have a structurally wide initial stop when the recent counter-move floor
-    sits far from current price. *)
-let _stop_distance_pct ~effective_entry ~installed_stop =
-  Float.abs (installed_stop -. effective_entry) /. effective_entry
-
-(** G15 follow-up (panel-golden cross-platform drift, 2026-05-01): when
-    [PANEL_GOLDEN_DEBUG=1] is set in the environment, emit one line per
-    candidate to [stderr] capturing the inputs to the [max_stop_distance_pct]
-    gate and which branch fires. Used to compare macOS vs Linux GHA traces
-    side-by-side and identify which candidate's [stop_distance_pct] flips across
-    the threshold due to sub-ULP libm differences. Off by default so normal runs
-    (including the goldens) are unaffected.
-
-    Trace also carries the screener's per-candidate [score] (Int) and
-    [rationale] (string list, joined with "; ") so cross-platform diffs can pin
-    not just the gate outcome but the upstream score that produced the candidate
-    order in the first place. The integer score is the sum of variant-gated
-    scoring weights — when scores differ across platforms, the divergent
-    classifier is upstream of the cascade in
-    [analysis/weinstein/{relative_strength, volume,resistance}/]. *)
-let _emit_candidate_trace ~ticker ~score ~rationale ~effective_entry
-    ~installed_stop ~stop_distance_pct ~max_stop_distance_pct ~outcome =
-  match Sys.getenv "PANEL_GOLDEN_DEBUG" with
-  | Some "1" ->
-      let rationale_str = String.concat ~sep:"; " rationale in
-      Printf.eprintf
-        "CANDIDATE ticker=%s score=%d rationale=%s effective_entry=%.12f \
-         installed_stop=%.12f stop_distance_pct=%.12f \
-         max_stop_distance_pct=%.12f gate_outcome=%s\n\
-         %!"
-        ticker score rationale_str effective_entry installed_stop
-        stop_distance_pct max_stop_distance_pct outcome
-  | _ -> ()
+    in
+    Entry_ok (trans, meta))
 
 let make_entry_transition ~portfolio_risk_config ~stops_config
     ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value ~current_date
     (cand : Screener.scored_candidate) : entry_attempt_result =
-  let effective_entry = _effective_entry_price ~bar_reader ~current_date cand in
+  let effective_entry =
+    Entry_audit_helpers.effective_entry_price ~bar_reader ~current_date cand
+  in
   let initial_stop, stop_floor_kind =
-    _initial_stop_and_kind ~stops_config ~initial_stop_buffer ~bar_reader
-      ~current_date ~effective_entry cand
+    Entry_audit_helpers.initial_stop_and_kind ~stops_config ~initial_stop_buffer
+      ~bar_reader ~current_date ~effective_entry cand
   in
   let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
   let stop_distance_pct =
-    _stop_distance_pct ~effective_entry ~installed_stop:installed_stop_level
+    Entry_audit_helpers.stop_distance_pct ~effective_entry
+      ~installed_stop:installed_stop_level
   in
   let max_stop_distance_pct =
     stops_config.Weinstein_stops.max_stop_distance_pct
   in
   if Float.( > ) stop_distance_pct max_stop_distance_pct then (
-    _emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
-      ~rationale:cand.rationale ~effective_entry
+    Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker
+      ~score:cand.score ~rationale:cand.rationale ~effective_entry
       ~installed_stop:installed_stop_level ~stop_distance_pct
       ~max_stop_distance_pct ~outcome:"Stop_too_wide";
     Stop_too_wide)
@@ -188,32 +120,10 @@ let make_entry_transition ~portfolio_risk_config ~stops_config
        larger and share count must shrink accordingly so total
        risk-to-stop = config.risk_per_trade_pct * portfolio_value (the
        fixed-risk-sizing contract). *)
-    let sizing =
-      Portfolio_risk.compute_position_size ~config:portfolio_risk_config
-        ~portfolio_value
-        ~side:(_sizing_side_of_cand_side cand.side)
-        ~entry_price:effective_entry ~stop_price:installed_stop_level ()
-    in
-    if sizing.shares = 0 then (
-      _emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
-        ~rationale:cand.rationale ~effective_entry
-        ~installed_stop:installed_stop_level ~stop_distance_pct
-        ~max_stop_distance_pct ~outcome:"Sized_zero";
-      Sized_zero)
-    else
-      let () =
-        _emit_candidate_trace ~ticker:cand.ticker ~score:cand.score
-          ~rationale:cand.rationale ~effective_entry
-          ~installed_stop:installed_stop_level ~stop_distance_pct
-          ~max_stop_distance_pct ~outcome:"Pass"
-      in
-      let id = gen_position_id cand.ticker in
-      stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
-      let trans, meta =
-        _build_transition_and_meta ~id ~current_date ~effective_entry
-          ~shares:sizing.shares ~initial_stop ~stop_floor_kind cand
-      in
-      Entry_ok (trans, meta)
+    let id = gen_position_id cand.ticker in
+    _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
+      ~current_date ~effective_entry ~initial_stop ~stop_floor_kind ~id
+      ~stop_distance_pct ~max_stop_distance_pct cand
 
 let check_cash_and_deduct ~remaining_cash
     ((trans : Position.transition), (meta : entry_meta)) =
@@ -255,33 +165,12 @@ let check_short_notional_cap ~short_notional_acc ~short_notional_cap
         short_notional_acc := projected;
         Some (trans, meta))
 
-(** G15 follow-up debug: emit a one-line trace per [classify_candidate] decision
-    when [PANEL_GOLDEN_DEBUG=1]. Captures the downstream gates (Already_held /
-    Insufficient_cash / Short_notional_cap / Kept) that [_emit_candidate_trace]
-    above does not see, plus the running [remaining_cash] / [short_notional_acc]
-    at the moment the decision is made. Used jointly with the [CANDIDATE] trace
-    to pin which gate diverges between macOS and Linux GHA. Off by default. *)
-let _emit_decision_trace ~ticker ~side ~decision ~remaining_cash
-    ~short_notional_acc =
-  match Sys.getenv "PANEL_GOLDEN_DEBUG" with
-  | Some "1" ->
-      let side_str =
-        match side with
-        | Trading_base.Types.Long -> "Long"
-        | Trading_base.Types.Short -> "Short"
-      in
-      Printf.eprintf
-        "DECISION ticker=%s side=%s decision=%s remaining_cash=%.6f \
-         short_notional_acc=%.6f\n\
-         %!"
-        ticker side_str decision remaining_cash short_notional_acc
-  | _ -> ()
-
 let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
     ~short_notional_cap (c : Screener.scored_candidate) : candidate_decision =
   let emit decision =
-    _emit_decision_trace ~ticker:c.ticker ~side:c.side ~decision
-      ~remaining_cash:!remaining_cash ~short_notional_acc:!short_notional_acc
+    Entry_audit_helpers.emit_decision_trace ~ticker:c.ticker ~side:c.side
+      ~decision ~remaining_cash:!remaining_cash
+      ~short_notional_acc:!short_notional_acc
   in
   if Set.mem held_set c.ticker then (
     emit "Already_held";
