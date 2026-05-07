@@ -119,32 +119,39 @@ let _checkpoint_manifest ~manifest_path ~schema entry =
       Printf.eprintf "manifest checkpoint failed for %s: %s\n%!"
         entry.Snapshot_manifest.symbol (Status.show err)
 
+(** Load bars for [symbol] and build its snapshot entry. Returns [None] on load
+    or build failure (logs the error). On success, optionally checkpoints the
+    manifest entry if [checkpoint] is set. *)
+let _try_build_and_checkpoint ~data_dir ~schema ~benchmark_bars ~output_dir
+    ~manifest_path ~checkpoint ~csv_mtime symbol =
+  match _load_bars ~data_dir ~symbol with
+  | Error err ->
+      Printf.eprintf "skip %s: load: %s\n%!" symbol (Status.show err);
+      None
+  | Ok bars -> (
+      match
+        _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars ~output_dir
+          ~csv_mtime
+      with
+      | Error err ->
+          Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
+          None
+      | Ok entry ->
+          if checkpoint then _checkpoint_manifest ~manifest_path ~schema entry;
+          Some entry)
+
 let _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
     ~manifest_path ~checkpoint symbol =
   match _csv_mtime ~data_dir ~symbol with
   | None ->
       Printf.eprintf "skip %s: no CSV\n%!" symbol;
       None
-  | Some csv_mtime -> (
+  | Some csv_mtime ->
       if _should_skip ~existing ~symbol ~csv_mtime ~schema then
         _maybe_reuse ~existing ~symbol
       else
-        match _load_bars ~data_dir ~symbol with
-        | Error err ->
-            Printf.eprintf "skip %s: load: %s\n%!" symbol (Status.show err);
-            None
-        | Ok bars -> (
-            match
-              _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars
-                ~output_dir ~csv_mtime
-            with
-            | Ok entry ->
-                if checkpoint then
-                  _checkpoint_manifest ~manifest_path ~schema entry;
-                Some entry
-            | Error err ->
-                Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
-                None))
+        _try_build_and_checkpoint ~data_dir ~schema ~benchmark_bars ~output_dir
+          ~manifest_path ~checkpoint ~csv_mtime symbol
 
 (* Minimal universe-file reader — only the [Pinned] shape is supported in
    Phase B, which is all this writer needs (Full_sector_map requires the
