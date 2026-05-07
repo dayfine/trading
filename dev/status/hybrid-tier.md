@@ -3,7 +3,9 @@
 ## Last updated: 2026-05-04
 
 ## Status
-MERGED — both options shipped; no active work in this track
+MERGED
+
+(Both options shipped; no active work in this track.)
 
 Phase 1 (measurement infra) merged (#609). Phase 2 was replanned via
 PR #611 into two separate plans after Phase 1 results showed the

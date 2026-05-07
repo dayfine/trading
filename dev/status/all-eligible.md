@@ -3,7 +3,12 @@
 ## Last updated: 2026-05-06
 
 ## Status
-IN_PROGRESS (PR-2 ready for review; PR-1 merged via #899)
+IN_PROGRESS
+
+(PR-2 ready for review; PR-1 merged via #899)
+
+## Interface stable
+NO
 
 ## Goal
 

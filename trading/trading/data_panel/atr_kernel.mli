@@ -13,7 +13,7 @@
     recurrence then gives, for [t > period]:
 
     {[
-    ATR [ t ] = ((ATR [ t - 1 ] * (period - 1)) + TR [ t ]) / period
+      ATR [ t ] = ((ATR [ t - 1 ] * (period - 1)) + TR [ t ]) / period
     ]}
 
     The kernel reads its prior state from the output panel at column [t - 1],
