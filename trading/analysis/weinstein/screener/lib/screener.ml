@@ -293,18 +293,22 @@ let _count_short_phases ~weights ~thresholds ~min_grade ~min_score_override
       in
       (_bump breakdown pb, _bump sector_ok ps, _bump rs_ok pr, _bump grade_ok pg))
 
+(** Apply [candidate_fn] to each pair, drop [None]s, sort by score, and cap at
+    [max_n]. Shared by the long and short evaluation paths. *)
+let _filter_and_cap ~candidate_fn ~max_n candidates =
+  List.filter_map candidates ~f:candidate_fn |> _top_n max_n
+
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_buy_candidates ~candidates ~macro_trend : scored_candidate list =
   match macro_trend with
   | Bearish -> []
   | Bullish | Neutral ->
-      candidates
-      |> List.filter_map
-           ~f:
-             (_long_candidate ~weights ~thresholds ~params ~min_grade
-                ~min_score_override)
-      |> _top_n max_buy_candidates
+      let candidate_fn =
+        _long_candidate ~weights ~thresholds ~params ~min_grade
+          ~min_score_override
+      in
+      _filter_and_cap ~candidate_fn ~max_n:max_buy_candidates candidates
 
 (** Filter, score, grade, sort, and cap short candidates. *)
 let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
@@ -312,12 +316,11 @@ let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
   match macro_trend with
   | Bullish -> []
   | Bearish | Neutral ->
-      candidates
-      |> List.filter_map
-           ~f:
-             (_short_candidate ~weights ~thresholds ~params ~min_grade
-                ~min_score_override)
-      |> _top_n max_short_candidates
+      let candidate_fn =
+        _short_candidate ~weights ~thresholds ~params ~min_grade
+          ~min_score_override
+      in
+      _filter_and_cap ~candidate_fn ~max_n:max_short_candidates candidates
 
 (** Build watchlist: breakout candidates with grade C/D not in the buy list.
     Empty when buys are inactive (Bearish market). *)

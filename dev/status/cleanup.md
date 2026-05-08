@@ -26,6 +26,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed
+- [x] nesting: trading/analysis/weinstein/screener/lib/screener.ml — extracted _filter_and_cap helper; _evaluate_longs/_evaluate_shorts nesting violations cleared. (branch cleanup/nesting-screener-eval-2, 2026-05-08)
 - [x] file_length: trading/trading/engine/lib/price_path.ml (511→498) + trading/trading/weinstein/strategy/lib/entry_audit_capture.ml (305→297) — condensed private-fn docstrings; both files now within limits. PR #958 (2026-05-08)
 
 - [x] nesting: trading/trading/weinstein/strategy/lib/exit_audit_capture.ml — extracted _pct_distance_from_callbacks, _make_exit_event, _handle_trigger_exit helpers; nesting linter now passes. (branch cleanup/nesting-exit-audit-capture, 2026-05-07)
