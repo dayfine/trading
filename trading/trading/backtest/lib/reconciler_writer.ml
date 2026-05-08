@@ -22,8 +22,8 @@ let _entry_date_of (pos : Trading_portfolio.Types.portfolio_position) =
     [symbol,side,entry_date,entry_price,quantity]. [entry_price] is the average
     cost per share (positive for both longs and shorts); [quantity] is the
     absolute share count. *)
-let _write_open_position_row oc (pos : Trading_portfolio.Types.portfolio_position)
-    =
+let _write_open_position_row oc
+    (pos : Trading_portfolio.Types.portfolio_position) =
   let qty = Trading_portfolio.Calculations.position_quantity pos in
   let avg_cost = Trading_portfolio.Calculations.avg_cost_of_position pos in
   let side = _open_position_side_label qty in

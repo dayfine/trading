@@ -16,8 +16,7 @@ let apply_to_position (event : t) (position : portfolio_position) :
     portfolio_position =
   { position with lots = List.map position.lots ~f:(_scale_lot event.factor) }
 
-(* Return [updated] if [p.symbol = symbol], otherwise return [p] unchanged. *)
-let _replace_if_symbol ~symbol ~updated (p : portfolio_position) =
+let _replace_position ~symbol ~updated (p : portfolio_position) =
   if String.equal p.symbol symbol then updated else p
 
 let apply_to_portfolio (event : t) (portfolio : Portfolio.t) : Portfolio.t =
@@ -27,6 +26,6 @@ let apply_to_portfolio (event : t) (portfolio : Portfolio.t) : Portfolio.t =
       let updated = apply_to_position event existing in
       let new_positions =
         List.map portfolio.positions
-          ~f:(_replace_if_symbol ~symbol:event.symbol ~updated)
+          ~f:(_replace_position ~symbol:event.symbol ~updated)
       in
       { portfolio with positions = new_positions }
