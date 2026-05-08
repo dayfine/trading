@@ -67,6 +67,41 @@ let _table_of (rows : (Date.t * float) list) =
 let _round_volume v =
   if Float.is_nan v then 0 else Int.of_float (Float.round_nearest v)
 
+(* Build a [Daily_price.t] from fully-matched OHLCAV values and a date. *)
+let _make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v =
+  let open_price =
+    Hashtbl.find open_t date |> Option.value ~default:Float.nan
+  in
+  {
+    Types.Daily_price.date;
+    open_price;
+    high_price = high_v;
+    low_price = low_v;
+    close_price = close_v;
+    volume = _round_volume vol_v;
+    adjusted_close = adj_v;
+  }
+
+(* Match OHLCV side-tables for [date]; returns [None] if any required field is
+   missing. [open_t] is optional so missing open degrades to NaN. *)
+let _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v =
+  match
+    ( Hashtbl.find adj_t date,
+      Hashtbl.find high_t date,
+      Hashtbl.find low_t date,
+      Hashtbl.find vol_t date )
+  with
+  | Some adj_v, Some high_v, Some low_v, Some vol_v ->
+      Some
+        (_make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v)
+  | _ -> None
+
+(* Attempt to build one [Daily_price.t] from a (date, close) pair and the
+   OHLCV side-tables. Returns [None] for NaN-close or any missing field. *)
+let _bar_for ~open_t ~adj_t ~high_t ~low_t ~vol_t (date, close_v) =
+  if Float.is_nan close_v then None
+  else _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v
+
 (* Align OHLCV field-histories by date → [Daily_price.t list]. Builds one
    hashtable per non-Close field, walks [Close] once (O(n)), skips NaN-close
    bars. [Open] included since Phase A.1; missing rows degrade to NaN. *)
@@ -77,32 +112,7 @@ let _assemble_daily_bars ~open_ ~adj ~close ~high ~low ~volume :
   let high_t = _table_of high in
   let low_t = _table_of low in
   let vol_t = _table_of volume in
-  let lookup_or_nan tbl date =
-    Hashtbl.find tbl date |> Option.value ~default:Float.nan
-  in
-  let bar_for (date, close_v) =
-    if Float.is_nan close_v then None
-    else
-      match
-        ( Hashtbl.find adj_t date,
-          Hashtbl.find high_t date,
-          Hashtbl.find low_t date,
-          Hashtbl.find vol_t date )
-      with
-      | Some adj_v, Some high_v, Some low_v, Some vol_v ->
-          Some
-            {
-              Types.Daily_price.date;
-              open_price = lookup_or_nan open_t date;
-              high_price = high_v;
-              low_price = low_v;
-              close_price = close_v;
-              volume = _round_volume vol_v;
-              adjusted_close = adj_v;
-            }
-      | _ -> None
-  in
-  List.filter_map close ~f:bar_for
+  List.filter_map close ~f:(_bar_for ~open_t ~adj_t ~high_t ~low_t ~vol_t)
 
 (* Convert a weekly [Daily_price.t] list (output of daily_to_weekly) into the
    [weekly_view] float-array shape. *)
@@ -154,17 +164,22 @@ let _daily_bars_in_range cb ~symbol ~from ~as_of =
     let volume = read Snapshot_schema.Volume in
     _assemble_daily_bars ~open_ ~adj ~close ~high ~low ~volume
 
+(* Build and truncate a weekly view from non-empty [bars]. *)
+let _build_weekly_view bars ~n =
+  let weekly =
+    Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
+  in
+  _truncate_weekly_view (_weekly_view_of_bars weekly) ~n
+
+(* Fetch daily bars and build a weekly view; called when n > 0. *)
+let _fetch_and_build_weekly_view cb ~symbol ~n ~as_of =
+  let from = Date.add_days as_of (-_weekly_calendar_span ~n) in
+  let bars = _daily_bars_in_range cb ~symbol ~from ~as_of in
+  if List.is_empty bars then _empty_weekly_view else _build_weekly_view bars ~n
+
 let weekly_view_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of =
   if n <= 0 then _empty_weekly_view
-  else
-    let from = Date.add_days as_of (-_weekly_calendar_span ~n) in
-    let bars = _daily_bars_in_range cb ~symbol ~from ~as_of in
-    if List.is_empty bars then _empty_weekly_view
-    else
-      let weekly =
-        Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
-      in
-      _truncate_weekly_view (_weekly_view_of_bars weekly) ~n
+  else _fetch_and_build_weekly_view cb ~symbol ~n ~as_of
 
 (* Fixed-width lookback window for [daily_bars_for] / [weekly_bars_for]:
    10 years × ~365.3 calendar days = 3653. Wide enough for any backtest
@@ -176,19 +191,24 @@ let daily_bars_for (cb : Snapshot_callbacks.t) ~symbol ~as_of :
   let from = Date.add_days as_of (-_bar_list_history_days) in
   _daily_bars_in_range cb ~symbol ~from ~as_of
 
+(* Convert daily bars to weekly and return the last [n]; caller ensures
+   [bars] is non-empty. *)
+let _to_weekly_bars bars ~n =
+  let weekly =
+    Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
+  in
+  let len = List.length weekly in
+  if len <= n then weekly else List.drop weekly (len - n)
+
+(* Fetch daily bars and return the last [n] as weekly bars; called when n > 0. *)
+let _fetch_weekly_bars cb ~symbol ~n ~as_of =
+  let from = Date.add_days as_of (-_bar_list_history_days) in
+  let bars = _daily_bars_in_range cb ~symbol ~from ~as_of in
+  if List.is_empty bars then [] else _to_weekly_bars bars ~n
+
 let weekly_bars_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of :
     Types.Daily_price.t list =
-  if n <= 0 then []
-  else
-    let from = Date.add_days as_of (-_bar_list_history_days) in
-    let bars = _daily_bars_in_range cb ~symbol ~from ~as_of in
-    if List.is_empty bars then []
-    else
-      let weekly =
-        Time_period.Conversion.daily_to_weekly ~include_partial_week:true bars
-      in
-      let len = List.length weekly in
-      if len <= n then weekly else List.drop weekly (len - n)
+  if n <= 0 then [] else _fetch_weekly_bars cb ~symbol ~n ~as_of
 
 (* Index of [as_of] in [calendar], or [-1] if absent. Exact-match contract:
    a date not in the calendar (out-of-window, off-calendar holiday) yields
@@ -239,59 +259,80 @@ let _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
       n_days = n;
     }
 
+(* Read close/high/low histories for [daily_view_for]; returns [None] when
+   close rows are absent, [Some (close_t, high_t, low_t)] otherwise. *)
+let _read_close_high_low cb ~symbol ~from_date ~until_date =
+  let read field =
+    _read_history_or_empty cb ~symbol ~from:from_date ~until:until_date ~field
+  in
+  let close = read Snapshot_schema.Close in
+  if List.is_empty close then None
+  else
+    let high = read Snapshot_schema.High in
+    let low = read Snapshot_schema.Low in
+    Some (_table_of close, _table_of high, _table_of low)
+
+(* Build a daily view from a valid [as_of_idx]; reads and walks the window. *)
+let _daily_view_from_idx cb ~symbol ~calendar ~as_of_idx ~lookback =
+  let from_idx = max 0 (as_of_idx - lookback + 1) in
+  let from_date = calendar.(from_idx) in
+  let until_date = calendar.(as_of_idx) in
+  match _read_close_high_low cb ~symbol ~from_date ~until_date with
+  | None -> _empty_daily_view
+  | Some (close_t, high_t, low_t) ->
+      _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
+        ~low_t
+
+(* Locate [as_of] in [calendar] and build a daily view; called when lookback > 0. *)
+let _find_and_build_daily_view cb ~symbol ~as_of ~lookback ~calendar =
+  let as_of_idx = _calendar_index_of calendar as_of in
+  if as_of_idx < 0 then _empty_daily_view
+  else _daily_view_from_idx cb ~symbol ~calendar ~as_of_idx ~lookback
+
 (* [~calendar] pins the window deterministically (pre-#848 path used
    ambiguous "lookback rows" semantics that diverged from the panel path). *)
 let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback
     ~calendar =
   if lookback <= 0 then _empty_daily_view
-  else
-    let as_of_idx = _calendar_index_of calendar as_of in
-    if as_of_idx < 0 then _empty_daily_view
-    else
-      let from_idx = max 0 (as_of_idx - lookback + 1) in
-      let from_date = calendar.(from_idx) in
-      let until_date = calendar.(as_of_idx) in
-      let read field =
-        _read_history_or_empty cb ~symbol ~from:from_date ~until:until_date
-          ~field
-      in
-      let close = read Snapshot_schema.Close in
-      if List.is_empty close then _empty_daily_view
-      else
-        let high = read Snapshot_schema.High in
-        let low = read Snapshot_schema.Low in
-        let close_t = _table_of close in
-        let high_t = _table_of high in
-        let low_t = _table_of low in
-        _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~close_t ~high_t
-          ~low_t
+  else _find_and_build_daily_view cb ~symbol ~as_of ~lookback ~calendar
+
+(* Fill a pre-allocated bigarray window with Low field values keyed by
+   calendar date; missing rows → NaN. *)
+let _fill_low_buf ~calendar ~from_idx ~len ~low_t buf =
+  for j = 0 to len - 1 do
+    let date = calendar.(from_idx + j) in
+    let v = Hashtbl.find low_t date |> Option.value ~default:Float.nan in
+    BA1.set buf j v
+  done
+
+(* Fetch Low rows and fill the bigarray window; [from_idx] and bounds are
+   pre-validated by [low_window]. *)
+let _low_buf_from_idx (cb : Snapshot_callbacks.t) ~symbol ~calendar ~from_idx
+    ~as_of_idx ~len =
+  let from_date = calendar.(from_idx) in
+  let until_date = calendar.(as_of_idx) in
+  match
+    cb.read_field_history ~symbol ~from:from_date ~until:until_date
+      ~field:Snapshot_schema.Low
+  with
+  | Error _ -> None
+  | Ok rows ->
+      let low_t = _table_of rows in
+      let buf = BA1.create Bigarray.Float64 Bigarray.C_layout len in
+      _fill_low_buf ~calendar ~from_idx ~len ~low_t buf;
+      Some buf
+
+(* Validate calendar bounds and fetch Low buf; called when len > 0. *)
+let _check_and_fetch_low cb ~symbol ~as_of ~len ~calendar =
+  let n_cal = Array.length calendar in
+  let as_of_idx = _calendar_index_of calendar as_of in
+  let from_idx = as_of_idx - len + 1 in
+  if as_of_idx < 0 || from_idx < 0 || as_of_idx >= n_cal then None
+  else _low_buf_from_idx cb ~symbol ~calendar ~from_idx ~as_of_idx ~len
 
 (* Walk calendar columns → fresh [Bigarray.Array1.t]; missing rows → NaN.
    Returns [None] on len≤0, as_of absent from calendar, window underflow,
    or unknown symbol. *)
 let low_window (cb : Snapshot_callbacks.t) ~symbol ~as_of ~len ~calendar =
   if len <= 0 then None
-  else
-    let n_cal = Array.length calendar in
-    let as_of_idx = _calendar_index_of calendar as_of in
-    let from_idx = as_of_idx - len + 1 in
-    if as_of_idx < 0 || from_idx < 0 || as_of_idx >= n_cal then None
-    else
-      let from_date = calendar.(from_idx) in
-      let until_date = calendar.(as_of_idx) in
-      match
-        cb.read_field_history ~symbol ~from:from_date ~until:until_date
-          ~field:Snapshot_schema.Low
-      with
-      | Error _ -> None
-      | Ok rows ->
-          let low_t = _table_of rows in
-          let buf = BA1.create Bigarray.Float64 Bigarray.C_layout len in
-          for j = 0 to len - 1 do
-            let date = calendar.(from_idx + j) in
-            let v =
-              Hashtbl.find low_t date |> Option.value ~default:Float.nan
-            in
-            BA1.set buf j v
-          done;
-          Some buf
+  else _check_and_fetch_low cb ~symbol ~as_of ~len ~calendar
