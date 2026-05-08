@@ -17,6 +17,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 - [x] nesting: trading/trading/backtest/optimal/lib/outcome_scorer.ml — extracted _step_stage3, _make_initial_state, _resolve_exit; both violations cleared. PR #950 (2026-05-08)
 - [x] nesting: trading/trading/backtest/optimal/lib/optimal_run_artefacts.ml — extracted _rejection_pair_of_alternative + _pairs_of_audit_record; nesting linter clean. PR #949 (2026-05-08)
+- [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 7 helpers (calendar, analysis, sector, forward, scan) to Optimal_strategy_runner_helpers; 413→282 LOC (branch cleanup/optimal-runner-split-2, 2026-05-08)
 - [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
 - [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
 - [x] nesting: trading/analysis/scripts/build_snapshots/build_snapshots.ml — extracted 5 helpers (_entry_is_current, _write_and_checksum, _file_metadata, _build_or_log, _load_benchmark_bars, _make_progress, _last_symbol, _fold_symbol); all 78 fns pass nesting linter (branch cleanup/nesting-build-snapshots-2, 2026-05-08)
