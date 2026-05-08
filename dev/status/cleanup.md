@@ -22,6 +22,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] nesting: trading/analysis/scripts/build_snapshots/build_snapshots.ml — extracted 5 helpers (_entry_is_current, _write_and_checksum, _file_metadata, _build_or_log, _load_benchmark_bars, _make_progress, _last_symbol, _fold_symbol); all 78 fns pass nesting linter (branch cleanup/nesting-build-snapshots-2, 2026-05-08)
 - [x] nesting: trading/trading/weinstein/strategy/lib/entry_audit_capture.ml — extracted 5 helpers; classify_candidate/emit_entries/alternatives_of_decisions all pass; file avg now under 2.5 (branch cleanup/nesting-entry-audit-capture, 2026-05-08)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
+- [x] magic_numbers: multiple files — extract real magic-number constants + fix linter for string-context false positives. PR #955 (2026-05-08)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed

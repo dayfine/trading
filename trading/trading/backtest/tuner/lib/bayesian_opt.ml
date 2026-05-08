@@ -2,6 +2,14 @@ open Core
 module Mat = Owl.Mat
 module Linalg = Owl.Linalg.D
 
+(** Deterministic seed for the default RNG so results are reproducible when no
+    external seed is supplied. Any fixed value works; 42 is conventional. *)
+let _default_rng_seed = 42
+
+(** Minimum sigma below which expected-improvement is treated as zero, avoiding
+    division by a near-zero standard deviation. *)
+let _sigma_epsilon = 1e-12
+
 (** {1 Types} *)
 
 type observation = { parameters : (string * float) list; metric : float }
@@ -17,7 +25,7 @@ type config = {
 
 let create_config ~bounds ?(acquisition = `Expected_improvement)
     ?(initial_random = 5) ?(total_budget = 50)
-    ?(rng = Stdlib.Random.State.make [| 42 |]) () =
+    ?(rng = Stdlib.Random.State.make [| _default_rng_seed |]) () =
   { bounds; acquisition; initial_random; total_budget; rng }
 
 type t = { config : config; observations : observation list (* newest first *) }
@@ -177,7 +185,7 @@ let _standard_normal_cdf z = 0.5 *. (1.0 +. Owl.Maths.erf (z /. Float.sqrt 2.0))
 let expected_improvement ~posterior ~f_best x =
   let mu = posterior.mean x in
   let sigma = Float.sqrt (posterior.variance x) in
-  if Float.( <= ) sigma 1e-12 then 0.0
+  if Float.( <= ) sigma _sigma_epsilon then 0.0
   else
     let improvement = mu -. f_best in
     let z = improvement /. sigma in

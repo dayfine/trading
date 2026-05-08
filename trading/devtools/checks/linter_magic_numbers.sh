@@ -79,6 +79,21 @@ for f in $(find "$TRADING_DIR" -path "*/lib/*.ml" \
       *'(*'* | *'*)'* | *'e.g.'*) continue ;;
     esac
 
+    # Skip OCaml multi-line string continuation lines (end with backslash).
+    # These lines are always inside a string literal started on a prior line.
+    case "$line" in
+      *'\') continue ;;
+    esac
+
+    # Skip lines whose numeric sits inside an open string from a prior line.
+    # An odd count of double-quotes means this line is a continuation of a
+    # string opened on an earlier line — all content is string literal, so
+    # any numeric is not a magic number in code.
+    quote_count=$(printf '%s' "$line" | tr -cd '"' | wc -c | tr -d ' ')
+    if [ $(( quote_count % 2 )) -ne 0 ]; then
+      continue
+    fi
+
     # Skip record field assignments and named constant definitions (= <num>)
     # e.g. "field = 42", "let max_size = 100", "let pi = 3.14"
     case "$line" in
@@ -113,7 +128,16 @@ for f in $(find "$TRADING_DIR" -path "*/lib/*.ml" \
       case "$num" in
         0 | 1 | 0.0 | 1.0) continue ;;
         2.0 | 0.5 | 100.0) continue ;;
-        *) VIOLATIONS="${VIOLATIONS}${f}: ${num} in: ${line}\n" ;;
+        *)
+          # Skip numerics that appear only inside double-quoted strings on
+          # this line. Strip all "..." segments; if the number no longer
+          # appears in the remainder, it was inside a string literal and is
+          # not a magic number in code.
+          stripped=$(printf '%s' "$line" | sed 's/"[^"]*"//g')
+          case "$stripped" in
+            *"$num"*) VIOLATIONS="${VIOLATIONS}${f}: ${num} in: ${line}\n" ;;
+          esac
+          ;;
       esac
     done
   done < "$f"

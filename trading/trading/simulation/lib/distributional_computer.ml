@@ -11,6 +11,10 @@ let _cvar_95_p = 0.05
 let _cvar_99_p = 0.01
 let _tail_ratio_p = 0.05
 
+(** Pearson excess kurtosis subtracts 3 from the fourth standardised moment so
+    that a normal distribution has kurtosis = 0. *)
+let _pearson_kurtosis_correction = 3.0
+
 type state = {
   portfolio_values : float list;  (** Reversed: head is most recent. *)
 }
@@ -77,7 +81,7 @@ let _kurtosis_excess returns =
   if Float.(var <= 0.0) then 0.0
   else
     let _m3, m4 = _moments_3_4 returns in
-    (m4 /. (var *. var)) -. 3.0
+    (m4 /. (var *. var)) -. _pearson_kurtosis_correction
 
 (** [_bottom_n_mean ~p sorted_asc] returns the mean of the lowest [floor(n × p)]
     returns; 0.0 if that count is zero. The input must be sorted ascending. *)
