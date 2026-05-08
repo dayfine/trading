@@ -18,17 +18,17 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] nesting: trading/trading/backtest/optimal/lib/outcome_scorer.ml — extracted _step_stage3, _make_initial_state, _resolve_exit; both violations cleared. PR #950 (2026-05-08)
 - [x] nesting: trading/trading/backtest/optimal/lib/optimal_run_artefacts.ml — extracted _rejection_pair_of_alternative + _pairs_of_audit_record; nesting linter clean. PR #949 (2026-05-08)
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 7 helpers (calendar, analysis, sector, forward, scan) to Optimal_strategy_runner_helpers; 413→282 LOC (branch cleanup/optimal-runner-split-2, 2026-05-08)
-- [~] nesting: trading/trading/data_panel/snapshot/lib/snapshot_format.ml — read_with_expected_schema avg 4.24/max 8, _validate_schemas 3.58/7, write 3.38/6, _check_payload_integrity max 5 (source: dispatch 2026-05-08)
 - [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
 - [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
-- [~] magic_numbers: trading/trading/backtest/optimal/lib/optimal_strategy_report_sections.ml — 3.0 and 1.5 thresholds in _implications_narrative; extract as named constants (source: dispatch 2026-05-08)
+- [x] magic_numbers: trading/trading/backtest/optimal/lib/optimal_strategy_report_sections.ml — extracted _strong_outperform_threshold=3.0 and _moderate_outperform_threshold=1.5; linter clean (branch cleanup/optimal-report-sections-magic, 2026-05-08)
 - [x] nesting: trading/analysis/scripts/build_snapshots/build_snapshots.ml — extracted 5 helpers (_entry_is_current, _write_and_checksum, _file_metadata, _build_or_log, _load_benchmark_bars, _make_progress, _last_symbol, _fold_symbol); all 78 fns pass nesting linter (branch cleanup/nesting-build-snapshots-2, 2026-05-08)
 - [x] nesting: trading/trading/weinstein/strategy/lib/entry_audit_capture.ml — extracted 5 helpers; classify_candidate/emit_entries/alternatives_of_decisions all pass; file avg now under 2.5 (branch cleanup/nesting-entry-audit-capture, 2026-05-08)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed
-- [x] fn_length+file_length: weinstein_strategy.ml (304→298) + weinstein_strategy_screening.ml (353→275) — extracted macro/screen helpers to weinstein_strategy_macro.ml; _on_market_close 78→41 lines. (branch cleanup/weinstein-strategy-trim, 2026-05-08)
+- [x] nesting: trading/trading/weinstein/snapshot/lib/round_trip_verifier.ml — extracted _stop_check/_carryover_stop/_stop_adjusted_ok/_stop_unchanged_ok helpers; all 3 violations cleared. PR #964 (2026-05-08)
+- [x] nesting: trading/analysis/weinstein/screener/lib/screener.ml — extracted _filter_and_cap helper; _evaluate_longs/_evaluate_shorts nesting violations cleared. (branch cleanup/nesting-screener-eval-2, 2026-05-08)
 - [x] file_length: trading/trading/engine/lib/price_path.ml (511→498) + trading/trading/weinstein/strategy/lib/entry_audit_capture.ml (305→297) — condensed private-fn docstrings; both files now within limits. PR #958 (2026-05-08)
 
 - [x] nesting: trading/trading/weinstein/strategy/lib/exit_audit_capture.ml — extracted _pct_distance_from_callbacks, _make_exit_event, _handle_trigger_exit helpers; nesting linter now passes. (branch cleanup/nesting-exit-audit-capture, 2026-05-07)

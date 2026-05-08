@@ -80,31 +80,46 @@ let _check_adjusted_close_continuity ~symbol ~split_date ~factor ~tolerance
       in
       _continuity_check_result ~symbol ~factor ~tolerance pre_bars mismatches
 
+(* Shared helper: compare [post_stop] against [expected]; return the named
+   pass/fail check.  Callers pre-compute both detail strings so all formatting
+   stays outside the conditional branch. *)
+let _stop_check ~name ~tolerance post_stop expected ~pass_detail ~fail_detail =
+  if _approximately_equal ~tolerance post_stop expected then
+    _pass ~name pass_detail
+  else _fail ~name fail_detail
+
+(* Inner body of the Some/Some arm of _check_position_carryover. *)
+let _carryover_stop ~symbol ~factor ~(pre_lot : held_lot)
+    (pre : Weekly_snapshot.held_position) (post : Weekly_snapshot.held_position)
+    =
+  let expected = pre.stop /. factor in
+  let pass_detail =
+    Printf.sprintf "%s: stop %.4f -> %.4f (factor=%.4f); pre quantity=%.4f"
+      symbol pre.stop post.stop factor pre_lot.quantity
+  in
+  let fail_detail =
+    Printf.sprintf "%s: stop_post=%.6f, expected stop_pre/factor=%.6f" symbol
+      post.stop expected
+  in
+  _stop_check ~name:"position_carryover" ~tolerance:_arithmetic_tolerance
+    post.stop expected ~pass_detail ~fail_detail
+
 let _check_position_carryover ~symbol ~factor ~(pre_lot : held_lot)
     (pick_pre : Weekly_snapshot.t) (pick_post : Weekly_snapshot.t) =
+  let no_pre =
+    _fail ~name:"position_carryover"
+      (Printf.sprintf "%s: not present in pre-split snapshot.held_positions"
+         symbol)
+  in
+  let no_post =
+    _fail ~name:"position_carryover"
+      (Printf.sprintf "%s: dropped from post-split snapshot.held_positions"
+         symbol)
+  in
   match (_find_held pick_pre symbol, _find_held pick_post symbol) with
-  | None, _ ->
-      _fail ~name:"position_carryover"
-        (Printf.sprintf "%s: not present in pre-split snapshot.held_positions"
-           symbol)
-  | _, None ->
-      _fail ~name:"position_carryover"
-        (Printf.sprintf "%s: dropped from post-split snapshot.held_positions"
-           symbol)
-  | Some pre, Some post ->
-      let expected_stop = pre.stop /. factor in
-      if
-        _approximately_equal ~tolerance:_arithmetic_tolerance post.stop
-          expected_stop
-      then
-        _pass ~name:"position_carryover"
-          (Printf.sprintf
-             "%s: stop %.4f -> %.4f (factor=%.4f); pre quantity=%.4f" symbol
-             pre.stop post.stop factor pre_lot.quantity)
-      else
-        _fail ~name:"position_carryover"
-          (Printf.sprintf "%s: stop_post=%.6f, expected stop_pre/factor=%.6f"
-             symbol post.stop expected_stop)
+  | None, _ -> no_pre
+  | _, None -> no_post
+  | Some pre, Some post -> _carryover_stop ~symbol ~factor ~pre_lot pre post
 
 let _check_cost_basis_preserved ~symbol ~factor ~(pre_lot : held_lot) =
   let qty_post = pre_lot.quantity *. factor in
@@ -138,25 +153,30 @@ let _check_no_phantom_picks ~symbol (pick_pre : Weekly_snapshot.t)
       (Printf.sprintf "%s: new symbols in post-split candidates: %s" symbol
          (Set.to_list phantom |> String.concat ~sep:","))
 
+(* Inner body of the Some/Some arm of _check_stop_adjusted. *)
+let _stop_adjusted_ok ~symbol ~factor (pre : Weekly_snapshot.held_position)
+    (post : Weekly_snapshot.held_position) =
+  let expected = pre.stop /. factor in
+  let pass_detail =
+    Printf.sprintf "%s: stop %.4f -> %.4f (factor=%.4f)" symbol pre.stop
+      post.stop factor
+  in
+  let fail_detail =
+    Printf.sprintf "%s: stop_post=%.6f, expected pre/factor=%.6f" symbol
+      post.stop expected
+  in
+  _stop_check ~name:"stop_adjusted" ~tolerance:_default_adjusted_close_tolerance
+    post.stop expected ~pass_detail ~fail_detail
+
 let _check_stop_adjusted ~symbol ~factor (pick_pre : Weekly_snapshot.t)
     (pick_post : Weekly_snapshot.t) =
+  let missing =
+    _fail ~name:"stop_adjusted"
+      (Printf.sprintf "%s: position missing from snapshots" symbol)
+  in
   match (_find_held pick_pre symbol, _find_held pick_post symbol) with
-  | Some pre, Some post ->
-      let expected = pre.stop /. factor in
-      if
-        _approximately_equal ~tolerance:_default_adjusted_close_tolerance
-          post.stop expected
-      then
-        _pass ~name:"stop_adjusted"
-          (Printf.sprintf "%s: stop %.4f -> %.4f (factor=%.4f)" symbol pre.stop
-             post.stop factor)
-      else
-        _fail ~name:"stop_adjusted"
-          (Printf.sprintf "%s: stop_post=%.6f, expected pre/factor=%.6f" symbol
-             post.stop expected)
-  | _ ->
-      _fail ~name:"stop_adjusted"
-        (Printf.sprintf "%s: position missing from snapshots" symbol)
+  | Some pre, Some post -> _stop_adjusted_ok ~symbol ~factor pre post
+  | _ -> missing
 
 let verify_split_round_trip ~symbol ~split_date ~factor ~bars
     ~(pre_split_lot : held_lot) ~(pick_pre_split : Weekly_snapshot.t)
@@ -196,24 +216,29 @@ let _check_quantity_unchanged_label ~symbol ~quantity =
   _pass ~name:"quantity_unchanged"
     (Printf.sprintf "%s: quantity=%.4f (no DRIP / scrip)" symbol quantity)
 
+(* Inner body of the Some/Some arm of _check_stop_unchanged. *)
+let _stop_unchanged_ok ~symbol (pre : Weekly_snapshot.held_position)
+    (post : Weekly_snapshot.held_position) =
+  let pass_detail =
+    Printf.sprintf "%s: stop %.4f preserved across dividend" symbol pre.stop
+  in
+  let fail_detail =
+    Printf.sprintf
+      "%s: stop_pre=%.6f, stop_post=%.6f (dividends should not adjust)" symbol
+      pre.stop post.stop
+  in
+  _stop_check ~name:"stop_unchanged" ~tolerance:_arithmetic_tolerance post.stop
+    pre.stop ~pass_detail ~fail_detail
+
 let _check_stop_unchanged ~symbol (pick_pre : Weekly_snapshot.t)
     (pick_post : Weekly_snapshot.t) =
+  let missing =
+    _fail ~name:"stop_unchanged"
+      (Printf.sprintf "%s: position missing from snapshots" symbol)
+  in
   match (_find_held pick_pre symbol, _find_held pick_post symbol) with
-  | Some pre, Some post ->
-      if
-        _approximately_equal ~tolerance:_arithmetic_tolerance post.stop pre.stop
-      then
-        _pass ~name:"stop_unchanged"
-          (Printf.sprintf "%s: stop %.4f preserved across dividend" symbol
-             pre.stop)
-      else
-        _fail ~name:"stop_unchanged"
-          (Printf.sprintf
-             "%s: stop_pre=%.6f, stop_post=%.6f (dividends should not adjust)"
-             symbol pre.stop post.stop)
-  | _ ->
-      _fail ~name:"stop_unchanged"
-        (Printf.sprintf "%s: position missing from snapshots" symbol)
+  | Some pre, Some post -> _stop_unchanged_ok ~symbol pre post
+  | _ -> missing
 
 let verify_dividend_round_trip ~symbol ~ex_date:_ ~amount_per_share
     ~(pre_lot : held_lot) ~(pick_pre : Weekly_snapshot.t)
