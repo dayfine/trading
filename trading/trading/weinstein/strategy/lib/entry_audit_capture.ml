@@ -138,18 +138,10 @@ let check_cash_and_deduct ~remaining_cash
 
 (** G15 step 2: aggregate short-notional cap evaluated at entry-decision time.
 
-    The aggregate cap is checked on a running [short_notional_acc] that starts
-    at the existing short notional in the portfolio (computed once by the caller
-    from the [Holding] state of every short position) and grows as short
-    candidates are admitted within this Friday's entry walk.
-
-    For [Long] candidates the gate is a no-op pass-through: longs cannot push
-    the cap up, and the strategy still admits them via the cash check.
-
-    Pure side effect on [short_notional_acc]: bumped only on a [Short] candidate
-    that passes — that way later [Short] candidates within the same walk see the
-    up-to-date running total and the cap is enforced monotonically across the
-    cascade. *)
+    Longs are a no-op pass-through. For [Short] candidates, accumulates notional
+    into [short_notional_acc] (seeded by the caller with existing portfolio
+    short exposure) and rejects if the projected total exceeds
+    [short_notional_cap]. *)
 let check_short_notional_cap ~short_notional_acc ~short_notional_cap
     ((trans : Position.transition), (meta : entry_meta))
     (cand : Screener.scored_candidate) =

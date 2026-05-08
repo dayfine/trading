@@ -78,22 +78,9 @@ let _clamp ~min_val ~max_val x = Float.max min_val (Float.min max_val x)
 
 (** Infer intraday volatility scaling factor from bar characteristics.
 
-    Combines two factors using geometric mean: 1. Shape: (high-low)/(open-close)
-    \- measures choppiness vs directionality
-    - ratio ≈ 1.0: Very directional (minimal wicks)
-    - ratio ≈ 2.5: Typical intraday volatility
-    - ratio ≥ 5.0: High volatility (large wicks, indecision)
-
-    2. Magnitude: (high-low)/open - measures size of move relative to price
-    - ~1%: Small move
-    - ~2%: Typical daily range
-    - ~4%+: Large move
-
-    Returns scaling factor for Brownian noise:
-    - ~1.0 for typical volatility (shape=1.0, magnitude=1.0)
-    - <1.0 for low volatility (small, directional moves)
-    - >1.0 for high volatility (large, choppy moves)
-    - Capped at ~2.0 for extreme cases *)
+    Geometric mean of two factors: shape (high-low)/(open-close) measuring
+    choppiness vs directionality, and magnitude (high-low)/open relative to a 2%
+    typical daily range. Returns a Brownian noise scale capped at ~2.0. *)
 let _infer_volatility_scale (bar : price_bar) : float =
   let range = bar.high_price -. bar.low_price in
   if Float.(range = 0.0) then 0.0 (* Completely flat bar *)
