@@ -28,21 +28,23 @@ let write ~path manifest =
   with Sys_error msg | Failure msg ->
     Status.error_internal (Printf.sprintf "Snapshot_manifest.write: %s" msg)
 
+let _decode_sexp ~path =
+  try
+    let sexp = Sexp.load_sexp path in
+    Ok (t_of_sexp sexp)
+  with
+  | Sys_error msg | Failure msg ->
+      Status.error_internal (Printf.sprintf "Snapshot_manifest.read: %s" msg)
+  | Sexp.Of_sexp_error (exn, _) ->
+      Status.error_internal
+        (Printf.sprintf "Snapshot_manifest.read: sexp decode: %s"
+           (Exn.to_string exn))
+
 let read ~path =
   if not (Stdlib.Sys.file_exists path) then
     Status.error_not_found
       (Printf.sprintf "Snapshot_manifest.read: %s does not exist" path)
-  else
-    try
-      let sexp = Sexp.load_sexp path in
-      Ok (t_of_sexp sexp)
-    with
-    | Sys_error msg | Failure msg ->
-        Status.error_internal (Printf.sprintf "Snapshot_manifest.read: %s" msg)
-    | Sexp.Of_sexp_error (exn, _) ->
-        Status.error_internal
-          (Printf.sprintf "Snapshot_manifest.read: sexp decode: %s"
-             (Exn.to_string exn))
+  else _decode_sexp ~path
 
 let find t ~symbol =
   List.find t.entries ~f:(fun e -> String.equal e.symbol symbol)
@@ -72,22 +74,23 @@ let _atomic_write ~path manifest =
     Status.error_internal
       (Printf.sprintf "Snapshot_manifest._atomic_write: %s" msg)
 
+let _load_if_exists ~path =
+  if Stdlib.Sys.file_exists path then
+    match read ~path with Ok m -> Some m | Error _ -> None
+  else None
+
+let _validate_and_write ~path ~schema entry m =
+  if not (String.equal m.schema_hash schema.Snapshot_schema.schema_hash) then
+    Status.error_internal
+      (Printf.sprintf
+         "Snapshot_manifest.update_for_symbol: schema_hash mismatch \
+          (existing=%s new=%s)"
+         m.schema_hash schema.Snapshot_schema.schema_hash)
+  else _atomic_write ~path (upsert_entry m entry)
+
 let update_for_symbol ~path ~schema entry =
-  let existing =
-    if Stdlib.Sys.file_exists path then
-      match read ~path with Ok m -> Some m | Error _ -> None
-    else None
-  in
-  match existing with
+  match _load_if_exists ~path with
   | None ->
       let manifest = create ~schema ~entries:[ entry ] in
       _atomic_write ~path manifest
-  | Some m ->
-      if not (String.equal m.schema_hash schema.Snapshot_schema.schema_hash)
-      then
-        Status.error_internal
-          (Printf.sprintf
-             "Snapshot_manifest.update_for_symbol: schema_hash mismatch \
-              (existing=%s new=%s)"
-             m.schema_hash schema.Snapshot_schema.schema_hash)
-      else _atomic_write ~path (upsert_entry m entry)
+  | Some m -> _validate_and_write ~path ~schema entry m
