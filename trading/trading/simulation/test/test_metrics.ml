@@ -875,7 +875,9 @@ let test_portfolio_state_no_steps _ =
 
 let test_portfolio_state_with_trades _ =
   let config = make_config () in
-  let portfolio = Trading_simulation_types.Portfolio_summary.with_cash 10000.0 in
+  let portfolio =
+    Trading_simulation_types.Portfolio_summary.with_cash 10000.0
+  in
   let trade =
     {
       Trading_base.Types.id = "t1";

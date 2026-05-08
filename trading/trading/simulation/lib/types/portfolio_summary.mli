@@ -24,9 +24,10 @@ type position_summary = {
           [Trading_portfolio.Calculations.position_cost_basis]. *)
 }
 [@@deriving show, eq, sexp]
-(** Per-position summary, projected from [Trading_portfolio.Types.portfolio_position].
-    Drops [lots] / [accounting_method]; retains the two scalars metric
-    computers and per-step audits actually read. *)
+(** Per-position summary, projected from
+    [Trading_portfolio.Types.portfolio_position]. Drops [lots] /
+    [accounting_method]; retains the two scalars metric computers and per-step
+    audits actually read. *)
 
 type t = {
   current_cash : float;  (** Mirrors [Portfolio.t.current_cash]. *)
@@ -36,10 +37,10 @@ type t = {
   position_value_total : float;
       (** Sum of position market values at this step's mark-to-market prices,
           forward-filled per [Simulator._compute_portfolio_value]. Equals
-          [step_result.portfolio_value -. current_cash] on bar-bearing days;
-          may be 0 on weekends/holidays when the simulator falls back to
-          cash-only valuation. Carried explicitly here to avoid re-deriving it
-          downstream. *)
+          [step_result.portfolio_value -. current_cash] on bar-bearing days; may
+          be 0 on weekends/holidays when the simulator falls back to cash-only
+          valuation. Carried explicitly here to avoid re-deriving it downstream.
+      *)
 }
 [@@deriving show, eq, sexp]
 (** Per-step portfolio projection. Independent of any [Portfolio.t] reference;
@@ -71,5 +72,5 @@ val find_position : t -> symbol:string -> position_summary option
 
 val position_cost_basis_total : t -> float
 (** Sum of [cost_basis] across all open positions in the summary. Used by
-    [Portfolio_state_computer] to derive unrealized P&L without needing the
-    full [Portfolio.t]. *)
+    [Portfolio_state_computer] to derive unrealized P&L without needing the full
+    [Portfolio.t]. *)

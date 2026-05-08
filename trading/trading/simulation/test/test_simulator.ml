@@ -165,8 +165,8 @@ let test_step_executes_market_order _ =
         (is_some_and
            (field
               (fun (p :
-                    Trading_simulation_types.Portfolio_summary.position_summary) ->
-                p.symbol)
+                     Trading_simulation_types.Portfolio_summary.position_summary)
+                 -> p.symbol)
               (equal_to "AAPL"))))
 
 let test_limit_order_executes_on_later_day _ =
@@ -398,8 +398,7 @@ let test_step_returns_completed_when_done _ =
                      (is_completed (fun result ->
                           let final = (List.last_exn result.steps).portfolio in
                           assert_equal expected_summary final;
-                          assert_equal expected_portfolio
-                            result.final_portfolio)))))))
+                          assert_equal expected_portfolio result.final_portfolio)))))))
 
 (* ==================== run tests ==================== *)
 

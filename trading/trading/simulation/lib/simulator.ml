@@ -336,11 +336,11 @@ let _apply_transitions ~positions ~transitions =
 
 (** Build run_result from accumulated state.
 
-    [final_portfolio] is the simulator's last full {!Trading_portfolio.Portfolio.t};
-    it is exposed on the result so reconciler writers (which need lots /
-    avg-cost / per-symbol position details) read it directly rather than
-    reconstructing from the skinny per-step [Portfolio_summary] retained on
-    [steps]. *)
+    [final_portfolio] is the simulator's last full
+    {!Trading_portfolio.Portfolio.t}; it is exposed on the result so reconciler
+    writers (which need lots / avg-cost / per-symbol position details) read it
+    directly rather than reconstructing from the skinny per-step
+    [Portfolio_summary] retained on [steps]. *)
 let _build_run_result t =
   let steps = List.rev t.step_history in
   let base_metrics =

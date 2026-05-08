@@ -1,10 +1,9 @@
 (** Portfolio state metric computer — captures end-of-simulation state:
     OpenPositionCount, OpenPositionsValue, UnrealizedPnl, TradeFrequency.
 
-    Reads {!Portfolio_summary} fields off [step_result.portfolio]; this
-    computer needs neither lots nor trade history, so the skinny projection
-    introduced for Fix B (see [dev/notes/15y-memory-cliff-2026-05-08.md])
-    suffices. *)
+    Reads {!Portfolio_summary} fields off [step_result.portfolio]; this computer
+    needs neither lots nor trade history, so the skinny projection introduced
+    for Fix B (see [dev/notes/15y-memory-cliff-2026-05-08.md]) suffices. *)
 
 open Core
 module Metric_types = Trading_simulation_types.Metric_types
@@ -54,7 +53,9 @@ let _metrics_from_step ~(position_step : Simulator_types.step_result)
   let open_positions_value =
     marked_step.portfolio_value -. marked_step.portfolio.current_cash
   in
-  let cost_basis = Portfolio_summary.position_cost_basis_total marked_step.portfolio in
+  let cost_basis =
+    Portfolio_summary.position_cost_basis_total marked_step.portfolio
+  in
   let unrealized_pnl = open_positions_value -. cost_basis in
   Metric_types.of_alist_exn
     [

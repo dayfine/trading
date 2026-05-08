@@ -402,8 +402,10 @@ let _total_cost_basis ~symbol
     =
   Trading_simulation_types.Portfolio_summary.find_position step.portfolio
     ~symbol
-  |> Option.map ~f:(fun (p : Trading_simulation_types.Portfolio_summary.position_summary) ->
-      p.cost_basis)
+  |> Option.map
+       ~f:(fun
+           (p : Trading_simulation_types.Portfolio_summary.position_summary) ->
+         p.cost_basis)
 
 (** Total quantity for [symbol] at this step. *)
 let _total_quantity ~symbol
@@ -411,8 +413,10 @@ let _total_quantity ~symbol
     =
   Trading_simulation_types.Portfolio_summary.find_position step.portfolio
     ~symbol
-  |> Option.map ~f:(fun (p : Trading_simulation_types.Portfolio_summary.position_summary) ->
-      p.quantity)
+  |> Option.map
+       ~f:(fun
+           (p : Trading_simulation_types.Portfolio_summary.position_summary) ->
+         p.quantity)
 
 (** Configurable test runner. Builds the simulator, runs to completion, applies
     universal invariants, returns the run result for scenario-specific

@@ -12,7 +12,9 @@ let _date s = Date.of_string s
 (** Empty portfolio (no positions, $10,000 cash) projects with no positions and
     [position_value_total = 0.0]. *)
 let test_of_portfolio_empty _ =
-  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10_000.0 () in
+  let portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:10_000.0 ()
+  in
   let summary =
     Portfolio_summary.of_portfolio portfolio ~position_value_total:0.0
   in
@@ -25,9 +27,7 @@ let test_of_portfolio_empty _ =
          field
            (fun (s : Portfolio_summary.t) -> s.position_value_total)
            (float_equal 0.0);
-         field
-           (fun (s : Portfolio_summary.t) -> s.positions)
-           (elements_are []);
+         field (fun (s : Portfolio_summary.t) -> s.positions) (elements_are []);
        ])
 
 (** A portfolio with one open long position projects to a single
@@ -173,13 +173,11 @@ let test_find_position _ =
        (field
           (fun (p : Portfolio_summary.position_summary) -> p.symbol)
           (equal_to "AAPL")));
-  assert_that
-    (Portfolio_summary.find_position summary ~symbol:"NVDA")
-    is_none
+  assert_that (Portfolio_summary.find_position summary ~symbol:"NVDA") is_none
 
 (** [position_cost_basis_total] sums cost_basis across positions. Used by
-    [Portfolio_state_computer] to derive UnrealizedPnl without needing the
-    full [Portfolio.t]. *)
+    [Portfolio_state_computer] to derive UnrealizedPnl without needing the full
+    [Portfolio.t]. *)
 let test_position_cost_basis_total _ =
   let base = Trading_portfolio.Portfolio.create ~initial_cash:100_000.0 () in
   let buy =
@@ -227,9 +225,7 @@ let test_empty _ =
          field
            (fun (s : Portfolio_summary.t) -> s.current_cash)
            (float_equal 0.0);
-         field
-           (fun (s : Portfolio_summary.t) -> s.positions)
-           (elements_are []);
+         field (fun (s : Portfolio_summary.t) -> s.positions) (elements_are []);
          field
            (fun (s : Portfolio_summary.t) -> s.position_value_total)
            (float_equal 0.0);
@@ -244,9 +240,7 @@ let test_with_cash _ =
          field
            (fun (s : Portfolio_summary.t) -> s.current_cash)
            (float_equal 50_000.0);
-         field
-           (fun (s : Portfolio_summary.t) -> s.positions)
-           (elements_are []);
+         field (fun (s : Portfolio_summary.t) -> s.positions) (elements_are []);
        ])
 
 let suite =

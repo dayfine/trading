@@ -257,8 +257,7 @@ let write ~output_dir (result : Runner.result) =
   Reconciler_writer.write_open_positions ~output_dir
     ~final_portfolio:result.final_portfolio;
   Reconciler_writer.write_final_prices ~output_dir
-    ~final_portfolio:result.final_portfolio
-    ~final_prices:result.final_prices;
+    ~final_portfolio:result.final_portfolio ~final_prices:result.final_prices;
   Reconciler_writer.write_splits ~output_dir ~steps:result.steps;
   _write_universe ~output_dir ~universe:result.universe;
   Macro_trend_writer.write ~output_dir result.cascade_summaries

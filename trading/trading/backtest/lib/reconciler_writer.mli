@@ -6,13 +6,11 @@
     — the reconciler exits 2 on any header drift. *)
 
 val write_open_positions :
-  output_dir:string ->
-  final_portfolio:Trading_portfolio.Portfolio.t ->
-  unit
-(** Write [open_positions.csv]: one row per position held at run end. Reads
-    full position records (lots, accounting method) from [final_portfolio] —
-    per-step [step_result.portfolio] is now a {!Portfolio_summary.t}
-    projection that omits lot-level detail. PHASE_1_SPEC §3:
+  output_dir:string -> final_portfolio:Trading_portfolio.Portfolio.t -> unit
+(** Write [open_positions.csv]: one row per position held at run end. Reads full
+    position records (lots, accounting method) from [final_portfolio] — per-step
+    [step_result.portfolio] is now a {!Portfolio_summary.t} projection that
+    omits lot-level detail. PHASE_1_SPEC §3:
     [symbol,side,entry_date,entry_price,quantity]. Always written; header-only
     when no positions are held. *)
 

@@ -14,10 +14,10 @@ type result = {
   steps : Trading_simulation_types.Simulator_types.step_result list;
       (** Steps filtered to [start_date..end_date] on real trading days only.
           Used for the equity curve and any downstream consumer that needs a
-          meaningful mark-to-market portfolio value per row. Each step carries
-          a {!Trading_simulation_types.Portfolio_summary.t} projection rather
-          than the full portfolio — see [final_portfolio] for the full
-          end-of-run state. *)
+          meaningful mark-to-market portfolio value per row. Each step carries a
+          {!Trading_simulation_types.Portfolio_summary.t} projection rather than
+          the full portfolio — see [final_portfolio] for the full end-of-run
+          state. *)
   final_portfolio : Trading_portfolio.Portfolio.t;
       (** The full {!Trading_portfolio.Portfolio.t} as of the simulator's last
           step (i.e. the end of [warmup_start..end_date]). Carries lots,

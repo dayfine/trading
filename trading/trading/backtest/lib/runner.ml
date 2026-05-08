@@ -351,12 +351,13 @@ let _position_symbol (p : Trading_portfolio.Types.portfolio_position) = p.symbol
 (** Filter [final_close_prices] to symbols that are still held in the run's
     [final_portfolio]. Empty result when no positions are open at end of run.
     The reconciler only references [final_prices.csv] via the join key against
-    [open_positions.csv], so prices for never-held or already-closed symbols
-    are not needed and would just bloat the artefact. *)
+    [open_positions.csv], so prices for never-held or already-closed symbols are
+    not needed and would just bloat the artefact. *)
 let _final_prices_for_held_symbols
     ~(final_portfolio : Trading_portfolio.Portfolio.t) ~final_close_prices =
   let held =
-    final_portfolio.positions |> List.map ~f:_position_symbol
+    final_portfolio.positions
+    |> List.map ~f:_position_symbol
     |> String.Set.of_list
   in
   List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
