@@ -409,8 +409,8 @@ let _filter_stale_holds ~stale_hold_log ~start_date =
       Date.( >= ) e.date start_date)
 
 (** Extract and in-window-filter all post-simulation artefacts: round trips,
-    stop infos, audit records, cascade summaries, force liquidations, and
-    stale holds. Wrapped in a [Trace.Teardown] span. *)
+    stop infos, audit records, cascade summaries, force liquidations, and stale
+    holds. Wrapped in a [Trace.Teardown] span. *)
 let _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
     ~force_liquidation_log ~stale_hold_log ~steps_in_range ~start_date () =
   let round_trips, stop_infos, audit, cascade_summaries, force_liquidations =
@@ -451,8 +451,12 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
   Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
   let steps_in_range, steps = _filter_steps ~sim_result ~start_date in
   let final_value = (List.last_exn steps).portfolio_value in
-  let round_trips, stop_infos, audit, cascade_summaries, force_liquidations,
-      stale_holds =
+  let ( round_trips,
+        stop_infos,
+        audit,
+        cascade_summaries,
+        force_liquidations,
+        stale_holds ) =
     _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
       ~force_liquidation_log ~stale_hold_log ~steps_in_range ~start_date ()
   in
