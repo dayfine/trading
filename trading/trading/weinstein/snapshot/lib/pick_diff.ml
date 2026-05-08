@@ -67,28 +67,33 @@ let _rank_changes_of ~v1_index ~v2_index ~overlap : rank_change list =
       if delta = 0 then None
       else Some { symbol; v1_rank = r1; v2_rank = r2; delta })
 
+(** Build the diff record from two same-date snapshots. *)
+let _compute_diff ~(v1 : Weekly_snapshot.t) ~(v2 : Weekly_snapshot.t) : t =
+  let v1_index = _index_candidates v1.long_candidates in
+  let v2_index = _index_candidates v2.long_candidates in
+  let v1_set = _symbols v1.long_candidates in
+  let v2_set = _symbols v2.long_candidates in
+  let overlap = Set.inter v1_set v2_set in
+  {
+    date = v1.date;
+    v1_version = v1.system_version;
+    v2_version = v2.system_version;
+    added_in_v2 = Set.to_list (Set.diff v2_set v1_set);
+    removed_in_v2 = Set.to_list (Set.diff v1_set v2_set);
+    score_changes = _score_changes_of ~v1_index ~v2_index ~overlap;
+    rank_changes = _rank_changes_of ~v1_index ~v2_index ~overlap;
+    macro_change = _macro_change_of ~v1:v1.macro ~v2:v2.macro;
+  }
+
+(** Error when v1 and v2 snapshots have different dates. *)
+let _date_mismatch_error ~(v1 : Weekly_snapshot.t) ~(v2 : Weekly_snapshot.t) =
+  let msg =
+    Printf.sprintf "Cannot diff snapshots from different dates: v1=%s v2=%s"
+      (Date.to_string v1.date) (Date.to_string v2.date)
+  in
+  Error (Status.invalid_argument_error msg)
+
 let diff ~(v1 : Weekly_snapshot.t) ~(v2 : Weekly_snapshot.t) :
     t Status.status_or =
-  if not (Date.equal v1.date v2.date) then
-    Error
-      (Status.invalid_argument_error
-         (Printf.sprintf
-            "Cannot diff snapshots from different dates: v1=%s v2=%s"
-            (Date.to_string v1.date) (Date.to_string v2.date)))
-  else
-    let v1_index = _index_candidates v1.long_candidates in
-    let v2_index = _index_candidates v2.long_candidates in
-    let v1_set = _symbols v1.long_candidates in
-    let v2_set = _symbols v2.long_candidates in
-    let overlap = Set.inter v1_set v2_set in
-    Ok
-      {
-        date = v1.date;
-        v1_version = v1.system_version;
-        v2_version = v2.system_version;
-        added_in_v2 = Set.to_list (Set.diff v2_set v1_set);
-        removed_in_v2 = Set.to_list (Set.diff v1_set v2_set);
-        score_changes = _score_changes_of ~v1_index ~v2_index ~overlap;
-        rank_changes = _rank_changes_of ~v1_index ~v2_index ~overlap;
-        macro_change = _macro_change_of ~v1:v1.macro ~v2:v2.macro;
-      }
+  if not (Date.equal v1.date v2.date) then _date_mismatch_error ~v1 ~v2
+  else Ok (_compute_diff ~v1 ~v2)
