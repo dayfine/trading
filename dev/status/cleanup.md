@@ -17,7 +17,10 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 - [~] nesting: trading/trading/backtest/lib/runner.ml + optimal_strategy_runner_helpers.ml + optimal_summary.ml + reconciler_writer.ml — extract private helpers to reduce nesting in 5 flagged fns (source: dispatch 2026-05-08)
 - [~] nesting: trading/trading/weinstein/snapshot/lib/pick_diff.ml + trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_manifest.ml — extract private helpers to reduce avg/max nesting (source: dispatch 2026-05-08)
+- [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
+- [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
 
+- [x] nesting: trading/trading/backtest/optimal/lib/optimal_strategy_report_sections.ml — extracted _cmp_actual_by_date, _actual_date_break, _label_actual_group, _cmp_optimal_by_date, _optimal_date_break, _label_optimal_group, _ratio_narrative; all 3 violations cleared (branch cleanup/nesting-report-sections, 2026-05-08)
 - [x] nesting: trading/trading/backtest/optimal/lib/outcome_scorer.ml — extracted _step_stage3, _make_initial_state, _resolve_exit; both violations cleared. PR #950 (2026-05-08)
 - [x] nesting: trading/trading/backtest/optimal/lib/optimal_run_artefacts.ml — extracted _rejection_pair_of_alternative + _pairs_of_audit_record; nesting linter clean. PR #949 (2026-05-08)
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 7 helpers (calendar, analysis, sector, forward, scan) to Optimal_strategy_runner_helpers; 413→282 LOC (branch cleanup/optimal-runner-split-2, 2026-05-08)
