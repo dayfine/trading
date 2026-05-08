@@ -1,0 +1,24 @@
+File ".", line 1, characters 0-0:
+Warning: No dune-project file has been found in directory ".". A default one
+is assumed but the project might break when dune is upgraded. Please create a
+dune-project file.
+Hint: generate the project file with: $ dune init project <name>
+Loading 1 scenarios from /workspaces/trading-1/dev/experiments/capital-recycling-combined-2026-05-07/perf-2026-05-08T163314Z/_stage_cell-A-baseline (parallel=1)
+Fixtures root: /workspaces/trading-1/trading/test_data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-08-163319
+
+>>> Running cell-A-both-off: 5y SP500 — Stage3 OFF, Laggard OFF (sanity baseline) (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_0a91a0)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+cell-A-both-off                 58.3%      81    19.8%    33.6%   PASS
+
+1/1 scenarios passed.
