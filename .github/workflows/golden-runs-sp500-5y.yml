@@ -1,29 +1,34 @@
-# SP500 golden-run postsubmit: runs sp500-2019-2023 (and any other
-# perf-tier: 3 scenarios under goldens-sp500/) on every push to main.
+# SP500 5y golden-run postsubmit: runs the 3 sp500-2019-2023* scenarios
+# (perf-tier 3) under goldens-sp500/ on every push to main.
 #
-# This is a POSTSUBMIT gate — it runs after merge, not before. Its purpose
-# is to catch strategy regressions in the canonical benchmark within hours
-# of a merge, not to block PRs from landing.
+# Split out of golden-runs-sp500.yml on 2026-05-08 so 5y signal isn't
+# blocked by 15y noise (sp500-2010-2026 currently OOMs on 8 GB runners
+# while Q1 memory cliff is being investigated). 15y runs moved to
+# golden-runs-sp500-15y.yml on a less-frequent cron.
+# See dev/notes/next-session-priorities-2026-05-08.md §Q4.
 #
-# Non-blocking by design: continue-on-error: true for the initial soak period
-# (~4 weeks). Flip to false after 4 consecutive clean runs at ≤60 min wall
-# time. See dev/notes/ci-golden-runs-design-2026-05-06.md §Phase 1.
+# This is a POSTSUBMIT gate — runs after merge, not before. Catches
+# strategy regressions in the canonical 5y benchmark within minutes
+# of a merge.
+#
+# Non-blocking by design: continue-on-error: true for the initial soak
+# period (~4 weeks). Flip to false after 4 consecutive clean runs at
+# ≤30 min wall time. See dev/notes/ci-golden-runs-design-2026-05-06.md §Phase 1.
 #
 # Prerequisite: bar data for the SP500 universe must be committed under
 # trading/test_data/. See dev/scripts/prepare_ci_data.sh for the one-time
-# data preparation step. The data is a date-filtered snapshot (2009-01-01+)
-# of the full EODHD bars from /data/. Once committed, update quarterly or
-# when dev/scripts/build_sp500_universe.sh is re-run with new symbols.
+# data preparation step.
 #
-# Expected runtimes (GHA ubuntu-latest, post-#845 panel perf fix):
-#   sp500-2019-2023:      ~15–25 min
-#   sp500-2019-2023-long-only: ~15–25 min (if present)
-# Budget: 120 min total covers both scenarios with 60 min headroom.
+# Expected runtimes (GHA ubuntu-latest):
+#   sp500-2019-2023:           ~5 min,  ~770 MB peak
+#   sp500-2019-2023-long-only: ~5 min   (currently FAIL — Q2 sub-bug)
+#   sp500-2019-2023-bah-spy:   ~1 min   (currently FAIL — Q2 main bug)
+# Budget: 30 min total covers all three with healthy headroom.
 #
 # Scenarios discovered: any *.sexp with ";; perf-tier: 3" under
 # trading/test_data/backtest_scenarios/goldens-sp500/
 # See dev/scripts/golden_sp500_postsubmit.sh for the runner logic.
-name: golden-runs-sp500
+name: golden-runs-sp500-5y
 
 on:
   push:
@@ -31,9 +36,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  golden-sp500:
+  golden-sp500-5y:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: read
@@ -46,11 +51,9 @@ jobs:
     env:
       HOME: /home/opam
       TRADING_IN_CONTAINER: "1"
-      # TRADING_DATA_DIR points at trading/test_data/ which contains:
-      #   - Bar CSVs for 500 SP500 symbols (trimmed 2009+, ~84 MB committed)
-      #   - backtest_scenarios/ subdirectory with universe + scenario files
-      # The scenario_runner resolves bar data AND scenario fixtures from this dir.
       TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+      # Restrict to 5y goldens — historical (15y) runs separately.
+      GOLDEN_SP500_SUBDIRS: goldens-sp500
     steps:
       - uses: actions/checkout@v4
 
@@ -62,8 +65,8 @@ jobs:
           restore-keys: |
             dune-${{ runner.os }}-
 
-      - name: Run SP500 golden postsubmit
-        id: golden_sp500
+      - name: Run SP500 5y golden postsubmit
+        id: golden_sp500_5y
         # Non-blocking during initial soak. Flip to false after 4 clean runs.
         continue-on-error: true
         run: dev/scripts/golden_sp500_postsubmit.sh
@@ -74,12 +77,12 @@ jobs:
           summary_file=$(ls -1t dev/perf/golden-sp500-postsubmit-*/summary.txt 2>/dev/null | head -1)
           if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
             {
-              echo "## SP500 golden postsubmit"
+              echo "## SP500 5y golden postsubmit"
               echo ""
               echo '```'
               cat "$summary_file"
               echo '```'
             } >>"$GITHUB_STEP_SUMMARY"
           else
-            echo "SP500 golden postsubmit: no summary produced." >>"$GITHUB_STEP_SUMMARY"
+            echo "SP500 5y golden postsubmit: no summary produced." >>"$GITHUB_STEP_SUMMARY"
           fi
