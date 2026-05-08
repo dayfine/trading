@@ -112,16 +112,19 @@ let _insert_into_cache t ~symbol ~rows =
 let _sort_rows_by_date (rows : Snapshot.t array) =
   Array.sort rows ~compare:(fun a b -> Date.compare a.date b.date)
 
+(* Convert a decoded row list into a sorted array and insert into cache. *)
+let _insert_rows t ~symbol rows_list =
+  let rows = Array.of_list rows_list in
+  _sort_rows_by_date rows;
+  _insert_into_cache t ~symbol ~rows
+
 let _load_and_insert t ~symbol =
   match Snapshot_manifest.find t.manifest ~symbol with
   | None ->
       Status.error_not_found
         (Printf.sprintf "Daily_panels: symbol %s not in manifest" symbol)
   | Some metadata ->
-      Result.map (_load_symbol_file t metadata) ~f:(fun rows_list ->
-          let rows = Array.of_list rows_list in
-          _sort_rows_by_date rows;
-          _insert_into_cache t ~symbol ~rows)
+      Result.map (_load_symbol_file t metadata) ~f:(_insert_rows t ~symbol)
 
 (* Cache hit: promote to MRU and return the resident entry. *)
 let _hit_path t (elt : cache_entry Doubly_linked.Elt.t) =

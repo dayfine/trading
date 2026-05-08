@@ -170,17 +170,20 @@ let _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars =
         |> Array.of_list)
   in
   let bench_idx = ref (-1) in
+  (* Update [rs] and [macro] at index [i] from [arr]. Advances [bench_idx]
+     monotonically so the bench window stays bounded across the day loop. *)
+  let update_bench i arr =
+    let cutoff = bars_arr.(i).Types.Daily_price.date in
+    bench_idx := _advance_bench_idx arr ~from_idx:(Int.max 0 !bench_idx) ~cutoff;
+    let usable_idx = _usable_bench_idx arr ~bench_idx:!bench_idx ~cutoff in
+    rs.(i) <-
+      _rs_value ~weekly_prefix ~day_idx:i ~bench_weekly_arr:arr
+        ~bench_idx:usable_idx;
+    macro.(i) <- _macro_value ~bench_weekly_arr:arr ~bench_idx:usable_idx
+  in
   for i = 0 to n - 1 do
     stage.(i) <- _stage_value ~weekly_prefix ~day_idx:i;
-    Option.iter bench_weekly_arr ~f:(fun arr ->
-        let cutoff = bars_arr.(i).Types.Daily_price.date in
-        bench_idx :=
-          _advance_bench_idx arr ~from_idx:(Int.max 0 !bench_idx) ~cutoff;
-        let usable_idx = _usable_bench_idx arr ~bench_idx:!bench_idx ~cutoff in
-        rs.(i) <-
-          _rs_value ~weekly_prefix ~day_idx:i ~bench_weekly_arr:arr
-            ~bench_idx:usable_idx;
-        macro.(i) <- _macro_value ~bench_weekly_arr:arr ~bench_idx:usable_idx)
+    Option.iter bench_weekly_arr ~f:(update_bench i)
   done;
   (stage, rs, macro)
 
@@ -204,18 +207,23 @@ let _compute_precomputed ~bars_arr ~benchmark_bars =
   in
   { ema; sma; atr; rsi; stage; rs; macro }
 
+(* Build snapshot rows for a non-empty [bars_arr]. Extracted from
+   [build_for_symbol] to eliminate the nested-else. *)
+let _build_rows ~symbol ~bars_arr ~schema ~benchmark_bars =
+  let n = Array.length bars_arr in
+  if n = 0 then Ok []
+  else
+    let precomputed = _compute_precomputed ~bars_arr ~benchmark_bars in
+    let rows =
+      List.init n ~f:(fun i ->
+          _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i)
+    in
+    Result.all rows
+
 let build_for_symbol ~symbol ~bars ~schema ?benchmark_bars () =
   if String.is_empty symbol then
     Status.error_invalid_argument
       "Snapshot_pipeline.build_for_symbol: empty symbol"
   else
     let bars_arr = Array.of_list bars in
-    let n = Array.length bars_arr in
-    if n = 0 then Ok []
-    else
-      let precomputed = _compute_precomputed ~bars_arr ~benchmark_bars in
-      let rows =
-        List.init n ~f:(fun i ->
-            _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i)
-      in
-      Result.all rows
+    _build_rows ~symbol ~bars_arr ~schema ~benchmark_bars
