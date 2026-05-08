@@ -54,9 +54,13 @@ let make_expected_step_result ~date ~portfolio ?portfolio_value
     Option.value portfolio_value
       ~default:portfolio.Trading_portfolio.Portfolio.current_cash
   in
+  let portfolio_summary =
+    Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
+      ~position_value_total:(portfolio_value -. portfolio.current_cash)
+  in
   {
     date;
-    portfolio;
+    portfolio = portfolio_summary;
     portfolio_value;
     trades;
     orders_submitted;
@@ -154,11 +158,16 @@ let test_step_executes_market_order _ =
       assert_that result.portfolio.current_cash (float_equal expected_cash);
       (* Verify position was created for AAPL *)
       let position =
-        Trading_portfolio.Portfolio.get_position result.portfolio "AAPL"
+        Trading_simulation_types.Portfolio_summary.find_position
+          result.portfolio ~symbol:"AAPL"
       in
       assert_that position
-        (is_some_and (fun (pos : Trading_portfolio.Types.portfolio_position) ->
-             assert_that pos.symbol (equal_to "AAPL"))))
+        (is_some_and
+           (field
+              (fun (p :
+                    Trading_simulation_types.Portfolio_summary.position_summary) ->
+                p.symbol)
+              (equal_to "AAPL"))))
 
 let test_limit_order_executes_on_later_day _ =
   with_test_data "simulator_limit_order"
@@ -375,6 +384,10 @@ let test_step_returns_completed_when_done _ =
       let expected_portfolio =
         Trading_portfolio.Portfolio.create ~initial_cash:10000.0 ()
       in
+      let expected_summary =
+        Trading_simulation_types.Portfolio_summary.of_portfolio
+          expected_portfolio ~position_value_total:0.0
+      in
       (* First step advances from start_date to end_date *)
       assert_that (step sim)
         (is_ok_and_holds
@@ -384,7 +397,9 @@ let test_step_returns_completed_when_done _ =
                   (is_ok_and_holds
                      (is_completed (fun result ->
                           let final = (List.last_exn result.steps).portfolio in
-                          assert_equal expected_portfolio final)))))))
+                          assert_equal expected_summary final;
+                          assert_equal expected_portfolio
+                            result.final_portfolio)))))))
 
 (* ==================== run tests ==================== *)
 
@@ -413,8 +428,7 @@ let test_run_completes_simulation _ =
       assert_that (run sim)
         (is_ok_and_holds (fun result ->
              assert_equal expected_steps result.steps;
-             let final = (List.last_exn result.steps).portfolio in
-             assert_equal expected_portfolio final)))
+             assert_equal expected_portfolio result.final_portfolio)))
 
 let test_create_rejects_invalid_date_range _ =
   with_test_data "simulator_invalid_date_range"
@@ -559,7 +573,7 @@ let test_full_position_lifecycle _ =
       | Error err -> failwith ("Run failed: " ^ Status.show err)
       | Ok result ->
           let steps = result.steps in
-          let final_portfolio = (List.last_exn steps).portfolio in
+          let final_portfolio = result.final_portfolio in
           (* Verify step structure: 3 steps with expected trades *)
           assert_that steps
             (elements_are

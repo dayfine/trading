@@ -12,12 +12,9 @@ module Simulator_types = Trading_simulation_types.Simulator_types
 let _date s = Date.of_string s
 
 let _make_step ~date ~portfolio_value : Simulator_types.step_result =
-  let portfolio =
-    Trading_portfolio.Portfolio.create ~initial_cash:10_000.0 ()
-  in
   {
     date;
-    portfolio;
+    portfolio = Trading_simulation_types.Portfolio_summary.empty;
     portfolio_value;
     trades = [];
     orders_submitted = [];

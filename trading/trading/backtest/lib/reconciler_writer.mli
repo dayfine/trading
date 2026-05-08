@@ -7,15 +7,18 @@
 
 val write_open_positions :
   output_dir:string ->
-  steps:Trading_simulation_types.Simulator_types.step_result list ->
+  final_portfolio:Trading_portfolio.Portfolio.t ->
   unit
-(** Write [open_positions.csv]: one row per position held at run end.
-    PHASE_1_SPEC §3: [symbol,side,entry_date,entry_price,quantity]. Always
-    written; header-only when no positions are held. *)
+(** Write [open_positions.csv]: one row per position held at run end. Reads
+    full position records (lots, accounting method) from [final_portfolio] —
+    per-step [step_result.portfolio] is now a {!Portfolio_summary.t}
+    projection that omits lot-level detail. PHASE_1_SPEC §3:
+    [symbol,side,entry_date,entry_price,quantity]. Always written; header-only
+    when no positions are held. *)
 
 val write_final_prices :
   output_dir:string ->
-  steps:Trading_simulation_types.Simulator_types.step_result list ->
+  final_portfolio:Trading_portfolio.Portfolio.t ->
   final_prices:(string * float) list ->
   unit
 (** Write [final_prices.csv]: one row per held symbol with a known closing

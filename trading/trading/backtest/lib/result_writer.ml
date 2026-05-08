@@ -254,8 +254,10 @@ let write ~output_dir (result : Runner.result) =
   _write_force_liquidations ~output_dir
     ~force_liquidations:result.force_liquidations;
   _write_stale_holds ~output_dir ~stale_holds:result.stale_holds;
-  Reconciler_writer.write_open_positions ~output_dir ~steps:result.steps;
-  Reconciler_writer.write_final_prices ~output_dir ~steps:result.steps
+  Reconciler_writer.write_open_positions ~output_dir
+    ~final_portfolio:result.final_portfolio;
+  Reconciler_writer.write_final_prices ~output_dir
+    ~final_portfolio:result.final_portfolio
     ~final_prices:result.final_prices;
   Reconciler_writer.write_splits ~output_dir ~steps:result.steps;
   _write_universe ~output_dir ~universe:result.universe;

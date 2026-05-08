@@ -14,7 +14,19 @@ type result = {
   steps : Trading_simulation_types.Simulator_types.step_result list;
       (** Steps filtered to [start_date..end_date] on real trading days only.
           Used for the equity curve and any downstream consumer that needs a
-          meaningful mark-to-market portfolio value per row. *)
+          meaningful mark-to-market portfolio value per row. Each step carries
+          a {!Trading_simulation_types.Portfolio_summary.t} projection rather
+          than the full portfolio — see [final_portfolio] for the full
+          end-of-run state. *)
+  final_portfolio : Trading_portfolio.Portfolio.t;
+      (** The full {!Trading_portfolio.Portfolio.t} as of the simulator's last
+          step (i.e. the end of [warmup_start..end_date]). Carries lots,
+          accounting method, and full trade history — the canonical source of
+          truth for end-of-run reconciler artefacts ([open_positions.csv],
+          [final_prices.csv]). Per-step [step_result.portfolio] is a skinny
+          {!Portfolio_summary.t} projection that omits these details to keep
+          [step_history] memory bounded; reconciler consumers must read this
+          field instead. *)
   overrides : Sexp.t list;
       (** The override sexps used for this run, echoed into params.sexp *)
   stop_infos : Stop_log.stop_info list;
@@ -56,10 +68,10 @@ type result = {
       (** Snapshot of close prices on the run's final calendar day, keyed by
           symbol. Populated by [Panel_runner.run] from the snapshot's [Close]
           field at [end_date] for every symbol still held in
-          [(List.last_exn steps).portfolio.positions]; empty when the simulation
-          never reached the final calendar day or no positions were held at end.
-          Consumed by [Result_writer] to emit [final_prices.csv] for the
-          external [trading-reconciler] tool — see
+          [final_portfolio.positions]; empty when the simulation never reached
+          the final calendar day or no positions were held at end. Consumed by
+          [Result_writer] to emit [final_prices.csv] for the external
+          [trading-reconciler] tool — see
           [~/Projects/trading-reconciler/PHASE_1_SPEC.md] §3.3. *)
   universe : string list;
       (** Post-cap, sorted list of symbols the simulator actually traded over

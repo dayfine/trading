@@ -334,7 +334,13 @@ let _apply_transitions ~positions ~transitions =
       | TriggerExit _ -> _apply_trigger_exit acc trans
       | _ -> Ok acc)
 
-(** Build run_result from accumulated state *)
+(** Build run_result from accumulated state.
+
+    [final_portfolio] is the simulator's last full {!Trading_portfolio.Portfolio.t};
+    it is exposed on the result so reconciler writers (which need lots /
+    avg-cost / per-symbol position details) read it directly rather than
+    reconstructing from the skinny per-step [Portfolio_summary] retained on
+    [steps]. *)
 let _build_run_result t =
   let steps = List.rev t.step_history in
   let base_metrics =
@@ -345,7 +351,7 @@ let _build_run_result t =
     _compute_derived ~derived_computers:t.deps.metric_suite.derived
       ~config:t.config ~base_metrics
   in
-  { steps; metrics }
+  { steps; final_portfolio = t.portfolio; metrics }
 
 (* Apply trades one at a time, skipping any that fail (e.g. insufficient
    cash). Returns the updated portfolio and the list of accepted trades. *)
@@ -400,13 +406,22 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
     Order_generator.transitions_to_orders ~current_date:t.current_date
       ~positions transitions
   in
+  let portfolio_value =
+    _compute_portfolio_value ~adapter:t.deps.market_data_adapter
+      ~date:t.current_date ~portfolio ~today_bars
+  in
+  (* Project to skinny per-step summary — see [Portfolio_summary.t] for the
+     memory-pressure rationale (Fix B in
+     dev/notes/15y-memory-cliff-2026-05-08.md). *)
+  let portfolio_summary =
+    Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
+      ~position_value_total:(portfolio_value -. portfolio.current_cash)
+  in
   let step_result =
     {
       date = t.current_date;
-      portfolio;
-      portfolio_value =
-        _compute_portfolio_value ~adapter:t.deps.market_data_adapter
-          ~date:t.current_date ~portfolio ~today_bars;
+      portfolio = portfolio_summary;
+      portfolio_value;
       trades;
       orders_submitted = _submit_orders t orders;
       splits_applied = split_events;

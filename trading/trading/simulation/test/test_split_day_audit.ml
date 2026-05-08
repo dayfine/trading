@@ -395,19 +395,24 @@ let _step_on ~date steps =
            (List.length steps))
 
 (** Total cost basis across all lots of the position for [symbol] at this step.
-    Returns [None] if the symbol is not held. *)
+    Returns [None] if the symbol is not held. Reads from
+    [Portfolio_summary.t.positions] (cost_basis pre-computed at step time). *)
 let _total_cost_basis ~symbol
     (step : Trading_simulation_types.Simulator_types.step_result) : float option
     =
-  Portfolio.get_position step.portfolio symbol
-  |> Option.map ~f:(fun pos -> Calculations.position_cost_basis pos)
+  Trading_simulation_types.Portfolio_summary.find_position step.portfolio
+    ~symbol
+  |> Option.map ~f:(fun (p : Trading_simulation_types.Portfolio_summary.position_summary) ->
+      p.cost_basis)
 
 (** Total quantity for [symbol] at this step. *)
 let _total_quantity ~symbol
     (step : Trading_simulation_types.Simulator_types.step_result) : float option
     =
-  Portfolio.get_position step.portfolio symbol
-  |> Option.map ~f:(fun pos -> Calculations.position_quantity pos)
+  Trading_simulation_types.Portfolio_summary.find_position step.portfolio
+    ~symbol
+  |> Option.map ~f:(fun (p : Trading_simulation_types.Portfolio_summary.position_summary) ->
+      p.quantity)
 
 (** Configurable test runner. Builds the simulator, runs to completion, applies
     universal invariants, returns the run result for scenario-specific
@@ -1020,10 +1025,7 @@ let test_10_mtm_identity_multiday_hold _ =
           let qty =
             _total_quantity ~symbol:"ABC" step |> Option.value ~default:0.0
           in
-          let expected_value =
-            step.portfolio.Trading_portfolio.Portfolio.current_cash
-            +. (qty *. close)
-          in
+          let expected_value = step.portfolio.current_cash +. (qty *. close) in
           assert_that step.portfolio_value
             (float_equal ~epsilon:_cash_epsilon expected_value))
 
@@ -1186,8 +1188,7 @@ let test_13_two_symbol_mtm_identity _ =
             _total_quantity ~symbol:"XYZ" step |> Option.value ~default:0.0
           in
           let expected_value =
-            step.portfolio.Trading_portfolio.Portfolio.current_cash
-            +. (qty_abc *. abc) +. (qty_xyz *. xyz)
+            step.portfolio.current_cash +. (qty_abc *. abc) +. (qty_xyz *. xyz)
           in
           assert_that step.portfolio_value
             (float_equal ~epsilon:_cash_epsilon expected_value)
@@ -1246,15 +1247,13 @@ let test_14_short_entry_mtm_identity _ =
       | Some close ->
           let qty =
             match
-              Trading_portfolio.Portfolio.get_position step.portfolio "ABC"
+              Trading_simulation_types.Portfolio_summary.find_position
+                step.portfolio ~symbol:"ABC"
             with
             | None -> 0.0
-            | Some p -> Trading_portfolio.Calculations.position_quantity p
+            | Some p -> p.quantity
           in
-          let expected_value =
-            step.portfolio.Trading_portfolio.Portfolio.current_cash
-            +. (qty *. close)
-          in
+          let expected_value = step.portfolio.current_cash +. (qty *. close) in
           assert_that step.portfolio_value
             (float_equal ~epsilon:_cash_epsilon expected_value))
 

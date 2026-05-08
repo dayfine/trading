@@ -24,12 +24,9 @@ let _make_trade ~id ~symbol ~side ~quantity ~price =
   }
 
 let _step_with_trades ~date ~trades : Simulator_types.step_result =
-  let portfolio =
-    Trading_portfolio.Portfolio.create ~initial_cash:10_000.0 ()
-  in
   {
     date;
-    portfolio;
+    portfolio = Trading_simulation_types.Portfolio_summary.empty;
     portfolio_value = 10_000.0;
     trades;
     orders_submitted = [];

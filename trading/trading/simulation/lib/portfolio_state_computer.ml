@@ -1,9 +1,15 @@
 (** Portfolio state metric computer — captures end-of-simulation state:
-    OpenPositionCount, OpenPositionsValue, UnrealizedPnl, TradeFrequency. *)
+    OpenPositionCount, OpenPositionsValue, UnrealizedPnl, TradeFrequency.
+
+    Reads {!Portfolio_summary} fields off [step_result.portfolio]; this
+    computer needs neither lots nor trade history, so the skinny projection
+    introduced for Fix B (see [dev/notes/15y-memory-cliff-2026-05-08.md])
+    suffices. *)
 
 open Core
 module Metric_types = Trading_simulation_types.Metric_types
 module Simulator_types = Trading_simulation_types.Simulator_types
+module Portfolio_summary = Trading_simulation_types.Portfolio_summary
 
 type state = {
   last_step : Simulator_types.step_result option;
@@ -29,25 +35,14 @@ type state = {
     the simulator's [_compute_portfolio_value] fell back to cash because no
     price bars were available for that date. *)
 let _is_marked_to_market (step : Simulator_types.step_result) =
-  let cash = step.portfolio.Trading_portfolio.Portfolio.current_cash in
-  let has_positions =
-    not (List.is_empty step.portfolio.Trading_portfolio.Portfolio.positions)
-  in
+  let cash = step.portfolio.current_cash in
+  let has_positions = Portfolio_summary.positions_count step.portfolio > 0 in
   (not has_positions) || Float.(abs (step.portfolio_value -. cash) > 1e-2)
 
 let _trade_frequency ~total_trades ~start_date ~end_date =
   let days = Float.of_int (Date.diff end_date start_date) in
   let months = days /. 30.44 in
   if Float.(months <= 0.0) then 0.0 else Float.of_int total_trades /. months
-
-(** Sum of [position_cost_basis] across the portfolio's currently-held
-    positions. For longs this is positive (qty>0 times avg_cost>0); for shorts
-    it is negative (qty<0 times avg_cost>0). Subtracting this signed sum from
-    [OpenPositionsValue] yields the signed-qty unrealized P&L formula in the
-    [UnrealizedPnl] metric description. *)
-let _open_positions_cost_basis (portfolio : Trading_portfolio.Portfolio.t) =
-  List.fold portfolio.positions ~init:0.0 ~f:(fun acc pos ->
-      acc +. Trading_portfolio.Calculations.position_cost_basis pos)
 
 (** Build metric set. [position_step] is the step that determines
     [OpenPositionCount] (always the absolute last step). [marked_step] is the
@@ -57,15 +52,15 @@ let _metrics_from_step ~(position_step : Simulator_types.step_result)
     ~(marked_step : Simulator_types.step_result) ~total_trades ~start_date
     ~end_date =
   let open_positions_value =
-    marked_step.portfolio_value
-    -. marked_step.portfolio.Trading_portfolio.Portfolio.current_cash
+    marked_step.portfolio_value -. marked_step.portfolio.current_cash
   in
-  let cost_basis = _open_positions_cost_basis marked_step.portfolio in
+  let cost_basis = Portfolio_summary.position_cost_basis_total marked_step.portfolio in
   let unrealized_pnl = open_positions_value -. cost_basis in
   Metric_types.of_alist_exn
     [
       ( OpenPositionCount,
-        Float.of_int (List.length position_step.portfolio.positions) );
+        Float.of_int (Portfolio_summary.positions_count position_step.portfolio)
+      );
       (OpenPositionsValue, open_positions_value);
       (UnrealizedPnl, unrealized_pnl);
       (TradeFrequency, _trade_frequency ~total_trades ~start_date ~end_date);
