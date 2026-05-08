@@ -351,69 +351,81 @@ let _apply_trades_best_effort portfolio trades =
 
 (* Split-handling helpers extracted to {!Split_handler}. *)
 
+(** Apply split detection, update market state, and record stale-held positions.
+    Returns the post-split portfolio, positions, today's bars, and the split
+    events (needed for [step_result.splits_applied]). *)
+let _prepare_market_state t =
+  let split_events =
+    Split_handler.detect_for_held_positions ~adapter:t.deps.market_data_adapter
+      ~date:t.current_date ~portfolio:t.portfolio
+  in
+  let portfolio = Split_handler.apply_events t.portfolio split_events in
+  let positions = Split_handler.apply_to_positions t.positions split_events in
+  let today_bars = _get_today_bars t in
+  (* Record stale-held positions (symbols without bars for K+ days) into
+     the per-run log. Detector only — no force-close; see [Stale_hold].
+     Runs only on bar-bearing days so weekend/holiday gaps don't trigger
+     false-positives every Saturday. *)
+  if not (List.is_empty today_bars) then
+    List.iter
+      (Stale_hold.detect_stale ~adapter:t.deps.market_data_adapter
+         ~date:t.current_date ~portfolio ~today_bars
+         ~config:t.deps.stale_hold_policy)
+      ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
+  Trading_engine.Engine.update_market t.deps.engine today_bars;
+  (portfolio, positions, today_bars, split_events)
+
+(** Process one day: execute pending orders, call strategy, generate new orders,
+    and assemble the [step_result]. Returns the next simulator state paired with
+    this day's [step_result]. *)
+let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
+  let open Result.Let_syntax in
+  let%bind execution_reports =
+    Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
+  in
+  let all_trades = _extract_trades execution_reports in
+  let portfolio, trades = _apply_trades_best_effort portfolio all_trades in
+  let%bind positions =
+    _update_positions_from_trades ~date:t.current_date ~positions ~trades
+  in
+  let%bind transitions = _call_strategy { t with portfolio; positions } in
+  let%bind positions = _apply_transitions ~positions ~transitions in
+  let%bind orders =
+    Order_generator.transitions_to_orders ~current_date:t.current_date
+      ~positions transitions
+  in
+  let step_result =
+    {
+      date = t.current_date;
+      portfolio;
+      portfolio_value =
+        _compute_portfolio_value ~adapter:t.deps.market_data_adapter
+          ~date:t.current_date ~portfolio ~today_bars;
+      trades;
+      orders_submitted = _submit_orders t orders;
+      splits_applied = split_events;
+      benchmark_return = _compute_benchmark_return t;
+      had_market_bars = not (List.is_empty today_bars);
+    }
+  in
+  let t' =
+    {
+      t with
+      current_date = Date.add_days t.current_date 1;
+      portfolio;
+      positions;
+      step_history = step_result :: t.step_history;
+    }
+  in
+  return (Stepped (t', step_result))
+
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
   else
-    let open Result.Let_syntax in
-    (* Detect splits first; then scale BOTH the broker portfolio and the
-       strategy-side [Position.t] map in lockstep — see the helper docs. *)
-    let split_events =
-      Split_handler.detect_for_held_positions
-        ~adapter:t.deps.market_data_adapter ~date:t.current_date
-        ~portfolio:t.portfolio
+    let portfolio, positions, today_bars, split_events =
+      _prepare_market_state t
     in
-    let portfolio = Split_handler.apply_events t.portfolio split_events in
-    let positions = Split_handler.apply_to_positions t.positions split_events in
-    let today_bars = _get_today_bars t in
-    (* Record stale-held positions (symbols without bars for K+ days) into
-       the per-run log. Detector only — no force-close; see [Stale_hold].
-       Runs only on bar-bearing days so weekend/holiday gaps don't trigger
-       false-positives every Saturday. *)
-    if not (List.is_empty today_bars) then
-      List.iter
-        (Stale_hold.detect_stale ~adapter:t.deps.market_data_adapter
-           ~date:t.current_date ~portfolio ~today_bars
-           ~config:t.deps.stale_hold_policy)
-        ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
-    Trading_engine.Engine.update_market t.deps.engine today_bars;
-    let%bind execution_reports =
-      Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
-    in
-    let all_trades = _extract_trades execution_reports in
-    let portfolio, trades = _apply_trades_best_effort portfolio all_trades in
-    let%bind positions =
-      _update_positions_from_trades ~date:t.current_date ~positions ~trades
-    in
-    let%bind transitions = _call_strategy { t with portfolio; positions } in
-    let%bind positions = _apply_transitions ~positions ~transitions in
-    let%bind orders =
-      Order_generator.transitions_to_orders ~current_date:t.current_date
-        ~positions transitions
-    in
-    let step_result =
-      {
-        date = t.current_date;
-        portfolio;
-        portfolio_value =
-          _compute_portfolio_value ~adapter:t.deps.market_data_adapter
-            ~date:t.current_date ~portfolio ~today_bars;
-        trades;
-        orders_submitted = _submit_orders t orders;
-        splits_applied = split_events;
-        benchmark_return = _compute_benchmark_return t;
-        had_market_bars = not (List.is_empty today_bars);
-      }
-    in
-    let t' =
-      {
-        t with
-        current_date = Date.add_days t.current_date 1;
-        portfolio;
-        positions;
-        step_history = step_result :: t.step_history;
-      }
-    in
-    return (Stepped (t', step_result))
+    _process_step_day t ~portfolio ~positions ~today_bars ~split_events
 
 let get_config t = t.config
 
