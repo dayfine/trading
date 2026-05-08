@@ -79,14 +79,19 @@ let _empty_summary ~start_date ~end_date : Backtest.Summary.t =
   }
 
 let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
-    ?(universe = []) ~round_trips ~force_liquidations () :
+    ?(universe = []) ?final_portfolio ~round_trips ~force_liquidations () :
     Backtest.Runner.result =
   let start_date = _date "2024-01-02" in
   let end_date = _date "2024-04-29" in
+  let final_portfolio =
+    Option.value final_portfolio
+      ~default:(Trading_portfolio.Portfolio.create ~initial_cash:100_000.0 ())
+  in
   {
     summary = _empty_summary ~start_date ~end_date;
     round_trips;
     steps;
+    final_portfolio;
     overrides = [];
     stop_infos;
     audit = [];
@@ -131,14 +136,21 @@ let _make_portfolio ~positions : Trading_portfolio.Portfolio.t =
 
 (** Build a [step_result] with the supplied portfolio + splits_applied. The
     [date] is the step's date; [trades] / [orders_submitted] are empty because
-    the reconciler artefacts under test consume only [portfolio] (open
-    positions) and [splits_applied] (split events). *)
-let _make_step ~date ~portfolio ?(splits_applied = []) () :
+    the reconciler artefacts under test consume only [splits_applied] (split
+    events) on the per-step list and the open-positions writer reads from
+    [Runner.result.final_portfolio]. *)
+let _make_step ~date ~(portfolio : Trading_portfolio.Portfolio.t)
+    ?(splits_applied = []) () :
     Trading_simulation_types.Simulator_types.step_result =
+  let portfolio_value = portfolio.current_cash in
+  let portfolio_summary =
+    Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
+      ~position_value_total:0.0
+  in
   {
     date;
-    portfolio;
-    portfolio_value = portfolio.Trading_portfolio.Portfolio.current_cash;
+    portfolio = portfolio_summary;
+    portfolio_value;
     trades = [];
     orders_submitted = [];
     splits_applied;
@@ -365,7 +377,8 @@ let test_open_positions_csv_header_and_rows _ =
   let portfolio = _make_portfolio ~positions:[ long_pos; short_pos ] in
   let step = _make_step ~date:(_date "2024-04-29") ~portfolio () in
   let result =
-    _make_result ~round_trips:[] ~force_liquidations:[] ~steps:[ step ] ()
+    _make_result ~round_trips:[] ~force_liquidations:[] ~steps:[ step ]
+      ~final_portfolio:portfolio ()
   in
   _with_writer_output ~result ~prefix:"/tmp/result_writer_open_pos_" (fun dir ->
       let header, rows = _read_csv ~path:(dir ^ "/open_positions.csv") in
@@ -405,7 +418,8 @@ let test_open_positions_csv_empty_writes_header_only _ =
   let portfolio = _make_portfolio ~positions:[] in
   let step = _make_step ~date:(_date "2024-04-29") ~portfolio () in
   let result =
-    _make_result ~round_trips:[] ~force_liquidations:[] ~steps:[ step ] ()
+    _make_result ~round_trips:[] ~force_liquidations:[] ~steps:[ step ]
+      ~final_portfolio:portfolio ()
   in
   _with_writer_output ~result ~prefix:"/tmp/result_writer_open_pos_empty_"
     (fun dir ->
@@ -443,7 +457,7 @@ let test_final_prices_csv_header_and_rows _ =
   let final_prices = [ ("AAPL", 182.45); ("TSLA", 395.10); ("NVDA", 800.00) ] in
   let result =
     _make_result ~round_trips:[] ~force_liquidations:[] ~steps:[ step ]
-      ~final_prices ()
+      ~final_prices ~final_portfolio:portfolio ()
   in
   _with_writer_output ~result ~prefix:"/tmp/result_writer_final_prices_"
     (fun dir ->
@@ -464,7 +478,7 @@ let test_final_prices_csv_empty_writes_header_only _ =
   let result =
     _make_result ~round_trips:[] ~force_liquidations:[] ~steps:[ step ]
       ~final_prices:[ ("AAPL", 100.0) ]
-      ()
+      ~final_portfolio:portfolio ()
   in
   _with_writer_output ~result ~prefix:"/tmp/result_writer_final_prices_empty_"
     (fun dir ->
@@ -647,6 +661,8 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
       summary = _empty_summary ~start_date:entry_date ~end_date:exit_date;
       round_trips = [ trade ];
       steps = [];
+      final_portfolio =
+        Trading_portfolio.Portfolio.create ~initial_cash:100_000.0 ();
       overrides = [];
       stop_infos = [ stop_info ];
       audit;

@@ -24,7 +24,14 @@ type config = {
 
 type step_result = {
   date : Date.t;  (** The date this step executed on *)
-  portfolio : Trading_portfolio.Portfolio.t;  (** Portfolio state after step *)
+  portfolio : Portfolio_summary.t;
+      (** Skinny per-step portfolio projection. Carries [current_cash], a
+          per-position summary (symbol / signed quantity / cost basis), and the
+          mark-to-market [position_value_total]. The full
+          {!Trading_portfolio.Portfolio.t} is retained only on
+          [run_result.final_portfolio]; the summary is what's safe to retain
+          across [step_history] for the whole run. See
+          [dev/notes/15y-memory-cliff-2026-05-08.md] §"Fix B" for why. *)
   portfolio_value : float;
       (** Total portfolio value: cash + market value of all positions *)
   trades : Trading_base.Types.trade list;
@@ -64,8 +71,18 @@ type step_result = {
 
 type run_result = {
   steps : step_result list;
-      (** Non-empty list of step results in chronological order. The final
-          portfolio can be obtained from [(List.last_exn steps).portfolio]. *)
+      (** Non-empty list of step results in chronological order. Each step
+          carries a {!Portfolio_summary.t}, not a full
+          {!Trading_portfolio.Portfolio.t} — see [step_result] above for
+          rationale. *)
+  final_portfolio : Trading_portfolio.Portfolio.t;
+      (** The full {!Trading_portfolio.Portfolio.t} as of the final simulation
+          step. This is the canonical end-of-run state for consumers that need
+          full position details (lots, accounting method, trade history) — the
+          reconciler writers ([open_positions.csv], [final_prices.csv]) and
+          end-of-run audits read this rather than reconstructing from
+          [step_result.portfolio] (which is the skinny projection). Always
+          populated with the simulator's last [t.portfolio]. *)
   metrics : Metric_types.metric_set;  (** Computed metrics from the simulation *)
 }
 (** Complete result of running a simulation with metrics *)

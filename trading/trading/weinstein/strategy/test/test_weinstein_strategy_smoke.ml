@@ -156,8 +156,8 @@ let test_weinstein_strategy_smoke _ =
         | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
       in
       assert_that result.steps (not_ is_empty);
-      let final_portfolio = (List.last_exn result.steps).portfolio in
-      assert_that final_portfolio.Trading_portfolio.Portfolio.current_cash
+      assert_that
+        result.final_portfolio.Trading_portfolio.Portfolio.current_cash
         (gt (module Float_ord) 0.0);
       (* Verify portfolio value is computed (not just cash — includes positions'
          market value). Bar accumulation + portfolio_value wiring make this
@@ -310,8 +310,8 @@ let test_weinstein_weekly_cadence _ =
         | Error e -> OUnit2.assert_failure ("run failed: " ^ Status.show e)
       in
       assert_that result.steps (not_ is_empty);
-      let final_portfolio = (List.last_exn result.steps).portfolio in
-      assert_that final_portfolio.Trading_portfolio.Portfolio.current_cash
+      assert_that
+        result.final_portfolio.Trading_portfolio.Portfolio.current_cash
         (gt (module Float_ord) 0.0))
 
 (* ------------------------------------------------------------------ *)

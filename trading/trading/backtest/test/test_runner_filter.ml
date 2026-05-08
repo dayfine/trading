@@ -39,10 +39,15 @@ let _make_trade ~id ~order_id ~symbol ~side ~quantity ~price =
     explicitly to [false]. *)
 let _make_step_with_trades ?(had_market_bars = true) ~date ~portfolio ~trades ()
     =
+  let portfolio_value = portfolio.Trading_portfolio.Portfolio.current_cash in
+  let portfolio_summary =
+    Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
+      ~position_value_total:0.0
+  in
   {
     Trading_simulation_types.Simulator_types.date;
-    portfolio;
-    portfolio_value = portfolio.Trading_portfolio.Portfolio.current_cash;
+    portfolio = portfolio_summary;
+    portfolio_value;
     trades;
     orders_submitted = [];
     splits_applied = [];

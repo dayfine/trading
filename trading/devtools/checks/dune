@@ -134,7 +134,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh agent_compliance_check.sh)
  (action
   (run sh %{dep:agent_compliance_test.sh})))
 
@@ -288,7 +288,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh rule_promotion_check.sh)
  (action
   (run sh %{dep:rule_promotion_self_test.sh})))
 
@@ -326,7 +326,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh posix_sh_check.sh)
  (action
   (run sh %{dep:posix_sh_check_test.sh})))
 
