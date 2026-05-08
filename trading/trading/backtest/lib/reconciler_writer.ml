@@ -45,6 +45,19 @@ let write_open_positions ~output_dir ~steps =
         ~f:(_write_open_position_row oc));
   Out_channel.close oc
 
+(** Symbol field accessor for portfolio positions. *)
+let _pos_symbol (p : Trading_portfolio.Types.portfolio_position) = p.symbol
+
+(** Set of symbols held in the last step's portfolio. Empty when [steps] is
+    empty. *)
+let _held_symbols_of_last_step steps =
+  let open Trading_simulation_types.Simulator_types in
+  match List.last steps with
+  | None -> String.Set.empty
+  | Some last_step ->
+      last_step.portfolio.Trading_portfolio.Portfolio.positions
+      |> List.map ~f:_pos_symbol |> String.Set.of_list
+
 (** One row per symbol present in [open_positions.csv]. PHASE_1_SPEC §3.3:
     [symbol,price]. Symbols held at run end without an entry in [final_prices]
     (e.g. delisted on the final calendar day) are silently dropped — the
@@ -52,19 +65,10 @@ let write_open_positions ~output_dir ~steps =
     diagnostics. *)
 let write_final_prices ~output_dir ~steps
     ~(final_prices : (string * float) list) =
-  let open Trading_simulation_types.Simulator_types in
   let path = output_dir ^ "/final_prices.csv" in
   let oc = Out_channel.create path in
   fprintf oc "symbol,price\n";
-  let held_symbols =
-    match List.last steps with
-    | None -> String.Set.empty
-    | Some last_step ->
-        last_step.portfolio.Trading_portfolio.Portfolio.positions
-        |> List.map ~f:(fun (p : Trading_portfolio.Types.portfolio_position) ->
-            p.symbol)
-        |> String.Set.of_list
-  in
+  let held_symbols = _held_symbols_of_last_step steps in
   let price_map =
     Map.of_alist_reduce (module String) final_prices ~f:(fun a _ -> a)
   in
@@ -84,6 +88,11 @@ let _format_split_factor (f : float) =
   if Float.( = ) f (Float.round_down f) then sprintf "%.1f" f
   else sprintf "%.6g" f
 
+(** Emit one [splits.csv] row for a split event [e] to [oc]. *)
+let _write_split_row oc (e : Trading_portfolio.Split_event.t) =
+  fprintf oc "%s,%s,%s\n" e.symbol (Date.to_string e.date)
+    (_format_split_factor e.factor)
+
 (** All split events that fired during the run. Pulled from
     [step_result.splits_applied] across every step the simulator produced (the
     simulator only logs splits for symbols actively held that day, so no further
@@ -94,8 +103,5 @@ let write_splits ~output_dir ~steps =
   let oc = Out_channel.create path in
   fprintf oc "symbol,date,factor\n";
   List.iter steps ~f:(fun (s : step_result) ->
-      List.iter s.splits_applied
-        ~f:(fun (e : Trading_portfolio.Split_event.t) ->
-          fprintf oc "%s,%s,%s\n" e.symbol (Date.to_string e.date)
-            (_format_split_factor e.factor)));
+      List.iter s.splits_applied ~f:(_write_split_row oc));
   Out_channel.close oc

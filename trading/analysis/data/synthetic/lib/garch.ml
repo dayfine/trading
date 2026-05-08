@@ -97,16 +97,20 @@ let _garch_step ~params ~rng ~var ~out ~k =
   out.(k) <- eps;
   var := _next_variance ~params ~prev_eps:eps ~prev_var:!var
 
+(* Allocate the output array, initialise the variance state, and run the
+   GARCH loop for [n_steps] steps using the given seeded RNG. *)
+let _run_garch_loop params ~n_steps ~seed ~initial_variance =
+  let rng = Stdlib.Random.State.make [| seed |] in
+  let out = Array.create ~len:n_steps 0.0 in
+  let var = ref (_clamp_variance initial_variance) in
+  for k = 0 to n_steps - 1 do
+    _garch_step ~params ~rng ~var ~out ~k
+  done;
+  Array.to_list out
+
 let sample_returns params ~n_steps ~seed ~initial_variance =
   if n_steps <= 0 then []
   else
     match _validate_sample_inputs params initial_variance with
     | Error e -> invalid_arg ("garch: " ^ Status.show e)
-    | Ok () ->
-        let rng = Stdlib.Random.State.make [| seed |] in
-        let out = Array.create ~len:n_steps 0.0 in
-        let var = ref (_clamp_variance initial_variance) in
-        for k = 0 to n_steps - 1 do
-          _garch_step ~params ~rng ~var ~out ~k
-        done;
-        Array.to_list out
+    | Ok () -> _run_garch_loop params ~n_steps ~seed ~initial_variance

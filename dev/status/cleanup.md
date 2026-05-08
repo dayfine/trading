@@ -16,7 +16,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 ## Backlog
 
 - [x] nesting: pipeline.ml+daily_panels.ml+optimal_strategy_runner_helpers.ml+optimal_portfolio_filler.ml — extracted _build_rows, update_bench, _insert_rows, _neutral_ctx, _compare_by_r_multiple, _compare_by_score; all 5 dispatch violations cleared (branch cleanup/nesting-pipeline-batch-2, 2026-05-08)
-- [~] nesting: trading/trading/backtest/lib/runner.ml + optimal_strategy_runner_helpers.ml + optimal_summary.ml + reconciler_writer.ml — extract private helpers to reduce nesting in 5 flagged fns (source: dispatch 2026-05-08)
+- [x] nesting: 8 final violations — garch.ml, snapshot_writer.ml, split_detector.ml, split_event.ml, runner.ml, reconciler_writer.ml — extracted _run_garch_loop, _version_mismatch_error, _mkdir_error, _snap_if_split, _replace_if_symbol, _pos_symbol, _held_symbols_of_last_step, _write_split_row, _position_symbol; all 8 cleared. PR #978 (2026-05-08)
 - [~] nesting: trading/trading/weinstein/snapshot/lib/pick_diff.ml + trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_manifest.ml — extract private helpers to reduce avg/max nesting (source: dispatch 2026-05-08)
 - [x] nesting: analysis/data/synthetic/garch.ml + regime_hmm.ml + data/types/split_detector.ml + wiki_sp500/changes_parser.ml + stock_analysis.ml — extracted _validate_sample_inputs, _garch_step, _sample_step, _classify_ratio, _date_of_groups, _split_factor_of_bar; all 5 violations cleared. PR #977 (2026-05-08)
 - [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
