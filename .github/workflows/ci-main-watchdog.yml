@@ -1,0 +1,192 @@
+# CI Red-Main Watchdog
+#
+# Detects when the CI workflow fails on main and auto-creates a GitHub issue
+# so the team knows within minutes instead of hours.
+#
+# Trigger: workflow_run completion of "CI" on main.
+# Action:  if conclusion is "failure", create (or comment on) a GitHub issue
+#          with title "[ci-watchdog] main CI red on <short-sha>".
+#
+# Idempotency: if an open issue with that title prefix already exists, this
+# workflow appends a comment instead of opening a duplicate.
+#
+# Manual testing:
+#   gh workflow run ci-main-watchdog.yml \
+#     --ref main \
+#     -F sha=<bad-sha>
+#
+# That sends a simulated-failure event (the script treats the workflow_dispatch
+# path as a failure for test purposes, using the provided sha).  Check the
+# Actions run log and the Issues tab to verify the issue / comment was created.
+
+name: CI Main Watchdog
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+  # Manual trigger for testing (see comment block above).
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA to simulate a red-main alert for (testing only)"
+        required: true
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    # Run on failure OR on a manual test trigger.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'failure'
+    permissions:
+      issues: write
+      actions: read
+
+    steps:
+      - name: Collect failure context
+        id: context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // ----------------------------------------------------------------
+            // Resolve short-sha and run URL
+            // ----------------------------------------------------------------
+            let shortSha, runUrl, failureLog;
+
+            if (context.eventName === 'workflow_dispatch') {
+              // Manual test path — use the provided sha directly.
+              const rawSha = context.payload.inputs.sha;
+              shortSha = rawSha.substring(0, 7);
+              runUrl   = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions`;
+              failureLog = '(simulated failure — manual watchdog test)';
+            } else {
+              // Real workflow_run completion path.
+              const run    = context.payload.workflow_run;
+              shortSha     = run.head_sha.substring(0, 7);
+              runUrl       = run.html_url;
+
+              // Attempt to fetch the first 20 lines of build-and-test log.
+              // The jobs + steps API requires actions:read permission.
+              try {
+                const jobs = await github.rest.actions.listJobsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  run_id: run.id,
+                });
+
+                // Find the failed job (prefer "build-and-test").
+                const failedJob = jobs.data.jobs.find(j =>
+                  j.conclusion === 'failure'
+                );
+
+                if (failedJob) {
+                  const logsResp = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                    owner:  context.repo.owner,
+                    repo:   context.repo.repo,
+                    job_id: failedJob.id,
+                  });
+                  // logsResp.data is the raw log text (plain text, not JSON).
+                  const lines = logsResp.data.split('\n').slice(0, 20).join('\n');
+                  failureLog = lines || '(log unavailable)';
+                } else {
+                  failureLog = '(no failed job found in run)';
+                }
+              } catch (err) {
+                failureLog = `(could not fetch log: ${err.message})`;
+              }
+            }
+
+            core.setOutput('short_sha', shortSha);
+            core.setOutput('run_url',   runUrl);
+            core.setOutput('failure_log', failureLog);
+
+      - name: Create or update watchdog issue
+        uses: actions/github-script@v7
+        env:
+          SHORT_SHA:   ${{ steps.context.outputs.short_sha }}
+          RUN_URL:     ${{ steps.context.outputs.run_url }}
+          FAILURE_LOG: ${{ steps.context.outputs.failure_log }}
+        with:
+          script: |
+            const shortSha   = process.env.SHORT_SHA;
+            const runUrl     = process.env.RUN_URL;
+            const failureLog = process.env.FAILURE_LOG;
+
+            const titlePrefix = '[ci-watchdog] main CI red';
+            const issueTitle  = `${titlePrefix} on ${shortSha}`;
+
+            // ----------------------------------------------------------------
+            // Idempotency: look for an existing open watchdog issue.
+            // ----------------------------------------------------------------
+            const existing = await github.rest.issues.listForRepo({
+              owner:  context.repo.owner,
+              repo:   context.repo.repo,
+              state:  'open',
+              labels: 'ci-red',
+              per_page: 50,
+            });
+
+            const watchdogIssue = existing.data.find(i =>
+              i.title.startsWith(titlePrefix)
+            );
+
+            const body = [
+              `**CI on \`main\` is red** — commit \`${shortSha}\` caused a failure.`,
+              '',
+              `**Run URL:** ${runUrl}`,
+              '',
+              '**First 20 lines of build-and-test log:**',
+              '```',
+              failureLog,
+              '```',
+              '',
+              'cc @dayfine',
+            ].join('\n');
+
+            if (watchdogIssue) {
+              // An open watchdog issue already exists — add a comment.
+              await github.rest.issues.createComment({
+                owner:    context.repo.owner,
+                repo:     context.repo.repo,
+                issue_number: watchdogIssue.number,
+                body: [
+                  `New failure on \`${shortSha}\` — run: ${runUrl}`,
+                  '',
+                  '```',
+                  failureLog,
+                  '```',
+                ].join('\n'),
+              });
+              console.log(`Commented on existing issue #${watchdogIssue.number}`);
+            } else {
+              // Ensure both labels exist before creating the issue.
+              for (const label of ['ci-red', 'urgent']) {
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo:  context.repo.repo,
+                    name:  label,
+                  });
+                } catch (_) {
+                  // Label doesn't exist — create it.
+                  const colors = { 'ci-red': 'e11d48', urgent: 'f97316' };
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo:  context.repo.repo,
+                    name:  label,
+                    color: colors[label],
+                  });
+                }
+              }
+
+              const created = await github.rest.issues.create({
+                owner:  context.repo.owner,
+                repo:   context.repo.repo,
+                title:  issueTitle,
+                body,
+                labels: ['ci-red', 'urgent'],
+              });
+              console.log(`Created issue #${created.data.number}: ${created.data.html_url}`);
+            }
