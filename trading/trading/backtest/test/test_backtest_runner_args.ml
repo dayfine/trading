@@ -768,6 +768,44 @@ let test_progress_every_missing_value _ =
   let result = _parse_csv [ "2018-01-02"; "--progress-every" ] in
   assert_that result is_error
 
+(* ==================== --slippage-bps (P4) ==================== *)
+
+let test_slippage_bps_flag _ =
+  let result = _parse_csv [ "2018-01-02"; "--slippage-bps"; "10" ] in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.slippage_bps)
+          (equal_to (Some 10))))
+
+let test_slippage_bps_zero_allowed _ =
+  let result = _parse_csv [ "2018-01-02"; "--slippage-bps"; "0" ] in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.slippage_bps)
+          (equal_to (Some 0))))
+
+let test_slippage_bps_default_is_none _ =
+  let result = _parse_csv [ "2018-01-02" ] in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (a : Backtest_runner_args.t) -> a.slippage_bps)
+          (equal_to None)))
+
+let test_slippage_bps_negative_is_error _ =
+  let result = _parse_csv [ "2018-01-02"; "--slippage-bps"; "-5" ] in
+  assert_that result is_error
+
+let test_slippage_bps_non_numeric_is_error _ =
+  let result = _parse_csv [ "2018-01-02"; "--slippage-bps"; "ten" ] in
+  assert_that result is_error
+
+let test_slippage_bps_missing_value _ =
+  let result = _parse_csv [ "2018-01-02"; "--slippage-bps" ] in
+  assert_that result is_error
+
 let suite =
   "Backtest_runner_args"
   >::: [
@@ -848,6 +886,15 @@ let suite =
          >:: test_progress_every_non_numeric_is_error;
          "--progress-every without value is error"
          >:: test_progress_every_missing_value;
+         "--slippage-bps captures positive int" >:: test_slippage_bps_flag;
+         "--slippage-bps 0 allowed" >:: test_slippage_bps_zero_allowed;
+         "no --slippage-bps yields None" >:: test_slippage_bps_default_is_none;
+         "--slippage-bps negative is error"
+         >:: test_slippage_bps_negative_is_error;
+         "--slippage-bps non-numeric is error"
+         >:: test_slippage_bps_non_numeric_is_error;
+         "--slippage-bps without value is error"
+         >:: test_slippage_bps_missing_value;
        ]
 
 let () = run_test_tt_main suite

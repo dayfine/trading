@@ -1,0 +1,31 @@
+Entering directory '/workspaces/trading-1/trading'
+File ".", line 1, characters 0-0:
+Warning: No dune-project file has been found in directory ".". A default one
+is assumed but the project might break when dune is upgraded. Please create a
+dune-project file.
+Hint: generate the project file with: $ dune init project <name>
+Leaving directory '/workspaces/trading-1/trading'
+Loading 5 scenarios from /workspaces/trading-1/dev/experiments/laggard-h-sweep-15y-2026-05-07/scenarios (parallel=2)
+Fixtures root: /workspaces/trading-1/data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-07-163531
+
+>>> Running laggard-h1-stage3-k1: 15y SP500 — Stage3 ON h=1 + Laggard ON h=1 (most aggressive). h-sweep variant. (2010-01-01 to 2026-04-30)
+
+>>> Running laggard-h2-stage3-k1: 15y SP500 — Stage3 ON h=1 + Laggard ON h=2 (Cell E baseline). h-sweep control. (2010-01-01 to 2026-04-30)
+Using scenario-provided sector map (510 symbols)...
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_b5f14f)
+Panel_runner: snapshot bar reader wired (calendar 4410 days) for strategy
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_6126df)
+Panel_runner: snapshot bar reader wired (calendar 4410 days) for strategy

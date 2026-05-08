@@ -50,6 +50,7 @@ val run :
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
   ?progress_emitter:Backtest_progress.emitter ->
+  ?slippage_bps:int ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t

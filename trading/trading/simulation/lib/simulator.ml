@@ -47,8 +47,8 @@ type dependencies = {
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
-    ?stale_hold_log () =
-  let engine_config = { Trading_engine.Types.commission } in
+    ?stale_hold_log ?(slippage_bps = 0) () =
+  let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
   let market_data_adapter =

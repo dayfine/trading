@@ -111,6 +111,14 @@ type t = {
           zero-overhead contract as the existing [--trace] / [--gc-trace]
           plumbing. Validated at parse time: [n] must be [>= 1]. Single-run mode
           only — baseline/smoke/fuzz modes ignore this flag. *)
+  slippage_bps : int option;
+      (** [Some n] when [--slippage-bps <n>] was passed; the runner threads [n]
+          into {!Backtest.Runner.run_backtest}, which configures the engine to
+          apply [n] basis points of slippage at every trade fill (P4 from
+          [dev/notes/next-session-priorities-2026-05-07.md]). [None] (the
+          default) preserves the no-friction baseline byte-for-byte —
+          engine_config.slippage_bps stays at 0. Validated at parse time: [n]
+          must be [>= 0]. *)
 }
 (** Result of parsing the [backtest_runner.exe] command line. *)
 

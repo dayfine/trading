@@ -51,15 +51,15 @@ let _build_market_data_adapter ~data_dir ~bar_data_source =
         (Status.show err) ()
 
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
-    ~end_date ~warmup_days ~initial_cash ~commission ~strategy
-    ~market_data_adapter =
+    ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps ~strategy
+    ~market_data_adapter () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission
       ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
-      ~market_data_adapter ~stale_hold_log ()
+      ~market_data_adapter ~stale_hold_log ?slippage_bps ()
   in
   let sim_config =
     Simulator.
@@ -193,7 +193,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
-    ?bar_data_source ?progress_emitter () =
+    ?bar_data_source ?progress_emitter ?slippage_bps () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   eprintf
     "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
@@ -217,7 +217,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   let sim =
     _make_simulator input ~stop_log ~stale_hold_log ~start_date ~end_date
-      ~warmup_days ~initial_cash ~commission ~strategy ~market_data_adapter
+      ~warmup_days ~initial_cash ~commission ?slippage_bps ~strategy
+      ~market_data_adapter ()
   in
   let progress_acc =
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
