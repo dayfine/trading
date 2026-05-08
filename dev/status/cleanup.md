@@ -25,7 +25,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] nesting: trading/analysis/scripts/build_snapshots/build_snapshots.ml — extracted 5 helpers (_entry_is_current, _write_and_checksum, _file_metadata, _build_or_log, _load_benchmark_bars, _make_progress, _last_symbol, _fold_symbol); all 78 fns pass nesting linter (branch cleanup/nesting-build-snapshots-2, 2026-05-08)
 - [x] nesting: trading/trading/weinstein/strategy/lib/entry_audit_capture.ml — extracted 5 helpers; classify_candidate/emit_entries/alternatives_of_decisions all pass; file avg now under 2.5 (branch cleanup/nesting-entry-audit-capture, 2026-05-08)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
-- [~] nesting: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — 5 violations (low_window avg 3.80/max 7/else 1, _assemble_daily_bars avg 3.59/max 7, daily_view_for avg 3.13/else 2, weekly_bars_for else 2, weekly_view_for else 1); extract private helpers (source: dispatch 2026-05-08)
+- [x] nesting: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — extracted 9 helpers (_make_daily_price, _match_ohlcv, _fetch_and_build_weekly_view, _fetch_weekly_bars, _to_weekly_bars, _daily_view_from_idx, _find_and_build_daily_view, _low_buf_from_idx, _check_and_fetch_low); all 5 violations cleared. PR #966 (2026-05-08)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed
