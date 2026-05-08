@@ -32,14 +32,17 @@ type t = { config : config; observations : observation list (* newest first *) }
 
 (** {1 Validation} *)
 
+(** Raise [Invalid_argument] if bound [k] has [lo > hi]. *)
+let _validate_bound (k, (lo, hi)) =
+  if Float.( > ) lo hi then
+    invalid_arg
+      (sprintf "Bayesian_opt.create: bound for %s has min > max (%g > %g)" k lo
+         hi)
+
 let _validate_config config =
   if List.is_empty config.bounds then
     invalid_arg "Bayesian_opt.create: bounds must be non-empty";
-  List.iter config.bounds ~f:(fun (k, (lo, hi)) ->
-      if Float.( > ) lo hi then
-        invalid_arg
-          (sprintf "Bayesian_opt.create: bound for %s has min > max (%g > %g)" k
-             lo hi));
+  List.iter config.bounds ~f:_validate_bound;
   if config.initial_random < 0 then
     invalid_arg "Bayesian_opt.create: initial_random must be >= 0";
   if config.total_budget < 0 then
@@ -54,20 +57,16 @@ let create config =
 let observe t obs = { t with observations = obs :: t.observations }
 let all_observations t = List.rev t.observations
 
+(** Return whichever of [acc] and [obs] has the higher metric, or [Some obs]
+    when [acc] is [None]. Ties go to [acc] (first-observation-wins). *)
+let _pick_better acc obs =
+  match acc with
+  | None -> Some obs
+  | Some b -> if Float.( > ) obs.metric b.metric then Some obs else acc
+
 (** Iterate over observations in eval order (oldest first); the first
     observation reaching the max metric wins ties. *)
-let best t =
-  let rec loop best = function
-    | [] -> best
-    | obs :: rest ->
-        let new_best =
-          match best with
-          | None -> Some obs
-          | Some b -> if Float.( > ) obs.metric b.metric then Some obs else best
-        in
-        loop new_best rest
-  in
-  loop None (all_observations t)
+let best t = List.fold (all_observations t) ~init:None ~f:_pick_better
 
 (** {1 Input scaling: raw <-> [0, 1]} *)
 

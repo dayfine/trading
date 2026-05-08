@@ -32,6 +32,30 @@ let _today_symbol_set today_bars =
   List.map today_bars ~f:(fun bar -> bar.Trading_engine.Types.symbol)
   |> String.Set.of_list
 
+(** Build a stale event for [pos] given its most recent prior bar [prev].
+    Returns [None] when the gap is below [stale_after_days]. *)
+let _build_stale_event ~date ~stale_after_days
+    (pos : Trading_portfolio.Types.portfolio_position)
+    (prev : Types.Daily_price.t) : event option =
+  let last_bar_date = prev.Types.Daily_price.date in
+  let gap = Date.diff date last_bar_date in
+  if gap < stale_after_days then None
+  else
+    let quantity =
+      Trading_portfolio.Calculations.position_quantity pos |> Float.abs
+    in
+    let avg_cost = Trading_portfolio.Calculations.avg_cost_of_position pos in
+    Some
+      {
+        symbol = pos.symbol;
+        date;
+        last_bar_date;
+        last_close = prev.Types.Daily_price.close_price;
+        days_since_last_bar = gap;
+        quantity;
+        cost_basis = avg_cost *. quantity;
+      }
+
 (** Build one stale event for a single held position, or [None] when the
     position has a bar today, no prior bar, or the prior bar is recent enough.
     Pure with respect to the adapter's cache. *)
@@ -43,24 +67,7 @@ let _event_for_position ~adapter ~date ~today_set ~stale_after_days
       Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
         ~symbol:pos.symbol ~date
     in
-    let last_bar_date = prev.Types.Daily_price.date in
-    let gap = Date.diff date last_bar_date in
-    if gap < stale_after_days then None
-    else
-      let quantity =
-        Trading_portfolio.Calculations.position_quantity pos |> Float.abs
-      in
-      let avg_cost = Trading_portfolio.Calculations.avg_cost_of_position pos in
-      Some
-        {
-          symbol = pos.symbol;
-          date;
-          last_bar_date;
-          last_close = prev.Types.Daily_price.close_price;
-          days_since_last_bar = gap;
-          quantity;
-          cost_basis = avg_cost *. quantity;
-        }
+    _build_stale_event ~date ~stale_after_days pos prev
 
 let detect_stale ~adapter ~date ~portfolio ~today_bars ~config =
   if not config.enabled then []
