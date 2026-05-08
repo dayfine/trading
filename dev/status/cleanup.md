@@ -25,7 +25,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed
-- [x] file_length: trading/trading/engine/lib/price_path.ml (511→498) + trading/trading/weinstein/strategy/lib/entry_audit_capture.ml (305→297) — condensed private-fn docstrings; both files now within limits. (branch cleanup/file-length-trim, 2026-05-08)
+- [x] file_length: trading/trading/engine/lib/price_path.ml (511→498) + trading/trading/weinstein/strategy/lib/entry_audit_capture.ml (305→297) — condensed private-fn docstrings; both files now within limits. PR #958 (2026-05-08)
 
 - [x] nesting: trading/trading/weinstein/strategy/lib/exit_audit_capture.ml — extracted _pct_distance_from_callbacks, _make_exit_event, _handle_trigger_exit helpers; nesting linter now passes. (branch cleanup/nesting-exit-audit-capture, 2026-05-07)
 - [x] fn_length + file_length: trading/trading/backtest/lib/runner.ml — extracted `Runner_metrics` module + `_filter_steps`/`_extract_filtered_logs` helpers; runner.ml 528→468 lines, `run_backtest` 83→49 lines. Branch cleanup/runner-fn-length (2026-05-07)
