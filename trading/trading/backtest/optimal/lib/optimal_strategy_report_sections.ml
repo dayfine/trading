@@ -221,6 +221,14 @@ let missed_section
 
 let _frac_to_pct v = v *. 100.0
 
+(** Counterfactual/actual return ratio above which the cascade is deemed
+    significantly mis-scoring (strong outperformance band). *)
+let _strong_outperform_threshold = 3.0
+
+(** Counterfactual/actual return ratio below which the cascade is deemed
+    near-optimal (moderate outperformance band lower bound). *)
+let _moderate_outperform_threshold = 1.5
+
 let _implications_narrative ~(actual_total_return_pct : float)
     ~(constrained_total_return_pct : float) : string =
   if Float.(actual_total_return_pct <= 0.0) then
@@ -229,14 +237,14 @@ let _implications_narrative ~(actual_total_return_pct : float)
      few candidates, or the macro gate may be over-restrictive."
   else
     let r = constrained_total_return_pct /. actual_total_return_pct in
-    if Float.(r > 3.0) then
+    if Float.(r > _strong_outperform_threshold) then
       sprintf
         "Constrained-counterfactual return is %.1f* the actual run's. The \
          cascade is significantly mis-scoring opportunities -- material gains \
          are reachable via re-weighting alone, without relaxing the macro gate \
          or sector caps."
         r
-    else if Float.(r < 1.5) then
+    else if Float.(r < _moderate_outperform_threshold) then
       sprintf
         "Constrained-counterfactual return is %.1f* the actual run's -- the \
          cascade is near-optimal under the current envelope. Further upside \
