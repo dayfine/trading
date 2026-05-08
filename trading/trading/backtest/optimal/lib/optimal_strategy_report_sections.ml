@@ -12,45 +12,58 @@ open Core
 (* Section: per-Friday divergence table                              *)
 (* ---------------------------------------------------------------- *)
 
+(** Compare two actual trade_metrics by entry_date. *)
+let _cmp_actual_by_date (x : Trading_simulation.Metrics.trade_metrics)
+    (y : Trading_simulation.Metrics.trade_metrics) =
+  Date.compare x.entry_date y.entry_date
+
+(** True iff two actual trade_metrics have different entry_dates (group break).
+*)
+let _actual_date_break (a : Trading_simulation.Metrics.trade_metrics)
+    (b : Trading_simulation.Metrics.trade_metrics) =
+  not (Date.equal a.entry_date b.entry_date)
+
+(** Label a group of actual round-trips with their common entry_date. *)
+let _label_actual_group (group : Trading_simulation.Metrics.trade_metrics list)
+    =
+  match group with
+  | [] -> failwith "_actual_picks_by_friday: empty group (impossible)"
+  | (hd : Trading_simulation.Metrics.trade_metrics) :: _ ->
+      (hd.entry_date, group)
+
 (** Group actual round-trips by their entry date (the equivalent of "Friday").
 *)
 let _actual_picks_by_friday
     (rts : Trading_simulation.Metrics.trade_metrics list) :
     (Date.t * Trading_simulation.Metrics.trade_metrics list) list =
   rts
-  |> List.sort
-       ~compare:(fun
-           (x : Trading_simulation.Metrics.trade_metrics)
-           (y : Trading_simulation.Metrics.trade_metrics)
-         -> Date.compare x.entry_date y.entry_date)
-  |> List.group
-       ~break:(fun
-           (a : Trading_simulation.Metrics.trade_metrics)
-           (b : Trading_simulation.Metrics.trade_metrics)
-         -> not (Date.equal a.entry_date b.entry_date))
-  |> List.map ~f:(fun group ->
-      match group with
-      | [] -> failwith "_actual_picks_by_friday: empty group (impossible)"
-      | (hd : Trading_simulation.Metrics.trade_metrics) :: _ ->
-          (hd.entry_date, group))
+  |> List.sort ~compare:_cmp_actual_by_date
+  |> List.group ~break:_actual_date_break
+  |> List.map ~f:_label_actual_group
+
+(** Compare two optimal round-trips by entry_week. *)
+let _cmp_optimal_by_date (x : Optimal_types.optimal_round_trip)
+    (y : Optimal_types.optimal_round_trip) =
+  Date.compare x.entry_week y.entry_week
+
+(** True iff two optimal round-trips have different entry_weeks (group break).
+*)
+let _optimal_date_break (a : Optimal_types.optimal_round_trip)
+    (b : Optimal_types.optimal_round_trip) =
+  not (Date.equal a.entry_week b.entry_week)
+
+(** Label a group of optimal round-trips with their common entry_week. *)
+let _label_optimal_group (group : Optimal_types.optimal_round_trip list) =
+  match group with
+  | [] -> failwith "_optimal_picks_by_friday: empty group (impossible)"
+  | (hd : Optimal_types.optimal_round_trip) :: _ -> (hd.entry_week, group)
 
 let _optimal_picks_by_friday (rts : Optimal_types.optimal_round_trip list) :
     (Date.t * Optimal_types.optimal_round_trip list) list =
   rts
-  |> List.sort
-       ~compare:(fun
-           (x : Optimal_types.optimal_round_trip)
-           (y : Optimal_types.optimal_round_trip)
-         -> Date.compare x.entry_week y.entry_week)
-  |> List.group
-       ~break:(fun
-           (a : Optimal_types.optimal_round_trip)
-           (b : Optimal_types.optimal_round_trip)
-         -> not (Date.equal a.entry_week b.entry_week))
-  |> List.map ~f:(fun group ->
-      match group with
-      | [] -> failwith "_optimal_picks_by_friday: empty group (impossible)"
-      | (hd : Optimal_types.optimal_round_trip) :: _ -> (hd.entry_week, group))
+  |> List.sort ~compare:_cmp_optimal_by_date
+  |> List.group ~break:_optimal_date_break
+  |> List.map ~f:_label_optimal_group
 
 let _syms_of_actual (rts : Trading_simulation.Metrics.trade_metrics list) =
   rts
@@ -229,6 +242,30 @@ let _strong_outperform_threshold = 3.0
     near-optimal (moderate outperformance band lower bound). *)
 let _moderate_outperform_threshold = 1.5
 
+(** Format a narrative for a valid (positive-actual) ratio of counterfactual to
+    actual return. *)
+let _ratio_narrative ~(r : float) : string =
+  if Float.(r > _strong_outperform_threshold) then
+    sprintf
+      "Constrained-counterfactual return is %.1f* the actual run's. The \
+       cascade is significantly mis-scoring opportunities -- material gains \
+       are reachable via re-weighting alone, without relaxing the macro gate \
+       or sector caps."
+      r
+  else if Float.(r < _moderate_outperform_threshold) then
+    sprintf
+      "Constrained-counterfactual return is %.1f* the actual run's -- the \
+       cascade is near-optimal under the current envelope. Further upside \
+       requires structural changes (envelope, gate thresholds, or additional \
+       signals)."
+      r
+  else
+    sprintf
+      "Constrained-counterfactual return is %.1f* the actual run's. Moderate \
+       cascade-ranking improvement is reachable; structural changes (envelope \
+       / gate / signals) are also needed for full upside."
+      r
+
 let _implications_narrative ~(actual_total_return_pct : float)
     ~(constrained_total_return_pct : float) : string =
   if Float.(actual_total_return_pct <= 0.0) then
@@ -237,26 +274,7 @@ let _implications_narrative ~(actual_total_return_pct : float)
      few candidates, or the macro gate may be over-restrictive."
   else
     let r = constrained_total_return_pct /. actual_total_return_pct in
-    if Float.(r > _strong_outperform_threshold) then
-      sprintf
-        "Constrained-counterfactual return is %.1f* the actual run's. The \
-         cascade is significantly mis-scoring opportunities -- material gains \
-         are reachable via re-weighting alone, without relaxing the macro gate \
-         or sector caps."
-        r
-    else if Float.(r < _moderate_outperform_threshold) then
-      sprintf
-        "Constrained-counterfactual return is %.1f* the actual run's -- the \
-         cascade is near-optimal under the current envelope. Further upside \
-         requires structural changes (envelope, gate thresholds, or additional \
-         signals)."
-        r
-    else
-      sprintf
-        "Constrained-counterfactual return is %.1f* the actual run's. Moderate \
-         cascade-ranking improvement is reachable; structural changes \
-         (envelope / gate / signals) are also needed for full upside."
-        r
+    _ratio_narrative ~r
 
 let implications_section ~(actual_initial_cash : float)
     ~(actual_final_portfolio_value : float)
