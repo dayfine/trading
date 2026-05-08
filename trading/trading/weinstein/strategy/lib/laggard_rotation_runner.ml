@@ -1,6 +1,11 @@
 open Core
 open Trading_strategy
 
+(** Compute the simple return between two price levels. Returns [None] if
+    [oldest] is non-positive (avoids divide-by-zero on degenerate snapshots). *)
+let _simple_return ~oldest ~latest : float option =
+  if Float.( <= ) oldest 0.0 then None else Some ((latest /. oldest) -. 1.0)
+
 (** Compute the simple return over the rolling window from a list of weekly
     bars. Expects [List.length bars >= n + 1]; takes the close at index 0
     (oldest) and the close at index n (latest). Returns [None] if the list is
@@ -10,9 +15,8 @@ let _window_return ~(n : int) (bars : Types.Daily_price.t list) : float option =
   if List.length bars < n + 1 then None
   else
     let arr = Array.of_list bars in
-    let oldest = arr.(0).close_price in
-    let latest = arr.(Array.length arr - 1).close_price in
-    if Float.( <= ) oldest 0.0 then None else Some ((latest /. oldest) -. 1.0)
+    _simple_return ~oldest:arr.(0).close_price
+      ~latest:arr.(Array.length arr - 1).close_price
 
 (** Build the [TriggerExit] transition for a laggard-rotation exit. Same fill
     convention as {!Stage3_force_exit_runner._make_exit_transition}: the exit
@@ -64,6 +68,22 @@ let _observe_and_emit ~config ~laggard_streaks ~benchmark_13w_return
       _emit_exit_transition ~pos ~current_date ~get_price ~skip_position_ids
         ~rs_13w_neg_weeks
 
+(** Check the RS return for a [Holding] long position over the configured window
+    and emit a laggard-rotation exit when the detector fires. Returns [None]
+    when the position has insufficient bar history. *)
+let _laggard_exit_for_holding ~config ~laggard_streaks ~benchmark_13w_return
+    ~skip_position_ids ~bar_reader ~get_price ~current_date (pos : Position.t) =
+  let n = config.Laggard_rotation.rs_window_weeks in
+  let pos_bars =
+    Bar_reader.weekly_bars_for bar_reader ~symbol:pos.symbol ~n:(n + 1)
+      ~as_of:current_date
+  in
+  match _window_return ~n pos_bars with
+  | None -> None
+  | Some position_13w_return ->
+      _observe_and_emit ~config ~laggard_streaks ~benchmark_13w_return
+        ~skip_position_ids ~get_price ~current_date ~position_13w_return pos
+
 (** Process one position. Returns [Some transition] when the detector fires AND
     the position is not already exiting via an earlier exit channel (stops,
     force-liq, Stage-3) on this tick. Mutates [laggard_streaks] only when both
@@ -71,19 +91,26 @@ let _observe_and_emit ~config ~laggard_streaks ~benchmark_13w_return
 let _process_position ~config ~laggard_streaks ~benchmark_13w_return
     ~skip_position_ids ~bar_reader ~get_price ~current_date (pos : Position.t) =
   match (pos.side, Position.get_state pos) with
-  | Trading_base.Types.Long, Position.Holding _ -> (
-      let n = config.Laggard_rotation.rs_window_weeks in
-      let pos_bars =
-        Bar_reader.weekly_bars_for bar_reader ~symbol:pos.symbol ~n:(n + 1)
-          ~as_of:current_date
-      in
-      match _window_return ~n pos_bars with
-      | None -> None
-      | Some position_13w_return ->
-          _observe_and_emit ~config ~laggard_streaks ~benchmark_13w_return
-            ~skip_position_ids ~get_price ~current_date ~position_13w_return pos
-      )
+  | Trading_base.Types.Long, Position.Holding _ ->
+      _laggard_exit_for_holding ~config ~laggard_streaks ~benchmark_13w_return
+        ~skip_position_ids ~bar_reader ~get_price ~current_date pos
   | _ -> None
+
+let _fold_position ~config ~laggard_streaks ~benchmark_13w_return
+    ~skip_position_ids ~bar_reader ~get_price ~current_date acc pos =
+  match
+    _process_position ~config ~laggard_streaks ~benchmark_13w_return
+      ~skip_position_ids ~bar_reader ~get_price ~current_date pos
+  with
+  | Some t -> t :: acc
+  | None -> acc
+
+let _collect_laggard_exits ~config ~positions ~laggard_streaks
+    ~benchmark_13w_return ~skip_position_ids ~bar_reader ~get_price
+    ~current_date =
+  Map.fold positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
+      _fold_position ~config ~laggard_streaks ~benchmark_13w_return
+        ~skip_position_ids ~bar_reader ~get_price ~current_date acc pos)
 
 let update ~config ~benchmark_symbol ~is_screening_day ~positions ~bar_reader
     ~get_price ~laggard_streaks ~skip_position_ids ~current_date =
@@ -101,10 +128,6 @@ let update ~config ~benchmark_symbol ~is_screening_day ~positions ~bar_reader
            signal — leave the streak table untouched and emit nothing. *)
         []
     | Some benchmark_13w_return ->
-        Map.fold positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
-            match
-              _process_position ~config ~laggard_streaks ~benchmark_13w_return
-                ~skip_position_ids ~bar_reader ~get_price ~current_date pos
-            with
-            | Some t -> t :: acc
-            | None -> acc)
+        _collect_laggard_exits ~config ~positions ~laggard_streaks
+          ~benchmark_13w_return ~skip_position_ids ~bar_reader ~get_price
+          ~current_date
