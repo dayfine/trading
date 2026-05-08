@@ -67,32 +67,36 @@ type _ols_sums = {
     [(1, x, x²)], so [XᵀX] is a [3 × 3] symmetric matrix of moments [Σ x^{i+j}]
     and [Xᵀy] is a [3] vector of moments [Σ x^i · y]. *)
 
-let _accumulate_sums pairs =
-  List.fold pairs
-    ~init:
-      {
-        n = 0.0;
-        sx = 0.0;
-        sx2 = 0.0;
-        sx3 = 0.0;
-        sx4 = 0.0;
-        sy = 0.0;
-        sxy = 0.0;
-        sx2y = 0.0;
-      } ~f:(fun acc (y, x) ->
-      let x2 = x *. x in
-      let x3 = x2 *. x in
-      let x4 = x2 *. x2 in
-      {
-        n = acc.n +. 1.0;
-        sx = acc.sx +. x;
-        sx2 = acc.sx2 +. x2;
-        sx3 = acc.sx3 +. x3;
-        sx4 = acc.sx4 +. x4;
-        sy = acc.sy +. y;
-        sxy = acc.sxy +. (x *. y);
-        sx2y = acc.sx2y +. (x2 *. y);
-      })
+(** All-zero initial sums for the fold over (y, x) pairs. *)
+let _zero_sums =
+  {
+    n = 0.0;
+    sx = 0.0;
+    sx2 = 0.0;
+    sx3 = 0.0;
+    sx4 = 0.0;
+    sy = 0.0;
+    sxy = 0.0;
+    sx2y = 0.0;
+  }
+
+(** Accumulate one (y, x) pair into the OLS moment sums. *)
+let _add_ols_pair acc (y, x) =
+  let x2 = x *. x in
+  let x3 = x2 *. x in
+  let x4 = x2 *. x2 in
+  {
+    n = acc.n +. 1.0;
+    sx = acc.sx +. x;
+    sx2 = acc.sx2 +. x2;
+    sx3 = acc.sx3 +. x3;
+    sx4 = acc.sx4 +. x4;
+    sy = acc.sy +. y;
+    sxy = acc.sxy +. (x *. y);
+    sx2y = acc.sx2y +. (x2 *. y);
+  }
+
+let _accumulate_sums pairs = List.fold pairs ~init:_zero_sums ~f:_add_ols_pair
 
 (** Determinant of the 3x3 [XᵀX] matrix:
 
@@ -208,17 +212,18 @@ let _finalize ~state ~config:_ =
   _build_metrics ~strat_returns
     ~benchmark_returns:(_resolve_benchmark_series state)
 
+let _init ~benchmark_returns ~config:_ =
+  {
+    portfolio_values = [];
+    step_benchmark_returns = [];
+    benchmark_returns_override = benchmark_returns;
+  }
+
 let computer ?benchmark_returns () : Simulator_types.any_metric_computer =
   Simulator_types.wrap_computer
     {
       name = "antifragility";
-      init =
-        (fun ~config:_ ->
-          {
-            portfolio_values = [];
-            step_benchmark_returns = [];
-            benchmark_returns_override = benchmark_returns;
-          });
+      init = _init ~benchmark_returns;
       update = _update;
       finalize = _finalize;
     }
