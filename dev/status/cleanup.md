@@ -18,6 +18,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] nesting: trading/trading/backtest/optimal/lib/outcome_scorer.ml — extracted _step_stage3, _make_initial_state, _resolve_exit; both violations cleared. PR #950 (2026-05-08)
 - [x] nesting: trading/trading/backtest/optimal/lib/optimal_run_artefacts.ml — extracted _rejection_pair_of_alternative + _pairs_of_audit_record; nesting linter clean. PR #949 (2026-05-08)
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 7 helpers (calendar, analysis, sector, forward, scan) to Optimal_strategy_runner_helpers; 413→282 LOC (branch cleanup/optimal-runner-split-2, 2026-05-08)
+- [x] nesting: trading/trading/data_panel/snapshot/lib/snapshot_format.ml — extracted _check_all_hashes_equal, _build_manifest, _flush_to_channel, _try_write_file, _check_payload_length, _check_payload_md5, _check_row_count, _check_schema_hash; all violations cleared (branch cleanup/nesting-snapshot-format, 2026-05-08)
 - [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
 - [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
 - [x] magic_numbers: trading/trading/backtest/optimal/lib/optimal_strategy_report_sections.ml — extracted _strong_outperform_threshold=3.0 and _moderate_outperform_threshold=1.5; linter clean (branch cleanup/optimal-report-sections-magic, 2026-05-08)
