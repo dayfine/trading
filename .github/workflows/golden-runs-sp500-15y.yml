@@ -77,3 +77,20 @@ jobs:
           else
             echo "SP500 15y golden run: no summary produced." >>"$GITHUB_STEP_SUMMARY"
           fi
+
+      # Upload run artefacts (equity_curve.csv, splits.csv, trades.csv, actual.sexp,
+      # progress.sexp, summary.sexp) so postmortem analysis after a FAIL doesn't
+      # require re-running the 50-minute scenario.  Retain 7 days — long enough
+      # to investigate, short enough to keep storage usage low.  See
+      # `dev/notes/15y-split-day-regression-2026-05-08.md` §"Fix-path" for how
+      # these are used.
+      - name: Upload run artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-sp500-15y-${{ github.run_id }}
+          path: |
+            dev/perf/golden-sp500-postsubmit-*/
+            dev/backtest/scenarios-*/sp500-2010-2026-historical/
+          retention-days: 7
+          if-no-files-found: warn

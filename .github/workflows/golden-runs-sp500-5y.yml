@@ -86,3 +86,17 @@ jobs:
           else
             echo "SP500 5y golden postsubmit: no summary produced." >>"$GITHUB_STEP_SUMMARY"
           fi
+
+      # Upload run artefacts (equity_curve.csv, splits.csv, trades.csv,
+      # actual.sexp, progress.sexp, summary.sexp) so postmortem analysis after a
+      # FAIL doesn't require re-running. Retain 7 days.
+      - name: Upload run artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-sp500-5y-${{ github.run_id }}
+          path: |
+            dev/perf/golden-sp500-postsubmit-*/
+            dev/backtest/scenarios-*/sp500-2019-2023*/
+          retention-days: 7
+          if-no-files-found: warn
