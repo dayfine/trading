@@ -59,8 +59,22 @@ for f in $(find "$TRADING_DIR" -path "*/lib/*.ml" \
     -not -name "*.pp.ml"); do
   _is_excluded "$f" && continue
 
+  # Track multi-line comment depth across lines. Lines inside an open comment
+  # block were previously flagged as violations on numerics. Now count opens
+  # and closes per line and skip lines whose start-of-line depth is positive.
+  comment_depth=0
   while IFS= read -r line; do
-    # Skip comment lines (single-line and multi-line comment content).
+    line_open_count=$(printf '%s' "$line" | grep -o '(\*' | wc -l | tr -d ' ')
+    line_close_count=$(printf '%s' "$line" | grep -o '\*)' | wc -l | tr -d ' ')
+    skip_this_line=0
+    if [ "$comment_depth" -gt 0 ]; then
+      skip_this_line=1
+    fi
+    comment_depth=$(( comment_depth + line_open_count - line_close_count ))
+    [ "$comment_depth" -lt 0 ] && comment_depth=0
+    [ "$skip_this_line" -eq 1 ] && continue
+
+    # Skip lines that open or close a comment on this line itself.
     case "$line" in
       *'(*'* | *'*)'* | *'e.g.'*) continue ;;
     esac
