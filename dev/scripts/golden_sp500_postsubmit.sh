@@ -8,10 +8,13 @@
 #
 # Mirrors dev/scripts/perf_tier3_weekly.sh — same discovery + output layout,
 # same OCAMLRUNPARAM tuning, same scratch-dir staging trick. Differences:
-#   - scans goldens-sp500/ only (not goldens-small/broad/perf-sweep/smoke)
+#   - scans goldens-sp500/ + goldens-sp500-historical/ by default; restrict
+#     via GOLDEN_SP500_SUBDIRS (space-separated names under
+#     trading/test_data/backtest_scenarios/)
 #   - per-cell timeout default is 5400s = 90 min
 #   - artefact dir is dev/perf/golden-sp500-postsubmit-<timestamp>/
-#   - env var override is GOLDEN_SP500_TIMEOUT / GOLDEN_SP500_OCAMLRUNPARAM
+#   - env var override is GOLDEN_SP500_TIMEOUT / GOLDEN_SP500_OCAMLRUNPARAM /
+#     GOLDEN_SP500_SUBDIRS
 #
 # Exit status:
 #   0 if every scenario completes within budget with PASS verdict
@@ -36,6 +39,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SCENARIO_ROOT="${REPO_ROOT}/trading/test_data/backtest_scenarios"
 RUN_IN_ENV="${REPO_ROOT}/dev/lib/run-in-env.sh"
 TIMEOUT="${GOLDEN_SP500_TIMEOUT:-5400}"
+# Space-separated subdir list under SCENARIO_ROOT. Default: both 5y + 15y.
+SUBDIRS="${GOLDEN_SP500_SUBDIRS:-goldens-sp500 goldens-sp500-historical}"
 
 # Same GC tuning as perf_tier3_weekly.sh — keeps peak RSS ~25-37% lower
 # for runs with low allocation rates.
@@ -65,13 +70,14 @@ mkdir -p "$OUT_DIR"
 
 printf 'SP500 golden postsubmit run.\n'
 printf '  Scenario root    : %s\n' "$SCENARIO_ROOT"
+printf '  Subdirs          : %s\n' "$SUBDIRS"
 printf '  Output dir       : %s\n' "$OUT_DIR"
 printf '  Per-cell timeout : %ss\n' "$TIMEOUT"
 printf '  GNU /usr/bin/time: %s\n\n' "$HAVE_GNU_TIME"
 
 # Discover tier-3 SP500 golden scenarios.
 SP500_PATHS=""
-for sub in goldens-sp500 goldens-sp500-historical; do
+for sub in $SUBDIRS; do
   dir="${SCENARIO_ROOT}/${sub}"
   [ -d "$dir" ] || continue
   for sexp in "$dir"/*.sexp; do
