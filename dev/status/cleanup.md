@@ -15,22 +15,22 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
+- [~] nesting: trading/trading/backtest/lib/runner.ml + optimal_strategy_runner_helpers.ml + optimal_summary.ml + reconciler_writer.ml — extract private helpers to reduce nesting in 5 flagged fns (source: dispatch 2026-05-08)
+- [~] nesting: trading/trading/weinstein/snapshot/lib/pick_diff.ml + trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_manifest.ml — extract private helpers to reduce avg/max nesting (source: dispatch 2026-05-08)
+
 - [x] nesting: trading/trading/backtest/optimal/lib/outcome_scorer.ml — extracted _step_stage3, _make_initial_state, _resolve_exit; both violations cleared. PR #950 (2026-05-08)
 - [x] nesting: trading/trading/backtest/optimal/lib/optimal_run_artefacts.ml — extracted _rejection_pair_of_alternative + _pairs_of_audit_record; nesting linter clean. PR #949 (2026-05-08)
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 7 helpers (calendar, analysis, sector, forward, scan) to Optimal_strategy_runner_helpers; 413→282 LOC (branch cleanup/optimal-runner-split-2, 2026-05-08)
 - [x] nesting: trading/trading/data_panel/snapshot/lib/snapshot_format.ml — extracted _check_all_hashes_equal, _build_manifest, _flush_to_channel, _try_write_file, _check_payload_length, _check_payload_md5, _check_row_count, _check_schema_hash; all violations cleared (branch cleanup/nesting-snapshot-format, 2026-05-08)
-- [x] nesting: trading/trading/backtest/lib/runner.ml + optimal_strategy_runner_helpers.ml + optimal_summary.ml + reconciler_writer.ml — extracted 7 helpers; all 5 violations cleared. PR #971 (2026-05-08)
 - [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
 - [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
 - [x] nesting: trading/trading/simulation/lib/{antifragility,return_basics,distributional}_computer.ml — extracted _add_ols_pair, _zero_sums, _add_sq_dev, _add_moments, _bucket_loop helpers; all 5 dispatch violations cleared. PR #967 (2026-05-08)
-- [x] nesting: trading/trading/simulation/lib/order_generator.ml + simulator.ml — extracted _accumulate_order + _fallback_price_for_position; transitions_to_orders + _prices_for_held_positions violations cleared. PR #968 (2026-05-08)
-- [x] nesting: trading/trading/weinstein/snapshot/lib/pick_diff.ml + trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_manifest.ml — extracted _compute_diff, _date_mismatch_error, _decode_sexp, _load_if_exists, _validate_and_write; all 3 violations cleared (branch cleanup/nesting-pick-manifest, 2026-05-08)
 - [x] magic_numbers: trading/trading/backtest/optimal/lib/optimal_strategy_report_sections.ml — extracted _strong_outperform_threshold=3.0 and _moderate_outperform_threshold=1.5; linter clean (branch cleanup/optimal-report-sections-magic, 2026-05-08)
 - [x] nesting: trading/analysis/scripts/build_snapshots/build_snapshots.ml — extracted 5 helpers (_entry_is_current, _write_and_checksum, _file_metadata, _build_or_log, _load_benchmark_bars, _make_progress, _last_symbol, _fold_symbol); all 78 fns pass nesting linter (branch cleanup/nesting-build-snapshots-2, 2026-05-08)
 - [x] nesting: trading/trading/weinstein/strategy/lib/entry_audit_capture.ml — extracted 5 helpers; classify_candidate/emit_entries/alternatives_of_decisions all pass; file avg now under 2.5 (branch cleanup/nesting-entry-audit-capture, 2026-05-08)
 - [x] fn_length + magic_numbers: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — condensed comments −15 lines (297); restructured to avoid bare literals on mid-comment lines. PR #924 (2026-05-07)
 - [x] nesting: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — extracted 9 helpers (_make_daily_price, _match_ohlcv, _fetch_and_build_weekly_view, _fetch_weekly_bars, _to_weekly_bars, _daily_view_from_idx, _find_and_build_daily_view, _low_buf_from_idx, _check_and_fetch_low); all 5 violations cleared. PR #966 (2026-05-08)
-- [x] nesting: strategy batch (laggard_rotation_runner.ml, stage3_force_exit_runner.ml, portfolio_view.ml, weinstein_strategy.ml) — extracted _simple_return, _laggard_exit_for_holding, _fold_position, _collect_laggard_exits, _force_exit_for_holding, _signed_quantity, _process_market_day; 6 violations cleared. PR #969 (2026-05-08)
+- [x] file_length: trading/analysis/weinstein/snapshot_runtime/lib/snapshot_bar_views.ml — 338->295 LOC; extracted 5 OHLCV helpers to snapshot_bar_views_helpers. PR #972 (2026-05-08)
 Orchestrator populates this from `dev/health/<date>-{fast,deep}.md`. Items here are eligible for next dispatch.
 
 ## Completed
