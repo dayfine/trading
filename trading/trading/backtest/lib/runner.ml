@@ -383,6 +383,29 @@ let _filter_steps ~sim_result ~start_date =
   let steps = List.filter steps_in_range ~f:is_trading_day in
   (steps_in_range, steps)
 
+(** Collect all in-window teardown artefacts (round trips, stop infos, audit
+    records, cascade summaries, force liquidations) from the simulation logs.
+    Called inside a [Trace.Teardown] span by [_extract_filtered_logs]. *)
+let _collect_teardown_artefacts ~stop_log ~trade_audit ~force_liquidation_log
+    ~steps_in_range ~start_date =
+  ( Metrics.extract_round_trips steps_in_range,
+    filter_stop_infos_in_window (Stop_log.get_stop_infos stop_log) ~start_date,
+    filter_audit_records_in_window
+      (Trade_audit.get_audit_records trade_audit)
+      ~start_date,
+    filter_cascade_summaries_in_window
+      (Trade_audit.get_cascade_summaries trade_audit)
+      ~start_date,
+    filter_force_liquidations_in_window
+      (Force_liquidation_log.events force_liquidation_log)
+      ~start_date )
+
+(** Filter stale-hold events to those at or after [start_date]. *)
+let _filter_stale_holds ~stale_hold_log ~start_date =
+  Trading_simulation.Stale_hold.Log.events stale_hold_log
+  |> List.filter ~f:(fun (e : Trading_simulation.Stale_hold.event) ->
+      Date.( >= ) e.date start_date)
+
 (** Extract and in-window-filter all post-simulation artefacts: round trips,
     stop infos, audit records, cascade summaries, force liquidations, and
     stale holds. Wrapped in a [Trace.Teardown] span. *)
@@ -390,26 +413,11 @@ let _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
     ~force_liquidation_log ~stale_hold_log ~steps_in_range ~start_date () =
   let round_trips, stop_infos, audit, cascade_summaries, force_liquidations =
     Trace.record ?trace Trace.Phase.Teardown (fun () ->
-        ( Metrics.extract_round_trips steps_in_range,
-          filter_stop_infos_in_window
-            (Stop_log.get_stop_infos stop_log)
-            ~start_date,
-          filter_audit_records_in_window
-            (Trade_audit.get_audit_records trade_audit)
-            ~start_date,
-          filter_cascade_summaries_in_window
-            (Trade_audit.get_cascade_summaries trade_audit)
-            ~start_date,
-          filter_force_liquidations_in_window
-            (Force_liquidation_log.events force_liquidation_log)
-            ~start_date ))
+        _collect_teardown_artefacts ~stop_log ~trade_audit
+          ~force_liquidation_log ~steps_in_range ~start_date)
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
-  let stale_holds =
-    Trading_simulation.Stale_hold.Log.events stale_hold_log
-    |> List.filter ~f:(fun (e : Trading_simulation.Stale_hold.event) ->
-        Date.( >= ) e.date start_date)
-  in
+  let stale_holds = _filter_stale_holds ~stale_hold_log ~start_date in
   ( round_trips,
     stop_infos,
     audit,

@@ -18,10 +18,21 @@ let _entry_date_of (pos : Trading_portfolio.Types.portfolio_position) =
   | Some lot -> lot.acquisition_date
   | None -> failwithf "position %s has no lots" pos.symbol ()
 
-(** One row per [Holding] position at run end. PHASE_1_SPEC §3:
+(** Emit one [open_positions.csv] row for [pos] to [oc]. PHASE_1_SPEC §3:
     [symbol,side,entry_date,entry_price,quantity]. [entry_price] is the average
     cost per share (positive for both longs and shorts); [quantity] is the
     absolute share count. *)
+let _write_open_position_row oc (pos : Trading_portfolio.Types.portfolio_position)
+    =
+  let qty = Trading_portfolio.Calculations.position_quantity pos in
+  let avg_cost = Trading_portfolio.Calculations.avg_cost_of_position pos in
+  let side = _open_position_side_label qty in
+  let entry_date = _entry_date_of pos in
+  fprintf oc "%s,%s,%s,%.2f,%.0f\n" pos.symbol side
+    (Date.to_string entry_date)
+    avg_cost (Float.abs qty)
+
+(** One row per [Holding] position at run end. PHASE_1_SPEC §3. *)
 let write_open_positions ~output_dir ~steps =
   let open Trading_simulation_types.Simulator_types in
   let path = output_dir ^ "/open_positions.csv" in
@@ -31,16 +42,7 @@ let write_open_positions ~output_dir ~steps =
   | None -> ()
   | Some last_step ->
       List.iter last_step.portfolio.Trading_portfolio.Portfolio.positions
-        ~f:(fun (pos : Trading_portfolio.Types.portfolio_position) ->
-          let qty = Trading_portfolio.Calculations.position_quantity pos in
-          let avg_cost =
-            Trading_portfolio.Calculations.avg_cost_of_position pos
-          in
-          let side = _open_position_side_label qty in
-          let entry_date = _entry_date_of pos in
-          fprintf oc "%s,%s,%s,%.2f,%.0f\n" pos.symbol side
-            (Date.to_string entry_date)
-            avg_cost (Float.abs qty)));
+        ~f:(_write_open_position_row oc));
   Out_channel.close oc
 
 (** One row per symbol present in [open_positions.csv]. PHASE_1_SPEC §3.3:
