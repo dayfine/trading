@@ -45,4 +45,27 @@ val build_adapter :
     + manifest with the given [max_cache_mb] cap, wires it through
       {!Snapshot_bar_source.make_callbacks}, and returns the resulting
       callback-mode adapter. Returns [Error] when [Daily_panels.create] fails
-      (e.g. invalid cap; corrupt manifest). *)
+      (e.g. invalid cap; corrupt manifest).
+
+    Callers that already hold a [Daily_panels.t] (e.g. {!Backtest.Panel_runner},
+    which builds one for the strategy bar reader) should prefer
+    {!build_adapter_from_panels} to avoid constructing a second LRU cache over
+    the same snapshot directory — see Cliff #2 in
+    [dev/notes/15y-memory-cliff-2026-05-08.md]. *)
+
+val build_adapter_from_panels :
+  Snapshot_runtime.Daily_panels.t ->
+  Trading_simulation_data.Market_data_adapter.t
+(** [build_adapter_from_panels panels] wraps an existing [Daily_panels.t] in a
+    callback-mode [Market_data_adapter.t] without allocating a second cache.
+
+    Used by {!Backtest.Panel_runner} so the simulator's per-tick price reads
+    and the strategy's snapshot-backed bar reader share one resident
+    [Daily_panels.t]. The investigation note
+    [dev/notes/15y-memory-cliff-2026-05-08.md] §"Cliff #2" measured ~330 MB
+    saved at the 15y SP500 window by deduplicating the cache.
+
+    Pure wrapper — {!Snapshot_callbacks.of_daily_panels} +
+    {!Snapshot_bar_source.make_callbacks} +
+    {!Market_data_adapter.create_with_callbacks}. Never errors; the input
+    panel is already validated. *)
