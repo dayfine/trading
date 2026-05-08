@@ -52,23 +52,30 @@ let _snap_to_rational ~tolerance ~max_denominator x =
   done;
   !best
 
+(* Snap [split_factor] to a rational if it clearly exceeds the dividend
+   threshold. Returns [None] for near-unity factors (likely dividends) and for
+   factors that do not match any rational with denominator <= [max_denominator]. *)
+let _snap_if_split ~dividend_threshold ~rational_snap_tolerance ~max_denominator
+    split_factor =
+  if Float.( <= ) (Float.abs (split_factor -. 1.0)) dividend_threshold then None
+  else
+    _snap_to_rational ~tolerance:rational_snap_tolerance ~max_denominator
+      split_factor
+
 (* ------------------------------------------------------------------ *)
 (* Detection                                                            *)
 (* ------------------------------------------------------------------ *)
 
 (* Compute a split factor from the ratio of adjusted to raw price change and
-   snap it to the nearest simple rational. Returns [None] if the ratio is too
-   close to 1.0 (likely a dividend, not a split) or does not match any
-   rational with denominator <= [max_denominator]. *)
-let _classify_ratio ~dividend_threshold ~rational_snap_tolerance ~max_denominator
-    ~raw_ratio ~adj_ratio =
+   snap it to the nearest simple rational. Returns [None] if the ratio is
+   zero, too close to 1.0 (likely a dividend, not a split), or does not match
+   any rational with denominator <= [max_denominator]. *)
+let _classify_ratio ~dividend_threshold ~rational_snap_tolerance
+    ~max_denominator ~raw_ratio ~adj_ratio =
   if Float.( = ) raw_ratio 0.0 then None
   else
-    let split_factor = adj_ratio /. raw_ratio in
-    if Float.( <= ) (Float.abs (split_factor -. 1.0)) dividend_threshold then None
-    else
-      _snap_to_rational ~tolerance:rational_snap_tolerance ~max_denominator
-        split_factor
+    _snap_if_split ~dividend_threshold ~rational_snap_tolerance ~max_denominator
+      (adj_ratio /. raw_ratio)
 
 let detect_split ?(dividend_threshold = default_dividend_threshold)
     ?(rational_snap_tolerance = default_rational_snap_tolerance)
@@ -78,5 +85,5 @@ let detect_split ?(dividend_threshold = default_dividend_threshold)
   else
     let raw_ratio = curr.close_price /. prev.close_price in
     let adj_ratio = curr.adjusted_close /. prev.adjusted_close in
-    _classify_ratio ~dividend_threshold ~rational_snap_tolerance ~max_denominator
-      ~raw_ratio ~adj_ratio
+    _classify_ratio ~dividend_threshold ~rational_snap_tolerance
+      ~max_denominator ~raw_ratio ~adj_ratio

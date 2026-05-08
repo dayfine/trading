@@ -342,6 +342,9 @@ let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
         ~steps_in_range ~start_date ~end_date;
   }
 
+(** Symbol accessor for [portfolio_position]. *)
+let _position_symbol (p : Trading_portfolio.Types.portfolio_position) = p.symbol
+
 (** Filter [final_close_prices] to symbols that are still held in the last
     step's portfolio. Empty result when [steps] is empty or no positions are
     open. The reconciler only references [final_prices.csv] via the join key
@@ -354,8 +357,7 @@ let _final_prices_for_held_symbols ~steps ~final_close_prices =
       let open Trading_simulation_types.Simulator_types in
       let held =
         last_step.portfolio.Trading_portfolio.Portfolio.positions
-        |> List.map ~f:(fun (p : Trading_portfolio.Types.portfolio_position) ->
-            p.symbol)
+        |> List.map ~f:_position_symbol
         |> String.Set.of_list
       in
       List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
