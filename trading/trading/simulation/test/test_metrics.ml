@@ -115,10 +115,9 @@ let _make_trade ~id ~symbol ~side ~quantity ~price =
     portfolio_value fields are placeholders — [extract_round_trips] only
     consumes [step.trades] and [step.date]. *)
 let _step_with_trades ~date ~trades =
-  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
   {
     date;
-    portfolio;
+    portfolio = Trading_simulation_types.Portfolio_summary.empty;
     portfolio_value = 10000.0;
     trades;
     orders_submitted = [];
@@ -318,10 +317,9 @@ let test_extract_round_trips_unclosed_short_dropped _ =
 
 (* Helper to create a mock step_result *)
 let make_step_result ~date ~portfolio_value =
-  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
   {
     date;
-    portfolio;
+    portfolio = Trading_simulation_types.Portfolio_summary.empty;
     portfolio_value;
     trades = [];
     orders_submitted = [];
@@ -612,7 +610,7 @@ let test_create_computer_max_drawdown _ =
 
 let test_profit_factor_all_winners _ =
   let config = make_config () in
-  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  let portfolio = Trading_simulation_types.Portfolio_summary.empty in
   let buy_trade =
     {
       Trading_base.Types.id = "t1";
@@ -877,7 +875,9 @@ let test_portfolio_state_no_steps _ =
 
 let test_portfolio_state_with_trades _ =
   let config = make_config () in
-  let portfolio = Trading_portfolio.Portfolio.create ~initial_cash:10000.0 () in
+  let portfolio =
+    Trading_simulation_types.Portfolio_summary.with_cash 10000.0
+  in
   let trade =
     {
       Trading_base.Types.id = "t1";
@@ -958,17 +958,25 @@ let _portfolio_with_open_position ~symbol ~quantity ~price =
     computer must skip those steps and use the last real mark-to-market step. *)
 let test_portfolio_state_skips_non_trading_final_step _ =
   let config = make_config () in
-  let portfolio =
+  let full_portfolio =
     _portfolio_with_open_position ~symbol:"AAPL" ~quantity:10.0 ~price:100.0
   in
-  let cash = portfolio.current_cash in
+  let cash = full_portfolio.current_cash in
   let mtm_value = cash +. (10.0 *. 105.0) in
+  let portfolio_marked =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:(mtm_value -. cash)
+  in
+  let portfolio_cash_only =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:0.0
+  in
   let steps =
     [
       {
         (* Trading day — position marked to market at $105: MTM = $1050. *)
         date = date_of_string "2024-01-05";
-        portfolio;
+        portfolio = portfolio_marked;
         portfolio_value = mtm_value;
         trades = [];
         orders_submitted = [];
@@ -979,7 +987,7 @@ let test_portfolio_state_skips_non_trading_final_step _ =
       {
         (* Non-trading day — simulator fell back to cash. *)
         date = date_of_string "2024-01-06";
-        portfolio;
+        portfolio = portfolio_cash_only;
         portfolio_value = cash;
         trades = [];
         orders_submitted = [];
@@ -1010,15 +1018,23 @@ let test_portfolio_state_skips_non_trading_final_step _ =
 *)
 let test_portfolio_state_uses_last_step_when_all_trading_days _ =
   let config = make_config () in
-  let portfolio =
+  let full_portfolio =
     _portfolio_with_open_position ~symbol:"AAPL" ~quantity:10.0 ~price:100.0
   in
-  let cash = portfolio.current_cash in
+  let cash = full_portfolio.current_cash in
+  let portfolio_v500 =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:500.0
+  in
+  let portfolio_v800 =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:800.0
+  in
   let steps =
     [
       {
         date = date_of_string "2024-01-05";
-        portfolio;
+        portfolio = portfolio_v500;
         portfolio_value = cash +. 500.0;
         trades = [];
         orders_submitted = [];
@@ -1028,7 +1044,7 @@ let test_portfolio_state_uses_last_step_when_all_trading_days _ =
       };
       {
         date = date_of_string "2024-01-06";
-        portfolio;
+        portfolio = portfolio_v800;
         portfolio_value = cash +. 800.0;
         trades = [];
         orders_submitted = [];
@@ -1058,12 +1074,16 @@ let test_portfolio_state_uses_last_step_when_all_trading_days _ =
     bar $130, qty 100. *)
 let test_portfolio_state_long_unrealized_pnl _ =
   let config = make_config () in
-  let portfolio =
+  let full_portfolio =
     _portfolio_with_open_position ~symbol:"BULL" ~quantity:100.0 ~price:100.0
   in
-  let cash = portfolio.current_cash in
+  let cash = full_portfolio.current_cash in
   let current_price = 130.0 in
   let portfolio_value = cash +. (100.0 *. current_price) in
+  let portfolio =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:(100.0 *. current_price)
+  in
   let steps =
     [
       {
@@ -1118,13 +1138,17 @@ let _portfolio_with_open_short ~symbol ~quantity ~price =
     profit on price drops). *)
 let test_portfolio_state_short_unrealized_pnl _ =
   let config = make_config () in
-  let portfolio =
+  let full_portfolio =
     _portfolio_with_open_short ~symbol:"BEAR" ~quantity:100.0 ~price:100.0
   in
-  let cash = portfolio.current_cash in
+  let cash = full_portfolio.current_cash in
   let current_price = 80.0 in
   (* signed_qty = -100 ; market_value contribution = -100 * 80 = -$8,000. *)
   let portfolio_value = cash +. (-100.0 *. current_price) in
+  let portfolio =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:(-100.0 *. current_price)
+  in
   let steps =
     [
       {
@@ -1182,14 +1206,14 @@ let test_portfolio_state_mixed_unrealized_pnl _ =
       timestamp = Time_ns_unix.now ();
     }
   in
-  let portfolio =
+  let full_portfolio =
     match Trading_portfolio.Portfolio.apply_trades base [ buy; sell ] with
     | Ok p -> p
     | Error err ->
         OUnit2.assert_failure
           ("failed to build mixed test portfolio: " ^ Status.show err)
   in
-  let cash = portfolio.current_cash in
+  let cash = full_portfolio.current_cash in
   (* BULL current $130 (long winner): mtm contribution = 100 * 130 = +$13,000;
      UnrealizedPnl_BULL = (130-100) * 100 = +$3,000.
      BEAR current $250 (short loser, price went UP): mtm contribution =
@@ -1197,6 +1221,10 @@ let test_portfolio_state_mixed_unrealized_pnl _ =
   let bull_mtm = 100.0 *. 130.0 in
   let bear_mtm = -50.0 *. 250.0 in
   let portfolio_value = cash +. bull_mtm +. bear_mtm in
+  let portfolio =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:(bull_mtm +. bear_mtm)
+  in
   let steps =
     [
       {

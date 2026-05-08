@@ -33,42 +33,31 @@ let _write_open_position_row oc
     avg_cost (Float.abs qty)
 
 (** One row per [Holding] position at run end. PHASE_1_SPEC §3. *)
-let write_open_positions ~output_dir ~steps =
-  let open Trading_simulation_types.Simulator_types in
+let write_open_positions ~output_dir
+    ~(final_portfolio : Trading_portfolio.Portfolio.t) =
   let path = output_dir ^ "/open_positions.csv" in
   let oc = Out_channel.create path in
   fprintf oc "symbol,side,entry_date,entry_price,quantity\n";
-  (match List.last steps with
-  | None -> ()
-  | Some last_step ->
-      List.iter last_step.portfolio.Trading_portfolio.Portfolio.positions
-        ~f:(_write_open_position_row oc));
+  List.iter final_portfolio.positions ~f:(_write_open_position_row oc);
   Out_channel.close oc
 
 (** Symbol field accessor for portfolio positions. *)
 let _pos_symbol (p : Trading_portfolio.Types.portfolio_position) = p.symbol
-
-(** Set of symbols held in the last step's portfolio. Empty when [steps] is
-    empty. *)
-let _held_symbols_of_last_step steps =
-  let open Trading_simulation_types.Simulator_types in
-  match List.last steps with
-  | None -> String.Set.empty
-  | Some last_step ->
-      last_step.portfolio.Trading_portfolio.Portfolio.positions
-      |> List.map ~f:_pos_symbol |> String.Set.of_list
 
 (** One row per symbol present in [open_positions.csv]. PHASE_1_SPEC §3.3:
     [symbol,price]. Symbols held at run end without an entry in [final_prices]
     (e.g. delisted on the final calendar day) are silently dropped — the
     reconciler's join is left-anti and surfaces these as "missing final price"
     diagnostics. *)
-let write_final_prices ~output_dir ~steps
+let write_final_prices ~output_dir
+    ~(final_portfolio : Trading_portfolio.Portfolio.t)
     ~(final_prices : (string * float) list) =
   let path = output_dir ^ "/final_prices.csv" in
   let oc = Out_channel.create path in
   fprintf oc "symbol,price\n";
-  let held_symbols = _held_symbols_of_last_step steps in
+  let held_symbols =
+    final_portfolio.positions |> List.map ~f:_pos_symbol |> String.Set.of_list
+  in
   let price_map =
     Map.of_alist_reduce (module String) final_prices ~f:(fun a _ -> a)
   in

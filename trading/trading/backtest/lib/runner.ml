@@ -29,6 +29,7 @@ type result = {
   summary : Summary.t;
   round_trips : Metrics.trade_metrics list;
   steps : Trading_simulation_types.Simulator_types.step_result list;
+  final_portfolio : Trading_portfolio.Portfolio.t;
   overrides : Sexp.t list;
   stop_infos : Stop_log.stop_info list;
   audit : Trade_audit.audit_record list;
@@ -347,22 +348,19 @@ let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
 (** Symbol accessor for [portfolio_position]. *)
 let _position_symbol (p : Trading_portfolio.Types.portfolio_position) = p.symbol
 
-(** Filter [final_close_prices] to symbols that are still held in the last
-    step's portfolio. Empty result when [steps] is empty or no positions are
-    open. The reconciler only references [final_prices.csv] via the join key
-    against [open_positions.csv], so prices for never-held or already-closed
-    symbols are not needed and would just bloat the artefact. *)
-let _final_prices_for_held_symbols ~steps ~final_close_prices =
-  match List.last steps with
-  | None -> []
-  | Some last_step ->
-      let open Trading_simulation_types.Simulator_types in
-      let held =
-        last_step.portfolio.Trading_portfolio.Portfolio.positions
-        |> List.map ~f:_position_symbol
-        |> String.Set.of_list
-      in
-      List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
+(** Filter [final_close_prices] to symbols that are still held in the run's
+    [final_portfolio]. Empty result when no positions are open at end of run.
+    The reconciler only references [final_prices.csv] via the join key against
+    [open_positions.csv], so prices for never-held or already-closed symbols are
+    not needed and would just bloat the artefact. *)
+let _final_prices_for_held_symbols
+    ~(final_portfolio : Trading_portfolio.Portfolio.t) ~final_close_prices =
+  let held =
+    final_portfolio.positions
+    |> List.map ~f:_position_symbol
+    |> String.Set.of_list
+  in
+  List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
 
 (** Split [sim_result.steps] into two views over [start_date..end_date]:
     [steps_in_range] includes every calendar day (needed for round-trip
@@ -471,19 +469,19 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
       ~final_value ~round_trips ~sim_result ~stale_holds
   in
-  let final_prices =
-    _final_prices_for_held_symbols ~steps ~final_close_prices
-  in
+  let final_portfolio = sim_result.final_portfolio in
   {
     summary;
     round_trips;
     steps;
+    final_portfolio;
     overrides;
     stop_infos;
     audit;
     cascade_summaries;
     force_liquidations;
     stale_holds;
-    final_prices;
+    final_prices =
+      _final_prices_for_held_symbols ~final_portfolio ~final_close_prices;
     universe = deps.universe;
   }

@@ -660,6 +660,8 @@ let _make_runner_result ~start_date ~end_date ~round_trips :
       };
     round_trips;
     steps = [];
+    final_portfolio =
+      Trading_portfolio.Portfolio.create ~initial_cash:10_000.0 ();
     overrides = [];
     stop_infos = [];
     audit = [];
