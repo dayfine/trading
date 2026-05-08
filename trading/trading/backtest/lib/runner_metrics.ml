@@ -9,6 +9,11 @@ open Trading_simulation
 let initial_cash = 1_000_000.0
 let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
+(** Sentinel year used when constructing a dummy [config] for metric re-runs
+    where the date range is irrelevant (e.g. [recompute_calmar_ratio]).
+    Year 2000 is safely before any real run date. *)
+let _empty_date_sentinel_year = 2000
+
 (** Re-run the step-based metric computers ([SharpeRatio], [MaxDrawdown],
     [CAGR]) on the in-window step list with a config whose [start_date] is the
     actual run start (not the warmup_start the simulator was created with). The
@@ -47,8 +52,8 @@ let recompute_in_window_step_metrics ~steps_in_range ~start_date ~end_date =
 let recompute_calmar_ratio ~base_metrics =
   let dummy_config : Trading_simulation_types.Simulator_types.config =
     {
-      start_date = Date.create_exn ~y:2000 ~m:Month.Jan ~d:1;
-      end_date = Date.create_exn ~y:2000 ~m:Month.Jan ~d:1;
+      start_date = Date.create_exn ~y:_empty_date_sentinel_year ~m:Month.Jan ~d:1;
+      end_date = Date.create_exn ~y:_empty_date_sentinel_year ~m:Month.Jan ~d:1;
       initial_cash;
       commission;
       strategy_cadence = Types.Cadence.Daily;
