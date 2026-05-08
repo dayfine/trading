@@ -58,6 +58,21 @@ let _distinct_entry_fridays (scored : Optimal_types.scored_candidate list) :
       sc.entry.entry_week)
   |> List.dedup_and_sort ~compare:Date.compare
 
+(** Sort by realised [r_multiple] descending — hindsight ceiling for
+    [Constrained] / [Relaxed_macro] variants. *)
+let _compare_by_r_multiple (a : Optimal_types.scored_candidate)
+    (b : Optimal_types.scored_candidate) : int =
+  Float.compare b.r_multiple a.r_multiple
+
+(** Sort by pre-trade [cascade_score] descending; ties broken by [symbol]
+    ascending so the order is deterministic across runs. Used by [Score_picked].
+*)
+let _compare_by_score (a : Optimal_types.scored_candidate)
+    (b : Optimal_types.scored_candidate) : int =
+  let by_score = Int.compare b.entry.cascade_score a.entry.cascade_score in
+  if by_score <> 0 then by_score
+  else String.compare a.entry.symbol b.entry.symbol
+
 (** Comparator for sorting same-Friday candidates under [variant].
 
     - [Constrained] / [Relaxed_macro] sort by realised [r_multiple] descending.
@@ -69,19 +84,8 @@ let _distinct_entry_fridays (scored : Optimal_types.scored_candidate list) :
 let _entry_comparator ~(variant : Optimal_types.variant_label) :
     Optimal_types.scored_candidate -> Optimal_types.scored_candidate -> int =
   match variant with
-  | Constrained | Relaxed_macro ->
-      fun (a : Optimal_types.scored_candidate)
-        (b : Optimal_types.scored_candidate)
-      -> Float.compare b.r_multiple a.r_multiple
-  | Score_picked ->
-      fun (a : Optimal_types.scored_candidate)
-        (b : Optimal_types.scored_candidate)
-      ->
-        let by_score =
-          Int.compare b.entry.cascade_score a.entry.cascade_score
-        in
-        if by_score <> 0 then by_score
-        else String.compare a.entry.symbol b.entry.symbol
+  | Constrained | Relaxed_macro -> _compare_by_r_multiple
+  | Score_picked -> _compare_by_score
 
 (** Candidates entering on [friday], sorted by the variant-specific key:
     [r_multiple] DESC for [Constrained] / [Relaxed_macro], [cascade_score] DESC

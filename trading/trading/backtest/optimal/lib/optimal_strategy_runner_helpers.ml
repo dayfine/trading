@@ -69,6 +69,16 @@ let analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
         (Stock_analysis.analyze ~config:stock_config ~ticker:symbol ~bars:weekly
            ~benchmark_bars:benchmark ~prior_stage:None ~as_of_date:friday)
 
+(** Pass-through sector context used by the counterfactual. [Neutral] rating and
+    [Stage2] stage because sector caps are handled separately via the filler's
+    [max_sector_concentration]. *)
+let _neutral_ctx (sector_name : string) : Screener.sector_context =
+  {
+    sector_name;
+    rating = Screener.Neutral;
+    stage = Stage2 { weeks_advancing = 4; late = false };
+  }
+
 (** Build a [sector_map] (symbol -> [Screener.sector_context]) from a flat
     [sectors : (symbol -> sector_name)] table. The screener's sector-context
     expects a [rating] and [stage] per sector; we use [Neutral] / [Stage2] as
@@ -78,14 +88,7 @@ let build_sector_context_map (sectors : (string, string) Hashtbl.t) :
     (string, Screener.sector_context) Hashtbl.t =
   let out = Hashtbl.create (module String) in
   Hashtbl.iteri sectors ~f:(fun ~key ~data ->
-      let ctx : Screener.sector_context =
-        {
-          sector_name = data;
-          rating = Screener.Neutral;
-          stage = Stage2 { weeks_advancing = 4; late = false };
-        }
-      in
-      Hashtbl.set out ~key ~data:ctx);
+      Hashtbl.set out ~key ~data:(_neutral_ctx data));
   out
 
 (* ---------------------------------------------------------------- *)
@@ -110,10 +113,11 @@ let _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol ~friday
 
 (** Collect the chronological outlook list for one [symbol] across all
     [fridays]. Factored out of [build_forward_table] to reduce nesting depth. *)
-let _outlooks_for_symbol ~snapshot_callbacks ~fridays ~stage_config ~bar_lookback
-    ~symbol =
+let _outlooks_for_symbol ~snapshot_callbacks ~fridays ~stage_config
+    ~bar_lookback ~symbol =
   List.filter_map fridays ~f:(fun friday ->
-      _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol ~friday)
+      _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol
+        ~friday)
 
 (** Build the per-symbol forward-outlook table (PR-1). Iterates [fridays] once
     per symbol and memoizes the full chronological outlook list. Sized to
