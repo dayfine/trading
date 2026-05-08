@@ -66,18 +66,22 @@ let _transition_to_order ~id ~positions
   | ExitFill _ | ExitComplete ->
       Ok None
 
+(** Advance the (seq, accumulator) pair with [maybe_order].
+
+    [seq] is always incremented even when no order is produced — this keeps
+    IDs stable regardless of how transition kinds are reordered in the
+    caller. Sequential gaps in IDs are harmless. *)
+let _accumulate_order (seq, acc) maybe_order =
+  match maybe_order with
+  | Some order -> Ok (seq + 1, order :: acc)
+  | None -> Ok (seq + 1, acc)
+
 let transitions_to_orders ~current_date ~positions transitions =
   let open Result.Let_syntax in
   let%bind _, orders =
     List.fold_result transitions ~init:(0, []) ~f:(fun (seq, acc) transition ->
         let id = _make_id ~current_date ~seq in
         let%bind maybe_order = _transition_to_order ~id ~positions transition in
-        match maybe_order with
-        | Some order -> Ok (seq + 1, order :: acc)
-        | None ->
-            (* We still advance [seq] for ignored transitions so that any
-               future re-ordering of transition kinds does not silently shift
-               IDs. Sequential gaps in IDs are harmless. *)
-            Ok (seq + 1, acc))
+        _accumulate_order (seq, acc) maybe_order)
   in
   Ok (List.rev orders)

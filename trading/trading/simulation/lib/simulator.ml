@@ -160,6 +160,19 @@ let _get_today_bars t =
   in
   List.filter_map t.deps.symbols ~f:get_bar
 
+(** Fetch the most recent prior close for [pos] when its symbol is absent from
+    [today_set]. Returns [None] when [pos.symbol] is in [today_set] (no
+    fallback needed) or when no prior bar exists for the symbol. *)
+let _fallback_price_for_position ~adapter ~date ~today_set
+    (pos : Trading_portfolio.Types.portfolio_position) =
+  if Set.mem today_set pos.symbol then None
+  else
+    let%map.Option prev =
+      Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
+        ~symbol:pos.symbol ~date
+    in
+    (pos.symbol, prev.Types.Daily_price.close_price)
+
 (** Build a [(symbol, close_price)] alist covering every position in
     [portfolio]. Today's bar (from [today_bars]) is preferred; for any held
     symbol with no bar today, fall back to the most recent prior bar via
@@ -180,14 +193,7 @@ let _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars =
   let today_set = today_prices |> List.map ~f:fst |> String.Set.of_list in
   let fallback_prices =
     List.filter_map portfolio.Trading_portfolio.Portfolio.positions
-      ~f:(fun (pos : Trading_portfolio.Types.portfolio_position) ->
-        if Set.mem today_set pos.symbol then None
-        else
-          let%map.Option prev =
-            Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
-              ~symbol:pos.symbol ~date
-          in
-          (pos.symbol, prev.Types.Daily_price.close_price))
+      ~f:(_fallback_price_for_position ~adapter ~date ~today_set)
   in
   today_prices @ fallback_prices
 
