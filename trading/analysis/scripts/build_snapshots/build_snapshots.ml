@@ -83,7 +83,9 @@ let _should_skip ~existing ~symbol ~csv_mtime ~schema =
   | None -> false
   | Some (m : Snapshot_manifest.t) ->
       String.equal m.schema_hash schema.Snapshot_schema.schema_hash
-      && Option.value_map (Snapshot_manifest.find m ~symbol) ~default:false
+      && Option.value_map
+           (Snapshot_manifest.find m ~symbol)
+           ~default:false
            ~f:(_entry_is_current ~csv_mtime)
 
 let _file_metadata ~symbol ~path ~csv_mtime =
@@ -283,9 +285,10 @@ let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~incremental
   let started_at = Core_unix.time () in
   let t0 = Time_ns.now () in
   let entries =
-    List.foldi symbols ~init:[] ~f:
-      (_fold_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
-         ~manifest_path ~progress_every ~symbols_total ~started_at)
+    List.foldi symbols ~init:[]
+      ~f:
+        (_fold_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
+           ~manifest_path ~progress_every ~symbols_total ~started_at)
   in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
   _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;

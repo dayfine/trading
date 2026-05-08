@@ -5,10 +5,10 @@ val recompute_in_window_step_metrics :
   start_date:Date.t ->
   end_date:Date.t ->
   Trading_simulation_types.Metric_types.metric_set
-(** Re-run [SharpeRatio], [MaxDrawdown], and [CAGR] computers on the
-    in-window step list only. The simulator runs from [warmup_start] so its
-    published step-based metrics include the warmup window; this call restores
-    them to the measurement window. *)
+(** Re-run [SharpeRatio], [MaxDrawdown], and [CAGR] computers on the in-window
+    step list only. The simulator runs from [warmup_start] so its published
+    step-based metrics include the warmup window; this call restores them to the
+    measurement window. *)
 
 val recompute_calmar_ratio :
   base_metrics:Trading_simulation_types.Metric_types.metric_set ->
@@ -26,5 +26,6 @@ val align_summary_metrics :
   Trading_simulation_types.Metric_types.metric_set
 (** Three-stage overlay: replace round-trip metrics from [round_trips], replace
     step-based metrics from [steps_in_range], then recompute [CalmarRatio].
-    Restores the invariant that published metrics describe the measurement window
-    [start_date..end_date] only, not the warmup window the simulator ran from. *)
+    Restores the invariant that published metrics describe the measurement
+    window [start_date..end_date] only, not the warmup window the simulator ran
+    from. *)

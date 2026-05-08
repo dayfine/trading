@@ -6,11 +6,11 @@
     Two-side scaling is required because the simulator threads two parallel
     representations of the same position state: the broker portfolio
     ({!Trading_portfolio.Portfolio.t}) and the strategy-facing
-    {!Trading_strategy.Position.t} map. Both must be scaled in lockstep on
-    every detected split or the views diverge.
+    {!Trading_strategy.Position.t} map. Both must be scaled in lockstep on every
+    detected split or the views diverge.
 
-    No behavior change relative to the pre-extraction simulator — the
-    helpers were lifted verbatim. *)
+    No behavior change relative to the pre-extraction simulator — the helpers
+    were lifted verbatim. *)
 
 open Core
 
@@ -19,27 +19,27 @@ val detect_for_symbol :
   date:Date.t ->
   symbol:string ->
   Trading_portfolio.Split_event.t option
-(** Detect a split for [symbol] between the prior trading day's bar and
-    today's bar. Returns [Some event] when both bars exist and
-    {!Types.Split_detector.detect_split} fires; otherwise [None]. Pure
-    with respect to the adapter's cache. *)
+(** Detect a split for [symbol] between the prior trading day's bar and today's
+    bar. Returns [Some event] when both bars exist and
+    {!Types.Split_detector.detect_split} fires; otherwise [None]. Pure with
+    respect to the adapter's cache. *)
 
 val detect_for_held_positions :
   adapter:Trading_simulation_data.Market_data_adapter.t ->
   date:Date.t ->
   portfolio:Trading_portfolio.Portfolio.t ->
   Trading_portfolio.Split_event.t list
-(** For every symbol currently held in [portfolio], call
-    {!detect_for_symbol}. Symbols with no current bar (weekends/holidays) or
-    no prior bar (first appearance) yield no event. Order follows
-    [portfolio.positions] (sorted by symbol). *)
+(** For every symbol currently held in [portfolio], call {!detect_for_symbol}.
+    Symbols with no current bar (weekends/holidays) or no prior bar (first
+    appearance) yield no event. Order follows [portfolio.positions] (sorted by
+    symbol). *)
 
 val apply_events :
   Trading_portfolio.Portfolio.t ->
   Trading_portfolio.Split_event.t list ->
   Trading_portfolio.Portfolio.t
-(** Apply each detected split event to [portfolio] in order. Pure: returns
-    the updated portfolio with all events folded in. *)
+(** Apply each detected split event to [portfolio] in order. Pure: returns the
+    updated portfolio with all events folded in. *)
 
 val apply_to_position :
   float -> Trading_strategy.Position.t -> Trading_strategy.Position.t
@@ -48,14 +48,14 @@ val apply_to_position :
     multiplies by [factor] and [Holding.entry_price] divides by [factor],
     preserving total cost basis. [Exiting] mirrors the same scaling on its
     share-count fields ([quantity], [target_quantity], [filled_quantity]) and
-    per-share-price fields ([entry_price], [exit_price]). [Entering]
-    (in-flight entry order) and [Closed] (historical) pass through unchanged:
-    an entry order spanning a split is exotic and out of scope for the
-    broker-model fix; closed positions have no live state to scale.
+    per-share-price fields ([entry_price], [exit_price]). [Entering] (in-flight
+    entry order) and [Closed] (historical) pass through unchanged: an entry
+    order spanning a split is exotic and out of scope for the broker-model fix;
+    closed positions have no live state to scale.
 
-    Pure: returns a new [Position.t] with [state] replaced. The position's
-    [id], [symbol], [side], [entry_reasoning], [exit_reason], [last_updated],
-    and [portfolio_lot_ids] are unchanged. *)
+    Pure: returns a new [Position.t] with [state] replaced. The position's [id],
+    [symbol], [side], [entry_reasoning], [exit_reason], [last_updated], and
+    [portfolio_lot_ids] are unchanged. *)
 
 val apply_to_positions :
   Trading_strategy.Position.t String.Map.t ->

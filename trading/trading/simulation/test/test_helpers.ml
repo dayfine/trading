@@ -33,11 +33,11 @@ let teardown_test_data test_data_dir =
 
     Usage:
     {[
-      with_test_data "my_test"
-        [ ("AAPL", prices) ]
-        ~f:(fun data_dir ->
-          (* test code here *)
-          ())
+    with_test_data "my_test"
+      [ ("AAPL", prices) ]
+      ~f:(fun data_dir ->
+        (* test code here *)
+        ())
     ]} *)
 let with_test_data test_name prices_by_symbol ~f =
   let data_dir = setup_test_data test_name prices_by_symbol in
