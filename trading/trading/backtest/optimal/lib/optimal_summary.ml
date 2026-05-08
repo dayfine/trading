@@ -18,30 +18,42 @@ let _step_dd (state : _dd_state) (equity : float) : _dd_state =
   in
   { peak; max_drawdown = Float.max state.max_drawdown drawdown }
 
+(** Group round-trips into per-Friday buckets, sorted chronologically.
+    The equity curve advances once per Friday, not once per round-trip. *)
+let _group_by_exit_friday
+    (round_trips : Optimal_types.optimal_round_trip list) :
+    Optimal_types.optimal_round_trip list list =
+  let compare_exit (a : Optimal_types.optimal_round_trip)
+      (b : Optimal_types.optimal_round_trip) =
+    Date.compare a.exit_week b.exit_week
+  in
+  let same_friday (a : Optimal_types.optimal_round_trip)
+      (b : Optimal_types.optimal_round_trip) =
+    Date.equal a.exit_week b.exit_week
+  in
+  round_trips
+  |> List.sort ~compare:compare_exit
+  |> List.group ~break:(fun a b -> not (same_friday a b))
+
+(** Advance one Friday group through the equity/drawdown state machine. *)
+let _accumulate_equity (equity, dd_state)
+    (group : Optimal_types.optimal_round_trip list) =
+  let group_pnl =
+    List.sum (module Float) group ~f:(fun rt -> rt.pnl_dollars)
+  in
+  let new_equity = equity +. group_pnl in
+  (new_equity, _step_dd dd_state new_equity)
+
 (** Compute MaxDD over the equity curve formed by accumulating round-trip P&L in
     [exit_week] order. Round-trips with the same exit_week are grouped — the
     equity curve advances once per Friday, not once per round-trip. *)
 let _max_drawdown_pct ~(starting_cash : float)
     (round_trips : Optimal_types.optimal_round_trip list) : float =
-  let by_friday =
-    round_trips
-    |> List.sort ~compare:(fun (a : Optimal_types.optimal_round_trip) b ->
-        Date.compare a.exit_week b.exit_week)
-    |> List.group
-         ~break:(fun
-             (a : Optimal_types.optimal_round_trip)
-             (b : Optimal_types.optimal_round_trip)
-           -> not (Date.equal a.exit_week b.exit_week))
-  in
+  let by_friday = _group_by_exit_friday round_trips in
   let _, final_state =
     List.fold by_friday
       ~init:(starting_cash, _initial_dd_state ~starting_cash)
-      ~f:(fun (equity, dd_state) group ->
-        let group_pnl =
-          List.sum (module Float) group ~f:(fun rt -> rt.pnl_dollars)
-        in
-        let new_equity = equity +. group_pnl in
-        (new_equity, _step_dd dd_state new_equity))
+      ~f:_accumulate_equity
   in
   final_state.max_drawdown
 

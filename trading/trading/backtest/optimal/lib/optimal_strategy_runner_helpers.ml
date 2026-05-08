@@ -108,6 +108,13 @@ let _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol ~friday
       in
       Some { Scorer.date = friday; bar; stage_result }
 
+(** Collect the chronological outlook list for one [symbol] across all
+    [fridays]. Factored out of [build_forward_table] to reduce nesting depth. *)
+let _outlooks_for_symbol ~snapshot_callbacks ~fridays ~stage_config ~bar_lookback
+    ~symbol =
+  List.filter_map fridays ~f:(fun friday ->
+      _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol ~friday)
+
 (** Build the per-symbol forward-outlook table (PR-1). Iterates [fridays] once
     per symbol and memoizes the full chronological outlook list. Sized to
     [List.length universe] for predictable hashtable growth. *)
@@ -116,9 +123,8 @@ let build_forward_table ~snapshot_callbacks ~fridays ~stage_config ~bar_lookback
   let table = Hashtbl.create ~size:(List.length universe) (module String) in
   List.iter universe ~f:(fun symbol ->
       let outlooks =
-        List.filter_map fridays ~f:(fun friday ->
-            _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol
-              ~friday)
+        _outlooks_for_symbol ~snapshot_callbacks ~fridays ~stage_config
+          ~bar_lookback ~symbol
       in
       Hashtbl.set table ~key:symbol ~data:outlooks);
   table
@@ -126,6 +132,26 @@ let build_forward_table ~snapshot_callbacks ~fridays ~stage_config ~bar_lookback
 (* ---------------------------------------------------------------- *)
 (* Scanning all candidates                                            *)
 (* ---------------------------------------------------------------- *)
+
+(** Run the scanner for a single [friday], collecting per-symbol analyses and
+    looking up the macro trend. Factored out of [scan_all_fridays] to reduce
+    nesting depth. *)
+let _scan_one_friday ~snapshot_callbacks ~friday ~universe ~sector_map
+    ~stock_config ~scanner_config ~bar_lookback ~macro_trend_table :
+    OT.candidate_entry list =
+  let analyses =
+    List.filter_map universe ~f:(fun sym ->
+        analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
+          ~bar_lookback sym)
+  in
+  let macro_trend =
+    Hashtbl.find macro_trend_table friday
+    |> Option.value ~default:Weinstein_types.Neutral
+  in
+  let week : Scanner.week_input =
+    { date = friday; macro_trend; analyses; sector_map }
+  in
+  Scanner.scan_week ~config:scanner_config week
 
 (** Run the scanner over all Fridays in the run and emit candidates. Each week's
     [macro_trend] is sourced from [macro_trend_table] (built from the run's
@@ -135,16 +161,5 @@ let scan_all_fridays ~snapshot_callbacks ~fridays ~universe ~sector_map
     ~stock_config ~scanner_config ~bar_lookback ~macro_trend_table :
     OT.candidate_entry list =
   List.concat_map fridays ~f:(fun friday ->
-      let analyses =
-        List.filter_map universe ~f:(fun sym ->
-            analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
-              ~bar_lookback sym)
-      in
-      let macro_trend =
-        Hashtbl.find macro_trend_table friday
-        |> Option.value ~default:Weinstein_types.Neutral
-      in
-      let week : Scanner.week_input =
-        { date = friday; macro_trend; analyses; sector_map }
-      in
-      Scanner.scan_week ~config:scanner_config week)
+      _scan_one_friday ~snapshot_callbacks ~friday ~universe ~sector_map
+        ~stock_config ~scanner_config ~bar_lookback ~macro_trend_table)
