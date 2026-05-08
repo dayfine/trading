@@ -5,6 +5,7 @@ open Core
 module BA1 = Bigarray.Array1
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Panel_views = Data_panel_snapshot.Panel_views
+module H = Snapshot_bar_views_helpers
 
 (* Phase F.3.e-1 (revised): the canonical record definitions live in
    [Data_panel_snapshot.Panel_views] — a neutral hub library with no
@@ -58,61 +59,17 @@ let _read_history_or_empty (cb : Snapshot_callbacks.t) ~symbol ~from ~until
   | Ok rows -> rows
   | Error _ -> []
 
-let _table_of (rows : (Date.t * float) list) =
-  let tbl = Hashtbl.create (module Date) in
-  List.iter rows ~f:(fun (d, v) ->
-      Hashtbl.set tbl ~key:d ~data:v |> (ignore : unit -> unit));
-  tbl
-
-let _round_volume v =
-  if Float.is_nan v then 0 else Int.of_float (Float.round_nearest v)
-
-(* Build a [Daily_price.t] from fully-matched OHLCAV values and a date. *)
-let _make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v =
-  let open_price =
-    Hashtbl.find open_t date |> Option.value ~default:Float.nan
-  in
-  {
-    Types.Daily_price.date;
-    open_price;
-    high_price = high_v;
-    low_price = low_v;
-    close_price = close_v;
-    volume = _round_volume vol_v;
-    adjusted_close = adj_v;
-  }
-
-(* Match OHLCV side-tables for [date]; returns [None] if any required field is
-   missing. [open_t] is optional so missing open degrades to NaN. *)
-let _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v =
-  match
-    ( Hashtbl.find adj_t date,
-      Hashtbl.find high_t date,
-      Hashtbl.find low_t date,
-      Hashtbl.find vol_t date )
-  with
-  | Some adj_v, Some high_v, Some low_v, Some vol_v ->
-      Some
-        (_make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v)
-  | _ -> None
-
-(* Attempt to build one [Daily_price.t] from a (date, close) pair and the
-   OHLCV side-tables. Returns [None] for NaN-close or any missing field. *)
-let _bar_for ~open_t ~adj_t ~high_t ~low_t ~vol_t (date, close_v) =
-  if Float.is_nan close_v then None
-  else _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v
-
 (* Align OHLCV field-histories by date → [Daily_price.t list]. Builds one
    hashtable per non-Close field, walks [Close] once (O(n)), skips NaN-close
    bars. [Open] included since Phase A.1; missing rows degrade to NaN. *)
 let _assemble_daily_bars ~open_ ~adj ~close ~high ~low ~volume :
     Types.Daily_price.t list =
-  let open_t = _table_of open_ in
-  let adj_t = _table_of adj in
-  let high_t = _table_of high in
-  let low_t = _table_of low in
-  let vol_t = _table_of volume in
-  List.filter_map close ~f:(_bar_for ~open_t ~adj_t ~high_t ~low_t ~vol_t)
+  let open_t = H.table_of open_ in
+  let adj_t = H.table_of adj in
+  let high_t = H.table_of high in
+  let low_t = H.table_of low in
+  let vol_t = H.table_of volume in
+  List.filter_map close ~f:(H.bar_for ~open_t ~adj_t ~high_t ~low_t ~vol_t)
 
 (* Convert a weekly [Daily_price.t] list (output of daily_to_weekly) into the
    [weekly_view] float-array shape. *)
@@ -270,7 +227,7 @@ let _read_close_high_low cb ~symbol ~from_date ~until_date =
   else
     let high = read Snapshot_schema.High in
     let low = read Snapshot_schema.Low in
-    Some (_table_of close, _table_of high, _table_of low)
+    Some (H.table_of close, H.table_of high, H.table_of low)
 
 (* Build a daily view from a valid [as_of_idx]; reads and walks the window. *)
 let _daily_view_from_idx cb ~symbol ~calendar ~as_of_idx ~lookback =
@@ -317,7 +274,7 @@ let _low_buf_from_idx (cb : Snapshot_callbacks.t) ~symbol ~calendar ~from_idx
   with
   | Error _ -> None
   | Ok rows ->
-      let low_t = _table_of rows in
+      let low_t = H.table_of rows in
       let buf = BA1.create Bigarray.Float64 Bigarray.C_layout len in
       _fill_low_buf ~calendar ~from_idx ~len ~low_t buf;
       Some buf
