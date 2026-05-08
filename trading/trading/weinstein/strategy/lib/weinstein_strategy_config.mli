@@ -1,15 +1,12 @@
-(** Indices consumed by the macro analyser. *)
 type index_config = {
-  primary : string;
-      (** The US benchmark symbol (e.g. ["GSPCX"]). *)
+  primary : string;  (** The US benchmark symbol (e.g. ["GSPCX"]). *)
   global : (string * string) list;
       (** [(symbol, label)] pairs for non-US indices used by the macro
           global-consensus indicator. Default: empty. *)
 }
 [@@deriving sexp]
+(** Indices consumed by the macro analyser. *)
 
-(** Complete Weinstein strategy configuration. All parameters configurable for
-    backtesting. *)
 type config = {
   universe : string list;
   indices : index_config;
@@ -39,6 +36,8 @@ type config = {
   laggard_reentry_cooldown_weeks : int; [@sexp.default 0]
 }
 [@@deriving sexp]
+(** Complete Weinstein strategy configuration. All parameters configurable for
+    backtesting. *)
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. *)

@@ -18,11 +18,10 @@ let _step_dd (state : _dd_state) (equity : float) : _dd_state =
   in
   { peak; max_drawdown = Float.max state.max_drawdown drawdown }
 
-(** Group round-trips into per-Friday buckets, sorted chronologically.
-    The equity curve advances once per Friday, not once per round-trip. *)
-let _group_by_exit_friday
-    (round_trips : Optimal_types.optimal_round_trip list) :
-    Optimal_types.optimal_round_trip list list =
+(** Group round-trips into per-Friday buckets, sorted chronologically. The
+    equity curve advances once per Friday, not once per round-trip. *)
+let _group_by_exit_friday (round_trips : Optimal_types.optimal_round_trip list)
+    : Optimal_types.optimal_round_trip list list =
   let compare_exit (a : Optimal_types.optimal_round_trip)
       (b : Optimal_types.optimal_round_trip) =
     Date.compare a.exit_week b.exit_week
@@ -38,9 +37,7 @@ let _group_by_exit_friday
 (** Advance one Friday group through the equity/drawdown state machine. *)
 let _accumulate_equity (equity, dd_state)
     (group : Optimal_types.optimal_round_trip list) =
-  let group_pnl =
-    List.sum (module Float) group ~f:(fun rt -> rt.pnl_dollars)
-  in
+  let group_pnl = List.sum (module Float) group ~f:(fun rt -> rt.pnl_dollars) in
   let new_equity = equity +. group_pnl in
   (new_equity, _step_dd dd_state new_equity)
 

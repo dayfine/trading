@@ -63,14 +63,14 @@ type t = {
 [@@deriving sexp]
 (** A Bayesian-optimisation spec on disk. Example sexp:
     {[
-      (bounds
-         (("screening.weights.rs" (0.1 0.5))
-            ("screening.weights.volume" (0.1 0.5))))
-        (acquisition Expected_improvement)
-        (initial_random 5) (total_budget 30) (seed 17)
-        (n_acquisition_candidates ())
-        (objective Sharpe)
-        (scenarios "trading/test_data/backtest_scenarios/smoke/bull-2019.sexp")
+    (bounds
+       (("screening.weights.rs" (0.1 0.5))
+          ("screening.weights.volume" (0.1 0.5))))
+      (acquisition Expected_improvement)
+      (initial_random 5) (total_budget 30) (seed 17)
+      (n_acquisition_candidates ())
+      (objective Sharpe)
+      (scenarios "trading/test_data/backtest_scenarios/smoke/bull-2019.sexp")
     ]} *)
 
 val load : string -> t

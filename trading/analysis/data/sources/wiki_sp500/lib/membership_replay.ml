@@ -46,7 +46,8 @@ let _missing_headers_error headers =
   Status.error_invalid_argument
     (Printf.sprintf
        "current-constituents CSV missing required header(s); need \
-        Symbol/Security/Sector, got: %s" got)
+        Symbol/Security/Sector, got: %s"
+       got)
 
 let _resolve_column_indices headers =
   let symbol_idx = _find_column_index headers _symbol_header in
@@ -78,8 +79,7 @@ let _parse_data_rows ~header data_rows =
     _resolve_column_indices headers
   in
   List.mapi data_rows ~f:(fun i row ->
-      _parse_data_row ~symbol_idx ~security_idx ~sector_idx ~row_num:(i + 2)
-        row)
+      _parse_data_row ~symbol_idx ~security_idx ~sector_idx ~row_num:(i + 2) row)
   |> Result.all
 
 let parse_current_csv csv_text =
@@ -198,8 +198,8 @@ let _added_timeline_event ~current_sectors ~date (a : Changes_parser.ticker_id)
 let _removed_timeline_event ~date (r : Changes_parser.ticker_id) =
   { date; action = `Removed; symbol = r.symbol; sector = _unknown_sector }
 
-let _change_event_to_timeline ~current_sectors
-    (e : Changes_parser.change_event) =
+let _change_event_to_timeline ~current_sectors (e : Changes_parser.change_event)
+    =
   let date = e.effective_date in
   let added_evt =
     Option.map e.added ~f:(_added_timeline_event ~current_sectors ~date)

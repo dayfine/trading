@@ -254,8 +254,7 @@ let _make_get_split_factor_from_bars (bars : Daily_price.t array) :
   let n = Array.length bars in
   fun ~week_offset ->
     let idx = n - 1 - week_offset in
-    if idx < 0 || idx >= n then None
-    else _split_factor_of_bar bars.(idx)
+    if idx < 0 || idx >= n then None else _split_factor_of_bar bars.(idx)
 
 let callbacks_from_bars ~(config : config) ~(bars : Daily_price.t list)
     ~(benchmark_bars : Daily_price.t list) : callbacks =

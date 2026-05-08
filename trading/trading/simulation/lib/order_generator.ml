@@ -68,9 +68,9 @@ let _transition_to_order ~id ~positions
 
 (** Advance the (seq, accumulator) pair with [maybe_order].
 
-    [seq] is always incremented even when no order is produced — this keeps
-    IDs stable regardless of how transition kinds are reordered in the
-    caller. Sequential gaps in IDs are harmless. *)
+    [seq] is always incremented even when no order is produced — this keeps IDs
+    stable regardless of how transition kinds are reordered in the caller.
+    Sequential gaps in IDs are harmless. *)
 let _accumulate_order (seq, acc) maybe_order =
   match maybe_order with
   | Some order -> Ok (seq + 1, order :: acc)

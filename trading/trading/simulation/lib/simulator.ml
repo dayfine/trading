@@ -161,8 +161,8 @@ let _get_today_bars t =
   List.filter_map t.deps.symbols ~f:get_bar
 
 (** Fetch the most recent prior close for [pos] when its symbol is absent from
-    [today_set]. Returns [None] when [pos.symbol] is in [today_set] (no
-    fallback needed) or when no prior bar exists for the symbol. *)
+    [today_set]. Returns [None] when [pos.symbol] is in [today_set] (no fallback
+    needed) or when no prior bar exists for the symbol. *)
 let _fallback_price_for_position ~adapter ~date ~today_set
     (pos : Trading_portfolio.Types.portfolio_position) =
   if Set.mem today_set pos.symbol then None
