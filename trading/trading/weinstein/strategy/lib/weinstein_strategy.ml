@@ -93,11 +93,10 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
 let _run_special_exits ~config ~positions ~(portfolio : Portfolio_view.t)
     ~get_price ~peak_tracker ~audit_recorder ~prior_stages ~stage3_streaks
     ~laggard_streaks ~bar_reader ~index_view ~exit_transitions ~current_date =
-  let cash = portfolio.cash in
   let raw_force_exit_ts =
     Force_liquidation_runner.update
       ~config:config.portfolio_config.force_liquidation ~positions ~get_price
-      ~cash ~current_date ~peak_tracker ~audit_recorder
+      ~cash:portfolio.cash ~current_date ~peak_tracker ~audit_recorder
   in
   let stop_exited_ids = _trigger_exit_ids_of exit_transitions in
   let force_exit_ts =
@@ -240,14 +239,10 @@ let _init_strategy_state ~initial_stop_states ~ad_bars =
   let last_stop_out_dates : Date.t Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
-  let prior_macro : Weinstein_types.market_trend ref =
-    ref Weinstein_types.Neutral
-  in
+  let prior_macro = ref Weinstein_types.Neutral in
   let peak_tracker = Portfolio_risk.Force_liquidation.Peak_tracker.create () in
   let prior_macro_result : Macro.result option ref = ref None in
-  let prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
+  let prior_stages = Hashtbl.create (module String) in
   let sector_prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
