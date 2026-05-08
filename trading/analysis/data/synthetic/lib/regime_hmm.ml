@@ -110,6 +110,12 @@ let _row_for ~transitions r =
         (Printf.sprintf "regime_hmm: missing transition row for %s"
            (show_regime r))
 
+(* Advance the HMM path by one step: look up the current regime's transition
+   row and draw the next regime. *)
+let _sample_step ~transitions ~rng ~arr ~k =
+  let row = _row_for ~transitions arr.(k - 1) in
+  arr.(k) <- _sample_next_regime ~rng ~row
+
 let sample_path t ~n_steps ~seed =
   if n_steps <= 0 then []
   else
@@ -119,7 +125,6 @@ let sample_path t ~n_steps ~seed =
         let rng = Stdlib.Random.State.make [| seed |] in
         let arr = Array.create ~len:n_steps t.initial_regime in
         for k = 1 to n_steps - 1 do
-          let row = _row_for ~transitions:t.transitions arr.(k - 1) in
-          arr.(k) <- _sample_next_regime ~rng ~row
+          _sample_step ~transitions:t.transitions ~rng ~arr ~k
         done;
         Array.to_list arr

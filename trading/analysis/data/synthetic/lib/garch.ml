@@ -84,24 +84,29 @@ let _check_initial_variance v =
       (Printf.sprintf "garch: initial_variance must be finite and >= 0 (got %f)"
          v)
 
+let _validate_sample_inputs params initial_variance =
+  Status.combine_status_list
+    [ validate params; _check_initial_variance initial_variance ]
+
+(* Advance the GARCH state by one step: draw a normal shock, emit the return
+   [eps], and update [var] in place. *)
+let _garch_step ~params ~rng ~var ~out ~k =
+  let z = _normal_sample rng in
+  let sigma = Float.sqrt !var in
+  let eps = sigma *. z in
+  out.(k) <- eps;
+  var := _next_variance ~params ~prev_eps:eps ~prev_var:!var
+
 let sample_returns params ~n_steps ~seed ~initial_variance =
   if n_steps <= 0 then []
   else
-    let validation =
-      Status.combine_status_list
-        [ validate params; _check_initial_variance initial_variance ]
-    in
-    match validation with
+    match _validate_sample_inputs params initial_variance with
     | Error e -> invalid_arg ("garch: " ^ Status.show e)
     | Ok () ->
         let rng = Stdlib.Random.State.make [| seed |] in
         let out = Array.create ~len:n_steps 0.0 in
         let var = ref (_clamp_variance initial_variance) in
         for k = 0 to n_steps - 1 do
-          let z = _normal_sample rng in
-          let sigma = Float.sqrt !var in
-          let eps = sigma *. z in
-          out.(k) <- eps;
-          var := _next_variance ~params ~prev_eps:eps ~prev_var:!var
+          _garch_step ~params ~rng ~var ~out ~k
         done;
         Array.to_list out

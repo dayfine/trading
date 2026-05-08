@@ -18,6 +18,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] nesting: pipeline.ml+daily_panels.ml+optimal_strategy_runner_helpers.ml+optimal_portfolio_filler.ml — extracted _build_rows, update_bench, _insert_rows, _neutral_ctx, _compare_by_r_multiple, _compare_by_score; all 5 dispatch violations cleared (branch cleanup/nesting-pipeline-batch-2, 2026-05-08)
 - [~] nesting: trading/trading/backtest/lib/runner.ml + optimal_strategy_runner_helpers.ml + optimal_summary.ml + reconciler_writer.ml — extract private helpers to reduce nesting in 5 flagged fns (source: dispatch 2026-05-08)
 - [~] nesting: trading/trading/weinstein/snapshot/lib/pick_diff.ml + trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_manifest.ml — extract private helpers to reduce avg/max nesting (source: dispatch 2026-05-08)
+- [~] nesting: analysis/data/synthetic/garch.ml + regime_hmm.ml + data/types/split_detector.ml + wiki_sp500/changes_parser.ml + stock_analysis.ml — 5 nesting violations (avg/max/else); extract private helpers (source: dispatch 2026-05-08)
 - [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
 - [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
 
@@ -26,6 +27,7 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] nesting: trading/trading/backtest/optimal/lib/optimal_run_artefacts.ml — extracted _rejection_pair_of_alternative + _pairs_of_audit_record; nesting linter clean. PR #949 (2026-05-08)
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 7 helpers (calendar, analysis, sector, forward, scan) to Optimal_strategy_runner_helpers; 413→282 LOC (branch cleanup/optimal-runner-split-2, 2026-05-08)
 - [x] nesting: trading/trading/data_panel/snapshot/lib/snapshot_format.ml — extracted _check_all_hashes_equal, _build_manifest, _flush_to_channel, _try_write_file, _check_payload_length, _check_payload_md5, _check_row_count, _check_schema_hash; all violations cleared (branch cleanup/nesting-snapshot-format, 2026-05-08)
+- [~] nesting: analysis/data/synthetic/garch.ml + regime_hmm.ml + data/types/split_detector.ml + wiki_sp500/changes_parser.ml + stock_analysis.ml — 5 nesting violations (avg/max/else); extract private helpers (source: dispatch 2026-05-08)
 - [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
 - [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
 - [x] nesting: trading/trading/simulation/lib/{antifragility,return_basics,distributional}_computer.ml — extracted _add_ols_pair, _zero_sums, _add_sq_dev, _add_moments, _bucket_loop helpers; all 5 dispatch violations cleared. PR #967 (2026-05-08)

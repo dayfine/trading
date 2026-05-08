@@ -106,20 +106,24 @@ let _months =
 let _month_of_string month =
   List.Assoc.find _months ~equal:String.equal (String.lowercase month)
 
+(* Given a successful regex match, extract y/m/d and construct a [Date.t].
+   Returns [Error] when the month name is not recognised. *)
+let _date_of_groups ~text groups =
+  let month_str = Re.Group.get groups 1 in
+  let day = Int.of_string (Re.Group.get groups 2) in
+  let year = Int.of_string (Re.Group.get groups 3) in
+  match _month_of_string month_str with
+  | None ->
+      Status.error_invalid_argument
+        (Printf.sprintf "Unknown month %S in date %S" month_str text)
+  | Some m -> Ok (Date.create_exn ~y:year ~m ~d:day)
+
 let _parse_date text =
   match Re.exec_opt _date_re text with
   | None ->
       Status.error_invalid_argument
         (Printf.sprintf "Cannot parse effective date: %S" text)
-  | Some groups -> (
-      let month_str = Re.Group.get groups 1 in
-      let day = Int.of_string (Re.Group.get groups 2) in
-      let year = Int.of_string (Re.Group.get groups 3) in
-      match _month_of_string month_str with
-      | None ->
-          Status.error_invalid_argument
-            (Printf.sprintf "Unknown month %S in date %S" month_str text)
-      | Some m -> Ok (Date.create_exn ~y:year ~m ~d:day))
+  | Some groups -> _date_of_groups ~text groups
 
 (* Empty ticker cell → [None] for the whole pair. The security cell may
    carry an [<a>] link or plain text; [_normalize_text] handles both. *)

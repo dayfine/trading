@@ -240,6 +240,12 @@ let _make_get_volume_from_bars (bars : Daily_price.t array) :
     if idx < 0 || idx >= n then None
     else Some (Float.of_int bars.(idx).Daily_price.volume)
 
+(* Return [adjusted_close / close_price] for [bar], or [None] when [close_price]
+   is non-positive (avoids div-by-zero / sign flips on bad bars). *)
+let _split_factor_of_bar (bar : Daily_price.t) =
+  if Float.( <= ) bar.Daily_price.close_price 0.0 then None
+  else Some (bar.Daily_price.adjusted_close /. bar.Daily_price.close_price)
+
 (** Build a [get_split_factor] closure: per-bar [adjusted_close / close_price].
     Returns [None] for offsets outside the array AND for bars whose raw close is
     non-positive (avoiding a div-by-zero / sign flip). *)
@@ -249,10 +255,7 @@ let _make_get_split_factor_from_bars (bars : Daily_price.t array) :
   fun ~week_offset ->
     let idx = n - 1 - week_offset in
     if idx < 0 || idx >= n then None
-    else
-      let bar = bars.(idx) in
-      if Float.( <= ) bar.Daily_price.close_price 0.0 then None
-      else Some (bar.Daily_price.adjusted_close /. bar.Daily_price.close_price)
+    else _split_factor_of_bar bars.(idx)
 
 let callbacks_from_bars ~(config : config) ~(bars : Daily_price.t list)
     ~(benchmark_bars : Daily_price.t list) : callbacks =
