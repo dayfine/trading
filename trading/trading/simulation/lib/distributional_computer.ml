@@ -38,6 +38,11 @@ let _mean = function
       let sum = List.fold xs ~init:0.0 ~f:( +. ) in
       sum /. Float.of_int (List.length xs)
 
+(** Accumulate the squared deviation from [m] into the running sum. *)
+let _add_sq_dev m acc r =
+  let d = r -. m in
+  acc +. (d *. d)
+
 (** Population variance (divides by N, not N-1). Higher moments use the
     population convention to keep the formulas numerically self-consistent with
     the standardized [(r - μ) / σ] terms. *)
@@ -46,12 +51,15 @@ let _variance returns =
   | [] | [ _ ] -> 0.0
   | _ ->
       let m = _mean returns in
-      let sum_sq =
-        List.fold returns ~init:0.0 ~f:(fun acc r ->
-            let d = r -. m in
-            acc +. (d *. d))
-      in
+      let sum_sq = List.fold returns ~init:0.0 ~f:(_add_sq_dev m) in
       sum_sq /. Float.of_int (List.length returns)
+
+(** Accumulate third and fourth central moments from [m] into the running pair.
+*)
+let _add_moments m (acc3, acc4) r =
+  let d = r -. m in
+  let d2 = d *. d in
+  (acc3 +. (d2 *. d), acc4 +. (d2 *. d2))
 
 (** Third / fourth central moments (population). *)
 let _moments_3_4 returns =
@@ -60,12 +68,7 @@ let _moments_3_4 returns =
   | _ ->
       let m = _mean returns in
       let n_f = Float.of_int (List.length returns) in
-      let m3, m4 =
-        List.fold returns ~init:(0.0, 0.0) ~f:(fun (acc3, acc4) r ->
-            let d = r -. m in
-            let d2 = d *. d in
-            (acc3 +. (d2 *. d), acc4 +. (d2 *. d2)))
-      in
+      let m3, m4 = List.fold returns ~init:(0.0, 0.0) ~f:(_add_moments m) in
       (m3 /. n_f, m4 /. n_f)
 
 let _skewness returns =

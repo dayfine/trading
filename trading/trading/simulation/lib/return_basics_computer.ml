@@ -40,17 +40,18 @@ let _mean = function
       let sum = List.fold xs ~init:0.0 ~f:( +. ) in
       sum /. Float.of_int (List.length xs)
 
+(** Accumulate the squared deviation from [mu] into the running sum. *)
+let _add_sq_dev mu acc x =
+  let d = x -. mu in
+  acc +. (d *. d)
+
 let _stdev xs =
   match xs with
   | [] | [ _ ] -> 0.0
   | _ ->
       let mu = _mean xs in
       let n = List.length xs in
-      let sum_sq =
-        List.fold xs ~init:0.0 ~f:(fun acc x ->
-            let d = x -. mu in
-            acc +. (d *. d))
-      in
+      let sum_sq = List.fold xs ~init:0.0 ~f:(_add_sq_dev mu) in
       Float.sqrt (sum_sq /. Float.of_int n)
 
 let _annualize_pct stdev_pct = stdev_pct *. Float.sqrt _trading_days_per_year
@@ -81,25 +82,28 @@ let _quarter_key (d : Date.t) =
 
 let _year_key (d : Date.t) = Date.year d
 
+(** Advance the bucket-accumulation state by one sample. Emits the previous
+    bucket's last value when the key changes. *)
+let rec _bucket_loop ~key_of acc current = function
+  | [] -> (
+      match current with
+      | None -> List.rev acc
+      | Some (_, v) -> List.rev (v :: acc))
+  | s :: rest ->
+      let k = key_of s.date in
+      let acc', current' =
+        match current with
+        | None -> (acc, Some (k, s.value))
+        | Some (cur_k, _) when Poly.equal cur_k k -> (acc, Some (cur_k, s.value))
+        | Some (_, prev_v) -> (prev_v :: acc, Some (k, s.value))
+      in
+      _bucket_loop ~key_of acc' current' rest
+
 (** Bucket [samples] (chronological) by [key_of], emitting one entry per bucket
     in order. The entry's value is the last sample within the bucket. Bucket
     order is preserved by left-to-right scanning. *)
 let _bucket_last_values (samples : sample list) ~key_of =
-  let rec loop acc current rest =
-    match rest with
-    | [] -> (
-        match current with
-        | None -> List.rev acc
-        | Some (_, v) -> List.rev (v :: acc))
-    | s :: rest' -> (
-        let k = key_of s.date in
-        match current with
-        | None -> loop acc (Some (k, s.value)) rest'
-        | Some (cur_k, _) when Poly.equal cur_k k ->
-            loop acc (Some (cur_k, s.value)) rest'
-        | Some (_, prev_v) -> loop (prev_v :: acc) (Some (k, s.value)) rest')
-  in
-  loop [] None samples
+  _bucket_loop ~key_of [] None samples
 
 let _bucket_returns_pct values ~initial =
   let rec loop prev rest acc =
