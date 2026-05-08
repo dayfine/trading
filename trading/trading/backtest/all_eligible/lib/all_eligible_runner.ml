@@ -222,37 +222,43 @@ let _analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
         (Stock_analysis.analyze ~config:stock_config ~ticker:symbol ~bars:weekly
            ~benchmark_bars:benchmark ~prior_stage:None ~as_of_date:friday)
 
+let _make_sector_context (sector_name : string) : Screener.sector_context =
+  {
+    sector_name;
+    rating = Screener.Neutral;
+    stage = Stage2 { weeks_advancing = 4; late = false };
+  }
+
 let _build_sector_context_map (sectors : (string, string) Hashtbl.t) :
     (string, Screener.sector_context) Hashtbl.t =
   let out = Hashtbl.create (module String) in
   Hashtbl.iteri sectors ~f:(fun ~key ~data ->
-      let ctx : Screener.sector_context =
-        {
-          sector_name = data;
-          rating = Screener.Neutral;
-          stage = Stage2 { weeks_advancing = 4; late = false };
-        }
-      in
-      Hashtbl.set out ~key ~data:ctx);
+      Hashtbl.set out ~key ~data:(_make_sector_context data));
   out
+
+let _scan_one_friday ~snapshot_callbacks ~universe ~sector_map ~stock_config
+    ~scanner_config ~bar_lookback (friday : Date.t) : OT.candidate_entry list =
+  let analyses =
+    List.filter_map universe ~f:(fun sym ->
+        _analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
+          ~bar_lookback sym)
+  in
+  let week : Scanner.week_input =
+    {
+      date = friday;
+      macro_trend = Weinstein_types.Neutral;
+      analyses;
+      sector_map;
+    }
+  in
+  Scanner.scan_week ~config:scanner_config week
 
 let _scan_all_fridays ~snapshot_callbacks ~fridays ~universe ~sector_map
     ~stock_config ~scanner_config ~bar_lookback : OT.candidate_entry list =
-  List.concat_map fridays ~f:(fun friday ->
-      let analyses =
-        List.filter_map universe ~f:(fun sym ->
-            _analyze_symbol_on_friday ~snapshot_callbacks ~friday ~stock_config
-              ~bar_lookback sym)
-      in
-      let week : Scanner.week_input =
-        {
-          date = friday;
-          macro_trend = Weinstein_types.Neutral;
-          analyses;
-          sector_map;
-        }
-      in
-      Scanner.scan_week ~config:scanner_config week)
+  List.concat_map fridays
+    ~f:
+      (_scan_one_friday ~snapshot_callbacks ~universe ~sector_map ~stock_config
+         ~scanner_config ~bar_lookback)
 
 (* ---------------------------------------------------------------- *)
 (* Forward-walk outlooks for the scorer                                *)
@@ -272,14 +278,19 @@ let _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol ~friday
       in
       Some { Scorer.date = friday; bar; stage_result }
 
+let _outlooks_for_symbol ~snapshot_callbacks ~fridays ~stage_config
+    ~bar_lookback (symbol : string) : Scorer.weekly_outlook list =
+  List.filter_map fridays ~f:(fun friday ->
+      _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol
+        ~friday)
+
 let _build_forward_table ~snapshot_callbacks ~fridays ~stage_config
     ~bar_lookback ~universe : (string, Scorer.weekly_outlook list) Hashtbl.t =
   let table = Hashtbl.create ~size:(List.length universe) (module String) in
   List.iter universe ~f:(fun symbol ->
       let outlooks =
-        List.filter_map fridays ~f:(fun friday ->
-            _outlook_at ~snapshot_callbacks ~stage_config ~bar_lookback ~symbol
-              ~friday)
+        _outlooks_for_symbol ~snapshot_callbacks ~fridays ~stage_config
+          ~bar_lookback symbol
       in
       Hashtbl.set table ~key:symbol ~data:outlooks);
   table
