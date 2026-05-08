@@ -6,52 +6,21 @@ module Stops_split_runner = Stops_split_runner
 module Force_liquidation_runner = Force_liquidation_runner
 module Stage3_force_exit_runner = Stage3_force_exit_runner
 module Laggard_rotation_runner = Laggard_rotation_runner
-
 module Stage3_force_exit = Stage3_force_exit
-
 module Laggard_rotation = Laggard_rotation
-
 module Ad_bars = Ad_bars
-
 module Macro_inputs = Macro_inputs
-
 module Panel_callbacks = Panel_callbacks
-
 module Weekly_ma_cache = Weekly_ma_cache
-
 module Audit_recorder = Audit_recorder
-
 module Entry_audit_capture = Entry_audit_capture
-
 module Exit_audit_capture = Exit_audit_capture
-
 include Weinstein_strategy_config
+module S = Weinstein_strategy_screening
 
-let held_symbols = Weinstein_strategy_screening.held_symbols
-let entries_from_candidates = Weinstein_strategy_screening.entries_from_candidates
-let survivors_for_screening = Weinstein_strategy_screening.survivors_for_screening
-
-let _positions_minus_exited ~(positions : Position.t Map.M(String).t)
-    ~(stop_exit_transitions : Position.transition list) :
-    Position.t Map.M(String).t =
-  let exited_ids =
-    List.filter_map stop_exit_transitions ~f:(fun (t : Position.transition) ->
-        match t.kind with
-        | Position.TriggerExit _ -> Some t.position_id
-        | _ -> None)
-    |> String.Set.of_list
-  in
-  if Set.is_empty exited_ids then positions
-  else
-    Map.filter positions ~f:(fun (p : Position.t) ->
-        not (Set.mem exited_ids p.id))
-
-let _maybe_reset_halt ~peak_tracker
-    ~(macro_trend : Weinstein_types.market_trend) =
-  match macro_trend with
-  | Weinstein_types.Bearish -> ()
-  | Weinstein_types.Bullish | Weinstein_types.Neutral ->
-      Portfolio_risk.Force_liquidation.Peak_tracker.reset peak_tracker
+let held_symbols = S.held_symbols
+let entries_from_candidates = S.entries_from_candidates
+let survivors_for_screening = S.survivors_for_screening
 
 let _trigger_exit_ids_of (ts : Position.transition list) : String.Set.t =
   List.filter_map ts ~f:(fun (t : Position.transition) ->
@@ -66,6 +35,22 @@ let _filter_out_exited_ids exited_ids (ts : Position.transition list) :
   else
     List.filter ts ~f:(fun (t : Position.transition) ->
         not (Set.mem exited_ids t.position_id))
+
+let _positions_minus_exited ~(positions : Position.t Map.M(String).t)
+    ~(stop_exit_transitions : Position.transition list) :
+    Position.t Map.M(String).t =
+  let exited_ids = _trigger_exit_ids_of stop_exit_transitions in
+  if Set.is_empty exited_ids then positions
+  else
+    Map.filter positions ~f:(fun (p : Position.t) ->
+        not (Set.mem exited_ids p.id))
+
+let _maybe_reset_halt ~peak_tracker
+    ~(macro_trend : Weinstein_types.market_trend) =
+  match macro_trend with
+  | Weinstein_types.Bearish -> ()
+  | Weinstein_types.Bullish | Weinstein_types.Neutral ->
+      Portfolio_risk.Force_liquidation.Peak_tracker.reset peak_tracker
 
 let _symbol_of_position_id ~(positions : Position.t Map.M(String).t) id =
   Map.data positions
@@ -82,13 +67,6 @@ let _handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date
       | None -> ())
   | _ -> ()
 
-let _record_stop_outs ~last_stop_out_dates
-    ~(positions : Position.t Map.M(String).t)
-    ~(exit_transitions : Position.transition list) ~current_date =
-  List.iter exit_transitions
-    ~f:
-      (_handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date)
-
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
     ~get_price ~last_stop_out_dates ~audit_recorder ~prior_macro_result
     ~current_date =
@@ -102,8 +80,9 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
       ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
       ~bar_reader ~as_of:current_date ~prior_stages ()
   in
-  _record_stop_outs ~last_stop_out_dates ~positions ~exit_transitions
-    ~current_date;
+  List.iter exit_transitions
+    ~f:
+      (_handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date);
   List.iter exit_transitions
     ~f:
       (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
@@ -129,10 +108,9 @@ let _run_special_exits ~config ~positions ~(portfolio : Portfolio_view.t)
   in
   let stage3_ts =
     if config.enable_stage3_force_exit then
-      Stage3_force_exit_runner.update
-        ~config:config.stage3_force_exit_config ~is_screening_day:is_friday
-        ~positions ~get_price ~prior_stages ~stage3_streaks
-        ~stop_exit_position_ids:stop_exited_ids ~current_date
+      Stage3_force_exit_runner.update ~config:config.stage3_force_exit_config
+        ~is_screening_day:is_friday ~positions ~get_price ~prior_stages
+        ~stage3_streaks ~stop_exit_position_ids:stop_exited_ids ~current_date
     else []
   in
   let stage3_exited_ids = _trigger_exit_ids_of stage3_ts in
@@ -154,6 +132,60 @@ let _run_special_exits ~config ~positions ~(portfolio : Portfolio_view.t)
     stop_exited_ids,
     stage3_exited_ids,
     laggard_exited_ids )
+
+let _run_macro_and_entries ~config ~ad_bars ~stop_states ~last_stop_out_dates
+    ~prior_macro ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder =
+  let is_screening_day =
+    Weinstein_strategy_screening.is_screening_day_view index_view
+  in
+  let macro_result_opt =
+    if is_screening_day then
+      Some
+        (Weinstein_strategy_macro.run_macro_only ~config ~ad_bars ~prior_macro
+           ~prior_macro_result ~bar_reader ~prior_stages ~current_date
+           ~index_view)
+    else None
+  in
+  if is_screening_day then
+    _maybe_reset_halt ~peak_tracker ~macro_trend:!prior_macro;
+  let halted =
+    match
+      Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
+    with
+    | Halted -> true
+    | Active -> false
+  in
+  Weinstein_strategy_macro.entry_transitions_if_active ~halted ~is_screening_day
+    ~macro_result_opt ~config ~stop_states ~last_stop_out_dates ~bar_reader
+    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
+    ~current_date ~index_view ~audit_recorder
+
+let _assemble_output ~exit_transitions ~stage3_force_exit_transitions
+    ~laggard_rotation_transitions ~force_exit_transitions ~adjust_transitions
+    ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids =
+  let force_liq_exited_ids = _trigger_exit_ids_of force_exit_transitions in
+  let all_exited_ids =
+    Set.union_list
+      (module String)
+      [
+        stop_exited_ids;
+        stage3_exited_ids;
+        laggard_exited_ids;
+        force_liq_exited_ids;
+      ]
+  in
+  let adjust_transitions =
+    _filter_out_exited_ids all_exited_ids adjust_transitions
+  in
+  Ok
+    {
+      Strategy_interface.transitions =
+        exit_transitions @ stage3_force_exit_transitions
+        @ laggard_rotation_transitions @ force_exit_transitions
+        @ adjust_transitions @ entry_transitions;
+    }
 
 let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
     ~prior_macro ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages
@@ -185,54 +217,16 @@ let _on_market_close ~config ~ad_bars ~stop_states ~last_stop_out_dates
           ~laggard_streaks ~bar_reader ~index_view ~exit_transitions
           ~current_date
       in
-      let is_screening_day =
-        Weinstein_strategy_screening.is_screening_day_view index_view
-      in
-      let macro_result_opt =
-        if is_screening_day then
-          Some
-            (Weinstein_strategy_screening.run_macro_only ~config ~ad_bars
-               ~prior_macro ~prior_macro_result ~bar_reader ~prior_stages
-               ~current_date ~index_view)
-        else None
-      in
-      if is_screening_day then
-        _maybe_reset_halt ~peak_tracker ~macro_trend:!prior_macro;
-      let halted =
-        match
-          Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
-        with
-        | Halted -> true
-        | Active -> false
-      in
       let entry_transitions =
-        Weinstein_strategy_screening.entry_transitions_if_active ~halted
-          ~is_screening_day ~macro_result_opt ~config ~stop_states
-          ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
-          ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-          ~audit_recorder
+        _run_macro_and_entries ~config ~ad_bars ~stop_states
+          ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
+          ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
+          ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
       in
-      let force_liq_exited_ids = _trigger_exit_ids_of force_exit_transitions in
-      let all_exited_ids =
-        Set.union_list
-          (module String)
-          [
-            stop_exited_ids;
-            stage3_exited_ids;
-            laggard_exited_ids;
-            force_liq_exited_ids;
-          ]
-      in
-      let adjust_transitions =
-        _filter_out_exited_ids all_exited_ids adjust_transitions
-      in
-      Ok
-        {
-          Strategy_interface.transitions =
-            exit_transitions @ stage3_force_exit_transitions
-            @ laggard_rotation_transitions @ force_exit_transitions
-            @ adjust_transitions @ entry_transitions;
-        }
+      _assemble_output ~exit_transitions ~stage3_force_exit_transitions
+        ~laggard_rotation_transitions ~force_exit_transitions
+        ~adjust_transitions ~entry_transitions ~stop_exited_ids
+        ~stage3_exited_ids ~laggard_exited_ids
 
 let _init_strategy_state ~initial_stop_states ~ad_bars =
   let stop_states = ref initial_stop_states in
