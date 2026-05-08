@@ -97,6 +97,6 @@ jobs:
           name: golden-sp500-5y-${{ github.run_id }}
           path: |
             dev/perf/golden-sp500-postsubmit-*/
-            dev/backtest/scenarios-*/sp500-2019-2023*/
+            **/dev/backtest/scenarios-*/sp500-2019-2023*/
           retention-days: 7
           if-no-files-found: warn
