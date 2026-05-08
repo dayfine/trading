@@ -40,15 +40,15 @@ let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
 
-let _build_market_data_adapter ~data_dir ~bar_data_source =
-  match
-    Bar_data_source.build_adapter bar_data_source ~data_dir
-      ~max_cache_mb:_snapshot_cache_mb
-  with
-  | Ok adapter -> adapter
-  | Error err ->
-      failwithf "Panel_runner: Bar_data_source.build_adapter failed: %s"
-        (Status.show err) ()
+(* Wrap the runner's already-constructed [daily_panels] in the simulator's
+   callback adapter, sharing the LRU cache with the strategy bar reader.
+
+   The naive path of going through [Bar_data_source.build_adapter (Snapshot
+   {...})] would call [Daily_panels.create] a second time and produce a
+   parallel ~330 MB LRU at the 15y SP500 window — see
+   [dev/notes/15y-memory-cliff-2026-05-08.md] §"Cliff #2". *)
+let _build_market_data_adapter ~daily_panels =
+  Bar_data_source.build_adapter_from_panels daily_panels
 
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
     ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps ~strategy
@@ -182,10 +182,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   let strategy =
     _build_strategy input ~strategy_choice ~bar_reader ~audit_recorder
   in
-  let adapter =
-    _build_market_data_adapter ~data_dir:input.data_dir_fpath
-      ~bar_data_source:(Bar_data_source.Snapshot { snapshot_dir; manifest })
-  in
+  let adapter = _build_market_data_adapter ~daily_panels in
   let final_close_prices () =
     _final_close_prices ~daily_panels ~symbols:input.all_symbols ~end_date
   in
