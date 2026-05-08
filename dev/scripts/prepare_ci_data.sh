@@ -40,6 +40,16 @@ DRY_RUN=0
 DATA_DIR="${DATA_DIR:-${TRADING_DATA_DIR:-/workspaces/trading-1/data}}"
 OUTPUT_DIR="${REPO_ROOT}/trading/test_data"
 
+# Benchmark / index symbols that are NOT in the SP500 universe but ARE
+# referenced by tier-3 golden scenarios under goldens-sp500/. The
+# Buy-and-Hold-SPY benchmark scenario reads SPY's bars; without the
+# explicit list the runner gets an empty (NaN) panel for SPY and the
+# strategy never enters, which surfaces as a "0% return" CI failure
+# (see fix/backtest/bah-spy-day1-entry / 2026-05-08). Extend this list
+# when adding a new benchmark scenario whose primary symbol is outside
+# the SP500 constituents.
+EXTRA_SYMBOLS="SPY"
+
 # ---- arg parsing ----
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -72,10 +82,13 @@ printf '  Dry run   : %s\n\n' "$DRY_RUN"
 
 # ---- extract symbols from universe sexp ----
 # Sexp format: (Pinned ( ((symbol AAPL) (sector "...")) ... ))
-# grep for 'symbol XXXX' and strip the prefix.
-SYMBOLS="$(grep -o 'symbol [A-Z0-9-]*' "$UNIVERSE_PATH" | sed 's/symbol //')"
+# grep for 'symbol XXXX' and strip the prefix. Append the benchmark
+# symbols (SPY, ...) that aren't in the SP500 constituents but are
+# required by tier-3 golden scenarios.
+UNIVERSE_SYMBOLS="$(grep -o 'symbol [A-Z0-9-]*' "$UNIVERSE_PATH" | sed 's/symbol //')"
+SYMBOLS="$(printf '%s\n%s\n' "$UNIVERSE_SYMBOLS" "$EXTRA_SYMBOLS" | sort -u | grep -v '^$')"
 TOTAL="$(printf '%s\n' "$SYMBOLS" | grep -c .)"
-printf 'Universe: %d symbols\n\n' "$TOTAL"
+printf 'Universe: %d symbols (incl. extras: %s)\n\n' "$TOTAL" "$EXTRA_SYMBOLS"
 
 FOUND=0
 MISSING=0

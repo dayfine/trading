@@ -1,0 +1,9 @@
+Cells A-E perf measurement (2026-05-08T163314Z)
+
+STATUS  SCENARIO                                  WALL      PEAK_RSS
+--------------------------------------------------------------------------
+PASS                                              cell-A-baseline   248s  545548kB
+PASS                                              cell-B-stage3-k1-only   285s  550392kB
+PASS                                              cell-C-laggard-h4-only   308s  548476kB
+PASS                                              cell-D-stage3-k1-laggard-h4   318s  550964kB
+PASS                                              cell-E-stage3-k1-laggard-h2   331s  553580kB

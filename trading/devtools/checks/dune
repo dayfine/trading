@@ -134,7 +134,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh agent_compliance_check.sh)
  (action
   (run sh %{dep:agent_compliance_test.sh})))
 
@@ -288,7 +288,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh rule_promotion_check.sh)
  (action
   (run sh %{dep:rule_promotion_self_test.sh})))
 
@@ -326,7 +326,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh posix_sh_check.sh)
  (action
   (run sh %{dep:posix_sh_check_test.sh})))
 
@@ -357,6 +357,23 @@
  (deps _check_lib.sh)
  (action
   (run sh %{dep:sweep_worktrees_smoke.sh})))
+
+; Active exceptions report: lists all linter_exceptions.conf entries and
+; inline @large-module / @large-function markers with status (active /
+; expired / no-review-at).  Passive — exits 0 always; output goes to the
+; build log and can be invoked directly via:
+;   dune exec devtools/list_active_exceptions/list_active_exceptions.exe -- <trading-root>
+; Cache-invalidated when any .ml file or linter_exceptions.conf changes.
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files_rec %{workspace_root}/*.ml)
+  %{workspace_root}/devtools/checks/linter_exceptions.conf)
+ (action
+  (run
+   %{exe:../list_active_exceptions/list_active_exceptions.exe}
+   %{workspace_root})))
 
 ; Perf-catalog integrity check: verifies every scenario sexp under
 ; trading/test_data/backtest_scenarios/{goldens-small,goldens-broad,perf-sweep,smoke}/

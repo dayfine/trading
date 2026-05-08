@@ -17,7 +17,7 @@ type config = {
 
 type step_result = {
   date : Date.t;
-  portfolio : Trading_portfolio.Portfolio.t;
+  portfolio : Portfolio_summary.t;
   portfolio_value : float;
   trades : Trading_base.Types.trade list;
   orders_submitted : Trading_orders.Types.order list;
@@ -31,6 +31,7 @@ type step_result = {
 
 type run_result = {
   steps : step_result list;  (** Non-empty list of step results *)
+  final_portfolio : Trading_portfolio.Portfolio.t;
   metrics : Metric_types.metric_set;
 }
 

@@ -137,10 +137,8 @@ let _max_one_day_drop steps =
   let values =
     List.filter_map steps
       ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
-        let cash = s.portfolio.Trading_portfolio.Portfolio.current_cash in
-        let has_pos =
-          not (List.is_empty s.portfolio.Trading_portfolio.Portfolio.positions)
-        in
+        let cash = s.portfolio.current_cash in
+        let has_pos = not (List.is_empty s.portfolio.positions) in
         let is_marked = Float.(abs (s.portfolio_value -. cash) > 1e-2) in
         if has_pos && is_marked && Float.(s.portfolio_value > 0.0) then
           Some s.portfolio_value

@@ -300,6 +300,19 @@
   matchers))
 
 (test
+ (name test_portfolio_summary)
+ (modules test_portfolio_summary)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.simulation.types
+  trading.base
+  trading.portfolio
+  matchers))
+
+(test
  (name test_stale_hold)
  (modules test_stale_hold)
  (libraries

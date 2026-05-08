@@ -55,9 +55,7 @@ let sample_commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 let run_sim_exn sim =
   match run sim with
   | Error err -> failwith ("Simulation failed: " ^ Status.show err)
-  | Ok result ->
-      let final_portfolio = (List.last_exn result.steps).portfolio in
-      (result.steps, final_portfolio)
+  | Ok result -> (result.steps, result.final_portfolio)
 
 (* ==================== Real Data Loading Tests ==================== *)
 

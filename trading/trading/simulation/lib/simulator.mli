@@ -50,6 +50,7 @@ val create_deps :
   ?market_data_adapter:Trading_simulation_data.Market_data_adapter.t ->
   ?stale_hold_policy:Stale_hold.config ->
   ?stale_hold_log:Stale_hold.Log.t ->
+  ?slippage_bps:int ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
@@ -72,7 +73,13 @@ val create_deps :
       Per-run collector populated by every step where at least one held position
       is stale. Defaults to a fresh log; pass a pre-built one when the caller
       wants to drain events at run end (the backtest runner does this to persist
-      [stale_holds.sexp]). *)
+      [stale_holds.sexp]).
+    @param slippage_bps
+      Explicit basis-points slippage applied at every trade fill. Default [0]
+      (no slippage — preserves the no-friction baseline). Plumbed directly into
+      {!Trading_engine.Types.engine_config.slippage_bps}. Use non-zero for
+      cost-overlay runs (P4 from
+      [dev/notes/next-session-priorities-2026-05-07.md]). *)
 
 (** {1 Creation} *)
 

@@ -35,6 +35,20 @@ let _spy_data_present () =
   | `Yes -> true
   | `No | `Unknown -> false
 
+(** True when the test is running inside the CI container (or any environment
+    that explicitly sets [TRADING_IN_CONTAINER=1]). Used to escalate the "SPY
+    data missing" branch from skip → hard failure: in CI, SPY's data file under
+    [test_data/S/Y/SPY/data.csv] is committed alongside the SP500 constituents
+    (see [dev/scripts/prepare_ci_data.sh] §EXTRA_SYMBOLS), so a missing CSV
+    indicates a regression in the data preparation step rather than a developer
+    running locally without the full [/data] mount.
+
+    A skip path that silently passes in CI is exactly what masked the 2026-05-08
+    bah-spy 0%-return regression — flipping the missing-data branch to
+    [assert_failure] in CI keeps the regression-test contract honest. *)
+let _is_ci () =
+  match Sys.getenv "TRADING_IN_CONTAINER" with Some "1" -> true | _ -> false
+
 (** Walk cwd parents looking for the worktree-local fixtures root —
     [trading/test_data/backtest_scenarios] under the repo root. Necessary
     because the BAH scenario file pinned in #882 is part of the worktree's
@@ -91,8 +105,29 @@ let _resolve_fixtures_root () =
             trading/test_data/backtest_scenarios under a parent)"
            (Stdlib.Sys.getcwd ()))
 
+(* Total fill count across every step. BAH should fire one BUY for SPY on
+   the first order-execution boundary; zero is the regression signature. *)
+let _total_trades (result : Backtest.Runner.result) =
+  List.sum
+    (module Int)
+    result.steps
+    ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
+      List.length s.trades)
+
+(* First trade emitted by the run. [None] means the strategy never entered. *)
+let _first_trade (result : Backtest.Runner.result) =
+  List.find_map result.steps
+    ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
+      List.hd s.trades)
+
 let test_bah_runner_e2e ctx =
   if not (_spy_data_present ()) then (
+    if _is_ci () then
+      assert_failure
+        "SPY data missing under TRADING_DATA_DIR but TRADING_IN_CONTAINER=1. \
+         The bah-spy golden scenario requires SPY bars in \
+         [test_data/S/Y/SPY/data.csv]; rerun [dev/scripts/prepare_ci_data.sh] \
+         and commit the output. See fix/backtest/bah-spy-day1-entry.";
     skip_if true
       "SPY data unavailable (data/S/Y/SPY/data.csv missing — test_data subset \
        doesn't include SPY). Run locally with the full /data mount.";
@@ -116,7 +151,16 @@ let test_bah_runner_e2e ctx =
   assert_that final_equity (is_between (module Float_ord) ~low ~high);
   (* BAH never sells — exactly zero closed round-trips by end of run.
      The position itself stays open and contributes the bulk of equity. *)
-  assert_that (List.length result.round_trips) (equal_to 0)
+  assert_that (List.length result.round_trips) (equal_to 0);
+  (* Day-1 entry pin: the strategy fires exactly one BUY trade for SPY,
+     executed at the next bar's open. A zero-trade run signals the BAH
+     strategy never entered (the original 2026-05-08 regression — the
+     panel runner's snapshot had an empty SPY column so
+     [get_price "SPY"] returned None). *)
+  assert_that (_total_trades result) (equal_to 1);
+  assert_that (_first_trade result)
+    (is_some_and
+       (field (fun t -> t.Trading_base.Types.symbol) (equal_to "SPY")))
 
 (** Sanity: scenarios that omit the [strategy] field still parse and default to
     Weinstein. This is the back-compat invariant called out in #882 — every

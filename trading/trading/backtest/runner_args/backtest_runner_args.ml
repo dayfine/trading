@@ -15,6 +15,10 @@ type t = {
   fuzz_window : string option;
   snapshot_dir : string option;
   progress_every : int option;
+  slippage_bps : int option;
+      (** [--slippage-bps N], when supplied, applies an explicit basis-points
+          slippage at every trade fill — the cost-overlay knob from P4. [None]
+          preserves the no-friction baseline (engine default = 0 bps). *)
 }
 
 type acc = {
@@ -33,6 +37,7 @@ type acc = {
   csv_mode : bool;
   snapshot_dir : string option;
   progress_every : int option;
+  slippage_bps : int option;
 }
 (** Accumulator for [_extract_flags]. Carries every flag the parser recognises
     plus the running list of positional args. Snapshot mode is the default since
@@ -58,6 +63,7 @@ let _empty_acc =
     csv_mode = false;
     snapshot_dir = None;
     progress_every = None;
+    slippage_bps = None;
   }
 
 let _err msg = Error (Status.invalid_argument_error msg)
@@ -112,6 +118,13 @@ let rec _extract_flags args (acc : acc) =
       | _ -> _err "--progress-every requires a positive integer argument")
   | [ "--progress-every" ] ->
       _err "--progress-every requires a positive integer argument"
+  | "--slippage-bps" :: value :: rest -> (
+      match Int.of_string_opt value with
+      | Some n when n >= 0 ->
+          _extract_flags rest { acc with slippage_bps = Some n }
+      | _ -> _err "--slippage-bps requires a non-negative integer argument")
+  | [ "--slippage-bps" ] ->
+      _err "--slippage-bps requires a non-negative integer argument"
   | arg :: rest ->
       _extract_flags rest { acc with positional = arg :: acc.positional }
 
@@ -215,6 +228,7 @@ let _build_result (acc : acc) (start_date, end_date) =
       fuzz_window = acc.fuzz_window;
       snapshot_dir = acc.snapshot_dir;
       progress_every = acc.progress_every;
+      slippage_bps = acc.slippage_bps;
     }
 
 let parse args =

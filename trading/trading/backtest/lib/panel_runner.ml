@@ -40,26 +40,26 @@ let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
 
-let _build_market_data_adapter ~data_dir ~bar_data_source =
-  match
-    Bar_data_source.build_adapter bar_data_source ~data_dir
-      ~max_cache_mb:_snapshot_cache_mb
-  with
-  | Ok adapter -> adapter
-  | Error err ->
-      failwithf "Panel_runner: Bar_data_source.build_adapter failed: %s"
-        (Status.show err) ()
+(* Wrap the runner's already-constructed [daily_panels] in the simulator's
+   callback adapter, sharing the LRU cache with the strategy bar reader.
+
+   The naive path of going through [Bar_data_source.build_adapter (Snapshot
+   {...})] would call [Daily_panels.create] a second time and produce a
+   parallel ~330 MB LRU at the 15y SP500 window — see
+   [dev/notes/15y-memory-cliff-2026-05-08.md] §"Cliff #2". *)
+let _build_market_data_adapter ~daily_panels =
+  Bar_data_source.build_adapter_from_panels daily_panels
 
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
-    ~end_date ~warmup_days ~initial_cash ~commission ~strategy
-    ~market_data_adapter =
+    ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps ~strategy
+    ~market_data_adapter () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission
       ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
-      ~market_data_adapter ~stale_hold_log ()
+      ~market_data_adapter ~stale_hold_log ?slippage_bps ()
   in
   let sim_config =
     Simulator.
@@ -182,10 +182,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   let strategy =
     _build_strategy input ~strategy_choice ~bar_reader ~audit_recorder
   in
-  let adapter =
-    _build_market_data_adapter ~data_dir:input.data_dir_fpath
-      ~bar_data_source:(Bar_data_source.Snapshot { snapshot_dir; manifest })
-  in
+  let adapter = _build_market_data_adapter ~daily_panels in
   let final_close_prices () =
     _final_close_prices ~daily_panels ~symbols:input.all_symbols ~end_date
   in
@@ -193,7 +190,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
-    ?bar_data_source ?progress_emitter () =
+    ?bar_data_source ?progress_emitter ?slippage_bps () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   eprintf
     "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
@@ -217,7 +214,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   let sim =
     _make_simulator input ~stop_log ~stale_hold_log ~start_date ~end_date
-      ~warmup_days ~initial_cash ~commission ~strategy ~market_data_adapter
+      ~warmup_days ~initial_cash ~commission ?slippage_bps ~strategy
+      ~market_data_adapter ()
   in
   let progress_acc =
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
