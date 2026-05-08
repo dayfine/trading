@@ -25,11 +25,6 @@ let _read_one_symbol ~data_dir ~start_date ~end_date symbol =
       failwithf "Csv_snapshot_builder: Csv_storage.get %s: %s" symbol
         (Status.show err) ()
 
-(* Read CSVs for [universe] and return [(symbol, bars)] pairs filtered to
-   [start_date..end_date] inclusive. *)
-let _read_bars_in_window ~data_dir ~universe ~start_date ~end_date =
-  List.map universe ~f:(_read_one_symbol ~data_dir ~start_date ~end_date)
-
 let _build_rows_or_fail ~symbol ~bars =
   match
     Pipeline.build_for_symbol ~symbol ~bars ~schema:Snapshot_schema.default ()
@@ -62,16 +57,21 @@ let _write_manifest_or_fail ~dir manifest =
       failwithf "Csv_snapshot_builder: Snapshot_manifest.write: %s"
         err.Status.message ()
 
+(* Stream per-symbol: read CSV → build rows → write [.snap] → drop bars before
+   moving to the next symbol. Avoids retaining the full
+   [(symbol, bars) list] across the universe — at 15y SP500 scale the
+   intermediate list-of-lists costs ~195 MB RSS (15y memory cliff Fix C). *)
+let _read_build_write_one ~data_dir ~start_date ~end_date ~dir symbol =
+  let symbol, bars = _read_one_symbol ~data_dir ~start_date ~end_date symbol in
+  let rows = _build_rows_or_fail ~symbol ~bars in
+  let path = _write_symbol_snap ~dir ~symbol rows in
+  _file_metadata_of ~symbol ~path
+
 let build ~data_dir ~universe ~start_date ~end_date =
-  let symbol_bars =
-    _read_bars_in_window ~data_dir ~universe ~start_date ~end_date
-  in
   let dir = Stdlib.Filename.temp_dir "panel_runner_csv_snapshot_" "" in
   let entries =
-    List.map symbol_bars ~f:(fun (symbol, bars) ->
-        let rows = _build_rows_or_fail ~symbol ~bars in
-        let path = _write_symbol_snap ~dir ~symbol rows in
-        _file_metadata_of ~symbol ~path)
+    List.map universe
+      ~f:(_read_build_write_one ~data_dir ~start_date ~end_date ~dir)
   in
   let manifest =
     Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
