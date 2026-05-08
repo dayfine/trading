@@ -427,18 +427,22 @@ let _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
     force_liquidations,
     stale_holds )
 
+let _log_backtest_window ~start_date ~end_date ~warmup_start ~all_symbols =
+  eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
+    (List.length all_symbols);
+  eprintf "Running backtest (%s to %s, warmup from %s)...\n%!"
+    (Date.to_string start_date)
+    (Date.to_string end_date)
+    (Date.to_string warmup_start)
+
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?progress_emitter () =
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
-  eprintf "Total symbols (universe + index + sector ETFs): %d\n%!"
-    (List.length deps.all_symbols);
   let warmup_days = _warmup_days_for strategy_choice in
   let warmup_start = Date.add_days start_date (-warmup_days) in
-  eprintf "Running backtest (%s to %s, warmup from %s)...\n%!"
-    (Date.to_string start_date)
-    (Date.to_string end_date)
-    (Date.to_string warmup_start);
+  _log_backtest_window ~start_date ~end_date ~warmup_start
+    ~all_symbols:deps.all_symbols;
   let ( sim_result,
         stop_log,
         trade_audit,
