@@ -16,10 +16,9 @@ type t = {
   snapshot_dir : string option;
   progress_every : int option;
   slippage_bps : int option;
-      (** [--slippage-bps N], when supplied, applies an explicit
-          basis-points slippage at every trade fill — the cost-overlay
-          knob from P4. [None] preserves the no-friction baseline (engine
-          default = 0 bps). *)
+      (** [--slippage-bps N], when supplied, applies an explicit basis-points
+          slippage at every trade fill — the cost-overlay knob from P4. [None]
+          preserves the no-friction baseline (engine default = 0 bps). *)
 }
 
 type acc = {
