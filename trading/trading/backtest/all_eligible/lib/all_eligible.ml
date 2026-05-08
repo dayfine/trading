@@ -121,6 +121,10 @@ let _bucket_bounds (boundaries : float list) : (float * float) list =
   let ends = boundaries @ [ Float.infinity ] in
   List.zip_exn starts ends
 
+(** Count values in [xs] falling in the half-open interval [\[low, high)]. *)
+let _count_in_range ~low ~high xs =
+  List.count xs ~f:(fun r -> Float.( >= ) r low && Float.( < ) r high)
+
 (** Count returns falling into each bucket. Bucket interval is half-open
     [\[low, high)]. The last bucket's [high] is [+infinity], so any positive
     return falls cleanly into [\[bn, +inf)]. *)
@@ -128,11 +132,7 @@ let _bucketize ~(boundaries : float list) (returns : float list) :
     (float * float * int) list =
   let bounds = _bucket_bounds boundaries in
   List.map bounds ~f:(fun (low, high) ->
-      let count =
-        List.count returns ~f:(fun r ->
-            Float.( >= ) r low && Float.( < ) r high)
-      in
-      (low, high, count))
+      (low, high, _count_in_range ~low ~high returns))
 
 let compute_aggregate ~(config : config) (trades : trade_record list) :
     aggregate =
@@ -168,6 +168,23 @@ let compute_aggregate ~(config : config) (trades : trade_record list) :
 (* First-admission dedup                                                *)
 (* ------------------------------------------------------------------ *)
 
+(** Compare two position sides: [Long < Short] — purely a tiebreaker so that
+    same-day same-symbol long and short entries produce a deterministic order.
+*)
+let _compare_sides (a : Trading_base.Types.position_side)
+    (b : Trading_base.Types.position_side) : int =
+  match (a, b) with
+  | Long, Long | Short, Short -> 0
+  | Long, Short -> -1
+  | Short, Long -> 1
+
+(** Secondary comparison for candidates with equal entry dates: first by symbol
+    then by side. *)
+let _compare_by_symbol_then_side (a : OT.scored_candidate)
+    (b : OT.scored_candidate) : int =
+  let by_symbol = String.compare a.entry.symbol b.entry.symbol in
+  if by_symbol <> 0 then by_symbol else _compare_sides a.entry.side b.entry.side
+
 (** Total order on scored candidates: [(entry_week, symbol, side)] ascending,
     side ordered Long < Short. The walk relies on chronological order; the
     secondary keys are deterministic tiebreakers for same-day cascade emissions
@@ -175,16 +192,7 @@ let compute_aggregate ~(config : config) (trades : trade_record list) :
 let _compare_scored_for_dedup (a : OT.scored_candidate)
     (b : OT.scored_candidate) : int =
   let by_date = Date.compare a.entry.entry_week b.entry.entry_week in
-  if by_date <> 0 then by_date
-  else
-    let by_symbol = String.compare a.entry.symbol b.entry.symbol in
-    if by_symbol <> 0 then by_symbol
-    else
-      (* Long < Short — purely a tiebreaker. *)
-      match (a.entry.side, b.entry.side) with
-      | Long, Long | Short, Short -> 0
-      | Long, Short -> -1
-      | Short, Long -> 1
+  if by_date <> 0 then by_date else _compare_by_symbol_then_side a b
 
 (** Render a [(symbol, side)] pair as a string key for the watermark table. The
     pipe character is reserved (never appears in tickers) so the encoding is

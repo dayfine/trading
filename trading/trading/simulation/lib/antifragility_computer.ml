@@ -124,13 +124,14 @@ let _gamma_numerator s =
   -. (s.sx *. ((s.sx *. s.sx2y) -. (s.sxy *. s.sx2)))
   +. (s.sy *. ((s.sx *. s.sx3) -. (s.sx2 *. s.sx2)))
 
+let _gamma_coef_or_zero s =
+  let det = _det33 s in
+  if Float.(Float.abs det < _det_tolerance) then 0.0
+  else _gamma_numerator s /. det
+
 let _concavity_coef pairs =
   if List.length pairs < _min_paired_samples then 0.0
-  else
-    let s = _accumulate_sums pairs in
-    let det = _det33 s in
-    if Float.(Float.abs det < _det_tolerance) then 0.0
-    else _gamma_numerator s /. det
+  else _gamma_coef_or_zero (_accumulate_sums pairs)
 
 (* ---- Bucket asymmetry via benchmark quintiles ---- *)
 

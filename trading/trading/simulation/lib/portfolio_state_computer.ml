@@ -79,21 +79,23 @@ let _update ~state ~step =
     total_trades = state.total_trades + List.length step.trades;
   }
 
+(** Compute metrics from [state] when a last step exists. If no marked-to-market
+    step was recorded (degenerate: all steps were non-trading days with open
+    positions), falls back to [position_step] so [OpenPositionsValue] /
+    [UnrealizedPnl] both read as 0. *)
+let _metrics_for_last_steps ~state ~(config : Simulator_types.config)
+    position_step =
+  let marked_step =
+    Option.value state.last_marked_step ~default:position_step
+  in
+  _metrics_from_step ~position_step ~marked_step
+    ~total_trades:state.total_trades ~start_date:config.start_date
+    ~end_date:config.end_date
+
 let _finalize ~state ~(config : Simulator_types.config) =
   match state.last_step with
   | None -> Metric_types.empty
-  | Some position_step ->
-      (* If no step in the sim was marked-to-market (degenerate: e.g. all
-         steps were non-trading days with open positions), fall back to the
-         last step. OpenPositionsValue / UnrealizedPnl will then be 0 as
-         before — not great, but consistent with pre-fix behaviour for that
-         edge case. *)
-      let marked_step =
-        Option.value state.last_marked_step ~default:position_step
-      in
-      _metrics_from_step ~position_step ~marked_step
-        ~total_trades:state.total_trades ~start_date:config.start_date
-        ~end_date:config.end_date
+  | Some position_step -> _metrics_for_last_steps ~state ~config position_step
 
 let computer () : Simulator_types.any_metric_computer =
   Simulator_types.wrap_computer

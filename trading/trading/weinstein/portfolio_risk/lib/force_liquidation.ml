@@ -202,6 +202,27 @@ let _event_of_input ~date ~reason (p : position_input) : event =
     reason;
   }
 
+(** Loss fraction threshold for the given position side. *)
+let _loss_threshold ~config (side : Trading_base.Types.position_side) =
+  match side with
+  | Trading_base.Types.Long -> config.max_long_unrealized_loss_fraction
+  | Trading_base.Types.Short -> config.max_short_unrealized_loss_fraction
+
+(** Check whether position [p] has breached its loss threshold; return
+    [Some event] if so, [None] otherwise. Assumes strictly positive
+    [cost_basis]. *)
+let _loss_event_if_breached ~config ~date ~cost_basis (p : position_input) :
+    event option =
+  let pnl =
+    unrealized_pnl ~side:p.side ~entry_price:p.entry_price
+      ~current_price:p.current_price ~quantity:p.quantity
+  in
+  let loss_fraction = -.pnl /. cost_basis in
+  let threshold = _loss_threshold ~config p.side in
+  if Float.( > ) loss_fraction threshold then
+    Some (_event_of_input ~date ~reason:Per_position p)
+  else None
+
 (* Per-position trigger: a position fires when its unrealized loss exceeds the
    side-specific threshold ([max_long_unrealized_loss_fraction] for longs,
    [max_short_unrealized_loss_fraction] for shorts) of cost basis. Cost basis
@@ -210,20 +231,7 @@ let _event_of_input ~date ~reason (p : position_input) : event =
 let _check_per_position ~config ~date (p : position_input) : event option =
   let cost_basis = p.entry_price *. p.quantity in
   if Float.( <= ) cost_basis 0.0 then None
-  else
-    let pnl =
-      unrealized_pnl ~side:p.side ~entry_price:p.entry_price
-        ~current_price:p.current_price ~quantity:p.quantity
-    in
-    let loss_fraction = -.pnl /. cost_basis in
-    let threshold =
-      match p.side with
-      | Trading_base.Types.Long -> config.max_long_unrealized_loss_fraction
-      | Trading_base.Types.Short -> config.max_short_unrealized_loss_fraction
-    in
-    if Float.( > ) loss_fraction threshold then
-      Some (_event_of_input ~date ~reason:Per_position p)
-    else None
+  else _loss_event_if_breached ~config ~date ~cost_basis p
 
 (* Portfolio-floor trigger fires when [portfolio_value < peak * fraction] AND
    the peak has actually been observed (peak > 0). The peak-zero case happens

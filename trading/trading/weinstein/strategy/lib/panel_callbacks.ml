@@ -207,6 +207,20 @@ let resistance_callbacks_of_weekly_view
 (* Stock_analysis — bundle of high/volume + nested Stage/Rs/Volume/Resistance *)
 (* ------------------------------------------------------------------ *)
 
+(** Compute the split-adjustment factor at array position [idx] within aligned
+    [closes] / [raw_closes] arrays. Returns [None] when the raw close is
+    non-positive. Caller is responsible for bounds checking. *)
+let _factor_at_idx ~closes ~raw_closes idx : float option =
+  let raw = raw_closes.(idx) in
+  if Float.( <= ) raw 0.0 then None else Some (closes.(idx) /. raw)
+
+(** Look up the split factor at [week_offset] within aligned arrays, after the
+    caller has already confirmed [n = m]. Returns [None] when [week_offset] is
+    out of range or the raw close is non-positive. *)
+let _factor_at_offset ~closes ~raw_closes ~n ~week_offset : float option =
+  let idx = n - 1 - week_offset in
+  if idx < 0 || idx >= n then None else _factor_at_idx ~closes ~raw_closes idx
+
 (** Per-bar split-adjustment factor lookup over a weekly view's [closes]
     (adjusted) and [raw_closes] (unadjusted). Returns [None] when [raw_closes]
     is empty (e.g., the empty weekly_view) or when the raw close at this offset
@@ -221,11 +235,8 @@ let _split_factor_of_weekly_view (weekly : Snapshot_bar_views.weekly_view) :
   fun ~week_offset ->
     if n <> m then None
     else
-      let idx = n - 1 - week_offset in
-      if idx < 0 || idx >= n then None
-      else
-        let raw = weekly.raw_closes.(idx) in
-        if Float.( <= ) raw 0.0 then None else Some (weekly.closes.(idx) /. raw)
+      _factor_at_offset ~closes:weekly.closes ~raw_closes:weekly.raw_closes ~n
+        ~week_offset
 
 let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
     ~(config : Stock_analysis.config) ~(stock : Snapshot_bar_views.weekly_view)
