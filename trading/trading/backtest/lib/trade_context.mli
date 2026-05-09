@@ -65,19 +65,37 @@ val csv_row_fields : t -> string list
     verbatim. [None] renders as the empty cell — consumers must tolerate empty
     cells (the canonical M5.2e missing-data sentinel). *)
 
+type precomputed
+(** Index bundle amortising the audit + stop-log scans across many trades.
+
+    {!of_audit_and_stop_log} rebuilt the audit index per trade — at Cell E 15 y
+    scale (~3 700 round-trips × ~3 700 audit records) the per-row build pushed
+    [trades.csv] writing into O(N²). Loop callers must hoist {!precompute}
+    outside the iter and feed each iteration via {!of_precomputed}. *)
+
+val precompute :
+  audit:Trade_audit.audit_record list ->
+  stop_infos:Stop_log.stop_info list ->
+  precomputed
+(** Build the index bundle once. O(N) over the audit + stop-log lists. The
+    by-symbol stop-log fallback preserves the head-first semantics of the legacy
+    [List.find]: when multiple [stop_info]s share a symbol, the first one in the
+    input list wins. *)
+
+val of_precomputed :
+  precomputed -> trade:Trading_simulation.Metrics.trade_metrics -> t
+(** Compute the context row for a single trade against pre-built indexes.
+    Field-population semantics match {!of_audit_and_stop_log}. O(log N) per call
+    (Map lookups). *)
+
 val of_audit_and_stop_log :
   audit:Trade_audit.audit_record list ->
   stop_infos:Stop_log.stop_info list ->
   trade:Trading_simulation.Metrics.trade_metrics ->
   t
-(** Compute the context row for a single trade by joining [audit] and
-    [stop_infos] on [(symbol, entry_date)] / [position_id].
-
-    The trade is matched to its audit record by [(symbol, entry_date)] — the
-    same key {!Trade_audit_report} uses. Once an audit record is found, its
-    [position_id] keys the {!Stop_log.stop_info} lookup; if no audit record
-    matches, the stop-log lookup falls back to a by-symbol scan picking the
-    first matching info.
+(** Convenience wrapper: builds {!precomputed} inline and projects one trade.
+    Useful for tests or one-shot callers; in a per-trade loop prefer
+    {!precompute} + {!of_precomputed} to amortise the index build.
 
     Each of the 6 fields populates independently:
     - Missing audit record → [entry_stage], [entry_volume_ratio],

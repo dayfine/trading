@@ -123,7 +123,7 @@ let _trades_csv_header =
   in
   String.concat ~sep:"," (base @ Trade_context.csv_header_fields)
 
-let _write_trade_row oc stop_index force_liq_index ~audit ~stop_infos
+let _write_trade_row oc stop_index force_liq_index ~ctx_pre
     (t : Metrics.trade_metrics) =
   let info = _pop_stop_info stop_index ~symbol:t.symbol in
   let entry_stop, exit_stop, base_exit_trigger = _stop_fields info in
@@ -133,7 +133,7 @@ let _write_trade_row oc stop_index force_liq_index ~audit ~stop_infos
     | Some reason -> _force_liq_label reason
     | None -> base_exit_trigger
   in
-  let ctx = Trade_context.of_audit_and_stop_log ~audit ~stop_infos ~trade:t in
+  let ctx = Trade_context.of_precomputed ctx_pre ~trade:t in
   let base_cells =
     [
       t.symbol;
@@ -163,8 +163,13 @@ let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
   fprintf oc "%s\n" _trades_csv_header;
   let stop_index = ref (_build_stop_index stop_infos) in
   let force_liq_index = _build_force_liq_index force_liquidations in
+  (* Build the audit + stop-log indexes once, not per row. Without this hoist,
+     [Trade_context.of_audit_and_stop_log] rebuilt the audit_idx Map every
+     call — turning [trades.csv] writing into O(N²) on Cell E 15 y
+     (~3 700 round-trips × ~3 700 audit records). *)
+  let ctx_pre = Trade_context.precompute ~audit ~stop_infos in
   List.iter round_trips
-    ~f:(_write_trade_row oc stop_index force_liq_index ~audit ~stop_infos);
+    ~f:(_write_trade_row oc stop_index force_liq_index ~ctx_pre);
   Out_channel.close oc
 
 let _write_equity_curve ~output_dir
