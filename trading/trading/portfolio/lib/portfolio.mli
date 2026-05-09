@@ -19,7 +19,12 @@ type t = {
 
     Fields:
     - [initial_cash]: Starting cash balance
-    - [trade_history]: Complete history of trades with realized P&L
+    - [trade_history]: Complete history of trades with realized P&L, stored
+      **newest-first** (most recent trade at the head). Readers that need
+      chronological order must [List.rev] before consuming. The newest-first
+      convention enables O(1) append in [apply_single_trade] and lets successive
+      [step_result.portfolio] snapshots share spines, which is load-bearing for
+      backtest memory at scale (15 y / 3 700 trades).
     - [current_cash]: Current cash balance (derived from initial_cash and
       trades)
     - [positions]: Current positions as sorted list (by symbol)

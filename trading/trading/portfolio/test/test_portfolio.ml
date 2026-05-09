@@ -215,8 +215,10 @@ let test_short_cover _ accounting_method =
   assert_that portfolio.current_cash (float_equal 17992.0);
 
   (* Verify realized P&L: covering 50 shares
-     P&L = 50 * ($149.95 - $140) - $3 = 50 * $9.95 - $3 = $497.50 - $3 = $494.50 *)
-  let history = portfolio.trade_history in
+     P&L = 50 * ($149.95 - $140) - $3 = 50 * $9.95 - $3 = $497.50 - $3 = $494.50
+
+     trade_history is newest-first; reverse for chronological indexing. *)
+  let history = List.rev portfolio.trade_history in
   let cover_pnl = (List.nth_exn history 1).realized_pnl in
   assert_that cover_pnl (float_equal 494.5);
 
@@ -294,7 +296,8 @@ let test_realized_pnl_calculation _ accounting_method =
         OUnit2.assert_failure ("Realized P&L test failed: " ^ Status.show err)
   in
 
-  let trade_history = updated_portfolio.trade_history in
+  (* trade_history is stored newest-first; reverse for chronological indexing. *)
+  let trade_history = List.rev updated_portfolio.trade_history in
   assert_equal 3 (List.length trade_history) ~msg:"Should have 3 trades";
 
   let trade1 = List.nth_exn trade_history 0 in
