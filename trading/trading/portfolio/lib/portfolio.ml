@@ -377,7 +377,14 @@ let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
       portfolio with
       current_cash = new_cash;
       positions = new_positions;
-      trade_history = portfolio.trade_history @ [ trade_with_pnl ];
+      (* Newest-first: prepend (O(1), shares tail across snapshots) instead of
+         append-via-[@] (O(N) per call, fresh prefix per snapshot). The latter
+         was the dominant cost on Cell E 15 y runs — both algorithmically
+         (N(N+1)/2 cons cells for N trades) and via [step_history] retention
+         (every [step_result.portfolio] held a fresh trade_history spine, so
+         [step_history] memory scaled O(N²) instead of O(N)).
+         See [dev/notes/cell-e-15y-engineering-blocker-2026-05-09.md]. *)
+      trade_history = trade_with_pnl :: portfolio.trade_history;
       unrealized_pnl_per_position = new_accumulator;
     }
 
@@ -395,9 +402,11 @@ let mark_to_market portfolio market_prices =
   in
   { portfolio with unrealized_pnl_per_position = new_accumulator }
 
-(* Reconstruct portfolio from scratch for validation *)
+(* Reconstruct portfolio from scratch for validation. [trade_history] is stored
+   newest-first (see [trade_history = trade_with_pnl :: ...] above), so we
+   reverse it once here to replay trades in chronological order. *)
 let reconstruct_from_history initial_cash accounting_method trade_history =
-  let trades = List.map trade_history ~f:(fun { trade; _ } -> trade) in
+  let trades = List.rev_map trade_history ~f:(fun { trade; _ } -> trade) in
   let empty_portfolio = create ~accounting_method ~initial_cash () in
   apply_trades empty_portfolio trades
 
