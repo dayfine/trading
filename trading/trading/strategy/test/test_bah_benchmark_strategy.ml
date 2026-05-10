@@ -161,6 +161,50 @@ let test_insufficient_cash _ =
   in
   assert_that result (is_ok_and_holds no_transitions_matcher)
 
+(** Pins the Closed-doesn't-block-reentry guard: a portfolio whose only entry
+    for [symbol] is in [Closed] state must NOT block a fresh CreateEntering
+    transition when cash + market data permit it. Without the [Closed]-filter in
+    [_has_position_for_symbol] the strategy would short-circuit on day 1 and
+    emit nothing. *)
+let test_closed_position_does_not_block_reentry _ =
+  let symbol = Bah_benchmark_strategy.default_symbol in
+  let closed_position : Position.t =
+    {
+      id = "SPY-prev-closed-1";
+      symbol;
+      side = Position.Long;
+      entry_reasoning =
+        Position.TechnicalSignal
+          { indicator = "BAH"; description = "prior-cycle entry" };
+      exit_reason =
+        Some (Position.SignalReversal { description = "prior whipsaw" });
+      state =
+        Position.Closed
+          {
+            quantity = 100.0;
+            entry_price = 80.0;
+            exit_price = 90.0;
+            gross_pnl = Some 1000.0;
+            entry_date = date_of_string "2024-01-01";
+            exit_date = date_of_string "2024-01-01";
+            days_held = 0;
+          };
+      last_updated = date_of_string "2024-01-01";
+      portfolio_lot_ids = [];
+    }
+  in
+  let positions =
+    Map.set String.Map.empty ~key:closed_position.id ~data:closed_position
+  in
+  let market = make_flat_market ~symbol ~start:date ~price:100.0 ~days:1 in
+  let result =
+    run_strategy (make_strategy ()) ~market_data:market
+      ~portfolio:{ Portfolio_view.cash = 10_000.0; positions }
+  in
+  assert_that result
+    (is_ok_and_holds
+       (single_entry_matcher (symbol, Position.Long, 100.0, 100.0)))
+
 let suite =
   "Bah_benchmark_strategy"
   >::: [
@@ -170,6 +214,8 @@ let suite =
          "no transitions after entry" >:: test_no_transitions_after_entry;
          "no price no transition" >:: test_no_price_no_transition;
          "insufficient cash no transition" >:: test_insufficient_cash;
+         "closed position does not block reentry"
+         >:: test_closed_position_does_not_block_reentry;
        ]
 
 let () = run_test_tt_main suite
