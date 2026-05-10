@@ -173,6 +173,58 @@ let test_multiple_cadences _ =
   assert_that ema_weekly (is_some_and (float_equal ~epsilon:0.1 111.17));
   teardown_test_data test_data_dir
 
+(** Test: a zero-OHLC bar (close = 0.0) returned by the underlying source is
+    filtered out at the adapter boundary. MON (delisted 2018) hit this in the
+    sp500-historical universe with zero rows starting 2023-01-11; the engine
+    would otherwise fill an exit at price=0 and crash on
+    Position.apply_transition's "exit_price must be positive" guard. *)
+let test_zero_close_bar_is_filtered _ =
+  let zero_bar : Types.Daily_price.t =
+    {
+      date = Date.create_exn ~y:2023 ~m:Month.Jan ~d:11;
+      open_price = 0.0;
+      high_price = 0.0;
+      low_price = 0.0;
+      close_price = 0.0;
+      volume = 0;
+      adjusted_close = 0.0;
+    }
+  in
+  let valid_bar : Types.Daily_price.t =
+    {
+      date = Date.create_exn ~y:2022 ~m:Month.Dec ~d:30;
+      open_price = 10.07;
+      high_price = 10.07;
+      low_price = 10.07;
+      close_price = 10.07;
+      volume = 0;
+      adjusted_close = 10.07;
+    }
+  in
+  let zero_date = Date.create_exn ~y:2023 ~m:Month.Jan ~d:11 in
+  let valid_date = Date.create_exn ~y:2022 ~m:Month.Dec ~d:30 in
+  let get_price ~symbol:_ ~date =
+    if Date.equal date zero_date then Some zero_bar
+    else if Date.equal date valid_date then Some valid_bar
+    else None
+  in
+  let get_previous_bar = get_price in
+  let adapter =
+    Market_data_adapter.create_with_callbacks ~get_price ~get_previous_bar
+  in
+  assert_that
+    (Market_data_adapter.get_price adapter ~symbol:"MON" ~date:zero_date)
+    is_none;
+  assert_that
+    (Market_data_adapter.get_price adapter ~symbol:"MON" ~date:valid_date)
+    (is_some_and
+       (field
+          (fun (p : Types.Daily_price.t) -> p.close_price)
+          (float_equal 10.07)));
+  assert_that
+    (Market_data_adapter.get_previous_bar adapter ~symbol:"MON" ~date:zero_date)
+    is_none
+
 let suite =
   "Market data adapter tests"
   >::: [
@@ -184,6 +236,8 @@ let suite =
          "test_unknown_indicator" >:: test_unknown_indicator;
          "test_multiple_symbols" >:: test_multiple_symbols;
          "test_multiple_cadences" >:: test_multiple_cadences;
+         "test_zero_close_bar_is_filtered"
+         >:: test_zero_close_bar_is_filtered;
        ]
 
 let () = run_test_tt_main suite

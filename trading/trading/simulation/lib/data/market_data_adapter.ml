@@ -25,6 +25,21 @@ let create ~data_dir =
 let create_with_callbacks ~get_price ~get_previous_bar =
   { backend = Callbacks { get_price; get_previous_bar } }
 
+(* A bar is "valid" only if it has a positive close price. Delisted symbols in
+   some bar datasets (e.g. EODHD) emit zero-OHLC rows after the delisting date
+   instead of truncating the file. Returning such a bar from [get_price] would
+   propagate the zero through engine.update_market → fill exit at price=0 →
+   Position.apply_transition error "exit_price must be positive: 0.00". MON
+   (Monsanto, delisted 2018) hit this on 2023-01-11 in the sp500-historical
+   universe. Treating zero-close bars as "no bar today" is consistent with the
+   delisting reality and lets the existing Stale_hold detector report the
+   stuck position. *)
+let _is_valid_bar (bar : Types.Daily_price.t) = Float.(bar.close_price > 0.0)
+
+let _filter_valid = function
+  | Some bar when _is_valid_bar bar -> Some bar
+  | Some _ | None -> None
+
 let get_price t ~symbol ~date =
   (* Direct date-indexed lookup in CSV mode. The previous implementation went
      through [get_prices ~end_date:date] which allocates a fresh [List.filter]'d
@@ -33,16 +48,22 @@ let get_price t ~symbol ~date =
      (symbol, day) cell at universe-scale per memtrace), that compounded into
      billions of cons-cell allocations per run. [Price_cache.get_price_on_date]
      is O(1) after first symbol load, with no per-call allocation. *)
-  match t.backend with
-  | Csv { price_cache; _ } ->
-      Price_cache.get_price_on_date price_cache ~symbol ~date
-  | Callbacks { get_price; _ } -> get_price ~symbol ~date
+  let raw =
+    match t.backend with
+    | Csv { price_cache; _ } ->
+        Price_cache.get_price_on_date price_cache ~symbol ~date
+    | Callbacks { get_price; _ } -> get_price ~symbol ~date
+  in
+  _filter_valid raw
 
 let get_previous_bar t ~symbol ~date =
-  match t.backend with
-  | Csv { price_cache; _ } ->
-      Price_cache.get_previous_bar price_cache ~symbol ~date
-  | Callbacks { get_previous_bar; _ } -> get_previous_bar ~symbol ~date
+  let raw =
+    match t.backend with
+    | Csv { price_cache; _ } ->
+        Price_cache.get_previous_bar price_cache ~symbol ~date
+    | Callbacks { get_previous_bar; _ } -> get_previous_bar ~symbol ~date
+  in
+  _filter_valid raw
 
 let get_indicator t ~symbol ~indicator_name ~period ~cadence ~date =
   match t.backend with
