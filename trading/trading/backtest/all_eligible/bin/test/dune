@@ -1,5 +1,5 @@
 (tests
- (names test_all_eligible_runner)
+ (names test_all_eligible_runner test_scenario_post_step)
  (libraries
   ounit2
   core

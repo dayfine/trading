@@ -4,6 +4,7 @@
     Usage: scenario_runner
     [--goldens-small | --goldens-broad | --goldens | --smoke | --dir <path>]
     [--parallel N] [--fixtures-root <path>] [--progress-every N]
+    [--no-emit-all-eligible]
 
     [--goldens-small] — small-universe goldens (~300 symbols; local-friendly).
     [--goldens-broad] — broad-universe goldens (full sector-map; nightly/GHA).
@@ -21,6 +22,15 @@
     multi-hour multi-scenario runs (e.g. 15y SP500, broad-10k 10y) emit
     checkpoints by default. Mirrors the [backtest_runner.exe --progress-every]
     flag from PR #820, but threads one emitter per scenario into each child.
+
+    [--no-emit-all-eligible] — disable the per-scenario all-eligible diagnostic
+    post-step. By default, after each child writes [actual.sexp] /
+    [summary.sexp], the runner invokes
+    {!Backtest_all_eligible.Scenario_post_step.emit} to produce
+    [<scenario_dir>/all_eligible/grade-C/{trades.csv,summary.md,config.sexp}] —
+    a per-trade alpha snapshot of every Stage-1→2 breakout that fired across the
+    run window. Use [--no-emit-all-eligible] to suppress for perf sweeps / quick
+    smoke pipelines that don't want to pay the diagnostic's scan + score cost.
 
     Reads all *.sexp files from the selected directory, runs each via
     {!Backtest.Runner.run_backtest}, prints a pass/fail table, and writes
@@ -217,7 +227,7 @@ let _actual_path ~output_root (s : Scenario.t) =
 (* Run one scenario inside a child process *)
 
 let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
-    (s : Scenario.t) =
+    ~emit_all_eligible ~scenario_path (s : Scenario.t) =
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
     (Date.to_string s.period.start_date)
     (Date.to_string s.period.end_date);
@@ -236,7 +246,14 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   let a = _actual_of_result result in
-  Sexp.save_hum (_actual_path ~output_root s) (sexp_of_actual a)
+  Sexp.save_hum (_actual_path ~output_root s) (sexp_of_actual a);
+  (* Post-step: emit the all-eligible diagnostic alongside actual.sexp /
+     summary.sexp so every scenario surfaces raw-signal alpha without manual
+     [all_eligible_runner.exe] invocation. Failures inside the runner are
+     logged + swallowed by [Scenario_post_step.emit] so a diagnostic crash
+     never aborts the parent scenario. *)
+  Backtest_all_eligible.Scenario_post_step.emit ~enabled:emit_all_eligible
+    ~scenario_path ~scenario_dir
 
 (* Fork-based worker pool. Scenarios run in parallel child processes up to
    [parallel] at a time. *)
@@ -254,12 +271,13 @@ let _write_crashed_actual ~output_root (s : Scenario.t) ~msg =
     (_actual_path ~output_root s)
     (sexp_of_actual (_crashed_actual ~msg))
 
-let _fork_scenario ~output_root ~fixtures_root ~progress_every (s : Scenario.t)
-    =
+let _fork_scenario ~output_root ~fixtures_root ~progress_every
+    ~emit_all_eligible ~scenario_path (s : Scenario.t) =
   match Core_unix.fork () with
   | `In_the_child -> (
       try
-        _run_scenario_in_child ~output_root ~fixtures_root ~progress_every s;
+        _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
+          ~emit_all_eligible ~scenario_path s;
         Stdlib.exit 0
       with e ->
         let msg = Exn.to_string e in
@@ -283,7 +301,8 @@ let _await_one running =
   match Core_unix.waitpid pid with Ok () -> Succeeded | Error _ -> Crashed
 
 let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
-    ~progress_every (scenarios : Scenario.t list) =
+    ~progress_every ~emit_all_eligible (scenarios : (string * Scenario.t) list)
+    =
   let running = Queue.create () in
   let statuses = Hashtbl.create (module String) in
   let reap () =
@@ -292,14 +311,17 @@ let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
     let status = _await_one running in
     Hashtbl.set statuses ~key:s.Scenario.name ~data:status
   in
-  List.iter scenarios ~f:(fun s ->
+  List.iter scenarios ~f:(fun (scenario_path, s) ->
       if Queue.length running >= parallel then reap ();
-      let pid = _fork_scenario ~output_root ~fixtures_root ~progress_every s in
+      let pid =
+        _fork_scenario ~output_root ~fixtures_root ~progress_every
+          ~emit_all_eligible ~scenario_path s
+      in
       Queue.enqueue running (s, pid));
   while not (Queue.is_empty running) do
     reap ()
   done;
-  List.map scenarios ~f:(fun s ->
+  List.map scenarios ~f:(fun (_, s) ->
       let status =
         Hashtbl.find statuses s.Scenario.name |> Option.value ~default:Crashed
       in
@@ -343,6 +365,14 @@ type _cli_args = {
          defaults to [Scenario_progress.default_every_n_fridays] (≈ monthly)
          when [--progress-every] is omitted, so the long-running multi-scenario
          exe gets recoverability by default. *)
+  emit_all_eligible : bool;
+      (* When [true] (the default), each scenario's child process invokes
+         [Backtest_all_eligible.Scenario_post_step.emit] after writing
+         actual.sexp, producing
+         [<scenario_dir>/all_eligible/grade-C/{trades.csv,summary.md,config.sexp}].
+         The [--no-emit-all-eligible] flag flips this off for perf sweeps /
+         quick smoke pipelines that don't want to pay the diagnostic's scan +
+         score cost. *)
 }
 
 let _default_parallel = 4
@@ -351,7 +381,7 @@ let _usage () =
   eprintf
     "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
      --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>] \
-     [--progress-every N]\n";
+     [--progress-every N] [--no-emit-all-eligible]\n";
   Stdlib.exit 1
 
 let _parse_progress_every n_str =
@@ -362,7 +392,8 @@ let _parse_progress_every n_str =
       Stdlib.exit 1
 
 let _parse_flag args =
-  let rec loop args dir parallel fixtures_root progress_every =
+  let rec loop args dir parallel fixtures_root progress_every emit_all_eligible
+      =
     match args with
     | [] ->
         let dir = Option.value dir ~default:(_goldens_small_dir ()) in
@@ -373,39 +404,51 @@ let _parse_flag args =
           progress_every =
             Option.value progress_every
               ~default:Scenario_progress.default_every_n_fridays;
+          emit_all_eligible;
         }
     | "--goldens-small" :: rest ->
         loop rest
           (Some (_goldens_small_dir ()))
-          parallel fixtures_root progress_every
+          parallel fixtures_root progress_every emit_all_eligible
     | "--goldens-broad" :: rest ->
         loop rest
           (Some (_goldens_broad_dir ()))
-          parallel fixtures_root progress_every
+          parallel fixtures_root progress_every emit_all_eligible
     | "--goldens" :: rest ->
         loop rest
           (Some (_goldens_small_dir ()))
-          parallel fixtures_root progress_every
+          parallel fixtures_root progress_every emit_all_eligible
     | "--smoke" :: rest ->
-        loop rest (Some (_smoke_dir ())) parallel fixtures_root progress_every
+        loop rest
+          (Some (_smoke_dir ()))
+          parallel fixtures_root progress_every emit_all_eligible
     | "--dir" :: path :: rest ->
         loop rest (Some path) parallel fixtures_root progress_every
+          emit_all_eligible
     | "--parallel" :: n :: rest ->
-        loop rest dir (Some (Int.of_string n)) fixtures_root progress_every
+        loop rest dir
+          (Some (Int.of_string n))
+          fixtures_root progress_every emit_all_eligible
     | "--fixtures-root" :: path :: rest ->
-        loop rest dir parallel (Some path) progress_every
+        loop rest dir parallel (Some path) progress_every emit_all_eligible
     | "--progress-every" :: n :: rest ->
-        loop rest dir parallel fixtures_root (Some (_parse_progress_every n))
+        loop rest dir parallel fixtures_root
+          (Some (_parse_progress_every n))
+          emit_all_eligible
+    | "--no-emit-all-eligible" :: rest ->
+        loop rest dir parallel fixtures_root progress_every false
     | _ -> _usage ()
   in
-  loop args None None None None
+  loop args None None None None true
 
 let _parse_args () =
   let argv = Sys.get_argv () in
   _parse_flag (List.tl_exn (Array.to_list argv))
 
 let () =
-  let { dir; parallel; fixtures_root; progress_every } = _parse_args () in
+  let { dir; parallel; fixtures_root; progress_every; emit_all_eligible } =
+    _parse_args ()
+  in
   let fixtures_root = Fixtures_root.resolve ?fixtures_root () in
   let files = _list_scenario_files dir in
   if List.is_empty files then (
@@ -417,12 +460,16 @@ let () =
   eprintf "Fixtures root: %s\n%!" fixtures_root;
   eprintf "Progress emission: every %d Friday cycle(s) per scenario\n%!"
     progress_every;
-  let scenarios = List.map files ~f:Scenario.load in
+  eprintf "All-eligible diagnostic: %s\n%!"
+    (if emit_all_eligible then "enabled" else "disabled");
+  let scenarios_with_paths =
+    List.map files ~f:(fun file -> (file, Scenario.load file))
+  in
   let output_root = _make_output_root () in
   eprintf "Output root: %s\n%!" output_root;
   let results =
     _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
-      ~progress_every scenarios
+      ~progress_every ~emit_all_eligible scenarios_with_paths
   in
   _print_header ();
   let pass_flags = List.map results ~f:(_process_result ~output_root) in
