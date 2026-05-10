@@ -11,7 +11,8 @@
     - {!Risk_adjusted_computer} (M5.2c)
     - {!Drawdown_analytics_computer} (M5.2c)
     - {!Distributional_computer} (M5.2d)
-    - {!Antifragility_computer} (M5.2d) *)
+    - {!Antifragility_computer} (M5.2d)
+    - {!Benchmark_relative_computer} *)
 
 open Core
 module Metric_types = Trading_simulation_types.Metric_types
@@ -30,6 +31,7 @@ let omega_ratio_computer = Risk_adjusted_computer.computer
 let drawdown_analytics_computer = Drawdown_analytics_computer.computer
 let distributional_computer = Distributional_computer.computer
 let antifragility_computer = Antifragility_computer.computer
+let benchmark_relative_computer = Benchmark_relative_computer.computer
 
 (** {1 Derived Metric Computers} *)
 
@@ -97,6 +99,9 @@ let create_computer (metric_type : Metric_types.metric_type) :
   | Skewness | Kurtosis | CVaR95 | CVaR99 | TailRatio | GainToPain ->
       distributional_computer ()
   | ConcavityCoef | BucketAsymmetry -> antifragility_computer ()
+  | BenchmarkAlphaPctAnnualized | BenchmarkBeta | TrackingErrorPctAnnualized
+  | InformationRatio | CorrelationToBenchmark ->
+      benchmark_relative_computer ()
 
 (** {1 Default Computer Set} *)
 
@@ -113,6 +118,7 @@ let default_computers ?(risk_free_rate = 0.0) ?(initial_cash = 0.0) () =
     drawdown_analytics_computer ();
     distributional_computer ();
     antifragility_computer ();
+    benchmark_relative_computer ();
   ]
 
 let default_derived_computers () =

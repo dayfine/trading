@@ -183,6 +183,41 @@ module Metric_type : sig
             the strategy concentrates returns in the extremes (barbell); ≤ 1
             means returns are concentrated in the middle. Reported as [0.0] when
             no benchmark series is supplied. *)
+    (* ---- Benchmark-relative (CAPM-style) ---- *)
+    | BenchmarkAlphaPctAnnualized
+        (** Annualized intercept α from the linear regression
+            [r_strat = α + β · r_bench] over per-step (daily) percent returns,
+            scaled by 252 to express as percent per year. Positive α indicates
+            the strategy delivered excess return that the benchmark linear
+            relationship cannot explain. Reported as [0.0] when no benchmark
+            series is supplied or fewer than the minimum paired samples are
+            available. *)
+    | BenchmarkBeta
+        (** Slope β from the linear regression [r_strat = α + β · r_bench] over
+            per-step (daily) percent returns. β = 1 means the strategy moves
+            1-for-1 with the benchmark; β = 0 means uncorrelated; β > 1
+            amplifies benchmark moves; β < 0 means inversely correlated.
+            Reported as [0.0] when no benchmark series is supplied or the
+            benchmark series has zero variance. *)
+    | TrackingErrorPctAnnualized
+        (** Annualized standard deviation of the active return series
+            [r_strat - r_bench], in percent. Multiplies the per-step stdev of
+            (r_strat - r_bench) by [sqrt(252)]. Lower means the strategy hugs
+            the benchmark; higher means more independent risk-taking. Reported
+            as [0.0] when no benchmark series is supplied. *)
+    | InformationRatio
+        (** Annualized Information Ratio:
+            [BenchmarkAlphaPctAnnualized / TrackingErrorPctAnnualized]. The
+            risk-adjusted active-return analogue of Sharpe (which uses absolute
+            returns) — measures alpha per unit of tracking error. Reported as
+            [0.0] when tracking error is zero or no benchmark is supplied. *)
+    | CorrelationToBenchmark
+        (** Pearson correlation of strategy and benchmark per-step returns.
+            Bounded in [-1, 1]. Together with β: high |corr| + β ≠ 1 means the
+            strategy is a leveraged or de-leveraged version of the benchmark;
+            low |corr| means the strategy moves on signals largely uncorrelated
+            with the benchmark. Reported as [0.0] when either series has zero
+            variance or no benchmark is supplied. *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -252,6 +287,11 @@ type metric_type = Metric_type.t =
   | GainToPain
   | ConcavityCoef
   | BucketAsymmetry
+  | BenchmarkAlphaPctAnnualized
+  | BenchmarkBeta
+  | TrackingErrorPctAnnualized
+  | InformationRatio
+  | CorrelationToBenchmark
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)

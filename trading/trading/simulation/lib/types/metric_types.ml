@@ -69,6 +69,11 @@ module Metric_type = struct
       | GainToPain
       | ConcavityCoef
       | BucketAsymmetry
+      | BenchmarkAlphaPctAnnualized
+      | BenchmarkBeta
+      | TrackingErrorPctAnnualized
+      | InformationRatio
+      | CorrelationToBenchmark
     [@@deriving show, eq, compare, sexp]
   end
 
@@ -139,6 +144,11 @@ type metric_type = Metric_type.t =
   | GainToPain
   | ConcavityCoef
   | BucketAsymmetry
+  | BenchmarkAlphaPctAnnualized
+  | BenchmarkBeta
+  | TrackingErrorPctAnnualized
+  | InformationRatio
+  | CorrelationToBenchmark
 [@@deriving show, eq, compare, sexp]
 
 include (Metric_type : Comparator.S with type t := metric_type)

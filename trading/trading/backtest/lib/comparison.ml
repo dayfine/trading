@@ -94,6 +94,12 @@ let _metric_label_table : (Metric_type.t * string) list =
     (* M5.2d: antifragility *)
     (ConcavityCoef, "concavity_coef");
     (BucketAsymmetry, "bucket_asymmetry");
+    (* benchmark-relative *)
+    (BenchmarkAlphaPctAnnualized, "benchmark_alpha_pct_annualized");
+    (BenchmarkBeta, "benchmark_beta");
+    (TrackingErrorPctAnnualized, "tracking_error_pct_annualized");
+    (InformationRatio, "information_ratio");
+    (CorrelationToBenchmark, "correlation_to_benchmark");
   ]
 
 let _metric_label (mt : Metric_type.t) : string =

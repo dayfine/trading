@@ -28,6 +28,7 @@
   drawdown_analytics_computer
   distributional_computer
   antifragility_computer
+  benchmark_relative_computer
   portfolio_valuation
   stale_hold)
  (preprocess
