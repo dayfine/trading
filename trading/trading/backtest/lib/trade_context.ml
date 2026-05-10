@@ -58,15 +58,12 @@ type precomputed = {
     (string, Trade_audit.audit_record, String.comparator_witness) Map.t;
       (** Exact (symbol, entry_date) → audit_record. *)
   audit_by_symbol :
-    ( string,
-      Trade_audit.audit_record list,
-      String.comparator_witness )
-    Map.t;
+    (string, Trade_audit.audit_record list, String.comparator_witness) Map.t;
       (** symbol → audit_records sorted by [entry.entry_date] descending. Used
           as fallback when the exact-date key misses: the audit records the
           {b decision} date (typically a Friday), while [trade.entry_date]
-          reflects the simulator step on which the order's fill was recorded
-          — which can be a calendar day or two later because the simulator
+          reflects the simulator step on which the order's fill was recorded —
+          which can be a calendar day or two later because the simulator
           increments [current_date] by 1 calendar day per step and fills GTC
           orders on the next step that has price-path state. We pick the most
           recent audit record whose [entry.entry_date] is ≤ [trade.entry_date]
@@ -100,9 +97,8 @@ let _build_audit_by_symbol (audit : Trade_audit.audit_record list) =
         | None -> [ record ]
         | Some xs -> record :: xs))
   |> Map.map ~f:(fun records ->
-         List.sort records
-           ~compare:(fun (a : Trade_audit.audit_record) b ->
-             Date.compare b.entry.entry_date a.entry.entry_date))
+      List.sort records ~compare:(fun (a : Trade_audit.audit_record) b ->
+          Date.compare b.entry.entry_date a.entry.entry_date))
 
 let _build_stop_by_position_id (stop_infos : Stop_log.stop_info list) =
   List.fold stop_infos
@@ -137,6 +133,21 @@ let precompute ~(audit : Trade_audit.audit_record list)
    stretches conservatively without admitting cross-trade ambiguity. *)
 let _audit_lookup_window_days = 7
 
+(* Predicate: audit record's entry_date is within the lookup window before
+   [trade_entry_date]. Pulled out of [_lookup_audit_for_trade] to flatten its
+   nesting. *)
+let _within_audit_window ~trade_entry_date (r : Trade_audit.audit_record) =
+  Date.( <= ) r.entry.entry_date trade_entry_date
+  && Date.diff trade_entry_date r.entry.entry_date <= _audit_lookup_window_days
+
+(* Fallback path: scan the per-symbol audit list for the most recent record
+   inside the lookup window. List is pre-sorted newest-first, so [List.find]
+   returns the closest match. *)
+let _audit_window_fallback (pre : precomputed) ~symbol ~trade_entry_date =
+  Option.bind
+    (Map.find pre.audit_by_symbol symbol)
+    ~f:(List.find ~f:(_within_audit_window ~trade_entry_date))
+
 (** Find the audit record for [trade]. Tries exact (symbol, entry_date) first;
     on miss, falls back to the most recent audit record for [symbol] whose
     [entry.entry_date] is ≤ [trade.entry_date] and within
@@ -146,12 +157,7 @@ let _lookup_audit_for_trade (pre : precomputed) ~symbol ~entry_date :
   let key = _audit_key ~symbol ~entry_date in
   match Map.find pre.audit_by_key key with
   | Some _ as r -> r
-  | None ->
-      Option.bind (Map.find pre.audit_by_symbol symbol) ~f:(fun records ->
-          List.find records ~f:(fun (r : Trade_audit.audit_record) ->
-              Date.( <= ) r.entry.entry_date entry_date
-              && Date.diff entry_date r.entry.entry_date
-                 <= _audit_lookup_window_days))
+  | None -> _audit_window_fallback pre ~symbol ~trade_entry_date:entry_date
 
 let _stop_info_for ~position_id ~symbol (pre : precomputed) :
     Stop_log.stop_info option =
