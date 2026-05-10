@@ -56,6 +56,21 @@ let csv_row_fields (t : t) =
 type precomputed = {
   audit_by_key :
     (string, Trade_audit.audit_record, String.comparator_witness) Map.t;
+      (** Exact (symbol, entry_date) → audit_record. *)
+  audit_by_symbol :
+    ( string,
+      Trade_audit.audit_record list,
+      String.comparator_witness )
+    Map.t;
+      (** symbol → audit_records sorted by [entry.entry_date] descending. Used
+          as fallback when the exact-date key misses: the audit records the
+          {b decision} date (typically a Friday), while [trade.entry_date]
+          reflects the simulator step on which the order's fill was recorded
+          — which can be a calendar day or two later because the simulator
+          increments [current_date] by 1 calendar day per step and fills GTC
+          orders on the next step that has price-path state. We pick the most
+          recent audit record whose [entry.entry_date] is ≤ [trade.entry_date]
+          and within a small window (1 week). *)
   stop_by_position_id :
     (string, Stop_log.stop_info, String.comparator_witness) Map.t;
   stop_first_by_symbol :
@@ -73,6 +88,21 @@ let _build_audit_by_key (audit : Trade_audit.audit_record list) =
           ~entry_date:record.entry.entry_date
       in
       Map.set acc ~key ~data:record)
+
+(** Group audit records by symbol, sorted by [entry.entry_date] descending
+    (newest first). Used by [_lookup_audit_for_trade] for the date-window
+    fallback. *)
+let _build_audit_by_symbol (audit : Trade_audit.audit_record list) =
+  List.fold audit
+    ~init:(Map.empty (module String))
+    ~f:(fun acc (record : Trade_audit.audit_record) ->
+      Map.update acc record.entry.symbol ~f:(function
+        | None -> [ record ]
+        | Some xs -> record :: xs))
+  |> Map.map ~f:(fun records ->
+         List.sort records
+           ~compare:(fun (a : Trade_audit.audit_record) b ->
+             Date.compare b.entry.entry_date a.entry.entry_date))
 
 let _build_stop_by_position_id (stop_infos : Stop_log.stop_info list) =
   List.fold stop_infos
@@ -96,9 +126,32 @@ let precompute ~(audit : Trade_audit.audit_record list)
     ~(stop_infos : Stop_log.stop_info list) : precomputed =
   {
     audit_by_key = _build_audit_by_key audit;
+    audit_by_symbol = _build_audit_by_symbol audit;
     stop_by_position_id = _build_stop_by_position_id stop_infos;
     stop_first_by_symbol = _build_stop_first_by_symbol stop_infos;
   }
+
+(* Tolerance for the date-window fallback. Cell E h=2 typically yields
+   trade.entry_date one calendar day after audit.entry_date (Friday decision
+   → Saturday-step fill record); a week handles long-weekend / holiday
+   stretches conservatively without admitting cross-trade ambiguity. *)
+let _audit_lookup_window_days = 7
+
+(** Find the audit record for [trade]. Tries exact (symbol, entry_date) first;
+    on miss, falls back to the most recent audit record for [symbol] whose
+    [entry.entry_date] is ≤ [trade.entry_date] and within
+    [_audit_lookup_window_days]. Returns [None] when no candidate matches. *)
+let _lookup_audit_for_trade (pre : precomputed) ~symbol ~entry_date :
+    Trade_audit.audit_record option =
+  let key = _audit_key ~symbol ~entry_date in
+  match Map.find pre.audit_by_key key with
+  | Some _ as r -> r
+  | None ->
+      Option.bind (Map.find pre.audit_by_symbol symbol) ~f:(fun records ->
+          List.find records ~f:(fun (r : Trade_audit.audit_record) ->
+              Date.( <= ) r.entry.entry_date entry_date
+              && Date.diff entry_date r.entry.entry_date
+                 <= _audit_lookup_window_days))
 
 let _stop_info_for ~position_id ~symbol (pre : precomputed) :
     Stop_log.stop_info option =
@@ -121,8 +174,10 @@ let _days_to_first_stop_trigger ~(entry_date : Date.t) ~(exit_date : Date.t)
 
 let of_precomputed (pre : precomputed)
     ~(trade : Trading_simulation.Metrics.trade_metrics) : t =
-  let key = _audit_key ~symbol:trade.symbol ~entry_date:trade.entry_date in
-  let audit_record = Map.find pre.audit_by_key key in
+  let audit_record =
+    _lookup_audit_for_trade pre ~symbol:trade.symbol
+      ~entry_date:trade.entry_date
+  in
   let entry =
     Option.map audit_record ~f:(fun (r : Trade_audit.audit_record) -> r.entry)
   in
