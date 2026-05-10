@@ -193,18 +193,18 @@ module Metric_type : sig
             series is supplied or fewer than the minimum paired samples are
             available. *)
     | BenchmarkBeta
-        (** Slope β from the linear regression
-            [r_strat = α + β · r_bench] over per-step (daily) percent returns.
-            β = 1 means the strategy moves 1-for-1 with the benchmark; β = 0
-            means uncorrelated; β > 1 amplifies benchmark moves; β < 0 means
-            inversely correlated. Reported as [0.0] when no benchmark series is
-            supplied or the benchmark series has zero variance. *)
+        (** Slope β from the linear regression [r_strat = α + β · r_bench] over
+            per-step (daily) percent returns. β = 1 means the strategy moves
+            1-for-1 with the benchmark; β = 0 means uncorrelated; β > 1
+            amplifies benchmark moves; β < 0 means inversely correlated.
+            Reported as [0.0] when no benchmark series is supplied or the
+            benchmark series has zero variance. *)
     | TrackingErrorPctAnnualized
         (** Annualized standard deviation of the active return series
             [r_strat - r_bench], in percent. Multiplies the per-step stdev of
             (r_strat - r_bench) by [sqrt(252)]. Lower means the strategy hugs
-            the benchmark; higher means more independent risk-taking.
-            Reported as [0.0] when no benchmark series is supplied. *)
+            the benchmark; higher means more independent risk-taking. Reported
+            as [0.0] when no benchmark series is supplied. *)
     | InformationRatio
         (** Annualized Information Ratio:
             [BenchmarkAlphaPctAnnualized / TrackingErrorPctAnnualized]. The

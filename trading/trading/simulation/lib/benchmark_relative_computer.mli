@@ -25,7 +25,7 @@ val computer :
   Trading_simulation_types.Simulator_types.any_metric_computer
 (** Build the benchmark-relative metric computer. Mirrors
     {!Antifragility_computer.computer}'s API: when [benchmark_returns] is
-    [Some], that series takes precedence over per-step
-    [step.benchmark_return]; when [None], the step-sourced series is used.
-    The override path is for synthetic tests that pin specific benchmark
-    values without going through the simulator. *)
+    [Some], that series takes precedence over per-step [step.benchmark_return];
+    when [None], the step-sourced series is used. The override path is for
+    synthetic tests that pin specific benchmark values without going through the
+    simulator. *)

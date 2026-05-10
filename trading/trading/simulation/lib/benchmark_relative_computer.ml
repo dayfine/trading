@@ -1,5 +1,5 @@
-(** Benchmark-relative metrics: alpha, beta, tracking error, Information
-    Ratio, correlation. See .mli for spec. *)
+(** Benchmark-relative metrics: alpha, beta, tracking error, Information Ratio,
+    correlation. See .mli for spec. *)
 
 open Core
 module Metric_types = Trading_simulation_types.Metric_types
@@ -47,11 +47,11 @@ let _align_pairs strat bench =
 type _moments = {
   n : float;
   sx : float;  (** Σ x (benchmark) *)
-  sy : float;  (** Σ y (strategy)  *)
-  sxx : float;  (** Σ x²            *)
-  syy : float;  (** Σ y²            *)
-  sxy : float;  (** Σ x·y           *)
-  sd2 : float;  (** Σ (y − x)²      *)
+  sy : float;  (** Σ y (strategy) *)
+  sxx : float;  (** Σ x² *)
+  syy : float;  (** Σ y² *)
+  sxy : float;  (** Σ x·y *)
+  sd2 : float;  (** Σ (y − x)² *)
 }
 
 let _zero_moments =
@@ -120,31 +120,38 @@ let _empty_metric_set () =
       (CorrelationToBenchmark, 0.0);
     ]
 
+(* Build the populated metric set from accumulated moments. Pulled out to
+   keep [_build_metrics] flat (the wrapper there is just gating). *)
+let _metrics_from_moments m =
+  let alpha, beta = _alpha_beta m in
+  let alpha_annualized = alpha *. _trading_days_per_year in
+  let te_annualized =
+    _active_return_stdev m *. Float.sqrt _trading_days_per_year
+  in
+  let info_ratio =
+    if Float.(Float.abs te_annualized < _variance_tolerance) then 0.0
+    else alpha_annualized /. te_annualized
+  in
+  Metric_types.of_alist_exn
+    [
+      (BenchmarkAlphaPctAnnualized, alpha_annualized);
+      (BenchmarkBeta, beta);
+      (TrackingErrorPctAnnualized, te_annualized);
+      (InformationRatio, info_ratio);
+      (CorrelationToBenchmark, _correlation m);
+    ]
+
 let _build_metrics ~strat_returns ~benchmark_returns =
-  match benchmark_returns with
-  | None | Some [] -> _empty_metric_set ()
-  | Some bench ->
-      let pairs = _align_pairs strat_returns bench in
-      if List.length pairs < _min_paired_samples then _empty_metric_set ()
-      else
-        let m = _accumulate_moments pairs in
-        let alpha, beta = _alpha_beta m in
-        let alpha_annualized = alpha *. _trading_days_per_year in
-        let te = _active_return_stdev m in
-        let te_annualized = te *. Float.sqrt _trading_days_per_year in
-        let info_ratio =
-          if Float.(Float.abs te_annualized < _variance_tolerance) then 0.0
-          else alpha_annualized /. te_annualized
-        in
-        let corr = _correlation m in
-        Metric_types.of_alist_exn
-          [
-            (BenchmarkAlphaPctAnnualized, alpha_annualized);
-            (BenchmarkBeta, beta);
-            (TrackingErrorPctAnnualized, te_annualized);
-            (InformationRatio, info_ratio);
-            (CorrelationToBenchmark, corr);
-          ]
+  let bench_opt =
+    match benchmark_returns with
+    | None | Some [] -> None
+    | Some bench -> Some (_align_pairs strat_returns bench)
+  in
+  match bench_opt with
+  | None -> _empty_metric_set ()
+  | Some pairs when List.length pairs < _min_paired_samples ->
+      _empty_metric_set ()
+  | Some pairs -> _metrics_from_moments (_accumulate_moments pairs)
 
 let _resolve_benchmark_series state =
   match state.benchmark_returns_override with

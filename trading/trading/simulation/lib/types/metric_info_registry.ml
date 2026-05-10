@@ -12,10 +12,17 @@
 open Core
 open Metric_types
 
-type metric_unit = Dollars | Percent | Days | Count | Ratio
-[@@deriving show, eq]
+(* Public types re-exported from {!Metric_info_types} so sibling modules
+   (e.g. {!Metric_info_registry_extras}) can construct records without a
+   circular dependency on this module. *)
+type metric_unit = Metric_info_types.metric_unit =
+  | Dollars
+  | Percent
+  | Days
+  | Count
+  | Ratio
 
-type metric_info = {
+type metric_info = Metric_info_types.metric_info = {
   display_name : string;
   description : string;
   unit : metric_unit;
@@ -105,32 +112,16 @@ let get_metric_info = function
       {
         display_name = "Open Positions Value";
         description =
-          "Signed mark-to-market value of all open positions at end of \
-           simulation. Equals last-marked-to-market portfolio_value minus \
-           current_cash on that step (= sum of [position_quantity(p) * \
-           current_close(p)] across each held position, with long \
-           contributions positive and short contributions negative). Computed \
-           from the most recent step whose portfolio_value actually reflects \
-           position mark-to-market — non-trading days (weekends, holidays, \
-           missing bars) are skipped because the simulator falls back to \
-           portfolio_value = cash on those days. NOT to be confused with \
-           unrealized P&L (see [UnrealizedPnl]) — this metric does not \
-           subtract cost basis.";
+          "Signed mark-to-market value of open positions at end of run. See \
+           [Metric_types.OpenPositionsValue] for the full semantic spec.";
         unit = Dollars;
       }
   | UnrealizedPnl ->
       {
         display_name = "Unrealized P&L";
         description =
-          "Total unrealized profit/loss on open positions at end of \
-           simulation: sum of [(current_close(p) - entry_price(p)) * \
-           signed_qty(p)] across each held position, where signed_qty is \
-           positive for longs and negative for shorts. Equivalently: \
-           [OpenPositionsValue] minus the sum of position cost bases. Positive \
-           means paper gains on the open book; negative means paper losses. \
-           Computed from the most recent step whose portfolio_value actually \
-           reflects position mark-to-market — non-trading days are skipped per \
-           the same logic as [OpenPositionsValue].";
+          "Total unrealized P&L on open positions at end of run. See \
+           [Metric_types.UnrealizedPnl] for the full semantic spec.";
         unit = Dollars;
       }
   | TradeFrequency ->
@@ -480,47 +471,13 @@ let get_metric_info = function
            supplied.";
         unit = Ratio;
       }
-  | BenchmarkAlphaPctAnnualized ->
-      {
-        display_name = "Alpha (annualized)";
-        description =
-          "Annualized intercept α from r_strat = α + β·r_bench. Positive α = \
-           excess return the benchmark cannot explain. Reported as 0 when no \
-           benchmark series is supplied.";
-        unit = Percent;
-      }
-  | BenchmarkBeta ->
-      {
-        display_name = "Beta";
-        description =
-          "Slope β from r_strat = α + β·r_bench. β=1 moves with benchmark; \
-           β>1 amplifies; β<0 inverse. Reported as 0 when no benchmark.";
-        unit = Ratio;
-      }
-  | TrackingErrorPctAnnualized ->
-      {
-        display_name = "Tracking Error (annualized)";
-        description =
-          "Annualized stdev of (r_strat - r_bench). Higher = more independent \
-           risk-taking vs benchmark. Reported as 0 when no benchmark.";
-        unit = Percent;
-      }
-  | InformationRatio ->
-      {
-        display_name = "Information Ratio";
-        description =
-          "Annualized α / Tracking Error. Risk-adjusted active-return \
-           analogue of Sharpe. Reported as 0 when tracking error is zero.";
-        unit = Ratio;
-      }
-  | CorrelationToBenchmark ->
-      {
-        display_name = "Correlation to Benchmark";
-        description =
-          "Pearson correlation of strategy and benchmark step returns, in \
-           [-1, 1]. Reported as 0 when either series has zero variance.";
-        unit = Ratio;
-      }
+  | ( BenchmarkAlphaPctAnnualized | BenchmarkBeta | TrackingErrorPctAnnualized
+    | InformationRatio | CorrelationToBenchmark ) as t -> (
+      match Metric_info_registry_extras.info_for_benchmark_relative t with
+      | Some info -> info
+      | None ->
+          failwithf "missing benchmark-relative info for %s"
+            (show_metric_type t) ())
 
 let format_metric metric_type value =
   let info = get_metric_info metric_type in

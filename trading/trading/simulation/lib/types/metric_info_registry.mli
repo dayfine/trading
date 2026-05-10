@@ -6,21 +6,20 @@
     by name (e.g. [Metric_info_registry.format_metric]) rather than relying on
     aliases. *)
 
-(** Unit of measurement, used for formatting per-variant. *)
-type metric_unit =
-  | Dollars  (** Monetary value in dollars *)
-  | Percent  (** Percentage value (0-100 scale) *)
-  | Days  (** Time duration in days *)
-  | Count  (** Discrete count *)
-  | Ratio  (** Dimensionless ratio *)
-[@@deriving show, eq]
+(** Unit of measurement, re-exported from {!Metric_info_types}. *)
+type metric_unit = Metric_info_types.metric_unit =
+  | Dollars
+  | Percent
+  | Days
+  | Count
+  | Ratio
 
-type metric_info = {
-  display_name : string;  (** Human-readable name *)
-  description : string;  (** Brief explanation *)
-  unit : metric_unit;  (** Unit for formatting *)
+type metric_info = Metric_info_types.metric_info = {
+  display_name : string;
+  description : string;
+  unit : metric_unit;
 }
-(** Metadata about a metric type *)
+(** Metadata about a metric type, re-exported from {!Metric_info_types}. *)
 
 val get_metric_info : Metric_types.metric_type -> metric_info
 (** Look up display info for a metric type. Total — every variant has an entry.
