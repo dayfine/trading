@@ -1,11 +1,12 @@
 # Status: all-eligible
 
-## Last updated: 2026-05-09
+## Last updated: 2026-05-10
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
-(PR-1 merged #899; PR-2 CLI merged #901; **PR-3 release-report wiring is the next dispatchable item**)
+(PR-1 merged #899; PR-2 CLI merged #901; **PR-3 release-report wiring on
+`feat/all-eligible-release-report` — ready for review**)
 
 ## Interface stable
 NO
@@ -41,16 +42,6 @@ natural exit. Produces per-trade alpha + aggregate stats so we can separate
 
 ## Open work
 
-**Next dispatchable (P0):** PR-3 release-report wiring — owner: feat-backtest.
-
-- [ ] **PR-3 wiring** — invoke `all_eligible_runner.exe` from the
-  release-report pipeline (or scenario_runner post-step) so every backtest
-  produces the diagnostic without manual invocation. Plan: add a
-  post-backtest step in the release-report pipeline that calls the runner
-  with the same `--scenario` + an `all_eligible/` subdirectory under the
-  report out-dir; gate behind a config flag (`emit_all_eligible : bool`,
-  default `true`); pin via a smoke-scenario integration test that asserts
-  the three-file emission. ~150 LOC + 2-3 tests.
 - [ ] Hand-crafted Stage-1→2 breakout fixture for content tests of the
   smoke suite (current smoke uses flat-price bars ⇒ zero breakouts ⇒
   pins runner shape but not alpha math). Currently a deferred follow-up
@@ -78,6 +69,20 @@ natural exit. Produces per-trade alpha + aggregate stats so we can separate
   $10K-per-signal sizing (negative all-eligible alpha across the
   universe — informs the "screener cascade is keeping the average
   signal out" hypothesis).
+- 2026-05-10 — **PR-3 release-report wiring** READY_FOR_REVIEW on
+  `feat/all-eligible-release-report` (`6eb8d6d`).
+  `Backtest_all_eligible.Scenario_post_step.emit` facade + `scenario_runner`
+  wiring so every per-scenario child writes
+  `<scenario_dir>/all_eligible/grade-C/{trades.csv,summary.md,config.sexp}`
+  alongside its existing `actual.sexp` / `summary.sexp` artefacts.
+  Gated by `--no-emit-all-eligible` flag (default: emit on). Three pinning
+  tests cover enabled/disabled/failure-isolation under
+  `trading/trading/backtest/all_eligible/bin/test/test_scenario_post_step.ml`.
+  Diagnostic failures inside the runner are logged + swallowed so a crash
+  never aborts the parent backtest. Verify:
+  ```bash
+  dune runtest trading/trading/backtest/all_eligible
+  ```
 
 ## Verify
 
