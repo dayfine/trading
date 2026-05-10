@@ -83,6 +83,18 @@ and t = {
   portfolio : Trading_portfolio.Portfolio.t;
   positions : Trading_strategy.Position.t String.Map.t;
   step_history : step_result list;  (** Accumulated steps in reverse order *)
+  last_known_prices : float String.Table.t;
+      (** Per-symbol last-resolved close price. Populated whenever
+          [_prices_for_held_positions] resolves a price for a held symbol
+          (today's bar OR adapter forward-fill). Consulted as the third fallback
+          if both today's bar and [get_previous_bar] fail — covers held symbols
+          whose bar dataset has gaps the adapter cannot reach (M&A delisting +
+          dataset edge, survivor-bias purges). Reference-shared across all
+          per-step copies of [t]. *)
+  valuation_failure_count : int ref;
+      (** Counter incremented each time [_resolve_price] fell through to the
+          avg-cost last-resort (the cache was also empty for a held symbol).
+          Should remain [0] in healthy runs; printed at end of [run]. *)
 }
 
 (** {1 Creation} *)
@@ -107,6 +119,8 @@ let create ~config ~deps =
         portfolio;
         positions = String.Map.empty;
         step_history = [];
+        last_known_prices = String.Table.create ();
+        valuation_failure_count = ref 0;
       }
 
 (** {1 Running} *)
@@ -159,59 +173,6 @@ let _get_today_bars t =
     |> Option.map ~f:(_to_price_bar symbol)
   in
   List.filter_map t.deps.symbols ~f:get_bar
-
-(** Fetch the most recent prior close for [pos] when its symbol is absent from
-    [today_set]. Returns [None] when [pos.symbol] is in [today_set] (no fallback
-    needed) or when no prior bar exists for the symbol. *)
-let _fallback_price_for_position ~adapter ~date ~today_set
-    (pos : Trading_portfolio.Types.portfolio_position) =
-  if Set.mem today_set pos.symbol then None
-  else
-    let%map.Option prev =
-      Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
-        ~symbol:pos.symbol ~date
-    in
-    (pos.symbol, prev.Types.Daily_price.close_price)
-
-(** Build a [(symbol, close_price)] alist covering every position in
-    [portfolio]. Today's bar (from [today_bars]) is preferred; for any held
-    symbol with no bar today, fall back to the most recent prior bar via
-    [adapter.get_previous_bar] (forward-fill of last-known close). Symbols with
-    neither today's bar nor any prior bar are dropped — the downstream
-    [Calculations.portfolio_value] errors when this happens, and the caller
-    falls back to cash-only valuation. The forward-fill matters when a held
-    symbol stops trading mid-run (corporate action, suspension): without it,
-    [Calculations.portfolio_value] errors, the caller silently substitutes
-    [current_cash], the equity curve flatlines, and the
-    [Backtest.Runner.is_trading_day] heuristic that gates equity-curve rows
-    drops every subsequent step. *)
-let _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars =
-  let today_prices =
-    List.map today_bars ~f:(fun bar ->
-        (bar.Trading_engine.Types.symbol, bar.close_price))
-  in
-  let today_set = today_prices |> List.map ~f:fst |> String.Set.of_list in
-  let fallback_prices =
-    List.filter_map portfolio.Trading_portfolio.Portfolio.positions
-      ~f:(_fallback_price_for_position ~adapter ~date ~today_set)
-  in
-  today_prices @ fallback_prices
-
-(** Compute total portfolio value (cash + position market values). Forward-
-    fills missing prices for held positions via [_prices_for_held_positions];
-    when even the forward-fill cannot resolve a price (no prior bar ever), falls
-    back to cash-only valuation rather than crashing the run. *)
-let _compute_portfolio_value ~adapter ~date ~portfolio ~today_bars =
-  let prices =
-    _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars
-  in
-  match
-    Trading_portfolio.Calculations.portfolio_value
-      portfolio.Trading_portfolio.Portfolio.positions portfolio.current_cash
-      prices
-  with
-  | Ok value -> value
-  | Error _ -> portfolio.current_cash
 
 (** Extract trades from execution reports *)
 let _extract_trades reports =
@@ -351,6 +312,14 @@ let _build_run_result t =
     _compute_derived ~derived_computers:t.deps.metric_suite.derived
       ~config:t.config ~base_metrics
   in
+  if !(t.valuation_failure_count) > 0 then
+    eprintf
+      "WARN: %d held-position price resolutions fell through to avg-cost \
+       fallback (zero unrealized assumption). Run still produced a valid \
+       portfolio_value series; review valuation_failure_count for cache \
+       coverage gaps.\n\
+       %!"
+      !(t.valuation_failure_count);
   { steps; final_portfolio = t.portfolio; metrics }
 
 (* Apply trades one at a time, skipping any that fail (e.g. insufficient
@@ -387,6 +356,26 @@ let _prepare_market_state t =
   Trading_engine.Engine.update_market t.deps.engine today_bars;
   (portfolio, positions, today_bars, split_events)
 
+(** Build the per-step [step_result]. Projection to the skinny
+    [Portfolio_summary] mirrors Fix B from
+    [dev/notes/15y-memory-cliff-2026-05-08.md]. *)
+let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
+    ~split_events =
+  let portfolio_summary =
+    Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
+      ~position_value_total:(portfolio_value -. portfolio.current_cash)
+  in
+  {
+    date = t.current_date;
+    portfolio = portfolio_summary;
+    portfolio_value;
+    trades;
+    orders_submitted = _submit_orders t orders;
+    splits_applied = split_events;
+    benchmark_return = _compute_benchmark_return t;
+    had_market_bars = not (List.is_empty today_bars);
+  }
+
 (** Process one day: execute pending orders, call strategy, generate new orders,
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
@@ -407,27 +396,14 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
       ~positions transitions
   in
   let portfolio_value =
-    _compute_portfolio_value ~adapter:t.deps.market_data_adapter
+    Portfolio_valuation.compute ~adapter:t.deps.market_data_adapter
       ~date:t.current_date ~portfolio ~today_bars
-  in
-  (* Project to skinny per-step summary — see [Portfolio_summary.t] for the
-     memory-pressure rationale (Fix B in
-     dev/notes/15y-memory-cliff-2026-05-08.md). *)
-  let portfolio_summary =
-    Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
-      ~position_value_total:(portfolio_value -. portfolio.current_cash)
+      ~last_known_prices:t.last_known_prices
+      ~valuation_failure_count:t.valuation_failure_count
   in
   let step_result =
-    {
-      date = t.current_date;
-      portfolio = portfolio_summary;
-      portfolio_value;
-      trades;
-      orders_submitted = _submit_orders t orders;
-      splits_applied = split_events;
-      benchmark_return = _compute_benchmark_return t;
-      had_market_bars = not (List.is_empty today_bars);
-    }
+    _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
+      ~split_events
   in
   let t' =
     {
