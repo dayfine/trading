@@ -58,6 +58,13 @@ let _entry_from_price (price : Types.Daily_price.t) ~(symbol : string)
   | Some target_quantity ->
       Some (_build_entry_transition ~symbol ~price ~target_quantity)
 
+(* Active (non-[Closed]) position lookup. Skipping [Closed] keeps the
+   buy-and-hold idempotency intact only against still-open positions; in
+   practice BAH never exits by design, so this is a defensive belt-and-
+   suspenders filter alongside the simulator's positions-Map prune (PR #1024).
+   Exhaustive pattern mirrors
+   [weinstein_strategy_screening.held_symbols]. *)
+
 (** True if any value in [positions] points at [symbol]. The simulator keys its
     position map by [position_id] (e.g. ["SPY-bah-benchmark"]) — not by symbol —
     so a [Map.mem positions symbol] check would never fire and the strategy
@@ -67,7 +74,10 @@ let _entry_from_price (price : Types.Daily_price.t) ~(symbol : string)
 let _has_position_for_symbol ~(positions : Position.t String.Map.t)
     ~(symbol : string) : bool =
   Map.exists positions ~f:(fun (pos : Position.t) ->
-      String.equal pos.symbol symbol)
+      match pos.state with
+      | Position.Entering _ | Position.Holding _ | Position.Exiting _ ->
+          String.equal pos.symbol symbol
+      | Position.Closed _ -> false)
 
 (** Single-symbol entry decision. Returns [None] when:
     - the position already exists in [positions] (don't double-enter), or

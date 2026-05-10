@@ -339,6 +339,75 @@ let test_no_entry_below_ema _ =
   assert_equal 0 (List.length output.transitions);
   assert_bool "No position" (Map.is_empty !positions)
 
+(** Pins the Closed-doesn't-block-reentry guard in [_find_position_for_symbol]:
+    a portfolio whose only entry for [AAPL] is in [Closed] state must NOT
+    short-circuit the by-symbol lookup; the strategy must still emit a fresh
+    CreateEntering when entry-signal conditions are met. Without the
+    [Closed]-filter the helper would return the stale Closed position,
+    [_check_exit] would silently fall through, and no CreateEntering would be
+    emitted on the active price/EMA cross. *)
+let test_closed_position_does_not_block_reentry _ =
+  let closed_position : Position.t =
+    {
+      id = "AAPL-prev-closed-1";
+      symbol = "AAPL";
+      side = Position.Long;
+      entry_reasoning =
+        Position.TechnicalSignal
+          { indicator = "EMA"; description = "prior-cycle entry" };
+      exit_reason =
+        Some (Position.SignalReversal { description = "prior whipsaw" });
+      state =
+        Position.Closed
+          {
+            quantity = 100.0;
+            entry_price = 130.0;
+            exit_price = 140.0;
+            gross_pnl = Some 1000.0;
+            entry_date = date_of_string "2023-12-01";
+            exit_date = date_of_string "2023-12-15";
+            days_held = 14;
+          };
+      last_updated = date_of_string "2023-12-15";
+      portfolio_lot_ids = [];
+    }
+  in
+  let positions =
+    Map.set String.Map.empty ~key:closed_position.id ~data:closed_position
+  in
+  let prices =
+    Test_helpers.Price_generators.make_price_sequence ~symbol:"AAPL"
+      ~start_date:(date_of_string "2024-01-01")
+      ~days:15 ~base_price:140.0 ~trend:(Uptrend 1.0) ~volatility:0.01
+  in
+  let market_data =
+    Test_helpers.Mock_market_data.create
+      ~data:[ ("AAPL", prices) ]
+      ~ema_periods:[ 10 ]
+      ~current_date:(date_of_string "2024-01-15")
+  in
+  let config =
+    {
+      Ema_strategy.symbols = [ "AAPL" ];
+      ema_period = 10;
+      stop_loss_percent = 0.05;
+      take_profit_percent = 0.10;
+      position_size = 100.0;
+    }
+  in
+  let (module S) = Ema_strategy.make config in
+  let get_price = Test_helpers.Mock_market_data.get_price market_data in
+  let get_indicator = Test_helpers.Mock_market_data.get_indicator market_data in
+  let output =
+    unwrap_result
+      (S.on_market_close ~get_price ~get_indicator
+         ~portfolio:{ cash = 0.0; positions })
+      "Strategy execution"
+  in
+  (* The Closed position must not block a fresh CreateEntering on the
+     active entry signal. *)
+  assert_equal 1 (List.length output.transitions)
+
 let suite =
   "EMA Strategy Tests"
   >::: [
@@ -346,6 +415,8 @@ let suite =
          "take profit" >:: test_take_profit;
          "stop loss" >:: test_stop_loss;
          "no entry below ema" >:: test_no_entry_below_ema;
+         "closed position does not block reentry"
+         >:: test_closed_position_does_not_block_reentry;
        ]
 
 let () = run_test_tt_main suite

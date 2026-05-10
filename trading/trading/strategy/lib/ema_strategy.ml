@@ -103,12 +103,19 @@ let _execute_exit ~(position : Position.t) ~quantity:_
         { exit_reason; exit_price = price.Types.Daily_price.close_price };
   }
 
-(* Find a position for a given symbol.
-   The positions map is keyed by position_id, so we need to search by symbol. *)
+(* Find an *active* position for a given symbol. The positions map is keyed
+   by position_id, so we search by symbol; we also skip [Closed] entries so a
+   previously-exited position doesn't block a fresh entry. Exhaustive pattern
+   mirrors [weinstein_strategy_screening.held_symbols] — strategy-internal
+   filter that does not rely on the simulator's positions-Map prune (PR
+   #1024). *)
 let _find_position_for_symbol positions symbol =
   Map.to_alist positions
-  |> List.find_map ~f:(fun (_id, pos) ->
-      if String.equal pos.Position.symbol symbol then Some pos else None)
+  |> List.find_map ~f:(fun (_id, (pos : Position.t)) ->
+      match pos.state with
+      | Position.Entering _ | Position.Holding _ | Position.Exiting _ ->
+          if String.equal pos.symbol symbol then Some pos else None
+      | Position.Closed _ -> None)
 
 let _check_exit price ema position =
   match Position.get_state position with
