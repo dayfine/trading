@@ -236,8 +236,7 @@ let suite =
          "test_unknown_indicator" >:: test_unknown_indicator;
          "test_multiple_symbols" >:: test_multiple_symbols;
          "test_multiple_cadences" >:: test_multiple_cadences;
-         "test_zero_close_bar_is_filtered"
-         >:: test_zero_close_bar_is_filtered;
+         "test_zero_close_bar_is_filtered" >:: test_zero_close_bar_is_filtered;
        ]
 
 let () = run_test_tt_main suite
