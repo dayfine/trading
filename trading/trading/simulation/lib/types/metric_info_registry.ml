@@ -480,6 +480,47 @@ let get_metric_info = function
            supplied.";
         unit = Ratio;
       }
+  | BenchmarkAlphaPctAnnualized ->
+      {
+        display_name = "Alpha (annualized)";
+        description =
+          "Annualized intercept α from r_strat = α + β·r_bench. Positive α = \
+           excess return the benchmark cannot explain. Reported as 0 when no \
+           benchmark series is supplied.";
+        unit = Percent;
+      }
+  | BenchmarkBeta ->
+      {
+        display_name = "Beta";
+        description =
+          "Slope β from r_strat = α + β·r_bench. β=1 moves with benchmark; \
+           β>1 amplifies; β<0 inverse. Reported as 0 when no benchmark.";
+        unit = Ratio;
+      }
+  | TrackingErrorPctAnnualized ->
+      {
+        display_name = "Tracking Error (annualized)";
+        description =
+          "Annualized stdev of (r_strat - r_bench). Higher = more independent \
+           risk-taking vs benchmark. Reported as 0 when no benchmark.";
+        unit = Percent;
+      }
+  | InformationRatio ->
+      {
+        display_name = "Information Ratio";
+        description =
+          "Annualized α / Tracking Error. Risk-adjusted active-return \
+           analogue of Sharpe. Reported as 0 when tracking error is zero.";
+        unit = Ratio;
+      }
+  | CorrelationToBenchmark ->
+      {
+        display_name = "Correlation to Benchmark";
+        description =
+          "Pearson correlation of strategy and benchmark step returns, in \
+           [-1, 1]. Reported as 0 when either series has zero variance.";
+        unit = Ratio;
+      }
 
 let format_metric metric_type value =
   let info = get_metric_info metric_type in
