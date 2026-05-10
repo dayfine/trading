@@ -1,0 +1,86 @@
+Loading 7 scenarios from /workspaces/trading-1/dev/experiments/rolling-5y-segmentation-ab-2026-05-11/scenarios (parallel=1)
+Fixtures root: /workspaces/trading-1/trading/test_data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-11-110408
+
+>>> Running cell-e-5y-2011-01-seg: Rolling 5y Cell E h=2 — 0.14/exp0.70 — Segmentation classifier — 2011-01-01 to 2015-12-31 (2011-01-01 to 2015-12-31)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2011-01-01 to 2015-12-31, warmup from 2010-06-05)...
+Panel_runner: simulator window 2010-06-05..2015-12-31 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_dc492c)
+Panel_runner: snapshot bar reader wired (calendar 1454 days) for strategy
+
+>>> Running cell-e-5y-2012-07-seg: Rolling 5y Cell E h=2 — 0.14/exp0.70 — Segmentation classifier — 2012-07-01 to 2017-06-30 (2012-07-01 to 2017-06-30)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2012-07-01 to 2017-06-30, warmup from 2011-12-04)...
+Panel_runner: simulator window 2011-12-04..2017-06-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_1df416)
+Panel_runner: snapshot bar reader wired (calendar 1455 days) for strategy
+
+>>> Running cell-e-5y-2014-01-seg: Rolling 5y Cell E h=2 — 0.14/exp0.70 — Segmentation classifier — 2014-01-01 to 2018-12-31 (2014-01-01 to 2018-12-31)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2014-01-01 to 2018-12-31, warmup from 2013-06-05)...
+Panel_runner: simulator window 2013-06-05..2018-12-31 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_33d84d)
+Panel_runner: snapshot bar reader wired (calendar 1454 days) for strategy
+
+>>> Running cell-e-5y-2015-07-seg: Rolling 5y Cell E h=2 — 0.14/exp0.70 — Segmentation classifier — 2015-07-01 to 2020-06-30 (2015-07-01 to 2020-06-30)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2015-07-01 to 2020-06-30, warmup from 2014-12-03)...
+Panel_runner: simulator window 2014-12-03..2020-06-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_e795c5)
+Panel_runner: snapshot bar reader wired (calendar 1455 days) for strategy
+
+>>> Running cell-e-5y-2017-01-seg: Rolling 5y Cell E h=2 — 0.14/exp0.70 — Segmentation classifier — 2017-01-01 to 2021-12-31 (2017-01-01 to 2021-12-31)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2017-01-01 to 2021-12-31, warmup from 2016-06-05)...
+Panel_runner: simulator window 2016-06-05..2021-12-31 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_75f311)
+Panel_runner: snapshot bar reader wired (calendar 1455 days) for strategy
+
+>>> Running cell-e-5y-2018-07-seg: Rolling 5y Cell E h=2 — 0.14/exp0.70 — Segmentation classifier — 2018-07-01 to 2023-06-30 (2018-07-01 to 2023-06-30)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2018-07-01 to 2023-06-30, warmup from 2017-12-03)...
+Panel_runner: simulator window 2017-12-03..2023-06-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_007372)
+Panel_runner: snapshot bar reader wired (calendar 1455 days) for strategy
+
+>>> Running cell-e-5y-2020-01-seg: Rolling 5y Cell E h=2 — 0.14/exp0.70 — Segmentation classifier — 2020-01-01 to 2024-12-31 (2020-01-01 to 2024-12-31)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2020-01-01 to 2024-12-31, warmup from 2019-06-05)...
+Panel_runner: simulator window 2019-06-05..2024-12-31 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_127a58)
+Panel_runner: snapshot bar reader wired (calendar 1455 days) for strategy
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+cell-e-5y-2011-01-seg           88.2%     246    41.1%    24.0%   PASS
+cell-e-5y-2012-07-seg          119.5%     229    40.2%    16.9%   PASS
+cell-e-5y-2014-01-seg           62.3%     242    34.3%    22.6%   PASS
+cell-e-5y-2015-07-seg           41.0%     254    33.1%    17.4%   PASS
+cell-e-5y-2017-01-seg          112.2%     225    36.0%    14.1%   PASS
+cell-e-5y-2018-07-seg           25.0%     286    27.3%    25.0%   PASS
+cell-e-5y-2020-01-seg            4.7%     313    31.3%    35.7%   PASS
+
+7/7 scenarios passed.
