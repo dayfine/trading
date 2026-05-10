@@ -265,6 +265,22 @@ let _find_fill_target acc symbol =
   | Some _ as r -> r
   | None -> try_find _is_exiting_state false
 
+(* Either install [data] in [acc] or remove [key] when [data] is in the
+   [Closed] terminal state. Hot-path callers ([_update_positions_from_trades],
+   [_apply_trigger_exit]) used to retain Closed positions in the simulator's
+   positions Map indefinitely; over a 15y run the Map grew to thousands of
+   entries and every per-trade / per-Friday walk
+   ([_find_position_by_symbol_state], [held_symbols],
+   [_initial_short_notional]) paid an O(closed + active) cost plus an
+   allocation from [Map.to_alist] / [Map.data]. Closed positions are
+   strategy-invisible (held_symbols already filters them) and contribute 0 to
+   valuation, so dropping them is observable-invariant; audit trails live in
+   [Trade_audit] / [Stop_log] / [final_portfolio.positions], which are fed
+   from independent sources. *)
+let _set_or_drop_if_closed acc ~key ~data =
+  if Trading_strategy.Position.is_closed data then Map.remove acc key
+  else Map.set acc ~key ~data
+
 (** Update positions from trades. *)
 let _update_positions_from_trades ~date ~positions ~trades =
   let open Result.Let_syntax in
@@ -273,7 +289,7 @@ let _update_positions_from_trades ~date ~positions ~trades =
       match _find_fill_target acc symbol with
       | Some (id, pos, is_entry) ->
           let%bind updated = _apply_fill ~date ~position:pos ~trade ~is_entry in
-          Ok (Map.set acc ~key:id ~data:updated)
+          Ok (_set_or_drop_if_closed acc ~key:id ~data:updated)
       | None -> Ok acc)
 
 let _apply_trigger_exit acc trans =
@@ -282,7 +298,7 @@ let _apply_trigger_exit acc trans =
   | None -> Ok acc
   | Some pos ->
       let%bind updated = Trading_strategy.Position.apply_transition pos trans in
-      Ok (Map.set acc ~key:trans.position_id ~data:updated)
+      Ok (_set_or_drop_if_closed acc ~key:trans.position_id ~data:updated)
 
 (** Apply transitions to positions *)
 let _apply_transitions ~positions ~transitions =
