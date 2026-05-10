@@ -23,14 +23,14 @@
 ;; pinned as a golden until we have cause to.
 ((name "15y-cell-e-stage3-k1-laggard-h2")
  (description
-   "15y SP500 — Cell E (Stage3 ON h=1 + Laggard ON h=2, aggressive) on the 510-sym Wiki-replayed historical universe with the same portfolio-sizing overrides as the 15y baseline.")
+   "15y SP500 — Cell E (Stage3 ON h=1 + Laggard ON h=2, aggressive) on the 510-sym Wiki-replayed historical universe. Position sizing 0.14 / 0.70 / 0.30 — promoted 2026-05-11 as new Cell E default after overnight sweep (dev/notes/overnight-2026-05-10-results.md). 0.14/0.70 wins return + Sharpe in 5/7 rolling 5y windows vs prior 0.05/0.50 default; geom-mean 5y return 41%→50%, avg Sharpe 0.66→0.75, trades cut ~60%.")
  (period ((start_date 2010-01-01) (end_date 2026-04-30)))
  (universe_path "universes/sp500-historical/sp500-2010-01-01.sexp")
  (universe_size 510)
  (config_overrides
   (((enable_short_side false))
-   ((portfolio_config ((max_position_pct_long 0.05))))
-   ((portfolio_config ((max_long_exposure_pct 0.50))))
+   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))
    ((stage3_force_exit_config ((hysteresis_weeks 1))))

@@ -1,0 +1,20 @@
+Loading 1 scenarios from /workspaces/trading-1/dev/backtest/golden-15y-rerun-2026-05-11-source (parallel=1)
+Fixtures root: /workspaces/trading-1/trading/test_data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-11-104806
+
+>>> Running sp500-2010-2026-historical: 15y sp500 historical backtest — survivorship-aware universe (510 symbols, replayed back to 2010-01-01), 2010-01-01 → 2026-04-30. Companion to goldens-sp500/sp500-2019-2023.sexp's 5y window. (2010-01-01 to 2026-04-30)
+Using scenario-provided sector map (510 symbols)...
+Universe: 510 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 525
+Running backtest (2010-01-01 to 2026-04-30, warmup from 2009-06-05)...
+Panel_runner: simulator window 2009-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (525 symbols, /tmp/panel_runner_csv_snapshot_b393fb)
+Panel_runner: snapshot bar reader wired (calendar 4410 days) for strategy
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+sp500-2010-2026-historical     594.4%      40    22.5%    28.4%   FAIL (total_trades low (40.00 < 200.00); win_rate low (22.50 < 25.00); open_positions_value high (6777708.37 > 5000000.00))
+
+0/1 scenarios passed.

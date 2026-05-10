@@ -44,28 +44,35 @@
  ;; widens the entry funnel proportional to the window's longer horizon
  ;; without modifying the default Portfolio_risk.config (which other
  ;; goldens depend on).
+ ;; Position-sizing promoted 2026-05-11 from 0.05/0.50/0.30 to 0.14/0.70/0.30
+ ;; per overnight sweep winner (dev/notes/overnight-2026-05-10-results.md):
+ ;; on the 2010-2024 15y window, 0.14/0.70 produced +374% / Sharpe 0.85 /
+ ;; DD 18.4% vs prior 0.05/0.50 default at +189-235%. Validated across 7
+ ;; rolling 5y windows (5/7 wins on return AND Sharpe; geom-mean 5y return
+ ;; 41%→50%; avg Sharpe 0.66→0.75; trades cut ~60%).
  (config_overrides
   (((enable_short_side false))
-   ((portfolio_config ((max_position_pct_long 0.05))))
-   ((portfolio_config ((max_long_exposure_pct 0.50))))
+   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))))
- ;; Tight-pinned 2026-05-09 post-Q1-memory-fix series (#988 Fix C / #992 Fix A /
- ;; #993 Fix B). Prior 2026-05-05 pin (5.15% / 102 trades / 16.12% MaxDD) was
- ;; stale by ~105 ppt: it was measured on a code state with much lower trade
- ;; turnover. Today's clean GHA run (run #25580570848, artefact zip preserves
- ;; full actual.sexp) measures:
- ;;   total_return_pct  110.84   total_trades 302   win_rate 21.19
- ;;   sharpe_ratio       0.46    max_drawdown 23.33 avg_holding_days 102.79
- ;;   open_positions_value 2,068,649   unrealized_pnl 985,444
- ;;   force_liquidations_count 2
- ;; CAGR is now 4.7% (was 0.31% on prior pin). Wall ~50 min on GHA.
- ;; Tolerances ±15% around measured; tighten if/when a follow-up tuning sweep
- ;; (#856) lands a more rigorous baseline.
+ ;; Tight-pinned 2026-05-11 after 0.14/0.70/0.30 promotion. Local run
+ ;; (run.log under dev/backtest/golden-15y-rerun-2026-05-11/, wall ~13 min)
+ ;; on the 16.3y window (2010-01-01 → 2026-04-30) measures:
+ ;;   total_return_pct  594.35   total_trades  40   win_rate 22.50
+ ;;   sharpe_ratio       0.6993  max_drawdown 28.38 avg_holding_days 142.63
+ ;;   open_positions_value 6,777,708   unrealized_pnl 6,115,434
+ ;;   force_liquidations_count 0
+ ;; Note: trade count dropped from 302 → 40 because the wider position size
+ ;; (0.05 → 0.14) holds positions ~3× longer (avg 143 days vs 103 days), and
+ ;; the higher exposure cap (0.50 → 0.70) means winners aren't rotated out
+ ;; for capital. Most of the return is unrealized at end-of-window — this is
+ ;; the baseline Weinstein behavior (no Cell E rotation overlay). Tolerances
+ ;; ±15% around measured.
  (expected
-  ((total_return_pct   ((min  90.0)         (max 130.0)))
-   (total_trades       ((min 250)           (max 360)))
-   (win_rate           ((min  17.0)         (max  26.0)))
-   (sharpe_ratio       ((min   0.30)        (max   0.65)))
-   (max_drawdown_pct   ((min  18.0)         (max  30.0)))
-   (avg_holding_days   ((min  85.0)         (max 125.0)))
-   (open_positions_value ((min 1700000.0)  (max 2500000.0))))))
+  ((total_return_pct   ((min 505.0)         (max 685.0)))
+   (total_trades       ((min  34)           (max  46)))
+   (win_rate           ((min  19.0)         (max  26.0)))
+   (sharpe_ratio       ((min   0.59)        (max   0.81)))
+   (max_drawdown_pct   ((min  24.0)         (max  33.0)))
+   (avg_holding_days   ((min 121.0)         (max 164.0)))
+   (open_positions_value ((min 5760000.0)  (max 7800000.0))))))
