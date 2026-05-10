@@ -17,11 +17,12 @@ type state = {
       *)
   last_marked_step : Simulator_types.step_result option;
       (** Last step whose [portfolio_value] is a real mark-to-market (cash +
-          position market values). On non-trading days (weekends, holidays) or
-          when price bars for open-position symbols are missing, the simulator
-          falls back to [portfolio_value = current_cash] — such steps are
-          excluded here so [OpenPositionsValue] / [UnrealizedPnl] reflect actual
-          end-of-sim state. See [_is_marked_to_market]. *)
+          position market values). Held positions are valued via cache +
+          avg-cost fallback chain in [Simulator._resolve_price] so the cash-only
+          collapse no longer fires; this filter remains as a safety net for any
+          residual cash-only step (e.g. zero-position runs) so
+          [OpenPositionsValue] / [UnrealizedPnl] reflect actual end-of-sim
+          state. See [_is_marked_to_market]. *)
   total_trades : int;
 }
 
@@ -30,9 +31,11 @@ type state = {
     Heuristic (mirrors [Backtest.Runner._is_trading_day] at
     [trading/trading/backtest/lib/runner.ml]): when there are no open positions,
     [portfolio_value = cash] is trivially correct. When there are open
-    positions, [portfolio_value] should differ measurably from cash — otherwise
-    the simulator's [_compute_portfolio_value] fell back to cash because no
-    price bars were available for that date. *)
+    positions, [portfolio_value] should differ measurably from cash — the
+    simulator's cache + avg-cost fallback in [_resolve_price] now guarantees
+    every held position is priced, so a step where they coincide indicates an
+    edge case (e.g., avg cost equals zero, or no positions remain after
+    end-of-day) that the metric computers should still skip. *)
 let _is_marked_to_market (step : Simulator_types.step_result) =
   let cash = step.portfolio.current_cash in
   let has_positions = Portfolio_summary.positions_count step.portfolio > 0 in

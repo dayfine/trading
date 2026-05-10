@@ -83,6 +83,18 @@ and t = {
   portfolio : Trading_portfolio.Portfolio.t;
   positions : Trading_strategy.Position.t String.Map.t;
   step_history : step_result list;  (** Accumulated steps in reverse order *)
+  last_known_prices : float String.Table.t;
+      (** Per-symbol last-resolved close price. Populated whenever
+          [_prices_for_held_positions] resolves a price for a held symbol
+          (today's bar OR adapter forward-fill). Consulted as the third fallback
+          if both today's bar and [get_previous_bar] fail — covers held symbols
+          whose bar dataset has gaps the adapter cannot reach (M&A delisting +
+          dataset edge, survivor-bias purges). Reference-shared across all
+          per-step copies of [t]. *)
+  valuation_failure_count : int ref;
+      (** Counter incremented each time [_resolve_price] fell through to the
+          avg-cost last-resort (the cache was also empty for a held symbol).
+          Should remain [0] in healthy runs; printed at end of [run]. *)
 }
 
 (** {1 Creation} *)
@@ -107,6 +119,8 @@ let create ~config ~deps =
         portfolio;
         positions = String.Map.empty;
         step_history = [];
+        last_known_prices = String.Table.create ();
+        valuation_failure_count = ref 0;
       }
 
 (** {1 Running} *)
@@ -160,50 +174,80 @@ let _get_today_bars t =
   in
   List.filter_map t.deps.symbols ~f:get_bar
 
-(** Fetch the most recent prior close for [pos] when its symbol is absent from
-    [today_set]. Returns [None] when [pos.symbol] is in [today_set] (no fallback
-    needed) or when no prior bar exists for the symbol. *)
-let _fallback_price_for_position ~adapter ~date ~today_set
-    (pos : Trading_portfolio.Types.portfolio_position) =
-  if Set.mem today_set pos.symbol then None
+(** Resolve a held position's price for today, populating + consulting
+    [last_known_prices] as a third-tier fallback after today's bar and the
+    adapter's forward-fill via [get_previous_bar]. The avg-cost last-resort
+    fires only when none of the three sources knows a price — equivalent to
+    "value the position at cost basis," i.e., assume zero unrealized P&L for
+    that position. Increments [valuation_failure_count] in the avg-cost branch.
+
+    Returns [None] only when [pos.symbol] is already in [today_set] (the caller
+    covers it via [today_prices]); otherwise always returns
+    [Some (symbol, price)] so the downstream [Calculations.portfolio_value] is
+    guaranteed to succeed. *)
+let _resolve_price ~adapter ~date ~today_set ~last_known_prices
+    ~valuation_failure_count (pos : Trading_portfolio.Types.portfolio_position)
+    =
+  let symbol = pos.symbol in
+  if Set.mem today_set symbol then None
   else
-    let%map.Option prev =
-      Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
-        ~symbol:pos.symbol ~date
+    let cache p =
+      Hashtbl.set last_known_prices ~key:symbol ~data:p;
+      p
     in
-    (pos.symbol, prev.Types.Daily_price.close_price)
+    let price =
+      match
+        Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
+          ~symbol ~date
+      with
+      | Some prev -> cache prev.Types.Daily_price.close_price
+      | None -> (
+          match Hashtbl.find last_known_prices symbol with
+          | Some cached -> cached
+          | None ->
+              incr valuation_failure_count;
+              cache (Trading_portfolio.Calculations.avg_cost_of_position pos))
+    in
+    Some (symbol, price)
 
 (** Build a [(symbol, close_price)] alist covering every position in
     [portfolio]. Today's bar (from [today_bars]) is preferred; for any held
-    symbol with no bar today, fall back to the most recent prior bar via
-    [adapter.get_previous_bar] (forward-fill of last-known close). Symbols with
-    neither today's bar nor any prior bar are dropped — the downstream
-    [Calculations.portfolio_value] errors when this happens, and the caller
-    falls back to cash-only valuation. The forward-fill matters when a held
-    symbol stops trading mid-run (corporate action, suspension): without it,
-    [Calculations.portfolio_value] errors, the caller silently substitutes
-    [current_cash], the equity curve flatlines, and the
-    [Backtest.Runner.is_trading_day] heuristic that gates equity-curve rows
-    drops every subsequent step. *)
-let _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars =
+    symbol with no bar today, fall back to the adapter's [get_previous_bar]
+    forward-fill, then to [last_known_prices] cache, then to the position's avg
+    cost basis (zero-unrealized assumption). The cache + avg-cost fallback were
+    added to fix the silent-cash-only valuation bug that previously corrupted
+    the [equity_curve.csv] daily-derivative metrics whenever any held symbol's
+    bar dataset had a gap. See [dev/notes/cell-e-15y-full-window-2026-05-10.md].
+*)
+let _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars
+    ~last_known_prices ~valuation_failure_count =
   let today_prices =
     List.map today_bars ~f:(fun bar ->
         (bar.Trading_engine.Types.symbol, bar.close_price))
   in
+  List.iter today_prices ~f:(fun (sym, p) ->
+      Hashtbl.set last_known_prices ~key:sym ~data:p);
   let today_set = today_prices |> List.map ~f:fst |> String.Set.of_list in
   let fallback_prices =
     List.filter_map portfolio.Trading_portfolio.Portfolio.positions
-      ~f:(_fallback_price_for_position ~adapter ~date ~today_set)
+      ~f:
+        (_resolve_price ~adapter ~date ~today_set ~last_known_prices
+           ~valuation_failure_count)
   in
   today_prices @ fallback_prices
 
-(** Compute total portfolio value (cash + position market values). Forward-
-    fills missing prices for held positions via [_prices_for_held_positions];
-    when even the forward-fill cannot resolve a price (no prior bar ever), falls
-    back to cash-only valuation rather than crashing the run. *)
-let _compute_portfolio_value ~adapter ~date ~portfolio ~today_bars =
+(** Compute total portfolio value (cash + position market values). With the
+    cache + avg-cost fallback in [_prices_for_held_positions], every held
+    position now has a price, so [Calculations.portfolio_value] should always
+    return [Ok]. The legacy cash-only fallback is preserved as defense-in-depth:
+    if anything regresses (e.g., a future field is added that causes the calc to
+    fail for an unrelated reason), we still log it instead of silently
+    corrupting the curve. *)
+let _compute_portfolio_value ~adapter ~date ~portfolio ~today_bars
+    ~last_known_prices ~valuation_failure_count =
   let prices =
     _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars
+      ~last_known_prices ~valuation_failure_count
   in
   match
     Trading_portfolio.Calculations.portfolio_value
@@ -211,7 +255,9 @@ let _compute_portfolio_value ~adapter ~date ~portfolio ~today_bars =
       prices
   with
   | Ok value -> value
-  | Error _ -> portfolio.current_cash
+  | Error _ ->
+      incr valuation_failure_count;
+      portfolio.current_cash
 
 (** Extract trades from execution reports *)
 let _extract_trades reports =
@@ -351,6 +397,14 @@ let _build_run_result t =
     _compute_derived ~derived_computers:t.deps.metric_suite.derived
       ~config:t.config ~base_metrics
   in
+  if !(t.valuation_failure_count) > 0 then
+    eprintf
+      "WARN: %d held-position price resolutions fell through to avg-cost \
+       fallback (zero unrealized assumption). Run still produced a valid \
+       portfolio_value series; review valuation_failure_count for cache \
+       coverage gaps.\n\
+       %!"
+      !(t.valuation_failure_count);
   { steps; final_portfolio = t.portfolio; metrics }
 
 (* Apply trades one at a time, skipping any that fail (e.g. insufficient
@@ -409,6 +463,8 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
   let portfolio_value =
     _compute_portfolio_value ~adapter:t.deps.market_data_adapter
       ~date:t.current_date ~portfolio ~today_bars
+      ~last_known_prices:t.last_known_prices
+      ~valuation_failure_count:t.valuation_failure_count
   in
   (* Project to skinny per-step summary — see [Portfolio_summary.t] for the
      memory-pressure rationale (Fix B in
