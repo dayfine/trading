@@ -47,6 +47,18 @@ type optimal_summary_pair = {
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 
+type all_eligible_summary = {
+  trade_count : int;
+  winners : int;
+  losers : int;
+  win_rate_pct : float;
+  mean_return_pct : float;
+  median_return_pct : float;
+  total_pnl_dollars : float;
+  trades_csv_path : string;
+}
+[@@deriving sexp] [@@sexp.allow_extra_fields]
+
 type scenario_run = {
   name : string;
   actual : actual;
@@ -55,6 +67,7 @@ type scenario_run = {
   wall_seconds : float option;
   trade_quality : Trade_audit_report.t option;
   optimal_strategy : optimal_summary_pair option;
+  all_eligible : all_eligible_summary option;
 }
 [@@deriving sexp]
 
@@ -136,6 +149,59 @@ let _try_load_optimal_summary ~dir ~scenario_name : optimal_summary_pair option
         }
     with _ -> None
 
+(* On-disk shape of [all_eligible/grade-C/summary.sexp] — mirrors the
+   [Backtest_all_eligible.All_eligible.aggregate] producer. We re-declare the
+   shape locally so [release_report] does not need to depend on the heavy
+   [backtest_all_eligible] library; [@@sexp.allow_extra_fields] absorbs
+   producer-side fields the comparison report does not surface (notably
+   [return_buckets], which is a per-cell histogram and would inflate the report
+   without per-batch context). The fields kept here are exactly those the
+   rendered table reads. *)
+type _all_eligible_summary_on_disk = {
+  trade_count : int;
+  winners : int;
+  losers : int;
+  win_rate_pct : float;
+  mean_return_pct : float;
+  median_return_pct : float;
+  total_pnl_dollars : float;
+}
+[@@deriving of_sexp] [@@sexp.allow_extra_fields]
+
+let _all_eligible_cell_subdir = Filename.concat "all_eligible" "grade-C"
+
+let _try_load_all_eligible_summary ~dir ~scenario_name :
+    all_eligible_summary option =
+  (* Loads [<dir>/all_eligible/grade-C/summary.sexp] when present. The
+     companion [trades.csv] path is recorded for the rendered drill-down link;
+     the section still renders if the CSV is absent (the link will 404 but
+     the metrics are intact). Any read / parse failure swallows silently —
+     the all-eligible section is auxiliary, never a hard requirement. *)
+  let cell_dir = Filename.concat dir _all_eligible_cell_subdir in
+  let sexp_path = Filename.concat cell_dir "summary.sexp" in
+  if not (Sys_unix.file_exists_exn sexp_path) then None
+  else
+    try
+      let on_disk =
+        _all_eligible_summary_on_disk_of_sexp (Sexp.load_sexp sexp_path)
+      in
+      let trades_csv_path =
+        Filename.concat scenario_name
+          (Filename.concat _all_eligible_cell_subdir "trades.csv")
+      in
+      Some
+        {
+          trade_count = on_disk.trade_count;
+          winners = on_disk.winners;
+          losers = on_disk.losers;
+          win_rate_pct = on_disk.win_rate_pct;
+          mean_return_pct = on_disk.mean_return_pct;
+          median_return_pct = on_disk.median_return_pct;
+          total_pnl_dollars = on_disk.total_pnl_dollars;
+          trades_csv_path;
+        }
+    with _ -> None
+
 let load_scenario_run ~dir =
   let name = Filename.basename dir in
   let actual_path = Filename.concat dir "actual.sexp" in
@@ -154,6 +220,9 @@ let load_scenario_run ~dir =
   in
   let trade_quality = _try_load_trade_quality ~dir in
   let optimal_strategy = _try_load_optimal_summary ~dir ~scenario_name:name in
+  let all_eligible =
+    _try_load_all_eligible_summary ~dir ~scenario_name:name
+  in
   {
     name;
     actual;
@@ -162,6 +231,7 @@ let load_scenario_run ~dir =
     wall_seconds;
     trade_quality;
     optimal_strategy;
+    all_eligible;
   }
 
 let _list_scenario_subdirs root =

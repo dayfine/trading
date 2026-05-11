@@ -103,6 +103,36 @@ type optimal_summary_pair = {
     alongside it. Built by {!load_scenario_run} when both files are present in
     the scenario dir. *)
 
+type all_eligible_summary = {
+  trade_count : int;
+  winners : int;
+  losers : int;
+  win_rate_pct : float;
+      (** Per-trade win rate as a decimal fraction in [0.0, 1.0]. Mirrors the
+          [All_eligible.aggregate.win_rate_pct] contract — multiply by 100 to
+          compare against {!actual.win_rate} which is already in percentage
+          units. *)
+  mean_return_pct : float;
+      (** Arithmetic mean of per-trade [return_pct] as a decimal fraction. *)
+  median_return_pct : float;
+      (** Median of per-trade [return_pct] as a decimal fraction. *)
+  total_pnl_dollars : float;
+      (** Sum of per-trade [pnl_dollars] across every signal at the cell's
+          fixed-dollar sizing. *)
+  trades_csv_path : string;
+      (** Relative path (from the scenario directory's parent batch root) to
+          the per-trade [trades.csv] — used to render a markdown link for
+          drill-down in the report. Always
+          [<scenario_name>/all_eligible/grade-C/trades.csv]. *)
+}
+[@@deriving sexp]
+(** The headline metrics from the [all_eligible/grade-C/summary.sexp] artefact
+    plus a relative path to its companion [trades.csv]. Mirrors the on-disk
+    shape that {!Backtest_all_eligible.Grade_sweep} writes; decoded with
+    [@@sexp.allow_extra_fields] so the reader survives forward additions on the
+    producer side (e.g. the [return_buckets] field is intentionally dropped —
+    it doesn't render in the comparison report). *)
+
 type scenario_run = {
   name : string;
   actual : actual;
@@ -121,16 +151,25 @@ type scenario_run = {
           [optimal_strategy.exe] binary against their output dir. The report
           renders an additional "Optimal-strategy delta" section for paired
           scenarios where at least one side has [Some _]. *)
+  all_eligible : all_eligible_summary option;
+      (** Loaded from [all_eligible/grade-C/summary.sexp] in the scenario dir
+          when present. [None] for scenarios that did not run the all-eligible
+          diagnostic (e.g. scenario_runner invoked with
+          [--no-emit-all-eligible]). The report renders an additional
+          "All-eligible diagnostic" section for paired scenarios where at least
+          one side has [Some _]. *)
 }
 [@@deriving sexp]
 (** One scenario's per-run readings — the [actual] block plus optional
-    infra-perf measurements, an optional trade-audit summary, and an optional
-    optimal-strategy counterfactual summary. Both [peak_rss_kb] and
-    [wall_seconds] are [None] when the corresponding sibling files are absent in
-    the batch dir; the report still renders trading metrics in that case.
-    [trade_quality] is [None] when no audit artefacts were found or when the
-    audit was empty (no trades). [optimal_strategy] is [None] when no
-    [optimal_summary.sexp] was emitted. *)
+    infra-perf measurements, an optional trade-audit summary, an optional
+    optimal-strategy counterfactual summary, and an optional all-eligible
+    diagnostic summary. Both [peak_rss_kb] and [wall_seconds] are [None] when
+    the corresponding sibling files are absent in the batch dir; the report
+    still renders trading metrics in that case. [trade_quality] is [None] when
+    no audit artefacts were found or when the audit was empty (no trades).
+    [optimal_strategy] is [None] when no [optimal_summary.sexp] was emitted.
+    [all_eligible] is [None] when no [all_eligible/grade-C/summary.sexp] was
+    emitted. *)
 
 type t = {
   current_label : string;

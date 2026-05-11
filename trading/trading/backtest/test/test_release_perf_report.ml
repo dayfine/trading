@@ -38,8 +38,8 @@ let _make_summary ?(start_date = Date.of_string "2023-01-02")
   }
 
 let _make_run ?(name = "scenario") ?actual ?summary ?(peak_rss_kb = None)
-    ?(wall_seconds = None) ?(trade_quality = None) ?(optimal_strategy = None) ()
-    : Release_report.scenario_run =
+    ?(wall_seconds = None) ?(trade_quality = None) ?(optimal_strategy = None)
+    ?(all_eligible = None) () : Release_report.scenario_run =
   let actual = Option.value actual ~default:(_make_actual ()) in
   let summary = Option.value summary ~default:(_make_summary ()) in
   {
@@ -50,6 +50,7 @@ let _make_run ?(name = "scenario") ?actual ?summary ?(peak_rss_kb = None)
     wall_seconds;
     trade_quality;
     optimal_strategy;
+    all_eligible;
   }
 
 let _make_optimal_summary ?(total_round_trips = 50) ?(winners = 25)
@@ -74,6 +75,22 @@ let _make_optimal_pair ?(constrained = _make_optimal_summary ())
     ?(report_path = "scenario/optimal_strategy.md") () :
     Release_report.optimal_summary_pair =
   { constrained; relaxed_macro; report_path }
+
+let _make_all_eligible_summary ?(trade_count = 100) ?(winners = 30)
+    ?(losers = 65) ?(win_rate_pct = 0.30) ?(mean_return_pct = -0.05)
+    ?(median_return_pct = -0.08) ?(total_pnl_dollars = -50_000.0)
+    ?(trades_csv_path = "scenario/all_eligible/grade-C/trades.csv") () :
+    Release_report.all_eligible_summary =
+  {
+    trade_count;
+    winners;
+    losers;
+    win_rate_pct;
+    mean_return_pct;
+    median_return_pct;
+    total_pnl_dollars;
+    trades_csv_path;
+  }
 
 (* --- default_thresholds --- *)
 
@@ -994,6 +1011,83 @@ let test_load_scenario_run_loads_optimal_strategy_with_extra_fields _ =
               (float_equal 0.35);
           ]))
 
+(* --- Loader: all-eligible diagnostic round-trip via on-disk fixtures ---
+
+   The all-eligible diagnostic lands at
+   [<scenario>/all_eligible/grade-C/summary.sexp]. The on-disk shape is the
+   raw [All_eligible.aggregate] sexp, which includes a [return_buckets] field
+   the comparison report intentionally drops (the histogram is per-cell and
+   doesn't carry useful cross-batch signal). These tests pin the loader's
+   presence-and-absence branches plus the [@@sexp.allow_extra_fields] guard
+   against forward additions on the producer side. *)
+
+let _write_all_eligible_summary_sexp path =
+  _write_text path
+    "((trade_count 100) (winners 30) (losers 65)\n\
+    \ (win_rate_pct 0.30) (mean_return_pct -0.05)\n\
+    \ (median_return_pct -0.08) (total_pnl_dollars -50000.00)\n\
+    \ (return_buckets (((-inf) -0.5 5) (-0.5 -0.2 20) (-0.2 0.0 40)\n\
+    \                   (0.0 0.2 25) (0.2 0.5 8) (0.5 1.0 1) (1.0 (+inf) 1))))\n"
+
+let _stage_all_eligible_cell ~scenario_dir =
+  let cell =
+    Filename.concat scenario_dir
+      (Filename.concat "all_eligible" "grade-C")
+  in
+  Core_unix.mkdir_p cell;
+  _write_all_eligible_summary_sexp (Filename.concat cell "summary.sexp")
+
+let test_load_scenario_run_loads_all_eligible_when_present _ =
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_alleli_" in
+  _make_scenario_dir ~root:dir "with-alleli" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "with-alleli" in
+  _stage_all_eligible_cell ~scenario_dir;
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.all_eligible
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (s : Release_report.all_eligible_summary) -> s.trade_count)
+              (equal_to 100);
+            field
+              (fun (s : Release_report.all_eligible_summary) ->
+                s.win_rate_pct)
+              (float_equal 0.30);
+            field
+              (fun (s : Release_report.all_eligible_summary) ->
+                s.total_pnl_dollars)
+              (float_equal (-50_000.0));
+            field
+              (fun (s : Release_report.all_eligible_summary) ->
+                s.trades_csv_path)
+              (equal_to "with-alleli/all_eligible/grade-C/trades.csv");
+          ]))
+
+let test_load_scenario_run_no_all_eligible_when_files_missing _ =
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_alleli_" in
+  _make_scenario_dir ~root:dir "no-alleli" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "no-alleli" in
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.all_eligible is_none
+
+let test_load_scenario_run_no_all_eligible_when_sexp_malformed _ =
+  (* Pins the [try ... with _ -> None] swallow on parse failure. The cell
+     directory exists and contains a [summary.sexp], but the content is not
+     valid sexp — the loader must return [None] rather than raise. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_alleli_" in
+  _make_scenario_dir ~root:dir "malformed-alleli" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "malformed-alleli" in
+  let cell =
+    Filename.concat scenario_dir
+      (Filename.concat "all_eligible" "grade-C")
+  in
+  Core_unix.mkdir_p cell;
+  _write_text (Filename.concat cell "summary.sexp")
+    "this is not valid sexp\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.all_eligible is_none
+
 let suite =
   "release_perf_report"
   >::: [
@@ -1044,6 +1138,12 @@ let suite =
          >:: test_load_scenario_run_no_optimal_when_sexp_malformed;
          "load_scenario_run loads optimal_strategy with extra outer fields"
          >:: test_load_scenario_run_loads_optimal_strategy_with_extra_fields;
+         "load_scenario_run loads all_eligible when present"
+         >:: test_load_scenario_run_loads_all_eligible_when_present;
+         "load_scenario_run no all_eligible when files missing"
+         >:: test_load_scenario_run_no_all_eligible_when_files_missing;
+         "load_scenario_run no all_eligible when sexp malformed"
+         >:: test_load_scenario_run_no_all_eligible_when_sexp_malformed;
        ]
 
 let () = run_test_tt_main suite
