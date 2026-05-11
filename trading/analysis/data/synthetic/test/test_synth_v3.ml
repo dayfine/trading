@@ -36,13 +36,12 @@ let test_default_symbol_names _ =
   let names = List.map u.symbols ~f:fst in
   assert_that names
     (elements_are
-       [
-         equal_to "SYNTH_0001"; equal_to "SYNTH_0002"; equal_to "SYNTH_0003";
-       ])
+       [ equal_to "SYNTH_0001"; equal_to "SYNTH_0002"; equal_to "SYNTH_0003" ])
 
 let test_explicit_symbol_names _ =
   let cfg =
-    { (_default_cfg ~n_symbols:3 ()) with
+    {
+      (_default_cfg ~n_symbols:3 ()) with
       symbols = Some [ "AAA"; "BBB"; "CCC" ];
     }
   in
@@ -58,15 +57,14 @@ let test_explicit_symbol_names _ =
 let test_all_symbols_share_dates _ =
   let cfg = _default_cfg ~n_symbols:6 ~target:40 () in
   let u = _unwrap_or_fail "generate failed" (Synth_v3.generate cfg) in
-  let bar_dates = List.map u.symbols ~f:(fun (_, bars) ->
-    List.map bars ~f:(fun (b : Types.Daily_price.t) -> b.date))
+  let bar_dates =
+    List.map u.symbols ~f:(fun (_, bars) ->
+        List.map bars ~f:(fun (b : Types.Daily_price.t) -> b.date))
   in
   match bar_dates with
   | [] -> assert_failure "empty universe"
   | first :: rest ->
-      let aligned =
-        List.for_all rest ~f:(List.equal Date.equal first)
-      in
+      let aligned = List.for_all rest ~f:(List.equal Date.equal first) in
       assert_that aligned (equal_to true)
 
 let test_dates_business_days_only _ =
@@ -187,9 +185,7 @@ let _pearson_correlation xs ys =
 let test_cross_sectional_correlation _ =
   let cfg = _default_cfg ~n_symbols:50 ~target:5_000 ~seed:7 () in
   let u = _unwrap_or_fail "generate failed" (Synth_v3.generate cfg) in
-  let returns =
-    List.map u.symbols ~f:(fun (_, bars) -> _daily_returns bars)
-  in
+  let returns = List.map u.symbols ~f:(fun (_, bars) -> _daily_returns bars) in
   let returns_arr = Array.of_list returns in
   let n = Array.length returns_arr in
   let total = ref 0.0 in
@@ -243,9 +239,7 @@ let test_validation_bad_idio_dist _ =
 
 let test_validation_bad_market_propagates _ =
   let cfg = _default_cfg () in
-  let bad_market =
-    { cfg.market with target_length_days = 0 }
-  in
+  let bad_market = { cfg.market with target_length_days = 0 } in
   let bad = { cfg with market = bad_market } in
   assert_that (Synth_v3.generate bad) (is_error_with Status.Invalid_argument)
 
@@ -257,9 +251,7 @@ let test_default_symbol_names_padded _ =
   let names = Synth_v3.default_symbol_names ~n:3 in
   assert_that names
     (elements_are
-       [
-         equal_to "SYNTH_0001"; equal_to "SYNTH_0002"; equal_to "SYNTH_0003";
-       ])
+       [ equal_to "SYNTH_0001"; equal_to "SYNTH_0002"; equal_to "SYNTH_0003" ])
 
 let test_default_symbol_names_zero _ =
   let names = Synth_v3.default_symbol_names ~n:0 in
@@ -300,8 +292,7 @@ let suite =
          >:: test_validation_symbol_list_mismatch;
          "validation: bad loading distribution"
          >:: test_validation_bad_loading_dist;
-         "validation: bad idio distribution"
-         >:: test_validation_bad_idio_dist;
+         "validation: bad idio distribution" >:: test_validation_bad_idio_dist;
          "validation: bad market config propagates"
          >:: test_validation_bad_market_propagates;
          (* default symbol names *)

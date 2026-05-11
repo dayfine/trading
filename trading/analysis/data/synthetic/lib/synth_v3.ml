@@ -85,7 +85,6 @@ let _validate config =
 let _beta_seed_offset = 100_000
 let _idio_param_seed_offset = 200_000
 let _idio_stream_seed_base = 1_000_000
-
 let _seed_for_betas seed = seed + _beta_seed_offset
 let _seed_for_idio_params seed = seed + _idio_param_seed_offset
 let _seed_for_symbol_returns seed i = seed + _idio_stream_seed_base + i
@@ -93,6 +92,12 @@ let _seed_for_symbol_returns seed i = seed + _idio_stream_seed_base + i
 (* ---------------------------------------------------------------------- *)
 (* Market-return extraction                                               *)
 (* ---------------------------------------------------------------------- *)
+
+(* Step function for the fold below: emit log(close/prev_close), advance the
+   prev-close accumulator. *)
+let _accumulate_log_return (prev_close, acc) (b : Types.Daily_price.t) =
+  let r = Float.log (b.close_price /. prev_close) in
+  (b.close_price, r :: acc)
 
 (* Pull log-returns from a sequence of bars: r_t = log(close_t / close_{t-1}).
    Returns a list of length [List.length bars - 1]; the first bar has no
@@ -102,10 +107,7 @@ let _log_returns_from_bars (bars : Types.Daily_price.t list) =
   | [] | [ _ ] -> []
   | first :: rest ->
       let _final_acc, returns =
-        List.fold rest ~init:(first.close_price, [])
-          ~f:(fun (prev_close, acc) (b : Types.Daily_price.t) ->
-            let r = Float.log (b.close_price /. prev_close) in
-            (b.close_price, r :: acc))
+        List.fold rest ~init:(first.close_price, []) ~f:_accumulate_log_return
       in
       List.rev returns
 
@@ -167,7 +169,9 @@ let _generate_symbol ~dates ~start_price ~market_returns ~beta ~idio_params
     Factor_model.generate_symbol_returns ~market_returns ~beta ~idio_params
       ~seed
   in
-  let bars = _bars_from_returns ~dates ~start_price ~log_returns:symbol_returns in
+  let bars =
+    _bars_from_returns ~dates ~start_price ~log_returns:symbol_returns
+  in
   (name, bars)
 
 let _assemble_universe ~dates ~market_returns ~betas ~idio_params ~names
@@ -185,26 +189,31 @@ let _assemble_universe ~dates ~market_returns ~betas ~idio_params ~names
   in
   { symbols = bars }
 
+let _dates_of_bars (bars : Types.Daily_price.t list) =
+  List.map bars ~f:(fun (b : Types.Daily_price.t) -> b.date)
+
+let _sample_betas_for_config (config : config) =
+  Factor_model.sample_betas config.loading_distribution ~n:config.n_symbols
+    ~seed:(_seed_for_betas config.seed)
+
+let _sample_idio_params_for_config (config : config) =
+  Factor_model.sample_idio_params config.idio_distribution ~n:config.n_symbols
+    ~seed:(_seed_for_idio_params config.seed)
+
+let _build_universe_from_market (config : config)
+    (market_bars : Types.Daily_price.t list) =
+  let dates = _dates_of_bars market_bars in
+  let market_returns = _log_returns_from_bars market_bars in
+  let betas = _sample_betas_for_config config in
+  let idio_params = _sample_idio_params_for_config config in
+  let names = _resolve_symbol_names config in
+  _assemble_universe ~dates ~market_returns ~betas ~idio_params ~names config
+
 (* Run after [_validate] has succeeded, so we can rely on input shape. *)
 let _generate_validated (config : config) =
-  Result.bind (Synth_v2.generate config.market) ~f:(fun market_bars ->
-      let dates =
-        List.map market_bars ~f:(fun (b : Types.Daily_price.t) -> b.date)
-      in
-      let market_returns = _log_returns_from_bars market_bars in
-      let n = config.n_symbols in
-      let betas =
-        Factor_model.sample_betas config.loading_distribution ~n
-          ~seed:(_seed_for_betas config.seed)
-      in
-      let idio_params =
-        Factor_model.sample_idio_params config.idio_distribution ~n
-          ~seed:(_seed_for_idio_params config.seed)
-      in
-      let names = _resolve_symbol_names config in
-      Ok
-        (_assemble_universe ~dates ~market_returns ~betas ~idio_params ~names
-           config))
+  Result.map
+    (Synth_v2.generate config.market)
+    ~f:(_build_universe_from_market config)
 
 let generate (config : config) =
   Result.bind (_validate config) ~f:(fun () -> _generate_validated config)

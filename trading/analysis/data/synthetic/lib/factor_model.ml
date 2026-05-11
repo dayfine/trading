@@ -36,16 +36,15 @@ let _check_range_ordered min_v max_v =
   if Float.(min_v < max_v) then Ok ()
   else
     Status.error_invalid_argument
-      (Printf.sprintf "factor_model: min_value (%.4f) must be < max_value (%.4f)"
-         min_v max_v)
+      (Printf.sprintf
+         "factor_model: min_value (%.4f) must be < max_value (%.4f)" min_v max_v)
 
 let _check_mean_in_range mean min_v max_v =
   if Float.(mean >= min_v) && Float.(mean <= max_v) then Ok ()
   else
     Status.error_invalid_argument
-      (Printf.sprintf
-         "factor_model: mean (%.4f) must be within [%.4f, %.4f]" mean min_v
-         max_v)
+      (Printf.sprintf "factor_model: mean (%.4f) must be within [%.4f, %.4f]"
+         mean min_v max_v)
 
 let validate_loading_distribution d =
   Status.combine_status_list
@@ -149,16 +148,20 @@ let _sample_omega ~dist ~rng =
   let z = _normal_sample rng in
   dist.omega_mean *. Float.exp (dist.omega_lognormal_sigma *. z)
 
+let _draw_idio_params ~dist ~rng : Garch.params =
+  let omega = _sample_omega ~dist ~rng in
+  { Garch.omega; alpha = dist.alpha; beta = dist.beta }
+
+let _idio_params_with_rng ~dist ~n ~seed =
+  let rng = Stdlib.Random.State.make [| seed |] in
+  List.init n ~f:(fun _ -> _draw_idio_params ~dist ~rng)
+
 let sample_idio_params dist ~n ~seed =
   if n <= 0 then []
   else
     match validate_idio_distribution dist with
     | Error e -> invalid_arg ("factor_model: " ^ Status.show e)
-    | Ok () ->
-        let rng = Stdlib.Random.State.make [| seed |] in
-        List.init n ~f:(fun _ ->
-            let omega = _sample_omega ~dist ~rng in
-            { Garch.omega; alpha = dist.alpha; beta = dist.beta })
+    | Ok () -> _idio_params_with_rng ~dist ~n ~seed
 
 (* ---------------------------------------------------------------------- *)
 (* Per-symbol return composition                                          *)
@@ -167,9 +170,7 @@ let sample_idio_params dist ~n ~seed =
 (* Bring idio GARCH variance up from the long-run mean; the [Garch] module
    computes this for us when params are stationary. *)
 let _idio_initial_variance params =
-  match Garch.long_run_variance params with
-  | Some v -> v
-  | None -> params.omega
+  match Garch.long_run_variance params with Some v -> v | None -> params.omega
 
 let generate_symbol_returns ~market_returns ~beta ~idio_params ~seed =
   match market_returns with
@@ -185,5 +186,4 @@ let generate_symbol_returns ~market_returns ~beta ~idio_params ~seed =
         Garch.sample_returns idio_params ~n_steps:n ~seed
           ~initial_variance:(_idio_initial_variance idio_params)
       in
-      List.map2_exn market_returns idio_returns ~f:(fun m e ->
-          (beta *. m) +. e)
+      List.map2_exn market_returns idio_returns ~f:(fun m e -> (beta *. m) +. e)

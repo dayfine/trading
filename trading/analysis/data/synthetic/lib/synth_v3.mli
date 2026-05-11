@@ -18,21 +18,21 @@
     by construction.
 
     Determinism (seed cascade):
-    - [config.seed] flows into Synth-v2 (Synth-v2 uses [seed] and [seed + 1] internally)
+    - [config.seed] flows into Synth-v2 (Synth-v2 uses [seed] and [seed + 1]
+      internally)
     - [config.seed + 100_000] seeds β sampling
     - [config.seed + 200_000] seeds idio-parameter sampling
     - [config.seed + 1_000_000 + i] seeds symbol-[i]'s idio return stream
 
-    The offsets are spaced widely so even adversarial seed choices keep
-    streams independent. *)
+    The offsets are spaced widely so even adversarial seed choices keep streams
+    independent. *)
 
 type config = {
-  n_symbols : int;
-      (** Number of symbols in the universe, must be > 0. *)
+  n_symbols : int;  (** Number of symbols in the universe, must be > 0. *)
   symbols : string list option;
       (** Optional explicit symbol names. When [None], [Synth_v3] emits
-          deterministic names [SYNTH_0001], [SYNTH_0002], …. When
-          [Some lst], the length of [lst] must equal [n_symbols]. *)
+          deterministic names [SYNTH_0001], [SYNTH_0002], …. When [Some lst],
+          the length of [lst] must equal [n_symbols]. *)
   market : Synth_v2.config;
       (** Market-series config. The market's [target_length_days] sets the
           length of every per-symbol bar list. *)
@@ -41,9 +41,8 @@ type config = {
   idio_distribution : Factor_model.idio_distribution;
       (** Per-symbol idiosyncratic GARCH distribution. *)
   start_price : float;
-      (** Starting close price for every symbol's bar series. Must be > 0.
-          We do not vary per-symbol start price; the focus is on return
-          structure. *)
+      (** Starting close price for every symbol's bar series. Must be > 0. We do
+          not vary per-symbol start price; the focus is on return structure. *)
   seed : int;  (** Master seed for the universe; see seed cascade above. *)
 }
 
@@ -53,7 +52,7 @@ type universe = {
 }
 
 val default_symbol_names : n:int -> string list
-(** [default_symbol_names ~n] returns [\["SYNTH_0001"; ...; "SYNTH_N"\]] for
+(** [default_symbol_names ~n] returns [["SYNTH_0001"; ...; "SYNTH_N"]] for
     [n > 0]. Returns the empty list when [n <= 0]. Padded to 4 digits to keep
     the name length stable at universe sizes up to 9_999; symbols beyond that
     use the bare integer (no truncation). *)
@@ -65,19 +64,21 @@ val default_config :
   target_length_days:int ->
   seed:int ->
   config
-(** Convenience constructor: wraps [Synth_v2.default_config] for the market
-    and pairs it with [Factor_model.default_loading_distribution] and
-    [Factor_model.default_idio_distribution]. Uses [default_symbol_names]
-    for symbol naming. *)
+(** Convenience constructor: wraps [Synth_v2.default_config] for the market and
+    pairs it with [Factor_model.default_loading_distribution] and
+    [Factor_model.default_idio_distribution]. Uses [default_symbol_names] for
+    symbol naming. *)
 
 val generate : config -> (universe, Status.t) Result.t
-(** [generate config] returns a synthetic universe of [config.n_symbols]
-    bar series, each of length [config.market.target_length_days].
+(** [generate config] returns a synthetic universe of [config.n_symbols] bar
+    series, each of length [config.market.target_length_days].
 
     Returns [Error Status.Invalid_argument] when:
     - [config.n_symbols <= 0];
     - [config.start_price <= 0];
     - [config.symbols] is [Some lst] and [List.length lst <> config.n_symbols];
     - [config.market] fails [Synth_v2.generate]'s validation;
-    - [config.loading_distribution] fails [Factor_model.validate_loading_distribution];
-    - [config.idio_distribution] fails [Factor_model.validate_idio_distribution]. *)
+    - [config.loading_distribution] fails
+      [Factor_model.validate_loading_distribution];
+    - [config.idio_distribution] fails
+      [Factor_model.validate_idio_distribution]. *)

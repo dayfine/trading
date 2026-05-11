@@ -14,25 +14,25 @@ let test_default_loading_distribution_validates _ =
     is_ok
 
 let test_loading_distribution_rejects_zero_stddev _ =
-  let bad =
-    { Factor_model.default_loading_distribution with stddev = 0.0 }
-  in
+  let bad = { Factor_model.default_loading_distribution with stddev = 0.0 } in
   assert_that
     (Factor_model.validate_loading_distribution bad)
     (is_error_with Status.Invalid_argument)
 
 let test_loading_distribution_rejects_inverted_range _ =
   let bad =
-    { Factor_model.default_loading_distribution with min_value = 2.5; max_value = 0.2 }
+    {
+      Factor_model.default_loading_distribution with
+      min_value = 2.5;
+      max_value = 0.2;
+    }
   in
   assert_that
     (Factor_model.validate_loading_distribution bad)
     (is_error_with Status.Invalid_argument)
 
 let test_loading_distribution_rejects_out_of_range_mean _ =
-  let bad =
-    { Factor_model.default_loading_distribution with mean = 5.0 }
-  in
+  let bad = { Factor_model.default_loading_distribution with mean = 5.0 } in
   assert_that
     (Factor_model.validate_loading_distribution bad)
     (is_error_with Status.Invalid_argument)
@@ -49,20 +49,14 @@ let test_default_idio_distribution_validates _ =
 
 let test_idio_distribution_rejects_non_stationary _ =
   let bad =
-    {
-      Factor_model.default_idio_distribution with
-      alpha = 0.6;
-      beta = 0.5;
-    }
+    { Factor_model.default_idio_distribution with alpha = 0.6; beta = 0.5 }
   in
   assert_that
     (Factor_model.validate_idio_distribution bad)
     (is_error_with Status.Invalid_argument)
 
 let test_idio_distribution_rejects_zero_omega _ =
-  let bad =
-    { Factor_model.default_idio_distribution with omega_mean = 0.0 }
-  in
+  let bad = { Factor_model.default_idio_distribution with omega_mean = 0.0 } in
   assert_that
     (Factor_model.validate_idio_distribution bad)
     (is_error_with Status.Invalid_argument)
@@ -73,8 +67,8 @@ let test_idio_distribution_rejects_zero_omega _ =
 
 let test_sample_betas_length _ =
   let betas =
-    Factor_model.sample_betas Factor_model.default_loading_distribution
-      ~n:50 ~seed:7
+    Factor_model.sample_betas Factor_model.default_loading_distribution ~n:50
+      ~seed:7
   in
   assert_that betas (size_is 50)
 
@@ -89,8 +83,8 @@ let test_sample_betas_in_range _ =
 
 let test_sample_betas_zero_n _ =
   let betas =
-    Factor_model.sample_betas Factor_model.default_loading_distribution
-      ~n:0 ~seed:1
+    Factor_model.sample_betas Factor_model.default_loading_distribution ~n:0
+      ~seed:1
   in
   assert_that betas (size_is 0)
 
@@ -108,12 +102,7 @@ let test_sample_betas_different_seeds_differ _ =
 
 let test_sample_betas_empirical_mean_near_target _ =
   let dist =
-    {
-      Factor_model.mean = 1.0;
-      stddev = 0.4;
-      min_value = 0.2;
-      max_value = 2.5;
-    }
+    { Factor_model.mean = 1.0; stddev = 0.4; min_value = 0.2; max_value = 2.5 }
   in
   let n = 10_000 in
   let betas = Factor_model.sample_betas dist ~n ~seed:101 in
@@ -121,8 +110,7 @@ let test_sample_betas_empirical_mean_near_target _ =
   (* Wide tolerance: truncation biases the mean slightly. The configured
      center is 1.0 and the truncation [0.2, 2.5] is roughly symmetric around
      it, so the empirical mean should land within ±0.1 of 1.0. *)
-  assert_that mean
-    (is_between (module Float_ord) ~low:0.9 ~high:1.1)
+  assert_that mean (is_between (module Float_ord) ~low:0.9 ~high:1.1)
 
 (* ------------------------------------------------------------------ *)
 (* sample_idio_params — output shape, stationarity, determinism         *)
@@ -130,8 +118,8 @@ let test_sample_betas_empirical_mean_near_target _ =
 
 let test_sample_idio_params_length _ =
   let params =
-    Factor_model.sample_idio_params Factor_model.default_idio_distribution
-      ~n:30 ~seed:5
+    Factor_model.sample_idio_params Factor_model.default_idio_distribution ~n:30
+      ~seed:5
   in
   assert_that params (size_is 30)
 
@@ -151,19 +139,19 @@ let test_sample_idio_params_all_stationary _ =
 
 let test_sample_idio_params_deterministic _ =
   let a =
-    Factor_model.sample_idio_params Factor_model.default_idio_distribution
-      ~n:20 ~seed:99
+    Factor_model.sample_idio_params Factor_model.default_idio_distribution ~n:20
+      ~seed:99
   in
   let b =
-    Factor_model.sample_idio_params Factor_model.default_idio_distribution
-      ~n:20 ~seed:99
+    Factor_model.sample_idio_params Factor_model.default_idio_distribution ~n:20
+      ~seed:99
   in
   assert_that (List.equal Garch.equal_params a b) (equal_to true)
 
 let test_sample_idio_params_omegas_vary _ =
   let params =
-    Factor_model.sample_idio_params Factor_model.default_idio_distribution
-      ~n:50 ~seed:5
+    Factor_model.sample_idio_params Factor_model.default_idio_distribution ~n:50
+      ~seed:5
   in
   let omegas = List.map params ~f:(fun (p : Garch.params) -> p.omega) in
   let distinct = List.dedup_and_sort omegas ~compare:Float.compare in
@@ -230,8 +218,7 @@ let test_generate_symbol_returns_beta_zero_strips_market _ =
       ~seed:42
   in
   let max_abs =
-    List.fold returns ~init:0.0 ~f:(fun acc r ->
-        Float.max acc (Float.abs r))
+    List.fold returns ~init:0.0 ~f:(fun acc r -> Float.max acc (Float.abs r))
   in
   (* All returns should be very small — vol baseline is sqrt(1e-12) ≈ 1e-6. *)
   assert_that max_abs (lt (module Float_ord) 1e-4)
@@ -249,8 +236,7 @@ let test_generate_symbol_returns_beta_one_reproduces_market _ =
   (* The market term dominates by ~14 orders of magnitude; check elementwise
      equality up to a loose epsilon. *)
   let close_enough =
-    List.for_all2_exn market returns ~f:(fun m r ->
-        Float.(abs (r -. m) < 1e-5))
+    List.for_all2_exn market returns ~f:(fun m r -> Float.(abs (r -. m) < 1e-5))
   in
   assert_that close_enough (equal_to true)
 
@@ -259,9 +245,7 @@ let test_generate_symbol_returns_beta_one_reproduces_market _ =
 (* ------------------------------------------------------------------ *)
 
 let test_sample_betas_invalid_distribution_raises _ =
-  let bad =
-    { Factor_model.default_loading_distribution with stddev = 0.0 }
-  in
+  let bad = { Factor_model.default_loading_distribution with stddev = 0.0 } in
   let did_raise =
     try
       let _ = Factor_model.sample_betas bad ~n:5 ~seed:1 in
