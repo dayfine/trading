@@ -65,7 +65,8 @@ let test_all_symbols_share_dates _ =
   | [] -> assert_failure "empty universe"
   | first :: rest ->
       let n_misaligned =
-        List.count rest ~f:(fun dates -> not (List.equal Date.equal first dates))
+        List.count rest ~f:(fun dates ->
+            not (List.equal Date.equal first dates))
       in
       assert_that n_misaligned (equal_to 0)
 
