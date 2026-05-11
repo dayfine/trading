@@ -12,12 +12,11 @@
     [1..period]. The Wilder recurrence then gives, for [t > period]:
 
     {[
-      avg_gain [ t ]
-      = ((avg_gain [ t - 1 ] * (period - 1)) + gain [ t ])
-        / period avg_loss [ t ]
-      = ((avg_loss [ t - 1 ] * (period - 1)) + loss [ t ]) / period rs
-      = avg_gain [ t ] / avg_loss [ t ] rsi
-      = 100 - (100 / (1 + rs))
+    avg_gain [ t ]
+    = ((avg_gain [ t - 1 ] * (period - 1)) + gain [ t ]) / period avg_loss [ t ]
+    = ((avg_loss [ t - 1 ] * (period - 1)) + loss [ t ]) / period rs
+    = avg_gain [ t ] / avg_loss [ t ] rsi
+    = 100 - (100 / (1 + rs))
     ]}
 
     Edge cases:

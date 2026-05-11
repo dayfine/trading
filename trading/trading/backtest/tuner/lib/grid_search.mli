@@ -36,12 +36,12 @@ type param_spec = (string * param_values) list
 
     Example:
     {[
-      [
-        ("screening.weights.rs", [ 0.2; 0.3; 0.4 ]);
-        ("screening.weights.volume", [ 0.2; 0.3; 0.4 ]);
-        ("screening.weights.breakout", [ 0.2; 0.3; 0.4 ]);
-        ("screening.weights.sector", [ 0.2; 0.3; 0.4 ]);
-      ]
+    [
+      ("screening.weights.rs", [ 0.2; 0.3; 0.4 ]);
+      ("screening.weights.volume", [ 0.2; 0.3; 0.4 ]);
+      ("screening.weights.breakout", [ 0.2; 0.3; 0.4 ]);
+      ("screening.weights.sector", [ 0.2; 0.3; 0.4 ]);
+    ]
     ]}
 
     yields a 3 × 3 × 3 × 3 = 81-cell grid.
@@ -54,10 +54,10 @@ type param_spec = (string * param_values) list
     replaces the grade-based filter with a strict numeric [score >= n] gate.
     Sweep example:
     {[
-      [
-        ( "screening_config.min_score_override",
-          [ 38.0; 39.0; 40.0; 41.0; 42.0; 43.0 ] );
-      ]
+    [
+      ( "screening_config.min_score_override",
+        [ 38.0; 39.0; 40.0; 41.0; 42.0; 43.0 ] );
+    ]
     ]}
     Note: although the field is [int option] in the OCaml record, the grid spec
     carries floats. The override sexp emitted by

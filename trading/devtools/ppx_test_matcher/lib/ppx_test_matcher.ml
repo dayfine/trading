@@ -5,15 +5,15 @@ open Ppxlib
 
     Given a record type:
     {[
-      type t = { x : float; y : int } [@@deriving test_matcher]
+    type t = { x : float; y : int } [@@deriving test_matcher]
     ]}
 
     It generates a function [match_t] with one required labeled parameter per
     field:
     {[
-      let match_t ~x ~y (r : t) =
-        x r.x;
-        y r.y
+    let match_t ~x ~y (r : t) =
+      x r.x;
+      y r.y
     ]}
 
     Every field must be explicitly matched or ignored with [__] (the wildcard
