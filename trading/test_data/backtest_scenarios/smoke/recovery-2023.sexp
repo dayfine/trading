@@ -10,16 +10,26 @@
 ;; dev/status/backtest-infra.md. (Pre-rename this pin was named
 ;; [unrealized_pnl] but its semantics matched the renamed
 ;; [Metric_types.OpenPositionsValue] — signed mtm, not true paper P&L.)
+;;
+;; Cell E rollout 2026-05-11: standard strategy config applied for consistency
+;; with goldens. Trade count widens ~3-10x; ranges loosened. Smoke gate.
 ((name "recovery-2023")
- (description "Recovery regime sanity check (2023)")
+ (description "Recovery regime sanity check (2023) — Cell E config")
  (period ((start_date 2023-01-02) (end_date 2023-12-31)))
  (universe_size 1654)
- (config_overrides ())
+ (config_overrides
+  (((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min -20.0) (max 60.0)))
-   (total_trades       ((min 0)     (max 60)))
+  ((total_return_pct   ((min -30.0) (max 200.0)))
+   (total_trades       ((min 0)     (max 500)))
    (win_rate           ((min 0.0)   (max 100.0)))
    (sharpe_ratio       ((min -2.0)  (max 5.0)))
-   (max_drawdown_pct   ((min 0.0)   (max 40.0)))
-   (avg_holding_days   ((min 0.0)   (max 100.0)))
-   (open_positions_value ((min 1000.0) (max 2000000.0))))))
+   (max_drawdown_pct   ((min 0.0)   (max 60.0)))
+   (avg_holding_days   ((min 0.0)   (max 200.0)))
+   (open_positions_value ((min 1000.0) (max 5000000.0))))))
