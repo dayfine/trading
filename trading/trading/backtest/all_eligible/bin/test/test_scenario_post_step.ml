@@ -6,8 +6,9 @@
     [test_all_eligible_runner] (so they're robust to scanner / scorer drift) and
     pin the wiring contract:
 
-    - [enabled = true] → [<scenario_dir>/all_eligible/grade-C/] gets the three
-      runner artefacts ([trades.csv], [summary.md], [config.sexp]).
+    - [enabled = true] → [<scenario_dir>/all_eligible/grade-C/] gets the four
+      runner artefacts ([trades.csv], [summary.md], [summary.sexp],
+      [config.sexp]).
     - [enabled = false] → no [all_eligible] subdir is created at all (so the
       [scenario_runner --no-emit-all-eligible] flag is a real no-op).
 
@@ -120,10 +121,11 @@ let _mk_tmpdirs prefix =
 (* ------------------------------------------------------------------ *)
 
 (** Pins the [enabled = true] wiring: the post-step writes
-    [<scenario_dir>/all_eligible/grade-C/{trades.csv,summary.md,config.sexp}].
-    These three artefacts are the contract [release_report.load_scenario_run]
-    will consume in a future follow-up. *)
-let test_emit_enabled_writes_three_artefacts _ =
+    [<scenario_dir>/all_eligible/grade-C/{trades.csv,summary.md,summary.sexp,config.sexp}].
+    These four artefacts are the contract [release_report.load_scenario_run]
+    consumes — [summary.sexp] is the structured aggregate the comparison
+    renderer surfaces in the markdown report. *)
+let test_emit_enabled_writes_four_artefacts _ =
   let data_dir, scenario_dir = _mk_tmpdirs "post_step_on" in
   let scenario_path = _stage_fixture ~data_dir in
   _with_data_dir ~data_dir (fun () ->
@@ -132,17 +134,20 @@ let test_emit_enabled_writes_three_artefacts _ =
     Filename.concat (Filename.concat scenario_dir "all_eligible") "grade-C"
   in
   let trades = Filename.concat cell "trades.csv" in
-  let summary = Filename.concat cell "summary.md" in
+  let summary_md = Filename.concat cell "summary.md" in
+  let summary_sexp = Filename.concat cell "summary.sexp" in
   let config = Filename.concat cell "config.sexp" in
   assert_that
     ( Sys_unix.file_exists_exn trades,
-      Sys_unix.file_exists_exn summary,
+      Sys_unix.file_exists_exn summary_md,
+      Sys_unix.file_exists_exn summary_sexp,
       Sys_unix.file_exists_exn config )
     (all_of
        [
-         field (fun (t, _, _) -> t) (equal_to true);
-         field (fun (_, s, _) -> s) (equal_to true);
-         field (fun (_, _, c) -> c) (equal_to true);
+         field (fun (t, _, _, _) -> t) (equal_to true);
+         field (fun (_, s, _, _) -> s) (equal_to true);
+         field (fun (_, _, ss, _) -> ss) (equal_to true);
+         field (fun (_, _, _, c) -> c) (equal_to true);
        ])
 
 (** Pins the [enabled = false] wiring: no [all_eligible] subdir is created. This
@@ -179,8 +184,8 @@ let test_emit_swallows_runner_failure _ =
 let suite =
   "Scenario_post_step"
   >::: [
-         "emit enabled writes three artefacts under all_eligible/grade-C"
-         >:: test_emit_enabled_writes_three_artefacts;
+         "emit enabled writes four artefacts under all_eligible/grade-C"
+         >:: test_emit_enabled_writes_four_artefacts;
          "emit disabled creates no all_eligible subdir"
          >:: test_emit_disabled_creates_no_subdir;
          "emit swallows runner failures (does not raise)"
