@@ -1,6 +1,6 @@
 # Status: tuning
 
-## Last updated: 2026-05-11 (orchestrator reconcile — merge-watch flip; T-B CLI #914 merged 2026-05-07T13:20:28Z)
+## Last updated: 2026-05-11
 
 ## Status
 MERGED
