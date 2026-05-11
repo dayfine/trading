@@ -1011,6 +1011,160 @@ let test_load_scenario_run_loads_optimal_strategy_with_extra_fields _ =
               (float_equal 0.35);
           ]))
 
+(* --- All-eligible diagnostic section ---
+
+   For paired scenarios where at least one side has [Some _] all-eligible
+   artefacts, the renderer surfaces a fixed-dollar opportunity-cost diagnostic
+   plus a link to the per-scenario [trades.csv]. These tests pin the section's
+   omission, presence, and one-sided rendering. *)
+
+let test_render_omits_all_eligible_when_both_none _ =
+  let cur = _make_run ~name:"recovery-2023" () in
+  let prior = _make_run ~name:"recovery-2023" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"## All-eligible diagnostic")
+           (equal_to false);
+         field
+           (fun s -> String.is_substring s ~substring:"Drill-down — Current:")
+           (equal_to false);
+       ])
+
+let test_render_includes_all_eligible_when_present _ =
+  let cur =
+    _make_run ~name:"recovery-2023"
+      ~all_eligible:
+        (Some
+           (_make_all_eligible_summary ~trade_count:200 ~winners:60 ~losers:130
+              ~win_rate_pct:0.30 ~mean_return_pct:(-0.04)
+              ~median_return_pct:(-0.06) ~total_pnl_dollars:(-80_000.0)
+              ~trades_csv_path:"recovery-2023/all_eligible/grade-C/trades.csv"
+              ()))
+      ()
+  in
+  let prior =
+    _make_run ~name:"recovery-2023"
+      ~all_eligible:
+        (Some
+           (_make_all_eligible_summary ~trade_count:180 ~winners:55 ~losers:115
+              ~win_rate_pct:0.31 ~mean_return_pct:(-0.03)
+              ~median_return_pct:(-0.05) ~total_pnl_dollars:(-60_000.0)
+              ~trades_csv_path:"recovery-2023/all_eligible/grade-C/trades.csv"
+              ()))
+      ()
+  in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"## All-eligible diagnostic")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"### recovery-2023")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "Drill-down — Current: \
+                  [trades.csv](recovery-2023/all_eligible/grade-C/trades.csv) \
+                  · Prior: \
+                  [trades.csv](recovery-2023/all_eligible/grade-C/trades.csv)")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"| Trades | 200 | 180 |")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"| Winners | 60 | 55 |")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"| Losers | 130 | 115 |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s ~substring:"| Win rate | +30.00% | +31.00% |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Mean return | -4.00% | -3.00% |")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Total P&L ($) | -80000 | -60000 |")
+           (equal_to true);
+       ])
+
+let test_render_all_eligible_handles_one_sided _ =
+  (* Only current side has artefacts — prior renders "—" in every value cell
+     and the prior link cell. *)
+  let cur =
+    _make_run ~name:"recovery-2023"
+      ~all_eligible:
+        (Some
+           (_make_all_eligible_summary ~trade_count:200 ~winners:60 ~losers:130
+              ~win_rate_pct:0.30 ~mean_return_pct:(-0.04)
+              ~median_return_pct:(-0.06) ~total_pnl_dollars:(-80_000.0)
+              ~trades_csv_path:"recovery-2023/all_eligible/grade-C/trades.csv"
+              ()))
+      ()
+  in
+  let prior = _make_run ~name:"recovery-2023" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"## All-eligible diagnostic")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "Drill-down — Current: \
+                  [trades.csv](recovery-2023/all_eligible/grade-C/trades.csv) \
+                  · Prior: —")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"| Trades | 200 | — |")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"| Win rate | +30.00% | — |")
+           (equal_to true);
+       ])
+
 (* --- Loader: all-eligible diagnostic round-trip via on-disk fixtures ---
 
    The all-eligible diagnostic lands at
@@ -1144,6 +1298,12 @@ let suite =
          >:: test_load_scenario_run_no_all_eligible_when_files_missing;
          "load_scenario_run no all_eligible when sexp malformed"
          >:: test_load_scenario_run_no_all_eligible_when_sexp_malformed;
+         "render omits all-eligible when both none"
+         >:: test_render_omits_all_eligible_when_both_none;
+         "render includes all-eligible when present"
+         >:: test_render_includes_all_eligible_when_present;
+         "render all-eligible handles one-sided"
+         >:: test_render_all_eligible_handles_one_sided;
        ]
 
 let () = run_test_tt_main suite
