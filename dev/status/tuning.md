@@ -1,13 +1,13 @@
 # Status: tuning
 
-## Last updated: 2026-05-07
+## Last updated: 2026-05-11 (orchestrator reconcile — merge-watch flip; T-B CLI #914 merged 2026-05-07T13:20:28Z)
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-(T-A lib + CLI MERGED; T-B lib MERGED; T-B CLI READY_FOR_REVIEW; walk-forward integration deferred)
+(T-A lib + CLI MERGED; T-B lib + CLI MERGED; walk-forward integration deferred; T-C blocked on Norgate)
 
-T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). T-A CLI binary landed via PR #893 (merged 2026-05-06). T-B Bayesian-opt lib + tests landed via PR #817 (merged 2026-05-04). T-B CLI binary `bayesian_runner.exe` ready for review on branch `feat/backtest-tuning-bayesian-opt-cli` (this PR). All `.mli` surfaces are stable. Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying) + `dev/plans/bayesian-opt-2026-05-03.md` (T-B clarifying with D1–D8 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
+T-A grid_search lib + tests landed via PR #805 (merged 2026-05-03). T-A CLI binary landed via PR #893 (merged 2026-05-06). T-B Bayesian-opt lib + tests landed via PR #817 (merged 2026-05-04). **T-B CLI binary `bayesian_runner.exe` MERGED via PR #914 (2026-05-07)**. All `.mli` surfaces are stable. Track created 2026-05-02 to absorb M5.5 (parameter tuning) + M7.1 (ML training). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` (T-A grid + T-B Bayesian) + `dev/plans/m7-data-and-tuning-2026-05-02.md` (T-C supervised) + `dev/plans/grid-search-2026-05-03.md` (T-A clarifying) + `dev/plans/bayesian-opt-2026-05-03.md` (T-B clarifying with D1–D8 design decisions). Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.5 + M7.1 (added 2026-05-02).
 
 Remaining work:
 - **81-cell flagship sweep** — run `grid_search.exe` on `screening.weights.{rs,volume,breakout,sector}`; deferred until sweep budget available.
