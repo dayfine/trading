@@ -7,7 +7,8 @@
   regime_hmm
   garch
   synth_v2
-  factor_model)
+  factor_model
+  synth_v3)
  (libraries core core_unix.sys_unix csv status types)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
