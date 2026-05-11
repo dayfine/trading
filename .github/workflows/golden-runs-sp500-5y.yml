@@ -20,10 +20,11 @@
 # data preparation step.
 #
 # Expected runtimes (GHA ubuntu-latest):
-#   sp500-2019-2023:           ~5 min,  ~770 MB peak
-#   sp500-2019-2023-long-only: ~5 min   (currently FAIL — Q2 sub-bug)
-#   sp500-2019-2023-bah-spy:   ~1 min   (currently FAIL — Q2 main bug)
-# Budget: 30 min total covers all three with healthy headroom.
+#   sp500-2019-2023:           ~5 min pre-Cell-E (~15 min post-Cell-E #1036)
+#   sp500-2019-2023-long-only: ~5 min pre-Cell-E (~12 min post-Cell-E)
+#   sp500-2019-2023-bah-spy:   ~1 min   (BAH, not affected by Cell E)
+# Cell E adds ~3.3x trade count (81 → 264 trades on 2019-2023) which roughly
+# triples wall time. Budget bumped from 30 → 60 min on 2026-05-11.
 #
 # Scenarios discovered: any *.sexp with ";; perf-tier: 3" under
 # trading/test_data/backtest_scenarios/goldens-sp500/
@@ -38,7 +39,7 @@ on:
 jobs:
   golden-sp500-5y:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: read
