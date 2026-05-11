@@ -134,8 +134,21 @@ RUN opam install --yes memtrace
 # CI fmt gate runs `dune fmt --check`, which fails if the formatter version
 # drifts. Pin here so the image cannot silently upgrade and break CI.
 # This is the ONLY tool the ci stage installs beyond runtime libraries.
+#
+# 2026-05-11: explicit `opam update` + `opam pin remove ocamlformat || true`
+# before install so opam picks the official 0.29.0 release tarball from the
+# opam-repository instead of falling back to "0.28.1 pinned to git tag 0.29.0"
+# when 0.29.0 isn't yet registered in the local opam-repo cache. That
+# frankenpackage build had subtly different output for docstring {[ ]} indent
+# vs CI's clean 0.29.0, causing the 2026-05-08 → 2026-05-11 fmt drift incident
+# (PRs #1039 + #1040 batch-fixed 22+ .mli files). See
+# `dev/notes/retrospective-ci-greenness-2026-05-11.md` for the full root cause.
 # -----------------------------------------------------------------------------
-RUN opam install --yes ocamlformat.0.29.0
+RUN opam update && \
+    (opam pin remove ocamlformat 2>/dev/null || true) && \
+    opam install --yes ocamlformat.0.29.0 && \
+    opam show ocamlformat | grep "all-installed-versions" | grep -q "0.29.0" \
+      || (echo "FAIL: ocamlformat post-install is not pure 0.29.0" && exit 1)
 
 # Drop any _build artifacts from opam install hooks so the ci stage stays lean.
 RUN rm -rf /workspaces/trading-1/trading/_build
