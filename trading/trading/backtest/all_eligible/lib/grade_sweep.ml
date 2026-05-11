@@ -87,11 +87,15 @@ type cell_inputs = {
 let _write_config_sexp ~path (config : All_eligible.config) : unit =
   Sexp.save_hum path (All_eligible.sexp_of_config config)
 
-(** Write the three per-cell artefacts to [cell_dir]. *)
+let _write_summary_sexp ~path (aggregate : All_eligible.aggregate) : unit =
+  Sexp.save_hum path (All_eligible.sexp_of_aggregate aggregate)
+
+(** Write the four per-cell artefacts to [cell_dir]. *)
 let _emit_cell ~cell_dir ~(inputs : cell_inputs) ~(config : All_eligible.config)
     ~(result : All_eligible.result) : unit =
   let trades_path = Filename.concat cell_dir "trades.csv" in
-  let summary_path = Filename.concat cell_dir "summary.md" in
+  let summary_md_path = Filename.concat cell_dir "summary.md" in
+  let summary_sexp_path = Filename.concat cell_dir "summary.sexp" in
   let config_path = Filename.concat cell_dir "config.sexp" in
   inputs.write_trades_csv ~path:trades_path result;
   let md =
@@ -100,10 +104,11 @@ let _emit_cell ~cell_dir ~(inputs : cell_inputs) ~(config : All_eligible.config)
       ~start_date:inputs.scenario.period.start_date
       ~end_date:inputs.scenario.period.end_date ~result
   in
-  Out_channel.write_all summary_path ~data:md;
+  Out_channel.write_all summary_md_path ~data:md;
+  _write_summary_sexp ~path:summary_sexp_path result.aggregate;
   _write_config_sexp ~path:config_path config;
-  eprintf "all_eligible: wrote %s, %s, %s\n%!" trades_path summary_path
-    config_path
+  eprintf "all_eligible: wrote %s, %s, %s, %s\n%!" trades_path summary_md_path
+    summary_sexp_path config_path
 
 (** Materialise the cell directory + emit one cell. Common between single and
     sweep modes. *)

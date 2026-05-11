@@ -47,6 +47,18 @@ type optimal_summary_pair = {
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 
+type all_eligible_summary = {
+  trade_count : int;
+  winners : int;
+  losers : int;
+  win_rate_pct : float;
+  mean_return_pct : float;
+  median_return_pct : float;
+  total_pnl_dollars : float;
+  trades_csv_path : string;
+}
+[@@deriving sexp] [@@sexp.allow_extra_fields]
+
 type scenario_run = {
   name : string;
   actual : actual;
@@ -55,6 +67,7 @@ type scenario_run = {
   wall_seconds : float option;
   trade_quality : Trade_audit_report.t option;
   optimal_strategy : optimal_summary_pair option;
+  all_eligible : all_eligible_summary option;
 }
 [@@deriving sexp]
 
@@ -136,6 +149,59 @@ let _try_load_optimal_summary ~dir ~scenario_name : optimal_summary_pair option
         }
     with _ -> None
 
+(* On-disk shape of [all_eligible/grade-C/summary.sexp] — mirrors the
+   [Backtest_all_eligible.All_eligible.aggregate] producer. We re-declare the
+   shape locally so [release_report] does not need to depend on the heavy
+   [backtest_all_eligible] library; [@@sexp.allow_extra_fields] absorbs
+   producer-side fields the comparison report does not surface (notably
+   [return_buckets], which is a per-cell histogram and would inflate the report
+   without per-batch context). The fields kept here are exactly those the
+   rendered table reads. *)
+type _all_eligible_summary_on_disk = {
+  trade_count : int;
+  winners : int;
+  losers : int;
+  win_rate_pct : float;
+  mean_return_pct : float;
+  median_return_pct : float;
+  total_pnl_dollars : float;
+}
+[@@deriving of_sexp] [@@sexp.allow_extra_fields]
+
+let _all_eligible_cell_subdir = Filename.concat "all_eligible" "grade-C"
+
+let _try_load_all_eligible_summary ~dir ~scenario_name :
+    all_eligible_summary option =
+  (* Loads [<dir>/all_eligible/grade-C/summary.sexp] when present. The
+     companion [trades.csv] path is recorded for the rendered drill-down link;
+     the section still renders if the CSV is absent (the link will 404 but
+     the metrics are intact). Any read / parse failure swallows silently —
+     the all-eligible section is auxiliary, never a hard requirement. *)
+  let cell_dir = Filename.concat dir _all_eligible_cell_subdir in
+  let sexp_path = Filename.concat cell_dir "summary.sexp" in
+  if not (Sys_unix.file_exists_exn sexp_path) then None
+  else
+    try
+      let on_disk =
+        _all_eligible_summary_on_disk_of_sexp (Sexp.load_sexp sexp_path)
+      in
+      let trades_csv_path =
+        Filename.concat scenario_name
+          (Filename.concat _all_eligible_cell_subdir "trades.csv")
+      in
+      Some
+        {
+          trade_count = on_disk.trade_count;
+          winners = on_disk.winners;
+          losers = on_disk.losers;
+          win_rate_pct = on_disk.win_rate_pct;
+          mean_return_pct = on_disk.mean_return_pct;
+          median_return_pct = on_disk.median_return_pct;
+          total_pnl_dollars = on_disk.total_pnl_dollars;
+          trades_csv_path;
+        }
+    with _ -> None
+
 let load_scenario_run ~dir =
   let name = Filename.basename dir in
   let actual_path = Filename.concat dir "actual.sexp" in
@@ -154,6 +220,7 @@ let load_scenario_run ~dir =
   in
   let trade_quality = _try_load_trade_quality ~dir in
   let optimal_strategy = _try_load_optimal_summary ~dir ~scenario_name:name in
+  let all_eligible = _try_load_all_eligible_summary ~dir ~scenario_name:name in
   {
     name;
     actual;
@@ -162,6 +229,7 @@ let load_scenario_run ~dir =
     wall_seconds;
     trade_quality;
     optimal_strategy;
+    all_eligible;
   }
 
 let _list_scenario_subdirs root =
@@ -652,12 +720,121 @@ let _optimal_strategy_section paired =
     let body = List.concat_map with_optimal ~f:_row_optimal_for_pair in
     header @ body
 
+(* --- All-eligible diagnostic section ---
+
+   For each paired scenario where at least one side has [Some _] all-eligible
+   artefacts, surface the headline aggregate (trade count, win rate, mean /
+   median return, total P&L) for current vs prior side. The diagnostic
+   measures opportunity cost: it sizes every cascade-admissible Stage-2
+   breakout signal at a uniform fixed-dollar entry, bypassing every
+   portfolio-level rejection (cash, exposure cap, sector concentration), and
+   reports what each signal would have returned. A negative win rate / total
+   P&L across the universe with a positive [actual] return implies the
+   cascade is correctly keeping the average signal out; the inverse implies
+   the cascade is leaving alpha on the table. Per-trade drill-down lives in
+   the linked [trades.csv]. *)
+
+let _fmt_pct_fraction_signed v = sprintf "%+.2f%%" (v *. 100.0)
+let _fmt_pnl_dollars v = sprintf "%+.0f" v
+let _fmt_int_signed v = sprintf "%d" v
+
+let _alleli_row ~label ~cur_str ~prior_str =
+  sprintf "| %s | %s | %s |" label cur_str prior_str
+
+let _alleli_field_str (run : scenario_run) ~(fmt : float -> string)
+    ~(get : all_eligible_summary -> float) =
+  match run.all_eligible with None -> "—" | Some s -> fmt (get s)
+
+let _alleli_int_field_str (run : scenario_run)
+    ~(get : all_eligible_summary -> int) =
+  match run.all_eligible with None -> "—" | Some s -> _fmt_int_signed (get s)
+
+let _alleli_link_str (run : scenario_run) =
+  Option.map run.all_eligible ~f:(fun s ->
+      sprintf "[trades.csv](%s)" s.trades_csv_path)
+  |> _fmt_optional_str
+
+let _row_all_eligible_for_pair (cur, prior) =
+  [
+    sprintf "### %s" cur.name;
+    "";
+    sprintf "Drill-down — Current: %s · Prior: %s" (_alleli_link_str cur)
+      (_alleli_link_str prior);
+    "";
+    "| Metric | Current | Prior |";
+    "|---|---:|---:|";
+    _alleli_row ~label:"Trades"
+      ~cur_str:(_alleli_int_field_str cur ~get:(fun s -> s.trade_count))
+      ~prior_str:(_alleli_int_field_str prior ~get:(fun s -> s.trade_count));
+    _alleli_row ~label:"Winners"
+      ~cur_str:(_alleli_int_field_str cur ~get:(fun s -> s.winners))
+      ~prior_str:(_alleli_int_field_str prior ~get:(fun s -> s.winners));
+    _alleli_row ~label:"Losers"
+      ~cur_str:(_alleli_int_field_str cur ~get:(fun s -> s.losers))
+      ~prior_str:(_alleli_int_field_str prior ~get:(fun s -> s.losers));
+    _alleli_row ~label:"Win rate"
+      ~cur_str:
+        (_alleli_field_str cur ~fmt:_fmt_pct_fraction_signed ~get:(fun s ->
+             s.win_rate_pct))
+      ~prior_str:
+        (_alleli_field_str prior ~fmt:_fmt_pct_fraction_signed ~get:(fun s ->
+             s.win_rate_pct));
+    _alleli_row ~label:"Mean return"
+      ~cur_str:
+        (_alleli_field_str cur ~fmt:_fmt_pct_fraction_signed ~get:(fun s ->
+             s.mean_return_pct))
+      ~prior_str:
+        (_alleli_field_str prior ~fmt:_fmt_pct_fraction_signed ~get:(fun s ->
+             s.mean_return_pct));
+    _alleli_row ~label:"Median return"
+      ~cur_str:
+        (_alleli_field_str cur ~fmt:_fmt_pct_fraction_signed ~get:(fun s ->
+             s.median_return_pct))
+      ~prior_str:
+        (_alleli_field_str prior ~fmt:_fmt_pct_fraction_signed ~get:(fun s ->
+             s.median_return_pct));
+    _alleli_row ~label:"Total P&L ($)"
+      ~cur_str:
+        (_alleli_field_str cur ~fmt:_fmt_pnl_dollars ~get:(fun s ->
+             s.total_pnl_dollars))
+      ~prior_str:
+        (_alleli_field_str prior ~fmt:_fmt_pnl_dollars ~get:(fun s ->
+             s.total_pnl_dollars));
+    "";
+  ]
+
+let _all_eligible_section paired =
+  let with_alleli =
+    List.filter paired ~f:(fun (c, p) ->
+        Option.is_some c.all_eligible || Option.is_some p.all_eligible)
+  in
+  if List.is_empty with_alleli then []
+  else
+    let header =
+      [
+        "## All-eligible diagnostic";
+        "";
+        "Fixed-dollar opportunity-cost diagnostic — every cascade-admissible \
+         Stage-2 breakout signal is sized at a uniform entry and tracked to \
+         its natural exit, bypassing portfolio-level rejections \
+         (`all_eligible/grade-C/summary.sexp` required). Compare against \
+         actual trading metrics: negative aggregate P&L with a positive actual \
+         return means the cascade is correctly keeping the average signal out; \
+         the inverse means signal alpha is being left on the table. Per-trade \
+         drill-down lives in the linked `trades.csv`.";
+        "";
+      ]
+    in
+    let body = List.concat_map with_alleli ~f:_row_all_eligible_for_pair in
+    header @ body
+
 let render ?(thresholds = default_thresholds) (t : t) =
   let lines =
     _section_header ~title:"Release perf report" ~current:t.current_label
       ~prior:t.prior_label
     @ _trading_section t.paired
     @ _trade_quality_section t.paired
+    @ _all_eligible_section t.paired
     @ _optimal_strategy_section t.paired
     @ _rss_section ~thresholds t.paired
     @ _wall_section ~thresholds t.paired

@@ -161,24 +161,27 @@ let _cell_dir ~out_dir grade_dirname = Filename.concat out_dir grade_dirname
 
 let _default_cell_dir ~out_dir = _cell_dir ~out_dir "grade-C"
 
-let test_run_emits_three_artefacts _ =
+let test_run_emits_four_artefacts _ =
   let data_dir, out_dir = _mk_tmpdirs "all_elig_smoke" in
   let scenario_path = _stage_fixture ~data_dir in
   let args = _make_args ~scenario_path ~out_dir in
   _with_data_dir ~data_dir (fun () -> Runner.run_with_args args);
   let cell = _default_cell_dir ~out_dir in
   let trades = Filename.concat cell "trades.csv" in
-  let summary = Filename.concat cell "summary.md" in
+  let summary_md = Filename.concat cell "summary.md" in
+  let summary_sexp = Filename.concat cell "summary.sexp" in
   let config = Filename.concat cell "config.sexp" in
   assert_that
     ( Sys_unix.file_exists_exn trades,
-      Sys_unix.file_exists_exn summary,
+      Sys_unix.file_exists_exn summary_md,
+      Sys_unix.file_exists_exn summary_sexp,
       Sys_unix.file_exists_exn config )
     (all_of
        [
-         field (fun (t, _, _) -> t) (equal_to true);
-         field (fun (_, s, _) -> s) (equal_to true);
-         field (fun (_, _, c) -> c) (equal_to true);
+         field (fun (t, _, _, _) -> t) (equal_to true);
+         field (fun (_, s, _, _) -> s) (equal_to true);
+         field (fun (_, _, ss, _) -> ss) (equal_to true);
+         field (fun (_, _, _, c) -> c) (equal_to true);
        ])
 
 let test_summary_md_contains_aggregate_fields _ =
@@ -228,6 +231,28 @@ let test_trades_csv_has_header_only_when_no_trades _ =
              _has
                "signal_date,symbol,side,entry_price,exit_date,exit_reason,return_pct,hold_days,entry_dollars,shares,pnl_dollars,cascade_score,passes_macro";
            ];
+       ])
+
+let test_summary_sexp_round_trips _ =
+  (* Pin: summary.sexp is sexp-readable as [All_eligible.aggregate_of_sexp].
+     The flat-price fixture yields trade_count = 0, so the round-trip exercises
+     the empty-aggregate branch — what release_report.load_scenario_run will
+     decode in practice on zero-trade scenarios. *)
+  let data_dir, out_dir = _mk_tmpdirs "all_elig_summary_sexp" in
+  let scenario_path = _stage_fixture ~data_dir in
+  let args = _make_args ~scenario_path ~out_dir in
+  _with_data_dir ~data_dir (fun () -> Runner.run_with_args args);
+  let path = Filename.concat (_default_cell_dir ~out_dir) "summary.sexp" in
+  let parsed = All_eligible.aggregate_of_sexp (Sexp.load_sexp path) in
+  assert_that parsed
+    (all_of
+       [
+         field (fun (a : All_eligible.aggregate) -> a.trade_count) (equal_to 0);
+         field (fun (a : All_eligible.aggregate) -> a.winners) (equal_to 0);
+         field (fun (a : All_eligible.aggregate) -> a.losers) (equal_to 0);
+         field
+           (fun (a : All_eligible.aggregate) -> a.total_pnl_dollars)
+           (float_equal 0.0);
        ])
 
 let test_config_sexp_round_trips _ =
@@ -488,6 +513,7 @@ let test_grade_sweep_emits_per_grade_subdirs _ =
         let dir = Filename.concat out_dir cell in
         Sys_unix.file_exists_exn (Filename.concat dir "trades.csv")
         && Sys_unix.file_exists_exn (Filename.concat dir "summary.md")
+        && Sys_unix.file_exists_exn (Filename.concat dir "summary.sexp")
         && Sys_unix.file_exists_exn (Filename.concat dir "config.sexp"))
   in
   let top_summary_body =
@@ -552,12 +578,13 @@ let test_format_summary_md_pins_table_header _ =
 let suite =
   "All_eligible_runner"
   >::: [
-         "run emits three artefacts" >:: test_run_emits_three_artefacts;
+         "run emits four artefacts" >:: test_run_emits_four_artefacts;
          "summary.md surfaces aggregate fields"
          >:: test_summary_md_contains_aggregate_fields;
          "trades.csv header-only on zero-trade run"
          >:: test_trades_csv_has_header_only_when_no_trades;
          "config.sexp round-trips" >:: test_config_sexp_round_trips;
+         "summary.sexp round-trips" >:: test_summary_sexp_round_trips;
          "parse_argv minimum required flags" >:: test_parse_argv_minimum;
          "parse_argv all flags populated" >:: test_parse_argv_all_flags;
          "parse_argv --min-grade variants" >:: test_parse_argv_min_grade;

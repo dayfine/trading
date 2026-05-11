@@ -1,12 +1,13 @@
 # Status: all-eligible
 
-## Last updated: 2026-05-10
+## Last updated: 2026-05-11
 
 ## Status
 READY_FOR_REVIEW
 
-(PR-1 merged #899; PR-2 CLI merged #901; **PR-3 release-report wiring on
-`feat/all-eligible-release-report` — ready for review**)
+(PR-1 merged #899; PR-2 CLI merged #901; PR-3 scenario_runner wiring merged
+#1017; **PR-4 release-report rendering on
+`feat/all-eligible-release-report-wiring` — ready for review**)
 
 ## Interface stable
 NO
@@ -36,9 +37,14 @@ natural exit. Produces per-trade alpha + aggregate stats so we can separate
   emission. `all_eligible_runner.exe --scenario <path> --out-dir <path>` →
   `trades.csv` + `summary.md` + `config.sexp`. 9 integration / unit tests.
   Bin lives at `trading/trading/backtest/all_eligible/bin/`.
-- **PR-3** (deferred) — wire `all_eligible_runner` into the release-report
-  pipeline so every nightly run emits the diagnostic alongside
-  `optimal_strategy.md`.
+- **PR-3** (merged #1017) — wire `all_eligible_runner` into the
+  `scenario_runner` post-step so every per-scenario child emits the
+  diagnostic alongside `actual.sexp` / `summary.sexp`.
+- **PR-4** (this PR — `feat/all-eligible-release-report-wiring`) — surface
+  the diagnostic in the release comparison report. Adds a structured
+  `summary.sexp` emission to the runner + a new `all_eligible_summary`
+  field on `Release_report.scenario_run` + an "All-eligible diagnostic"
+  section in the rendered markdown.
 
 ## Open work
 
@@ -55,6 +61,8 @@ natural exit. Produces per-trade alpha + aggregate stats so we can separate
   sweep cascade thresholds without editing scenario files. Currently the
   flag is a passthrough — accepted for forward-compat but not yet
   threaded.
+- [x] Extend `release_report.load_scenario_run` to surface the
+  `all_eligible/grade-C/` artefact in markdown. **PR-4 (this PR).**
 
 ## Completed
 
@@ -69,8 +77,7 @@ natural exit. Produces per-trade alpha + aggregate stats so we can separate
   $10K-per-signal sizing (negative all-eligible alpha across the
   universe — informs the "screener cascade is keeping the average
   signal out" hypothesis).
-- 2026-05-10 — **PR-3 release-report wiring** READY_FOR_REVIEW on
-  `feat/all-eligible-release-report` (`6eb8d6d`).
+- 2026-05-10 — **PR-3 release-report wiring** merged via #1017.
   `Backtest_all_eligible.Scenario_post_step.emit` facade + `scenario_runner`
   wiring so every per-scenario child writes
   `<scenario_dir>/all_eligible/grade-C/{trades.csv,summary.md,config.sexp}`
@@ -79,9 +86,26 @@ natural exit. Produces per-trade alpha + aggregate stats so we can separate
   tests cover enabled/disabled/failure-isolation under
   `trading/trading/backtest/all_eligible/bin/test/test_scenario_post_step.ml`.
   Diagnostic failures inside the runner are logged + swallowed so a crash
-  never aborts the parent backtest. Verify:
+  never aborts the parent backtest.
+- 2026-05-11 — **PR-4 release-report rendering** READY_FOR_REVIEW on
+  `feat/all-eligible-release-report-wiring`. Three additive changes:
+  (1) `Grade_sweep._emit_cell` now writes a fourth artefact
+  `summary.sexp` alongside `trades.csv` / `summary.md` / `config.sexp` —
+  the structured `All_eligible.aggregate` is round-trippable across batches.
+  (2) `Release_report.scenario_run` gains an optional `all_eligible`
+  field populated by a new `_try_load_all_eligible_summary` helper that
+  reads `<scenario>/all_eligible/grade-C/summary.sexp` and decodes via
+  `@@sexp.allow_extra_fields` (intentionally drops the producer-side
+  `return_buckets` histogram).
+  (3) `Release_report.render` surfaces an "All-eligible diagnostic"
+  section between trade-quality and optimal-strategy, with per-scenario
+  metrics (trade count, winners/losers, win rate, mean+median return,
+  total P&L) and a `trades.csv` drill-down link. Six new tests cover
+  summary.sexp round-trip + loader presence/absence/malformed +
+  renderer omission/presence/one-sided. Verify:
   ```bash
   dune runtest trading/trading/backtest/all_eligible
+  dune runtest trading/trading/backtest/test
   ```
 
 ## Verify
