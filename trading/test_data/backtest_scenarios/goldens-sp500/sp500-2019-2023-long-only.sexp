@@ -41,25 +41,33 @@
 ;; that gap is closed by fixing G14 alone, or whether it requires a real
 ;; risk control (G15-style for longs), is part of what these pins surface.
 ((name "sp500-2019-2023-long-only")
- (description "S&P 500 over 2019-2023 — long-only counterpart to sp500-2019-2023")
+ (description "S&P 500 over 2019-2023 — long-only — Cell E config")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
  (universe_path "universes/sp500.sexp")
  (universe_size 503)
- (config_overrides (((enable_short_side false))))
- ;; Re-pinned 2026-05-04 to 503-sym universe (post-#807 universe refresh) and
- ;; post-#847 partial revert (Option-1: panel-backed strategy + snapshot-backed
- ;; simulator). Measured baseline:
- ;;   total_return_pct  79.74   total_trades 74   win_rate 27.03
- ;;   sharpe_ratio       0.66   max_drawdown 30.79  avg_holding_days 94.55
- ;;   open_positions_value 1,696,593
- ;; Tolerances widened around the measured baseline; tighten if/when the
- ;; long-only profile is re-shaped by deliberate strategy work (re-pin then,
- ;; do not tighten reactively to absorb regressions).
+ ;; Cell E rollout 2026-05-11: applies the new standard strategy config
+ ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+ ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
+ ;; default-sized baseline (79.74% / 74 trades / 30.8% DD).
+ ;; Measured 2026-05-11 (Cell E):
+ ;;   total_return_pct   66.5   total_trades 248   win_rate 39.1
+ ;;   sharpe_ratio       0.68   max_drawdown 24.1  avg_holding_days  42
+ ;;   open_positions_value 1,401,130
+ ;; MaxDD cut 6.7pp (31 → 24), trade count 3.4x. Tolerances ±15%.
+ (config_overrides
+  (((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min  60.0)       (max 100.0)))
-   (total_trades       ((min  60)         (max  90)))
-   (win_rate           ((min  18.0)       (max  35.0)))
-   (sharpe_ratio       ((min   0.40)      (max   0.90)))
-   (max_drawdown_pct   ((min  20.0)       (max  40.0)))
-   (avg_holding_days   ((min  75.0)       (max 115.0)))
-   (open_positions_value ((min 1300000.0) (max 2100000.0))))))
+  ((total_return_pct   ((min  56.5)        (max  76.5)))
+   (total_trades       ((min 210)          (max 285)))
+   (win_rate           ((min  33.2)        (max  45.0)))
+   (sharpe_ratio       ((min   0.58)       (max   0.78)))
+   (max_drawdown_pct   ((min  20.5)        (max  27.7)))
+   (avg_holding_days   ((min  36.0)        (max  48.0)))
+   (open_positions_value ((min 1190000.0)  (max 1611000.0))))))
