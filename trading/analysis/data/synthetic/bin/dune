@@ -1,6 +1,13 @@
 (executables
- (names generate_synth generate_synth_v2)
- (modules generate_synth generate_synth_v2)
- (libraries core core_unix.command_unix status synthetic types)
+ (names generate_synth generate_synth_v2 generate_synth_v3)
+ (modules generate_synth generate_synth_v2 generate_synth_v3)
+ (libraries
+  core
+  core_unix
+  core_unix.command_unix
+  core_unix.filename_unix
+  status
+  synthetic
+  types)
  (preprocess
   (pps ppx_jane)))

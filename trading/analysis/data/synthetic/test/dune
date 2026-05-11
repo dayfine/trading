@@ -1,6 +1,18 @@
 (tests
- (names test_block_bootstrap test_regime_hmm test_garch test_synth_v2)
- (modules test_block_bootstrap test_regime_hmm test_garch test_synth_v2)
+ (names
+  test_block_bootstrap
+  test_regime_hmm
+  test_garch
+  test_synth_v2
+  test_factor_model
+  test_synth_v3)
+ (modules
+  test_block_bootstrap
+  test_regime_hmm
+  test_garch
+  test_synth_v2
+  test_factor_model
+  test_synth_v3)
  (libraries
   core
   core_unix
