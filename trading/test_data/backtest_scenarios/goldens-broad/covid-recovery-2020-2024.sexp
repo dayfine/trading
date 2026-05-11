@@ -21,16 +21,30 @@
  ;; dev/notes/short-side-gaps-2026-04-29.md) produce broken metrics on any
  ;; scenario crossing a Bearish-macro window. Until the gaps close, this
  ;; cell runs long-only — see dev/notes/goldens-broad-long-only-baselines-2026-04-29.md.
- (config_overrides (((universe_cap (1000)) (enable_short_side false))))
- ;; Baseline measured 2026-04-29 (long-only):
- ;;   return +15.12% / 149 trades / win_rate 20.81% / Sharpe 0.238 /
- ;;   MaxDD 75.30% / avg_hold 61.1d / open_positions_value $1.12M /
- ;;   peak RSS 1,693 MB / wall 2:50.
+ ;; Cell E rollout 2026-05-11: applies the new standard strategy config
+ ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+ ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
+ ;; default-sized baseline (15.12% / 149 trades / 75.3% DD on N=1000 broad).
+ ;; Measured 2026-05-11 (Cell E, N=1000 broad):
+ ;;   total_return_pct  294.5   total_trades 309   win_rate 34.6
+ ;;   sharpe_ratio       0.85   max_drawdown 38.6  avg_holding_days  34
+ ;;   open_positions_value 3,787,086
+ ;; Return 19x (15 → 295), MaxDD cut 37pp (75 → 39). Tolerances ±15%.
+ (config_overrides
+  (((universe_cap (1000)))
+   ((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 12.5)         (max 17.5)))     ;; ±15% around 15.1
-   (total_trades       ((min 139)          (max 159)))      ;; ±10 around 149
-   (win_rate           ((min 17.5)         (max 24.0)))     ;; ±15% around 20.8
-   (sharpe_ratio       ((min 0.10)         (max 0.40)))     ;; small absolute, wider relative
-   (max_drawdown_pct   ((min 67.5)         (max 83.0)))     ;; ±10% around 75.3
-   (avg_holding_days   ((min 55.0)         (max 67.5)))     ;; ±10% around 61.1
-   (open_positions_value ((min 955000.0)   (max 1295000.0))))))  ;; ±15% around $1.12M (mtm value, NOT true unrealized P&L; see metric_types.mli)
+  ((total_return_pct   ((min 250.0)        (max 339.0)))
+   (total_trades       ((min 263)          (max 355)))
+   (win_rate           ((min  29.4)        (max  39.8)))
+   (sharpe_ratio       ((min   0.72)       (max   0.98)))
+   (max_drawdown_pct   ((min  32.8)        (max  44.4)))
+   (avg_holding_days   ((min  29.0)        (max  39.0)))
+   (open_positions_value ((min 3220000.0)  (max 4360000.0))))))

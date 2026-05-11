@@ -25,25 +25,31 @@
  ;; dev/notes/short-side-gaps-2026-04-29.md) produce broken metrics on any
  ;; scenario crossing a Bearish-macro window. Until the gaps close, this
  ;; cell runs long-only — see dev/notes/goldens-broad-long-only-baselines-2026-04-29.md.
- (config_overrides (((universe_cap (1000)) (enable_short_side false))))
- ;; Baseline measured 2026-04-29 (long-only) — TWO independent runs landed:
- ;;   run-1: return +1582.85% / 145 trades / win_rate 40.69% / Sharpe 0.960 /
- ;;          MaxDD 94.31% / avg_hold 103.3d / open_positions_value $15.91M /
- ;;          peak RSS 1,956 MB / wall 4:31.
- ;;   run-2: return +1627.09% / 135 trades / win_rate 40.00% / Sharpe 0.960 /
- ;;          MaxDD 94.84% / avg_hold 98.0d  / open_positions_value $16.66M.
- ;; The decade cell is the ONLY one of the four goldens-broad cells that is
- ;; non-deterministic across reruns (3/4 are bit-identical). Source of the
- ;; variance is unknown — likely Hashtbl iteration order divergence accumulating
- ;; over the 10y horizon (see dev/notes/goldens-broad-long-only-baselines-2026-04-29.md
- ;; "Determinism" section). Ranges are widened to encompass both observed runs +
- ;; ~10% headroom; if subsequent reruns drift outside these ranges, prioritise
- ;; nailing down the source of non-determinism over re-pinning.
+ ;; Cell E rollout 2026-05-11: applies the new standard strategy config
+ ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+ ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
+ ;; default-sized baseline (1582-1627% / 135-145 trades / 94% DD on N=1000).
+ ;; Measured 2026-05-11 (Cell E, N=1000 broad):
+ ;;   total_return_pct  545.4   total_trades 553   win_rate 36.7
+ ;;   sharpe_ratio       0.73   max_drawdown 46.3  avg_holding_days  41
+ ;;   open_positions_value 5,410,009
+ ;; Return cut (concentrated bull run loses to rotation) but MaxDD cut 48pp
+ ;; (94 → 46) — much safer. Tolerances ±15%.
+ (config_overrides
+  (((universe_cap (1000)))
+   ((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 1300.0)       (max 1900.0)))   ;; encompass 1582.9 + 1627.1, ±10% headroom
-   (total_trades       ((min 125)          (max 160)))      ;; encompass 135 + 145, ±10 headroom
-   (win_rate           ((min 34.0)         (max 47.0)))     ;; encompass 40.0 + 40.7, ±15% headroom
-   (sharpe_ratio       ((min 0.65)         (max 1.30)))     ;; small absolute, wider relative
-   (max_drawdown_pct   ((min 84.0)         (max 100.0)))    ;; encompass 94.3 + 94.8 (capped at 100)
-   (avg_holding_days   ((min 88.0)         (max 115.0)))    ;; encompass 98.0 + 103.3, ±10% headroom
-   (open_positions_value ((min 13500000.0) (max 19000000.0))))))  ;; encompass 15.9 + 16.7M (mtm value, NOT true unrealized P&L; see metric_types.mli)
+  ((total_return_pct   ((min 463.0)        (max 627.0)))
+   (total_trades       ((min 470)          (max 636)))
+   (win_rate           ((min  31.2)        (max  42.2)))
+   (sharpe_ratio       ((min   0.62)       (max   0.84)))
+   (max_drawdown_pct   ((min  39.4)        (max  53.3)))
+   (avg_holding_days   ((min  35.0)        (max  47.0)))
+   (open_positions_value ((min 4600000.0)  (max 6220000.0))))))

@@ -24,16 +24,33 @@
 ;; exactly 0 (PR #393's fix). (Pre-rename this pin was named
 ;; [unrealized_pnl] but matched mtm-value semantics; see metric_types.mli
 ;; for the corrected meaning.)
+;;
+;; Cell E rollout 2026-05-11: applies the new standard strategy config
+;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior default-sized
+;; baseline (8% return / 21 trades / 36% DD on 0.30/0.90/0.10 sizing).
+;; Measured 2026-05-11 (Cell E):
+;;   total_return_pct   80.8   total_trades 280   win_rate 38.2
+;;   sharpe_ratio       0.80   max_drawdown 24.3  avg_holding_days  38
+;;   open_positions_value 1,634,151
+;; Return 10x (8 → 81), MaxDD cut 12pp (36 → 24). Tolerances ±15%.
 ((name "covid-recovery-2020-2024")
- (description "COVID crash and recovery through 2024")
+ (description "COVID crash and recovery through 2024 — Cell E config")
  (period ((start_date 2020-01-02) (end_date 2024-12-31)))
  (universe_size 302)
- (config_overrides ())
+ (config_overrides
+  (((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min -5.0)  (max 40.0)))
-   (total_trades       ((min 12)    (max 30)))
-   (win_rate           ((min 25.0)  (max 40.0)))
-   (sharpe_ratio       ((min -0.3)  (max 0.80)))
-   (max_drawdown_pct   ((min 25.0)  (max 45.0)))
-   (avg_holding_days   ((min 55.0)  (max 120.0)))
-   (open_positions_value ((min 1000.0) (max 2500000.0))))))
+  ((total_return_pct   ((min  68.0)        (max  93.0)))
+   (total_trades       ((min 238)          (max 322)))
+   (win_rate           ((min  32.0)        (max  44.0)))
+   (sharpe_ratio       ((min   0.68)       (max   0.92)))
+   (max_drawdown_pct   ((min  20.6)        (max  28.0)))
+   (avg_holding_days   ((min  32.0)        (max  44.0)))
+   (open_positions_value ((min 1390000.0)  (max 1880000.0))))))

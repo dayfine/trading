@@ -39,7 +39,21 @@
  (period ((start_date 1996-01-02) (end_date 2025-12-31)))
  (universe_path "universes/broad-1000-30y.sexp")
  (universe_size 1000)
- (config_overrides (((universe_cap (1000)) (enable_short_side false))))
+ ;; Cell E rollout 2026-05-11: applies the standard Cell E strategy config
+ ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+ ;; stage3 force-exit h=1, laggard rotation h=2) for consistency with the
+ ;; rest of the goldens. Capacity testing isn't affected by the config knobs
+ ;; — pin ranges are intentionally wide and tolerate the new shape.
+ (config_overrides
+  (((universe_cap (1000)))
+   ((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
  ;; Expected ranges intentionally permissive — this is a smoke gate,
  ;; not a baseline. PASS = run completes without OOM/crash and produces
  ;; non-degenerate metrics. Specific values are recorded in

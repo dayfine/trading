@@ -44,35 +44,32 @@
  ;; widens the entry funnel proportional to the window's longer horizon
  ;; without modifying the default Portfolio_risk.config (which other
  ;; goldens depend on).
- ;; Position-sizing promoted 2026-05-11 from 0.05/0.50/0.30 to 0.14/0.70/0.30
- ;; per overnight sweep winner (dev/notes/overnight-2026-05-10-results.md):
- ;; on the 2010-2024 15y window, 0.14/0.70 produced +374% / Sharpe 0.85 /
- ;; DD 18.4% vs prior 0.05/0.50 default at +189-235%. Validated across 7
- ;; rolling 5y windows (5/7 wins on return AND Sharpe; geom-mean 5y return
- ;; 41%→50%; avg Sharpe 0.66→0.75; trades cut ~60%).
+ ;; Cell E rollout 2026-05-11: position sizing promoted from 0.05/0.50/0.30 to
+ ;; 0.14/0.70/0.30 AND stage3 force-exit (h=1) + laggard rotation (h=2) added
+ ;; for full Cell E parity. Single canonical strategy config across all
+ ;; goldens. Prior 0.05/0.50 baseline (110.84% / 302 trades / 23.3% DD) and
+ ;; the partial 0.14/0.70-without-rotation baseline (594.35% / 40 trades /
+ ;; 28.4% DD) both preserved in git history.
+ ;; Measured 2026-05-11 (full Cell E, 16.3y window):
+ ;;   total_return_pct  344.9   total_trades 1099   win_rate 42.8
+ ;;   sharpe_ratio       0.78   max_drawdown 18.4   avg_holding_days   34
+ ;;   open_positions_value 3,085,413
+ ;; Cell E rotation cuts MaxDD by 10pp vs the no-rotation 0.14/0.70 variant
+ ;; (28 → 18.4) while running 27x more trades (40 → 1099). Tolerances ±15%.
  (config_overrides
   (((enable_short_side false))
    ((portfolio_config ((max_position_pct_long 0.14))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
-   ((portfolio_config ((min_cash_pct 0.30))))))
- ;; Tight-pinned 2026-05-11 after 0.14/0.70/0.30 promotion. Local run
- ;; (run.log under dev/backtest/golden-15y-rerun-2026-05-11/, wall ~13 min)
- ;; on the 16.3y window (2010-01-01 → 2026-04-30) measures:
- ;;   total_return_pct  594.35   total_trades  40   win_rate 22.50
- ;;   sharpe_ratio       0.6993  max_drawdown 28.38 avg_holding_days 142.63
- ;;   open_positions_value 6,777,708   unrealized_pnl 6,115,434
- ;;   force_liquidations_count 0
- ;; Note: trade count dropped from 302 → 40 because the wider position size
- ;; (0.05 → 0.14) holds positions ~3× longer (avg 143 days vs 103 days), and
- ;; the higher exposure cap (0.50 → 0.70) means winners aren't rotated out
- ;; for capital. Most of the return is unrealized at end-of-window — this is
- ;; the baseline Weinstein behavior (no Cell E rotation overlay). Tolerances
- ;; ±15% around measured.
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 505.0)         (max 685.0)))
-   (total_trades       ((min  34)           (max  46)))
-   (win_rate           ((min  19.0)         (max  26.0)))
-   (sharpe_ratio       ((min   0.59)        (max   0.81)))
-   (max_drawdown_pct   ((min  24.0)         (max  33.0)))
-   (avg_holding_days   ((min 121.0)         (max 164.0)))
-   (open_positions_value ((min 5760000.0)  (max 7800000.0))))))
+  ((total_return_pct   ((min 293.0)         (max 397.0)))
+   (total_trades       ((min 935)           (max 1265)))
+   (win_rate           ((min  36.4)         (max  49.2)))
+   (sharpe_ratio       ((min   0.66)        (max   0.90)))
+   (max_drawdown_pct   ((min  15.6)         (max  21.2)))
+   (avg_holding_days   ((min  29.0)         (max  39.0)))
+   (open_positions_value ((min 2620000.0)   (max 3550000.0))))))
