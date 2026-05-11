@@ -1,13 +1,13 @@
 # Status: all-eligible
 
-## Last updated: 2026-05-11
+## Last updated: 2026-05-12
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-(PR-1 merged #899; PR-2 CLI merged #901; PR-3 scenario_runner wiring merged
-#1017; **PR-4 release-report rendering on
-`feat/all-eligible-release-report-wiring` — ready for review**)
+(PR-1 lib #899; PR-2 CLI #901; PR-3 scenario_runner wiring #1017
+(2026-05-10); PR-4 release-report rendering #1027 (2026-05-11) all
+merged. Deferred polish only.)
 
 ## Interface stable
 NO
@@ -62,7 +62,7 @@ natural exit. Produces per-trade alpha + aggregate stats so we can separate
   flag is a passthrough — accepted for forward-compat but not yet
   threaded.
 - [x] Extend `release_report.load_scenario_run` to surface the
-  `all_eligible/grade-C/` artefact in markdown. **PR-4 (this PR).**
+  `all_eligible/grade-C/` artefact in markdown. **PR-4 (#1027) MERGED 2026-05-11.**
 
 ## Completed
 

@@ -1,9 +1,15 @@
 # Status: cost-tracking
 
-## Last updated: 2026-04-20
+## Last updated: 2026-05-12
 
 ## Status
-IN_PROGRESS
+MERGED
+
+(Measured `total_cost_usd` populates per-run `dev/budget/<date>-runId.json`
+since #483 + the new-day bug fix #495/#499. Verified on the most recent
+10 runs 2026-05-05..2026-05-11 — every JSON carries a non-null
+`totals.total_cost_usd` figure. Per-subagent breakdown remains a known
+gap, captured under §Follow-up below.)
 
 ## Interface stable
 NO
@@ -93,6 +99,6 @@ track run-to-run cost trends and see if PRs #481/#482 moved the needle on total 
 
 ## Next Steps
 
-1. Verify GHA "Capture run cost" step produces valid JSON on next orchestrator run
-2. Run `dev/lib/budget_rollup.sh` after several runs to see cost trend
-3. Compare costs before/after PRs #481 (saturated-queue fast-exit) and #482 (qc-structural → Haiku)
+Track wraps. Future enhancements (per-subagent breakdown, token counts,
+OTEL telemetry) live under §Follow-up — re-open the track only if one
+of them becomes a hard requirement.
