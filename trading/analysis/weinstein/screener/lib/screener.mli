@@ -65,6 +65,24 @@ type config = {
           parameter; add to the M5.5 grid_search sweep parameter list". The
           design intent is to make the cascade score gate a single tunable
           dimension. *)
+  max_score_override : int option; [@sexp.default None]
+      (** Optional numeric score ceiling. When [Some n], candidates with
+          [score >= n] are rejected from the cascade output. Composes with
+          {!min_score_override}: a candidate survives only if [low <= score < n]
+          where [low] is whichever floor is in effect.
+
+          Default: [None] — no ceiling.
+
+          Motivation: per-quintile entry-feature analysis on rolling 5y Cell E
+          trades (dev/notes/entry-signal-quintiles-2026-05-11.md) showed the top
+          score quintile (≥80) has 28.6% win rate (worst of all buckets) and ≈
+          $0 average P&L per trade — the screener's highest-confidence
+          candidates produce no edge. Capping at 79 or 80 lets the cascade fall
+          through to the next-best candidates from the still-abundant pool (avg
+          12.5 admitted per Friday vs ~1.3 entered).
+
+          The cap is applied at the same gate as {!min_score_override} so the
+          cascade-diagnostics phase counters stay consistent. *)
   max_buy_candidates : int;
       (** Maximum number of buy candidates returned. Default: 20. *)
   max_short_candidates : int;

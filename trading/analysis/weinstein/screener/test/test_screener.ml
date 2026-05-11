@@ -425,6 +425,91 @@ let test_min_score_override_supersedes_min_grade _ =
     (elements_are
        [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "HIGH") ])
 
+(** [max_score_override = Some n] excludes candidates with [score >= n]. With
+    the cap set strictly between LOW and HIGH, only LOW survives — the inverse
+    of the [min_score_override] test. *)
+let test_max_score_override_excludes_at_or_above_threshold _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let low_score = Map.find_exn scores "LOW" in
+  let high_score = Map.find_exn scores "HIGH" in
+  assert_that high_score (gt (module Int_ord) low_score);
+  let cap = low_score + 1 in
+  let cfg_cap = { cfg with max_score_override = Some cap } in
+  let result =
+    screen ~config:cfg_cap ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates
+    (elements_are
+       [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "LOW") ])
+
+(** [max_score_override = Some n] equal to HIGH's exact score still excludes
+    HIGH — the gate is strict [<], symmetric with {!min_score_override}'s
+    inclusive [>=]. *)
+let test_max_score_override_exclusive_at_boundary _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let high_score = Map.find_exn scores "HIGH" in
+  let cfg_cap = { cfg with max_score_override = Some high_score } in
+  let result =
+    screen ~config:cfg_cap ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates
+    (all_of
+       [
+         size_is 1;
+         elements_are
+           [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "LOW") ];
+       ])
+
+(** [max_score_override = None] (default) admits both candidates — bit-equal to
+    the legacy ceiling-free behaviour. *)
+let test_max_score_override_default_admits_all _ =
+  let stocks = _two_breakouts () in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  assert_that (List.length result.buy_candidates) (equal_to 2)
+
+(** [max_score_override] strictly above HIGH's score admits both — confirms the
+    ceiling is a strict [<] (no candidate at-or-above the cap passes). *)
+let test_max_score_override_above_high_admits_all _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let high_score = Map.find_exn scores "HIGH" in
+  let cfg_cap = { cfg with max_score_override = Some (high_score + 1) } in
+  let result =
+    screen ~config:cfg_cap ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that (List.length result.buy_candidates) (equal_to 2)
+
+(** [min_score_override] + [max_score_override] compose: window
+    [low <= score < high] admits only candidates inside the band. With LOW's
+    score as the floor and HIGH's score as the ceiling, only LOW survives. *)
+let test_min_and_max_score_override_compose _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let low_score = Map.find_exn scores "LOW" in
+  let high_score = Map.find_exn scores "HIGH" in
+  let cfg_window =
+    {
+      cfg with
+      min_score_override = Some low_score;
+      max_score_override = Some high_score;
+    }
+  in
+  let result =
+    screen ~config:cfg_window ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates
+    (elements_are
+       [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "LOW") ])
+
 (* ------------------------------------------------------------------ *)
 (* Short candidates in Neutral market                                  *)
 (* ------------------------------------------------------------------ *)
@@ -991,6 +1076,16 @@ let suite =
          >:: test_min_score_override_default_preserves_min_grade;
          "test_min_score_override_supersedes_min_grade"
          >:: test_min_score_override_supersedes_min_grade;
+         "test_max_score_override_excludes_at_or_above_threshold"
+         >:: test_max_score_override_excludes_at_or_above_threshold;
+         "test_max_score_override_exclusive_at_boundary"
+         >:: test_max_score_override_exclusive_at_boundary;
+         "test_max_score_override_default_admits_all"
+         >:: test_max_score_override_default_admits_all;
+         "test_max_score_override_above_high_admits_all"
+         >:: test_max_score_override_above_high_admits_all;
+         "test_min_and_max_score_override_compose"
+         >:: test_min_and_max_score_override_compose;
          "test_neutral_macro_produces_shorts"
          >:: test_neutral_macro_produces_shorts;
          "test_short_candidate_stop_above_entry"
