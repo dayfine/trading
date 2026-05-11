@@ -511,6 +511,126 @@ let test_min_and_max_score_override_compose _ =
        [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "LOW") ])
 
 (* ------------------------------------------------------------------ *)
+(* volume_ratio_exclude_range: per-Friday volume-band exclusion         *)
+(* ------------------------------------------------------------------ *)
+
+(** Helper: read each candidate's volume_ratio so tests can choose exclusion
+    bands relative to live values without hard-pinning them. *)
+let _volume_ratios stocks =
+  String.Map.of_alist_reduce
+    (List.filter_map stocks ~f:(fun (a : Stock_analysis.t) ->
+         Option.map a.volume ~f:(fun v -> (a.ticker, v.Volume.volume_ratio))))
+    ~f:(fun a _ -> a)
+
+(** Default ([None]) is bit-equal to legacy behaviour: both LOW (ratio 1.5) and
+    HIGH (ratio 3.0) survive. *)
+let test_volume_ratio_exclude_range_default_admits_all _ =
+  let stocks = _two_breakouts () in
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  assert_that (List.length result.buy_candidates) (equal_to 2)
+
+(** A band that brackets LOW's volume_ratio drops LOW; HIGH (outside band)
+    survives. Pins the [low <= r < high] half-open semantics. *)
+let test_volume_ratio_exclude_range_drops_in_band _ =
+  let stocks = _two_breakouts () in
+  let ratios = _volume_ratios stocks in
+  let low_ratio = Map.find_exn ratios "LOW" in
+  let cfg_excl =
+    {
+      cfg with
+      volume_ratio_exclude_range =
+        Some { low = low_ratio -. 0.1; high = low_ratio +. 0.1 };
+    }
+  in
+  let result =
+    screen ~config:cfg_excl ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates
+    (elements_are
+       [ field (fun (c : scored_candidate) -> c.ticker) (equal_to "HIGH") ])
+
+(** Upper boundary is exclusive: a band ending exactly at HIGH's volume_ratio
+    does NOT drop HIGH. Pins the half-open shape: low inclusive, high exclusive.
+*)
+let test_volume_ratio_exclude_range_upper_bound_exclusive _ =
+  let stocks = _two_breakouts () in
+  let ratios = _volume_ratios stocks in
+  let high_ratio = Map.find_exn ratios "HIGH" in
+  let low_ratio = Map.find_exn ratios "LOW" in
+  let cfg_excl =
+    {
+      cfg with
+      volume_ratio_exclude_range =
+        Some { low = low_ratio +. 0.01; high = high_ratio };
+    }
+  in
+  let result =
+    screen ~config:cfg_excl ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  let surviving_tickers =
+    List.map result.buy_candidates ~f:(fun (c : scored_candidate) -> c.ticker)
+    |> List.sort ~compare:String.compare
+  in
+  assert_that surviving_tickers
+    (elements_are [ equal_to "HIGH"; equal_to "LOW" ])
+
+(** Composes with [min_score_override]: a candidate must pass BOTH the volume
+    band and the score gate. With a min_score_override set at HIGH's score (so
+    only HIGH would survive on score alone) AND a volume band that brackets
+    HIGH's ratio (so HIGH would be dropped on volume alone), the result is
+    empty. *)
+let test_volume_ratio_exclude_range_composes_with_score _ =
+  let stocks = _two_breakouts () in
+  let scores = _scores_by_ticker stocks in
+  let ratios = _volume_ratios stocks in
+  let high_score = Map.find_exn scores "HIGH" in
+  let high_ratio = Map.find_exn ratios "HIGH" in
+  let cfg_compose =
+    {
+      cfg with
+      min_score_override = Some high_score;
+      volume_ratio_exclude_range =
+        Some { low = high_ratio -. 0.1; high = high_ratio +. 0.1 };
+    }
+  in
+  let result =
+    screen ~config:cfg_compose ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that result.buy_candidates is_empty
+
+(** Diagnostics fold: a candidate excluded by the volume band is counted as NOT
+    passing the breakout phase, even though [is_breakout_candidate] returns
+    true. Pins the docstring claim "the cascade-diagnostics phase counters treat
+    exclusion as part of the breakout phase". *)
+let test_volume_ratio_exclude_range_counts_as_breakout_drop _ =
+  let stocks = _two_breakouts () in
+  let ratios = _volume_ratios stocks in
+  let low_ratio = Map.find_exn ratios "LOW" in
+  let cfg_excl =
+    {
+      cfg with
+      volume_ratio_exclude_range =
+        Some { low = low_ratio -. 0.1; high = low_ratio +. 0.1 };
+    }
+  in
+  let baseline =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks ~held_tickers:[]
+  in
+  let with_excl =
+    screen ~config:cfg_excl ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[]
+  in
+  assert_that baseline.cascade_diagnostics.long_breakout_admitted (equal_to 2);
+  assert_that with_excl.cascade_diagnostics.long_breakout_admitted (equal_to 1)
+
+(* ------------------------------------------------------------------ *)
 (* Short candidates in Neutral market                                  *)
 (* ------------------------------------------------------------------ *)
 
@@ -1084,6 +1204,16 @@ let suite =
          >:: test_max_score_override_default_admits_all;
          "test_max_score_override_above_high_admits_all"
          >:: test_max_score_override_above_high_admits_all;
+         "test_volume_ratio_exclude_range_default_admits_all"
+         >:: test_volume_ratio_exclude_range_default_admits_all;
+         "test_volume_ratio_exclude_range_drops_in_band"
+         >:: test_volume_ratio_exclude_range_drops_in_band;
+         "test_volume_ratio_exclude_range_upper_bound_exclusive"
+         >:: test_volume_ratio_exclude_range_upper_bound_exclusive;
+         "test_volume_ratio_exclude_range_composes_with_score"
+         >:: test_volume_ratio_exclude_range_composes_with_score;
+         "test_volume_ratio_exclude_range_counts_as_breakout_drop"
+         >:: test_volume_ratio_exclude_range_counts_as_breakout_drop;
          "test_min_and_max_score_override_compose"
          >:: test_min_and_max_score_override_compose;
          "test_neutral_macro_produces_shorts"
