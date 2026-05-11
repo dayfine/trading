@@ -1035,7 +1035,8 @@ let test_render_omits_all_eligible_when_both_none _ =
     (all_of
        [
          field
-           (fun s -> String.is_substring s ~substring:"## All-eligible diagnostic")
+           (fun s ->
+             String.is_substring s ~substring:"## All-eligible diagnostic")
            (equal_to false);
          field
            (fun s -> String.is_substring s ~substring:"Drill-down — Current:")
@@ -1079,7 +1080,8 @@ let test_render_includes_all_eligible_when_present _ =
     (all_of
        [
          field
-           (fun s -> String.is_substring s ~substring:"## All-eligible diagnostic")
+           (fun s ->
+             String.is_substring s ~substring:"## All-eligible diagnostic")
            (equal_to true);
          field
            (fun s -> String.is_substring s ~substring:"### recovery-2023")
@@ -1147,7 +1149,8 @@ let test_render_all_eligible_handles_one_sided _ =
     (all_of
        [
          field
-           (fun s -> String.is_substring s ~substring:"## All-eligible diagnostic")
+           (fun s ->
+             String.is_substring s ~substring:"## All-eligible diagnostic")
            (equal_to true);
          field
            (fun s ->
@@ -1161,7 +1164,8 @@ let test_render_all_eligible_handles_one_sided _ =
            (fun s -> String.is_substring s ~substring:"| Trades | 200 | — |")
            (equal_to true);
          field
-           (fun s -> String.is_substring s ~substring:"| Win rate | +30.00% | — |")
+           (fun s ->
+             String.is_substring s ~substring:"| Win rate | +30.00% | — |")
            (equal_to true);
        ])
 
@@ -1185,8 +1189,7 @@ let _write_all_eligible_summary_sexp path =
 
 let _stage_all_eligible_cell ~scenario_dir =
   let cell =
-    Filename.concat scenario_dir
-      (Filename.concat "all_eligible" "grade-C")
+    Filename.concat scenario_dir (Filename.concat "all_eligible" "grade-C")
   in
   Core_unix.mkdir_p cell;
   _write_all_eligible_summary_sexp (Filename.concat cell "summary.sexp")
@@ -1205,8 +1208,7 @@ let test_load_scenario_run_loads_all_eligible_when_present _ =
               (fun (s : Release_report.all_eligible_summary) -> s.trade_count)
               (equal_to 100);
             field
-              (fun (s : Release_report.all_eligible_summary) ->
-                s.win_rate_pct)
+              (fun (s : Release_report.all_eligible_summary) -> s.win_rate_pct)
               (float_equal 0.30);
             field
               (fun (s : Release_report.all_eligible_summary) ->
@@ -1233,12 +1235,10 @@ let test_load_scenario_run_no_all_eligible_when_sexp_malformed _ =
   _make_scenario_dir ~root:dir "malformed-alleli" ~with_perf:false;
   let scenario_dir = Filename.concat dir "malformed-alleli" in
   let cell =
-    Filename.concat scenario_dir
-      (Filename.concat "all_eligible" "grade-C")
+    Filename.concat scenario_dir (Filename.concat "all_eligible" "grade-C")
   in
   Core_unix.mkdir_p cell;
-  _write_text (Filename.concat cell "summary.sexp")
-    "this is not valid sexp\n";
+  _write_text (Filename.concat cell "summary.sexp") "this is not valid sexp\n";
   let run = Release_report.load_scenario_run ~dir:scenario_dir in
   assert_that run.all_eligible is_none
 

@@ -120,9 +120,9 @@ type all_eligible_summary = {
       (** Sum of per-trade [pnl_dollars] across every signal at the cell's
           fixed-dollar sizing. *)
   trades_csv_path : string;
-      (** Relative path (from the scenario directory's parent batch root) to
-          the per-trade [trades.csv] — used to render a markdown link for
-          drill-down in the report. Always
+      (** Relative path (from the scenario directory's parent batch root) to the
+          per-trade [trades.csv] — used to render a markdown link for drill-down
+          in the report. Always
           [<scenario_name>/all_eligible/grade-C/trades.csv]. *)
 }
 [@@deriving sexp]
@@ -130,8 +130,8 @@ type all_eligible_summary = {
     plus a relative path to its companion [trades.csv]. Mirrors the on-disk
     shape that {!Backtest_all_eligible.Grade_sweep} writes; decoded with
     [@@sexp.allow_extra_fields] so the reader survives forward additions on the
-    producer side (e.g. the [return_buckets] field is intentionally dropped —
-    it doesn't render in the comparison report). *)
+    producer side (e.g. the [return_buckets] field is intentionally dropped — it
+    doesn't render in the comparison report). *)
 
 type scenario_run = {
   name : string;

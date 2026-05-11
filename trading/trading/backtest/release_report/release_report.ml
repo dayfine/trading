@@ -220,9 +220,7 @@ let load_scenario_run ~dir =
   in
   let trade_quality = _try_load_trade_quality ~dir in
   let optimal_strategy = _try_load_optimal_summary ~dir ~scenario_name:name in
-  let all_eligible =
-    _try_load_all_eligible_summary ~dir ~scenario_name:name
-  in
+  let all_eligible = _try_load_all_eligible_summary ~dir ~scenario_name:name in
   {
     name;
     actual;
@@ -749,9 +747,7 @@ let _alleli_field_str (run : scenario_run) ~(fmt : float -> string)
 
 let _alleli_int_field_str (run : scenario_run)
     ~(get : all_eligible_summary -> int) =
-  match run.all_eligible with
-  | None -> "—"
-  | Some s -> _fmt_int_signed (get s)
+  match run.all_eligible with None -> "—" | Some s -> _fmt_int_signed (get s)
 
 let _alleli_link_str (run : scenario_run) =
   Option.map run.all_eligible ~f:(fun s ->
@@ -822,10 +818,10 @@ let _all_eligible_section paired =
          Stage-2 breakout signal is sized at a uniform entry and tracked to \
          its natural exit, bypassing portfolio-level rejections \
          (`all_eligible/grade-C/summary.sexp` required). Compare against \
-         actual trading metrics: negative aggregate P&L with a positive \
-         actual return means the cascade is correctly keeping the average \
-         signal out; the inverse means signal alpha is being left on the \
-         table. Per-trade drill-down lives in the linked `trades.csv`.";
+         actual trading metrics: negative aggregate P&L with a positive actual \
+         return means the cascade is correctly keeping the average signal out; \
+         the inverse means signal alpha is being left on the table. Per-trade \
+         drill-down lives in the linked `trades.csv`.";
         "";
       ]
     in

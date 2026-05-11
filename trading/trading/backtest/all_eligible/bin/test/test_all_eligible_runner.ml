@@ -247,15 +247,9 @@ let test_summary_sexp_round_trips _ =
   assert_that parsed
     (all_of
        [
-         field
-           (fun (a : All_eligible.aggregate) -> a.trade_count)
-           (equal_to 0);
-         field
-           (fun (a : All_eligible.aggregate) -> a.winners)
-           (equal_to 0);
-         field
-           (fun (a : All_eligible.aggregate) -> a.losers)
-           (equal_to 0);
+         field (fun (a : All_eligible.aggregate) -> a.trade_count) (equal_to 0);
+         field (fun (a : All_eligible.aggregate) -> a.winners) (equal_to 0);
+         field (fun (a : All_eligible.aggregate) -> a.losers) (equal_to 0);
          field
            (fun (a : All_eligible.aggregate) -> a.total_pnl_dollars)
            (float_equal 0.0);
