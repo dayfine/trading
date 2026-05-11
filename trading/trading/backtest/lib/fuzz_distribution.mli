@@ -61,12 +61,12 @@ val compute : fuzz_spec_raw:string -> (string * Summary.t) list -> t
 val to_sexp : t -> Sexp.t
 (** Render [t] as a machine-readable sexp. Shape:
     {[
-      ((fuzz_spec_raw <string>)
-       (variant_labels (<l1> <l2> ...))
-       (metric_stats   ((<name>
-                         ((median <f>) (p25 <f>) (p75 <f>) (std <f>)
-                          (min <f>) (max <f>)
-                          (values (<v1> <v2> ...)))) ...)))
+    ((fuzz_spec_raw <string>)
+     (variant_labels (<l1> <l2> ...))
+     (metric_stats   ((<name>
+                       ((median <f>) (p25 <f>) (p75 <f>) (std <f>)
+                        (min <f>) (max <f>)
+                        (values (<v1> <v2> ...)))) ...)))
     ]} *)
 
 val to_markdown : t -> string

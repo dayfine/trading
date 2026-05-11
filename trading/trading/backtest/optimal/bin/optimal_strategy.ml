@@ -8,7 +8,7 @@
     {1 Usage}
 
     {[
-      optimal_strategy.exe --output-dir dev/backtest/scenarios-XYZ/sp500-2019-2023/
+    optimal_strategy.exe --output-dir dev/backtest/scenarios-XYZ/sp500-2019-2023/
     ]} *)
 
 open Core

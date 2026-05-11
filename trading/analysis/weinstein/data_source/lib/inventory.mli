@@ -7,14 +7,14 @@
 
     Typical workflow:
     {[
-      (* 1. Fetch prices for symbols of interest *)
-      fetch_symbols.exe --symbols AAPL,MSFT,...
+    (* 1. Fetch prices for symbols of interest *)
+    fetch_symbols.exe --symbols AAPL,MSFT,...
 
-      (* 2. Rebuild the inventory from cached metadata *)
-      build_inventory.exe
+    (* 2. Rebuild the inventory from cached metadata *)
+    build_inventory.exe
 
-      (* 3. Bootstrap a universe.sexp from the inventory *)
-      bootstrap_universe.exe
+    (* 3. Bootstrap a universe.sexp from the inventory *)
+    bootstrap_universe.exe
     ]}
 
     The inventory file ([inventory.sexp]) is the input to {!bootstrap_universe}

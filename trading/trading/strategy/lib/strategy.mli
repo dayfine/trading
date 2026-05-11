@@ -6,24 +6,24 @@
     {1 Usage Example}
 
     {[
-      (* Create strategies using factory *)
-      let strategies = [
-        Strategy.create_strategy (Strategy.EmaConfig {
-          symbols = ["AAPL"]; ema_period = 20; ...
-        });
-        Strategy.create_strategy (Strategy.BuyAndHoldConfig {
-          symbols = ["MSFT"]; position_size = 100.0; ...
-        });
-      ] in
+    (* Create strategies using factory *)
+    let strategies = [
+      Strategy.create_strategy (Strategy.EmaConfig {
+        symbols = ["AAPL"]; ema_period = 20; ...
+      });
+      Strategy.create_strategy (Strategy.BuyAndHoldConfig {
+        symbols = ["MSFT"]; position_size = 100.0; ...
+      });
+    ] in
 
-      (* Execute uniformly - no pattern matching needed *)
-      (* Partially apply market_data to accessor functions *)
-      let get_price_fn = get_price market_data in
-      let get_indicator_fn = get_indicator market_data in
-      let results = List.map strategies ~f:(fun strategy ->
-        Strategy.use_strategy ~get_price:get_price_fn ~get_indicator:get_indicator_fn
-          ~portfolio strategy
-      ) in
+    (* Execute uniformly - no pattern matching needed *)
+    (* Partially apply market_data to accessor functions *)
+    let get_price_fn = get_price market_data in
+    let get_indicator_fn = get_indicator market_data in
+    let results = List.map strategies ~f:(fun strategy ->
+      Strategy.use_strategy ~get_price:get_price_fn ~get_indicator:get_indicator_fn
+        ~portfolio strategy
+    ) in
     ]} *)
 
 include module type of Strategy_interface
@@ -57,16 +57,16 @@ val create_strategy : config -> t
 
     Example:
     {[
-      let ema_cfg : Ema_strategy.config =
-        {
-          symbols = [ "AAPL" ];
-          ema_period = 20;
-          stop_loss_percent = 0.05;
-          take_profit_percent = 0.10;
-          position_size = 100.0;
-        }
-      in
-      let strategy = create_strategy (EmaConfig ema_cfg)
+    let ema_cfg : Ema_strategy.config =
+      {
+        symbols = [ "AAPL" ];
+        ema_period = 20;
+        stop_loss_percent = 0.05;
+        take_profit_percent = 0.10;
+        position_size = 100.0;
+      }
+    in
+    let strategy = create_strategy (EmaConfig ema_cfg)
     ]} *)
 
 val use_strategy :
