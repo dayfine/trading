@@ -75,11 +75,11 @@ let test_sample_betas_length _ =
 let test_sample_betas_in_range _ =
   let dist = Factor_model.default_loading_distribution in
   let betas = Factor_model.sample_betas dist ~n:200 ~seed:23 in
-  let in_range =
-    List.for_all betas ~f:(fun b ->
-        Float.(b >= dist.min_value) && Float.(b <= dist.max_value))
+  let n_out_of_range =
+    List.count betas ~f:(fun b ->
+        not (Float.(b >= dist.min_value) && Float.(b <= dist.max_value)))
   in
-  assert_that in_range (equal_to true)
+  assert_that n_out_of_range (equal_to 0)
 
 let test_sample_betas_zero_n _ =
   let betas =
@@ -128,14 +128,15 @@ let test_sample_idio_params_all_stationary _ =
     Factor_model.sample_idio_params Factor_model.default_idio_distribution
       ~n:100 ~seed:5
   in
-  let all_stationary =
-    List.for_all params ~f:(fun (p : Garch.params) ->
-        Float.(p.omega > 0.0)
-        && Float.(p.alpha >= 0.0)
-        && Float.(p.beta >= 0.0)
-        && Float.(p.alpha +. p.beta < 1.0))
+  let n_non_stationary =
+    List.count params ~f:(fun (p : Garch.params) ->
+        not
+          (Float.(p.omega > 0.0)
+          && Float.(p.alpha >= 0.0)
+          && Float.(p.beta >= 0.0)
+          && Float.(p.alpha +. p.beta < 1.0)))
   in
-  assert_that all_stationary (equal_to true)
+  assert_that n_non_stationary (equal_to 0)
 
 let test_sample_idio_params_deterministic _ =
   let a =
@@ -165,10 +166,11 @@ let test_sample_idio_params_zero_sigma_collapses _ =
   in
   let params = Factor_model.sample_idio_params dist ~n:10 ~seed:5 in
   let omegas = List.map params ~f:(fun (p : Garch.params) -> p.omega) in
-  let all_equal =
-    List.for_all omegas ~f:(fun o -> Float.(abs (o -. dist.omega_mean) < 1e-12))
+  let n_diverging =
+    List.count omegas ~f:(fun o ->
+        not Float.(abs (o -. dist.omega_mean) < 1e-12))
   in
-  assert_that all_equal (equal_to true)
+  assert_that n_diverging (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
 (* generate_symbol_returns — length, sanity, determinism                *)
@@ -235,10 +237,11 @@ let test_generate_symbol_returns_beta_one_reproduces_market _ =
   in
   (* The market term dominates by ~14 orders of magnitude; check elementwise
      equality up to a loose epsilon. *)
-  let close_enough =
-    List.for_all2_exn market returns ~f:(fun m r -> Float.(abs (r -. m) < 1e-5))
+  let n_diverging =
+    List.zip_exn market returns
+    |> List.count ~f:(fun (m, r) -> not Float.(abs (r -. m) < 1e-5))
   in
-  assert_that close_enough (equal_to true)
+  assert_that n_diverging (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
 (* Sample-betas + idio params: validation paths via Invalid_argument   *)

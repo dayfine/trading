@@ -25,10 +25,10 @@ let test_each_symbol_target_length _ =
   let target = 80 in
   let cfg = _default_cfg ~n_symbols:5 ~target () in
   let u = _unwrap_or_fail "generate failed" (Synth_v3.generate cfg) in
-  let all_match =
-    List.for_all u.symbols ~f:(fun (_, bars) -> List.length bars = target)
+  let n_wrong_length =
+    List.count u.symbols ~f:(fun (_, bars) -> List.length bars <> target)
   in
-  assert_that all_match (equal_to true)
+  assert_that n_wrong_length (equal_to 0)
 
 let test_default_symbol_names _ =
   let cfg = _default_cfg ~n_symbols:3 () in
@@ -64,18 +64,20 @@ let test_all_symbols_share_dates _ =
   match bar_dates with
   | [] -> assert_failure "empty universe"
   | first :: rest ->
-      let aligned = List.for_all rest ~f:(List.equal Date.equal first) in
-      assert_that aligned (equal_to true)
+      let n_misaligned =
+        List.count rest ~f:(fun dates -> not (List.equal Date.equal first dates))
+      in
+      assert_that n_misaligned (equal_to 0)
 
 let test_dates_business_days_only _ =
   let cfg = _default_cfg ~n_symbols:2 ~target:40 () in
   let u = _unwrap_or_fail "generate failed" (Synth_v3.generate cfg) in
   let _, bars0 = List.hd_exn u.symbols in
-  let all_weekdays =
-    List.for_all bars0 ~f:(fun (b : Types.Daily_price.t) ->
-        match Date.day_of_week b.date with Sat | Sun -> false | _ -> true)
+  let n_weekend_bars =
+    List.count bars0 ~f:(fun (b : Types.Daily_price.t) ->
+        match Date.day_of_week b.date with Sat | Sun -> true | _ -> false)
   in
-  assert_that all_weekdays (equal_to true)
+  assert_that n_weekend_bars (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
 (* Determinism                                                          *)
@@ -132,10 +134,13 @@ let test_ohlc_well_formed_all_symbols _ =
     && Float.(b.close_price > 0.0)
     && Float.is_finite b.close_price
   in
-  let all_ok =
-    List.for_all u.symbols ~f:(fun (_, bars) -> List.for_all bars ~f:ok_bar)
+  let n_malformed =
+    List.sum
+      (module Int)
+      u.symbols
+      ~f:(fun (_, bars) -> List.count bars ~f:(fun b -> not (ok_bar b)))
   in
-  assert_that all_ok (equal_to true)
+  assert_that n_malformed (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
 (* Cross-sectional correlation matches target ~0.5                       *)
