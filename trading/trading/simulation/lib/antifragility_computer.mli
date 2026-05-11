@@ -30,7 +30,7 @@
     step-sourced series and pin a synthetic series. Used by tests that want to
     fix benchmark values independent of any market data adapter:
     {[
-      let computer = Antifragility_computer.computer ~benchmark_returns:[ ... ] ()
+    let computer = Antifragility_computer.computer ~benchmark_returns:[ ... ] ()
     ]}
 
     When neither path supplies a benchmark — no override, and every step has

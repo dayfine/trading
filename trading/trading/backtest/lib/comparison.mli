@@ -61,10 +61,10 @@ val to_sexp : t -> Sexp.t
 (** Render [t] as a machine-readable sexp suitable for diffing or downstream
     tooling. Shape:
     {[
-      ((baseline_summary <summary-sexp>)
-       (variant_summary  <summary-sexp>)
-       (metric_diffs     ((<name> ((baseline <f>) (variant <f>) (delta <f>))) ...))
-       (scalar_diffs     ((<name> <delta>) ...)))
+    ((baseline_summary <summary-sexp>)
+     (variant_summary  <summary-sexp>)
+     (metric_diffs     ((<name> ((baseline <f>) (variant <f>) (delta <f>))) ...))
+     (scalar_diffs     ((<name> <delta>) ...)))
     ]}
     [None] floats are written as the atom [-]. *)
 

@@ -13,8 +13,8 @@ val create : engine_config -> t
 
     Example:
     {[
-      let config = { commission = { per_share = 0.01; minimum = 1.0 } } in
-      let engine = Engine.create config
+    let config = { commission = { per_share = 0.01; minimum = 1.0 } } in
+    let engine = Engine.create config
     ]} *)
 
 val update_market :
@@ -69,10 +69,10 @@ val process_orders : t -> order_manager -> execution_report list status_or
 
     Example:
     {[
-      let reports = Engine.process_orders engine order_mgr in
-      match reports with
-      | Ok reports ->
-          let trades = List.concat_map reports ~f:(fun r -> r.trades) in
-          Portfolio.apply_trades portfolio trades
-      | Error err -> (* handle error *)
+    let reports = Engine.process_orders engine order_mgr in
+    match reports with
+    | Ok reports ->
+        let trades = List.concat_map reports ~f:(fun r -> r.trades) in
+        Portfolio.apply_trades portfolio trades
+    | Error err -> (* handle error *)
     ]} *)
