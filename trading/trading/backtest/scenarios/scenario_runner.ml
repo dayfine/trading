@@ -151,7 +151,16 @@ let _check_one name value (range : Scenario.range) =
   let ok = Scenario.in_range range value in
   { name; value; range; ok }
 
-let _run_checks (a : actual) (e : Scenario.expected) =
+(** Read the canonical [wall_seconds.txt] perf-report file from [scenario_dir].
+    Returns [NaN] when missing — same skip-the-check semantic as NaN handling in
+    {!Scenario.in_range}. *)
+let _read_wall_seconds ~scenario_dir =
+  let path = Filename.concat scenario_dir "wall_seconds.txt" in
+  try Float.of_string (String.strip (In_channel.read_all path))
+  with _ -> Float.nan
+
+let _run_checks ?(wall_seconds = Float.nan) (a : actual) (e : Scenario.expected)
+    =
   let base =
     [
       _check_one "total_return_pct" a.total_return_pct e.total_return_pct;
@@ -175,6 +184,7 @@ let _run_checks (a : actual) (e : Scenario.expected) =
        e.sortino_ratio_annualized
   |> append_opt "calmar_ratio" a.calmar_ratio e.calmar_ratio
   |> append_opt "ulcer_index" a.ulcer_index e.ulcer_index
+  |> append_opt "wall_seconds" wall_seconds e.wall_seconds
 
 let _failure_message checks =
   List.filter checks ~f:(fun c -> not c.ok)
@@ -254,14 +264,25 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
   let progress_emitter =
     Scenario_progress.make_emitter ~scenario_dir ~every_n_fridays:progress_every
   in
+  let t_start = Time_ns_unix.now () in
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
       ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter ()
   in
+  let wall_seconds =
+    Time_ns.Span.to_sec (Time_ns.diff (Time_ns_unix.now ()) t_start)
+  in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   let a = _actual_of_result result in
   Sexp.save_hum (_actual_path ~output_root s) (sexp_of_actual a);
+  (* Emit wall_seconds.txt — the canonical perf-report convention
+     (release_report._read_optional_float). Goldens may pin
+     [expected.wall_seconds] to catch runtime regressions; scenarios that
+     don't pin are unaffected. *)
+  Out_channel.write_all
+    (Filename.concat scenario_dir "wall_seconds.txt")
+    ~data:(sprintf "%.3f\n" wall_seconds);
   (* Post-step: emit the all-eligible diagnostic alongside actual.sexp /
      summary.sexp so every scenario surfaces raw-signal alpha without manual
      [all_eligible_runner.exe] invocation. Failures inside the runner are
@@ -362,7 +383,9 @@ let _process_result ~output_root (s, _status) =
      mkdir, or filesystem errors during the sentinel write). *)
   match _load_actual ~output_root s with
   | Some a ->
-      let checks = _run_checks a s.expected in
+      let scenario_dir = _scenario_dir ~output_root s in
+      let wall_seconds = _read_wall_seconds ~scenario_dir in
+      let checks = _run_checks ~wall_seconds a s.expected in
       _format_row s a checks
   | None ->
       _print_crashed_row s;
