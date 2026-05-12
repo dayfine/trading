@@ -5,21 +5,22 @@ include Screener_scoring
 
 type candidate_params = {
   entry_buffer_pct : float;
-      (** Fraction above breakout price for the suggested entry. Default: 0.005.
-      *)
   initial_stop_pct : float;
-      (** Fraction below entry for the long initial stop. Default: 0.08. *)
   short_stop_pct : float;
-      (** Fraction above entry for the short initial stop. Default: 0.08. *)
   base_low_proxy_pct : float;
-      (** Fraction below MA used as proxy for the prior base low. Default: 0.15.
-      *)
   breakout_fallback_pct : float;
-      (** Fraction above MA used as breakout price when none is detected.
-          Default: 0.05. *)
+  installed_stop_min_pct : float; [@sexp.default 0.0]
 }
 [@@deriving sexp]
-(** Per-candidate price computation parameters. All configurable. *)
+(** Per-candidate price computation parameters. All configurable.
+
+    [installed_stop_min_pct] is the floor on the placed-stop distance from entry
+    — opt-in for the G15-rewire path. Default 0.0 = no floor (the
+    [support-floor / fallback-buffer] logic in
+    {!Weinstein_stops.compute_initial_stop_with_floor} decides the stop
+    unmodified). Sweepers that want wider stops set this to a positive fraction
+    (e.g. 0.10 ⇒ stop must sit ≥ 10% from entry). See
+    {!Weinstein_stops.widen_initial_to_min_distance}. *)
 
 let default_candidate_params =
   {
@@ -28,6 +29,7 @@ let default_candidate_params =
     short_stop_pct = 0.08;
     base_low_proxy_pct = 0.15;
     breakout_fallback_pct = 0.05;
+    installed_stop_min_pct = 0.0;
   }
 
 type volume_ratio_band = { low : float; high : float } [@@deriving sexp]

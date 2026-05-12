@@ -128,6 +128,7 @@ val gen_position_id : string -> string
     don't change. *)
 
 val make_entry_transition :
+  ?min_stop_distance_pct:float ->
   portfolio_risk_config:Portfolio_risk.config ->
   stops_config:Weinstein_stops.config ->
   initial_stop_buffer:float ->
@@ -162,7 +163,15 @@ val make_entry_transition :
     actual [installed_stop] the position will operate under. Pre-step-3
     behaviour sized off [cand.suggested_stop], which left a structural sizing
     drift whenever support-floor produced a wider stop than the screener's
-    pre-fill suggestion. *)
+    pre-fill suggestion.
+
+    [?min_stop_distance_pct] (default [0.0] = no floor) is plumbed into step (2)
+    via {!Weinstein_stops.widen_initial_to_min_distance}. When [> 0.0], the
+    [Initial] stop is widened if needed so its [stop_level] sits at least
+    [min_stop_distance_pct] away from [effective_entry]. Used by the strategy to
+    re-wire {!Screener.candidate_params.initial_stop_pct} into the
+    installed-stop path — preserves the G15 sizing invariant because sizing
+    still keys off the final installed [stop_level]. *)
 
 val check_cash_and_deduct :
   remaining_cash:float ref ->

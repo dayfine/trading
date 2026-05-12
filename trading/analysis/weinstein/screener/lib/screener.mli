@@ -23,7 +23,14 @@ type candidate_params = {
       (** Fraction above breakout price for the suggested entry. Default: 0.005.
       *)
   initial_stop_pct : float;
-      (** Fraction below entry for the long initial stop. Default: 0.08. *)
+      (** Fraction below entry for the screener's {b advisory} long initial
+          stop. Default: 0.08.
+
+          Feeds {!scored_candidate.suggested_stop} and
+          {!scored_candidate.risk_pct} only — does not drive the installed stop
+          in the trade-execution path (the G15 refactor severed that coupling;
+          see [entry_audit_capture.ml] §"G15 step 3"). To widen the installed
+          stop, use {!installed_stop_min_pct} instead. *)
   short_stop_pct : float;
       (** Fraction above entry for the short initial stop. Default: 0.08. *)
   base_low_proxy_pct : float;
@@ -32,6 +39,26 @@ type candidate_params = {
   breakout_fallback_pct : float;
       (** Fraction above MA used as breakout price when none is detected.
           Default: 0.05. *)
+  installed_stop_min_pct : float;
+      (** Floor on the installed-stop distance from entry. Default: 0.0 (no
+          floor — the standard support-floor / fallback-buffer logic decides the
+          stop unmodified).
+
+          When set to a positive fraction, the strategy plumbs this through to
+          {!Weinstein_stops.widen_initial_to_min_distance}, so the [Initial]
+          stop is widened (if necessary) to sit at least
+          [installed_stop_min_pct] away from entry. A support-floor-derived stop
+          that already sits at least that far is preserved.
+
+          Use-case: entry-caps-style sweeps that want to test wider stops (e.g.
+          arm C of the 2026-05-12 entry-caps experiment intended to set this to
+          0.10 but inadvertently set the advisory {!initial_stop_pct} instead —
+          that field was severed from the installed-stop path by the G15
+          refactor). Restores the original "screener-set fraction drives the
+          installed stop" intent without shifting the default-config goldens.
+
+          Opt-in semantics: the field is [[\@sexp.default 0.0]] so an overlay
+          sexp that omits the field deserialises to [0.0] (no widening). *)
 }
 [@@deriving sexp]
 (** Per-candidate price computation parameters. All configurable. *)
