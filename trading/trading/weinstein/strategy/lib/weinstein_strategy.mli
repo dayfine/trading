@@ -463,11 +463,15 @@ module Internal_for_test : sig
 
   val maybe_reset_halt :
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
-    macro_trend:Weinstein_types.market_trend ->
+    prior_macro:Weinstein_types.market_trend ->
+    current_macro:Weinstein_types.market_trend ->
     unit
-  (** Resets [peak_tracker]'s halt state to [Active] when [macro_trend] is not
-      [Bearish]; no-op otherwise. The strategy invokes this on every Friday
-      after refreshing macro so the halt clears as soon as macro recovers. *)
+  (** Resets [peak_tracker]'s halt state to [Active] only on the TRANSITION from
+      [Bearish] to [Bullish]/[Neutral] (i.e. [prior_macro = Bearish] and
+      [current_macro <> Bearish]). All other [(prior, current)] pairs are no-ops
+      — in particular [(Bullish, Bullish)] does NOT reset, which breaks the
+      Portfolio_floor death loop in the 2026-05-12 long-short 16y backtest. The
+      strategy invokes this on every Friday after refreshing macro. *)
 
   val positions_minus_exited :
     positions:Trading_strategy.Position.t String.Map.t ->
