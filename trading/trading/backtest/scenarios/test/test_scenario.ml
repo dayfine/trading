@@ -48,6 +48,32 @@ let test_unrealized_pnl_field_present _ =
             field (fun (r : Scenario.range) -> r.max_f) (float_equal 50000.0);
           ]))
 
+(** Pre-existing scenario sexps that don't pin [wall_seconds] continue to parse
+    with [None] (skip-the-check semantic). *)
+let test_wall_seconds_field_absent _ =
+  let s =
+    Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
+  in
+  assert_that s.expected.wall_seconds is_none
+
+(** A scenario that pins [wall_seconds] parses the range correctly and
+    round-trips through sexp_of_t. *)
+let test_wall_seconds_field_present _ =
+  let original =
+    Scenario.t_of_sexp
+      (Sexp.of_string
+         (_make_sexp
+            ~extra_expected_fields:"(wall_seconds ((min 30.0) (max 90.0)))"))
+  in
+  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
+  assert_that roundtripped.expected.wall_seconds
+    (is_some_and
+       (all_of
+          [
+            field (fun (r : Scenario.range) -> r.min_f) (float_equal 30.0);
+            field (fun (r : Scenario.range) -> r.max_f) (float_equal 90.0);
+          ]))
+
 let test_unrealized_pnl_roundtrip _ =
   let original =
     Scenario.t_of_sexp
@@ -229,6 +255,9 @@ let suite =
          "unrealized_pnl present => Some range"
          >:: test_unrealized_pnl_field_present;
          "unrealized_pnl sexp round-trips" >:: test_unrealized_pnl_roundtrip;
+         "wall_seconds absent => None" >:: test_wall_seconds_field_absent;
+         "wall_seconds present => Some range round-trips"
+         >:: test_wall_seconds_field_present;
          "non-zero range rejects zero" >:: test_non_zero_range_rejects_zero;
          "near-zero range accepts zero" >:: test_near_zero_range_accepts_zero;
          "NaN actual passes any range (#882)"

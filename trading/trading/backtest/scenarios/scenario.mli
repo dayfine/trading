@@ -49,6 +49,13 @@ type expected = {
           Portfolio_floor-cascade death loop pattern where many small drawdown
           spikes add up to a high ulcer index even though MaxDrawdown stays the
           same. [None] skips. *)
+  wall_seconds : range option; [@sexp.option]
+      (** Wall-clock duration of [Backtest.Runner.run_backtest] in seconds —
+          read from [wall_seconds.txt] under each scenario's output dir
+          (canonical perf-report convention; see
+          {!Backtest.Release_report.load_scenario_run}). Pinned range catches CI
+          runtime regressions and overflows of the 8 GB / 2h GHA budget. [None]
+          skips. *)
 }
 [@@deriving sexp]
 
