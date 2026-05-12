@@ -307,6 +307,60 @@ let test_portfolio_floor_no_fire_under_threshold _ =
   in
   assert_that events (size_is 0)
 
+(** Pins the death-loop fix: once [Halted], a subsequent [check] with the breach
+    still active does NOT re-fire Portfolio_floor. Per-position triggers
+    continue to run independently. Caller is responsible for resetting halt
+    (typically via [Peak_tracker.reset] on a macro regime change). Origin:
+    2026-05-12 16y long-short backtest accumulated 307 cascading Portfolio_floor
+    events because the breach re-fired on every Friday under sustained-Bullish
+    macro. *)
+let test_portfolio_floor_no_refire_while_halted _ =
+  let pt = FL.Peak_tracker.create () in
+  let positions = [ make_long () ] in
+  (* Observe the peak first. *)
+  let _ =
+    FL.check ~config:FL.default_config ~date ~positions:[]
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  (* First breach: fires once for the held position, marks Halted. *)
+  let events1 =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:300_000.0 ~peak_tracker:pt
+  in
+  assert_that events1 (size_is 1);
+  assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted);
+  (* Second check with breach still active and same position: should NOT
+     re-fire — halt suppresses Portfolio_floor. *)
+  let events2 =
+    FL.check ~config:FL.default_config ~date ~positions
+      ~portfolio_value:300_000.0 ~peak_tracker:pt
+  in
+  assert_that events2 (size_is 0)
+
+(** While halted, a Per_position breach still fires independently. Pins that the
+    halt-gate is scoped to Portfolio_floor only. *)
+let test_per_position_fires_while_halted _ =
+  let pt = FL.Peak_tracker.create () in
+  let _ =
+    FL.check ~config:FL.default_config ~date ~positions:[]
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  let _ =
+    FL.check ~config:FL.default_config ~date ~positions:[]
+      ~portfolio_value:300_000.0 ~peak_tracker:pt
+  in
+  assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted);
+  (* Now portfolio recovers above the floor BUT a single position has a
+     deep unrealized loss. Per_position must still fire. *)
+  let loser = make_long ~entry_price:100.0 ~current_price:40.0 () in
+  let events =
+    FL.check ~config:FL.default_config ~date ~positions:[ loser ]
+      ~portfolio_value:900_000.0 ~peak_tracker:pt
+  in
+  assert_that events
+    (elements_are
+       [ field (fun (e : FL.event) -> e.reason) (equal_to FL.Per_position) ])
+
 (* ---- Precedence: portfolio-floor wins over per-position ---- *)
 
 let test_portfolio_floor_precedence _ =
@@ -426,6 +480,10 @@ let suite =
          "portfolio_floor_marks_halted" >:: test_portfolio_floor_marks_halted;
          "portfolio_floor_no_fire_under_threshold"
          >:: test_portfolio_floor_no_fire_under_threshold;
+         "portfolio_floor_no_refire_while_halted (death-loop fix)"
+         >:: test_portfolio_floor_no_refire_while_halted;
+         "per_position_fires_while_halted (halt-gate scoped)"
+         >:: test_per_position_fires_while_halted;
          "portfolio_floor_precedence" >:: test_portfolio_floor_precedence;
          "zero cost basis does not fire" >:: test_zero_cost_basis_does_not_fire;
          "zero quantity does not fire" >:: test_zero_quantity_does_not_fire;

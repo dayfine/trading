@@ -1,3 +1,7 @@
+(* @large-module: top-level strategy entry point — on_market_close orchestrates
+   stops + macro + screener + force-liquidation + stage3-exit + laggard-rotation
+   passes through closure-scoped state; closes 2026-05-12 Portfolio_floor
+   death-loop fix in _maybe_reset_halt + _run_macro_and_entries *)
 open Core
 open Trading_strategy
 module Bar_reader = Bar_reader
@@ -45,12 +49,13 @@ let _positions_minus_exited ~(positions : Position.t Map.M(String).t)
     Map.filter positions ~f:(fun (p : Position.t) ->
         not (Set.mem exited_ids p.id))
 
-let _maybe_reset_halt ~peak_tracker
-    ~(macro_trend : Weinstein_types.market_trend) =
-  match macro_trend with
-  | Weinstein_types.Bearish -> ()
-  | Weinstein_types.Bullish | Weinstein_types.Neutral ->
+(* Transition-only reset — see .mli for full contract. *)
+let _maybe_reset_halt ~peak_tracker ~prior_macro ~current_macro =
+  let open Weinstein_types in
+  match (prior_macro, current_macro) with
+  | Bearish, (Bullish | Neutral) ->
       Portfolio_risk.Force_liquidation.Peak_tracker.reset peak_tracker
+  | _ -> ()
 
 let _symbol_of_position_id ~(positions : Position.t Map.M(String).t) id =
   Map.data positions
@@ -140,15 +145,17 @@ let _run_macro_and_entries ~config ~ad_bars ~stop_states ~last_stop_out_dates
     Weinstein_strategy_screening.is_screening_day_view index_view
   in
   let macro_result_opt =
-    if is_screening_day then
-      Some
-        (Weinstein_strategy_macro.run_macro_only ~config ~ad_bars ~prior_macro
-           ~prior_macro_result ~bar_reader ~prior_stages ~current_date
-           ~index_view)
+    if is_screening_day then (
+      let prev = !prior_macro in
+      let r =
+        Weinstein_strategy_macro.run_macro_only ~config ~ad_bars ~prior_macro
+          ~prior_macro_result ~bar_reader ~prior_stages ~current_date
+          ~index_view
+      in
+      _maybe_reset_halt ~peak_tracker ~prior_macro:prev ~current_macro:r.trend;
+      Some r)
     else None
   in
-  if is_screening_day then
-    _maybe_reset_halt ~peak_tracker ~macro_trend:!prior_macro;
   let halted =
     match
       Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
