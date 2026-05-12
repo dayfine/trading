@@ -271,6 +271,63 @@ let test_default_screening_volume_ratio_exclude_range_is_none _ =
   let cfg = _default_config () in
   assert_that cfg.screening_config.volume_ratio_exclude_range is_none
 
+(** Fold-equivalent helper: applies a list of override sexps the same way
+    [Backtest.Runner._apply_overrides] does — sequential deep-merge of each
+    overlay into the running sexp, then a single [config_of_sexp] at the end.
+    Mirrors `List.fold overrides ~init:base ~f:_merge_sexp`. *)
+let _apply_overrides_seq config overlays =
+  let base = Weinstein_strategy.sexp_of_config config in
+  let is_record fields =
+    List.for_all fields ~f:(function
+      | Sexp.List [ Sexp.Atom _; _ ] -> true
+      | _ -> false)
+  in
+  let rec merge base overlay =
+    match (base, overlay) with
+    | Sexp.List bf, Sexp.List of_ when is_record bf && is_record of_ ->
+        let overlay_map =
+          List.filter_map of_ ~f:(function
+            | Sexp.List [ Sexp.Atom k; v ] -> Some (k, v)
+            | _ -> None)
+          |> String.Map.of_alist_exn
+        in
+        Sexp.List
+          (List.map bf ~f:(function
+            | Sexp.List [ Sexp.Atom k; v ] as pair -> (
+                match Map.find overlay_map k with
+                | Some v' -> Sexp.List [ Sexp.Atom k; merge v v' ]
+                | None -> pair)
+            | other -> other))
+    | _, _ -> overlay
+  in
+  let merged = List.fold overlays ~init:base ~f:merge in
+  Weinstein_strategy.config_of_sexp merged
+
+(** Repro for bug filed in dev/experiments/entry-caps-2026-05-12/report.md §"Bug
+    filed": two overlays targeting the same top-level field ([screening_config])
+    — second overlay's effect silently dropped. *)
+let test_two_overlays_same_top_level_field _ =
+  let overlay1 =
+    Sexp.of_string "((screening_config ((max_score_override (79)))))"
+  in
+  let overlay2 =
+    Sexp.of_string
+      "((screening_config ((candidate_params ((initial_stop_pct 0.10))))))"
+  in
+  let merged =
+    _apply_overrides_seq (_default_config ()) [ overlay1; overlay2 ]
+  in
+  assert_that merged.screening_config
+    (all_of
+       [
+         field
+           (fun (c : Screener.config) -> c.max_score_override)
+           (is_some_and (equal_to 79));
+         field
+           (fun (c : Screener.config) -> c.candidate_params.initial_stop_pct)
+           (float_equal 0.10);
+       ])
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -304,6 +361,8 @@ let suite =
           through sexp" >:: test_override_screening_volume_ratio_exclude_range;
          "default: screening_config.volume_ratio_exclude_range = None"
          >:: test_default_screening_volume_ratio_exclude_range_is_none;
+         "two overlays targeting same top-level field both apply"
+         >:: test_two_overlays_same_top_level_field;
        ]
 
 let () = run_test_tt_main suite
