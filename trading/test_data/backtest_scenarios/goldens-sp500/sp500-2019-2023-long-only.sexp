@@ -49,10 +49,11 @@
  ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
  ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
  ;; default-sized baseline (79.74% / 74 trades / 30.8% DD).
- ;; Measured 2026-05-11 (Cell E):
- ;;   total_return_pct   66.5   total_trades 248   win_rate 39.1
- ;;   sharpe_ratio       0.68   max_drawdown 24.1  avg_holding_days  42
+ ;; Measured 2026-05-12 (Cell E, post-#1052 force-liq fix + #1053 metric schema):
+ ;;   total_return_pct   66.54  total_trades 248   win_rate 39.11
+ ;;   sharpe_ratio       0.68   max_drawdown 24.09 avg_holding_days  41.95
  ;;   open_positions_value 1,401,130
+ ;;   sortino_ratio_annualized 0.95   calmar_ratio 0.45   ulcer_index 8.61
  ;; MaxDD cut 6.7pp (31 → 24), trade count 3.4x. Tolerances ±15%.
  (config_overrides
   (((enable_short_side false))
@@ -70,4 +71,7 @@
    (sharpe_ratio       ((min   0.58)       (max   0.78)))
    (max_drawdown_pct   ((min  20.5)        (max  27.7)))
    (avg_holding_days   ((min  36.0)        (max  48.0)))
-   (open_positions_value ((min 1190000.0)  (max 1611000.0))))))
+   (open_positions_value ((min 1190000.0)  (max 1611000.0)))
+   (sortino_ratio_annualized ((min 0.81)   (max 1.09)))
+   (calmar_ratio       ((min   0.38)       (max   0.51)))
+   (ulcer_index        ((min   7.32)       (max   9.90))))))
