@@ -9,6 +9,7 @@
   bayesian_runner_runner)
  (libraries
   core
+  core_unix
   core_unix.filename_unix
   tuner
   backtest

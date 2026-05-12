@@ -28,26 +28,36 @@ module GS = Tuner.Grid_search
 
 let _usage_msg =
   "Usage: grid_search.exe --spec <spec.sexp> --out-dir <dir> [--fixtures-root \
-   <path>]"
+   <path>] [--parallel N]"
 
 type cli_args = {
   spec_path : string;
   out_dir : string;
   fixtures_root : string option;
+  parallel : int;
 }
 
+let _default_parallel = 1
+
 let _parse_args argv =
-  let rec loop spec out fixtures = function
+  let rec loop spec out fixtures parallel = function
     | [] -> (
         match (spec, out) with
         | Some s, Some o ->
-            { spec_path = s; out_dir = o; fixtures_root = fixtures }
+            {
+              spec_path = s;
+              out_dir = o;
+              fixtures_root = fixtures;
+              parallel = Option.value parallel ~default:_default_parallel;
+            }
         | _ ->
             eprintf "%s\n" _usage_msg;
             Stdlib.exit 1)
-    | "--spec" :: p :: rest -> loop (Some p) out fixtures rest
-    | "--out-dir" :: p :: rest -> loop spec (Some p) fixtures rest
-    | "--fixtures-root" :: p :: rest -> loop spec out (Some p) rest
+    | "--spec" :: p :: rest -> loop (Some p) out fixtures parallel rest
+    | "--out-dir" :: p :: rest -> loop spec (Some p) fixtures parallel rest
+    | "--fixtures-root" :: p :: rest -> loop spec out (Some p) parallel rest
+    | "--parallel" :: n :: rest ->
+        loop spec out fixtures (Some (Int.of_string n)) rest
     | "--help" :: _ | "-h" :: _ ->
         printf "%s\n" _usage_msg;
         Stdlib.exit 0
@@ -55,7 +65,7 @@ let _parse_args argv =
         eprintf "Error: unknown argument %S\n%s\n" unknown _usage_msg;
         Stdlib.exit 1
   in
-  loop None None None argv
+  loop None None None None argv
 
 let _load_scenarios paths =
   let table = Hashtbl.create (module String) in
@@ -87,9 +97,10 @@ let _main () =
   let evaluator =
     Tuner_bin.Grid_search_evaluator.build ~fixtures_root ~scenarios_by_path
   in
+  eprintf "[grid_search] parallel=%d\n%!" args.parallel;
   let result =
     Tuner_bin.Grid_search_runner.run_and_write ~spec ~out_dir:args.out_dir
-      ~evaluator
+      ~evaluator ~parallel:args.parallel
   in
   eprintf "[grid_search] best_score=%.6f best_cell=%s\n%!" result.best_score
     (Sexp.to_string (Sexp.List (GS.cell_to_overrides result.best_cell)));

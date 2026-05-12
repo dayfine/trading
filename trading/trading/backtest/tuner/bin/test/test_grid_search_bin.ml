@@ -138,6 +138,7 @@ let test_run_and_write_emits_three_artefacts _ =
       let out_dir = Filename.concat dir "out" in
       let result =
         Runner.run_and_write ~spec ~out_dir ~evaluator:_stub_evaluator
+          ~parallel:1
       in
       (* Argmax: (a=2, b=20) wins with score = 22. *)
       assert_that result.best_score (float_equal 22.0);
@@ -154,6 +155,75 @@ let test_run_and_write_emits_three_artefacts _ =
       in
       assert_that csv_lines (size_is 9))
 
+(** [~parallel:2] produces byte-identical artefacts to [~parallel:1] on the stub
+    evaluator. Pins the parallel-cell fork-pool's output-parity contract.
+
+    The stub evaluator is a pure function of [cell], so forked-child output
+    matches in-process output bit-equally; this is the test in which to regress
+    any change that breaks that parity (e.g. evaluator non-determinism across
+    forks, shard read order, or row interleaving). *)
+let test_run_and_write_parallel_matches_sequential _ =
+  let spec : Spec.t =
+    {
+      params = [ ("a", [ 1.0; 2.0 ]); ("b", [ 10.0; 20.0 ]) ];
+      objective = Spec.Sharpe;
+      scenarios = [ "s1"; "s2" ];
+    }
+  in
+  _with_temp_dir (fun dir ->
+      let out_seq = Filename.concat dir "out-seq" in
+      let out_par = Filename.concat dir "out-par" in
+      let r_seq =
+        Runner.run_and_write ~spec ~out_dir:out_seq ~evaluator:_stub_evaluator
+          ~parallel:1
+      in
+      let r_par =
+        Runner.run_and_write ~spec ~out_dir:out_par ~evaluator:_stub_evaluator
+          ~parallel:2
+      in
+      assert_that r_par.best_score (float_equal r_seq.best_score);
+      assert_that
+        (In_channel.read_all (Filename.concat out_par "grid.csv"))
+        (equal_to (In_channel.read_all (Filename.concat out_seq "grid.csv")));
+      assert_that
+        (In_channel.read_all (Filename.concat out_par "best.sexp"))
+        (equal_to (In_channel.read_all (Filename.concat out_seq "best.sexp")));
+      assert_that
+        (In_channel.read_all (Filename.concat out_par "sensitivity.md"))
+        (equal_to
+           (In_channel.read_all (Filename.concat out_seq "sensitivity.md"))))
+
+(** Pins the documented crash-surface contract from `grid_search_runner.mli`:
+    when a forked cell-child exits non-zero, the parent collects all such
+    failures and raises [Failure] with the cited "[grid_search] %d cell(s)
+    crashed (indices: %s)" message after reaping all children. The stub throws
+    unconditionally so every cell crashes; [parallel=2] forces the fork-pool
+    path (sequential path doesn't fork). *)
+let test_run_and_write_parallel_surfaces_cell_crashes _ =
+  let throwing_evaluator : GS.evaluator =
+   fun _cell ~scenario:_ -> failwith "stub_intentional_crash"
+  in
+  let spec : Spec.t =
+    {
+      params = [ ("a", [ 1.0; 2.0 ]) ];
+      objective = Spec.Sharpe;
+      scenarios = [ "s" ];
+    }
+  in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let raised =
+        try
+          let _ =
+            Runner.run_and_write ~spec ~out_dir ~evaluator:throwing_evaluator
+              ~parallel:2
+          in
+          false
+        with Failure msg ->
+          String.is_substring msg ~substring:"cell(s) crashed"
+      in
+      assert_that raised (equal_to true))
+
 let test_run_and_write_creates_missing_out_dir _ =
   let spec : Spec.t =
     {
@@ -167,6 +237,7 @@ let test_run_and_write_creates_missing_out_dir _ =
       let out_dir = Filename.concat dir "deep/nested/out" in
       let _result =
         Runner.run_and_write ~spec ~out_dir ~evaluator:_stub_evaluator
+          ~parallel:1
       in
       assert_that (Sys_unix.is_directory_exn out_dir) (equal_to true))
 
@@ -201,6 +272,10 @@ let suite =
          >:: test_to_grid_objective_simple_variants;
          "Runner.run_and_write: emits three artefacts"
          >:: test_run_and_write_emits_three_artefacts;
+         "Runner.run_and_write: parallel=2 matches parallel=1 byte-identically"
+         >:: test_run_and_write_parallel_matches_sequential;
+         "Runner.run_and_write: parallel=2 surfaces cell-child crashes"
+         >:: test_run_and_write_parallel_surfaces_cell_crashes;
          "Runner.run_and_write: creates missing out-dir tree"
          >:: test_run_and_write_creates_missing_out_dir;
          "Evaluator.build: unknown scenario path raises Failure"
