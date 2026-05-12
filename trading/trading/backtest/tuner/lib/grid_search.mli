@@ -128,8 +128,10 @@ type row = {
   metrics : Trading_simulation_types.Metric_types.metric_set;
   objective_value : float;
 }
+[@@deriving sexp]
 (** One row of the grid output: a cell × scenario × its metric set + the
-    scalarised objective value. *)
+    scalarised objective value. Sexp-derived so a parallel runner can serialise
+    per-cell row batches to disk for inter-process collection. *)
 
 type result = {
   rows : row list;
@@ -158,6 +160,25 @@ val run :
     — no scenario weighting in T-A.
 
     Raises [Invalid_argument] when [scenarios = []]. *)
+
+val rows_for_cell :
+  cell ->
+  scenarios:string list ->
+  objective:objective ->
+  evaluator:evaluator ->
+  row list
+(** [rows_for_cell cell ~scenarios ~objective ~evaluator] evaluates a single
+    cell against every scenario in order and returns the resulting [row]s.
+    Exposed for parallel runners that fork one child per cell — the child calls
+    this, serialises the row list to disk, and the parent merges. *)
+
+val argmax_by_cell : row list -> cell * float
+(** [argmax_by_cell rows] groups [rows] by cell (in their original order),
+    averages each cell's [objective_value]s across scenarios, and returns the
+    cell with the highest mean plus its mean. Tie-broken by enumeration order
+    (first cell wins). [([], Float.neg_infinity)] when [rows = []]. Exposed so a
+    parallel runner that collected [row]s from forked children can compute the
+    same best-cell selection as the sequential {!run}. *)
 
 (** {1 Sensitivity analysis} *)
 

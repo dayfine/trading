@@ -171,6 +171,8 @@ let sexp_of_metric_set m =
       Sexp.List [ Metric_type.sexp_of_t k; Float.sexp_of_t v ])
   |> fun l -> Sexp.List l
 
+let metric_set_of_sexp = [%of_sexp: float Map.M(Metric_type).t]
+
 let _format_value v =
   if Float.is_integer v then sprintf "%.0f" v else sprintf "%.2f" v
 

@@ -1251,6 +1251,38 @@ let test_portfolio_state_mixed_unrealized_pnl _ =
          (UnrealizedPnl, float_equal 500.0);
        ])
 
+(* ==================== sexp round-trip ==================== *)
+
+(** Pins [metric_set_of_sexp] as the strict inverse of [sexp_of_metric_set].
+    Load-bearing for the fork-pool grid_search runner: parent reads back the
+    sexp written by child processes, so a regression in either direction
+    silently corrupts cross-process metric transport. *)
+let test_metric_set_sexp_round_trip _ =
+  let original =
+    of_alist_exn
+      [
+        (TotalPnl, 12345.6789);
+        (SharpeRatio, 1.5);
+        (MaxDrawdown, 18.42);
+        (WinRate, 42.93);
+        (NumTrades, 1125.0);
+      ]
+  in
+  let recovered = metric_set_of_sexp (sexp_of_metric_set original) in
+  assert_that recovered
+    (map_includes
+       [
+         (TotalPnl, float_equal 12345.6789);
+         (SharpeRatio, float_equal 1.5);
+         (MaxDrawdown, float_equal 18.42);
+         (WinRate, float_equal 42.93);
+         (NumTrades, float_equal 1125.0);
+       ])
+
+let test_metric_set_sexp_round_trip_empty _ =
+  let recovered = metric_set_of_sexp (sexp_of_metric_set empty) in
+  assert_that (Map.length recovered) (equal_to 0)
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -1260,6 +1292,8 @@ let suite =
          "singleton" >:: test_singleton;
          "of_alist_exn" >:: test_of_alist_exn;
          "merge" >:: test_merge;
+         "sexp round-trip" >:: test_metric_set_sexp_round_trip;
+         "sexp round-trip empty" >:: test_metric_set_sexp_round_trip_empty;
          (* Format tests *)
          "format_metric dollars" >:: test_format_metric_dollars;
          "format_metric percent" >:: test_format_metric_percent;

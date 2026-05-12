@@ -314,6 +314,11 @@ val merge : metric_set -> metric_set -> metric_set
 val sexp_of_metric_set : metric_set -> Sexp.t
 (** Serialize a metric set to sexp. *)
 
+val metric_set_of_sexp : Sexp.t -> metric_set
+(** Inverse of {!sexp_of_metric_set}. Reads a sexp list of [(key value)] pairs
+    using the canonical [Map.M(Metric_type).t] shape, so a [sexp_of_metric_set]
+    output round-trips. *)
+
 val metric_set_to_sexp_pairs : metric_set -> Sexp.t
 (** Convert to a sexp list of [(key value)] pairs for human-readable output. *)
 

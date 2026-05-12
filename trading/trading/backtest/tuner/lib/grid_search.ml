@@ -3,9 +3,9 @@ module Metric_types = Trading_simulation_types.Metric_types
 
 (** {1 Parameter spec} *)
 
-type param_values = float list
-type param_spec = (string * param_values) list
-type cell = (string * float) list
+type param_values = float list [@@deriving sexp]
+type param_spec = (string * param_values) list [@@deriving sexp]
+type cell = (string * float) list [@@deriving sexp]
 
 (** {1 Objectives} *)
 
@@ -78,6 +78,7 @@ type row = {
   metrics : Metric_types.metric_set;
   objective_value : float;
 }
+[@@deriving sexp]
 
 type result = { rows : row list; best_cell : cell; best_score : float }
 
@@ -90,13 +91,13 @@ let _row_for cell scenario ~objective ~evaluator =
   let objective_value = evaluate_objective objective metrics in
   { cell; scenario; metrics; objective_value }
 
-let _rows_for_cell cell ~scenarios ~objective ~evaluator =
+let rows_for_cell cell ~scenarios ~objective ~evaluator =
   List.map scenarios ~f:(fun scenario ->
       _row_for cell scenario ~objective ~evaluator)
 
 let _evaluate_grid spec ~scenarios ~objective ~evaluator =
   let cells = cells_of_spec spec in
-  List.concat_map cells ~f:(_rows_for_cell ~scenarios ~objective ~evaluator)
+  List.concat_map cells ~f:(rows_for_cell ~scenarios ~objective ~evaluator)
 
 let _mean = function
   | [] -> Float.neg_infinity
@@ -120,7 +121,7 @@ let _group_rows_by_cell rows =
       | _ -> (row.cell, [ row ]) :: acc)
   |> List.rev_map ~f:(fun (c, rs) -> (c, List.rev rs))
 
-let _argmax_by_cell rows =
+let argmax_by_cell rows =
   let groups = _group_rows_by_cell rows in
   let scored =
     List.map groups ~f:(fun (cell, rs) ->
@@ -138,7 +139,7 @@ let run spec ~scenarios ~objective ~evaluator =
   if List.is_empty scenarios then
     invalid_arg "Grid_search.run: scenarios must be non-empty";
   let rows = _evaluate_grid spec ~scenarios ~objective ~evaluator in
-  let best_cell, best_score = _argmax_by_cell rows in
+  let best_cell, best_score = argmax_by_cell rows in
   { rows; best_cell; best_score }
 
 (** {1 Sensitivity analysis} *)
