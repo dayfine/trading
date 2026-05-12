@@ -44,6 +44,9 @@ type actual = {
   avg_holding_days : float;
   open_positions_value : float; [@sexp.default Float.nan]
   unrealized_pnl : float;
+  sortino_ratio_annualized : float; [@sexp.default Float.nan]
+  calmar_ratio : float; [@sexp.default Float.nan]
+  ulcer_index : float; [@sexp.default Float.nan]
   force_liquidations_count : int; [@sexp.default 0]
   crashed : bool; [@sexp.default false]
   crash_message : string; [@sexp.default ""]
@@ -66,6 +69,9 @@ let _crashed_actual ~msg =
     avg_holding_days = 0.0;
     open_positions_value = 0.0;
     unrealized_pnl = 0.0;
+    sortino_ratio_annualized = Float.nan;
+    calmar_ratio = Float.nan;
+    ulcer_index = Float.nan;
     force_liquidations_count = 0;
     crashed = true;
     crash_message = msg;

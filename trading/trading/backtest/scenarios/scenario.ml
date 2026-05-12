@@ -44,6 +44,9 @@ type expected = {
   avg_holding_days : range;
   open_positions_value : range option; [@sexp.option]
   unrealized_pnl : range option; [@sexp.option]
+  sortino_ratio_annualized : range option; [@sexp.option]
+  calmar_ratio : range option; [@sexp.option]
+  ulcer_index : range option; [@sexp.option]
 }
 [@@deriving sexp]
 

@@ -74,6 +74,13 @@ type actual = {
   unrealized_pnl : float;
       (* Post-rename: true unrealized P&L (OpenPositionsValue - cost basis).
          Pre-rename actual.sexp files carry the legacy mtm-value here. *)
+  sortino_ratio_annualized : float; [@sexp.default Float.nan]
+      (* M5.2c Sortino — defaults to NaN on read so pre-pin actual.sexp files
+         still parse. *)
+  calmar_ratio : float; [@sexp.default Float.nan]
+      (* M5.2c Calmar (CAGR / |MaxDD|) — defaults to NaN as above. *)
+  ulcer_index : float; [@sexp.default Float.nan]
+      (* M5.2c Ulcer Index — defaults to NaN as above. *)
   force_liquidations_count : int; [@sexp.default 0]
       (* G4 (force-liquidation policy). Defaults to 0 on read so pre-G4
          actual.sexp files that don't carry the field still parse. *)
@@ -105,6 +112,9 @@ let _actual_of_result (r : Backtest.Runner.result) =
     avg_holding_days = get AvgHoldingDays;
     open_positions_value = get OpenPositionsValue;
     unrealized_pnl = get UnrealizedPnl;
+    sortino_ratio_annualized = get SortinoRatioAnnualized;
+    calmar_ratio = get CalmarRatio;
+    ulcer_index = get UlcerIndex;
     force_liquidations_count = List.length r.force_liquidations;
     crashed = false;
     crash_message = "";
@@ -125,6 +135,9 @@ let _crashed_actual ~msg =
     avg_holding_days = 0.0;
     open_positions_value = 0.0;
     unrealized_pnl = 0.0;
+    sortino_ratio_annualized = Float.nan;
+    calmar_ratio = Float.nan;
+    ulcer_index = Float.nan;
     force_liquidations_count = 0;
     crashed = true;
     crash_message = msg;
@@ -149,17 +162,19 @@ let _run_checks (a : actual) (e : Scenario.expected) =
       _check_one "avg_holding_days" a.avg_holding_days e.avg_holding_days;
     ]
   in
-  let with_opv =
-    match e.open_positions_value with
-    | None -> base
-    | Some range ->
-        base
-        @ [ _check_one "open_positions_value" a.open_positions_value range ]
+  let append_opt name value range_opt acc =
+    match range_opt with
+    | None -> acc
+    | Some range -> acc @ [ _check_one name value range ]
   in
-  match e.unrealized_pnl with
-  | None -> with_opv
-  | Some range ->
-      with_opv @ [ _check_one "unrealized_pnl" a.unrealized_pnl range ]
+  base
+  |> append_opt "open_positions_value" a.open_positions_value
+       e.open_positions_value
+  |> append_opt "unrealized_pnl" a.unrealized_pnl e.unrealized_pnl
+  |> append_opt "sortino_ratio_annualized" a.sortino_ratio_annualized
+       e.sortino_ratio_annualized
+  |> append_opt "calmar_ratio" a.calmar_ratio e.calmar_ratio
+  |> append_opt "ulcer_index" a.ulcer_index e.ulcer_index
 
 let _failure_message checks =
   List.filter checks ~f:(fun c -> not c.ok)

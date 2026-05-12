@@ -34,6 +34,21 @@ type expected = {
           [OpenPositionsValue - Σ position_cost_basis]. [None] skips the check.
           Optional even when [open_positions_value] is pinned — populate when an
           empirical baseline justifies a tight range. *)
+  sortino_ratio_annualized : range option; [@sexp.option]
+      (** Annualized Sortino ratio — penalises downside volatility only. Pinned
+          range catches strategies where Sharpe stays stable but the downside
+          shape changes (e.g. a regression that adds skewed tail losses). [None]
+          skips the check. *)
+  calmar_ratio : range option; [@sexp.option]
+      (** CAGR / |MaxDrawdown|. Single number capturing return-per-unit-of-pain.
+          Composes MaxDrawdown and total return into one orthogonal check.
+          [None] skips. *)
+  ulcer_index : range option; [@sexp.option]
+      (** Sqrt of mean squared per-day drawdown percent — penalises BOTH depth
+          and duration of drawdowns. Catches the long-short
+          Portfolio_floor-cascade death loop pattern where many small drawdown
+          spikes add up to a high ulcer index even though MaxDrawdown stays the
+          same. [None] skips. *)
 }
 [@@deriving sexp]
 
