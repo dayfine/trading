@@ -1,12 +1,12 @@
 # Status: experiments
 
-## Last updated: 2026-05-06
+## Last updated: 2026-05-12
 
 ## Status
 IN_PROGRESS
 
 ## Notes
-M5.2a–e all MERGED: config-override + comparison + smoke catalog (#756), trade aggregates (#758), risk-adjusted + drawdown (#762), distributional/antifragility (#765), per-trade context (#769). M5.4 E1 short on/off A/B (#777), E2 segmentation stage classifier (#754), E3 stop-buffer sweep harness (#815), E4 scoring-weight sweep harness (#816) all MERGED. Pending: E3/E4 actual sweep runs (local-only, ~5×2h each) + result `report.md` files.
+M5.2a–e all MERGED (config-override + comparison + smoke catalog #756, trade aggregates #758, risk-adjusted + drawdown #762, distributional/antifragility #765, per-trade context #769). M5.4 E1–E4 harnesses all MERGED (#777/#754/#815/#816). **E3 + E4 sweep reports BOTH PRESENT** on `main`: `dev/experiments/m5-4-e3-stop-buffer-sweep/report.md` (buffer 1.00 wins) and `dev/experiments/m5-4-e4-scoring-weight-sweep/report.md` (resistance-heavy wins). M5.2 second-wave benchmark-relative metrics (alpha/beta/IR/TE/corr) shipped via #1021 (2026-05-10). Remaining: stability + turnover metrics PR — track wraps once that lands.
 
 Track created 2026-05-02 to absorb M5.2 (experiment infra) + M5.4 (mechanical experiments). Plan: `dev/plans/m5-experiments-roadmap-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.2 + M5.4 (added 2026-05-02).
 
@@ -34,7 +34,7 @@ NO
 - [x] **E4 — Scoring-weight sweep harness** (8 cells on `goldens-sp500/sp500-2019-2023` — `baseline`, `equal-weights`, `stage-heavy`, `volume-heavy`, `rs-heavy`, `resistance-heavy`, `sector-heavy`, `late-stage-strict`). One-axis-at-a-time perturbations of `Screener.scoring_weights` (manual prequel to M5.5 T-A grid). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e4-scoring-weight-sweep/`; hypothesis + README at `dev/experiments/m5-4-e4-scoring-weight-sweep/`. Run via `dune exec backtest/scenarios/scenario_runner.exe -- --dir trading/test_data/backtest_scenarios/experiments/m5-4-e4-scoring-weight-sweep --parallel 5` (local-only; ~5×2h tier-3 budget). Sweep run + report.md is the follow-up.
 
 ## In Progress
-- None. M5.2a–e and M5.4 E1–E4 harnesses all MERGED. Next: run E3/E4 sweeps locally and write result report.md files.
+- None. M5.2a–e and M5.4 E1–E4 harnesses all MERGED. E3 + E4 sweep reports both landed. Next: stability/turnover metrics PR (M5.2 second-wave catch-all) — benchmark-relative shipped via #1021.
 
 ## Completed
 - M5.4 E1 short on/off A/B (PR #777, MERGED 2026-05-02) — uses `--baseline` infra; `dev/experiments/short-on-off/` comparison artefacts.
@@ -49,9 +49,10 @@ NO
 
 ## Next Steps
 
-1. Run M5.4 E3 stop-buffer sweep locally (`scenario_runner.exe --dir .../experiments/m5-4-e3-stop-buffer-sweep --parallel 5`); write `dev/experiments/m5-4-e3-stop-buffer-sweep/report.md` with verdict.
-2. Run M5.4 E4 scoring-weight sweep locally; write `dev/experiments/m5-4-e4-scoring-weight-sweep/report.md` with verdict. Feeds M5.5 T-A grid setup.
-3. M5.2 second-wave metrics (benchmark-relative + stability) when sweep results are available to compare.
+1. ~~Run M5.4 E3 stop-buffer sweep~~ — DONE (`dev/experiments/m5-4-e3-stop-buffer-sweep/report.md`, buffer 1.00 wins).
+2. ~~Run M5.4 E4 scoring-weight sweep~~ — DONE (`dev/experiments/m5-4-e4-scoring-weight-sweep/report.md`, resistance-heavy wins).
+3. ~~Benchmark-relative metrics (alpha, beta, IR, TE, corr)~~ — DONE via #1021 (2026-05-10).
+4. **Stability + turnover metrics** — last second-wave catch-all (rolling-Sharpe stability, trade-frequency, position-turnover, sector-rotation). Mirrors the #1021 computer pattern. Track wraps after this PR.
 
 ## Out of scope
 

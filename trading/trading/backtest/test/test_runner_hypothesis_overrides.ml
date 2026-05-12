@@ -243,6 +243,34 @@ let test_default_screening_min_score_override_is_none _ =
   let cfg = _default_config () in
   assert_that cfg.screening_config.min_score_override is_none
 
+(** Deep-merge path for [screening_config.volume_ratio_exclude_range]. Pairs
+    with the [Screener.config.volume_ratio_exclude_range] knob added on this
+    branch; sweepers can move the boundaries by overriding the partial-config
+    overlay. *)
+let test_override_screening_volume_ratio_exclude_range _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string
+         "((screening_config ((volume_ratio_exclude_range (((low 2.5) (high \
+          3.0)))))))")
+  in
+  assert_that merged.screening_config.volume_ratio_exclude_range
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (b : Screener.volume_ratio_band) -> b.low)
+              (float_equal 2.5);
+            field
+              (fun (b : Screener.volume_ratio_band) -> b.high)
+              (float_equal 3.0);
+          ]))
+
+(** Default is preserved when no override is applied. *)
+let test_default_screening_volume_ratio_exclude_range_is_none _ =
+  let cfg = _default_config () in
+  assert_that cfg.screening_config.volume_ratio_exclude_range is_none
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -272,6 +300,10 @@ let suite =
           sexp" >:: test_override_screening_min_score_override;
          "default: screening_config.min_score_override = None"
          >:: test_default_screening_min_score_override_is_none;
+         "override: screening_config.volume_ratio_exclude_range round-trips \
+          through sexp" >:: test_override_screening_volume_ratio_exclude_range;
+         "default: screening_config.volume_ratio_exclude_range = None"
+         >:: test_default_screening_volume_ratio_exclude_range_is_none;
        ]
 
 let () = run_test_tt_main suite

@@ -44,6 +44,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     min_grade = F;
     min_score_override = None;
     max_score_override = None;
+    volume_ratio_exclude_range = None;
     max_buy_candidates = Int.max_value;
     max_short_candidates = Int.max_value;
     cascade_post_stop_cooldown_weeks = 0;

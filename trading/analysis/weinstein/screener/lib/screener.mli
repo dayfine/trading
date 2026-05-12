@@ -39,6 +39,13 @@ type candidate_params = {
 val default_candidate_params : candidate_params
 (** [default_candidate_params] provides the reference parameters. *)
 
+type volume_ratio_band = { low : float; high : float } [@@deriving sexp]
+(** Half-open volume-ratio exclusion band used by
+    {!config.volume_ratio_exclude_range}. The named-field record (rather than a
+    plain [float * float] tuple) keeps the on-disk sexp shape outside the
+    runner's deep-merge "looks like a record" heuristic, so a partial-config
+    overlay that sets just this field deep-merges correctly. *)
+
 type config = {
   weights : scoring_weights;
   grade_thresholds : grade_thresholds;
@@ -83,6 +90,31 @@ type config = {
 
           The cap is applied at the same gate as {!min_score_override} so the
           cascade-diagnostics phase counters stay consistent. *)
+  volume_ratio_exclude_range : volume_ratio_band option; [@sexp.default None]
+      (** Optional half-open exclusion band on the candidate's
+          [volume.volume_ratio] (event-volume / avg-volume). When
+          [Some {low; high}], a candidate is rejected if its volume ratio falls
+          in the half-open interval from [low] (inclusive) to [high]
+          (exclusive). Composes with the score gates: a candidate survives only
+          if both the score is in band and the volume ratio is not in the
+          excluded band.
+
+          Default: [None] — no exclusion.
+
+          Motivation: per-quintile entry-feature analysis on rolling 5y Cell E
+          trades (dev/notes/entry-signal-quintiles-2026-05-11.md) showed the
+          volume_ratio bucket between 2.5 and 3.0 is the only negative-$/trade
+          bucket and second-worst on win rate. Extreme volume (3.0 and above)
+          recovers on $/trade despite lower WR (fat-tail bull setups), so the
+          right cap is "exclude 2.5 to 3.0", not "exclude everything above 2.5".
+          This knob exposes the band as a single tunable so sweepers can move
+          the boundaries without code edits.
+
+          Candidates with no [volume] result (e.g. insufficient bars to compute
+          the ratio) are admitted unconditionally — the gate is only a filter
+          when the ratio is computable. The cascade-diagnostics phase counters
+          treat exclusion as part of the breakout phase (no new counter is
+          added; the candidate is simply absent from the downstream phases). *)
   max_buy_candidates : int;
       (** Maximum number of buy candidates returned. Default: 20. *)
   max_short_candidates : int;
