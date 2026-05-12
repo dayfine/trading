@@ -47,6 +47,7 @@ type expected = {
   sortino_ratio_annualized : range option; [@sexp.option]
   calmar_ratio : range option; [@sexp.option]
   ulcer_index : range option; [@sexp.option]
+  wall_seconds : range option; [@sexp.option]
 }
 [@@deriving sexp]
 
