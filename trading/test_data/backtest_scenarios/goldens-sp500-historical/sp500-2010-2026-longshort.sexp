@@ -75,4 +75,7 @@
    (sharpe_ratio       ((min   0.56)        (max   0.76)))
    (max_drawdown_pct   ((min  18.1)         (max  24.6)))
    (avg_holding_days   ((min  37.7)         (max  51.1)))
-   (open_positions_value ((min 2017000.0)   (max 2730000.0))))))
+   (open_positions_value ((min 2017000.0)   (max 2730000.0)))
+   (sortino_ratio_annualized ((min  0.86)   (max   1.16)))
+   (calmar_ratio       ((min   0.32)        (max   0.44)))
+   (ulcer_index        ((min   8.38)        (max  11.33))))))

@@ -50,12 +50,24 @@
  ;; goldens. Prior 0.05/0.50 baseline (110.84% / 302 trades / 23.3% DD) and
  ;; the partial 0.14/0.70-without-rotation baseline (594.35% / 40 trades /
  ;; 28.4% DD) both preserved in git history.
- ;; Measured 2026-05-11 (full Cell E, 16.3y window):
- ;;   total_return_pct  344.9   total_trades 1099   win_rate 42.8
- ;;   sharpe_ratio       0.78   max_drawdown 18.4   avg_holding_days   34
- ;;   open_positions_value 3,085,413
+ ;; Measured 2026-05-13 (full Cell E, 16.3y window, post-#1052 force-liq fix
+ ;; + #1053/#1054 schema):
+ ;;   total_return_pct  341.69  total_trades  806  win_rate 39.08
+ ;;   sharpe_ratio       0.78   max_drawdown 18.36 avg_holding_days  44.68
+ ;;   open_positions_value 3,085,413  unrealized_pnl 566,200
+ ;;   sortino_ratio_annualized 1.25   calmar_ratio 0.52   ulcer_index 7.48
+ ;;   force_liquidations_count 10
+ ;;
+ ;; Pre-P1-fix (2026-05-11) vs post-P1-fix delta:
+ ;;   return    344.9  → 341.69  (-0.9%, marginal)
+ ;;   trades   1099    → 806     (-27%, P1 prevents spurious cascade churn)
+ ;;   avg_hold  34     → 44.68   (+31%, positions live longer without
+ ;;                                weekly forced exits)
+ ;;   force-liqs  0    → 10      (1 legitimate cascade × ~10 positions —
+ ;;                                same root mechanism as long-short, see
+ ;;                                dev/notes/longshort-cascades-investigation-2026-05-13.md)
  ;; Cell E rotation cuts MaxDD by 10pp vs the no-rotation 0.14/0.70 variant
- ;; (28 → 18.4) while running 27x more trades (40 → 1099). Tolerances ±15%.
+ ;; (28 → 18.4) while running 22x more trades (40 → 806). Tolerances ±15%.
  (config_overrides
   (((enable_short_side false))
    ((portfolio_config ((max_position_pct_long 0.14))))
@@ -66,10 +78,13 @@
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 293.0)         (max 397.0)))
-   (total_trades       ((min 935)           (max 1265)))
-   (win_rate           ((min  36.4)         (max  49.2)))
+  ((total_return_pct   ((min 290.0)         (max 393.0)))
+   (total_trades       ((min 685)           (max  927)))
+   (win_rate           ((min  33.2)         (max  44.9)))
    (sharpe_ratio       ((min   0.66)        (max   0.90)))
    (max_drawdown_pct   ((min  15.6)         (max  21.2)))
-   (avg_holding_days   ((min  29.0)         (max  39.0)))
-   (open_positions_value ((min 2620000.0)   (max 3550000.0))))))
+   (avg_holding_days   ((min  37.9)         (max  51.3)))
+   (open_positions_value ((min 2620000.0)   (max 3550000.0)))
+   (sortino_ratio_annualized ((min  1.06)   (max   1.43)))
+   (calmar_ratio       ((min   0.44)        (max   0.59)))
+   (ulcer_index        ((min   6.35)        (max   8.60))))))
