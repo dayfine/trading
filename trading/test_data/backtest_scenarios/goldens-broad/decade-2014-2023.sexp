@@ -29,10 +29,12 @@
  ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
  ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
  ;; default-sized baseline (1582-1627% / 135-145 trades / 94% DD on N=1000).
- ;; Measured 2026-05-11 (Cell E, N=1000 broad):
- ;;   total_return_pct  545.4   total_trades 553   win_rate 36.7
- ;;   sharpe_ratio       0.73   max_drawdown 46.3  avg_holding_days  41
- ;;   open_positions_value 5,410,009
+ ;; Measured 2026-05-12 (Cell E, N=1000 broad, post-#1052/#1053/#1054):
+ ;;   total_return_pct  545.37  total_trades 553   win_rate 36.71
+ ;;   sharpe_ratio       0.73   max_drawdown 46.29 avg_holding_days  41.18
+ ;;   open_positions_value 5,410,009  unrealized_pnl 1,579,384
+ ;;   sortino_ratio_annualized 1.27   calmar_ratio 0.44   ulcer_index 16.98
+ ;;   force_liquidations_count 4  wall_seconds 1231.51 (local Docker)
  ;; Return cut (concentrated bull run loses to rotation) but MaxDD cut 48pp
  ;; (94 → 46) — much safer. Tolerances ±15%.
  (config_overrides
@@ -52,4 +54,7 @@
    (sharpe_ratio       ((min   0.62)       (max   0.84)))
    (max_drawdown_pct   ((min  39.4)        (max  53.3)))
    (avg_holding_days   ((min  35.0)        (max  47.0)))
-   (open_positions_value ((min 4600000.0)  (max 6220000.0))))))
+   (open_positions_value ((min 4600000.0)  (max 6220000.0)))
+   (sortino_ratio_annualized ((min  1.08)  (max   1.46)))
+   (calmar_ratio       ((min   0.38)       (max   0.50)))
+   (ulcer_index        ((min  14.43)       (max  19.52))))))
