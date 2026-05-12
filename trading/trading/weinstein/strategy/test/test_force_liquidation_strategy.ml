@@ -117,24 +117,48 @@ let _drive_tick state ~config ~current_date ~portfolio =
 (* ------------------------------------------------------------------ *)
 
 (** Pins the macro-flip semantics of {!Internal_for_test.maybe_reset_halt}. The
-    halt clears when macro is [Bullish] or [Neutral]; stays armed under
-    [Bearish]. *)
-let test_maybe_reset_halt_clears_on_non_bearish _ =
+    halt clears ONLY on the TRANSITION from [Bearish] to [Bullish] or [Neutral];
+    stays armed under all other [(prior, current)] pairs.
+
+    This stricter "transition-only" reset (was: "reset whenever non-Bearish")
+    breaks the Portfolio_floor death loop observed in the 2026-05-12 16y
+    long-short backtest, where 307 force-liqs cascaded because the old "reset
+    whenever non-Bearish" condition cleared halt every Friday under
+    sustained-Bullish macro. *)
+let test_maybe_reset_halt_clears_on_bearish_to_bullish _ =
   let pt = FL.Peak_tracker.create () in
   FL.Peak_tracker.mark_halted pt;
-  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~macro_trend:Bullish;
+  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~prior_macro:Bearish
+    ~current_macro:Bullish;
   assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Active)
 
-let test_maybe_reset_halt_clears_on_neutral _ =
+let test_maybe_reset_halt_clears_on_bearish_to_neutral _ =
   let pt = FL.Peak_tracker.create () in
   FL.Peak_tracker.mark_halted pt;
-  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~macro_trend:Neutral;
+  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~prior_macro:Bearish
+    ~current_macro:Neutral;
   assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Active)
 
-let test_maybe_reset_halt_persists_under_bearish _ =
+let test_maybe_reset_halt_persists_under_sustained_bullish _ =
+  (* THE death-loop fix: prior=Bullish, current=Bullish must NOT reset. *)
   let pt = FL.Peak_tracker.create () in
   FL.Peak_tracker.mark_halted pt;
-  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~macro_trend:Bearish;
+  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~prior_macro:Bullish
+    ~current_macro:Bullish;
+  assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted)
+
+let test_maybe_reset_halt_persists_under_sustained_neutral _ =
+  let pt = FL.Peak_tracker.create () in
+  FL.Peak_tracker.mark_halted pt;
+  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~prior_macro:Neutral
+    ~current_macro:Neutral;
+  assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted)
+
+let test_maybe_reset_halt_persists_under_sustained_bearish _ =
+  let pt = FL.Peak_tracker.create () in
+  FL.Peak_tracker.mark_halted pt;
+  Internal_for_test.maybe_reset_halt ~peak_tracker:pt ~prior_macro:Bearish
+    ~current_macro:Bearish;
   assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted)
 
 (* ------------------------------------------------------------------ *)
@@ -166,7 +190,10 @@ let test_halt_resets_after_macro_flip _ =
   let current_date = _next_friday (Date.of_string "2024-04-26") in
   let bar_reader = _rising_index_reader ~end_date:current_date in
   let state = _fresh_state ~bar_reader in
-  (* Prime the pump: halt is active before the tick. *)
+  (* Prime the pump: halt is active before the tick. Seed prior_macro to
+     Bearish so the rising-index Friday creates a Bearish → non-Bearish
+     transition (the transition-only reset semantic, post-death-loop fix). *)
+  state.prior_macro := Bearish;
   FL.Peak_tracker.mark_halted state.peak_tracker;
   assert_that
     (FL.Peak_tracker.halt_state state.peak_tracker)
@@ -463,12 +490,16 @@ let test_adjust_dedup_against_force_liq_exit _ =
 let suite =
   "force_liquidation_strategy"
   >::: [
-         "maybe_reset_halt clears on Bullish"
-         >:: test_maybe_reset_halt_clears_on_non_bearish;
-         "maybe_reset_halt clears on Neutral"
-         >:: test_maybe_reset_halt_clears_on_neutral;
-         "maybe_reset_halt persists under Bearish"
-         >:: test_maybe_reset_halt_persists_under_bearish;
+         "maybe_reset_halt clears on Bearish→Bullish transition"
+         >:: test_maybe_reset_halt_clears_on_bearish_to_bullish;
+         "maybe_reset_halt clears on Bearish→Neutral transition"
+         >:: test_maybe_reset_halt_clears_on_bearish_to_neutral;
+         "maybe_reset_halt persists under sustained Bullish (death-loop fix)"
+         >:: test_maybe_reset_halt_persists_under_sustained_bullish;
+         "maybe_reset_halt persists under sustained Neutral"
+         >:: test_maybe_reset_halt_persists_under_sustained_neutral;
+         "maybe_reset_halt persists under sustained Bearish"
+         >:: test_maybe_reset_halt_persists_under_sustained_bearish;
          "halt resets after macro flip on Friday tick"
          >:: test_halt_resets_after_macro_flip;
          "halt persists when macro stays Bearish"

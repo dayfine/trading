@@ -244,8 +244,19 @@ let _portfolio_floor_breached ~config ~peak ~portfolio_value =
 let check ~config ~date ~positions ~portfolio_value
     ~(peak_tracker : Peak_tracker.t) =
   Peak_tracker.observe peak_tracker ~portfolio_value;
-  let peak = Peak_tracker.peak peak_tracker in
-  if _portfolio_floor_breached ~config ~peak ~portfolio_value then (
-    Peak_tracker.mark_halted peak_tracker;
-    List.map positions ~f:(_event_of_input ~date ~reason:Portfolio_floor))
-  else List.filter_map positions ~f:(_check_per_position ~config ~date)
+  (* Once halted, the portfolio-floor trigger does NOT re-fire on subsequent
+     ticks. Per-position triggers continue to run (single positions can
+     still hit their max-unrealized-loss threshold independently). The halt
+     is cleared via [Peak_tracker.reset], invoked by the strategy on a
+     Bearish → non-Bearish macro transition (see
+     [Weinstein_strategy._maybe_reset_halt]). Without this gate, the
+     16y-longshort backtest hit a death loop where the same breach fired
+     307 times in 2025 (see dev/notes/longshort-portfolio-floor-death-loop). *)
+  match Peak_tracker.halt_state peak_tracker with
+  | Halted -> List.filter_map positions ~f:(_check_per_position ~config ~date)
+  | Active ->
+      let peak = Peak_tracker.peak peak_tracker in
+      if _portfolio_floor_breached ~config ~peak ~portfolio_value then (
+        Peak_tracker.mark_halted peak_tracker;
+        List.map positions ~f:(_event_of_input ~date ~reason:Portfolio_floor))
+      else List.filter_map positions ~f:(_check_per_position ~config ~date)
