@@ -29,6 +29,79 @@ let stage4 = Stage4 { weeks_declining = 2 }
    Short: raw_stop = reference_level * (1 + min_correction_pct/2) = reference_level * 1.04
    A round-number nudge is applied after: stop placed just outside the nearest half-dollar. *)
 
+(* ---- widen_initial_to_min_distance tests ----
+   The floor primitive that re-wires [Screener.candidate_params.initial_stop_pct]
+   into the installed stop. Three guarantees pinned: (1) no-op when pct <= 0,
+   (2) no-op when existing stop is already at-least that far from entry,
+   (3) widens to entry * (1 - pct) [long] / entry * (1 + pct) [short] when
+   the existing stop is tighter. Trailing and Tightened states are pass-through.
+*)
+let test_widen_noop_when_pct_zero _ =
+  let s = Initial { stop_level = 99.0; reference_level = 103.125 } in
+  assert_that
+    (Weinstein_stops.Stop_widen.widen_initial_to_min_distance ~config:cfg
+       ~side:Long ~entry_price:100.0 ~min_distance_pct:0.0 s)
+    (equal_to s)
+
+let test_widen_noop_when_already_wide_enough_long _ =
+  (* Existing stop at 90 (10% below); pct=0.08 (8%) is tighter — no widen. *)
+  let s = Initial { stop_level = 90.0; reference_level = 93.75 } in
+  assert_that
+    (Weinstein_stops.Stop_widen.widen_initial_to_min_distance ~config:cfg
+       ~side:Long ~entry_price:100.0 ~min_distance_pct:0.08 s)
+    (equal_to s)
+
+let test_widen_when_too_tight_long _ =
+  (* Existing stop at 98 (2% below); pct=0.10 (10%) → widen to 90. *)
+  let s = Initial { stop_level = 98.0; reference_level = 102.08 } in
+  let widened =
+    Weinstein_stops.Stop_widen.widen_initial_to_min_distance ~config:cfg
+      ~side:Long ~entry_price:100.0 ~min_distance_pct:0.10 s
+  in
+  assert_that (get_stop_level widened) (float_equal 90.0)
+
+let test_widen_synthetic_reference_round_trips_long _ =
+  (* After widening, the new reference_level should re-produce stop_level
+     bit-equally via compute_initial_stop: ref * (1 - delta) = stop_level. *)
+  let s = Initial { stop_level = 99.0; reference_level = 103.125 } in
+  let widened =
+    Weinstein_stops.Stop_widen.widen_initial_to_min_distance ~config:cfg
+      ~side:Long ~entry_price:100.0 ~min_distance_pct:0.10 s
+  in
+  (* delta = cfg.min_correction_pct / 2 = 0.04; ref = 90 / 0.96 = 93.75. *)
+  let ref_level =
+    match widened with
+    | Initial { reference_level; _ } -> reference_level
+    | _ -> assert_failure "Expected Initial after widening"
+  in
+  assert_that ref_level (float_equal 93.75)
+
+let test_widen_when_too_tight_short _ =
+  (* Short: existing stop at 102 (2% above entry 100); pct=0.10 → widen to 110. *)
+  let s = Initial { stop_level = 102.0; reference_level = 98.077 } in
+  let widened =
+    Weinstein_stops.Stop_widen.widen_initial_to_min_distance ~config:cfg
+      ~side:Short ~entry_price:100.0 ~min_distance_pct:0.10 s
+  in
+  assert_that (get_stop_level widened) (float_equal 110.0)
+
+let test_widen_trailing_is_passthrough _ =
+  let s =
+    Trailing
+      {
+        stop_level = 95.0;
+        last_correction_extreme = 92.0;
+        last_trend_extreme = 110.0;
+        ma_at_last_adjustment = 100.0;
+        correction_count = 1;
+        correction_observed_since_reset = true;
+      }
+  in
+  assert_that
+    (Weinstein_stops.Stop_widen.widen_initial_to_min_distance ~config:cfg
+       ~side:Long ~entry_price:100.0 ~min_distance_pct:0.50 s)
+    (equal_to s)
+
 let test_compute_initial_stop_long _ =
   (* Long: reference_level=50.0 → raw_stop=48.0 → nudged to 47.875 (below 48.0) *)
   assert_that
@@ -519,6 +592,14 @@ let suite =
          "no_phantom_cycle_on_continuous_advance"
          >:: test_no_phantom_cycle_on_continuous_advance;
          "deriving" >:: test_deriving;
+         "widen_noop_when_pct_zero" >:: test_widen_noop_when_pct_zero;
+         "widen_noop_when_already_wide_enough_long"
+         >:: test_widen_noop_when_already_wide_enough_long;
+         "widen_when_too_tight_long" >:: test_widen_when_too_tight_long;
+         "widen_synthetic_reference_round_trips_long"
+         >:: test_widen_synthetic_reference_round_trips_long;
+         "widen_when_too_tight_short" >:: test_widen_when_too_tight_short;
+         "widen_trailing_is_passthrough" >:: test_widen_trailing_is_passthrough;
        ]
 
 let () = run_test_tt_main suite

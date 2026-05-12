@@ -24,6 +24,11 @@ module Stop_split_adjust = Stop_split_adjust
     absolute stop prices in lockstep with the broker-side share-count rescale on
     a corporate-action split. See the module doc for the contract. *)
 
+module Stop_widen = Stop_widen
+(** Floor-widening primitive for {!Initial} stops. Used by the strategy to
+    re-wire {!Screener.candidate_params.installed_stop_min_pct} into the
+    installed-stop path. See the module doc for the contract. *)
+
 (** {1 Core Functions} *)
 
 val compute_initial_stop :

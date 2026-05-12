@@ -38,9 +38,17 @@ let effective_entry_price ~bar_reader ~current_date
 (** Compute the support-floor-aware initial stop for [cand] entering at
     [effective_entry], plus the [stop_floor_kind] tag for audit. Mirrors the
     logic in [entry_audit_capture.classify_stop_floor_kind] for the floor-kind
-    tag — both key off [Support_floor.find_recent_level_with_callbacks]. *)
-let initial_stop_and_kind ~stops_config ~initial_stop_buffer ~bar_reader
-    ~current_date ~effective_entry (cand : Screener.scored_candidate) =
+    tag — both key off [Support_floor.find_recent_level_with_callbacks].
+
+    [?min_stop_distance_pct] is an optional floor on the placed stop's distance
+    from [effective_entry]: when [Some pct], the resulting [stop_state] is
+    widened (if necessary) so the [Initial] [stop_level] is at least [pct] away
+    from entry. Used to re-wire {!Screener.candidate_params.initial_stop_pct}
+    into the actual installed stop — see
+    {!Weinstein_stops.widen_initial_to_min_distance}. *)
+let initial_stop_and_kind ?(min_stop_distance_pct = 0.0) ~stops_config
+    ~initial_stop_buffer ~bar_reader ~current_date ~effective_entry
+    (cand : Screener.scored_candidate) =
   let daily_view =
     Bar_reader.daily_view_for bar_reader ~symbol:cand.ticker ~as_of:current_date
       ~lookback:stops_config.Weinstein_stops.support_floor_lookback_bars
@@ -48,10 +56,15 @@ let initial_stop_and_kind ~stops_config ~initial_stop_buffer ~bar_reader
   let callbacks =
     Panel_callbacks.support_floor_callbacks_of_daily_view daily_view
   in
-  let initial_stop =
+  let raw_stop =
     Weinstein_stops.compute_initial_stop_with_floor_with_callbacks
       ~config:stops_config ~side:cand.side ~entry_price:effective_entry
       ~callbacks ~fallback_buffer:initial_stop_buffer
+  in
+  let initial_stop =
+    Weinstein_stops.Stop_widen.widen_initial_to_min_distance
+      ~config:stops_config ~side:cand.side ~entry_price:effective_entry
+      ~min_distance_pct:min_stop_distance_pct raw_stop
   in
   let stop_floor_kind : Audit_recorder.stop_floor_kind =
     match

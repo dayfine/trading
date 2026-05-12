@@ -68,6 +68,8 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
   in
   let make_entry =
     Entry_audit_capture.make_entry_transition
+      ~min_stop_distance_pct:
+        config.screening_config.candidate_params.installed_stop_min_pct
       ~portfolio_risk_config:config.portfolio_config
       ~stops_config:config.stops_config
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
