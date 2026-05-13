@@ -22,46 +22,29 @@ type config = {
   enable_short_side : bool; [@sexp.default true]
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]
-      (** Cadence for trailing-stop trail advancement (G11). [Daily] (the
-          default) preserves all existing baselines: the trail can tighten on
-          every daily bar. [Weekly] only advances the state machine on Friday
-          ticks, matching Weinstein Ch. 6 §Stop-Loss Rules ("trail moves only on
-          weekly close"). Trigger logic stays continuous in both modes. *)
+      (** Cadence for trailing-stop trail advancement (G11). [Daily] preserves
+          baselines; [Weekly] gates trail advancement to Friday ticks. *)
   stage3_force_exit_config : Stage3_force_exit.config;
       [@sexp.default Stage3_force_exit.default_config]
-      (** Stage-3 force-exit detector parameters (issue #872). Default
-          [{ hysteresis_weeks = 2 }] — fires on the second consecutive Friday
-          Stage-3 classification of a held long position. *)
+      (** Stage-3 force-exit detector parameters (issue #872). *)
   enable_stage3_force_exit : bool; [@sexp.default false]
       (** Master switch for the Stage-3 force-exit runner. Default [false]
-          preserves all existing baselines: the runner is a no-op and the
-          strategy emits no [StrategySignal "stage3_force_exit"] transitions.
-          Flipping to [true] activates {!Stage3_force_exit_runner.update} on
-          every Friday tick. *)
+          preserves all existing baselines. *)
   stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Reserved for future tuning — currently unwired (default [0] = no
-          cooldown applied). Once wired, would suppress cascade re-admission of
-          a symbol force-exited under Stage 3 for [N] weeks beyond the existing
-          stop-out cooldown surface (#718). [0] is the book-aligned default
-          (§5.2 "STATE: EXITED — IF whipsaw … acceptable to re-buy"). The knob
-          exists on [config] so future tuning can flip it via sexp override
-          without a code change. *)
+      (** Cascade re-admission cooldown (#718) for Stage-3 force-exited symbols.
+          Default [0] = no extra cooldown. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
-      (** Laggard-rotation detector parameters (issue #887). Default
-          [{ hysteresis_weeks = 4; rs_window_weeks = 13 }] — fires on the fourth
-          consecutive Friday observation of negative
-          relative-strength-vs-benchmark over a rolling 13-week window. *)
+      (** Laggard-rotation detector parameters (issue #887). *)
   enable_laggard_rotation : bool; [@sexp.default false]
-      (** Master switch for the laggard-rotation runner (issue #887). Default
-          [false] preserves all existing baselines: the runner is a no-op and
-          the strategy emits no [StrategySignal "laggard_rotation"] transitions.
-      *)
+      (** Master switch for the laggard-rotation runner (issue #887). *)
   laggard_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Reserved for future tuning — currently unwired (default [0] = no
-          cooldown applied beyond the existing stop-out cooldown surface #718).
-          The knob exists on [config] so future tuning can flip it via sexp
-          override without a code change. *)
+      (** Cascade re-admission cooldown (#718) for laggard-rotation exited
+          symbols. Default [0] = no extra cooldown. *)
+  enable_continuation_buys : bool; [@sexp.default false]
+      (** Master switch for Weinstein Ch. 3 continuation-buy detection
+          (Interpretation B of issue #889). Default [false] preserves baselines.
+      *)
 }
 [@@deriving sexp]
 
@@ -90,6 +73,7 @@ let default_config ~universe ~index_symbol =
     laggard_rotation_config = Laggard_rotation.default_config;
     enable_laggard_rotation = false;
     laggard_reentry_cooldown_weeks = 0;
+    enable_continuation_buys = false;
   }
 
 let name = "Weinstein"

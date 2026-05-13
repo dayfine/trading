@@ -560,6 +560,7 @@ let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
       resistance = None;
       support = None;
       prior_stage = Some (Stage3 { weeks_topping = 8 });
+      continuation = None;
       as_of_date = Date.of_string "2024-01-05";
     }
   in
@@ -1087,6 +1088,124 @@ let test_survivors_for_screening_pr_b_counter _ =
     (equal_to [ "FALL_WEAK"; "RISE_STRONG_A"; "RISE_STRONG_B" ])
 
 (* ------------------------------------------------------------------ *)
+(* record_force_exit — feeds stage3 / laggard exits into the existing  *)
+(* screener cooldown gate (issue #889 §F1).                            *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a minimal [Position.t] in Holding state for the given [symbol]. Only
+    the [symbol], [id], and state matter for [_record_force_exit]'s
+    [_symbol_of_position_id] lookup. Mirrors the helper in
+    [test_stage3_force_exit_runner.ml]. *)
+let _make_holding_position ~symbol ~id : Trading_strategy.Position.t =
+  let date = Date.of_string "2024-01-01" in
+  let make_trans kind =
+    { Trading_strategy.Position.position_id = id; date; kind }
+  in
+  let unwrap = function
+    | Ok p -> p
+    | Error err ->
+        OUnit2.assert_failure ("position setup failed: " ^ Status.show err)
+  in
+  let open Trading_strategy.Position in
+  let p =
+    create_entering
+      (make_trans
+         (CreateEntering
+            {
+              symbol;
+              side = Trading_base.Types.Long;
+              target_quantity = 100.0;
+              entry_price = 50.0;
+              reasoning = ManualDecision { description = "test" };
+            }))
+    |> unwrap
+  in
+  let p =
+    apply_transition p
+      (make_trans (EntryFill { filled_quantity = 100.0; fill_price = 50.0 }))
+    |> unwrap
+  in
+  apply_transition p
+    (make_trans
+       (EntryComplete
+          {
+            risk_params =
+              {
+                stop_loss_price = Some 45.0;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          }))
+  |> unwrap
+
+(** Build a [StrategySignal] exit transition for the given symbol's position_id.
+*)
+let _make_strategy_signal_exit ~position_id ~current_date ~label :
+    Trading_strategy.Position.transition =
+  {
+    position_id;
+    date = current_date;
+    kind =
+      TriggerExit
+        {
+          exit_reason = StrategySignal { label; detail = Some "test exit" };
+          exit_price = 60.0;
+        };
+  }
+
+(** When [cooldown_weeks = 0] the recorder is a no-op even on a matching label —
+    preserves the bit-equal default-off behaviour. *)
+let test_record_force_exit_zero_cooldown_is_noop _ =
+  let last_stop_out_dates = Hashtbl.create (module String) in
+  let pos = _make_holding_position ~symbol:"AAPL" ~id:"pos_a" in
+  let positions = Map.singleton (module String) "pos_a" pos in
+  let current_date = Date.of_string "2024-02-15" in
+  let trans =
+    _make_strategy_signal_exit ~position_id:"pos_a" ~current_date
+      ~label:"stage3_force_exit"
+  in
+  Internal_for_test.record_force_exit ~last_stop_out_dates ~positions
+    ~current_date ~cooldown_weeks:0 ~label:"stage3_force_exit" trans;
+  assert_that (Hashtbl.length last_stop_out_dates) (equal_to 0)
+
+(** When [cooldown_weeks > 0] and the transition's StrategySignal label matches,
+    the recorder writes [(symbol, current_date)] into the map. The
+    screener-level cooldown gate then blocks the symbol from re-admission via
+    the continuation arm — closing the same-Friday re-entry hazard. *)
+let test_record_force_exit_positive_cooldown_records_date _ =
+  let last_stop_out_dates = Hashtbl.create (module String) in
+  let pos = _make_holding_position ~symbol:"AAPL" ~id:"pos_a" in
+  let positions = Map.singleton (module String) "pos_a" pos in
+  let current_date = Date.of_string "2024-02-15" in
+  let trans =
+    _make_strategy_signal_exit ~position_id:"pos_a" ~current_date
+      ~label:"stage3_force_exit"
+  in
+  Internal_for_test.record_force_exit ~last_stop_out_dates ~positions
+    ~current_date ~cooldown_weeks:4 ~label:"stage3_force_exit" trans;
+  assert_that
+    (Hashtbl.find last_stop_out_dates "AAPL")
+    (is_some_and (equal_to current_date))
+
+(** When the StrategySignal label DOES NOT match (e.g. the recorder is looking
+    for laggard_rotation but the transition is stage3_force_exit), the recorder
+    is a no-op. This isolates per-source cooldown handling so a future
+    per-source cooldown design can add separate maps without
+    cross-contamination. *)
+let test_record_force_exit_label_mismatch_is_noop _ =
+  let last_stop_out_dates = Hashtbl.create (module String) in
+  let pos = _make_holding_position ~symbol:"AAPL" ~id:"pos_a" in
+  let positions = Map.singleton (module String) "pos_a" pos in
+  let current_date = Date.of_string "2024-02-15" in
+  let trans =
+    _make_strategy_signal_exit ~position_id:"pos_a" ~current_date
+      ~label:"stage3_force_exit"
+  in
+  Internal_for_test.record_force_exit ~last_stop_out_dates ~positions
+    ~current_date ~cooldown_weeks:4 ~label:"laggard_rotation" trans;
+  assert_that (Hashtbl.length last_stop_out_dates) (equal_to 0)
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -1094,6 +1213,12 @@ let () =
   run_test_tt_main
     ("weinstein_strategy"
     >::: [
+           "record_force_exit: zero cooldown is no-op"
+           >:: test_record_force_exit_zero_cooldown_is_noop;
+           "record_force_exit: positive cooldown records date"
+           >:: test_record_force_exit_positive_cooldown_records_date;
+           "record_force_exit: label mismatch is no-op"
+           >:: test_record_force_exit_label_mismatch_is_noop;
            "make produces strategy" >:: test_make_produces_strategy;
            "empty universe no transitions"
            >:: test_empty_universe_no_transitions;

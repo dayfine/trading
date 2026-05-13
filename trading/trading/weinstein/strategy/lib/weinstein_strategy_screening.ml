@@ -151,6 +151,21 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     in
     Some (ticker, stock_view, prior_stage, stage_result)
 
+(** Build the per-screen-pass [Stock_analysis.config]. Currently differs from
+    {!Stock_analysis.default_config} only by toggling the continuation detector
+    based on [Weinstein_strategy_config.enable_continuation_buys]. When the
+    strategy flag is [false] (default), this returns a config equal to
+    [Stock_analysis.default_config] — preserving bit-equality with prior
+    behaviour. *)
+let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
+    Stock_analysis.config =
+  if config.enable_continuation_buys then
+    {
+      Stock_analysis.default_config with
+      continuation = Some Continuation.default_config;
+    }
+  else Stock_analysis.default_config
+
 (** Stage 4-5 PR-A Phase 2: build the full [Stock_analysis.callbacks] bundle
     (Stage / Rs / Volume / Resistance) for a survivor and run
     [Stock_analysis.analyze_with_callbacks]. This is the load-bearing allocation
@@ -159,7 +174,7 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     Phase 1 captured before any [prior_stages] update — matches the pre-PR-A
     semantics where every per-symbol analysis on a given Friday saw the same
     "previous Friday" snapshot. *)
-let _full_analysis_of_survivor ~bar_reader ~index_view
+let _full_analysis_of_survivor ~stock_analysis_config ~bar_reader ~index_view
     ( ticker,
       (stock_view : Snapshot_runtime.Snapshot_bar_views.weekly_view),
       prior_stage,
@@ -168,11 +183,11 @@ let _full_analysis_of_survivor ~bar_reader ~index_view
   let callbacks =
     Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ~stock_symbol:ticker ~config:Stock_analysis.default_config
-      ~stock:stock_view ~benchmark:index_view ()
+      ~stock_symbol:ticker ~config:stock_analysis_config ~stock:stock_view
+      ~benchmark:index_view ()
   in
-  Stock_analysis.analyze_with_callbacks ~config:Stock_analysis.default_config
-    ~ticker ~callbacks ~prior_stage ~as_of_date
+  Stock_analysis.analyze_with_callbacks ~config:stock_analysis_config ~ticker
+    ~callbacks ~prior_stage ~as_of_date
 
 (** Phase 1: classify every ticker in [config.universe] via the cheap stage-only
     pass. Returns the full classification result — non-survivors retained so the
@@ -213,6 +228,14 @@ let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
   _commit_prior_stages ~prior_stages classified;
   final_survivors
 
+(* Per-element predicates over the four-tuple shape so [screen_universe]'s
+   cascade stays a flat pipeline (one filter per gate, no destructuring
+   lambdas pushing nesting depth). *)
+let _phase1_of (_, _, _, sr) = _survives_phase1 sr
+
+let _sector_filter_of ~sector_map (ticker, view, _prior, sr) =
+  _survives_sector_filter ~sector_map (ticker, view, sr)
+
 (** Screen the universe via the lazy cascade (Phase 1 stage filter → PR-B sector
     pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
@@ -224,15 +247,15 @@ let screen_universe ~config ~index_view ~(macro_result : Macro.result)
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
-  (* Cascade: Phase 1 stage filter → PR-B sector pre-filter → Phase 2 full
-     analysis. The four-tuple shape is preserved through both filters so
-     [prior_stage] stays threaded into [_full_analysis_of_survivor]. *)
+  let stock_analysis_config = _stock_analysis_config_for ~config in
+  (* Bind Phase-2 closure outside the pipeline (depth-5 ceiling). *)
+  let analyze =
+    _full_analysis_of_survivor ~stock_analysis_config ~bar_reader ~index_view
+  in
   let stocks =
-    classified
-    |> List.filter ~f:(fun (_, _, _, sr) -> _survives_phase1 sr)
-    |> List.filter ~f:(fun (ticker, view, _prior, sr) ->
-        _survives_sector_filter ~sector_map (ticker, view, sr))
-    |> List.map ~f:(_full_analysis_of_survivor ~bar_reader ~index_view)
+    classified |> List.filter ~f:_phase1_of
+    |> List.filter ~f:(_sector_filter_of ~sector_map)
+    |> List.map ~f:analyze
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =
