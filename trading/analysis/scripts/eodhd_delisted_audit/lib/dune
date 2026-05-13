@@ -1,0 +1,5 @@
+(library
+ (name eodhd_delisted_audit_lib)
+ (libraries core status yojson)
+ (preprocess
+  (pps ppx_jane)))

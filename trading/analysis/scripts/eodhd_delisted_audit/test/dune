@@ -1,0 +1,8 @@
+(test
+ (name test_eodhd_delisted_audit)
+ (libraries core ounit2 matchers status eodhd_delisted_audit_lib)
+ (deps
+  (glob_files ./data/*.json)
+  (glob_files ./data/*.sexp))
+ (preprocess
+  (pps ppx_jane)))

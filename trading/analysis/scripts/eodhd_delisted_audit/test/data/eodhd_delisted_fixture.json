@@ -1,0 +1,11 @@
+{
+  "delisted": [
+    {"Code": "LEH", "Name": "Lehman Brothers Holdings Inc"},
+    {"Code": "BSC", "Name": "Bear Stearns Companies Inc"}
+  ],
+  "live": [
+    {"Code": "AAPL", "Name": "Apple Inc"},
+    {"Code": "WB",   "Name": "Weibo Corp"},
+    {"Code": "MSFT", "Name": "Microsoft Corp"}
+  ]
+}
