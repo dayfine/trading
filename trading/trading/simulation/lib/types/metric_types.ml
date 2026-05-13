@@ -74,6 +74,10 @@ module Metric_type = struct
       | TrackingErrorPctAnnualized
       | InformationRatio
       | CorrelationToBenchmark
+      | RollingSharpeStability
+      | TradeFrequencyAnnualized
+      | PositionTurnover
+      | PositionConcentrationHhi
     [@@deriving show, eq, compare, sexp]
   end
 
@@ -149,6 +153,10 @@ type metric_type = Metric_type.t =
   | TrackingErrorPctAnnualized
   | InformationRatio
   | CorrelationToBenchmark
+  | RollingSharpeStability
+  | TradeFrequencyAnnualized
+  | PositionTurnover
+  | PositionConcentrationHhi
 [@@deriving show, eq, compare, sexp]
 
 include (Metric_type : Comparator.S with type t := metric_type)

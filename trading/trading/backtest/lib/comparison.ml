@@ -100,6 +100,11 @@ let _metric_label_table : (Metric_type.t * string) list =
     (TrackingErrorPctAnnualized, "tracking_error_pct_annualized");
     (InformationRatio, "information_ratio");
     (CorrelationToBenchmark, "correlation_to_benchmark");
+    (* stability + turnover *)
+    (RollingSharpeStability, "rolling_sharpe_stability");
+    (TradeFrequencyAnnualized, "trade_frequency_annualized");
+    (PositionTurnover, "position_turnover");
+    (PositionConcentrationHhi, "position_concentration_hhi");
   ]
 
 let _metric_label (mt : Metric_type.t) : string =

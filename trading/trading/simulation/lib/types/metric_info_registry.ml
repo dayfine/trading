@@ -472,12 +472,17 @@ let get_metric_info = function
         unit = Ratio;
       }
   | ( BenchmarkAlphaPctAnnualized | BenchmarkBeta | TrackingErrorPctAnnualized
-    | InformationRatio | CorrelationToBenchmark ) as t -> (
-      match Metric_info_registry_extras.info_for_benchmark_relative t with
-      | Some info -> info
+    | InformationRatio | CorrelationToBenchmark | RollingSharpeStability
+    | TradeFrequencyAnnualized | PositionTurnover | PositionConcentrationHhi )
+    as t -> (
+      let open Metric_info_registry_extras in
+      match info_for_benchmark_relative t with
+      | Some i -> i
       | None ->
-          failwithf "missing benchmark-relative info for %s"
-            (show_metric_type t) ())
+          Option.value_exn
+            (info_for_stability_turnover t)
+            ~message:(sprintf "missing extras info for %s" (show_metric_type t))
+      )
 
 let format_metric metric_type value =
   let info = get_metric_info metric_type in
