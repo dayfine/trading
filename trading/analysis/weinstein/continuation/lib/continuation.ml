@@ -46,6 +46,19 @@ let _compute_ma_slope ~(get_ma : week_offset:int -> float option) : float =
   | Some now, Some back when Float.( > ) back 0.0 -> (now -. back) /. back
   | _ -> 0.0
 
+(** [true] iff the close/MA ratio at [off] falls inside [band]. Returns [false]
+    when either reading is missing or the MA is non-positive — those offsets are
+    skipped, not treated as matches. Pulled out of the [_find_pullback_offset]
+    loop body to keep the loop's depth flat. *)
+let _offset_in_band ~callbacks ~band off : bool =
+  match
+    (callbacks.get_close ~week_offset:off, callbacks.get_ma ~week_offset:off)
+  with
+  | Some close, Some ma when Float.( > ) ma 0.0 ->
+      let ratio = close /. ma in
+      Float.( >= ) ratio band.low && Float.( <= ) ratio band.high
+  | _ -> false
+
 (** Scan offsets [1 .. lookback_weeks] for the most recent bar whose
     [close / ma_30w] sits inside [band]. Skip offset 0 deliberately — the
     current bar should be ABOVE the consolidation high (i.e. on a new breakout),
@@ -54,16 +67,8 @@ let _compute_ma_slope ~(get_ma : week_offset:int -> float option) : float =
 let _find_pullback_offset ~callbacks ~band ~lookback_weeks : int option =
   let rec loop off =
     if off > lookback_weeks then None
-    else
-      match
-        (callbacks.get_close ~week_offset:off, callbacks.get_ma ~week_offset:off)
-      with
-      | Some close, Some ma when Float.( > ) ma 0.0 ->
-          let ratio = close /. ma in
-          if Float.( >= ) ratio band.low && Float.( <= ) ratio band.high then
-            Some off
-          else loop (off + 1)
-      | _ -> loop (off + 1)
+    else if _offset_in_band ~callbacks ~band off then Some off
+    else loop (off + 1)
   in
   loop 1
 
@@ -100,6 +105,15 @@ let _scan_window ~callbacks ~n : (float * float * float) option =
     | Some h, Some l, Some c -> loop 2 h l c
     | _ -> None
 
+(** [Some hi] when the [weeks]-bar window's [(hi - lo) / avg_close <= range_pct]
+    and [avg_close > 0]; [None] otherwise. Split out from [_consolidation_high]
+    so the gate evaluation is a flat else-if chain (no nested-else). *)
+let _check_tight_window ~weeks ~range_pct ~hi ~lo ~sum : float option =
+  let avg = sum /. Float.of_int weeks in
+  if Float.( <= ) avg 0.0 then None
+  else if Float.( <= ) ((hi -. lo) /. avg) range_pct then Some hi
+  else None
+
 (** Check the consolidation-tightness gate over the last [weeks] bars. Returns
     [Some hi] when [(hi - lo) / avg_close <= range_pct], i.e. the window is
     tight enough to count as consolidation. [hi] is the window's highest [high],
@@ -108,12 +122,7 @@ let _scan_window ~callbacks ~n : (float * float * float) option =
 let _consolidation_high ~callbacks ~weeks ~range_pct : float option =
   match _scan_window ~callbacks ~n:weeks with
   | None -> None
-  | Some (hi, lo, sum) ->
-      let avg = sum /. Float.of_int weeks in
-      if Float.( <= ) avg 0.0 then None
-      else
-        let range_fraction = (hi -. lo) /. avg in
-        if Float.( <= ) range_fraction range_pct then Some hi else None
+  | Some (hi, lo, sum) -> _check_tight_window ~weeks ~range_pct ~hi ~lo ~sum
 
 (** Check the breakout-arm gate: the current close (offset 0) exceeds the
     consolidation high. Mirrors the book's "breaks out anew above the top of its

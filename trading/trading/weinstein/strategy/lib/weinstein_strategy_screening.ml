@@ -228,6 +228,14 @@ let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
   _commit_prior_stages ~prior_stages classified;
   final_survivors
 
+(* Per-element predicates over the four-tuple shape so [screen_universe]'s
+   cascade stays a flat pipeline (one filter per gate, no destructuring
+   lambdas pushing nesting depth). *)
+let _phase1_of (_, _, _, sr) = _survives_phase1 sr
+
+let _sector_filter_of ~sector_map (ticker, view, _prior, sr) =
+  _survives_sector_filter ~sector_map (ticker, view, sr)
+
 (** Screen the universe via the lazy cascade (Phase 1 stage filter → PR-B sector
     pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
@@ -240,18 +248,14 @@ let screen_universe ~config ~index_view ~(macro_result : Macro.result)
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
   let stock_analysis_config = _stock_analysis_config_for ~config in
-  (* Cascade: Phase 1 stage filter → PR-B sector pre-filter → Phase 2 full
-     analysis. The four-tuple shape is preserved through both filters so
-     [prior_stage] stays threaded into [_full_analysis_of_survivor]. *)
+  (* Bind Phase-2 closure outside the pipeline (depth-5 ceiling). *)
+  let analyze =
+    _full_analysis_of_survivor ~stock_analysis_config ~bar_reader ~index_view
+  in
   let stocks =
-    classified
-    |> List.filter ~f:(fun (_, _, _, sr) -> _survives_phase1 sr)
-    |> List.filter ~f:(fun (ticker, view, _prior, sr) ->
-        _survives_sector_filter ~sector_map (ticker, view, sr))
-    |> List.map
-         ~f:
-           (_full_analysis_of_survivor ~stock_analysis_config ~bar_reader
-              ~index_view)
+    classified |> List.filter ~f:_phase1_of
+    |> List.filter ~f:(_sector_filter_of ~sector_map)
+    |> List.map ~f:analyze
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =

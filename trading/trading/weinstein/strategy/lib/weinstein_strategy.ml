@@ -72,6 +72,11 @@ let _handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date
       | None -> ())
   | _ -> ()
 
+(* Stamp the cooldown table for one position-id, no-op when the position has
+   already been pruned. Extracted from [_record_force_exit] so the nested
+   match against [_symbol_of_position_id] doesn't push depth past the linter's
+   max-5 ceiling. *)
+
 (** Record stage3 / laggard force-exit dates into [last_stop_out_dates] when the
     corresponding reentry cooldown knob is enabled. Re-uses the existing
     [Screener.screen_with_cooldown] gate (which keys on [last_stop_out_dates])
@@ -81,6 +86,12 @@ let _handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date
     [cascade_post_stop_cooldown_weeks] is the responsibility of a follow-up: the
     screener applies a single window today; widening that to a per-source window
     is out of scope for the continuation-buys PR (issue #889). *)
+let _stamp_cooldown ~last_stop_out_dates ~positions ~current_date position_id =
+  match _symbol_of_position_id ~positions position_id with
+  | Some symbol ->
+      Hashtbl.set last_stop_out_dates ~key:symbol ~data:current_date
+  | None -> ()
+
 let _record_force_exit ~last_stop_out_dates ~positions ~current_date
     ~cooldown_weeks ~(label : string) (t : Position.transition) =
   if cooldown_weeks <= 0 then ()
@@ -88,11 +99,9 @@ let _record_force_exit ~last_stop_out_dates ~positions ~current_date
     match t.kind with
     | Position.TriggerExit
         { exit_reason = Position.StrategySignal { label = l; _ }; _ }
-      when String.equal l label -> (
-        match _symbol_of_position_id ~positions t.position_id with
-        | Some symbol ->
-            Hashtbl.set last_stop_out_dates ~key:symbol ~data:current_date
-        | None -> ())
+      when String.equal l label ->
+        _stamp_cooldown ~last_stop_out_dates ~positions ~current_date
+          t.position_id
     | _ -> ()
 
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
@@ -117,6 +126,23 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
          ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
          ~bar_reader ~prior_stages ~positions);
   (exit_transitions, adjust_transitions)
+
+let _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
+    ~get_price ~laggard_streaks ~is_friday ~skip_ids ~current_date =
+  let laggard_ts =
+    if config.enable_laggard_rotation then
+      Laggard_rotation_runner.update ~config:config.laggard_rotation_config
+        ~benchmark_symbol:config.indices.primary ~is_screening_day:is_friday
+        ~positions ~bar_reader ~get_price ~laggard_streaks
+        ~skip_position_ids:skip_ids ~current_date
+    else []
+  in
+  List.iter laggard_ts
+    ~f:
+      (_record_force_exit ~last_stop_out_dates ~positions ~current_date
+         ~cooldown_weeks:config.laggard_reentry_cooldown_weeks
+         ~label:"laggard_rotation");
+  laggard_ts
 
 let _run_special_exits ~config ~positions ~last_stop_out_dates
     ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
@@ -149,19 +175,11 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
   let stage3_exited_ids = _trigger_exit_ids_of stage3_ts in
   let force_exit_ts = _filter_out_exited_ids stage3_exited_ids force_exit_ts in
   let laggard_ts =
-    if config.enable_laggard_rotation then
-      let skip_ids = Set.union stop_exited_ids stage3_exited_ids in
-      Laggard_rotation_runner.update ~config:config.laggard_rotation_config
-        ~benchmark_symbol:config.indices.primary ~is_screening_day:is_friday
-        ~positions ~bar_reader ~get_price ~laggard_streaks
-        ~skip_position_ids:skip_ids ~current_date
-    else []
+    _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
+      ~get_price ~laggard_streaks ~is_friday
+      ~skip_ids:(Set.union stop_exited_ids stage3_exited_ids)
+      ~current_date
   in
-  List.iter laggard_ts
-    ~f:
-      (_record_force_exit ~last_stop_out_dates ~positions ~current_date
-         ~cooldown_weeks:config.laggard_reentry_cooldown_weeks
-         ~label:"laggard_rotation");
   let laggard_exited_ids = _trigger_exit_ids_of laggard_ts in
   let force_exit_ts = _filter_out_exited_ids laggard_exited_ids force_exit_ts in
   ( force_exit_ts,
