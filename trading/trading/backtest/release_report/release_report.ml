@@ -59,6 +59,15 @@ type all_eligible_summary = {
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 
+type benchmark_relative_summary = {
+  alpha_pct_annualized : float;
+  beta : float;
+  information_ratio : float;
+  tracking_error_pct_annualized : float;
+  correlation : float;
+}
+[@@deriving sexp]
+
 type scenario_run = {
   name : string;
   actual : actual;
@@ -68,6 +77,7 @@ type scenario_run = {
   trade_quality : Trade_audit_report.t option;
   optimal_strategy : optimal_summary_pair option;
   all_eligible : all_eligible_summary option;
+  benchmark_relative : benchmark_relative_summary option;
 }
 [@@deriving sexp]
 
@@ -202,6 +212,70 @@ let _try_load_all_eligible_summary ~dir ~scenario_name :
         }
     with _ -> None
 
+(* On-disk metric labels for the five PR #1021 benchmark-relative metrics.
+   [Metric_type.show] derives [Metric_types.Metric_type.t.<Variant>], which
+   [metric_set_to_sexp_pairs] then [String.lowercase]s — yielding e.g.
+   [metric_types.metric_type.t.benchmarkbeta]. We match by suffix (last
+   dot-separated segment) so the loader survives if the producer's module path
+   ever changes. *)
+let _benchmark_relative_labels =
+  [
+    "benchmarkalphapctannualized";
+    "benchmarkbeta";
+    "informationratio";
+    "trackingerrorpctannualized";
+    "correlationtobenchmark";
+  ]
+
+let _metric_key_suffix label =
+  match String.rsplit2 label ~on:'.' with
+  | Some (_, suffix) -> suffix
+  | None -> label
+
+(* Extract the metric key/value alist from a [summary.sexp] sexp. The on-disk
+   shape is [((... fields ...) (metrics ((<label> <value>) ...)))]; we walk the
+   top-level list looking for [(metrics ...)]. Any malformed entry yields an
+   empty alist — the report renders the benchmark-relative section as [None]
+   in that case, which is the same graceful-skip path as a legacy summary. *)
+let _metrics_alist_of_summary_sexp sexp =
+  match sexp with
+  | Sexp.List fields ->
+      let rec find = function
+        | [] -> []
+        | Sexp.List [ Sexp.Atom "metrics"; Sexp.List pairs ] :: _ ->
+            List.filter_map pairs ~f:(function
+              | Sexp.List [ Sexp.Atom k; Sexp.Atom v ] -> (
+                  try Some (_metric_key_suffix k, Float.of_string v)
+                  with _ -> None)
+              | _ -> None)
+        | _ :: rest -> find rest
+      in
+      find fields
+  | _ -> []
+
+let _try_load_benchmark_relative ~summary_sexp :
+    benchmark_relative_summary option =
+  (* Build the suffix-keyed map once, then require all five labels. Missing
+     any single label yields [None] — the report renders the section only
+     when at least one side of a pair has [Some _], so this is the legacy-
+     summary graceful-skip path. *)
+  let alist = _metrics_alist_of_summary_sexp summary_sexp in
+  let has_all =
+    List.for_all _benchmark_relative_labels ~f:(fun lbl ->
+        List.Assoc.mem alist lbl ~equal:String.equal)
+  in
+  if not has_all then None
+  else
+    let get lbl = List.Assoc.find_exn alist lbl ~equal:String.equal in
+    Some
+      {
+        alpha_pct_annualized = get "benchmarkalphapctannualized";
+        beta = get "benchmarkbeta";
+        information_ratio = get "informationratio";
+        tracking_error_pct_annualized = get "trackingerrorpctannualized";
+        correlation = get "correlationtobenchmark";
+      }
+
 let load_scenario_run ~dir =
   let name = Filename.basename dir in
   let actual_path = Filename.concat dir "actual.sexp" in
@@ -211,7 +285,8 @@ let load_scenario_run ~dir =
   if not (Sys_unix.file_exists_exn summary_path) then
     failwithf "Missing summary.sexp in %s" dir ();
   let actual = actual_of_sexp (Sexp.load_sexp actual_path) in
-  let summary = summary_meta_of_sexp (Sexp.load_sexp summary_path) in
+  let summary_sexp = Sexp.load_sexp summary_path in
+  let summary = summary_meta_of_sexp summary_sexp in
   let peak_rss_kb =
     _read_optional_int (Filename.concat dir "peak_rss_kb.txt")
   in
@@ -221,6 +296,7 @@ let load_scenario_run ~dir =
   let trade_quality = _try_load_trade_quality ~dir in
   let optimal_strategy = _try_load_optimal_summary ~dir ~scenario_name:name in
   let all_eligible = _try_load_all_eligible_summary ~dir ~scenario_name:name in
+  let benchmark_relative = _try_load_benchmark_relative ~summary_sexp in
   {
     name;
     actual;
@@ -230,6 +306,7 @@ let load_scenario_run ~dir =
     trade_quality;
     optimal_strategy;
     all_eligible;
+    benchmark_relative;
   }
 
 let _list_scenario_subdirs root =
@@ -828,11 +905,95 @@ let _all_eligible_section paired =
     let body = List.concat_map with_alleli ~f:_row_all_eligible_for_pair in
     header @ body
 
+(* --- Benchmark-relative section ---
+
+   For each paired scenario where at least one side has [Some _]
+   benchmark-relative artefacts (i.e. all five PR #1021 metrics were emitted in
+   [summary.sexp]'s metrics block), surface α, β, IR, TE, and Pearson
+   correlation side-by-side. The five metrics together pin how much of the
+   strategy's return is benchmark-explained vs. residual: a strategy with
+   β ≈ 1, corr ≈ 1, α ≈ 0 is replicating the benchmark; β < 1 with positive
+   α and low correlation indicates a genuinely independent return stream.
+
+   Δ is rendered as (current - prior) in absolute units for β, IR, and corr
+   (which are unitless ratios) and in percentage points (pp) for α and TE
+   (which are already in %/yr). Rendered only when at least one side has
+   [Some _]; missing sides print "—". *)
+
+let _br_field_str (run : scenario_run) ~(fmt : float -> string)
+    ~(get : benchmark_relative_summary -> float) =
+  match run.benchmark_relative with None -> "—" | Some b -> fmt (get b)
+
+let _br_delta_str ~(fmt : float -> string)
+    ~(get : benchmark_relative_summary -> float) cur prior =
+  match (cur.benchmark_relative, prior.benchmark_relative) with
+  | Some c, Some p -> fmt (get c -. get p)
+  | _ -> "—"
+
+let _fmt_signed_3 v = sprintf "%+.3f" v
+let _fmt_signed_pp_2 v = sprintf "%+.2f pp" v
+let _fmt_signed_pct_2 v = sprintf "%+.2f%%" v
+
+let _br_row ~label ~cur_str ~prior_str ~delta_str =
+  sprintf "| %s | %s | %s | %s |" label cur_str prior_str delta_str
+
+let _br_value_row (cur, prior) ~label ~fmt_val ~fmt_delta ~get =
+  _br_row ~label
+    ~cur_str:(_br_field_str cur ~fmt:fmt_val ~get)
+    ~prior_str:(_br_field_str prior ~fmt:fmt_val ~get)
+    ~delta_str:(_br_delta_str ~fmt:fmt_delta ~get cur prior)
+
+let _row_benchmark_relative_for_pair (cur, prior) =
+  [
+    sprintf "### %s" cur.name;
+    "";
+    "| Metric | Current | Prior | \xce\x94 |";
+    "|---|---:|---:|---:|";
+    _br_value_row (cur, prior) ~label:"Alpha (%/yr)" ~fmt_val:_fmt_signed_pct_2
+      ~fmt_delta:_fmt_signed_pp_2 ~get:(fun b -> b.alpha_pct_annualized);
+    _br_value_row (cur, prior) ~label:"Beta" ~fmt_val:_fmt_signed_3
+      ~fmt_delta:_fmt_signed_3 ~get:(fun b -> b.beta);
+    _br_value_row (cur, prior) ~label:"Information ratio" ~fmt_val:_fmt_signed_3
+      ~fmt_delta:_fmt_signed_3 ~get:(fun b -> b.information_ratio);
+    _br_value_row (cur, prior) ~label:"Tracking error (%/yr)"
+      ~fmt_val:_fmt_signed_pct_2 ~fmt_delta:_fmt_signed_pp_2 ~get:(fun b ->
+        b.tracking_error_pct_annualized);
+    _br_value_row (cur, prior) ~label:"Correlation" ~fmt_val:_fmt_signed_3
+      ~fmt_delta:_fmt_signed_3 ~get:(fun b -> b.correlation);
+    "";
+  ]
+
+let _benchmark_relative_section paired =
+  let with_br =
+    List.filter paired ~f:(fun (c, p) ->
+        Option.is_some c.benchmark_relative
+        || Option.is_some p.benchmark_relative)
+  in
+  if List.is_empty with_br then []
+  else
+    let header =
+      [
+        "## Benchmark-relative";
+        "";
+        "CAPM-style residual-return diagnostics from PR #1021: α (annualised \
+         intercept of [r_strat = α + β · r_bench]), β (slope), Information \
+         Ratio (α / TE), Tracking Error (annualised stdev of the active-return \
+         series), and Pearson correlation. Δ is current minus prior — α / TE \
+         in percentage points, β / IR / correlation in absolute units. \
+         Rendered only for scenarios whose [summary.sexp] metrics block \
+         carries all five labels.";
+        "";
+      ]
+    in
+    let body = List.concat_map with_br ~f:_row_benchmark_relative_for_pair in
+    header @ body
+
 let render ?(thresholds = default_thresholds) (t : t) =
   let lines =
     _section_header ~title:"Release perf report" ~current:t.current_label
       ~prior:t.prior_label
     @ _trading_section t.paired
+    @ _benchmark_relative_section t.paired
     @ _trade_quality_section t.paired
     @ _all_eligible_section t.paired
     @ _optimal_strategy_section t.paired
