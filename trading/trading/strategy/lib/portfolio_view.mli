@@ -16,5 +16,7 @@ val portfolio_value :
     positions. Long holdings contribute [+quantity * close_price]; shorts
     contribute [-quantity * close_price] (the buy-back liability — cash already
     reflects proceeds credited at short entry, so subtracting the current
-    liability tracks short P&L correctly). Positions not in [Holding] state or
-    without a current price are excluded. *)
+    liability tracks short P&L correctly). When [get_price] returns [None] for a
+    held symbol, the position is marked at its [entry_price] (zero unrealized
+    P&L) — defense in depth against silent NAV collapse on dataset gaps.
+    Positions not in [Holding] state are excluded. *)
