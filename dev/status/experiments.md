@@ -1,12 +1,16 @@
 # Status: experiments
 
-## Last updated: 2026-05-12
+## Last updated: 2026-05-13
 
 ## Status
 IN_PROGRESS
 
 ## Notes
-M5.2a–e all MERGED (config-override + comparison + smoke catalog #756, trade aggregates #758, risk-adjusted + drawdown #762, distributional/antifragility #765, per-trade context #769). M5.4 E1–E4 harnesses all MERGED (#777/#754/#815/#816). **E3 + E4 sweep reports BOTH PRESENT** on `main`: `dev/experiments/m5-4-e3-stop-buffer-sweep/report.md` (buffer 1.00 wins) and `dev/experiments/m5-4-e4-scoring-weight-sweep/report.md` (resistance-heavy wins). M5.2 second-wave benchmark-relative metrics (alpha/beta/IR/TE/corr) shipped via #1021 (2026-05-10). Remaining: stability + turnover metrics PR — track wraps once that lands.
+M5.2a–e all MERGED (config-override + comparison + smoke catalog #756, trade aggregates #758, risk-adjusted + drawdown #762, distributional/antifragility #765, per-trade context #769). M5.4 E1–E4 harnesses all MERGED (#777/#754/#815/#816). **E3 + E4 sweep reports BOTH PRESENT** on `main`: `dev/experiments/m5-4-e3-stop-buffer-sweep/report.md` (buffer 1.00 wins, PR #999 2026-05-08) and `dev/experiments/m5-4-e4-scoring-weight-sweep/report.md` (resistance-heavy wins, PR #1000 2026-05-08). M5.2 second-wave benchmark-relative metrics (alpha/beta/IR/TE/corr) shipped via #1021 (2026-05-10).
+
+**81-cell flagship grid result (PR #1051, 2026-05-12)** — first run produced bit-identical metrics across all 81 cells and was published with a "weights are inert" verdict. PR #1061 (2026-05-13) reopened that: root cause was a **key-path bug** in the sweep overlays — they targeted `weights.{rs,volume,breakout,sector}` but the real `Screener.scoring_weights` fields are `w_positive_rs/w_strong_volume/w_stage2_breakout/w_sector_strong`. `_apply_overrides` silently dropped the unrecognized keys, so every cell ran identical config. **Weights ARE load-bearing** — counter-evidence: the M5.4-E4 sweep (using correct field paths) moved metrics by 22 pp return / 0.12 Sharpe. PR #1068 added `.mli` clarifications naming the real fields. Rerun owned by `tuning` track.
+
+Remaining: stability + turnover metrics PR — track wraps once that lands.
 
 Track created 2026-05-02 to absorb M5.2 (experiment infra) + M5.4 (mechanical experiments). Plan: `dev/plans/m5-experiments-roadmap-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.2 + M5.4 (added 2026-05-02).
 
@@ -34,9 +38,13 @@ NO
 - [x] **E4 — Scoring-weight sweep harness** (8 cells on `goldens-sp500/sp500-2019-2023` — `baseline`, `equal-weights`, `stage-heavy`, `volume-heavy`, `rs-heavy`, `resistance-heavy`, `sector-heavy`, `late-stage-strict`). One-axis-at-a-time perturbations of `Screener.scoring_weights` (manual prequel to M5.5 T-A grid). Scenarios at `trading/test_data/backtest_scenarios/experiments/m5-4-e4-scoring-weight-sweep/`; hypothesis + README at `dev/experiments/m5-4-e4-scoring-weight-sweep/`. Run via `dune exec backtest/scenarios/scenario_runner.exe -- --dir trading/test_data/backtest_scenarios/experiments/m5-4-e4-scoring-weight-sweep --parallel 5` (local-only; ~5×2h tier-3 budget). Sweep run + report.md is the follow-up.
 
 ## In Progress
-- None. M5.2a–e and M5.4 E1–E4 harnesses all MERGED. E3 + E4 sweep reports both landed. Next: stability/turnover metrics PR (M5.2 second-wave catch-all) — benchmark-relative shipped via #1021.
+- None. M5.2a–e and M5.4 E1–E4 harnesses all MERGED. E3 + E4 sweep reports both landed (#999/#1000 2026-05-08). Benchmark-relative metrics shipped via #1021 (2026-05-10). 81-cell flagship grid first run (#1051) invalidated by key-path bug; corrected rerun owned by `tuning` track per PR #1061 (2026-05-13). Next: stability/turnover metrics PR (M5.2 second-wave catch-all).
 
 ## Completed
+- 81-cell flagship grid first run + result interpretation (PRs #1044 spec, #1051 run, #1061 interpretation, #1068 `.mli` clarifications, 2026-05-12..13) — the run itself completed but its "weights are inert" verdict was REOPENED in #1061 once the key-path bug was found. Counter-evidence (M5.4-E4) shows weights ARE load-bearing.
+- Benchmark-relative metrics (alpha, beta, info ratio, tracking error, correlation) via PR #1021 (2026-05-10). Mirrors the existing computer pattern; closes the second-wave benchmark-relative slot in M5.2.
+- M5.4 E3 stop-buffer sweep results (PR #999, MERGED 2026-05-08) — buffer 1.00 wins; `dev/experiments/m5-4-e3-stop-buffer-sweep/report.md`.
+- M5.4 E4 scoring-weight sweep results (PR #1000, MERGED 2026-05-08) — resistance-heavy wins; `dev/experiments/m5-4-e4-scoring-weight-sweep/report.md`.
 - M5.4 E1 short on/off A/B (PR #777, MERGED 2026-05-02) — uses `--baseline` infra; `dev/experiments/short-on-off/` comparison artefacts.
 - M5.4 E2 segmentation-driven Stage classifier (PR #754, MERGED 2026-05-02) — `stage_method = MaSlope | Segmentation` enum; both paths produce stage output; existing MA-slope goldens pass.
 - M5.2d distributional/antifragility catalog (PR #765, MERGED 2026-05-02) — skewness, kurtosis, concavity_coef (γ), bucket_asymmetry, CVaR_95/99, tail_ratio, gain_to_pain. Also #771 benchmark plumbing.
@@ -49,10 +57,11 @@ NO
 
 ## Next Steps
 
-1. ~~Run M5.4 E3 stop-buffer sweep~~ — DONE (`dev/experiments/m5-4-e3-stop-buffer-sweep/report.md`, buffer 1.00 wins).
-2. ~~Run M5.4 E4 scoring-weight sweep~~ — DONE (`dev/experiments/m5-4-e4-scoring-weight-sweep/report.md`, resistance-heavy wins).
+1. ~~Run M5.4 E3 stop-buffer sweep~~ — DONE via PR #999 (2026-05-08; `dev/experiments/m5-4-e3-stop-buffer-sweep/report.md`, buffer 1.00 wins).
+2. ~~Run M5.4 E4 scoring-weight sweep~~ — DONE via PR #1000 (2026-05-08; `dev/experiments/m5-4-e4-scoring-weight-sweep/report.md`, resistance-heavy wins).
 3. ~~Benchmark-relative metrics (alpha, beta, IR, TE, corr)~~ — DONE via #1021 (2026-05-10).
-4. **Stability + turnover metrics** — last second-wave catch-all (rolling-Sharpe stability, trade-frequency, position-turnover, sector-rotation). Mirrors the #1021 computer pattern. Track wraps after this PR.
+4. ~~Run 81-cell flagship grid on `screening.weights.*`~~ — first run DONE via #1051 (2026-05-12) but invalidated by key-path bug (PR #1061, 2026-05-13). Rerun with corrected field paths owned by `tuning` track.
+5. **Stability + turnover metrics** — last second-wave catch-all (rolling-Sharpe stability, trade-frequency, position-turnover, sector-rotation). Mirrors the #1021 computer pattern. Track wraps after this PR.
 
 ## Out of scope
 
