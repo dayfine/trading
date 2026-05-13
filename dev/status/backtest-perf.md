@@ -1,9 +1,27 @@
 # Status: backtest-perf
 
-## Last updated: 2026-05-04
+## Last updated: 2026-05-13
 
 ## Status
 IN_PROGRESS
+
+**15y memory cliff RESOLVED 2026-05-08..10.** Three data-side fixes (#988
+Fix C stream `csv_snapshot_builder` per-symbol, #992 Fix A dedupe
+`Daily_panels` LRU caches, #993 Fix B skinny `step_result.portfolio`
+projection) + four simulator/orders-side fixes (#1019 simulator NAV
+`_resolve_price` cache + avg-cost fallback, #1020 `Order_manager`
+`active_orders` index O(N)→O(1) for `list_orders ~ActiveOnly`, #1024
+simulator Closed-positions prune from positions Map, #1014 portfolio
+`trade_history` prepend O(N²)→O(N)) + audit-loop hoist (#1015 trade_context
+audit_idx out of trades.csv iter loop) brought 15y SP500 wall from ~5 h to
+~13.6 min (≈22×) and peak RSS from 11.4 GB to ~766 MB band. Root-cause
+investigation pinned in `dev/notes/15y-memory-cliff-2026-05-08.md` (PR #987)
+and `dev/notes/15y-memory-cliff-validation-2026-05-08.md`. SCALE cell scaffolding
+extended via #897 (tier4-broad-1y). Cell-E 15y engineering blocker (simulator
+NAV-fallback equity_curve corruption) tracked in
+`dev/notes/cell-e-15y-engineering-blocker-2026-05-09.md` — largely addressed by
+#1019 + #1063 (`Portfolio_view` avg-cost fallback when `get_price=None`,
+MERGED 2026-05-13). 
 
 Steps 1+2 (`feat/backtest-perf-tier1-catalog`, PR #574) merged
 2026-04-26T16:07Z. **`perf-tier1.yml` landed via PR #616 on 2026-04-27**
@@ -198,6 +216,28 @@ mechanics + release-gate procedure.
   scheduled** — out-of-PR follow-up.
 
 ## Completed
+
+- **15y memory-cliff resolution + perf hotspot fixes** (2026-05-08..13). Combined
+  data-side + simulator-side + orders-side work brought 15y SP500 wall from ~5 h
+  to ~13.6 min (~22×) and peak RSS from 11.4 GB to ~766 MB. MERGED:
+  - **#987** — investigation: 15y SP500 memory cliff root cause (doc-only;
+    `dev/notes/15y-memory-cliff-2026-05-08.md`). Identifies 5 contributing
+    structures; headline is post-simulation analytics phase keeping full `steps`
+    list resident while folding 11 metric computers + 8 sexp/csv writers.
+  - **#988** — Fix C: stream `csv_snapshot_builder` per-symbol (15y memory).
+  - **#992** — Fix A: dedupe `Daily_panels` LRU caches (15y memory).
+  - **#993** — Fix B: project `step_result.portfolio` to skinny summary (15y memory).
+  - **#1014** — fix(portfolio): prepend trades to `trade_history` (O(N²) → O(N)).
+  - **#1015** — perf(backtest): hoist `trade_context` `audit_idx` out of trades.csv iter loop.
+  - **#1019** — fix(simulation): cache + avg-cost fallback in `_resolve_price`
+    (extracts `Portfolio_valuation`; resolves NAV-fallback equity_curve corruption
+    flagged in `dev/notes/cell-e-15y-engineering-blocker-2026-05-09.md`).
+  - **#1020** — perf(orders): bound `list_orders ~ActiveOnly` walk via
+    `active_orders` index (O(N) → O(1) mirror on `Order_manager`).
+  - **#1024** — perf(simulation): prune Closed positions from simulator positions
+    Map (15y wall 5h → 13.6 min, ~22×).
+  - **#1063** — fix(portfolio_view): avg-cost fallback when `get_price=None`
+    (2026-05-13 follow-on to #1019).
 
 - **Tier-4 release-gate SCALE scaffolding for N=5k/10k × 5-10y** (2026-05-03,
   `feat/backtest-tier4-scaffolding`). Adds three scenarios + a dedicated

@@ -1,12 +1,18 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-11
+## Last updated: 2026-05-13
 
 ## Status
 IN_PROGRESS
 
 ## Notes
-M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04**: a-1 (#825 `Bar_reader.of_in_memory_bars`), a-2 (#827 migrate 5 strategy test files / 17 callsites), a-3 (#828 `Panel_runner` CSV path through snapshot via `Csv_snapshot_builder`), a-4 (#829 delete `Bar_reader.of_panels` + `Weinstein_strategy.make ?bar_panels`). **F.3.b staged b-1 MERGED** (#833 `Weekly_ma_cache.of_snapshot_views`). **F.3.c staged c-1 MERGED** (#837 `Panel_callbacks.*_of_snapshot_views`). **F.3.d staged d-1 MERGED** (#842 `Macro_inputs.*_of_snapshot_views`). **#848 forward fix COMPLETE 2026-05-05** (PR1 #861 + PR2 #864). **F.3.b-2/c-2/d-2 caller migration MERGED 2026-05-05** (#866 — flips `Weinstein_strategy._run_macro_only` + `_run_screen_after_macro` onto the `*_of_snapshot_views ~cb` variants). **F.3.e-1 / e-2 MERGED 2026-05-06** (#868 / #869 — relocate view types to `Data_panel_snapshot.Panel_views` neutral hub; delete `Bar_reader.of_panels` + 4 `_panel_*` helpers). **F.3.e-3 stack MERGED 2026-05-06** (#875 / #876 / #877 — 3a port `optimal_strategy_runner` off `Bar_panels`; 3b rename `Bar_panels.{weekly,daily}_view` → `Snapshot_bar_views.*` in production + migrate panel-callback / weekly-MA / macro-inputs / snapshot-bar-views tests off `Bar_panels`; 3c DELETE `bar_panels.{ml,mli}` + the panel-vs-snapshot diag harness; sp500-2019-2023 baseline confirmed bit-equal 58.34%/81 across the stack). **M5.3 streaming Phase F COMPLETE.** **Synth-v3 multi-symbol factor model READY 2026-05-11** (this session — `factor_model.{ml,mli}` + `synth_v3.{ml,mli}` + `generate_synth_v3.exe` CLI; 44 new tests passing; cross-sectional avg pairwise correlation in [0.3, 0.7] target band). Only Norgate ingest (vendor-blocked) remains. Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
+M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04** (#825/#827/#828/#829). **F.3.b–F.3.e ALL MERGED 2026-05-04..06** (#833 b-1, #837 c-1, #842 d-1, #861/#864 #848 forward fix, #866 b-2/c-2/d-2 caller migration, #868/#869 e-1/e-2 type relocation + `Bar_reader.of_panels` deletion, #875/#876/#877 e-3 stack — `Bar_panels.{ml,mli}` DELETED; sp500-2019-2023 baseline bit-equal 58.34%/81 across the stack). **M5.3 streaming Phase F COMPLETE.**
+
+**Synth-v1 — block bootstrap — MERGED 2026-05-02 (#755).** **Synth-v2 — HMM + GARCH — MERGED 2026-05-02 (#775).** **Synth-v3 — multi-symbol factor model — MERGED 2026-05-11 (#1028)** (`factor_model.{ml,mli}` + `synth_v3.{ml,mli}` + `generate_synth_v3.exe` CLI; 44 new tests passing; cross-sectional avg pairwise correlation in [0.3, 0.7] target band; 500-sym × 80yr universe smoke-tested via the CLI). **EODHD multi-market expansion MERGED 2026-05-02 (#772)** — LSE/TSE/ASX/HKEX/TSX symbol resolution.
+
+**15y memory-cliff fixes MERGED 2026-05-08** — three parallel fixes from `dev/notes/15y-memory-cliff-2026-05-08.md`: Fix A (#992 dedupe `Daily_panels` LRU caches), Fix B (#993 skinny `step_result.portfolio` projection), Fix C (#988 stream `csv_snapshot_builder` per-symbol); root-cause investigation (#987); split-day-adjustment investigation (#998). Combined with simulator-side #1024 (Closed-positions prune) the 15y wall dropped 5h → 13.6 min (~22×).
+
+Only Norgate ingest (vendor-blocked) remains. Owner authorized: feat-data per `dev/decisions.md` 2026-05-03 §"Agent scope: extend feat-backtest + create feat-data".
 
 Track created 2026-05-02 to absorb M5.3 (scale infra: streaming + Norgate) + M7.0 (data foundations: Norgate, multi-market, synthetic). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` + `dev/plans/m7-data-and-tuning-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.3 + M7.0 (added 2026-05-02).
 
@@ -82,10 +88,9 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 
 ## In Progress
 
-(M5.3 streaming sequence — all phases through F.1 are MERGED on main as of
-2026-05-03. F.2 + F.3 not yet started. See
-`dev/plans/snapshot-engine-phase-f-2026-05-03.md` for the F.2 + F.3 plan,
-including the V1/V2/V3 verification follow-ups that gate F.2.)
+(M5.3 streaming Phases A through F COMPLETE on main as of 2026-05-06.
+Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
+fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
 ### Merged (data-pipeline-automation track)
 
@@ -148,52 +153,33 @@ including the V1/V2/V3 verification follow-ups that gate F.2.)
 - **#868** — F.3.e-1: relocate `weekly_view` / `daily_view` types to `Data_panel_snapshot.Panel_views` neutral hub; `Bar_panels` retains alias re-exports.
 - **#869** — F.3.e-2: delete `Bar_reader.of_panels` + 4 `_panel_*` helpers (zero live callers).
 
-### Ready for review
+### Merged (Synth-v3 — 2026-05-11)
 
-- **F.3.e-3 PR-stack** (this session, 3 stacked PRs): final retirement of `Bar_panels`.
-  - **3a (`feat/snapshot/f3-e-3a`)**: port `optimal_strategy_runner.ml` off `Bar_panels` onto `Snapshot_callbacks` via `Csv_snapshot_builder.build` + `Snapshot_bar_views.weekly_bars_for`. Drops `Bar_panels.column_of_date` / `weekly_bars_for` / `_build_calendar` from the runner; the `_world` carries a `Snapshot_callbacks.t` instead of a `Bar_panels.t`. ~150 LOC.
-  - **3b (`feat/snapshot/f3-e-3b`)**: rename `Bar_panels.{weekly,daily}_view` → `Snapshot_runtime.Snapshot_bar_views.{weekly,daily}_view` in production (`panel_callbacks`, `macro_inputs`, `weinstein_strategy`); drop `Weekly_ma_cache.create panels` (only tests used it). Migrate `test_panel_callbacks.ml`, `test_weekly_ma_cache.ml`, `test_macro_inputs.ml`, `test_snapshot_bar_views.ml` off `panels_of_symbols` onto snapshot-callbacks helpers. Delete `bar_panels_test.ml` and `test_macro_panel_callbacks_real_data.ml` (panel-only tests). ~485 insertions, 1636 deletions.
-  - **3c (this PR — `feat/snapshot/f3-e-3c`)**: DELETE `trading/trading/data_panel/bar_panels.{ml,mli}`; drop `trading/trading/backtest/diag/diag_panel_vs_snapshot_extended.ml` (panel-vs-snapshot diag — moot post-F.3); fix remaining test file references; clean up docstrings throughout.
-
-After PR-3c lands: `grep -rn "Bar_panels" trading/ analysis/ --include="*.ml" --include="*.mli"` returns only docstring/comment references. **M5.3 streaming Phase F COMPLETE.**
-
-### Ready for review (Synth-v3 — this session)
-
-- **Synth-v3 multi-symbol factor model** — `feat/synth-v3-multi-symbol-factor`,
-  plan `dev/plans/synth-v3-multi-symbol-factor-2026-05-11.md`. Four commits:
-  - `5e0da8b` plan file.
-  - `c19c55f` **factor_model** library — single-factor cross-section sampler.
-    `loading_distribution` (β truncated normal), `idio_distribution`
-    (per-symbol log-normal omega + shared α/β GARCH), `sample_betas`,
-    `sample_idio_params`, `generate_symbol_returns`. 25 unit tests
-    covering validation, sampling determinism, range/empirical-mean
-    properties, and degenerate-β reproduction checks.
-  - `1481af8` **synth_v3** orchestrator — pairs `Synth_v2` market with the
-    factor model. `config` mirrors Synth-v2's shape; optional explicit
-    `symbols` list with default `SYNTH_NNNN` naming. Seed cascade keeps
-    market / β / idio-param / per-symbol streams independent (offsets
-    100k / 200k / 1M+i). 19 integration tests including the load-bearing
-    cross-sectional acceptance test (50sym × 5_000bars avg pairwise corr
-    in [0.3, 0.7], target ~0.5 per m7 plan).
-  - `d834487` **generate_synth_v3** CLI bin (writes one CSV per symbol
-    under `--output-dir`) + nesting-linter refactor on `_log_returns_from_bars`,
-    `_generate_validated`, `sample_idio_params`.
+- **#1028 — Synth-v3 multi-symbol factor model** (MERGED 2026-05-11; plan `dev/plans/synth-v3-multi-symbol-factor-2026-05-11.md`).
+  - **factor_model** library — single-factor cross-section sampler. `loading_distribution` (β truncated normal), `idio_distribution` (per-symbol log-normal omega + shared α/β GARCH), `sample_betas`, `sample_idio_params`, `generate_symbol_returns`. 25 unit tests covering validation, sampling determinism, range/empirical-mean properties, and degenerate-β reproduction checks.
+  - **synth_v3** orchestrator — pairs `Synth_v2` market with the factor model. `config` mirrors Synth-v2's shape; optional explicit `symbols` list with default `SYNTH_NNNN` naming. Seed cascade keeps market / β / idio-param / per-symbol streams independent (offsets 100k / 200k / 1M+i). 19 integration tests including the load-bearing cross-sectional acceptance test (50sym × 5_000bars avg pairwise corr in [0.3, 0.7], target ~0.5 per m7 plan).
+  - **generate_synth_v3** CLI bin (writes one CSV per symbol under `--output-dir`) + nesting-linter refactor on `_log_returns_from_bars`, `_generate_validated`, `sample_idio_params`.
 
   Acceptance pinned in tests:
   - 500-sym × 80yr universe smoke-tested via the CLI (`-n-symbols 500 -target-days 20000`).
   - Cross-section avg pairwise correlation in target band.
-  - Deterministic given seed; per-symbol streams independent; OHLC
-    well-formed; calendar-aligned across symbols.
+  - Deterministic given seed; per-symbol streams independent; OHLC well-formed; calendar-aligned across symbols.
 
   Deferred to follow-up (out of feat-data scope):
-  - Strategy-side end-to-end smoke run on the generated universe →
-    Sharpe/MaxDD. The data side is done; the integration belongs in
-    `feat-backtest`.
+  - Strategy-side end-to-end smoke run on the generated universe → Sharpe/MaxDD. The data side is done; the integration belongs in `feat-backtest`.
   - Real-cross-section calibration of β / idio params from EODHD history.
 
-### Pending (post-F.3)
+### Merged (15y memory-cliff fixes — 2026-05-08)
 
-M5.3 Phase F is COMPLETE post-F.3.e-3. Remaining track items:
+- **#987** — investigation: 15y SP500 memory cliff root cause (doc-only PR pinning the structural diagnosis to `dev/notes/15y-memory-cliff-2026-05-08.md`).
+- **#988** — Fix C: stream `csv_snapshot_builder` per-symbol (avoid materializing the whole corpus in memory).
+- **#992** — Fix A: dedupe `Daily_panels` LRU caches (one cache per process, not per-strategy).
+- **#993** — Fix B: project `step_result.portfolio` to a skinny summary (drop the full `Trading_portfolio.Portfolio.t` from each retained step).
+- **#998** — split-day adjustment investigation (root-causes the 15y split-day regression surfaced during 15y SP500 baseline pinning).
+
+  Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
+
+### Pending
 
 - **Norgate ingest** (vendor-blocked; user must sign up).
 
@@ -268,19 +254,19 @@ aggregates. Manifest schema-hash drives incremental rebuild.
 
 ## Next Steps
 
-Synth-v1 (#755) + Synth-v2 (#775) + Synth-v3 (this session) all complete.
-EODHD multi-market expansion is also complete (#772). The track is
-effectively unblocked from a feature-completion standpoint — only the
-vendor-gated Norgate ingest remains.
+Synth-v1 (#755) + Synth-v2 (#775) + Synth-v3 (#1028) all MERGED.
+EODHD multi-market expansion MERGED (#772). M5.3 Phase F retirement
+COMPLETE. 15y memory-cliff fixes MERGED (#988/#992/#993 + #1024).
+The track is effectively unblocked from a feature-completion standpoint
+— only the vendor-gated Norgate ingest remains.
 
-1. Land the Synth-v3 PR once QC reviews approve.
-2. Norgate ingest after user signs up + decides which Norgate plan
+1. **Norgate ingest** — after user signs up + decides which Norgate plan
    (vendor-blocked; not orchestrator-dispatchable until then).
-3. Optional follow-ups (non-blocking):
+2. Optional follow-ups (non-blocking):
    - Strategy-side smoke test on a Synth-v3 universe (Sharpe/MaxDD) —
      belongs in `feat-backtest`, not feat-data.
    - Real-cross-section calibration of Synth-v3 β / idio params from
-     EODHD history (defaults are hand-set in this session's PR).
+     EODHD history (defaults are hand-set in #1028).
 
 ## CRSP defer
 ~$5k/yr institutional. Only viable for 100-year NYSE data (1925+). Skip until M7.1 ML training shows scale matters.
