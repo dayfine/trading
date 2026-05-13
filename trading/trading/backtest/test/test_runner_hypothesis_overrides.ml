@@ -328,6 +328,107 @@ let test_two_overlays_same_top_level_field _ =
            (float_equal 0.10);
        ])
 
+(* -------------------------------------------------------------------- *)
+(* Sweep-path validation: unknown overlay keys fail loudly               *)
+(* -------------------------------------------------------------------- *)
+
+(** Reproduction of the PR-#1051 silent-no-op hazard: a sweep cell keyed on
+    [screening_config.weights.rs] (a path that does not name any field on the
+    real [scoring_weights] record — the field is [w_positive_rs]) used to be
+    silently dropped by the deep-merge, so all 81 cells produced bit-identical
+    metrics. With the sweep-path linter added in this PR, the runner must FAIL
+    LOUDLY on the first unknown key, naming the offending dotted path. *)
+let test_unknown_top_level_overlay_key_fails _ =
+  let s = _load_scenario () in
+  let sector_map_override = _sector_map_override s in
+  let result =
+    Result.try_with (fun () ->
+        Backtest.Runner.run_backtest ~start_date:s.period.start_date
+          ~end_date:s.period.end_date
+          ~overrides:[ Sexp.of_string "((no_such_field 42))" ]
+          ?sector_map_override ())
+  in
+  assert_that result
+    (matching ~msg:"Expected Failure raising on unknown key"
+       (function Error (Failure msg) -> Some msg | _ -> None)
+       (all_of
+          [
+            field
+              (fun s -> String.is_substring s ~substring:"no_such_field")
+              (equal_to true);
+            field
+              (fun s -> String.is_substring s ~substring:"overlay #0")
+              (equal_to true);
+          ]))
+
+(** Nested unknown path — the merge walks into the (real) [screening_config]
+    sub-record, then sees the (non-existent) [weights.rs] path. The error must
+    name the full dotted path so an operator looking at the error can match it
+    back to their sweep-spec key. *)
+let test_unknown_nested_overlay_key_fails _ =
+  let s = _load_scenario () in
+  let sector_map_override = _sector_map_override s in
+  let result =
+    Result.try_with (fun () ->
+        Backtest.Runner.run_backtest ~start_date:s.period.start_date
+          ~end_date:s.period.end_date
+          ~overrides:
+            [ Sexp.of_string "((screening_config ((weights ((rs 1.5))))))" ]
+          ?sector_map_override ())
+  in
+  assert_that result
+    (matching ~msg:"Expected Failure raising on nested unknown key"
+       (function Error (Failure msg) -> Some msg | _ -> None)
+       (field
+          (fun s ->
+            String.is_substring s ~substring:"screening_config.weights.rs")
+          (equal_to true)))
+
+(** A real (deep, valid) path must still resolve and apply — the
+    [screening_config.weights.w_clean_resistance] field IS a real
+    [scoring_weights] field. This pins that the happy path is unaffected by the
+    new validation. *)
+let test_known_nested_overlay_key_succeeds _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string
+         "((screening_config ((weights ((w_clean_resistance 30))))))")
+  in
+  assert_that merged.screening_config.weights.w_clean_resistance (equal_to 30)
+
+(** The error message must include the index of the offending overlay (0-based)
+    so operators can map back to the specific [--override] flag. When the second
+    overlay is invalid and the first is valid, the index must report [#1] (not
+    [#0]). *)
+let test_unknown_key_error_reports_overlay_index _ =
+  let s = _load_scenario () in
+  let sector_map_override = _sector_map_override s in
+  let result =
+    Result.try_with (fun () ->
+        Backtest.Runner.run_backtest ~start_date:s.period.start_date
+          ~end_date:s.period.end_date
+          ~overrides:
+            [
+              (* valid — universe_cap is a real field *)
+              Sexp.of_string "((universe_cap (3)))";
+              (* invalid — typo of universe_cap *)
+              Sexp.of_string "((universe_caps (3)))";
+            ]
+          ?sector_map_override ())
+  in
+  assert_that result
+    (matching ~msg:"Expected Failure naming overlay #1"
+       (function Error (Failure msg) -> Some msg | _ -> None)
+       (all_of
+          [
+            field
+              (fun s -> String.is_substring s ~substring:"overlay #1")
+              (equal_to true);
+            field
+              (fun s -> String.is_substring s ~substring:"universe_caps")
+              (equal_to true);
+          ]))
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -363,6 +464,14 @@ let suite =
          >:: test_default_screening_volume_ratio_exclude_range_is_none;
          "two overlays targeting same top-level field both apply"
          >:: test_two_overlays_same_top_level_field;
+         "unknown top-level overlay key fails loudly (sweep-path linter)"
+         >:: test_unknown_top_level_overlay_key_fails;
+         "unknown nested overlay key names the full dotted path"
+         >:: test_unknown_nested_overlay_key_fails;
+         "known nested overlay key still applies (linter happy path)"
+         >:: test_known_nested_overlay_key_succeeds;
+         "error message reports overlay index for multi-overlay runs"
+         >:: test_unknown_key_error_reports_overlay_index;
        ]
 
 let () = run_test_tt_main suite
