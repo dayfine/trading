@@ -63,7 +63,10 @@ let test_portfolio_value_with_long_position _ =
     (Portfolio_view.portfolio_value pv ~get_price)
     (float_equal 66000.0)
 
-let test_portfolio_value_no_price_excludes _ =
+(* When get_price returns None for a held symbol, fall back to entry_price
+   (zero unrealized P&L). Previously returned 0.0 → cash-only collapse, which
+   silently corrupted portfolio_value and the Peak_tracker. *)
+let test_portfolio_value_no_price_uses_avg_cost _ =
   let aapl =
     _make_holding ~id:"AAPL-1" ~symbol:"AAPL" ~side:Long ~quantity:100.0
       ~entry_price:150.0
@@ -72,9 +75,25 @@ let test_portfolio_value_no_price_excludes _ =
     { cash = 50000.0; positions = String.Map.singleton "AAPL-1" aapl }
   in
   let get_price _ = None in
+  (* 50000 cash + 100 shares * 150 (avg cost) = 65000 *)
   assert_that
     (Portfolio_view.portfolio_value pv ~get_price)
-    (float_equal 50000.0)
+    (float_equal 65000.0)
+
+(* Same fallback for shorts: liability marked at entry_price. *)
+let test_portfolio_value_short_no_price_uses_avg_cost _ =
+  let xyz =
+    _make_holding ~id:"XYZ-1" ~symbol:"XYZ" ~side:Short ~quantity:100.0
+      ~entry_price:100.0
+  in
+  let pv : Portfolio_view.t =
+    { cash = 1_010_000.0; positions = String.Map.singleton "XYZ-1" xyz }
+  in
+  let get_price _ = None in
+  (* 1_010_000 cash - 100 shares * 100 (avg cost liability) = 1_000_000 *)
+  assert_that
+    (Portfolio_view.portfolio_value pv ~get_price)
+    (float_equal 1_000_000.0)
 
 (* G8 — short positions must subtract from portfolio value, not add.
 
@@ -148,8 +167,10 @@ let suite =
          "portfolio_value_cash_only" >:: test_portfolio_value_cash_only;
          "portfolio_value_with_long_position"
          >:: test_portfolio_value_with_long_position;
-         "portfolio_value_no_price_excludes"
-         >:: test_portfolio_value_no_price_excludes;
+         "portfolio_value_no_price_uses_avg_cost"
+         >:: test_portfolio_value_no_price_uses_avg_cost;
+         "portfolio_value_short_no_price_uses_avg_cost"
+         >:: test_portfolio_value_short_no_price_uses_avg_cost;
          "portfolio_value_short_position_at_profit"
          >:: test_portfolio_value_short_position_at_profit;
          "portfolio_value_short_position_at_loss"
