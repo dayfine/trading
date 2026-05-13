@@ -37,7 +37,28 @@ type scoring_weights = {
       (** Negative weight for late Stage2 flag. Default: -15. *)
 }
 [@@deriving sexp]
-(** Scoring weights for each positive signal. All are configurable. *)
+(** Scoring weights for each positive signal. All are configurable.
+
+    {b Field-name spellings for sweep overlays.} The eight fields above are the
+    {e exact} keys that any sweep overlay or config patch must use to mutate
+    these weights:
+    - [w_stage2_breakout]
+    - [w_strong_volume]
+    - [w_adequate_volume]
+    - [w_positive_rs]
+    - [w_bullish_rs_crossover]
+    - [w_clean_resistance]
+    - [w_sector_strong]
+    - [w_late_stage2_penalty]
+
+    These are the field-name spellings that sweep overlays must use —
+    [runner.ml:_apply_overrides] does not deep-merge by alias; an overlay with a
+    non-matching key silently no-ops (see PR #1061). Friendly shorthand such as
+    [weights.rs] / [weights.volume] / [weights.breakout] / [weights.sector] will
+    be silently ignored, producing an "inert sweep" where every cell runs with
+    [default_scoring_weights] and metrics collapse to a single point. See
+    [dev/notes/screener-weights-inertness-2026-05-13.md] for the P4
+    investigation that surfaced this. *)
 
 val default_scoring_weights : scoring_weights
 (** [default_scoring_weights] provides the reference weights. *)
