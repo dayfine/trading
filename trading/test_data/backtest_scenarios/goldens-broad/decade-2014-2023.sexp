@@ -53,7 +53,7 @@
  ;; Peak_tracker / sizing → trade sequence → returns; total_return /
  ;; sharpe / sortino / calmar / open_positions_value shifted lower as
  ;; the strategy now sees realistic-not-spurious NAV. force_liq events
- ;; on this 10y run: 3 (no death-loop signature). Wall on local
+ ;; on this 10y run: 4 (no death-loop signature). Wall on local
  ;; parallel-3 in trading-1-dev: 614s; pin sized to absorb GHA/local
  ;; variance (per perf-tier4 guidance).
  (expected
