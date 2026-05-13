@@ -75,4 +75,7 @@
    (open_positions_value ((min 1040000.0)  (max 1405000.0)))
    (sortino_ratio_annualized ((min 0.64)   (max 0.86)))
    (calmar_ratio       ((min   0.34)       (max   0.46)))
-   (ulcer_index        ((min   7.15)       (max   9.68))))))
+   (ulcer_index        ((min   7.15)       (max   9.68)))
+   ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
+   ;; catches only catastrophic 2x slowdowns per design intent.
+   (wall_seconds       ((min 100.0)        (max 1500.0))))))
