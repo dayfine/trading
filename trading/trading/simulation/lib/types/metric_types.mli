@@ -218,6 +218,42 @@ module Metric_type : sig
             low |corr| means the strategy moves on signals largely uncorrelated
             with the benchmark. Reported as [0.0] when either series has zero
             variance or no benchmark is supplied. *)
+    (* ---- Stability / turnover (portfolio-quality) ---- *)
+    | RollingSharpeStability
+        (** Standard deviation of the rolling 90-trading-day Sharpe ratio
+            computed across the equity curve, in absolute Sharpe units. Lower
+            means the strategy's risk-adjusted return is steady through time;
+            higher means it lurches between regimes. Reported as [0.0] when
+            fewer than two full rolling windows are available. *)
+    | TradeFrequencyAnnualized
+        (** Round-trips per calendar year:
+            [NumTrades × 365.25 / (config.end_date − config.start_date)].
+            Distinct from [TradeFrequency], which counts every trade (entry +
+            exit) per month. Note that [config.{start,end}_date] is the
+            simulator window, which may include a warmup prefix in the
+            [Backtest.Runner] flow; this matches the convention of the existing
+            [TradeFrequency] metric so both divide by the same denominator. Use
+            this for turnover-oriented diagnostics and cost-model calibration.
+            Reported as [0.0] when the window length is non-positive. *)
+    | PositionTurnover
+        (** Average daily churn intensity:
+            [Σ_step |Δ position_notional| / mean(portfolio_value)] divided by
+            the count of trading-day steps. Sums absolute changes in each
+            symbol's [|quantity × cost_basis_per_share|] proxy from one
+            trading-day step to the next, normalized by the mean mark-to-market
+            portfolio value across the run. Higher means more churn per day;
+            [0.0] for a buy-and-hold portfolio with no position changes. *)
+    | PositionConcentrationHhi
+        (** Herfindahl-Hirschman index of per-position absolute market value
+            weights, sampled every Friday and averaged across all sampled days.
+            Bounded in [0, 1]: 1.0 means a single position holds 100% of the
+            gross book; lower values mean exposure is spread across more
+            positions (a 1/n equal-weighted book of n positions has HHI = 1/n).
+            The metric is named after the antitrust concentration index since
+            the codebase has no sector→symbol map at the simulator level;
+            symbol-level diversity is the available proxy for the
+            rotation-vs-concentration question. Reported as [0.0] when no Friday
+            step has any open position. *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -292,6 +328,10 @@ type metric_type = Metric_type.t =
   | TrackingErrorPctAnnualized
   | InformationRatio
   | CorrelationToBenchmark
+  | RollingSharpeStability
+  | TradeFrequencyAnnualized
+  | PositionTurnover
+  | PositionConcentrationHhi
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)

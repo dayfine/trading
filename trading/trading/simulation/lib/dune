@@ -29,6 +29,7 @@
   distributional_computer
   antifragility_computer
   benchmark_relative_computer
+  stability_turnover_computer
   portfolio_valuation
   stale_hold)
  (preprocess

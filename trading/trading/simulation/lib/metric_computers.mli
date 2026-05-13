@@ -118,6 +118,13 @@ val antifragility_computer :
     neither source is available, both metrics emit 0.0. See
     {!Antifragility_computer} for spec. *)
 
+(** {1 Stability + Turnover Computer} *)
+
+val stability_turnover_computer : unit -> Simulator.any_metric_computer
+(** Computer that emits the portfolio-quality group: [RollingSharpeStability],
+    [PositionTurnover], [PositionConcentrationHhi]. [TradeFrequencyAnnualized]
+    ships as a {b derived} metric (see {!default_derived_computers}). *)
+
 (** {1 Default Computer Set} *)
 
 val default_computers :

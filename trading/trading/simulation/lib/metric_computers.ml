@@ -12,7 +12,8 @@
     - {!Drawdown_analytics_computer} (M5.2c)
     - {!Distributional_computer} (M5.2d)
     - {!Antifragility_computer} (M5.2d)
-    - {!Benchmark_relative_computer} *)
+    - {!Benchmark_relative_computer}
+    - {!Stability_turnover_computer} *)
 
 open Core
 module Metric_types = Trading_simulation_types.Metric_types
@@ -32,6 +33,7 @@ let drawdown_analytics_computer = Drawdown_analytics_computer.computer
 let distributional_computer = Distributional_computer.computer
 let antifragility_computer = Antifragility_computer.computer
 let benchmark_relative_computer = Benchmark_relative_computer.computer
+let stability_turnover_computer = Stability_turnover_computer.computer
 
 (** {1 Derived Metric Computers} *)
 
@@ -102,6 +104,11 @@ let create_computer (metric_type : Metric_types.metric_type) :
   | BenchmarkAlphaPctAnnualized | BenchmarkBeta | TrackingErrorPctAnnualized
   | InformationRatio | CorrelationToBenchmark ->
       benchmark_relative_computer ()
+  | RollingSharpeStability | PositionTurnover | PositionConcentrationHhi ->
+      stability_turnover_computer ()
+  | TradeFrequencyAnnualized ->
+      _derived_only_stub ~name:"trade_freq_annualized_stub"
+        TradeFrequencyAnnualized
 
 (** {1 Default Computer Set} *)
 
@@ -119,6 +126,7 @@ let default_computers ?(risk_free_rate = 0.0) ?(initial_cash = 0.0) () =
     distributional_computer ();
     antifragility_computer ();
     benchmark_relative_computer ();
+    stability_turnover_computer ();
   ]
 
 let default_derived_computers () =
@@ -126,6 +134,7 @@ let default_derived_computers () =
     calmar_ratio_derived;
     Risk_adjusted_computer.sortino_ratio_derived;
     Risk_adjusted_computer.mar_ratio_derived;
+    Stability_turnover_computer.trade_frequency_annualized_derived;
   ]
 
 let default_metric_suite ?(risk_free_rate = 0.0) ?(initial_cash = 0.0) () :
