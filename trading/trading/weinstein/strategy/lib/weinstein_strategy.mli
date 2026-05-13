@@ -231,13 +231,12 @@ type config = {
           sequencing" (§3) in
           [dev/notes/capital-recycling-framing-2026-05-06.md]. *)
   stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Reserved for future tuning — currently unwired (default [0] = no
-          cooldown applied). Once wired, would suppress cascade re-admission of
-          a symbol force-exited under Stage 3 for [N] weeks beyond the existing
-          stop-out cooldown surface (#718). [0] is the book-aligned default
-          (§5.2 "STATE: EXITED — IF whipsaw … acceptable to re-buy"). The knob
-          exists on [config] so future tuning can flip it via sexp override
-          without a code change. *)
+      (** Suppresses cascade re-admission of a symbol force-exited under Stage 3
+          for [N] weeks beyond the existing stop-out cooldown surface (#718).
+          Default [0] = no cooldown applied (preserves baselines). The strategy
+          records Stage-3 force-exit events into [last_stop_out_dates] when this
+          knob is [> 0], so the existing cascade gate applies regardless of
+          which exit path fired. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
       (** Laggard-rotation detector parameters (issue #887). Default
@@ -257,12 +256,23 @@ type config = {
           a separate post-merge step per the framing note's "Recommended
           sequencing" in [dev/notes/capital-recycling-framing-2026-05-06.md]. *)
   laggard_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Reserved for future tuning — currently unwired (default [0] = no
-          cooldown applied beyond the existing stop-out cooldown surface #718).
-          [0] is the book-aligned default per §5.6: laggard rotation is
-          discretionary, the symbol may be re-bought once it shows fresh Stage-2
-          strength. The knob exists on [config] so future tuning can flip it via
-          sexp override without a code change. *)
+      (** Suppresses cascade re-admission of a symbol exited by the laggard-
+          rotation runner for [N] weeks beyond the existing stop-out cooldown
+          surface (#718). Default [0] = no cooldown applied (preserves
+          baselines). The strategy records laggard-rotation exits into
+          [last_stop_out_dates] when this knob is [> 0], so the existing cascade
+          gate applies regardless of which exit path fired. *)
+  enable_continuation_buys : bool; [@sexp.default false]
+      (** Master switch for Weinstein Ch. 3 continuation-buy detection
+          (Interpretation B of issue #889). Default [false] preserves all
+          existing baselines: the {!Continuation} detector does not run and
+          {!Stock_analysis.is_breakout_candidate} retains its
+          initial-breakout-only behaviour. Flipping to [true] populates
+          [Stock_analysis.continuation] via the detector and admits continuation
+          candidates through the OR-arm of the cascade.
+
+          Interpretation A (pyramid adds to existing holdings) is deferred
+          behind a core-module decision and is NOT enabled by this flag. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -460,6 +470,22 @@ module Internal_for_test : sig
       / [prior_macro_result] / [peak_tracker] / [prior_stages] /
       [sector_prior_stages] / [stage3_streaks] / [laggard_streaks] in place,
       mirroring the closure semantics in {!make}. *)
+
+  val record_force_exit :
+    last_stop_out_dates:Date.t Hashtbl.M(String).t ->
+    positions:Trading_strategy.Position.t Map.M(String).t ->
+    current_date:Date.t ->
+    cooldown_weeks:int ->
+    label:string ->
+    Trading_strategy.Position.transition ->
+    unit
+  (** Records a strategy-signal exit into [last_stop_out_dates] when
+      [cooldown_weeks > 0] AND the transition is a [TriggerExit] whose
+      [StrategySignal.label] equals [label]. Otherwise a no-op.
+
+      Used to plumb stage-3 force-exit and laggard-rotation exits through the
+      existing screener cooldown gate (issue #889 §F1). Exposed for tests; not
+      part of the public strategy API. *)
 
   val maybe_reset_halt :
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->

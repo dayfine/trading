@@ -21,6 +21,15 @@ type config = {
           (~1 year). *)
   base_end_offset_weeks : int;
       (** How many recent bars to exclude from the base search. Default: 8. *)
+  continuation : Continuation.config option;
+      (** When [Some cfg], the continuation-buy detector (Weinstein Ch. 3
+          "continuation buy") runs and populates {!t.continuation}, which then
+          feeds the OR-arm in {!is_breakout_candidate}. When [None] (default),
+          the detector is skipped and {!t.continuation} is [None] — preserves
+          bit-equality with pre-feature behaviour. Gated at this level so
+          callers (strategy / screener) can enable continuation buys via
+          [Weinstein_strategy_config.enable_continuation_buys] without touching
+          tests that rely on bit-equal screener output. *)
 }
 (** Configuration bundling all sub-module configs. *)
 
@@ -51,6 +60,13 @@ type t = {
           [(base_end_offset_weeks .. base_lookback_weeks)]. *)
   prior_stage : Weinstein_types.stage option;
       (** Stage from the previous week, passed forward for transition tracking.
+      *)
+  continuation : Continuation.result option;
+      (** Continuation-buy detector output. [None] when
+          [config.continuation = None] (default — feature off) OR when the
+          underlying callbacks couldn't compute the result. [Some r] with
+          [r.is_continuation = true] indicates the bar matches Weinstein's Ch. 3
+          continuation pattern and feeds the OR-arm in {!is_breakout_candidate}.
       *)
   as_of_date : Core.Date.t;  (** The date this analysis was computed. *)
 }
@@ -164,6 +180,15 @@ val is_breakout_candidate : t -> bool
 (** [is_breakout_candidate analysis] returns true if the stock shows a potential
     Stage 2 breakout: transitioning from Stage 1, with rising MA and strong
     volume.
+
+    OR-arm (Interpretation B of issue #889): a stock that has [Some r] in
+    {!t.continuation} with [r.is_continuation = true] also qualifies, even when
+    the Stage1→Stage2 transition is no longer in scope ([weeks_advancing > 4]).
+    This admits the Weinstein Ch. 3 "continuation buy" pattern as a new-position
+    candidate when [config.continuation = Some _].
+
+    Volume confirmation (Strong / Adequate) and the RS-not-negative-declining
+    gate apply to both arms equally.
 
     Uses the sub-analysis results directly — no additional I/O. *)
 

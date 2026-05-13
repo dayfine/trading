@@ -22,6 +22,7 @@
   weinstein.sector
   weinstein.screener
   weinstein.stock_analysis
+  weinstein.continuation
   indicators.types
   indicators.sma
   indicators.ema

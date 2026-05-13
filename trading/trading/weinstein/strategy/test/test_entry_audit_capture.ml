@@ -60,6 +60,7 @@ let _stock_analysis ~ticker ~as_of_date : Stock_analysis.t =
     breakout_price = None;
     breakdown_price = None;
     prior_stage = None;
+    continuation = None;
     as_of_date;
   }
 

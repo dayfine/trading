@@ -34,6 +34,10 @@ type config = {
       [@sexp.default Laggard_rotation.default_config]
   enable_laggard_rotation : bool; [@sexp.default false]
   laggard_reentry_cooldown_weeks : int; [@sexp.default 0]
+  enable_continuation_buys : bool; [@sexp.default false]
+      (** Master switch for Weinstein Ch. 3 continuation-buy detection
+          (Interpretation B of issue #889). Default [false] preserves existing
+          baselines. See [.ml] for full semantics. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

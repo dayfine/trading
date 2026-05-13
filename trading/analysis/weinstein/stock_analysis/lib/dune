@@ -2,6 +2,15 @@
  (name stock_analysis)
  (public_name weinstein.stock_analysis)
  (wrapped false)
- (libraries core types weinstein_types stage rs volume resistance support)
+ (libraries
+  core
+  types
+  weinstein_types
+  stage
+  rs
+  volume
+  resistance
+  support
+  continuation)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

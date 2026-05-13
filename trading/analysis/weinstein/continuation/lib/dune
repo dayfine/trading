@@ -1,0 +1,7 @@
+(library
+ (name continuation)
+ (public_name weinstein.continuation)
+ (wrapped false)
+ (libraries core)
+ (preprocess
+  (pps ppx_sexp_conv)))

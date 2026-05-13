@@ -39,13 +39,13 @@ type config = {
           Flipping to [true] activates {!Stage3_force_exit_runner.update} on
           every Friday tick. *)
   stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Reserved for future tuning — currently unwired (default [0] = no
-          cooldown applied). Once wired, would suppress cascade re-admission of
-          a symbol force-exited under Stage 3 for [N] weeks beyond the existing
-          stop-out cooldown surface (#718). [0] is the book-aligned default
-          (§5.2 "STATE: EXITED — IF whipsaw … acceptable to re-buy"). The knob
-          exists on [config] so future tuning can flip it via sexp override
-          without a code change. *)
+      (** Suppresses cascade re-admission of a symbol force-exited under Stage 3
+          for [N] weeks beyond the existing stop-out cooldown surface (#718).
+          Default [0] = no cooldown applied (preserves baselines). The strategy
+          records Stage-3 force-exit events into [last_stop_out_dates] when this
+          knob is [> 0], so the existing cascade gate
+          ([Screener.screen_with_cooldown]) applies regardless of which exit
+          path fired. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
       (** Laggard-rotation detector parameters (issue #887). Default
@@ -58,10 +58,22 @@ type config = {
           the strategy emits no [StrategySignal "laggard_rotation"] transitions.
       *)
   laggard_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Reserved for future tuning — currently unwired (default [0] = no
-          cooldown applied beyond the existing stop-out cooldown surface #718).
-          The knob exists on [config] so future tuning can flip it via sexp
-          override without a code change. *)
+      (** Suppresses cascade re-admission of a symbol exited by the laggard-
+          rotation runner for [N] weeks beyond the existing stop-out cooldown
+          surface (#718). Default [0] = no cooldown applied (preserves
+          baselines). Wired through the same [Screener.screen_with_cooldown]
+          gate as [Screener.cascade_post_stop_cooldown_weeks]: the strategy
+          records laggard-rotation exits into [last_stop_out_dates] when this
+          knob is [> 0], so the same cascade gate applies regardless of which
+          exit path fired. *)
+  enable_continuation_buys : bool; [@sexp.default false]
+      (** Master switch for Weinstein Ch. 3 continuation-buy detection
+          (Interpretation B of issue #889). Default [false] preserves all
+          existing baselines: the {!Continuation} detector does not run and
+          {!Stock_analysis.is_breakout_candidate} keeps its initial-breakout-
+          only behaviour. Flipping to [true] populates
+          [Stock_analysis.continuation] via the detector and admits continuation
+          candidates through the OR-arm of the cascade. *)
 }
 [@@deriving sexp]
 
@@ -90,6 +102,7 @@ let default_config ~universe ~index_symbol =
     laggard_rotation_config = Laggard_rotation.default_config;
     enable_laggard_rotation = false;
     laggard_reentry_cooldown_weeks = 0;
+    enable_continuation_buys = false;
   }
 
 let name = "Weinstein"

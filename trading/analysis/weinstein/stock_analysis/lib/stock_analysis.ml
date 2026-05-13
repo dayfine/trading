@@ -24,6 +24,9 @@ type config = {
   base_end_offset_weeks : int;
       (** How many recent bars to exclude from the base search (avoids counting
           the current advance as part of the base). Default: 8. *)
+  continuation : Continuation.config option;
+      (** When [Some cfg], the continuation-buy detector runs; when [None]
+          (default), it is skipped. See .mli for full semantics. *)
 }
 
 let default_config =
@@ -35,6 +38,7 @@ let default_config =
     breakout_event_lookback = 8;
     base_lookback_weeks = 52;
     base_end_offset_weeks = 8;
+    continuation = None;
   }
 
 type t = {
@@ -47,6 +51,7 @@ type t = {
   breakout_price : float option;
   breakdown_price : float option;
   prior_stage : stage option;
+  continuation : Continuation.result option;
   as_of_date : Date.t;
 }
 
@@ -299,6 +304,29 @@ let _support_result ~(config : config)
       Support.analyze_with_callbacks ~config:config.resistance
         ~callbacks:resistance_callbacks ~breakdown_price:bp ~as_of_date)
 
+(** Build a {!Continuation.callbacks} bundle from this module's callbacks (Stage
+    \+ Resistance sub-bundles + our own [get_high]). [get_low] adapts the
+    Resistance callback's [~bar_offset] naming to Continuation's [~week_offset]
+    — both indices mean "offset back from the newest bar" in weekly cadence. *)
+let _continuation_callbacks_of (callbacks : callbacks) : Continuation.callbacks
+    =
+  {
+    get_ma = callbacks.stage.get_ma;
+    get_close = callbacks.stage.get_close;
+    get_high = callbacks.get_high;
+    get_low =
+      (fun ~week_offset -> callbacks.resistance.get_low ~bar_offset:week_offset);
+  }
+
+(** Run the continuation detector when [config.continuation = Some cfg]; return
+    [None] otherwise (feature off). *)
+let _continuation_result ~(config : config) ~(callbacks : callbacks) :
+    Continuation.result option =
+  Option.map config.continuation ~f:(fun cont_cfg ->
+      let cont_callbacks = _continuation_callbacks_of callbacks in
+      Continuation.analyze_with_callbacks ~config:cont_cfg
+        ~callbacks:cont_callbacks)
+
 (* ------------------------------------------------------------------ *)
 (* Main analyzer — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
@@ -353,6 +381,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     _support_result ~config ~resistance_callbacks:callbacks.resistance
       ~as_of_date ~breakdown_price
   in
+  let continuation = _continuation_result ~config ~callbacks in
   {
     ticker;
     stage = stage_result;
@@ -363,6 +392,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     breakout_price;
     breakdown_price;
     prior_stage;
+    continuation;
     as_of_date;
   }
 
@@ -379,14 +409,27 @@ let analyze ~(config : config) ~ticker ~bars ~benchmark_bars ~prior_stage
 (* Candidate predicates                                                 *)
 (* ------------------------------------------------------------------ *)
 
+(** Initial-breakout arm (pre-existing): Stage1→Stage2 transition, or fresh
+    Stage2 with [weeks_advancing ≤ 4]. Mature Stage2 symbols (the cascade's
+    blind spot per dev/notes/capital-recycling-framing-2026-05-06.md) are
+    rejected by this arm but admitted by the continuation arm when enabled. *)
+let _initial_breakout_arm (a : t) : bool =
+  match (a.stage.stage, a.prior_stage) with
+  | Stage2 _, Some (Stage1 _) -> true
+  | Stage2 { weeks_advancing; late = false }, _ -> weeks_advancing <= 4
+  | _ -> false
+
+(** Continuation-buy arm (Interpretation B of issue #889). Active only when
+    [a.continuation = Some r] (the detector ran AND found a hit). Restricted to
+    symbols currently in Stage 2 — the book's continuation pattern only fires
+    inside an existing Stage 2 advance. *)
+let _continuation_arm (a : t) : bool =
+  match (a.continuation, a.stage.stage) with
+  | Some { is_continuation = true; _ }, Stage2 _ -> true
+  | _ -> false
+
 let is_breakout_candidate (a : t) : bool =
-  (* Stage 2 transition from Stage 1, with rising MA *)
-  let stage_ok =
-    match (a.stage.stage, a.prior_stage) with
-    | Stage2 _, Some (Stage1 _) -> true
-    | Stage2 { weeks_advancing; late = false }, _ -> weeks_advancing <= 4
-    | _ -> false
-  in
+  let stage_ok = _initial_breakout_arm a || _continuation_arm a in
   (* Volume confirmation: at least Adequate *)
   let volume_ok =
     match a.volume with

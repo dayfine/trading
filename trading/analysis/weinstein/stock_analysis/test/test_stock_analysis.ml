@@ -410,6 +410,92 @@ let test_no_split_no_truncation _ =
      bound to confirm truncation didn't fire spuriously. *)
   assert_that result.breakout_price (is_some_and (gt (module Float_ord) 100.0))
 
+(* ------------------------------------------------------------------ *)
+(* Continuation buys — Interpretation B of issue #889                   *)
+(*                                                                      *)
+(* The continuation arm of [is_breakout_candidate] only fires when      *)
+(* [config.continuation = Some _]. The default config keeps it [None]   *)
+(* so the existing screener tests remain bit-equal.                     *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a Stage-2 stock with a pullback-then-breakout shape:
+    - rising trend up to bar [n-12]
+    - pullback (close back near MA) at bar [n-6]
+    - tight consolidation bars [n-5..n-2]
+    - fresh breakout bar at [n-1] (the as-of bar)
+
+    With [n = 60] this puts the continuation pattern inside the default
+    [pullback_lookback_weeks = 8] window. *)
+let _continuation_shape_bars =
+  let bars = ref [] in
+  (* Phase 1: rising bars 0..47 (Stage 2 advance) *)
+  for i = 0 to 47 do
+    bars := make_bar i (50.0 +. (Float.of_int i *. 1.5)) 1000 :: !bars
+  done;
+  (* Phase 2: pullback at bars 48-52 *)
+  let pullback_prices = [ 110.0; 108.0; 106.0; 105.0; 105.0 ] in
+  List.iteri pullback_prices ~f:(fun k p ->
+      let i = 48 + k in
+      bars := make_bar i p 1000 :: !bars);
+  (* Phase 3: consolidation at bars 53-58 *)
+  let consol_prices = [ 110.0; 112.0; 111.0; 113.0; 114.0; 115.0 ] in
+  List.iteri consol_prices ~f:(fun k p ->
+      let i = 53 + k in
+      bars := make_bar i p 1000 :: !bars);
+  (* Phase 4: breakout at bar 59 with a strong volume spike (3x) so the
+     volume gate also fires. *)
+  bars := make_bar 59 130.0 3000 :: !bars;
+  List.rev !bars
+
+(** With [config.continuation = None] (default), a mature Stage-2 symbol fails
+    the initial-breakout arm ([weeks_advancing > 4] without
+    [prior_stage = Stage1]) and is NOT admitted. *)
+let test_continuation_default_off_keeps_existing_rejection _ =
+  let bars = _continuation_shape_bars in
+  let bench = rising_bars ~n:60 80.0 110.0 in
+  let prior = Some (Stage2 { weeks_advancing = 10; late = false }) in
+  let result =
+    analyze ~config:cfg ~ticker:"X" ~bars ~benchmark_bars:bench
+      ~prior_stage:prior ~as_of_date:as_of
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (r : Stock_analysis.t) -> r.continuation) is_none;
+         field
+           (fun (r : Stock_analysis.t) -> is_breakout_candidate r)
+           (equal_to false);
+       ])
+
+(** With [config.continuation = Some _], the same mature Stage-2 symbol IS
+    admitted via the continuation OR-arm because the bars show the
+    pullback-then-breakout pattern. Pins the design plan's "B-1 approach" (issue
+    #889) integration site. *)
+let test_continuation_enabled_admits_mature_stage2 _ =
+  let bars = _continuation_shape_bars in
+  let bench = rising_bars ~n:60 80.0 110.0 in
+  let prior = Some (Stage2 { weeks_advancing = 10; late = false }) in
+  let cfg_on = { cfg with continuation = Some Continuation.default_config } in
+  let result =
+    analyze ~config:cfg_on ~ticker:"X" ~bars ~benchmark_bars:bench
+      ~prior_stage:prior ~as_of_date:as_of
+  in
+  (* Sanity: the detector fired (continuation field populated). The OR-arm
+     of [is_breakout_candidate] also fires. *)
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : Stock_analysis.t) -> r.continuation)
+           (is_some_and
+              (field
+                 (fun (c : Continuation.result) -> c.is_continuation)
+                 (equal_to true)));
+         field
+           (fun (r : Stock_analysis.t) -> is_breakout_candidate r)
+           (equal_to true);
+       ])
+
 let suite =
   "stock_analysis_tests"
   >::: [
@@ -445,6 +531,10 @@ let suite =
          "G14: breakdown truncates at split boundary"
          >:: test_breakdown_truncates_at_split_boundary;
          "G14: no split, no truncation" >:: test_no_split_no_truncation;
+         "continuation default off keeps existing rejection"
+         >:: test_continuation_default_off_keeps_existing_rejection;
+         "continuation enabled admits mature stage2"
+         >:: test_continuation_enabled_admits_mature_stage2;
        ]
 
 let () = run_test_tt_main suite
