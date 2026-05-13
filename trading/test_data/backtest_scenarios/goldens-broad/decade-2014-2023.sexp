@@ -47,14 +47,24 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Re-pinned 2026-05-13 post NAV stale-price fix (#1063). Pre-fix runs
+ ;; relied on the silent cash-only NAV collapse in Portfolio_view (when
+ ;; get_price=None for a held symbol). Avg-cost fallback there changes
+ ;; Peak_tracker / sizing → trade sequence → returns; total_return /
+ ;; sharpe / sortino / calmar / open_positions_value shifted lower as
+ ;; the strategy now sees realistic-not-spurious NAV. force_liq events
+ ;; on this 10y run: 3 (no death-loop signature). Wall on local
+ ;; parallel-3 in trading-1-dev: 614s; pin sized to absorb GHA/local
+ ;; variance (per perf-tier4 guidance).
  (expected
-  ((total_return_pct   ((min 463.0)        (max 627.0)))
+  ((total_return_pct   ((min 290.0)        (max 410.0)))
    (total_trades       ((min 470)          (max 636)))
    (win_rate           ((min  31.2)        (max  42.2)))
-   (sharpe_ratio       ((min   0.62)       (max   0.84)))
+   (sharpe_ratio       ((min   0.50)       (max   0.72)))
    (max_drawdown_pct   ((min  39.4)        (max  53.3)))
    (avg_holding_days   ((min  35.0)        (max  47.0)))
-   (open_positions_value ((min 4600000.0)  (max 6220000.0)))
-   (sortino_ratio_annualized ((min  1.08)  (max   1.46)))
-   (calmar_ratio       ((min   0.38)       (max   0.50)))
-   (ulcer_index        ((min  14.43)       (max  19.52))))))
+   (open_positions_value ((min 2800000.0)  (max 3900000.0)))
+   (sortino_ratio_annualized ((min  0.85)  (max   1.20)))
+   (calmar_ratio       ((min   0.30)       (max   0.42)))
+   (ulcer_index        ((min  14.43)       (max  21.50)))
+   (wall_seconds       ((min 300.0)        (max 1200.0))))))

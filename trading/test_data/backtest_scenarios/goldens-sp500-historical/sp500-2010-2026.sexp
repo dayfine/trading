@@ -77,14 +77,24 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Re-pinned 2026-05-13 post NAV stale-price fix (#1063). Long-only
+ ;; force_liq events on this 16y run: 0 (vs spurious events pre-fix).
+ ;; The Portfolio_view avg-cost fallback removes the phantom NAV
+ ;; collapse → Peak_tracker no longer fires on gapped-data days, so
+ ;; the realistic-mtm path opens more positions and holds them longer.
+ ;; open_positions_value drifts ~12% higher; total_trades drifts a
+ ;; few units lower as fewer false-exit cycles trigger. Wall on local
+ ;; parallel-3 in trading-1-dev: 1218.7s; pin sized to absorb GHA/local
+ ;; variance.
  (expected
   ((total_return_pct   ((min 290.0)         (max 393.0)))
-   (total_trades       ((min 685)           (max  927)))
+   (total_trades       ((min 640)           (max  800)))
    (win_rate           ((min  33.2)         (max  44.9)))
    (sharpe_ratio       ((min   0.66)        (max   0.90)))
    (max_drawdown_pct   ((min  15.6)         (max  21.2)))
    (avg_holding_days   ((min  37.9)         (max  51.3)))
-   (open_positions_value ((min 2620000.0)   (max 3550000.0)))
+   (open_positions_value ((min 3400000.0)   (max 4400000.0)))
    (sortino_ratio_annualized ((min  1.06)   (max   1.43)))
    (calmar_ratio       ((min   0.44)        (max   0.59)))
-   (ulcer_index        ((min   6.35)        (max   8.60))))))
+   (ulcer_index        ((min   6.35)        (max   8.60)))
+   (wall_seconds       ((min 600.0)         (max 2400.0))))))

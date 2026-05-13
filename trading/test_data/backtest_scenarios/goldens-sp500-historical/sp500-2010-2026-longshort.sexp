@@ -68,14 +68,25 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Re-pinned 2026-05-13 post NAV stale-price fix (#1063). Long-short
+ ;; force_liq events on this 16y run: 1 (vs 300+ death-loop signature
+ ;; pre-fix, per dev/notes/longshort-portfolio-floor-death-loop). The
+ ;; Portfolio_view avg-cost fallback removes the phantom NAV collapse
+ ;; that triggered cascading Peak_tracker breaches; the short book now
+ ;; tracks Sharpe 0.70 / Calmar 0.46 / MaxDD 19.8% on the cleaned
+ ;; baseline. total_return ~316% (was crashing pre-fix); open_positions
+ ;; ~4.1M (was inflated by spurious-NAV-driven sizing). Wall on local
+ ;; parallel-3 in trading-1-dev: 1217.2s; pin sized for GHA/local
+ ;; variance.
  (expected
-  ((total_return_pct   ((min 222.9)         (max 301.5)))
-   (total_trades       ((min 707)           (max  957)))
+  ((total_return_pct   ((min 260.0)         (max 360.0)))
+   (total_trades       ((min 640)           (max  800)))
    (win_rate           ((min  33.6)         (max  45.5)))
-   (sharpe_ratio       ((min   0.56)        (max   0.76)))
-   (max_drawdown_pct   ((min  18.1)         (max  24.6)))
+   (sharpe_ratio       ((min   0.56)        (max   0.82)))
+   (max_drawdown_pct   ((min  17.0)         (max  24.6)))
    (avg_holding_days   ((min  37.7)         (max  51.1)))
-   (open_positions_value ((min 2017000.0)   (max 2730000.0)))
-   (sortino_ratio_annualized ((min  0.86)   (max   1.16)))
-   (calmar_ratio       ((min   0.32)        (max   0.44)))
-   (ulcer_index        ((min   8.38)        (max  11.33))))))
+   (open_positions_value ((min 3500000.0)   (max 4600000.0)))
+   (sortino_ratio_annualized ((min  0.86)   (max   1.22)))
+   (calmar_ratio       ((min   0.36)        (max   0.52)))
+   (ulcer_index        ((min   7.00)        (max  10.50)))
+   (wall_seconds       ((min 600.0)         (max 2400.0))))))

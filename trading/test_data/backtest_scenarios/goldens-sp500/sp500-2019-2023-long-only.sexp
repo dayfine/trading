@@ -74,4 +74,5 @@
    (open_positions_value ((min 1190000.0)  (max 1611000.0)))
    (sortino_ratio_annualized ((min 0.81)   (max 1.09)))
    (calmar_ratio       ((min   0.38)       (max   0.51)))
-   (ulcer_index        ((min   7.32)       (max   9.90))))))
+   (ulcer_index        ((min   7.32)       (max   9.90)))
+   (wall_seconds       ((min 100.0)        (max 1500.0))))))
