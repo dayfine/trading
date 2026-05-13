@@ -24,6 +24,7 @@ let _make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v =
     close_price = close_v;
     volume = _round_volume vol_v;
     adjusted_close = adj_v;
+    active_through = None;
   }
 
 let _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v =

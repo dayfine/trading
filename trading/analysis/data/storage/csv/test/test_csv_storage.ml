@@ -37,6 +37,7 @@ let prices =
       close_price = 103.0;
       adjusted_close = 103.0;
       volume = 1000;
+      active_through = None;
     };
     {
       Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
@@ -46,6 +47,7 @@ let prices =
       close_price = 107.0;
       adjusted_close = 107.0;
       volume = 1200;
+      active_through = None;
     };
     {
       Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21;
@@ -55,6 +57,7 @@ let prices =
       close_price = 111.0;
       adjusted_close = 111.0;
       volume = 1400;
+      active_through = None;
     };
     {
       Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:22;
@@ -64,6 +67,7 @@ let prices =
       close_price = 114.0;
       adjusted_close = 114.0;
       volume = 1600;
+      active_through = None;
     };
   ]
 
@@ -159,6 +163,7 @@ let test_reject_overlapping_contradictory_data _ =
         close_price = 112.0;
         adjusted_close = 112.0;
         volume = 1500;
+        active_through = None;
       };
       {
         Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21;
@@ -168,6 +173,7 @@ let test_reject_overlapping_contradictory_data _ =
         close_price = 116.0;
         adjusted_close = 116.0;
         volume = 1800;
+        active_through = None;
       };
     ]
   in
@@ -196,6 +202,7 @@ let test_allow_overlapping_with_override _ =
         close_price = 112.0;
         adjusted_close = 112.0;
         volume = 1500;
+        active_through = None;
       };
       {
         Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21;
@@ -205,6 +212,7 @@ let test_allow_overlapping_with_override _ =
         close_price = 116.0;
         adjusted_close = 116.0;
         volume = 1800;
+        active_through = None;
       };
     ]
   in
@@ -272,7 +280,7 @@ let test_stream_bad_line_propagates_error _ =
   | Error status ->
       assert_equal ~printer:Status.show status
         (Status.invalid_argument_error
-           "Expected 7 columns, line: not,enough,columns")
+           "Expected 7 or 8 columns, line: not,enough,columns")
 
 let test_stream_header_only_returns_empty _ =
   let storage = create ~data_dir:test_dir "STREAM3" |> ok_or_failwith_status in
@@ -285,13 +293,107 @@ let test_stream_header_only_returns_empty _ =
   in
   let oc = Stdlib.open_out path in
   Out_channel.output_string oc
-    "date,open,high,low,close,adjusted_close,volume\n";
+    "date,open,high,low,close,adjusted_close,volume,active_through\n";
   Out_channel.close oc;
   let result = get storage () |> ok_or_failwith_status in
   assert_equal
     ~printer:(fun ps ->
       String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
     [] result
+
+(* Phase 3: round-trip [active_through] through CSV. Mixing [Some _] and
+   [None] in the same write batch verifies that the writer emits the new
+   column independently per row and that the reader maps the empty cell
+   back to [None] while keeping a populated cell as [Some d]. *)
+let test_save_and_get_with_active_through _ =
+  let storage = create ~data_dir:test_dir "DELIST" |> ok_or_failwith_status in
+  let delisted_date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:21 in
+  let prices_with_metadata =
+    [
+      {
+        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:19;
+        open_price = 100.0;
+        high_price = 105.0;
+        low_price = 98.0;
+        close_price = 103.0;
+        adjusted_close = 103.0;
+        volume = 1000;
+        active_through = None;
+      };
+      {
+        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
+        open_price = 103.0;
+        high_price = 108.0;
+        low_price = 102.0;
+        close_price = 107.0;
+        adjusted_close = 107.0;
+        volume = 1200;
+        active_through = Some delisted_date;
+      };
+      {
+        Types.Daily_price.date = delisted_date;
+        open_price = 107.0;
+        high_price = 112.0;
+        low_price = 106.0;
+        close_price = 111.0;
+        adjusted_close = 111.0;
+        volume = 1400;
+        active_through = Some delisted_date;
+      };
+    ]
+  in
+  ok_or_failwith_status (save storage prices_with_metadata);
+  let retrieved = get storage () |> ok_or_failwith_status in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    prices_with_metadata retrieved
+
+(* Phase 3 backward-compatibility: a 7-column legacy CSV (no
+   [active_through] column) must load with [active_through = None] for
+   every row. Goldens written before this PR have the legacy schema and
+   must keep loading. *)
+let test_read_legacy_7col_csv _ =
+  let symbol = "LEGACY" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  let path =
+    Fpath.(test_dir / "L" / "Y" / "LEGACY" / "data.csv") |> Fpath.to_string
+  in
+  let oc = Stdlib.open_out path in
+  Out_channel.output_string oc
+    "date,open,high,low,close,adjusted_close,volume\n\
+     2024-03-19,100.0,105.0,98.0,103.0,103.0,1000\n\
+     2024-03-20,103.0,108.0,102.0,107.0,107.0,1200\n";
+  Out_channel.close oc;
+  let retrieved = get storage () |> ok_or_failwith_status in
+  let expected =
+    [
+      {
+        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:19;
+        open_price = 100.0;
+        high_price = 105.0;
+        low_price = 98.0;
+        close_price = 103.0;
+        adjusted_close = 103.0;
+        volume = 1000;
+        active_through = None;
+      };
+      {
+        Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
+        open_price = 103.0;
+        high_price = 108.0;
+        low_price = 102.0;
+        close_price = 107.0;
+        adjusted_close = 107.0;
+        volume = 1200;
+        active_through = None;
+      };
+    ]
+  in
+  assert_equal
+    ~printer:(fun ps ->
+      String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
+    expected retrieved
 
 let suite =
   "CSV Storage tests"
@@ -320,6 +422,9 @@ let suite =
          >:: test_stream_bad_line_propagates_error;
          "test_stream_header_only_returns_empty"
          >:: test_stream_header_only_returns_empty;
+         "test_save_and_get_with_active_through"
+         >:: test_save_and_get_with_active_through;
+         "test_read_legacy_7col_csv" >:: test_read_legacy_7col_csv;
        ]
 
 let () =

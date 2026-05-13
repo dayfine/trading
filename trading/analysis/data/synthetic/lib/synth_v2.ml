@@ -127,6 +127,7 @@ let _build_bar ~date ~close : Types.Daily_price.t =
     close_price = close;
     adjusted_close = close;
     volume = _synthetic_volume;
+    active_through = None;
   }
 
 (* ---------------------------------------------------------------------- *)

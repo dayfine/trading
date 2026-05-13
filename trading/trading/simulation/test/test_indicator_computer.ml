@@ -13,6 +13,7 @@ let make_price ~y ~m ~d ~close () =
     close_price = close;
     volume = 1000000;
     adjusted_close = close;
+    active_through = None;
   }
 
 (** Test helper: extract result or fail *)
@@ -228,6 +229,7 @@ let test_uses_close_prices _ =
         close_price = 100.0;
         volume = 1000000;
         adjusted_close = 100.0;
+        active_through = None;
       };
       {
         Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:2;
@@ -237,6 +239,7 @@ let test_uses_close_prices _ =
         close_price = 105.0;
         volume = 1000000;
         adjusted_close = 105.0;
+        active_through = None;
       };
       {
         Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:3;
@@ -246,6 +249,7 @@ let test_uses_close_prices _ =
         close_price = 110.0;
         volume = 1000000;
         adjusted_close = 110.0;
+        active_through = None;
       };
     ]
   in

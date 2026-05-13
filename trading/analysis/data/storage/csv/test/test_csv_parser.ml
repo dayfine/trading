@@ -21,6 +21,7 @@ let test_parse_line_valid _ =
       close_price = 103.0;
       adjusted_close = 103.0;
       volume = 1000;
+      active_through = None;
     }
 
 let test_parse_line_invalid_date _ =
@@ -48,7 +49,7 @@ let test_parse_line_invalid_volume _ =
 let test_parse_line_invalid_format _ =
   let result = parse_line "not,enough,columns" |> Result.error in
   assert_equal result
-    (Option.some "Expected 7 columns, line: not,enough,columns")
+    (Option.some "Expected 7 or 8 columns, line: not,enough,columns")
 
 let test_parse_lines_with_empty_list _ =
   let result = Parser.parse_lines [] in
@@ -57,14 +58,14 @@ let test_parse_lines_with_empty_list _ =
 let test_parse_lines_with_empty_lines _ =
   let result = Parser.parse_lines [ ""; "" ] in
   assert_equal result
-    (Error (Status.invalid_argument_error "Expected 7 columns, line: "))
+    (Error (Status.invalid_argument_error "Expected 7 or 8 columns, line: "))
 
 let test_parse_lines_with_invalid_line _ =
   let result = Parser.parse_lines [ ""; "not,enough,columns" ] in
   assert_equal result
     (Error
        (Status.invalid_argument_error
-          "Expected 7 columns, line: not,enough,columns"))
+          "Expected 7 or 8 columns, line: not,enough,columns"))
 
 let test_read_test_data_file _ =
   let prices =
@@ -82,6 +83,7 @@ let test_read_test_data_file _ =
       close_price = 139.62;
       adjusted_close = 138.9618;
       volume = 19019700;
+      active_through = None;
     };
   let last_price = List.last_exn prices in
   assert_equal ~printer:Types.Daily_price.show last_price
@@ -93,7 +95,56 @@ let test_read_test_data_file _ =
       close_price = 165.98;
       adjusted_close = 165.98;
       volume = 23682500;
+      active_through = None;
     }
+
+(* 8-column input with empty active_through cell — backward-compat sister
+   case to the 7-column [test_parse_line_valid]: produces [None] without
+   raising. *)
+let test_parse_line_8col_empty_active_through _ =
+  let result =
+    parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,1000,"
+    |> Result.ok |> Option.value_exn |> List.hd_exn
+  in
+  assert_equal ~printer:Types.Daily_price.show result
+    {
+      Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:19;
+      open_price = 100.0;
+      high_price = 105.0;
+      low_price = 98.0;
+      close_price = 103.0;
+      adjusted_close = 103.0;
+      volume = 1000;
+      active_through = None;
+    }
+
+(* 8-column input with a populated active_through cell: the typed delisted
+   marker round-trips back into the record. *)
+let test_parse_line_8col_with_active_through _ =
+  let result =
+    parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,1000,2024-05-15"
+    |> Result.ok |> Option.value_exn |> List.hd_exn
+  in
+  assert_equal ~printer:Types.Daily_price.show result
+    {
+      Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:19;
+      open_price = 100.0;
+      high_price = 105.0;
+      low_price = 98.0;
+      close_price = 103.0;
+      adjusted_close = 103.0;
+      volume = 1000;
+      active_through = Some (Date.create_exn ~y:2024 ~m:Month.May ~d:15);
+    }
+
+(* Malformed active_through cell: parser must surface a clear error rather
+   than silently producing [None]. *)
+let test_parse_line_8col_invalid_active_through _ =
+  let result =
+    parse_line "2024-03-19,100.0,105.0,98.0,103.0,103.0,1000,not-a-date"
+    |> Result.error
+  in
+  assert_equal result (Option.some "Invalid date format, expected YYYY-MM-DD")
 
 let suite =
   "CSV Parser tests"
@@ -109,6 +160,12 @@ let suite =
          "test_parse_lines_with_invalid_line"
          >:: test_parse_lines_with_invalid_line;
          "test_read_test_data_file" >:: test_read_test_data_file;
+         "test_parse_line_8col_empty_active_through"
+         >:: test_parse_line_8col_empty_active_through;
+         "test_parse_line_8col_with_active_through"
+         >:: test_parse_line_8col_with_active_through;
+         "test_parse_line_8col_invalid_active_through"
+         >:: test_parse_line_8col_invalid_active_through;
        ]
 
 let () = run_test_tt_main suite

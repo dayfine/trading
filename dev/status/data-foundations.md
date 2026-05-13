@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-13
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
 ## Notes
 M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04** (#825/#827/#828/#829). **F.3.b–F.3.e ALL MERGED 2026-05-04..06** (#833 b-1, #837 c-1, #842 d-1, #861/#864 #848 forward fix, #866 b-2/c-2/d-2 caller migration, #868/#869 e-1/e-2 type relocation + `Bar_reader.of_panels` deletion, #875/#876/#877 e-3 stack — `Bar_panels.{ml,mli}` DELETED; sp500-2019-2023 baseline bit-equal 58.34%/81 across the stack). **M5.3 streaming Phase F COMPLETE.**
@@ -179,9 +179,44 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
 
+### In Progress / READY_FOR_REVIEW
+
+- **[x] Phase 3 — `Daily_price.active_through` field**
+  (`dev/notes/historical-universe-status-2026-05-13.md` §2 action item 1;
+  original 2026-04-30 design phase 3).
+  - Adds `active_through : Date.t option` to `Types.Daily_price.t`
+    (`trading/analysis/data/types/lib/daily_price.{ml,mli}`) — typed
+    delisted-date marker; default `None` = "still trading / unknown".
+  - CSV round-trip (`trading/analysis/data/storage/csv/lib/{parser,csv_storage}.ml`):
+    reader accepts both 7-column (legacy → `None`) and 8-column input;
+    writer always emits the new column, empty cell when `None`.
+  - EODHD `/api/eod` parser leaves `active_through = None` (the bar
+    response carries no delisting marker — separate enrichment pass
+    would attach it).
+  - `Snapshot_bar_views` daily-price assembly preserves the field
+    (snapshot has no delisting source today → `None`).
+  - Mechanical update of 127 `Types.Daily_price.t` record literals
+    across 74 files (test helpers + builders) to thread
+    `active_through = None`.
+  - Tests: 4 new unit tests in `analysis/data/types/test/test_daily_price.ml`
+    (helper defaults to `None`, threads explicit dates, equality
+    respects the field); 5 new round-trip tests in
+    `analysis/data/storage/csv/test/` (both schemas + populated /
+    unpopulated active_through). `dune runtest analysis/data/`,
+    `dune runtest trading/backtest/`, `dune runtest analysis/weinstein/`,
+    `dune runtest trading/weinstein/` all green — no golden drift.
+  - A1 (qc-structural): touches a base type, will FLAG. Mitigation:
+    change is strategy-agnostic broker-data-side; default `None` keeps
+    every existing CSV / fixture loading unchanged → goldens bit-equal.
+  - Natural follow-on: **Phase 5 — screener point-in-time filter**
+    (`membership_at` callback in `Screener.screen` keyed on
+    `active_through`). Highest-leverage gain once this lands.
+
 ### Pending
 
 - **Norgate ingest** (vendor-blocked; user must sign up).
+- **Phase 5 — screener point-in-time filter** (next natural step;
+  ~250–400 LOC per design note §4).
 
 ### Detail (kept for reference; all entries below are MERGED on main)
 

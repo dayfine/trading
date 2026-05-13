@@ -55,6 +55,7 @@ let _make_bar ~date ~price : Types.Daily_price.t =
     close_price = price;
     adjusted_close = price;
     volume = 1_000_000;
+    active_through = None;
   }
 
 let _make_bars ~start ~n ~start_price ~step =

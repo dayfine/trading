@@ -18,6 +18,7 @@ let make_bar ?(open_price = 100.0) ?(high_price = 105.0) ?(low_price = 95.0)
       close_price;
       volume;
       adjusted_close;
+      active_through = None;
     }
 
 let cfg = default_config

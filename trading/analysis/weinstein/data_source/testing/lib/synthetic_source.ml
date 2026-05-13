@@ -57,6 +57,7 @@ let _make_bar date close volume =
     close_price = close;
     adjusted_close = close;
     volume;
+    active_through = None;
   }
 
 (* @nesting-ok: structural weekend skip — match arms are flat transformations *)

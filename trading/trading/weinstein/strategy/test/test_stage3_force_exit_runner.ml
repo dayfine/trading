@@ -18,6 +18,7 @@ let make_bar date ~close ?low ?high () =
     close_price = close;
     adjusted_close = close;
     volume = 1_000_000;
+    active_through = None;
   }
 
 let stage3 = Weinstein_types.Stage3 { weeks_topping = 1 }

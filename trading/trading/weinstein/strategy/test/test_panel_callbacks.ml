@@ -41,6 +41,7 @@ let make_weekly_bar ~date ~price =
     close_price = price;
     adjusted_close = price;
     volume = 1_000_000;
+    active_through = None;
   }
 
 (** Build [n] consecutive Friday weekly bars starting at [start_friday]. The
@@ -385,6 +386,7 @@ let test_support_floor_callbacks_parity _ =
           close_price = price;
           adjusted_close = price;
           volume = 100_000;
+          active_through = None;
         })
   in
   let cb = build_snapshot_callbacks [ ("AAPL", bars) ] in
@@ -565,6 +567,7 @@ let test_support_floor_snapshot_views_parity _ =
           close_price = price;
           adjusted_close = price;
           volume = 100_000;
+          active_through = None;
         })
   in
   let cb = build_snapshot_callbacks [ ("AAPL", bars) ] in

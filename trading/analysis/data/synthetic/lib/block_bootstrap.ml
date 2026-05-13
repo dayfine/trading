@@ -50,6 +50,7 @@ let _apply_shape ~(shape : _bar_shape) ~close ~date : Types.Daily_price.t =
     close_price = close;
     adjusted_close = close *. shape.adj_close_ratio;
     volume = shape.volume;
+    active_through = None;
   }
 
 (* ---------------------------------------------------------------------- *)

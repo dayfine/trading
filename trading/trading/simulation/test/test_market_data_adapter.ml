@@ -20,6 +20,7 @@ let generate_prices ~start_date ~num_days ~base_price =
         close_price = close;
         volume = 1000000;
         adjusted_close = close;
+        active_through = None;
       })
 
 let setup_test_data test_name =
@@ -188,6 +189,7 @@ let test_zero_close_bar_is_filtered _ =
       close_price = 0.0;
       volume = 0;
       adjusted_close = 0.0;
+      active_through = None;
     }
   in
   let valid_bar : Types.Daily_price.t =
@@ -199,6 +201,7 @@ let test_zero_close_bar_is_filtered _ =
       close_price = 10.07;
       volume = 0;
       adjusted_close = 10.07;
+      active_through = None;
     }
   in
   let zero_date = Date.create_exn ~y:2023 ~m:Month.Jan ~d:11 in

@@ -17,6 +17,7 @@ let _make_bar ~date ~close =
     close_price = close;
     volume = 1_000_000;
     adjusted_close = close;
+    active_through = None;
   }
 
 let _date_seq ~start ~n = List.init n ~f:(fun i -> Date.add_days start i)
@@ -239,6 +240,7 @@ let _make_distinct_bar ~date ~i =
     close_price = 105.0 +. f;
     volume = 1_000 + i;
     adjusted_close = 104.0 +. f;
+    active_through = None;
   }
 
 let _distinct_bars ~n =

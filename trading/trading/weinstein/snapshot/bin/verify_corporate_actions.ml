@@ -29,6 +29,7 @@ let _parse_bar_line line =
            close_price = Float.of_string c;
            adjusted_close = Float.of_string ac;
            volume = Int.of_string v;
+           active_through = None;
          }
           : Types.Daily_price.t)
   | _ -> Error (Printf.sprintf "Malformed bar line: %s" line)

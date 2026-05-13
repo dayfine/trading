@@ -45,6 +45,7 @@ let _make_bar ~symbol ~day_index ~start =
     close_price = close;
     volume = 1_000_000 + (day_index * 1000);
     adjusted_close = close;
+    active_through = None;
   }
 
 let _bars_for ~symbol ~start ~n =

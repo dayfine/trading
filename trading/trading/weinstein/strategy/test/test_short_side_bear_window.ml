@@ -65,6 +65,7 @@ let _make_bar ?(volume = 1000) date adjusted_close =
     close_price = adjusted_close;
     adjusted_close;
     volume;
+    active_through = None;
   }
 
 let _weekly_bars_with_volumes prices_and_volumes =

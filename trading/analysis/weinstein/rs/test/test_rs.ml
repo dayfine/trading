@@ -21,6 +21,7 @@ let make_bar date adjusted_close =
     close_price = adjusted_close;
     volume = 1000;
     adjusted_close;
+    active_through = None;
   }
 
 (** Build aligned weekly bars starting 2020-01-06 at the given prices. *)

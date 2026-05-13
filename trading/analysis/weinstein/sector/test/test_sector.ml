@@ -22,6 +22,7 @@ let make_bar date adjusted_close =
     close_price = adjusted_close;
     adjusted_close;
     volume = 10_000;
+    active_through = None;
   }
 
 let weekly_bars prices =

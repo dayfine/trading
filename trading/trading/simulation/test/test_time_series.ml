@@ -15,6 +15,7 @@ let make_test_price ~date ~price =
       close_price = price;
       volume = default_volume;
       adjusted_close = price;
+      active_through = None;
     }
 
 (* Cadence type tests *)
@@ -88,6 +89,7 @@ let test_convert_cadence_daily _ =
               close_price = 1.0;
               volume = default_volume;
               adjusted_close = 1.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
          equal_to
@@ -99,6 +101,7 @@ let test_convert_cadence_daily _ =
               close_price = 2.0;
               volume = default_volume;
               adjusted_close = 2.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
          equal_to
@@ -110,6 +113,7 @@ let test_convert_cadence_daily _ =
               close_price = 3.0;
               volume = default_volume;
               adjusted_close = 3.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
        ])
@@ -147,6 +151,7 @@ let test_convert_cadence_weekly_complete _ =
               close_price = 5.0;
               volume = default_volume * 3;
               adjusted_close = 5.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
        ])
@@ -202,6 +207,7 @@ let test_convert_cadence_weekly_incomplete_provisional _ =
               close_price = 3.0;
               volume = default_volume * 2;
               adjusted_close = 3.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
        ])
@@ -245,6 +251,7 @@ let test_convert_cadence_weekly_mixed _ =
               close_price = 5.0;
               volume = default_volume * 2;
               adjusted_close = 5.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
        ]);
@@ -265,6 +272,7 @@ let test_convert_cadence_weekly_mixed _ =
               close_price = 5.0;
               volume = default_volume * 2;
               adjusted_close = 5.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
          equal_to
@@ -276,6 +284,7 @@ let test_convert_cadence_weekly_mixed _ =
               close_price = 8.0;
               volume = default_volume * 2;
               adjusted_close = 8.0;
+              active_through = None;
             }
              : Types.Daily_price.t);
        ])

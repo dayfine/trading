@@ -23,6 +23,7 @@ let make_bar i price volume =
     close_price = price;
     adjusted_close = price;
     volume;
+    active_through = None;
   }
 
 (** Rising bars from [start] to [stop_], all at uniform volume 1000. *)
@@ -352,6 +353,7 @@ let _split_synth ~n_total ~n_pre ~pre_high ~pre_close ~pre_adj ~post_high
         close_price = close;
         adjusted_close = adj;
         volume = 1000;
+        active_through = None;
       })
 
 (** With a 4:1 split between weeks 15 and 16 (pre: factor 0.25, post: factor

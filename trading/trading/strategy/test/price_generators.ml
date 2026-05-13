@@ -36,6 +36,7 @@ let make_price_sequence ~symbol:_ ~start_date ~days ~base_price ~trend
             close_price;
             volume = 1000000;
             adjusted_close = close_price;
+            active_through = None;
           }
       in
       generate (daily_price :: acc) (Date.add_days date 1) (remaining_days - 1)

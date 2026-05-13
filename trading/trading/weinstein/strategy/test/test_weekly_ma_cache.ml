@@ -44,6 +44,7 @@ let make_weekly_bar ~date ~price =
     close_price = price;
     adjusted_close = price;
     volume = 1_000_000;
+    active_through = None;
   }
 
 let make_friday_bars ~start_friday ~n ~start_price ~step =

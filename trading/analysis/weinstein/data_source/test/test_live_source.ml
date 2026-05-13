@@ -22,6 +22,7 @@ let make_bar date close =
     close_price = close;
     adjusted_close = close;
     volume = 1000;
+    active_through = None;
   }
 
 let make_query ?start_date ?end_date symbol : Data_source.bar_query =
@@ -148,6 +149,7 @@ let test_live_stale_cache_refetches _ =
           close_price = 100.0;
           adjusted_close = 100.0;
           volume = 1000;
+          active_through = None;
         }
       in
       let fake_json =
@@ -190,6 +192,7 @@ let test_live_cache_write _ =
           close_price = 51.0;
           adjusted_close = 51.0;
           volume = 2000;
+          active_through = None;
         }
       in
       let fake_json =

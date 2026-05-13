@@ -34,6 +34,7 @@ let _adapter_of_table ~(table : (string * Date.t * float) list) =
       close_price = price;
       adjusted_close = price;
       volume = 1_000;
+      active_through = None;
     }
   in
   let get_price ~symbol ~date =

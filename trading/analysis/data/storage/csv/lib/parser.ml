@@ -5,8 +5,12 @@ let parse_date (str : string) : Date.t =
   with _ ->
     raise (Invalid_argument "Invalid date format, expected YYYY-MM-DD")
 
-let _build_price date_str open_str high_str low_str close_str adj_close_str
-    volume_str : Types.Daily_price.t =
+let _parse_optional_date_field (str : string) : Date.t option =
+  let trimmed = String.strip str in
+  if String.is_empty trimmed then None else Some (parse_date trimmed)
+
+let _build_price ?(active_through = None) date_str open_str high_str low_str
+    close_str adj_close_str volume_str : Types.Daily_price.t =
   {
     date = parse_date date_str;
     open_price = float_of_string open_str;
@@ -15,14 +19,15 @@ let _build_price date_str open_str high_str low_str close_str adj_close_str
     close_price = float_of_string close_str;
     adjusted_close = float_of_string adj_close_str;
     volume = int_of_string volume_str;
+    active_through;
   }
 
-let _build_price_result date_str open_str high_str low_str close_str
-    adj_close_str volume_str line =
+let _build_price_result ?(active_through = None) date_str open_str high_str
+    low_str close_str adj_close_str volume_str line =
   try
     Ok
-      (_build_price date_str open_str high_str low_str close_str adj_close_str
-         volume_str)
+      (_build_price ~active_through date_str open_str high_str low_str close_str
+         adj_close_str volume_str)
   with
   | Invalid_argument msg -> Error msg
   | Failure _ -> Error ("Invalid number in line: " ^ line)
@@ -33,9 +38,25 @@ let parse_line (line : string) : (Types.Daily_price.t, string) Result.t =
   | [
    date_str; open_str; high_str; low_str; close_str; adj_close_str; volume_str;
   ] ->
+      (* Legacy 7-column rows: active_through defaults to None. *)
       _build_price_result date_str open_str high_str low_str close_str
         adj_close_str volume_str line
-  | _ -> Error ("Expected 7 columns, line: " ^ line)
+  | [
+   date_str;
+   open_str;
+   high_str;
+   low_str;
+   close_str;
+   adj_close_str;
+   volume_str;
+   active_through_str;
+  ] -> (
+      try
+        let active_through = _parse_optional_date_field active_through_str in
+        _build_price_result ~active_through date_str open_str high_str low_str
+          close_str adj_close_str volume_str line
+      with Invalid_argument msg -> Error msg)
+  | _ -> Error ("Expected 7 or 8 columns, line: " ^ line)
 
 let parse_lines (lines : string list) :
     Types.Daily_price.t list Status.status_or =
