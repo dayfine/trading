@@ -37,6 +37,7 @@ let _make_daily_bar ~date ~price =
     close_price = price;
     adjusted_close = price;
     volume = 1_000_000;
+    active_through = None;
   }
 
 (** Build [n] consecutive daily bars (one per calendar day) starting at

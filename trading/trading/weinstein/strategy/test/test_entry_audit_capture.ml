@@ -32,6 +32,7 @@ let _bar_reader_with_current_close ~current_date ~current_close : Bar_reader.t =
       close_price = current_close;
       adjusted_close = current_close;
       volume = 1_000_000;
+      active_through = None;
     }
   in
   Bar_reader.of_in_memory_bars [ (_ticker, [ bar ]) ]

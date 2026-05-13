@@ -46,6 +46,7 @@ let _make_bar ~date ~open_ ~high ~low ~close ~adjusted_close ~volume =
       close_price = close;
       adjusted_close;
       volume;
+      active_through = None;
     }
 
 (** Synthetic AAPL-like CSV spanning a 4:1 split.

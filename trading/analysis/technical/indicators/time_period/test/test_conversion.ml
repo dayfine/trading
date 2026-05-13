@@ -14,6 +14,7 @@ let make_test_data ~date ~price =
     close_price = price;
     volume = default_volume;
     adjusted_close = price;
+    active_through = None;
   }
 
 (* Daily to weekly conversion tests *)
@@ -47,6 +48,7 @@ let test_single_week _ =
         close_price = 4.0;
         volume = default_volume * 4;
         adjusted_close = 4.0;
+        active_through = None;
       };
     ]
 
@@ -91,6 +93,7 @@ let test_multiple_weeks _ =
         close_price = 3.0;
         volume = default_volume * 4;
         adjusted_close = 3.0;
+        active_through = None;
       };
       {
         date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
@@ -100,6 +103,7 @@ let test_multiple_weeks _ =
         close_price = 7.0;
         volume = default_volume * 3;
         adjusted_close = 7.0;
+        active_through = None;
       };
     ]
 
@@ -158,6 +162,7 @@ let test_weekdays_only _ =
         close_price = 4.0;
         volume = default_volume * 4;
         adjusted_close = 4.0;
+        active_through = None;
       };
     ]
 
@@ -204,6 +209,7 @@ let test_weekend_data_with_weekdays_only_raises_invalid_argument _ =
         close_price = 5.0;
         volume = default_volume * 2;
         adjusted_close = 5.0;
+        active_through = None;
       };
     ];
   (* Should fail when weekdays_only is true *)
@@ -260,6 +266,7 @@ let test_partial_week_included_by_default _ =
         close_price = 3.0;
         volume = default_volume * 3;
         adjusted_close = 3.0;
+        active_through = None;
       };
     ]
 
@@ -323,6 +330,7 @@ let test_complete_and_partial_weeks _ =
         close_price = 5.0;
         volume = default_volume * 2;
         adjusted_close = 5.0;
+        active_through = None;
       };
       {
         date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:20;
@@ -332,6 +340,7 @@ let test_complete_and_partial_weeks _ =
         close_price = 8.0;
         volume = default_volume * 2;
         adjusted_close = 8.0;
+        active_through = None;
       };
     ];
   (* Exclude partial: only complete week *)
@@ -348,6 +357,7 @@ let test_complete_and_partial_weeks _ =
         close_price = 5.0;
         volume = default_volume * 2;
         adjusted_close = 5.0;
+        active_through = None;
       };
     ]
 
@@ -385,6 +395,7 @@ let test_all_complete_weeks_unaffected _ =
         close_price = 5.0;
         volume = default_volume * 2;
         adjusted_close = 5.0;
+        active_through = None;
       };
       {
         date = Date.create_exn ~y:2024 ~m:Month.Mar ~d:22;
@@ -394,6 +405,7 @@ let test_all_complete_weeks_unaffected _ =
         close_price = 10.0;
         volume = default_volume * 2;
         adjusted_close = 10.0;
+        active_through = None;
       };
     ]
   in

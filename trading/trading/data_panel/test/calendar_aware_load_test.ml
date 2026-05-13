@@ -26,6 +26,7 @@ let _make_price ~date_str ~close () : Types.Daily_price.t =
     close_price = close;
     volume = 1_000;
     adjusted_close = close;
+    active_through = None;
   }
 
 let _write_csv ~data_dir ~symbol prices =

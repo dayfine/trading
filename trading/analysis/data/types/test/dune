@@ -1,4 +1,3 @@
-(test
- (name test_split_detector)
- (modules test_split_detector)
+(tests
+ (names test_split_detector test_daily_price)
  (libraries core ounit2 matchers types))

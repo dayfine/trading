@@ -18,6 +18,10 @@ let _validate_prices prices =
   | [] -> Ok ()
   | first :: rest -> _check_sorted_and_unique first.Types.Daily_price.date rest
 
+let _active_through_to_string = function
+  | None -> ""
+  | Some d -> Date.to_string d
+
 let _write_price oc price =
   let open Types.Daily_price in
   let date = Date.to_string price.date in
@@ -27,6 +31,7 @@ let _write_price oc price =
   let close_price = Float.to_string price.close_price in
   let adjusted_close = Float.to_string price.adjusted_close in
   let volume = Int.to_string price.volume in
+  let active_through = _active_through_to_string price.active_through in
   Out_channel.output_string oc
     (String.concat ~sep:","
        [
@@ -37,6 +42,7 @@ let _write_price oc price =
          close_price;
          adjusted_close;
          volume;
+         active_through;
        ]);
   Out_channel.newline oc
 
@@ -65,7 +71,7 @@ let _write_prices_to_file path prices =
   Exn.protect
     ~f:(fun () ->
       Out_channel.output_string oc
-        "date,open,high,low,close,adjusted_close,volume\n";
+        "date,open,high,low,close,adjusted_close,volume,active_through\n";
       List.iter ~f:(_write_price oc) prices;
       Ok ())
     ~finally:(fun () -> Out_channel.close oc)

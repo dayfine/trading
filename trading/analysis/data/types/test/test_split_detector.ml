@@ -20,6 +20,7 @@ let make_bar ~date ~close_price ~adjusted_close : Daily_price.t =
     close_price;
     adjusted_close;
     volume = 100_000;
+    active_through = None;
   }
 
 let detect prev curr = Split_detector.detect_split ~prev ~curr ()

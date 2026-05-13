@@ -16,6 +16,7 @@ let make_daily_price ~date ~open_price ~high ~low ~close ~volume =
       close_price = close;
       volume;
       adjusted_close = close;
+      active_through = None;
     }
 
 let sample_config =

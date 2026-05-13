@@ -16,6 +16,7 @@ let make_bar date price =
     close_price = price;
     adjusted_close = price;
     volume = 1000;
+    active_through = None;
   }
 
 let get_price_of prices symbol =
@@ -677,6 +678,7 @@ let _make_friday_bars ~start_friday ~n ~start_price ~step =
         close_price = price;
         adjusted_close = price;
         volume = 1_000_000;
+        active_through = None;
       })
 
 (** Last date across every bar in [symbols_with_bars]. Mirrors the calendar's
@@ -763,6 +765,7 @@ let test_survivors_for_screening_drops_stage1_and_stage3 _ =
           close_price = p;
           adjusted_close = p;
           volume = 1_000_000;
+          active_through = None;
         })
   in
   (* Stage1: 15 weeks declining 100 → 86, then 50 weeks flat at 85. *)
@@ -837,6 +840,7 @@ let test_phase2_call_count_equals_survivor_count _ =
           close_price = p;
           adjusted_close = p;
           volume = 1_000_000;
+          active_through = None;
         })
   in
   let stage1_bars _seed =

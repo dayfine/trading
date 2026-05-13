@@ -29,6 +29,7 @@ let _make_bar ~date ~close =
       close_price = close;
       adjusted_close = close;
       volume = 1_000_000;
+      active_through = None;
     }
 
 (** Build a [Holding] position with [side]/[entry_price]/[quantity] using the

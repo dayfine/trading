@@ -12,6 +12,7 @@ let _mk_ohlc_bar ~date ~o ~h ~l ~c : Daily_price.t =
     close_price = c;
     volume = 0;
     adjusted_close = c;
+    active_through = None;
   }
 
 let _flat_bars ~n ~start_date ~base =

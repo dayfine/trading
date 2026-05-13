@@ -43,6 +43,7 @@ let _aggregate_week (week_rev : t list) : t =
     close_price = last.close_price;
     volume = List.sum (module Int) week_rev ~f:(fun d -> d.volume);
     adjusted_close = last.adjusted_close;
+    active_through = None;
   }
 
 (* Drop a trailing partial week if its last observed day is not a Friday. The

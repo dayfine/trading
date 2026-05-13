@@ -18,6 +18,7 @@ let create_test_price_data ~start_date ~end_date ~prices ~volumes =
         close_price = price;
         volume;
         adjusted_close = price;
+        active_through = None;
       })
 
 let test_normal_prices _ =

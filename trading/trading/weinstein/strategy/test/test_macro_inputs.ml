@@ -37,6 +37,7 @@ let make_rising_bars ~start_date ~n ~start_price =
         close_price = price;
         adjusted_close = price;
         volume = 1_000_000;
+        active_through = None;
       })
 
 (** Build a snapshot-backed [Bar_reader.t] over a synthetic universe.

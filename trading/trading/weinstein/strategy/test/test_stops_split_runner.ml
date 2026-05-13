@@ -39,6 +39,7 @@ let _make_bar ~date ~open_ ~high ~low ~close ~adjusted_close ~volume =
       close_price = close;
       adjusted_close;
       volume;
+      active_through = None;
     }
 
 (** Build a snapshot-backed [Bar_reader.t] from a single-symbol bar series. *)

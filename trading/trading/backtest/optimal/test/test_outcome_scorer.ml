@@ -59,6 +59,7 @@ let make_bar ~date ?(open_price = 100.0) ?(high_price = 105.0)
     close_price;
     volume;
     adjusted_close;
+    active_through = None;
   }
 
 (** Build a [Stage.result]. Defaults to a healthy Stage 2; tests flip [stage] to

@@ -28,6 +28,7 @@ let make_bar ~date ~high ~low ~close =
     close_price = close;
     adjusted_close = close;
     volume = 1_000_000;
+    active_through = None;
   }
 
 (* Call the bar-list path and the callback path on identical inputs and assert

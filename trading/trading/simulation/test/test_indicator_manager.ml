@@ -17,6 +17,7 @@ let generate_prices ~start_date ~num_days ~base_price =
         close_price = close;
         volume = 1000000;
         adjusted_close = close;
+        active_through = None;
       })
 
 (** Standard test prices for indicator tests *)

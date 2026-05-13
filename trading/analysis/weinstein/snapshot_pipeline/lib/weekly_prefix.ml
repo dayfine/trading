@@ -42,6 +42,7 @@ let _aggregate_week (week_rev : Types.Daily_price.t list) : Types.Daily_price.t
     close_price = last.close_price;
     volume = List.sum (module Int) week_rev ~f:(fun d -> d.volume);
     adjusted_close = last.adjusted_close;
+    active_through = None;
   }
 
 let _empty =

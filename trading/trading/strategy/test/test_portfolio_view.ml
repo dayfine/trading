@@ -36,6 +36,7 @@ let _make_price close_price =
     close_price;
     adjusted_close = close_price;
     volume = 1000;
+    active_through = None;
   }
 
 let test_portfolio_value_cash_only _ =

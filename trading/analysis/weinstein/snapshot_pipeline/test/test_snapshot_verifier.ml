@@ -20,6 +20,7 @@ let _make_bar ~date ~close =
     close_price = close;
     volume = 1_000_000;
     adjusted_close = close;
+    active_through = None;
   }
 
 let _ramp_bars ~n =

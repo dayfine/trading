@@ -23,6 +23,7 @@ let make_bar ?(low = 90.0) ?(high = 110.0) close =
     close_price = close;
     adjusted_close = close;
     volume = 1000;
+    active_through = None;
   }
 
 (* ------------------------------------------------------------------ *)

@@ -30,6 +30,7 @@ let make_bar ?(high_price = 105.0) ?(low_price = 95.0) close_price =
     close_price;
     adjusted_close = close_price;
     volume = 1000000;
+    active_through = None;
   }
 
 (** Apply a sequence of (close, low, high, ma, ma_dir, stage) tuples and return

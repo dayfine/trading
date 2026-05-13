@@ -29,6 +29,7 @@ let setup_test_data test_name =
         close_price = 101.0;
         volume = 1000000;
         adjusted_close = 101.0;
+        active_through = None;
       };
       {
         Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:2;
@@ -38,6 +39,7 @@ let setup_test_data test_name =
         close_price = 102.0;
         volume = 1100000;
         adjusted_close = 102.0;
+        active_through = None;
       };
       {
         Types.Daily_price.date = Date.create_exn ~y:2024 ~m:Month.Jan ~d:3;
@@ -47,6 +49,7 @@ let setup_test_data test_name =
         close_price = 103.0;
         volume = 1200000;
         adjusted_close = 103.0;
+        active_through = None;
       };
     ]
   in
@@ -66,6 +69,7 @@ let setup_test_data test_name =
         close_price = 151.0;
         volume = 2000000;
         adjusted_close = 151.0;
+        active_through = None;
       };
     ]
   in

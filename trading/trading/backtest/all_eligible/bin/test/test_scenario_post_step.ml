@@ -36,6 +36,7 @@ let _make_bar ~date ~close () : Types.Daily_price.t =
     close_price = close;
     volume = 1_000;
     adjusted_close = close;
+    active_through = None;
   }
 
 let _flat_bars ~start ~end_ ~close : Types.Daily_price.t list =

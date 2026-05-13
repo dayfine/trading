@@ -233,6 +233,7 @@ let test_complete_lifecycle _ =
       close_price = 50.0;
       volume = 1000;
       adjusted_close = 50.0;
+      active_through = None;
     }
   in
 
@@ -287,6 +288,7 @@ let test_complete_lifecycle _ =
       close_price = 60.0;
       volume = 1000;
       adjusted_close = 60.0;
+      active_through = None;
     }
   in
 

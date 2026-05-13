@@ -18,6 +18,7 @@ let make_bar date ~close ?low ?high () =
     close_price = close;
     adjusted_close = close;
     volume = 1_000_000;
+    active_through = None;
   }
 
 let cfg_k4 = { Laggard_rotation.hysteresis_weeks = 4; rs_window_weeks = 13 }
@@ -87,6 +88,7 @@ let _make_weekly_bars_to_friday ~from_close ~to_close ~n =
         close_price = close;
         adjusted_close = close;
         volume = 1_000_000;
+        active_through = None;
       })
 
 (** Build a [Bar_reader.t] backed by in-memory bars for the given (symbol, bars)

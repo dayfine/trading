@@ -21,6 +21,7 @@ let make_bar ?(date = "2024-01-01") adjusted_close =
     close_price = adjusted_close;
     volume = 1000;
     adjusted_close;
+    active_through = None;
   }
 
 (** Make [n] bars with the given price, assigning consecutive Monday dates. *)

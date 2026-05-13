@@ -20,6 +20,7 @@ let make_bar ?(price = 100.0) volume =
     close_price = price;
     adjusted_close = price;
     volume;
+    active_through = None;
   }
 
 (** [n] baseline bars followed by one event bar. *)

@@ -18,6 +18,7 @@ let make_bar date ~close ?low ?high () =
     close_price = close;
     adjusted_close = close;
     volume = 1_000_000;
+    active_through = None;
   }
 
 let get_price_of bars symbol = List.Assoc.find bars symbol ~equal:String.equal

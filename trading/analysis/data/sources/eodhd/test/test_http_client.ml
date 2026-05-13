@@ -14,6 +14,7 @@ let expected_prices =
       close_price = 614.68;
       volume = 29640000;
       adjusted_close = 12.2936;
+      active_through = None;
     };
     {
       Types.Daily_price.date = Date.of_string "2015-11-13";
@@ -23,6 +24,7 @@ let expected_prices =
       close_price = 592.89;
       volume = 60785000;
       adjusted_close = 11.8578;
+      active_through = None;
     };
     {
       Types.Daily_price.date = Date.of_string "2015-11-16";
@@ -32,6 +34,7 @@ let expected_prices =
       close_price = 588.74;
       volume = 41905000;
       adjusted_close = 11.7748;
+      active_through = None;
     };
   ]
 
@@ -314,6 +317,7 @@ let test_get_bulk_last_day _ =
               close_price = 12.3;
               volume = 0;
               adjusted_close = 12.3;
+              active_through = None;
             } );
           ( "AABB",
             {
@@ -324,6 +328,7 @@ let test_get_bulk_last_day _ =
               close_price = 0.0304;
               volume = 5158473;
               adjusted_close = 0.0304;
+              active_through = None;
             } );
           ( "AABCX",
             {
@@ -334,6 +339,7 @@ let test_get_bulk_last_day _ =
               close_price = 15.51;
               volume = 0;
               adjusted_close = 15.51;
+              active_through = None;
             } );
         ]
       in

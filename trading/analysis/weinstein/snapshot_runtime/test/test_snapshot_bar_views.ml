@@ -56,6 +56,7 @@ let _make_bar ~date ~symbol_seed ~day_offset : Types.Daily_price.t =
     close_price = 105.0 +. s +. (i *. 0.15);
     volume = 1000 + ((symbol_seed + 1) * (day_offset + 1));
     adjusted_close = 102.0 +. s +. (i *. 0.13);
+    active_through = None;
   }
 
 (* --- Schema for the snapshot path. The shim only reads OHLCV fields, but

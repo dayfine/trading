@@ -21,6 +21,7 @@ let _make_price ~date_str ~open_ ~high ~low ~close ~volume () :
     close_price = close;
     volume;
     adjusted_close = close;
+    active_through = None;
   }
 
 let test_create_initializes_to_nan _ =

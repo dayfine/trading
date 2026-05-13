@@ -141,6 +141,11 @@ let _parse_price_fields fields =
   let%bind adjusted_close =
     _find_field fields "adjusted_close" >>= _float_of_yojson
   in
+  (* EODHD's [/api/eod] response carries no delisting marker on individual
+     bars. The delisted-date is sourced separately (via the fundamentals
+     endpoint or the delisted-symbol exchange listing) and would need a
+     separate enrichment pass to attach. Leaving [active_through = None]
+     here keeps the bar-parser contract narrow: bars in, bars out. *)
   Ok
     {
       Types.Daily_price.date;
@@ -150,6 +155,7 @@ let _parse_price_fields fields =
       close_price;
       volume;
       adjusted_close;
+      active_through = None;
     }
 
 let _parse_json_price = function

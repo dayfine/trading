@@ -44,6 +44,7 @@ let _snapshot_to_daily_price (s : Snapshot.t) : Types.Daily_price.t option =
       close_price;
       volume = Float.to_int volume_f;
       adjusted_close;
+      active_through = None;
     }
 
 (* Today's bar: a single read_today call, then OHLCV reconstruction. *)

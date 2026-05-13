@@ -22,6 +22,7 @@ let _bar ?(volume = 1_000_000) ~date ~o ~h ~l ~c () : Daily_price.t =
     close_price = c;
     volume;
     adjusted_close = c;
+    active_through = None;
   }
 
 let _candidate ?(score = 0.9) ?(grade = "A+") ?(sector = "XLK")
@@ -168,6 +169,7 @@ let _split_day_bars : Daily_price.t list =
       close_price = 500.0;
       volume = 1_000_000;
       adjusted_close = 125.0;
+      active_through = None;
     };
     {
       date = _date "2020-09-01";
@@ -177,6 +179,7 @@ let _split_day_bars : Daily_price.t list =
       close_price = 502.0;
       volume = 1_000_000;
       adjusted_close = 125.5;
+      active_through = None;
     };
     (* Split day: raw price collapses 4×, adjusted is unchanged scale *)
     {
@@ -187,6 +190,7 @@ let _split_day_bars : Daily_price.t list =
       close_price = 130.0;
       volume = 4_000_000;
       adjusted_close = 130.0;
+      active_through = None;
     };
     {
       date = _date "2020-09-03";
@@ -196,6 +200,7 @@ let _split_day_bars : Daily_price.t list =
       close_price = 132.0;
       volume = 4_000_000;
       adjusted_close = 132.0;
+      active_through = None;
     };
   ]
 
