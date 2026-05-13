@@ -23,7 +23,7 @@ and substantial code has already landed on `main`:
 | P3 — `Daily_price.active_through` field | **NOT STARTED** | `analysis/data/types/` unchanged; loaders still don't carry a "delisted after" marker. Missing bars currently surface as warnings, not as a typed field. |
 | P4 — universe sexp interval shape | **NOT STARTED — and now arguably superseded** | Current production shape is *one sexp per as-of date* (e.g. `goldens-sp500/universes/sp500-historical/sp500-2010-01-01.sexp`, 510 symbols). Interval-encoded universes would be needed only for the deferred change-log / dynamic-membership path (PR-D in the Wiki plan, also NOT STARTED). |
 | P5 — screener point-in-time filter | **NOT STARTED** | No `membership_at` callback in the screener cascade. Current path treats the loaded universe as static for a full backtest window. |
-| P6 — historical-universe scenario (30y) | **NOT STARTED for survivorship-aware** | `goldens-broad/sp500-30y-capacity-1996.sexp` exists but is explicitly capacity-only + survivorship-biased. The 16y `sp500-2010-2026` baseline (#1057 long-only + long-short) runs on the *static* 2010-01-01 universe (510 symbols including delisted) — this is the "closest existing thing" to PI-aware production today. |
+| P6 — historical-universe scenario (30y) | **NOT STARTED for survivorship-aware** | `goldens-broad/sp500-30y-capacity-1996.sexp` exists but is explicitly capacity-only + survivorship-biased. The 16y `sp500-2010-2026` baseline (#1058 long-only + long-short) runs on the *static* 2010-01-01 universe (510 symbols including delisted) — this is the "closest existing thing" to PI-aware production today. |
 
 **Codebase changes since 2026-04-30 that affect the design:**
 
@@ -42,7 +42,7 @@ missing for plumbing reasons" without changing the universe-sexp shape.
 
 **Files to touch (P3 — `Daily_price` metadata extension):**
 
-- `trading/analysis/data/types/daily_price.ml` + `.mli` — add `active_through : Date.t option` field (default `None` = "still trading / unknown"). Update `[@@deriving show, eq]` callers.
+- `trading/analysis/data/types/lib/daily_price.ml` + `.mli` — add `active_through : Date.t option` field (default `None` = "still trading / unknown"). Update `[@@deriving show, eq]` callers.
 - `trading/analysis/data/storage/csv/` — CSV roundtrip must read/write the new column; backward-compat: missing column → `None`.
 - `trading/analysis/data/storage/csv/test/` — new round-trip test fixture with `active_through` set + unset.
 - `trading/analysis/data/sources/eodhd/lib/http_client.{ml,mli}` — read-only consumer; if EODHD's response carries a delisting date, surface it; otherwise leave `None`.
