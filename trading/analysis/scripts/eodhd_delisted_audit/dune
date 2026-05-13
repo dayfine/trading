@@ -1,0 +1,5 @@
+(executable
+ (name eodhd_delisted_audit)
+ (libraries core core_unix.command_unix status eodhd_delisted_audit_lib)
+ (preprocess
+  (pps ppx_jane)))
