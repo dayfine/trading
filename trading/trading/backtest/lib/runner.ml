@@ -76,42 +76,11 @@ let is_trading_day (step : Trading_simulation_types.Simulator_types.step_result)
     =
   step.had_market_bars
 
-(* Config overrides via sexp deep-merge *)
+(* Config overrides via sexp deep-merge — see {!Overlay_validator} for the
+   deep-merge + unknown-key validation. Extracted to a sibling module to keep
+   this file under the @large-module size limit. *)
 
-let _is_record fields =
-  List.for_all fields ~f:(function
-    | Sexp.List [ Sexp.Atom _; _ ] -> true
-    | _ -> false)
-
-let rec _merge_sexp base overlay =
-  match (base, overlay) with
-  | Sexp.List base_fields, Sexp.List overlay_fields
-    when _is_record base_fields && _is_record overlay_fields ->
-      _merge_records base_fields overlay_fields
-  | _, _ -> overlay
-
-and _merge_records base_fields overlay_fields =
-  let overlay_map =
-    List.filter_map overlay_fields ~f:(function
-      | Sexp.List [ Sexp.Atom k; v ] -> Some (k, v)
-      | _ -> None)
-    |> String.Map.of_alist_exn
-  in
-  Sexp.List
-    (List.map base_fields ~f:(function
-      | Sexp.List [ Sexp.Atom k; v ] as pair -> (
-          match Map.find overlay_map k with
-          | Some overlay_v -> Sexp.List [ Sexp.Atom k; _merge_sexp v overlay_v ]
-          | None -> pair)
-      | other -> other))
-
-let _apply_overrides (config : Weinstein_strategy.config) overrides =
-  match overrides with
-  | [] -> config
-  | _ ->
-      let base = Weinstein_strategy.sexp_of_config config in
-      let merged = List.fold overrides ~init:base ~f:_merge_sexp in
-      Weinstein_strategy.config_of_sexp merged
+let _apply_overrides = Overlay_validator.apply_overrides
 
 (* Dependency loading *)
 
