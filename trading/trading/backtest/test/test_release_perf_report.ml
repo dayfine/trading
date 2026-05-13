@@ -39,7 +39,8 @@ let _make_summary ?(start_date = Date.of_string "2023-01-02")
 
 let _make_run ?(name = "scenario") ?actual ?summary ?(peak_rss_kb = None)
     ?(wall_seconds = None) ?(trade_quality = None) ?(optimal_strategy = None)
-    ?(all_eligible = None) () : Release_report.scenario_run =
+    ?(all_eligible = None) ?(benchmark_relative = None) () :
+    Release_report.scenario_run =
   let actual = Option.value actual ~default:(_make_actual ()) in
   let summary = Option.value summary ~default:(_make_summary ()) in
   {
@@ -51,6 +52,18 @@ let _make_run ?(name = "scenario") ?actual ?summary ?(peak_rss_kb = None)
     trade_quality;
     optimal_strategy;
     all_eligible;
+    benchmark_relative;
+  }
+
+let _make_benchmark_relative ?(alpha_pct_annualized = 3.42) ?(beta = 0.87)
+    ?(information_ratio = 0.51) ?(tracking_error_pct_annualized = 6.70)
+    ?(correlation = 0.82) () : Release_report.benchmark_relative_summary =
+  {
+    alpha_pct_annualized;
+    beta;
+    information_ratio;
+    tracking_error_pct_annualized;
+    correlation;
   }
 
 let _make_optimal_summary ?(total_round_trips = 50) ?(winners = 25)
@@ -1242,6 +1255,223 @@ let test_load_scenario_run_no_all_eligible_when_sexp_malformed _ =
   let run = Release_report.load_scenario_run ~dir:scenario_dir in
   assert_that run.all_eligible is_none
 
+(* --- Benchmark-relative section ---
+
+   The "Benchmark-relative" sub-table is rendered only when at least one side
+   of a paired scenario carries a [benchmark_relative] record (i.e. all five
+   PR #1021 metrics were emitted in [summary.sexp]'s metrics block). These
+   tests pin the header text + per-metric formatting, exercise the
+   graceful-skip path (no metrics → no section), and verify the loader
+   recognises the on-disk metric labels written by [metric_set_to_sexp_pairs].
+*)
+
+let test_render_omits_benchmark_relative_when_both_none _ =
+  let cur = _make_run ~name:"no-bench" () in
+  let prior = _make_run ~name:"no-bench" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that
+    (String.is_substring md ~substring:"## Benchmark-relative")
+    (equal_to false)
+
+let test_render_includes_benchmark_relative_when_present _ =
+  let cur =
+    _make_run ~name:"sp500-2019"
+      ~benchmark_relative:
+        (Some
+           (_make_benchmark_relative ~alpha_pct_annualized:3.42 ~beta:0.87
+              ~information_ratio:0.51 ~tracking_error_pct_annualized:6.70
+              ~correlation:0.82 ()))
+      ()
+  in
+  let prior =
+    _make_run ~name:"sp500-2019"
+      ~benchmark_relative:
+        (Some
+           (_make_benchmark_relative ~alpha_pct_annualized:2.00 ~beta:0.80
+              ~information_ratio:0.30 ~tracking_error_pct_annualized:6.00
+              ~correlation:0.75 ()))
+      ()
+  in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur, prior) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         (* Section header pinned *)
+         field
+           (fun s -> String.is_substring s ~substring:"## Benchmark-relative")
+           (equal_to true);
+         (* α row: current = +3.42% (already in %), Δ = +1.42 pp *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Alpha (%/yr) | +3.42% | +2.00% | +1.42 pp |")
+           (equal_to true);
+         (* β row: unitless, Δ in absolute units *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Beta | +0.870 | +0.800 | +0.070 |")
+           (equal_to true);
+         (* IR row *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Information ratio | +0.510 | +0.300 | +0.210 |")
+           (equal_to true);
+         (* TE row: pp units *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "| Tracking error (%/yr) | +6.70% | +6.00% | +0.70 pp |")
+           (equal_to true);
+         (* Correlation row *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:"| Correlation | +0.820 | +0.750 | +0.070 |")
+           (equal_to true);
+       ])
+
+let test_render_benchmark_relative_handles_one_sided _ =
+  (* One scenario has the section, one doesn't — the with-bench side renders;
+     the without-bench side prints "—" for current and "—" for Δ. *)
+  let cur_with =
+    _make_run ~name:"with-bench"
+      ~benchmark_relative:(Some (_make_benchmark_relative ()))
+      ()
+  in
+  let prior_no = _make_run ~name:"with-bench" () in
+  let cur_no = _make_run ~name:"without-bench" () in
+  let prior_no2 = _make_run ~name:"without-bench" () in
+  let comparison : Release_report.t =
+    {
+      current_label = "cur";
+      prior_label = "prior";
+      paired = [ (cur_with, prior_no); (cur_no, prior_no2) ];
+      current_only = [];
+      prior_only = [];
+    }
+  in
+  let md = Release_report.render comparison in
+  assert_that md
+    (all_of
+       [
+         (* Section is rendered (at least one side has data) *)
+         field
+           (fun s -> String.is_substring s ~substring:"## Benchmark-relative")
+           (equal_to true);
+         (* with-bench scenario header present *)
+         field
+           (fun s -> String.is_substring s ~substring:"### with-bench")
+           (equal_to true);
+         (* without-bench scenario is skipped: per-scenario block only emits
+            when at least one of (cur, prior) has [Some _] benchmark_relative.
+            Neither side of without-bench has data, so its ### header should
+            NOT appear in the Benchmark-relative section. We approximate by
+            asserting that without-bench's prior column renders "—" — but
+            since the without-bench row is never emitted, we instead verify
+            the prior-side "—" appears for the with-bench scenario. *)
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "| Alpha (%/yr) | +3.42% | \xe2\x80\x94 | \xe2\x80\x94 |")
+           (equal_to true);
+       ])
+
+let test_load_scenario_run_loads_benchmark_relative_when_all_five_present _ =
+  (* Pins that the loader recognises the [Metric_type.show]-derived lowercase
+     labels written by [metric_set_to_sexp_pairs] — the suffix-match approach
+     means the producer's module path can change without breaking the
+     loader. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_br_" in
+  let scenario_dir = Filename.concat dir "br-present" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_actual_sexp (Filename.concat scenario_dir "actual.sexp");
+  _write_text
+    (Filename.concat scenario_dir "summary.sexp")
+    "((start_date 2023-01-02) (end_date 2023-12-31) (universe_size 1654)\n\
+    \ (n_steps 251) (initial_cash 1000000.00) (final_portfolio_value 1122915.42)\n\
+    \ (n_round_trips 39)\n\
+    \ (metrics ((metric_types.metric_type.t.benchmarkalphapctannualized 3.42)\n\
+    \           (metric_types.metric_type.t.benchmarkbeta 0.87)\n\
+    \           (metric_types.metric_type.t.informationratio 0.51)\n\
+    \           (metric_types.metric_type.t.trackingerrorpctannualized 6.70)\n\
+    \           (metric_types.metric_type.t.correlationtobenchmark 0.82))))\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.benchmark_relative
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (b : Release_report.benchmark_relative_summary) ->
+                b.alpha_pct_annualized)
+              (float_equal 3.42);
+            field
+              (fun (b : Release_report.benchmark_relative_summary) -> b.beta)
+              (float_equal 0.87);
+            field
+              (fun (b : Release_report.benchmark_relative_summary) ->
+                b.information_ratio)
+              (float_equal 0.51);
+            field
+              (fun (b : Release_report.benchmark_relative_summary) ->
+                b.tracking_error_pct_annualized)
+              (float_equal 6.70);
+            field
+              (fun (b : Release_report.benchmark_relative_summary) ->
+                b.correlation)
+              (float_equal 0.82);
+          ]))
+
+let test_load_scenario_run_no_benchmark_relative_when_legacy_summary _ =
+  (* Legacy summary.sexp from before PR #1021 — none of the five labels
+     present. Loader must return [None] for graceful skip. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_br_legacy_" in
+  _make_scenario_dir ~root:dir "legacy" ~with_perf:false;
+  let scenario_dir = Filename.concat dir "legacy" in
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.benchmark_relative is_none
+
+let test_load_scenario_run_no_benchmark_relative_when_any_missing _ =
+  (* Partial summary — only four of the five labels present. Loader must
+     return [None] (graceful skip): the section requires all five so users
+     never see a phantom 0.0 hiding a producer regression. *)
+  let dir = Core_unix.mkdtemp "/tmp/rel_perf_br_partial_" in
+  let scenario_dir = Filename.concat dir "partial" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_actual_sexp (Filename.concat scenario_dir "actual.sexp");
+  _write_text
+    (Filename.concat scenario_dir "summary.sexp")
+    "((start_date 2023-01-02) (end_date 2023-12-31) (universe_size 1654)\n\
+    \ (n_steps 251) (initial_cash 1000000.00) (final_portfolio_value 1122915.42)\n\
+    \ (n_round_trips 39)\n\
+    \ (metrics ((metric_types.metric_type.t.benchmarkalphapctannualized 3.42)\n\
+    \           (metric_types.metric_type.t.benchmarkbeta 0.87)\n\
+    \           (metric_types.metric_type.t.informationratio 0.51)\n\
+    \           (metric_types.metric_type.t.correlationtobenchmark 0.82))))\n";
+  let run = Release_report.load_scenario_run ~dir:scenario_dir in
+  assert_that run.benchmark_relative is_none
+
 let suite =
   "release_perf_report"
   >::: [
@@ -1304,6 +1534,18 @@ let suite =
          >:: test_render_includes_all_eligible_when_present;
          "render all-eligible handles one-sided"
          >:: test_render_all_eligible_handles_one_sided;
+         "render omits benchmark-relative when both none"
+         >:: test_render_omits_benchmark_relative_when_both_none;
+         "render includes benchmark-relative when present"
+         >:: test_render_includes_benchmark_relative_when_present;
+         "render benchmark-relative handles one-sided"
+         >:: test_render_benchmark_relative_handles_one_sided;
+         "load_scenario_run loads benchmark_relative when all five present"
+         >:: test_load_scenario_run_loads_benchmark_relative_when_all_five_present;
+         "load_scenario_run no benchmark_relative when legacy summary"
+         >:: test_load_scenario_run_no_benchmark_relative_when_legacy_summary;
+         "load_scenario_run no benchmark_relative when any missing"
+         >:: test_load_scenario_run_no_benchmark_relative_when_any_missing;
        ]
 
 let () = run_test_tt_main suite

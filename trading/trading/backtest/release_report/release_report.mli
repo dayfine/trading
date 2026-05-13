@@ -133,6 +133,31 @@ type all_eligible_summary = {
     producer side (e.g. the [return_buckets] field is intentionally dropped — it
     doesn't render in the comparison report). *)
 
+type benchmark_relative_summary = {
+  alpha_pct_annualized : float;
+      (** Annualized intercept α from [r_strat = α + β · r_bench] regressed over
+          per-step returns, scaled by 252. Mirrors the
+          [BenchmarkAlphaPctAnnualized] metric written into [summary.sexp]. *)
+  beta : float;
+      (** Slope β from the same regression. Mirrors [BenchmarkBeta]. *)
+  information_ratio : float;
+      (** [α / TE] — risk-adjusted active return analogue of Sharpe. Mirrors
+          [InformationRatio]. *)
+  tracking_error_pct_annualized : float;
+      (** Annualized stdev of [r_strat - r_bench] in percent. Mirrors
+          [TrackingErrorPctAnnualized]. *)
+  correlation : float;
+      (** Pearson correlation of strategy and benchmark per-step returns,
+          bounded in [-1, 1]. Mirrors [CorrelationToBenchmark]. *)
+}
+[@@deriving sexp]
+(** The five benchmark-relative metrics emitted by PR #1021 — surfaced in the
+    release report as a per-scenario sub-table beneath the main trading metrics.
+    Loaded from the [(metrics ...)] block of [summary.sexp] by matching the
+    [Metric_type.show]-derived lowercase variant labels (e.g.
+    [metric_types.metric_type.t.benchmarkbeta]). All five must be present to
+    populate this record; missing-any-of-them yields [None] (graceful skip). *)
+
 type scenario_run = {
   name : string;
   actual : actual;
@@ -158,18 +183,27 @@ type scenario_run = {
           [--no-emit-all-eligible]). The report renders an additional
           "All-eligible diagnostic" section for paired scenarios where at least
           one side has [Some _]. *)
+  benchmark_relative : benchmark_relative_summary option;
+      (** Loaded from the [(metrics ...)] block of [summary.sexp] when all five
+          benchmark-relative metric labels are present. [None] for legacy
+          summaries written before PR #1021 (none of the five emitted), or when
+          any of the five is absent. The report renders an additional
+          "Benchmark-relative" sub-table for paired scenarios where at least one
+          side has [Some _]. *)
 }
 [@@deriving sexp]
 (** One scenario's per-run readings — the [actual] block plus optional
     infra-perf measurements, an optional trade-audit summary, an optional
-    optimal-strategy counterfactual summary, and an optional all-eligible
-    diagnostic summary. Both [peak_rss_kb] and [wall_seconds] are [None] when
-    the corresponding sibling files are absent in the batch dir; the report
-    still renders trading metrics in that case. [trade_quality] is [None] when
-    no audit artefacts were found or when the audit was empty (no trades).
-    [optimal_strategy] is [None] when no [optimal_summary.sexp] was emitted.
-    [all_eligible] is [None] when no [all_eligible/grade-C/summary.sexp] was
-    emitted. *)
+    optimal-strategy counterfactual summary, an optional all-eligible diagnostic
+    summary, and an optional benchmark-relative summary. Both [peak_rss_kb] and
+    [wall_seconds] are [None] when the corresponding sibling files are absent in
+    the batch dir; the report still renders trading metrics in that case.
+    [trade_quality] is [None] when no audit artefacts were found or when the
+    audit was empty (no trades). [optimal_strategy] is [None] when no
+    [optimal_summary.sexp] was emitted. [all_eligible] is [None] when no
+    [all_eligible/grade-C/summary.sexp] was emitted. [benchmark_relative] is
+    [None] when [summary.sexp]'s metrics block lacks any of the five
+    benchmark-relative metric labels. *)
 
 type t = {
   current_label : string;
