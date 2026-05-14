@@ -419,16 +419,9 @@ let _cooldown_block_set ~cooldown_weeks ~as_of ~last_stop_out_dates =
         if elapsed < cooldown_days then Some ticker else None)
     |> String.Set.of_list
 
-(** Single-pass filter that drops [held], [cooldown], and non-member symbols and
-    resolves each survivor's sector context. Was a chained [filter |> map]
-    allocating two lists; the [filter_map] keeps just one. Runs every Friday
-    over the full screened universe (potentially thousands of symbols).
-
-    [is_member] is the point-in-time membership predicate. A symbol is admitted
-    only when [is_member a.ticker] is [true]; the default predicate (used by
-    [screen]) returns [true] unconditionally so existing callers preserve
-    bit-equality. See [screen_with_cooldown] for the wiring that closes over
-    [as_of]. *)
+(** Single-pass filter dropping [held], [cooldown], and non-member symbols.
+    [is_member] defaults to always-true via [screen]; [screen_with_cooldown]
+    wires it from [?membership_at] closed over [as_of]. *)
 let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member =
   List.filter_map stocks ~f:(fun (a : Stock_analysis.t) ->
       if Set.mem held_set a.ticker then None
@@ -487,15 +480,9 @@ let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
         ~buy_candidates ~short_candidates;
   }
 
-(** Default membership predicate — admits every symbol. Used as the seed for
-    [screen] / [screen_with_cooldown] when the caller does not supply
-    [?membership_at]; preserves bit-equality with the pre-PI-filter behaviour.
-*)
-let _always_member (_ : string) = true
-
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers
-    ~cooldown_set:String.Set.empty ~is_member:_always_member
+    ~cooldown_set:String.Set.empty ~is_member:(fun _ -> true)
 
 let screen_with_cooldown ?membership_at ~config ~macro_trend ~sector_map ~stocks
     ~held_tickers ~as_of ~last_stop_out_dates () : result =
@@ -503,10 +490,8 @@ let screen_with_cooldown ?membership_at ~config ~macro_trend ~sector_map ~stocks
     _cooldown_block_set ~cooldown_weeks:config.cascade_post_stop_cooldown_weeks
       ~as_of ~last_stop_out_dates
   in
-  let is_member =
-    match membership_at with
-    | None -> _always_member
-    | Some m -> fun ticker -> m ticker as_of
+  let is_member ticker =
+    match membership_at with None -> true | Some m -> m ticker as_of
   in
   _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
     ~is_member

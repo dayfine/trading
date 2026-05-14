@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-14
 
 ## Status
-MERGED — with one PR in flight
+IN_PROGRESS
 
 Cascade post-stop-out cooldown gate landed via PR #718 (merged 2026-04-30 evening). 2026-05-14: `feat/screener-pi-filter` adds an opt-in point-in-time universe-membership gate (`Screener.screen_with_cooldown ?membership_at`) plus strategy-side wiring (`enable_pi_filter` config flag → `Bar_reader.daily_bars_for` → `Daily_price.active_through`). Default-off preserves all baselines; behavioural effect is gated on the P3 follow-up (snapshot pipeline propagation of `active_through`). See `dev/experiments/p5-pi-filter-validation-2026-05-14/` and `dev/notes/historical-universe-status-2026-05-13.md`.
 

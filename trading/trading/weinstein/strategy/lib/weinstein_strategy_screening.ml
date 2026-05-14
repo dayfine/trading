@@ -295,7 +295,6 @@ let screen_universe ?membership_at ~config ~index_view
     week-bucket aggregation). *)
 let is_screening_day_view
     (view : Snapshot_runtime.Snapshot_bar_views.weekly_view) =
-  if view.n = 0 then false
-  else
-    Date.day_of_week view.dates.(view.n - 1)
-    |> Day_of_week.equal Day_of_week.Fri
+  view.n > 0
+  && Day_of_week.equal Day_of_week.Fri
+       (Date.day_of_week view.dates.(view.n - 1))
