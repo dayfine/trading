@@ -39,6 +39,39 @@ let run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result ~bar_reader
   prior_macro_result := Some macro_result;
   macro_result
 
+(** Point-in-time membership predicate derived from [Bar_reader].
+
+    [pi_membership_at ~bar_reader symbol as_of] returns:
+    - [true] when the symbol has no resident bars on or before [as_of] — no
+      delisting information available, default to membership so the cascade's
+      downstream phases (which will themselves drop the symbol when its weekly
+      view is empty) make the rejection decision uniformly.
+    - [true] when the most recent bar's [active_through] is [None] — the symbol
+      is still trading or the loader did not surface a delisting marker.
+    - [Core.Date.(as_of <= d)] when the most recent bar's [active_through] is
+      [Some d] — the symbol was active through [d] and is treated as a member on
+      or before that date.
+
+    Reading the last bar only (rather than scanning the full history) is
+    sufficient: the snapshot pipeline writes [active_through] uniformly on every
+    per-symbol row, so any non-empty history will surface the marker on its last
+    row. *)
+let _pi_membership_at ~bar_reader (symbol : string) (as_of : Core.Date.t) =
+  let bars = Bar_reader.daily_bars_for bar_reader ~symbol ~as_of in
+  match List.last bars with
+  | None -> true
+  | Some bar -> (
+      match bar.Types.Daily_price.active_through with
+      | None -> true
+      | Some d -> Core.Date.( <= ) as_of d)
+
+(** Build the optional [?membership_at] callback for {!screen_universe} based on
+    [config.enable_pi_filter]. When the flag is [false] (default), returns
+    [None] — the screener's PI gate is a no-op and baselines are preserved. When
+    [true], returns [Some] of {!_pi_membership_at} closed over [bar_reader]. *)
+let _membership_at_callback_of ~config ~bar_reader =
+  if config.enable_pi_filter then Some (_pi_membership_at ~bar_reader) else None
+
 (** Run the Friday universe screener path given an already-computed
     [macro_result]. Under all macro regimes (Bullish, Neutral, Bearish) the
     screener is invoked; macro-specific gating — longs blocked under Bearish,
@@ -59,9 +92,11 @@ let run_screen_after_macro ~config ~stop_states ~last_stop_out_dates ~bar_reader
       ~sector_etfs:config.sector_etfs ~cb ~as_of:current_date
       ~sector_prior_stages ~index_view ~ticker_sectors ()
   in
-  Weinstein_strategy_screening.screen_universe ~config ~index_view ~macro_result
-    ~sector_map ~stop_states ~last_stop_out_dates ~portfolio ~get_price
-    ~bar_reader ~prior_stages ~current_date ~audit_recorder
+  let membership_at = _membership_at_callback_of ~config ~bar_reader in
+  Weinstein_strategy_screening.screen_universe ?membership_at ~config
+    ~index_view ~macro_result ~sector_map ~stop_states ~last_stop_out_dates
+    ~portfolio ~get_price ~bar_reader ~prior_stages ~current_date
+    ~audit_recorder ()
 
 (** Run the universe screen when the strategy is active (not halted, on a
     Friday, with a valid macro result). Returns the list of entry transitions,
@@ -78,3 +113,8 @@ let entry_transitions_if_active ~halted ~is_screening_day ~macro_result_opt
         ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
         ~macro_result
   | _ -> []
+
+module Internal_for_test = struct
+  let pi_membership_at = _pi_membership_at
+  let membership_at_callback_of = _membership_at_callback_of
+end

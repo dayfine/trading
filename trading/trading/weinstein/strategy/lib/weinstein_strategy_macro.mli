@@ -61,3 +61,34 @@ val entry_transitions_if_active :
     [is_screening_day = true], and [macro_result_opt = Some _]. Returns [[]]
     when any guard is false. Keeps [_on_market_close] at a shallow nesting
     level. *)
+
+module Internal_for_test : sig
+  val pi_membership_at : bar_reader:Bar_reader.t -> string -> Date.t -> bool
+  (** [pi_membership_at ~bar_reader symbol as_of] is the point-in-time
+      membership predicate the strategy hands to
+      {!Screener.screen_with_cooldown} when [config.enable_pi_filter = true].
+
+      Returns [true] for: a symbol with no resident bars (no delisting marker
+      available; the cascade's downstream phases will themselves drop the symbol
+      when its weekly view is empty); a symbol whose most recent bar has
+      [active_through = None] (still trading or unknown delisting status); a
+      symbol whose most recent bar has [active_through = Some d] with
+      [as_of <= d].
+
+      Returns [false] only when the most recent bar carries
+      [active_through = Some d] with [as_of > d] — the symbol is known to have
+      been delisted before the cascade's evaluation date.
+
+      Exposed for behavioural unit-testing of the [Bar_reader] →
+      [Daily_price.active_through] wiring. *)
+
+  val membership_at_callback_of :
+    config:Weinstein_strategy_config.config ->
+    bar_reader:Bar_reader.t ->
+    (string -> Date.t -> bool) option
+  (** [membership_at_callback_of ~config ~bar_reader] returns [None] when
+      [config.enable_pi_filter = false] (default), preserving existing
+      baselines, and [Some] of {!pi_membership_at} closed over [bar_reader] when
+      [config.enable_pi_filter = true]. Exposed for unit-testing the flag-driven
+      branch. *)
+end

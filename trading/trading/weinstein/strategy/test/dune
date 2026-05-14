@@ -9,6 +9,7 @@
   test_force_liquidation_strategy
   test_macro_inputs
   test_panel_callbacks
+  test_pi_filter_wiring
   test_short_side_bear_window
   test_stage3_force_exit_runner
   test_laggard_rotation_runner

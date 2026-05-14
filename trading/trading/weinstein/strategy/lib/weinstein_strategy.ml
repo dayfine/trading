@@ -20,6 +20,8 @@ module Audit_recorder = Audit_recorder
 module Entry_audit_capture = Entry_audit_capture
 module Exit_audit_capture = Exit_audit_capture
 include Weinstein_strategy_config
+module Weinstein_strategy_macro = Weinstein_strategy_macro
+module Weinstein_strategy_config = Weinstein_strategy_config
 module S = Weinstein_strategy_screening
 
 let held_symbols = S.held_symbols

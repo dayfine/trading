@@ -107,6 +107,18 @@ module Exit_audit_capture = Exit_audit_capture
 (** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
     {!Audit_recorder.exit_event}. See {!Exit_audit_capture}. *)
 
+module Weinstein_strategy_macro = Weinstein_strategy_macro
+(** Macro computation and screen-dispatch helpers. Re-exposed for tests that
+    drive {!Weinstein_strategy_macro.Internal_for_test} (the PI membership
+    predicate and the flag-driven callback factory consumed by
+    {!Screener.screen_with_cooldown}'s [?membership_at] argument). *)
+
+module Weinstein_strategy_config = Weinstein_strategy_config
+(** Strategy configuration record + {!Weinstein_strategy_config.default_config}
+    factory. Re-exposed so tests can construct configs without depending on the
+    included-into-this-module re-export below (which is read-only at the type
+    level). *)
+
 (** {1 Configuration} *)
 
 type index_config = {
@@ -282,6 +294,29 @@ type config = {
           sweeps can tune [ma_slope_min], [pullback_band],
           [consolidation_weeks], and [consolidation_range_pct] via the standard
           config-override mechanism (issue #889 follow-up). *)
+  enable_pi_filter : bool; [@sexp.default false]
+      (** Master switch for the screener point-in-time (PI) universe-membership
+          filter. Default [false] preserves all existing baselines: the
+          [Screener.screen_with_cooldown] [?membership_at] callback is left
+          unsupplied and every loaded symbol participates in the cascade.
+
+          When [true], the strategy builds a callback from per-symbol bar reads
+          — a symbol is treated as a member on [as_of] iff its most recent
+          observed bar's [Daily_price.active_through] is either [None] (still
+          trading / unknown delisting status) or [Some d] with [as_of <= d].
+          Symbols delisted before [as_of] are excluded from stage
+          classification, sector resolution, and scoring before the cascade's
+          downstream phases run.
+
+          Authority: [dev/notes/historical-universe-membership-2026-04-30.md]
+          §P5; [dev/notes/historical-universe-status-2026-05-13.md] §1 phase 3
+          action item #2.
+
+          The opt-in default is intentional: enabling the filter changes which
+          symbols the cascade considers and shifts every existing fixture's
+          pinned numbers as the underlying [active_through] column propagates
+          through the snapshot pipeline. Re-pinning goldens is a separate
+          post-merge step. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

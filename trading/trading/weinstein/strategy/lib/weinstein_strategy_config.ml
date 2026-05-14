@@ -49,6 +49,29 @@ type config = {
       [@sexp.default Continuation.default_config]
       (** Detector parameters; only consulted when
           [enable_continuation_buys = true]. See [.mli] for tuning context. *)
+  enable_pi_filter : bool; [@sexp.default false]
+      (** Master switch for the screener point-in-time (PI) universe-membership
+          filter. Default [false] preserves all existing baselines: the
+          [Screener.screen_with_cooldown] [?membership_at] callback is left
+          unsupplied and every loaded symbol participates in the cascade.
+
+          When [true], the strategy builds a callback from per-symbol bar reads
+          — a symbol is treated as a member on [as_of] iff its most recent
+          observed bar's [Daily_price.active_through] is either [None] (still
+          trading / unknown delisting status) or [Some d] with [as_of <= d].
+          Symbols delisted before [as_of] are excluded from stage
+          classification, sector resolution, and scoring before the cascade's
+          downstream phases run.
+
+          Authority: [dev/notes/historical-universe-membership-2026-04-30.md]
+          §P5; [dev/notes/historical-universe-status-2026-05-13.md] §1 phase 3
+          action item #2.
+
+          The opt-in default is intentional: enabling the filter changes which
+          symbols the cascade considers and shifts every existing fixture's
+          pinned numbers as the underlying [active_through] column propagates
+          through the snapshot pipeline. Re-pinning goldens is a separate
+          post-merge step. *)
 }
 [@@deriving sexp]
 
@@ -79,6 +102,7 @@ let default_config ~universe ~index_symbol =
     laggard_reentry_cooldown_weeks = 0;
     enable_continuation_buys = false;
     continuation_config = Continuation.default_config;
+    enable_pi_filter = false;
   }
 
 let name = "Weinstein"
