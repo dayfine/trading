@@ -1,0 +1,31 @@
+Loading 2 scenarios from ../dev/experiments/continuation-buys-impact-2026-05-14/scenarios (parallel=2)
+Fixtures root: /workspaces/trading-1/data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-14-005026
+
+>>> Running continuation-buys-baseline: Cell E baseline (continuation_buys=false) — 5y sp500-2019-2023 control arm (2019-01-02 to 2023-12-29)
+
+>>> Running continuation-buys-on: Cell E + enable_continuation_buys=true — 5y sp500-2019-2023 treatment arm (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Universe: 500 stocks
+Loading AD breadth bars...
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_327439)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_3973ad)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+continuation-buys-baseline      50.7%     264    37.5%    21.6%   PASS
+continuation-buys-on            52.1%     265    37.7%    21.6%   PASS
+
+2/2 scenarios passed.
