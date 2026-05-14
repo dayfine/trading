@@ -38,6 +38,17 @@ type config = {
       (** Master switch for Weinstein Ch. 3 continuation-buy detection
           (Interpretation B of issue #889). Default [false] preserves existing
           baselines. See [.ml] for full semantics. *)
+  continuation_config : Continuation.config;
+      [@sexp.default Continuation.default_config]
+      (** Detector parameters for continuation-buy detection. Only consulted
+          when [enable_continuation_buys = true]. Defaults to
+          [Continuation.default_config], preserving bit-equality with prior
+          behaviour when the sweep field is omitted from a scenario sexp.
+          Exposed so parameter sweeps (issue #889 follow-up, see
+          [dev/notes/next-session-priorities-2026-05-14.md] §P3) can tune
+          [ma_slope_min], [pullback_band], [consolidation_weeks], and
+          [consolidation_range_pct] via the standard config-override mechanism.
+      *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

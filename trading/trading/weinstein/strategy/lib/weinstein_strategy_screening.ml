@@ -153,16 +153,16 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
 
 (** Build the per-screen-pass [Stock_analysis.config]. Currently differs from
     {!Stock_analysis.default_config} only by toggling the continuation detector
-    based on [Weinstein_strategy_config.enable_continuation_buys]. When the
-    strategy flag is [false] (default), this returns a config equal to
-    [Stock_analysis.default_config] — preserving bit-equality with prior
-    behaviour. *)
+    based on [Weinstein_strategy_config.enable_continuation_buys] and threading
+    the strategy's [continuation_config] (defaults to
+    [Continuation.default_config], preserving bit-equality with prior baselines
+    when the field is omitted from a scenario sexp). *)
 let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
     Stock_analysis.config =
   if config.enable_continuation_buys then
     {
       Stock_analysis.default_config with
-      continuation = Some Continuation.default_config;
+      continuation = Some config.continuation_config;
     }
   else Stock_analysis.default_config
 

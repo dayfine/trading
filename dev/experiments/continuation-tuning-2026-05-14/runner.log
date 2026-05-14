@@ -1,0 +1,108 @@
+Loading 9 scenarios from ../dev/experiments/continuation-tuning-2026-05-14/scenarios (parallel=3)
+Fixtures root: test_data/backtest_scenarios
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-05-14-072437
+
+>>> Running axis1-ma_slope_min-0_005: Continuation tuning axis-1: ma_slope_min=0.005 (loose). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+
+>>> Running axis1-ma_slope_min-0_02: Continuation tuning axis-1: ma_slope_min=0.02 (tight). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+
+>>> Running axis2-pullback_band-pm3: Continuation tuning axis-2: pullback_band=[0.97,1.03] (narrow). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_de8853)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_d84cac)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_452123)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+
+>>> Running axis2-pullback_band-pm8: Continuation tuning axis-2: pullback_band=[0.92,1.08] (wide). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+
+>>> Running axis3-consolidation_weeks-2: Continuation tuning axis-3: consolidation_weeks=2 (short). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+
+>>> Running axis3-consolidation_weeks-6: Continuation tuning axis-3: consolidation_weeks=6 (long). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_a0ed7a)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_e112f7)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_5fcc77)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+
+>>> Running axis4-consolidation_range_pct-0_05: Continuation tuning axis-4: consolidation_range_pct=0.05 (tight). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+
+>>> Running axis4-consolidation_range_pct-0_15: Continuation tuning axis-4: consolidation_range_pct=0.15 (loose). 5y sp500-2019-2023. (2019-01-02 to 2023-12-29)
+
+>>> Running continuation-tuning-baseline: Cell E + continuation-buys ON at ship defaults — 5y sp500-2019-2023 tuning sweep reference (2019-01-02 to 2023-12-29)
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Running backtest (2019-01-02 to 2023-12-29, warmup from 2018-06-06)...
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: simulator window 2018-06-06..2023-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_7d819c)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_143a90)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Panel_runner: in-process snapshot built (515 symbols, /tmp/panel_runner_csv_snapshot_2edb10)
+Panel_runner: snapshot bar reader wired (calendar 1453 days) for strategy
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+axis1-ma_slope_min-0_005        52.1%     265    37.7%    21.6%   PASS
+axis1-ma_slope_min-0_02         51.7%     265    37.7%    21.6%   PASS
+axis2-pullback_band-pm3         52.1%     265    37.7%    21.6%   PASS
+axis2-pullback_band-pm8         52.1%     265    37.7%    21.6%   PASS
+axis3-consolidation_weeks-2     56.3%     261    35.2%    22.1%   PASS
+axis3-consolidation_weeks-6     50.7%     264    37.5%    21.6%   PASS
+axis4-consolidation_range_pct-0_05    50.7%     264    37.5%    21.6%   PASS
+axis4-consolidation_range_pct-0_15    54.9%     266    38.0%    21.6%   PASS
+continuation-tuning-baseline    52.1%     265    37.7%    21.6%   PASS
+
+9/9 scenarios passed.

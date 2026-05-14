@@ -273,6 +273,15 @@ type config = {
 
           Interpretation A (pyramid adds to existing holdings) is deferred
           behind a core-module decision and is NOT enabled by this flag. *)
+  continuation_config : Continuation.config;
+      [@sexp.default Continuation.default_config]
+      (** Detector parameters for continuation-buy detection. Only consulted
+          when [enable_continuation_buys = true]. Defaults to
+          [Continuation.default_config], preserving bit-equality with prior
+          behaviour when omitted from a scenario sexp. Exposed so parameter
+          sweeps can tune [ma_slope_min], [pullback_band],
+          [consolidation_weeks], and [consolidation_range_pct] via the standard
+          config-override mechanism (issue #889 follow-up). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

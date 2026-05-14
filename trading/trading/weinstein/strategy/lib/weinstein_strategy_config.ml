@@ -45,6 +45,10 @@ type config = {
       (** Master switch for Weinstein Ch. 3 continuation-buy detection
           (Interpretation B of issue #889). Default [false] preserves baselines.
       *)
+  continuation_config : Continuation.config;
+      [@sexp.default Continuation.default_config]
+      (** Detector parameters; only consulted when
+          [enable_continuation_buys = true]. See [.mli] for tuning context. *)
 }
 [@@deriving sexp]
 
@@ -74,6 +78,7 @@ let default_config ~universe ~index_symbol =
     enable_laggard_rotation = false;
     laggard_reentry_cooldown_weeks = 0;
     enable_continuation_buys = false;
+    continuation_config = Continuation.default_config;
   }
 
 let name = "Weinstein"
