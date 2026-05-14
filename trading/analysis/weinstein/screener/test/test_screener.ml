@@ -1128,6 +1128,7 @@ let test_cooldown_disabled_no_exclusion _ =
     screen_with_cooldown ~config:cfg ~macro_trend:Bullish
       ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
       ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-1)) ]
+      ()
   in
   assert_that result.buy_candidates
     (elements_are [ field (fun c -> c.ticker) (equal_to "AAPL") ])
@@ -1140,6 +1141,7 @@ let test_cooldown_recent_stop_excludes _ =
     screen_with_cooldown ~config:cooldown_cfg ~macro_trend:Bullish
       ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
       ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-14)) ]
+      ()
   in
   assert_that result.buy_candidates is_empty
 
@@ -1151,6 +1153,7 @@ let test_cooldown_elapsed_stop_eligible _ =
     screen_with_cooldown ~config:cooldown_cfg ~macro_trend:Bullish
       ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
       ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-35)) ]
+      ()
   in
   assert_that result.buy_candidates
     (elements_are [ field (fun c -> c.ticker) (equal_to "AAPL") ])
@@ -1163,10 +1166,82 @@ let test_cooldown_per_symbol_scope _ =
     screen_with_cooldown ~config:cooldown_cfg ~macro_trend:Bullish
       ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
       ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-7)) ]
+      ()
   in
   assert_that result.buy_candidates
     (all_of
        [ size_is 1; elements_are [ field (fun c -> c.ticker) (equal_to "HD") ] ])
+
+(* ------------------------------------------------------------------ *)
+(* Point-in-time membership filter                                    *)
+(* ------------------------------------------------------------------ *)
+
+(** PI filter unsupplied (default): every symbol is admitted — pins bit-equality
+    with the pre-feature [screen_with_cooldown]. *)
+let test_pi_filter_default_admits_all _ =
+  let stocks = _breakout_stocks [ "AAPL"; "HD" ] in
+  let result =
+    screen_with_cooldown ~config:cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[] ()
+  in
+  assert_that result.buy_candidates (size_is 2)
+
+(** PI filter explicitly admits both symbols: same result as the default. *)
+let test_pi_filter_admits_both _ =
+  let stocks = _breakout_stocks [ "AAPL"; "HD" ] in
+  let always_member _ _ = true in
+  let result =
+    screen_with_cooldown ~membership_at:always_member ~config:cfg
+      ~macro_trend:Bullish ~sector_map:(empty_sector_map ()) ~stocks
+      ~held_tickers:[] ~as_of ~last_stop_out_dates:[] ()
+  in
+  assert_that result.buy_candidates (size_is 2)
+
+(** PI filter rejects AAPL (delisted) but keeps HD. Models a 16y backtest where
+    a symbol was active for years before [as_of] but is no longer in the
+    eligible universe. *)
+let test_pi_filter_excludes_delisted _ =
+  let stocks = _breakout_stocks [ "AAPL"; "HD" ] in
+  let membership_at ticker _date = not (String.equal ticker "AAPL") in
+  let result =
+    screen_with_cooldown ~membership_at ~config:cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[] ()
+  in
+  assert_that result.buy_candidates
+    (all_of
+       [ size_is 1; elements_are [ field (fun c -> c.ticker) (equal_to "HD") ] ])
+
+(** PI filter is consulted with [as_of]: a callback that depends on the date can
+    admit or reject the same ticker on different days. *)
+let test_pi_filter_consults_as_of _ =
+  let stocks = _breakout_stocks [ "AAPL" ] in
+  let cutoff = Date.add_days as_of (-1) in
+  (* AAPL is a member only on or before [cutoff]; here as_of > cutoff. *)
+  let membership_at _ticker date = Date.( <= ) date cutoff in
+  let result =
+    screen_with_cooldown ~membership_at ~config:cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[] ()
+  in
+  assert_that result.buy_candidates is_empty
+
+(** PI filter composes with the cooldown gate: a symbol that would survive the
+    cooldown gate but fail the PI filter is still rejected. *)
+let test_pi_filter_composes_with_cooldown _ =
+  let stocks = _breakout_stocks [ "AAPL"; "HD" ] in
+  let cooldown_cfg = { cfg with cascade_post_stop_cooldown_weeks = 4 } in
+  (* HD blocked by PI filter; AAPL blocked by cooldown (recent stop). *)
+  let membership_at ticker _date = not (String.equal ticker "HD") in
+  let result =
+    screen_with_cooldown ~membership_at ~config:cooldown_cfg
+      ~macro_trend:Bullish ~sector_map:(empty_sector_map ()) ~stocks
+      ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[ ("AAPL", Date.add_days as_of (-7)) ]
+      ()
+  in
+  assert_that result.buy_candidates is_empty
 
 let suite =
   "screener_tests"
@@ -1248,6 +1323,13 @@ let suite =
          "test_cooldown_elapsed_stop_eligible"
          >:: test_cooldown_elapsed_stop_eligible;
          "test_cooldown_per_symbol_scope" >:: test_cooldown_per_symbol_scope;
+         "test_pi_filter_default_admits_all"
+         >:: test_pi_filter_default_admits_all;
+         "test_pi_filter_admits_both" >:: test_pi_filter_admits_both;
+         "test_pi_filter_excludes_delisted" >:: test_pi_filter_excludes_delisted;
+         "test_pi_filter_consults_as_of" >:: test_pi_filter_consults_as_of;
+         "test_pi_filter_composes_with_cooldown"
+         >:: test_pi_filter_composes_with_cooldown;
        ]
 
 let () = run_test_tt_main suite

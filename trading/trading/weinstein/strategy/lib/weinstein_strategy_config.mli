@@ -49,6 +49,10 @@ type config = {
           [ma_slope_min], [pullback_band], [consolidation_weeks], and
           [consolidation_range_pct] via the standard config-override mechanism.
       *)
+  enable_pi_filter : bool; [@sexp.default false]
+      (** Master switch for the screener point-in-time universe-membership
+          filter (universe plan phase P5). Default [false] preserves existing
+          baselines. See [.ml] for full semantics. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

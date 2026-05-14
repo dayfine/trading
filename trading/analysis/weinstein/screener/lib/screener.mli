@@ -273,11 +273,13 @@ val screen :
     @param stocks Per-stock analysis results.
     @param held_tickers Tickers already in portfolio — excluded from output.
 
-    Pure function. Equivalent to {!screen_with_cooldown} with [as_of = None] and
-    [last_stop_out_dates = []] — i.e. the post-stop-out cooldown gate is a no-op
-    regardless of [config.cascade_post_stop_cooldown_weeks]. *)
+    Pure function. Equivalent to {!screen_with_cooldown} with no [membership_at]
+    callback, [as_of] equal to today, and [last_stop_out_dates = []] — i.e. the
+    post-stop-out cooldown gate and the point-in-time membership gate are both
+    no-ops. *)
 
 val screen_with_cooldown :
+  ?membership_at:(string -> Core.Date.t -> bool) ->
   config:config ->
   macro_trend:Weinstein_types.market_trend ->
   sector_map:(string, sector_context) Core.Hashtbl.t ->
@@ -285,17 +287,36 @@ val screen_with_cooldown :
   held_tickers:string list ->
   as_of:Core.Date.t ->
   last_stop_out_dates:(string * Core.Date.t) list ->
+  unit ->
   result
 (** [screen_with_cooldown] is {!screen} with the per-symbol post-stop-out
-    cooldown gate active.
+    cooldown gate active and an optional point-in-time (PI) membership gate.
 
+    @param membership_at
+      Optional point-in-time universe-membership predicate. When supplied, the
+      cascade rejects any symbol for which [membership_at ticker as_of] returns
+      [false] before stage classification, sector resolution, or scoring runs.
+      The intent is to model "this symbol was not in the eligible universe on
+      [as_of]" — e.g. a delisted symbol whose bars are stale, a stock added to
+      the index after [as_of], or any other source of survivorship-bias drift in
+      the loaded universe.
+
+    Default behaviour ([None]): every symbol is treated as a member — bit-equal
+    to the pre-PI-filter cascade. The default preserves every existing baseline
+    so wiring this gate at a single call site is a no-op until the caller opts
+    in.
+
+    Authority: [dev/notes/historical-universe-membership-2026-04-30.md] §P5 —
+    "screener point-in-time filter";
+    [dev/notes/historical-universe-status-2026-05-13.md] §1 phase 3 action item
+    #2.
     @param as_of Cascade evaluation date.
     @param last_stop_out_dates
       Per-symbol last stop-out date. Each entry [(ticker, date)] excludes
       [ticker] from the cascade if
       [(as_of - date) < config.cascade_post_stop_cooldown_weeks * 7] days. When
       [config.cascade_post_stop_cooldown_weeks = 0] the gate is a no-op, so this
-      function is bit-equal to {!screen} on the same inputs.
+      function is bit-equal to {!screen} on the same inputs (modulo PI filter).
 
     Authority: weinstein-book-reference.md §Buy-Side Rules — a stopped-out trade
     signals the breakout was false; book does not prescribe a specific cooldown

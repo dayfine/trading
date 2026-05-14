@@ -419,18 +419,25 @@ let _cooldown_block_set ~cooldown_weeks ~as_of ~last_stop_out_dates =
         if elapsed < cooldown_days then Some ticker else None)
     |> String.Set.of_list
 
-(** Single-pass filter that drops [held] and [cooldown] symbols and resolves
-    each survivor's sector context. Was a chained [filter |> map] allocating two
-    lists; the [filter_map] keeps just one. Runs every Friday over the full
-    screened universe (potentially thousands of symbols). *)
-let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map =
+(** Single-pass filter that drops [held], [cooldown], and non-member symbols and
+    resolves each survivor's sector context. Was a chained [filter |> map]
+    allocating two lists; the [filter_map] keeps just one. Runs every Friday
+    over the full screened universe (potentially thousands of symbols).
+
+    [is_member] is the point-in-time membership predicate. A symbol is admitted
+    only when [is_member a.ticker] is [true]; the default predicate (used by
+    [screen]) returns [true] unconditionally so existing callers preserve
+    bit-equality. See [screen_with_cooldown] for the wiring that closes over
+    [as_of]. *)
+let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member =
   List.filter_map stocks ~f:(fun (a : Stock_analysis.t) ->
       if Set.mem held_set a.ticker then None
       else if Set.mem cooldown_set a.ticker then None
+      else if not (is_member a.ticker) then None
       else Some (a, _resolve_sector ~sector_map a.ticker))
 
 let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
-    : result =
+    ~is_member : result =
   let held_set = String.Set.of_list held_tickers in
   let {
     weights;
@@ -451,7 +458,7 @@ let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
   in
   let total_stocks = List.length stocks in
   let candidates =
-    _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map
+    _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member
   in
   let candidates_after_held = List.length candidates in
   let buy_candidates =
@@ -480,14 +487,26 @@ let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
         ~buy_candidates ~short_candidates;
   }
 
+(** Default membership predicate — admits every symbol. Used as the seed for
+    [screen] / [screen_with_cooldown] when the caller does not supply
+    [?membership_at]; preserves bit-equality with the pre-PI-filter behaviour.
+*)
+let _always_member (_ : string) = true
+
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
   _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers
-    ~cooldown_set:String.Set.empty
+    ~cooldown_set:String.Set.empty ~is_member:_always_member
 
-let screen_with_cooldown ~config ~macro_trend ~sector_map ~stocks ~held_tickers
-    ~as_of ~last_stop_out_dates : result =
+let screen_with_cooldown ?membership_at ~config ~macro_trend ~sector_map ~stocks
+    ~held_tickers ~as_of ~last_stop_out_dates () : result =
   let cooldown_set =
     _cooldown_block_set ~cooldown_weeks:config.cascade_post_stop_cooldown_weeks
       ~as_of ~last_stop_out_dates
   in
+  let is_member =
+    match membership_at with
+    | None -> _always_member
+    | Some m -> fun ticker -> m ticker as_of
+  in
   _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
+    ~is_member

@@ -240,10 +240,10 @@ let _sector_filter_of ~sector_map (ticker, view, _prior, sr) =
     pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
     right shape per regime. *)
-let screen_universe ~config ~index_view ~(macro_result : Macro.result)
-    ~sector_map ~stop_states ~last_stop_out_dates
+let screen_universe ?membership_at ~config ~index_view
+    ~(macro_result : Macro.result) ~sector_map ~stop_states ~last_stop_out_dates
     ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
-    ~current_date ~audit_recorder =
+    ~current_date ~audit_recorder () =
   let classified =
     _classify_all ~config ~bar_reader ~prior_stages ~current_date
   in
@@ -259,10 +259,11 @@ let screen_universe ~config ~index_view ~(macro_result : Macro.result)
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =
-    Screener.screen_with_cooldown ~config:config.screening_config
+    Screener.screen_with_cooldown ?membership_at ~config:config.screening_config
       ~macro_trend:macro_result.trend ~sector_map ~stocks
       ~held_tickers:(held_symbols portfolio) ~as_of:current_date
       ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
+      ()
   in
   let combined_candidates =
     if config.enable_short_side then
