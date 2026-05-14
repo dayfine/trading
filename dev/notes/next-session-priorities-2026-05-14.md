@@ -1,5 +1,12 @@
 # Next-session priorities (2026-05-14)
 
+> **Superseded by `dev/notes/next-session-priorities-2026-05-15.md`** —
+> strategic pivot to broader-first + ML-discipline tuning. The P1-P3
+> priorities below all landed today (PRs #1089, #1090, #1091, plus
+> followups #1094 + #1095); the P4-P5 priorities are demoted to a new
+> P1 tier behind the broader-universe data-foundation work that's now
+> the P0. See the successor note for the new framing.
+
 ## Context
 
 The 2026-05-13 → 2026-05-14 marathon landed 29 PRs, including the M5.5
