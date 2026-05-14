@@ -61,15 +61,18 @@ let _read_history_or_empty (cb : Snapshot_callbacks.t) ~symbol ~from ~until
 
 (* Align OHLCV field-histories by date → [Daily_price.t list]. Builds one
    hashtable per non-Close field, walks [Close] once (O(n)), skips NaN-close
-   bars. [Open] included since Phase A.1; missing rows degrade to NaN. *)
-let _assemble_daily_bars ~open_ ~adj ~close ~high ~low ~volume :
+   bars. [Open] included since Phase A.1; missing rows degrade to NaN.
+   [active_through] is the manifest's per-symbol delisting marker, stamped on
+   every reconstituted bar. *)
+let _assemble_daily_bars ~open_ ~active_through ~adj ~close ~high ~low ~volume :
     Types.Daily_price.t list =
   let open_t = H.table_of open_ in
   let adj_t = H.table_of adj in
   let high_t = H.table_of high in
   let low_t = H.table_of low in
   let vol_t = H.table_of volume in
-  List.filter_map close ~f:(H.bar_for ~open_t ~adj_t ~high_t ~low_t ~vol_t)
+  List.filter_map close
+    ~f:(H.bar_for ~open_t ~active_through ~adj_t ~high_t ~low_t ~vol_t)
 
 (* Convert a weekly [Daily_price.t] list (output of daily_to_weekly) into the
    [weekly_view] float-array shape. *)
@@ -103,11 +106,12 @@ let _truncate_weekly_view (v : weekly_view) ~n : weekly_view =
       n;
     }
 
-(* Read OHLCV histories over [(from, as_of)] for [symbol] and assemble into
-   a [Daily_price.t list] in chronological order. Returns [] under the same
-   "missing → empty" contract as the rest of the module. Shared by
-   {!weekly_view_for}, {!daily_bars_for} and {!weekly_bars_for}. *)
-let _daily_bars_in_range cb ~symbol ~from ~as_of =
+(* Read OHLCV histories over [(from, as_of)] for [symbol] and assemble into a
+   [Daily_price.t list] in chronological order. Returns [] under the same
+   "missing → empty" contract as the rest of the module. The manifest's
+   per-symbol [active_through] (cb-resolved) is propagated onto every
+   reconstituted bar so PI-filter consumers see the delisting marker. *)
+let _daily_bars_in_range (cb : Snapshot_callbacks.t) ~symbol ~from ~as_of =
   let read field =
     _read_history_or_empty cb ~symbol ~from ~until:as_of ~field
   in
@@ -119,7 +123,8 @@ let _daily_bars_in_range cb ~symbol ~from ~as_of =
     let high = read Snapshot_schema.High in
     let low = read Snapshot_schema.Low in
     let volume = read Snapshot_schema.Volume in
-    _assemble_daily_bars ~open_ ~adj ~close ~high ~low ~volume
+    let active_through = cb.active_through_for ~symbol in
+    _assemble_daily_bars ~open_ ~active_through ~adj ~close ~high ~low ~volume
 
 (* Build and truncate a weekly view from non-empty [bars]. *)
 let _build_weekly_view bars ~n =

@@ -14,6 +14,7 @@ type t = {
     until:Core.Date.t ->
     field:Snapshot_schema.field ->
     (Core.Date.t * float) list Status.status_or;
+  active_through_for : symbol:string -> Core.Date.t option;
 }
 
 let _missing_field_error (snapshot : Snapshot.t) ~field =
@@ -47,4 +48,5 @@ let of_daily_panels panels =
   {
     read_field = _make_read_field panels;
     read_field_history = _make_read_field_history panels;
+    active_through_for = Daily_panels.active_through_for panels;
   }

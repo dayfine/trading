@@ -10,22 +10,22 @@
     [dev/notes/historical-universe-status- 2026-05-13.md] §1 phase 3 action item
     #2.
 
-    {b Caveat — snapshot pipeline currently strips [active_through]}. The
-    in-memory bar reader ({!Bar_reader.of_in_memory_bars}) round-trips bars
-    through the snapshot-pipeline write/read path. The snapshot-runtime
-    reconstitution
-    ([Snapshot_runtime.Snapshot_bar_views_helpers._make_daily_price]) hard-
-    codes [active_through = None] on every reconstituted row, so any
-    [active_through] set on the input bars is dropped before reaching
-    {!Bar_reader.daily_bars_for}'s consumers (this PR).
+    Coverage spans:
+    - the [None] / no-bars branches of [_pi_membership_at] (predicate-only),
+    - the flag-driven callback factory,
+    - end-to-end propagation of [active_through] through the
+      [Bar_reader.of_in_memory_bars] → snapshot writer → manifest →
+      [Snapshot_callbacks.active_through_for] →
+      [Snapshot_bar_views.daily_bars_for] → [Bar_reader.daily_bars_for] path,
+      including the rejection branch ([active_through = Some d] with
+      [as_of > d]). The end-to-end coverage is what makes
+      [enable_pi_filter = true] behaviourally distinct from
+      [enable_pi_filter = false] on real backtests.
 
-    That is the foundational P3 follow-up — propagating [active_through] through
-    the snapshot pipeline — and is intentionally out of scope here. The tests
-    below cover what can be exercised today: (a) the [None] / no-bars branches
-    of the predicate, (b) the flag-driven callback factory. The rejection branch
-    ([active_through = Some d] with [as_of > d]) is pinned at the {!Screener}
-    layer by [test_pi_filter_excludes_delisted] in [test_screener.ml], which
-    feeds the cascade an in-memory predicate directly. *)
+    Cross-reference: the screener-layer rejection branch is also pinned in
+    [test_screener.ml]'s [test_pi_filter_excludes_delisted], which feeds the
+    cascade an in-memory predicate directly without exercising the snapshot
+    pipeline. *)
 
 open OUnit2
 open Core
@@ -50,7 +50,7 @@ let _weekdays_starting ~start ~n =
   in
   loop [] start n
 
-let _make_bar ~date ~price : Types.Daily_price.t =
+let _make_bar ?(active_through = None) ~date ~price () : Types.Daily_price.t =
   {
     date;
     open_price = price;
@@ -59,13 +59,15 @@ let _make_bar ~date ~price : Types.Daily_price.t =
     close_price = price;
     adjusted_close = price;
     volume = 1_000_000;
-    active_through = None;
+    active_through;
   }
 
-let _bars ~n ~start_date ~start_price ~step =
+let _bars ?active_through ~n ~start_date ~start_price ~step () =
   let dates = _weekdays_starting ~start:start_date ~n in
   List.mapi dates ~f:(fun i d ->
-      _make_bar ~date:d ~price:(start_price +. (Float.of_int i *. step)))
+      _make_bar ?active_through ~date:d
+        ~price:(start_price +. (Float.of_int i *. step))
+        ())
 
 let _default_config () =
   Config.default_config ~universe:[ "AAPL"; "MSFT" ] ~index_symbol:"SPY"
@@ -84,21 +86,51 @@ let test_no_bars_admits _ =
        (_ymd 2024 6 14))
     (equal_to true)
 
-(** Most-recent bar's [active_through] reconstitutes to [None] under the current
-    snapshot pipeline (P3 propagation not yet wired): predicate returns [true].
-    Pins the bit-equality contract that PI-filter ON today does not change which
-    symbols are admitted purely on bar contents — only the
-    {!Daily_price.active_through} P3 follow-up activates the rejection branch.
-*)
-let test_active_through_currently_admits_through_snapshot _ =
+(** Bars with [active_through = None] (still trading): predicate returns [true]
+    after the snapshot round-trip. Pins the bit-equality contract that PI-filter
+    ON does not change which symbols are admitted purely on bar contents when no
+    delisting marker is set. *)
+let test_active_through_none_admits_through_snapshot _ =
   let bars =
-    _bars ~n:10 ~start_date:(_ymd 2024 1 2) ~start_price:100.0 ~step:0.5
+    _bars ~n:10 ~start_date:(_ymd 2024 1 2) ~start_price:100.0 ~step:0.5 ()
   in
   let bar_reader = Bar_reader.of_in_memory_bars [ ("AAPL", bars) ] in
   assert_that
     (Macro.Internal_for_test.pi_membership_at ~bar_reader "AAPL"
        (_ymd 2024 6 14))
     (equal_to true)
+
+(** End-to-end propagation: bars with [active_through = Some d] where
+    [as_of <= d] still admit. Pins that the manifest's per-symbol
+    [active_through] reaches the predicate through the snapshot pipeline. *)
+let test_active_through_set_admits_within_window _ =
+  let delisted_on = _ymd 2024 12 31 in
+  let bars =
+    _bars ~active_through:(Some delisted_on) ~n:10 ~start_date:(_ymd 2024 1 2)
+      ~start_price:100.0 ~step:0.5 ()
+  in
+  let bar_reader = Bar_reader.of_in_memory_bars [ ("AAPL", bars) ] in
+  assert_that
+    (Macro.Internal_for_test.pi_membership_at ~bar_reader "AAPL"
+       (_ymd 2024 6 14))
+    (equal_to true)
+
+(** End-to-end propagation, rejection branch: bars with
+    [active_through = Some d] where [as_of > d] reject. This is the behavioural
+    contract the P5 PI filter relies on; with [active_through] propagation in
+    place a delisted symbol that loses index membership is excluded from
+    screening even after its last bar. *)
+let test_active_through_set_rejects_after_delisting _ =
+  let delisted_on = _ymd 2024 3 31 in
+  let bars =
+    _bars ~active_through:(Some delisted_on) ~n:10 ~start_date:(_ymd 2024 1 2)
+      ~start_price:100.0 ~step:0.5 ()
+  in
+  let bar_reader = Bar_reader.of_in_memory_bars [ ("AAPL", bars) ] in
+  assert_that
+    (Macro.Internal_for_test.pi_membership_at ~bar_reader "AAPL"
+       (_ymd 2024 6 14))
+    (equal_to false)
 
 (* ------------------------------------------------------------------ *)
 (* membership_at_callback_of: flag-driven wiring                       *)
@@ -129,8 +161,12 @@ let suite =
   "pi_filter_wiring_tests"
   >::: [
          "test_no_bars_admits" >:: test_no_bars_admits;
-         "test_active_through_currently_admits_through_snapshot"
-         >:: test_active_through_currently_admits_through_snapshot;
+         "test_active_through_none_admits_through_snapshot"
+         >:: test_active_through_none_admits_through_snapshot;
+         "test_active_through_set_admits_within_window"
+         >:: test_active_through_set_admits_within_window;
+         "test_active_through_set_rejects_after_delisting"
+         >:: test_active_through_set_rejects_after_delisting;
          "test_callback_default_is_none" >:: test_callback_default_is_none;
          "test_callback_enabled_returns_some"
          >:: test_callback_enabled_returns_some;

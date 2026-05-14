@@ -199,6 +199,10 @@ let read_history t ~symbol ~from ~until =
     if hi <= lo then Ok []
     else Ok (Array.to_list (Array.sub entry.rows ~pos:lo ~len:(hi - lo)))
 
+let active_through_for t ~symbol =
+  Option.bind (Snapshot_manifest.find t.manifest ~symbol)
+    ~f:(fun (e : Snapshot_manifest.file_metadata) -> e.active_through)
+
 let cache_bytes t = t.bytes
 
 let close t =

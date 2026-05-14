@@ -7,6 +7,7 @@ type file_metadata = {
   byte_size : int;
   payload_md5 : string;
   csv_mtime : float;
+  active_through : Date.t option; [@sexp.option]
 }
 [@@deriving sexp, compare, equal]
 

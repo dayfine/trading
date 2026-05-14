@@ -35,6 +35,16 @@ type file_metadata = {
       (** Unix mtime of the source CSV at the time this snapshot was built.
           Drives the incremental-rebuild predicate: a CSV with [mtime > this]
           forces a rebuild for the symbol. *)
+  active_through : Core.Date.t option; [@sexp.option]
+      (** Per-symbol delisting marker. [None] = still trading or unknown;
+          [Some d] = symbol was active through date [d]. Derived from the last
+          input bar's [Daily_price.active_through] at write time. Serialized
+          with [@sexp.option] so manifests written before this field landed
+          continue to decode (the field is omitted from the sexp when [None]).
+          Surfaced to consumers via [Daily_panels.active_through_for] and
+          [Snapshot_callbacks.active_through_for]; reaches the screener PI
+          filter via {!Bar_reader.daily_bars_for}'s reconstituted
+          [Daily_price.t] rows. *)
 }
 [@@deriving sexp, compare, equal]
 (** Per-symbol metadata recorded in the directory manifest. *)

@@ -45,9 +45,23 @@ let _write_symbol_snap ~dir ~symbol rows =
 (* Per-symbol manifest entry. The [byte_size] / [payload_md5] / [csv_mtime]
    fields are observational only — the runtime [Daily_panels] reader does
    not validate them at create time. Sentinel values keep the constructor
-   stdlib-only (no [Core_unix.stat]). *)
-let _file_metadata_of ~symbol ~path : Snapshot_manifest.file_metadata =
-  { symbol; path; byte_size = 0; payload_md5 = "ignored"; csv_mtime = 0.0 }
+   stdlib-only (no [Core_unix.stat]). [active_through] is the symbol's
+   delisting marker, taken from the last input bar; surfaces through
+   [Daily_panels.active_through_for] to the screener PI filter. *)
+let _file_metadata_of ~symbol ~path ~active_through :
+    Snapshot_manifest.file_metadata =
+  {
+    symbol;
+    path;
+    byte_size = 0;
+    payload_md5 = "ignored";
+    csv_mtime = 0.0;
+    active_through;
+  }
+
+let _active_through_of_bars (bars : Types.Daily_price.t list) : Date.t option =
+  List.last bars
+  |> Option.bind ~f:(fun (b : Types.Daily_price.t) -> b.active_through)
 
 let _write_manifest_or_fail ~dir manifest =
   let path = Filename.concat dir "manifest.sexp" in
@@ -63,9 +77,10 @@ let _write_manifest_or_fail ~dir manifest =
    intermediate list-of-lists costs ~195 MB RSS (15y memory cliff Fix C). *)
 let _read_build_write_one ~data_dir ~start_date ~end_date ~dir symbol =
   let symbol, bars = _read_one_symbol ~data_dir ~start_date ~end_date symbol in
+  let active_through = _active_through_of_bars bars in
   let rows = _build_rows_or_fail ~symbol ~bars in
   let path = _write_symbol_snap ~dir ~symbol rows in
-  _file_metadata_of ~symbol ~path
+  _file_metadata_of ~symbol ~path ~active_through
 
 let build ~data_dir ~universe ~start_date ~end_date =
   let dir = Stdlib.Filename.temp_dir "panel_runner_csv_snapshot_" "" in

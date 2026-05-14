@@ -45,6 +45,7 @@ let _write_symbol_file ~dir ~symbol rows =
            byte_size = Int64.to_int_exn stat.st_size;
            payload_md5 = "ignored";
            csv_mtime = stat.st_mtime;
+           active_through = None;
          }
           : Snapshot_manifest.file_metadata) )
   | Error err -> assert_failure ("Snapshot_format.write: " ^ Status.show err)
@@ -243,6 +244,7 @@ let test_schema_mismatch_fails_loud _ =
       byte_size = 0;
       payload_md5 = "ignored";
       csv_mtime = 0.0;
+      active_through = None;
     }
   in
   let manifest =

@@ -45,6 +45,7 @@ let _setup ~symbols ~n_days =
            byte_size = 0;
            payload_md5 = "ignored";
            csv_mtime = 0.0;
+           active_through = None;
          }
           : Snapshot_manifest.file_metadata))
   in

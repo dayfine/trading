@@ -117,6 +117,15 @@ val read_history :
     Errors are the same as {!read_today} except a date with no matching row
     yields [Ok []] rather than [Error NotFound]. *)
 
+val active_through_for : t -> symbol:string -> Core.Date.t option
+(** [active_through_for t ~symbol] returns the per-symbol delisting marker
+    recorded in the directory manifest's [file_metadata.active_through]. [None]
+    when [symbol] is not in the manifest or its [active_through] field is absent
+    (still trading / unknown). This is the seam the [Snapshot_callbacks] layer
+    reads to populate [Daily_price.active_through] on every reconstituted bar;
+    the screener PI filter consumes the propagated value via
+    {!Bar_reader.daily_bars_for}. *)
+
 val cache_bytes : t -> int
 (** [cache_bytes t] returns the current sum of estimated bytes resident in the
     cache. Useful for tests that assert eviction kicked in. *)

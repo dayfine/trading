@@ -109,6 +109,7 @@ let _build_snapshot_callbacks ~symbols ~calendar ~bars_for_symbol :
            byte_size = 0;
            payload_md5 = "ignored";
            csv_mtime = 0.0;
+           active_through = None;
          }
           : Snapshot_manifest.file_metadata))
   in

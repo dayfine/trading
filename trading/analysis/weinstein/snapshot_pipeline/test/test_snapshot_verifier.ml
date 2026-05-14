@@ -58,6 +58,7 @@ let _build_one_symbol_dir ~symbols =
           byte_size = String.length bytes;
           payload_md5 = Stdlib.Digest.to_hex (Stdlib.Digest.string bytes);
           csv_mtime = 0.0;
+          active_through = None;
         })
   in
   let manifest =

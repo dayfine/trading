@@ -88,7 +88,7 @@ let _should_skip ~existing ~symbol ~csv_mtime ~schema =
            ~default:false
            ~f:(_entry_is_current ~csv_mtime)
 
-let _file_metadata ~symbol ~path ~csv_mtime =
+let _file_metadata ~symbol ~path ~csv_mtime ~active_through =
   let bytes = In_channel.read_all path in
   {
     Snapshot_manifest.symbol;
@@ -96,19 +96,31 @@ let _file_metadata ~symbol ~path ~csv_mtime =
     byte_size = String.length bytes;
     payload_md5 = Stdlib.Digest.to_hex (Stdlib.Digest.string bytes);
     csv_mtime;
+    active_through;
   }
 
-let _write_and_checksum ~symbol ~path ~csv_mtime rows =
+(** Last-bar [active_through] is the symbol's delisting marker. The CSV loader
+    sets the same value on every row of a symbol's history (or [None] throughout
+    for still-trading symbols), so reading the tail is equivalent to reading any
+    row. Surfaces to the runtime via the manifest → [Daily_panels] →
+    [Snapshot_callbacks] → reconstituted [Daily_price.t] rows path so the
+    screener PI filter can see it. *)
+let _active_through_of_bars (bars : Types.Daily_price.t list) : Date.t option =
+  List.last bars
+  |> Option.bind ~f:(fun (b : Types.Daily_price.t) -> b.active_through)
+
+let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
   match Snapshot_format.write ~path rows with
   | Error err -> Error err
-  | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime)
+  | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime ~active_through)
 
 let _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars ~output_dir
     ~csv_mtime =
   let path = _file_path ~output_dir ~symbol in
+  let active_through = _active_through_of_bars bars in
   match Pipeline.build_for_symbol ~symbol ~bars ~schema ?benchmark_bars () with
   | Error err -> Error err
-  | Ok rows -> _write_and_checksum ~symbol ~path ~csv_mtime rows
+  | Ok rows -> _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows
 
 let _maybe_reuse ~existing ~symbol =
   match existing with
