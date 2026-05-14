@@ -1,11 +1,36 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-13
+## Last updated: 2026-05-15
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
 ## Notes
+
+**2026-05-15 strategic pivot — track elevated to P0.** Per
+`dev/notes/next-session-priorities-2026-05-15.md`, broader-universe +
+longer-horizon survivorship-correct data is now the load-bearing
+prerequisite for the next round of strategy work. Two cross-window
+inversions in one week (M5.5 axis-2 PR #1086 + continuation combined
+PR #1095) confirmed Cell E is locally near-optimal on the levers it
+exposes; the limiting factor is what the optimizer is looking at. New
+Phase 1 work below:
+
+1. **`sp500-1996-01-01.sexp` membership data** — mirror PR #1076's
+   per-symbol `active_through` columns back to 1996, sourced from
+   the Wikipedia changelog infra in PR #813 (`Changes_parser`).
+2. **`broad-3000-2010-01-01.sexp` cohort** — expand beyond SP500 to
+   the full Russell 3000 with PI-aware `active_through` data.
+3. **Survivorship-correct re-pin of `goldens-sp500-historical/sp500-2010-2026.sexp`** —
+   replace current pinned baseline (measured on survivorship-biased
+   data per #1076's hypothesis) with one where PI filter is ON by
+   default.
+
+Owner: feat-data. Status flipped READY_FOR_REVIEW → IN_PROGRESS on
+the strategic pivot.
+
+**Prior notes retained below.**
+
 M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#782/#790/#791/#793); Phase B writer perf fix O(N²)→O(N) merged (#792). **F.2 default-flip COMPLETE 2026-05-03** (#797/#800/#802 — snapshot mode is now the canonical runtime path). **Wiki+EODHD PR-A/B/C/D MERGED** (#803/#808/#809/#813). **F.3.a sub-sequence COMPLETE 2026-05-04** (#825/#827/#828/#829). **F.3.b–F.3.e ALL MERGED 2026-05-04..06** (#833 b-1, #837 c-1, #842 d-1, #861/#864 #848 forward fix, #866 b-2/c-2/d-2 caller migration, #868/#869 e-1/e-2 type relocation + `Bar_reader.of_panels` deletion, #875/#876/#877 e-3 stack — `Bar_panels.{ml,mli}` DELETED; sp500-2019-2023 baseline bit-equal 58.34%/81 across the stack). **M5.3 streaming Phase F COMPLETE.**
 
 **Synth-v1 — block bootstrap — MERGED 2026-05-02 (#755).** **Synth-v2 — HMM + GARCH — MERGED 2026-05-02 (#775).** **Synth-v3 — multi-symbol factor model — MERGED 2026-05-11 (#1028)** (`factor_model.{ml,mli}` + `synth_v3.{ml,mli}` + `generate_synth_v3.exe` CLI; 44 new tests passing; cross-sectional avg pairwise correlation in [0.3, 0.7] target band; 500-sym × 80yr universe smoke-tested via the CLI). **EODHD multi-market expansion MERGED 2026-05-02 (#772)** — LSE/TSE/ASX/HKEX/TSX symbol resolution.

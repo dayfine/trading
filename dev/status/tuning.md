@@ -1,9 +1,43 @@
 # Status: tuning
 
-## Last updated: 2026-05-13
+## Last updated: 2026-05-15
 
 ## Status
 IN_PROGRESS
+
+**2026-05-15 strategic pivot — track elevated to P0 alongside
+data-foundations.** Per `dev/notes/next-session-priorities-2026-05-15.md`,
+multi-parameter ML-discipline tuning over the full Cell E config
+surface (~15-25 parameters) on walk-forward CV is now the primary
+tuning vector. Two cross-window inversions in one week (PR #1086 M5.5
+axis-2 + PR #1095 continuation combined) confirmed that single-axis
+and small-grid sweeps under fixed windows are diagnostic-only at this
+point; further manual tuning is rejected.
+
+New Phase 2 work — **walk-forward CV harness scaled up**:
+- Extend `dev/experiments/cell-e-walk-forward-2026-05-08/` (8 half-period
+  folds) to ~30 rolling folds.
+- Output `walk_forward_report.md` surfacing per-fold metrics + cross-
+  fold stability + parameter sensitivity + explicit go/no-go gate
+  ("wins on ≥M of N folds with no fold worse than baseline by Δ").
+- This gate language is what M5.5 axis-2 and continuation-combined
+  would have failed.
+
+New Phase 3 work — **multi-parameter Bayesian opt scaled up**:
+- Extend `bayesian_runner.exe` (PR #914) from current 4-D bounds to
+  the full Cell E config surface.
+- Scored on Phase 2 walk-forward CV with explicit MaxDD penalty.
+- Acceptance: converges to a cell beating Cell E on walk-forward
+  Sharpe by ≥0.05 with MaxDD no worse.
+
+Phase 2 is independent of `data-foundations` Phase 1 (can run on
+existing 510-sym 2010-2026 universe) and should land in parallel.
+Phase 3 benefits from Phase 1 broader universe but is not strictly
+blocked on it.
+
+Owner: feat-backtest.
+
+**Prior status preamble retained below.**
 
 (T-A lib + CLI MERGED; T-B lib + CLI MERGED; 81-cell flagship grid RUN but key-path bug invalidated result; weights surface CONFIRMED load-bearing via correct field paths)
 
