@@ -53,21 +53,33 @@ universe (broad-1000) absorbs the breadth of stop-out events differently.
 
 ## Meta-lesson — 5y tuning doesn't generalize
 
-This is the SECOND axis whose 5y win failed on long-horizon validation:
+Both stop-distance levers were 5y winners but generalized differently:
 
-- Axis-1 (`installed_stop_min_pct = 0.08`, PR #1079→#1081 validation):
-  10y broad-1000 ΔCalmar +0.008 (in neutral band — barely lifted).
-- Axis-2 (`min_correction_pct = 0.10`, this PR): all 3 long horizons FAIL.
+- **Axis-1** (`installed_stop_min_pct = 0.08`, PR #1079→#1081 validation):
+  CONDITIONAL GO. 16y long-only ΔCalmar **+0.06**, 16y long-short **+0.04**,
+  10y broad-1000 **+0.008** (in neutral band). Two of three horizons passed
+  the +0.02 GO threshold; broad-1000 was inconclusive. The lever generalized
+  partially. The cross-sweep (#1084) later showed axis-1 + axis-2 combined
+  is destructive, but axis-1 alone was promoted with a "SP500-horizons only,
+  hold on broad-1000" caveat.
+
+- **Axis-2** (`min_correction_pct = 0.10`, this PR): STOP on all 3 long
+  horizons (10y −0.04, 16y long-only **−0.24**, 16y long-short −0.05). The
+  5y win does NOT generalize; the lever fails catastrophically on the 16y
+  long-only window (MaxDD 19.9% → 60.1%, 0 → 26 force-liqs).
 
 **The 5y sp500-2019-2023 window has a specific shape** (late-cycle 2019 →
-COVID crash → V-shaped recovery → 2022 bear) that rewards wider stops
-(longer-hold compounding of bull legs). 16y captures the 2010-2014 grinding
-recovery, multi-year bear cycles, and regime changes where wider stops let
-position losses compound.
+COVID crash → V-shaped recovery → 2022 bear) that rewards wider stops.
+Axis-1 widens the installed-stop FLOOR (the support-floor logic still
+drives most stops); axis-2 widens the support-floor DETECTION threshold
+itself, so on 16y bear cycles positions ride down further before any stop
+triggers. Axis-2 is strictly more aggressive than axis-1 in widening
+effective stop distance, which is why it breaks where axis-1 partly held.
 
-**Implication for future tuning:** all parameter sweeps that affect stop
-distance (axis-1, axis-2, future axis-3 / installed-stop) MUST be validated
-on 10y + 16y BEFORE promotion. Single-window winners cannot be trusted.
+**Implication for future tuning:** parameter sweeps that affect stop
+distance MUST be validated on 10y + 16y BEFORE promotion. A 5y win is
+necessary but not sufficient evidence. The validation protocol from #1064's
+design plan is now load-bearing — don't skip it.
 
 ## Verdict — STOP
 
@@ -79,8 +91,10 @@ on 10y + 16y BEFORE promotion. Single-window winners cannot be trusted.
 
 ## Open: what does work on long horizons?
 
-None of the 3 stop-distance axes (axis-1 floor, axis-2 buffer, combined)
-generalize to 10y/16y. Remaining unmeasured axes from #1064:
+Of the stop-distance levers tested: axis-1 alone (`installed_stop_min_pct = 0.08`)
+partially generalized (passed 2 of 3 long horizons per #1081) but the combined
+axis-1 + axis-2 is destructive (#1084) and axis-2 alone is destructive on
+long horizons (this PR). Remaining unmeasured axes from #1064:
 
 - **axis-3** (`min_score_override` floor tightening) — targets the cascade
   gate, NOT stop distance. May behave differently. Worth a sweep.
