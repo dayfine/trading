@@ -268,7 +268,8 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
-      ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter ()
+      ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
+      ?slippage_bps:s.slippage_bps ()
   in
   let wall_seconds =
     Time_ns.Span.to_sec (Time_ns.diff (Time_ns_unix.now ()) t_start)

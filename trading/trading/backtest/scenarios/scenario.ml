@@ -61,6 +61,7 @@ type t = {
   config_overrides : Sexp.t list;
   strategy : Backtest.Strategy_choice.t;
       [@sexp.default Backtest.Strategy_choice.default]
+  slippage_bps : int option; [@sexp.option]
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]

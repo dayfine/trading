@@ -92,6 +92,13 @@ type t = {
           back-compat with every pre-#882 scenario file. Set to e.g.
           [(Bah_benchmark (symbol SPY))] to swap in a Buy-and-Hold benchmark
           run. *)
+  slippage_bps : int option; [@sexp.option]
+      (** Basis-points slippage threaded into {!Backtest.Runner.run_backtest}'s
+          [?slippage_bps] argument (engine cost-overlay knob, PR #920). [None]
+          preserves the zero-slippage baseline byte-for-byte. Set to a
+          non-negative int for cost-overlay runs (e.g. M5.6 slippage sweep,
+          2026-05-14). The runner applies buy fills at [price * (1 + bps/10000)]
+          and sell fills at [price / (1 + bps/10000)] symmetrically. *)
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
