@@ -12,7 +12,8 @@ let table_of (rows : (Date.t * float) list) =
 let _round_volume v =
   if Float.is_nan v then 0 else Int.of_float (Float.round_nearest v)
 
-let _make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v =
+let _make_daily_price ~open_t ~active_through ~date ~close_v ~adj_v ~high_v
+    ~low_v ~vol_v =
   let open_price =
     Hashtbl.find open_t date |> Option.value ~default:Float.nan
   in
@@ -24,10 +25,11 @@ let _make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v =
     close_price = close_v;
     volume = _round_volume vol_v;
     adjusted_close = adj_v;
-    active_through = None;
+    active_through;
   }
 
-let _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v =
+let _match_ohlcv ~open_t ~active_through ~adj_t ~high_t ~low_t ~vol_t ~date
+    ~close_v =
   match
     ( Hashtbl.find adj_t date,
       Hashtbl.find high_t date,
@@ -36,9 +38,13 @@ let _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v =
   with
   | Some adj_v, Some high_v, Some low_v, Some vol_v ->
       Some
-        (_make_daily_price ~open_t ~date ~close_v ~adj_v ~high_v ~low_v ~vol_v)
+        (_make_daily_price ~open_t ~active_through ~date ~close_v ~adj_v ~high_v
+           ~low_v ~vol_v)
   | _ -> None
 
-let bar_for ~open_t ~adj_t ~high_t ~low_t ~vol_t (date, close_v) =
+let bar_for ~open_t ~active_through ~adj_t ~high_t ~low_t ~vol_t (date, close_v)
+    =
   if Float.is_nan close_v then None
-  else _match_ohlcv ~open_t ~adj_t ~high_t ~low_t ~vol_t ~date ~close_v
+  else
+    _match_ohlcv ~open_t ~active_through ~adj_t ~high_t ~low_t ~vol_t ~date
+      ~close_v

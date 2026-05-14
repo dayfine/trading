@@ -14,6 +14,7 @@ let _sample_entry ~symbol =
     byte_size = 1024;
     payload_md5 = "deadbeef";
     csv_mtime = 1700000000.0;
+    active_through = None;
   }
 
 let _sample_manifest () =
@@ -117,6 +118,7 @@ let test_upsert_entry_replaces_existing _ =
       byte_size = 2048;
       payload_md5 = "feedface";
       csv_mtime = 1800000000.0;
+      active_through = None;
     }
   in
   let updated = Snapshot_manifest.upsert_entry manifest replacement in

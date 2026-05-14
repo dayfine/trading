@@ -104,6 +104,7 @@ let _write_snapshot_dir ~snapshot_dir bars_by_symbol =
            byte_size = Int64.to_int_exn stat.st_size;
            payload_md5 = "ignored";
            csv_mtime = stat.st_mtime;
+           active_through = None;
          }
           : Snapshot_manifest.file_metadata))
   in

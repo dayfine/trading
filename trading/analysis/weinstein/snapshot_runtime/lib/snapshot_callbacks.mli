@@ -55,6 +55,14 @@ type t = {
           result with [snd] = [Float.nan]; the caller decides what NaN means in
           context (e.g. ATR-14 on day < 14 of a symbol's history per the Phase B
           contract). *)
+  active_through_for : symbol:string -> Core.Date.t option;
+      (** [active_through_for ~symbol] returns the per-symbol delisting marker
+          stored in the directory manifest's [file_metadata.active_through].
+          [None] = still trading / unknown; [Some d] = symbol was active through
+          [d]. Used by {!Snapshot_bar_views} to stamp the value onto every
+          reconstituted [Daily_price.t] so the screener point-in-time filter
+          (which reads the last bar's [active_through]) sees the delisting
+          marker for any symbol that has one in the manifest. *)
 }
 (** Field-level accessor bundle.
 

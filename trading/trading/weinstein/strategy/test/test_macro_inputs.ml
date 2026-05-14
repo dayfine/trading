@@ -399,6 +399,7 @@ let _build_snapshot_callbacks
           byte_size = 0;
           payload_md5 = "ignored";
           csv_mtime = 0.0;
+          active_through = None;
         })
   in
   let manifest =

@@ -60,6 +60,7 @@ let _empty_snapshot_callbacks : Snapshot_callbacks.t =
   {
     read_field = (fun ~symbol:_ ~date:_ ~field:_ -> not_found);
     read_field_history = (fun ~symbol:_ ~from:_ ~until:_ ~field:_ -> not_found);
+    active_through_for = (fun ~symbol:_ -> None);
   }
 
 (* Empty views — used as the sentinel return when [as_of] falls outside the
@@ -196,9 +197,24 @@ let _write_symbol_snap ~dir ~symbol rows =
    the byte_size / payload_md5 / csv_mtime fields are observational only —
    the runtime [Daily_panels] reader does not validate them at create time.
    Filling sentinel values keeps the constructor stdlib-only (no
-   [Core_unix.stat]). *)
-let _file_metadata_of ~symbol ~path : Snapshot_manifest.file_metadata =
-  { symbol; path; byte_size = 0; payload_md5 = "ignored"; csv_mtime = 0.0 }
+   [Core_unix.stat]). [active_through] is the symbol's delisting marker
+   (taken from the last bar's [Daily_price.active_through]); the runtime
+   path uses it to populate the same field on reconstituted bars so the
+   screener PI filter sees the value the in-memory caller fed in. *)
+let _file_metadata_of ~symbol ~path ~active_through :
+    Snapshot_manifest.file_metadata =
+  {
+    symbol;
+    path;
+    byte_size = 0;
+    payload_md5 = "ignored";
+    csv_mtime = 0.0;
+    active_through;
+  }
+
+let _active_through_of_bars (bars : Types.Daily_price.t list) : Date.t option =
+  List.last bars
+  |> Option.bind ~f:(fun (b : Types.Daily_price.t) -> b.active_through)
 
 let _open_daily_panels ~dir ~manifest =
   match
@@ -224,7 +240,8 @@ let of_in_memory_bars (symbol_bars : (string * Types.Daily_price.t list) list) =
     List.map symbol_bars ~f:(fun (symbol, bars) ->
         let rows = _build_for_symbol_or_fail ~symbol ~bars in
         let path = _write_symbol_snap ~dir ~symbol rows in
-        _file_metadata_of ~symbol ~path)
+        let active_through = _active_through_of_bars bars in
+        _file_metadata_of ~symbol ~path ~active_through)
   in
   let manifest =
     Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
