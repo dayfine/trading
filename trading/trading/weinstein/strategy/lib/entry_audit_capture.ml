@@ -1,5 +1,8 @@
 (** Entry-side trade-audit capture. See [entry_audit_capture.mli]. *)
 
+(* @large-module: per-candidate entry construction + cash/notional/sector gate
+   chain + audit emission. The strategy file delegates here so it stays under
+   its own cap; splitting further would scatter the gate-ordering contract. *)
 open Core
 open Trading_strategy
 
@@ -158,6 +161,37 @@ let check_short_notional_cap ~short_notional_acc ~short_notional_cap
         short_notional_acc := projected;
         Some (trans, meta))
 
+(** P1 2026-05-15: aggregate per-sector exposure cap evaluated at entry-decision
+    time. Pass-through when the cap is None (default-off) or the candidate's
+    sector is the empty-string (unknown bucket exempted). Otherwise: projects
+    sector exposure after admitting the candidate
+    ([(existing + shares * entry_price) / portfolio_value]) and rejects if over
+    [pct]. Bumps the accumulator on the pass case. *)
+let check_sector_exposure_cap ~sector_exposure_acc ~max_sector_exposure_pct
+    ~portfolio_value ((trans : Position.transition), (meta : entry_meta))
+    (cand : Screener.scored_candidate) =
+  match max_sector_exposure_pct with
+  | None -> Some (trans, meta)
+  | Some _ when String.is_empty cand.sector.sector_name -> Some (trans, meta)
+  | Some pct ->
+      let sector_name = cand.sector.sector_name in
+      let existing =
+        Hashtbl.find sector_exposure_acc sector_name
+        |> Option.value ~default:0.0
+      in
+      let candidate_notional =
+        Float.of_int meta.shares *. meta.effective_entry_price
+      in
+      let projected = existing +. candidate_notional in
+      let projected_pct =
+        if Float.( <= ) portfolio_value 0.0 then 0.0
+        else projected /. portfolio_value
+      in
+      if Float.( > ) projected_pct pct then None
+      else (
+        Hashtbl.set sector_exposure_acc ~key:sector_name ~data:projected;
+        Some (trans, meta))
+
 (* Refund the cash tentatively deducted by [check_cash_and_deduct] when the
    notional-cap gate subsequently rejects the candidate. This keeps the running
    cash balance correct for later candidates in the same walk. *)
@@ -169,28 +203,49 @@ let _refund_cash_for_trans ~remaining_cash (trans : Position.transition) =
     | Position.CreateEntering e -> e.target_quantity *. e.entry_price
     | _ -> 0.0
 
-(** Check the short-notional cap for a cash-cleared entry. Returns [Kept] or
-    [Skipped Short_notional_cap], refunding the tentatively deducted cash on
-    rejection so subsequent cash gates see the correct running balance. *)
-let _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
-    ~short_notional_cap ~emit (cand : Screener.scored_candidate) trans meta :
-    candidate_decision =
+(** Apply the sector-exposure cap (P1 2026-05-15) for a notional-cleared entry.
+    Returns [Kept] or [Skipped Sector_exposure_cap], refunding the tentatively
+    deducted cash on rejection so subsequent gates see the correct balance. *)
+let _apply_sector_exposure_gate ~remaining_cash ~sector_exposure_acc
+    ~max_sector_exposure_pct ~portfolio_value ~emit
+    (cand : Screener.scored_candidate) trans meta : candidate_decision =
   match
-    check_short_notional_cap ~short_notional_acc ~short_notional_cap
-      (trans, meta) cand
+    check_sector_exposure_cap ~sector_exposure_acc ~max_sector_exposure_pct
+      ~portfolio_value (trans, meta) cand
   with
   | Some (trans, meta) ->
       emit "Kept";
       Kept (trans, meta)
   | None ->
       _refund_cash_for_trans ~remaining_cash trans;
+      emit "Sector_exposure_cap";
+      Skipped Sector_exposure_cap
+
+(** Check the short-notional cap for a cash-cleared entry. On pass, hand off to
+    the sector-exposure gate. On rejection, refund the tentatively deducted
+    cash. *)
+let _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
+    ~short_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
+    ~portfolio_value ~emit (cand : Screener.scored_candidate) trans meta :
+    candidate_decision =
+  match
+    check_short_notional_cap ~short_notional_acc ~short_notional_cap
+      (trans, meta) cand
+  with
+  | Some (trans, meta) ->
+      _apply_sector_exposure_gate ~remaining_cash ~sector_exposure_acc
+        ~max_sector_exposure_pct ~portfolio_value ~emit cand trans meta
+  | None ->
+      _refund_cash_for_trans ~remaining_cash trans;
       emit "Short_notional_cap";
       Skipped Short_notional_cap
 
-(** Apply the cash and short-notional-cap gates to an [Entry_ok] result. Returns
-    [Kept] on double-pass or the appropriate [Skipped] variant. *)
+(** Apply the cash, short-notional-cap, and sector-exposure-cap gates to an
+    [Entry_ok] result. Returns [Kept] on all-pass or the appropriate [Skipped]
+    variant. *)
 let _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
-    ~short_notional_cap ~emit ~(cand : Screener.scored_candidate) trans meta :
+    ~short_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
+    ~portfolio_value ~emit ~(cand : Screener.scored_candidate) trans meta :
     candidate_decision =
   match check_cash_and_deduct ~remaining_cash (trans, meta) with
   | None ->
@@ -198,10 +253,12 @@ let _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
       Skipped Insufficient_cash
   | Some (trans, meta) ->
       _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
-        ~short_notional_cap ~emit cand trans meta
+        ~short_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
+        ~portfolio_value ~emit cand trans meta
 
 let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
-    ~short_notional_cap (c : Screener.scored_candidate) : candidate_decision =
+    ~short_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
+    ~portfolio_value (c : Screener.scored_candidate) : candidate_decision =
   let emit decision =
     Entry_audit_helpers.emit_decision_trace ~ticker:c.ticker ~side:c.side
       ~decision ~remaining_cash:!remaining_cash
@@ -220,7 +277,8 @@ let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
         Skipped Sized_to_zero
     | Entry_ok (trans, meta) ->
         _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
-          ~short_notional_cap ~emit ~cand:c trans meta
+          ~short_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
+          ~portfolio_value ~emit ~cand:c trans meta
 
 let _alternative_of_decision ~exclude_position_id (candidate, decision) :
     Audit_recorder.alternative_input option =

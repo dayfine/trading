@@ -63,6 +63,13 @@ type skip_reason =
           at +16% above entry — wider than the 15% Per_position safety net —
           meaning the position was guaranteed to force-liquidate before the
           per-position stop could ever fire. *)
+  | Sector_exposure_cap
+      (** P1 2026-05-15: skipped because admitting the candidate would push
+          aggregate dollar exposure to the candidate's sector past
+          [Portfolio_risk.config.max_sector_exposure_pct] of portfolio value.
+          Default-off (cap = [None]) so the variant is never emitted under
+          baseline configurations. Authority:
+          [dev/notes/next-session-priorities-2026-05-15.md] §P1. *)
 [@@deriving sexp]
 
 type alternative_candidate = {

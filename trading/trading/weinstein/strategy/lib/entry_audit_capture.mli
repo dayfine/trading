@@ -194,19 +194,48 @@ val check_short_notional_cap :
     pass case so later candidates in the same entry walk see the up-to-date
     running total. *)
 
+val check_sector_exposure_cap :
+  sector_exposure_acc:(string, float) Core.Hashtbl.t ->
+  max_sector_exposure_pct:float option ->
+  portfolio_value:float ->
+  Trading_strategy.Position.transition * entry_meta ->
+  Screener.scored_candidate ->
+  (Trading_strategy.Position.transition * entry_meta) option
+(** P1 2026-05-15: aggregate per-sector exposure cap evaluated at entry-decision
+    time. Mirrors {!check_short_notional_cap}'s shape so the gate composes
+    uniformly in {!classify_candidate}.
+
+    Pass-through [Some] on every candidate when [max_sector_exposure_pct = None]
+    (default-off; preserves all goldens). When [Some pct] and the candidate's
+    sector is non-empty, returns [Some] only when
+    [(existing_sector_exposure + (shares * effective_entry_price)) /
+     portfolio_value <= pct].
+
+    The empty-string (unknown) sector is exempt — pass-through [Some], same
+    rationale as {!Portfolio_risk.check_limits}'s exemption.
+
+    Side-effect on the pass case: bumps [sector_exposure_acc] for the
+    candidate's sector by [shares * effective_entry_price] so later candidates
+    in the same entry walk see the up-to-date running total. *)
+
 val classify_candidate :
   held_set:Core.String.Set.t ->
   make_entry:(Screener.scored_candidate -> entry_attempt_result) ->
   remaining_cash:float ref ->
   short_notional_acc:float ref ->
   short_notional_cap:float ->
+  sector_exposure_acc:(string, float) Core.Hashtbl.t ->
+  max_sector_exposure_pct:float option ->
+  portfolio_value:float ->
   Screener.scored_candidate ->
   candidate_decision
-(** Classify one candidate as [Kept] or [Skipped reason]. The four skip reasons
+(** Classify one candidate as [Kept] or [Skipped reason]. The five skip reasons
     match {!Audit_recorder.skip_reason}: held, sized to zero, rejected by the
-    running cash check, or rejected by the running short-notional cap. Order:
-    held-check, sizing via [make_entry], cash check, then short-notional cap.
+    running cash check, rejected by the running short-notional cap, or rejected
+    by the running sector-exposure cap. Order: held-check, sizing via
+    [make_entry], cash check, short-notional cap, then sector-exposure cap.
 
-    The cash check tentatively deducts before the short-notional gate; on a
-    [Short_notional_cap] rejection the deducted cash is refunded into
-    [remaining_cash] so subsequent candidates see the correct balance. *)
+    The cash check tentatively deducts before the short-notional and
+    sector-exposure gates; on a [Short_notional_cap] or [Sector_exposure_cap]
+    rejection the deducted cash is refunded into [remaining_cash] so subsequent
+    candidates see the correct balance. *)

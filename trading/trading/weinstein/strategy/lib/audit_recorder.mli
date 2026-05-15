@@ -42,6 +42,14 @@ type skip_reason =
           other candidates" rule. The gate fires symmetrically on longs and
           shorts; both sides can see structurally wide initial stops when the
           recent counter-move floor is far from current price. *)
+  | Sector_exposure_cap
+      (** P1 2026-05-15: candidate dropped because admitting it would push the
+          aggregate dollar exposure of the candidate's sector past
+          [Portfolio_risk.config.max_sector_exposure_pct] of portfolio value.
+          Only fires when the config option is [Some _]; default-off path is a
+          no-op. Named sectors only — empty-string (unknown) bucket is exempt
+          and its discipline comes from
+          [Portfolio_risk.config.max_unknown_sector_positions]. *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

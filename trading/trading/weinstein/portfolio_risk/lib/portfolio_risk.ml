@@ -1,3 +1,8 @@
+(* @large-module: portfolio risk primitive — snapshot construction, position
+   sizing, and the limit-check ladder (max_positions / exposure / cash / sector
+   count / sector exposure / risk). Each concern is independently testable but
+   the module's surface is intentionally cohesive — splitting it would scatter
+   the [config] / [check_limits] contract across files. *)
 open Core
 module Force_liquidation = Force_liquidation
 

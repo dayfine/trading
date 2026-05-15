@@ -1,3 +1,7 @@
+(* @large-module: Friday screening + entry-walk orchestration. Holds the
+   per-Friday seeding for cash / short-notional / sector-exposure accumulators
+   and the Phase 1 / Phase 2 / cascade chain. Splitting would scatter the
+   single-Friday entry-walk contract. *)
 open Core
 open Trading_strategy
 open Weinstein_strategy_config
@@ -37,6 +41,34 @@ let _initial_short_notional (positions : Position.t Map.M(String).t) =
   Map.fold positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
       acc +. _short_holding_notional pos)
 
+(** Entry-price-denominated absolute notional for a single [Holding] position
+    (long or short); 0.0 for all other states. P1 2026-05-15: companion to
+    [_short_holding_notional] for the sector-exposure cap, which counts long +
+    short exposure to the same sector toward the same bucket. *)
+let _holding_abs_notional (pos : Position.t) =
+  match pos.state with
+  | Position.Holding { quantity; entry_price; _ } ->
+      Float.abs quantity *. entry_price
+  | _ -> 0.0
+
+(** Build the per-sector exposure accumulator seeded with existing [Holding]
+    positions' entry-price-denominated absolute notional. Uses [sector_lookup]
+    to resolve each held symbol to its sector — same source the entry walk uses
+    for new candidates, so the seed and the per-tick bumps stay consistent. Held
+    symbols not in [sector_lookup] are bucketed under the empty string, which
+    the cap exempts (caller can ignore the bucket). *)
+let _initial_sector_exposures ~(positions : Position.t Map.M(String).t)
+    ~sector_lookup =
+  let acc = Hashtbl.create (module String) in
+  Map.iter positions ~f:(fun pos ->
+      let notional = _holding_abs_notional pos in
+      if Float.( > ) notional 0.0 then
+        let sector = sector_lookup pos.symbol |> Option.value ~default:"" in
+        Hashtbl.update acc sector ~f:(function
+          | None -> notional
+          | Some v -> v +. notional));
+  acc
+
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
@@ -50,8 +82,8 @@ let _initial_short_notional (positions : Position.t Map.M(String).t) =
     original screener order) is bit-equivalent to the pre-audit shape: same
     candidates, same transitions, same side-effects on [stop_states] and
     [remaining_cash]. *)
-let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
-    ~(portfolio : Portfolio_view.t) ~get_price ~current_date
+let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
+    ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
@@ -66,6 +98,23 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
   let short_notional_cap =
     portfolio_value *. config.portfolio_config.max_short_notional_fraction
   in
+  (* P1 2026-05-15: seed the per-sector exposure accumulator with the current
+     entry-price-denominated absolute notional of every [Holding] position,
+     bucketed by sector. The strategy bumps the accumulator each time a
+     candidate is admitted within this Friday's entry walk. When no
+     [sector_lookup] is provided, the seed is empty — held positions don't
+     contribute to any sector bucket. This is benign in the default-off path
+     ([max_sector_exposure_pct = None]) where the gate never fires. *)
+  let sector_exposure_acc =
+    match sector_lookup with
+    | None -> Hashtbl.create (module String)
+    | Some lookup ->
+        _initial_sector_exposures ~positions:portfolio.positions
+          ~sector_lookup:lookup
+  in
+  let max_sector_exposure_pct =
+    config.portfolio_config.max_sector_exposure_pct
+  in
   let make_entry =
     Entry_audit_capture.make_entry_transition
       ~min_stop_distance_pct:
@@ -78,7 +127,8 @@ let entries_from_candidates ~config ~candidates ~stop_states ~bar_reader
   let classify c =
     ( c,
       Entry_audit_capture.classify_candidate ~held_set ~make_entry
-        ~remaining_cash ~short_notional_acc ~short_notional_cap c )
+        ~remaining_cash ~short_notional_acc ~short_notional_cap
+        ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value c )
   in
   let decisions = List.map candidates ~f:classify in
   let kept =
@@ -271,10 +321,17 @@ let screen_universe ?membership_at ~config ~index_view
       @ screen_result.Screener.short_candidates
     else screen_result.Screener.buy_candidates
   in
+  (* P1 2026-05-15: resolve each held symbol's sector via the same
+     [sector_map] feeding the screener cascade. Used to seed the
+     per-sector exposure accumulator for the new sector-cap gate. *)
+  let sector_lookup symbol =
+    Hashtbl.find sector_map symbol
+    |> Option.map ~f:(fun (ctx : Screener.sector_context) -> ctx.sector_name)
+  in
   let entries =
-    entries_from_candidates ~config ~candidates:combined_candidates ~stop_states
-      ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
-      ~macro:macro_result ()
+    entries_from_candidates ~sector_lookup ~config
+      ~candidates:combined_candidates ~stop_states ~bar_reader ~portfolio
+      ~get_price ~current_date ~audit_recorder ~macro:macro_result ()
   in
   (* Per-Friday cascade-rejection capture. Fires after the entry walk so the
      [entered] count reflects actual transitions emitted, not just the
