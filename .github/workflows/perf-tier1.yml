@@ -53,8 +53,6 @@ jobs:
         with:
           path: trading/_build
           key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
-          restore-keys: |
-            dune-${{ runner.os }}-
 
       - name: Run tier-1 perf smoke
         id: tier1

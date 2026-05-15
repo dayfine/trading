@@ -69,8 +69,6 @@ jobs:
         with:
           path: trading/_build
           key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
-          restore-keys: |
-            dune-${{ runner.os }}-
 
       - name: Run tier-3 perf weekly
         id: tier3

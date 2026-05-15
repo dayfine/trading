@@ -55,15 +55,13 @@ jobs:
       #
       # Key strategy: hash everything dune sees as input. On a hit we get
       # the prior build artefacts; on a miss (any source/dep file changed)
-      # we fall back to restore-keys for a partial cache, then dune does
-      # incremental work from there.
+      # we do a full rebuild. No restore-keys fallback: partial caches with
+      # mismatched .exe files cause SIGILL on module splits (e.g. #1113/#1115).
       - name: Cache _build
         uses: actions/cache@v4
         with:
           path: trading/_build
           key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
-          restore-keys: |
-            dune-${{ runner.os }}-
 
       - name: dune build
         run: |
