@@ -70,6 +70,10 @@ let _prices_for_held_positions ~adapter ~date ~portfolio ~today_bars
   in
   today_prices @ fallback_prices
 
+(* List held symbols for use in diagnostic messages. *)
+let _held_symbols (portfolio : Trading_portfolio.Portfolio.t) : string list =
+  List.map portfolio.positions ~f:(fun p -> p.Trading_portfolio.Types.symbol)
+
 let compute ~adapter ~date ~portfolio ~today_bars ~last_known_prices
     ~valuation_failure_count =
   let prices =
@@ -82,6 +86,23 @@ let compute ~adapter ~date ~portfolio ~today_bars ~last_known_prices
       prices
   with
   | Ok value -> value
-  | Error _ ->
-      incr valuation_failure_count;
-      portfolio.current_cash
+  | Error err ->
+      (* Unreachable in healthy runs: the four-tier chain in
+         [_resolve_price] guarantees every held position has a price
+         (today's bar, adapter forward-fill, run cache, or avg-cost
+         last-resort). If [portfolio_value] still reports a missing
+         price, the chain's invariant is broken — fail loud with a
+         diagnostic naming the held symbols and the date.
+
+         Prior behaviour silently substituted [portfolio.current_cash]
+         here, which corrupted [equity_curve.csv] (NAV flatlined to
+         cash-only during the gap and silently masked the underlying
+         issue). See memory/project_simulator_nav_fallback_bug.md. *)
+      failwithf
+        "Portfolio_valuation.compute: price-resolution chain produced no valid \
+         mark for one or more held positions on %s — equity-curve corruption \
+         avoided by failing loud. Held symbols: [%s]. Underlying calculations \
+         error: %s"
+        (Date.to_string date)
+        (String.concat ~sep:"; " (_held_symbols portfolio))
+        (Status.show err) ()

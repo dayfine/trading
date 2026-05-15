@@ -12,12 +12,14 @@
       when no market price has ever been seen for the symbol).
 
     Tier (4) increments [valuation_failure_count] so the operator can audit the
-    fallback rate at end-of-run. The earlier silent collapse to
-    [portfolio.current_cash] (which corrupted [equity_curve.csv]
-    daily-derivative metrics on runs with delisting / dataset edges) survives
-    only as defense-in-depth: with the cache + avg-cost chain in place, every
+    fallback rate at end-of-run. With the cache + avg-cost chain in place, every
     held position is now priced, so [Calculations.portfolio_value] should always
-    return [Ok]. See {!compute} for the full contract. *)
+    return [Ok]. If it does not, the chain's invariant has been violated —
+    {!compute} now raises a descriptive exception rather than silently
+    collapsing to [portfolio.current_cash] (which previously corrupted
+    [equity_curve.csv] daily-derivative metrics on runs with delisting / dataset
+    edges; see [memory/project_simulator_nav_fallback_bug.md]). See {!compute}
+    for the full contract. *)
 
 open Core
 
@@ -39,7 +41,11 @@ val compute :
     [valuation_failure_count] is incremented exactly once per (symbol, step)
     pair that fell through to the avg-cost last-resort.
 
-    Always returns a finite value. The legacy cash-only fallback (when
+    Always returns a finite value on healthy runs (the four-tier chain
+    guarantees every held position has a price). If
     [Calculations.portfolio_value] errors despite the chain providing a price
-    for every held position) is preserved as defense-in-depth and likewise
-    increments [valuation_failure_count]. *)
+    for every held position — i.e. the chain's invariant is broken by a future
+    regression — {!compute} raises a [Failure] exception with a diagnostic
+    naming the held symbols, the date, and the underlying calculations error.
+    The prior behaviour silently substituted [portfolio.current_cash],
+    corrupting [equity_curve.csv] daily-derivative metrics during the gap. *)
