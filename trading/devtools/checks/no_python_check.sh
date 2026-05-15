@@ -11,10 +11,18 @@
 #
 # Excluded from the scan (not part of the source tree):
 #   .git/         VCS internals
-#   _build/       Dune build artifacts
+#   _build/       Dune build artifacts — pruned by NAME, not by path, so all
+#                 nested _build dirs (e.g. trading/_build) are covered.
+#                 Path-anchored prunes (e.g. -path "$REPO_ROOT/_build") fail
+#                 when _build is nested below the repo root (common in CI where
+#                 $REPO_ROOT is the repo root but _build is inside
+#                 trading/_build). A mid-walk sandbox cleanup then causes find
+#                 to exit non-zero, killing the script via set -e with no
+#                 error message.  See PR #1108 / #1115 for CI failure evidence.
 #   node_modules/ Front-end dependencies (not present; excluded defensively)
 #   vendor/       Third-party vendored code (not present; excluded defensively)
 #   .devcontainer/ Docker image build context (may include Python install steps)
+#   worktrees/    .claude/worktrees/ agent checkouts (may contain any language)
 #
 # Output:
 #   OK: no-python check -- no *.py files found.
@@ -27,14 +35,18 @@ set -e
 REPO_ROOT="$(repo_root)"
 
 # Collect *.py files, excluding generated/non-source directories.
+# Name-anchored prunes (-name X -prune) match at any depth in the tree, so
+# all _build dirs are pruned regardless of nesting level.  This avoids the CI
+# race where a path-anchored prune misses a nested _build and find descends
+# into a dune sandbox that dune is simultaneously cleaning up.
+# The trailing "|| true" is belt-and-suspenders: if find still exits non-zero
+# due to a transient TOCTOU deletion, we treat it as "no .py files found"
+# rather than crashing the script via set -e.
 FOUND=$(find "$REPO_ROOT" \
-  -path "$REPO_ROOT/.git" -prune -o \
-  -path "$REPO_ROOT/_build" -prune -o \
-  -path "$REPO_ROOT/node_modules" -prune -o \
-  -path "$REPO_ROOT/vendor" -prune -o \
-  -path "$REPO_ROOT/.devcontainer" -prune -o \
+  \( -name '.git' -o -name '_build' -o -name 'node_modules' \
+     -o -name 'vendor' -o -name '.devcontainer' -o -name 'worktrees' \) -prune -o \
   -name '*.py' -print \
-  2>/dev/null)
+  2>/dev/null || true)
 
 if [ -n "$FOUND" ]; then
   echo "FAIL: no-python check -- unexpected *.py files found:"
