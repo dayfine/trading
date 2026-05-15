@@ -86,26 +86,40 @@ let _render_stability_table (folds : fold_actual list) =
   in
   String.concat ~sep:"\n" (header :: rows)
 
+(** Lookup a fold actual by (fold_name, variant_label). Returns [None] when no
+    such measurement exists. *)
+let _find_fold_actual (folds : fold_actual list) ~fold_name ~variant_label =
+  List.find folds ~f:(fun fa ->
+      String.equal fa.fold_name fold_name
+      && String.equal fa.variant_label variant_label)
+
+(** True iff [variant] strictly beats [baseline] on the named fold, per the
+    gate's metric direction (higher-is-better vs drawdown). *)
+let _variant_beats_baseline ~(gate : Fold_gate.t) ~hib ~folds ~baseline_label
+    ~variant_label ~fold_name =
+  let b = _find_fold_actual folds ~fold_name ~variant_label:baseline_label in
+  let v = _find_fold_actual folds ~fold_name ~variant_label in
+  match (b, v) with
+  | Some b, Some v ->
+      let bv = _project_metric gate b in
+      let vv = _project_metric gate v in
+      if hib then Float.(vv > bv) else Float.(vv < bv)
+  | _ -> false
+
+let _wins_for_variant ~gate ~hib ~folds ~baseline_label ~variant_label =
+  let fold_names = _fold_names_in_order folds in
+  List.count fold_names ~f:(fun fold_name ->
+      _variant_beats_baseline ~gate ~hib ~folds ~baseline_label ~variant_label
+        ~fold_name)
+
 let _wins_per_variant_on_metric (folds : fold_actual list)
     ~(baseline_label : string) ~(gate : Fold_gate.t) =
   let labels = _variant_labels_in_order folds in
-  let fold_names = _fold_names_in_order folds in
   let hib = Fold_gate.higher_is_better gate.metric in
   List.filter labels ~f:(fun l -> not (String.equal l baseline_label))
   |> List.map ~f:(fun variant_label ->
       let wins =
-        List.count fold_names ~f:(fun fold_name ->
-            let fold_of label =
-              List.find folds ~f:(fun fa ->
-                  String.equal fa.fold_name fold_name
-                  && String.equal fa.variant_label label)
-            in
-            match (fold_of baseline_label, fold_of variant_label) with
-            | Some b, Some v ->
-                let bv = _project_metric gate b in
-                let vv = _project_metric gate v in
-                if hib then Float.(vv > bv) else Float.(vv < bv)
-            | _ -> false)
+        _wins_for_variant ~gate ~hib ~folds ~baseline_label ~variant_label
       in
       (variant_label, wins))
 
@@ -133,6 +147,19 @@ let _render_sensitivity_table ~baseline_label ~(gate : Fold_gate.t)
   in
   String.concat ~sep:"\n" (header :: rows)
 
+(** Build one [Fold_gate.fold_result] for the (baseline, variant) pair on the
+    named fold. Returns [None] when either side's measurement is missing. *)
+let _fold_result_for_one ~(gate : Fold_gate.t) ~folds ~baseline_label
+    ~variant_label ~fold_name : Fold_gate.fold_result option =
+  let b = _find_fold_actual folds ~fold_name ~variant_label:baseline_label in
+  let v = _find_fold_actual folds ~fold_name ~variant_label in
+  match (b, v) with
+  | Some b, Some v ->
+      let baseline_score = _project_metric gate b in
+      let variant_score = _project_metric gate v in
+      Some { fold_name; variant_score; baseline_score }
+  | _ -> None
+
 (** Build [Fold_gate.fold_result] list for a single (variant vs baseline)
     pairing. Returns folds in baseline-side ordering — anchors on the unique
     fold-name list. *)
@@ -140,19 +167,8 @@ let _fold_results_for_pair (folds : fold_actual list) ~baseline_label
     ~variant_label ~gate =
   let fold_names = _fold_names_in_order folds in
   List.filter_map fold_names ~f:(fun fold_name ->
-      let find label =
-        List.find folds ~f:(fun fa ->
-            String.equal fa.fold_name fold_name
-            && String.equal fa.variant_label label)
-      in
-      match (find baseline_label, find variant_label) with
-      | Some b, Some v ->
-          let bv = _project_metric gate b in
-          let vv = _project_metric gate v in
-          Some
-            ({ fold_name; variant_score = vv; baseline_score = bv }
-              : Fold_gate.fold_result)
-      | _ -> None)
+      _fold_result_for_one ~gate ~folds ~baseline_label ~variant_label
+        ~fold_name)
 
 let _render_verdict_for_variant ~(gate : Fold_gate.t) ~variant_label
     fold_results =

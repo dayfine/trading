@@ -66,6 +66,19 @@ let _worst_shortfall ~hib (folds : fold_result list) =
       let g = _signed_gap_for ~hib fr.variant_score fr.baseline_score in
       if Float.(g > best_gap) then (fr.fold_name, g) else (best_name, best_gap))
 
+let _fail_reason ~wins ~(gate : t) ~worst_fold ~worst_gap ~m_fail ~delta_fail =
+  match (m_fail, delta_fail) with
+  | true, true ->
+      sprintf
+        "M-threshold miss: %d wins < %d required; worst fold %s trails by %.4f \
+         > Δ=%.4f"
+        wins gate.m worst_fold worst_gap gate.worst_delta
+  | true, false -> sprintf "M-threshold miss: %d wins < %d required" wins gate.m
+  | false, true ->
+      sprintf "Δ-threshold miss: fold %s trails by %.4f > Δ=%.4f" worst_fold
+        worst_gap gate.worst_delta
+  | false, false -> assert false (* unreachable; caller guards *)
+
 let evaluate (gate : t) (folds : fold_result list) =
   _validate gate folds;
   let hib = higher_is_better gate.metric in
@@ -73,28 +86,16 @@ let evaluate (gate : t) (folds : fold_result list) =
   let worst_fold, worst_gap = _worst_shortfall ~hib folds in
   let delta_fail = Float.(worst_gap > gate.worst_delta) in
   let m_fail = wins < gate.m in
-  match (m_fail, delta_fail) with
-  | false, false -> Pass { wins; n = gate.n }
-  | _, _ ->
-      let reason =
-        match (m_fail, delta_fail) with
-        | true, true ->
-            sprintf
-              "M-threshold miss: %d wins < %d required; worst fold %s trails \
-               by %.4f > Δ=%.4f"
-              wins gate.m worst_fold worst_gap gate.worst_delta
-        | true, false ->
-            sprintf "M-threshold miss: %d wins < %d required" wins gate.m
-        | false, true ->
-            sprintf "Δ-threshold miss: fold %s trails by %.4f > Δ=%.4f"
-              worst_fold worst_gap gate.worst_delta
-        | false, false -> assert false (* unreachable *)
-      in
-      Fail
-        {
-          wins;
-          n = gate.n;
-          worst_fold;
-          worst_gap = Float.max worst_gap 0.0;
-          reason;
-        }
+  if (not m_fail) && not delta_fail then Pass { wins; n = gate.n }
+  else
+    let reason =
+      _fail_reason ~wins ~gate ~worst_fold ~worst_gap ~m_fail ~delta_fail
+    in
+    Fail
+      {
+        wins;
+        n = gate.n;
+        worst_fold;
+        worst_gap = Float.max worst_gap 0.0;
+        reason;
+      }

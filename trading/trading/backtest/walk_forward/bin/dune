@@ -1,0 +1,13 @@
+(executable
+ (name walk_forward_runner)
+ (modules walk_forward_runner)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  backtest
+  scenario_lib
+  walk_forward
+  trading.simulation.types)
+ (preprocess
+  (pps ppx_sexp_conv)))
