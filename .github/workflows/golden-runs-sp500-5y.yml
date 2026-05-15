@@ -63,8 +63,6 @@ jobs:
         with:
           path: trading/_build
           key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
-          restore-keys: |
-            dune-${{ runner.os }}-
 
       - name: Run SP500 5y golden postsubmit
         id: golden_sp500_5y
