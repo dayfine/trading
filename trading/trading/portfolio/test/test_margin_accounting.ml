@@ -14,6 +14,7 @@ open Core
 open OUnit2
 open Trading_base.Types
 open Trading_portfolio.Portfolio
+open Trading_portfolio.Portfolio_margin
 module Margin_config = Trading_portfolio.Margin_config
 open Matchers
 
