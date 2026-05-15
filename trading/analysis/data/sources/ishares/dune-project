@@ -1,0 +1,10 @@
+(lang dune 3.17)
+
+(name ishares)
+
+(generate_opam_files true)
+
+(package
+ (name ishares)
+ (depends ocaml base core re uri ppx_deriving)
+ (tags ()))

@@ -1,0 +1,19 @@
+﻿iShares Russell 3000 ETF
+Fund Holdings as of,"-"
+
+Inception Date,"-"
+Shares Outstanding,"-"
+Stock,-
+Bonds,-
+Other,-
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: Synthetic representative sample of the iShares IWV "no data
+;; available" sentinel response. Per Phase 1.4 URL probe, iShares returns
+;; HTTP 200 + a ~4,585-byte body whose line 2 contains
+;; 'Fund Holdings as of,"-"' for non-business days, market holidays, and
+;; pre-2006-09-29 dates. This template carries the same 9-line preamble and
+;; 15-column header as real data, then zero data rows. Used only for
+;; parser tests.

@@ -1,0 +1,6 @@
+(library
+ (name ishares)
+ (public_name ishares)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq))
+ (libraries base core re status uri))

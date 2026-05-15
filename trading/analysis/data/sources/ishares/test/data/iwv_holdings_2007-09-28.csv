@@ -1,0 +1,28 @@
+﻿iShares Russell 3000 ETF
+Fund Holdings as of,"Sep 28, 2007"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"15,650,000"
+Stock,-
+Bonds,-
+Other,-
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"BRKB","BERKSHIRE HATHAWAY INC CLASS B","-","Equity","1,234.56","0.01","1,234.56","10.00","123.46","United States","NYSE","USD","1.00","-","-"
+"WLLBW","WILLIAMS COS INC EXPIRING ESCROW","-","Equity","0.00","0.00","0.00","100.00","0.00","United States","NYSE","USD","1.00","-","-"
+"P5N994","PG&E RIGHTS","-","Equity","12.34","0.00","12.34","5.00","2.47","United States","NYSE","USD","1.00","-","-"
+"0R01","CITIGROUP INC (LSE)","-","Equity","45,678.90","0.05","45,678.90","1000.00","45.68","United Kingdom","LSE","GBP","2.05","-","-"
+"GEC","GENERAL ELECTRIC CO (XETRA)","-","Equity","78,901.23","0.08","78,901.23","2000.00","39.45","Germany","XETRA","EUR","1.42","-","-"
+"-","UNTICKERED ESCROW POSITION","-","Equity","100.00","0.00","100.00","50.00","2.00","United States","NYSE","USD","1.00","-","-"
+"MSFT","MICROSOFT CORP","-","Equity","12,345,678.90","2.50","12,345,678.90","420000.00","29.40","United States","NASDAQ","USD","1.00","-","-"
+"GE","GENERAL ELECTRIC CO","-","Equity","23,456,789.01","4.75","23,456,789.01","565000.00","41.52","United States","NYSE","USD","1.00","-","-"
+"XOM","EXXON MOBIL CORP","-","Equity","45,678,901.23","9.25","45,678,901.23","525000.00","87.01","United States","NYSE","USD","1.00","-","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: Truncated/synthetic representative sample of the iShares IWV
+;; holdings CSV in the quarterly era (2006-09 to 2008-12). Real responses
+;; have ~2,900-2,985 holdings with empty Sector / Market Currency cells
+;; and ascending market-value order. Constructed to match the verified
+;; schema (15 columns, byte-identical header) per
+;; dev/notes/phase1.4-iwv-url-probe-2026-05-16.md. Used only for parser
+;; tests; not a live snapshot.

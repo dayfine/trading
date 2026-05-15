@@ -1,0 +1,27 @@
+﻿iShares Russell 3000 ETF
+Fund Holdings as of,"Apr 30, 2012"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"31,300,000"
+Stock,99.50
+Bonds,0.00
+Other,0.50
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"AAPL","APPLE INC","Information Technology","Equity","98,765,432.10","3.50","98,765,432.10","168000.00","587.89","United States","NASDAQ","USD","1.00","USD","-"
+"XOM","EXXON MOBIL CORP","Energy","Equity","87,654,321.00","3.10","87,654,321.00","1020000.00","85.93","United States","NYSE","USD","1.00","USD","-"
+"MSFT","MICROSOFT CORP","Information Technology","Equity","65,432,109.87","2.32","65,432,109.87","2050000.00","31.92","United States","NASDAQ","USD","1.00","USD","-"
+"IBM","INTERNATIONAL BUSINESS MACHINES","Information Technology","Equity","43,210,987.65","1.53","43,210,987.65","207000.00","208.75","United States","NYSE","USD","1.00","USD","-"
+"GE","GENERAL ELECTRIC CO","Industrials","Equity","32,109,876.54","1.14","32,109,876.54","1620000.00","19.82","United States","NYSE","USD","1.00","USD","-"
+"JPM","JPMORGAN CHASE & CO","Financials","Equity","21,098,765.43","0.75","21,098,765.43","490000.00","43.06","United States","NYSE","USD","1.00","USD","-"
+"P5N994","ESCROW POSITION","-","Equity","0.00","0.00","0.00","100.00","0.00","United States","NYSE","USD","1.00","USD","-"
+"ESM2","S&P 500 EMINI FUT JUN12","-","Futures","1,234,567.89","0.04","1,234,567.89","50.00","24691.36","United States","-","USD","1.00","USD","-"
+"USD","USD CASH","-","Cash","123,456.78","0.00","123,456.78","123456.78","1.00","United States","-","USD","1.00","USD","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: Truncated/synthetic representative sample of the iShares IWV
+;; holdings CSV at the daily-cadence cutover (2012-04-30, the first
+;; daily-available date per Phase 1.4 URL probe). Real responses have
+;; ~2,930 holdings with populated GICS sectors, descending market-value
+;; order, plus end-of-file Futures and USD Cash rows. Schema matches the
+;; verified 15-column header. Used only for parser tests.
