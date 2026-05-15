@@ -1,0 +1,22 @@
+iShares Russell 3000 ETF
+Fund Holdings as of,"Apr 30, 2012"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"25,000,000"
+Stock,99.50
+Bonds,0.00
+Other,0.50
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"AAPL","APPLE INC","Information Technology","Equity","456,789,012.34","6.20","456,789,012.34","780000.00","585.63","United States","NASDAQ","USD","1.00","USD","-"
+"IBM","INTERNATIONAL BUSINESS MACHINES","Information Technology","Equity","298,765,432.10","4.05","298,765,432.10","1450000.00","206.05","United States","NYSE","USD","1.00","USD","-"
+"MSFT","MICROSOFT CORP","Information Technology","Equity","234,567,890.12","3.18","234,567,890.12","7300000.00","32.13","United States","NASDAQ","USD","1.00","USD","-"
+"JNJ","JOHNSON & JOHNSON","Health Care","Equity","189,012,345.67","2.55","189,012,345.67","2900000.00","65.18","United States","NYSE","USD","1.00","USD","-"
+"FB","FACEBOOK INC CLASS A","Communication Services","Equity","34,567,890.12","0.46","34,567,890.12","900000.00","38.41","United States","NASDAQ","USD","1.00","USD","-"
+"TSLA","TESLA INC","Consumer Discretionary","Equity","6,789,012.34","0.09","6,789,012.34","210000.00","32.33","United States","NASDAQ","USD","1.00","USD","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: synthetic 6-row sample of the iShares IWV holdings CSV at the
+;; 2012-04-30 daily-era cutover. KODK temporarily absent (single-snapshot
+;; data glitch; threshold=3 keeps tenure open). New entries: FB (synthetic
+;; date — real FB IPO was 2012-05-18), TSLA.

@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-16 (PR-C added)
+## Last updated: 2026-05-16
 
 ## Status
 IN_PROGRESS
@@ -327,6 +327,49 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
 
 ### In Progress / READY_FOR_REVIEW
+
+- **Phase 1.4 PR-D — `build_iwv_universe.exe` (READY_FOR_REVIEW
+  2026-05-16, branch `feat/iwv-build-universe`).**
+  - New CLI `trading/analysis/data/sources/ishares/bin/build_iwv_universe.{ml,dune}`
+    + pure helper lib `build_iwv_universe_lib.{ml,mli}` — completes the
+    IWV scraper stack (PR-A → PR-B → PR-C → PR-D). Reads the cached
+    snapshot directory produced by PR-C's `fetch_iwv_history.exe`,
+    pipes parsed snapshots through PR-B's
+    `Ishares_membership_replay.replay`, and emits a point-in-time
+    universe sexp matching the existing `broad-3000-2010-01-01.sexp`
+    shape (PR #1103).
+  - CLI flags: `--cache-root`, `--output`, `--start`, `--end`, `--as-of`,
+    `--threshold-misses`. Defaults: `--start 2006-09-29`, `--end today`,
+    `--as-of = --end`, `--threshold-misses 3`. All knobs routed through
+    the lib's `run` entry point — no magic numbers.
+  - Equity + US-location filter applied in the lib (per plan §2.3.3,
+    NOT in the replay layer), exposed as `filter_config` so per-backtest
+    policy can vary. Default drops `Asset Class != Equity` (futures hedges,
+    cash) and `Location != United States` (pre-2012 cross-listings).
+  - Sample fixture: 5 hand-curated snapshots × 9 tickers under
+    `test/data/sample_history/2007-09-28.csv` through `2020-06-01.csv`.
+    Covers: always-present (AAPL/MSFT/JNJ/IBM), single-miss survival
+    (KODK absent in 1 of 5 → tenure stays open with threshold=3),
+    confirmed removal via 3 misses (LEH only in 2007 → closed by snap 4,
+    excluded from output), late-entry (TSLA/FB first seen 2012), futures
+    filter (ESM6 dropped before replay).
+  - 14 OUnit2 tests pass: cache-entry scanning (window filter; missing
+    dir error), load_and_filter (default filter drops ESM6 → 7 equity
+    tickers; no-filter keeps 8; full-window loads all 5 snapshots in
+    ascending date order), build_universe (7 members at as_of=2020-06-01
+    with full sexp shape pinned; mid-window pi-filter excludes pre-2012
+    arrivals; threshold=1 closes KODK and re-opens with new
+    sector_at_first), write_outcome_to_file (header comment + sexp body;
+    sexp roundtrips via Sexp.of_string), run end-to-end pipeline,
+    schema parity check vs `broad-3000-2010-01-01.sexp`.
+  - Does NOT generate the actual `russell-3000-2006-2026.sexp` fixture —
+    that requires running the full ~3 hour scrape against iShares;
+    follow-up ops session ships the artifact. This PR ships the TOOL.
+  - Linters green: `dune build @fmt`, `no_python_check`,
+    `fn_length_linter` (all functions ≤ 25 LOC). 386 source LOC
+    (`.ml` + `.mli` 86+185+115); 408 test LOC. Sample CSV fixtures
+    (5 files, ~6 KB) excluded per PR-sizing rules. Plan:
+    `dev/plans/iwv-scraper-2026-05-16.md` §PR-D.
 
 - **Phase 1.4 PR-C — `fetch_iwv_history.exe` (READY_FOR_REVIEW
   2026-05-16, branch `feat/iwv-fetch-history`).**

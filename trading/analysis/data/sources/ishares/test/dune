@@ -2,10 +2,12 @@
  (names
   test_ishares_holdings_client
   test_ishares_membership_replay
-  test_fetch_iwv_history_lib)
+  test_fetch_iwv_history_lib
+  test_build_iwv_universe_lib)
  (libraries
   ishares
   fetch_iwv_history_lib
+  build_iwv_universe_lib
   core
   core_unix.filename_unix
   core_unix.sys_unix
@@ -14,4 +16,5 @@
   status
   uri)
  (deps
-  (glob_files ./data/*.csv)))
+  (glob_files ./data/*.csv)
+  (glob_files ./data/sample_history/*.csv)))

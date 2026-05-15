@@ -1,0 +1,22 @@
+iShares Russell 3000 ETF
+Fund Holdings as of,"Jun 15, 2018"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"40,000,000"
+Stock,99.40
+Bonds,0.00
+Other,0.60
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"AAPL","APPLE INC","Information Technology","Equity","678,901,234.56","6.50","678,901,234.56","3600000.00","188.58","United States","NASDAQ","USD","1.00","USD","-"
+"MSFT","MICROSOFT CORP","Information Technology","Equity","523,456,789.01","5.05","523,456,789.01","5300000.00","98.77","United States","NASDAQ","USD","1.00","USD","-"
+"FB","FACEBOOK INC CLASS A","Communication Services","Equity","389,012,345.67","3.78","389,012,345.67","2000000.00","194.51","United States","NASDAQ","USD","1.00","USD","-"
+"JNJ","JOHNSON & JOHNSON","Health Care","Equity","234,567,890.12","2.30","234,567,890.12","1900000.00","123.46","United States","NYSE","USD","1.00","USD","-"
+"IBM","INTERNATIONAL BUSINESS MACHINES","Information Technology","Equity","123,456,789.01","1.20","123,456,789.01","860000.00","143.55","United States","NYSE","USD","1.00","USD","-"
+"TSLA","TESLA INC","Consumer Discretionary","Equity","98,765,432.10","0.95","98,765,432.10","280000.00","352.73","United States","NASDAQ","USD","1.00","USD","-"
+"KODK","EASTMAN KODAK CO","Information Technology","Equity","2,345,678.90","0.02","2,345,678.90","430000.00","5.45","United States","NYSE","USD","1.00","USD","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: synthetic 7-row sample of the iShares IWV holdings CSV in the
+;; daily era. KODK re-appears (returning after single-snapshot glitch in
+;; 2012-04-30 fixture); LEH long gone (closed by threshold=3 misses).

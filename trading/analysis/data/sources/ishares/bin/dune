@@ -5,6 +5,13 @@
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
 
+(library
+ (name build_iwv_universe_lib)
+ (modules build_iwv_universe_lib)
+ (libraries core core_unix.sys_unix core_unix ishares status)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
 (executable
  (name fetch_iwv_history)
  (modules fetch_iwv_history)
@@ -22,3 +29,16 @@
   uri)
  (preprocess
   (pps ppx_jane)))
+
+(executable
+ (name build_iwv_universe)
+ (modules build_iwv_universe)
+ (libraries
+  core
+  core_unix.command_unix
+  core_unix.time_float_unix
+  build_iwv_universe_lib
+  ishares
+  status)
+ (preprocess
+  (pps ppx_let ppx_jane)))

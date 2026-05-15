@@ -1,0 +1,20 @@
+iShares Russell 3000 ETF
+Fund Holdings as of,"Jan 29, 2010"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"15,000,000"
+Stock,99.40
+Bonds,0.00
+Other,0.60
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"IBM","INTERNATIONAL BUSINESS MACHINES","Information Technology","Equity","267,890,123.45","3.65","267,890,123.45","2200000.00","121.77","United States","NYSE","USD","1.00","USD","-"
+"MSFT","MICROSOFT CORP","Information Technology","Equity","209,876,543.21","2.95","209,876,543.21","6800000.00","30.86","United States","NASDAQ","USD","1.00","USD","-"
+"AAPL","APPLE INC","Information Technology","Equity","156,789,012.34","2.12","156,789,012.34","780000.00","201.01","United States","NASDAQ","USD","1.00","USD","-"
+"JNJ","JOHNSON & JOHNSON","Health Care","Equity","178,901,234.56","2.40","178,901,234.56","2750000.00","65.06","United States","NYSE","USD","1.00","USD","-"
+"KODK","EASTMAN KODAK CO","Information Technology","Equity","8,234,567.89","0.11","8,234,567.89","1200000.00","6.86","United States","NYSE","USD","1.00","USD","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: synthetic 5-row sample of the iShares IWV holdings CSV in the
+;; monthly era (2009-01 to 2012-04). Sectors populated; LEH no longer present
+;; (delisted post-bankruptcy 2008).

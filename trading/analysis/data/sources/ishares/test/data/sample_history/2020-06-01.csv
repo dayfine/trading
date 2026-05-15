@@ -1,0 +1,23 @@
+iShares Russell 3000 ETF
+Fund Holdings as of,"Jun 01, 2020"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"50,400,000"
+Stock,99.30
+Bonds,0.00
+Other,0.70
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"AAPL","APPLE INC","Information Technology","Equity","745,678,901.23","6.80","745,678,901.23","2400000.00","310.70","United States","NASDAQ","USD","1.00","USD","-"
+"MSFT","MICROSOFT CORP","Information Technology","Equity","634,567,890.12","5.78","634,567,890.12","3500000.00","181.30","United States","NASDAQ","USD","1.00","USD","-"
+"FB","FACEBOOK INC CLASS A","Communication Services","Equity","432,109,876.54","3.94","432,109,876.54","1950000.00","221.59","United States","NASDAQ","USD","1.00","USD","-"
+"JNJ","JOHNSON & JOHNSON","Health Care","Equity","298,765,432.10","2.72","298,765,432.10","2000000.00","149.38","United States","NYSE","USD","1.00","USD","-"
+"TSLA","TESLA INC","Consumer Discretionary","Equity","187,654,321.00","1.71","187,654,321.00","250000.00","750.62","United States","NASDAQ","USD","1.00","USD","-"
+"IBM","INTERNATIONAL BUSINESS MACHINES","Information Technology","Equity","134,567,890.12","1.22","134,567,890.12","1080000.00","124.60","United States","NYSE","USD","1.00","USD","-"
+"KODK","EASTMAN KODAK CO","Information Technology","Equity","876,543.21","0.01","876,543.21","450000.00","1.95","United States","NYSE","USD","1.00","USD","-"
+"ESM6","S&P 500 EMINI FUT JUN20","-","Futures","3,456,789.01","0.03","3,456,789.01","30.00","115226.30","United States","-","USD","1.00","USD","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: synthetic 8-row sample of the iShares IWV holdings CSV in the
+;; daily era. Includes futures row (ESM6) to exercise the asset-class filter
+;; — should be excluded from the universe output.
