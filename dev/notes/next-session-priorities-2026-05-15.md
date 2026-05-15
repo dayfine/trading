@@ -32,22 +32,39 @@ Treat as a coherent 2-4 week track, dispatched in PR-sized increments.
 Extend `dev/notes/historical-universe-status-2026-05-13.md` work from
 the 510-symbol 2010-2026 universe to a broader / longer cohort:
 
-1. **`sp500-1996-01-01.sexp` membership data.** Mirror PR #1076's
-   per-symbol `active_through` columns back to 1996. Need historical
-   SP500 membership change-log (likely from Wikipedia changelog via
-   PR #813's `Changes_parser` infra). Authority: same hypothesis as
-   PR #1076 — survivorship bias inflates losses by ~13 pp CAGR on 16y
-   (verified by today's P3-followup data).
-2. **`broad-3000-2010-01-01.sexp` cohort.** Expand beyond SP500
-   constituents to the full Russell 3000 universe with PI-aware
-   active-through data. The current 510-sym universe artificially
-   constrains cross-sectional dispersion the Weinstein cascade
-   depends on.
+1. **SP500 2000-present via EODHD Fundamentals Feed, optional 1996-1999
+   tail via fja05680/sp500 static seed.** (Re-scoped 2026-05-16 — see
+   `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.)
+   Norgate retired (Windows-only NDU client). EODHD's
+   `/api/fundamentals/GSPC.INDX?historical=1` exposes
+   `HistoricalTickerComponents` with `StartDate`/`EndDate`/`IsDelisted`
+   per ticker from Jan 2000 — covers 25 of the 30-year horizon at no
+   marginal infra cost (same vendor / client / Docker stack we already
+   use). The 1996–1999 tail is an optional patch from
+   `fja05680/sp500` (MIT, free) as a static seed. Authority: same
+   hypothesis as PR #1076 — survivorship bias inflates losses by
+   ~13 pp CAGR on 16y (verified by today's P3-followup data).
+   Pre-flight verification gate before starting work — see Phase 1.1
+   row in `dev/status/data-foundations.md`.
+2. **`broad-3000-2010-01-01.sexp` cohort.** **MERGED 2026-05-15 (PR
+   #1103).** Expanded beyond SP500 constituents toward Russell 3000.
+   Caveat: PR #1103 is a *sectors.csv proxy* (2026-04-14 snapshot,
+   forward-looking-biased) — not a true historical reconstitution.
+   For *true* Russell 3000 PI reconstitution see Phase 1.4 below.
 3. **Survivorship-correct re-pin of pinned baselines.** Replace the
    current `goldens-sp500-historical/sp500-2010-2026.sexp` pinned
    baseline with one where PI filter is ON by default. Today's
    pinned baseline was measured on survivorship-biased data — every
    downstream tuning conclusion stacks on it.
+4. **Russell 3000 true historical reconstitution via DIY iShares IWV
+   scrape 2006-present.** (Added 2026-05-16 — see vendor-comparison
+   doc.) Only non-Windows / non-institutional path to Russell 3000
+   membership history. URL pattern verified at iShares.com; CSV per
+   `asOfDate`; tenure inferred by diffing consecutive snapshots.
+   Implementation in OCaml `cohttp` — no Python dependency. ~5,000
+   trading days × 2,500 symbols / day; rate-limit politely; one-time
+   backfill 1–2 hours wall-clock. Becomes the canonical broad-universe
+   source once it lands, superseding PR #1103's sectors.csv proxy.
 
 Track owner: `feat-data` per `dev/decisions.md` 2026-05-03 §"Agent
 scope".
@@ -126,9 +143,16 @@ etc. are P1; defer synthetic". This note records the agreement.
 
 ## Recommended sequencing
 
-1. **Spin up `feat-data` on Phase 1.1** (1996 membership data) — the
-   single most expensive prerequisite. Most other Phase 1 work
-   blocks on it.
+**2026-05-16 update:** A successor priorities doc
+(`dev/notes/next-session-priorities-2026-05-16.md`) was issued after
+the vendor pivot. Read that first; the sequencing below is preserved
+for context.
+
+1. **Spin up `feat-data` on Phase 1.1** — re-scoped 2026-05-16: SP500
+   2000-present via EODHD Fundamentals (no vendor signup needed; same
+   EODHD client we already use). 1996-1999 tail via fja05680 static
+   seed is optional. Pre-flight verification gate before
+   implementation — see status file.
 2. In parallel, **dispatch `feat-backtest` on Phase 2** (walk-forward
    harness) — independent of Phase 1; can run on the existing
    510-sym 2010-2026 universe to start, then re-baseline once Phase 1

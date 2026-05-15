@@ -1,10 +1,25 @@
 Status / handoff: historical S&P 500 universe membership (2026-05-13)
 ====================================================================
 
+> **2026-05-16 update — vendor pivot.** Wherever this doc references
+> "Norgate" as the source for 30y / pre-2010 / per-symbol delisting
+> data, that path is retired (Norgate's NDU client is Windows-only).
+> The new sources are:
+>
+> - **SP500 2000-present:** EODHD Fundamentals `HistoricalTickerComponents`.
+> - **SP500 1996-1999 (optional tail):** `fja05680/sp500` static seed.
+> - **Russell 3000 2006-present:** DIY iShares IWV scrape.
+>
+> Full reasoning in
+> **`dev/notes/vendor-comparison-historical-universe-2026-05-16.md`**.
+> The five-phase design (P3–P5) and the integration seam analysis
+> (`Snapshot_bar_views` / `Panel_callbacks`) remain valid as written.
+
 Companion to:
 - `dev/notes/historical-universe-membership-2026-04-30.md` — original 6-phase design (P1–P6).
 - `dev/plans/wiki-eodhd-historical-universe-2026-05-03.md` — interim Wiki+EODHD plan (PR-A/B/C/D).
-- `dev/notes/plan-norgate-horizon-universe-2026-05-12.md` — forward-looking horizon plan.
+- `dev/notes/plan-norgate-horizon-universe-2026-05-12.md` — forward-looking horizon plan (Norgate path retired 2026-05-16).
+- `dev/notes/vendor-comparison-historical-universe-2026-05-16.md` — 2026-05-16 vendor pivot (EODHD + IWV + fja05680 replace Norgate).
 
 ## 1. Is the 2026-04-30 design still the canonical plan?
 

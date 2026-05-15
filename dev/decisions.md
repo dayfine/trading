@@ -43,6 +43,28 @@ _(None yet — system just initialized.)_
 
 ## Direction Changes
 
+### 2026-05-16 — Vendor pivot — Norgate retired
+
+Norgate Data is removed from the data-foundations roadmap. Their NDU
+client is Windows-only and would require running Windows in Docker
+or a separate VM just to import historical SP500 / Russell 3000 PI
+membership — adding an OS to our supported stack for one ingest path.
+The new sources are: (a) EODHD Fundamentals API
+(`/api/fundamentals/GSPC.INDX?historical=1` returns
+`HistoricalTickerComponents` with `StartDate`/`EndDate`/`IsDelisted`
+per ticker from Jan 2000), reusing the EODHD client and credentials
+we already pay for; (b) DIY iShares IWV holdings scrape for Russell
+3000 2006-present (pure HTTP, no auth, no Python — port the
+URL/diff pattern to OCaml `cohttp`); (c) optional `fja05680/sp500`
+GitHub static seed (MIT-licensed, includes
+`sp500_ticker_start_end.csv`) for the 1996-1999 SP500 tail. Full
+vendor matrix + ranked recommendation in
+`dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
+Track state in `dev/status/data-foundations.md` (Phase 1.1 active
+pending EODHD-tier verification; Phase 1.4 IWV scrape added; Phase
+1.5 fja05680 tail deferred per broader-first pivot). Successor
+priorities doc: `dev/notes/next-session-priorities-2026-05-16.md`.
+
 ### 2026-05-03 — Agent scope: extend `feat-backtest` + create `feat-data`
 
 Maintainer authorization: extend `feat-backtest` scope to cover the four
