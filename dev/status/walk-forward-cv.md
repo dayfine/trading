@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-16
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## Notes
 
@@ -22,11 +22,16 @@ alone — Phase 3 BO will consume this harness for variant scoring
 instead of single-window mean-Sharpe.
 
 ## Interface stable
-NO
+YES
 
-M5.5 follow-on work — `WalkForwardRunner` spec sexp shape is explicitly
-marked unstable in the binary's docstring; Phase 3 BO integration will
-iterate it.
+Spec sexp shape stabilised as of PR #1116 (PR-B):
+`(base_scenario / window_spec / variants / baseline_label / gate)`
+with `window_spec` now a variant `Rolling | Explicit` (legacy flat
+record promotes silently to `Rolling`). The structured `aggregate`
+record emitted to `<out-dir>/aggregate.sexp` is the programmatic
+surface Bayesian Phase 3 PR-A consumes. Phase 3 will not iterate the
+spec shape — see `dev/plans/bayesian-multi-param-scaling-2026-05-16.md`
+§7 PR-A.
 
 ## Scope
 
@@ -56,7 +61,9 @@ dune exec trading/backtest/walk_forward/bin/walk_forward_runner.exe -- --help
 
 ## In Progress
 
-### Second PR — Phase 2.2 PR-A: Explicit folds + structured aggregate (in flight)
+(no in-flight work — both PR-A and PR-B merged 2026-05-16)
+
+### Second PR — Phase 2.2 PR-A: Explicit folds + structured aggregate — MERGED #1111
 
 Per `dev/plans/walk-forward-cv-rolling-30fold-2026-05-16.md`. This is the
 first of the plan's two-PR split (PR-A = steps 1-2; PR-B = steps 3-5,
@@ -75,7 +82,7 @@ dune build && dune runtest trading/backtest/walk_forward/test && dune build @fmt
 54 tests across the 4 modules (9 + 17 + 13 + 15), all pass. All linters
 (nesting, fn-length, mli-coverage, file-length, magic-numbers, fmt) clean.
 
-### Third PR — Phase 2.2 PR-B: multi-metric sensitivity + CAGR + fixture sexps
+### Third PR — Phase 2.2 PR-B: multi-metric sensitivity + CAGR + fixture sexps — MERGED #1116
 
 Per `dev/plans/walk-forward-cv-rolling-30fold-2026-05-16.md` (PR-B half).
 PR-A landed as #1111; this PR is the §3-5 deferred half.
@@ -102,22 +109,29 @@ dune build && dune runtest trading/backtest/walk_forward && dune build @fmt
 
 - **PR #1100** (2026-05-15) — walk-forward CV harness first PR. Plan + 4 lib modules + binary + tests. ~1200 LOC including tests. All four checklist items satisfied (`dune build`, `dune runtest`, `dune fmt`, nesting + magic-number linters clean).
 - **PR #1107** (2026-05-16) — Phase 2.2 plan: rolling 30-fold harness extension. Plan file only; implementation tracked across the PR-A + PR-B split.
+- **PR #1111** (2026-05-16) — Phase 2.2 PR-A: `Window_spec.t` variant (`Rolling | Explicit`) + structured `aggregate` record + `Walk_forward_types` extraction. 54 tests (9 + 17 + 13 + 15) all pass.
+- **PR #1116** (2026-05-16) — Phase 2.2 PR-B: multi-metric sensitivity table (4 columns; gate metric suffixed `*`), derived `cagr_pct`, `Spec` module hoist, `aggregate.sexp` writer, two checked-in fixture spec sexps under `trading/test_data/walk_forward/`. 73 tests all pass.
 
 ## Next Steps
 
-1. **First production sweep** — run the binary against a real spec
-   (`base = goldens-sp500/sp500-2010-2026.sexp`, 30 rolling folds with
-   train_days=730 / test_days=365 / step_days=182, variants = baseline +
-   cell-E + cell-F-candidates). Local-only follow-up; multi-hour wall
-   time. Output: `dev/experiments/walk-forward-cell-e-2026-05-XX/`.
-2. **Re-baseline the M5.4-E3 and -E4 sweeps** — re-run those reports
-   through the walk-forward gate to confirm which buffer / weight cells
-   actually pass M-of-N on rolling folds.
-3. **Phase 3 — Bayesian-optimizer integration** (~3-5 PRs, 1 week).
-   `bayesian_runner.exe` consumes the walk-forward harness as its
-   evaluator (replacing the single-window mean-Sharpe scoring); the BO
-   loop chooses variant overrides. Convergence acceptance: a cell that
-   beats Cell E on walk-forward Sharpe by ≥0.05 with MaxDD no worse.
+Harness is complete; Phase 3 (Bayesian) plan landed PR #1124 with a 5-PR
+stack. Track owner shifts from `feat-backtest` (harness scope) to
+`feat-backtest` again (Bayesian Phase 3 scope) — see
+`dev/plans/bayesian-multi-param-scaling-2026-05-16.md`.
+
+1. **Phase 3 PR-A — scoring function + walk-forward aggregate consumer**
+   (~200 LOC). New `trading/trading/backtest/tuner/bin/bayesian_runner_scoring.{ml,mli}`
+   plus ~12 unit tests. Pure addition; testable in isolation
+   (consumes a pre-computed aggregate, no backtest invocation). See
+   plan §7 PR-A.
+2. **Phase 3 PR-B through PR-E** — per plan §7. Knob inventory +
+   parameter-space encoding → walk-forward in-process integration →
+   int/Option encoding + GP length-scale tuning + early-stop →
+   end-to-end runner + result reporter + OOS holdout.
+3. **First production sweep** — once PR-E lands, run the binary
+   against the `cell_e_30fold_2026_05_16.sexp` fixture spec. Local-
+   only follow-up; multi-hour wall time. Output:
+   `dev/experiments/bayesian-cell-e-walk-forward-2026-05-XX/`.
 4. **Parallel fold execution** — sequential is fine for first sweeps;
    wall-time will demand fork-pool akin to
    `Scenario_runner._run_scenarios_parallel` once sweeps go to ~30

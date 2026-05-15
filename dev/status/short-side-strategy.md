@@ -8,12 +8,22 @@ IN_PROGRESS
 ## Interface stable
 YES
 
-Issue #859 margin work is in progress. Phase 1 (margin_config + Portfolio
-extensions + Portfolio_margin module) landed via #1113 + #1115. Phase 2
+Issue #859 margin work: **Phase 1 + Phase 2 both MERGED 2026-05-16.**
+Phase 1 (margin_config + Portfolio extensions + Portfolio_margin
+module) landed via #1113 + #1115 (file-length fix-forward). Phase 2
 (simulator wiring — daily borrow fee accrual + maintenance-margin
-force-cover) opened today as #1119. Both phases gate behind
+force-cover) merged as #1119. Both phases gate behind
 `Margin_config.enabled = false` so prior MERGED baselines stay bit-equal
 until a scenario opts in.
+
+**Next short-side step: Margin Phase 3 — Stage A bear-window
+validation.** Plan: `dev/plans/short-side-margin-2026-05-13.md` §Stage A.
+Gated on an `ops-data` session: run shorts on 3 bear windows
+(2000-2002, 2008-2009, 2020-Q1 + 2022) with `margin_config.enabled =
+true` and compare bottom-line metrics (total return, MaxDD, force-cover
+count, accrued borrow fee) against the flag-off baseline. Hypothesis:
+realistic margin makes shorts strictly negative-EV at the current
+Stage-4 entry edge. Phase 4-5 (long-short combined) gated on Phase 3.
 
 **Earlier MERGED note retained below.**
 

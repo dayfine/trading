@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-16
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
 ## Blocking Refactors
 - **2026-05-16 Option B pivot — IWV scrape becomes the primary
@@ -326,7 +326,51 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
 
+### Merged (Phase 1.4 IWV scraper stack — 2026-05-16)
+
+All four PRs of the IWV scraper stack landed in a single session per
+`dev/plans/iwv-scraper-2026-05-16.md`. The stack provides the tooling
+to scrape iShares IWV holdings CSVs, infer point-in-time membership
+by diffing snapshots, and emit a Pinned-shape Russell 3000 universe
+sexp. **Next step is operational, not feature work:** an `ops-data`
+session must run the actual ~3-hour backfill against ishares.com to
+populate `dev/data/ishares/iwv/*.csv` and emit
+`russell-3000-2006-2026.sexp`.
+
+- **#1112 — Phase 1.4 PR-A — `ishares_holdings_client`** — pure CSV
+  parser + URI builder under
+  `trading/analysis/data/sources/ishares/lib/ishares_holdings_client.{ml,mli}`.
+  `parse : string -> parse_outcome Status.status_or` returns
+  `Parsed snapshot` (era-agnostic; preserves source order; preserves
+  non-equity rows) or `No_data_sentinel` (line-2 `-` check).
+  `build_uri : as_of:Date.t -> Uri.t` constructs the verified
+  `IWV_holdings` URL. 4 pinned era fixtures (quarterly 2007-09-28,
+  cutover 2012-04-30, modern 2020-06-01, sentinel) + 14 OUnit2 tests.
+- **#1118 — Phase 1.4 PR-B — `ishares_membership_replay`** — pure
+  tenure-replay layer under
+  `trading/analysis/data/sources/ishares/lib/ishares_membership_replay.{ml,mli}`.
+  Forward-scan with per-ticker `absent_streak` counter; threshold
+  misses close the tenure at last-observed date; re-appearance opens
+  a fresh tenure. 9 OUnit2 tests pinning all hysteresis edges.
+- **#1120 — Phase 1.4 PR-C — `fetch_iwv_history.exe`** — resume-safe
+  + polite IWV backfill CLI under
+  `trading/analysis/data/sources/ishares/bin/`. Cache layout
+  `<cache_dir>/YYYY-MM-DD.csv` + `.sentinel` markers. Cadence policies
+  auto / daily / monthly / quarterly; auto pins quarter-ends pre-2009,
+  month-ends through 2012-04, weekdays after. Atomic-rename writes
+  via `.tmp` sibling. 17 OUnit2 tests on the lib (no live HTTP in CI).
+- **#1122 — Phase 1.4 PR-D — `build_iwv_universe.exe`** — completes
+  the stack. Reads cached snapshots, pipes through
+  `Ishares_membership_replay.replay`, emits a Pinned-shape universe
+  sexp matching `broad-3000-2010-01-01.sexp`. Equity + US-location
+  filter in the lib (per-backtest policy). 14 OUnit2 tests including
+  schema parity check.
+
 ### In Progress / READY_FOR_REVIEW
+
+(none — all four IWV PRs merged this session)
+
+### Historical README (pre-merge entries below; preserved for review traceability)
 
 - **Phase 1.4 PR-D — `build_iwv_universe.exe` (READY_FOR_REVIEW
   2026-05-16, branch `feat/iwv-build-universe`).**
@@ -486,39 +530,23 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
 ### Pending
 
-- **Phase 1.4 — Russell 3000 via IWV scrape (PRIMARY PATH)** — URL
-  pattern verified PR #1108; plan landed PR #1109
-  (`dev/plans/iwv-scraper-2026-05-16.md`, 4-PR stack). Stack status:
-  - **[ ] PR-A `ishares_holdings_client`** — READY_FOR_REVIEW
-    2026-05-16. Pure CSV parser + URI builder under
-    `trading/analysis/data/sources/ishares/lib/ishares_holdings_client.{ml,mli}`
-    with 4 pinned era fixtures (quarterly 2007, cutover 2012,
-    modern 2020, sentinel) and 14 tests covering all three eras +
-    sentinel + header-drift + empty input. Branch:
-    `feat/iwv-holdings-client`.
-  - **[ ] PR-B `ishares_membership_replay`** — READY_FOR_REVIEW
-    2026-05-16. Pure tenure-replay layer under
-    `trading/analysis/data/sources/ishares/lib/ishares_membership_replay.{ml,mli}`
-    with 9 OUnit2 tests covering single-snapshot / overlap /
-    miss-threshold / sector-pinning / threshold-parameterization /
-    un-tickered-drop. Branch: `feat/iwv-membership-replay`.
-  - **[ ] PR-C `fetch_iwv_history.exe`** — READY_FOR_REVIEW
-    2026-05-16. Resume-safe + polite IWV backfill CLI under
-    `trading/analysis/data/sources/ishares/bin/`. New
-    `fetch_iwv_history_lib.{ml,mli}` exposes pure cadence + plan +
-    sentinel-marker helpers (testable); `fetch_iwv_history.ml` wires
-    [Cohttp_async] HTTP + polite spacing on top. Auto cadence pins
-    quarter-ends pre-2009, month-ends 2009–2012-04, weekdays
-    2012-04-30+ per the Phase 1.4 URL probe. Sentinel responses
-    materialise as `<D>.sentinel` markers so re-runs don't re-fetch
-    known-empty dates. 17 OUnit2 tests cover cadence parsing,
-    enumeration across all four policies + cutover boundary,
-    resume-from-mixed-cache classification, zero-byte-CSV →
-    refetch fallback, sentinel roundtrip, format_plan_summary, and
-    cache-dir creation. `dune build && dune runtest && dune build @fmt`
-    all green. Branch: `feat/iwv-fetch-history`. Plan:
-    `dev/plans/iwv-scraper-2026-05-16.md` §PR-C.
-  - **[ ] PR-D `build_iwv_universe.exe`** + golden — pending PR-B / PR-C.
+- **Phase 1.4 — Russell 3000 via IWV scrape (PRIMARY PATH) — TOOLING
+  COMPLETE 2026-05-16.** URL pattern verified PR #1108; plan landed
+  PR #1109 (`dev/plans/iwv-scraper-2026-05-16.md`, 4-PR stack); all
+  four PRs merged this session:
+  - **[x] PR-A `ishares_holdings_client`** — MERGED 2026-05-16 (#1112).
+  - **[x] PR-B `ishares_membership_replay`** — MERGED 2026-05-16 (#1118).
+  - **[x] PR-C `fetch_iwv_history.exe`** — MERGED 2026-05-16 (#1120).
+  - **[x] PR-D `build_iwv_universe.exe`** — MERGED 2026-05-16 (#1122).
+  Tooling shipped; **next action is operational**, not feature work.
+  An `ops-data` session must run the ~3-hour backfill against
+  ishares.com:
+    1. `dune exec analysis/data/sources/ishares/bin/fetch_iwv_history.exe --
+       --cache-dir dev/data/ishares/iwv --start 2006-09-29
+       --end <today> --cadence auto --polite-spacing 2.0`
+    2. `dune exec analysis/data/sources/ishares/bin/build_iwv_universe.exe --
+       --cache-root dev/data/ishares/iwv
+       --output trading/test_data/goldens-russell-3000-historical/russell-3000-2006-2026.sexp`
   No vendor signup; Linux/Mac OCaml native; zero marginal cost.
 - **Phase 1.3 — Survivorship-correct re-pin** — deferred until 1.4
   lands (no longer downstream of the parked 1.1).
@@ -607,6 +635,8 @@ Synth-v1 (#755) + Synth-v2 (#775) + Synth-v3 (#1028) all MERGED.
 EODHD multi-market expansion MERGED (#772). M5.3 Phase F retirement
 COMPLETE. 15y memory-cliff fixes MERGED (#988/#992/#993 + #1024).
 broad-3000-2010-01-01 cohort MERGED (#1103, sectors.csv proxy).
+**Phase 1.4 IWV scraper stack: ALL 4 PRs MERGED 2026-05-16
+(#1112 / #1118 / #1120 / #1122).**
 
 **2026-05-16 Option B pivot:** Phase 1 work is sourced from DIY
 iShares IWV scrape (primary, 2006-present Russell 3000) with
@@ -614,24 +644,25 @@ fja05680 1996-1999 SP500 tail deferred. EODHD Fundamentals
 parked after verification FAIL (PR #1106). Norgate retired. See
 `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
 
-1. **Phase 1.4 implementation** — plan landed PR #1109
-   (`dev/plans/iwv-scraper-2026-05-16.md`); 4-PR stack under
-   `analysis/data/sources/ishares/`
-   (`ishares_holdings_client.{ml,mli}` →
-   `ishares_membership_replay.{ml,mli}` → `fetch_iwv_history.ml` CLI
-   → `build_iwv_universe.ml` CLI). Mirrors the `wiki_sp500` layout
-   (PRs #803/#808/#809/#813). Dispatch `feat-data` against PR 1 of
-   the stack. Authority for URL pattern / sentinel / header
-   stability: `dev/notes/phase1.4-iwv-url-probe-2026-05-16.md`.
-2. **Phase 1.3 re-pin** — once 1.4 lands, re-pin the
+1. **Phase 1.4 — run the actual IWV scrape (ops-data, ~3-hour
+   wall-clock).** Tooling complete; data is not. Dispatch `ops-data`
+   to run `fetch_iwv_history.exe` over 2006-09-29 → today against
+   ishares.com (polite 2s spacing), then `build_iwv_universe.exe`
+   over the cache to emit
+   `trading/test_data/goldens-russell-3000-historical/russell-3000-2006-2026.sexp`.
+   See `dev/notes/next-session-priorities-2026-05-17.md` §P0a for
+   the exact commands.
+2. **Phase 1.3 re-pin** — gated on (1). Re-pin
    `goldens-sp500-historical/sp500-2010-2026.sexp` baseline on the
    IWV-derived cohort. The new cohort is wider than SP500 (Russell
    3000) so the baseline numbers will differ; this needs fresh
    sign-off, not a like-for-like comparison against the current
-   510-symbol baseline.
-3. **Phase 5 — screener point-in-time filter** — `membership_at`
-   callback in `Screener.screen`. Independent of which Phase 1
-   source feeds it. Can run in parallel with 1.4.
+   510-symbol baseline. Owner: `feat-backtest` (re-pin) + `ops-data`
+   (run the actual sweep).
+3. **Phase 5 — screener point-in-time filter** — MERGED 2026-05-14
+   (PR #1089). The `membership_at` callback is wired into
+   `Screener.screen` and is opt-in via `enable_pi_filter`. No further
+   feat-data work remains on this item.
 4. Optional follow-ups (non-blocking):
    - Strategy-side smoke test on a Synth-v3 universe (Sharpe/MaxDD) —
      belongs in `feat-backtest`, not feat-data.
