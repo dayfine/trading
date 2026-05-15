@@ -149,7 +149,9 @@ let _short_equity_ratio ~(margin_config : Margin_config.t)
 let _short_breaches_maintenance ~(margin_config : Margin_config.t)
     ~(current_price : float) (p : portfolio_position) : symbol option =
   let entry_avg_cost = Calculations.avg_cost_of_position p in
-  let ratio = _short_equity_ratio ~margin_config ~entry_avg_cost ~current_price in
+  let ratio =
+    _short_equity_ratio ~margin_config ~entry_avg_cost ~current_price
+  in
   if Float.O.(ratio < margin_config.maintenance_margin_pct) then Some p.symbol
   else None
 
