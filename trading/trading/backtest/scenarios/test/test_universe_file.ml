@@ -141,6 +141,35 @@ let test_committed_universes_parse _ =
            (function Universe_file.Full_sector_map -> Some () | _ -> None)
            (equal_to ()))
 
+let _is_alpha_sorted entries =
+  let symbols = List.map entries ~f:(fun e -> e.Universe_file.symbol) in
+  List.is_sorted symbols ~compare:String.compare
+
+let _all_sectors_non_empty entries =
+  List.for_all entries ~f:(fun e -> String.length e.Universe_file.sector > 0)
+
+(* The committed broad-3000-2010-01-01 fixture is the Phase 1.2 deliverable
+   from dev/notes/next-session-priorities-2026-05-15.md §P0. Pins cardinality
+   (~3000), alphabetic ordering (deterministic for diffs), and the 11-GICS-
+   sector spread that the strategy's sector-rotation logic depends on. *)
+let test_broad_3000_2010_universe_parses _ =
+  match _universes_root () with
+  | None ->
+      assert_failure
+        (sprintf "universes/ dir not found from cwd=%s" (Stdlib.Sys.getcwd ()))
+  | Some root ->
+      assert_that
+        (Universe_file.load (Filename.concat root "broad-3000-2010-01-01.sexp"))
+        (when_pinned
+           (all_of
+              [
+                field List.length
+                  (is_between (module Int_ord) ~low:2500 ~high:3500);
+                field _distinct_sector_count (ge (module Int_ord) 8);
+                field _is_alpha_sorted (equal_to true);
+                field _all_sectors_non_empty (equal_to true);
+              ]))
+
 let suite =
   "Universe_file"
   >::: [
@@ -152,6 +181,8 @@ let suite =
          >:: test_to_sector_map_override_full_is_none;
          "to_sector_map_override Pinned" >:: test_to_sector_map_override_pinned;
          "committed universes parse" >:: test_committed_universes_parse;
+         "broad-3000-2010 universe parses"
+         >:: test_broad_3000_2010_universe_parses;
        ]
 
 let () = run_test_tt_main suite
