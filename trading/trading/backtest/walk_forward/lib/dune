@@ -1,0 +1,5 @@
+(library
+ (name walk_forward)
+ (libraries core scenario_lib)
+ (preprocess
+  (pps ppx_sexp_conv)))

@@ -52,6 +52,18 @@ let not_ ?(msg = "Expected matcher to fail but it succeeded") matcher value =
   if passed then assert_failure msg
 
 (* ========================================================================== *)
+(* String Matchers                                                            *)
+(* ========================================================================== *)
+
+let contains_substring ?msg substring actual =
+  if not (String.is_substring actual ~substring) then
+    let default_msg =
+      Printf.sprintf "Expected string to contain substring %S but got: %S"
+        substring actual
+    in
+    assert_failure (Option.value msg ~default:default_msg)
+
+(* ========================================================================== *)
 (* Result Matchers                                                           *)
 (* ========================================================================== *)
 
