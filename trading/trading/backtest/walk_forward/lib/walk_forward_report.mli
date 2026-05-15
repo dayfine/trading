@@ -1,24 +1,38 @@
-(** Pure markdown renderer for walk-forward CV results.
+(** Pure aggregate + markdown renderer for walk-forward CV results.
 
     Consumes a flat list of per-(fold, variant) measurements + a baseline label
-    \+ a {!Fold_gate.t}, and emits a four-section markdown report:
+    + a {!Fold_gate.t}, and produces:
 
-    1. **Per-fold metrics table** — one row per fold × variant, columns: fold
-    name, variant label, total return %, Sharpe, MaxDD %, Calmar. 2. **Stability
-    table** — one row per variant: mean ± stdev of each metric across folds. 3.
-    **Cross-fold parameter sensitivity** — variant win-count per metric. 4.
-    **Go/no-go verdict block** — calls {!Fold_gate.evaluate} on the
-    gate-selected metric and renders Pass/Fail with the diagnostic fields. *)
+    - {!compute} — a structured {!aggregate} record (per-variant stability,
+      per-variant gate verdict, win-counts on the gate metric) suitable for
+      programmatic consumption by Phase 3's Bayesian optimizer.
+    - {!render} — a four-section markdown report: per-fold metrics, stability,
+      cross-fold sensitivity, go/no-go verdict. Internally calls {!compute} and
+      delegates the markdown emission to {!Walk_forward_render}. *)
 
-type fold_actual = {
-  fold_name : string;
-  variant_label : string;
-  total_return_pct : float;
-  sharpe_ratio : float;
-  max_drawdown_pct : float;
-  calmar_ratio : float;
-}
-[@@deriving sexp]
+include module type of Walk_forward_types
+(** The type surface ({!fold_actual}, {!aggregate}, {!variant_stability},
+    {!variant_sensitivity}, {!per_metric_stats}) lives in {!Walk_forward_types}
+    and is re-exported here unchanged. *)
+
+val compute :
+  baseline_label:string ->
+  gate:Fold_gate.t ->
+  fold_actuals:fold_actual list ->
+  aggregate
+(** [compute ~baseline_label ~gate ~fold_actuals] returns the structured
+    aggregate.
+
+    Validation matches {!render}: raises [Failure] if [fold_actuals] is empty or
+    if [baseline_label] is not present among the variant labels in
+    [fold_actuals].
+
+    The stability list aggregates by variant label in first-appearance order.
+    The sensitivity and verdicts lists exclude the baseline. Each verdict is a
+    synthetic Fail with a "fold-pair count mismatch" reason when the (variant,
+    baseline) fold-pair count doesn't match [gate.n] — the gate's [evaluate]
+    would raise in that case; we produce a uniform diagnostic surface for
+    downstream consumers instead. *)
 
 val render :
   baseline_label:string ->
@@ -26,16 +40,9 @@ val render :
   fold_actuals:fold_actual list ->
   string
 (** [render ~baseline_label ~gate ~fold_actuals] returns a markdown report
-    string. The renderer is deterministic — same inputs produce byte-identical
-    output (modulo timestamp, which is intentionally omitted).
+    string. Internally calls {!compute} then {!Walk_forward_render.to_markdown}.
 
-    Raises [Failure] if [fold_actuals] is empty or if [baseline_label] is not
-    present among the variant labels in [fold_actuals].
+    Deterministic — same inputs produce byte-identical output (modulo timestamp,
+    which is intentionally omitted).
 
-    The per-fold table preserves the input ordering of [fold_actuals]. The
-    stability and sensitivity tables aggregate by variant label, in the order
-    the labels first appear in [fold_actuals].
-
-    The go/no-go verdict block pairs each non-baseline variant against the
-    baseline on the gate's [metric] and renders a separate Pass/Fail line per
-    variant. *)
+    Raises [Failure] under the same conditions as {!compute}. *)

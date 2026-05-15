@@ -131,13 +131,14 @@ let test_description_marks_fold_and_variant _ =
 let test_build_all_cross_product _ =
   let base = _make_base ~name:"X" () in
   let spec : WS.t =
-    {
-      start_date = _date 2020 1 1;
-      end_date = _date 2020 6 30;
-      train_days = 0;
-      test_days = 30;
-      step_days = 60;
-    }
+    Rolling
+      {
+        start_date = _date 2020 1 1;
+        end_date = _date 2020 6 30;
+        train_days = 0;
+        test_days = 30;
+        step_days = 60;
+      }
   in
   (* Folds at 01-01, 03-01, 05-01 (step=60) = 3 folds. Wait: 01-01 + 60 = 03-01,
      +60 = 05-01. test 05-01..05-30 ends by 06-30. fold-3 anchor 06-30, test
@@ -161,13 +162,14 @@ let test_build_all_cross_product _ =
 let test_build_all_empty_variants_yields_empty _ =
   let base = _make_base () in
   let spec : WS.t =
-    {
-      start_date = _date 2020 1 1;
-      end_date = _date 2020 6 30;
-      train_days = 0;
-      test_days = 30;
-      step_days = 30;
-    }
+    Rolling
+      {
+        start_date = _date 2020 1 1;
+        end_date = _date 2020 6 30;
+        train_days = 0;
+        test_days = 30;
+        step_days = 30;
+      }
   in
   let scenarios = WFR.build_all ~base ~spec ~variants:[] in
   assert_that scenarios (size_is 0)
