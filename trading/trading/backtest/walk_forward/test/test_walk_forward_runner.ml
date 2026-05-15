@@ -121,15 +121,9 @@ let test_description_marks_fold_and_variant _ =
     (all_of
        [
          (* Both labels present *)
-         field
-           (fun d -> String.is_substring d ~substring:"fold-007")
-           (equal_to true);
-         field
-           (fun d -> String.is_substring d ~substring:"cellX")
-           (equal_to true);
-         field
-           (fun d -> String.is_substring d ~substring:"orig desc")
-           (equal_to true);
+         contains_substring "fold-007";
+         contains_substring "cellX";
+         contains_substring "orig desc";
        ])
 
 (* ---------- build_all: cross product order ---------- *)

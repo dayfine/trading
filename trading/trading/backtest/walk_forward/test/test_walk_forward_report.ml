@@ -88,23 +88,11 @@ let test_render_contains_all_four_section_headers _ =
   assert_that md
     (all_of
        [
-         field
-           (fun s ->
-             String.is_substring s ~substring:"# Walk-forward CV report")
-           (equal_to true);
-         field
-           (fun s -> String.is_substring s ~substring:"## 1. Per-fold metrics")
-           (equal_to true);
-         field
-           (fun s -> String.is_substring s ~substring:"## 2. Stability")
-           (equal_to true);
-         field
-           (fun s ->
-             String.is_substring s ~substring:"## 3. Cross-fold sensitivity")
-           (equal_to true);
-         field
-           (fun s -> String.is_substring s ~substring:"## 4. Go/no-go verdict")
-           (equal_to true);
+         contains_substring "# Walk-forward CV report";
+         contains_substring "## 1. Per-fold metrics";
+         contains_substring "## 2. Stability";
+         contains_substring "## 3. Cross-fold sensitivity";
+         contains_substring "## 4. Go/no-go verdict";
        ])
 
 let test_render_contains_pass_when_variant_wins _ =
@@ -114,15 +102,7 @@ let test_render_contains_pass_when_variant_wins _ =
   let gate = _baseline_gate ~m:2 ~n:3 ~worst_delta:0.5 () in
   let md = Report.render ~baseline_label:"baseline" ~gate ~fold_actuals:folds in
   assert_that md
-    (all_of
-       [
-         field
-           (fun s -> String.is_substring s ~substring:"cellE")
-           (equal_to true);
-         field
-           (fun s -> String.is_substring s ~substring:"PASS")
-           (equal_to true);
-       ])
+    (all_of [ contains_substring "cellE"; contains_substring "PASS" ])
 
 let test_render_contains_fail_when_m_threshold_missed _ =
   (* baseline > cellE on all 3 folds; require cellE wins ≥2 — must FAIL. *)
@@ -144,8 +124,7 @@ let test_render_contains_fail_when_m_threshold_missed _ =
   in
   let gate = _baseline_gate ~m:2 ~n:3 ~worst_delta:100.0 () in
   let md = Report.render ~baseline_label:"baseline" ~gate ~fold_actuals:folds in
-  assert_that md
-    (field (fun s -> String.is_substring s ~substring:"FAIL") (equal_to true))
+  assert_that md (contains_substring "FAIL")
 
 let test_per_fold_table_renders_decimal_metrics _ =
   let folds = _three_fold_two_variant_setup () in
@@ -153,23 +132,14 @@ let test_per_fold_table_renders_decimal_metrics _ =
   let md = Report.render ~baseline_label:"baseline" ~gate ~fold_actuals:folds in
   (* baseline fold-000 has return 5.0 and Sharpe 0.5 — should appear formatted *)
   assert_that md
-    (all_of
-       [
-         field
-           (fun s -> String.is_substring s ~substring:"5.00")
-           (equal_to true);
-         field
-           (fun s -> String.is_substring s ~substring:"0.500")
-           (equal_to true);
-       ])
+    (all_of [ contains_substring "5.00"; contains_substring "0.500" ])
 
 let test_stability_row_shows_mean_and_stdev _ =
   let folds = _three_fold_two_variant_setup () in
   let gate = _baseline_gate ~m:2 ~n:3 () in
   let md = Report.render ~baseline_label:"baseline" ~gate ~fold_actuals:folds in
   (* The stability table uses "μ ± σ" header; verify the symbol pair appears. *)
-  assert_that md
-    (field (fun s -> String.is_substring s ~substring:"μ ± σ") (equal_to true))
+  assert_that md (contains_substring "μ ± σ")
 
 let test_sensitivity_row_per_variant _ =
   let folds = _three_fold_two_variant_setup () in
@@ -177,13 +147,7 @@ let test_sensitivity_row_per_variant _ =
   let md = Report.render ~baseline_label:"baseline" ~gate ~fold_actuals:folds in
   (* cellE wins on 3 folds (0.9>0.5, 0.7>0.6, 0.45>0.4). Sensitivity table
      should report "cellE | 3 | 3". *)
-  assert_that md
-    (all_of
-       [
-         field
-           (fun s -> String.is_substring s ~substring:"| cellE | 3 | 3 |")
-           (equal_to true);
-       ])
+  assert_that md (contains_substring "| cellE | 3 | 3 |")
 
 (* ---------- Determinism ---------- *)
 
