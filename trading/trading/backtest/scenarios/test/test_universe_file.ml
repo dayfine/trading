@@ -163,8 +163,7 @@ let test_broad_3000_2010_universe_parses _ =
         (when_pinned
            (all_of
               [
-                field List.length
-                  (is_between (module Int_ord) ~low:2500 ~high:3500);
+                field List.length (equal_to 3000);
                 field _distinct_sector_count (ge (module Int_ord) 8);
                 field _is_alpha_sorted (equal_to true);
                 field _all_sectors_non_empty (equal_to true);
