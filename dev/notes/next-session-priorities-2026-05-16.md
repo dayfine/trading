@@ -1,52 +1,66 @@
-# Next-session priorities (2026-05-16) — vendor pivot
+# Next-session priorities (2026-05-16) — Option B pivot
 
-Supersedes `dev/notes/next-session-priorities-2026-05-15.md`. Carries
-forward all P0/P1/P2/P3 items; the only material change is Phase 1
-sourcing.
+Supersedes `dev/notes/next-session-priorities-2026-05-15.md`. Revised
+2026-05-16 evening after the Phase 1.1 (EODHD Fundamentals) and Phase
+1.4 (IWV scrape) verifications landed. Carries forward all P0/P1/P2/P3
+items; the only material change is **Phase 1 sourcing**.
 
 ## TL;DR
 
-**Vendor pivot — Norgate retired.** Norgate's NDU client is
-Windows-only; incompatible with our Mac/Linux Docker toolchain.
-Replacements:
+**Phase 1.1 FAILED at verification (PR #1106).** Our EODHD subscription
+is the EOD-only tier; the Fundamentals endpoint returns HTTP 403
+across every variant probed. Tier upgrade rejected per the Option B
+decision.
 
-- **SP500 PI 2000-present:** EODHD Fundamentals API
-  (`GSPC.INDX?historical=1`, same client we already use).
-- **Russell 3000 2006-present:** DIY iShares IWV scrape (pure HTTP,
-  no vendor signup).
-- **SP500 1996-1999 (optional):** `fja05680/sp500` static seed.
+**Phase 1.4 PASSED verification (PR #1108).** iShares IWV URL pattern
+works HTTP 200 across the full 2006-09-29 → 2026-05-08 range with
+byte-identical line-10 headers. Pure HTTP, no auth, free.
 
-Full reasoning in
-`dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
+**Result — Option B pivot.** Russell 3000 via DIY IWV scrape is now
+the **primary** survivorship-correct universe source. SP500 PI 2000-
+present via EODHD Fundamentals is parked indefinitely. SP500 1996-1999
+tail (fja05680) remains deferred. Strategy can now pin a 20y × 3000-
+name baseline that strictly contains every SP500 member.
 
 Strategic posture from 2026-05-15 unchanged: broader-first beats
-more-knobs. P2 walk-forward CV (PR #1100 landed) and P3 Bayesian
-optimizer continue on the existing 510-sym 2010-2026 universe while
-Phase 1 lands.
+more-knobs. P2 walk-forward CV (PR #1100 / #1107 landed) and P3
+Bayesian optimizer continue on the existing 510-sym 2010-2026
+universe in parallel.
 
-## Phase 1 ordering (updated 2026-05-16)
+Full reasoning + ranked vendor table in
+`dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
+
+## Phase 1 ordering (revised 2026-05-16 evening)
 
 | # | Item | Source | Status |
 |---|---|---|---|
-| 1.1 | SP500 PI membership 2000-present | EODHD Fundamentals `HistoricalTickerComponents` | Pending 4-item EODHD-tier verification (`dev/status/data-foundations.md` §"Blocking Refactors") |
+| 1.1 | SP500 PI membership 2000-present | EODHD Fundamentals `HistoricalTickerComponents` | **FAILED at verification (PR #1106)** — subscription tier does not include Fundamentals; tier upgrade rejected per Option B. Parked. |
 | 1.2 | `broad-3000-2010-01-01.sexp` cohort (sectors.csv proxy) | EODHD + sectors.csv | **MERGED 2026-05-15** (PR #1103); forward-looking-biased; superseded by 1.4 |
-| 1.3 | Survivorship-correct re-pin of `sp500-2010-2026.sexp` baseline | derived from 1.1 + PR #1076 active_through | Pending 1.1 |
-| 1.4 | Russell 3000 true historical reconstitution | DIY iShares IWV scrape 2006-present | Pending plan-first; independent of 1.1 |
+| 1.3 | Survivorship-correct re-pin of `sp500-2010-2026.sexp` baseline | derived from 1.1 + PR #1076 active_through | **DEFERRED** until 1.4 lands (no longer downstream of 1.1) |
+| 1.4 | Russell 3000 true historical reconstitution | DIY iShares IWV scrape 2006-present | **IN_PROGRESS (PRIMARY PATH)** — URL pattern verified (PR #1108); next step is plan-first dispatch to `feat-data` |
 | 1.5 | SP500 1996-1999 tail (optional) | `fja05680/sp500` static seed | Deferred per broader-first pivot |
 
-Recommended dispatch order:
+Recommended dispatch order (revised):
 
-1. **1.1 verification** — zero-code; hit EODHD dashboard + spot-check
-   5 events (LEH 2008, KODK 2009, FB 2013, TSLA 2020, GE 2018). Once
-   green, dispatch feat-data.
-2. **1.4 IWV scrape** in parallel with 1.1 — spot-curl the URL
-   pattern recent + 2010-01-04, then plan-first.
-3. **1.3 re-pin** after 1.1 lands.
+1. **1.4 PR 1 (client)** — plan landed as PR #1109
+   (`dev/plans/iwv-scraper-2026-05-16.md`, 4-PR stack). Dispatch
+   `feat-data` against the first PR: `ishares_holdings_client.{ml,mli}`
+   (cohttp HTTPS GET + CSV decode + pinned fixture). Authority for
+   the URL pattern / sentinel / header stability:
+   `dev/notes/phase1.4-iwv-url-probe-2026-05-16.md`.
+2. **1.4 PR 2-4** — `ishares_membership_replay` →
+   `fetch_iwv_history` CLI → `build_iwv_universe` CLI, per the plan.
+   Each PR aims for 400-500 LOC. Backfill ~3 hr at 2s polite spacing.
+3. **1.3 re-pin** — once 1.4 lands, re-pin the 2010-2026 baseline
+   on the IWV-derived Russell 3000 cohort (now wider than SP500,
+   so the baseline numbers will differ; this needs fresh
+   sign-off, not a like-for-like comparison).
 
 ## P2 / P3 / P1 — unchanged from 2026-05-15
 
-- **P2 walk-forward CV** — owner `feat-backtest`; PR #1100 landed
-  first PR; continue scaling to ~30 rolling folds.
+- **P2 walk-forward CV** — owner `feat-backtest`; PR #1100 landed the
+  first PR; PR #1107 landed the 30-fold rolling extension. Continue
+  scaling.
 - **P3 Bayesian optimizer** — owner `feat-backtest`; scale
   `bayesian_runner.exe` to full Cell E knob set with MaxDD-penalized
   loss on walk-forward CV.
@@ -66,18 +80,20 @@ F variants all explicitly deferred. See
 
 The only credible >30y step-up for non-institutional pricing is
 **Sharadar via Nasdaq Data Link** ($150–$300/mo personal; SP500
-changes since 1957). Deferred until 1.1 proves out at 30y.
+changes since 1957). Deferred until 1.4 proves out at 20y.
 Institutional vendors (CRSP/WRDS, Refinitiv, Bloomberg) not viable.
 See vendor-comparison doc §Option 4.
 
-## Carry-forward in-flight from 2026-05-15
+## Carry-forward in-flight
 
-- PR #1095 / #1097 / #1098 / #1100 / #1101 / #1103 — all MERGED.
-- PR #1101 (Phase 1.1 Norgate blocker note) superseded 2026-05-16
+- PR #1095 / #1097 / #1098 / #1100 / #1103 / #1105 / #1106 / #1107 /
+  #1108 / #1109 — all MERGED.
+- PR #1101 (Phase 1.1 Norgate blocker note) — superseded 2026-05-16
   by the vendor pivot; original analysis preserved at the bottom of
   `dev/notes/phase1.1-1996-membership-blocker-2026-05-15.md`.
 
-## What the user said (2026-05-16)
+## What the user said (2026-05-16, evening)
 
-"Norgate is OUT (Windows-only); EODHD + IWV scrape + fja05680 are
-IN." Phase 1.1 re-scoped; Phase 1.4 added.
+"Option B — IWV scrape is the primary path. No Fundamentals tier
+upgrade. Park Phase 1.1; promote Phase 1.4." Phase 1.1 retired;
+Phase 1.4 promoted to primary; Phase 1.3 deferred until 1.4 lands.

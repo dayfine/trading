@@ -209,3 +209,24 @@ the 100k/day cap.
   `memory/project_jj_workspace_docker_path.md` (not `/tmp/` which is
   invisible to docker — though docker wasn't needed for any probe;
   all curl ran on the host).
+
+## 2026-05-16 follow-up — Option B chosen; no tier upgrade pursued
+
+Per `dev/decisions.md` 2026-05-16 §"Option B pivot — IWV scrape as
+primary, EODHD Fundamentals retired", the recommendation from the
+verification doc's §"Option B — drop Phase 1.1; Phase 1.4 (IWV
+scrape) becomes the primary survivorship-correct source" was
+selected. No Fundamentals tier upgrade was purchased; the Unicorn
+Bay marketplace add-on was likewise rejected.
+
+Phase 1.4 verification (PR #1108) returned green the same day —
+iShares IWV URL pattern works HTTP 200 across the full 2006-09-29 →
+2026-05-08 range with byte-identical headers. Full transcript in
+`dev/notes/phase1.4-iwv-url-probe-2026-05-16.md`.
+
+Phase 1.1 is now PARKED indefinitely. If the strategy ever needs
+the 2000-2005 SP500 tail that IWV cannot cover, the cheapest revival
+path is still the standalone Fundamentals Data Feed tier ($59.99/mo),
+not the marketplace Unicorn Bay add-on (12y coverage doesn't reach
+back further than IWV does). At that point this doc's
+§"Schema caveat" must be re-verified before any parser work.
