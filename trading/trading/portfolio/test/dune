@@ -11,3 +11,14 @@
  (libraries ounit2 trading.portfolio trading.base matchers)
  (preprocess
   (pps ppx_test_matcher)))
+
+(test
+ (name test_margin_accounting)
+ (libraries
+  core
+  core_unix.time_ns_unix
+  ounit2
+  trading.portfolio
+  trading.base
+  status
+  matchers))
