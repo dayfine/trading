@@ -5,6 +5,13 @@
 ## Status
 IN_PROGRESS
 
+## Blocking Refactors
+- Phase 1.1 (`sp500-1996-01-01.sexp`) confirmed blocked on Norgate
+  vendor signup — see
+  `dev/notes/phase1.1-1996-membership-blocker-2026-05-15.md`.
+  Pivot recommendation: Phase 1.2 (`broad-3000-2010-01-01.sexp`)
+  is unblocked and higher-ROI on existing substrate.
+
 ## Notes
 
 **2026-05-15 strategic pivot — track elevated to P0.** Per
@@ -19,8 +26,18 @@ Phase 1 work below:
 1. **`sp500-1996-01-01.sexp` membership data** — mirror PR #1076's
    per-symbol `active_through` columns back to 1996, sourced from
    the Wikipedia changelog infra in PR #813 (`Changes_parser`).
+   **BLOCKED on Norgate vendor signup (2026-05-15).** Wikipedia
+   changes table covers only ~22 events for 1996–2009 vs. the
+   ~750 expected; full diagnosis in
+   `dev/notes/phase1.1-1996-membership-blocker-2026-05-15.md`.
+   Three resolution options offered in that doc: (a) wait on
+   Norgate, (b) narrow to sp500-2007-01-01, (c) pivot to Phase 1.2
+   (broad-3000-2010-01-01).
 2. **`broad-3000-2010-01-01.sexp` cohort** — expand beyond SP500 to
    the full Russell 3000 with PI-aware `active_through` data.
+   Per the Phase 1.1 blocker findings, this is the recommended
+   higher-ROI next step while Norgate signup is pending —
+   reproducible entirely from existing Wikipedia + EODHD substrate.
 3. **Survivorship-correct re-pin of `goldens-sp500-historical/sp500-2010-2026.sexp`** —
    replace current pinned baseline (measured on survivorship-biased
    data per #1076's hypothesis) with one where PI filter is ON by
