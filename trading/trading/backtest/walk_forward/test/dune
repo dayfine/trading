@@ -1,0 +1,9 @@
+(tests
+ (names
+  test_window_spec
+  test_fold_gate
+  test_walk_forward_runner
+  test_walk_forward_report)
+ (libraries ounit2 core matchers scenario_lib walk_forward)
+ (preprocess
+  (pps ppx_sexp_conv)))
