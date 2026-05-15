@@ -119,6 +119,30 @@ val all_of : ('a -> unit) list -> 'a -> unit
       ]
     ]} *)
 
+(** {1 String Matchers} *)
+
+val contains_substring : ?msg:string -> string -> string matcher
+(** [contains_substring ?msg substring] asserts the actual string contains
+    [substring] (via [String.is_substring]). Optionally takes a custom failure
+    message; otherwise reports the expected substring and the actual string.
+
+    Use this instead of wrapping [String.is_substring] in [equal_to true] —
+    that pattern violates the test-pattern rule against boolean equality in
+    assertions.
+
+    Example:
+    {[
+    assert_that markdown (contains_substring "## Verdict")
+    ]}
+    {[
+    assert_that markdown
+      (all_of
+         [
+           contains_substring "PASS";
+           contains_substring "cellE";
+         ])
+    ]} *)
+
 (** {1 Result Matchers}
 
     Matchers for [Result.t] and [Status.status_or] types *)

@@ -94,6 +94,28 @@ let test_matching_custom_msg_fails _ =
            (function `A x -> Some x | _ -> None)
            (equal_to 0)))
 
+(* ------------------------------------------------------------------ *)
+(* contains_substring                                                   *)
+(* ------------------------------------------------------------------ *)
+
+let test_contains_substring_passes _ =
+  assert_that "hello world" (contains_substring "world");
+  assert_that "## Verdict: PASS" (contains_substring "PASS")
+
+let test_contains_substring_fails_when_absent _ =
+  assert_fails (fun () ->
+      assert_that "hello world" (contains_substring "goodbye"))
+
+let test_contains_substring_empty_substring_passes _ =
+  (* Empty substring is contained in every string per String.is_substring. *)
+  assert_that "anything" (contains_substring "")
+
+let test_contains_substring_empty_haystack_fails _ =
+  assert_fails (fun () -> assert_that "" (contains_substring "nonempty"))
+
+let test_contains_substring_equal_strings_passes _ =
+  assert_that "exact" (contains_substring "exact")
+
 let suite =
   "matchers"
   >::: [
@@ -115,6 +137,15 @@ let suite =
          "matching_passes_when_some" >:: test_matching_passes_when_some;
          "matching_fails_when_none" >:: test_matching_fails_when_none;
          "matching_custom_msg_fails" >:: test_matching_custom_msg_fails;
+         "contains_substring_passes" >:: test_contains_substring_passes;
+         "contains_substring_fails_when_absent"
+         >:: test_contains_substring_fails_when_absent;
+         "contains_substring_empty_substring_passes"
+         >:: test_contains_substring_empty_substring_passes;
+         "contains_substring_empty_haystack_fails"
+         >:: test_contains_substring_empty_haystack_fails;
+         "contains_substring_equal_strings_passes"
+         >:: test_contains_substring_equal_strings_passes;
        ]
 
 let () = run_test_tt_main suite
