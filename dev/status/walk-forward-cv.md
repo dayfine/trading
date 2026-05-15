@@ -1,6 +1,6 @@
 # Status: walk-forward-cv
 
-## Last updated: 2026-05-15
+## Last updated: 2026-05-16
 
 ## Status
 READY_FOR_REVIEW
@@ -56,11 +56,38 @@ dune exec trading/backtest/walk_forward/bin/walk_forward_runner.exe -- --help
 
 ## In Progress
 
-None for this PR. The harness is complete in its first-PR scope.
+### Second PR — Phase 2.2 PR-A: Explicit folds + structured aggregate (in flight)
+
+Per `dev/plans/walk-forward-cv-rolling-30fold-2026-05-16.md`. This is the
+first of the plan's two-PR split (PR-A = steps 1-2; PR-B = steps 3-5,
+defer).
+
+- [x] `Window_spec.t` promoted to variant `Rolling of rolling_spec | Explicit of explicit_fold list`. Backwards-compatible `t_of_sexp` accepts the legacy flat-record shape and silently promotes to `Rolling`. 6 new tests covering Explicit pass-through, empty/duplicate rejection, train_period preservation, sexp round-trip for both variants, and legacy-flat fallback.
+- [x] `Walk_forward_report.compute` returns a structured `aggregate` record (fold_count, baseline_label, metric_label, per-variant stability, per-variant sensitivity, per-variant verdicts). Programmatic surface for Phase 3 Bayesian optimizer to score candidates without parsing markdown. Existing `render` now delegates to `compute` then to a new `Walk_forward_render.to_markdown` helper module — markdown output preserved byte-identically. 5 new tests covering per-variant stability (mean/stdev/min/max), sensitivity exclusion of baseline, Pass verdict shape, baseline-label validation, and aggregate sexp round-trip.
+- [x] Type surface extracted to `Walk_forward_types` module so `Walk_forward_render` (the markdown emitter) can depend on the types without cycling back through `Walk_forward_report.compute`. `Walk_forward_report.mli` re-exports via `include module type of Walk_forward_types`.
+
+### Verify (PR-A)
+
+```
+dune build && dune runtest trading/backtest/walk_forward/test && dune build @fmt
+```
+
+54 tests across the 4 modules (9 + 17 + 13 + 15), all pass. All linters
+(nesting, fn-length, mli-coverage, file-length, magic-numbers, fmt) clean.
+
+### Deferred to PR-B (same plan)
+
+Plan §3-5: multi-metric sensitivity in markdown (4-col wins table),
+`cagr_pct` derived field in the binary, the two new fixture spec sexps
+(`cell-e-walk-forward-2026-05-08-harness/spec.sexp` regression fixture
+re-expressing the 8 hand-curated scenarios via `Window_spec.Explicit`,
+and `walk-forward-cell-e-30fold-2026-05-16/spec.sexp` production
+30-fold).
 
 ## Completed
 
-- **PR #1100** (this PR, 2026-05-15) — walk-forward CV harness first PR. Plan + 4 lib modules + binary + tests. ~1200 LOC including tests. All four checklist items satisfied (`dune build`, `dune runtest`, `dune fmt`, nesting + magic-number linters clean).
+- **PR #1100** (2026-05-15) — walk-forward CV harness first PR. Plan + 4 lib modules + binary + tests. ~1200 LOC including tests. All four checklist items satisfied (`dune build`, `dune runtest`, `dune fmt`, nesting + magic-number linters clean).
+- **PR #1107** (2026-05-16) — Phase 2.2 plan: rolling 30-fold harness extension. Plan file only; implementation tracked across the PR-A + PR-B split.
 
 ## Next Steps
 

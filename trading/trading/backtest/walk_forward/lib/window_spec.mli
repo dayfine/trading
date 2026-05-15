@@ -1,8 +1,8 @@
-(** Rolling window specification for walk-forward cross-validation.
+(** Window specification for walk-forward cross-validation.
 
-    A [WindowSpec.t] is a pure description of how to roll a fixed-shape
-    train/test window forward across a calendar range. {!generate} expands the
-    spec into a list of {!fold}s; each fold carries a name and the train + test
+    A [WindowSpec.t] is a pure description of how to lay out a sequence of
+    train/test windows across a calendar range. {!generate} expands the spec
+    into a list of {!fold}s; each fold carries a name and the train + test
     {!Scenario_lib.Scenario.period}s the walk-forward runner will instantiate
     base scenarios over.
 
@@ -12,13 +12,23 @@
     observable and a machine-checkable go/no-go gate becomes the verdict rather
     than an eyeballed table.
 
+    Two construction modes:
+
+    - [Rolling] — start_date/train_days/test_days/step_days expansion; the
+      generator emits the fold sequence and stops dropping folds whose
+      test_period extends past [end_date].
+    - [Explicit] — hand-curated list of fold periods, used to migrate the
+      2026-05-08 8-fold experiment as a regression fixture (its windows are not
+      a rolling pattern). Folds pass through verbatim with their input-order
+      indexes and operator-supplied names.
+
     All date arithmetic is in calendar days (not trading days). Conversion to
     trading-day windows is the backtest runner's job — the spec only constrains
     the wall-clock period each fold runs over. *)
 
 open Core
 
-type t = {
+type rolling_spec = {
   start_date : Date.t;
       (** Inclusive earliest day for the first fold's train (or test, when
           [train_days = 0]) period. *)
@@ -39,19 +49,44 @@ type t = {
           windows tile without overlap. *)
 }
 [@@deriving sexp]
-(** Sexp shape (one record):
-    [((start_date 2010-01-01) (end_date 2024-12-31) (train_days 730) (test_days
-     365) (step_days 182))]. *)
+
+type explicit_fold = {
+  name : string;
+      (** Human-readable fold name used verbatim as [fold.name] in the generated
+          fold record. Must be unique within the [Explicit] list. *)
+  train_period : Scenario_lib.Scenario.period option;
+      (** Optional in-sample period, same semantics as the rolling case. *)
+  test_period : Scenario_lib.Scenario.period;
+}
+[@@deriving sexp]
+(** One hand-curated fold for the [Explicit] mode. *)
+
+(** Sexp shape: [(Rolling ((start_date ...) (end_date ...) ...))] or
+    [(Explicit (((name "...") (train_period ...) (test_period ...)) ...))].
+
+    {b Legacy flat-shape compatibility:} the [t_of_sexp] override below accepts
+    the pre-variant shape
+    [((start_date ...) (end_date ...) (train_days ...) (test_days ...)
+     (step_days ...))] and parses it as [Rolling]. The plan tracks this
+    temporarily; new spec files should use the variant shape. *)
+type t = Rolling of rolling_spec | Explicit of explicit_fold list
+[@@deriving sexp]
+
+val t_of_sexp : Sexp.t -> t
+(** [t_of_sexp sexp] parses both the variant shape ([Rolling]/[Explicit]) and
+    the legacy flat-record shape (silently promoted to [Rolling]). Raises
+    [Failure] on shapes matching neither. *)
 
 type fold = {
   index : int;  (** Zero-based fold index in generation order. *)
   name : string;
-      (** Human-readable fold name, shape ["fold-NNN"] where [NNN] is [index]
-          zero-padded to width 3. Used as a suffix in generated scenario names.
-      *)
+      (** Human-readable fold name. For [Rolling] folds shape is ["fold-NNN"]
+          where [NNN] is [index] zero-padded to width 3. For [Explicit] folds
+          the name is the operator-supplied {!explicit_fold.name} verbatim. *)
   train_period : Scenario_lib.Scenario.period option;
-      (** [Some] when [WindowSpec.train_days > 0], else [None]. The train period
-          precedes the test period back-to-back. *)
+      (** [Some] when there is an in-sample period, else [None]. The train
+          period precedes the test period back-to-back in [Rolling] mode; the
+          [Explicit] case passes through whatever the operator supplied. *)
   test_period : Scenario_lib.Scenario.period;
 }
 [@@deriving sexp]
@@ -59,7 +94,7 @@ type fold = {
 val generate : t -> fold list
 (** [generate spec] expands a spec into its sequence of folds.
 
-    Algorithm: starting from [spec.start_date], the first fold's train_period
+    [Rolling]: starting from [spec.start_date], the first fold's train_period
     runs [start_date .. start_date + train_days - 1] (inclusive) and its
     test_period runs
     [start_date + train_days .. start_date + train_days + test_days - 1]. Each
@@ -68,6 +103,9 @@ val generate : t -> fold list
     fold whose test_period would extend past [end_date] is dropped along with
     all later folds.
 
-    Returns an empty list when [start_date > end_date] or no fold fits the
-    bounds. Raises [Failure] when [train_days < 0], [test_days <= 0], or
-    [step_days <= 0]. *)
+    [Explicit]: passes the list through verbatim, assigning [index] in input
+    order. Raises [Failure] on an empty list or on duplicate names.
+
+    Returns an empty list when [Rolling]'s [start_date > end_date] or no fold
+    fits the bounds. Raises [Failure] when [Rolling.train_days < 0],
+    [Rolling.test_days <= 0], or [Rolling.step_days <= 0]. *)
