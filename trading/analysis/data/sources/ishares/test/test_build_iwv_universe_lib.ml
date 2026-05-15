@@ -63,6 +63,35 @@ let test_list_cache_entries_missing_dir_errors _ =
   in
   assert_that entries is_error
 
+(* Sentinel marker files (extension [.sentinel]) must be skipped by the
+   loader — pins the [cache_entry] docstring claim "deliberately excluded
+   from this list". The marker carries no date-bearing CSV body; emitting
+   it as a cache_entry would propagate to [load_and_filter] and fail. *)
+let _tmpdir () = Filename_unix.temp_dir ~in_dir:"/tmp" "iwv-prd-test-" ""
+
+let _write_file ~path ~contents =
+  Out_channel.with_file path ~f:(fun oc ->
+      Out_channel.output_string oc contents)
+
+let test_list_cache_entries_skips_sentinel_files _ =
+  let dir = _tmpdir () in
+  _write_file
+    ~path:(Filename.concat dir "2025-01-15.csv")
+    ~contents:"placeholder body\n";
+  _write_file ~path:(Filename.concat dir "2025-02-15.sentinel") ~contents:"\n";
+  let entries =
+    Lib.list_cache_entries ~cache_dir:dir ~from:(_date 2000 Month.Jan 1)
+      ~until:(_date 2030 Month.Jan 1)
+  in
+  assert_that entries
+    (is_ok_and_holds
+       (elements_are
+          [
+            field
+              (fun (e : Lib.cache_entry) -> e.as_of)
+              (equal_to (_date 2025 Month.Jan 15));
+          ]))
+
 (* ------------------------------------------------------------------------- *)
 (* load_and_filter                                                           *)
 (* ------------------------------------------------------------------------- *)
@@ -144,6 +173,34 @@ let test_load_and_filter_full_window _ =
   in
   assert_that dates
     (elements_are (List.map _sample_dates ~f:(fun d -> equal_to d)))
+
+(* Pins the [load_and_filter] docstring claim "drops [No_data_sentinel]
+   outcomes (cached sentinel bodies that slipped past the marker-file
+   check)". A cached CSV body whose line-2 cell is ["-"] parses to
+   [No_data_sentinel] (per [Ishares_holdings_client.parse]); the loader
+   must silently skip it rather than fail or emit a stub snapshot.
+
+   The minimal sentinel template is two lines: a placeholder line 1 and
+   ["Fund Holdings as of,\"-\""] on line 2 — see
+   [Ishares_holdings_client]'s parser, which only inspects line 2 before
+   returning [No_data_sentinel]. *)
+let _sentinel_body = "iShares Russell 3000 ETF\nFund Holdings as of,\"-\"\n"
+
+let test_load_and_filter_skips_in_body_sentinel _ =
+  let dir = _tmpdir () in
+  _write_file
+    ~path:(Filename.concat dir "2025-03-01.csv")
+    ~contents:_sentinel_body;
+  let entries =
+    match
+      Lib.list_cache_entries ~cache_dir:dir ~from:(_date 2000 Month.Jan 1)
+        ~until:(_date 2030 Month.Jan 1)
+    with
+    | Ok e -> e
+    | Error err -> assert_failure (Status.show err)
+  in
+  let result = Lib.load_and_filter ~entries ~filter:Lib.default_filter_config in
+  assert_that result (is_ok_and_holds is_empty)
 
 (* ------------------------------------------------------------------------- *)
 (* build_universe — end-to-end on the 5-snapshot sample                      *)
@@ -263,13 +320,33 @@ let test_build_universe_threshold_one_changes_kodk_sector _ =
   in
   assert_that kodk_sector (is_some_and (equal_to "Information Technology"))
 
+(* Pins the [build_universe] docstring claim "The function is total —
+   empty input yields an empty universe sexp." Empty snapshot input must
+   not raise; counts collapse to zero and the sexp is the empty Pinned
+   shape so downstream callers can [Sexp.of_string] the output without
+   special-casing. *)
+let test_build_universe_empty_input_is_total _ =
+  let outcome =
+    Lib.build_universe ~snapshots:[] ~threshold_consecutive_misses:3
+      ~as_of:(_date 2020 Month.Jun 1)
+  in
+  assert_that outcome
+    (all_of
+       [
+         field (fun o -> o.Lib.member_count) (equal_to 0);
+         field (fun o -> o.Lib.snapshot_count) (equal_to 0);
+         field (fun o -> o.Lib.removed_count) (equal_to 0);
+         field
+           (fun o -> o.Lib.universe_sexp)
+           (equal_to (Sexp.of_string "(Pinned ())"));
+       ])
+
 (* ------------------------------------------------------------------------- *)
 (* write_outcome_to_file — file format / atomicity                           *)
 (* ------------------------------------------------------------------------- *)
 
-(* Tmpdir helper: each file-write test uses a fresh sandbox to avoid stale
-   leftovers from prior runs. *)
-let _tmpdir () = Filename_unix.temp_dir ~in_dir:"/tmp" "iwv-prd-test-" ""
+(* Reuses [_tmpdir] defined above: each file-write test uses a fresh sandbox
+   to avoid stale leftovers from prior runs. *)
 
 let test_write_outcome_to_file_includes_header_and_body _ =
   let tmp = _tmpdir () in
@@ -383,11 +460,15 @@ let suite =
          >:: test_list_cache_entries_filters_window;
          "list_cache_entries_missing_dir_errors"
          >:: test_list_cache_entries_missing_dir_errors;
+         "list_cache_entries_skips_sentinel_files"
+         >:: test_list_cache_entries_skips_sentinel_files;
          "load_and_filter_drops_futures_row"
          >:: test_load_and_filter_drops_futures_row;
          "load_and_filter_no_filter_keeps_futures"
          >:: test_load_and_filter_no_filter_keeps_futures;
          "load_and_filter_full_window" >:: test_load_and_filter_full_window;
+         "load_and_filter_skips_in_body_sentinel"
+         >:: test_load_and_filter_skips_in_body_sentinel;
          "build_universe_yields_seven_members_at_end_of_window"
          >:: test_build_universe_yields_seven_members_at_end_of_window;
          "build_universe_sexp_shape_and_order"
@@ -396,6 +477,8 @@ let suite =
          >:: test_build_universe_mid_window_pi_filter;
          "build_universe_threshold_one_changes_kodk_sector"
          >:: test_build_universe_threshold_one_changes_kodk_sector;
+         "build_universe_empty_input_is_total"
+         >:: test_build_universe_empty_input_is_total;
          "write_outcome_to_file_includes_header_and_body"
          >:: test_write_outcome_to_file_includes_header_and_body;
          "written_sexp_roundtrips_via_sexp_of_string"

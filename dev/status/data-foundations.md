@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-16 (PR-D added)
+## Last updated: 2026-05-16
 
 ## Status
 IN_PROGRESS
