@@ -1,3 +1,22 @@
+## SUPERSEDED 2026-05-16
+
+This note is preserved for historical context. The Norgate-blocked
+diagnosis below has been replaced by a vendor pivot: Norgate is
+retired (Windows-only NDU client incompatible with our Mac/Linux
+Docker toolchain), and the new SP500 PI path is EODHD Fundamentals
+API (`HistoricalTickerComponents` on `GSPC.INDX`) for 2000-present,
+with optional `fja05680/sp500` static seed for the 1996-1999 tail.
+Russell 3000 history is now sourced via DIY iShares IWV scrape
+(2006-present), tracked separately as Phase 1.4.
+
+Full vendor comparison and reasoning:
+**`dev/notes/vendor-comparison-historical-universe-2026-05-16.md`**.
+
+Updated track status:
+**`dev/status/data-foundations.md`** §"Blocking Refactors" + §"Notes".
+
+---
+
 Phase 1.1 — sp500-1996-01-01.sexp membership blocker (2026-05-15)
 ==================================================================
 
