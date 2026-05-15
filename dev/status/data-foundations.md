@@ -328,6 +328,33 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
 ### In Progress / READY_FOR_REVIEW
 
+- **Phase 1.4 PR-B — `ishares_membership_replay` (READY_FOR_REVIEW
+  2026-05-16, branch `feat/iwv-membership-replay`).**
+  - New module `trading/analysis/data/sources/ishares/lib/ishares_membership_replay.{ml,mli}`
+    — pure tenure-replay layer. Consumes the forward-ordered
+    `(Date.t * Ishares_holdings_client.snapshot)` stream from PR-A and
+    emits one `tenure_record` per `(ticker)` observed.
+  - `replay : ?index:string -> threshold_consecutive_misses:int -> _ list -> tenure_record list`.
+    `tenure_record = { ticker; first_seen; last_seen; sector_at_first;
+    index }`. Default `index = "IWV"`; the `threshold_consecutive_misses`
+    knob defaults to 3 in callers (per plan §2.3.2) but is required-named
+    in the lib to keep the policy explicit.
+  - Algorithm: forward scan with a per-ticker `absent_streak` counter;
+    threshold misses close the tenure at the last-observed date, and
+    re-appearance opens a fresh tenure. Un-tickered escrow rows
+    (`ticker = "-"`) are dropped; other vendor-specific filters
+    (Asset Class, location) are intentionally deferred to the
+    universe-builder CLI (PR-D) so per-backtest policy varies cleanly.
+  - 9 OUnit2 tests pass: single snapshot, 2-snapshot overlap,
+    single-miss-below-threshold preservation, 3-consecutive-miss
+    closure-at-last-seen, era-mixing `sector_at_first` pinning,
+    `threshold=1` collapse + re-open, un-tickered drop, empty input,
+    custom `?index` plumbing.
+  - Linters green: `dune build @fmt`, `no_python_check`,
+    `fn_length_linter`. ~490 LOC across `.ml` + `.mli` + `test.ml`
+    (under PR-sizing cap; status / plan / fixtures don't count). Plan:
+    `dev/plans/iwv-scraper-2026-05-16.md` §PR-B.
+
 - **Phase 1.4 PR-A — `ishares_holdings_client` (READY_FOR_REVIEW
   2026-05-16, branch `feat/iwv-holdings-client`).**
   - New module `trading/analysis/data/sources/ishares/lib/ishares_holdings_client.{ml,mli}`
@@ -397,7 +424,12 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
     modern 2020, sentinel) and 14 tests covering all three eras +
     sentinel + header-drift + empty input. Branch:
     `feat/iwv-holdings-client`.
-  - **[ ] PR-B `ishares_membership_replay`** — pending PR-A merge.
+  - **[ ] PR-B `ishares_membership_replay`** — READY_FOR_REVIEW
+    2026-05-16. Pure tenure-replay layer under
+    `trading/analysis/data/sources/ishares/lib/ishares_membership_replay.{ml,mli}`
+    with 9 OUnit2 tests covering single-snapshot / overlap /
+    miss-threshold / sector-pinning / threshold-parameterization /
+    un-tickered-drop. Branch: `feat/iwv-membership-replay`.
   - **[ ] PR-C `fetch_iwv_history.exe`** — pending PR-A merge.
   - **[ ] PR-D `build_iwv_universe.exe`** + golden — pending PR-B / PR-C.
   No vendor signup; Linux/Mac OCaml native; zero marginal cost.
