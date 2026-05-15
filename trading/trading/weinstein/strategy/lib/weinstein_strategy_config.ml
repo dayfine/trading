@@ -72,6 +72,10 @@ type config = {
           pinned numbers as the underlying [active_through] column propagates
           through the snapshot pipeline. Re-pinning goldens is a separate
           post-merge step. *)
+  margin_config : Trading_portfolio.Margin_config.t;
+      [@sexp.default Trading_portfolio.Margin_config.default_config]
+      (** Phase-2 margin-accounting parameters (issue #859,
+          [dev/plans/short-side-margin-2026-05-13.md] §2). See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -103,6 +107,7 @@ let default_config ~universe ~index_symbol =
     enable_continuation_buys = false;
     continuation_config = Continuation.default_config;
     enable_pi_filter = false;
+    margin_config = Trading_portfolio.Margin_config.default_config;
   }
 
 let name = "Weinstein"

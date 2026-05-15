@@ -1,0 +1,67 @@
+open Core
+module Margin_config = Trading_portfolio.Margin_config
+module Portfolio = Trading_portfolio.Portfolio
+module Portfolio_margin = Trading_portfolio.Portfolio_margin
+module Position = Trading_strategy.Position
+
+(* Forensic detail string emitted on margin_call exit transitions. Kept
+   ASCII-only + key=value so simple parsers (trades.csv readers, audit
+   reports) can extract fields without OCaml-side helpers. *)
+let _margin_call_detail ~entry_avg_cost ~current_price =
+  Printf.sprintf "entry_avg_cost=%.6f current_price=%.6f" entry_avg_cost
+    current_price
+
+let mark_prices (today_bars : Trading_engine.Types.price_bar list) :
+    (string * float) list =
+  List.map today_bars ~f:(fun bar ->
+      (bar.Trading_engine.Types.symbol, bar.Trading_engine.Types.close_price))
+
+let accrue_borrow_fee ~(margin_config : Margin_config.t) ~portfolio ~prices =
+  Portfolio_margin.accrue_daily_borrow_fee ~margin_config portfolio prices
+
+(* Find the strategy-side Position.t for a flagged symbol. Match only
+   positions currently in Holding state — Entering/Exiting are mid-flight
+   under the regular order machinery and reissuing a TriggerExit on top
+   would conflict with their existing transitions. *)
+let _find_holding_short_for_symbol positions symbol =
+  Map.to_alist positions
+  |> List.find ~f:(fun (_, pos) ->
+      String.equal pos.Position.symbol symbol
+      &&
+      match Position.get_state pos with
+      | Position.Holding _ -> true
+      | _ -> false)
+
+let _entry_price_from_holding (pos : Position.t) : float =
+  match Position.get_state pos with
+  | Position.Holding h -> h.entry_price
+  | _ -> 0.0
+
+let _margin_call_exit_reason ~entry_avg_cost ~current_price :
+    Position.exit_reason =
+  let detail = _margin_call_detail ~entry_avg_cost ~current_price in
+  Position.StrategySignal { label = "margin_call"; detail = Some detail }
+
+let _build_margin_call_transition ~date ~current_price (id, pos) =
+  let entry_avg_cost = _entry_price_from_holding pos in
+  let exit_reason = _margin_call_exit_reason ~entry_avg_cost ~current_price in
+  let kind = Position.TriggerExit { exit_reason; exit_price = current_price } in
+  { Position.position_id = id; date; kind }
+
+let _transition_for_flagged_symbol ~date ~price_map ~positions symbol =
+  let%bind.Option current_price = Map.find price_map symbol in
+  let%bind.Option holding = _find_holding_short_for_symbol positions symbol in
+  Some (_build_margin_call_transition ~date ~current_price holding)
+
+let margin_call_transitions ~margin_config ~portfolio ~positions ~prices ~date =
+  if not margin_config.Margin_config.enabled then []
+  else
+    let flagged =
+      Portfolio_margin.check_maintenance_margin ~margin_config portfolio prices
+    in
+    match flagged with
+    | [] -> []
+    | _ ->
+        let price_map = Map.of_alist_exn (module String) prices in
+        List.filter_map flagged
+          ~f:(_transition_for_flagged_symbol ~date ~price_map ~positions)

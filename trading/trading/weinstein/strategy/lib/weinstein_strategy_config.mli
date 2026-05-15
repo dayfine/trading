@@ -53,6 +53,14 @@ type config = {
       (** Master switch for the screener point-in-time universe-membership
           filter (universe plan phase P5). Default [false] preserves existing
           baselines. See [.ml] for full semantics. *)
+  margin_config : Trading_portfolio.Margin_config.t;
+      [@sexp.default Trading_portfolio.Margin_config.default_config]
+      (** Phase-2 margin-accounting parameters (issue #859 / Phase 2). Opting in
+          via [margin_config.enabled = true] threads the value through the
+          backtest runner into the simulator's per-tick margin mechanics (daily
+          borrow fee + maintenance-margin force-cover). Default
+          {!Trading_portfolio.Margin_config.default_config} (disabled) preserves
+          bit-equality with prior baselines. See [.ml] for full semantics. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

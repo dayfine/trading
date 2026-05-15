@@ -1,9 +1,21 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-05-02
+## Last updated: 2026-05-16
 
 ## Status
-MERGED
+IN_PROGRESS
+
+## Interface stable
+YES
+
+Issue #859 margin work is in progress. Phase 1 (margin_config + Portfolio
+extensions + Portfolio_margin module) landed via #1113 + #1115. Phase 2
+(simulator wiring — daily borrow fee accrual + maintenance-margin
+force-cover) opened today as #1119. Both phases gate behind
+`Margin_config.enabled = false` so prior MERGED baselines stay bit-equal
+until a scenario opts in.
+
+**Earlier MERGED note retained below.**
 
 Track wrapped on the MVP + initial follow-up axis. New follow-ups surfaced overnight in `dev/notes/force-liq-cascade-findings-2026-05-01.md` (G14 split-adjustment on Position.t Holding state) and `dev/notes/g14-deep-dive-2026-05-01.md` (Option 1 fix recommendation). G15 (short-side risk control) also filed. Both are `feat-weinstein` — strategy + position state machine; current `feat-weinstein` scope is closed. See §Follow-ups below for the new items.
 

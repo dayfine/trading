@@ -42,12 +42,22 @@ type dependencies = {
           as [None] on every step (default; preserves prior behaviour). *)
   stale_hold_policy : Stale_hold.config;
   stale_hold_log : Stale_hold.Log.t;
+  margin_config : Trading_portfolio.Margin_config.t;
+      (** Phase 2 margin-accounting parameters (issue #859). Default
+          {!Trading_portfolio.Margin_config.default_config} — i.e. disabled, so
+          every Phase-1 / Phase-2 surface is a bit-equal no-op and existing
+          long-only goldens stay pinned. When [margin_config.enabled = true] the
+          simulator accrues a daily short borrow fee against [current_cash] and
+          emits margin-call [TriggerExit] transitions on shorts whose
+          maintenance equity ratio has fallen below [maintenance_margin_pct]
+          (see {!Margin_runner}). *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
-    ?stale_hold_log ?(slippage_bps = 0) () =
+    ?stale_hold_log ?(slippage_bps = 0)
+    ?(margin_config = Trading_portfolio.Margin_config.default_config) () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -70,6 +80,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     benchmark_symbol;
     stale_hold_policy;
     stale_hold_log;
+    margin_config;
   }
 
 (** {1 Simulator State} *)
@@ -392,6 +403,25 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
     had_market_bars = not (List.is_empty today_bars);
   }
 
+(** Apply the Phase-2 margin per-tick mechanics: accrue daily borrow fee, then
+    build margin-call [TriggerExit] transitions for any short whose maintenance
+    margin has been breached. No-op when [margin_config.enabled = false]
+    (preserves baselines bit-equal). The margin transitions are appended to the
+    strategy's transitions so they flow through the same {!_apply_transitions}
+    + {!Order_generator} pipeline as any other exit. *)
+let _apply_margin_tick t ~portfolio ~positions ~today_bars ~strategy_transitions
+    =
+  let margin_config = t.deps.margin_config in
+  let prices = Margin_runner.mark_prices today_bars in
+  let portfolio =
+    Margin_runner.accrue_borrow_fee ~margin_config ~portfolio ~prices
+  in
+  let margin_trans =
+    Margin_runner.margin_call_transitions ~margin_config ~portfolio ~positions
+      ~prices ~date:t.current_date
+  in
+  (portfolio, strategy_transitions @ margin_trans)
+
 (** Process one day: execute pending orders, call strategy, generate new orders,
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
@@ -405,7 +435,12 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
   let%bind positions =
     _update_positions_from_trades ~date:t.current_date ~positions ~trades
   in
-  let%bind transitions = _call_strategy { t with portfolio; positions } in
+  let%bind strategy_transitions =
+    _call_strategy { t with portfolio; positions }
+  in
+  let portfolio, transitions =
+    _apply_margin_tick t ~portfolio ~positions ~today_bars ~strategy_transitions
+  in
   let%bind positions = _apply_transitions ~positions ~transitions in
   let%bind orders =
     Order_generator.transitions_to_orders ~current_date:t.current_date

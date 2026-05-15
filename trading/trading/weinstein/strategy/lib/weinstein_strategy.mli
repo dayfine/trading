@@ -317,6 +317,14 @@ type config = {
           pinned numbers as the underlying [active_through] column propagates
           through the snapshot pipeline. Re-pinning goldens is a separate
           post-merge step. *)
+  margin_config : Trading_portfolio.Margin_config.t;
+      [@sexp.default Trading_portfolio.Margin_config.default_config]
+      (** Phase-2 margin-accounting parameters (issue #859 / Phase 2). When
+          [enabled = true], the runner threads the value into the simulator's
+          per-tick margin mechanics. Default
+          {!Trading_portfolio.Margin_config.default_config} (disabled) preserves
+          bit-equality with prior baselines. See [Weinstein_strategy_config] for
+          full semantics. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

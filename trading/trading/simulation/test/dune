@@ -344,3 +344,19 @@
   trading.strategy
   types
   matchers))
+
+(test
+ (name test_margin_runner)
+ (modules test_margin_runner)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.portfolio
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
