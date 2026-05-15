@@ -11,6 +11,7 @@ type portfolio_snapshot = {
   short_exposure_pct : float;
   position_count : int;
   sector_counts : (string * int) list;
+  sector_exposures : (string * float) list;
 }
 [@@deriving show, eq]
 
@@ -28,6 +29,7 @@ type limit_violation =
   | Short_exposure_exceeded of float
   | Cash_below_minimum of float
   | Sector_concentration of string * int
+  | Sector_exposure_exceeded of string * float
   | Unknown_sector_exceeded of int
   | Risk_too_high of float
 [@@deriving show]
@@ -50,6 +52,7 @@ type config = {
   max_position_pct_short : float; [@sexp.default default_max_position_pct_short]
   max_position_pct : float; [@sexp.default default_max_position_pct]
   max_sector_concentration : int;
+  max_sector_exposure_pct : float option; [@sexp.default None]
   max_unknown_sector_positions : int;
   big_winner_multiplier : float;
   force_liquidation : Force_liquidation.config;
@@ -69,6 +72,7 @@ let default_config =
     max_position_pct_short = default_max_position_pct_short;
     max_position_pct = default_max_position_pct;
     max_sector_concentration = 5;
+    max_sector_exposure_pct = None;
     max_unknown_sector_positions = 2;
     big_winner_multiplier = 1.5;
     force_liquidation = Force_liquidation.default_config;
@@ -99,7 +103,28 @@ let _compute_sector_counts positions sectors =
   |> Map.to_alist
   |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
 
-let _make_snapshot ~cash ~positions ~sector_counts =
+(* Build a (sector_name, dollar_exposure) list parallel to sector_counts.
+   Dollar exposure is the absolute value of the position's market value
+   (|qty * price|), summed within each sector bucket. Long + short positions
+   to the same sector aggregate — the cap measures total sector concentration,
+   not directional concentration. Empty-string sector follows the same
+   bucketing as _compute_sector_counts; the exposure-percent cap exempts it,
+   but it's still reported here for consistency with [sector_counts]. *)
+let _compute_sector_exposures positions sectors =
+  let sector_map =
+    List.fold sectors ~init:String.Map.empty ~f:(fun m (sym, sec) ->
+        Map.set m ~key:sym ~data:sec)
+  in
+  List.fold positions ~init:String.Map.empty ~f:(fun acc (sym, qty, price) ->
+      let sector = Map.find sector_map sym |> Option.value ~default:"" in
+      let exposure = Float.abs (qty *. price) in
+      Map.update acc sector ~f:(function
+        | None -> exposure
+        | Some v -> v +. exposure))
+  |> Map.to_alist
+  |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+
+let _make_snapshot ~cash ~positions ~sector_counts ~sector_exposures =
   let long_exp, short_exp, position_count = _compute_exposures positions in
   let total_value = cash +. long_exp -. short_exp in
   let safe_pct v =
@@ -115,11 +140,13 @@ let _make_snapshot ~cash ~positions ~sector_counts =
     short_exposure_pct = safe_pct short_exp;
     position_count;
     sector_counts;
+    sector_exposures;
   }
 
 let snapshot ~cash ~positions ?(sectors = []) () =
   let sector_counts = _compute_sector_counts positions sectors in
-  _make_snapshot ~cash ~positions ~sector_counts
+  let sector_exposures = _compute_sector_exposures positions sectors in
+  _make_snapshot ~cash ~positions ~sector_counts ~sector_exposures
 
 (* Extract (symbol, total_quantity, current_price) triples from a portfolio
    and price lookup. Position quantity is the sum across all lots. *)
@@ -254,6 +281,30 @@ let _check_sector ~config ~snapshot ~proposed_sector =
     [ Sector_concentration (proposed_sector, new_count) ]
   else []
 
+(* P1 2026-05-15: per-sector dollar-exposure cap. No-op when
+   [config.max_sector_exposure_pct = None] (the default). For named sectors,
+   project the new exposure as a fraction of [snapshot.total_value] and check
+   against the cap. The empty-string (unknown) sector is exempt — discipline
+   for that bucket comes from the count-cap [max_unknown_sector_positions]. *)
+let _check_sector_exposure ~config ~snapshot ~proposed_sector ~proposed_value =
+  match config.max_sector_exposure_pct with
+  | None -> []
+  | Some _ when String.is_empty proposed_sector -> []
+  | Some cap ->
+      let existing =
+        List.Assoc.find snapshot.sector_exposures ~equal:String.equal
+          proposed_sector
+        |> Option.value ~default:0.0
+      in
+      let projected_value = existing +. proposed_value in
+      let projected_pct =
+        if Float.( <= ) snapshot.total_value 0.0 then 0.0
+        else projected_value /. snapshot.total_value
+      in
+      if Float.( > ) projected_pct cap then
+        [ Sector_exposure_exceeded (proposed_sector, projected_pct) ]
+      else []
+
 let check_limits ~config ~snapshot ~proposed_side ~proposed_value
     ~proposed_sector =
   let violations =
@@ -261,5 +312,6 @@ let check_limits ~config ~snapshot ~proposed_side ~proposed_value
     @ _check_exposure ~config ~snapshot ~proposed_side ~proposed_value
     @ _check_cash ~config ~snapshot ~proposed_value
     @ _check_sector ~config ~snapshot ~proposed_sector
+    @ _check_sector_exposure ~config ~snapshot ~proposed_sector ~proposed_value
   in
   match violations with [] -> Result.Ok () | vs -> Result.Error vs

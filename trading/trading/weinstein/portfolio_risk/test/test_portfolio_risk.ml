@@ -15,6 +15,7 @@ type snapshot = Portfolio_risk.portfolio_snapshot = {
   short_exposure_pct : float;
   position_count : int;
   sector_counts : (string * int) list;
+  sector_exposures : (string * float) list;
 }
 [@@deriving test_matcher]
 
@@ -32,7 +33,7 @@ type sizing = Portfolio_risk.sizing_result = {
    the snapshot functions. This lets us set arbitrary exposure values without
    needing a real portfolio + trade history. *)
 let make_snapshot ?(cash = 80000.0) ?(long_exp = 15000.0) ?(short_exp = 0.0)
-    ?(positions = 3) ?(sectors = []) () =
+    ?(positions = 3) ?(sectors = []) ?(sector_exposures = []) () =
   let total = cash +. long_exp -. short_exp in
   {
     total_value = total;
@@ -46,6 +47,7 @@ let make_snapshot ?(cash = 80000.0) ?(long_exp = 15000.0) ?(short_exp = 0.0)
       (if Float.( > ) total 0.0 then short_exp /. total else 0.0);
     position_count = positions;
     sector_counts = sectors;
+    sector_exposures;
   }
 
 let make_trade ~symbol ~(side : Trading_base.Types.side) ~quantity ~price =
@@ -75,7 +77,7 @@ let test_snapshot_empty _ =
        ~cash:(float_equal 100000.0) ~cash_pct:(float_equal 1.0)
        ~long_exposure:(float_equal 0.0) ~long_exposure_pct:__
        ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 0) ~sector_counts:__)
+       ~position_count:(equal_to 0) ~sector_counts:__ ~sector_exposures:__)
 
 let test_snapshot_long_only _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("MSFT", 50.0, 200.0) ] in
@@ -85,7 +87,7 @@ let test_snapshot_long_only _ =
        ~long_exposure:(float_equal 25000.0)
        ~long_exposure_pct:(float_equal ~epsilon:1e-6 (1.0 /. 3.0))
        ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 2) ~sector_counts:__)
+       ~position_count:(equal_to 2) ~sector_counts:__ ~sector_exposures:__)
 
 let test_snapshot_with_short _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("TSLA", -50.0, 200.0) ] in
@@ -94,7 +96,7 @@ let test_snapshot_with_short _ =
     (match_snapshot ~total_value:(float_equal 85000.0) ~cash:__ ~cash_pct:__
        ~long_exposure:(float_equal 15000.0) ~long_exposure_pct:__
        ~short_exposure:(float_equal 10000.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 2) ~sector_counts:__)
+       ~position_count:(equal_to 2) ~sector_counts:__ ~sector_exposures:__)
 
 let test_snapshot_with_sectors _ =
   let positions =
@@ -105,7 +107,8 @@ let test_snapshot_with_sectors _ =
   assert_that snap
     (match_snapshot ~total_value:__ ~cash:__ ~cash_pct:__ ~long_exposure:__
        ~long_exposure_pct:__ ~short_exposure:__ ~short_exposure_pct:__
-       ~position_count:(equal_to 3) ~sector_counts:(fun counts ->
+       ~position_count:(equal_to 3) ~sector_exposures:__
+       ~sector_counts:(fun counts ->
          assert_that
            (List.Assoc.find counts ~equal:String.equal "Tech")
            (is_some_and (equal_to 3))))
@@ -131,7 +134,7 @@ let test_snapshot_of_portfolio _ =
        ~cash:(float_equal 85000.0) ~cash_pct:__
        ~long_exposure:(float_equal 25000.0) ~long_exposure_pct:__
        ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 2) ~sector_counts:__)
+       ~position_count:(equal_to 2) ~sector_counts:__ ~sector_exposures:__)
 
 (* ---- Position sizing tests ---- *)
 
@@ -429,7 +432,7 @@ let test_snapshot_buckets_missing_sectors_as_unknown _ =
   assert_that snap
     (match_snapshot ~total_value:__ ~cash:__ ~cash_pct:__ ~long_exposure:__
        ~long_exposure_pct:__ ~short_exposure:__ ~short_exposure_pct:__
-       ~position_count:__ ~sector_counts:(fun counts ->
+       ~position_count:__ ~sector_exposures:__ ~sector_counts:(fun counts ->
          assert_that
            (List.Assoc.find counts ~equal:String.equal "")
            (is_some_and (equal_to 2));

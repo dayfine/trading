@@ -51,6 +51,14 @@ type portfolio_snapshot = {
           limited separately by [config.max_unknown_sector_positions]. High
           counts in any named sector indicate concentration risk; limited by
           [config.max_sector_concentration]. *)
+  sector_exposures : (string * float) list;
+      (** Dollar notional (absolute value, summing long + short) per sector,
+          sorted by sector name. Parallel to [sector_counts]: same key set, same
+          bucketing under empty-string for unknown sectors. Consumed by the
+          [Sector_exposure_exceeded] check (P1 2026-05-15) when
+          [config.max_sector_exposure_pct] is set. The empty-string bucket is
+          intentionally exempt from the exposure-percent cap — its discipline
+          comes from the count-cap [config.max_unknown_sector_positions]. *)
 }
 [@@deriving show, eq]
 (** Point-in-time view of portfolio composition used for risk calculations.
@@ -170,6 +178,20 @@ type config = {
           still parse. Will be removed once all callers migrate. *)
   max_sector_concentration : int;
       (** Maximum positions in any single named sector (default: 5) *)
+  max_sector_exposure_pct : float option; [@sexp.default None]
+      (** P1 2026-05-15: optional per-sector dollar-exposure cap as a fraction
+          of [portfolio_snapshot.total_value]. [None] (default) disables the
+          cap; [Some pct] enforces that, when admitting a new position to a
+          named sector S,
+          [(existing_sector_exposure_S +. proposed_value) /. total_value <= pct].
+          The empty-string (unknown) sector is exempt — see [sector_exposures]
+          doc. Composes with the count-based [max_sector_concentration] cap:
+          both are enforced independently when configured.
+
+          Hypothesis (testable in follow-up backtest): a 0.30 cap reduces 16y
+          MaxDD by decorrelating the same-sector force-liquidation cascade
+          flagged by M5.5 axis-2. See
+          [dev/notes/next-session-priorities-2026-05-15.md] §P1. *)
   max_unknown_sector_positions : int;
       (** Maximum positions whose sector is unknown — tracked under the
           empty-string sector key (default: 2). Prevents long-tail names with
@@ -194,6 +216,7 @@ val default_config : config
     - min_cash_pct = 0.10 (10%, deprecated — see field doc)
     - max_position_pct = 0.20 (20% per position)
     - max_sector_concentration = 5
+    - max_sector_exposure_pct = None (P1 2026-05-15; opt-in)
     - max_unknown_sector_positions = 2
     - big_winner_multiplier = 1.5
     - force_liquidation = {!Force_liquidation.default_config} *)
@@ -261,6 +284,10 @@ type limit_violation =
       (** After this trade, cash would fall to [pct] of portfolio *)
   | Sector_concentration of string * int
       (** Sector [name] would have [n] positions, over limit *)
+  | Sector_exposure_exceeded of string * float
+      (** Sector [name] would have exposure [pct] of portfolio, over
+          [config.max_sector_exposure_pct]. Only emitted for named sectors when
+          [config.max_sector_exposure_pct = Some _]. *)
   | Unknown_sector_exceeded of int
       (** Adding this position would push the unknown-sector (empty-string)
           bucket to [n] positions, over [config.max_unknown_sector_positions].

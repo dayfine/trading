@@ -14,6 +14,7 @@ type snapshot = Portfolio_risk.portfolio_snapshot = {
   short_exposure_pct : float;
   position_count : int;
   sector_counts : (string * int) list;
+  sector_exposures : (string * float) list;
 }
 [@@deriving test_matcher]
 
@@ -31,6 +32,7 @@ let _make_snapshot () : Portfolio_risk.portfolio_snapshot =
     short_exposure_pct = 0.1;
     position_count = 5;
     sector_counts = [ ("Tech", 3); ("Finance", 2) ];
+    sector_exposures = [ ("Tech", 30_000.0); ("Finance", 20_000.0) ];
   }
 
 let test_point_matcher_all_fields _ =
@@ -48,7 +50,8 @@ let test_snapshot_matcher _ =
     (match_snapshot ~total_value:(float_equal 100_000.0)
        ~cash:(float_equal 50_000.0) ~cash_pct:(float_equal 0.5)
        ~long_exposure:__ ~long_exposure_pct:__ ~short_exposure:__
-       ~short_exposure_pct:__ ~position_count:(equal_to 5) ~sector_counts:__)
+       ~short_exposure_pct:__ ~position_count:(equal_to 5) ~sector_counts:__
+       ~sector_exposures:__)
 
 let test_snapshot_matcher_all_fields _ =
   let s = _make_snapshot () in
@@ -64,6 +67,12 @@ let test_snapshot_matcher_all_fields _ =
             [
               pair (equal_to "Tech") (equal_to 3);
               pair (equal_to "Finance") (equal_to 2);
+            ])
+       ~sector_exposures:
+         (elements_are
+            [
+              pair (equal_to "Tech") (float_equal 30_000.0);
+              pair (equal_to "Finance") (float_equal 20_000.0);
             ]))
 
 let test_snapshot_matcher_failure _ =
@@ -72,7 +81,8 @@ let test_snapshot_matcher_failure _ =
     try
       match_snapshot ~total_value:(float_equal 999.0) ~cash:__ ~cash_pct:__
         ~long_exposure:__ ~long_exposure_pct:__ ~short_exposure:__
-        ~short_exposure_pct:__ ~position_count:__ ~sector_counts:__ s;
+        ~short_exposure_pct:__ ~position_count:__ ~sector_counts:__
+        ~sector_exposures:__ s;
       false
     with _ -> true
   in
