@@ -1,0 +1,27 @@
+﻿iShares Russell 3000 ETF
+Fund Holdings as of,"Jun 01, 2020"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"50,400,000"
+Stock,99.30
+Bonds,0.00
+Other,0.70
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"MSFT","MICROSOFT CORP","Information Technology","Equity","234,567,890.12","4.85","234,567,890.12","1280000.00","183.25","United States","NASDAQ","USD","1.00","USD","-"
+"AAPL","APPLE INC","Information Technology","Equity","223,456,789.01","4.62","223,456,789.01","700000.00","319.22","United States","NASDAQ","USD","1.00","USD","-"
+"AMZN","AMAZON COM INC","Consumer Discretionary","Equity","187,654,321.00","3.88","187,654,321.00","75000.00","2502.06","United States","NASDAQ","USD","1.00","USD","-"
+"FB","FACEBOOK INC CLASS A","Communication Services","Equity","98,765,432.10","2.04","98,765,432.10","440000.00","224.47","United States","NASDAQ","USD","1.00","USD","-"
+"GOOGL","ALPHABET INC CLASS A","Communication Services","Equity","87,654,321.00","1.81","87,654,321.00","61000.00","1436.96","United States","NASDAQ","USD","1.00","USD","-"
+"JNJ","JOHNSON & JOHNSON","Health Care","Equity","54,321,098.76","1.12","54,321,098.76","363000.00","149.65","United States","NYSE","USD","1.00","USD","-"
+"BRKB","BERKSHIRE HATHAWAY INC CLASS B","Financials","Equity","43,210,987.65","0.89","43,210,987.65","235000.00","183.88","United States","NYSE","USD","1.00","USD","-"
+"ESM0","S&P 500 EMINI FUT JUN20","-","Futures","2,345,678.90","0.05","2,345,678.90","20.00","117283.95","United States","-","USD","1.00","USD","-"
+"USD","USD CASH","-","Cash","234,567.89","0.00","234,567.89","234567.89","1.00","United States","-","USD","1.00","USD","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: Truncated/synthetic representative sample of the iShares IWV
+;; holdings CSV in the modern daily era (2012-04-30 onward). Real responses
+;; have ~2,880 holdings with populated sectors, descending market-value
+;; order, full GICS classification, USD market currency. Schema matches the
+;; verified 15-column header from the Phase 1.4 URL probe. Used only for
+;; parser tests.

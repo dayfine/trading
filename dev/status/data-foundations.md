@@ -328,6 +328,32 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
 ### In Progress / READY_FOR_REVIEW
 
+- **Phase 1.4 PR-A — `ishares_holdings_client` (READY_FOR_REVIEW
+  2026-05-16, branch `feat/iwv-holdings-client`).**
+  - New module `trading/analysis/data/sources/ishares/lib/ishares_holdings_client.{ml,mli}`
+    — pure CSV parser + URI builder. No HTTP, no Async; live fetch
+    deferred to PR-C.
+  - `parse : string -> parse_outcome Status.status_or` returns
+    `Parsed snapshot` (era-agnostic; preserves source order; preserves
+    non-equity rows) or `No_data_sentinel` (line-2 `-` check per Phase
+    1.4 URL probe). Fails loudly on header drift, missing header,
+    unparseable as-of, or wrong column count.
+  - `build_uri : as_of:Date.t -> Uri.t` constructs the verified
+    `IWV_holdings` URL with zero-padded YYYYMMDD `asOfDate`.
+  - 4 pinned era fixtures under `test/data/` (quarterly 2007-09-28,
+    cutover 2012-04-30, modern 2020-06-01, sentinel) — each truncated
+    to 9 rows + provenance header (commit small samples per
+    `dev/plans/iwv-scraper-2026-05-16.md` §6 risk #5).
+  - 14 OUnit2 tests pass: per-era schema, sector quirks (empty vs
+    populated), non-equity preservation, source-order preservation
+    (descending in 2020 fixture), sentinel detection, three structural
+    error paths, URI shape.
+  - Linters green: `dune build @fmt`, `nesting_linter` (after
+    refactoring three offenders), `no_python_check`, `fn_length_linter`.
+  - ~540 LOC across `.ml` + `.mli` + `test.ml` (at PR-sizing cap;
+    fixtures don't count). Plan: `dev/plans/iwv-scraper-2026-05-16.md`
+    §PR-A.
+
 - **[x] Phase 3 — `Daily_price.active_through` field**
   (`dev/notes/historical-universe-status-2026-05-13.md` §2 action item 1;
   original 2026-04-30 design phase 3).
@@ -363,10 +389,18 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
 - **Phase 1.4 — Russell 3000 via IWV scrape (PRIMARY PATH)** — URL
   pattern verified PR #1108; plan landed PR #1109
-  (`dev/plans/iwv-scraper-2026-05-16.md`, 4-PR stack). Next step is
-  dispatching `feat-data` against PR 1 of the stack
-  (`ishares_holdings_client`). No vendor signup; Linux/Mac OCaml
-  native; zero marginal cost.
+  (`dev/plans/iwv-scraper-2026-05-16.md`, 4-PR stack). Stack status:
+  - **[ ] PR-A `ishares_holdings_client`** — READY_FOR_REVIEW
+    2026-05-16. Pure CSV parser + URI builder under
+    `trading/analysis/data/sources/ishares/lib/ishares_holdings_client.{ml,mli}`
+    with 4 pinned era fixtures (quarterly 2007, cutover 2012,
+    modern 2020, sentinel) and 14 tests covering all three eras +
+    sentinel + header-drift + empty input. Branch:
+    `feat/iwv-holdings-client`.
+  - **[ ] PR-B `ishares_membership_replay`** — pending PR-A merge.
+  - **[ ] PR-C `fetch_iwv_history.exe`** — pending PR-A merge.
+  - **[ ] PR-D `build_iwv_universe.exe`** + golden — pending PR-B / PR-C.
+  No vendor signup; Linux/Mac OCaml native; zero marginal cost.
 - **Phase 1.3 — Survivorship-correct re-pin** — deferred until 1.4
   lands (no longer downstream of the parked 1.1).
 - **Phase 1.5 — fja05680 SP500 1996-1999 static seed** — deferred

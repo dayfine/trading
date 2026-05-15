@@ -1,0 +1,5 @@
+(tests
+ (names test_ishares_holdings_client)
+ (libraries ishares core ounit2 matchers status uri)
+ (deps
+  (glob_files ./data/*.csv)))
