@@ -8,6 +8,7 @@
   trading.base
   trading.data_panel
   trading.data_panel.snapshot
+  trading.portfolio
   trading.strategy
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime

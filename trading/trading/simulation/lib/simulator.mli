@@ -38,6 +38,10 @@ type dependencies = {
   stale_hold_log : Stale_hold.Log.t;
       (** Per-run collector populated by every step where at least one held
           position is stale. Drained by the runner at end-of-run. *)
+  margin_config : Trading_portfolio.Margin_config.t;
+      (** Phase-2 margin-accounting parameters (issue #859). When
+          [enabled = false] (the default), every margin code path is a no-op and
+          existing baselines are bit-equal. *)
 }
 
 val create_deps :
@@ -51,6 +55,7 @@ val create_deps :
   ?stale_hold_policy:Stale_hold.config ->
   ?stale_hold_log:Stale_hold.Log.t ->
   ?slippage_bps:int ->
+  ?margin_config:Trading_portfolio.Margin_config.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
@@ -79,7 +84,12 @@ val create_deps :
       (no slippage — preserves the no-friction baseline). Plumbed directly into
       {!Trading_engine.Types.engine_config.slippage_bps}. Use non-zero for
       cost-overlay runs (P4 from
-      [dev/notes/next-session-priorities-2026-05-07.md]). *)
+      [dev/notes/next-session-priorities-2026-05-07.md]).
+    @param margin_config
+      Phase-2 margin-accounting parameters (issue #859). Default
+      {!Trading_portfolio.Margin_config.default_config} — disabled, so the
+      simulator's per-step margin code paths are no-ops and existing baselines
+      are bit-equal. *)
 
 (** {1 Creation} *)
 

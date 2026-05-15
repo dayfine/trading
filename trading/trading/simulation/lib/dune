@@ -31,6 +31,7 @@
   benchmark_relative_computer
   stability_turnover_computer
   portfolio_valuation
-  stale_hold)
+  stale_hold
+  margin_runner)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
