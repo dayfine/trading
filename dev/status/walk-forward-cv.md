@@ -22,9 +22,11 @@ alone — Phase 3 BO will consume this harness for variant scoring
 instead of single-window mean-Sharpe.
 
 ## Interface stable
-NO (M5.5 follow-on work — `WalkForwardRunner` spec sexp shape is
-explicitly marked unstable in the binary's docstring; Phase 3 BO
-integration will iterate it).
+NO
+
+M5.5 follow-on work — `WalkForwardRunner` spec sexp shape is explicitly
+marked unstable in the binary's docstring; Phase 3 BO integration will
+iterate it.
 
 ## Scope
 
