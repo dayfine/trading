@@ -1,0 +1,144 @@
+(** Unit tests for {!Walk_forward.Spec}.
+
+    These exercise the two checked-in fixture spec sexps under
+    [trading/test_data/walk_forward/]:
+    - [cell_e_8fold_2026_05_08.sexp] — the 2026-05-08 hand-curated 8-fold
+      experiment encoded as a [Window_spec.Explicit].
+    - [cell_e_30fold_2026_05_16.sexp] — the production 30-fold rolling window
+      over the 2010-2026 sp500 historical scenario.
+
+    The tests verify only that {!Spec.load} parses the fixture and that
+    [Window_spec.generate] returns the right number of folds — no backtest is
+    invoked. Running the actual sweeps is a local-only follow-up. *)
+
+open OUnit2
+open Core
+open Matchers
+module Spec = Walk_forward.Spec
+module WS = Walk_forward.Window_spec
+
+(** Walk the cwd up until we hit a directory that contains
+    [trading/test_data/walk_forward/]. Mirrors the helper in
+    [Scenarios.Test_scenario._scenarios_root]; needed because [dune runtest]'s
+    cwd is [_build/default/trading/backtest/walk_forward/test]. *)
+let _walk_forward_fixtures_root () =
+  let target = "trading/test_data/walk_forward" in
+  let rec walk_up dir tries_left =
+    if tries_left = 0 then None
+    else
+      let candidate = Filename.concat dir target in
+      if try Stdlib.Sys.is_directory candidate with _ -> false then
+        Some candidate
+      else
+        let parent = Filename.dirname dir in
+        if String.equal parent dir then None else walk_up parent (tries_left - 1)
+  in
+  walk_up (Stdlib.Sys.getcwd ()) 10
+
+let _fixture_path name =
+  match _walk_forward_fixtures_root () with
+  | Some root -> Filename.concat root name
+  | None ->
+      assert_failure
+        (sprintf "Could not locate trading/test_data/walk_forward/ from cwd %s"
+           (Stdlib.Sys.getcwd ()))
+
+(* ---------- 8-fold Explicit fixture ---------- *)
+
+let test_8fold_spec_parses _ =
+  let spec = Spec.load (_fixture_path "cell_e_8fold_2026_05_08.sexp") in
+  assert_that spec
+    (all_of
+       [
+         field
+           (fun (s : Spec.t) -> s.base_scenario)
+           (equal_to "goldens-small/bull-crash-2015-2020.sexp");
+         field (fun (s : Spec.t) -> s.baseline_label) (equal_to "cell-A");
+         field (fun (s : Spec.t) -> List.length s.variants) (equal_to 2);
+         field (fun (s : Spec.t) -> s.gate.n) (equal_to 8);
+       ])
+
+let test_8fold_window_spec_is_explicit _ =
+  let spec = Spec.load (_fixture_path "cell_e_8fold_2026_05_08.sexp") in
+  assert_that spec.window_spec
+    (matching ~msg:"Expected Window_spec.Explicit variant"
+       (function WS.Explicit fs -> Some fs | _ -> None)
+       (size_is 8))
+
+let test_8fold_generate_yields_8_folds_in_input_order _ =
+  let spec = Spec.load (_fixture_path "cell_e_8fold_2026_05_08.sexp") in
+  let folds = WS.generate spec.window_spec in
+  let names = List.map folds ~f:(fun (f : WS.fold) -> f.name) in
+  assert_that names
+    (elements_are
+       [
+         equal_to "bull-crash-2015-2017";
+         equal_to "bull-crash-2018-2020";
+         equal_to "covid-2020-2022h1";
+         equal_to "covid-2022h2-2024";
+         equal_to "six-year-2018-2020";
+         equal_to "six-year-2021-2023";
+         equal_to "sp500-2019-2021h1";
+         equal_to "sp500-2021h2-2023";
+       ])
+
+let test_8fold_variants_are_cellA_and_cellE _ =
+  let spec = Spec.load (_fixture_path "cell_e_8fold_2026_05_08.sexp") in
+  let labels =
+    List.map spec.variants
+      ~f:(fun (v : Walk_forward.Walk_forward_runner.variant) -> v.label)
+  in
+  assert_that labels (elements_are [ equal_to "cell-A"; equal_to "cell-E" ])
+
+(* ---------- 30-fold Rolling fixture ---------- *)
+
+let test_30fold_spec_parses _ =
+  let spec = Spec.load (_fixture_path "cell_e_30fold_2026_05_16.sexp") in
+  assert_that spec
+    (all_of
+       [
+         field
+           (fun (s : Spec.t) -> s.base_scenario)
+           (equal_to "goldens-sp500-historical/sp500-2010-2026.sexp");
+         field (fun (s : Spec.t) -> s.baseline_label) (equal_to "cell-E");
+         field (fun (s : Spec.t) -> s.gate.n) (equal_to 30);
+       ])
+
+let test_30fold_window_spec_is_rolling _ =
+  let spec = Spec.load (_fixture_path "cell_e_30fold_2026_05_16.sexp") in
+  assert_that spec.window_spec
+    (matching ~msg:"Expected Window_spec.Rolling variant"
+       (function WS.Rolling r -> Some r | _ -> None)
+       (all_of
+          [
+            field (fun (r : WS.rolling_spec) -> r.train_days) (equal_to 0);
+            field (fun (r : WS.rolling_spec) -> r.test_days) (equal_to 365);
+            field (fun (r : WS.rolling_spec) -> r.step_days) (equal_to 182);
+          ]))
+
+(** Plan §5 acceptance: ≥28 folds (target 30, allowance for end-of-range
+    clamping). Per the plan-§5 arithmetic, the actual count should be ~30. *)
+let test_30fold_generate_yields_close_to_30_folds _ =
+  let spec = Spec.load (_fixture_path "cell_e_30fold_2026_05_16.sexp") in
+  let folds = WS.generate spec.window_spec in
+  let _min_acceptable = 28 in
+  let _max_acceptable = 32 in
+  assert_that (List.length folds)
+    (is_between (module Int_ord) ~low:_min_acceptable ~high:_max_acceptable)
+
+let suite =
+  "Walk_forward_spec"
+  >::: [
+         "8-fold spec parses" >:: test_8fold_spec_parses;
+         "8-fold window_spec is Explicit" >:: test_8fold_window_spec_is_explicit;
+         "8-fold generate yields 8 folds in input order"
+         >:: test_8fold_generate_yields_8_folds_in_input_order;
+         "8-fold variants are cell-A and cell-E"
+         >:: test_8fold_variants_are_cellA_and_cellE;
+         "30-fold spec parses" >:: test_30fold_spec_parses;
+         "30-fold window_spec is Rolling" >:: test_30fold_window_spec_is_rolling;
+         "30-fold generate yields close to 30 folds"
+         >:: test_30fold_generate_yields_close_to_30_folds;
+       ]
+
+let () = run_test_tt_main suite
