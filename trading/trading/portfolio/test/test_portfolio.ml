@@ -40,6 +40,8 @@ let test_create_portfolio _ accounting_method =
       positions = [];
       accounting_method;
       unrealized_pnl_per_position = [];
+      locked_collateral = 0.0;
+      accrued_borrow_fee = 0.0;
     }
   in
   assert_equal expected portfolio ~msg:"Portfolio should match expected state"

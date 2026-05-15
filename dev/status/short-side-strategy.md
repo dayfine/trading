@@ -193,7 +193,32 @@ Wire short-side entries into `Weinstein_strategy` so the simulation emits short 
      is currently unwired — placeholder for future RS-conditioned
      tuning.
 
-9. **#887 — Laggard rotation detector for capital recycling on the
+10. **#859 — Margin accounting Phase 1** (filed 2026-05-13 via
+    `dev/plans/short-side-margin-2026-05-13.md`; PR #1113 opened
+    2026-05-16). First of 5 PRs implementing Reg-T-style short-side
+    margin accounting. Adds `Margin_config.t` (enabled/initial_margin_pct
+    /maintenance_margin_pct/short_borrow_fee_annual_pct, default OFF) +
+    `Portfolio.locked_collateral` + `Portfolio.accrued_borrow_fee` +
+    new APIs `available_cash`, `apply_single_trade_with_margin`,
+    `apply_trades_with_margin`, `accrue_daily_borrow_fee`,
+    `check_maintenance_margin`, `sum_short_notional`. With the flag
+    off, all margin-aware APIs are bit-equal pass-throughs of the
+    legacy entry points — long-only goldens stay pinned. 21 new tests
+    pin flag-off bit-equality, initial collateral lock, maintenance
+    threshold boundaries (exactly-at-threshold, 1bp past), partial
+    cover proportional release, multi-year borrow fee math, and
+    sorted-output of flagged shorts. **Out of scope** in this PR:
+    `Portfolio_risk.compute_position_size` plumbing for `sizing_cash`
+    (deferred to a follow-up for review focus); simulator/strategy
+    wiring of the daily borrow-fee tick + maintenance-margin
+    force-cover (Phase 2 of the plan); `Weinstein_strategy_config`
+    flag plumbing (Phase 2). A1 watch-list note: change modifies
+    `trading/trading/portfolio/` but is strategy-agnostic — margin is
+    a broker-side concept that applies identically to any strategy
+    opening shorts. Default-off invariant is the load-bearing
+    mitigation.
+
+11. **#887 — Laggard rotation detector for capital recycling on the
    long side** (filed 2026-05-06, PR #909, `feat-weinstein` scope).
    Implements Weinstein Ch.4 §portfolio sizing rotation rule (book-ref
    §5.6): "if it's lagging badly and acting poorly, lighten up on that
