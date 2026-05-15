@@ -126,8 +126,8 @@ val contains_substring : ?msg:string -> string -> string matcher
     [substring] (via [String.is_substring]). Optionally takes a custom failure
     message; otherwise reports the expected substring and the actual string.
 
-    Use this instead of wrapping [String.is_substring] in [equal_to true] —
-    that pattern violates the test-pattern rule against boolean equality in
+    Use this instead of wrapping [String.is_substring] in [equal_to true] — that
+    pattern violates the test-pattern rule against boolean equality in
     assertions.
 
     Example:
@@ -136,11 +136,7 @@ val contains_substring : ?msg:string -> string -> string matcher
     ]}
     {[
     assert_that markdown
-      (all_of
-         [
-           contains_substring "PASS";
-           contains_substring "cellE";
-         ])
+      (all_of [ contains_substring "PASS"; contains_substring "cellE" ])
     ]} *)
 
 (** {1 Result Matchers}
