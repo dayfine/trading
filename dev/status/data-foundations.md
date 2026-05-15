@@ -6,33 +6,41 @@
 IN_PROGRESS
 
 ## Blocking Refactors
-- **2026-05-16 vendor pivot — Norgate retired.** Norgate's NDU client
-  is Windows-only and incompatible with our Mac/Linux Docker toolchain.
-  Phase 1.1 re-scoped to EODHD Fundamentals (`HistoricalTickerComponents`
-  on `GSPC.INDX`) for SP500 2000-present, with optional `fja05680/sp500`
-  static seed for the 1996–1999 tail. Russell 3000 history moves to a
-  new Phase 1.4 via DIY iShares IWV scrape (2006-present). Full
-  reasoning in `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
+- **2026-05-16 Option B pivot — IWV scrape becomes the primary
+  survivorship-correct source.** Phase 1.1 (EODHD Fundamentals
+  `HistoricalTickerComponents` on `GSPC.INDX`) FAILED verification per
+  PR #1106 — our EODHD subscription is the EOD-only tier; the
+  Fundamentals endpoint returns HTTP 403 across every variant probed
+  (including bulk + historical-market-cap with explicit denial
+  messages). Tier upgrade ($59.99/mo Fundamentals Data Feed or
+  €99.99/mo All-In-One) rejected per the Option B decision.
+  Phase 1.4 (DIY iShares IWV scrape, 2006-present) was promoted to
+  primary path: URL pattern verified working HTTP 200 across the full
+  2006-09-29 → 2026-05-08 range with byte-identical line-10 headers
+  per PR #1108. Phase 1.1 is parked indefinitely. Full reasoning in
+  `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
 
-  Phase 1.1 verification checklist (do before starting implementation):
-  - [ ] Confirm our current EODHD plan tier includes Fundamentals
-    (free EOD-only plan does *not* — needs Fundamentals Data Feed at
-    $59.99/mo or All-In-One at €99.99/mo). Check EODHD account
-    dashboard.
-  - [ ] Spot-check 5 known SP500 events (e.g. LEH 2008-09-15 delisting,
-    KODK 2009-12 removal, FB 2013-12-23 addition, TSLA 2020-12-21
-    addition, GE 2018-06-26 removal) — `StartDate`/`EndDate` match
-    S&P official press releases.
+  Phase 1.1 verification checklist — outcome:
+  - [x] Confirm current EODHD plan tier includes Fundamentals —
+    **FAIL** (EOD-only tier; HTTP 403 across 10 URL variants per PR
+    #1106).
+  - [ ] Spot-check 5 known SP500 events (LEH 2008-09-15 / KODK 2009-12
+    / FB 2013-12-23 / TSLA 2020-12-21 / GE 2018-06-26) —
+    **NOT_RUN** (blocked on tier 403).
   - [ ] Confirm `IsDelisted` symbols include OHLCV history in our
-    existing EODHD price subscription (or whether delisted prices
-    require a separate add-on).
+    existing EODHD price subscription — **NOT_RUN** (blocked on tier
+    403).
   - [ ] Verify the JSON path: `HistoricalTickerComponents` vs
-    `Components` — schema may have changed since the EODHD blog post.
+    `Components` — **NOT_RUN** (blocked on tier 403; vendor public
+    docs hedge between the two shapes per
+    `dev/notes/phase1.1-eodhd-verification-2026-05-16.md` §"Schema
+    caveat").
 
 - Historical record: Phase 1.1 had previously been BLOCKED on Norgate
   signup (`dev/notes/phase1.1-1996-membership-blocker-2026-05-15.md` —
-  Wikipedia-only path insufficient pre-2010). Superseded by the
-  2026-05-16 vendor pivot above.
+  Wikipedia-only path insufficient pre-2010); re-scoped 2026-05-16
+  morning to EODHD Fundamentals, then FAILED-and-parked 2026-05-16
+  evening per the Option B pivot above.
 
 ## Notes
 
@@ -46,15 +54,15 @@ exposes; the limiting factor is what the optimizer is looking at. New
 Phase 1 work below:
 
 1. **SP500 PI membership via EODHD Fundamentals (2000-present) +
-   optional fja05680 tail (1996-1999)** — re-scoped 2026-05-16 from
-   the Norgate-blocked path. Source: `/api/fundamentals/GSPC.INDX?historical=1`
-   exposes `HistoricalTickerComponents` with `StartDate`/`EndDate`/
-   `IsDelisted` per ticker from Jan 2000. Pre-flight verification
-   gate (4 items) listed under §"Blocking Refactors" above — confirm
-   before starting implementation. The 1996-1999 patch is optional;
-   `fja05680/sp500` (MIT, free) ships
-   `sp500_ticker_start_end.csv` for the gap. Authority:
-   `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
+   optional fja05680 tail (1996-1999)** — **PARKED 2026-05-16**
+   after verification FAILED (PR #1106; subscription tier does not
+   include Fundamentals, tier upgrade rejected per Option B). Source
+   was `/api/fundamentals/GSPC.INDX?historical=1` exposing
+   `HistoricalTickerComponents`. Phase 1.4 (IWV scrape) is now the
+   primary path and strictly contains SP500 in its Russell 3000
+   universe. Authority:
+   `dev/notes/vendor-comparison-historical-universe-2026-05-16.md` +
+   `dev/notes/phase1.1-eodhd-verification-2026-05-16.md`.
 2. **[x] `broad-3000-2010-01-01.sexp` cohort** — DONE 2026-05-15
    (PR #1103). 3000-symbol Pinned-shape universe sourced
    alphabetically from `data/sectors.csv` via new
@@ -73,21 +81,30 @@ Phase 1 work below:
    data per #1076's hypothesis) with one where PI filter is ON by
    default.
 4. **Russell 3000 true historical reconstitution via DIY iShares IWV
-   scrape** — PENDING (added 2026-05-16). Pure HTTP GET against
+   scrape** — **IN_PROGRESS, PRIMARY PATH** (added 2026-05-16; URL
+   pattern verified 2026-05-16 per PR #1108). Pure HTTP GET against
    `https://www.ishares.com/us/products/239714/ishares-russell-3000-etf/1467271812596.ajax?fileType=csv&fileName=IWV_holdings&dataType=fund&asOfDate=YYYYMMDD`;
    no auth; CSV per `asOfDate`; tenure inferred by diffing
-   consecutive daily snapshots (entry = first appearance, exit =
-   first disappearance). 2006-present coverage. Implementation in
-   OCaml `cohttp` — no Python dependency; `talsan/ishares` is a
-   reference doc only, not a runtime dep. ~5,000 trading days ×
-   2,500 syms/day = ~12.5M rows compressed. Replaces the sectors.csv
-   proxy used by PR #1103. Authority:
+   consecutive snapshots (entry = first appearance, exit = first
+   disappearance). Coverage 2006-09-29 → present (cadence:
+   quarterly through 2008-12, monthly through 2012-04, daily
+   thereafter). Sentinel for unavailable dates is HTTP 200 + 4585-
+   byte template with `Fund Holdings as of,"-"` on line 2 — must
+   parse line 2, not status code. Implementation in OCaml `cohttp` —
+   no Python dependency; `talsan/ishares` is a reference doc only,
+   not a runtime dep. ~3,550 snapshots × ~430 KB ≈ 1.5 GB raw
+   uncompressed; ~3 hr backfill at 2s polite spacing. Replaces the
+   sectors.csv proxy used by PR #1103 and replaces the parked
+   Phase 1.1. Next step: plan-first dispatch to `feat-data`.
+   Authority:
    `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`
-   §Option 7.
+   §Option 1 + `dev/notes/phase1.4-iwv-url-probe-2026-05-16.md`.
 
 Owner: feat-data. Status flipped READY_FOR_REVIEW → IN_PROGRESS on
-the strategic pivot (2026-05-15) and re-confirmed IN_PROGRESS on the
-2026-05-16 vendor pivot.
+the strategic pivot (2026-05-15), re-confirmed IN_PROGRESS on the
+2026-05-16 vendor pivot, and re-confirmed IN_PROGRESS again on the
+2026-05-16 Option B pivot — Phase 1.4 (IWV scrape) is now the
+load-bearing item.
 
 **Prior notes retained below.**
 
@@ -97,12 +114,13 @@ M5.3 streaming Phases A + A.1 + B + C + D + E + F.1 all merged (#779/#786/#781/#
 
 **15y memory-cliff fixes MERGED 2026-05-08** — three parallel fixes from `dev/notes/15y-memory-cliff-2026-05-08.md`: Fix A (#992 dedupe `Daily_panels` LRU caches), Fix B (#993 skinny `step_result.portfolio` projection), Fix C (#988 stream `csv_snapshot_builder` per-symbol); root-cause investigation (#987); split-day-adjustment investigation (#998). Combined with simulator-side #1024 (Closed-positions prune) the 15y wall dropped 5h → 13.6 min (~22×).
 
-**2026-05-16 vendor pivot:** Norgate retired (Windows-only). New
-Phase 1 surface = EODHD Fundamentals (SP500 2000-present) + DIY
-iShares IWV scrape (Russell 3000 2006-present) + optional fja05680
-static seed (SP500 1996-1999). Owner authorized: feat-data per
-`dev/decisions.md` 2026-05-03 §"Agent scope" and 2026-05-16 §"Vendor
-pivot — Norgate retired".
+**2026-05-16 Option B pivot:** Norgate retired (Windows-only); EODHD
+Fundamentals path FAILED at verification (PR #1106) and parked. New
+Phase 1 surface = DIY iShares IWV scrape (Russell 3000 2006-present)
+as primary, with optional fja05680 static seed (SP500 1996-1999)
+deferred. Owner authorized: feat-data per `dev/decisions.md`
+2026-05-03 §"Agent scope" and 2026-05-16 §"Option B pivot — IWV
+scrape as primary, EODHD Fundamentals retired".
 
 Track created 2026-05-02 to absorb M5.3 (scale infra: streaming + Norgate) + M7.0 (data foundations: Norgate, multi-market, synthetic). Plans: `dev/plans/m5-experiments-roadmap-2026-05-02.md` + `dev/plans/m7-data-and-tuning-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M5.3 + M7.0 (added 2026-05-02).
 
@@ -110,47 +128,53 @@ Track created 2026-05-02 to absorb M5.3 (scale infra: streaming + Norgate) + M7.
 NO
 
 ## Blocked on
-- **Phase 1.1 (SP500 PI via EODHD Fundamentals)** is unblocked
-  pending the 4-item EODHD-tier verification checklist under
-  §"Blocking Refactors". Once that gate passes, implementation is
-  feat-data work on existing infrastructure (same EODHD client
-  pattern we already use). No vendor signup needed.
+- **Nothing blocking.** Phase 1.4 (DIY iShares IWV scrape) is the
+  primary path and needs no vendor signup, no subscription, no
+  Python — it's straight OCaml `cohttp` work against a verified
+  public endpoint (PR #1108). Next step is a plan-first dispatch to
+  `feat-data` against `analysis/data/sources/ishares/`.
+- Phase 1.1 (EODHD Fundamentals) is parked — would need a tier
+  upgrade ($60/mo) to revive; not pursued per Option B.
 - Norgate ingest retired 2026-05-16 (Windows-only client; see
   vendor-comparison doc). Synth ladder rungs (v1, v2, v3) all
   shipped; EODHD multi-market shipped (#772).
 
 ## Scope
 
-### Track 1 — Historical universe ingestion (RETIRED Norgate, 2026-05-16)
+### Track 1 — Historical universe ingestion (Option B pivot, 2026-05-16)
 
-**Vendor pivot 2026-05-16:** Norgate retired (Windows-only NDU
-client). Replaced by a two-source approach. Full vendor comparison
-in `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
+**Option B pivot 2026-05-16:** Phase 1.1 (EODHD Fundamentals)
+FAILED verification (PR #1106) — our subscription is EOD-only,
+Fundamentals returns HTTP 403. Tier upgrade rejected. Phase 1.4
+(DIY iShares IWV scrape, 2006-present) is now the **primary
+survivorship-correct source** — URL pattern verified working per
+PR #1108. Russell 3000 strictly contains every SP500 name. Full
+vendor comparison in
+`dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
 
-**SP500 (2000-present): EODHD Fundamentals API**
+**SP500 (2000-present) via EODHD Fundamentals: PARKED**
 
 | Item | Value |
 |---|---|
-| Vendor | EODHD — already paid; Fundamentals Data Feed tier required ($59.99/mo or All-In-One €99.99/mo) |
-| Coverage | SP500 from Jan 2000; `HistoricalTickerComponents` returns `Code`/`Name`/`StartDate`/`EndDate`/`IsActiveNow`/`IsDelisted` per ticker |
-| Why | Same vendor / client / Docker stack we already use. Linux/Mac native. 25 of 30y horizon at zero marginal infra cost. |
-| Endpoint | `GET /api/fundamentals/GSPC.INDX?api_token=...&historical=1&from=YYYY-MM-DD&to=YYYY-MM-DD` |
-| Storage | Same EODHD cache layout we use today (gitignored under `dev/data/eodhd/`) |
+| Vendor | EODHD Fundamentals Data Feed tier ($59.99/mo standalone) |
+| Status | **PARKED 2026-05-16** — current EODHD subscription does NOT include Fundamentals; tier upgrade rejected per Option B |
+| Reference | `dev/notes/phase1.1-eodhd-verification-2026-05-16.md` |
 
-Likely new paths (subject to plan-first pass):
-- `analysis/data/sources/eodhd/lib/index_membership.{ml,mli}` — parser for `HistoricalTickerComponents`
-- `analysis/data/sources/eodhd/bin/build_sp500_universe.ml` — CLI emitting `sp500-<as-of>.sexp`
-- `analysis/data/sources/eodhd/test/test_index_membership.ml` — fixtures from spot-check events
-
-**Russell 3000 (2006-present): DIY iShares IWV scrape (Phase 1.4)**
+**Russell 3000 (2006-present) via DIY iShares IWV scrape: PRIMARY PATH (Phase 1.4)**
 
 | Item | Value |
 |---|---|
 | Source | iShares.com per-date holdings CSV (no auth, no key) |
-| Coverage | Russell 3000 from 2006; daily snapshots; tenure inferred by diffing consecutive snapshots |
+| Coverage | 2006-09-29 → present (verified PR #1108); cadence quarterly through 2008-12, monthly through 2012-04, daily thereafter |
+| Universe | Russell 3000 (~3000 names; strictly contains every SP500 name) |
+| Tenure | Inferred by diffing consecutive snapshots (entry = first appearance, exit = first disappearance) |
 | URL pattern | `https://www.ishares.com/us/products/239714/ishares-russell-3000-etf/1467271812596.ajax?fileType=csv&fileName=IWV_holdings&dataType=fund&asOfDate=YYYYMMDD` |
+| Header stability | Line 10 header byte-identical 2006-12-29 → 2026-05-08 (verified PR #1108) |
+| Sentinel | Unavailable date returns HTTP 200 + 4585-byte template with `Fund Holdings as of,"-"` on line 2 — parse content, not status code |
 | Sibling ETFs | IWB (Russell 1000) and IWM (Russell 2000) follow the same URL pattern with different product IDs |
-| Storage | `dev/data/ishares/iwv/<YYYYMMDD>.csv` (gitignored — vendor terms TBD) |
+| Storage | `dev/data/ishares/iwv/<YYYYMMDD>.csv` (gitignored — public website, cache locally, do not redistribute) |
+| Volume | ~3,550 snapshots × ~430 KB ≈ 1.5 GB raw uncompressed |
+| Backfill | ~3 hr at 2s polite spacing |
 
 Likely new paths (subject to plan-first pass):
 - `analysis/data/sources/ishares/lib/iwv_client.{ml,mli}` — `cohttp` GET + CSV decode (no Python)
@@ -337,13 +361,23 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
 ### Pending
 
-- **Phase 1.1 — SP500 PI via EODHD Fundamentals** (active; pending
-  4-item EODHD-tier verification checklist — see §"Blocking Refactors").
-- **Phase 1.4 — Russell 3000 via IWV scrape** (added 2026-05-16; no
-  vendor signup; Linux/Mac OCaml native).
-- **fja05680 SP500 1996-1999 static seed** (optional tail).
-- **Phase 5 — screener point-in-time filter** (next natural step;
-  ~250–400 LOC per design note §4).
+- **Phase 1.4 — Russell 3000 via IWV scrape (PRIMARY PATH)** — URL
+  pattern verified PR #1108; plan landed PR #1109
+  (`dev/plans/iwv-scraper-2026-05-16.md`, 4-PR stack). Next step is
+  dispatching `feat-data` against PR 1 of the stack
+  (`ishares_holdings_client`). No vendor signup; Linux/Mac OCaml
+  native; zero marginal cost.
+- **Phase 1.3 — Survivorship-correct re-pin** — deferred until 1.4
+  lands (no longer downstream of the parked 1.1).
+- **Phase 1.5 — fja05680 SP500 1996-1999 static seed** — deferred
+  per the broader-first pivot.
+- **Phase 5 — screener point-in-time filter** — independent of
+  Phase 1 source; can run in parallel (~250-400 LOC per design
+  note §4).
+
+- **Phase 1.1 — PARKED** (SP500 PI via EODHD Fundamentals; failed
+  verification PR #1106). Not actively scheduled; would require a
+  tier upgrade to revive.
 
 ### Detail (kept for reference; all entries below are MERGED on main)
 
@@ -421,23 +455,30 @@ EODHD multi-market expansion MERGED (#772). M5.3 Phase F retirement
 COMPLETE. 15y memory-cliff fixes MERGED (#988/#992/#993 + #1024).
 broad-3000-2010-01-01 cohort MERGED (#1103, sectors.csv proxy).
 
-**2026-05-16 vendor pivot:** Phase 1 work is now sourced from EODHD
-Fundamentals + DIY iShares IWV scrape + optional fja05680 static
-seed. Norgate retired. See
+**2026-05-16 Option B pivot:** Phase 1 work is sourced from DIY
+iShares IWV scrape (primary, 2006-present Russell 3000) with
+fja05680 1996-1999 SP500 tail deferred. EODHD Fundamentals
+parked after verification FAIL (PR #1106). Norgate retired. See
 `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
 
-1. **Phase 1.1 verification** — confirm EODHD Fundamentals tier
-   subscription + spot-check 5 SP500 events + confirm delisted OHLCV
-   coverage + verify JSON schema path (see §"Blocking Refactors"
-   checklist). Once green, dispatch feat-data on the EODHD
-   `index_membership` library + SP500 universe builder.
-2. **Phase 1.4 — Russell 3000 via IWV scrape** — independent of
-   Phase 1.1. Can run in parallel; no vendor signup needed. First
-   step: spot-curl the URL pattern against a recent date + an older
-   date (e.g. 2010-01-04) to confirm both work in 2026, then plan-first.
+1. **Phase 1.4 implementation** — plan landed PR #1109
+   (`dev/plans/iwv-scraper-2026-05-16.md`); 4-PR stack under
+   `analysis/data/sources/ishares/`
+   (`ishares_holdings_client.{ml,mli}` →
+   `ishares_membership_replay.{ml,mli}` → `fetch_iwv_history.ml` CLI
+   → `build_iwv_universe.ml` CLI). Mirrors the `wiki_sp500` layout
+   (PRs #803/#808/#809/#813). Dispatch `feat-data` against PR 1 of
+   the stack. Authority for URL pattern / sentinel / header
+   stability: `dev/notes/phase1.4-iwv-url-probe-2026-05-16.md`.
+2. **Phase 1.3 re-pin** — once 1.4 lands, re-pin the
+   `goldens-sp500-historical/sp500-2010-2026.sexp` baseline on the
+   IWV-derived cohort. The new cohort is wider than SP500 (Russell
+   3000) so the baseline numbers will differ; this needs fresh
+   sign-off, not a like-for-like comparison against the current
+   510-symbol baseline.
 3. **Phase 5 — screener point-in-time filter** — `membership_at`
-   callback in `Screener.screen`. Highest-leverage gain once Phase 1.1
-   lands.
+   callback in `Screener.screen`. Independent of which Phase 1
+   source feeds it. Can run in parallel with 1.4.
 4. Optional follow-ups (non-blocking):
    - Strategy-side smoke test on a Synth-v3 universe (Sharpe/MaxDD) —
      belongs in `feat-backtest`, not feat-data.
@@ -454,9 +495,9 @@ seed. Norgate retired. See
   scale matters.
 - **Sharadar via Nasdaq Data Link**: $150–$300/mo personal tier;
   SP500 changes since 1957. The only credible >30y step-up for
-  non-institutional pricing. Deferred until 30y horizon (post Phase
-  1.1) proves out. See vendor-comparison-historical-universe doc
-  §Option 4.
+  non-institutional pricing. Deferred until 20y horizon (post Phase
+  1.4 IWV scrape) proves out. See vendor-comparison-historical-universe
+  doc §Option 4.
 
 ## Out of scope
 

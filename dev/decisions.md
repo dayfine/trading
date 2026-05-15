@@ -43,6 +43,55 @@ _(None yet — system just initialized.)_
 
 ## Direction Changes
 
+### 2026-05-16 — Option B pivot — IWV scrape as primary, EODHD Fundamentals retired
+
+Follow-on to the 2026-05-16 morning vendor pivot, after the two
+verification dispatches landed.
+
+Phase 1.1 (EODHD Fundamentals `HistoricalTickerComponents` on
+`GSPC.INDX`) FAILED at verification per PR #1106. The 10-URL probe
+returned HTTP 403 across every variant of the Fundamentals endpoint
+— including bulk and historical-market-cap with an explicit
+`Forbidden. You have no access to Historical Market Cap Data Feed.`
+denial message. Our subscription is the EOD-only tier; the Fundamentals
+add-on costs $59.99/mo standalone or €99.99/mo bundled (All-In-One).
+
+Phase 1.4 (DIY iShares IWV holdings scrape, Russell 3000 2006-present)
+PASSED verification per PR #1108. 31 probes (3 primary + 28 boundary)
+returned HTTP 200 across the full 2006-09-29 → 2026-05-08 range with
+byte-identical line-10 headers. Sentinel for unavailable dates is an
+HTTP 200 + 4585-byte template body with `Fund Holdings as of,"-"` on
+line 2 (parse content, not status code). Cadence is asymmetric:
+quarterly through 2008-12, monthly through 2012-04, daily thereafter.
+~3550 total snapshots, ~1.5 GB raw, ~3 hr backfill at 2s polite
+spacing.
+
+Decision: **Option B — IWV scrape becomes the PRIMARY survivorship-
+correct source for the data-foundations track.** No EODHD tier
+upgrade is being purchased. Phase 1.1 is parked indefinitely
+(reviving it would require a tier upgrade and a re-verification of
+the schema, which EODHD's public docs hedge between two shapes —
+`HistoricalTickerComponents` per-row tenure vs `Components` /
+`HistoricalComponents` per-date snapshots). Phase 1.4 implementation
+is the load-bearing item; plan-first dispatch to `feat-data` against
+`analysis/data/sources/ishares/` is the next action.
+
+Russell 3000 strictly contains every SP500 name, so we don't lose
+SP500 coverage — we gain 2500 additional symbols (mid + small cap)
+for free, in exchange for a 4y horizon reduction (2006 vs 2000) that
+the strategic posture in `memory/project_strategic_pivot_broader_first.md`
+already prefers (broader-first beats deeper-history at this stage).
+
+Full ranked vendor matrix:
+`dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
+Verification transcripts:
+`dev/notes/phase1.1-eodhd-verification-2026-05-16.md` (FAIL) +
+`dev/notes/phase1.4-iwv-url-probe-2026-05-16.md` (PASS).
+Track state: `dev/status/data-foundations.md` (Phase 1.4 IN_PROGRESS
+as primary; Phase 1.1 PARKED; Phase 1.5 fja05680 tail deferred).
+Successor priorities doc:
+`dev/notes/next-session-priorities-2026-05-16.md`.
+
 ### 2026-05-16 — Vendor pivot — Norgate retired
 
 Norgate Data is removed from the data-foundations roadmap. Their NDU
