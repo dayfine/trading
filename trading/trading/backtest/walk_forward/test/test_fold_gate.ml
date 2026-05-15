@@ -18,10 +18,12 @@ let _gate ?(metric = FG.Sharpe) ?(m = 3) ?(n = 5) ?(worst_delta = 0.10) () :
 (* ---------- higher_is_better ---------- *)
 
 let test_higher_is_better _ =
-  assert_that (FG.higher_is_better Sharpe) (equal_to true);
-  assert_that (FG.higher_is_better Calmar) (equal_to true);
-  assert_that (FG.higher_is_better TotalReturnPct) (equal_to true);
-  assert_that (FG.higher_is_better MaxDrawdownPct) (equal_to false)
+  assert_bool "Sharpe is higher-is-better" (FG.higher_is_better Sharpe);
+  assert_bool "Calmar is higher-is-better" (FG.higher_is_better Calmar);
+  assert_bool "TotalReturnPct is higher-is-better"
+    (FG.higher_is_better TotalReturnPct);
+  assert_bool "MaxDrawdownPct is lower-is-better"
+    (not (FG.higher_is_better MaxDrawdownPct))
 
 (* ---------- Validation ---------- *)
 
@@ -94,9 +96,7 @@ let test_m_threshold_miss _ =
   | FG.Fail { wins; n; reason; _ } ->
       assert_that wins (equal_to 2);
       assert_that n (equal_to 5);
-      assert_that
-        (String.is_substring reason ~substring:"M-threshold")
-        (equal_to true)
+      assert_that reason (contains_substring "M-threshold")
   | FG.Pass _ -> assert_failure "Expected Fail (M-threshold)"
 
 (* ---------- Δ-threshold miss ---------- *)
@@ -119,9 +119,7 @@ let test_delta_threshold_miss _ =
       assert_that wins (equal_to 4);
       assert_that worst_fold (equal_to "fold-004");
       assert_that worst_gap (float_equal 0.5);
-      assert_that
-        (String.is_substring reason ~substring:"Δ-threshold")
-        (equal_to true)
+      assert_that reason (contains_substring "Δ-threshold")
   | FG.Pass _ -> assert_failure "Expected Fail (Δ-threshold)"
 
 (* ---------- Baseline tie counts as baseline win ---------- *)
