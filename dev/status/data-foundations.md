@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-15
 
 ## Status
-IN_PROGRESS
+READY_FOR_REVIEW
 
 ## Blocking Refactors
 - Phase 1.1 (`sp500-1996-01-01.sexp`) confirmed blocked on Norgate
@@ -33,11 +33,20 @@ Phase 1 work below:
    Three resolution options offered in that doc: (a) wait on
    Norgate, (b) narrow to sp500-2007-01-01, (c) pivot to Phase 1.2
    (broad-3000-2010-01-01).
-2. **`broad-3000-2010-01-01.sexp` cohort** — expand beyond SP500 to
-   the full Russell 3000 with PI-aware `active_through` data.
-   Per the Phase 1.1 blocker findings, this is the recommended
-   higher-ROI next step while Norgate signup is pending —
-   reproducible entirely from existing Wikipedia + EODHD substrate.
+2. **[x] `broad-3000-2010-01-01.sexp` cohort** — DONE this session.
+   3000-symbol Pinned-shape universe sourced alphabetically from
+   `data/sectors.csv` via new
+   `trading/trading/backtest/scenarios/pick_broad_3000_universe/pick_broad_3000.exe`.
+   No bar-coverage pre-filter (per
+   `memory/project_broad_universe_semantics.md`). Per-symbol
+   delisting awareness flows through `Daily_price.active_through`
+   (PR #1076 / #1094) and is opted in via `enable_pi_filter = true`
+   (PR #1089). Caveat: this is NOT a true Russell 3000 historical
+   reconstitution — the committed sectors.csv is a 2026-04-14
+   snapshot, so the membership list is forward-looking-biased.
+   Header in the emitted sexp documents this. True PI-aware
+   reconstitution needs Norgate (vendor-blocked) or IWV-history
+   scraping (deferred).
 3. **Survivorship-correct re-pin of `goldens-sp500-historical/sp500-2010-2026.sexp`** —
    replace current pinned baseline (measured on survivorship-biased
    data per #1076's hypothesis) with one where PI filter is ON by

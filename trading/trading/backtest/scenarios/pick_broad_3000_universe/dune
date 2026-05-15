@@ -1,0 +1,5 @@
+(executable
+ (name pick_broad_3000)
+ (libraries core fpath scenario_lib weinstein.data_source)
+ (preprocess
+  (pps ppx_sexp_conv)))
