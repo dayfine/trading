@@ -540,6 +540,154 @@ let test_sizing_uses_installed_stop _ =
   assert_that meta.installed_stop
     (is_between (module Float_ord) ~low:85.0 ~high:94.0)
 
+(* ------------------------------------------------------------------ *)
+(* P1 2026-05-15: per-sector exposure cap gate                          *)
+(* ------------------------------------------------------------------ *)
+
+(** Default-off path: when [max_sector_exposure_pct = None], the gate is a no-op
+    pass-through regardless of accumulator state or sector. *)
+let test_sector_exposure_cap_off_passes_through _ =
+  let sector_exposure_acc = Hashtbl.create (module String) in
+  Hashtbl.set sector_exposure_acc ~key:"Test" ~data:99_000.0;
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:100
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_sector_exposure_cap ~sector_exposure_acc
+      ~max_sector_exposure_pct:None ~portfolio_value:100_000.0 (trans, meta)
+      cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 100)))
+
+(** Cap=0.30 + Test sector at 28% ($28K of $100K) + a candidate adding $5K
+    notional → projected 33% > 30% → rejection. Accumulator must NOT advance on
+    rejection. *)
+let test_sector_exposure_cap_rejects_at_33pct _ =
+  let sector_exposure_acc = Hashtbl.create (module String) in
+  Hashtbl.set sector_exposure_acc ~key:"Test" ~data:28_000.0;
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:50
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_sector_exposure_cap ~sector_exposure_acc
+      ~max_sector_exposure_pct:(Some 0.30) ~portfolio_value:100_000.0
+      (trans, meta) cand
+  in
+  assert_that result is_none;
+  assert_that
+    (Hashtbl.find_exn sector_exposure_acc "Test")
+    (float_equal 28_000.0)
+
+(** Cap=0.30 + Test sector at 20% + a candidate adding $5K → projected 25% →
+    admitted, accumulator advances to $25K. *)
+let test_sector_exposure_cap_admits_at_25pct _ =
+  let sector_exposure_acc = Hashtbl.create (module String) in
+  Hashtbl.set sector_exposure_acc ~key:"Test" ~data:20_000.0;
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:50
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_sector_exposure_cap ~sector_exposure_acc
+      ~max_sector_exposure_pct:(Some 0.30) ~portfolio_value:100_000.0
+      (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 50)));
+  assert_that
+    (Hashtbl.find_exn sector_exposure_acc "Test")
+    (float_equal 25_000.0)
+
+(** Empty-string sector is exempt — even with cap=0.05 and a $50K candidate, an
+    unknown-sector candidate passes the exposure check. The accumulator is NOT
+    bumped (the bucket is exempt from tracking too). *)
+let test_sector_exposure_cap_exempts_empty_sector _ =
+  let sector_exposure_acc = Hashtbl.create (module String) in
+  let unknown_sector : Screener.sector_context =
+    { sector_name = ""; rating = Neutral; stage = _sector_context.stage }
+  in
+  let cand =
+    {
+      (_long_candidate ~ticker:"STUB" ~suggested_entry:100.0
+         ~suggested_stop:90.0
+         ~as_of_date:(Date.of_string "2024-06-14"))
+      with
+      sector = unknown_sector;
+    }
+  in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:500
+      ~effective_entry_price:100.0
+  in
+  let result =
+    Entry_audit_capture.check_sector_exposure_cap ~sector_exposure_acc
+      ~max_sector_exposure_pct:(Some 0.05) ~portfolio_value:100_000.0
+      (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 500)));
+  (* No bump on the empty bucket — the cap exempts it from both checking
+     and tracking. *)
+  assert_that (Hashtbl.find sector_exposure_acc "") is_none
+
+(** Successive admissions accumulate: two $10K candidates to the same sector
+    against a 0.30 cap and a $0 starting accumulator. First admits to $10K;
+    second admits to $20K. *)
+let test_sector_exposure_cap_accumulates_across_candidates _ =
+  let sector_exposure_acc = Hashtbl.create (module String) in
+  let candidate () =
+    let trans, meta =
+      _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:100
+        ~effective_entry_price:100.0
+    in
+    let cand =
+      _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+        ~as_of_date:(Date.of_string "2024-06-14")
+    in
+    Entry_audit_capture.check_sector_exposure_cap ~sector_exposure_acc
+      ~max_sector_exposure_pct:(Some 0.30) ~portfolio_value:100_000.0
+      (trans, meta) cand
+  in
+  let r1 = candidate () in
+  let r2 = candidate () in
+  assert_that r1
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 100)));
+  assert_that r2
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 100)));
+  assert_that
+    (Hashtbl.find_exn sector_exposure_acc "Test")
+    (float_equal 20_000.0)
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
@@ -565,4 +713,14 @@ let () =
            "G15-step3: stop within 15% admits" >:: test_stop_within_15pct_admits;
            "G15-step3: sizing uses installed_stop"
            >:: test_sizing_uses_installed_stop;
+           "P1: sector exposure cap off passes through"
+           >:: test_sector_exposure_cap_off_passes_through;
+           "P1: sector exposure cap rejects at 33%"
+           >:: test_sector_exposure_cap_rejects_at_33pct;
+           "P1: sector exposure cap admits at 25%"
+           >:: test_sector_exposure_cap_admits_at_25pct;
+           "P1: sector exposure cap exempts empty sector"
+           >:: test_sector_exposure_cap_exempts_empty_sector;
+           "P1: sector exposure cap accumulates across candidates"
+           >:: test_sector_exposure_cap_accumulates_across_candidates;
          ])

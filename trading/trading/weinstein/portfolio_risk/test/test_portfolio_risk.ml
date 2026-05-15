@@ -15,6 +15,7 @@ type snapshot = Portfolio_risk.portfolio_snapshot = {
   short_exposure_pct : float;
   position_count : int;
   sector_counts : (string * int) list;
+  sector_exposures : (string * float) list;
 }
 [@@deriving test_matcher]
 
@@ -32,7 +33,7 @@ type sizing = Portfolio_risk.sizing_result = {
    the snapshot functions. This lets us set arbitrary exposure values without
    needing a real portfolio + trade history. *)
 let make_snapshot ?(cash = 80000.0) ?(long_exp = 15000.0) ?(short_exp = 0.0)
-    ?(positions = 3) ?(sectors = []) () =
+    ?(positions = 3) ?(sectors = []) ?(sector_exposures = []) () =
   let total = cash +. long_exp -. short_exp in
   {
     total_value = total;
@@ -46,6 +47,7 @@ let make_snapshot ?(cash = 80000.0) ?(long_exp = 15000.0) ?(short_exp = 0.0)
       (if Float.( > ) total 0.0 then short_exp /. total else 0.0);
     position_count = positions;
     sector_counts = sectors;
+    sector_exposures;
   }
 
 let make_trade ~symbol ~(side : Trading_base.Types.side) ~quantity ~price =
@@ -75,7 +77,7 @@ let test_snapshot_empty _ =
        ~cash:(float_equal 100000.0) ~cash_pct:(float_equal 1.0)
        ~long_exposure:(float_equal 0.0) ~long_exposure_pct:__
        ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 0) ~sector_counts:__)
+       ~position_count:(equal_to 0) ~sector_counts:__ ~sector_exposures:__)
 
 let test_snapshot_long_only _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("MSFT", 50.0, 200.0) ] in
@@ -85,7 +87,7 @@ let test_snapshot_long_only _ =
        ~long_exposure:(float_equal 25000.0)
        ~long_exposure_pct:(float_equal ~epsilon:1e-6 (1.0 /. 3.0))
        ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 2) ~sector_counts:__)
+       ~position_count:(equal_to 2) ~sector_counts:__ ~sector_exposures:__)
 
 let test_snapshot_with_short _ =
   let positions = [ ("AAPL", 100.0, 150.0); ("TSLA", -50.0, 200.0) ] in
@@ -94,7 +96,7 @@ let test_snapshot_with_short _ =
     (match_snapshot ~total_value:(float_equal 85000.0) ~cash:__ ~cash_pct:__
        ~long_exposure:(float_equal 15000.0) ~long_exposure_pct:__
        ~short_exposure:(float_equal 10000.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 2) ~sector_counts:__)
+       ~position_count:(equal_to 2) ~sector_counts:__ ~sector_exposures:__)
 
 let test_snapshot_with_sectors _ =
   let positions =
@@ -105,7 +107,8 @@ let test_snapshot_with_sectors _ =
   assert_that snap
     (match_snapshot ~total_value:__ ~cash:__ ~cash_pct:__ ~long_exposure:__
        ~long_exposure_pct:__ ~short_exposure:__ ~short_exposure_pct:__
-       ~position_count:(equal_to 3) ~sector_counts:(fun counts ->
+       ~position_count:(equal_to 3) ~sector_exposures:__
+       ~sector_counts:(fun counts ->
          assert_that
            (List.Assoc.find counts ~equal:String.equal "Tech")
            (is_some_and (equal_to 3))))
@@ -131,7 +134,7 @@ let test_snapshot_of_portfolio _ =
        ~cash:(float_equal 85000.0) ~cash_pct:__
        ~long_exposure:(float_equal 25000.0) ~long_exposure_pct:__
        ~short_exposure:(float_equal 0.0) ~short_exposure_pct:__
-       ~position_count:(equal_to 2) ~sector_counts:__)
+       ~position_count:(equal_to 2) ~sector_counts:__ ~sector_exposures:__)
 
 (* ---- Position sizing tests ---- *)
 
@@ -418,6 +421,125 @@ let test_check_limits_unknown_sector_configurable _ =
   in
   assert_that result (equal_to (Result.Ok ()))
 
+(* ---- Sector exposure cap tests (P1 2026-05-15) ---- *)
+
+(* Default config has [max_sector_exposure_pct = None]. Even at high sector
+   exposure (50% of portfolio in Tech), proposing a new Tech position is
+   accepted — the cap doesn't fire when configured off. This is the
+   default-off bit-equality guarantee. *)
+let test_sector_exposure_cap_off_by_default _ =
+  let snap =
+    make_snapshot ~cash:50_000.0 ~long_exp:50_000.0
+      ~sector_exposures:[ ("Tech", 50_000.0) ]
+      ~sectors:[ ("Tech", 1) ]
+      ()
+  in
+  let result =
+    check_limits ~config:default_config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5_000.0 ~proposed_sector:"Tech"
+  in
+  assert_that result (equal_to (Result.Ok ()))
+
+(* total=100k, Tech sector at 28k (28%). Adding a 5k Tech position projects
+   to 33% — over the 0.30 cap. Violation surfaces with the projected pct. *)
+let test_sector_exposure_cap_blocks_over_concentration _ =
+  let config = { default_config with max_sector_exposure_pct = Some 0.30 } in
+  let snap =
+    make_snapshot ~cash:60_000.0 ~long_exp:40_000.0
+      ~sector_exposures:[ ("Tech", 28_000.0) ]
+      ~sectors:[ ("Tech", 2) ]
+      ()
+  in
+  let result =
+    check_limits ~config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5_000.0 ~proposed_sector:"Tech"
+  in
+  assert_that result
+    (equal_to (Result.Error [ Sector_exposure_exceeded ("Tech", 0.33) ]))
+
+(* Same cap (0.30) but Tech currently at 20% — adding 5k projects to 25%,
+   under the cap. Accepted. *)
+let test_sector_exposure_cap_admits_under_concentration _ =
+  let config = { default_config with max_sector_exposure_pct = Some 0.30 } in
+  let snap =
+    make_snapshot ~cash:60_000.0 ~long_exp:40_000.0
+      ~sector_exposures:[ ("Tech", 20_000.0) ]
+      ~sectors:[ ("Tech", 2) ]
+      ()
+  in
+  let result =
+    check_limits ~config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5_000.0 ~proposed_sector:"Tech"
+  in
+  assert_that result (equal_to (Result.Ok ()))
+
+(* Empty-string sector is exempt from the exposure cap — discipline for the
+   unknown bucket comes from max_unknown_sector_positions, not this cap. Even
+   with the cap set very low (0.05), an unknown-sector candidate passes the
+   exposure check (the proposed_value can still fail other limits, but it
+   doesn't trigger Sector_exposure_exceeded). *)
+let test_sector_exposure_cap_exempts_empty_string_sector _ =
+  let config = { default_config with max_sector_exposure_pct = Some 0.05 } in
+  let snap =
+    make_snapshot ~cash:60_000.0 ~long_exp:40_000.0
+      ~sector_exposures:[ ("", 30_000.0) ]
+      ~sectors:[ ("", 1) ]
+      ()
+  in
+  let result =
+    check_limits ~config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5_000.0 ~proposed_sector:""
+  in
+  assert_that result (equal_to (Result.Ok ()))
+
+(* Composes with sector_concentration count-cap: when both are configured and
+   both would fire, both violations surface. *)
+let test_sector_exposure_cap_composes_with_count_cap _ =
+  let config =
+    {
+      default_config with
+      max_sector_exposure_pct = Some 0.30;
+      max_sector_concentration = 2;
+    }
+  in
+  let snap =
+    make_snapshot ~cash:60_000.0 ~long_exp:40_000.0
+      ~sector_exposures:[ ("Tech", 28_000.0) ]
+      ~sectors:[ ("Tech", 2) ]
+      ()
+  in
+  let result =
+    check_limits ~config ~snapshot:snap ~proposed_side:`Long
+      ~proposed_value:5_000.0 ~proposed_sector:"Tech"
+  in
+  assert_that result
+    (equal_to
+       (Result.Error
+          [
+            Sector_concentration ("Tech", 3);
+            Sector_exposure_exceeded ("Tech", 0.33);
+          ]))
+
+(* snapshot computes sector_exposures from positions, parallel to
+   sector_counts. Long + short positions to the same sector aggregate via
+   absolute value. *)
+let test_snapshot_computes_sector_exposures _ =
+  let positions =
+    [ ("AAPL", 100.0, 150.0); ("MSFT", 50.0, 200.0); ("XYZ", -10.0, 100.0) ]
+  in
+  let sectors = [ ("AAPL", "Tech"); ("MSFT", "Tech"); ("XYZ", "Finance") ] in
+  let snap = snapshot ~cash:60_000.0 ~positions ~sectors () in
+  assert_that snap
+    (match_snapshot ~total_value:__ ~cash:__ ~cash_pct:__ ~long_exposure:__
+       ~long_exposure_pct:__ ~short_exposure:__ ~short_exposure_pct:__
+       ~position_count:__ ~sector_counts:__ ~sector_exposures:(fun exposures ->
+         assert_that
+           (List.Assoc.find exposures ~equal:String.equal "Tech")
+           (is_some_and (float_equal 25_000.0));
+         assert_that
+           (List.Assoc.find exposures ~equal:String.equal "Finance")
+           (is_some_and (float_equal 1_000.0))))
+
 (* snapshot derives sector counts from positions. Positions whose symbol is
    absent from the sectors list are bucketed under the empty-string key. *)
 let test_snapshot_buckets_missing_sectors_as_unknown _ =
@@ -429,7 +551,7 @@ let test_snapshot_buckets_missing_sectors_as_unknown _ =
   assert_that snap
     (match_snapshot ~total_value:__ ~cash:__ ~cash_pct:__ ~long_exposure:__
        ~long_exposure_pct:__ ~short_exposure:__ ~short_exposure_pct:__
-       ~position_count:__ ~sector_counts:(fun counts ->
+       ~position_count:__ ~sector_exposures:__ ~sector_counts:(fun counts ->
          assert_that
            (List.Assoc.find counts ~equal:String.equal "")
            (is_some_and (equal_to 2));
@@ -493,6 +615,18 @@ let suite =
          >:: test_check_limits_named_sector_unaffected_by_unknown_cap;
          "check_limits_unknown_sector_configurable"
          >:: test_check_limits_unknown_sector_configurable;
+         "sector_exposure_cap_off_by_default"
+         >:: test_sector_exposure_cap_off_by_default;
+         "sector_exposure_cap_blocks_over_concentration"
+         >:: test_sector_exposure_cap_blocks_over_concentration;
+         "sector_exposure_cap_admits_under_concentration"
+         >:: test_sector_exposure_cap_admits_under_concentration;
+         "sector_exposure_cap_exempts_empty_string_sector"
+         >:: test_sector_exposure_cap_exempts_empty_string_sector;
+         "sector_exposure_cap_composes_with_count_cap"
+         >:: test_sector_exposure_cap_composes_with_count_cap;
+         "snapshot_computes_sector_exposures"
+         >:: test_snapshot_computes_sector_exposures;
          "snapshot_buckets_missing_sectors_as_unknown"
          >:: test_snapshot_buckets_missing_sectors_as_unknown;
          "deriving" >:: test_deriving;

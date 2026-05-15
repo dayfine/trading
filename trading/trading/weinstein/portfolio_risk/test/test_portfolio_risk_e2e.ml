@@ -370,7 +370,7 @@ let test_position_sizing_respects_risk_budget _ =
 (** Build a portfolio_snapshot for limit-check tests, bypassing the actual
     Portfolio module so we can set arbitrary sector counts. *)
 let _make_snapshot ?(cash = 80_000.0) ?(long_exp = 15_000.0) ?(short_exp = 0.0)
-    ?(positions = 3) ?(sectors = []) () =
+    ?(positions = 3) ?(sectors = []) ?(sector_exposures = []) () =
   let total = cash +. long_exp -. short_exp in
   {
     Portfolio_risk.total_value = total;
@@ -384,6 +384,7 @@ let _make_snapshot ?(cash = 80_000.0) ?(long_exp = 15_000.0) ?(short_exp = 0.0)
       (if Float.( > ) total 0.0 then short_exp /. total else 0.0);
     position_count = positions;
     sector_counts = sectors;
+    sector_exposures;
   }
 
 let test_exposure_limits_flag_over_concentration _ =

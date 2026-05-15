@@ -390,6 +390,7 @@ val survivors_for_screening :
     still run inside Phase 2's [Stock_analysis] for the surviving symbols. *)
 
 val entries_from_candidates :
+  ?sector_lookup:(string -> string option) ->
   config:config ->
   candidates:Screener.scored_candidate list ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
@@ -435,7 +436,15 @@ val entries_from_candidates :
     @param macro
       Macro snapshot consumed by [audit_recorder]'s entry event. Required only
       when [audit_recorder] is passed; ignored otherwise. Tests that don't
-      record audit events can omit it. *)
+      record audit events can omit it.
+    @param sector_lookup
+      P1 2026-05-15. Resolves a held symbol to its sector name; used to seed the
+      per-sector exposure accumulator that drives
+      [Portfolio_risk.config.max_sector_exposure_pct]. When omitted, the
+      accumulator is empty — held positions don't contribute to any sector
+      bucket. Default-off path
+      ([config.portfolio_config.max_sector_exposure_pct = None]) is bit-equal to
+      pre-P1 behaviour regardless of whether [sector_lookup] is passed. *)
 
 val make :
   ?initial_stop_states:Weinstein_stops.stop_state String.Map.t ->

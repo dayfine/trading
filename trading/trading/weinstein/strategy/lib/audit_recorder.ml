@@ -8,6 +8,7 @@ type skip_reason =
   | Sized_to_zero
   | Short_notional_cap
   | Stop_too_wide
+  | Sector_exposure_cap
 
 type alternative_input = {
   candidate : Screener.scored_candidate;
