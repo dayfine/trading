@@ -55,6 +55,33 @@ let _seen_in_snapshot (snap : Ishares_holdings_client.snapshot) :
         | `Ok | `Duplicate -> ());
   tbl
 
+(* Record a ticker observed in the current snapshot: either extend an
+   existing tenure ([last_seen] moves forward, miss counter resets) or open
+   a new one. Mutates [state] in place. *)
+let _record_seen ~as_of ~state ~ticker
+    ~(holding : Ishares_holdings_client.holding) : unit =
+  match Hashtbl.find state ticker with
+  | Some ip ->
+      Hashtbl.set state ~key:ticker
+        ~data:{ ip with last_seen = as_of; absent_streak = 0 }
+  | None ->
+      Hashtbl.set state ~key:ticker ~data:(_new_in_progress ~as_of ~holding)
+
+(* For a ticker absent in the current snapshot, bump its miss counter.
+   Returns [Some ip] (and removes the entry from [state]) if the bumped
+   counter has hit the configured threshold — signalling the tenure should
+   be closed. Otherwise writes the bumped counter back to [state] and
+   returns [None]. *)
+let _bump_miss_counter ~threshold ~state ~ticker (ip : _in_progress) :
+    _in_progress option =
+  let bumped = ip.absent_streak + 1 in
+  if bumped >= threshold then (
+    Hashtbl.remove state ticker;
+    Some ip)
+  else (
+    Hashtbl.set state ~key:ticker ~data:{ ip with absent_streak = bumped };
+    None)
+
 (* Process one snapshot: update [state] in-place and return the list of
    tenure_records closed by hitting the miss threshold during this step. *)
 let _step_snapshot ~threshold ~index ~(state : (string, _in_progress) Hashtbl.t)
@@ -63,12 +90,7 @@ let _step_snapshot ~threshold ~index ~(state : (string, _in_progress) Hashtbl.t)
   let seen = _seen_in_snapshot snap in
   (* Update entries for tickers present in this snapshot. *)
   Hashtbl.iteri seen ~f:(fun ~key:ticker ~data:holding ->
-      match Hashtbl.find state ticker with
-      | Some ip ->
-          Hashtbl.set state ~key:ticker
-            ~data:{ ip with last_seen = as_of; absent_streak = 0 }
-      | None ->
-          Hashtbl.set state ~key:ticker ~data:(_new_in_progress ~as_of ~holding));
+      _record_seen ~as_of ~state ~ticker ~holding);
   (* Increment miss counters for tickers in state but absent in this
      snapshot. Core's Hashtbl forbids mutation during fold/iter, so we
      materialize an explicit "absent" list first, then mutate, then
@@ -79,13 +101,7 @@ let _step_snapshot ~threshold ~index ~(state : (string, _in_progress) Hashtbl.t)
   in
   let to_close =
     List.filter_map absent ~f:(fun (ticker, ip) ->
-        let bumped = ip.absent_streak + 1 in
-        if bumped >= threshold then (
-          Hashtbl.remove state ticker;
-          Some ip)
-        else (
-          Hashtbl.set state ~key:ticker ~data:{ ip with absent_streak = bumped };
-          None))
+        _bump_miss_counter ~threshold ~state ~ticker ip)
   in
   (* Determinism: emit closures sorted by (first_seen, ticker) so the output
      is independent of hashtable iteration order. *)
