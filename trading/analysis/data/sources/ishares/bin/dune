@@ -1,0 +1,24 @@
+(library
+ (name fetch_iwv_history_lib)
+ (modules fetch_iwv_history_lib)
+ (libraries core core_unix.sys_unix core_unix ishares status)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name fetch_iwv_history)
+ (modules fetch_iwv_history)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  async_unix
+  cohttp
+  cohttp-async
+  async_ssl
+  fetch_iwv_history_lib
+  ishares
+  status
+  uri)
+ (preprocess
+  (pps ppx_jane)))

@@ -1,5 +1,17 @@
 (tests
- (names test_ishares_holdings_client test_ishares_membership_replay)
- (libraries ishares core ounit2 matchers status uri)
+ (names
+  test_ishares_holdings_client
+  test_ishares_membership_replay
+  test_fetch_iwv_history_lib)
+ (libraries
+  ishares
+  fetch_iwv_history_lib
+  core
+  core_unix.filename_unix
+  core_unix.sys_unix
+  ounit2
+  matchers
+  status
+  uri)
  (deps
   (glob_files ./data/*.csv)))

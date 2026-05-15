@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-16
+## Last updated: 2026-05-16 (PR-C added)
 
 ## Status
 IN_PROGRESS
@@ -328,6 +328,35 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
 ### In Progress / READY_FOR_REVIEW
 
+- **Phase 1.4 PR-C — `fetch_iwv_history.exe` (READY_FOR_REVIEW
+  2026-05-16, branch `feat/iwv-fetch-history`).**
+  - New CLI `trading/analysis/data/sources/ishares/bin/fetch_iwv_history.{ml,dune}`
+    + pure helper lib `fetch_iwv_history_lib.{ml,mli}`. Backfills the
+    on-disk cache of iShares IWV holdings CSVs across a date window;
+    resume-safe (skips already-cached + sentinel dates), polite (2 s
+    default spacing), and `--dry-run`-capable.
+  - Cache layout: `<cache_dir>/YYYY-MM-DD.csv` for data responses,
+    `<cache_dir>/YYYY-MM-DD.sentinel` (one-byte marker) for the iShares
+    no-data template. Atomic-rename writes via `.tmp` sibling guard
+    against half-cached CSVs.
+  - Cadence policies: `auto` (quarterly pre-2009 → monthly through
+    2012-04-29 → weekly weekdays from 2012-04-30 per the Phase 1.4 URL
+    probe), `daily`, `monthly`, `quarterly`. Era cutovers + polite-
+    sleep default are named constants — no magic numbers.
+  - 17 OUnit2 tests on the lib: cadence parsing (case/whitespace
+    tolerance + reject unknown), enumeration across all four policies
+    (daily skips weekends; monthly picks month-ends; quarterly picks
+    Mar/Jun/Sep/Dec ends; auto handles the 2012-04-30 cutover and
+    the quarterly→monthly→daily era transitions), plan classification
+    over a mixed cache (cached / sentinel / fetch), zero-byte-CSV
+    refetch fallback, no-resume mode, format_plan_summary, sentinel
+    roundtrip, write_csv_body roundtrip, cache-dir mkdir_p.
+  - No live HTTP tests (would hit ishares.com — rate-limit / flaky);
+    hand-tested via `dry-run`. Linters green: `dune build @fmt`,
+    `no_python_check`, `fn_length_linter`, `linter_magic_numbers`.
+    ~450 LOC across `.ml` + `.mli` + `test.ml` (within PR-sizing cap).
+    Plan: `dev/plans/iwv-scraper-2026-05-16.md` §PR-C.
+
 - **Phase 1.4 PR-B — `ishares_membership_replay` (READY_FOR_REVIEW
   2026-05-16, branch `feat/iwv-membership-replay`).**
   - New module `trading/analysis/data/sources/ishares/lib/ishares_membership_replay.{ml,mli}`
@@ -430,7 +459,22 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
     with 9 OUnit2 tests covering single-snapshot / overlap /
     miss-threshold / sector-pinning / threshold-parameterization /
     un-tickered-drop. Branch: `feat/iwv-membership-replay`.
-  - **[ ] PR-C `fetch_iwv_history.exe`** — pending PR-A merge.
+  - **[ ] PR-C `fetch_iwv_history.exe`** — READY_FOR_REVIEW
+    2026-05-16. Resume-safe + polite IWV backfill CLI under
+    `trading/analysis/data/sources/ishares/bin/`. New
+    `fetch_iwv_history_lib.{ml,mli}` exposes pure cadence + plan +
+    sentinel-marker helpers (testable); `fetch_iwv_history.ml` wires
+    [Cohttp_async] HTTP + polite spacing on top. Auto cadence pins
+    quarter-ends pre-2009, month-ends 2009–2012-04, weekdays
+    2012-04-30+ per the Phase 1.4 URL probe. Sentinel responses
+    materialise as `<D>.sentinel` markers so re-runs don't re-fetch
+    known-empty dates. 17 OUnit2 tests cover cadence parsing,
+    enumeration across all four policies + cutover boundary,
+    resume-from-mixed-cache classification, zero-byte-CSV →
+    refetch fallback, sentinel roundtrip, format_plan_summary, and
+    cache-dir creation. `dune build && dune runtest && dune build @fmt`
+    all green. Branch: `feat/iwv-fetch-history`. Plan:
+    `dev/plans/iwv-scraper-2026-05-16.md` §PR-C.
   - **[ ] PR-D `build_iwv_universe.exe`** + golden — pending PR-B / PR-C.
   No vendor signup; Linux/Mac OCaml native; zero marginal cost.
 - **Phase 1.3 — Survivorship-correct re-pin** — deferred until 1.4
