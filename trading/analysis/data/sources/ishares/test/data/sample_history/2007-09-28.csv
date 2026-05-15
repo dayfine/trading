@@ -1,0 +1,20 @@
+iShares Russell 3000 ETF
+Fund Holdings as of,"Sep 28, 2007"
+
+Inception Date,"May 22, 2000"
+Shares Outstanding,"10,000,000"
+Stock,99.50
+Bonds,0.00
+Other,0.50
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"LEH","LEHMAN BROTHERS HOLDINGS INC","-","Equity","98,765,432.10","1.50","98,765,432.10","1500000.00","65.84","United States","NYSE","USD","1.00","-","-"
+"IBM","INTERNATIONAL BUSINESS MACHINES","-","Equity","234,567,890.12","3.40","234,567,890.12","2000000.00","117.28","United States","NYSE","USD","1.00","-","-"
+"MSFT","MICROSOFT CORP","-","Equity","187,654,321.00","2.85","187,654,321.00","6300000.00","29.79","United States","NASDAQ","USD","1.00","-","-"
+"AAPL","APPLE INC","-","Equity","123,456,789.01","1.87","123,456,789.01","800000.00","154.32","United States","NASDAQ","USD","1.00","-","-"
+"JNJ","JOHNSON & JOHNSON","-","Equity","154,321,098.76","2.34","154,321,098.76","2350000.00","65.67","United States","NYSE","USD","1.00","-","-"
+"KODK","EASTMAN KODAK CO","-","Equity","12,345,678.90","0.18","12,345,678.90","430000.00","28.71","United States","NYSE","USD","1.00","-","-"
+
+The fund holdings are subject to change. Holdings information is based on the trade date for portfolio transactions.
+;; PROVENANCE: synthetic 6-row sample of the iShares IWV holdings CSV in the
+;; pre-2009 quarterly era. Sectors are "-" per Phase 1.4 probe doc.
