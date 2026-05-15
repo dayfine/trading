@@ -174,6 +174,42 @@ let test_build_all_empty_variants_yields_empty _ =
   let scenarios = WFR.build_all ~base ~spec ~variants:[] in
   assert_that scenarios (size_is 0)
 
+(* ---------- CAGR derivation (PR-B step 4) ---------- *)
+
+(* test_days = 365 ≈ 1y → CAGR ≈ total_return_pct.
+   Tolerance ±0.1pp (the 365/365.25 ratio introduces ~0.07% drift on a 10%
+   total return). *)
+let test_cagr_at_one_year_equals_total_return _ =
+  assert_that
+    (WFR.cagr_pct ~test_days:365 ~total_return_pct:10.0)
+    (float_equal ~epsilon:0.1 10.0)
+
+(* test_days = 182 (half-year) → CAGR > total_return_pct (annualising up).
+   For total_return=10%, years≈0.4983, CAGR = 1.10^(1/0.4983) - 1 ≈ 21.05%. *)
+let test_cagr_half_year_annualises_up _ =
+  assert_that
+    (WFR.cagr_pct ~test_days:182 ~total_return_pct:10.0)
+    (float_equal ~epsilon:0.05 21.05)
+
+(* test_days = 730 (two years) → CAGR < total_return_pct (annualising down).
+   For total_return=20%, years≈1.9986, CAGR = 1.20^(1/1.9986) - 1 ≈ 9.55%. *)
+let test_cagr_two_year_annualises_down _ =
+  assert_that
+    (WFR.cagr_pct ~test_days:730 ~total_return_pct:20.0)
+    (float_equal ~epsilon:0.05 9.55)
+
+let test_cagr_zero_days_returns_nan _ =
+  assert_that
+    (Float.is_nan (WFR.cagr_pct ~test_days:0 ~total_return_pct:10.0))
+    (equal_to true)
+
+let test_cagr_negative_return_handled _ =
+  (* -20% over a half-year → annualised loss ≈ -36%.  Mathematically:
+     0.80^(1/0.4983) - 1 ≈ -0.3603. *)
+  assert_that
+    (WFR.cagr_pct ~test_days:182 ~total_return_pct:(-20.0))
+    (float_equal ~epsilon:0.1 (-36.03))
+
 (* ---------- Variant sexp round-trip ---------- *)
 
 let test_variant_sexp_round_trip _ =
@@ -205,6 +241,14 @@ let suite =
          "build_all empty variants yields empty"
          >:: test_build_all_empty_variants_yields_empty;
          "variant sexp round-trip" >:: test_variant_sexp_round_trip;
+         "CAGR at 365 days ≈ total return"
+         >:: test_cagr_at_one_year_equals_total_return;
+         "CAGR over 182 days annualises up"
+         >:: test_cagr_half_year_annualises_up;
+         "CAGR over 730 days annualises down"
+         >:: test_cagr_two_year_annualises_down;
+         "CAGR test_days=0 returns NaN" >:: test_cagr_zero_days_returns_nan;
+         "CAGR handles negative return" >:: test_cagr_negative_return_handled;
        ]
 
 let () = run_test_tt_main suite

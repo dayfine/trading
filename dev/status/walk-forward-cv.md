@@ -75,14 +75,28 @@ dune build && dune runtest trading/backtest/walk_forward/test && dune build @fmt
 54 tests across the 4 modules (9 + 17 + 13 + 15), all pass. All linters
 (nesting, fn-length, mli-coverage, file-length, magic-numbers, fmt) clean.
 
-### Deferred to PR-B (same plan)
+### Third PR — Phase 2.2 PR-B: multi-metric sensitivity + CAGR + fixture sexps
 
-Plan §3-5: multi-metric sensitivity in markdown (4-col wins table),
-`cagr_pct` derived field in the binary, the two new fixture spec sexps
-(`cell-e-walk-forward-2026-05-08-harness/spec.sexp` regression fixture
-re-expressing the 8 hand-curated scenarios via `Window_spec.Explicit`,
-and `walk-forward-cell-e-30fold-2026-05-16/spec.sexp` production
-30-fold).
+Per `dev/plans/walk-forward-cv-rolling-30fold-2026-05-16.md` (PR-B half).
+PR-A landed as #1111; this PR is the §3-5 deferred half.
+
+- [x] **Multi-metric sensitivity table** (plan §3) — `variant_sensitivity` extended from a single `wins_on_gate_metric : int` to four win counts (`sharpe_wins`, `calmar_wins`, `total_return_wins`, `max_drawdown_wins`). The markdown report's "Cross-fold sensitivity" section grows from 1 column to 4; the gate metric's column header is suffixed with `*` so the operator can see which column the verdict gates on at a glance. The `_wins_on_metric_for_variant` helper counts wins per (variant, metric) directly off the fold_actuals — independent of the gate. 3 new tests (multi-metric counts, gate-metric flagging for Sharpe, gate-metric flagging for MaxDD).
+- [x] **Derived `cagr_pct`** (plan §4) — added as a public helper `Walk_forward.Walk_forward_runner.cagr_pct : test_days:int -> total_return_pct:float -> float`. Formula `((1+r)^(1/y)-1)*100` with `y = test_days /. 365.25`. Returns `Float.nan` when `test_days ≤ 0`. New field `cagr_pct : float` on `fold_actual` populated by the binary from each fold's calendar test window. New `cagr_pct : per_metric_stats` on `variant_stability`. Renderer prints `n/a` for NaN values so older fixtures don't break. 5 new tests covering 365-day identity, 182-day annualise-up, 730-day annualise-down, zero-days NaN, and negative-return handling.
+- [x] **`Spec` module hoist** — the on-disk spec type (`base_scenario`, `window_spec`, `variants`, `baseline_label`, `gate`) was duplicated in the binary; hoisted to the library as `Walk_forward.Spec` so the test surface can validate fixture sexps without invoking the backtest. Binary updated to use it.
+- [x] **`aggregate.sexp` writer** — binary now writes the structured aggregate per `Walk_forward.Walk_forward_report.compute` to `<out-dir>/aggregate.sexp` alongside the markdown report and `fold_actuals.sexp`. Phase 3 BO will read it directly.
+- [x] **Two checked-in fixture spec sexps** under `trading/test_data/walk_forward/`:
+  - `cell_e_8fold_2026_05_08.sexp` — Window_spec.Explicit re-expressing the 2026-05-08 hand-curated 8-fold experiment (4 underlying windows × 2 halves) as 8 folds named `bull-crash-2015-2017`, `bull-crash-2018-2020`, …, `sp500-2021h2-2023`. Variants `cell-A` (baseline; disables Cell E features) and `cell-E` (empty overrides; uses base's canonical config).
+  - `cell_e_30fold_2026_05_16.sexp` — Window_spec.Rolling, OOS-only, base=`goldens-sp500-historical/sp500-2010-2026.sexp`, train_days=0 / test_days=365 / step_days=182. Generates ~30 folds spanning 2010-01 → 2026-04. Gate: 17/30 Sharpe wins, Δ≤0.30.
+  - Both ship as **spec files only**; the actual sweeps are local-only follow-ups (multi-hour wall) and out of scope for this PR.
+- [x] **`_mismatch_verdict` branch test coverage** — PR-A's CP4 review nit. New dedicated tests (`test_mismatch_verdict_when_fold_count_below_gate_n` and `test_mismatch_verdict_renders_skipped_line`) exercise the synthetic Fail produced when the (variant, baseline) fold-pair count doesn't match `gate.n`, and verify the renderer emits the `SKIPPED — fold-pair count mismatch:` line.
+
+### Verify (PR-B)
+
+```
+dune build && dune runtest trading/backtest/walk_forward && dune build @fmt
+```
+
+73 tests across 5 modules (13 fold_gate + 14 runner + 17 window_spec + 7 spec + 22 report), all pass. All linters clean.
 
 ## Completed
 

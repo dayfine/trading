@@ -54,12 +54,14 @@ let _stats xs : per_metric_stats =
 
 (* -------------- gate-metric projection -------------- *)
 
-let _project_metric (gate : Fold_gate.t) (fa : fold_actual) =
-  match gate.metric with
+let _project_metric_key (metric : Fold_gate.metric_key) (fa : fold_actual) =
+  match metric with
   | Sharpe -> fa.sharpe_ratio
   | Calmar -> fa.calmar_ratio
   | TotalReturnPct -> fa.total_return_pct
   | MaxDrawdownPct -> fa.max_drawdown_pct
+
+let _project_metric (gate : Fold_gate.t) fa = _project_metric_key gate.metric fa
 
 let _metric_str (gate : Fold_gate.t) =
   match gate.metric with
@@ -81,6 +83,7 @@ let _stability_for_variant (folds : fold_actual list) label : variant_stability
     sharpe_ratio = _stats (List.map vs ~f:(fun fa -> fa.sharpe_ratio));
     max_drawdown_pct = _stats (List.map vs ~f:(fun fa -> fa.max_drawdown_pct));
     calmar_ratio = _stats (List.map vs ~f:(fun fa -> fa.calmar_ratio));
+    cagr_pct = _stats (List.map vs ~f:(fun fa -> fa.cagr_pct));
   }
 
 let _find_fold_actual (folds : fold_actual list) ~fold_name ~variant_label =
@@ -114,6 +117,27 @@ let _wins_for_variant ~(gate : Fold_gate.t) frs =
   List.count frs ~f:(fun (fr : Fold_gate.fold_result) ->
       if hib then Float.(fr.variant_score > fr.baseline_score)
       else Float.(fr.variant_score < fr.baseline_score))
+
+(** Count per-(variant, metric) wins by projecting [fold_actuals] under each
+    metric independently. Used by {!compute} to populate the 4-column
+    sensitivity table. Returns 0 when fewer than [gate.n]-matched fold-pairs
+    exist for the variant (mirrors the verdict mismatch path). *)
+let _wins_on_metric_for_variant (folds : fold_actual list) ~baseline_label
+    ~variant_label ~(metric : Fold_gate.metric_key) =
+  let hib = Fold_gate.higher_is_better metric in
+  let pairs =
+    _fold_names_in_order folds
+    |> List.filter_map ~f:(fun fold_name ->
+        let b =
+          _find_fold_actual folds ~fold_name ~variant_label:baseline_label
+        in
+        let v = _find_fold_actual folds ~fold_name ~variant_label in
+        match (b, v) with Some b, Some v -> Some (b, v) | _ -> None)
+  in
+  List.count pairs ~f:(fun (b, v) ->
+      let bs = _project_metric_key metric b in
+      let vs = _project_metric_key metric v in
+      if hib then Float.(vs > bs) else Float.(vs < bs))
 
 (* -------------- top-level compute -------------- *)
 
@@ -161,9 +185,22 @@ let _pair_results_per_variant ~baseline_label ~gate ~labels fold_actuals =
   |> List.filter ~f:(_is_non_baseline ~baseline_label)
   |> List.map ~f:(_pair_one fold_actuals ~baseline_label ~gate)
 
-let _sensitivity_from_pairs ~gate pair_results : variant_sensitivity list =
-  List.map pair_results ~f:(fun (variant_label, frs) ->
-      { variant_label; wins_on_gate_metric = _wins_for_variant ~gate frs })
+let _sensitivity_per_variant fold_actuals ~baseline_label ~labels :
+    variant_sensitivity list =
+  let wins variant_label metric =
+    _wins_on_metric_for_variant fold_actuals ~baseline_label ~variant_label
+      ~metric
+  in
+  labels
+  |> List.filter ~f:(_is_non_baseline ~baseline_label)
+  |> List.map ~f:(fun variant_label ->
+      {
+        variant_label;
+        sharpe_wins = wins variant_label Sharpe;
+        calmar_wins = wins variant_label Calmar;
+        total_return_wins = wins variant_label TotalReturnPct;
+        max_drawdown_wins = wins variant_label MaxDrawdownPct;
+      })
 
 let _verdicts_from_pairs ~gate pair_results =
   List.map pair_results ~f:(fun (variant_label, frs) ->
@@ -181,7 +218,7 @@ let compute ~baseline_label ~(gate : Fold_gate.t)
     baseline_label;
     metric_label = _metric_str gate;
     stability = List.map labels ~f:(_stability_for_variant fold_actuals);
-    sensitivity = _sensitivity_from_pairs ~gate pair_results;
+    sensitivity = _sensitivity_per_variant fold_actuals ~baseline_label ~labels;
     verdicts = _verdicts_from_pairs ~gate pair_results;
   }
 

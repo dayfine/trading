@@ -7,6 +7,7 @@ type fold_actual = {
   sharpe_ratio : float;
   max_drawdown_pct : float;
   calmar_ratio : float;
+  cagr_pct : float;
 }
 [@@deriving sexp]
 
@@ -24,10 +25,17 @@ type variant_stability = {
   sharpe_ratio : per_metric_stats;
   max_drawdown_pct : per_metric_stats;
   calmar_ratio : per_metric_stats;
+  cagr_pct : per_metric_stats;
 }
 [@@deriving sexp]
 
-type variant_sensitivity = { variant_label : string; wins_on_gate_metric : int }
+type variant_sensitivity = {
+  variant_label : string;
+  sharpe_wins : int;
+  calmar_wins : int;
+  total_return_wins : int;
+  max_drawdown_wins : int;
+}
 [@@deriving sexp]
 
 type aggregate = {

@@ -56,3 +56,21 @@ val build_all :
     [variants × WindowSpec.generate spec]. Ordering: outer = variants in input
     order, inner = folds in generation order. Empty variant list → empty result.
 *)
+
+val cagr_pct : test_days:int -> total_return_pct:float -> float
+(** [cagr_pct ~test_days ~total_return_pct] annualises a per-fold total return
+    over a calendar window of length [test_days] (inclusive).
+
+    Formula: [((1 + total_return_pct/100) ^ (1/years) - 1) * 100] where
+    [years = test_days /. 365.25].
+
+    Properties:
+    - When [test_days = 365], the result equals [total_return_pct] within
+      sub-percentage-point tolerance — full year is the identity case modulo the
+      365.25 leap-year averaging.
+    - For [test_days < 365] (sub-year window), CAGR > total return when total
+      return is positive (annualising up); < total return when negative.
+    - Returns [Float.nan] when [test_days <= 0].
+
+    Calendar-based, not trading-day based — close enough for a stability metric.
+*)

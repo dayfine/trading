@@ -28,3 +28,11 @@ let build_all ~(base : Scenario.t) ~(spec : Window_spec.t)
   let folds = Window_spec.generate spec in
   List.concat_map variants ~f:(fun variant ->
       List.map folds ~f:(fun fold -> build_fold_scenario ~base ~fold ~variant))
+
+let _days_per_year = 365.25
+
+let cagr_pct ~test_days ~total_return_pct =
+  let years = Float.of_int test_days /. _days_per_year in
+  if Float.(years <= 0.0) then Float.nan
+  else
+    (((1.0 +. (total_return_pct /. 100.0)) ** (1.0 /. years)) -. 1.0) *. 100.0

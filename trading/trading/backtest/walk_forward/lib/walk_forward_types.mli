@@ -11,6 +11,15 @@ type fold_actual = {
   sharpe_ratio : float;
   max_drawdown_pct : float;
   calmar_ratio : float;
+  cagr_pct : float;
+      (** Annualised return for the fold's test period, derived from
+          [total_return_pct] and the test_period length:
+          [((1 + total_return_pct/100) ^ (1/years) - 1) * 100] where
+          [years = test_days / 365.25]. Equal to [total_return_pct] (within
+          tolerance) when [test_days = 365]; populated by the binary that has
+          access to the fold's calendar length. Producers that don't compute
+          CAGR (older fold_actuals fixtures, manual constructions) may set this
+          to [Float.nan]; the renderer prints "n/a" in that case. *)
 }
 [@@deriving sexp]
 (** One per-(fold, variant) measurement row. *)
@@ -30,13 +39,26 @@ type variant_stability = {
   sharpe_ratio : per_metric_stats;
   max_drawdown_pct : per_metric_stats;
   calmar_ratio : per_metric_stats;
+  cagr_pct : per_metric_stats;
+      (** Cross-fold summary of derived annualised return. Stats are NaN when
+          input [fold_actual.cagr_pct] values are NaN. *)
 }
 [@@deriving sexp]
-(** All four metric summaries for one variant. *)
+(** Five metric summaries for one variant. *)
 
-type variant_sensitivity = { variant_label : string; wins_on_gate_metric : int }
+type variant_sensitivity = {
+  variant_label : string;
+  sharpe_wins : int;
+  calmar_wins : int;
+  total_return_wins : int;
+  max_drawdown_wins : int;
+      (** "Wins" = lower MaxDrawdown% than baseline (lower is better). *)
+}
 [@@deriving sexp]
-(** Per-variant win-count on the gate's metric. Excludes the baseline itself. *)
+(** Per-variant win-counts on each of the four metrics. Excludes the baseline
+    itself. The gate's metric is the column the verdict gates on; the other
+    three columns are surfaced so the operator can see Sharpe-vs-MaxDD
+    trade-offs at a glance. *)
 
 type aggregate = {
   fold_count : int;
