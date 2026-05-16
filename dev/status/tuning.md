@@ -110,8 +110,33 @@ Plan splits into 5 stacked PRs (~200-400 LOC each):
   regular Fail, lookup errors (3 paths), zero-fold guard, boundary
   cases, parameters-not-affecting-score contract, and constant
   pinning. No wiring into the BO evaluator/runner yet — that's PR-C.
-- **PR-B: knob inventory + parameter space encoding** — pending.
-- **PR-C: walk-forward in-process integration** — pending.
+- **PR-B: knob inventory + parameter space encoding** — MERGED PR #1132 (2026-05-16).
+- **PR-C: walk-forward in-process integration** — IN REVIEW PR #1136
+  (branch `feat/bayesian-phase3-prc`). Hoists per-fold execution out
+  of `bin/walk_forward_runner.ml` into a shared
+  `Walk_forward.Walk_forward_executor.execute_spec` library entry
+  point (returns `{ fold_actuals; aggregate }`). Adds
+  `Bayesian_runner_evaluator.build_walk_forward` alongside the legacy
+  `build`: per BO iteration, builds a two-variant walk-forward spec
+  `[ baseline; bo-iter-N (cell-to-overrides) ]`, calls an injectable
+  executor (`default_executor` = real executor; tests pass a stub),
+  scores the resulting aggregate via PR-A's
+  `Bayesian_runner_scoring.score_cell`, propagates `Status.Error` as
+  `Failure`. Projects candidate stability stats into a single
+  `Metric_types.metric_set` for `bo_log.csv`. Binary's three output
+  files (`fold_actuals.sexp`, `walk_forward_report.md`,
+  `aggregate.sexp`) are byte-identical to the prior implementation.
+  Legacy `build` kept until PR-E flips the binary. 14 new unit tests
+  pin: score matches `Scoring.score_cell` output on stub aggregate;
+  candidate label increments per call (closure counter); two-variant
+  spec carries `[baseline; bo-iter-N]` in order; executor invoked
+  exactly once per call; metric_set list is single-element with
+  Sharpe/MaxDD/Calmar/TotalReturn/CAGR populated; scorer
+  `Status.Error` → `Failure`; gate `Fail` penalty applied
+  (Sharpe – 10.0 verified); `fixtures_root`, `base`, gate,
+  baseline_label, parameters threaded correctly; `default_executor`
+  is exposed in the mli. Verify: `dev/lib/run-in-env.sh dune runtest
+  trading/backtest/tuner/ trading/backtest/walk_forward/ --force`.
 - **PR-D: int/Option encoding + GP length-scale tuning + early-stop** — pending.
 - **PR-E: end-to-end runner + OOS holdout validator** — pending.
 

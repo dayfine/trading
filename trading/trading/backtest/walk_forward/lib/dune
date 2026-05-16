@@ -1,5 +1,5 @@
 (library
  (name walk_forward)
- (libraries core scenario_lib)
+ (libraries core scenario_lib backtest trading.simulation.types)
  (preprocess
   (pps ppx_sexp_conv)))
