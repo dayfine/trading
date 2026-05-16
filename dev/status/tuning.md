@@ -1,6 +1,6 @@
 # Status: tuning
 
-## Last updated: 2026-05-15
+## Last updated: 2026-05-16
 
 ## Status
 IN_PROGRESS
@@ -91,6 +91,38 @@ Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 - **Bayesian Phase 3 PR-A** (scoring function, PR #1126, branch `feat/bayesian-phase3-pr-a`) — structural_qc: APPROVED; behavioral_qc: APPROVED (2026-05-16, quality 5). CP1–CP4 all PASS; domain rows NA (pure tuner-side scoring policy). See `dev/reviews/tuning.md` §"Behavioral Checklist — Bayesian Phase 3 PR-A".
 - T-A lib + CLI, T-B lib + CLI, and `min_score_override` / `max_score_override` knobs all MERGED. First 81-cell flagship sweep run published (PR #1051) but invalidated by key-path bug (PR #1061). Next queued: 81-cell rerun with corrected `w_positive_rs/w_strong_volume/w_stage2_breakout/w_sector_strong` field paths + sweep-path validation linter to prevent silent-no-op repeats.
 
+### Bayesian Phase 3 — multi-parameter scaling (5-PR stack, plan PR #1124 MERGED)
+
+Plan authority: `dev/plans/bayesian-multi-param-scaling-2026-05-16.md`.
+Plan splits into 5 stacked PRs (~200-400 LOC each):
+
+- **PR-A: scoring function + walk-forward aggregate consumer** —
+  IN REVIEW (branch `feat/bayesian-phase3-pr-a`). Adds
+  `Tuner_bin.Bayesian_runner_scoring` (pure scorer over a
+  `Walk_forward_types.aggregate` + Cell E baseline aggregate) with
+  loss = `-mean_sharpe + lambda_dd*max(0, maxdd_excess) + lambda_gate*gate_penalty`;
+  hyperparameters as named constants (`_lambda_dd=0.10`,
+  `_gate_penalty_value=10.0`, `_lambda_gate=1.0`,
+  `_degenerate_fold_floor_return_pct=-50.0`). Returns
+  `float Status.status_or` so missing-variant lookups surface as
+  structured errors. 15 unit tests cover identity case, MaxDD hinge
+  zero/linear, gate Pass/Fail diff = -10.0 exactly, synthetic Fail ≡
+  regular Fail, lookup errors (3 paths), zero-fold guard, boundary
+  cases, parameters-not-affecting-score contract, and constant
+  pinning. No wiring into the BO evaluator/runner yet — that's PR-C.
+- **PR-B: knob inventory + parameter space encoding** — pending.
+- **PR-C: walk-forward in-process integration** — pending.
+- **PR-D: int/Option encoding + GP length-scale tuning + early-stop** — pending.
+- **PR-E: end-to-end runner + OOS holdout validator** — pending.
+
+Operational follow-ups (unblock when capacity allows):
+
+- **81-cell flagship rerun with corrected field paths** — sweep
+  `screening.weights.{w_positive_rs, w_strong_volume, w_stage2_breakout, w_sector_strong}`
+  paired with `min_score_override` / `max_score_override` tightening.
+- **Sweep-path validation linter** in `runner.ml:_merge_records` —
+  fail on unrecognized keys to prevent silent-no-op overlays.
+
 ## Completed
 
 - [x] **PR #1047 — `grid_search.exe --parallel N` (cell-level parallelism)** (MERGED 2026-05-12). Reduces wall-time for large grids by running N cells concurrently. Used for the 81-cell flagship sweep.
@@ -109,11 +141,14 @@ Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 1. ~~Wire CLI binary at `trading/trading/backtest/tuner/bin/grid_search.ml`~~ — done (#893).
 2. ~~Wire CLI binary at `trading/trading/backtest/tuner/bin/bayesian_runner.ml`~~ — done (#914).
 3. ~~Run 81-cell flagship sweep~~ — first run published #1051; invalidated by PR #1061 (key-path bug in overlays).
-4. **Rerun the 81-cell flagship sweep with corrected field paths** — sweep `screening.weights.{w_positive_rs, w_strong_volume, w_stage2_breakout, w_sector_strong}` (the real `Screener.scoring_weights` field names; see PR #1068 `.mli` clarifications). Pair with `min_score_override` / `max_score_override` tightening to surface a cell-discriminating signal.
-5. **Sweep-path validation linter** in `runner.ml:_merge_records` — fail on unrecognized keys to prevent silent-no-op overlays (closes the hazard surfaced by PR #1051 → #1061).
-6. After corrected grid sweep results land, validate T-B converges to the same (or better) cell within ~30 evals using the same param surface — the convergence acceptance criterion in `m5-experiments-roadmap-2026-05-02.md` §M5.5 T-B.
-7. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
-8. Hyperparameter learning for T-B (Type-II MLE on length scales) — defer until 4-dim / 6-dim sweeps show that fixed length scales miss the optimum.
+4. **Bayesian Phase 3 PR-A** (scoring + aggregate consumer) — IN REVIEW
+   (`feat/bayesian-phase3-pr-a`). 15 unit tests passing. PR-B (knob
+   inventory) is the next deliverable in the 5-PR stack.
+5. **Rerun the 81-cell flagship sweep with corrected field paths** — sweep `screening.weights.{w_positive_rs, w_strong_volume, w_stage2_breakout, w_sector_strong}` (the real `Screener.scoring_weights` field names; see PR #1068 `.mli` clarifications). Pair with `min_score_override` / `max_score_override` tightening to surface a cell-discriminating signal.
+6. **Sweep-path validation linter** in `runner.ml:_merge_records` — fail on unrecognized keys to prevent silent-no-op overlays (closes the hazard surfaced by PR #1051 → #1061).
+7. After corrected grid sweep results land, validate T-B converges to the same (or better) cell within ~30 evals using the same param surface — the convergence acceptance criterion in `m5-experiments-roadmap-2026-05-02.md` §M5.5 T-B.
+8. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
+9. Hyperparameter learning for T-B (Type-II MLE on length scales) — defer until 4-dim / 6-dim sweeps show that fixed length scales miss the optimum.
 
 ## Out of scope
 

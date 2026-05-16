@@ -1,13 +1,18 @@
 (tests
- (names test_grid_search_bin test_bayesian_runner_bin)
+ (names
+  test_grid_search_bin
+  test_bayesian_runner_bin
+  test_bayesian_runner_scoring)
  (libraries
   ounit2
   core
   core_unix.filename_unix
   core_unix.sys_unix
   matchers
+  status
   tuner
   tuner_bin
+  walk_forward
   trading.simulation.types)
  (preprocess
   (pps ppx_sexp_conv))

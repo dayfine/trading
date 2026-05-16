@@ -6,17 +6,20 @@
   grid_search_runner
   bayesian_runner_spec
   bayesian_runner_evaluator
-  bayesian_runner_runner)
+  bayesian_runner_runner
+  bayesian_runner_scoring)
  (libraries
   core
   core_unix
   core_unix.filename_unix
+  status
   tuner
   backtest
   scenario_lib
-  trading.simulation.types)
+  trading.simulation.types
+  walk_forward)
  (preprocess
-  (pps ppx_sexp_conv)))
+  (pps ppx_sexp_conv ppx_let)))
 
 (executable
  (name grid_search)

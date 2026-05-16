@@ -1,4 +1,5 @@
 open Core
+open Async
 open OUnit2
 open Matchers
 module Lib = Fetch_iwv_history_lib
@@ -270,6 +271,99 @@ let test_write_csv_body_roundtrip _ =
     (elements_are
        [ equal_to ({ as_of = d; action = Lib.Skip_cached } : Lib.planned_step) ])
 
+(* ------------------------------------------------------------------------- *)
+(* retry_with_backoff                                                        *)
+(* ------------------------------------------------------------------------- *)
+
+(* The tests below inject a mock fetcher (so no real HTTP) AND a mock
+   sleep function (so the wall clock doesn't actually wait 5+30+120s).
+   The sleep recorder captures the requested intervals for assertion. *)
+
+let _dummy_uri = Uri.of_string "https://example.invalid/test"
+let _test_backoff = [ 5.0; 30.0; 120.0 ]
+
+(* Mock fetcher producing a scripted sequence of attempts. Each call
+   pops the next outcome from [responses]; [calls] counts invocations. *)
+let _scripted_fetch responses :
+    (Uri.t -> Lib.fetch_attempt Deferred.t) * int ref =
+  let calls = ref 0 in
+  let remaining = ref responses in
+  let fetch _uri =
+    Int.incr calls;
+    match !remaining with
+    | [] -> failwith "scripted fetch ran out of responses"
+    | r :: rest ->
+        remaining := rest;
+        Deferred.return r
+  in
+  (fetch, calls)
+
+(* Mock sleep that records (does not actually sleep) — keeps tests fast. *)
+let _recording_sleep () : (float -> unit Deferred.t) * float list ref =
+  let intervals = ref [] in
+  let sleep secs =
+    intervals := !intervals @ [ secs ];
+    Deferred.return ()
+  in
+  (sleep, intervals)
+
+let _run_retry ~fetch ~sleep =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Lib.retry_with_backoff ~fetch ~sleep ~backoff_seconds:_test_backoff
+        _dummy_uri)
+
+(* First attempt returns Ok → no sleep, no further attempts. *)
+let test_retry_returns_ok_on_first_attempt _ =
+  let fetch, calls = _scripted_fetch [ Lib.Ok_body "payload-body" ] in
+  let sleep, intervals = _recording_sleep () in
+  let result = _run_retry ~fetch ~sleep in
+  assert_that result (is_ok_and_holds (equal_to "payload-body"));
+  assert_that !calls (equal_to 1);
+  assert_that !intervals is_empty
+
+(* One transient 503 then Ok → second attempt succeeds, exactly one
+   sleep at the first backoff interval (5s). *)
+let test_retry_recovers_after_one_503 _ =
+  let fetch, calls =
+    _scripted_fetch
+      [ Lib.Retryable_error "HTTP 503 first try"; Lib.Ok_body "after-retry" ]
+  in
+  let sleep, intervals = _recording_sleep () in
+  let result = _run_retry ~fetch ~sleep in
+  assert_that result (is_ok_and_holds (equal_to "after-retry"));
+  assert_that !calls (equal_to 2);
+  assert_that !intervals (elements_are [ float_equal 5.0 ])
+
+(* Every attempt returns 503 → 4 attempts total (1 + 3 retries), three
+   sleeps at 5/30/120, and the final result is the last 503 error. *)
+let test_retry_gives_up_after_max_attempts _ =
+  let fetch, calls =
+    _scripted_fetch
+      [
+        Lib.Retryable_error "HTTP 503 attempt 1";
+        Lib.Retryable_error "HTTP 503 attempt 2";
+        Lib.Retryable_error "HTTP 503 attempt 3";
+        Lib.Retryable_error "HTTP 503 attempt 4";
+      ]
+  in
+  let sleep, intervals = _recording_sleep () in
+  let result = _run_retry ~fetch ~sleep in
+  assert_that result (is_error_with Status.Internal);
+  assert_that !calls (equal_to 4);
+  assert_that !intervals
+    (elements_are [ float_equal 5.0; float_equal 30.0; float_equal 120.0 ])
+
+(* Fatal (non-retryable) status short-circuits — only one attempt, no
+   sleep. Guards against a future regression where the classifier might
+   accidentally mark a 4xx as retryable. *)
+let test_retry_does_not_retry_fatal_error _ =
+  let fetch, calls = _scripted_fetch [ Lib.Fatal_error "HTTP 404 not found" ] in
+  let sleep, intervals = _recording_sleep () in
+  let result = _run_retry ~fetch ~sleep in
+  assert_that result (is_error_with Status.Internal);
+  assert_that !calls (equal_to 1);
+  assert_that !intervals is_empty
+
 let suite =
   "fetch_iwv_history_lib_test"
   >::: [
@@ -303,6 +397,13 @@ let suite =
          >:: test_ensure_cache_dir_creates_recursively;
          "sentinel_marker_roundtrip" >:: test_sentinel_marker_roundtrip;
          "write_csv_body_roundtrip" >:: test_write_csv_body_roundtrip;
+         "retry_returns_ok_on_first_attempt"
+         >:: test_retry_returns_ok_on_first_attempt;
+         "retry_recovers_after_one_503" >:: test_retry_recovers_after_one_503;
+         "retry_gives_up_after_max_attempts"
+         >:: test_retry_gives_up_after_max_attempts;
+         "retry_does_not_retry_fatal_error"
+         >:: test_retry_does_not_retry_fatal_error;
        ]
 
 let () = run_test_tt_main suite
