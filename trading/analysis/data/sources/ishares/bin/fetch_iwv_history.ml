@@ -6,11 +6,14 @@
     polite sleep (default 2,000 ms).
 
     See [dev/plans/iwv-scraper-2026-05-16.md] §PR-C and
-    [fetch_iwv_history_lib.mli] for the planning / cache-layout contract. *)
+    [fetch_iwv_history_lib.mli] for the planning / cache-layout contract. See
+    [dev/notes/iwv-scrape-akamai-block-2026-05-16.md] §Option (c) for why this
+    exe shells out to system curl rather than [Cohttp_async]. *)
 
 open Core
 open Async
 module Lib = Fetch_iwv_history_lib
+module Curl_fetch = Iwv_curl_fetch
 module Client = Ishares.Ishares_holdings_client
 
 let _default_cache_dir = "../dev/data/ishares/iwv"
@@ -20,51 +23,14 @@ let _default_polite_sleep_ms = 2000
    ishares.com); the executable wires [_default_fetch] in unconditionally. *)
 type fetch_fn = Uri.t -> string Status.status_or Deferred.t
 
-(* Browser-like request headers. iShares' Akamai WAF rejects bare
-   [Cohttp_async] UA strings with HTTP 503 ("AkamaiGHost"); the headers
-   below mirror a recent Chrome on macOS and a plausible Referer back to
-   the IWV product page. See [dev/notes/iwv-scrape-akamai-block-2026-05-16.md]. *)
-let _browser_headers =
-  Cohttp.Header.of_list
-    [
-      ( "User-Agent",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
-         (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" );
-      ("Accept", "text/csv,application/csv,*/*;q=0.8");
-      ("Accept-Language", "en-US,en;q=0.9");
-      ( "Referer",
-        "https://www.ishares.com/us/products/239714/ishares-russell-3000-etf" );
-    ]
-
 (* Exponential backoff schedule for retryable HTTP errors (503 / 429 / 502
    / 504). Three retries spaced 5s / 30s / 120s — total wall-clock cap is
    ~155s on top of the original failed attempt, which absorbs typical
    Akamai/WAF cooldowns without inflating the steady-state scrape time. *)
 let _retry_backoff_seconds_5xx = [ 5.0; 30.0; 120.0 ]
 
-let _is_retryable_status = function
-  | `Service_unavailable | `Too_many_requests | `Bad_gateway | `Gateway_timeout
-    ->
-      true
-  | _ -> false
-
-(* Single HTTP attempt with browser headers. Returns a structured
-   [Lib.fetch_attempt] so the retry helper can decide whether to retry. *)
 let _attempt_fetch uri : Lib.fetch_attempt Deferred.t =
-  Cohttp_async.Client.get ~headers:_browser_headers uri >>= fun (resp, body) ->
-  let status = Cohttp.Response.status resp in
-  match status with
-  | `OK ->
-      Cohttp_async.Body.to_string body >>| fun body_str -> Lib.Ok_body body_str
-  | status ->
-      let status_str = Cohttp.Code.string_of_status status in
-      Cohttp_async.Body.to_string body >>| fun body_str ->
-      let msg =
-        Printf.sprintf "HTTP %s for %s\n%s" status_str (Uri.to_string uri)
-          body_str
-      in
-      if _is_retryable_status status then Lib.Retryable_error msg
-      else Lib.Fatal_error msg
+  Curl_fetch.attempt_fetch ~curl:Curl_fetch.real_curl_runner uri
 
 let _sleep_seconds secs = Clock.after (Time_float.Span.of_sec secs)
 
@@ -207,11 +173,15 @@ let command =
       "Per asOfDate D in [--from..--until] at the chosen cadence:\n\
       \  * If <cache>/D.csv exists and is non-empty, skip.\n\
       \  * If <cache>/D.sentinel exists, skip.\n\
-      \  * Otherwise GET the iShares URL, parse the body. On sentinel\n\
-      \    response write D.sentinel; on data response write D.csv.\n\
+      \  * Otherwise GET the iShares URL via system curl, parse the body.\n\
+      \    On sentinel response write D.sentinel; on data response write\n\
+      \    D.csv.\n\
       \  * Sleep --sleep-ms between fetches.\n\n\
        --dry-run prints the planned actions without HTTP. See\n\
-       dev/plans/iwv-scraper-2026-05-16.md §PR-C.")
+       dev/plans/iwv-scraper-2026-05-16.md §PR-C and\n\
+       dev/notes/iwv-scrape-akamai-block-2026-05-16.md §Option (c) for\n\
+       why this exe shells out to system curl rather than using\n\
+       Cohttp_async (Akamai WAF fingerprints HTTP/1.1 + OCaml TLS).")
     (let%map_open.Command from_str =
        flag "from" (required string) ~doc:"YYYY-MM-DD inclusive start date"
      and until_str =

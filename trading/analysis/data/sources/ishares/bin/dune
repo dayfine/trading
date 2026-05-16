@@ -6,6 +6,20 @@
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
 
 (library
+ (name iwv_curl_fetch)
+ (modules iwv_curl_fetch)
+ (libraries
+  core
+  core_unix.filename_unix
+  core_unix.sys_unix
+  async
+  async_unix
+  fetch_iwv_history_lib
+  uri)
+ (preprocess
+  (pps ppx_let)))
+
+(library
  (name build_iwv_universe_lib)
  (modules build_iwv_universe_lib)
  (libraries core core_unix.sys_unix core_unix ishares status)
@@ -20,10 +34,8 @@
   core_unix.command_unix
   async
   async_unix
-  cohttp
-  cohttp-async
-  async_ssl
   fetch_iwv_history_lib
+  iwv_curl_fetch
   ishares
   status
   uri)
