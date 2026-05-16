@@ -1,0 +1,27 @@
+(library
+ (name shiller_curl_fetch)
+ (modules shiller_curl_fetch)
+ (libraries
+  core
+  core_unix.filename_unix
+  core_unix.sys_unix
+  async
+  async_unix
+  uri)
+ (preprocess
+  (pps ppx_let)))
+
+(executable
+ (name fetch_shiller_history)
+ (modules fetch_shiller_history)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  async_unix
+  shiller
+  shiller_curl_fetch
+  status
+  uri)
+ (preprocess
+  (pps ppx_jane)))

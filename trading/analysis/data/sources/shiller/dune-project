@@ -1,0 +1,10 @@
+(lang dune 3.17)
+
+(name shiller)
+
+(generate_opam_files true)
+
+(package
+ (name shiller)
+ (depends ocaml base core re uri ppx_deriving)
+ (tags ()))
