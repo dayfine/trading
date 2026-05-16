@@ -1,0 +1,119 @@
+# One-shot workflow_dispatch to scrape iShares IWV holdings CSV cache from
+# a GHA runner, bypassing local IP blocks (Akamai cooldowns, etc.).
+#
+# Runs fetch_iwv_history.exe inside the same trading-ci container used by CI,
+# then uploads the CSV cache and a log file as workflow artifacts.
+#
+# DO NOT auto-commit the cache — dev/data/ishares/iwv/ is gitignored.
+# After downloading the artifact, run build_iwv_universe.exe offline.
+#
+# See dev/notes/iwv-scrape-akamai-block-2026-05-16.md §"GHA-runner workflow"
+# for dispatch instructions and next steps.
+
+name: IWV Scrape (one-shot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_date:
+        description: "Inclusive start date (YYYY-MM-DD)"
+        required: false
+        default: "2006-09-29"
+      until_date:
+        description: "Inclusive end date (YYYY-MM-DD)"
+        required: false
+        default: "2026-05-16"
+      cadence:
+        description: "Date cadence: auto | daily | monthly | quarterly"
+        required: false
+        default: "auto"
+      sleep_ms:
+        description: "Polite sleep between HTTP fetches (milliseconds)"
+        required: false
+        default: "2000"
+
+concurrency:
+  # Never cancel a partial scrape — an interrupted run wastes the wall clock
+  # already spent and leaves an incomplete cache.
+  group: iwv-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      # Run as root so GHA post-step cleanup can write to /__w/_temp/.
+      # HOME points to /home/opam so opam env finds the installed 5.3 switch.
+      options: --user 0
+    env:
+      HOME: /home/opam
+    defaults:
+      run:
+        shell: bash
+        working-directory: trading
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build fetch_iwv_history.exe
+        run: |
+          eval $(opam env)
+          dune build analysis/data/sources/ishares/bin/fetch_iwv_history.exe
+
+      - name: Run IWV scraper
+        run: |
+          eval $(opam env)
+          # Cache dir relative to /workspaces/trading-1/ (repo root).
+          # GitHub Actions mounts the checkout at $GITHUB_WORKSPACE (/__w/…),
+          # so we use an absolute path derived from the workspace.
+          CACHE_DIR="${GITHUB_WORKSPACE}/dev/data/ishares/iwv"
+          LOG_FILE="${GITHUB_WORKSPACE}/iwv-fetch-${{ github.run_id }}.log"
+          mkdir -p "$CACHE_DIR"
+
+          echo "=== IWV scrape start: $(date -u) ===" | tee "$LOG_FILE"
+          echo "  from=${{ inputs.from_date }}" | tee -a "$LOG_FILE"
+          echo "  until=${{ inputs.until_date }}" | tee -a "$LOG_FILE"
+          echo "  cadence=${{ inputs.cadence }}" | tee -a "$LOG_FILE"
+          echo "  sleep_ms=${{ inputs.sleep_ms }}" | tee -a "$LOG_FILE"
+          echo "  cache_dir=$CACHE_DIR" | tee -a "$LOG_FILE"
+          echo "" | tee -a "$LOG_FILE"
+
+          dune exec analysis/data/sources/ishares/bin/fetch_iwv_history.exe -- \
+            -from "${{ inputs.from_date }}" \
+            -until "${{ inputs.until_date }}" \
+            -cadence "${{ inputs.cadence }}" \
+            -cache-dir "$CACHE_DIR" \
+            -sleep-ms "${{ inputs.sleep_ms }}" \
+            2>&1 | tee -a "$LOG_FILE"
+
+          echo "" | tee -a "$LOG_FILE"
+          echo "=== IWV scrape end: $(date -u) ===" | tee -a "$LOG_FILE"
+
+          CSV_COUNT=$(find "$CACHE_DIR" -name '*.csv' | wc -l)
+          SENTINEL_COUNT=$(find "$CACHE_DIR" -name '*.sentinel' | wc -l)
+          echo "Cache summary: $CSV_COUNT csv files, $SENTINEL_COUNT sentinel files" | tee -a "$LOG_FILE"
+
+      - name: Upload CSV cache artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwv-cache-${{ github.run_id }}
+          path: dev/data/ishares/iwv/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwv-log-${{ github.run_id }}
+          path: iwv-fetch-${{ github.run_id }}.log
+          retention-days: 30
+          if-no-files-found: warn

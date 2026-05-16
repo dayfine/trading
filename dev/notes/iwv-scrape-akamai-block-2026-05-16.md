@@ -174,3 +174,50 @@ flagged. The exe is container-portable; needs a one-shot
   said "Next step is operational, not a feature PR" — that wasn't
   true; PR #1131 (browser headers + retry) was needed first, and is
   now merged. Update the priorities doc next-step text accordingly.
+
+## GHA-runner workflow
+
+**Rationale:** GHA runner has a different egress IP than the local dev
+machine. Even if local IP is in Akamai cooldown, a GHA run will come
+from a GitHub-owned IP range (not previously flagged by iShares WAF).
+
+**Workflow file:** `.github/workflows/iwv-scrape-once.yml`
+
+This `workflow_dispatch` workflow:
+1. Pulls `ghcr.io/dayfine/trading-ci:latest` (same image as CI).
+2. Builds `fetch_iwv_history.exe` inside the container via dune.
+3. Runs the fetcher with the input parameters, writing to
+   `$GITHUB_WORKSPACE/dev/data/ishares/iwv/`.
+4. Uploads `dev/data/ishares/iwv/` as artifact `iwv-cache-<run_id>`
+   (30-day retention).
+5. Uploads `iwv-fetch-<run_id>.log` as artifact `iwv-log-<run_id>`.
+6. Does NOT commit the cache (gitignored; download artifact manually).
+
+**Dispatch command** (paste after PR merges):
+```bash
+gh workflow run iwv-scrape-once.yml \
+  -f from_date=2006-09-29 \
+  -f until_date=2026-05-16 \
+  -f cadence=auto \
+  -f sleep_ms=2000
+```
+
+**After the run completes (~3h):**
+1. Download the artifact:
+   ```bash
+   gh run download <run_id> --name iwv-cache-<run_id> --dir dev/data/ishares/iwv/
+   ```
+2. Run `build_iwv_universe.exe` offline against the cache:
+   ```bash
+   docker exec -w /workspaces/trading-1/trading trading-1-dev bash -c \
+     'eval $(opam env) && dune exec analysis/data/sources/ishares/bin/build_iwv_universe.exe -- \
+        --cache-root ../dev/data/ishares/iwv \
+        --output ../dev/data/ishares/russell-3000-2006-2026.sexp'
+   ```
+3. Commit the resulting sexp as a follow-up PR (the CSV cache stays
+   gitignored; only the derived universe sexp is checked in).
+
+**Important constraint:** concurrency is set to `cancel-in-progress: false`
+— a second dispatch will queue rather than cancel a partial scrape.
+The job timeout is 360 min (6h), well above the ~3h expected wall clock
+at `-sleep-ms 2000` for ~3700 dates.

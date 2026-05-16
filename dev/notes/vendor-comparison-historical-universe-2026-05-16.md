@@ -294,6 +294,25 @@ Norgate (formerly Phase 1.1 / pre-pivot Phase 1.2) is RETIRED.
   `dev/notes/phase1.1-eodhd-verification-2026-05-16.md`). The
   algorithm is vendor-agnostic; only the snapshot source changes.
 
+## Adjacent vendor pointers (broader landscape)
+
+This doc's scope is **point-in-time SP500 / Russell 3000 membership**. For
+broader data-vendor questions — deep-history (Shiller, French), free
+cross-check (Stooq, Tiingo), commodities (World Bank, datahub.io) — see
+`dev/notes/deep-history-data-pointers-2026-05-16.md` and
+`memory/reference_deep_history_data_sources.md`. Highlights:
+
+- **Shillerdata.com** — free S&P monthly from **1871** (`ie_data.xls`).
+  Next-pursue for long-horizon index anchor + EODHD adjusted-close
+  cross-validation.
+- **Kenneth French Data Library** — free portfolio + factor returns from
+  **1926-07**. Synthesis target for pre-2006 backtests when real per-stock
+  data isn't available.
+- **Stooq** — free bulk EOD global. Pairs with manifest Phase 1 for
+  EODHD-vs-Stooq drift detection.
+- **CRSP-via-WRDS** is institutional-only and out of scope; Morningstar
+  acquired CRSP Feb 2026 (access terms in flux).
+
 ## Sources
 
 - EODHD pricing page (read 2026-05-16) — Fundamentals tier gating.

@@ -44,6 +44,16 @@ READY_FOR_REVIEW
 
 ## Notes
 
+**2026-05-16 vendor-landscape pointers added.** Beyond the Phase 1.4 IWV
+work (point-in-time Russell membership), see
+`dev/notes/deep-history-data-pointers-2026-05-16.md` for the broader
+vendor catalog covering deep-history (Shiller 1871, Kenneth French 1926),
+free cross-check (Stooq, Tiingo), and commodities (World Bank Pink Sheet,
+datahub.io). **Next-pursue candidate: shillerdata.com ingest** — free,
+~200 LOC, unlocks long-horizon S&P index anchor + EODHD adjusted-close
+cross-validation. Companion memory:
+`memory/reference_deep_history_data_sources.md`.
+
 **2026-05-15 strategic pivot — track elevated to P0.** Per
 `dev/notes/next-session-priorities-2026-05-15.md`, broader-universe +
 longer-horizon survivorship-correct data is now the load-bearing
@@ -133,6 +143,14 @@ NO
   Python — it's straight OCaml `cohttp` work against a verified
   public endpoint (PR #1108). Next step is a plan-first dispatch to
   `feat-data` against `analysis/data/sources/ishares/`.
+- **Local IP Akamai cooldown (2026-05-16 transient):** If local
+  egress IP is still blocked, use the GHA-runner workflow as an
+  IP-independent alternative: `.github/workflows/iwv-scrape-once.yml`.
+  GHA runner uses a different egress IP from GitHub's range (not
+  previously flagged by iShares WAF). Dispatch:
+  `gh workflow run iwv-scrape-once.yml -f from_date=2006-09-29 -f until_date=2026-05-16`.
+  Full instructions in
+  `dev/notes/iwv-scrape-akamai-block-2026-05-16.md` §"GHA-runner workflow".
 - Phase 1.1 (EODHD Fundamentals) is parked — would need a tier
   upgrade ($60/mo) to revive; not pursued per Option B.
 - Norgate ingest retired 2026-05-16 (Windows-only client; see
