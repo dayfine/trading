@@ -69,15 +69,60 @@ on this egress IP.
 
 ## Cooldown probe timeline (2026-05-16)
 
-| Probe | Local time | Wall time post-first-contact | Result |
+| Probe | Local time | curl result | OCaml fetcher result |
 |---|---|---|---|
-| 0 | ~10:34Z | 0 (first contact) | 503 — initial run that flagged the IP |
-| 1 | ~11:50Z | ~75 min | 503 |
-| 2 | ~12:33Z | ~120 min | 503 |
-| 3 | ~13:41Z (scheduled wakeup) | ~190 min | TBD |
-| 4 | (conditional, ~17:30Z) | ~420 min | TBD |
+| 0 | ~10:34Z | 503 | n/a (initial run that flagged the IP) |
+| 1 | ~11:50Z | 503 | not attempted |
+| 2 | ~12:33Z | 503 | not attempted |
+| 3 | ~21:43Z | **200 + text/csv** | **HTML body → parse error** |
 
-Akamai blocks last 1–24h per their public docs.
+Akamai cooldown elapsed ~3.5h post-first-contact (within their 1-24h
+public-doc window). At probe 3 the WAF stopped IP-blocking outright,
+but the response content differs by HTTP client — see §"2026-05-16
+~21:43Z update" below.
+
+## 2026-05-16 ~21:43Z update — Akamai unblocked, but Cohttp_async still gets HTML
+
+Direct curl (host + docker) returns HTTP/2 200 + `text/csv;charset=UTF-8`.
+**But the OCaml fetcher in `fetch_iwv_history.exe` (with the PR #1131
+browser headers) gets HTML in the body, status 200:**
+
+```
+ERROR 2024-03-01 — parse error: { Status.code = Status.Invalid_argument;
+  message =
+  "Cannot read 'Fund Holdings as of' cell from line: \"<html xmlns=\\\"http://www.w3.org/1999/xhtml\\\" prefix=\\\"og: http://ogp.me/ns#\\\" lang=\\\"en-US\\\" xml:lang=\\\"en-US\\\">\""
+  }
+```
+
+Status WAS 200 (otherwise PR #1131's retry classifier would have caught
+it as `Retryable_error` or `Fatal_error`), but body is the Akamai
+bot-check interstitial HTML, not CSV.
+
+### Root-cause hypothesis (untested)
+
+Akamai's WAF likely fingerprints clients via one or more of:
+1. **HTTP version.** curl uses HTTP/2; `Cohttp_async` is HTTP/1.1. Many
+   CDNs serve automation-friendly content over HTTP/2 and bot-check HTML
+   over HTTP/1.1 when UA claims to be a modern Chrome.
+2. **TLS JA3 fingerprint.** curl on macOS emits one JA3; OCaml's
+   `cohttp-async-tls` emits a different, distinctively non-browser JA3.
+3. **Missing browser-only headers.** Real Chrome sends `Sec-Fetch-Site`,
+   `Sec-Fetch-Dest`, `Sec-Fetch-Mode`, `sec-ch-ua`, `sec-ch-ua-mobile`,
+   `sec-ch-ua-platform`. PR #1131 only added UA / Accept / Referer.
+
+Most likely culprit is #1 (UA-version vs HTTP-version mismatch).
+
+### What needs to happen next
+
+| Option | Effort | P(fix) |
+|---|---|---|
+| (a) Add full Chrome `Sec-Fetch-*` + `sec-ch-ua-*` headers. ~10 LOC. | XS | low-medium |
+| (b) Switch HTTP client to HTTP/2-capable lib (e.g. `piaf`, `h2`). Multi-file refactor. | M | medium-high |
+| (c) Shell out to `curl` via `Core_unix.create_process`. ~30 LOC. | S | high |
+
+**Recommendation:** try (a) first as a cheap probe in one PR. If still
+HTML, jump to (c) — `curl` is a known-good. Don't invest in (b) until
+(a)/(c) prove insufficient.
 
 ## What needs to happen next
 
