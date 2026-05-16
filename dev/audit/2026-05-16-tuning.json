@@ -1,7 +1,7 @@
 {
   "date": "2026-05-16",
   "feature": "tuning",
-  "branch": "feat/bayesian-phase3-pr-a",
+  "branch": "feat/bayesian-phase3-pr-b",
   "structural_qc": "APPROVED",
   "behavioral_qc": "APPROVED",
   "overall_qc": "APPROVED",
