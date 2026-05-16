@@ -428,6 +428,46 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
     `analysis/`. Bulk-fetch across the full 41k EODHD cache and
     auto-driven detection over many symbols are deferred (Phase 2+).
 
+### READY_FOR_REVIEW (CSV-manifest Phase 3 — bulk-rehash CLI — 2026-05-17)
+
+- **`manifest_rehash` CLI** (branch `feat/manifest-bulk-rehash`,
+  `trading/analysis/data/storage/manifest/bin/`). Closes the deployment
+  gap left by Phase 2 (#1148): `Csv_storage.save` now writes manifest
+  entries on every new save, but the ~41,575 symbols already in the
+  cache predate that integration and so have no entries. This CLI walks
+  the L1/L2-sharded data dir and bulk-populates missing manifest
+  entries via `Csv.Csv_storage_manifest.update_for_save`.
+  - `bin/manifest_rehash_lib.{ml,mli}` (library, ~130 + 50 LOC) holds
+    the walker + per-CSV rehash logic. Split out from the executable
+    so the end-to-end flow is unit-testable without spawning the exe.
+  - `bin/manifest_rehash.{ml}` (executable, ~80 LOC) is the thin
+    entry point — parses CLI flags (`-data-dir`, `-source`,
+    `-endpoint-fmt`, `-dry-run`, `-only-missing`/`-all`) and calls
+    `Manifest_rehash_lib.run`.
+  - `test/test_manifest_rehash.ml` (~130 LOC, 3 OUnit2 cases): dry-run
+    counts but writes nothing; rehash writes manifest entries with
+    correct source/endpoint provenance; second-run-with-`-only-missing`
+    skips already-rehashed symbols.
+  - Probe (dry-run, 2026-05-17): `dune exec
+    analysis/data/storage/manifest/bin/manifest_rehash.exe -- -data-dir
+    /workspaces/trading-1/data -dry-run -only-missing` →
+    `walked=41577 / present=0 / rehashed=41577 / failures=0`. Matches
+    the expected baseline pre-deployment (Phase 2 wire-in does not
+    backfill existing files).
+  - Defaults: `-source EODHD`, `-endpoint-fmt /eod/%s` (printf-style;
+    `%s` substituted with symbol). `-only-missing` is the default
+    (idempotent re-runs).
+  - Out-of-scope: actually running the rehash against the real cache —
+    that's an ops invocation post-merge.
+  - Linters green: `dune build @fmt`, `no_python_check`,
+    `fn_length_linter` (longest new function ≤ 17 LOC),
+    `linter_magic_numbers`. `dune runtest analysis/data/storage` clean
+    (3 new rehash tests + 14 manifest + 25 csv + 12 metadata + 5
+    interface = 59 total).
+  - Sizing: ~263 LOC source (`.ml` + `.mli`) + ~130 LOC tests + dune
+    edits. Plan:
+    `dev/plans/data-inventory-and-reproducibility-2026-05-02.md` §Phase 3.
+
 ### READY_FOR_REVIEW (CSV-manifest Phase 2 — hash-verify on load — 2026-05-17)
 
 - **`csv_storage` manifest integration** (branch `feat/csv-manifest-phase2`,

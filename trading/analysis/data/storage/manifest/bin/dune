@@ -1,5 +1,16 @@
-(executable
- (name manifest_inspect)
- (public_name manifest_inspect)
+(library
+ (name manifest_rehash_lib)
+ (modules manifest_rehash_lib)
+ (libraries core csv fpath status storage.manifest))
+
+(executables
+ (names manifest_inspect manifest_rehash)
+ (public_names manifest_inspect manifest_rehash)
  (package storage)
- (libraries core core_unix.sys_unix status storage.manifest))
+ (modules manifest_inspect manifest_rehash)
+ (libraries
+  core
+  core_unix.sys_unix
+  status
+  storage.manifest
+  manifest_rehash_lib))
