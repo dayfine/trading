@@ -11,6 +11,10 @@ as the next-after-M5.5 priority in
 
 ## Interface stable
 
+YES
+
+### Surface
+
 `Backtest_cost_model.Cost_model` (`trading/trading/backtest/cost_model/lib/`):
 - `type t = { per_trade_commission; per_share_commission;
   bid_ask_spread_bps; market_impact_bps_per_pct_adv }` — four
