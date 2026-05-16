@@ -1,0 +1,6 @@
+(library
+ (name shiller)
+ (public_name shiller)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq))
+ (libraries base core re status uri))

@@ -1,0 +1,5 @@
+(tests
+ (names test_shiller_client)
+ (libraries shiller core ounit2 matchers status uri)
+ (deps
+  (glob_files ./data/*.csv)))

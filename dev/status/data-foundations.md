@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-16
+## Last updated: 2026-05-17
 
 ## Status
 READY_FOR_REVIEW
@@ -343,6 +343,52 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 - **#998** — split-day adjustment investigation (root-causes the 15y split-day regression surfaced during 15y SP500 baseline pinning).
 
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
+
+### READY_FOR_REVIEW (Shiller deep-history ingest — 2026-05-17)
+
+- **`shiller` data source** (branch `feat/shiller-ingest`,
+  `analysis/data/sources/shiller/`). Free monthly S&P composite series from
+  Robert Shiller's dataset (1871-01 → present), ingested via the
+  `datasets/s-and-p-500` GitHub mirror (auto-tracks Shiller's `ie_data.xls`;
+  pure CSV — no spreadsheet parser needed). Companion authorities:
+  `dev/notes/deep-history-data-pointers-2026-05-16.md` §"Shiller dataset" +
+  `memory/reference_deep_history_data_sources.md`. Unlocks long-horizon
+  S&P anchor for backtests + cross-validation against EODHD's adjusted-close
+  construction.
+  - `lib/shiller_client.{ml,mli}` — pure CSV parser + URI constant. Output
+    type `monthly_observation = { period; sp_price; dividend; earnings;
+    cpi; long_rate }` where the four fundamental columns are `float option`
+    with sentinel `0.0` mapped to `None` (Shiller's typical 1-3 month
+    fundamental-release lag emits zeros for the head of the series). Header
+    pinned verbatim; drift surfaces as a structural `Status.error_invalid_argument`.
+  - `bin/shiller_curl_fetch.{ml,mli}` — curl-shellout HTTP fetcher mirroring
+    PR #1137's pattern: tempfile-staged body via `curl -o` + status via
+    `-w "%{http_code}"`, no `Cohttp_async` dependency.
+  - `bin/fetch_shiller_history.exe` — operator CLI; one flag (`-out PATH`)
+    plus the fetch+parse+write pipeline. Emits a 6-column canonical CSV
+    (`period,sp_price,dividend,earnings,cpi,long_rate`) with empty cells for
+    `None` options. Cache target convention `dev/data/shiller/shiller-monthly-YYYYMMDD.csv`
+    (gitignored under `dev/data/`).
+  - `test/test_shiller_client.ml` + `test/data/shiller_sample.csv` — pinned
+    8-row sample (3 head + 1 y2k + 1 covid + 3 sentinel-era tail). 15
+    OUnit2 tests covering: parse counts, era-specific population, sentinel
+    → None mapping, sub-1.0 long-rate boundary case (covid March 2020
+    rate=0.87 must survive as `Some`, not become `None`), header drift /
+    empty body / unparseable date / wrong column count / unparseable numeric
+    error paths, UTF-8 BOM tolerance, URI shape.
+  - Probe (live, 2026-05-17): `dune exec
+    analysis/data/sources/shiller/bin/fetch_shiller_history.exe -- -out
+    /tmp/shiller-test.csv` wrote 1865 observations from 1871-01-01 to
+    2026-05-01 (155y × 12 ≈ 1860 expected; matches). Output well-formed;
+    empty cells appear for the 2023-2026 fundamental-lag tail.
+  - Linters green: `dune build @fmt`, `no_python_check`, `fn_length_linter`
+    (longest function in lib = 27 LOC, all bin helpers ≤ 12 LOC). ~330
+    source LOC (`.ml` + `.mli` 75 lib + 56 + 12 curl + 75 + 8 cli + dune
+    boilerplate); 200 LOC tests. Fixture (8-row CSV) excluded per
+    PR-sizing rules.
+  - Not consumed yet — pure data-source infrastructure under `analysis/`.
+    Strategy-side wire-up + adjusted-close cross-validation against EODHD
+    are follow-ups (belong in `feat-backtest`).
 
 ### Merged (Phase 1.4 IWV scraper stack — 2026-05-16)
 
