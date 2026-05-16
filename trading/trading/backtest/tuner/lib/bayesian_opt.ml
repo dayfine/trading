@@ -44,53 +44,15 @@ type t = { config : config; observations : observation list (* newest first *) }
 
 (** {1 Validation} *)
 
-(** Raise [Invalid_argument] if bound [k] has [lo > hi]. *)
-let _validate_bound (k, (lo, hi)) =
-  if Float.( > ) lo hi then
-    invalid_arg
-      (sprintf "Bayesian_opt.create: bound for %s has min > max (%g > %g)" k lo
-         hi)
-
-let _validate_length_scales bounds = function
-  | None -> ()
-  | Some scales ->
-      let expected = List.length bounds in
-      if Array.length scales <> expected then
-        invalid_arg
-          (sprintf
-             "Bayesian_opt.create: length_scales dim %d disagrees with bounds \
-              dim %d"
-             (Array.length scales) expected);
-      Array.iter scales ~f:(fun s ->
-          if Float.( <= ) s 0.0 then
-            invalid_arg
-              (sprintf
-                 "Bayesian_opt.create: length_scales entries must be > 0 (got \
-                  %g)"
-                 s))
-
-let _validate_early_stop_config = function
-  | None -> ()
-  | Some { window; epsilon } ->
-      if window < 1 then
-        invalid_arg "Bayesian_opt.create: early_stop_config.window must be >= 1";
-      if Float.( < ) epsilon 0.0 then
-        invalid_arg
-          "Bayesian_opt.create: early_stop_config.epsilon must be >= 0"
-
-let _validate_config config =
-  if List.is_empty config.bounds then
-    invalid_arg "Bayesian_opt.create: bounds must be non-empty";
-  List.iter config.bounds ~f:_validate_bound;
-  if config.initial_random < 0 then
-    invalid_arg "Bayesian_opt.create: initial_random must be >= 0";
-  if config.total_budget < 0 then
-    invalid_arg "Bayesian_opt.create: total_budget must be >= 0";
-  _validate_length_scales config.bounds config.length_scales;
-  _validate_early_stop_config config.early_stop_config
+let _early_stop_pair_of_opt = function
+  | None -> None
+  | Some { window; epsilon } -> Some (window, epsilon)
 
 let create config =
-  _validate_config config;
+  Bayesian_opt_validate.config ~bounds:config.bounds
+    ~initial_random:config.initial_random ~total_budget:config.total_budget
+    ~length_scales:config.length_scales
+    ~early_stop:(_early_stop_pair_of_opt config.early_stop_config);
   { config; observations = [] }
 
 (** {1 Observation accessors} *)
@@ -327,21 +289,6 @@ let suggest_next_with_candidates t ~n_candidates =
 let suggest_next t =
   suggest_next_with_candidates t ~n_candidates:_default_n_candidates
 
-(** {1 Early-stop helper} *)
-
-(** Read [running_best] at offset [n - 1 - k] from the end (so [k = 0] is the
-    most recent value); returns [None] when out of range. *)
-let _running_best_at running_best ~k =
-  let n = List.length running_best in
-  if k < 0 || k >= n then None else List.nth running_best (n - 1 - k)
-
 let should_early_stop cfg ~initial_random ~running_best =
-  let n = List.length running_best in
-  if n <= initial_random + cfg.window then false
-  else
-    match
-      ( _running_best_at running_best ~k:0,
-        _running_best_at running_best ~k:cfg.window )
-    with
-    | Some recent, Some past -> Float.( < ) (recent -. past) cfg.epsilon
-    | _ -> false
+  Bayesian_opt_early_stop.should_stop ~window:cfg.window ~epsilon:cfg.epsilon
+    ~initial_random ~running_best
