@@ -165,6 +165,45 @@ flagged. The exe is container-portable; needs a one-shot
 
 `.github/workflows/iwv-scrape-once.yml` would be ~40 LOC.
 
+## 2026-05-17 GHA-runner scrape — ALSO BLOCKED
+
+Workflow `iwv-scrape-once.yml` (PR #1138) dispatched 2026-05-16 16:50Z
+after PR #1137 curl-shellout merged at 16:34Z, so the runner built
+`fetch_iwv_history.exe` with curl-shellout backend (#1137). Ran 3h38min
+(completed 20:28Z), exit 0 at the workflow level. **But cache summary
+in the uploaded log: `0 csv files, 0 sentinel files`.**
+
+Every fetch returned the Akamai HTML interstitial body:
+```
+ERROR YYYY-MM-DD — parse error: { Status.code = Status.Invalid_argument;
+  message = "Cannot read 'Fund Holdings as of' cell from line:
+  \"<html xmlns=\\\"http://www.w3.org/1999/xhtml\\\" ..."
+```
+
+Implications:
+- GHA runner egress IP is **also Akamai-flagged**, OR Akamai
+  fingerprints something deeper than IP + UA (TLS JA3 + HTTP version
+  + Sec-Fetch headers).
+- Curl-shellout in PR #1137 alone is **not sufficient** against this
+  WAF posture.
+- The "different egress IP" alternative path is **disproven**.
+
+### Next options (none cheap)
+
+1. **Full Chrome `Sec-Fetch-*` + `sec-ch-ua-*` headers** added to the
+   curl invocation. ~20 LOC delta to `iwv_curl_fetch.ml`. Cheapest
+   probe; was option (a) at the original diagnosis.
+2. **Paid scraper API** (ScrapingBee, ScraperAPI, Bright Data) —
+   rotating residential IPs + browser fingerprints specifically
+   against Akamai. ~$20-50 one-shot.
+3. **Different vendor entirely**: Sharadar ($99/mo) or EODHD
+   Fundamentals upgrade ($60/mo) — both rejected previously.
+4. **Headless browser** (chromium --headless via shell-out, or
+   Playwright). Heaviest engineering.
+
+**Recommended next-pursue:** try (1) first as a ~$0 probe. If still
+HTML, (2) is the one-shot pragmatic exit.
+
 ## Open items for next session
 
 - (a) Probe 3 + 4 results (will be appended by the scheduled wakeups).

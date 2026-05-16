@@ -1,0 +1,13 @@
+(tests
+ (names test_stooq_client test_stooq_drift_check_core)
+ (libraries
+  stooq
+  stooq_drift_check_core
+  core
+  ounit2
+  matchers
+  status
+  types
+  uri)
+ (deps
+  (glob_files ./data/*.csv)))

@@ -344,6 +344,90 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
 
+### READY_FOR_REVIEW (Stooq drift-check module — 2026-05-17)
+
+- **`stooq` data source** (branch `feat/stooq-drift-check`,
+  `analysis/data/sources/stooq/`). Independent integrity-audit module for
+  the 41,575-symbol EODHD cache. Pairs naturally with manifest/hash-verify
+  Phase 1 (PR #1142) — detects EODHD silent split-revisions (G14-class)
+  and adjusted-close drift via a free second source. Authority:
+  `dev/notes/deep-history-data-pointers-2026-05-16.md` §"Stooq cross-check
+  design".
+  - `lib/stooq_client.{ml,mli}` — pure CSV parser + URI builder. Output
+    type `daily_observation = { date; open_; high; low; close; volume }`.
+    Header pinned verbatim (`Date,Open,High,Low,Close,Volume`). Header
+    drift / empty body / unparseable date or numeric all surface as
+    `Status.error_invalid_argument`. URI builder lowercases symbol +
+    appends `.us` suffix; optional apikey query param.
+    `is_apikey_error_body` detects Stooq's plaintext apikey-required
+    sentinel (HTTP 200 + body starting `Get your apikey:`).
+  - `bin/stooq_curl_fetch.{ml,mli}` — curl-shellout HTTP fetcher mirroring
+    PR #1137's pattern: tempfile-staged body via `curl -o` + status via
+    `-w "%{http_code}"`, no `Cohttp_async` dependency.
+  - `bin/stooq_drift_check_core.{ml,mli}` — pure drift pipeline. Pairs
+    each EODHD bar with the Stooq observation for the same trading date,
+    computes signed `rel_diff = (eodhd_adj_close - stooq_close) /
+    stooq_close`, emits flagged-row list sorted by descending |rel_diff|
+    + summary stats (n_compared, n_flagged, mean / max |rel_diff|).
+    **Comparison fields:** Stooq `Close` (split-adjusted, NOT
+    dividend-adjusted) vs EODHD `adjusted_close` (both split-AND-dividend
+    adjusted) — chosen because comparing against EODHD `close_price`
+    (raw, NOT split-adjusted) produces post-split-ratio false-positives
+    (e.g. AAPL 4:1 split 2020-08-31 produces ~300% drift pre-split).
+    Trade-off: ~1-2% structural drift per year from dividend adjustment
+    is expected; the audit signal is sudden discontinuities, not the
+    baseline level.
+  - `bin/stooq_drift_check.exe` — single-symbol probe CLI. Flags:
+    `-symbol SYM`, `-eodhd-cache-dir DIR`, `-apikey KEY` (or env
+    `STOOQ_APIKEY`), `-threshold` (default 0.005 = 0.5%), `-stooq-csv
+    PATH` (offline mode using a pre-fetched CSV — bypasses the apikey
+    requirement). `Command.basic` (not `Command.async`) with
+    `Thread_safe.block_on_async_exn` only for the actual curl fetch, so
+    synchronous error paths flush stderr cleanly via `Stdlib.exit`.
+  - `test/test_stooq_client.ml` + `test/data/stooq_aapl_sample.csv` —
+    pinned 8-row AAPL fixture. 17 OUnit2 tests covering parse counts,
+    row equality, source-order preservation, header drift / empty body /
+    unparseable date / wrong column count / unparseable numeric error
+    paths, UTF-8 BOM tolerance, `build_uri` lowercase + `.us` suffix +
+    apikey appending, apikey-error sentinel detection (and negative
+    check on real CSV body).
+  - `test/test_stooq_drift_check_core.ml` — 11 OUnit2 tests on the pure
+    drift pipeline: exact overlap → zero diff, signed direction
+    (positive/negative), date-merge dropping stooq-only / eodhd-only
+    dates, threshold flagging, empty rows, overlap-bound endpoints,
+    flagged-rows descending sort, empty overlap, unmatched date counts,
+    Markdown surface contains summary lines.
+  - **Stooq API surprise (verified 2026-05-17):** the documented CSV
+    endpoint `stooq.com/q/d/l/?s=<symbol>.us&i=d` now REQUIRES an apikey
+    (free, captcha-gated via `stooq.com/q/d/?s=<symbol>.us&get_apikey`).
+    Bare GETs return HTTP 200 with a `Get your apikey:` plaintext body
+    that the parser must detect. The bulk-download path
+    (`stooq.com/db/d/?b=d_us_txt`, 507 MB) is captcha-gated too. The
+    CLI takes the apikey via `-apikey` flag or env `STOOQ_APIKEY`. Once
+    a user-driven apikey signup happens, the CLI is ready to run live.
+  - **Probe (live, 2026-05-17):**
+    - Fixture mode: `./_build/.../stooq_drift_check.exe -symbol AAPL
+      -eodhd-cache-dir test_data -stooq-csv
+      analysis/data/sources/stooq/test/data/stooq_aapl_sample.csv` →
+      5-day overlap (2020-01-02 → 2020-01-08), all 5 days flagged with
+      structural drift ~3.58% (consistent across days — exactly the
+      6-year cumulative dividend-adjustment delta expected; EODHD's
+      adjusted_close compounds dividend reinvestments while Stooq does
+      not). **AAPL baseline drift level: ~3.58% over ~6 years.** Sudden
+      discontinuity beyond this baseline would indicate a split-revision
+      bug.
+    - Live mode (no apikey): clean exit 1 with hint pointing at
+      `https://stooq.com/q/d/?s=aapl.us&get_apikey`.
+    - Missing symbol: clean stderr message + exit 1.
+  - Linters green: `dune build @fmt`, `no_python_check`,
+    `fn_length_linter` (no functions > 50 LOC), `linter_magic_numbers`,
+    `linter_mli_coverage`. ~415 source LOC (`.ml` + `.mli`: 159 lib +
+    97 curl + 156 core + 130 cli). Tests ~310 LOC. Pinned fixture (8
+    rows) excluded per PR-sizing rules.
+  - Not consumed yet — pure data-source infrastructure under
+    `analysis/`. Bulk-fetch across the full 41k EODHD cache and
+    auto-driven detection over many symbols are deferred (Phase 2+).
+
 ### READY_FOR_REVIEW (Shiller deep-history ingest — 2026-05-17)
 
 - **`shiller` data source** (branch `feat/shiller-ingest`,
