@@ -63,6 +63,33 @@ jobs:
           path: trading/_build
           key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
 
+      # Smoke-test: print CPU flags and verify ta-lib loads without SIGILL.
+      # When this failure recurs, the log will show the CPU flag set and the
+      # exact exit code (132 = SIGILL) at the top of the job rather than
+      # buried mid-suite. Runs before dune build so failures are immediately
+      # visible. See issue #1129.
+      - name: CPU-flag + ta-lib smoke test
+        run: |
+          echo "=== CPU flags ==="
+          grep '^flags' /proc/cpuinfo | head -1
+          echo "=== ta-lib linkage ==="
+          # Find libta-lib.so and verify it contains no AVX-512 instructions.
+          # AVX-512 instructions (zmm registers, evex prefix, KNC) cause SIGILL
+          # on GHA runners that don't support AVX-512 (most ubuntu-latest hosts).
+          TA_LIB_SO=$(ldconfig -p | grep 'libta-lib' | awk '{print $NF}' | head -1)
+          if [ -z "$TA_LIB_SO" ]; then
+            echo "WARNING: libta-lib.so not found via ldconfig — may not be installed yet"
+          else
+            echo "libta-lib.so found at: $TA_LIB_SO"
+            echo "=== Verifying libta-lib.so ISA (objdump check) ==="
+            if objdump -d "$TA_LIB_SO" 2>/dev/null | grep -q 'zmm\|evex\|knc'; then
+              echo "FAIL: libta-lib.so contains AVX-512 instructions — will SIGILL on non-AVX512 runners"
+              exit 1
+            else
+              echo "OK: libta-lib.so contains no AVX-512 instructions"
+            fi
+          fi
+
       - name: dune build
         run: |
           eval $(opam env)

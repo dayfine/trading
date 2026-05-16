@@ -64,12 +64,19 @@ RUN sudo apt-get update && sudo apt-get install -y \
 # TA-Lib (Technical Analysis Library)
 # -----------------------------------------------------------------------------
 # Required by ta_ocaml. Not in apt; built from source.
+#
+# CFLAGS: pinned to x86-64-v2 baseline (Nehalem+SSE4.2, ~2009) for portability
+# across the GHA runner pool. Without this, the compiler defaults to the build
+# host's native CPU flags (e.g. AVX-512 on the image-build runner), producing
+# a libta-lib.so that triggers SIGILL on runners without those instructions.
+# x86-64-v2 is supported by all modern GHA ubuntu-latest runners.
+# See issue #1129.
 # -----------------------------------------------------------------------------
 RUN cd /tmp && \
     curl -L https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz -o ta-lib.tar.gz && \
     tar xzf ta-lib.tar.gz && \
     cd ta-lib-0.6.4 && \
-    ./configure --prefix=/usr && \
+    ./configure --prefix=/usr CFLAGS="-O2 -mtune=generic -march=x86-64-v2" && \
     make -j$(nproc) && \
     sudo make install && \
     cd / && \
