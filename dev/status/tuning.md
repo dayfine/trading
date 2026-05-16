@@ -88,7 +88,8 @@ Features: from M5.2e per-trade context (Stage one-hot, MA slope, vol ratio, RS, 
 Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 
 ## In Progress
-- None. T-A lib + CLI, T-B lib + CLI, and `min_score_override` / `max_score_override` knobs all MERGED. First 81-cell flagship sweep run published (PR #1051) but invalidated by key-path bug (PR #1061). Next queued: 81-cell rerun with corrected `w_positive_rs/w_strong_volume/w_stage2_breakout/w_sector_strong` field paths + sweep-path validation linter to prevent silent-no-op repeats.
+- **Bayesian Phase 3 PR-A** (scoring function, PR #1126, branch `feat/bayesian-phase3-pr-a`) — structural_qc: APPROVED; behavioral_qc: APPROVED (2026-05-16, quality 5). CP1–CP4 all PASS; domain rows NA (pure tuner-side scoring policy). See `dev/reviews/tuning.md` §"Behavioral Checklist — Bayesian Phase 3 PR-A".
+- T-A lib + CLI, T-B lib + CLI, and `min_score_override` / `max_score_override` knobs all MERGED. First 81-cell flagship sweep run published (PR #1051) but invalidated by key-path bug (PR #1061). Next queued: 81-cell rerun with corrected `w_positive_rs/w_strong_volume/w_stage2_breakout/w_sector_strong` field paths + sweep-path validation linter to prevent silent-no-op repeats.
 
 ## Completed
 
