@@ -3,7 +3,8 @@
   test_grid_search_bin
   test_bayesian_runner_bin
   test_bayesian_runner_scoring
-  test_bayesian_runner_evaluator)
+  test_bayesian_runner_evaluator
+  test_bayesian_runner_oos_validator)
  (libraries
   ounit2
   core
