@@ -14,6 +14,7 @@ let _sigma_epsilon = 1e-12
 
 type observation = { parameters : (string * float) list; metric : float }
 type acquisition = [ `Expected_improvement | `Upper_confidence_bound of float ]
+type early_stop_config = { window : int; epsilon : float }
 
 type config = {
   bounds : (string * (float * float)) list;
@@ -21,12 +22,23 @@ type config = {
   initial_random : int;
   total_budget : int;
   rng : Stdlib.Random.State.t;
+  length_scales : float array option;
+  early_stop_config : early_stop_config option;
 }
 
 let create_config ~bounds ?(acquisition = `Expected_improvement)
     ?(initial_random = 5) ?(total_budget = 50)
-    ?(rng = Stdlib.Random.State.make [| _default_rng_seed |]) () =
-  { bounds; acquisition; initial_random; total_budget; rng }
+    ?(rng = Stdlib.Random.State.make [| _default_rng_seed |]) ?length_scales
+    ?early_stop_config () =
+  {
+    bounds;
+    acquisition;
+    initial_random;
+    total_budget;
+    rng;
+    length_scales;
+    early_stop_config;
+  }
 
 type t = { config : config; observations : observation list (* newest first *) }
 
@@ -39,6 +51,33 @@ let _validate_bound (k, (lo, hi)) =
       (sprintf "Bayesian_opt.create: bound for %s has min > max (%g > %g)" k lo
          hi)
 
+let _validate_length_scales bounds = function
+  | None -> ()
+  | Some scales ->
+      let expected = List.length bounds in
+      if Array.length scales <> expected then
+        invalid_arg
+          (sprintf
+             "Bayesian_opt.create: length_scales dim %d disagrees with bounds \
+              dim %d"
+             (Array.length scales) expected);
+      Array.iter scales ~f:(fun s ->
+          if Float.( <= ) s 0.0 then
+            invalid_arg
+              (sprintf
+                 "Bayesian_opt.create: length_scales entries must be > 0 (got \
+                  %g)"
+                 s))
+
+let _validate_early_stop_config = function
+  | None -> ()
+  | Some { window; epsilon } ->
+      if window < 1 then
+        invalid_arg "Bayesian_opt.create: early_stop_config.window must be >= 1";
+      if Float.( < ) epsilon 0.0 then
+        invalid_arg
+          "Bayesian_opt.create: early_stop_config.epsilon must be >= 0"
+
 let _validate_config config =
   if List.is_empty config.bounds then
     invalid_arg "Bayesian_opt.create: bounds must be non-empty";
@@ -46,7 +85,9 @@ let _validate_config config =
   if config.initial_random < 0 then
     invalid_arg "Bayesian_opt.create: initial_random must be >= 0";
   if config.total_budget < 0 then
-    invalid_arg "Bayesian_opt.create: total_budget must be >= 0"
+    invalid_arg "Bayesian_opt.create: total_budget must be >= 0";
+  _validate_length_scales config.bounds config.length_scales;
+  _validate_early_stop_config config.early_stop_config
 
 let create config =
   _validate_config config;
@@ -195,9 +236,20 @@ let upper_confidence_bound ~posterior ~beta x =
 
 (** {1 Suggest_next} *)
 
-(** Default length scale per dimension: [0.25] in normalised [0,1] space. *)
+(** Default length scale per dimension. In normalised [0,1] space, the kernel
+    needs wider effective bandwidth as dimensionality grows to keep the
+    posterior from under-fitting (plan §5.2). Scales as [sqrt(d) * 0.25]: at d =
+    1 the value is [0.25] (matches the legacy 4-D-era default); at d = 16 it is
+    [1.0]. Configs may override via [config.length_scales]. *)
 let _default_length_scales bounds =
-  Array.of_list (List.map bounds ~f:(fun _ -> 0.25))
+  let d = List.length bounds in
+  let value = Float.sqrt (Float.of_int d) *. 0.25 in
+  Array.of_list (List.map bounds ~f:(fun _ -> value))
+
+let _length_scales_for_config config =
+  match config.length_scales with
+  | Some scales -> scales
+  | None -> _default_length_scales config.bounds
 
 let _signal_variance = 1.0
 let _noise_variance = 1e-6
@@ -220,7 +272,7 @@ let _build_posterior_for_state t =
            _scale_to_unit ~bounds:t.config.bounds raw))
   in
   let ys = Array.of_list (List.map observations ~f:(fun obs -> obs.metric)) in
-  let length_scales = _default_length_scales t.config.bounds in
+  let length_scales = _length_scales_for_config t.config in
   fit_gp ~length_scales ~signal_variance:_signal_variance
     ~noise_variance:_noise_variance ~observations_x:xs ~observations_y:ys
 
@@ -274,3 +326,22 @@ let suggest_next_with_candidates t ~n_candidates =
 
 let suggest_next t =
   suggest_next_with_candidates t ~n_candidates:_default_n_candidates
+
+(** {1 Early-stop helper} *)
+
+(** Read [running_best] at offset [n - 1 - k] from the end (so [k = 0] is the
+    most recent value); returns [None] when out of range. *)
+let _running_best_at running_best ~k =
+  let n = List.length running_best in
+  if k < 0 || k >= n then None else List.nth running_best (n - 1 - k)
+
+let should_early_stop cfg ~initial_random ~running_best =
+  let n = List.length running_best in
+  if n <= initial_random + cfg.window then false
+  else
+    match
+      ( _running_best_at running_best ~k:0,
+        _running_best_at running_best ~k:cfg.window )
+    with
+    | Some recent, Some past -> Float.( < ) (recent -. past) cfg.epsilon
+    | _ -> false

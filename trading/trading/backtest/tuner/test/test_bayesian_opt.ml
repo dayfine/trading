@@ -463,6 +463,175 @@ let test_suggest_next_with_invalid_n_candidates_raises _ =
        "Bayesian_opt.suggest_next_with_candidates: n_candidates must be >= 1")
     f
 
+(* ---------- PR-D: length_scales override ---------- *)
+
+let test_create_config_default_length_scales_is_none _ =
+  (* Default config keeps [length_scales = None]; the GP fit falls back to
+     [sqrt(d) * 0.25]. *)
+  let config = BO.create_config ~bounds:[ ("x", (0.0, 1.0)) ] () in
+  assert_that config.length_scales is_none
+
+let test_create_config_with_length_scales_propagates _ =
+  let config =
+    BO.create_config
+      ~bounds:[ ("x", (0.0, 1.0)); ("y", (0.0, 1.0)) ]
+      ~length_scales:[| 0.1; 0.5 |] ()
+  in
+  assert_that config.length_scales
+    (is_some_and
+       (matching ~msg:"expected 2-element array"
+          (fun a -> Some (Array.to_list a))
+          (elements_are [ float_equal 0.1; float_equal 0.5 ])))
+
+let test_create_with_length_scales_dim_mismatch_raises _ =
+  let f () =
+    let _ =
+      BO.create
+        (BO.create_config
+           ~bounds:[ ("x", (0.0, 1.0)); ("y", (0.0, 1.0)) ]
+           ~length_scales:[| 0.1 |] ())
+    in
+    ()
+  in
+  assert_raises
+    (Invalid_argument
+       "Bayesian_opt.create: length_scales dim 1 disagrees with bounds dim 2")
+    f
+
+let test_create_with_nonpositive_length_scale_raises _ =
+  let f () =
+    let _ =
+      BO.create
+        (BO.create_config
+           ~bounds:[ ("x", (0.0, 1.0)) ]
+           ~length_scales:[| 0.0 |] ())
+    in
+    ()
+  in
+  assert_raises
+    (Invalid_argument
+       "Bayesian_opt.create: length_scales entries must be > 0 (got 0)")
+    f
+
+let test_length_scales_override_changes_posterior _ =
+  (* Synthetic surface: two observations far apart in [0, 1]. With a very
+     wide length-scale (1e3), the GP posterior at a test point should be very
+     close to the y-mean (kernel is nearly constant across the whole
+     normalised domain). With a very tight length-scale (0.01), the posterior
+     should be near zero (the centred y values) far from any observation. *)
+  let bounds = [ ("x", (0.0, 1.0)) ] in
+  let obs1 : BO.observation = { parameters = [ ("x", 0.1) ]; metric = 1.0 } in
+  let obs2 : BO.observation = { parameters = [ ("x", 0.9) ]; metric = 1.0 } in
+  let make_bo length_scales =
+    let bo =
+      BO.create
+        (BO.create_config ~bounds ~initial_random:0 ~rng:(_make_rng 41)
+           ~length_scales ())
+    in
+    let bo = BO.observe bo obs1 in
+    BO.observe bo obs2
+  in
+  (* Wide kernel: posterior mean at any point ~ y_mean = 1.0. *)
+  let _wide = make_bo [| 100.0 |] in
+  (* Tight kernel: posterior mean far from observations ~ y_mean (centred to
+     0 internally + offset back). The two override values produce visibly
+     different acquisition argmax behaviour — driving suggestions to different
+     points. *)
+  let _tight = make_bo [| 0.01 |] in
+  let next_wide = BO.suggest_next _wide in
+  let next_tight = BO.suggest_next _tight in
+  let xw = List.Assoc.find_exn next_wide ~equal:String.equal "x" in
+  let xt = List.Assoc.find_exn next_tight ~equal:String.equal "x" in
+  (* Two GPs with extreme length-scales pick measurably different suggestions
+     for the same observation set + RNG seed. *)
+  assert_that (Float.abs (xw -. xt)) (gt (module Float_ord) 1e-6)
+
+(* ---------- PR-D: early_stop_config validation ---------- *)
+
+let test_create_config_default_early_stop_is_none _ =
+  let config = BO.create_config ~bounds:[ ("x", (0.0, 1.0)) ] () in
+  assert_that config.early_stop_config is_none
+
+let test_create_with_invalid_early_stop_window_raises _ =
+  let f () =
+    let _ =
+      BO.create
+        (BO.create_config
+           ~bounds:[ ("x", (0.0, 1.0)) ]
+           ~early_stop_config:{ window = 0; epsilon = 0.01 }
+           ())
+    in
+    ()
+  in
+  assert_raises
+    (Invalid_argument
+       "Bayesian_opt.create: early_stop_config.window must be >= 1")
+    f
+
+let test_create_with_negative_early_stop_epsilon_raises _ =
+  let f () =
+    let _ =
+      BO.create
+        (BO.create_config
+           ~bounds:[ ("x", (0.0, 1.0)) ]
+           ~early_stop_config:{ window = 5; epsilon = -0.01 }
+           ())
+    in
+    ()
+  in
+  assert_raises
+    (Invalid_argument
+       "Bayesian_opt.create: early_stop_config.epsilon must be >= 0")
+    f
+
+(* ---------- PR-D: should_early_stop predicate ---------- *)
+
+let test_should_early_stop_false_when_running_best_empty _ =
+  let cfg : BO.early_stop_config = { window = 3; epsilon = 0.01 } in
+  assert_that
+    (BO.should_early_stop cfg ~initial_random:0 ~running_best:[])
+    (equal_to false)
+
+let test_should_early_stop_false_during_random_phase _ =
+  (* Pre-condition: must have more than [initial_random + window] observations
+     before the predicate can fire. *)
+  let cfg : BO.early_stop_config = { window = 3; epsilon = 0.01 } in
+  let running_best = [ 0.1; 0.2; 0.3; 0.3; 0.3 ] in
+  assert_that
+    (BO.should_early_stop cfg ~initial_random:5 ~running_best)
+    (equal_to false)
+
+let test_should_early_stop_true_on_flat_trail _ =
+  (* After random phase: running_best has been flat at 0.5 for [window]
+     consecutive iterations → trigger. *)
+  let cfg : BO.early_stop_config = { window = 3; epsilon = 0.01 } in
+  let running_best = [ 0.1; 0.2; 0.3; 0.5; 0.5; 0.5; 0.5 ] in
+  (* initial_random = 2 means the iterations after position 2 are GP-driven;
+     we have 4 GP-driven iterations and the last 3 are flat → trigger. *)
+  assert_that
+    (BO.should_early_stop cfg ~initial_random:2 ~running_best)
+    (equal_to true)
+
+let test_should_early_stop_false_when_improving _ =
+  let cfg : BO.early_stop_config = { window = 3; epsilon = 0.01 } in
+  (* Most recent running_best (1.0) is well above the value 3 ago (0.5) → no
+     trigger. *)
+  let running_best = [ 0.1; 0.2; 0.3; 0.5; 0.7; 0.8; 1.0 ] in
+  assert_that
+    (BO.should_early_stop cfg ~initial_random:2 ~running_best)
+    (equal_to false)
+
+let test_should_early_stop_threshold_at_epsilon_boundary _ =
+  (* Improvement strictly equal to epsilon does not trigger (predicate uses
+     strict [<], not [<=]). Values chosen to be IEEE-754-exact: 0.25 and 0.5
+     have finite binary representations so 0.5 - 0.25 = 0.25 exactly. *)
+  let cfg : BO.early_stop_config = { window = 2; epsilon = 0.25 } in
+  let running_best = [ 0.0; 0.125; 0.25; 0.375; 0.5 ] in
+  (* recent = 0.5, past (2 ago) = 0.25, diff = 0.25 == epsilon → no trigger. *)
+  assert_that
+    (BO.should_early_stop cfg ~initial_random:1 ~running_best)
+    (equal_to false)
+
 (* ---------- Test runner ---------- *)
 
 let suite =
@@ -523,6 +692,32 @@ let suite =
          "ucb: increases with beta" >:: test_ucb_increases_with_beta;
          "suggest_next_with_candidates: invalid n raises"
          >:: test_suggest_next_with_invalid_n_candidates_raises;
+         "create_config: default length_scales is None"
+         >:: test_create_config_default_length_scales_is_none;
+         "create_config: length_scales propagates"
+         >:: test_create_config_with_length_scales_propagates;
+         "create: length_scales dim mismatch raises"
+         >:: test_create_with_length_scales_dim_mismatch_raises;
+         "create: non-positive length_scale raises"
+         >:: test_create_with_nonpositive_length_scale_raises;
+         "length_scales override changes posterior + suggestions"
+         >:: test_length_scales_override_changes_posterior;
+         "create_config: default early_stop is None"
+         >:: test_create_config_default_early_stop_is_none;
+         "create: invalid early_stop window raises"
+         >:: test_create_with_invalid_early_stop_window_raises;
+         "create: negative early_stop epsilon raises"
+         >:: test_create_with_negative_early_stop_epsilon_raises;
+         "should_early_stop: false on empty running_best"
+         >:: test_should_early_stop_false_when_running_best_empty;
+         "should_early_stop: false during random phase"
+         >:: test_should_early_stop_false_during_random_phase;
+         "should_early_stop: true on flat trail"
+         >:: test_should_early_stop_true_on_flat_trail;
+         "should_early_stop: false when improving"
+         >:: test_should_early_stop_false_when_improving;
+         "should_early_stop: strict < at epsilon boundary"
+         >:: test_should_early_stop_threshold_at_epsilon_boundary;
        ]
 
 let () = run_test_tt_main suite

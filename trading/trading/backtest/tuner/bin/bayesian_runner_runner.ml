@@ -3,11 +3,16 @@ module BO = Tuner.Bayesian_opt
 module GS = Tuner.Grid_search
 module Metric_types = Trading_simulation_types.Metric_types
 
+(** Reason the BO ask/tell loop terminated. Surfaced on {!result} so callers
+    (and tests) can detect early-stop without re-reading [convergence.md]. *)
+type stop_reason = Budget_exhausted | Early_stopped of { iter : int }
+
 type result = {
   best_params : (string * float) list;
   best_score : float;
   observations : BO.observation list;
   per_iteration_metrics : Metric_types.metric_set list list;
+  stop_reason : stop_reason;
 }
 
 type evaluator =
@@ -20,21 +25,47 @@ let _suggest spec bo =
   | None -> BO.suggest_next bo
   | Some n -> BO.suggest_next_with_candidates bo ~n_candidates:n
 
+let _running_best_so_far rev_obs =
+  let observations = List.rev rev_obs in
+  let _, rev_running =
+    List.fold observations ~init:(Float.neg_infinity, [])
+      ~f:(fun (running, acc) (obs : BO.observation) ->
+        let next = Float.max running obs.metric in
+        (next, next :: acc))
+  in
+  List.rev rev_running
+
 (** Run the BO ask/tell loop, accumulating
-    [(observation, per-scenario metric sets)] in evaluation order. *)
+    [(observation, per-scenario metric sets)] in evaluation order. Honours the
+    optional [early_stop_config] on the BO config: if set, after each iteration
+    computes the running-best curve and checks the early-stop predicate before
+    issuing the next [suggest_next]. *)
 let _run_loop spec ~evaluator =
   let config = Bayesian_runner_spec.to_bo_config spec in
   let initial = BO.create config in
-  let rec loop bo iters_left rev_obs rev_metrics =
-    if iters_left <= 0 then (bo, List.rev rev_obs, List.rev rev_metrics)
+  let early_stop_cfg = config.early_stop_config in
+  let initial_random = config.initial_random in
+  let rec loop bo iter_idx iters_left rev_obs rev_metrics =
+    if iters_left <= 0 then
+      (bo, List.rev rev_obs, List.rev rev_metrics, Budget_exhausted)
     else
-      let parameters = _suggest spec bo in
-      let metric, per_scenario = evaluator ~parameters in
-      let obs = { BO.parameters; metric } in
-      let bo = BO.observe bo obs in
-      loop bo (iters_left - 1) (obs :: rev_obs) (per_scenario :: rev_metrics)
+      match early_stop_cfg with
+      | Some cfg
+        when BO.should_early_stop cfg ~initial_random
+               ~running_best:(_running_best_so_far rev_obs) ->
+          ( bo,
+            List.rev rev_obs,
+            List.rev rev_metrics,
+            Early_stopped { iter = iter_idx } )
+      | _ ->
+          let parameters = _suggest spec bo in
+          let metric, per_scenario = evaluator ~parameters in
+          let obs = { BO.parameters; metric } in
+          let bo = BO.observe bo obs in
+          loop bo (iter_idx + 1) (iters_left - 1) (obs :: rev_obs)
+            (per_scenario :: rev_metrics)
   in
-  loop initial spec.total_budget [] []
+  loop initial 0 spec.total_budget [] []
 
 (** {1 Output writers} *)
 
@@ -112,14 +143,23 @@ let _write_convergence_rows oc observations =
   in
   ()
 
-let _write_convergence_md ~output_path ~objective ~observations =
+(** Tail line emitted by {!_write_convergence_md} that records the reason the BO
+    loop terminated. Stable greppable shape so tooling can detect early stops
+    without reparsing the table. *)
+let _stop_reason_line = function
+  | Budget_exhausted -> "\n(stop_reason budget_exhausted)\n"
+  | Early_stopped { iter } ->
+      sprintf "\n(stop_reason early_stopped (iter %d))\n" iter
+
+let _write_convergence_md ~output_path ~objective ~observations ~stop_reason =
   Out_channel.with_file output_path ~f:(fun oc ->
       Out_channel.output_string oc (_convergence_title objective);
-      _write_convergence_rows oc observations)
+      _write_convergence_rows oc observations;
+      Out_channel.output_string oc (_stop_reason_line stop_reason))
 
 (** {1 Top-level} *)
 
-let _result_of bo observations per_iteration_metrics =
+let _result_of bo observations per_iteration_metrics stop_reason =
   match BO.best bo with
   | Some best ->
       {
@@ -127,6 +167,7 @@ let _result_of bo observations per_iteration_metrics =
         best_score = best.metric;
         observations;
         per_iteration_metrics;
+        stop_reason;
       }
   | None ->
       {
@@ -134,18 +175,22 @@ let _result_of bo observations per_iteration_metrics =
         best_score = Float.neg_infinity;
         observations;
         per_iteration_metrics;
+        stop_reason;
       }
 
 let run_and_write ~(spec : Bayesian_runner_spec.t) ~out_dir ~evaluator =
   Core_unix.mkdir_p out_dir;
   let objective = Bayesian_runner_spec.to_grid_objective spec.objective in
-  let bo, observations, per_iteration_metrics = _run_loop spec ~evaluator in
-  let result = _result_of bo observations per_iteration_metrics in
+  let bo, observations, per_iteration_metrics, stop_reason =
+    _run_loop spec ~evaluator
+  in
+  let result = _result_of bo observations per_iteration_metrics stop_reason in
   let log_path = Filename.concat out_dir "bo_log.csv" in
   let best_path = Filename.concat out_dir "best.sexp" in
   let conv_path = Filename.concat out_dir "convergence.md" in
   _write_bo_log ~output_path:log_path ~spec ~objective ~observations
     ~per_iteration_metrics;
   _write_best_sexp ~output_path:best_path ~best_params:result.best_params;
-  _write_convergence_md ~output_path:conv_path ~objective ~observations;
+  _write_convergence_md ~output_path:conv_path ~objective ~observations
+    ~stop_reason;
   result

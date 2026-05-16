@@ -170,6 +170,9 @@ let test_to_bo_config_propagates_fields _ =
       objective = Spec.Sharpe;
       scenarios = [ "s" ];
       holdout_folds = None;
+      sentinel_bounds = None;
+      length_scales = None;
+      early_stop = None;
     }
   in
   let config = Spec.to_bo_config spec in
@@ -203,6 +206,9 @@ let _parabola_spec ~total_budget ~seed : Spec.t =
     objective = Spec.Sharpe;
     scenarios = [ "stub-scenario" ];
     holdout_folds = None;
+    sentinel_bounds = None;
+    length_scales = None;
+    early_stop = None;
   }
 
 let test_run_and_write_emits_three_artefacts _ =
@@ -246,6 +252,103 @@ let test_run_and_write_creates_missing_out_dir _ =
         Runner.run_and_write ~spec ~out_dir ~evaluator:_parabola_evaluator
       in
       assert_that (Sys_unix.is_directory_exn out_dir) (equal_to true))
+
+(* ---------- PR-D: early-stop wiring ---------- *)
+
+(** A flat evaluator: always returns the same scalar metric and an empty
+    per-scenario metric set. Deterministically triggers the early-stop predicate
+    after [initial_random + window] iterations because the running-best curve is
+    exactly flat. *)
+let _flat_evaluator : Runner.evaluator =
+ fun ~parameters:_ ->
+  let empty = Map.empty (module Metric_types.Metric_type) in
+  (0.0, [ empty ])
+
+let _flat_spec_with_early_stop ~window ~epsilon : Spec.t =
+  {
+    bounds = [ ("x", (0.0, 10.0)) ];
+    acquisition = Spec.Expected_improvement;
+    initial_random = 3;
+    total_budget = 50;
+    seed = Some 11;
+    n_acquisition_candidates = None;
+    objective = Spec.Sharpe;
+    scenarios = [ "stub-scenario" ];
+    holdout_folds = None;
+    sentinel_bounds = None;
+    length_scales = None;
+    early_stop = Some (window, epsilon);
+  }
+
+let test_early_stop_fires_on_flat_objective _ =
+  (* PR-D acceptance: a flat evaluator triggers early-stop deterministically.
+     With initial_random=3 and window=5, the predicate fires once
+     observations.length > 3 + 5 = 8 (the first iteration whose pre-suggest
+     check sees a flat 5-iter trail past the random phase). The total budget
+     is 50; an early-stop run terminates well before that. *)
+  let spec = _flat_spec_with_early_stop ~window:5 ~epsilon:0.01 in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let result =
+        Runner.run_and_write ~spec ~out_dir ~evaluator:_flat_evaluator
+      in
+      assert_that result
+        (all_of
+           [
+             field
+               (fun (r : Runner.result) -> r.stop_reason)
+               (matching ~msg:"expected Early_stopped"
+                  (function
+                    | Runner.Early_stopped { iter } -> Some iter | _ -> None)
+                  (gt (module Int_ord) 0));
+             (* Length must be strictly less than the total_budget. *)
+             field
+               (fun (r : Runner.result) -> List.length r.observations)
+               (lt (module Int_ord) 50);
+           ]))
+
+let test_early_stop_emits_stop_reason_line _ =
+  (* The [convergence.md] writer appends the stop-reason as a stable greppable
+     sexp tail line. PR-D: [(stop_reason early_stopped (iter <N>))]. *)
+  let spec = _flat_spec_with_early_stop ~window:4 ~epsilon:0.001 in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let _result =
+        Runner.run_and_write ~spec ~out_dir ~evaluator:_flat_evaluator
+      in
+      let conv_md =
+        In_channel.read_all (Filename.concat out_dir "convergence.md")
+      in
+      assert_that
+        (String.is_substring conv_md
+           ~substring:"(stop_reason early_stopped (iter ")
+        (equal_to true))
+
+let test_no_early_stop_emits_budget_exhausted_line _ =
+  (* PR-D: when [early_stop = None], the stop-reason line is
+     [(stop_reason budget_exhausted)]. Pinned so downstream tooling can rely
+     on the tag's presence regardless of early-stop being enabled. *)
+  let spec = _parabola_spec ~total_budget:6 ~seed:5 in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let result =
+        Runner.run_and_write ~spec ~out_dir ~evaluator:_parabola_evaluator
+      in
+      let conv_md =
+        In_channel.read_all (Filename.concat out_dir "convergence.md")
+      in
+      assert_that result
+        (all_of
+           [
+             field
+               (fun (r : Runner.result) -> r.stop_reason)
+               (equal_to Runner.Budget_exhausted);
+             field
+               (fun _ ->
+                 String.is_substring conv_md
+                   ~substring:"(stop_reason budget_exhausted)")
+               (equal_to true);
+           ]))
 
 let test_determinism_same_seed_byte_identical_log _ =
   (* CP4: pin the documented determinism property. Two runs with the same
@@ -354,6 +457,9 @@ let _spec_record_with_holdout holdout : Spec.t =
     objective = Spec.Sharpe;
     scenarios = [];
     holdout_folds = holdout;
+    sentinel_bounds = None;
+    length_scales = None;
+    early_stop = None;
   }
 
 let test_holdout_folds_round_trip_none _ =
@@ -375,6 +481,201 @@ let test_holdout_folds_round_trip_some_empty _ =
   let original = _spec_record_with_holdout (Some []) in
   let round_tripped = Spec.t_of_sexp (Spec.sexp_of_t original) in
   assert_that round_tripped.holdout_folds (is_some_and (size_is 0))
+
+(* ---------- PR-D: sentinel_bounds encoding ---------- *)
+
+let _spec_with_pr_d_text trailing_clause =
+  String.concat
+    [
+      "((bounds (";
+      "  (initial_stop_buffer (0.5 2.0))))";
+      " (acquisition Expected_improvement)";
+      " (initial_random 5)";
+      " (total_budget 30)";
+      " (seed (7))";
+      " (n_acquisition_candidates ())";
+      " (objective Sharpe)";
+      " (scenarios ())";
+      " ";
+      trailing_clause;
+      ")";
+    ]
+    ~sep:"\n"
+
+let test_sentinel_bounds_parses_to_some _ =
+  _with_temp_dir (fun dir ->
+      let path =
+        _write_spec_file dir
+          (_spec_with_pr_d_text
+             "(sentinel_bounds ((max_sector_exposure_pct (sentinel 0.10 \
+              0.35))))")
+      in
+      let spec = Spec.load path in
+      assert_that spec.sentinel_bounds
+        (is_some_and
+           (elements_are
+              [
+                equal_to
+                  ( "max_sector_exposure_pct",
+                    Spec.Sentinel { threshold = 0.10; upper = 0.35 } );
+              ])))
+
+let test_sentinel_bounds_omitted_parses_to_none _ =
+  _with_temp_dir (fun dir ->
+      let path = _write_spec_file dir _spec_text in
+      let spec = Spec.load path in
+      assert_that spec.sentinel_bounds is_none)
+
+let test_sentinel_bounds_plain_form_also_parses _ =
+  (* sentinel_bounds is a list of [(key, bound_spec)] — bound_spec admits both
+     [Plain (lo, hi)] (the legacy shape) and [Sentinel { ... }] (PR-D). *)
+  _with_temp_dir (fun dir ->
+      let path =
+        _write_spec_file dir
+          (_spec_with_pr_d_text
+             "(sentinel_bounds ((min_score_override (30.0 55.0))))")
+      in
+      let spec = Spec.load path in
+      assert_that spec.sentinel_bounds
+        (is_some_and
+           (elements_are
+              [ equal_to ("min_score_override", Spec.Plain (30.0, 55.0)) ])))
+
+let test_sentinel_bound_spec_round_trip _ =
+  let original : Spec.bound_spec =
+    Spec.Sentinel { threshold = 0.10; upper = 0.35 }
+  in
+  let round_tripped =
+    Spec.bound_spec_of_sexp (Spec.sexp_of_bound_spec original)
+  in
+  assert_that round_tripped
+    (equal_to (Spec.Sentinel { threshold = 0.10; upper = 0.35 }))
+
+let test_plain_bound_spec_round_trip _ =
+  let original : Spec.bound_spec = Spec.Plain (0.5, 2.0) in
+  let round_tripped =
+    Spec.bound_spec_of_sexp (Spec.sexp_of_bound_spec original)
+  in
+  assert_that round_tripped (equal_to (Spec.Plain (0.5, 2.0)))
+
+(* ---------- PR-D: plain_range + decode_sentinel_sample ---------- *)
+
+let test_plain_range_for_plain_returns_input _ =
+  assert_that (Spec.plain_range (Spec.Plain (0.5, 2.0))) (equal_to (0.5, 2.0))
+
+let test_plain_range_for_sentinel_expands_below_threshold _ =
+  (* For [Sentinel { threshold = 0.10; upper = 0.35 }], the expanded BO range
+     is [(threshold - 0.25 * (upper - threshold), upper)] = (0.10 - 0.0625,
+     0.35) = (0.0375, 0.35). *)
+  let lo, hi =
+    Spec.plain_range (Spec.Sentinel { threshold = 0.10; upper = 0.35 })
+  in
+  assert_that lo (float_equal 0.0375);
+  assert_that hi (float_equal 0.35)
+
+let test_decode_sentinel_sample_plain_always_some _ =
+  assert_that
+    (Spec.decode_sentinel_sample (Spec.Plain (0.5, 2.0)) 1.25)
+    (is_some_and (float_equal 1.25))
+
+let test_decode_sentinel_sample_below_threshold_is_none _ =
+  assert_that
+    (Spec.decode_sentinel_sample
+       (Spec.Sentinel { threshold = 0.10; upper = 0.35 })
+       0.05)
+    is_none
+
+let test_decode_sentinel_sample_at_or_above_threshold_is_some _ =
+  assert_that
+    (Spec.decode_sentinel_sample
+       (Spec.Sentinel { threshold = 0.10; upper = 0.35 })
+       0.20)
+    (is_some_and (float_equal 0.20));
+  (* Exactly equal to the threshold also decodes as [Some] (predicate is
+     [sampled < threshold]). *)
+  assert_that
+    (Spec.decode_sentinel_sample
+       (Spec.Sentinel { threshold = 0.10; upper = 0.35 })
+       0.10)
+    (is_some_and (float_equal 0.10))
+
+(* ---------- PR-D: length_scales + early_stop spec fields ---------- *)
+
+let test_length_scales_parses_to_some _ =
+  _with_temp_dir (fun dir ->
+      let path =
+        _write_spec_file dir
+          (_spec_with_pr_d_text "(length_scales (0.25 0.5 0.75))")
+      in
+      let spec = Spec.load path in
+      assert_that spec.length_scales
+        (is_some_and
+           (elements_are
+              [ float_equal 0.25; float_equal 0.5; float_equal 0.75 ])))
+
+let test_length_scales_omitted_parses_to_none _ =
+  _with_temp_dir (fun dir ->
+      let path = _write_spec_file dir _spec_text in
+      let spec = Spec.load path in
+      assert_that spec.length_scales is_none)
+
+let test_early_stop_parses_to_some _ =
+  _with_temp_dir (fun dir ->
+      let path =
+        _write_spec_file dir (_spec_with_pr_d_text "(early_stop (20 0.02))")
+      in
+      let spec = Spec.load path in
+      assert_that spec.early_stop
+        (is_some_and (equal_to ((20, 0.02) : int * float))))
+
+let test_early_stop_omitted_parses_to_none _ =
+  _with_temp_dir (fun dir ->
+      let path = _write_spec_file dir _spec_text in
+      let spec = Spec.load path in
+      assert_that spec.early_stop is_none)
+
+let test_to_bo_config_propagates_pr_d_fields _ =
+  let spec : Spec.t =
+    {
+      bounds = [ ("x", (0.0, 1.0)); ("y", (0.0, 1.0)) ];
+      acquisition = Spec.Expected_improvement;
+      initial_random = 5;
+      total_budget = 30;
+      seed = Some 7;
+      n_acquisition_candidates = None;
+      objective = Spec.Sharpe;
+      scenarios = [];
+      holdout_folds = None;
+      sentinel_bounds = None;
+      length_scales = Some [ 0.3; 0.4 ];
+      early_stop = Some (15, 0.025);
+    }
+  in
+  let config = Spec.to_bo_config spec in
+  assert_that config
+    (all_of
+       [
+         field
+           (fun (c : Tuner.Bayesian_opt.config) -> c.length_scales)
+           (is_some_and
+              (matching ~msg:"expected 2-element length_scales array"
+                 (fun a -> Some (Array.to_list a))
+                 (elements_are [ float_equal 0.3; float_equal 0.4 ])));
+         field
+           (fun (c : Tuner.Bayesian_opt.config) -> c.early_stop_config)
+           (is_some_and
+              (all_of
+                 [
+                   field
+                     (fun (e : Tuner.Bayesian_opt.early_stop_config) ->
+                       e.window)
+                     (equal_to 15);
+                   field
+                     (fun (e : Tuner.Bayesian_opt.early_stop_config) ->
+                       e.epsilon)
+                     (float_equal 0.025);
+                 ]));
+       ])
 
 (* ---------- production fixture: bayesian-multi-param-2026-05-16.sexp ---- *)
 
@@ -492,6 +793,41 @@ let suite =
          >:: test_phase3_fixture_parses;
          "Phase-3 fixture: 11 knobs in expected order"
          >:: test_phase3_fixture_bounds_cover_expected_tracks;
+         "PR-D: Runner.run_and_write early-stop fires on flat objective"
+         >:: test_early_stop_fires_on_flat_objective;
+         "PR-D: Runner.run_and_write emits early_stopped stop_reason line"
+         >:: test_early_stop_emits_stop_reason_line;
+         "PR-D: Runner.run_and_write emits budget_exhausted stop_reason line"
+         >:: test_no_early_stop_emits_budget_exhausted_line;
+         "PR-D: Spec.load sentinel_bounds (sentinel form) -> Some"
+         >:: test_sentinel_bounds_parses_to_some;
+         "PR-D: Spec.load sentinel_bounds omitted -> None"
+         >:: test_sentinel_bounds_omitted_parses_to_none;
+         "PR-D: Spec.load sentinel_bounds (plain form) -> Some"
+         >:: test_sentinel_bounds_plain_form_also_parses;
+         "PR-D: bound_spec round-trip: Sentinel"
+         >:: test_sentinel_bound_spec_round_trip;
+         "PR-D: bound_spec round-trip: Plain"
+         >:: test_plain_bound_spec_round_trip;
+         "PR-D: plain_range for Plain returns input"
+         >:: test_plain_range_for_plain_returns_input;
+         "PR-D: plain_range for Sentinel expands below threshold"
+         >:: test_plain_range_for_sentinel_expands_below_threshold;
+         "PR-D: decode_sentinel_sample Plain always Some"
+         >:: test_decode_sentinel_sample_plain_always_some;
+         "PR-D: decode_sentinel_sample below threshold -> None"
+         >:: test_decode_sentinel_sample_below_threshold_is_none;
+         "PR-D: decode_sentinel_sample at/above threshold -> Some"
+         >:: test_decode_sentinel_sample_at_or_above_threshold_is_some;
+         "PR-D: Spec.load length_scales -> Some"
+         >:: test_length_scales_parses_to_some;
+         "PR-D: Spec.load length_scales omitted -> None"
+         >:: test_length_scales_omitted_parses_to_none;
+         "PR-D: Spec.load early_stop -> Some" >:: test_early_stop_parses_to_some;
+         "PR-D: Spec.load early_stop omitted -> None"
+         >:: test_early_stop_omitted_parses_to_none;
+         "PR-D: to_bo_config propagates length_scales + early_stop"
+         >:: test_to_bo_config_propagates_pr_d_fields;
        ]
 
 let () = run_test_tt_main suite

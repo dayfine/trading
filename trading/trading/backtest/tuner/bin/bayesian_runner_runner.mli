@@ -8,6 +8,13 @@
     [~spec ~out_dir ~evaluator] and return a result record holding the optimum.
 *)
 
+(** Reason the BO ask/tell loop terminated. [Budget_exhausted] means the loop
+    ran for the full [spec.total_budget] iterations; [Early_stopped { iter }]
+    means the early-stop predicate fired at iteration [iter] (0-indexed). PR-D
+    surfaces this on {!result} so callers / tests can detect early-stop without
+    re-reading [convergence.md]. *)
+type stop_reason = Budget_exhausted | Early_stopped of { iter : int }
+
 type result = {
   best_params : (string * float) list;
       (** Parameter assignment of the highest-metric observation. [[]] when
@@ -16,14 +23,18 @@ type result = {
       (** Highest observed scalar metric. [Float.neg_infinity] when
           [total_budget = 0]. *)
   observations : Tuner.Bayesian_opt.observation list;
-      (** Every observation in evaluation order (oldest first). Length =
-          [total_budget]. *)
+      (** Every observation in evaluation order (oldest first). Length ≤
+          [total_budget] — strictly less when [stop_reason = Early_stopped _].
+      *)
   per_iteration_metrics :
     Trading_simulation_types.Metric_types.metric_set list list;
       (** Per-iteration list of per-scenario metric sets, in evaluation order.
           [List.nth_exn per_iteration_metrics i] is a list with one [metric_set]
           per scenario for the [i]-th BO iteration. Used to render the
           [bo_log.csv] columns beyond the scalar metric. *)
+  stop_reason : stop_reason;
+      (** Why the loop terminated. PR-D: [Early_stopped _] when
+          [spec.early_stop = Some _] fires; [Budget_exhausted] otherwise. *)
 }
 (** Outcome of a BO run: the argmax + the full observation history + the raw
     per-scenario metric sets. *)
@@ -50,7 +61,10 @@ val run_and_write :
       config-override sexp consumed by [Backtest.Runner.run_backtest], same
       shape as {!Tuner_bin.Grid_search_runner.run_and_write}'s [best.sexp];
     - [<out_dir>/convergence.md] — the running-best curve over iterations, one
-      row per iteration with [iter] + [score] + [running_best].
+      row per iteration with [iter] + [score] + [running_best]; PR-D appends a
+      trailing [(stop_reason ...)] sexp line: [(stop_reason budget_exhausted)]
+      when the loop ran the full budget, or
+      [(stop_reason early_stopped (iter <N>))] when early-stop fired.
 
     Creates [out_dir] via [mkdir -p] if it does not exist. Returns the {!result}
     record so callers can log [best_score] without re-reading the artefacts. *)
