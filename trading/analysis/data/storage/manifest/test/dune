@@ -1,9 +1,11 @@
-(test
- (name test_manifest)
+(tests
+ (names test_manifest test_manifest_rehash)
  (libraries
   core
+  core_unix
   core_unix.filename_unix
   core_unix.time_ns_unix
+  manifest_rehash_lib
   matchers
   ounit2
   status
