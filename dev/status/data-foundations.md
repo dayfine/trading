@@ -428,6 +428,52 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
     `analysis/`. Bulk-fetch across the full 41k EODHD cache and
     auto-driven detection over many symbols are deferred (Phase 2+).
 
+### READY_FOR_REVIEW (CSV-manifest Phase 2 — hash-verify on load — 2026-05-17)
+
+- **`csv_storage` manifest integration** (branch `feat/csv-manifest-phase2`,
+  `trading/analysis/data/storage/csv/`). Phase 2 of
+  `dev/plans/data-inventory-and-reproducibility-2026-05-02.md`. Wires the
+  Phase 1 manifest module (#1142) into `Csv_storage.save` + adds a new
+  `load_with_verify` that consults the manifest's sha256.
+  - `Csv_storage.save` now also writes/upserts a per-shard manifest entry
+    at `<data-dir>/<L1>/<L2>/manifest.sexp` after every successful CSV
+    write. New optional provenance params: `?source` (default
+    `"unknown"`), `?endpoint`, `?vendor_revision_tag`, `?fetch_id`,
+    `?api_key_id` — backward-compatible (all defaults are empty / sane).
+    Manifest write failures are **non-fatal**: a warning is logged to
+    stderr and `save` itself returns `Ok ()` so existing pipelines do not
+    break when the sidecar cannot be updated.
+  - `Csv_storage.load_with_verify : ?strictness:[ \`Strict | \`Warn | \`Off ]`
+    is a new function (sibling to `get`) that reads the manifest entry
+    and compares the on-disk file's MD5 against the recorded value.
+    `\`Strict` returns `Error (Status.Internal ...)` on mismatch; `\`Warn`
+    (default) logs and returns `Ok`; `\`Off` skips verification entirely.
+    A missing manifest / missing entry is tolerated under all strictness
+    settings — pre-Phase-2 data still loads.
+  - `Csv_storage.shard_manifest_path` exposed as a public helper for
+    callers (inspectors, bulk-rehash tools in Phase 3) that need to
+    locate the manifest without re-implementing sharding.
+  - `t` now carries `data_dir` + `symbol` in addition to `path` so the
+    manifest extension can locate the shard sidecar. Existing `t` is
+    abstract; the change is invisible to callers.
+  - 8 new OUnit2 tests under `csv/test/test_csv_storage.ml` (Matchers
+    library wired in): manifest entry written + sha256 matches CSV;
+    save-twice upserts (not appends); round-trip `load_with_verify`;
+    tampered file detected under `\`Strict` (Internal); tampered file
+    tolerated under `\`Warn` + `\`Off`; missing manifest tolerated
+    under `\`Strict` + `\`Warn`.
+  - Out-of-scope (deferred to Phase 3): reconcile-on-refetch diff log;
+    bulk-rehash CLI for the existing 41k cached symbols; cross-source
+    dispatch (Shiller, Stooq, etc.).
+  - Linters green: `dune build @fmt`, `no_python_check`,
+    `fn_length_linter` (longest new function ≤ 24 LOC),
+    `linter_magic_numbers`. `dune runtest analysis/data/storage` clean
+    (25 csv tests + 14 manifest tests + 12 metadata tests + 5
+    interface tests = 56 total).
+  - Sizing: ~140 LOC added to `csv_storage.{ml,mli}` + ~30 LOC dune
+    edits (libraries) + ~155 LOC new tests (status + plan + fixtures
+    don't count). Plan:
+    `dev/plans/data-inventory-and-reproducibility-2026-05-02.md` §Phase 2.
 ### READY_FOR_REVIEW (Shiller deep-history ingest — 2026-05-17)
 
 - **`shiller` data source** (branch `feat/shiller-ingest`,

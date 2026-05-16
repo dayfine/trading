@@ -1,7 +1,7 @@
 (library
  (name csv)
  (public_name csv)
- (modules csv_storage parser)
+ (modules csv_storage csv_storage_manifest parser)
  (libraries
   bos
   core
@@ -9,6 +9,7 @@
   fpath
   ppx_deriving.runtime
   storage.interface
+  storage.manifest
   types
   unix)
  (preprocess
