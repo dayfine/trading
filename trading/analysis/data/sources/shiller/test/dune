@@ -1,5 +1,13 @@
 (tests
- (names test_shiller_client)
- (libraries shiller core ounit2 matchers status uri)
+ (names test_shiller_client test_shiller_validator)
+ (libraries
+  shiller
+  shiller_validator_core
+  core
+  ounit2
+  matchers
+  status
+  types
+  uri)
  (deps
   (glob_files ./data/*.csv)))

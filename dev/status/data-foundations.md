@@ -390,6 +390,58 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
     Strategy-side wire-up + adjusted-close cross-validation against EODHD
     are follow-ups (belong in `feat-backtest`).
 
+### READY_FOR_REVIEW (Shiller → EODHD adjusted-close validator — 2026-05-17)
+
+- **`shiller_validator` — Shiller vs EODHD `GSPC.INDX` cross-validator**
+  (branch `feat/shiller-validator`,
+  `trading/analysis/data/sources/shiller/bin/`). Pure cross-validation
+  on top of PR #1140's Shiller ingest. Consumes the derived CSV from
+  `fetch_shiller_history.exe` and EODHD's cached SP500 index (default
+  `GSPC.INDX` under `data/G/X/GSPC.INDX/data.csv`), resamples daily →
+  monthly (last trading day per calendar month), aligns on
+  first-of-month, computes signed relative drift, and emits a Markdown
+  report.
+  - `bin/shiller_validator_core.{ml,mli}` (library) — pure pipeline:
+    `resample_daily_to_monthly` / `build_drift_rows` / `compute_stats` /
+    `build_report` / `format_markdown_report` /
+    `parse_shiller_derived_csv` (consumes the 6-column derived CSV
+    produced by `fetch_shiller_history.exe`).
+  - `bin/shiller_validator.ml` (CLI exe) — wires the library to file IO
+    with flags `-shiller-csv`, `-eodhd-cache-dir`, `-index-symbol`
+    (default `GSPC.INDX`), `-threshold` (default `0.005` = 0.5%),
+    `-top-n` (default 10), `-out` (default
+    `dev/data/shiller/validation_report.md`). Missing EODHD cache →
+    graceful no-overlap report (exit 0), not exit 1.
+  - `test/test_shiller_validator.ml` — 14 OUnit2 tests across
+    resampling (last-bar-per-month, empty input), drift computation
+    (signed rel diff, overlap-only join), stats (threshold flagging,
+    empty rows), pipeline (overlap, empty overlap, top-N ordering),
+    Markdown rendering (anchors, empty-overlap surface), and
+    derived-CSV parsing (empty optionals, header drift, empty body).
+  - **Alignment caveat surfaced in `.mli` + Markdown report:**
+    Shiller's monthly price is the *monthly average of daily closing
+    prices* (per his `ie_data` documentation); the validator pairs
+    each Shiller month with the *last trading day* of that calendar
+    month in the EODHD cache. The two definitions diverge by 5-20% in
+    high-volatility months (1929-1940, 1987-10, 2008-09, 2020-02)
+    even when both sources are internally consistent. Persistent
+    monotone drift in recent months would be the real vendor-revision
+    signal; large bidirectional drift in volatile historical months is
+    structural.
+  - **Probe (live, 2026-05-17):** 1865-row Shiller series ×
+    GSPC.INDX cache (1927-12 → 2026-04). 1,181 months compared in
+    overlap. Mean |rel_diff| = 1.94%, max |rel_diff| = 20.36%, 971
+    months flagged at 0.5% threshold. Top drift months cluster in
+    1929-1940 + COVID era — consistent with the
+    average-vs-month-end alignment caveat above, not vendor split
+    drift. No EODHD adjusted-close revision detected.
+  - `dune build && dune runtest analysis/data/sources/shiller/` clean;
+    `dune build @fmt` clean; 14 new validator tests + 15 existing
+    Shiller-client tests all pass.
+  - Sizing: ~410 LOC (`.ml` + `.mli` validator-core 234 + 90 ml + cli
+    87). Tests ~250 LOC. Pinned fixtures not added (validator-core is
+    pure; CLI integration exercised by live probe).
+
 ### Merged (Phase 1.4 IWV scraper stack — 2026-05-16)
 
 All four PRs of the IWV scraper stack landed in a single session per

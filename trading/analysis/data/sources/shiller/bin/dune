@@ -11,6 +11,13 @@
  (preprocess
   (pps ppx_let)))
 
+(library
+ (name shiller_validator_core)
+ (modules shiller_validator_core)
+ (libraries core shiller status types)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
 (executable
  (name fetch_shiller_history)
  (modules fetch_shiller_history)
@@ -23,5 +30,21 @@
   shiller_curl_fetch
   status
   uri)
+ (preprocess
+  (pps ppx_jane)))
+
+(executable
+ (name shiller_validator)
+ (modules shiller_validator)
+ (libraries
+  core
+  core_unix.command_unix
+  core_unix.sys_unix
+  core_unix
+  csv
+  fpath
+  shiller_validator_core
+  status
+  types)
  (preprocess
   (pps ppx_jane)))
