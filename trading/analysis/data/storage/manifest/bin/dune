@@ -1,0 +1,5 @@
+(executable
+ (name manifest_inspect)
+ (public_name manifest_inspect)
+ (package storage)
+ (libraries core core_unix.sys_unix status storage.manifest))

@@ -257,6 +257,24 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
+### Data-inventory + reproducibility track (Phase 1 — 2026-05-17)
+
+- [x] **CSV-layer manifest writer (Phase 1)** — `Manifest` lib + tests +
+  `manifest_inspect.exe` CLI under
+  `trading/analysis/data/storage/manifest/{lib,test,bin}`. Sexp-serialized
+  shard manifests at `<cache>/<L1>/<L2>/manifest.sexp` with per-symbol
+  provenance (source, endpoint, date_range, rows_count, hash,
+  vendor_revision_tag, fetched_at, fetch_id, api_key_id). Atomic-rename
+  write, schema_version guard on read, MD5-via-`Stdlib.Digest` for the
+  hash field (name kept `sha256` for forward compatibility once a real
+  SHA-256 lib lands). 14 OUnit2/Matchers tests covering round-trip,
+  upsert idempotency, find, sha256 of known content, and the
+  missing-file / schema-mismatch error paths. CLI probe on the full
+  `data/` cache (~41.5k symbols) reports `0 manifests / N missing` as
+  expected — write-side integration into `Csv_storage.save` is Phase 2.
+  See `dev/plans/data-inventory-and-reproducibility-2026-05-02.md`
+  §"Phase 1". Interface stable (Phase 2 will extend, not break).
+
 ### Merged (data-pipeline-automation track)
 
 - **#819** — Automation PR 1/4: snapshot build checkpointing
