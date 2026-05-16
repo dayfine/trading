@@ -1,6 +1,23 @@
 open Core
 open Result.Let_syntax
 
+type time_ns = Time_ns.Alternate_sexp.t [@@deriving sexp, compare, equal]
+
+type reconcile_entry = {
+  reconcile_at : time_ns;
+  symbol : string;
+  old_sha256 : string;
+  new_sha256 : string;
+  old_date_range : (Date.t * Date.t) option; [@sexp.option]
+  new_date_range : (Date.t * Date.t) option; [@sexp.option]
+  old_rows_count : int;
+  new_rows_count : int;
+  fetch_id : string;
+}
+[@@deriving sexp, compare, equal]
+
+type reconcile_result = Reconciled of reconcile_entry | Unchanged
+
 let shard_manifest_path ~data_dir symbol =
   let first_char = String.get symbol 0 in
   let last_char = String.get symbol (String.length symbol - 1) in
@@ -145,3 +162,91 @@ let verify ~data_dir ~symbol ~path ~strictness =
         shard_manifest_path ~data_dir symbol |> Fpath.to_string
       in
       _verify_active ~strictness ~symbol ~path ~manifest_path
+
+(* {1 Phase 3 — reconcile-on-refetch diff log} *)
+
+let _reconcile_log_dir = "_reconcile_log"
+
+let _date_shard_of_time t =
+  let date = Time_ns.to_date t ~zone:Time_float.Zone.utc in
+  Date.to_string date
+
+let reconcile_log_path ~data_dir ~reconcile_at symbol =
+  let date_shard = _date_shard_of_time reconcile_at in
+  Fpath.(data_dir / _reconcile_log_dir / date_shard / (symbol ^ ".sexp"))
+
+let _build_reconcile_entry ~prior ~new_sha256 ~new_path ~fetch_id =
+  {
+    reconcile_at = Time_ns.now ();
+    symbol = prior.Manifest.symbol;
+    old_sha256 = prior.Manifest.sha256;
+    new_sha256;
+    old_date_range = prior.Manifest.date_range;
+    new_date_range = _date_range_of_path new_path;
+    old_rows_count = prior.Manifest.rows_count;
+    new_rows_count = _row_count_of_path new_path;
+    fetch_id;
+  }
+
+let _ensure_parent_dir ~path =
+  let dir = Filename.dirname path in
+  match Bos.OS.Dir.create ~path:true (Fpath.v dir) with
+  | Ok _ -> Ok ()
+  | Error (`Msg msg) -> Status.error_internal msg
+
+let _append_sexp_to_file ~path sexp =
+  let oc = Stdlib.open_out_gen [ Open_append; Open_creat ] 0o644 path in
+  Exn.protect
+    ~f:(fun () ->
+      Out_channel.output_string oc (Sexp.to_string_hum sexp);
+      Out_channel.newline oc;
+      Ok ())
+    ~finally:(fun () -> Out_channel.close oc)
+  |> Result.map_error ~f:(fun e ->
+      Status.internal_error
+        (Printf.sprintf "Reconcile log write failed: %s" (Exn.to_string e)))
+
+let _write_reconcile_entry ~data_dir entry =
+  let path =
+    reconcile_log_path ~data_dir ~reconcile_at:entry.reconcile_at entry.symbol
+    |> Fpath.to_string
+  in
+  let%bind () = _ensure_parent_dir ~path in
+  _append_sexp_to_file ~path (sexp_of_reconcile_entry entry)
+
+let _persist_or_warn ~data_dir ~symbol entry =
+  match _write_reconcile_entry ~data_dir entry with
+  | Ok () -> Ok (Reconciled entry)
+  | Error err ->
+      _log_warning "csv_storage: reconcile log write failed for %s: %s" symbol
+        err.message;
+      Ok Unchanged
+
+let _reconcile_against_prior ~data_dir ~new_path ~fetch_id prior =
+  match Manifest.sha256_of_file ~path:new_path with
+  | Error err ->
+      _log_warning "csv_storage: reconcile sha256 failed for %s: %s"
+        prior.Manifest.symbol err.message;
+      Ok Unchanged
+  | Ok new_sha256 when String.equal new_sha256 prior.Manifest.sha256 ->
+      Ok Unchanged
+  | Ok new_sha256 ->
+      let entry =
+        _build_reconcile_entry ~prior ~new_sha256 ~new_path ~fetch_id
+      in
+      _persist_or_warn ~data_dir ~symbol:prior.Manifest.symbol entry
+
+let _reconcile_with_loaded ~data_dir ~symbol ~new_path ~fetch_id m =
+  match Manifest.find m ~symbol with
+  | None -> Ok Unchanged
+  | Some prior -> _reconcile_against_prior ~data_dir ~new_path ~fetch_id prior
+
+let reconcile_on_save ~data_dir ~symbol ~new_path ~fetch_id =
+  let manifest_path = shard_manifest_path ~data_dir symbol |> Fpath.to_string in
+  match Manifest.read ~path:manifest_path with
+  | Error { code = Status.NotFound; _ } -> Ok Unchanged
+  | Error err ->
+      _log_warning "csv_storage: reconcile manifest read failed for %s: %s"
+        symbol err.message;
+      Ok Unchanged
+  | Ok m -> _reconcile_with_loaded ~data_dir ~symbol ~new_path ~fetch_id m

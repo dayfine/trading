@@ -257,6 +257,10 @@ let save t ?(override = false) ?(source = "unknown") ?(endpoint = "")
       _handle_existing_and_new_prices t.path ~override existing_prices prices
     else _write_prices_to_file t.path prices
   in
+  let (_ : Csv_storage_manifest.reconcile_result Status.status_or) =
+    Csv_storage_manifest.reconcile_on_save ~data_dir:t.data_dir ~symbol:t.symbol
+      ~new_path:t.path ~fetch_id
+  in
   Csv_storage_manifest.update_for_save ~data_dir:t.data_dir ~symbol:t.symbol
     ~path:t.path ~source ~endpoint ~vendor_revision_tag ~fetch_id ~api_key_id
 
