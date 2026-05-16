@@ -1,22 +1,23 @@
 (** Pure scoring function for the Phase 3 Bayesian optimizer.
 
-    Consumes a per-cell walk-forward {!Walk_forward.Walk_forward_types.aggregate}
-    plus a baseline aggregate (always Cell E on the same walk-forward spec) and
-    returns the BO loop's "higher is better" score for that cell. Splitting the
-    scorer out of {!Tuner_bin.Bayesian_runner_evaluator} keeps it pure and
-    unit-testable: the evaluator (PR-C) calls this function after running the
-    walk-forward CV; this module never touches the filesystem, never spawns a
-    subprocess, never reads a config.
+    Consumes a per-cell walk-forward
+    {!Walk_forward.Walk_forward_types.aggregate} plus a baseline aggregate
+    (always Cell E on the same walk-forward spec) and returns the BO loop's
+    "higher is better" score for that cell. Splitting the scorer out of
+    {!Tuner_bin.Bayesian_runner_evaluator} keeps it pure and unit-testable: the
+    evaluator (PR-C) calls this function after running the walk-forward CV; this
+    module never touches the filesystem, never spawns a subprocess, never reads
+    a config.
 
-    Scoring formula (plan
-    [dev/plans/bayesian-multi-param-scaling-2026-05-16.md] §3.1):
+    Scoring formula (plan [dev/plans/bayesian-multi-param-scaling-2026-05-16.md]
+    §3.1):
 
-    {[
-      loss(cell) = -mean_sharpe(cell)
-                 + lambda_dd  * max(0, mean_maxdd(cell) - baseline_maxdd)
-                 + lambda_gate * gate_penalty(cell)
+    {v
+      loss(cell)  = -mean_sharpe(cell)
+                  + lambda_dd  * max(0, mean_maxdd(cell) - baseline_maxdd)
+                  + lambda_gate * gate_penalty(cell)
       score(cell) = -loss(cell)
-    ]}
+    v}
 
     where:
 
@@ -46,13 +47,13 @@
       {!Walk_forward.Walk_forward_report.compute}) collapses to the same penalty
       — no special case.
 
-    Hyperparameter tuning rationale lives in the plan §3.1; the constants
-    below are exposed in the mli so callers can introspect them (e.g. for
-    diagnostic output) but the values are pinned, not overridable. *)
+    Hyperparameter tuning rationale lives in the plan §3.1; the constants below
+    are exposed in the mli so callers can introspect them (e.g. for diagnostic
+    output) but the values are pinned, not overridable. *)
 
 val _lambda_dd : float
-(** Penalty coefficient on excess MaxDD over baseline. Default [0.10] —
-    every 1pp of excess MaxDD costs 0.10 units of Sharpe-equivalent loss. *)
+(** Penalty coefficient on excess MaxDD over baseline. Default [0.10] — every
+    1pp of excess MaxDD costs 0.10 units of Sharpe-equivalent loss. *)
 
 val _gate_penalty_value : float
 (** Magnitude of the gate-fail penalty. Default [10.0] — chosen to dominate any
@@ -93,8 +94,8 @@ val score_cell :
     [candidate_aggregate] and [baseline_aggregate] are produced by
     {!Walk_forward.Walk_forward_report.compute}. The candidate aggregate is the
     output of the walk-forward run for the cell under test; the baseline
-    aggregate is the Cell E reference run on the SAME walk-forward spec
-    (window / fold layout / gate).
+    aggregate is the Cell E reference run on the SAME walk-forward spec (window
+    / fold layout / gate).
 
     Error cases (each carrying a structured {!Status.t}):
 
@@ -104,8 +105,8 @@ val score_cell :
       [candidate_aggregate.verdicts].
     - [Status.NotFound] when [baseline_label] is not present in
       [baseline_aggregate.stability].
-    - [Status.Invalid_argument] when [candidate_aggregate.fold_count = 0] —
-      a zero-fold aggregate cannot yield a meaningful mean Sharpe.
+    - [Status.Invalid_argument] when [candidate_aggregate.fold_count = 0] — a
+      zero-fold aggregate cannot yield a meaningful mean Sharpe.
 
     Determinism: same inputs → byte-identical [float] output (modulo IEEE-754
     quirks; no floating-point reduction order dependencies because the
