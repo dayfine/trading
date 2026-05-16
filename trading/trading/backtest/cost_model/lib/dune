@@ -1,0 +1,5 @@
+(library
+ (name backtest_cost_model)
+ (libraries core status trading.base trading.engine)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
