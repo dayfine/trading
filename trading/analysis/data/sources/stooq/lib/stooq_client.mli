@@ -23,8 +23,8 @@
     instructing the caller to obtain an apikey at
     [https://stooq.com/q/d/?s=<symbol>.us&get_apikey]. The apikey is free but
     requires manual captcha completion. Live fetches in
-    [bin/stooq_curl_fetch.ml] take the apikey via env var [STOOQ_APIKEY] or
-    CLI flag.
+    [bin/stooq_curl_fetch.ml] take the apikey via env var [STOOQ_APIKEY] or CLI
+    flag.
 
     This module is pure: no IO. {!parse} consumes a CSV body string;
     {!build_uri} constructs the canonical request URI; {!is_apikey_error_body}
@@ -58,9 +58,9 @@ val parse : string -> series Status.status_or
     Expected header: [Date,Open,High,Low,Close,Volume] (6 columns). Each data
     row is [YYYY-MM-DD,OPEN,HIGH,LOW,CLOSE,VOLUME].
 
-    Returns [Ok series] on success; [Error _] on structural failure (missing
-    or drifted header, empty body, unparseable date, unparseable numeric,
-    wrong column count on a data row).
+    Returns [Ok series] on success; [Error _] on structural failure (missing or
+    drifted header, empty body, unparseable date, unparseable numeric, wrong
+    column count on a data row).
 
     {!is_apikey_error_body} should be checked {b before} calling {!parse}: an
     apikey-error body is structurally not a CSV (no header line) and would
@@ -69,8 +69,8 @@ val parse : string -> series Status.status_or
 val build_uri : ?apikey:string -> symbol:string -> unit -> Uri.t
 (** [build_uri ~symbol ?apikey ()] constructs the Stooq daily-CSV request URI.
 
-    [symbol] is the bare ticker; this function lowercases it and appends
-    [".us"] (Stooq's US-market suffix; e.g. [AAPL] becomes [aapl.us]).
+    [symbol] is the bare ticker; this function lowercases it and appends [".us"]
+    (Stooq's US-market suffix; e.g. [AAPL] becomes [aapl.us]).
 
     [?apikey] appends the [apikey] query parameter when provided. Without it,
     the live endpoint returns the apikey-error body rather than CSV — that
@@ -82,9 +82,9 @@ val build_uri : ?apikey:string -> symbol:string -> unit -> Uri.t
 val is_apikey_error_body : string -> bool
 (** [is_apikey_error_body body] returns [true] if [body] looks like Stooq's
     apikey-required sentinel response (verified 2026-05-17). The sentinel is
-    HTTP 200 + a plaintext body that opens with
-    [Get your apikey:] and contains a [get_apikey] hint URL.
+    HTTP 200 + a plaintext body that opens with [Get your apikey:] and contains
+    a [get_apikey] hint URL.
 
     Callers should branch on this before attempting {!parse} so the
-    "apikey-missing" failure mode produces a clear error message rather than
-    a structural CSV-parse failure deep in the parser. *)
+    "apikey-missing" failure mode produces a clear error message rather than a
+    structural CSV-parse failure deep in the parser. *)

@@ -1,28 +1,27 @@
 (** Pure drift-comparison logic for Stooq vs EODHD daily OHLCV.
 
-    Pairs each EODHD bar with the Stooq observation for the same trading
-    date, computes signed relative diff on Stooq [close] vs EODHD
-    [adjusted_close], and emits a summary report.
+    Pairs each EODHD bar with the Stooq observation for the same trading date,
+    computes signed relative diff on Stooq [close] vs EODHD [adjusted_close],
+    and emits a summary report.
 
     {b Why [adjusted_close] and not [close_price]:} Stooq's [Close] is
     split-adjusted (historical bars are restated whenever a split occurs);
-    EODHD's [close_price] is the raw closing price as printed on the tape
-    (NOT split-adjusted), while EODHD's [adjusted_close] is both
-    split-adjusted AND dividend-adjusted. Comparing Stooq's split-adjusted
-    [close] against EODHD's raw [close_price] would produce post-split
-    ratios as massive false-positive drift (e.g. AAPL 4-for-1 split on
-    2020-08-31 produces ~300% drift on pre-split dates).
+    EODHD's [close_price] is the raw closing price as printed on the tape (NOT
+    split-adjusted), while EODHD's [adjusted_close] is both split-adjusted AND
+    dividend-adjusted. Comparing Stooq's split-adjusted [close] against EODHD's
+    raw [close_price] would produce post-split ratios as massive false-positive
+    drift (e.g. AAPL 4-for-1 split on 2020-08-31 produces ~300% drift on
+    pre-split dates).
 
     The trade-off: Stooq is split-adjusted but NOT dividend-adjusted; EODHD
-    [adjusted_close] is both. Expect structural ~1-2% drift across the
-    overlap window from dividend-adjustment alone. The audit signal we
-    care about is {b sudden discontinuities} in the drift series (e.g. a
-    cliff of >5% drift suddenly appearing across a single day boundary)
-    indicating a vendor split-revision G14-class bug — not the level of
-    the baseline drift itself.
+    [adjusted_close] is both. Expect structural ~1-2% drift across the overlap
+    window from dividend-adjustment alone. The audit signal we care about is
+    {b sudden discontinuities} in the drift series (e.g. a cliff of >5% drift
+    suddenly appearing across a single day boundary) indicating a vendor
+    split-revision G14-class bug — not the level of the baseline drift itself.
 
-    Pure module — no IO. The companion executable [stooq_drift_check.ml]
-    handles file IO + CLI wiring + curl. *)
+    Pure module — no IO. The companion executable [stooq_drift_check.ml] handles
+    file IO + CLI wiring + curl. *)
 
 open! Core
 
@@ -34,16 +33,15 @@ type drift_row = {
       (** EODHD's [adjusted_close] (split-adjusted AND dividend-adjusted). *)
   rel_diff : float;
       (** [(eodhd_adj_close - stooq_close) / stooq_close]. Signed: positive
-          means EODHD reads higher than Stooq. Stooq is the denominator
-          because it is the {b reference / second source} in this audit. *)
+          means EODHD reads higher than Stooq. Stooq is the denominator because
+          it is the {b reference / second source} in this audit. *)
 }
 [@@deriving show, eq]
 (** A single aligned trading day with its computed relative drift. *)
 
 type stats = {
   n_compared : int;  (** Total days in the overlap. *)
-  n_flagged : int;
-      (** Days whose [|rel_diff|] exceeds the threshold. *)
+  n_flagged : int;  (** Days whose [|rel_diff|] exceeds the threshold. *)
   mean_abs_rel_diff : float;
       (** Mean of [|rel_diff|] across compared days. [0.0] when no overlap. *)
   max_abs_rel_diff : float;
@@ -66,10 +64,10 @@ type report = {
       (** EODHD days absent from Stooq (informational; bars not compared). *)
   stats : stats;
   flagged_rows : drift_row list;
-      (** Days whose [|rel_diff|] exceeded the threshold, sorted descending
-          by [|rel_diff|]. The full row list is intentionally NOT exposed so
-          large overlaps don't bloat the report; if you need all rows,
-          consume {!build_drift_rows} directly. *)
+      (** Days whose [|rel_diff|] exceeded the threshold, sorted descending by
+          [|rel_diff|]. The full row list is intentionally NOT exposed so large
+          overlaps don't bloat the report; if you need all rows, consume
+          {!build_drift_rows} directly. *)
 }
 [@@deriving show, eq]
 (** Full drift report for a single symbol. *)
@@ -95,13 +93,13 @@ val build_report :
   eodhd:Types.Daily_price.t list ->
   threshold:float ->
   report
-(** [build_report ~symbol ~stooq ~eodhd ~threshold] is the full pipeline:
-    align, compute stats, collect flagged rows (descending |rel_diff|),
-    surface stooq-only / eodhd-only date counts.
+(** [build_report ~symbol ~stooq ~eodhd ~threshold] is the full pipeline: align,
+    compute stats, collect flagged rows (descending |rel_diff|), surface
+    stooq-only / eodhd-only date counts.
 
     [threshold] is a relative-diff cutoff, e.g. [0.005] = 0.5%. *)
 
 val format_text_report : report -> string
-(** [format_text_report r] renders [r] as a human-readable plaintext summary
-    for stdout. Includes header line, overlap range, stats, flagged-row
-    counts, and the top 10 flagged days. *)
+(** [format_text_report r] renders [r] as a human-readable plaintext summary for
+    stdout. Includes header line, overlap range, stats, flagged-row counts, and
+    the top 10 flagged days. *)

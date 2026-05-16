@@ -10,14 +10,7 @@ let _date y m d = Date.create_exn ~y ~m ~d
    Builders"). *)
 
 let _stooq ~date ~close : Client.daily_observation =
-  {
-    date;
-    open_ = close;
-    high = close;
-    low = close;
-    close;
-    volume = 0;
-  }
+  { date; open_ = close; high = close; low = close; close; volume = 0 }
 
 (* The drift check pairs Stooq.close against EODHD.adjusted_close (both
    split-adjusted). The [close_price] field is set the same value here for
@@ -152,7 +145,8 @@ let test_compute_stats_threshold_flagging _ =
          field (fun s -> s.n_compared) (equal_to 3);
          field (fun s -> s.n_flagged) (equal_to 2);
          field (fun s -> s.max_abs_rel_diff) (float_equal ~epsilon:1e-9 0.02);
-         field (fun s -> s.mean_abs_rel_diff)
+         field
+           (fun s -> s.mean_abs_rel_diff)
            (float_equal ~epsilon:1e-9 ((0.004 +. 0.01 +. 0.02) /. 3.0));
        ])
 
@@ -188,20 +182,21 @@ let test_build_report_overlap_and_top_flagged _ =
       (* flagged, biggest *)
     ]
   in
-  let report =
-    build_report ~symbol:"aapl" ~stooq ~eodhd ~threshold:0.005
-  in
+  let report = build_report ~symbol:"aapl" ~stooq ~eodhd ~threshold:0.005 in
   assert_that report
     (all_of
        [
          field (fun r -> r.symbol) (equal_to "AAPL");
-         field (fun r -> r.overlap_first)
+         field
+           (fun r -> r.overlap_first)
            (is_some_and (equal_to (_date 2020 Month.Jan 2)));
-         field (fun r -> r.overlap_last)
+         field
+           (fun r -> r.overlap_last)
            (is_some_and (equal_to (_date 2020 Month.Jan 6)));
          field (fun r -> r.stats.n_compared) (equal_to 3);
          field (fun r -> r.stats.n_flagged) (equal_to 2);
-         field (fun r -> r.flagged_rows)
+         field
+           (fun r -> r.flagged_rows)
            (elements_are
               [
                 field (fun row -> row.date) (equal_to (_date 2020 Month.Jan 6));

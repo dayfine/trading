@@ -29,7 +29,14 @@ type report = {
 [@@deriving show, eq]
 
 let _flagged_top_n_for_report = 10
-let _empty_stats = { n_compared = 0; n_flagged = 0; mean_abs_rel_diff = 0.0; max_abs_rel_diff = 0.0 }
+
+let _empty_stats =
+  {
+    n_compared = 0;
+    n_flagged = 0;
+    mean_abs_rel_diff = 0.0;
+    max_abs_rel_diff = 0.0;
+  }
 
 (* Join two ascending-by-date series on [date]. Stooq dates may include
    weekends? No — Stooq's daily-cadence CSV is trading-day cadence. Both
@@ -99,13 +106,11 @@ let _top_flagged ~threshold rows =
   rows
   |> List.filter ~f:(fun r -> Float.( > ) (_abs_rel_diff r) threshold)
   |> List.sort ~compare:(fun a b ->
-         Float.compare (_abs_rel_diff b) (_abs_rel_diff a))
+      Float.compare (_abs_rel_diff b) (_abs_rel_diff a))
   |> fun sorted -> List.take sorted _flagged_top_n_for_report
 
 let build_report ~symbol ~stooq ~eodhd ~threshold =
-  let pairs, stooq_only_count, eodhd_only_count =
-    _merge_by_date stooq eodhd
-  in
+  let pairs, stooq_only_count, eodhd_only_count = _merge_by_date stooq eodhd in
   let rows = List.map pairs ~f:_pair_to_row in
   let stats = compute_stats ~threshold rows in
   let overlap_first, overlap_last = _overlap_endpoints rows in
@@ -120,9 +125,7 @@ let build_report ~symbol ~stooq ~eodhd ~threshold =
     flagged_rows = _top_flagged ~threshold rows;
   }
 
-let _format_date_or_na = function
-  | None -> "n/a"
-  | Some d -> Date.to_string d
+let _format_date_or_na = function None -> "n/a" | Some d -> Date.to_string d
 
 let _format_summary_lines (r : report) =
   [
@@ -144,8 +147,7 @@ let _format_summary_lines (r : report) =
 
 let _format_row_line (r : drift_row) =
   Printf.sprintf "    %s  stooq=%.4f  eodhd_adj=%.4f  rel_diff=%+.4f%%"
-    (Date.to_string r.date) r.stooq_close r.eodhd_adj_close
-    (r.rel_diff *. 100.0)
+    (Date.to_string r.date) r.stooq_close r.eodhd_adj_close (r.rel_diff *. 100.0)
 
 let _format_flagged_section (r : report) =
   match r.flagged_rows with

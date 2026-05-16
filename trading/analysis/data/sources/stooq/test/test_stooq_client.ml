@@ -135,8 +135,7 @@ let test_build_uri_with_apikey _ =
   assert_that uri_str
     (all_of
        [
-         contains_substring "s=aapl.us";
-         contains_substring "apikey=TESTKEY123";
+         contains_substring "s=aapl.us"; contains_substring "apikey=TESTKEY123";
        ])
 
 (* The apikey-error sentinel verbatim from the 2026-05-17 probe. *)
@@ -146,7 +145,8 @@ let _apikey_error_body =
    2. Enter the captcha code.\n\
    3. Copy the CSV download link at the bottom of the page - it will contain \
    the <apikey> variable.\n\
-   4. Append the <apikey> variable with its value to your requests, e.g.\n   \
+   4. Append the <apikey> variable with its value to your requests, e.g.\n\
+  \   \
    https://stooq.com/q/d/l/?s=aapl.us&i=d&apikey=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n"
 
 let test_apikey_error_body_detected _ =
@@ -175,8 +175,7 @@ let suite =
          "test_unparseable_numeric_is_error"
          >:: test_unparseable_numeric_is_error;
          "test_utf8_bom_is_tolerated" >:: test_utf8_bom_is_tolerated;
-         "test_build_uri_default_no_apikey"
-         >:: test_build_uri_default_no_apikey;
+         "test_build_uri_default_no_apikey" >:: test_build_uri_default_no_apikey;
          "test_build_uri_lowercases_symbol" >:: test_build_uri_lowercases_symbol;
          "test_build_uri_appends_us_suffix" >:: test_build_uri_appends_us_suffix;
          "test_build_uri_with_apikey" >:: test_build_uri_with_apikey;
