@@ -65,9 +65,10 @@ type report = {
   stats : stats;
   flagged_rows : drift_row list;
       (** Days whose [|rel_diff|] exceeded the threshold, sorted descending by
-          [|rel_diff|]. The full row list is intentionally NOT exposed so large
-          overlaps don't bloat the report; if you need all rows, consume
-          {!build_drift_rows} directly. *)
+          [|rel_diff|], capped at the top {b 10} rows. The full row list is
+          intentionally NOT exposed so large overlaps don't bloat the report; if
+          you need all rows, consume {!build_drift_rows} directly. The top-10
+          cap is a fixed report constant (not a configurable parameter). *)
 }
 [@@deriving show, eq]
 (** Full drift report for a single symbol. *)

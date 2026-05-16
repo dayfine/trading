@@ -255,6 +255,28 @@ let test_format_text_report_contains_summary_lines _ =
          contains_substring "days flagged:  1";
        ])
 
+let test_build_report_flagged_rows_capped_at_top_10 _ =
+  (* Pins the top-10 cap on flagged_rows (per stooq_drift_check_core.mli). *)
+  let n = 15 in
+  let stooq =
+    List.init n ~f:(fun i ->
+        _stooq ~date:(_date 2020 Month.Jan (i + 1)) ~close:100.0)
+  in
+  let eodhd =
+    List.init n ~f:(fun i ->
+        _eodhd
+          ~date:(_date 2020 Month.Jan (i + 1))
+          ~adj_close:(100.0 +. Float.of_int (i + 1)))
+  in
+  let report = build_report ~symbol:"x" ~stooq ~eodhd ~threshold:0.005 in
+  assert_that report
+    (all_of
+       [
+         field (fun r -> r.stats.n_compared) (equal_to n);
+         field (fun r -> r.stats.n_flagged) (equal_to n);
+         field (fun r -> List.length r.flagged_rows) (equal_to 10);
+       ])
+
 let suite =
   "stooq_drift_check_core"
   >::: [
@@ -277,6 +299,8 @@ let suite =
          >:: test_build_report_counts_unmatched_dates;
          "test_format_text_report_contains_summary_lines"
          >:: test_format_text_report_contains_summary_lines;
+         "test_build_report_flagged_rows_capped_at_top_10"
+         >:: test_build_report_flagged_rows_capped_at_top_10;
        ]
 
 let () = run_test_tt_main suite

@@ -12,10 +12,12 @@
     the primary source itself.
 
     {b Adjustment caveat.} Stooq's [Close] column is split-adjusted but NOT
-    dividend-adjusted by default. Compare against EODHD's [close_price] (not
-    [adjusted_close]) for a clean apples-to-apples drift check; comparing
-    against EODHD [adjusted_close] will show structural ~1-2% drift from
-    dividend adjustment alone.
+    dividend-adjusted by default. This module is the pure parser; the
+    comparison-field decision (Stooq [close] vs EODHD [adjusted_close] vs EODHD
+    [close_price]) lives in [bin/stooq_drift_check_core.mli]'s "Comparison
+    field" section — comparing against the wrong EODHD field introduces large
+    structural drift (e.g. ~300% post-split false positives if comparing
+    pre-split prices against EODHD [close_price]).
 
     {b Apikey gate (verified 2026-05-17).} Stooq's CSV endpoint
     [https://stooq.com/q/d/l/?s=<symbol>.us&i=d] {b requires an apikey} as of
@@ -38,8 +40,8 @@ type daily_observation = {
   high : float;  (** High price (split-adjusted, dividend-unadjusted). *)
   low : float;  (** Low price (split-adjusted, dividend-unadjusted). *)
   close : float;
-      (** Close price (split-adjusted, dividend-unadjusted). The primary drift
-          comparison field against EODHD [close_price]. *)
+      (** Close price (split-adjusted, dividend-unadjusted). See module-level
+          docstring for the comparison-field caveat. *)
   volume : int;
       (** Trading volume. Stooq emits this as an integer; 0 indicates the
           underlying was an index or otherwise non-volume-bearing. *)
