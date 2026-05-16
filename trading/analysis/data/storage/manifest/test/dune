@@ -1,0 +1,10 @@
+(test
+ (name test_manifest)
+ (libraries
+  core
+  core_unix.filename_unix
+  core_unix.time_ns_unix
+  matchers
+  ounit2
+  status
+  storage.manifest))
