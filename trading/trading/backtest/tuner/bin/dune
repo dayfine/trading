@@ -7,7 +7,8 @@
   bayesian_runner_spec
   bayesian_runner_evaluator
   bayesian_runner_runner
-  bayesian_runner_scoring)
+  bayesian_runner_scoring
+  bayesian_runner_oos_validator)
  (libraries
   core
   core_unix
@@ -29,4 +30,11 @@
 (executable
  (name bayesian_runner)
  (modules bayesian_runner)
- (libraries core core_unix tuner backtest scenario_lib tuner_bin))
+ (libraries
+  core
+  core_unix
+  tuner
+  backtest
+  scenario_lib
+  tuner_bin
+  walk_forward))
