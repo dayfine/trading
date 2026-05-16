@@ -21,6 +21,7 @@ type t = {
   n_acquisition_candidates : int option;
   objective : objective_spec;
   scenarios : string list;
+  holdout_folds : int list option; [@sexp.option]
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 

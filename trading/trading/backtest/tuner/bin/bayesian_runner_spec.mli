@@ -59,6 +59,15 @@ type t = {
       (** Paths to scenario sexp files, resolved relative to the current working
           directory and loaded via {!Scenario_lib.Scenario.load} when the binary
           runs the evaluator. *)
+  holdout_folds : int list option;
+      (** Phase-3 walk-forward holdout (PR-B). When [Some [k1; ...; kn]], the
+          listed 1-indexed fold positions are reserved as out-of-sample
+          validation and excluded from BO scoring per plan §6.2 of
+          [dev/plans/bayesian-multi-param-scaling-2026-05-16.md]. When [None]
+          (or omitted from the sexp), the BO uses every fold as in-sample. PR-B
+          only pins the parsed shape; PR-C will thread the list through the
+          walk-forward executor's fold filter, and PR-E will re-run the best
+          cell on the held-out folds. *)
 }
 [@@deriving sexp]
 (** A Bayesian-optimisation spec on disk. Example sexp:
@@ -71,7 +80,11 @@ type t = {
       (n_acquisition_candidates ())
       (objective Sharpe)
       (scenarios "trading/test_data/backtest_scenarios/smoke/bull-2019.sexp")
-    ]} *)
+      (holdout_folds (27 28 29 30))
+    ]}
+    The [holdout_folds] tag is optional ([\@sexp.option]): omit it entirely for
+    [None]; write [(holdout_folds (k1 ... kn))] for [Some [k1; ...; kn]]; write
+    [(holdout_folds ())] for [Some []]. *)
 
 val load : string -> t
 (** Load and parse a spec sexp file. Raises [Failure] on malformed input. *)
