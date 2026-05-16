@@ -41,8 +41,16 @@ val curl_args : body_tempfile:string -> Uri.t -> string list
     [body_tempfile] (curl's [-o]); the HTTP status code is written to curl's
     stdout (curl's [-w "%{http_code}"]).
 
-    Browser-mimicking headers (UA / Accept / Accept-Language / Referer) are
-    added unconditionally. *)
+    Forces HTTP/2 ([--http2]) to match the browser's negotiated protocol —
+    Akamai fingerprints the UA-vs-HTTP-version mismatch and serves an HTML
+    interstitial on HTTP/1.1 with a Chrome UA.
+
+    Browser-mimicking headers added unconditionally:
+    - [User-Agent], [Accept], [Accept-Language], [Referer] (PR #1131).
+    - [Sec-Fetch-Dest], [Sec-Fetch-Mode], [Sec-Fetch-Site] — browser same-origin
+      XHR fingerprint.
+    - [sec-ch-ua], [sec-ch-ua-mobile], [sec-ch-ua-platform] — Chrome client
+      hints (brand list, mobile flag, platform). *)
 
 val classify_curl_output :
   uri:Uri.t -> body:string -> Process.Output.t -> Lib.fetch_attempt

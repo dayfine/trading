@@ -23,6 +23,7 @@ let test_curl_args_full_argv_shape _ =
     (elements_are
        [
          equal_to "-sS";
+         equal_to "--http2";
          equal_to "--max-time";
          equal_to (Int.to_string Curl_fetch.curl_max_time_seconds);
          equal_to "-H";
@@ -37,6 +38,23 @@ let test_curl_args_full_argv_shape _ =
          contains_substring "Accept-Language: en-US";
          equal_to "-H";
          contains_substring "Referer: https://www.ishares.com/";
+         equal_to "-H";
+         contains_substring "Sec-Fetch-Dest: empty";
+         equal_to "-H";
+         contains_substring "Sec-Fetch-Mode: cors";
+         equal_to "-H";
+         contains_substring "Sec-Fetch-Site: same-origin";
+         equal_to "-H";
+         all_of
+           [
+             contains_substring "sec-ch-ua:";
+             contains_substring "Google Chrome";
+             contains_substring "v=\"120\"";
+           ];
+         equal_to "-H";
+         contains_substring "sec-ch-ua-mobile: ?0";
+         equal_to "-H";
+         contains_substring "sec-ch-ua-platform: \"macOS\"";
          equal_to "-o";
          equal_to "/tmp/iwv_body_abc.csv";
          equal_to "-w";
