@@ -65,16 +65,16 @@ let _decode_sexp ~path =
       Status.error_internal
         (Printf.sprintf "Manifest.read: sexp decode: %s" (Exn.to_string exn))
 
+let _schema_version_error ~path ~got =
+  let message =
+    Printf.sprintf "Manifest.read: %s schema_version=%d expected %d" path got
+      current_schema_version
+  in
+  Status.{ code = Failed_precondition; message }
+
 let _check_schema_version t ~path =
   if t.schema_version <> current_schema_version then
-    Error
-      Status.
-        {
-          code = Failed_precondition;
-          message =
-            Printf.sprintf "Manifest.read: %s schema_version=%d expected %d"
-              path t.schema_version current_schema_version;
-        }
+    Error (_schema_version_error ~path ~got:t.schema_version)
   else Ok t
 
 let read ~path =
