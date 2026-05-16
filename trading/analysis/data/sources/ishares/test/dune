@@ -8,6 +8,8 @@
   ishares
   fetch_iwv_history_lib
   build_iwv_universe_lib
+  async
+  async_unix
   core
   core_unix.filename_unix
   core_unix.sys_unix

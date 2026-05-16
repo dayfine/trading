@@ -1,7 +1,7 @@
 (library
  (name fetch_iwv_history_lib)
  (modules fetch_iwv_history_lib)
- (libraries core core_unix.sys_unix core_unix ishares status)
+ (libraries core core_unix.sys_unix core_unix async ishares status)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
 
