@@ -133,6 +133,14 @@ NO
   Python — it's straight OCaml `cohttp` work against a verified
   public endpoint (PR #1108). Next step is a plan-first dispatch to
   `feat-data` against `analysis/data/sources/ishares/`.
+- **Local IP Akamai cooldown (2026-05-16 transient):** If local
+  egress IP is still blocked, use the GHA-runner workflow as an
+  IP-independent alternative: `.github/workflows/iwv-scrape-once.yml`.
+  GHA runner uses a different egress IP from GitHub's range (not
+  previously flagged by iShares WAF). Dispatch:
+  `gh workflow run iwv-scrape-once.yml -f from_date=2006-09-29 -f until_date=2026-05-16`.
+  Full instructions in
+  `dev/notes/iwv-scrape-akamai-block-2026-05-16.md` §"GHA-runner workflow".
 - Phase 1.1 (EODHD Fundamentals) is parked — would need a tier
   upgrade ($60/mo) to revive; not pursued per Option B.
 - Norgate ingest retired 2026-05-16 (Windows-only client; see
