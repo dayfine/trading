@@ -86,7 +86,10 @@ let test_load_simple_spec_parses _ =
       assert_that spec.initial_random (equal_to 5);
       assert_that spec.total_budget (equal_to 30);
       assert_that spec.seed (is_some_and (equal_to 17));
-      assert_that spec.n_acquisition_candidates is_none)
+      assert_that spec.n_acquisition_candidates is_none;
+      (* The simple fixture omits [holdout_folds]; [@sexp.option] parses
+         the absence as [None]. *)
+      assert_that spec.holdout_folds is_none)
 
 let _ucb_spec_text =
   String.concat
@@ -166,6 +169,7 @@ let test_to_bo_config_propagates_fields _ =
       n_acquisition_candidates = None;
       objective = Spec.Sharpe;
       scenarios = [ "s" ];
+      holdout_folds = None;
     }
   in
   let config = Spec.to_bo_config spec in
@@ -198,6 +202,7 @@ let _parabola_spec ~total_budget ~seed : Spec.t =
     n_acquisition_candidates = None;
     objective = Spec.Sharpe;
     scenarios = [ "stub-scenario" ];
+    holdout_folds = None;
   }
 
 let test_run_and_write_emits_three_artefacts _ =
@@ -281,6 +286,173 @@ let test_evaluator_unknown_scenario_raises _ =
   in
   assert_that raised (equal_to true)
 
+(* ---------- holdout_folds field (PR-B) ---------- *)
+
+(** PR-B: pin the parsed shape of the optional [holdout_folds] field. The field
+    uses [\@sexp.option] so absence in the sexp parses as [None]; presence
+    parses as [Some [..]] (including the empty-list edge case). PR-C will thread
+    the list into the walk-forward executor; PR-B is shape-only. *)
+
+let _spec_with_holdout_text holdout_clause =
+  String.concat
+    [
+      "((bounds (";
+      "  (initial_stop_buffer (0.5 2.0))))";
+      " (acquisition Expected_improvement)";
+      " (initial_random 5)";
+      " (total_budget 30)";
+      " (seed (7))";
+      " (n_acquisition_candidates ())";
+      " (objective Sharpe)";
+      " (scenarios ())";
+      " ";
+      holdout_clause;
+      ")";
+    ]
+    ~sep:"\n"
+
+let test_holdout_folds_present_parses_to_some _ =
+  _with_temp_dir (fun dir ->
+      let path =
+        _write_spec_file dir
+          (_spec_with_holdout_text "(holdout_folds (27 28 29 30))")
+      in
+      let spec = Spec.load path in
+      assert_that spec.holdout_folds
+        (is_some_and
+           (elements_are [ equal_to 27; equal_to 28; equal_to 29; equal_to 30 ])))
+
+let test_holdout_folds_empty_list_parses_to_some_empty _ =
+  (* Edge case: a present-but-empty list is distinct from an omitted field
+     under [\@sexp.option]: [(holdout_folds ())] parses to [Some []], while
+     omission parses to [None]. Pinning both keeps PR-C honest when it adds
+     a fold filter — an empty list should mean "explicitly no holdouts",
+     not "default to all folds in-sample". *)
+  _with_temp_dir (fun dir ->
+      let path =
+        _write_spec_file dir (_spec_with_holdout_text "(holdout_folds ())")
+      in
+      let spec = Spec.load path in
+      assert_that spec.holdout_folds (is_some_and (size_is 0)))
+
+let test_holdout_folds_omitted_parses_to_none _ =
+  (* Already covered by [test_load_simple_spec_parses]; re-pin here as the
+     primary holdout-folds contract so the file's intent is greppable. *)
+  _with_temp_dir (fun dir ->
+      let path = _write_spec_file dir _spec_text in
+      let spec = Spec.load path in
+      assert_that spec.holdout_folds is_none)
+
+let _spec_record_with_holdout holdout : Spec.t =
+  {
+    bounds = [ ("initial_stop_buffer", (0.5, 2.0)) ];
+    acquisition = Spec.Expected_improvement;
+    initial_random = 5;
+    total_budget = 30;
+    seed = Some 7;
+    n_acquisition_candidates = None;
+    objective = Spec.Sharpe;
+    scenarios = [];
+    holdout_folds = holdout;
+  }
+
+let test_holdout_folds_round_trip_none _ =
+  (* Round-trip: [t -> sexp -> t] preserves [holdout_folds = None]. With
+     [\@sexp.option], the serialised sexp omits the field entirely, and
+     re-parsing yields [None] (not e.g. [Some []]). *)
+  let original = _spec_record_with_holdout None in
+  let round_tripped = Spec.t_of_sexp (Spec.sexp_of_t original) in
+  assert_that round_tripped.holdout_folds is_none
+
+let test_holdout_folds_round_trip_some _ =
+  let original = _spec_record_with_holdout (Some [ 27; 28; 29; 30 ]) in
+  let round_tripped = Spec.t_of_sexp (Spec.sexp_of_t original) in
+  assert_that round_tripped.holdout_folds
+    (is_some_and
+       (elements_are [ equal_to 27; equal_to 28; equal_to 29; equal_to 30 ]))
+
+let test_holdout_folds_round_trip_some_empty _ =
+  let original = _spec_record_with_holdout (Some []) in
+  let round_tripped = Spec.t_of_sexp (Spec.sexp_of_t original) in
+  assert_that round_tripped.holdout_folds (is_some_and (size_is 0))
+
+(* ---------- production fixture: bayesian-multi-param-2026-05-16.sexp ---- *)
+
+(** Walk the cwd up until we hit a directory containing
+    [trading/test_data/tuner/]. Mirrors the helper in [Walk_forward.test_spec];
+    needed because [dune runtest]'s cwd is
+    [_build/default/trading/backtest/tuner/bin/test]. *)
+let _tuner_fixtures_root () =
+  let target = "trading/test_data/tuner" in
+  let rec walk_up dir tries_left =
+    if tries_left = 0 then None
+    else
+      let candidate = Filename.concat dir target in
+      if try Stdlib.Sys.is_directory candidate with _ -> false then
+        Some candidate
+      else
+        let parent = Filename.dirname dir in
+        if String.equal parent dir then None else walk_up parent (tries_left - 1)
+  in
+  walk_up (Stdlib.Sys.getcwd ()) 10
+
+let _tuner_fixture_path name =
+  match _tuner_fixtures_root () with
+  | Some root -> Filename.concat root name
+  | None ->
+      OUnit2.assert_failure
+        (sprintf "tuner fixtures dir not found from cwd %s"
+           (Stdlib.Sys.getcwd ()))
+
+let test_phase3_fixture_parses _ =
+  (* PR-B acceptance criterion: the production Phase-3 BO spec sexp parses
+     without error and pins the 11-knob curated surface + the (27 28 29 30)
+     OOS holdout. Asserting on [List.length spec.bounds] guards against
+     accidental knob churn. *)
+  let spec =
+    Spec.load (_tuner_fixture_path "bayesian-multi-param-2026-05-16.sexp")
+  in
+  assert_that spec
+    (all_of
+       [
+         field (fun (s : Spec.t) -> s.bounds) (size_is 11);
+         field
+           (fun (s : Spec.t) -> s.acquisition)
+           (equal_to Spec.Expected_improvement);
+         field (fun (s : Spec.t) -> s.initial_random) (equal_to 25);
+         field (fun (s : Spec.t) -> s.total_budget) (equal_to 100);
+         field (fun (s : Spec.t) -> s.seed) (is_some_and (equal_to 2026));
+         field
+           (fun (s : Spec.t) -> s.holdout_folds)
+           (is_some_and
+              (elements_are
+                 [ equal_to 27; equal_to 28; equal_to 29; equal_to 30 ]));
+       ])
+
+let test_phase3_fixture_bounds_cover_expected_tracks _ =
+  (* The 11-knob curation is structured across four tracks. Asserting the
+     full key list (in order) guards against silent drift between the plan
+     and the fixture. *)
+  let spec =
+    Spec.load (_tuner_fixture_path "bayesian-multi-param-2026-05-16.sexp")
+  in
+  let keys = List.map spec.bounds ~f:fst in
+  assert_that keys
+    (elements_are
+       [
+         equal_to "initial_stop_buffer";
+         equal_to "screening_config.candidate_params.initial_stop_pct";
+         equal_to "screening_config.candidate_params.installed_stop_min_pct";
+         equal_to "screening_config.candidate_params.entry_buffer_pct";
+         equal_to "portfolio_config.max_position_pct_long";
+         equal_to "portfolio_config.max_long_exposure_pct";
+         equal_to "portfolio_config.risk_per_trade_pct";
+         equal_to "stage3_force_exit_config.hysteresis_weeks";
+         equal_to "laggard_rotation_config.hysteresis_weeks";
+         equal_to "screening_config.weights.w_positive_rs";
+         equal_to "screening_config.weights.w_strong_volume";
+       ])
+
 let suite =
   "Tuner_bin.Bayesian_runner"
   >::: [
@@ -304,6 +476,22 @@ let suite =
          >:: test_determinism_same_seed_byte_identical_log;
          "Evaluator.build: unknown scenario path raises Failure"
          >:: test_evaluator_unknown_scenario_raises;
+         "Spec.load: holdout_folds present -> Some [..]"
+         >:: test_holdout_folds_present_parses_to_some;
+         "Spec.load: holdout_folds () -> Some []"
+         >:: test_holdout_folds_empty_list_parses_to_some_empty;
+         "Spec.load: holdout_folds omitted -> None"
+         >:: test_holdout_folds_omitted_parses_to_none;
+         "Spec round-trip: holdout_folds = None"
+         >:: test_holdout_folds_round_trip_none;
+         "Spec round-trip: holdout_folds = Some [..]"
+         >:: test_holdout_folds_round_trip_some;
+         "Spec round-trip: holdout_folds = Some []"
+         >:: test_holdout_folds_round_trip_some_empty;
+         "Phase-3 fixture: bayesian-multi-param-2026-05-16.sexp parses"
+         >:: test_phase3_fixture_parses;
+         "Phase-3 fixture: 11 knobs in expected order"
+         >:: test_phase3_fixture_bounds_cover_expected_tracks;
        ]
 
 let () = run_test_tt_main suite

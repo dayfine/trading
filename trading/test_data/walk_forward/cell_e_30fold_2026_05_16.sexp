@@ -41,4 +41,11 @@
  ;; fold worse by >0.30 Sharpe. We're gating on cell-A vs cell-E
  ;; (cell-E is baseline), so a PASS would mean cell-E feature
  ;; bundle is NOT a net win — signal worth investigating.
- (gate ((metric Sharpe) (m 17) (n 30) (worst_delta 0.30))))
+ (gate ((metric Sharpe) (m 17) (n 30) (worst_delta 0.30)))
+ ;; Phase 3 BO holdout: the last 4 folds (1-indexed 27-30, covering
+ ;; ~2024-04 to 2026-04 by anchor stride) are reserved as
+ ;; out-of-sample validation for the Bayesian tuner per plan §6.2.
+ ;; The walk-forward runner ignores this field
+ ;; ([\@\@sexp.allow_extra_fields] on Spec.t); the BO scorer consumes
+ ;; it via the Phase-3 Bayesian_runner_spec.
+ (holdout_folds (27 28 29 30)))

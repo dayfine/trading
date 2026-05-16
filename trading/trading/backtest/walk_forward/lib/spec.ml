@@ -7,6 +7,6 @@ type t = {
   baseline_label : string;
   gate : Fold_gate.t;
 }
-[@@deriving sexp]
+[@@deriving sexp] [@@sexp.allow_extra_fields]
 
 let load path : t = t_of_sexp (Sexp.load_sexp path)

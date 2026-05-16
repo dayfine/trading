@@ -12,7 +12,13 @@ type t = {
   gate : Fold_gate.t;
 }
 [@@deriving sexp]
-(** Top-level spec the binary reads via [Sexp.load_sexp] + [t_of_sexp]. *)
+(** Top-level spec the binary reads via [Sexp.load_sexp] + [t_of_sexp].
+
+    The underlying record allows extra sexp fields
+    ([\@\@sexp.allow_extra_fields]) so spec files may carry metadata that the
+    runner does not consume directly (e.g. a [holdout_folds] block used by the
+    Bayesian tuner to mark folds excluded from BO scoring — the walk-forward
+    runner itself ignores the list). *)
 
 val load : string -> t
 (** [load path] = [Sexp.load_sexp path |> t_of_sexp]. Raises [Failure] / sexp

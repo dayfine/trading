@@ -10,4 +10,6 @@
   tuner_bin
   trading.simulation.types)
  (preprocess
-  (pps ppx_sexp_conv)))
+  (pps ppx_sexp_conv))
+ (deps
+  (glob_files_rec %{workspace_root}/test_data/tuner/*.sexp)))
