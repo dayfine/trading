@@ -3,10 +3,12 @@
   test_ishares_holdings_client
   test_ishares_membership_replay
   test_fetch_iwv_history_lib
+  test_iwv_curl_fetch
   test_build_iwv_universe_lib)
  (libraries
   ishares
   fetch_iwv_history_lib
+  iwv_curl_fetch
   build_iwv_universe_lib
   async
   async_unix
