@@ -1,6 +1,6 @@
-(** Pure-precondition validators for [Bayesian_opt] config fields. Each
-    function raises [Invalid_argument] with a [Bayesian_opt.create:] prefix
-    when the precondition fails; returns [()] otherwise. *)
+(** Pure-precondition validators for [Bayesian_opt] config fields. Each function
+    raises [Invalid_argument] with a [Bayesian_opt.create:] prefix when the
+    precondition fails; returns [()] otherwise. *)
 
 val bound : string * (float * float) -> unit
 (** Bound for parameter [k] must satisfy [lo <= hi]. *)
@@ -21,4 +21,5 @@ val config :
   early_stop:(int * float) option ->
   unit
 (** Composite check: non-empty bounds, all bounds valid, non-negative
-    [initial_random] and [total_budget], length-scales valid, early-stop valid. *)
+    [initial_random] and [total_budget], length-scales valid, early-stop valid.
+*)

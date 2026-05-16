@@ -8,8 +8,8 @@ let bound (k, (lo, hi)) =
 
 let _length_scales_dim_msg ~got ~expected =
   sprintf
-    "Bayesian_opt.create: length_scales dim %d disagrees with bounds dim %d"
-    got expected
+    "Bayesian_opt.create: length_scales dim %d disagrees with bounds dim %d" got
+    expected
 
 let _length_scales_dim_check ~expected scales =
   let got = Array.length scales in
