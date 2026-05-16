@@ -428,6 +428,59 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
     `analysis/`. Bulk-fetch across the full 41k EODHD cache and
     auto-driven detection over many symbols are deferred (Phase 2+).
 
+### READY_FOR_REVIEW (CSV-manifest Phase 3 — reconcile-on-refetch diff log — 2026-05-17)
+
+- **`Csv_storage_manifest.reconcile_on_save`** (branch
+  `feat/manifest-phase3-reconcile`,
+  `trading/analysis/data/storage/csv/lib/`). Closes the loop on the
+  three-phase CSV-manifest stack (#1142 manifest writer, #1148 hash-verify
+  on load, #1149 bulk-rehash CLI): when a refetch produces content that
+  differs from what the prior manifest entry recorded, the new
+  `reconcile_on_save` captures a structured diff entry under
+  `<data-dir>/_reconcile_log/<YYYY-MM-DD>/<symbol>.sexp` **before** the
+  manifest upsert overwrites the prior entry. Surfaces vendor revision
+  drift, accidental overwrites, and upstream point-in-time changes that
+  would otherwise be silent.
+  - `csv_storage_manifest.{ml,mli}` (+182 LOC) — new types
+    `reconcile_entry` and `reconcile_result = Reconciled _ | Unchanged`;
+    new entry points `reconcile_log_path` (pure path) and
+    `reconcile_on_save` (the wire-in). The diff schema records
+    `reconcile_at`, `symbol`, `old_sha256` / `new_sha256`, `old_date_range`
+    / `new_date_range`, `old_rows_count` / `new_rows_count`, and the
+    caller-supplied `fetch_id`. Date sharding is UTC so log entries are
+    stable across hosts.
+  - `csv_storage.ml` (+4 LOC) — `save` now invokes `reconcile_on_save`
+    between the CSV write and the manifest upsert. The reconcile pass is
+    best-effort: any failure (manifest read, sha256, log-file write) logs
+    a warning to stderr and surfaces as `Ok Unchanged`. The CSV write has
+    already succeeded by the time reconcile runs, so a failed reconcile
+    log must never block the save.
+  - 5 new OUnit2 tests under `csv/test/test_csv_storage.ml`: refetch with
+    byte-identical content writes no log; refetch with mutated content
+    writes a per-symbol sexp under the right date shard with all fields
+    populated; date-shard layout verified by listing the directory;
+    first save (no prior entry) skips reconcile entirely; non-fatal
+    failure path verified by planting a non-directory at the
+    `_reconcile_log` mount point.
+  - **Schema design note:** the plan
+    `dev/plans/data-inventory-and-reproducibility-2026-05-02.md` reserves
+    "Phase 3" for the fetch-log writer (JSONL) and "Phase 4" for a
+    reconciliation tool. This PR implements the **inline** reconciliation
+    half of Phase 4 (the part that lives in the save path itself) since
+    Phase 2 (#1148) explicitly listed it as out-of-scope-deferred-to-Phase-3.
+    The fetch-log writer remains a separate follow-up. Schema designed in
+    the .mli docstring per the task brief.
+  - Out-of-scope: querying / folding over the reconcile log (separate
+    CLI); automatic alerting on reconcile entries; fetch-log JSONL writer.
+  - Linters green: `dune build @fmt`, `no_python_check`,
+    `fn_length_linter` (longest new function ≤ 12 LOC),
+    `linter_magic_numbers`, `nesting_linter`. `dune runtest
+    analysis/data/storage/csv` clean (30 tests, +5 new reconcile tests).
+  - Sizing: 362 LOC total diff (105 in `csv_storage_manifest.ml`, 77 in
+    `.mli`, 4 in `csv_storage.ml`, 175 in tests, 1 dune line). Plan:
+    `dev/plans/data-inventory-and-reproducibility-2026-05-02.md` §Phase 4
+    (inline reconciliation half).
+
 ### READY_FOR_REVIEW (CSV-manifest Phase 3 — bulk-rehash CLI — 2026-05-17)
 
 - **`manifest_rehash` CLI** (branch `feat/manifest-bulk-rehash`,
