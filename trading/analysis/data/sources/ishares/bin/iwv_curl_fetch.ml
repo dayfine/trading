@@ -20,6 +20,23 @@ let _accept_language_header = "en-US,en;q=0.9"
 let _referer_header =
   "https://www.ishares.com/us/products/239714/ishares-russell-3000-etf"
 
+(* Browser-fingerprint hint headers Chrome emits on every request. The
+   ajax CSV endpoint is a same-origin XHR from the iShares product page,
+   so the Sec-Fetch trio mirrors what a real browser would send. The
+   sec-ch-ua client hints announce the brand list (Chrome 120 on macOS,
+   non-mobile). 2026-05-16: PR #1137 (curl shell-out) was insufficient
+   on both local and GHA runner egress IPs; this is the cheapest
+   remaining probe before paying for a scraper-API.
+   See [dev/notes/iwv-scrape-akamai-block-2026-05-16.md] §"Next options" #1. *)
+let _sec_fetch_dest_header = "empty"
+let _sec_fetch_mode_header = "cors"
+let _sec_fetch_site_header = "same-origin"
+
+let _sec_ch_ua_header =
+  "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\""
+
+let _sec_ch_ua_mobile_header = "?0"
+let _sec_ch_ua_platform_header = "\"macOS\""
 let curl_path = "curl"
 let curl_max_time_seconds = 30
 let curl_retryable_exit_codes = [ 6; 7; 28; 35; 52; 56 ]
@@ -34,6 +51,7 @@ let _is_retryable_http_status = function
 let curl_args ~body_tempfile uri : string list =
   [
     "-sS";
+    "--http2";
     "--max-time";
     Int.to_string curl_max_time_seconds;
     "-H";
@@ -44,6 +62,18 @@ let curl_args ~body_tempfile uri : string list =
     "Accept-Language: " ^ _accept_language_header;
     "-H";
     "Referer: " ^ _referer_header;
+    "-H";
+    "Sec-Fetch-Dest: " ^ _sec_fetch_dest_header;
+    "-H";
+    "Sec-Fetch-Mode: " ^ _sec_fetch_mode_header;
+    "-H";
+    "Sec-Fetch-Site: " ^ _sec_fetch_site_header;
+    "-H";
+    "sec-ch-ua: " ^ _sec_ch_ua_header;
+    "-H";
+    "sec-ch-ua-mobile: " ^ _sec_ch_ua_mobile_header;
+    "-H";
+    "sec-ch-ua-platform: " ^ _sec_ch_ua_platform_header;
     "-o";
     body_tempfile;
     "-w";
