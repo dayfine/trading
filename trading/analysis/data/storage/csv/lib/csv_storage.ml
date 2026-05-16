@@ -53,6 +53,13 @@ let symbol_data_dir ~data_dir symbol =
   let last_char = String.get symbol (String.length symbol - 1) in
   Fpath.(data_dir / String.make 1 first_char / String.make 1 last_char / symbol)
 
+let shard_manifest_path ~data_dir symbol =
+  let first_char = String.get symbol 0 in
+  let last_char = String.get symbol (String.length symbol - 1) in
+  Fpath.(
+    data_dir / String.make 1 first_char / String.make 1 last_char
+    / "manifest.sexp")
+
 let _create_symbol_dirs data_dir symbol =
   if String.is_empty symbol then
     Status.error_invalid_argument "Symbol cannot be empty"
@@ -162,12 +169,12 @@ let _handle_existing_and_new_prices path ~override existing_prices new_prices =
         in
         _write_prices_to_file path merged
 
-type t = { path : string }
+type t = { path : string; data_dir : Fpath.t; symbol : string }
 
 let create ?(data_dir = _default_data_dir) symbol =
   let%bind symbol_dir = _create_symbol_dirs data_dir symbol in
   let path = Fpath.(symbol_dir / "data.csv") in
-  Ok { path = Fpath.to_string path }
+  Ok { path = Fpath.to_string path; data_dir; symbol }
 
 let _in_date_range ~start_date ~end_date (price : Types.Daily_price.t) =
   let date = price.date in
@@ -239,11 +246,24 @@ let get t ?start_date ?end_date () =
         "start_date must be before or equal to end_date"
   | _ -> Ok prices
 
-let save t ?(override = false) prices =
+let save t ?(override = false) ?(source = "unknown") ?(endpoint = "")
+    ?(vendor_revision_tag = "") ?(fetch_id = "") ?(api_key_id = "") prices =
   let open Result.Let_syntax in
   let%bind () = _validate_prices prices in
-  let exists = Sys_unix.file_exists t.path in
-  if phys_equal exists `Yes then
-    let%bind existing_prices = get t () in
-    _handle_existing_and_new_prices t.path ~override existing_prices prices
-  else _write_prices_to_file t.path prices
+  let%bind () =
+    let exists = Sys_unix.file_exists t.path in
+    if phys_equal exists `Yes then
+      let%bind existing_prices = get t () in
+      _handle_existing_and_new_prices t.path ~override existing_prices prices
+    else _write_prices_to_file t.path prices
+  in
+  Csv_storage_manifest.update_for_save ~data_dir:t.data_dir ~symbol:t.symbol
+    ~path:t.path ~source ~endpoint ~vendor_revision_tag ~fetch_id ~api_key_id
+
+let load_with_verify t ?(strictness = `Warn) ?start_date ?end_date () =
+  let open Result.Let_syntax in
+  let%bind () =
+    Csv_storage_manifest.verify ~data_dir:t.data_dir ~symbol:t.symbol
+      ~path:t.path ~strictness
+  in
+  get t ?start_date ?end_date ()

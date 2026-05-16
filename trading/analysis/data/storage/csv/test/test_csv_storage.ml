@@ -2,6 +2,7 @@ open OUnit2
 open Bos
 open Core
 open Csv.Csv_storage
+open Matchers
 open Status
 
 let ok_or_failwith_status = function
@@ -395,6 +396,155 @@ let test_read_legacy_7col_csv _ =
       String.concat ~sep:"\n" (List.map ps ~f:Types.Daily_price.show))
     expected retrieved
 
+(* {1 Phase 2 — manifest integration} *)
+
+(* The shard manifest path is derived from the symbol's [<L1>/<L2>] sharding
+   rule so every test that wants to inspect or tamper with the manifest can
+   do so without re-implementing the path math. *)
+let _manifest_path_for symbol =
+  Csv.Csv_storage.shard_manifest_path ~data_dir:test_dir symbol
+  |> Fpath.to_string
+
+let _csv_path_for symbol =
+  let dir = Csv.Csv_storage.symbol_data_dir ~data_dir:test_dir symbol in
+  Fpath.(dir / "data.csv") |> Fpath.to_string
+
+(* After a successful [save], the per-shard manifest contains an entry for
+   the saved symbol whose sha256 matches the on-disk file. The row count
+   and date range are derived from the written CSV. *)
+let test_save_writes_manifest_entry _ =
+  let symbol = "MAN1" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status
+    (save storage ~source:"EODHD" ~endpoint:"/eod/MAN1" ~fetch_id:"req-1" prices);
+  let manifest =
+    Manifest.read ~path:(_manifest_path_for symbol) |> ok_or_failwith_status
+  in
+  let csv_hash =
+    Manifest.sha256_of_file ~path:(_csv_path_for symbol)
+    |> ok_or_failwith_status
+  in
+  assert_that
+    (Manifest.find manifest ~symbol)
+    (is_some_and
+       (all_of
+          [
+            field (fun e -> e.Manifest.symbol) (equal_to symbol);
+            field (fun e -> e.Manifest.source) (equal_to "EODHD");
+            field (fun e -> e.Manifest.endpoint) (equal_to "/eod/MAN1");
+            field (fun e -> e.Manifest.fetch_id) (equal_to "req-1");
+            field (fun e -> e.Manifest.sha256) (equal_to csv_hash);
+            field (fun e -> e.Manifest.rows_count) (equal_to 4);
+          ]))
+
+(* Two saves for the same symbol must produce a single entry — the second
+   write upserts the first rather than appending. *)
+let test_save_upserts_manifest_entry _ =
+  let symbol = "MAN2" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  ok_or_failwith_status (save storage ~override:true prices);
+  let manifest =
+    Manifest.read ~path:(_manifest_path_for symbol) |> ok_or_failwith_status
+  in
+  assert_that
+    (List.count manifest.entries ~f:(fun e -> String.equal e.symbol symbol))
+    (equal_to 1)
+
+(* [load_with_verify] returns the same rows as [get] when the manifest entry
+   matches the on-disk file. *)
+let test_load_with_verify_round_trip _ =
+  let symbol = "VER1" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  assert_that
+    (load_with_verify storage ~strictness:`Strict ())
+    (is_ok_and_holds (size_is (List.length prices)))
+
+(* Corrupting the on-disk CSV after save trips the strict-mode hash check
+   with a [Status.Internal] error. The Manifest's hash stays at the original
+   file's digest because we never call [save] again. *)
+let _tamper_csv path =
+  let oc = Stdlib.open_out_gen [ Open_append ] 0o666 path in
+  Out_channel.output_string oc "# tamper\n";
+  Out_channel.close oc
+
+let test_load_with_verify_strict_detects_tampering _ =
+  let symbol = "VER2" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  _tamper_csv (_csv_path_for symbol);
+  assert_that
+    (load_with_verify storage ~strictness:`Strict ())
+    (is_error_with Internal)
+
+(* [`Warn] mode tolerates a hash mismatch — the parser-valid replacement
+   loads as [Ok] and the mismatch is only logged to stderr. The replaced
+   CSV has one valid row so the parser succeeds; the on-disk sha256 differs
+   from the manifest entry written by [save]. *)
+let test_load_with_verify_warn_tolerates_mismatch _ =
+  let symbol = "VER3" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  let path = _csv_path_for symbol in
+  let oc = Stdlib.open_out path in
+  Out_channel.output_string oc
+    "date,open,high,low,close,adjusted_close,volume,active_through\n\
+     2024-03-19,100.0,105.0,98.0,103.0,103.0,9999,\n";
+  Out_channel.close oc;
+  assert_that
+    (load_with_verify storage ~strictness:`Warn ())
+    (is_ok_and_holds (size_is 1))
+
+(* [`Off] mode never reads the manifest and never errors on hash mismatch. *)
+let test_load_with_verify_off_skips_check _ =
+  let symbol = "VER4" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  let path = _csv_path_for symbol in
+  let oc = Stdlib.open_out path in
+  Out_channel.output_string oc
+    "date,open,high,low,close,adjusted_close,volume,active_through\n\
+     2024-03-19,100.0,105.0,98.0,103.0,103.0,1,\n";
+  Out_channel.close oc;
+  assert_that
+    (load_with_verify storage ~strictness:`Off ())
+    (is_ok_and_holds (size_is 1))
+
+(* Legacy data (CSV present, no manifest sidecar) must load cleanly under
+   both [`Strict] and [`Warn] — there is no claim to verify. *)
+let test_load_with_verify_no_manifest_strict _ =
+  let symbol = "LEG1" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  (* Write the CSV directly so no manifest is created. *)
+  let path = _csv_path_for symbol in
+  let oc = Stdlib.open_out path in
+  Out_channel.output_string oc
+    "date,open,high,low,close,adjusted_close,volume,active_through\n\
+     2024-03-19,100.0,105.0,98.0,103.0,103.0,1000,\n";
+  Out_channel.close oc;
+  (* The manifest sidecar should not exist for this shard before we load. *)
+  let manifest_path = _manifest_path_for symbol in
+  (try Stdlib.Sys.remove manifest_path with _ -> ());
+  assert_that
+    (load_with_verify storage ~strictness:`Strict ())
+    (is_ok_and_holds (size_is 1))
+
+let test_load_with_verify_no_manifest_warn _ =
+  let symbol = "LEG2" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  let path = _csv_path_for symbol in
+  let oc = Stdlib.open_out path in
+  Out_channel.output_string oc
+    "date,open,high,low,close,adjusted_close,volume,active_through\n\
+     2024-03-19,100.0,105.0,98.0,103.0,103.0,1000,\n";
+  Out_channel.close oc;
+  let manifest_path = _manifest_path_for symbol in
+  (try Stdlib.Sys.remove manifest_path with _ -> ());
+  assert_that
+    (load_with_verify storage ~strictness:`Warn ())
+    (is_ok_and_holds (size_is 1))
+
 let suite =
   "CSV Storage tests"
   >::: [
@@ -425,6 +575,19 @@ let suite =
          "test_save_and_get_with_active_through"
          >:: test_save_and_get_with_active_through;
          "test_read_legacy_7col_csv" >:: test_read_legacy_7col_csv;
+         "test_save_writes_manifest_entry" >:: test_save_writes_manifest_entry;
+         "test_save_upserts_manifest_entry" >:: test_save_upserts_manifest_entry;
+         "test_load_with_verify_round_trip" >:: test_load_with_verify_round_trip;
+         "test_load_with_verify_strict_detects_tampering"
+         >:: test_load_with_verify_strict_detects_tampering;
+         "test_load_with_verify_warn_tolerates_mismatch"
+         >:: test_load_with_verify_warn_tolerates_mismatch;
+         "test_load_with_verify_off_skips_check"
+         >:: test_load_with_verify_off_skips_check;
+         "test_load_with_verify_no_manifest_strict"
+         >:: test_load_with_verify_no_manifest_strict;
+         "test_load_with_verify_no_manifest_warn"
+         >:: test_load_with_verify_no_manifest_warn;
        ]
 
 let () =
