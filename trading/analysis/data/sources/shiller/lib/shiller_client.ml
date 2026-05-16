@@ -56,13 +56,41 @@ let _parse_float ~column raw =
 let _optional_of_sentinel f =
   if Float.equal f _sentinel_zero then None else Some f
 
+let _parse_observation ~date_s ~price_s ~div_s ~earn_s ~cpi_s ~rate_s :
+    monthly_observation Status.status_or =
+  let open Result.Let_syntax in
+  let%bind period = _parse_date date_s in
+  let%bind sp_price = _parse_float ~column:"SP500" price_s in
+  let%bind dividend = _parse_float ~column:"Dividend" div_s in
+  let%bind earnings = _parse_float ~column:"Earnings" earn_s in
+  let%bind cpi = _parse_float ~column:"Consumer Price Index" cpi_s in
+  let%bind long_rate = _parse_float ~column:"Long Interest Rate" rate_s in
+  Ok
+    {
+      period;
+      sp_price;
+      dividend = _optional_of_sentinel dividend;
+      earnings = _optional_of_sentinel earnings;
+      cpi = _optional_of_sentinel cpi;
+      long_rate = _optional_of_sentinel long_rate;
+    }
+
+let _column_count_error line_num raw_line n =
+  Status.error_invalid_argument
+    (Printf.sprintf "shiller_client: line %d has %d columns (expected %d): %S"
+       line_num n _expected_column_count raw_line)
+
+(* Defensive branch: [List.length = _expected_column_count] above implies the
+   destructuring is total, but the compiler can't prove that statically. *)
+let _unreachable_destructure_error line_num =
+  Status.error_internal
+    (Printf.sprintf "shiller_client: unreachable destructure on line %d"
+       line_num)
+
 let _parse_row line_num raw_line : monthly_observation Status.status_or =
   let fields = String.split raw_line ~on:',' in
   let n = List.length fields in
-  if n <> _expected_column_count then
-    Status.error_invalid_argument
-      (Printf.sprintf "shiller_client: line %d has %d columns (expected %d): %S"
-         line_num n _expected_column_count raw_line)
+  if n <> _expected_column_count then _column_count_error line_num raw_line n
   else
     match fields with
     | [
@@ -77,29 +105,8 @@ let _parse_row line_num raw_line : monthly_observation Status.status_or =
      _real_e;
      _pe10;
     ] ->
-        let open Result.Let_syntax in
-        let%bind period = _parse_date date_s in
-        let%bind sp_price = _parse_float ~column:"SP500" price_s in
-        let%bind dividend = _parse_float ~column:"Dividend" div_s in
-        let%bind earnings = _parse_float ~column:"Earnings" earn_s in
-        let%bind cpi = _parse_float ~column:"Consumer Price Index" cpi_s in
-        let%bind long_rate = _parse_float ~column:"Long Interest Rate" rate_s in
-        Ok
-          {
-            period;
-            sp_price;
-            dividend = _optional_of_sentinel dividend;
-            earnings = _optional_of_sentinel earnings;
-            cpi = _optional_of_sentinel cpi;
-            long_rate = _optional_of_sentinel long_rate;
-          }
-    | _ ->
-        (* Defensive: [List.length = _expected_column_count] above implies
-           the destructuring is total, but the compiler can't prove that
-           statically. *)
-        Status.error_internal
-          (Printf.sprintf "shiller_client: unreachable destructure on line %d"
-             line_num)
+        _parse_observation ~date_s ~price_s ~div_s ~earn_s ~cpi_s ~rate_s
+    | _ -> _unreachable_destructure_error line_num
 
 let _strip_bom s =
   let bom = "\xEF\xBB\xBF" in
