@@ -1,4 +1,5 @@
 open Core
+open Async
 
 type cadence = Auto | Daily | Monthly | Quarterly [@@deriving show, eq]
 
@@ -148,3 +149,30 @@ let write_sentinel_marker ~cache_dir ~as_of =
   _write_file_atomic
     ~path:(sentinel_path ~cache_dir ~as_of)
     ~contents:_sentinel_marker_payload
+
+(* ------------------------------------------------------------------------- *)
+(* HTTP retry with exponential backoff                                       *)
+(* ------------------------------------------------------------------------- *)
+
+type fetch_attempt =
+  | Ok_body of string
+  | Retryable_error of string
+  | Fatal_error of string
+
+(* Recursive driver: walks [backoff_seconds] sleeping between attempts.
+   The first attempt runs immediately. On a [Retryable_error], if more
+   backoff intervals remain, sleep for the next interval and retry; if not,
+   surface the last error. [Fatal_error] short-circuits without retrying. *)
+let rec _retry_loop ~fetch ~sleep ~backoff_seconds uri =
+  fetch uri >>= function
+  | Ok_body body -> return (Result.Ok body)
+  | Fatal_error msg -> return (Status.error_internal msg)
+  | Retryable_error msg -> (
+      match backoff_seconds with
+      | [] -> return (Status.error_internal msg)
+      | next_delay :: rest ->
+          sleep next_delay >>= fun () ->
+          _retry_loop ~fetch ~sleep ~backoff_seconds:rest uri)
+
+let retry_with_backoff ~fetch ~sleep ~backoff_seconds uri =
+  _retry_loop ~fetch ~sleep ~backoff_seconds uri

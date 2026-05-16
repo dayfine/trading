@@ -100,3 +100,35 @@ val write_sentinel_marker :
   cache_dir:string -> as_of:Date.t -> unit Status.status_or
 (** [write_sentinel_marker] creates a one-byte marker file at [sentinel_path].
 *)
+
+(** Outcome of one HTTP attempt, classified for retry decisions.
+
+    [Ok_body body] — request succeeded with the response body.
+    [Retryable_error msg] — transient failure (HTTP 503 / 429 / 502 / 504); the
+    caller should sleep + retry up to the configured attempt budget.
+    [Fatal_error msg] — non-retryable failure (4xx other than 429, network
+    error, parse error); the caller should give up immediately. *)
+type fetch_attempt =
+  | Ok_body of string
+  | Retryable_error of string
+  | Fatal_error of string
+
+val retry_with_backoff :
+  fetch:(Uri.t -> fetch_attempt Async.Deferred.t) ->
+  sleep:(float -> unit Async.Deferred.t) ->
+  backoff_seconds:float list ->
+  Uri.t ->
+  string Status.status_or Async.Deferred.t
+(** [retry_with_backoff ~fetch ~sleep ~backoff_seconds uri] performs up to
+    [1 + List.length backoff_seconds] HTTP attempts.
+
+    The first attempt runs immediately. On a [Retryable_error], the helper
+    sleeps for the next backoff interval (in seconds) and re-attempts. On
+    [Ok_body], it returns [Ok body] immediately. On [Fatal_error], it returns
+    the error immediately without retrying. After exhausting the backoff list,
+    if the last attempt was still a [Retryable_error], it surfaces that as the
+    final error.
+
+    [sleep] is parameterised to make the helper unit-testable — production
+    callers pass [Clock.after ... Time_float.Span.of_sec]; tests pass a no-op
+    recorder. *)
