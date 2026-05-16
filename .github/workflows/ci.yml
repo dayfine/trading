@@ -76,7 +76,10 @@ jobs:
           # Find libta-lib.so and verify it contains no AVX-512 instructions.
           # AVX-512 instructions (zmm registers, evex prefix, KNC) cause SIGILL
           # on GHA runners that don't support AVX-512 (most ubuntu-latest hosts).
-          TA_LIB_SO=$(ldconfig -p | grep 'libta-lib' | awk '{print $NF}' | head -1)
+          # awk's no-match exit code is 0 (unlike grep's 1), so this survives
+          # `set -eo pipefail` when libta-lib is absent — the case we want to
+          # report as a WARNING below, not silently abort.
+          TA_LIB_SO=$(ldconfig -p | awk '/libta-lib/ {print $NF; exit}')
           if [ -z "$TA_LIB_SO" ]; then
             echo "WARNING: libta-lib.so not found via ldconfig — may not be installed yet"
           else
