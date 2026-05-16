@@ -1,0 +1,10 @@
+(lang dune 3.17)
+
+(name stooq)
+
+(generate_opam_files true)
+
+(package
+ (name stooq)
+ (depends ocaml base core re uri ppx_deriving)
+ (tags ()))

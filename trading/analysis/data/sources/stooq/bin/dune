@@ -1,0 +1,40 @@
+(library
+ (name stooq_curl_fetch)
+ (modules stooq_curl_fetch)
+ (libraries
+  core
+  core_unix.filename_unix
+  core_unix.sys_unix
+  async
+  async_unix
+  uri)
+ (preprocess
+  (pps ppx_let)))
+
+(library
+ (name stooq_drift_check_core)
+ (modules stooq_drift_check_core)
+ (libraries core stooq types)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name stooq_drift_check)
+ (modules stooq_drift_check)
+ (libraries
+  core
+  core_unix.command_unix
+  core_unix.sys_unix
+  core_unix
+  async
+  async_unix
+  csv
+  fpath
+  status
+  stooq
+  stooq_curl_fetch
+  stooq_drift_check_core
+  types
+  uri)
+ (preprocess
+  (pps ppx_jane)))
