@@ -545,6 +545,172 @@ let test_load_with_verify_no_manifest_warn _ =
     (load_with_verify storage ~strictness:`Warn ())
     (is_ok_and_holds (size_is 1))
 
+(* {1 Phase 3 — reconcile-on-refetch diff log} *)
+
+let _reconcile_dir = Fpath.(test_dir / "_reconcile_log")
+
+(* The reconcile log is rooted at [test_data/_reconcile_log/]. Tests share the
+   same [test_dir] across cases (setup runs once), so each reconcile-test must
+   reset the reconcile-log tree up front to be order-independent. *)
+let _reset_reconcile_dir () =
+  let path = Fpath.to_string _reconcile_dir in
+  match Sys_unix.file_exists path with
+  | `No | `Unknown -> ()
+  | `Yes -> (
+      (* The dir may have been replaced with a regular file by the
+         failure-injection test; try the file removal first, then the
+         recursive-directory removal as a fallback. *)
+      try Stdlib.Sys.remove path
+      with _ ->
+        ok_or_failwith_os_error (OS.Dir.delete ~recurse:true _reconcile_dir))
+
+(* True iff a per-symbol reconcile entry has been written under any date shard
+   below [_reconcile_dir]. Used to assert presence/absence without baking in
+   today's UTC date as a literal. *)
+let _reconcile_log_for symbol =
+  let recon_path = Fpath.to_string _reconcile_dir in
+  match Sys_unix.file_exists recon_path with
+  | `No | `Unknown -> None
+  | `Yes ->
+      let dates = Sys_unix.readdir recon_path |> Array.to_list in
+      List.find_map dates ~f:(fun d ->
+          let p =
+            Fpath.(_reconcile_dir / d / (symbol ^ ".sexp")) |> Fpath.to_string
+          in
+          match Sys_unix.file_exists p with `Yes -> Some p | _ -> None)
+
+(* A refetch with byte-identical content produces no reconcile entry. The
+   sha256 of the new file matches the prior manifest entry, so [save] takes
+   the [Unchanged] branch and no per-symbol log file is written. *)
+let test_reconcile_no_op_when_content_unchanged _ =
+  _reset_reconcile_dir ();
+  let symbol = "REC1" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  ok_or_failwith_status (save storage ~override:true prices);
+  assert_that (_reconcile_log_for symbol) is_none
+
+(* Refetch with different rows on the same date triggers a reconcile entry.
+   The entry's [old_*] fields come from the prior manifest entry; [new_*]
+   fields are derived from the post-save on-disk file. *)
+let test_reconcile_writes_entry_when_content_changes _ =
+  _reset_reconcile_dir ();
+  let symbol = "REC2" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status
+    (save storage ~source:"EODHD" ~fetch_id:"req-old" prices);
+  let prior_manifest =
+    Manifest.read ~path:(_manifest_path_for symbol) |> ok_or_failwith_status
+  in
+  let prior_entry =
+    match Manifest.find prior_manifest ~symbol with
+    | Some e -> e
+    | None -> assert_failure "expected manifest entry from first save"
+  in
+  let mutated_prices =
+    List.map prices ~f:(fun p ->
+        { p with Types.Daily_price.close_price = p.close_price +. 1.0 })
+  in
+  ok_or_failwith_status
+    (save storage ~override:true ~source:"EODHD" ~fetch_id:"req-new"
+       mutated_prices);
+  let new_csv_hash =
+    Manifest.sha256_of_file ~path:(_csv_path_for symbol)
+    |> ok_or_failwith_status
+  in
+  let today_shard =
+    Time_ns.to_date (Time_ns.now ()) ~zone:Time_float.Zone.utc |> Date.to_string
+  in
+  let log_path =
+    Fpath.(_reconcile_dir / today_shard / (symbol ^ ".sexp")) |> Fpath.to_string
+  in
+  let log_contents = In_channel.read_all log_path in
+  let entry =
+    Csv.Csv_storage_manifest.reconcile_entry_of_sexp
+      (Sexp.of_string (String.strip log_contents))
+  in
+  assert_that entry
+    (all_of
+       [
+         field (fun e -> e.Csv.Csv_storage_manifest.symbol) (equal_to symbol);
+         field
+           (fun e -> e.Csv.Csv_storage_manifest.old_sha256)
+           (equal_to prior_entry.Manifest.sha256);
+         field
+           (fun e -> e.Csv.Csv_storage_manifest.new_sha256)
+           (equal_to new_csv_hash);
+         field
+           (fun e -> e.Csv.Csv_storage_manifest.old_rows_count)
+           (equal_to prior_entry.Manifest.rows_count);
+         field
+           (fun e -> e.Csv.Csv_storage_manifest.new_rows_count)
+           (equal_to (List.length prices));
+         field
+           (fun e -> e.Csv.Csv_storage_manifest.fetch_id)
+           (equal_to "req-new");
+       ])
+
+(* The reconcile log is sharded by UTC date directory. After a content-changing
+   refetch the date directory exists, contains the per-symbol sexp, and the
+   directory's name parses as a valid date. *)
+let test_reconcile_log_path_layout _ =
+  _reset_reconcile_dir ();
+  let symbol = "REC3" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  let mutated_prices =
+    List.map prices ~f:(fun p ->
+        { p with Types.Daily_price.volume = p.volume + 1 })
+  in
+  ok_or_failwith_status (save storage ~override:true mutated_prices);
+  let date_shards =
+    Sys_unix.readdir (Fpath.to_string _reconcile_dir) |> Array.to_list
+  in
+  assert_that (List.length date_shards) (equal_to 1);
+  let shard_name = List.hd_exn date_shards in
+  let _ = Date.of_string shard_name in
+  let symbol_file =
+    Fpath.(_reconcile_dir / shard_name / (symbol ^ ".sexp")) |> Fpath.to_string
+  in
+  let exists =
+    match Sys_unix.file_exists symbol_file with `Yes -> true | _ -> false
+  in
+  assert_that exists (equal_to true)
+
+(* First save (no prior manifest entry) skips the reconcile pass entirely.
+   The reconcile-log directory must not exist after a single fresh save. *)
+let test_reconcile_first_save_creates_no_log _ =
+  _reset_reconcile_dir ();
+  let symbol = "REC4" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  assert_that (_reconcile_log_for symbol) is_none
+
+(* A reconcile-log write failure must not surface as an error from [save].
+   We force the failure by pre-creating a non-directory at the reconcile-log
+   shard path so the [_ensure_parent_dir] call inside [reconcile_on_save]
+   fails. The save returns [Ok ()] regardless. *)
+let test_reconcile_failure_is_non_fatal _ =
+  _reset_reconcile_dir ();
+  let symbol = "REC5" in
+  let storage = create ~data_dir:test_dir symbol |> ok_or_failwith_status in
+  ok_or_failwith_status (save storage prices);
+  (* Plant a regular file where the reconcile-log directory would live so
+     [_ensure_parent_dir] fails when reconcile_on_save tries to create it. *)
+  let recon_dir = Fpath.to_string _reconcile_dir in
+  let oc = Stdlib.open_out recon_dir in
+  Out_channel.output_string oc "not a directory\n";
+  Out_channel.close oc;
+  let mutated_prices =
+    List.map prices ~f:(fun p ->
+        { p with Types.Daily_price.high_price = p.high_price +. 0.5 })
+  in
+  assert_that
+    (save storage ~override:true mutated_prices)
+    (is_ok_and_holds (equal_to ()));
+  (* Cleanup the planted file so teardown can run normally. *)
+  try Stdlib.Sys.remove recon_dir with _ -> ()
+
 let suite =
   "CSV Storage tests"
   >::: [
@@ -588,6 +754,15 @@ let suite =
          >:: test_load_with_verify_no_manifest_strict;
          "test_load_with_verify_no_manifest_warn"
          >:: test_load_with_verify_no_manifest_warn;
+         "test_reconcile_no_op_when_content_unchanged"
+         >:: test_reconcile_no_op_when_content_unchanged;
+         "test_reconcile_writes_entry_when_content_changes"
+         >:: test_reconcile_writes_entry_when_content_changes;
+         "test_reconcile_log_path_layout" >:: test_reconcile_log_path_layout;
+         "test_reconcile_first_save_creates_no_log"
+         >:: test_reconcile_first_save_creates_no_log;
+         "test_reconcile_failure_is_non_fatal"
+         >:: test_reconcile_failure_is_non_fatal;
        ]
 
 let () =
