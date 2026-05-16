@@ -14,6 +14,7 @@ let _sigma_epsilon = 1e-12
 
 type observation = { parameters : (string * float) list; metric : float }
 type acquisition = [ `Expected_improvement | `Upper_confidence_bound of float ]
+type early_stop_config = { window : int; epsilon : float }
 
 type config = {
   bounds : (string * (float * float)) list;
@@ -21,35 +22,37 @@ type config = {
   initial_random : int;
   total_budget : int;
   rng : Stdlib.Random.State.t;
+  length_scales : float array option;
+  early_stop_config : early_stop_config option;
 }
 
 let create_config ~bounds ?(acquisition = `Expected_improvement)
     ?(initial_random = 5) ?(total_budget = 50)
-    ?(rng = Stdlib.Random.State.make [| _default_rng_seed |]) () =
-  { bounds; acquisition; initial_random; total_budget; rng }
+    ?(rng = Stdlib.Random.State.make [| _default_rng_seed |]) ?length_scales
+    ?early_stop_config () =
+  {
+    bounds;
+    acquisition;
+    initial_random;
+    total_budget;
+    rng;
+    length_scales;
+    early_stop_config;
+  }
 
 type t = { config : config; observations : observation list (* newest first *) }
 
 (** {1 Validation} *)
 
-(** Raise [Invalid_argument] if bound [k] has [lo > hi]. *)
-let _validate_bound (k, (lo, hi)) =
-  if Float.( > ) lo hi then
-    invalid_arg
-      (sprintf "Bayesian_opt.create: bound for %s has min > max (%g > %g)" k lo
-         hi)
-
-let _validate_config config =
-  if List.is_empty config.bounds then
-    invalid_arg "Bayesian_opt.create: bounds must be non-empty";
-  List.iter config.bounds ~f:_validate_bound;
-  if config.initial_random < 0 then
-    invalid_arg "Bayesian_opt.create: initial_random must be >= 0";
-  if config.total_budget < 0 then
-    invalid_arg "Bayesian_opt.create: total_budget must be >= 0"
+let _early_stop_pair_of_opt = function
+  | None -> None
+  | Some { window; epsilon } -> Some (window, epsilon)
 
 let create config =
-  _validate_config config;
+  Bayesian_opt_validate.config ~bounds:config.bounds
+    ~initial_random:config.initial_random ~total_budget:config.total_budget
+    ~length_scales:config.length_scales
+    ~early_stop:(_early_stop_pair_of_opt config.early_stop_config);
   { config; observations = [] }
 
 (** {1 Observation accessors} *)
@@ -195,9 +198,20 @@ let upper_confidence_bound ~posterior ~beta x =
 
 (** {1 Suggest_next} *)
 
-(** Default length scale per dimension: [0.25] in normalised [0,1] space. *)
+(** Default length scale per dimension. In normalised [0,1] space, the kernel
+    needs wider effective bandwidth as dimensionality grows to keep the
+    posterior from under-fitting (plan §5.2). Scales as [sqrt(d) * 0.25]: at d =
+    1 the value is [0.25] (matches the legacy 4-D-era default); at d = 16 it is
+    [1.0]. Configs may override via [config.length_scales]. *)
 let _default_length_scales bounds =
-  Array.of_list (List.map bounds ~f:(fun _ -> 0.25))
+  let d = List.length bounds in
+  let value = Float.sqrt (Float.of_int d) *. 0.25 in
+  Array.of_list (List.map bounds ~f:(fun _ -> value))
+
+let _length_scales_for_config config =
+  match config.length_scales with
+  | Some scales -> scales
+  | None -> _default_length_scales config.bounds
 
 let _signal_variance = 1.0
 let _noise_variance = 1e-6
@@ -220,7 +234,7 @@ let _build_posterior_for_state t =
            _scale_to_unit ~bounds:t.config.bounds raw))
   in
   let ys = Array.of_list (List.map observations ~f:(fun obs -> obs.metric)) in
-  let length_scales = _default_length_scales t.config.bounds in
+  let length_scales = _length_scales_for_config t.config in
   fit_gp ~length_scales ~signal_variance:_signal_variance
     ~noise_variance:_noise_variance ~observations_x:xs ~observations_y:ys
 
@@ -274,3 +288,7 @@ let suggest_next_with_candidates t ~n_candidates =
 
 let suggest_next t =
   suggest_next_with_candidates t ~n_candidates:_default_n_candidates
+
+let should_early_stop cfg ~initial_random ~running_best =
+  Bayesian_opt_early_stop.should_stop ~window:cfg.window ~epsilon:cfg.epsilon
+    ~initial_random ~running_best

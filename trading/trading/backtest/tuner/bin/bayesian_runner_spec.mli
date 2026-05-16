@@ -28,6 +28,47 @@ type objective_spec =
 type acquisition_spec = Expected_improvement | Upper_confidence_bound of float
 [@@deriving sexp]
 
+(** Per-knob bound shape. PR-D introduces Option-typed knobs via a sentinel
+    encoding (plan §2.5). [Plain (lo, hi)] is the existing form — the BO samples
+    uniformly from [[lo, hi]] and the override is always emitted.
+    [Sentinel { threshold; upper }] expands the BO sampling range to
+    [[threshold - margin, upper]] (where [margin = (upper - threshold) * 0.25]
+    by convention); samples below [threshold] decode as [None] (override
+    omitted), samples in [[threshold, upper]] decode as [Some sample].
+
+    Sexp encoding (round-trip stable):
+    - [Plain (lo, hi)] is written as [(lo hi)] — preserves the legacy shape.
+    - [Sentinel { threshold; upper }] is written as
+      [(sentinel threshold upper)].
+
+    Cell-to-overrides conversion lives in the evaluator (PR-C/PR-E); PR-D only
+    pins the on-disk shape. *)
+type bound_spec =
+  | Plain of float * float
+  | Sentinel of { threshold : float; upper : float }
+[@@deriving sexp]
+
+val plain_range : bound_spec -> float * float
+(** Project a [bound_spec] to the [(min, max)] pair the BO samples from. For
+    [Plain (lo, hi)] returns [(lo, hi)]. For [Sentinel { threshold; upper }]
+    returns [(threshold - margin, upper)] where
+    [margin = (upper - threshold) * sentinel_margin_fraction] — the expanded
+    lower bound gives the GP one normalised slot's worth of "off" mass. *)
+
+val sentinel_margin_fraction : float
+(** Fraction of the active [(threshold, upper)] span allocated below [threshold]
+    as the "off" slot in {!plain_range}. Pinned at [0.25]: a candidate's draw in
+    [\[threshold - 0.25 * (upper - threshold), threshold)] decodes as [None].
+    Exposed so tests can assert exact bounds. *)
+
+val decode_sentinel_sample : bound_spec -> float -> float option
+(** [decode_sentinel_sample spec sampled] interprets a BO-sampled value against
+    a [bound_spec].
+
+    - For [Plain _], always returns [Some sampled].
+    - For [Sentinel { threshold; _ }], returns [None] when
+      [sampled < threshold], [Some sampled] otherwise. *)
+
 type t = {
   bounds : (string * (float * float)) list;
       (** Per-parameter bounds [(key, (min, max))]. Sexp:
@@ -68,6 +109,35 @@ type t = {
           only pins the parsed shape; PR-C will thread the list through the
           walk-forward executor's fold filter, and PR-E will re-run the best
           cell on the held-out folds. *)
+  sentinel_bounds : (string * bound_spec) list option;
+      (** Phase-3 Option-typed knobs (PR-D, plan §2.5). When [Some bs], each
+          element is an extra knob the BO tunes whose decoded form is
+          [float option] — used for [max_sector_exposure_pct],
+          [min_score_override], and similar Option config fields. The BO
+          consumes a sampling range derived via {!plain_range}; the evaluator
+          decodes each sample via {!decode_sentinel_sample}.
+
+          PR-D pins the parsed shape + the decode helpers; the cell-to-overrides
+          translation that emits or omits the override on a per-sample basis
+          lives in PR-C/PR-E's evaluator. The field is [\@sexp.option] so
+          omission parses as [None]. *)
+  length_scales : float list option;
+      (** Phase-3 GP length-scale override (PR-D, plan §5.2 response 2). When
+          [Some xs], the BO config sets
+          [length_scales = Some (Array.of_list xs)] — used to widen the kernel
+          bandwidth at high dimensionality. When [None] (or omitted), the lib's
+          [sqrt(d) * 0.25] default applies. List length must match
+          [List.length bounds]; the BO library raises [Invalid_argument] at
+          create-time otherwise. *)
+  early_stop : (int * float) option;
+      (** Phase-3 early-stop config (PR-D, plan §5.4). When
+          [Some (window, epsilon)], the runner monitors the running-best curve
+          and stops the BO loop when
+          [running_best[i] - running_best[i - window] < epsilon] for the
+          trailing [window] iterations (after the random-seed phase). When
+          [None] (or omitted), the loop runs to [total_budget] without early
+          termination. Sexp form: [(early_stop (20 0.02))] for
+          [Some (20, 0.02)]; omit the tag for [None]. *)
 }
 [@@deriving sexp]
 (** A Bayesian-optimisation spec on disk. Example sexp:

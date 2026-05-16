@@ -46,6 +46,23 @@ type acquisition = [ `Expected_improvement | `Upper_confidence_bound of float ]
     - [`Upper_confidence_bound β] — UCB. [UCB(x) = μ(x) + β · σ(x)]. Larger β
       explores more; β = 0 is greedy exploitation. *)
 
+type early_stop_config = {
+  window : int;
+      (** Number of consecutive non-improving iterations after which to stop
+          (the [K] of the plan's
+          "[running_best[i] - running_best[i - K] < epsilon]" check). Must be
+          [≥ 1]. *)
+  epsilon : float;
+      (** Minimum running-best improvement over [window] iterations that counts
+          as progress. When the running-best change over the trailing [window]
+          is strictly less than [epsilon], the BO loop is considered converged.
+          Must be [≥ 0]. *)
+}
+(** Early-stop trigger configuration. The library only stores this on the config
+    — the actual termination decision lives in the caller's iteration loop (e.g.
+    [bayesian_runner_runner.ml]), which has visibility into the iteration
+    counter. Carried here so the runner has a single source of truth. *)
+
 type config = {
   bounds : (string * (float * float)) list;
       (** Per-parameter bounds [(key, (min, max))]. The order of this list
@@ -60,6 +77,23 @@ type config = {
           loop when [List.length (all_observations t) ≥ total_budget]. *)
   rng : Stdlib.Random.State.t;
       (** RNG for the random phase + acquisition candidate sampling. *)
+  length_scales : float array option;
+      (** Optional per-dimension RBF kernel length-scales in normalised [0,1]
+          space. When [None] (default), the library uses [sqrt(d) * 0.25] across
+          all dimensions, which keeps the kernel's effective basis stable as
+          dimensionality grows (per plan §5.2 of
+          [dev/plans/bayesian-multi-param-scaling-2026-05-16.md] — without
+          rescaling, an 18-D GP under-fits at standard length-scales).
+
+          When [Some scales], [Array.length scales] must equal
+          [List.length bounds]; raises [Invalid_argument] at {!create} time
+          otherwise. Each entry must be [> 0]. *)
+  early_stop_config : early_stop_config option;
+      (** Optional early-stop trigger. When [Some _], the iteration driver may
+          terminate the BO ask/tell loop before [total_budget] is exhausted if
+          the running-best has not improved by at least [epsilon] over the
+          previous [window] iterations. When [None] (default), no early-stop is
+          performed; the loop runs the full [total_budget]. *)
 }
 
 val create_config :
@@ -68,10 +102,14 @@ val create_config :
   ?initial_random:int ->
   ?total_budget:int ->
   ?rng:Stdlib.Random.State.t ->
+  ?length_scales:float array ->
+  ?early_stop_config:early_stop_config ->
   unit ->
   config
 (** Builder for [config] with sensible defaults: [Expected_improvement],
-    [initial_random = 5], [total_budget = 50], a fresh RNG seeded with [42]. *)
+    [initial_random = 5], [total_budget = 50], a fresh RNG seeded with [42],
+    [length_scales = None] (lib computes [sqrt(d) * 0.25] default at fit time),
+    [early_stop_config = None] (no early termination). *)
 
 type t
 (** Opaque BO state. Carries the observations + RNG state. *)
@@ -120,6 +158,28 @@ val suggest_next_with_candidates :
     acquisition argmax. Must be [≥ 1]; raises [Invalid_argument] otherwise.
     Larger values give a finer search of the acquisition surface at linear cost
     per suggestion. *)
+
+(** {1 Early-stop helper} *)
+
+val should_early_stop :
+  early_stop_config -> initial_random:int -> running_best:float list -> bool
+(** [should_early_stop cfg ~initial_random ~running_best] returns [true] when
+    the BO ask/tell loop should terminate before exhausting its budget.
+    [running_best] is the per-iteration running-best score in evaluation order
+    (oldest first); its length equals the iteration count so far.
+
+    The trigger condition (per plan §5.4 of
+    [dev/plans/bayesian-multi-param-scaling-2026-05-16.md]):
+
+    - Wait until the random phase is over: only fires once
+      [List.length running_best > initial_random + cfg.window]. Earlier
+      iterations are in the random phase or still seeding the GP, where flat
+      running-best is expected.
+    - Compare the most recent [running_best] with [running_best] from
+      [cfg.window] iterations ago; trigger when the delta is strictly less than
+      [cfg.epsilon].
+
+    Returns [false] when [running_best = []] (nothing to compare). *)
 
 (** {1 Internal helpers exposed for testing} *)
 
