@@ -77,8 +77,12 @@
  ;;   sharpe_ratio      0.62   max_drawdown 59.06 avg_holding_days 40.85
  ;;   open_positions_value 2,263,365  sortino 0.73  calmar 0.38
  ;;   ulcer 26.89   wall 186.5s
- ;; Tolerances ±20% (wider than sp500's ±15% — single-measurement
- ;; baseline; tighten after the second run if drift is bounded).
+ ;; Tolerances ±20% across the board, EXCEPT max_drawdown_pct at ±15%
+ ;; (DD bands kept tight on purpose — a single-symbol blow-up shifts DD
+ ;; more violently than the other metrics in a concentrated universe, so
+ ;; we want CI to catch a regression there sooner than the rest). Wider
+ ;; than sp500's ±15% otherwise — single-measurement baseline; tighten
+ ;; the others after a second run confirms bounded drift.
  (expected
   ((total_return_pct   ((min 139.0)         (max 210.0)))
    (total_trades       ((min 198)           (max 298)))
