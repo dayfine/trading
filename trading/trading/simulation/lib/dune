@@ -13,6 +13,7 @@
  (modules
   simulator
   split_handler
+  cancel_handler
   order_generator
   metrics
   metric_computers

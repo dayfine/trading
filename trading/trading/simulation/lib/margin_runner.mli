@@ -66,3 +66,15 @@ val margin_call_transitions :
     no shorts breaching maintenance, or when no matching [Holding] position can
     be located for the flagged symbol (e.g. the short is already mid-exit on
     this tick). *)
+
+val tick :
+  margin_config:Margin_config.t ->
+  portfolio:Portfolio.t ->
+  positions:Position.t String.Map.t ->
+  today_bars:Trading_engine.Types.price_bar list ->
+  date:Date.t ->
+  strategy_transitions:Position.transition list ->
+  Portfolio.t * Position.transition list
+(** One simulator-tick worth of margin mechanics: accrue daily borrow fee, then
+    append any maintenance-margin-breach exits to [strategy_transitions]. No-op
+    when [margin_config.enabled = false] (preserves baselines bit-equal). *)

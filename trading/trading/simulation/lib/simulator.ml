@@ -311,7 +311,8 @@ let _apply_trigger_exit acc trans =
       let%bind updated = Trading_strategy.Position.apply_transition pos trans in
       Ok (_set_or_drop_if_closed acc ~key:trans.position_id ~data:updated)
 
-(** Apply transitions to positions *)
+(** Apply transitions to positions. [CancelEntry] is delegated to
+    {!Cancel_handler.apply_to_positions}; the rest are inline. *)
 let _apply_transitions ~positions ~transitions =
   let open Result.Let_syntax in
   List.fold_result transitions ~init:positions ~f:(fun acc trans ->
@@ -320,6 +321,7 @@ let _apply_transitions ~positions ~transitions =
           let%bind pos = Trading_strategy.Position.create_entering trans in
           Ok (Map.set acc ~key:pos.id ~data:pos)
       | TriggerExit _ -> _apply_trigger_exit acc trans
+      | CancelEntry _ -> Cancel_handler.apply_to_positions acc trans
       | _ -> Ok acc)
 
 (** Build run_result from accumulated state.
@@ -349,15 +351,25 @@ let _build_run_result t =
       !(t.valuation_failure_count);
   { steps; final_portfolio = t.portfolio; metrics }
 
-(* Apply trades one at a time, skipping any that fail (e.g. insufficient
-   cash). Returns the updated portfolio and the list of accepted trades. *)
-let _apply_trades_best_effort portfolio trades =
-  List.fold trades ~init:(portfolio, []) ~f:(fun (portfolio, accepted) trade ->
-      match Trading_portfolio.Portfolio.apply_single_trade portfolio trade with
-      | Ok p -> (p, accepted @ [ trade ])
-      | Error _ -> (portfolio, accepted))
+(* Apply trades; partition into accepted vs rejected by the portfolio.
+   Rejected trades are routed through {!Cancel_handler} so the
+   corresponding [Entering] positions don't stay stuck forever. See PR
+   #1172 follow-up §"Option B". *)
+let _try_apply_trade portfolio trade =
+  match Trading_portfolio.Portfolio.apply_single_trade portfolio trade with
+  | Ok p -> (p, `Accepted trade)
+  | Error _ -> (portfolio, `Rejected trade)
 
-(* Split-handling helpers extracted to {!Split_handler}. *)
+let _apply_trades_best_effort portfolio trades =
+  let portfolio, accepted_rev, rejected_rev =
+    List.fold trades ~init:(portfolio, [], [])
+      ~f:(fun (portfolio, accepted, rejected) trade ->
+        let portfolio, outcome = _try_apply_trade portfolio trade in
+        match outcome with
+        | `Accepted t -> (portfolio, t :: accepted, rejected)
+        | `Rejected t -> (portfolio, accepted, t :: rejected))
+  in
+  (portfolio, List.rev accepted_rev, List.rev rejected_rev)
 
 (** Apply split detection, update market state, and record stale-held positions.
     Returns the post-split portfolio, positions, today's bars, and the split
@@ -403,43 +415,43 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
     had_market_bars = not (List.is_empty today_bars);
   }
 
-(** Apply the Phase-2 margin per-tick mechanics: accrue daily borrow fee, then
-    build margin-call [TriggerExit] transitions for any short whose maintenance
-    margin has been breached. No-op when [margin_config.enabled = false]
-    (preserves baselines bit-equal). The margin transitions are appended to the
-    strategy's transitions so they flow through the same {!_apply_transitions}
-    + {!Order_generator} pipeline as any other exit. *)
-let _apply_margin_tick t ~portfolio ~positions ~today_bars ~strategy_transitions
-    =
-  let margin_config = t.deps.margin_config in
-  let prices = Margin_runner.mark_prices today_bars in
-  let portfolio =
-    Margin_runner.accrue_borrow_fee ~margin_config ~portfolio ~prices
+(* Execute pending orders, apply fills, and route rejected fills through
+   {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). *)
+let _process_fills_and_cancels t ~portfolio ~positions =
+  let open Result.Let_syntax in
+  let%bind execution_reports =
+    Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
   in
-  let margin_trans =
-    Margin_runner.margin_call_transitions ~margin_config ~portfolio ~positions
-      ~prices ~date:t.current_date
+  let all_trades = _extract_trades execution_reports in
+  let portfolio, trades, rejected_trades =
+    _apply_trades_best_effort portfolio all_trades
   in
-  (portfolio, strategy_transitions @ margin_trans)
+  let%bind positions =
+    _update_positions_from_trades ~date:t.current_date ~positions ~trades
+  in
+  let cancel_transitions =
+    Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
+      ~positions ~rejected_trades
+  in
+  let%bind positions =
+    _apply_transitions ~positions ~transitions:cancel_transitions
+  in
+  Ok (portfolio, positions, trades)
 
 (** Process one day: execute pending orders, call strategy, generate new orders,
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
 let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
   let open Result.Let_syntax in
-  let%bind execution_reports =
-    Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
-  in
-  let all_trades = _extract_trades execution_reports in
-  let portfolio, trades = _apply_trades_best_effort portfolio all_trades in
-  let%bind positions =
-    _update_positions_from_trades ~date:t.current_date ~positions ~trades
+  let%bind portfolio, positions, trades =
+    _process_fills_and_cancels t ~portfolio ~positions
   in
   let%bind strategy_transitions =
     _call_strategy { t with portfolio; positions }
   in
   let portfolio, transitions =
-    _apply_margin_tick t ~portfolio ~positions ~today_bars ~strategy_transitions
+    Margin_runner.tick ~margin_config:t.deps.margin_config ~portfolio ~positions
+      ~today_bars ~date:t.current_date ~strategy_transitions
   in
   let%bind positions = _apply_transitions ~positions ~transitions in
   let%bind orders =
