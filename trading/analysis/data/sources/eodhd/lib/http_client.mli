@@ -30,6 +30,20 @@ type fundamentals = {
 [@@deriving show, eq]
 (** Fundamental data for a security, including sector and industry metadata. *)
 
+type symbol_metadata = {
+  code : string;  (** Ticker symbol, e.g. ["AAPL"]. *)
+  name : string;
+      (** Human-readable issuer / instrument name. Empty string if missing or
+          null in the source. *)
+  exchange : string;
+      (** Listing exchange, e.g. ["NASDAQ"], ["NYSE ARCA"], ["PINK"]. Empty if
+          missing or null. *)
+  asset_type : Asset_type.t;
+      (** Instrument classification used downstream by universe filters. *)
+}
+[@@deriving show, eq]
+(** Per-symbol metadata returned by [/api/exchange-symbol-list/{ex}]. *)
+
 val get_historical_price :
   token:string ->
   params:historical_price_params ->
@@ -63,8 +77,11 @@ val get_symbols :
   token:string ->
   ?fetch:fetch_fn ->
   unit ->
-  string list Status.status_or Deferred.t
-(** Get a list of symbols for a given exchange *)
+  symbol_metadata list Status.status_or Deferred.t
+(** Fetch the full US exchange symbol listing, including per-symbol [asset_type]
+    / [name] / [exchange] metadata. Used downstream to drop mutual funds and
+    other non-common-stock instruments from Weinstein-style universe-build (see
+    [dev/plans/custom-universe-bidirectional-2026-05-17.md] §Q1). *)
 
 val get_bulk_last_day :
   token:string ->

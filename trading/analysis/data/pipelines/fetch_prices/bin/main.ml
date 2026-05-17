@@ -43,7 +43,8 @@ let main ~num_symbols () =
       | Error status ->
           printf "Error fetching symbols: %s\n" (Status.show status);
           return ()
-      | Ok symbols ->
+      | Ok metadata ->
+          let symbols = List.map metadata ~f:(fun m -> m.code) in
           let selected_symbols = random_sample ~n:num_symbols symbols in
           fetch_and_save_prices ~token ~symbols:selected_symbols ()
           >>| print_results)
