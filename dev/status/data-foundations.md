@@ -260,6 +260,57 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
+### IN_PROGRESS — Cross-validation: composition vs Shiller (2026-05-17)
+
+- [ ] `feat/cross-validation` — Final item of the bidirectional plan
+  (`dev/plans/custom-universe-bidirectional-2026-05-17.md`). Per-year
+  drift report comparing the Q2-A composition path's
+  `aggregate_period_return` (top-500 dollar-volume goldens, 1998-2025)
+  against Shiller's S&P composite total return for the matching
+  May-anchored 1-year windows. Equal-weight-vs-cap-weight ballpark
+  sanity check — methodology divergence is expected; only a bug or
+  data-pipeline error would produce drift orders-of-magnitude beyond
+  the equal-weight basis differential.
+- Surface:
+  - `analysis/data/universe/lib/cross_validation.{ml,mli}` — pure
+    function: walks `[start_year..end_year]`, loads
+    `composition/top-N-YYYY.sexp` (silent skip on missing year),
+    computes Shiller window return via the exact formula used by
+    `Build_from_index._anchor_return_from_shiller`
+    (`((p_end + div_total) / p_start) - 1`, with `div_total` =
+    sum of `dividend / 12` over in-window monthly observations).
+    Emits a `report` with cells + mean / median / max-abs / worst-
+    year stats. Markdown + sexp emitters.
+  - `analysis/data/universe/bin/cross_validation_runner_lib.{ml,mli}`
+    — testable orchestration; reuses
+    `Build_synthetic_universes_runner_lib.parse_shiller_cache_csv` so
+    both runners share one cache-format contract.
+  - `analysis/data/universe/bin/cross_validation_runner.ml` — CLI
+    wrapper. Flags: `-composition-dir -shiller-cache -size -start-year
+    -end-year -out-sexp -out-markdown`.
+  - `analysis/data/universe/test/test_cross_validation.ml` — 7 OUnit2
+    tests: end-to-end with hand-built fixtures (two years, known
+    drifts), missing-composition skip, missing-Shiller skip,
+    statistics (mean / median / max-abs / worst-year), markdown
+    formatter (header + rows), sexp round-trip, runner end-to-end
+    through the cache-CSV parser + file writes.
+  - `trading/test_data/cross-validation-composition-vs-shiller.sexp`
+    — bulk run output, 28 cells (1998-2025).
+  - `dev/sweep/cross-validation-composition-vs-shiller.md` — human-
+    readable per-year drift table + summary.
+- **Bulk-run result** (top-500, 1998-2025): mean drift +5.16 pp,
+  median +5.48 pp, max-abs 22.53 pp at worst-year 2000 (dotcom peak,
+  cap-weight dragged by mega-cap tech reversal — exactly the regime
+  where equal-vs-cap divergence is largest). All sanity checks pass:
+  2008 both negative (-32.17% / -30.63%), 2009 both positive (+28.19%
+  / +23.98%), 1999-2000 both directionally consistent. Median +5 pp
+  is consistent with the "equal-weight beats cap-weight" small-cap
+  effect, and the magnitude is in the expected ballpark for a
+  19-year-mean equal-vs-cap differential.
+- All 7 new tests pass; full `analysis/data/universe/` suite has 40
+  tests passing. `dune runtest devtools/checks/` clean (zero `^FAIL`).
+  `dune build @fmt` clean. No new Python.
+
 ### BRK-B BAH benchmark (2026-05-17)
 
 - [x] 5y golden + 15y golden + universe + e2e test + CI symbol pin

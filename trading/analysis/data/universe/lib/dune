@@ -6,7 +6,8 @@
   build_from_index
   build_from_individuals
   composition_inputs
-  composition_bar_reader)
+  composition_bar_reader
+  cross_validation)
  (libraries core eodhd kenneth_french shiller status synthetic)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
