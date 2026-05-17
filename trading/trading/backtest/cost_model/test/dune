@@ -1,0 +1,10 @@
+(tests
+ (names test_cost_model)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  matchers
+  trading.base
+  trading.engine
+  backtest_cost_model))
