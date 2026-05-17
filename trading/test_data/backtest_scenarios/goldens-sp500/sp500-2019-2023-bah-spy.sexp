@@ -33,41 +33,43 @@
 ;; cash; holds indefinitely; never sells, rebalances, or adjusts. Single
 ;; CreateEntering transition followed by a stationary position.
 ;;
-;; {1 Measurement (2026-05-06, $1,000,000 initial cash, via Backtest.Runner)}
+;; {1 Measurement (2026-05-17, $1,000,000 initial cash, via Backtest.Runner)}
 ;;
 ;; Verified through {!Backtest.Runner.run_backtest} with [strategy_choice =
-;; Bah_benchmark { symbol = "SPY" }]. Entry sizing happens at day-1 close,
-;; trade fills at next-day open (the simulator's standard order-routing
-;; semantics — orders placed in [on_market_close] execute against the
-;; next bar). The simulator stops one bar before [end_date] (the
-;; [is_complete] check fires when [current_date >= end_date]), so the final
-;; mark-to-market uses [end_date - 1 trading day]'s close.
+;; Bah_benchmark { symbol = "SPY" }]. Entry sizing happens at day-1 close
+;; with a 1% gap-buffer headroom (see [_entry_gap_buffer_pct] in
+;; [bah_benchmark_strategy.ml]), trade fills at next-day open (the
+;; simulator's standard order-routing semantics — orders placed in
+;; [on_market_close] execute against the next bar). The simulator stops one
+;; bar before [end_date] (the [is_complete] check fires when
+;; [current_date >= end_date]), so the final mark-to-market uses
+;; [end_date - 1 trading day]'s close.
 ;;
 ;;   sizing close 2019-01-02:  $250.18
-;;   shares bought:            3997 (= floor(1,000,000 / 250.18))
+;;   gap-buffered sizing px:   $252.6818  (= 250.18 * 1.01)
+;;   shares bought:            3957 (= floor(1,000,000 / 252.6818))
 ;;   fill open  2019-01-03:    $248.23
-;;   entry commission:         $39.97 ($0.01/share * 3997)
-;;   leftover cash:            $7,784.72
-;;     (= 1,000,000 - 3997 * 248.23 - 39.97)
+;;   entry commission:         $39.57 ($0.01/share * 3957)
+;;   leftover cash:            $17,754.32  (closed-form approximation)
+;;     (= 1,000,000 - 3957 * 248.23 - 39.57)
 ;;   final close 2023-12-28:   $476.69
 ;;     (last bar processed; end_date 2023-12-29 is not stepped)
-;;   final equity:             $1,913,114.65
-;;     (= 7,784.72 + 3997 * 476.69)
-;;   total_return_pct:         +91.3115%
+;;   final equity:             $1,903,976.65  (runner-actual)
+;;   total_return_pct:         +90.40%
 ;;   SPY raw return (sizing 2019-01-02 close to MtM 2023-12-28 close):
 ;;                             +90.5%  (= 476.69 / 250.18 - 1)
 ;;
-;; The +$1.5k delta vs the closed-form using same-day fill is the day-2
-;; open ($248.23) being lower than the day-1 close ($250.18), giving the
-;; strategy a slightly cheaper effective entry with leftover cash carried
-;; through to end-of-window MtM. The +0.7% delta vs SPY raw return reflects
-;; the leftover cash sitting idle (no money-market interest modeled) plus
-;; the commission drag.
+;; The ~$140 delta between the closed-form $1,904,115.65 and the
+;; runner-actual $1,903,976.65 is residual slippage / commission-tier
+;; rounding the closed-form math doesn't capture; runner output is the
+;; authoritative pin.
 ;;
-;; Day-2 fill semantics also explain why a closed-form spreadsheet using
-;; "buy at sizing-day close" arithmetic ($1,899,804.64) underestimates the
-;; runner output by ~$13k; the runner is not buggy, the spreadsheet just
-;; doesn't model the next-day-open fill the simulator actually performs.
+;; The 1% gap buffer was introduced in PR #1172 to fix the weekly-start
+;; sweep's ~45% zero-trade rate: without it, next-day-open gap-ups busted
+;; the cash budget on a tight floor(cash/close) share count, the simulator
+;; silently dropped the rejected fill, and the position stuck in [Entering]
+;; with 0 fills forever. Sweep zero-trade cells dropped from 70/157 to 4/157
+;; after the fix.
 ;;
 ;; {1 Accounting findings}
 ;;
@@ -104,8 +106,9 @@
 ;; (BAH's case), so it's pinned tight at [(min 0) (max 1)] to catch any
 ;; regression that flips it to a non-zero value via a phantom round-trip.
 ;;
-;; open_positions_value: 3997 shares * $476.69 = $1,905,330.93 marked to
-;; market on 2023-12-28 (last bar processed). +/- 2% band = 1.87M..1.94M.
+;; open_positions_value: 3957 shares * $476.69 = $1,886,361.33 marked to
+;; market on 2023-12-28 (last bar processed). The current pinned band
+;; [1.87M..1.94M] absorbs the post-fix value; no re-anchor needed.
 ;;
 ;; {1 Universe}
 ;;

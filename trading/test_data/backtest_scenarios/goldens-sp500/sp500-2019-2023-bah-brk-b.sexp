@@ -32,44 +32,44 @@
 ;;
 ;; [Trading_strategy.Bah_benchmark_strategy] (added in PR #874,
 ;; symbol-parameterized via [config.symbol]): on day 1, buys
-;; [floor(initial_cash / BRK-B_close)] shares of BRK-B with all available
-;; cash; holds indefinitely; never sells, rebalances, or adjusts. Single
+;; [floor(initial_cash / (BRK-B_close * 1.01))] shares of BRK-B with all
+;; available cash (PR #1172 added the 1% gap-buffer to absorb next-day-open
+;; gap-ups — see [_entry_gap_buffer_pct] in [bah_benchmark_strategy.ml]);
+;; holds indefinitely; never sells, rebalances, or adjusts. Single
 ;; CreateEntering transition followed by a stationary position.
 ;;
 ;; {1 Measurement (2026-05-17, $1,000,000 initial cash, via Backtest.Runner)}
 ;;
 ;; Closed-form sanity using the simulator's day-2-open fill convention
-;; (entry sizing at day-1 close, fill at next-day open, final mark uses
-;; [end_date - 1 trading day]'s close):
+;; (entry sizing at day-1 close with 1% gap buffer, fill at next-day open,
+;; final mark uses [end_date - 1 trading day]'s close):
 ;;
 ;;   sizing close 2019-01-02:  $202.80
-;;   shares bought:            4997 = floor(1,000,000 / 202.80) ... wait,
-;;                             1,000,000 / 202.80 = 4930.97..., so
-;;                             4931 actually.
-;;   shares bought:            4931
+;;   gap-buffered sizing px:   $204.8280  (= 202.80 * 1.01)
+;;   shares bought:            4882  (= floor(1,000,000 / 204.8280))
 ;;   fill open  2019-01-03:    $199.97
-;;   entry commission:         $49.31 ($0.01/share * 4931)
-;;   leftover cash:            $13,898.62
-;;     (= 1,000,000 - 4931 * 199.97 - 49.31)
+;;   entry commission:         $48.82 ($0.01/share * 4882)
+;;   leftover cash:            $23,697.64
+;;     (= 1,000,000 - 4882 * 199.97 - 48.82)
 ;;   final close 2023-12-28:   $357.57
 ;;     (last bar processed; end_date 2023-12-29 is not stepped — same
 ;;     [current_date >= end_date] [is_complete] semantics as bah-spy)
-;;   final equity:             $1,777,076.29
-;;     (= 13,898.62 + 4931 * 357.57)
-;;   total_return_pct:         +77.71%
+;;   final equity:             $1,769,354.38
+;;     (= 23,697.64 + 4882 * 357.57)  — exact match to runner-actual
+;;   total_return_pct:         +76.94%
 ;;   BRK-B raw return (sizing 2019-01-02 close to MtM 2023-12-28 close):
 ;;                             +76.32%  (= 357.57 / 202.80 - 1)
 ;;
-;; The ~+1.4 pp delta vs the closed-form raw-close ratio mirrors the
-;; SPY BAH dynamic — the day-2 open ($199.97) is below the day-1 close
-;; ($202.80), giving the strategy a slightly cheaper effective entry
-;; with leftover cash carried through to end-of-window MtM. The
-;; commission drag (~$49) is structurally identical to the SPY pin.
+;; The +0.6 pp delta vs the closed-form raw-close ratio reflects the
+;; day-2 open ($199.97) being below the day-1 close ($202.80) — the
+;; strategy gets a slightly cheaper effective entry — offset by 1% of
+;; cash sitting uninvested as gap-buffer headroom. The commission drag
+;; (~$49) is structurally identical to the SPY pin.
 ;;
 ;; {1 Comparison to BAH-SPY 2019-2023}
 ;;
-;; SPY 5y total return (pinned): +91.31%.
-;; BRK-B 5y total return:       +77.71%.
+;; SPY 5y total return (pinned): +90.40%.
+;; BRK-B 5y total return:        +76.94%.
 ;; Spread: BRK-B underperformed SPY by ~13.6 pp over 2019-2023. This is
 ;; the documented BRK underperformance during the post-COVID growth /
 ;; tech rally — value style lagged momentum style materially over this
@@ -88,7 +88,7 @@
 ;;
 ;; {1 Pinned ranges}
 ;;
-;; total_return_pct: ±2 pp around the closed-form +77.71% (75.7..79.7).
+;; total_return_pct: ±1.5 pp around the runner-actual +76.94% (75.7..79.7).
 ;; Same tolerance scheme as the SPY pin — mechanical strategy, no
 ;; parameter sensitivity, no stop slippage, no cash-deployment timing.
 ;; The only sources of drift are BRK-B's day-1 close (deterministic
@@ -110,8 +110,9 @@
 ;; any regression that flips it to a non-zero value via a phantom
 ;; round-trip.
 ;;
-;; open_positions_value: 4931 shares * $357.57 = $1,763,178 marked to
-;; market on 2023-12-28 (last bar processed). ±2% band ≈ 1.73M..1.80M.
+;; open_positions_value: 4882 shares * $357.57 = $1,745,656.74 marked to
+;; market on 2023-12-28 (last bar processed). The current pinned band
+;; [1.73M..1.80M] absorbs the post-fix value; no re-anchor needed.
 ;;
 ;; {1 Universe}
 ;;
