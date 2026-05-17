@@ -15,3 +15,21 @@
   status)
  (preprocess
   (pps ppx_jane)))
+
+(library
+ (name build_composition_universes_runner_lib)
+ (modules build_composition_universes_runner_lib)
+ (libraries core status universe)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name build_composition_universes_runner)
+ (modules build_composition_universes_runner)
+ (libraries
+  build_composition_universes_runner_lib
+  core
+  core_unix.command_unix
+  status)
+ (preprocess
+  (pps ppx_jane)))

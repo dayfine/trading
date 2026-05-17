@@ -13,6 +13,7 @@ depends: [
   "shiller"
   "kenneth_french"
   "synthetic"
+  "eodhd"
   "odoc" {with-doc}
 ]
 build: [

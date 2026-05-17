@@ -9,5 +9,5 @@
  (synopsis
    "Custom universe snapshots — bottom-up composition + top-down decomposition")
  (depends ocaml base core ppx_deriving status types shiller kenneth_french
-   synthetic)
+   synthetic eodhd)
  (tags ()))
