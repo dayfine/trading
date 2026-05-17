@@ -369,6 +369,69 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
 
+### READY_FOR_REVIEW (Q2-B PR1 — Snapshot type + decomposition builder — 2026-05-17)
+
+- **`universe` library** (branch `feat/q2b-pr1-decomposition`,
+  `analysis/data/universe/`). Q2-B PR1 of
+  `dev/plans/custom-universe-bidirectional-2026-05-17.md` — lands the
+  unified `Snapshot.t` type and the pre-1998 decomposition builder. Q2-A
+  composition (parked on EODHD Fundamentals 403) will consume the same
+  type when it unblocks.
+  - `lib/snapshot.{ml,mli}` — `Snapshot.t` carries `date`, `method_`
+    (variant: `Composition_from_individuals` or `Decomposition_from_index
+    { anchor; factor_skeleton }`), `size`, `entries : entry list`,
+    `aggregate_period_return`. `entry` is `{ symbol; weight; sector;
+    synthetic }`. Anchor v1 = `` `Shiller_sp_composite ``; skeleton v1 =
+    `` `French_5_industry ``. Sexp save/load round-trip via
+    `Sexp.to_string_hum` + `t_of_sexp` (atomic temp-file + rename on
+    save; `Failed_precondition` on decode error, `Internal` on filesystem
+    error). `total_weight` exposed for well-formedness checks.
+  - `lib/build_from_index.{ml,mli}` — pure decomposition builder. Splits
+    `size` synthetics equally across the 5 French industries (Cnsmr,
+    Manuf, HiTec, Hlth, Other; v1 simplification documented). For each
+    industry: extracts the daily-return series from
+    `Kenneth_french_client.daily_return.industry_returns` (percent →
+    fraction), draws `per_industry_count` betas + GARCH idio-params from
+    `Synthetic.Factor_model.default_loading_distribution` /
+    `default_idio_distribution`, composes per-symbol log-returns via
+    `Factor_model.generate_symbol_returns`. Compounds to period return,
+    applies a single global multiplicative scalar to anchor the
+    cap-weighted aggregate to Shiller's composite total return for the
+    [date, date+365] window. Synthetic-symbol naming:
+    `SYNTH_<industry>_<4-digit rank>`. Weights uniform `1/size`.
+    Validation surfaces empty inputs / non-divisible-by-5 size as
+    `Invalid_argument`; calibration drift beyond `epsilon` (default
+    0.005) as `Failed_precondition`.
+  - `test/test_snapshot.ml` — 4 OUnit2 tests: round-trip save/load,
+    uniform-weight `total_weight = 1.0`, missing-file Internal error,
+    garbage-sexp Failed_precondition.
+  - `test/test_build_from_index.ml` — 9 OUnit2 tests: calibration
+    anchors aggregate to 10% Shiller target within ε=0.005 (12-month
+    fixture with p_start=100, p_end=110, zero dividends), size+entry
+    count match config, equal-split industry distribution (10 per
+    bucket at size=50), synthetic-symbol naming pinned for first three
+    entries (`SYNTH_Cnsmr_0001/0002/0003`), `total_weight=1.0`, method
+    carries anchor + skeleton tags, determinism across two builds with
+    the same seed, `size mod 5 ≠ 0` rejected, empty-Shiller rejected.
+  - All 13 tests pass. `dune build @fmt` clean. nesting-linter,
+    fn-length, mli-coverage, magic-numbers, no-python all clean.
+    `build_from_index.ml` = 268 LOC, `snapshot.ml` = 70 LOC — under the
+    300 LOC file-length linter threshold without exception markers.
+  - **Honest caveats (documented in .mli):** (1) Equal-weight industry
+    allocation v1 — historical FF market-cap weights drift but the v1
+    build splits equally across 5 buckets; phase-2 calibration TODO.
+    (2) Pre-1962 NYSE-only universe — French covers 1926-, but firms
+    were NYSE-only pre-1962; callers should consider a smaller `size`.
+    (3) Synthetic names don't delist — aggregate stats are reliable,
+    per-symbol persistence is fictional; strategies must consume
+    aggregates not per-symbol P&L in deep-history mode. (4) 5-industry
+    is coarse; 49-industry French portfolios reserved as the phase-2
+    upgrade (`` `French_49_industry ``). (5) No pre-1926 mode in this PR
+    — Shiller goes to 1871 but French starts 1926; single-factor mode
+    out of scope.
+  - **Deferred to Q2-B PR2:** goldens runner emitting 1926-1997 annual
+    snapshots (72 reconstitution dates × annual cycle).
+
 ### READY_FOR_REVIEW (Stooq drift-check module — 2026-05-17)
 
 - **`stooq` data source** (branch `feat/stooq-drift-check`,
