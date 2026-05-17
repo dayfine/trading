@@ -554,15 +554,14 @@ let _reconcile_dir = Fpath.(test_dir / "_reconcile_log")
    reset the reconcile-log tree up front to be order-independent. *)
 let _reset_reconcile_dir () =
   let path = Fpath.to_string _reconcile_dir in
-  match Sys_unix.file_exists path with
-  | `No | `Unknown -> ()
-  | `Yes -> (
-      (* The dir may have been replaced with a regular file by the
-         failure-injection test; try the file removal first, then the
-         recursive-directory removal as a fallback. *)
-      try Stdlib.Sys.remove path
-      with _ ->
-        ok_or_failwith_os_error (OS.Dir.delete ~recurse:true _reconcile_dir))
+  (* Use rm -rf to remove the reconcile dir regardless of whether the path
+     or any of its children is a regular file (planted by
+     test_reconcile_failure_is_non_fatal's failure-injection setup) or a
+     proper directory. Ignore exit status — a missing path is fine. *)
+  let _ : int =
+    Stdlib.Sys.command (Printf.sprintf "rm -rf %s" (Filename.quote path))
+  in
+  ()
 
 (* True iff a per-symbol reconcile entry has been written under any date shard
    below [_reconcile_dir]. Used to assert presence/absence without baking in
