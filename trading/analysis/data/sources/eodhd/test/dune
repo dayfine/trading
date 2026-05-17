@@ -4,7 +4,8 @@
   test_splits_endpoint
   test_dividends_endpoint
   test_exchange_resolver
-  test_multi_market)
+  test_multi_market
+  test_asset_type)
  (libraries eodhd core async async_unix ounit2 csv matchers status)
  (deps
   (glob_files ./data/*.json)))

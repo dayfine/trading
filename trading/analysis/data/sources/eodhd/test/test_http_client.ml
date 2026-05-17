@@ -1,6 +1,7 @@
 open Core
 open Async
 open OUnit2
+open Matchers
 open Eodhd.Http_client
 
 (* data from /trading/analysis/data/sources/eodhd/test/data/get_historical_price.json *)
@@ -235,6 +236,15 @@ let test_get_historical_price_invalid_date_range _ =
            "start_date must be before or equal to end_date")
         status
 
+(* Asserts (code, asset_type) for one symbol_metadata entry. Composed into
+   elements_are below. *)
+let symbol_with ~code ~asset_type : symbol_metadata matcher =
+  all_of
+    [
+      field (fun m -> m.code) (equal_to code);
+      field (fun m -> m.asset_type) (equal_to asset_type);
+    ]
+
 let test_get_symbols _ =
   let mock_fetch uri =
     let actual_uri_str = Uri.to_string uri in
@@ -251,15 +261,90 @@ let test_get_symbols _ =
     Async.Thread_safe.block_on_async_exn (fun () ->
         get_symbols ~fetch:mock_fetch ~token:"test_token" ())
   in
-  match result with
-  | Ok symbols ->
-      let expected_symbols =
-        [ "0P000070L2"; "0P0000A2WI"; "ZZHGY"; "ZZZ"; "ZZZOF" ]
-      in
-      assert_equal
-        ~printer:(fun xs -> String.concat ~sep:"," xs)
-        expected_symbols symbols
-  | Error err -> assert_failure (Status.show err)
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            symbol_with ~code:"AAPL" ~asset_type:Eodhd.Asset_type.Common_stock;
+            symbol_with ~code:"SPY" ~asset_type:Eodhd.Asset_type.ETF;
+            symbol_with ~code:"0P000070L2"
+              ~asset_type:Eodhd.Asset_type.Mutual_fund;
+            symbol_with ~code:"BABA" ~asset_type:Eodhd.Asset_type.ADR;
+            symbol_with ~code:"GSPC" ~asset_type:Eodhd.Asset_type.Index;
+            symbol_with ~code:"WTF"
+              ~asset_type:
+                (Eodhd.Asset_type.Other "Brand New Type EODHD Just Invented");
+          ]))
+
+let test_get_symbols_extracts_name_and_exchange _ =
+  let mock_fetch _uri =
+    let test_data =
+      In_channel.read_all "./data/get_symbol_list_response.json"
+    in
+    Deferred.return (Ok test_data)
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_symbols ~fetch:mock_fetch ~token:"test_token" ())
+  in
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            all_of
+              [
+                field (fun m -> m.name) (equal_to "Apple Inc");
+                field (fun m -> m.exchange) (equal_to "NASDAQ");
+              ];
+            all_of
+              [
+                field (fun m -> m.name) (equal_to "SPDR S&P 500");
+                field (fun m -> m.exchange) (equal_to "NYSE ARCA");
+              ];
+            all_of
+              [
+                field (fun m -> m.name) (equal_to "Vanguard Total Stock Market");
+                field (fun m -> m.exchange) (equal_to "PINK");
+              ];
+            all_of
+              [
+                field (fun m -> m.name) (equal_to "Alibaba ADR");
+                field (fun m -> m.exchange) (equal_to "NYSE");
+              ];
+            all_of
+              [
+                field (fun m -> m.name) (equal_to "S&P 500 Index");
+                field (fun m -> m.exchange) (equal_to "INDEX");
+              ];
+            all_of
+              [
+                field (fun m -> m.name) (equal_to "Mystery");
+                field (fun m -> m.exchange) (equal_to "NASDAQ");
+              ];
+          ]))
+
+let test_get_symbols_partitions_by_equity_like _ =
+  let mock_fetch _uri =
+    let test_data =
+      In_channel.read_all "./data/get_symbol_list_response.json"
+    in
+    Deferred.return (Ok test_data)
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_symbols ~fetch:mock_fetch ~token:"test_token" ())
+  in
+  let equity_like_codes metadata =
+    metadata
+    |> List.filter ~f:(fun m -> Eodhd.Asset_type.is_equity_like m.asset_type)
+    |> List.map ~f:(fun m -> m.code)
+  in
+  (* AAPL (Common_stock) and BABA (ADR) are equity-like; SPY (ETF),
+     0P000070L2 (Mutual_fund), GSPC (Index) and WTF (Other) are not. *)
+  assert_that result
+    (is_ok_and_holds
+       (field equity_like_codes
+          (elements_are [ equal_to "AAPL"; equal_to "BABA" ])))
 
 let test_get_symbols_error _ =
   let mock_fetch _uri =
@@ -458,6 +543,10 @@ let suite =
          "get_fundamentals_error" >:: test_get_fundamentals_error;
          "get_index_symbols" >:: test_get_index_symbols;
          "get_symbols" >:: test_get_symbols;
+         "get_symbols_extracts_name_and_exchange"
+         >:: test_get_symbols_extracts_name_and_exchange;
+         "get_symbols_partitions_by_equity_like"
+         >:: test_get_symbols_partitions_by_equity_like;
          "get_symbols_error" >:: test_get_symbols_error;
          "get_symbols_malformed_data" >:: test_get_symbols_malformed_data;
          "get_bulk_last_day" >:: test_get_bulk_last_day;

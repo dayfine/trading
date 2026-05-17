@@ -1,47 +1,56 @@
 [
   {
-    "Code": "0P000070L2",
-    "Name": "RBC $U.S. Money Market Fund A",
-    "Country": "USA",
-    "Exchange": "OTC",
-    "Currency": "USD",
-    "Type": "FUND",
-    "Isin": null
-  },
-  {
-    "Code": "0P0000A2WI",
-    "Name": "Fidelity American High Yield Sr B",
-    "Country": "USA",
-    "Exchange": "US",
-    "Currency": "USD",
-    "Type": "FUND",
-    "Isin": null
-  },
-  {
-    "Code": "ZZHGY",
-    "Name": "ZhongAn Online P & C Insurance Co. Ltd",
-    "Country": "USA",
-    "Exchange": "PINK",
-    "Currency": "USD",
-    "Type": "Common Stock",
-    "Isin": null
-  },
-  {
-    "Code": "ZZZ",
-    "Name": "Cyber Hornet S&P 500 and Bitcoin 75/25 Strategy ETF",
+    "Code": "AAPL",
+    "Name": "Apple Inc",
     "Country": "USA",
     "Exchange": "NASDAQ",
     "Currency": "USD",
-    "Type": "ETF",
-    "Isin": "US45407J4094"
+    "Type": "Common Stock",
+    "Isin": "US0378331005"
   },
   {
-    "Code": "ZZZOF",
-    "Name": "Zinc One Resources Inc",
+    "Code": "SPY",
+    "Name": "SPDR S&P 500",
+    "Country": "USA",
+    "Exchange": "NYSE ARCA",
+    "Currency": "USD",
+    "Type": "ETF",
+    "Isin": null
+  },
+  {
+    "Code": "0P000070L2",
+    "Name": "Vanguard Total Stock Market",
     "Country": "USA",
     "Exchange": "PINK",
     "Currency": "USD",
-    "Type": "Common Stock",
+    "Type": "Mutual Fund",
+    "Isin": null
+  },
+  {
+    "Code": "BABA",
+    "Name": "Alibaba ADR",
+    "Country": "USA",
+    "Exchange": "NYSE",
+    "Currency": "USD",
+    "Type": "ADR",
+    "Isin": null
+  },
+  {
+    "Code": "GSPC",
+    "Name": "S&P 500 Index",
+    "Country": "USA",
+    "Exchange": "INDEX",
+    "Currency": "USD",
+    "Type": "INDEX",
+    "Isin": null
+  },
+  {
+    "Code": "WTF",
+    "Name": "Mystery",
+    "Country": "USA",
+    "Exchange": "NASDAQ",
+    "Currency": "USD",
+    "Type": "Brand New Type EODHD Just Invented",
     "Isin": null
   }
 ]

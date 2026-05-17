@@ -23,7 +23,10 @@ let random_sample ~n symbols =
 let main ~num_symbols () =
   let token = read_token () in
   Eodhd.Http_client.get_symbols ~token () >>= function
-  | Ok all_symbols ->
+  | Ok all_metadata ->
+      let all_symbols =
+        List.map all_metadata ~f:(fun m -> m.Eodhd.Http_client.code)
+      in
       let symbols = random_sample ~n:num_symbols all_symbols in
       above_30w_ema ~token ~symbols () >>| print_results >>= fun () -> return ()
   | Error status ->

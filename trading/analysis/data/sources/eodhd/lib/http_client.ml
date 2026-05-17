@@ -20,6 +20,14 @@ type fundamentals = {
 }
 [@@deriving show, eq]
 
+type symbol_metadata = {
+  code : string;
+  name : string;
+  exchange : string;
+  asset_type : Asset_type.t;
+}
+[@@deriving show, eq]
+
 let _api_host = "eodhd.com"
 
 let default_fetch uri : string Status.status_or Deferred.t =
@@ -63,30 +71,6 @@ let _make_symbols_uri token =
     ~query:[ ("api_token", [ token ]); ("fmt", [ "json" ]) ]
     ()
 
-let _extract_symbol_from_json = function
-  | `Assoc fields -> (
-      match List.find fields ~f:(fun (k, _) -> String.equal k "Code") with
-      | Some (_, `String code) -> Ok code
-      | Some (_, _) ->
-          Status.error_invalid_argument "Code field is not a string"
-      | None -> Status.error_not_found "Code field not found")
-  | _ -> Status.error_invalid_argument "Invalid symbol format"
-
-let _parse_symbols_response body_str =
-  try
-    match Yojson.Safe.from_string body_str with
-    | `List symbols ->
-        let results = List.map symbols ~f:_extract_symbol_from_json in
-        Result.all results
-    | _ -> Status.error_invalid_argument "Invalid response format"
-  with Yojson.Json_error msg ->
-    Status.error_invalid_argument ("Invalid JSON: " ^ msg)
-
-let get_symbols ~token ?(fetch = _fetch_body) () :
-    string list Status.status_or Deferred.t =
-  let uri = _make_symbols_uri token in
-  fetch uri >>| Result.bind ~f:_parse_symbols_response
-
 let _float_of_yojson = function
   | `Float f -> Ok f
   | `Int i -> Ok (float_of_int i)
@@ -120,6 +104,42 @@ let _string_or_null_of_yojson = function
   | v ->
       Status.error_invalid_argument
         ("Expected string or null, got: " ^ Yojson.Safe.to_string v)
+
+let _lookup_string_or_null fields name =
+  match List.Assoc.find ~equal:String.equal fields name with
+  | Some v -> _string_or_null_of_yojson v
+  | None -> Ok ""
+
+let _extract_symbol_from_json = function
+  | `Assoc fields ->
+      let open Result.Let_syntax in
+      let%bind code =
+        match List.Assoc.find ~equal:String.equal fields "Code" with
+        | Some (`String c) -> Ok c
+        | Some _ -> Status.error_invalid_argument "Code field is not a string"
+        | None -> Status.error_not_found "Code field not found"
+      in
+      let%bind name = _lookup_string_or_null fields "Name" in
+      let%bind exchange = _lookup_string_or_null fields "Exchange" in
+      let%bind type_raw = _lookup_string_or_null fields "Type" in
+      let asset_type = Asset_type.of_eodhd_string type_raw in
+      Ok { code; name; exchange; asset_type }
+  | _ -> Status.error_invalid_argument "Invalid symbol format"
+
+let _parse_symbols_response body_str =
+  try
+    match Yojson.Safe.from_string body_str with
+    | `List symbols ->
+        let results = List.map symbols ~f:_extract_symbol_from_json in
+        Result.all results
+    | _ -> Status.error_invalid_argument "Invalid response format"
+  with Yojson.Json_error msg ->
+    Status.error_invalid_argument ("Invalid JSON: " ^ msg)
+
+let get_symbols ~token ?(fetch = _fetch_body) () :
+    symbol_metadata list Status.status_or Deferred.t =
+  let uri = _make_symbols_uri token in
+  fetch uri >>| Result.bind ~f:_parse_symbols_response
 
 let _find_field fields name =
   match List.Assoc.find ~equal:String.equal fields name with
@@ -259,6 +279,9 @@ let get_fundamentals ~token ~symbol ?(fetch = _fetch_body) () :
 
 (* Index symbols *)
 
+let _parse_symbol_codes body =
+  Result.map (_parse_symbols_response body) ~f:(List.map ~f:(fun m -> m.code))
+
 let get_index_symbols ~token ~index ?(fetch = _fetch_body) () :
     string list Status.status_or Deferred.t =
   let uri =
@@ -267,4 +290,4 @@ let get_index_symbols ~token ~index ?(fetch = _fetch_body) () :
       ~query:[ ("api_token", [ token ]); ("fmt", [ "json" ]) ]
       ()
   in
-  fetch uri >>| Result.bind ~f:_parse_symbols_response
+  fetch uri >>| Result.bind ~f:_parse_symbol_codes
