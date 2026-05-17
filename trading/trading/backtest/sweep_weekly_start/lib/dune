@@ -1,0 +1,5 @@
+(library
+ (name sweep_weekly_start)
+ (libraries core scenario_lib backtest trading.simulation.types)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))
