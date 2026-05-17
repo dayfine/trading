@@ -10,16 +10,6 @@ type historical_price_params = {
   period : Types.Cadence.t;
 }
 
-type fundamentals = {
-  symbol : string;
-  name : string;
-  sector : string;
-  industry : string;
-  market_cap : float;
-  exchange : string;
-}
-[@@deriving show, eq]
-
 type symbol_metadata = {
   code : string;
   name : string;
@@ -77,14 +67,6 @@ let _float_of_yojson = function
   | v ->
       Status.error_invalid_argument
         ("Expected float or int, got: " ^ Yojson.Safe.to_string v)
-
-let _float_or_null_of_yojson = function
-  | `Float f -> Ok f
-  | `Int i -> Ok (float_of_int i)
-  | `Null -> Ok 0.0
-  | v ->
-      Status.error_invalid_argument
-        ("Expected float, int, or null, got: " ^ Yojson.Safe.to_string v)
 
 let _int_of_yojson = function
   | `Int i -> Ok i
@@ -225,57 +207,6 @@ let get_bulk_last_day ~token ~exchange ?(fetch = _fetch_body) () :
       ()
   in
   fetch uri >>| Result.bind ~f:_parse_bulk_last_day_prices
-
-(* Fundamentals parsing *)
-
-let _parse_general_section symbol general =
-  let open Result.Let_syntax in
-  let find_str key =
-    match List.Assoc.find ~equal:String.equal general key with
-    | Some v -> _string_or_null_of_yojson v
-    | None -> Ok ""
-  in
-  let find_float key =
-    match List.Assoc.find ~equal:String.equal general key with
-    | Some v -> _float_or_null_of_yojson v
-    | None -> Ok 0.0
-  in
-  let%bind name = find_str "Name" in
-  let%bind sector = find_str "Sector" in
-  let%bind industry = find_str "Industry" in
-  let%bind market_cap = find_float "MarketCapitalization" in
-  let%bind exchange = find_str "Exchange" in
-  Ok { symbol; name; sector; industry; market_cap; exchange }
-
-let _parse_general_field symbol = function
-  | Some (`Assoc general) -> _parse_general_section symbol general
-  | Some _ -> Status.error_invalid_argument "General field is not an object"
-  | None -> Status.error_not_found "General section not found in response"
-
-let _parse_fundamentals_response symbol body_str =
-  try
-    match Yojson.Safe.from_string body_str with
-    | `Assoc fields ->
-        let general = List.Assoc.find ~equal:String.equal fields "General" in
-        _parse_general_field symbol general
-    | _ -> Status.error_invalid_argument "Invalid response format"
-  with Yojson.Json_error msg ->
-    Status.error_invalid_argument ("Invalid JSON: " ^ msg)
-
-let get_fundamentals ~token ~symbol ?(fetch = _fetch_body) () :
-    fundamentals Status.status_or Deferred.t =
-  let uri =
-    Uri.make ~scheme:"https" ~host:_api_host
-      ~path:("/api/fundamentals/" ^ symbol)
-      ~query:
-        [
-          ("api_token", [ token ]);
-          ("filter", [ "General" ]);
-          ("fmt", [ "json" ]);
-        ]
-      ()
-  in
-  fetch uri >>| Result.bind ~f:(_parse_fundamentals_response symbol)
 
 (* Index symbols *)
 

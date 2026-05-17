@@ -19,17 +19,6 @@ type historical_price_params = {
   period : Types.Cadence.t;  (** Cadence of price bars. *)
 }
 
-type fundamentals = {
-  symbol : string;
-  name : string;
-  sector : string;
-  industry : string;
-  market_cap : float;
-  exchange : string;
-}
-[@@deriving show, eq]
-(** Fundamental data for a security, including sector and industry metadata. *)
-
 type symbol_metadata = {
   code : string;  (** Ticker symbol, e.g. ["AAPL"]. *)
   name : string;
@@ -55,14 +44,6 @@ val get_historical_price :
     The [params.period] field controls whether daily, weekly, or monthly bars
     are returned. Use [Types.Cadence.Weekly] for Weinstein-style weekly
     analysis. *)
-
-val get_fundamentals :
-  token:string ->
-  symbol:string ->
-  ?fetch:fetch_fn ->
-  unit ->
-  fundamentals Status.status_or Deferred.t
-(** Fetch fundamental data (sector, industry, market cap) for a symbol. *)
 
 val get_index_symbols :
   token:string ->

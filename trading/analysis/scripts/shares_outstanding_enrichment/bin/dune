@@ -1,0 +1,15 @@
+(executable
+ (name main)
+ (libraries
+  core
+  core_unix.command_unix
+  async
+  async_ssl
+  status
+  eodhd
+  file.sexp
+  weinstein.data_source
+  asset_type_enrichment_lib
+  shares_outstanding_enrichment_lib)
+ (preprocess
+  (pps ppx_let)))
