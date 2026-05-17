@@ -668,7 +668,13 @@ let test_reconcile_log_path_layout _ =
   in
   ok_or_failwith_status (save storage ~override:true mutated_prices);
   let date_shards =
-    Sys_unix.readdir (Fpath.to_string _reconcile_dir) |> Array.to_list
+    match Sys_unix.is_directory (Fpath.to_string _reconcile_dir) with
+    | `Yes -> Sys_unix.readdir (Fpath.to_string _reconcile_dir) |> Array.to_list
+    | `No | `Unknown ->
+        assert_failure
+          (Printf.sprintf
+             "_reconcile_dir is missing or not a directory after save: %s"
+             (Fpath.to_string _reconcile_dir))
   in
   assert_that (List.length date_shards) (equal_to 1);
   let shard_name = List.hd_exn date_shards in
