@@ -1,7 +1,12 @@
 (library
  (name universe)
  (public_name universe)
- (modules snapshot build_from_index)
- (libraries core status shiller kenneth_french synthetic)
+ (modules
+  snapshot
+  build_from_index
+  build_from_individuals
+  composition_inputs
+  composition_bar_reader)
+ (libraries core eodhd kenneth_french shiller status synthetic)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

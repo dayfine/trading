@@ -110,14 +110,14 @@ a second test pins order preservation.
 
 Q1's filter narrows the inventory we already have. Q2 has two sub-tracks:
 
-- **Q2-A — Market-cap composition** (PR1: shares-outstanding enrichment;
-  PR2: rank-by-market-cap composition builder). Once we have current
-  shares-outstanding for every equity-like symbol, we can construct
-  market-cap-ranked historical universes (top-500, top-1000, etc.) without
-  depending on IWV scrape. The approximation: `current_shares ×
-  historical_close_price`. Buybacks and IPO phantom market caps before
-  listing introduce drift; a cross-validation PR will measure this vs
-  Shiller's actual SP composite.
+- **Q2-A — Dollar-volume composition** (PR1: shares-outstanding enrichment,
+  PARKED on EODHD Fundamentals 403; PR2: dollar-volume-ranked composition
+  builder, PIVOTED methodology — see below). With shares-outstanding
+  vendor-blocked, PR2 pivoted to rank by trailing 60-day average daily
+  dollar volume (`close × volume`) instead of market cap. Dollar-volume
+  uses cached EODHD bars (zero data spend), is a defensible proxy for
+  "tradeable size", and arguably better for Weinstein universe
+  construction (it weights liquidity rather than total cap).
 - **Q2-B — Pre-1996 SP500 backbone**: widens history past the EODHD floor
   (2000) and the fja05680/sp500 floor (1996).
 
@@ -146,11 +146,56 @@ NOT included in this PR; producing it is gated on a plan upgrade or a
 swap to an alternate fundamentals source (Sharadar via Nasdaq Data
 Link, AlphaVantage, etc.).
 
-### Q2-A PR2 — Composition builder (NOT YET STARTED)
+### Q2-A PR2 — Composition builder (THIS PR, methodology pivoted to dollar-volume)
 
-Will consume `shares_outstanding.sexp` + the cached daily bars and emit
-top-N point-in-time universes by `current_shares × close_price` for each
-quarter-end in the historical window.
+**Methodology pivot 2026-05-17.** PR1's shares-outstanding artifact is
+blocked on the EODHD Fundamentals tier 403 with no clean upgrade path
+(see PR1 above). Rather than re-route to a different fundamentals
+vendor and pay $60-100/mo for a single field, PR2 pivots to **rank by
+trailing 60-day average daily dollar-volume** (`close × volume`,
+unadjusted). This uses cached EODHD bars exclusively — zero new data
+spend — and is arguably a better proxy for Weinstein universe-build
+anyway: dollar-volume weights liquidity (tradeable position size at
+realistic slippage) rather than total cap, which is the constraint
+that actually binds at backtest-realistic position sizing.
+
+Adds:
+
+- `analysis/data/universe/lib/build_from_individuals.{ml,mli}` —
+  pure ranker. Given `(date, config)`: filters
+  `data/inventory.sexp` to symbols active at `date` (need 60 days of
+  trailing data), passes through equity-like
+  classification via `data/symbol_types.sexp`, reads each survivor's
+  cached EODHD bars under `<bars_root>/<L1>/<L2>/<symbol>/data.csv`,
+  scores each by trailing 60-day avg `close × volume` (drops symbols
+  with < 30 in-window bars), ranks descending, takes top-N. Emits a
+  `Snapshot.t` with uniform `1/N` weights, sector lookup from
+  `sectors.csv` (empty when missing), and a 1-year-forward
+  `aggregate_period_return` computed over `adjusted_close` (equal-
+  weight average of per-symbol total returns).
+- `analysis/data/universe/lib/composition_inputs.{ml,mli}` — file
+  loaders for `inventory.sexp` (sexp), `symbol_types.sexp` (sexp,
+  walks the existing on-disk shape directly), `sectors.csv` (CSV).
+- `analysis/data/universe/lib/composition_bar_reader.{ml,mli}` —
+  minimal CSV reader for the EODHD-shaped bar files. Drops OHL fields
+  (keeps just `date`, `close`, `adjusted_close`, `volume`) to keep
+  memory low across the bulk run.
+- `analysis/data/universe/bin/build_composition_universes_runner_lib.{ml,mli}` —
+  testable orchestration; mirror of Q2-B PR2's runner_lib.
+- `analysis/data/universe/bin/build_composition_universes_runner.ml` —
+  CLI wrapper. Flags: `--bars-root`, `--symbol-types`, `--sectors-csv`,
+  `--inventory`, `--out-dir`, `--start-year`, `--end-year`, `--top-n`.
+- `trading/test_data/goldens-custom-universe/composition/` — bulk
+  goldens: 87 sexp files (29 years 1998-2026 × 3 sizes
+  {500, 1000, 3000}).
+
+Tests pin the ranking algorithm at multiple layers: pure-ranker dollar-
+volume order, active-filter, min-window-bars filter, equity-like filter,
+1-year forward aggregate-return calculation, uniform-weight contract,
+determinism, size=0 rejection, insufficient-survivors error. Runner-lib
+adds 3 orchestration tests (smoke, skip-on-insufficient-signal, multi-
+size). All linters clean (zero `^FAIL`); `dune build @fmt` clean; no
+new Python.
 
 ### Q2-B (Stooq) — Decomposition (1996-2000 gap)
 
@@ -196,8 +241,8 @@ universe. Not yet started.
 | Q1 PR1   | `Eodhd.Asset_type` parser | MERGED (#1156) |
 | Q1 PR2   | Bulk enrichment exe + `symbol_types.sexp` | MERGED (#1157) |
 | Q1 PR3   | `filter_equity_like_symbols` | MERGED (#1159) |
-| Q2-A PR1 | Shares-outstanding bulk enrichment (this PR) | gated on EODHD Fundamentals tier |
-| Q2-A PR2 | Composition builder (`current_shares × historical_close`) | NOT STARTED |
+| Q2-A PR1 | Shares-outstanding bulk enrichment | PARKED on EODHD Fundamentals tier 403 |
+| Q2-A PR2 | Composition builder (PIVOTED to dollar-volume rank) | READY_FOR_REVIEW |
 | Q2-B     | Stooq 1996-1999 backbone | NOT STARTED |
 | Q2-B     | French-industry universe (1926-1997) | NOT STARTED |
 

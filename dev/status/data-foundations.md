@@ -474,6 +474,88 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
 
+### READY_FOR_REVIEW (Q2-A PR2 — dollar-volume composition builder + 1998-2026 goldens — 2026-05-17)
+
+- **Composition library + runner + 87 goldens** (branch
+  `feat/q2a-pr2-dollar-volume-composition`,
+  `analysis/data/universe/`). Q2-A PR2 of
+  `dev/plans/custom-universe-bidirectional-2026-05-17.md` — the
+  bottom-up sibling of Q2-B PR2's synthesizer.
+  - **Methodology pivot (documented in PR body + plan):** the
+    original Q2-A PR2 design ranked by `current_shares ×
+    historical_close` (market cap), but PR1's
+    shares-outstanding artifact is gated on the EODHD Fundamentals
+    tier 403. Rather than escalate to a paid fundamentals tier
+    ($60-100/mo), PR2 pivots to rank by **trailing 60-day average
+    daily dollar volume** (`close × volume`, unadjusted). Uses
+    cached EODHD bars only — zero new data spend — and is a
+    defensible Weinstein-universe proxy (weights liquidity rather
+    than total cap; tradeable-position-size constraint is the one
+    that actually binds at backtest-realistic slippage).
+  - `lib/build_from_individuals.{ml,mli}` — pure ranker. Filters
+    `data/inventory.sexp` for symbols active at `date`
+    (`data_start_date ≤ date − 60d`, `data_end_date ≥ date`),
+    drops non-equity-like via `data/symbol_types.sexp`
+    (`Common_stock | Preferred_stock | ADR | GDR`), reads each
+    survivor's `data/<L1>/<L2>/<symbol>/data.csv`, scores by
+    trailing 60-day avg `close × volume` (drops symbols with < 30
+    in-window bars), ranks descending, takes top-N. Uniform
+    weights `1/N`; 1-year-forward `aggregate_period_return` from
+    `adjusted_close` averaged equal-weight across surviving
+    entries; sector via `sectors.csv` (empty when missing).
+  - `lib/composition_inputs.{ml,mli}` — sexp/CSV loaders. The
+    symbol-types loader walks the on-disk shape directly rather
+    than depending on `asset_type_enrichment_lib` (separate
+    dune-project with no `public_name`); equivalent algorithm,
+    no cross-project boundary issue.
+  - `lib/composition_bar_reader.{ml,mli}` — minimal CSV reader
+    for EODHD bars; drops OHL to keep memory low across ~14k
+    symbols × 29 years × ~60 bars/window.
+  - `bin/build_composition_universes_runner_lib.{ml,mli}` —
+    testable orchestration (mirrors Q2-B PR2's runner_lib
+    contract: per-(year, size) skip-on-error, never raises).
+  - `bin/build_composition_universes_runner.ml` — CLI flags
+    `--bars-root --symbol-types --sectors-csv --inventory
+    --out-dir --start-year --end-year --top-n`.
+  - `test/test_build_from_individuals.ml` — 10 OUnit2 tests
+    pinning the dollar-volume rank order, activity filter,
+    min-window-bars filter, equity-like filter, 1-year forward
+    aggregate-return, sector lookup, uniform weights /
+    `total_weight = 1.0`, determinism, `size = 0` rejection, and
+    insufficient-survivors error.
+  - `test/test_build_composition_universes_runner.ml` — 3 OUnit2
+    tests pinning runner orchestration (smoke,
+    skip-on-insufficient-signal, multi-size-per-year).
+  - `trading/test_data/goldens-custom-universe/composition/` —
+    bulk goldens, **87 sexp snapshots** = 29 years (1998-2026) ×
+    3 sizes (500 / 1000 / 3000). See PR body for bulk-run wall
+    clock + sanity spot-checks.
+  - All 13 new tests pass; full `analysis/data/universe/` suite
+    has 33 tests passing. `dune runtest devtools/checks/` clean
+    (zero `^FAIL`). `dune build @fmt` clean. No new Python.
+    `build_from_individuals.ml` = 197 LOC,
+    `composition_inputs.ml` = 117 LOC,
+    `composition_bar_reader.ml` = 53 LOC — all under the 300 LOC
+    file-length linter threshold without exception markers.
+  - **Honest caveats:**
+    1. **Dollar-volume ≠ market cap.** Cap ranking would rank Berkshire
+       above an active mid-cap; dollar-volume favors liquidity.
+       For Weinstein it's probably the right proxy, but downstream
+       analyses that assume cap-weighting need to be flagged.
+    2. **Unadjusted dollar-volume for scoring; adjusted_close for
+       returns.** `close × volume` reflects the actual dollars
+       traded at the time; `adjusted_close` is the right total-
+       return basis. This split is intentional and pinned in the
+       `.mli`.
+    3. **Equal-weight forward return.** The aggregate is a simple
+       mean over surviving entries' total returns, not cap-
+       weighted. This matches the uniform `1/N` weighting in the
+       snapshot entries.
+    4. **Pre-2010 forward-looking-biased sectors.** `sectors.csv`
+       is a 2026 snapshot; sector tags before 2010 reflect today's
+       classification, not the era's. Same caveat as
+       `broad-3000-2010-01-01.sexp` (PR #1103).
+
 ### READY_FOR_REVIEW (Q2-B PR2 — synthesizer runner + 1927-1997 decomposition goldens — 2026-05-17, PR #1164)
 
 - **Runner CLI + library** (branch `feat/q2b-pr2-synthesizer-runner`,
