@@ -246,3 +246,30 @@ let per_type_counts t =
       match Int.compare b.count a.count with
       | 0 -> String.compare a.asset_type_label b.asset_type_label
       | c -> c)
+
+(* ---- Equity-like filter (Q1 PR3) ----
+
+   Drops [Not_in_eodhd_listing] (no record at all) and any [Listed at] whose
+   underlying [at] is not equity-like per [Eodhd.Asset_type.is_equity_like].
+   Symbols that have no entry in [symbol_types] at all are also dropped. *)
+
+let _is_equity_like_enriched = function
+  | Listed at -> Eodhd.Asset_type.is_equity_like at
+  | Not_in_eodhd_listing -> false
+
+let _build_symbol_to_asset_type t =
+  let tbl = Hashtbl.create (module String) in
+  List.iter t.symbols ~f:(fun e ->
+      (* First occurrence wins, mirroring the join contract. *)
+      let _ : [ `Duplicate | `Ok ] =
+        Hashtbl.add tbl ~key:e.symbol ~data:e.asset_type
+      in
+      ());
+  tbl
+
+let filter_equity_like_symbols ~symbol_types ~symbols =
+  let lookup = _build_symbol_to_asset_type symbol_types in
+  List.filter symbols ~f:(fun s ->
+      match Hashtbl.find lookup s with
+      | Some at -> _is_equity_like_enriched at
+      | None -> false)

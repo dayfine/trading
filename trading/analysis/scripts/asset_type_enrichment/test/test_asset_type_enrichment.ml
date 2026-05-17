@@ -229,6 +229,123 @@ let test_per_type_counts_sorted_by_count_desc _ =
   assert_that (per_type_counts t)
     (elements_are (List.map _expected_per_type_counts ~f:equal_to))
 
+(* ---- Equity-like filter (Q1 PR3) ----
+
+   Pin that [filter_equity_like_symbols] keeps Common_stock / Preferred_stock /
+   ADR / GDR and drops everything else (ETF, Mutual_fund, Fund, Index, Bond,
+   Currency, Commodity, Other _, Not_in_eodhd_listing). Order preservation is
+   exercised by a separate test. *)
+
+let _adr_listing code =
+  _make_metadata ~code ~name:"" ~exchange:"" ~asset_type:Eodhd.Asset_type.ADR
+
+let _gdr_listing code =
+  _make_metadata ~code ~name:"" ~exchange:"" ~asset_type:Eodhd.Asset_type.GDR
+
+let _preferred_listing code =
+  _make_metadata ~code ~name:"" ~exchange:""
+    ~asset_type:Eodhd.Asset_type.Preferred_stock
+
+let _fund_listing code =
+  _make_metadata ~code ~name:"" ~exchange:"" ~asset_type:Eodhd.Asset_type.Fund
+
+let _index_listing code =
+  _make_metadata ~code ~name:"" ~exchange:"" ~asset_type:Eodhd.Asset_type.Index
+
+let _bond_listing code =
+  _make_metadata ~code ~name:"" ~exchange:"" ~asset_type:Eodhd.Asset_type.Bond
+
+let _currency_listing code =
+  _make_metadata ~code ~name:"" ~exchange:""
+    ~asset_type:Eodhd.Asset_type.Currency
+
+let _commodity_listing code =
+  _make_metadata ~code ~name:"" ~exchange:""
+    ~asset_type:Eodhd.Asset_type.Commodity
+
+let _other_listing code raw =
+  _make_metadata ~code ~name:"" ~exchange:""
+    ~asset_type:(Eodhd.Asset_type.Other raw)
+
+(* Mixed listings: 4 equity-like (Common, Preferred, ADR, GDR) + 8 non-equity
+   (ETF, Mutual_fund, Fund, Index, Bond, Currency, Commodity, Other). *)
+let _mixed_listings =
+  [
+    _stock_listing "AAPL";
+    _preferred_listing "BRK-A";
+    _adr_listing "BABA";
+    _gdr_listing "GAZP";
+    _etf_listing "SPY";
+    _mutual_fund_listing "0P000070L2";
+    _fund_listing "PCEF";
+    _index_listing "GSPC";
+    _bond_listing "TLT-BOND";
+    _currency_listing "EURUSD";
+    _commodity_listing "GOLD";
+    _other_listing "WTF" "Brand New Type";
+  ]
+
+let _mixed_inventory =
+  [
+    "AAPL";
+    "BRK-A";
+    "BABA";
+    "GAZP";
+    "SPY";
+    "0P000070L2";
+    "PCEF";
+    "GSPC";
+    "TLT-BOND";
+    "EURUSD";
+    "GOLD";
+    "WTF";
+    "MISSING_FROM_INDEX";
+  ]
+
+let _mixed_filter_input =
+  [
+    "AAPL";
+    "SPY";
+    "BRK-A";
+    "0P000070L2";
+    "BABA";
+    "GSPC";
+    "GAZP";
+    "WTF";
+    "MISSING_FROM_INDEX";
+  ]
+
+let _expected_mixed_kept =
+  [ equal_to "AAPL"; equal_to "BRK-A"; equal_to "BABA"; equal_to "GAZP" ]
+
+let test_filter_drops_non_equity_like _ =
+  let symbol_types =
+    _join_with_defaults ~inventory_symbols:_mixed_inventory
+      ~eodhd_listings:_mixed_listings
+  in
+  let kept =
+    filter_equity_like_symbols ~symbol_types ~symbols:_mixed_filter_input
+  in
+  assert_that kept (elements_are _expected_mixed_kept)
+
+(* Order preservation: re-using the same enriched index, ensure the kept
+   symbols come back in the input order (not in the [symbol_types] inventory
+   order). *)
+
+let _order_listings =
+  [ _stock_listing "MSFT"; _stock_listing "AAPL"; _stock_listing "GOOG" ]
+
+let test_filter_preserves_input_order _ =
+  let symbol_types =
+    _join_with_defaults ~inventory_symbols:[ "AAPL"; "GOOG"; "MSFT" ]
+      ~eodhd_listings:_order_listings
+  in
+  let kept =
+    filter_equity_like_symbols ~symbol_types ~symbols:[ "MSFT"; "AAPL"; "GOOG" ]
+  in
+  assert_that kept
+    (elements_are [ equal_to "MSFT"; equal_to "AAPL"; equal_to "GOOG" ])
+
 let suite =
   "asset_type_enrichment_test"
   >::: [
@@ -245,6 +362,8 @@ let suite =
          "round_trip_save_load" >:: test_round_trip_save_load;
          "per_type_counts_sorted_by_count_desc"
          >:: test_per_type_counts_sorted_by_count_desc;
+         "filter_drops_non_equity_like" >:: test_filter_drops_non_equity_like;
+         "filter_preserves_input_order" >:: test_filter_preserves_input_order;
        ]
 
 let () = run_test_tt_main suite
