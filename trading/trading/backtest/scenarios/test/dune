@@ -2,6 +2,7 @@
  (names
   test_scenario
   test_universe_file
+  test_universe_snapshot
   test_fixtures_root
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
@@ -9,6 +10,7 @@
  (modules
   test_scenario
   test_universe_file
+  test_universe_snapshot
   test_fixtures_root
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
@@ -22,6 +24,8 @@
   matchers
   backtest
   weinstein.data_source
-  trading.simulation)
+  trading.simulation
+  universe
+  status)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))

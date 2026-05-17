@@ -3,10 +3,11 @@
  (modules
   scenario
   universe_file
+  universe_snapshot
   fixtures_root
   smoke_catalog
   scenario_progress)
- (libraries core fpath weinstein.data_source backtest)
+ (libraries core fpath weinstein.data_source backtest universe status)
  (preprocess
   (pps ppx_sexp_conv)))
 
