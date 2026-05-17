@@ -362,6 +362,19 @@
   simulation_test_helpers))
 
 (test
+ (name test_cancel_handler)
+ (modules test_cancel_handler)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.simulation
+  trading.base
+  trading.strategy
+  matchers))
+
+(test
  (name test_portfolio_valuation)
  (modules test_portfolio_valuation)
  (libraries

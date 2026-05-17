@@ -65,3 +65,12 @@ let margin_call_transitions ~margin_config ~portfolio ~positions ~prices ~date =
         let price_map = Map.of_alist_exn (module String) prices in
         List.filter_map flagged
           ~f:(_transition_for_flagged_symbol ~date ~price_map ~positions)
+
+let tick ~margin_config ~portfolio ~positions ~today_bars ~date
+    ~strategy_transitions =
+  let prices = mark_prices today_bars in
+  let portfolio = accrue_borrow_fee ~margin_config ~portfolio ~prices in
+  let margin_trans =
+    margin_call_transitions ~margin_config ~portfolio ~positions ~prices ~date
+  in
+  (portfolio, strategy_transitions @ margin_trans)
