@@ -35,6 +35,16 @@ let _spy_data_present () =
   | `Yes -> true
   | `No | `Unknown -> false
 
+(* Same probe pattern for BRK-B at [<root>/B/B/BRK-B/data.csv]. EODHD
+   convention encodes the share class with a hyphen (BRK-B, not BRK.B);
+   the on-disk layout follows the API ticker convention. *)
+let _brk_b_data_present () =
+  let data_dir = Data_path.default_data_dir () in
+  let brk_path = Fpath.(data_dir / "B" / "B" / "BRK-B" / "data.csv") in
+  match Sys_unix.file_exists (Fpath.to_string brk_path) with
+  | `Yes -> true
+  | `No | `Unknown -> false
+
 (** True when the test is running inside the CI container (or any environment
     that explicitly sets [TRADING_IN_CONTAINER=1]). Used to escalate the "SPY
     data missing" branch from skip → hard failure: in CI, SPY's data file under
@@ -72,8 +82,16 @@ let _worktree_fixtures_root () =
 
 let _scenario_relpath = "goldens-sp500/sp500-2019-2023-bah-spy.sexp"
 
+(** 5y BRK-B BAH companion scenario — same window as the SPY 5y cell, swaps the
+    strategy [symbol] to ["BRK-B"]. Lives alongside the SPY golden so the SP500
+    postsubmit script picks up both. *)
+let _scenario_relpath_brk_b_5y = "goldens-sp500/sp500-2019-2023-bah-brk-b.sexp"
+
 let _load_scenario_exn fixtures_root =
   Scenario.load (Filename.concat fixtures_root _scenario_relpath)
+
+let _load_scenario_brk_b_5y_exn fixtures_root =
+  Scenario.load (Filename.concat fixtures_root _scenario_relpath_brk_b_5y)
 
 let _sector_map_override fixtures_root (s : Scenario.t) =
   let resolved = Filename.concat fixtures_root s.universe_path in
@@ -87,6 +105,15 @@ let _sector_map_override fixtures_root (s : Scenario.t) =
     close ($476.69) since the simulator's [is_complete] check fires when
     [current_date >= end_date]. *)
 let _expected_final_equity = 1_913_114.65
+
+(** Pinned closed-form final equity for BAH-BRK-B 2019-2023.
+
+    See [sp500-2019-2023-bah-brk-b.sexp] §"Measurement" for the breakdown —
+    sizing close 2019-01-02 = $202.80 → 4931 shares at next-day open $199.97
+    with $49.31 commission; final MtM at 2023-12-28 close $357.57 produces
+    $1,777,076.29. Same [current_date >= end_date] [is_complete] semantics as
+    the SPY cell. *)
+let _expected_final_equity_brk_b_5y = 1_777_076.29
 
 (** ±0.05% band around the expected equity. The number is fully deterministic
     against pinned SPY data — no parameter sensitivity, no stochasticity.
@@ -162,6 +189,46 @@ let test_bah_runner_e2e ctx =
     (is_some_and
        (field (fun t -> t.Trading_base.Types.symbol) (equal_to "SPY")))
 
+(** Parallel of {!test_bah_runner_e2e} for the BRK-B 5y cell — same runner path,
+    same assertions, swapped symbol. Demonstrates that the BAH strategy's
+    [symbol] config knob actually wires through end-to-end (not just at the type
+    level), and pins the BRK-B 5y baseline at the runner's actual output. *)
+let test_bah_runner_e2e_brk_b_5y ctx =
+  if not (_brk_b_data_present ()) then (
+    if _is_ci () then
+      assert_failure
+        "BRK-B data missing under TRADING_DATA_DIR but TRADING_IN_CONTAINER=1. \
+         The bah-brk-b golden scenario requires BRK-B bars in \
+         [test_data/B/B/BRK-B/data.csv]; rerun \
+         [dev/scripts/prepare_ci_data.sh] (BRK-B must appear in EXTRA_SYMBOLS \
+         like SPY) and commit the output.";
+    skip_if true
+      "BRK-B data unavailable (data/B/B/BRK-B/data.csv missing — test_data \
+       subset doesn't include BRK-B). Run locally with the full /data mount.";
+    assert_failure "unreachable after skip_if");
+  ignore ctx;
+  let fixtures_root = _resolve_fixtures_root () in
+  let s = _load_scenario_brk_b_5y_exn fixtures_root in
+  let sector_map_override = _sector_map_override fixtures_root s in
+  let result =
+    Backtest.Runner.run_backtest ~start_date:s.period.start_date
+      ~end_date:s.period.end_date ~overrides:s.config_overrides
+      ?sector_map_override ~strategy_choice:s.strategy ()
+  in
+  let final_equity = result.summary.final_portfolio_value in
+  let low =
+    _expected_final_equity_brk_b_5y *. (1.0 -. (_equity_tolerance_pct /. 100.0))
+  in
+  let high =
+    _expected_final_equity_brk_b_5y *. (1.0 +. (_equity_tolerance_pct /. 100.0))
+  in
+  assert_that final_equity (is_between (module Float_ord) ~low ~high);
+  assert_that (List.length result.round_trips) (equal_to 0);
+  assert_that (_total_trades result) (equal_to 1);
+  assert_that (_first_trade result)
+    (is_some_and
+       (field (fun t -> t.Trading_base.Types.symbol) (equal_to "BRK-B")))
+
 (** Sanity: scenarios that omit the [strategy] field still parse and default to
     Weinstein. This is the back-compat invariant called out in #882 — every
     pre-#882 scenario must be unchanged. *)
@@ -214,15 +281,58 @@ let test_bah_benchmark_strategy_roundtrips _ =
        (Backtest.Strategy_choice.Bah_benchmark { symbol = "SPY" }
          : Backtest.Strategy_choice.t))
 
+(** Parse-only sanity for the 15y BAH-BRK-B golden. The 15y window (2011-01-03 →
+    2026-04-30) is too long to actually run inside a unit test, so we just
+    verify the scenario file parses, contains the expected strategy variant, and
+    pins the post-split start date.
+
+    The 2011-01-03 start (NOT 2010-01-01) is the critical contract — BRK-B had a
+    50-for-1 stock split on 2010-01-21 that would produce a phantom 98% drawdown
+    on a raw-close BAH run spanning the split. See the scenario file's §"Window
+    choice" for the full rationale. This test catches any regression that
+    accidentally re-introduces a pre-split start date. *)
+let test_bah_brk_b_15y_scenario_parses _ =
+  let fixtures_root = _resolve_fixtures_root () in
+  let path =
+    Filename.concat fixtures_root
+      "goldens-sp500-historical/sp500-2011-2026-bah-brk-b.sexp"
+  in
+  let s = Scenario.load path in
+  assert_that s
+    (all_of
+       [
+         field
+           (fun (s : Scenario.t) -> s.name)
+           (equal_to "sp500-2011-2026-bah-brk-b");
+         field
+           (fun (s : Scenario.t) -> s.strategy)
+           (equal_to
+              (Backtest.Strategy_choice.Bah_benchmark { symbol = "BRK-B" }
+                : Backtest.Strategy_choice.t));
+         field
+           (fun (s : Scenario.t) -> Date.to_string s.period.start_date)
+           (equal_to "2011-01-03");
+         field
+           (fun (s : Scenario.t) -> Date.to_string s.period.end_date)
+           (equal_to "2026-04-30");
+         field
+           (fun (s : Scenario.t) -> s.universe_path)
+           (equal_to "universes/brk-b-only.sexp");
+       ])
+
 let suite =
   "Bah_runner_e2e"
   >::: [
          "BAH-SPY 2019-2023 through Backtest.Runner matches pinned baseline"
          >:: test_bah_runner_e2e;
+         "BAH-BRK-B 2019-2023 through Backtest.Runner matches pinned baseline"
+         >:: test_bah_runner_e2e_brk_b_5y;
          "scenarios without [strategy] field default to Weinstein (back-compat)"
          >:: test_default_strategy_is_weinstein;
          "Bah_benchmark variant round-trips through sexp"
          >:: test_bah_benchmark_strategy_roundtrips;
+         "BAH-BRK-B 2011-2026 (15y) scenario parses with post-split start date"
+         >:: test_bah_brk_b_15y_scenario_parses;
        ]
 
 let () = run_test_tt_main suite

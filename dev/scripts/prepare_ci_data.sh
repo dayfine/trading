@@ -48,7 +48,14 @@ OUTPUT_DIR="${REPO_ROOT}/trading/test_data"
 # (see fix/backtest/bah-spy-day1-entry / 2026-05-08). Extend this list
 # when adding a new benchmark scenario whose primary symbol is outside
 # the SP500 constituents.
-EXTRA_SYMBOLS="SPY"
+#
+# BRK-B is included even though it is an SP500 constituent: the EODHD
+# ticker convention is BRK-B (hyphen) but the SP500 universe sexp may
+# encode the share-class delimiter as a period (BRK.B). Pinning BRK-B
+# here explicitly guarantees the bah-brk-b golden scenarios under
+# goldens-sp500/ and goldens-sp500-historical/ get their bars regardless
+# of universe-file delimiter conventions.
+EXTRA_SYMBOLS="SPY BRK-B"
 
 # ---- arg parsing ----
 while [ "$#" -gt 0 ]; do
