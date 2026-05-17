@@ -260,6 +260,62 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
+### BRK-B BAH benchmark (2026-05-17)
+
+- [x] 5y golden + 15y golden + universe + e2e test + CI symbol pin
+  added. Adds Berkshire Hathaway Class B (BRK-B) as an "active-value /
+  smart-money" buy-and-hold benchmark alongside the existing
+  passive-market BAH-SPY baseline. The BAH strategy
+  (`Trading_strategy.Bah_benchmark_strategy`) was already symbol-
+  parameterized via `config.symbol`; we just wired the canonical
+  ticker through new golden scenario files.
+- Surface:
+  - `trading/test_data/backtest_scenarios/universes/brk-b-only.sexp` —
+    one-symbol Pinned universe mirroring `universes/spy-only.sexp`.
+  - `trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023-bah-brk-b.sexp` —
+    5y companion to `sp500-2019-2023-bah-spy.sexp`. Same 2019-01-02 →
+    2023-12-29 window, same starting cash, swapped symbol. Pinned
+    +77.7 ± 2 pp closed-form total return (vs SPY +91.3 ± 2 pp);
+    runner-actual final equity verified within ±0.05% via
+    `test_bah_runner_e2e_brk_b_5y`.
+  - `trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2011-2026-bah-brk-b.sexp` —
+    15y BAH-BRK-B starting **2011-01-03** (NOT 2010-01-01 like the
+    SPY-active companion). BRK-B's only stock split was a 50-for-1 on
+    2010-01-21; raw close jumped $3,476 → $72.72, and the BAH strategy
+    reads raw close not adjusted close. A 2010-start window would
+    produce a phantom 98% drawdown that does not reflect investor
+    experience. The 15.3y post-split window is the longest
+    split-clean BRK-B window pinnable against test_data. Closed-form
+    pin: +491.3 ± 10 pp total return.
+  - `trading/trading/backtest/test/test_bah_runner_e2e.ml` — extended
+    with `test_bah_runner_e2e_brk_b_5y` test parallel; same data-
+    presence guard as the SPY case (skips locally if BRK-B CSV
+    missing, hard-fails in CI per the TRADING_IN_CONTAINER escalation
+    added by #986).
+  - `dev/scripts/prepare_ci_data.sh` — extended `EXTRA_SYMBOLS` to
+    include `BRK-B` so CI postsubmit golden runs ship BRK-B bars
+    alongside SPY.
+- Verify:
+  - `dune build && dune runtest trading/backtest/test/` — passes
+    locally; the BRK-B e2e test pins final equity at $1,777,076 ±
+    0.05%, exactly 1 entry trade, 0 round-trips.
+  - `dune exec trading/backtest/scenarios/scenario_runner.exe -- --dir
+    test_data/backtest_scenarios/goldens-sp500 --fixtures-root
+    test_data/backtest_scenarios` — both bah-spy and bah-brk-b
+    5y goldens pass.
+- Scope boundary: a 30y BAH-BRK-B cell would require either /data
+  mount at CI time (gates this on `prepare_ci_data.sh` extending to
+  cover pre-2009 data) or a runner-side split-aware MtM path. Neither
+  is in this PR's scope; the 15y post-split cell is the longest
+  feasible window with the current raw-close BAH mechanics. BRK-B
+  trading on NYSE began 1996-04-30 ($1,166 pre-split), so the
+  theoretical-longest BAH window is ~30y but blocked on the split-
+  handling work.
+- Reference: BRK-B closed-form 5y return ≈ raw-close ratio 357.57 /
+  202.80 - 1 = +76.32% (matches Yahoo Finance / Berkshire 2023 annual
+  letter to within rounding); 15y CAGR ≈ 12.3%/yr (consistent with
+  BRK's long-term ~10-13% returns).
+
 ### Custom-universe bidirectional Q2-A PR1 — shares-outstanding enrichment (2026-05-17)
 
 - [x] Lib + bin + tests built. `Eodhd.Http_client.fundamentals` extended
