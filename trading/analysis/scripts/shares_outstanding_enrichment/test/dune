@@ -1,0 +1,14 @@
+(test
+ (name test_shares_outstanding_enrichment)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  ounit2
+  matchers
+  status
+  eodhd
+  shares_outstanding_enrichment_lib)
+ (preprocess
+  (pps ppx_let)))

@@ -106,12 +106,53 @@ Tests pin the equity-only contract over a 12-listing fixture covering
 every named `Asset_type.t` variant plus `Other _` and absent-from-index;
 a second test pins order preservation.
 
-## 2. Q2 — Pre-1996 SP500 backbone (synthesis)
+## 2. Q2 — Market-cap composition + pre-1996 SP500 backbone
 
-Q1's filter narrows the inventory we already have. Q2 widens history past
-the EODHD floor (2000) and the fja05680/sp500 floor (1996).
+Q1's filter narrows the inventory we already have. Q2 has two sub-tracks:
 
-### Q2-A — Decomposition (1996-2000 gap)
+- **Q2-A — Market-cap composition** (PR1: shares-outstanding enrichment;
+  PR2: rank-by-market-cap composition builder). Once we have current
+  shares-outstanding for every equity-like symbol, we can construct
+  market-cap-ranked historical universes (top-500, top-1000, etc.) without
+  depending on IWV scrape. The approximation: `current_shares ×
+  historical_close_price`. Buybacks and IPO phantom market caps before
+  listing introduce drift; a cross-validation PR will measure this vs
+  Shiller's actual SP composite.
+- **Q2-B — Pre-1996 SP500 backbone**: widens history past the EODHD floor
+  (2000) and the fja05680/sp500 floor (1996).
+
+### Q2-A PR1 — Shares-outstanding bulk enrichment (THIS PR)
+
+Adds `analysis/scripts/shares_outstanding_enrichment/` with a pure `join`
+library (filter-then-sort: keeps only fundamentals with
+`shares_outstanding > 0.0`, sorted by symbol ascending), an executable
+that filters the inventory to equity-like via Q1 PR3's filter, calls
+`/api/fundamentals/{symbol}?filter=General,SharesStats` per symbol, and
+writes `data/shares_outstanding.sexp`.
+
+Also extends `Eodhd.Http_client.fundamentals` to carry the new
+`shares_outstanding : float` field, parsed from `SharesStats.SharesOutstanding`
+(NOT `General.SharesOutstanding` — the latter does not exist). Missing
+section → 0.0 sentinel; enrichment-lib's join then drops zero-share
+entries.
+
+Token-tier dependency: the `/api/fundamentals/` endpoint requires an
+EODHD plan with the "Fundamentals API" add-on. Tokens without this
+add-on receive HTTP 403 even when `/api/eod` keeps working — the bin
+treats 5 consecutive 403s as token-tier gating and aborts to preserve
+quota. **The current repo-local secrets token does not have this
+add-on.** The bulk artifact `data/shares_outstanding.sexp` is therefore
+NOT included in this PR; producing it is gated on a plan upgrade or a
+swap to an alternate fundamentals source (Sharadar via Nasdaq Data
+Link, AlphaVantage, etc.).
+
+### Q2-A PR2 — Composition builder (NOT YET STARTED)
+
+Will consume `shares_outstanding.sexp` + the cached daily bars and emit
+top-N point-in-time universes by `current_shares × close_price` for each
+quarter-end in the historical window.
+
+### Q2-B (Stooq) — Decomposition (1996-2000 gap)
 
 Between fja05680/sp500's earliest commit (1996-01-02) and EODHD's
 earliest daily OHLCV (2000-01-03), we have membership but no per-symbol
@@ -127,10 +168,10 @@ prices. The two viable closures are:
    forward. Names whose history starts inside the backtest window are
    excluded for that window's purposes.
 
-Q2-A PR: `analysis/data/sources/stooq/` — minimal client + bulk fetch
+Q2-B Stooq PR: `analysis/data/sources/stooq/` — minimal client + bulk fetch
 for a fixed SP500 1996-1999 backbone list. Not yet started.
 
-### Q2-B — Decomposition (1926-1997 industry-aggregate synthesis)
+### Q2-B (French) — Decomposition (1926-1997 industry-aggregate synthesis)
 
 Pre-1996 we abandon individual-name coverage entirely. The substitute is
 Kenneth French's 5-industry daily-portfolio returns (already landed via
@@ -144,7 +185,7 @@ against an equal-weight subuniverse of every SP500 member at the time.
 The information content is lower per-bar (5 series instead of 500), but
 that's the price of a 1926 backbone.
 
-Q2-B PR: `analysis/data/synthetic/french_industry_universe/` —
+Q2-B French PR: `analysis/data/synthetic/french_industry_universe/` —
 wraps the existing French daily output as a Weinstein-compatible
 universe. Not yet started.
 
@@ -152,11 +193,13 @@ universe. Not yet started.
 
 | PR | Name | Status |
 |----|------|--------|
-| Q1 PR1 | `Eodhd.Asset_type` parser | MERGED (#1156) |
-| Q1 PR2 | Bulk enrichment exe + `symbol_types.sexp` | MERGED (#1157) |
-| Q1 PR3 | `filter_equity_like_symbols` | THIS PR |
-| Q2-A   | Stooq 1996-1999 backbone | NOT STARTED |
-| Q2-B   | French-industry universe (1926-1997) | NOT STARTED |
+| Q1 PR1   | `Eodhd.Asset_type` parser | MERGED (#1156) |
+| Q1 PR2   | Bulk enrichment exe + `symbol_types.sexp` | MERGED (#1157) |
+| Q1 PR3   | `filter_equity_like_symbols` | MERGED (#1159) |
+| Q2-A PR1 | Shares-outstanding bulk enrichment (this PR) | gated on EODHD Fundamentals tier |
+| Q2-A PR2 | Composition builder (`current_shares × historical_close`) | NOT STARTED |
+| Q2-B     | Stooq 1996-1999 backbone | NOT STARTED |
+| Q2-B     | French-industry universe (1926-1997) | NOT STARTED |
 
 Q1 is self-contained — it doesn't depend on Q2 and unblocks downstream
 broader-universe backtests immediately. Q2 is sequenced after the
@@ -174,4 +217,7 @@ the deep-history extension is worth the synthesis complexity.
   2010-present (already landed).
 - Companion `.mli`:
   - `trading/analysis/data/sources/eodhd/lib/asset_type.mli`
+  - `trading/analysis/data/sources/eodhd/lib/http_client.mli` (Q2-A PR1
+    extends `fundamentals` with `shares_outstanding`)
   - `trading/analysis/scripts/asset_type_enrichment/lib/asset_type_enrichment_lib.mli`
+  - `trading/analysis/scripts/shares_outstanding_enrichment/lib/shares_outstanding_enrichment_lib.mli`

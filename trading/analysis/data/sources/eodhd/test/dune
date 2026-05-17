@@ -3,6 +3,7 @@
   test_http_client
   test_splits_endpoint
   test_dividends_endpoint
+  test_fundamentals_endpoint
   test_exchange_resolver
   test_multi_market
   test_asset_type)

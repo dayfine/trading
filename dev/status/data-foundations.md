@@ -260,6 +260,28 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
+### Custom-universe bidirectional Q2-A PR1 — shares-outstanding enrichment (2026-05-17)
+
+- [x] Lib + bin + tests built. `Eodhd.Http_client.fundamentals` extended
+  with `shares_outstanding : float` parsed from
+  `SharesStats.SharesOutstanding` (NOT `General` — that field does not
+  exist). Two-section filter (`General,SharesStats`) keeps the response
+  small. Lib joins by filtering to positive shares + sorting by symbol
+  ascending; bin walks the equity-like inventory and writes
+  `data/shares_outstanding.sexp`.
+- [ ] Bulk run NOT YET PRODUCED. The `/api/fundamentals/` endpoint
+  requires an EODHD plan with the "Fundamentals API" add-on; the
+  repo-local token returns HTTP 403 across all variants probed
+  (consistent with the Phase 1.1 failure noted in §"Blocking Refactors"
+  above). Production of `data/shares_outstanding.sexp` is gated on a
+  plan upgrade or a swap to an alternate fundamentals source
+  (Sharadar via Nasdaq Data Link, AlphaVantage, etc.). The bin handles
+  this gracefully: 5 consecutive 403s abort the run to preserve API
+  quota.
+- Authority: `dev/plans/custom-universe-bidirectional-2026-05-17.md`
+  §Q2-A PR1. Companion `.mli`:
+  `trading/analysis/scripts/shares_outstanding_enrichment/lib/shares_outstanding_enrichment_lib.mli`.
+
 ### Merged (data-pipeline-automation track)
 
 - **#819** — Automation PR 1/4: snapshot build checkpointing

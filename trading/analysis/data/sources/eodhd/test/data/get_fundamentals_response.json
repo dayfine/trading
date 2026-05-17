@@ -6,5 +6,9 @@
     "Industry": "Consumer Electronics",
     "MarketCapitalization": 2800000000000.0,
     "Exchange": "NASDAQ"
+  },
+  "SharesStats": {
+    "SharesOutstanding": 14687356000,
+    "SharesFloat": 14662534368
   }
 }
