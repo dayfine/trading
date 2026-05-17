@@ -35,21 +35,28 @@
 ;; | calmar_ratio      |    0.40         |    0.38             | flat             |
 ;; | ulcer_index       |    8.41         |   26.89             | 3.2×             |
 ;;
-;; The composition universe is HIGHER-CAGR, MUCH-WIDER-DRAWDOWN. Composition
-;; entries at 2019-05-31 are concentrated in mega-cap growth names that
-;; massively outperformed in 2019-2023 (AMZN, NVDA, TSLA, NFLX, BKNG, AVGO,
-;; SHOP, ANET top of cap-ranked list). Current-SP500 snapshot (sp500.sexp)
-;; mixes growth + mature/value names and so produces tamer return + DD.
-;; Calmar parity (~0.38 vs ~0.40) confirms the risk-adjusted edge is
-;; preserved — extra return mostly comes with proportionally extra DD.
+;; **WARNING — this is a BRIDGE SMOKE TEST, NOT a strategy alpha
+;; benchmark.** Random-universe sweep on 2026-05-18 (see
+;; dev/notes/random-universe-sweep-2026-05-18.md) showed the +174.69%
+;; return here is ~8 σ above the random-500-sample mean of +12.66%
+;; drawn from the same 2019 cap-ranked pool. The composition golden
+;; is forward-looking: it's "what survived to 2026 AND was big in
+;; 2019" — pure survivor + winner bias. Concentration in AMZN / NVDA /
+;; TSLA / NFLX / BKNG / AVGO / SHOP / ANET — all monster 2019-2023
+;; runners — drives the headline number, not Weinstein alpha. Win
+;; rate (30.65) is statistically identical to the 5 random samples
+;; (mean 28.99, range 26.5-31.5) — strategy mechanics are universe-
+;; invariant; only the universe's intrinsic up-side changes.
 ;;
-;; **NOT a like-for-like alpha test**: the two universes differ in
-;; composition (top-500-by-marketcap vs current-SP500 membership) AND in
-;; survivorship characteristics. This cell exists primarily to prove the
-;; Universe_file ↔ Universe_snapshot bridge works end-to-end and to
-;; smoke-test that strategy + screener consume composition goldens
-;; without crashing. For true cross-universe alpha comparison we'd need
-;; the same selection rule applied to both (P1 follow-up).
+;; The cell still earns its keep: it pins the
+;; Universe_file → Universe_snapshot.load_path_as_pairs bridge wiring
+;; (added in PR #1174), pins the runner's universe-sized sector-map
+;; handling for composition goldens, and pins per-symbol fill +
+;; commission + stop accounting against a 500-symbol cell. A strategy
+;; bug that breaks any of those will move trade count / win rate / DD
+;; out of the pinned bands. A strategy bug that changes alpha discovery
+;; on a *fair* (point-in-time) universe will NOT be caught here —
+;; selection bias dominates the return number.
 ;;
 ;; Universe path uses ".." traversal because composition goldens live
 ;; outside fixtures_root (test_data/goldens-custom-universe/) — they're
