@@ -82,6 +82,39 @@ missing-bar symbols needs verification.
 
 ## P1 — Optional follow-ups
 
+### Composition-golden bar-coverage audit (1998-2005)
+
+The `Universe_snapshot` bridge (#1174) projects composition goldens
+into the runner via [Universe_file.load]. But the goldens were built
+from EODHD inventory; some 1998-2005-era symbols (delisted, M&A'd,
+gone) may have spotty or missing bars in `data/<X>/<Y>/<SYM>/data.csv`.
+The runner's `Csv_snapshot_builder` tolerates missing bars (returns
+empty rows + NaN columns), so a backtest doesn't crash — but the
+universe effectively shrinks silently, and statistics on the
+"500-symbol universe" become misleading.
+
+**Deliverable:** per-symbol bar-coverage report for each
+`top-{500,1000,3000}-{1998..2005}.sexp` composition golden. For each
+golden + symbol: trading-day coverage percent over the snapshot's
+forward 1y window. Flag symbols with `< 80%` coverage; flag goldens
+with `> 10%` of symbols below threshold.
+
+**Effort:** ~80 LOC OCaml (reads inventory + counts CSV rows) + 1-2h
+operator wall to run across the 8 affected years. Output: a markdown
+report at `dev/reports/composition-golden-bar-coverage-2026-05-XX.md`.
+
+**Why P1, not P0:** the 2019+ goldens have near-100% coverage (current
+symbols, complete bars). The hole shows up only when consuming
+pre-2006 goldens, which is the broader-first agenda but not the
+immediate 2026-05-19 work. File now so it doesn't get lost.
+
+### Tunable-parameter inventory + private tuned-configs repo
+
+See `dev/notes/tunable-parameters-inventory-2026-05-18.md` (inventory)
+and `dev/plans/private-tuned-configs-repo-2026-05-18.md` (design). When
+the next BO sweep produces a config worth blessing, set up the private
+repo per the design plan.
+
 ### Decomposition + Composition unification
 
 `Universe.Build_from_index` + `Universe.Build_from_individuals` both
