@@ -1,0 +1,10 @@
+(lang dune 3.17)
+
+(name kenneth_french)
+
+(generate_opam_files true)
+
+(package
+ (name kenneth_french)
+ (depends ocaml base core re uri ppx_deriving)
+ (tags ()))

@@ -49,9 +49,12 @@ work (point-in-time Russell membership), see
 `dev/notes/deep-history-data-pointers-2026-05-16.md` for the broader
 vendor catalog covering deep-history (Shiller 1871, Kenneth French 1926),
 free cross-check (Stooq, Tiingo), and commodities (World Bank Pink Sheet,
-datahub.io). **Next-pursue candidate: shillerdata.com ingest** — free,
-~200 LOC, unlocks long-horizon S&P index anchor + EODHD adjusted-close
-cross-validation. Companion memory:
+datahub.io). **Shillerdata ingest DONE 2026-05-17 (PR #1140) + Shiller
+validator DONE 2026-05-17 + Kenneth French 5-Industry daily ingest DONE
+2026-05-17.** Tier 1 deep-history infrastructure is in place; next
+non-Norgate candidate is the Stooq cross-check (manifest-Phase-1
+gated) or extending Kenneth French to the 49-industry / factor
+datasets when synthesis is in scope. Companion memory:
 `memory/reference_deep_history_data_sources.md`.
 
 **2026-05-15 strategic pivot — track elevated to P0.** Per
@@ -664,6 +667,86 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
   - Sizing: ~410 LOC (`.ml` + `.mli` validator-core 234 + 90 ml + cli
     87). Tests ~250 LOC. Pinned fixtures not added (validator-core is
     pure; CLI integration exercised by live probe).
+
+### READY_FOR_REVIEW (Kenneth French Data Library ingest — 2026-05-17)
+
+- **`kenneth_french` data source** (branch `feat/kenneth-french-ingest`,
+  `analysis/data/sources/kenneth_french/`). Tier 1 deep-history anchor
+  per `memory/reference_deep_history_data_sources.md`. Free CSV download
+  from Kenneth French's data library (Dartmouth/Tuck); no auth; ZIP +
+  CSV format. The 5-Industry Portfolios Daily dataset covers
+  **1926-07-01 → present**, daily cadence (~100 years × 5 industries ×
+  2 weighting schemes). Companion authority:
+  `dev/notes/deep-history-data-pointers-2026-05-16.md` §"Tier 1 — 50-100y
+  deep history". Unlocks the long-horizon factor-skeleton for the
+  pre-2000 synthesis path (industry × size × value × momentum) per the
+  Tier 1 synthesis methodology.
+  - `lib/kenneth_french_client.{ml,mli}` — pure CSV parser + URI
+    constant. Output types: `daily_return = { date; industry_returns :
+    (string * float option) list }`, `series = { industries;
+    observations }`, `parsed = { value_weighted; equal_weighted }`. The
+    parser handles the two-block structure (Value-Weighted block first,
+    then Equal-Weighted) — both blocks span the same date range and use
+    identical industry columns; the parser validates industry-name
+    equality between blocks. YYYYMMDD dates parsed manually (8-char
+    slice). Sentinel values `-99.99` / `-999.99` map to `None` per the
+    file's preamble. UTF-8 BOM + CRLF line endings tolerated. Header
+    drift surfaces as `Status.error_invalid_argument`.
+  - `bin/french_curl_fetch.{ml,mli}` — curl-shellout HTTP fetcher
+    mirroring PRs #1137 (iShares) and #1141 (Shiller). Differs from
+    shiller's variant in returning the staged tempfile path instead of
+    the body string, because the Kenneth French response is a binary
+    ZIP that needs to be passed to `unzip` next. Prophylactic
+    browser-style `User-Agent` defends against future IIS WAF changes
+    on the Dartmouth server (probe 2026-05-16 confirmed 200 without it
+    but we include it defensively).
+  - `bin/fetch_french_history.exe` — operator CLI; two flags
+    (`-dataset SLUG`, `-out PATH`) plus the fetch → unzip → parse →
+    write pipeline. Currently only `5-industry-daily` is supported;
+    the slug-table structure is set up so follow-up datasets
+    (`49-industry-daily`, `factors-daily`, etc.) can plug in without
+    breaking the contract. ZIP unpack is `Sys_unix.command "unzip -o
+    -q ..."` (shell-out, no opam Zip dep). Emits a 7-column canonical
+    CSV (`block,date,Cnsmr,Manuf,HiTec,Hlth,Other`) with empty cells
+    for `None` options. Cache target convention
+    `dev/data/kenneth_french/<dataset>-YYYYMMDD.csv` (gitignored).
+  - `test/test_kenneth_french_client.ml` +
+    `test/data/french_5industry_sample.csv` — pinned ~25-line fixture
+    covering both blocks (4 VW rows + 4 EW rows) + the canonical
+    7-line preamble + trailing copyright line. One synthetic `-99.99`
+    cell on the 2020-03-16 EW row exercises the sentinel → None path.
+    18 OUnit2 tests covering: block extraction, industry-order
+    pinning, VW/EW first-row pinned values, covid-era deeply-negative
+    real values vs sentinel mapping, source ordering, missing
+    VW/EW/industry-header / empty-body / whitespace-only /
+    unparseable-date / wrong-column-count / unparseable-numeric error
+    paths, industry-mismatch defensive check, UTF-8 BOM tolerance,
+    CRLF line-ending tolerance, URI shape.
+  - **Probe (live, 2026-05-17):** `dune exec
+    analysis/data/sources/kenneth_french/bin/fetch_french_history.exe
+    -- -dataset 5-industry-daily -out /tmp/french-test.csv` wrote
+    **VW=26212 + EW=26212 observations to /tmp/french-test.csv (VW
+    first 1926-07-01, last 2026-03-31)** — exactly the 99.75 years of
+    daily coverage promised by the data library. Output CSV
+    well-formed; no missing-data sentinels observed in the 5-Industry
+    daily set.
+  - Linters green: `dune build @fmt`, `no_python_check`,
+    `fn_length_linter` (longest function in lib = 22 LOC; longest in
+    bin = 24 LOC), `linter_magic_numbers`, `linter_mli_coverage`,
+    `nesting_linter` (2496 functions within limits).
+  - Sizing: 346 LOC lib (`.ml` 249 + `.mli` 97) + 284 LOC bin
+    (`fetch` 177 + `curl` 57 + `curl.mli` 50) + 285 LOC tests.
+    Pinned fixture (25-line CSV) + dune/opam boilerplate excluded
+    per PR-sizing rules.
+  - Not consumed yet — pure data-source infrastructure under
+    `analysis/`. Synthesis-path wire-up (the Tier 1 use case —
+    industry × size × value × momentum skeleton for pre-2000
+    backtests) is a follow-up belonging in `feat-backtest` /
+    `feat-weinstein` when synthesis is in scope.
+  - Out of scope (deferred): 49-Industry daily portfolios (larger
+    dataset, same parser pattern); Fama-French factors (separate
+    ZIP, different schema); cross-validator EODHD-vs-French
+    (Shiller-validator pattern; follow-up).
 
 ### Merged (Phase 1.4 IWV scraper stack — 2026-05-16)
 
