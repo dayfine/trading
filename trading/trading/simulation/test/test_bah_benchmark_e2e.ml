@@ -139,8 +139,15 @@ let test_bah_spy_year_2024 ctx =
     | Some (_, c) -> c
     | None -> assert_failure "Could not load SPY final close"
   in
-  (* All-cash sizing: floor(initial_cash / entry_close) shares.  *)
-  let shares = Float.round_down (initial_cash /. entry_close) in
+  (* All-cash sizing with the strategy's 1% gap buffer: floor(initial_cash /
+     (entry_close * 1.01)) shares. The buffer absorbs the overnight gap
+     between today's close (used for sizing) and the next-day open (where the
+     market order actually fills); see [_entry_gap_buffer_pct] in
+     bah_benchmark_strategy.ml. *)
+  let gap_buffer_pct = 0.01 in
+  let shares =
+    Float.round_down (initial_cash /. (entry_close *. (1.0 +. gap_buffer_pct)))
+  in
   let leftover_cash = initial_cash -. (shares *. entry_close) in
   let entry_commission =
     Float.max sample_commission.minimum (sample_commission.per_share *. shares)

@@ -18,14 +18,36 @@ let _position_id_of_symbol (symbol : string) : string =
 let _valid_sizing_inputs ~(cash : float) ~(close_price : float) : bool =
   Float.(cash > 0.0) && Float.(close_price > 0.0)
 
+(** Headroom over today's close to absorb the overnight gap between sizing
+    (today) and fill (next trading-day open). The market order generated from
+    [CreateEntering] fills at the next bar's open via the engine; if the open
+    gaps up by more than the residual cash on a tight floor-divided share count,
+    [Portfolio.apply_single_trade] returns [Error "Insufficient cash"], the
+    simulator's [_apply_trades_best_effort] silently drops the trade
+    (simulator.ml:354-358), and the position stays stuck in [Entering] with 0
+    fills — BAH's [_has_position_for_symbol] then suppresses any retry. The
+    weekly-start-sweep golden surfaced this as a ~45% zero-trade rate on SPY
+    Mondays 2023-2026 (see PR #1167 + fix-forward).
+
+    1% covers gap-ups up to ~1%, which is above the typical SP500 large-cap
+    overnight gap. Extreme days (e.g. 2020-03 COVID gaps > 2%) may still reject;
+    the proper long-term fix is to make the simulator surface rejected fills
+    back to the strategy so retries are possible (filed as a follow-up). *)
+let _entry_gap_buffer_pct = 0.01
+
 (** All-cash sizing: convert available cash to whole shares at [close_price].
     Returns [None] when the cash can't buy a single share (price exceeds cash)
     or when inputs are non-positive — both cases should not emit a transition.
-*)
+
+    Divides by [close_price * (1 + _entry_gap_buffer_pct)] (not by [close_price]
+    directly) so a small overnight gap-up between today's sizing close and
+    tomorrow's fill open does not bust the cash budget. See
+    [_entry_gap_buffer_pct]'s doc for the failure mode this guards against. *)
 let _shares_from_cash ~(cash : float) ~(close_price : float) : float option =
   if not (_valid_sizing_inputs ~cash ~close_price) then None
   else
-    let shares = Float.round_down (cash /. close_price) in
+    let sizing_price = close_price *. (1.0 +. _entry_gap_buffer_pct) in
+    let shares = Float.round_down (cash /. sizing_price) in
     Option.some_if Float.(shares > 0.0) shares
 
 let _entry_reasoning : Position.entry_reasoning =
