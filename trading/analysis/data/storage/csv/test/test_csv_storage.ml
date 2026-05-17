@@ -566,10 +566,14 @@ let _reset_reconcile_dir () =
 
 (* True iff a per-symbol reconcile entry has been written under any date shard
    below [_reconcile_dir]. Used to assert presence/absence without baking in
-   today's UTC date as a literal. *)
+   today's UTC date as a literal.
+
+   Returns [None] if [_reconcile_dir] is missing OR is a regular file
+   (which happens transiently inside [test_reconcile_failure_is_non_fatal]'s
+   failure-injection setup); readdir on a non-directory would raise. *)
 let _reconcile_log_for symbol =
   let recon_path = Fpath.to_string _reconcile_dir in
-  match Sys_unix.file_exists recon_path with
+  match Sys_unix.is_directory recon_path with
   | `No | `Unknown -> None
   | `Yes ->
       let dates = Sys_unix.readdir recon_path |> Array.to_list in
