@@ -1,124 +1,157 @@
-# Next-session priorities (2026-05-18)
+# Next-session priorities (2026-05-18) — overnight 2026-05-17
 
-Supersedes `dev/notes/next-session-priorities-2026-05-17.md`. Written
-end-of-session 2026-05-16 PM after the autonomous recovery from a
-~14-hour red-main incident + 5 PRs landed.
+Supersedes the prior `dev/notes/next-session-priorities-2026-05-18.md`
+(written end-of-session 2026-05-16 PM). This version replaces it after
+the 2026-05-17 overnight autonomous run.
 
 ## TL;DR
 
-- **Main CI was red for 14h.** Root cause was a docker-image rebuild on
-  2026-05-15 18:54Z (triggered by the new `ishares.opam` from PR #1112)
-  on a runner with AVX-512, baking AVX-512 instructions into
-  `libta-lib.so`. Most GHA `ubuntu-latest` runners lack AVX-512 →
-  SIGILL on every ta_ocaml-linked test. PR #1130 fixed it with
-  `-march=x86-64-v2 -mtune=generic` + a CPU-flag smoke step. Watchdog
-  issue #1114 fired 12 times before action; full timeline +
-  process-level lessons in updated memory files.
-- **5 PRs merged this session**: #1128 (nesting fix), #1130 (image
-  rebuild), #1126 (Bayesian Phase 3 PR-A scoring), #1131 (IWV
-  browser headers + 503 retry), #1132 (Bayesian Phase 3 PR-B knob
-  inventory).
-- **2 issues closed**: #1114 (watchdog), #1129 (SIGILL infra).
-- **3 memory files updated** with stricter merge / session-rampup rules
-  to prevent recurrence.
+- **17 PRs merged overnight 2026-05-17.** Two complete feature tracks
+  (Bayesian Phase 3 stack PR-A → PR-E; CSV manifest stack Phase 1 +
+  Phase 2 + Phase 3 + bulk-rehash). 4 new data sources (Shiller, Stooq,
+  Kenneth French, IWV-with-Sec-Fetch). Cost-model overlay scaffolded.
+- **IWV scrape still BLOCKED.** Local + GHA-runner egress IPs both hit
+  Akamai bot-check. Curl shellout + Sec-Fetch + HTTP/2 all insufficient.
+  Next: paid scraper API or Sharadar/EODHD-Fundamentals tier upgrade.
+- **Cost-model built but NOT wired** into the simulator. 4 deferred
+  items in `dev/status/cost-model.md`.
+- **Bayesian production sweep READY.** Phase 3 stack complete; ops
+  session can dispatch.
 
-## What shipped 2026-05-16 PM (this session)
+## PRs landed 2026-05-17 (17 merged, 1 closed dup)
 
-| PR | Track | Summary | Notes |
-|---|---|---|---|
-| #1128 | tech-debt | `_fail_loud_on_missing_mark` extraction | Fixes nesting linter on `portfolio_valuation.compute` (was 3.03, limit 3.0). |
-| #1130 | CI infra | TA-Lib portable rebuild + smoke step | `-march=x86-64-v2 -mtune=generic`; admin-merged as `[main-fix]` per memory exception. Smoke step had two iterative fixes (pipefail / fs-search). |
-| #1126 | tuning (P0b) | Bayesian Phase 3 PR-A scoring function | Already had QC APPROVED pre-rebase; rebased + verified + autonomous-merged. |
-| #1131 | data (P0a code) | IWV fetcher browser headers + 503/429 retry | qc-structural + behavioral both APPROVED quality 5; CI green after image rebuild; autonomous-merged. |
-| #1132 | tuning (P0b PR-B) | Bayesian Phase 3 knob inventory + spec | qc-structural + behavioral APPROVED quality 4; CI green after rebase; autonomous-merged. |
+| PR | Track | Summary |
+|---|---|---|
+| #1136 | Bayesian Phase 3 | PR-C walk-forward in-process integration |
+| #1137 | IWV (ops) | curl shellout (bypass Cohttp_async TLS fingerprint) |
+| #1138 | IWV (ops) | GHA workflow_dispatch yaml for scrape |
+| #1139 | docs | Tier-1/2/3 data-vendor pointers |
+| #1140 | data | Shiller ingest (1871-present, 1865 monthly obs) |
+| #1141 | data | Shiller → EODHD GSPC.INDX cross-validator |
+| #1142 | manifest | Phase 1 — manifest module + manifest_inspect CLI |
+| #1143 | Bayesian Phase 3 | PR-D — length-scale + early-stop + Option encoding |
+| #1145 | Bayesian Phase 3 | PR-E — OOS holdout validator (stack closed) |
+| #1146 | data | Stooq drift check (apikey-gated, AAPL ~3.58% baseline) |
+| #1147 | IWV (ops) | Sec-Fetch + sec-ch-ua + --http2 headers |
+| #1148 | manifest | Phase 2 — save writes manifest + load_with_verify |
+| #1149 | manifest | bulk-rehash CLI for the 41,577 cached symbols |
+| #1150 | manifest | Phase 3 — reconcile-on-refetch diff log |
+| #1151 | backtest | cost-model overlay (4 cost knobs; not yet wired) |
+| #1152 | data | Kenneth French 5-industry daily ingest (52,424 obs, 1926-2026) |
+| #1153 | tests | Fix-forward — `is_directory` in `_reconcile_log_for` |
 
-## Still pending (carried forward)
+Closed: **#1144** (CSV manifest Phase 1 duplicate from crashed-agent state).
 
-### P0a — IWV ops scrape (BLOCKED on Akamai 503)
+## Carry-forward
 
-- PR #1131 ships the *code* (browser headers + 503/429 retry, mock-fetcher
-  retry tests). What's missing is the *data*.
-- **Blocker**: my local egress IP is in Akamai cooldown (1-24h block
-  window per their docs). 4 cooldown probes between 10:34Z and ~14Z
-  all returned 503. Scheduled probes continue at +1h intervals; if
-  probe 4 (~17:30Z) still 503, give up local path tonight.
-- Full diagnosis + alternative path in
-  `dev/notes/iwv-scrape-akamai-block-2026-05-16.md`.
-- **Alternative**: run scrape from a GHA runner (different egress IP,
-  not flagged). ~40 LOC manual workflow_dispatch yaml. Recommended
-  for next session if local IP stays blocked.
+### P0a — IWV scrape (BLOCKED — paid path required)
 
-### P0b PR-C/D/E — Bayesian Phase 3 stack continuation
+Both local IP and GHA-runner IPs hit Akamai bot-check. Stack of
+hardenings landed (PR #1131 browser headers, PR #1137 curl shellout,
+PR #1147 Sec-Fetch + HTTP/2) — none sufficient. Per
+`dev/notes/iwv-scrape-akamai-block-2026-05-16.md` §"Next options":
 
-Plan: `dev/plans/bayesian-multi-param-scaling-2026-05-16.md`.
+1. **Paid scraper API** (ScrapingBee / ScraperAPI / Bright Data) —
+   ~$20-50 one-shot for the ~3700-snapshot backfill. Cheapest pragmatic
+   unblock.
+2. **EODHD Fundamentals tier upgrade** ($59.99/mo).
+3. **Sharadar via Nasdaq Data Link** ($99/mo).
+4. **Headless browser** (Playwright / chromium-headless). Heaviest
+   engineering.
 
-- **PR-C** (~400 LOC) — walk-forward in-process integration:
-  pull per-fold execution out of `walk_forward_runner.ml` into a
-  library, rewrite `bayesian_runner_evaluator` to call it per BO
-  iteration. **Next dispatch.**
-- **PR-D** (~250 LOC) — int/Option encoding + GP length-scale
-  tuning + early-stop.
-- **PR-E** (~300 LOC) — end-to-end runner + result reporter +
-  OOS holdout.
+Recommend (1) as one-shot ops decision.
 
-### P0c — Survivorship-correct re-pin (gated on P0a data)
+### P0b — Bayesian production sweep (READY)
 
-Unchanged from priorities-2026-05-17 doc. Once
-`russell-3000-2006-2026.sexp` exists, re-pin
-`goldens-sp500-historical/sp500-2010-2026.sexp` against the
-IWV-derived cohort. Authority: PR #1076's survivorship-bias
-hypothesis.
+Phase 3 stack complete (#1126, #1132, #1136, #1143, #1145). Ops session
+can dispatch:
 
-### P1 — Margin Phase 3 bear-window validation (unchanged)
+```
+# 1. Build Cell-E baseline aggregate (~15 min)
+dune exec trading/backtest/walk_forward/bin/walk_forward_runner.exe -- \
+  --spec trading/test_data/walk_forward/cell_e_30fold_2026_05_16.sexp \
+  --out-dir dev/data/cell-e-baseline-aggregate
 
-Per `dev/plans/short-side-margin-2026-05-13.md` §Stage A. Phase 1+2
-merged in prior session; Phase 3 needs ops-data sweep on 3 bear
-windows (2000-2002, 2008-2009, 2020-Q1 + 2022). Gated on having
-universe data covering those windows — depends on P0a completing.
+# 2. Dispatch BO run (~25-75h)
+dune exec trading/backtest/tuner/bin/bayesian_runner.exe -- \
+  --walk-forward-spec trading/test_data/walk_forward/cell_e_30fold_2026_05_16.sexp \
+  --baseline-aggregate dev/data/cell-e-baseline-aggregate/aggregate.sexp \
+  --out-dir dev/data/bayesian-runs/2026-05-18
+```
 
-## CI infra hardening (memory updates this session)
+### P0c — Survivorship-correct re-pin (BLOCKED on P0a)
 
-Two new memory rules + index entry in `~/.claude/projects/.../memory/`:
+Unchanged. Re-pin `goldens-sp500-historical/sp500-2010-2026.sexp` on
+the IWV-derived cohort once data lands.
 
-1. `feedback_session_rampup_check_main_ci.md` — **NEW**. Step 0 of every
-   session: `gh run list --branch main --limit 3 --json conclusion`. If
-   red, fix first.
-2. `feedback_pr_merge_ci_gate.md` — **UPDATED** with two HARD STOP
-   sections:
-   - Any `^FAIL:` line in CI log → never an infra flake.
-   - Main must be green before merging the next PR (only fix-forward
-     `[main-fix]` PRs may merge on red main).
-3. `feedback_cleanup_local_lint_then_merge.md` — **UPDATED** with the
-   same two HARD STOP preconditions.
-4. `feedback_no_pr_merging.md` — **UPDATED** to explicitly drop
-   `--admin` from the default merge command. `--admin` is the narrow
-   `[main-fix]` exception only.
+### P1 — Cost overlay wiring (NEW)
 
-These were motivated by the 14-hour red-main incident where 12 PRs
-piled on a red main before anyone caught it.
+PR #1151 shipped the cost-model module standalone. 4 items deferred
+per `dev/status/cost-model.md`:
+
+1. Wire `cost_model` field into `scenario.mli`.
+2. Wire `apply_per_trade_commission` into `Simulator._apply_trades_best_effort`.
+3. Plumb ADV through engine + auto-apply `apply_market_impact`.
+4. Re-pin Cell E + smaller scenarios under cost overlay.
+
+### P1 — Margin Phase 3 bear-window validation
+
+Unchanged. Gated on universe data covering 2000-02, 2008-09, 2020-Q1,
+2022 bear windows. Depends on P0a.
+
+### P2 — Pre-2006 synthesis backtest (NEW, feasible)
+
+After Shiller (#1140) + French (#1152) ingests landed, the synthesis
+methodology in `memory/reference_deep_history_data_sources.md` is
+buildable:
+
+1. French portfolio returns (5-industry daily, 1926-) → systematic
+   factor skeleton.
+2. Per-symbol idiosyncratic noise calibrated to French dispersion.
+3. Rescale so cap-weighted aggregate matches Shiller composite.
+4. Output: synthetic per-symbol returns covering 1926-1999.
+
+~500 LOC. Separate session.
+
+## Strategy / data infrastructure status
+
+- **Manifest stack complete** (Phase 1 + 2 + 3 + bulk-rehash).
+- **Cross-validators available**: EODHD vs Shiller (#1141), EODHD vs
+  Stooq (#1146).
+- **Bayesian tuner end-to-end**: scoring + knob spec + walk-forward
+  in-process + length-scale/early-stop + OOS holdout.
+- **Deep-history data**: Shiller (1871-) + Kenneth French (1926-),
+  both free, OCaml-native curl ingest.
+
+## CI / harness gaps surfaced this session
+
+1. **Test state pollution** in `_reconcile_log_for` — fixed PR #1153
+   (`is_directory` instead of `file_exists`). Lesson: helpers that
+   readdir a path must check is_directory, not just file_exists.
+2. **ocamlformat skew** continues (~15-20min per PR for fix-fmt-push).
+   Per memory `project_ocamlformat_version_skew`. Has NOT been
+   root-caused.
+3. **Test ordering vs dune sandbox reuse**: tests within a single
+   `(test ...)` exe share state across cases within one suite.
+4. **Disk pressure** (>95%) reached twice; sweep script handled.
+   Budget for cleanup between dispatches.
 
 ## Recommended sequencing for next session
 
-1. **Step 0 (always):** `gh run list --branch main --limit 3` — verify
-   green. If red, fix first.
-2. **Akamai probe** if blocker still open per
-   `dev/notes/iwv-scrape-akamai-block-2026-05-16.md`. If unblocked
-   (>=24h elapsed by then) → kick off full IWV backfill in background.
-3. **Dispatch feat-backtest on Bayesian Phase 3 PR-C** — walk-forward
-   in-process integration. Largest PR in the stack at ~400 LOC.
-   Independent of IWV scrape outcome.
-4. **If IWV backfill succeeds**: P0c re-pin (survivorship-correct
-   baseline).
-5. **If IWV backfill still blocked after >=24h**: implement GHA-runner
-   scrape workflow per `iwv-scrape-akamai-block-2026-05-16.md` §
-   alternative.
+1. **Step 0**: `gh run list --branch main --limit 3` — verify green.
+2. **Cost-model wiring PR** (P1) — lifts 4 deferred items. ~200 LOC.
+3. **IWV unblock decision**: pick paid scraper API or Sharadar or
+   EODHD tier upgrade. Ops decision, ~$20-100 budget.
+4. **Pre-2006 synthesis backtest** (P2) — consumes Shiller + French.
+   ~500 LOC. Separate session if budget tight.
+5. **Bayesian production sweep** if IWV unblocks (ops, 25-75h).
 
 ## Open follow-ups
 
-- Watchdog issue #1114 (closed) had cc @dayfine 12 times — consider
-  adding a paging mechanism (Slack? Email?) so future red-main
-  incidents surface within the same hour, not 14 hours later.
-- PR #1130's smoke step had two bugs (pipefail on empty grep, then
-  wrong lib path) that needed iterative fixing under fire. Worth
-  hardening the smoke-step pattern as a `dev/scripts/check_ta_lib_isa.sh`
-  for re-use + unit testing.
+- `dev/status/cost-model.md` — 4 deferred items from PR #1151.
+- `dev/notes/iwv-scrape-akamai-block-2026-05-16.md` §"Next options" —
+  4 paths to unblock IWV.
+- French ingest `-999.99` sentinel branch documented but not
+  test-exercised (qc-behavioral CP4 soft-flag on #1152).
+- Reconcile-log query CLI (Phase 3.5) deferred from continuation plan.
+- Sector cap PR (P1, Weinstein domain) deferred from continuation plan.
