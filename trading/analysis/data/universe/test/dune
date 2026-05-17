@@ -1,3 +1,14 @@
 (tests
- (names test_snapshot test_build_from_index)
- (libraries universe shiller kenneth_french core ounit2 matchers status))
+ (names
+  test_snapshot
+  test_build_from_index
+  test_build_synthetic_universes_runner)
+ (libraries
+  build_synthetic_universes_runner_lib
+  core
+  kenneth_french
+  matchers
+  ounit2
+  shiller
+  status
+  universe))

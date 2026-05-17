@@ -369,6 +369,48 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
   Combined with simulator-side #1024 (Closed-positions prune), 15y wall dropped 5h → 13.6 min (~22×). See `dev/status/backtest-perf.md` for the simulator-side share.
 
+### READY_FOR_REVIEW (Q2-B PR2 — synthesizer runner + 1927-1997 decomposition goldens — 2026-05-17, PR #1164)
+
+- **Runner CLI + library** (branch `feat/q2b-pr2-synthesizer-runner`,
+  `analysis/data/universe/bin/`). Q2-B PR2 of
+  `dev/plans/custom-universe-bidirectional-2026-05-17.md` — emits the
+  bulk goldens that complete the bottom half of the bidirectional plan.
+  - `bin/build_synthetic_universes_runner_lib.{ml,mli}` — testable
+    orchestration library. Owns the cache-CSV parsers for the canonical
+    Shiller (`period,sp_price,dividend,earnings,cpi,long_rate`) and
+    Kenneth French (`block,date,Cnsmr,Manuf,HiTec,Hlth,Other`) on-disk
+    formats (the format `fetch_*_history.exe` writes, NOT the
+    upstream-mirror format the `_client.parse` functions consume).
+    Drives a year × top-N loop calling
+    `Universe.Build_from_index.build`; on `Ok` writes
+    `{out_dir}/top-{top_n}-{year}.sexp` via `Snapshot.save`; on `Error`
+    records the skip reason and continues — never raises.
+  - `bin/build_synthetic_universes_runner.ml` — thin CLI wrapper. Flags:
+    `-shiller-cache`, `-french-cache`, `-out-dir`, `-start-year`,
+    `-end-year`, `-top-n`, `-rng-seed`.
+  - `test/test_build_synthetic_universes_runner.ml` — 7 OUnit2 tests:
+    end-to-end write, skip-on-missing-window, multi-size-per-year, plus
+    4 cache-CSV-parser tests (header drift rejected, VW retained / EW
+    dropped, optional-cell handling).
+  - `trading/test_data/goldens-custom-universe/decomposition/` — **213
+    sexp snapshots** = 71 years (1927-1997) × 3 sizes (500/1000/3000),
+    ~28 MB total. Bulk run: 0 skipped, wall clock ~8 s.
+  - **Calibration cross-checked** against raw Shiller data for 2 sample
+    years (1929, 1987) — `aggregate_period_return` matches
+    `(p_end + sum_div_in_window) / p_start - 1` to 15 digits. The 5
+    historical-event audit (1929 crash, 1945 V-E day, 1973 oil crisis,
+    1987 Black Monday, 1995 dotcom buildup) all surface domain-plausible
+    aggregate returns (-4.8% / +28.3% / -11.2% / -12.1% / +25.2%).
+  - All 20 universe tests pass. `dune runtest devtools/checks/` clean
+    (zero `^FAIL`). `dune build @fmt` clean.
+  - **Coverage caveat:** start year is 1927 (not 1926) because each
+    snapshot needs 12 months forward of Shiller observations from the
+    May-31 anchor; the earliest viable anchor is 1927-05-31 (window =
+    1927-06-01 .. 1928-05-31). Shiller observations exist back to 1871,
+    but the synthesis path is bounded by the French 5-industry start
+    date 1926-07-01 anyway — the 1927-1997 range is the full viable
+    span before EODHD takes over at 1998.
+
 ### READY_FOR_REVIEW (Q2-B PR1 — Snapshot type + decomposition builder — 2026-05-17)
 
 - **`universe` library** (branch `feat/q2b-pr1-decomposition`,
