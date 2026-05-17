@@ -107,7 +107,17 @@ let _forward_return ~date bars =
 (* Build pipeline                                                      *)
 (* ------------------------------------------------------------------ *)
 
-type _scored = { symbol : string; score : float; bars : BR.bar list }
+(* Per-symbol scoring result. [forward_return] is computed eagerly at
+   scoring time so [bars] can be dropped immediately — the prior shape
+   retained [bars : BR.bar list] across every candidate symbol (post-filter
+   ~5-7k symbols × ~1k bars × ~50 bytes ≈ 250 MB at the broad-universe
+   scale), which OOMed multi-year × multi-size runner invocations. Both
+   the dollar-volume score (trailing window) and the forward-return
+   (forward window) read disjoint slices of the same [bars] list, so the
+   bars only need to be live for the duration of one
+   [_dollar_volume_score] + [_forward_return] call pair, not until the
+   downstream rank + take + aggregate steps. *)
+type _scored = { symbol : string; score : float; forward_return : float option }
 
 let _score_symbol ~date ~config symbol : _scored option =
   match BR.read_bars ~bars_root:config.bars_root symbol with
@@ -115,7 +125,9 @@ let _score_symbol ~date ~config symbol : _scored option =
   | Some bars -> (
       match _dollar_volume_score ~date ~config bars with
       | None -> None
-      | Some score -> Some { symbol; score; bars })
+      | Some score ->
+          let forward_return = _forward_return ~date bars in
+          Some { symbol; score; forward_return })
 
 let _score_all ~date ~config symbols : _scored list =
   List.filter_map symbols ~f:(_score_symbol ~date ~config)
@@ -134,9 +146,9 @@ let _make_entry ~sector_lookup ~uniform_weight scored : Snapshot.entry =
     synthetic = false;
   }
 
-let _aggregate_period_return ~date scored_kept =
+let _aggregate_period_return scored_kept =
   let per_symbol_returns =
-    List.filter_map scored_kept ~f:(fun s -> _forward_return ~date s.bars)
+    List.filter_map scored_kept ~f:(fun s -> s.forward_return)
   in
   match per_symbol_returns with
   | [] -> 0.0
@@ -183,7 +195,7 @@ let _build_validated ~date ~config ~inventory ~equity_like_lookup ~sector_lookup
   let%bind.Result kept = _take_top_n_or_error ~size:config.size ranked in
   let uniform_weight = 1.0 /. Float.of_int config.size in
   let entries = List.map kept ~f:(_make_entry ~sector_lookup ~uniform_weight) in
-  let aggregate_period_return = _aggregate_period_return ~date kept in
+  let aggregate_period_return = _aggregate_period_return kept in
   Ok (_make_snapshot ~date ~config ~entries ~aggregate_period_return)
 
 let build ~date ~config =
