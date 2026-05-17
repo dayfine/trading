@@ -1,0 +1,5 @@
+(test
+ (name test_sweep_weekly_start)
+ (libraries ounit2 core sweep_weekly_start matchers)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))

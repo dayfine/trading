@@ -282,6 +282,55 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
   §Q2-A PR1. Companion `.mli`:
   `trading/analysis/scripts/shares_outstanding_enrichment/lib/shares_outstanding_enrichment_lib.mli`.
 
+### Weekly-start sweep tool — BAH-SPY entry-timing dispersion (2026-05-17)
+
+- [x] Library + binary + tests built under
+  `trading/trading/backtest/sweep_weekly_start/{lib,bin,test}/`. Lib
+  exposes `run`, `run_one`, pure formatters (`format_sexp`,
+  `format_markdown`), and pure aggregation (`mondays_in_window`,
+  `summarize`). Binary `main.exe` is the CLI seam — accepts
+  `--symbol`, `--init-cash`, `--years-back`, `--out-sexp`,
+  `--out-markdown`, optional `--end-date` (reproducible testing),
+  `--universe-path`, `--fixtures-root`, `--max-cells-in-md`.
+- [x] Pure tests (8 cases) verify Monday enumeration, summary
+  aggregation, markdown rendering (header + summary + table +
+  downsampling + empty-cell notice), and sexp round-trip.
+- [x] GHA workflow at `.github/workflows/weekly-start-sweep.yml`:
+  Monday 14:00 UTC cron + `workflow_dispatch`. Runs the sweep, opens
+  an advisory PR with the refreshed artefacts when they differ from
+  main. Each run is a fresh snapshot — `end_date` floats with the run
+  date.
+- [x] Initial bulk run produced
+  `trading/test_data/weekly-start-sweep-bah-spy.sexp` +
+  `dev/sweep/weekly-start-sweep-bah-spy.md` covering the 3y trailing
+  window from main's pinned end_date.
+- **Pre-existing BAH-runner behavioural finding surfaced.** With the
+  worktree's `test_data/` subset (SPY only — no GSPC.INDX, no sector
+  ETFs), ~45% of cells return 0% (BAH never enters). With the full
+  `/workspaces/trading-1/data/` mount, ~10% of cells still return 0%
+  for reasons not explainable by Monday-vs-holiday or day-of-week
+  alone; the same `start_date` fails standalone (not a cross-cell
+  state pollution). The sweep tool faithfully reports the runner's
+  output — this is a finding for `feat-weinstein` /
+  `backtest-perf` to investigate. The tool design intentionally
+  exposes this dispersion (that's exactly what "entry-timing
+  dispersion" is meant to surface).
+- Verify:
+  ```bash
+  docker exec -w /workspaces/trading-1/.claude/worktrees/<ws>/trading trading-1-dev \
+    bash -c 'eval $(opam env) && dune runtest trading/backtest/sweep_weekly_start/'
+  ```
+  Re-run the sweep locally:
+  ```bash
+  docker exec -w /workspaces/trading-1/.claude/worktrees/<ws>/trading trading-1-dev bash -c '
+    eval $(opam env)
+    ./_build/default/trading/backtest/sweep_weekly_start/bin/main.exe \
+      --symbol SPY --init-cash 100000 --years-back 3 \
+      --fixtures-root /workspaces/trading-1/.claude/worktrees/<ws>/trading/test_data/backtest_scenarios \
+      --out-sexp /workspaces/trading-1/.claude/worktrees/<ws>/trading/test_data/weekly-start-sweep-bah-spy.sexp \
+      --out-markdown /workspaces/trading-1/.claude/worktrees/<ws>/dev/sweep/weekly-start-sweep-bah-spy.md'
+  ```
+
 ### Merged (data-pipeline-automation track)
 
 - **#819** — Automation PR 1/4: snapshot build checkpointing
