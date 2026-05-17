@@ -90,3 +90,16 @@ val per_type_counts : t -> type_count list
 (** Count entries per [enriched_asset_type]. Output is sorted by [count]
     descending, then by [asset_type_label] ascending for deterministic
     reporting. Pure. *)
+
+(** {1 Equity-like filter (Q1 PR3)} *)
+
+val filter_equity_like_symbols :
+  symbol_types:t -> symbols:string list -> string list
+(** Drops every symbol whose [asset_type] is not equity-like (anything other
+    than [Common_stock], [Preferred_stock], [ADR], [GDR]). Symbols absent from
+    [symbol_types] (no enrichment record at all) are dropped — they're either
+    delisted or never made it into the EODHD exchange listing.
+
+    Order-preserving: kept symbols come back in input order.
+
+    Pure: same input -> same output. *)
