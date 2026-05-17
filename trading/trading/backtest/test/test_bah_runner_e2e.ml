@@ -97,23 +97,25 @@ let _sector_map_override fixtures_root (s : Scenario.t) =
   let resolved = Filename.concat fixtures_root s.universe_path in
   Universe_file.to_sector_map_override (Universe_file.load resolved)
 
-(** Pinned runner-actual final equity for BAH-SPY 2019-2023, verified 2026-05-06
-    against the same code path the postsubmit script takes.
+(** Pinned runner-actual final equity for BAH-SPY 2019-2023, re-anchored
+    2026-05-17 after the BAH gap-buffer fix (PR P0a) — sizing now divides by
+    [close * 1.01] to absorb overnight gap-ups, leaving ~1% cash uninvested.
 
     See [sp500-2019-2023-bah-spy.sexp] §"Measurement" for the full breakdown —
     fill happens at next-day open ($248.23) and final MtM uses 2023-12-28's
     close ($476.69) since the simulator's [is_complete] check fires when
     [current_date >= end_date]. *)
-let _expected_final_equity = 1_913_114.65
+let _expected_final_equity = 1_903_976.65
 
-(** Pinned closed-form final equity for BAH-BRK-B 2019-2023.
+(** Pinned closed-form final equity for BAH-BRK-B 2019-2023. Re-anchored
+    2026-05-17 after the BAH gap-buffer fix.
 
     See [sp500-2019-2023-bah-brk-b.sexp] §"Measurement" for the breakdown —
-    sizing close 2019-01-02 = $202.80 → 4931 shares at next-day open $199.97
-    with $49.31 commission; final MtM at 2023-12-28 close $357.57 produces
-    $1,777,076.29. Same [current_date >= end_date] [is_complete] semantics as
+    sizing close 2019-01-02 = $202.80 → 4882 shares at next-day open $199.97
+    with $48.82 commission; final MtM at 2023-12-28 close $357.57 produces
+    $1,769,354.38. Same [current_date >= end_date] [is_complete] semantics as
     the SPY cell. *)
-let _expected_final_equity_brk_b_5y = 1_777_076.29
+let _expected_final_equity_brk_b_5y = 1_769_354.38
 
 (** ±0.05% band around the expected equity. The number is fully deterministic
     against pinned SPY data — no parameter sensitivity, no stochasticity.
@@ -320,6 +322,44 @@ let test_bah_brk_b_15y_scenario_parses _ =
            (equal_to "universes/brk-b-only.sexp");
        ])
 
+(** Regression for the weekly-start-sweep zero-trade bug: a known gap-up Monday
+    (2023-06-12, close $433.80 → next open $435.32, +0.35% gap-up) that produced
+    0 trades under the pre-fix sizing must now produce exactly 1 BUY fill. Runs
+    a tight 1-week window so the test stays fast (<1s on the BAH path). Bypasses
+    the scenario-loader machinery and calls the runner directly — there's no
+    committed scenario file for this window. *)
+let test_bah_runner_e2e_gap_up_monday ctx =
+  if not (_spy_data_present ()) then (
+    if _is_ci () then
+      assert_failure
+        "SPY data missing under TRADING_DATA_DIR but TRADING_IN_CONTAINER=1. \
+         The gap-up regression requires SPY bars in \
+         [test_data/S/Y/SPY/data.csv]; rerun [dev/scripts/prepare_ci_data.sh] \
+         and commit the output.";
+    skip_if true
+      "SPY data unavailable (data/S/Y/SPY/data.csv missing — test_data subset \
+       doesn't include SPY). Run locally with the full /data mount.";
+    assert_failure "unreachable after skip_if");
+  ignore ctx;
+  let fixtures_root = _resolve_fixtures_root () in
+  let universe =
+    Universe_file.load (Filename.concat fixtures_root "universes/spy-only.sexp")
+  in
+  let sector_map_override = Universe_file.to_sector_map_override universe in
+  let result =
+    Backtest.Runner.run_backtest
+      ~start_date:(Date.of_string "2023-06-12")
+      ~end_date:(Date.of_string "2023-06-20")
+      ?sector_map_override
+      ~strategy_choice:
+        (Backtest.Strategy_choice.Bah_benchmark { symbol = "SPY" })
+      ()
+  in
+  assert_that (_total_trades result) (equal_to 1);
+  assert_that (_first_trade result)
+    (is_some_and
+       (field (fun t -> t.Trading_base.Types.symbol) (equal_to "SPY")))
+
 let suite =
   "Bah_runner_e2e"
   >::: [
@@ -327,6 +367,8 @@ let suite =
          >:: test_bah_runner_e2e;
          "BAH-BRK-B 2019-2023 through Backtest.Runner matches pinned baseline"
          >:: test_bah_runner_e2e_brk_b_5y;
+         "BAH-SPY gap-up Monday 2023-06-12 enters (zero-trade regression)"
+         >:: test_bah_runner_e2e_gap_up_monday;
          "scenarios without [strategy] field default to Weinstein (back-compat)"
          >:: test_default_strategy_is_weinstein;
          "Bah_benchmark variant round-trips through sexp"

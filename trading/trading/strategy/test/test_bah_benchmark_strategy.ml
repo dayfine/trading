@@ -70,8 +70,10 @@ let make_portfolio ~cash = { Portfolio_view.cash; positions = String.Map.empty }
 
 let date = date_of_string "2024-01-02"
 
-(** Day 1 with default SPY config: $10,000 / $100.00 close = 100 whole shares;
-    verify symbol, side, quantity, and entry price together. *)
+(** Day 1 with default SPY config: $10,000 / ($100.00 * 1.01) = 99.0099 → 99
+    whole shares. Sizing divides by [close * (1 + 0.01)] to leave a 1% gap
+    buffer so the next-day-open market fill doesn't bust cash on overnight
+    gap-ups; see [_entry_gap_buffer_pct] in bah_benchmark_strategy.ml. *)
 let test_default_day_one_entry _ =
   let symbol = Bah_benchmark_strategy.default_symbol in
   let market = make_flat_market ~symbol ~start:date ~price:100.0 ~days:1 in
@@ -81,9 +83,10 @@ let test_default_day_one_entry _ =
   in
   assert_that result
     (is_ok_and_holds
-       (single_entry_matcher (symbol, Position.Long, 100.0, 100.0)))
+       (single_entry_matcher (symbol, Position.Long, 99.0, 100.0)))
 
-(** Day 1 sizing rounds down: $10,000 / $333.33 = 30.0003 → 30 whole shares. *)
+(** Day 1 sizing rounds down: $10,000 / ($333.33 * 1.01) = 29.7032 → 29 whole
+    shares. *)
 let test_floors_share_count _ =
   let market =
     make_flat_market ~symbol:"SPY" ~start:date ~price:333.33 ~days:1
@@ -94,7 +97,7 @@ let test_floors_share_count _ =
   in
   assert_that result
     (is_ok_and_holds
-       (single_entry_matcher ("SPY", Position.Long, 30.0, 333.33)))
+       (single_entry_matcher ("SPY", Position.Long, 29.0, 333.33)))
 
 (** Custom symbol: the strategy buys what's configured, not the default. *)
 let test_custom_symbol _ =
@@ -106,7 +109,7 @@ let test_custom_symbol _ =
   in
   assert_that result
     (is_ok_and_holds
-       (single_entry_matcher (symbol, Position.Long, 25.0, 400.0)))
+       (single_entry_matcher (symbol, Position.Long, 24.0, 400.0)))
 
 (** Day 2+ with the position already in [portfolio.positions]: no transitions
     emitted. The strategy must not double-enter or rebalance. *)
@@ -161,6 +164,25 @@ let test_insufficient_cash _ =
   in
   assert_that result (is_ok_and_holds no_transitions_matcher)
 
+(** Gap-buffer regression: sizing must reserve ~1% of cash so the next-day open
+    market fill can absorb a typical overnight gap-up. With $1,000,000 cash and
+    a $1,000.00 close, naive [floor(cash/close)] = 1000 shares would bust at any
+    gap-up (1000 shares * $1,000.01 open = $1,000,010 > $1M cash). With the 1%
+    buffer the strategy sizes 990 shares, leaving headroom for gap-ups up to
+    ~1%. The [Portfolio.apply_single_trade] / [_apply_trades_best_effort]
+    silent-drop failure mode this guards against is documented in
+    [_entry_gap_buffer_pct] (bah_benchmark_strategy.ml). *)
+let test_gap_buffer_sizing_pinned _ =
+  let symbol = Bah_benchmark_strategy.default_symbol in
+  let market = make_flat_market ~symbol ~start:date ~price:1000.0 ~days:1 in
+  let result =
+    run_strategy (make_strategy ()) ~market_data:market
+      ~portfolio:(make_portfolio ~cash:1_000_000.0)
+  in
+  assert_that result
+    (is_ok_and_holds
+       (single_entry_matcher (symbol, Position.Long, 990.0, 1000.0)))
+
 (** Pins the Closed-doesn't-block-reentry guard: a portfolio whose only entry
     for [symbol] is in [Closed] state must NOT block a fresh CreateEntering
     transition when cash + market data permit it. Without the [Closed]-filter in
@@ -203,7 +225,7 @@ let test_closed_position_does_not_block_reentry _ =
   in
   assert_that result
     (is_ok_and_holds
-       (single_entry_matcher (symbol, Position.Long, 100.0, 100.0)))
+       (single_entry_matcher (symbol, Position.Long, 99.0, 100.0)))
 
 let suite =
   "Bah_benchmark_strategy"
@@ -214,6 +236,7 @@ let suite =
          "no transitions after entry" >:: test_no_transitions_after_entry;
          "no price no transition" >:: test_no_price_no_transition;
          "insufficient cash no transition" >:: test_insufficient_cash;
+         "gap-buffer sizing reserves ~1% cash" >:: test_gap_buffer_sizing_pinned;
          "closed position does not block reentry"
          >:: test_closed_position_does_not_block_reentry;
        ]
