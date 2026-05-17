@@ -1,0 +1,14 @@
+(test
+ (name test_asset_type_enrichment)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  ounit2
+  matchers
+  status
+  eodhd
+  asset_type_enrichment_lib)
+ (preprocess
+  (pps ppx_let)))
