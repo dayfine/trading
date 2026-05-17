@@ -33,3 +33,22 @@
   status)
  (preprocess
   (pps ppx_jane)))
+
+(library
+ (name cross_validation_runner_lib)
+ (modules cross_validation_runner_lib)
+ (libraries
+  build_synthetic_universes_runner_lib
+  core
+  shiller
+  status
+  universe)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name cross_validation_runner)
+ (modules cross_validation_runner)
+ (libraries core core_unix.command_unix cross_validation_runner_lib status)
+ (preprocess
+  (pps ppx_jane)))
