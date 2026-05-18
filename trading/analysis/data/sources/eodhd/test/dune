@@ -1,6 +1,7 @@
 (tests
  (names
   test_http_client
+  test_delisted_symbols_endpoint
   test_splits_endpoint
   test_dividends_endpoint
   test_fundamentals_endpoint

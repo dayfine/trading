@@ -18,7 +18,7 @@ type t =
   | Other of string
       (** Catch-all for unrecognised values. The raw string is preserved so
           downstream filters can still discriminate without code changes. *)
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 val of_eodhd_string : string -> t
 (** Parses the raw [Type] string from EODHD's response. Recognised values are

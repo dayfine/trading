@@ -13,7 +13,7 @@ type t =
   | Currency
   | Commodity
   | Other of string
-[@@deriving show, eq]
+[@@deriving show, eq, sexp]
 
 let of_eodhd_string raw =
   match String.strip raw with
