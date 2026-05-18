@@ -771,7 +771,7 @@
    ((symbol CPAY) (weight 0.001) (sector Financials) (synthetic false))
    ((symbol CAG) (weight 0.001) (sector "Consumer Staples")
     (synthetic false))
-   ((symbol CHK) (weight 0.001) (sector "") (synthetic false))
+   ((symbol CHK) (weight 0.001) (sector Energy) (synthetic false))
    ((symbol EXE) (weight 0.001) (sector Energy) (synthetic false))
    ((symbol DGX) (weight 0.001) (sector "Health Care") (synthetic false))
    ((symbol BJ) (weight 0.001) (sector "Consumer Staples") (synthetic false))
