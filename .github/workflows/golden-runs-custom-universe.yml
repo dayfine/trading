@@ -1,0 +1,81 @@
+# Custom-universe golden-run postsubmit: runs goldens-custom-universe-scenarios/
+# cells (perf-tier 3) on every push to main.
+#
+# Split from golden-runs-sp500-5y.yml because:
+#   - the universe overlap with SP500 is partial (~73% of names common, ~27%
+#     unique to top-500-2019 — e.g. ASML, BABA, BHP, BIDU). The sp500 workflow
+#     ships bars only for SP500 + a small extras set; we'd have to either
+#     widen its extras or ship a separate data layer.
+#   - the cell is a BRIDGE SMOKE TEST per dev/notes/random-universe-sweep-2026-05-18.md
+#     and PR #1180. It catches mechanical regressions in the
+#     Universe_file → Universe_snapshot bridge + per-symbol fill/commission/stop
+#     accounting on a non-SP500 cell. Not a strategy alpha benchmark.
+#
+# Bars for the cell's universe (top-500-2019.sexp, 500 symbols) must be
+# present under trading/test_data/. Prepared by:
+#   dev/scripts/prepare_ci_data.sh --universe \
+#     trading/test_data/goldens-custom-universe/composition/top-500-2019.sexp \
+#     --cutoff 2009-01-01
+#
+# Expected runtime: ~3-5 min (local was 186 s; CI is ~3-5x).
+# Wall budget: 60 min (matches goldens-sp500-5y).
+#
+# Non-blocking during initial soak (continue-on-error: true) — flip to false
+# after 4 consecutive clean runs.
+
+name: golden-runs-custom-universe
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  golden-custom-universe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+      TRADING_IN_CONTAINER: "1"
+      TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
+      # Reuse the existing postsubmit script — it discovers ;; perf-tier: 3
+      # cells under each named subdir.
+      GOLDEN_SP500_SUBDIRS: goldens-custom-universe-scenarios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache _build
+        uses: actions/cache@v4
+        with:
+          path: trading/_build
+          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
+
+      - name: Run custom-universe golden postsubmit
+        id: golden_custom_universe
+        continue-on-error: true
+        run: dev/scripts/golden_sp500_postsubmit.sh
+
+      - name: Publish summary
+        if: always()
+        run: |
+          summary_file=$(ls -1t dev/perf/golden-sp500-postsubmit-*/summary.txt 2>/dev/null | head -1)
+          if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
+            {
+              echo "## Custom-universe golden postsubmit"
+              echo ""
+              echo '```'
+              cat "$summary_file"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary file found" >> "$GITHUB_STEP_SUMMARY"
+          fi

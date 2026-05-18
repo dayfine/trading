@@ -1,0 +1,8 @@
+((symbol                      BABA)
+ (last_verified               2025-06-08)
+ (verification_status         Verified)
+ (data_start_date             2014-09-19)
+ (data_end_date               2025-05-16)
+ (has_volume                  true)
+ (last_n_prices_avg_below_10  false)
+ (last_n_prices_avg_above_500 false))
