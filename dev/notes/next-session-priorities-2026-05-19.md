@@ -1,161 +1,199 @@
-# Next-session priorities (2026-05-19) — autonomous PM 2026-05-17
+# Next-session priorities (2026-05-19) — written end-of-session 2026-05-18
 
-Rewritten end-of-session 2026-05-17 PM after a 4-PR autonomous batch.
-Supersedes the prior "13 PRs full day" version (written earlier in the
-same session, before the P0a fix landed and based on the pre-fix
-sweep golden).
+15-PR autonomous session shipped today (10 substantive + 2 author-existing
+merged + 3 plan/QC iterations). The delisted-aware universe agenda is
+**COMPLETE END-TO-END**: P1 → P2 → P3 → P4 → P5 → P6 all shipped.
+Bayesian production sweep design is shipped (#1192) and **runnable**.
+
+This doc supersedes `dev/notes/next-session-priorities-2026-05-20.md`
+(written mid-session before P4/P5/P6 landed; its P0 sequence is now
+all-done).
 
 ## TL;DR
 
-- **P0a (BAH zero-trade bug) DONE.** PR #1172 merged; 1% gap-buffer in
-  sizing drops the weekly-start-sweep zero-trade rate from 70/157 → 4/157.
-  The 4 residual cells are all extreme overnight gap-ups (1.10%, 1.22%,
-  1.39%, 3.47%) — those need the simulator silent-swallow fix to close.
-- **P0b (Universe-snapshot consumer adapter) DONE.** PR #1174 (pending
-  CI/QC at writing). Bridges `analysis/data/universe` Snapshot.t
-  goldens into `Universe_file` consumers via auto-fallback in
-  `Universe_file.load`. A2 allow-list widened to permit `universe`
-  imports under `trading/trading/backtest/**`.
-- **P1 (Q2-A composition memory opt) DONE.** PR #1175 (pending CI/QC).
-  Drops bars from `_scored` records → frees ~250 MB at broad-universe
-  scale; unblocks multi-year × multi-size composition runs that
-  previously OOMed.
-- **Docs fix-forward DONE.** PR #1173 merged — scenario sexp comment
-  headers refreshed to match the gap-buffered sizing math.
+```
+The headline trading-system work this week is the BAYESIAN PRODUCTION
+SWEEP. It runs in ~24-48 hr wall and doesn't depend on any further
+infrastructure. Phase A prep (~2 hr) is the next session's
+immediate work; Phase B is operator-driven background dispatch.
+```
 
-## PRs landed 2026-05-17 PM (this autonomous session)
+## P0 — Bayesian production sweep (Phase A + dispatch Phase B)
 
-| PR | Track | Summary |
-|---|---|---|
-| #1172 | fix-bah | 1% gap buffer in BAH sizing — prevents stuck-Entering on overnight gap-ups |
-| #1173 | docs | scenario sexp comment headers refresh after #1172 |
-| #1174 | feat-scenarios | Universe-snapshot → Universe_file bridge (P0b adapter) |
-| #1175 | perf | drop bars from `_scored` to fix multi-year × multi-size OOM (Q2-A P1) |
+Per `dev/plans/bayesian-production-sweep-2026-05-18.md` (#1192, merged).
 
-## Carry-forward — P0 items
+### Phase A — ~2 hr, this is the manual work
 
-### P0a-residual — simulator silent-swallow fix (Option B from #1172 review)
+```sh
+# Step 0: establish Cell-E baseline numbers on the 5-fold walk-forward
+#   split (§3 of #1192). Run baseline through the walk-forward CV harness
+#   (#1116). Captures: per-fold Sharpe, MaxDD, N_trades, composite. These
+#   are the values §6 promote-gate compares against.
 
-The 4 residual zero-trade cells in the sweep golden are extreme gap-ups
-that exceed the 1% buffer (2023-11-13 +1.39%, 2025-04-07 +3.47%,
-2025-04-21 +1.22%, 2026-03-30 +1.10%). Root cause confirmed:
-`Simulator._apply_trades_best_effort` silently drops the rejected trade
-(simulator.ml:354-358), the position stays stuck in `Entering` with 0
-fills, and BAH's `_has_position_for_symbol` suppresses every retry.
+# Step 1: author bayesian_runner.exe spec at
+#   dev/experiments/bayesian-production-sweep-2026-05-18/spec.sexp
+#   Use the PascalCase metric-type constructors (SharpeRatio etc.) per §4.
+#   7 params (sizing×2 + stops×2 + cascade×3). Bounds in §2.
 
-**Fix design (Option B):** emit a `CancelEntry` transition for the
-Entering position whenever its corresponding fill is rejected, so the
-strategy sees `Closed` next day and naturally retries with updated
-sizing. Touches:
+# Step 2: smoke run with total_budget=5 initial_random=5
+#   docker exec trading-1-dev bash -c '
+#     cd /workspaces/trading-1/trading && eval $(opam env) &&
+#     dune exec --no-build trading/backtest/tuner/bin/bayesian_runner.exe -- \
+#       --spec dev/experiments/bayesian-production-sweep-2026-05-18/spec.sexp \
+#       --out-dir dev/experiments/bayesian-production-sweep-2026-05-18/output-smoke'
+#   Verify the 3 artefacts: bo_log.csv + best.sexp + convergence.md.
+#   CONFIRM PARAMS ACTUALLY VARY across the 5 evals (no silent-no-op overlay
+#   per the #1051 → #1061 hazard).
+```
 
-- `Simulator._apply_trades_best_effort` — return rejected trades alongside accepted.
-- `Simulator._process_step_day` — generate cancel transitions from rejected trades.
-- `Simulator._apply_transitions` — add `CancelEntry` dispatch (the
-  position state machine in `Position.apply_transition` already handles
-  `Entering + CancelEntry → Closed`, but the simulator's transition
-  dispatcher currently ignores `CancelEntry`).
+### Phase B — ~24-48 hr wall, background dispatch
 
-**Effort:** ~50 LOC simulator + ~50 LOC tests. Re-pins BAH baselines
-again (small shift downward as cancelled-then-retried entries pay extra
-commission and incur 1 extra day of cash drag). Sweep golden should
-re-anchor with 0/157 zero cells under typical conditions; pathological
-multi-day gap-up streaks may still produce stuck cells but should be rare.
+Once Phase A spec is verified, dispatch full sweep with `total_budget=120`:
 
-### P0b-followup — Weinstein scenario against a composition golden
+```sh
+docker exec -d trading-1-dev bash -c '
+  cd /workspaces/trading-1/trading && eval $(opam env) > /dev/null &&
+  dune exec --no-build trading/backtest/tuner/bin/bayesian_runner.exe -- \
+    --spec dev/experiments/bayesian-production-sweep-2026-05-18/spec.sexp \
+    --out-dir dev/experiments/bayesian-production-sweep-2026-05-18/output \
+    > dev/logs/bayesian-prod-sweep.log 2>&1'
+```
 
-PR #1174 wires the bridge but does not commit a runnable Weinstein
-scenario that consumes one. Natural next step:
+Monitor via `bo_log.csv` row count + `best.sexp` for convergence.
 
-1. Add `goldens-custom-universe-scenarios/weinstein-2019-top-500.sexp`
-   pointing at `../../goldens-custom-universe/composition/top-500-2019.sexp`
-   with the standard Cell-E config and 2019-01-02..2023-12-29 period.
-2. Pin expected ranges loosely on first run; tighten after measurement.
-3. Compare to `sp500-2019-2023.sexp` baseline (same window, sp500.sexp
-   universe) — the cap-weighted composition universe should produce
-   comparable Sharpe / MaxDD within 1-2 standard-error bands.
+### Phase C — promote decision
 
-**Effort:** ~30 LOC scenario file + 1 run (~10-15 min wall) to pin
-expected ranges + smoke check that all 500 symbols' bars are present in
-`data/` for the 2019-2023 window. Some 1998-era names may have stopped
-trading by 2019 — the runner's degraded-mode drop-or-skip behavior for
-missing-bar symbols needs verification.
+Apply the 5 gates in #1192 §6 to the median-fold metrics. If winner
+clears all 5: create the private repo per `dev/plans/private-tuned-configs-repo-2026-05-18.md`
+§4 and commit the winner as the first blessed config. If gates fail:
+write up why + revised hypothesis for v2.
 
-## P1 — Optional follow-ups
+## P1 — Optional cleanup items
 
-### Composition-golden bar-coverage audit (1998-2005)
+### P5 sectors backfill — extension to ~80 entries (deferred)
 
-The `Universe_snapshot` bridge (#1174) projects composition goldens
-into the runner via [Universe_file.load]. But the goldens were built
-from EODHD inventory; some 1998-2005-era symbols (delisted, M&A'd,
-gone) may have spotty or missing bars in `data/<X>/<Y>/<SYM>/data.csv`.
-The runner's `Csv_snapshot_builder` tolerates missing bars (returns
-empty rows + NaN columns), so a backtest doesn't crash — but the
-universe effectively shrinks silently, and statistics on the
-"500-symbol universe" become misleading.
+`#1194` shipped 40 hand-curated delistings. ~100 empty-sector entries
+remain in `top-500-2019` — foreign ADRs (KBC Belgium, SBER Russia, ACL
+Switzerland), EODHD ticker-reuse markers (FB_old, CTRA_old, POW_old,
+COMP_old), and less-famous delistings. Closing the full gap needs:
 
-**Deliverable:** per-symbol bar-coverage report for each
-`top-{500,1000,3000}-{1998..2005}.sexp` composition golden. For each
-golden + symbol: trading-day coverage percent over the snapshot's
-forward 1y window. Flag symbols with `< 80%` coverage; flag goldens
-with `> 10%` of symbols below threshold.
+- **Wikipedia scrape** (~1 hr engineering + may run into rate limits)
+- **Sharadar via Nasdaq Data Link** ($99/mo, rejected per broader-first pivot)
+- **Manual extension** (~30 min curation for ~40 more entries)
 
-**Effort:** ~80 LOC OCaml (reads inventory + counts CSV rows) + 1-2h
-operator wall to run across the 8 affected years. Output: a markdown
-report at `dev/reports/composition-golden-bar-coverage-2026-05-XX.md`.
+Not on critical path. Defer unless P6/P7 work resumes.
 
-**Why P1, not P0:** the 2019+ goldens have near-100% coverage (current
-symbols, complete bars). The hole shows up only when consuming
-pre-2006 goldens, which is the broader-first agenda but not the
-immediate 2026-05-19 work. File now so it doesn't get lost.
+### P7 — N≥30 random-universe sweep (deferred)
 
-### Tunable-parameter inventory + private tuned-configs repo
+Per #1191, both #1180 and #1191 N=5 random sweeps had σ ≈ 100pp →
+stderr ≈ 45pp. Headline "8σ outlier" claim was overstated. A
+properly-sized N=30 sweep would give a stable distribution estimate.
 
-See `dev/notes/tunable-parameters-inventory-2026-05-18.md` (inventory)
-and `dev/plans/private-tuned-configs-repo-2026-05-18.md` (design). When
-the next BO sweep produces a config worth blessing, set up the private
-repo per the design plan.
+Wall: 30 × 3 min × 5 folds = ~7.5 hr serial, ~2 hr at parallel=4.
 
-### Decomposition + Composition unification
+Defer — sample-size correction is a methodological footnote, not on
+the critical path. The Bayesian sweep (P0 above) is the higher-value
+use of compute time.
 
-`Universe.Build_from_index` + `Universe.Build_from_individuals` both
-produce `Snapshot.t` but expose different config shapes. The original
-priorities note suggested a `Universe_builder` wrapper that dispatches by
-date. Lower value than expected because the configs differ in shape
-(composition needs bars/inventory/sectors; decomposition needs Shiller +
-French observations), so a discriminated-union wrapper saves little.
-**Defer or close as not-worth.**
+### Refactor pre-existing match-statement tests in `test_http_client.ml`
 
-### Q2-A 2026 gap
+PR #1184 sidestepped this by putting the new delisted-endpoint test
+in a standalone file. The original `test_http_client.ml` still has
+~12 tests using `match result with | Ok ... | Error -> assert_failure`.
+qc-structural P6 will block any future PR that touches this file until
+the patterns are refactored. Effort: ~60-90 min mechanical.
 
-`top-{500,1000,3000}-2026.sexp` missing because EODHD bars don't extend
-to 2026-05-31 in the inventory. Re-run cleanly once bars cache catches
-up. Operational, not feature work.
+## P2 — Strategic open items (no immediate action)
 
-### Cost-model wiring
+### M6.6 live cycle
 
-Per `dev/status/cost-model.md` — all 4 deferred items are flagged
-"defer until empirical evidence" or "every scenario needs re-pin".
-Not actionable until a specific scenario demands the per-trade or
-impact knob. **Defer.**
+Per the track-pacer report (#1163): "the system goal per §3 cannot
+ship without it, but it is consistently deferred." Worth a quarterly
+check on whether to scope a feature track.
 
-## Recommended sequencing for 2026-05-19
+### M7.1 / M7.2 ML + synthetic stress
 
-1. **Step 0**: `gh run list --branch main --limit 3` — verify green.
-2. **P0a-residual** (simulator silent-swallow): ~2-3h. Closes the 4
-   residual sweep zero-trade cells AND protects all future strategies
-   from the same trap. Re-pin BAH baselines after.
-3. **P0b-followup** (Weinstein composition scenario): ~1h. Concrete
-   proof the universe-snapshot bridge unlocks the substrate.
-4. **Bayesian production sweep** (from the older 2026-05-18 note) if
-   IWV unblocks — still gated on the paid-scraper / Sharadar / EODHD
-   tier decision.
-5. **Optional**: small follow-up PRs (cleanup, docs, etc.).
+Deferred until the Bayesian Phase 3 + walk-forward CV stack settles
+and Phase 3 outputs converge.
 
-## Open follow-ups
+### Shares-outstanding fundamentals source
 
-- Simulator silent-swallow fix (Option B) — primary P0 for next session.
-- Weinstein-on-composition scenario file — secondary P0.
-- `dev/status/cost-model.md` — 4 deferred items (no action).
-- `dev/notes/iwv-scrape-akamai-block-2026-05-16.md` — paid-scraper
-  decision still open; gates Bayesian production sweep + survivorship
-  re-pin.
+EODHD Fundamentals 403 on our tier; documented in
+`dev/notes/eodhd-delisted-roster-unlock-2026-05-18.md` as
+SUPERSEDED — the delisted-roster discovery obsoletes the Sharadar /
+AlphaVantage decision for the broader-first agenda. Q2-A bulk run
+is no longer blocked on a vendor decision.
+
+### Orchestrator-automation Phase 2
+
+Last PR #1134 was 2026-05-04; the track has been IN_PROGRESS with no
+feature dispatch since. Either spin up Phase 2 (background execution
++ harvest) or mark the track MERGED on Phase 1's stable operating
+state.
+
+### Recurring `[info]` items
+
+`qc-structural recurring H3 false-positive on advisory linter text` +
+`qc-structural review-file persistence gap` carried 7+ reconciles
+without resolution. Recommended ESCALATE_TO_MAINTAINER per the
+track-pacer report.
+
+## Open follow-ups (carry from this session)
+
+- **Wikipedia historical SP500 changes** as a P5 extension source — has
+  delisting events + dates, but no GICS sector directly. Would need
+  cross-referencing against the wiki SP500 components table. Not yet
+  scoped.
+- **Bayesian sweep --resume flag** — `bayesian_runner_runner.ml` writes
+  bo_log.csv append-only but doesn't have a resume entry point. Per
+  #1192 §9, this is "~1 LOC change" — but only worth doing if the
+  24-48 hr run gets interrupted.
+- **`dev/scripts/run_delisted_pipeline.sh`** ran twice this session
+  with composition-runner --out-dir bug found + fixed (#1190). The
+  fix landed; future runs should work cleanly. The script also needs
+  the `--bars-root` / `--inventory` / `--sectors-csv` / `--symbol-types`
+  flags (added in #1190 as well). Confirmed working in P5 v3 run.
+
+## Session-end state snapshot
+
+- **Data files**: `data/inventory.sexp` (56,652 entries), `data/symbol_types.sexp`
+  (56,652 entries with -include-delisted), `data/sectors.csv` (10,513 rows
+  incl. 40 supplemental delistings), `data/delisted_symbols.sexp` (57,592
+  entries from #1184). All gitignored except sectors.csv + symbol_types.sexp
+  + delisted_symbols.sexp.
+- **Composition goldens**: 84 files at `trading/test_data/goldens-custom-universe/composition/`
+  rebuilt with delisted-aware inventory pool + supplemental sectors.
+- **Disk**: ~17-20 GB free on host. Docker container /tmp cleaned of stale
+  `panel_runner_csv_snapshot_*` dirs (~61 GB reclaimed).
+- **Bars cache**: ~17.5 GB total in `data/` (live + delisted Common Stock
+  NASDAQ/NYSE).
+
+## Companion docs to consult
+
+- `memory/project_eodhd_delisted_unlock.md` — full agenda status
+- `memory/project_composition_golden_survivor_bias.md` — #1180 finding
+- `dev/notes/delisted-aware-p4-result-2026-05-18.md` — P4 narrative
+- `dev/notes/random-universe-sweep-v2-p6-2026-05-18.md` — P6 caveat
+- `dev/notes/delisted-sectors-backfill-p5-2026-05-18.md` — P5 hand-curation
+- `dev/plans/bayesian-production-sweep-2026-05-18.md` — **THE NEXT THING**
+- `dev/plans/private-tuned-configs-repo-2026-05-18.md` — promote target
+
+## What was DONE this session (the 15-PR sprint)
+
+| PR    | Track           | Summary |
+|-------|-----------------|---------|
+| #1179 | feat-scenarios  | Weinstein on top-500-2019 composition golden (P0b) |
+| #1180 | docs            | random-universe sweep — selection-bias-driven (#1179 follow-up) |
+| #1181 | docs            | composition-golden bar-coverage audit — P1 closed |
+| #1182 | ci              | wire weinstein-2019-top-500 into postsubmit (F4) |
+| #1183 | docs            | EODHD delisted-roster unlocks PIT-universe agenda |
+| #1184 | feat-eodhd      | delisted-symbols endpoint + cached roster (P1) |
+| #1185 | feat-eodhd      | bulk-fetch delisted-symbol bars (P2-code) |
+| #1186 | feat-eodhd      | asset_type_enrichment -include-delisted (P3) |
+| #1187 | feat-eodhd      | parallel fetcher + orchestrator + handoff notes |
+| #1190 | feat-eodhd      | P4 result + composition rebuild + orchestrator fix |
+| #1191 | docs            | random-universe sweep v2 reveals N=5 sampling noise |
+| #1163 | ops             | weekly track pacer (existing PR, merged for user) |
+| #1189 | chore           | weekly opam deps update (existing PR, merged for user) |
+| #1192 | plan            | Bayesian production sweep design + run plan |
+| #1194 | feat-data       | P5 sectors backfill (40 famous delistings) |
