@@ -252,3 +252,80 @@ NEEDS_REWORK
 - Required fix: Rename the column to "Centre of bounds (best-known from overnight 2026-05-10)" or split into two columns: "Cell-E baseline" (canonical defaults) and "Empirical best-known prior". Then make explicit which one the §6 gate-1 "baseline Cell-E" composite is computed against — this matters because the +0.05 threshold has different meaning depending on which reference point is used.
 - harness_gap: ONGOING_REVIEW — naming-vs-semantics issue, not a deterministic check.
 
+---
+
+# Behavioral QC re-review — docs-bayesian-production-sweep-plan
+Date: 2026-05-18
+Reviewer: qc-behavioral
+Reviewed SHA: a95f0b00
+
+## Status of prior 4 findings
+
+| # | Prior finding | Status at a95f0b00 |
+|---|---------------|---------------------|
+| 1 | `min_cash_pct` deprecated (waste of BO budget) | **RESOLVED.** §2 now lists 7 params; line 70-72 explicitly notes `min_cash_pct` removed per `portfolio_risk.mli` lines 159-162 with the deprecation rationale quoted. Axis A is now 2 params (max_position_pct_long, max_long_exposure_pct). §1 → §6 prose acknowledges the change in the §2 preamble. |
+| 2 | §4 Composite snake_case metric names + `force_liquidations_count` | **RESOLVED.** §4 lines 142-147 now uses PascalCase: `(SharpeRatio 0.40) (CalmarRatio 0.30) (CVaR95 -0.20) (MaxDrawdown -0.10)`. This matches the canonical fixture at `test_bayesian_runner_bin.ml:104`. Secondary metrics list lines 161-162 also PascalCase. Line 162-164 explicitly notes `force_liquidations_count` is NOT a metric_type variant + redirects to per-fold actual.sexp for analysis. |
+| 3 | §2 knob paths missing sexp-key prefix | **RESOLVED.** §2 now writes full sexp paths in every row: `portfolio_config.max_position_pct_long`, `portfolio_config.max_long_exposure_pct`, `screening_config.candidate_params.installed_stop_min_pct`, `stage3_force_exit_config.hysteresis_weeks`, `laggard_rotation_config.hysteresis_weeks`, `stage3_reentry_cooldown_weeks`. `initial_stop_buffer` correctly listed without prefix (top-level field on `Weinstein_strategy_config.config` per .mli line 19). All paths cross-checked against the relevant .mli files. ✓ |
+| 4 | §2 "Cell-E default" column conflated baseline (0.30/0.90) with empirical winners (0.14/0.70) | **PARTIALLY RESOLVED.** §2 now has separate "Canonical default" and "Cell-E baseline" columns. Axis A canonical column correctly shows 0.30/0.90 (per `Portfolio_risk.default_config` portfolio_risk.ml:68-84). §6 lines 211-220 adds an explicit Cell-E baseline reference table with the 0.14/0.70/h1/h2 config + TBD-must-measure callouts for composite numbers. §7 Phase A step 0 adds a pre-sweep step to establish baseline numbers. However, the Axis B and Axis C canonical-default values contain new errors (see Finding R2 below). |
+
+## Contract Pinning Checklist (re-review)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new `.mli` docstrings has an identified test | NA | No new `.mli` — pure planning doc. |
+| CP2 | Each claim in PR body Test plan / Test coverage has corresponding test | PASS | PR body's "Test plan" remains "no code change — pure docs PR" + cross-ref + 2 reviewer-decision checkboxes. No misleading test claims. (Note: PR body summary still references "8 params" and "~25 hr" — see Finding R3.) |
+| CP3 | Pass-through tests pin identity | NA | No tests in this PR. |
+| CP4 | Each docstring guard has a test exercising the guarded scenario | NA | No new code/docstrings. |
+
+## Behavioral Checklist (Weinstein-domain rows)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| (all S/L/C/T rows) | Stage / stops / cascade / test rows | NA | Pure planning doc; no Weinstein domain logic implemented. |
+
+## New findings introduced by the edits
+
+### Finding R1 — Axis C "Canonical default" column has wrong values for 2 of 3 rows
+- Finding: Plan §2 Axis C lists "Canonical" = 0 for all three rows. The actual canonical defaults per the authority docs are:
+  - `stage3_force_exit_config.hysteresis_weeks`: **2** (per `Stage3_force_exit.default_config`, `stage3_force_exit.mli` line 59: *"Defaults: [{ hysteresis_weeks = 2 }]"*; inventory line 203: "Default `2`")
+  - `laggard_rotation_config.hysteresis_weeks`: **4** (per `Laggard_rotation` mli line 51: "Default 4"; inventory line 195: "Default `4`")
+  - `stage3_reentry_cooldown_weeks`: 0 ✓ (matches inventory line 28)
+- This is the same finding-class as the original Finding #4 (canonical-default vs empirical-baseline conflation), reintroduced in a new table column. The §2 preamble lines 58-61 explicitly promised: *"Two 'default' columns distinguish the canonical Weinstein-config default (`Portfolio_risk.default_config` etc.) from the empirical Cell-E baseline."* — but the canonical column for Axis C does not match `Stage3_force_exit.default_config` or `Laggard_rotation.default_config`.
+- Location: `dev/plans/bayesian-production-sweep-2026-05-18.md` lines 83-87 (Axis C table).
+- Authority: `trading/analysis/weinstein/stage3_force_exit/lib/stage3_force_exit.mli` line 59 (`hysteresis_weeks = 2`); `trading/analysis/weinstein/laggard_rotation/lib/laggard_rotation.mli` lines 49-59 (`hysteresis_weeks` default 4); `dev/notes/tunable-parameters-inventory-2026-05-18.md` lines 195, 203.
+- Required fix: Update Axis C "Canonical" column values to: `stage3_force_exit_config.hysteresis_weeks = 2`, `laggard_rotation_config.hysteresis_weeks = 4`, `stage3_reentry_cooldown_weeks = 0`. The Cell-E column (1, 2, 0) stays as-is — Cell-E does overlay these via `cell-E-stage3-k1-laggard-h2` scenario sexp.
+- harness_gap: LINTER_CANDIDATE — a doc-lint that cross-references default values in plan tables against the `*_default_config` bindings in the relevant `.ml` files would catch this deterministically.
+
+### Finding R2 — Axis B "Canonical default" column for `installed_stop_min_pct` is wrong
+- Finding: Plan §2 Axis B lists `screening_config.candidate_params.installed_stop_min_pct` with Canonical=0.08, Cell-E=0.08. The actual canonical default is **0.0** (per `Screener.default_candidate_params` at `screener.ml:32`: `installed_stop_min_pct = 0.0`; and `screener.ml:12`: `installed_stop_min_pct : float; [@sexp.default 0.0]`; and inventory line 85: "Default `0.0`"). 0.08 is the m5-5 axis-1-winner empirical value that has become the de facto Cell-E baseline. The column is mis-labeled — 0.08 belongs only in the Cell-E column, not in Canonical.
+- This is the same Finding-#4-class error: a battle-tested empirical winner is being labeled as the canonical default. Risk: a reviewer interpreting the canonical column as "what the strategy ships with by default" will assume the trading system already applies an 8% installed-stop floor when in fact it ships with 0% floor.
+- Location: `dev/plans/bayesian-production-sweep-2026-05-18.md` line 79 (Axis B row 2).
+- Authority: `trading/analysis/weinstein/screener/lib/screener.ml` lines 12, 32 (`installed_stop_min_pct = 0.0`); `dev/notes/tunable-parameters-inventory-2026-05-18.md` line 85 ("Default `0.0`, Tuned: m5-5-installed-stop-min-pct-2026-05-13 — axis-1 winner").
+- Required fix: Change Axis B `installed_stop_min_pct` Canonical column from 0.08 to 0.0. Keep Cell-E = 0.08.
+- harness_gap: LINTER_CANDIDATE — same lint as R1.
+
+### Finding R3 — §9 / §11 internal inconsistencies left over from the edits
+- Finding: The §5/§6 revisions update the knob count (8→7) and wall budget (25hr → 24-48hr), but three downstream sections still carry the v1 numbers:
+  1. §9 Risks table row 5 (line 294): *"8-D continuous + 3-D integer mix"* — should be **4-D continuous + 3-D integer = 7-D** per the §5 revision (line 184).
+  2. §11 Acceptance gate 1 (line 312): *"The 8 parameters in §2 are confirmed reasonable"* — should be **7 parameters** (matches §2 line 52).
+  3. §11 Acceptance gate 5 (line 320): *"The ~24-30 hr wall + 25 hr CPU budget at parallel=4 is acceptable"* — should reflect the new §5 estimate **24-48 hr wall** (line 182). The phrase "25 hr CPU budget at parallel=4" is also internally awkward — at parallel=4, the CPU-hour count and wall-hour count are not 1:1 (the v1 framing conflated them). Either drop the CPU-hour clause or restate as "~96-192 CPU-hours (24-48 hr wall at parallel=4)".
+- Location: `dev/plans/bayesian-production-sweep-2026-05-18.md` lines 294, 312, 320.
+- Authority: Internal consistency with §2 line 52 (7 params), §5 lines 181-186 (24-48 hr / 7-D).
+- Required fix: Update §9 to "4-D continuous + 3-D integer mix"; §11 gate 1 to "7 parameters"; §11 gate 5 to match the §5 framing.
+- harness_gap: ONGOING_REVIEW — cross-section consistency is hard to automate without a structured plan schema; this is a manual-review case.
+
+### Observation (non-blocking) — PR body summary still carries v1 numbers
+- The PR body summary still says "**Knob inventory** | 8 params" and "**Budget** | 120 evals, 20 random initial, EI acquisition, ~25 hr wall at parallel=4." This is a cosmetic mismatch with the (corrected) plan body — not a CP2 failure (the body's "Test plan" section has no test claims that aren't met), but the operator will hit conflicting numbers between the PR landing page and the doc. Suggest the author update the PR description as well; this is a soft observation, not a FAIL.
+
+## Quality Score
+
+3 — Prior 4 findings are substantively resolved (min_cash_pct dropped; PascalCase metric names; sexp-path prefixes added; baseline-vs-empirical column split). However, the new "Canonical default" column reintroduces the same Finding-#4-class error in 3 of the 7 rows (R1 + R2), and the §5/§6 budget/knob-count revisions left three downstream consistency bugs in §9 and §11 (R3). The plan is closer to mergeable but still has mechanical errors that will mislead the Phase-A spec author about what canonical-config baselines look like.
+
+## Verdict
+
+NEEDS_REWORK
+
+## Summary for orchestrator
+
+Three prior findings (min_cash_pct, PascalCase metrics, sexp-paths) are fully resolved. The fourth (Cell-E vs canonical conflation) is structurally resolved by splitting the column but reintroduces wrong values in 3 of 7 canonical-default cells. Three internal-consistency bugs from the §5/§6 rewrites remain in §9 and §11. None of the new findings are blocking for the design intent — they are mechanical-data corrections to make the plan internally consistent before Phase A authors the spec sexp.
+

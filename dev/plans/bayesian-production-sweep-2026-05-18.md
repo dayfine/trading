@@ -76,15 +76,24 @@ is no-op since the entry walk never reads it.)
 | Param sexp-path                                                   | Bounds         | Canonical | Cell-E |
 |-------------------------------------------------------------------|----------------|-----------|--------|
 | `initial_stop_buffer`                                             | `[1.00, 1.10]` | 1.02      | 1.02   |
-| `screening_config.candidate_params.installed_stop_min_pct`        | `[0.04, 0.15]` | 0.08      | 0.08   |
+| `screening_config.candidate_params.installed_stop_min_pct`        | `[0.04, 0.15]` | 0.0       | 0.08   |
+
+(`installed_stop_min_pct` canonical = 0.0 per `screener.ml:32`; the
+0.08 value is the m5-5 axis-1 empirical winner promoted into Cell-E.)
 
 ### Axis C — Cascade / rotation knobs (3 params)
 
 | Param sexp-path                                | Bounds          | Canonical | Cell-E |
 |------------------------------------------------|-----------------|-----------|--------|
-| `stage3_force_exit_config.hysteresis_weeks`    | `[0, 4]` int    | 0         | 1      |
-| `laggard_rotation_config.hysteresis_weeks`     | `[0, 4]` int    | 0         | 2      |
+| `stage3_force_exit_config.hysteresis_weeks`    | `[0, 4]` int    | 2         | 1      |
+| `laggard_rotation_config.hysteresis_weeks`     | `[0, 4]` int    | 4         | 2      |
 | `stage3_reentry_cooldown_weeks`                | `[0, 6]` int    | 0         | 0      |
+
+(Canonical defaults from `stage3_force_exit.mli:59` and
+`laggard_rotation.mli:51`. Cell-E baseline (K=1 / K=2) is MORE
+AGGRESSIVE than canonical (K=2 / K=4) — lower hysteresis_weeks =
+faster force-exit + faster laggard rotation. Per the .mli docstrings
+"K=1 most aggressive ... K≥3/K≥6 more conservative".)
 
 ### Out of scope for this sweep (justified deferrals)
 
@@ -243,7 +252,7 @@ numbers by running the 5-fold split on Cell-E config first.
 3. Verify each fold runs end-to-end in ~5-15 min via the walk-forward
    CV harness (PR #1100/#1116 path).
 
-### Phase B — Full run (~24-30 hr wall)
+### Phase B — Full run (~24-48 hr wall)
 
 Dispatch from CLI:
 ```sh
@@ -291,7 +300,7 @@ to a long-running cron OR run in a tmux session for the operator.
 | Single fold dominates the composite          | Median aggregation; per-fold floors (§6 gate 2). |
 | Multi-day wall time interrupted              | bo_log.csv is append-only; can resume from last row via a follow-up `--resume` flag (not yet implemented; ~1 LOC change to `bayesian_runner_runner`). |
 | Winner overfits to 2010-2026 specific events | Walk-forward CV with 5 folds + OOS gate (§6). |
-| 8-D continuous + 3-D integer mix             | Phase 3 PR-D's integer-rounding in `Bayesian_opt.suggest_next` (already shipped). |
+| 4-D continuous + 3-D integer mix             | Phase 3 PR-D's integer-rounding in `Bayesian_opt.suggest_next` (already shipped). |
 | Quota / API limits                           | None — the sweep reads cached bars; no live HTTP. |
 
 ## 10. Out of scope (explicit)
@@ -309,7 +318,7 @@ to a long-running cron OR run in a tmux session for the operator.
 
 This plan is APPROVED when:
 
-1. The 8 parameters in §2 are confirmed reasonable by review (no
+1. The 7 parameters in §2 are confirmed reasonable by review (no
    off-the-shelf "this is broken on prior axis tests" objections).
 2. The 5-fold split in §3 is acknowledged as the canonical
    walk-forward split for production-grade sweeps (no objection that
@@ -317,7 +326,7 @@ This plan is APPROVED when:
 3. The composite objective in §4 weights are accepted (no objection
    to penalising CVaR/DD at the stated -20% / -10% magnitudes).
 4. The 5 gates in §6 are accepted as the promote criterion.
-5. The ~24-30 hr wall + 25 hr CPU budget at parallel=4 is acceptable.
+5. The ~24-48 hr wall budget at parallel=4 is acceptable.
 
 If any gate fails, revise the plan and re-circulate. If all pass,
 proceed to Phase A.
