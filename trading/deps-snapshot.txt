@@ -79,8 +79,8 @@ ocaml-compiler-libs         v0.17.0
 ocaml-config                3
 ocaml-options-vanilla       1
 ocaml-syntax-shims          1.0.0
-ocaml-version               4.1.0
-ocaml_intrinsics_kernel     v0.17.1
+ocaml-version               4.1.1
+ocaml_intrinsics_kernel     v0.17.2
 ocamlbuild                  0.16.1
 ocamlfind                   1.9.8
 ocamlformat                 0.29.0
