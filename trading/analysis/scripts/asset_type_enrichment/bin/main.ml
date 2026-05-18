@@ -51,7 +51,7 @@ let _print_summary t =
       Core.printf "  %-32s %d\n" c.Asset_type_enrichment_lib.asset_type_label
         c.count)
 
-let _run ~inventory_path ~output_path ~secrets_path =
+let _run ~inventory_path ~output_path ~secrets_path ~include_delisted =
   let open Deferred.Result.Let_syntax in
   let%bind token = _read_token ~secrets_path |> Deferred.return in
   let%bind inventory = _load_inventory ~inventory_path |> Deferred.return in
@@ -59,14 +59,29 @@ let _run ~inventory_path ~output_path ~secrets_path =
     List.map inventory.Inventory.symbols ~f:(fun e -> e.Inventory.symbol)
   in
   Core.printf "Inventory has %d symbols.\n%!" (List.length inventory_symbols);
-  let%bind eodhd_listings = Eodhd.Http_client.get_symbols ~token () in
-  Core.printf "EODHD US listing has %d entries.\n%!"
-    (List.length eodhd_listings);
+  let%bind live = Eodhd.Http_client.get_symbols ~token () in
+  Core.printf "EODHD US LIVE listing has %d entries.\n%!" (List.length live);
+  let%bind delisted =
+    if include_delisted then (
+      let%bind d = Eodhd.Http_client.get_delisted_symbols ~token () in
+      Core.printf "EODHD US DELISTED listing has %d entries.\n%!"
+        (List.length d);
+      Deferred.Result.return d)
+    else Deferred.Result.return []
+  in
+  let eodhd_listings = live @ delisted in
   let today = Date.today ~zone:Time_float.Zone.utc in
+  let source_endpoints =
+    if include_delisted then
+      [
+        ("/api/exchange-symbol-list/US", today);
+        ("/api/exchange-symbol-list/US?delisted=1", today);
+      ]
+    else [ ("/api/exchange-symbol-list/US", today) ]
+  in
   let enriched =
     Asset_type_enrichment_lib.join ~inventory_symbols ~eodhd_listings
-      ~generated_at:today
-      ~source_endpoints:[ ("/api/exchange-symbol-list/US", today) ]
+      ~generated_at:today ~source_endpoints
   in
   let%bind () =
     Asset_type_enrichment_lib.save enriched ~path:(Fpath.v output_path)
@@ -76,8 +91,8 @@ let _run ~inventory_path ~output_path ~secrets_path =
   Core.printf "Wrote %s\n%!" output_path;
   Deferred.Result.return ()
 
-let _main ~inventory_path ~output_path ~secrets_path () =
-  _run ~inventory_path ~output_path ~secrets_path >>= function
+let _main ~inventory_path ~output_path ~secrets_path ~include_delisted () =
+  _run ~inventory_path ~output_path ~secrets_path ~include_delisted >>= function
   | Ok () -> return ()
   | Error e ->
       Core.eprintf "Error: %s\n" (Status.show e);
@@ -89,7 +104,10 @@ let command =
   Command.async
     ~summary:
       "Bulk-enrich inventory symbols with EODHD Asset_type (Q1 PR2 of \
-       custom-universe-bidirectional)"
+       custom-universe-bidirectional). Pass -include-delisted to merge in the \
+       /api/exchange-symbol-list/US?delisted=1 roster (P3 of the \
+       delisted-aware universe agenda — see \
+       dev/notes/eodhd-delisted-roster-unlock-2026-05-18.md)."
     (let%map_open.Command inventory_path =
        flag "inventory-path" (required string)
          ~doc:"PATH Path to inventory.sexp"
@@ -100,7 +118,13 @@ let command =
        flag "secrets-path"
          (optional_with_default _default_secrets_path string)
          ~doc:"PATH EODHD API token file (default: repo-local secrets)"
+     and include_delisted =
+       flag "include-delisted" no_arg
+         ~doc:
+           "If set, also fetch /api/exchange-symbol-list/US?delisted=1 and \
+            merge results so delisted-symbol inventory entries get \
+            attribution. Required for the delisted-aware composition agenda."
      in
-     _main ~inventory_path ~output_path ~secrets_path)
+     _main ~inventory_path ~output_path ~secrets_path ~include_delisted)
 
 let () = Command_unix.run command
