@@ -276,6 +276,43 @@ let test_get_symbols _ =
                 (Eodhd.Asset_type.Other "Brand New Type EODHD Just Invented");
           ]))
 
+let test_get_delisted_symbols _ =
+  (* The delisted endpoint reuses the same response schema as the live
+     listings endpoint (Code/Name/Exchange/Type fields). The discriminator
+     is the [delisted=1] query parameter, which flips the response from
+     ~14k currently-listed to ~57k delisted entries. We assert the URI
+     carries that param + that the response parser produces the same
+     [symbol_metadata] shape. *)
+  let mock_fetch uri =
+    let actual_uri_str = Uri.to_string uri in
+    let expected_uri_str =
+      "https://eodhd.com/api/exchange-symbol-list/US?api_token=test_token&fmt=json&delisted=1"
+    in
+    assert_equal ~printer:Fn.id actual_uri_str expected_uri_str;
+    let test_data =
+      In_channel.read_all "./data/get_symbol_list_response.json"
+    in
+    Deferred.return (Ok test_data)
+  in
+  let result =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        get_delisted_symbols ~fetch:mock_fetch ~token:"test_token" ())
+  in
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            symbol_with ~code:"AAPL" ~asset_type:Eodhd.Asset_type.Common_stock;
+            symbol_with ~code:"SPY" ~asset_type:Eodhd.Asset_type.ETF;
+            symbol_with ~code:"0P000070L2"
+              ~asset_type:Eodhd.Asset_type.Mutual_fund;
+            symbol_with ~code:"BABA" ~asset_type:Eodhd.Asset_type.ADR;
+            symbol_with ~code:"GSPC" ~asset_type:Eodhd.Asset_type.Index;
+            symbol_with ~code:"WTF"
+              ~asset_type:
+                (Eodhd.Asset_type.Other "Brand New Type EODHD Just Invented");
+          ]))
+
 let test_get_symbols_extracts_name_and_exchange _ =
   let mock_fetch _uri =
     let test_data =
@@ -500,6 +537,7 @@ let suite =
          "get_historical_price_weekly" >:: test_get_historical_price_weekly;
          "get_index_symbols" >:: test_get_index_symbols;
          "get_symbols" >:: test_get_symbols;
+         "get_delisted_symbols" >:: test_get_delisted_symbols;
          "get_symbols_extracts_name_and_exchange"
          >:: test_get_symbols_extracts_name_and_exchange;
          "get_symbols_partitions_by_equity_like"

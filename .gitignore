@@ -38,6 +38,7 @@ _opam/
 !/data/sectors.csv
 !/data/sectors.meta.sexp
 !/data/symbol_types.sexp
+!/data/delisted_symbols.sexp
 
 # Agent runtime files (logs, lock files, worktrees)
 dev/logs/*.log

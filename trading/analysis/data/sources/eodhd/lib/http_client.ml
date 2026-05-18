@@ -61,6 +61,12 @@ let _make_symbols_uri token =
     ~query:[ ("api_token", [ token ]); ("fmt", [ "json" ]) ]
     ()
 
+let _make_delisted_symbols_uri token =
+  Uri.make ~scheme:"https" ~host:_api_host ~path:"/api/exchange-symbol-list/US"
+    ~query:
+      [ ("api_token", [ token ]); ("fmt", [ "json" ]); ("delisted", [ "1" ]) ]
+    ()
+
 let _float_of_yojson = function
   | `Float f -> Ok f
   | `Int i -> Ok (float_of_int i)
@@ -121,6 +127,11 @@ let _parse_symbols_response body_str =
 let get_symbols ~token ?(fetch = _fetch_body) () :
     symbol_metadata list Status.status_or Deferred.t =
   let uri = _make_symbols_uri token in
+  fetch uri >>| Result.bind ~f:_parse_symbols_response
+
+let get_delisted_symbols ~token ?(fetch = _fetch_body) () :
+    symbol_metadata list Status.status_or Deferred.t =
+  let uri = _make_delisted_symbols_uri token in
   fetch uri >>| Result.bind ~f:_parse_symbols_response
 
 let _find_field fields name =

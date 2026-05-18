@@ -64,6 +64,27 @@ val get_symbols :
     other non-common-stock instruments from Weinstein-style universe-build (see
     [dev/plans/custom-universe-bidirectional-2026-05-17.md] §Q1). *)
 
+val get_delisted_symbols :
+  token:string ->
+  ?fetch:fetch_fn ->
+  unit ->
+  symbol_metadata list Status.status_or Deferred.t
+(** Fetch all DELISTED US-exchange symbols via the
+    [/api/exchange-symbol-list/US?delisted=1] endpoint. Same schema as
+    {!get_symbols} (Code / Name / Exchange / Type fields); the only difference
+    is the [?delisted=1] query parameter, which flips the response from the ~14k
+    currently-listed roster to the ~57k delisted roster (~31.7k Common Stock as
+    of 2026-05-18).
+
+    Used by the delisted-aware universe builder to recover symbols that delisted
+    before the snapshot date and so are invisible to the live listings — fixes
+    the construction-time survivor bias documented in PR #1180 +
+    [dev/notes/eodhd-delisted-roster-unlock-2026-05-18.md].
+
+    The bars for each delisted symbol must still be fetched separately via
+    {!get_historical_price}; EODHD retains bars for major delistings (TWTR, FIT)
+    but not all small-cap delistings. *)
+
 val get_bulk_last_day :
   token:string ->
   exchange:string ->
