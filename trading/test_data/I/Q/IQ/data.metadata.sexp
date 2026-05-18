@@ -1,0 +1,8 @@
+((symbol                      IQ)
+ (last_verified               2025-06-08)
+ (verification_status         Verified)
+ (data_start_date             2018-03-29)
+ (data_end_date               2025-05-16)
+ (has_volume                  true)
+ (last_n_prices_avg_below_10  true)
+ (last_n_prices_avg_above_500 false))

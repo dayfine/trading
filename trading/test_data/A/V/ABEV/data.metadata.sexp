@@ -1,0 +1,8 @@
+((symbol                      ABEV)
+ (last_verified               2026-05-03)
+ (verification_status         Verified)
+ (data_start_date             1997-03-05)
+ (data_end_date               2026-05-01)
+ (has_volume                  true)
+ (last_n_prices_avg_below_10  true)
+ (last_n_prices_avg_above_500 false))
