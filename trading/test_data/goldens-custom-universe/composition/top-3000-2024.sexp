@@ -1095,7 +1095,7 @@
     (synthetic false))
    ((symbol CAG) (weight 0.00033333333333333332) (sector "Consumer Staples")
     (synthetic false))
-   ((symbol CHK) (weight 0.00033333333333333332) (sector "")
+   ((symbol CHK) (weight 0.00033333333333333332) (sector Energy)
     (synthetic false))
    ((symbol EXE) (weight 0.00033333333333333332) (sector Energy)
     (synthetic false))
