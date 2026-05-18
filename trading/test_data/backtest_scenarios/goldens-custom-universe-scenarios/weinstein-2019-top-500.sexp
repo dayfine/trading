@@ -79,28 +79,47 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
- ;; Measured 2026-05-17 (post #1172/#1174/#1175/#1177):
+ ;; **Re-pinned 2026-05-18 after the delisted-aware composition rebuild
+ ;; (P1 #1184 + P2 #1185 + P3 #1186 + ergonomics #1187 + post-P2 pipeline
+ ;; run). The new top-500-2019 universe now includes ~101 names that
+ ;; delisted between 2019-05-31 and 2026 (AABA, CELG, ANTM, AGN, ATVI,
+ ;; CBS, CERN, ABMD, etc.), and drops 101 low-volume live names that
+ ;; they crowded out by 2019 dollar-volume rank. See
+ ;; `dev/notes/delisted-aware-p4-result-2026-05-18.md` for the full P4
+ ;; writeup.
+ ;;
+ ;; Measured 2026-05-18 (delisted-aware universe):
+ ;;   total_return_pct   78.34  total_trades 263   win_rate 31.94
+ ;;   sharpe_ratio       0.69   max_drawdown 42.17 avg_holding_days 41.99
+ ;;   open_positions_value 1,424,418  sortino 0.96  calmar 0.29
+ ;;   ulcer 19.01
+ ;;
+ ;; Prior measurement (pre-delisted-aware, kept for #1180 narrative):
  ;;   total_return_pct  174.69  total_trades 248   win_rate 30.65
- ;;   sharpe_ratio      0.62   max_drawdown 59.06 avg_holding_days 40.85
- ;;   open_positions_value 2,263,365  sortino 0.73  calmar 0.38
- ;;   ulcer 26.89   wall 186.5s
- ;; Tolerances ±20% across the board, EXCEPT max_drawdown_pct at ±15%
- ;; (DD bands kept tight on purpose — a single-symbol blow-up shifts DD
- ;; more violently than the other metrics in a concentrated universe, so
- ;; we want CI to catch a regression there sooner than the rest). Wider
- ;; than sp500's ±15% otherwise — single-measurement baseline; tighten
- ;; the others after a second run confirms bounded drift.
+ ;;   sharpe_ratio      0.62   max_drawdown 59.06 ulcer 26.89
+ ;;
+ ;; The selection-bias finding from #1180 is borne out: return drops 55%
+ ;; (175% → 78%) once we stop excluding names that delisted between
+ ;; snapshot and 2026. Risk metrics IMPROVE (MaxDD -29%, Ulcer -29%,
+ ;; Sortino +31%) because the new universe is less concentrated in
+ ;; extreme-volatility growth names (AMZN/NVDA/TSLA still in but no
+ ;; longer dominating the top of the cap-rank distribution). The 8σ gap
+ ;; to the random-sample mean (+12.66%, #1180) narrows from ~8σ to ~3σ.
+ ;;
+ ;; Tolerances ±20% across the board, EXCEPT max_drawdown_pct +
+ ;; win_rate + avg_holding_days at ±15% (those have lower per-run
+ ;; variance per the #1180 random-sample distribution).
  (expected
-  ((total_return_pct   ((min 139.0)         (max 210.0)))
-   (total_trades       ((min 198)           (max 298)))
-   (win_rate           ((min  24.5)         (max  36.8)))
-   (sharpe_ratio       ((min   0.49)        (max   0.74)))
-   (max_drawdown_pct   ((min  50.2)         (max  68.0)))
-   (avg_holding_days   ((min  32.7)         (max  49.0)))
-   (open_positions_value ((min 1810000.0)   (max 2720000.0)))
-   (sortino_ratio_annualized ((min  0.58)   (max   0.88)))
-   (calmar_ratio       ((min   0.30)        (max   0.46)))
-   (ulcer_index        ((min  21.5)         (max  32.3)))
+  ((total_return_pct   ((min  62.7)         (max  94.0)))
+   (total_trades       ((min 210)           (max 316)))
+   (win_rate           ((min  27.1)         (max  36.7)))
+   (sharpe_ratio       ((min   0.55)        (max   0.83)))
+   (max_drawdown_pct   ((min  35.8)         (max  48.5)))
+   (avg_holding_days   ((min  35.7)         (max  48.3)))
+   (open_positions_value ((min 1139000.0)   (max 1710000.0)))
+   (sortino_ratio_annualized ((min  0.77)   (max   1.15)))
+   (calmar_ratio       ((min   0.23)        (max   0.35)))
+   (ulcer_index        ((min  15.2)         (max  22.8)))
    ;; wall_seconds wide (CI ~5x local, local ~190s) — catches only
    ;; catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 100.0)         (max 1800.0))))))
