@@ -93,9 +93,21 @@ if [ "$SKIP_REBUILD" = "1" ]; then
 fi
 
 printf '\n=== Step 3/3: build_composition_universes_runner.exe ===\n'
+# --out-dir MUST be absolute. The runner default is the relative path
+# "trading/test_data/goldens-custom-universe/composition/", which under
+# `dune exec` from /workspaces/trading-1/trading/ resolves to
+# /workspaces/trading-1/trading/trading/test_data/... — the WRONG location
+# (canonical path is /workspaces/trading-1/trading/test_data/...). The first
+# end-to-end run on 2026-05-18 caught this; see
+# dev/notes/delisted-aware-p4-result-2026-05-18.md §"Bug found".
 _run_in_container '
   cd /workspaces/trading-1/trading && eval $(opam env) > /dev/null
-  dune exec --no-build analysis/data/universe/bin/build_composition_universes_runner.exe
+  dune exec --no-build analysis/data/universe/bin/build_composition_universes_runner.exe -- \
+    --bars-root /workspaces/trading-1/data \
+    --inventory /workspaces/trading-1/data/inventory.sexp \
+    --sectors-csv /workspaces/trading-1/data/sectors.csv \
+    --symbol-types /workspaces/trading-1/data/symbol_types.sexp \
+    --out-dir /workspaces/trading-1/trading/test_data/goldens-custom-universe/composition/
 '
 
 printf '\n=== Done ===\n'
