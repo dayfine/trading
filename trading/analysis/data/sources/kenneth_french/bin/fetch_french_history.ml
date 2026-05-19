@@ -6,12 +6,17 @@
       dune exec analysis/data/sources/kenneth_french/bin/fetch_french_history.exe -- \
         -dataset 5-industry-daily \
         -out dev/data/kenneth_french/5_industry_daily-YYYYMMDD.csv
+
+      dune exec analysis/data/sources/kenneth_french/bin/fetch_french_history.exe -- \
+        -dataset 49-industry-daily \
+        -out dev/data/kenneth_french/49_industry_daily-YYYYMMDD.csv
     v}
 
     Behaviour:
     - HTTP-GETs the canonical ZIP URI
-      ({!Kenneth_french.Kenneth_french_client.source_uri}) via system [curl]
-      ({!French_curl_fetch.fetch}) and writes it to a tempfile.
+      ({!Kenneth_french.Kenneth_french_client.source_uri_5industry} or
+      {!Kenneth_french.Kenneth_french_client.source_uri_49industry}) via system
+      [curl] ({!French_curl_fetch.fetch}) and writes it to a tempfile.
     - Shell-outs to [unzip] to extract the inner CSV beside the tempfile.
     - Parses the inner CSV body through
       {!Kenneth_french.Kenneth_french_client.parse} (so any upstream schema
@@ -21,20 +26,27 @@
       row per observation × per block, sentinel-derived [None] options emitted
       as empty cells.
 
-    Only the [5-industry-daily] dataset is supported in this PR; the CLI flag
-    accepts the slug verbatim and rejects unknown values so the follow-up
-    "49-industry" / "factors" datasets can plug in without breaking the
-    contract. *)
+    The CLI flag accepts a slug verbatim and rejects unknown values so future
+    French datasets (e.g. factor / size-sort series) can plug in without
+    breaking the contract. *)
 
 open! Core
 open Async
 module Client = Kenneth_french.Kenneth_french_client
 
 (* Hard-pinned set of supported datasets. Each entry maps a CLI slug to
-   the canonical source URI. For the first PR there's only one; the
-   structure exists so follow-up datasets can extend it. *)
+   the canonical source URI and the expected inner-CSV filename in the
+   ZIP. Extending this table is the only change required to onboard a new
+   N-industry French daily dataset (the parser is column-count-driven). *)
 let _datasets =
-  [ ("5-industry-daily", Client.source_uri, "5_Industry_Portfolios_Daily.csv") ]
+  [
+    ( "5-industry-daily",
+      Client.source_uri_5industry,
+      "5_Industry_Portfolios_Daily.csv" );
+    ( "49-industry-daily",
+      Client.source_uri_49industry,
+      "49_Industry_Portfolios_Daily.csv" );
+  ]
 
 let _dataset_slugs = List.map _datasets ~f:(fun (slug, _, _) -> slug)
 
@@ -166,8 +178,8 @@ let command =
     (let%map_open.Command dataset =
        flag "-dataset" (required string)
          ~doc:
-           "SLUG dataset identifier (currently only \"5-industry-daily\" is \
-            supported)"
+           "SLUG dataset identifier (\"5-industry-daily\" or \
+            \"49-industry-daily\")"
      and out_path =
        flag "-out" (required string)
          ~doc:"PATH output CSV path (will be overwritten)"
