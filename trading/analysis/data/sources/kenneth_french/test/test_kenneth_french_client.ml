@@ -246,6 +246,252 @@ let test_source_uri_is_dartmouth_tuck_zip _ =
          contains_substring "5_Industry_Portfolios_daily_CSV.zip";
        ])
 
+let test_source_uri_5industry_alias_matches_legacy _ =
+  assert_that (Uri.equal source_uri source_uri_5industry) (equal_to true)
+
+let test_source_uri_49industry_is_dartmouth_tuck_zip _ =
+  let uri_str = Uri.to_string source_uri_49industry in
+  assert_that uri_str
+    (all_of
+       [
+         contains_substring "https://mba.tuck.dartmouth.edu/";
+         contains_substring "ken.french";
+         contains_substring "49_Industry_Portfolios_daily_CSV.zip";
+       ])
+
+(* ===========================================================================
+   49-Industry daily dataset — same parser, wider column header.
+
+   The pinned 49-Industry sample fixture mirrors the upstream layout
+   verbatim: 7-line preamble, the VW block with 4 rows (1926-07-01,
+   1926-07-02, 1929-10-28 Black Monday, 2026-03-31), a blank separator,
+   the EW block with the same 4 dates, and a trailing copyright line.
+
+   These tests pin: (a) the parser is column-count-agnostic — same code
+   path, just 49 columns; (b) industry order in the header is preserved;
+   (c) pinned spot-check values (Agric on 1929-10-28 = -5.80 VW / -5.25
+   EW) detect any silent reorder; (d) sentinel mapping still fires for
+   the many [-99.99] cells in the early 1926 rows (industries like
+   Soda/Hlth/Rubbr/FabPr etc. did not exist in 1926). *)
+
+let _fixture_path_49 = "./data/french_49industry_sample.csv"
+let _read_49 () = In_channel.read_all _fixture_path_49
+
+let _expected_industries_49 =
+  [
+    "Agric";
+    "Food";
+    "Soda";
+    "Beer";
+    "Smoke";
+    "Toys";
+    "Fun";
+    "Books";
+    "Hshld";
+    "Clths";
+    "Hlth";
+    "MedEq";
+    "Drugs";
+    "Chems";
+    "Rubbr";
+    "Txtls";
+    "BldMt";
+    "Cnstr";
+    "Steel";
+    "FabPr";
+    "Mach";
+    "ElcEq";
+    "Autos";
+    "Aero";
+    "Ships";
+    "Guns";
+    "Gold";
+    "Mines";
+    "Coal";
+    "Oil";
+    "Util";
+    "Telcm";
+    "PerSv";
+    "BusSv";
+    "Hardw";
+    "Softw";
+    "Chips";
+    "LabEq";
+    "Paper";
+    "Boxes";
+    "Trans";
+    "Whlsl";
+    "Rtail";
+    "Meals";
+    "Banks";
+    "Insur";
+    "RlEst";
+    "Fin";
+    "Other";
+  ]
+
+let test_49ind_parse_extracts_both_blocks _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  assert_that parsed
+    (all_of
+       [
+         field (fun p -> p.value_weighted.observations) (size_is 4);
+         field (fun p -> p.equal_weighted.observations) (size_is 4);
+       ])
+
+let test_49ind_industries_pinned_in_source_order _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  assert_that parsed
+    (all_of
+       [
+         field
+           (fun p -> p.value_weighted.industries)
+           (equal_to _expected_industries_49);
+         field
+           (fun p -> p.equal_weighted.industries)
+           (equal_to _expected_industries_49);
+       ])
+
+let test_49ind_industries_count_is_49 _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  assert_that parsed
+    (all_of
+       [
+         field (fun p -> p.value_weighted.industries) (size_is 49);
+         field (fun p -> p.equal_weighted.industries) (size_is 49);
+       ])
+
+(* Spot-check the first row of each block. Agric should be the first
+   industry; the value pinned here is the verbatim upstream cell. If
+   industry order silently shifts, these assertions would fire because
+   the [(industry, return)] tuple equality includes the industry name. *)
+let test_49ind_vw_first_row_agric_pinned _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  match parsed.value_weighted.observations with
+  | first :: _ ->
+      assert_that first
+        (all_of
+           [
+             field (fun o -> o.date) (equal_to (_date 1926 Month.Jul 1));
+             field
+               (fun o -> List.hd_exn o.industry_returns)
+               (equal_to ("Agric", Some 0.56));
+             field
+               (fun o -> List.last_exn o.industry_returns)
+               (equal_to ("Other", Some (-1.66)));
+             field (fun o -> o.industry_returns) (size_is 49);
+           ])
+  | [] -> assert_failure "Expected non-empty 49-industry VW observations"
+
+let test_49ind_ew_first_row_agric_pinned _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  match parsed.equal_weighted.observations with
+  | first :: _ ->
+      assert_that first
+        (all_of
+           [
+             field (fun o -> o.date) (equal_to (_date 1926 Month.Jul 1));
+             field
+               (fun o -> List.hd_exn o.industry_returns)
+               (equal_to ("Agric", Some 0.63));
+             field
+               (fun o -> List.last_exn o.industry_returns)
+               (equal_to ("Other", Some (-0.75)));
+             field (fun o -> o.industry_returns) (size_is 49);
+           ])
+  | [] -> assert_failure "Expected non-empty 49-industry EW observations"
+
+(* The 1929-10-28 Black Monday row pins a known historical event.
+   Agric VW = -5.80, Agric EW = -5.25 per the Dartmouth/Tuck CSV. We
+   spot-check Agric on both blocks plus a tail-industry (Other) to
+   detect silent column-misalignment that would not surface on a single
+   industry. *)
+let test_49ind_vw_black_monday_1929_agric _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  let row =
+    List.find parsed.value_weighted.observations ~f:(fun o ->
+        Date.equal o.date (_date 1929 Month.Oct 28))
+  in
+  assert_that row
+    (is_some_and
+       (field
+          (fun o ->
+            List.find_exn o.industry_returns ~f:(fun (name, _) ->
+                String.equal name "Agric"))
+          (equal_to ("Agric", Some (-5.80)))))
+
+let test_49ind_ew_black_monday_1929_agric _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  let row =
+    List.find parsed.equal_weighted.observations ~f:(fun o ->
+        Date.equal o.date (_date 1929 Month.Oct 28))
+  in
+  assert_that row
+    (is_some_and
+       (field
+          (fun o ->
+            List.find_exn o.industry_returns ~f:(fun (name, _) ->
+                String.equal name "Agric"))
+          (equal_to ("Agric", Some (-5.25)))))
+
+(* Sentinels (-99.99) are dense in the early 1926 rows because many
+   industries (Soda, Hlth, Rubbr, FabPr, Guns, Gold, Mines, PerSv,
+   Softw, Boxes) didn't exist as separately-tracked SIC buckets in 1926.
+   Pin one example per block to confirm the sentinel→None mapping
+   survives the wider-column code path. *)
+let test_49ind_vw_first_row_sentinel_industries_are_none _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  match parsed.value_weighted.observations with
+  | first :: _ ->
+      let soda =
+        List.find_exn first.industry_returns ~f:(fun (name, _) ->
+            String.equal name "Soda")
+      in
+      assert_that soda (equal_to ("Soda", None))
+  | [] -> assert_failure "Expected non-empty 49-industry VW observations"
+
+let test_49ind_ew_first_row_sentinel_industries_are_none _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  match parsed.equal_weighted.observations with
+  | first :: _ ->
+      let hlth =
+        List.find_exn first.industry_returns ~f:(fun (name, _) ->
+            String.equal name "Hlth")
+      in
+      assert_that hlth (equal_to ("Hlth", None))
+  | [] -> assert_failure "Expected non-empty 49-industry EW observations"
+
+let test_49ind_observations_in_source_order _ =
+  let parsed = _parsed_or_fail (_read_49 ()) in
+  let dates =
+    List.map parsed.value_weighted.observations ~f:(fun o -> o.date)
+  in
+  assert_that dates
+    (elements_are
+       [
+         equal_to (_date 1926 Month.Jul 1);
+         equal_to (_date 1926 Month.Jul 2);
+         equal_to (_date 1929 Month.Oct 28);
+         equal_to (_date 2026 Month.Mar 31);
+       ])
+
+(* Defensive: the 49-Industry CSV is upstream-identical in shape to the
+   5-Industry one, so industry-mismatch between blocks is structurally
+   impossible. The contract still asserts it; pin a counterexample on
+   the 49-wide axis so the test exercises the wide-column path. *)
+let test_49ind_industry_mismatch_between_blocks_is_error _ =
+  let body = _read_49 () in
+  let corrupted =
+    String.substr_replace_first body
+      ~pattern:
+        ",Agric,Food,Soda,Beer,Smoke,Toys,Fun,Books,Hshld,Clths,Hlth,MedEq,Drugs,Chems,Rubbr,Txtls,BldMt,Cnstr,Steel,FabPr,Mach,ElcEq,Autos,Aero,Ships,Guns,Gold,Mines,Coal,Oil,Util,Telcm,PerSv,BusSv,Hardw,Softw,Chips,LabEq,Paper,Boxes,Trans,Whlsl,Rtail,Meals,Banks,Insur,RlEst,Fin,Other\n\
+         19260701,   0.63"
+      ~with_:
+        ",Agric,Food,Soda,Beer,Smoke,Toys,Fun,Books,Hshld,Clths,Hlth,MedEq,Drugs,Chems,Rubbr,Txtls,BldMt,Cnstr,Steel,FabPr,Mach,ElcEq,Autos,Aero,Ships,Guns,Gold,Mines,Coal,Oil,Util,Telcm,PerSv,BusSv,Hardw,Softw,Chips,LabEq,Paper,Boxes,Trans,Whlsl,Rtail,Meals,Banks,Insur,RlEst,Fin,DIFFERENT\n\
+         19260701,   0.63"
+  in
+  assert_that (parse corrupted) (is_error_with Status.Invalid_argument)
+
 let suite =
   "kenneth_french_client"
   >::: [
@@ -280,6 +526,32 @@ let suite =
          >:: test_crlf_line_endings_are_tolerated;
          "test_source_uri_is_dartmouth_tuck_zip"
          >:: test_source_uri_is_dartmouth_tuck_zip;
+         "test_source_uri_5industry_alias_matches_legacy"
+         >:: test_source_uri_5industry_alias_matches_legacy;
+         "test_source_uri_49industry_is_dartmouth_tuck_zip"
+         >:: test_source_uri_49industry_is_dartmouth_tuck_zip;
+         "test_49ind_parse_extracts_both_blocks"
+         >:: test_49ind_parse_extracts_both_blocks;
+         "test_49ind_industries_pinned_in_source_order"
+         >:: test_49ind_industries_pinned_in_source_order;
+         "test_49ind_industries_count_is_49"
+         >:: test_49ind_industries_count_is_49;
+         "test_49ind_vw_first_row_agric_pinned"
+         >:: test_49ind_vw_first_row_agric_pinned;
+         "test_49ind_ew_first_row_agric_pinned"
+         >:: test_49ind_ew_first_row_agric_pinned;
+         "test_49ind_vw_black_monday_1929_agric"
+         >:: test_49ind_vw_black_monday_1929_agric;
+         "test_49ind_ew_black_monday_1929_agric"
+         >:: test_49ind_ew_black_monday_1929_agric;
+         "test_49ind_vw_first_row_sentinel_industries_are_none"
+         >:: test_49ind_vw_first_row_sentinel_industries_are_none;
+         "test_49ind_ew_first_row_sentinel_industries_are_none"
+         >:: test_49ind_ew_first_row_sentinel_industries_are_none;
+         "test_49ind_observations_in_source_order"
+         >:: test_49ind_observations_in_source_order;
+         "test_49ind_industry_mismatch_between_blocks_is_error"
+         >:: test_49ind_industry_mismatch_between_blocks_is_error;
        ]
 
 let () = run_test_tt_main suite

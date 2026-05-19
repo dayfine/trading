@@ -12,13 +12,23 @@ type series = { industries : string list; observations : daily_return list }
 type parsed = { value_weighted : series; equal_weighted : series }
 [@@deriving show, eq]
 
-(* Canonical ZIP URI on the Dartmouth/Tuck server. The 5-Industry daily
-   dataset is small (~500KB compressed, ~2.6MB inflated) and updated monthly
+(* Canonical ZIP URIs on the Dartmouth/Tuck server. Both datasets share the
+   same two-block file shape — only the column count differs (5 vs 49) and the
+   inflated size (5-Industry ~2.6 MB; 49-Industry ~20 MB). Updated monthly
    alongside the rest of Kenneth French's data library. *)
-let _source_uri_str =
+let _source_uri_5industry_str =
   "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/5_Industry_Portfolios_daily_CSV.zip"
 
-let source_uri = Uri.of_string _source_uri_str
+let _source_uri_49industry_str =
+  "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/49_Industry_Portfolios_daily_CSV.zip"
+
+let source_uri_5industry = Uri.of_string _source_uri_5industry_str
+let source_uri_49industry = Uri.of_string _source_uri_49industry_str
+
+(* Compatibility alias for the original single-URI export. New callers should
+   prefer [source_uri_5industry]; this binding stays so the existing bin layer
+   keeps building unchanged. *)
+let source_uri = source_uri_5industry
 
 (* Pinned block-header strings as they appear in the source CSV. Any drift
    here indicates an upstream schema change and is a load-bearing failure
