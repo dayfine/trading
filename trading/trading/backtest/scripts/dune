@@ -1,0 +1,6 @@
+; 2026-05-19 diagnostic. Delete this dir after the leak hunt is complete.
+
+(executable
+ (name leak_repro)
+ (modules leak_repro)
+ (libraries core memtrace scenario_lib backtest))
