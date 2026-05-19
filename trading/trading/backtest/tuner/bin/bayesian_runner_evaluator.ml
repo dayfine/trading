@@ -64,11 +64,12 @@ type executor =
   fixtures_root:string ->
   Wf_executor.result
 
-let default_executor : executor =
+let make_executor ?(parallel = 1) () : executor =
  fun ~base ~spec ~fixtures_root ->
   Wf_executor.execute_spec ~base ~spec ~fixtures_root
-    ~progress:Wf_executor.noop_progress ()
+    ~progress:Wf_executor.noop_progress ~parallel ()
 
+let default_executor : executor = make_executor ()
 let _candidate_label_for_iter (iter : int) : string = sprintf "bo-iter-%d" iter
 
 let _build_two_variant_spec ~(baseline_label : string)

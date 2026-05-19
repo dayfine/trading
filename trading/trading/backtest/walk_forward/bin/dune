@@ -1,6 +1,12 @@
 (executable
  (name walk_forward_runner)
  (modules walk_forward_runner)
- (libraries core core_unix core_unix.filename_unix scenario_lib walk_forward)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  fork_pool
+  scenario_lib
+  walk_forward)
  (preprocess
   (pps ppx_sexp_conv)))

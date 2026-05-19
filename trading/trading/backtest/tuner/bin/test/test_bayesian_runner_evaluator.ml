@@ -644,6 +644,21 @@ let test_default_executor_type_exists _ =
   let _ : Evaluator.executor = Evaluator.default_executor in
   assert_that true (equal_to true)
 
+(* ---------- 15. make_executor (plan #1197 §7 PR-3) -------------------- *)
+
+(** CP4: [make_executor] is the production wiring exposed in the mli that
+    accepts a [?parallel] degree (plan #1197 §7 PR-3). Pin that the function
+    returns a value of type [executor] for both the default (omitted) and
+    explicit-parallel forms — type-check only, no runtime invocation (which
+    would call the real backtest). *)
+let test_make_executor_default_type_exists _ =
+  let _ : Evaluator.executor = Evaluator.make_executor () in
+  assert_that true (equal_to true)
+
+let test_make_executor_with_parallel_type_exists _ =
+  let _ : Evaluator.executor = Evaluator.make_executor ~parallel:4 () in
+  assert_that true (equal_to true)
+
 let suite =
   "Tuner_bin.Bayesian_runner_evaluator.build_walk_forward"
   >::: [
@@ -675,6 +690,10 @@ let suite =
          >:: test_base_scenario_threaded_to_executor;
          "default_executor exists with expected signature"
          >:: test_default_executor_type_exists;
+         "make_executor () returns an executor (PR-3)"
+         >:: test_make_executor_default_type_exists;
+         "make_executor ~parallel:N returns an executor (PR-3)"
+         >:: test_make_executor_with_parallel_type_exists;
        ]
 
 let () = run_test_tt_main suite

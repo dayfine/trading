@@ -71,10 +71,21 @@ type executor =
     iteration scoring path can be exercised without invoking
     {!Backtest.Runner.run_backtest}. *)
 
+val make_executor : ?parallel:int -> unit -> executor
+(** [make_executor ?parallel ()] builds a production executor that calls
+    {!Walk_forward.Walk_forward_executor.execute_spec} with
+    {!Walk_forward.Walk_forward_executor.noop_progress} and the supplied
+    [?parallel] degree (default [1] — sequential, bit-identical to the pre-#1200
+    path). Validation of [parallel] against [Fork_pool.max_parallel] is deferred
+    to {!execute_spec}, which raises [Invalid_argument] on out-of-range values.
+    Plan #1197 §7 PR-3. *)
+
 val default_executor : executor
 (** Production executor: thin wrapper that calls
     {!Walk_forward.Walk_forward_executor.execute_spec} with
-    {!Walk_forward.Walk_forward_executor.noop_progress}. *)
+    {!Walk_forward.Walk_forward_executor.noop_progress}. Equivalent to
+    [make_executor ()] — kept as a separate value for the pre-#1197 callers that
+    bind it directly. *)
 
 val build_walk_forward :
   executor:executor ->
