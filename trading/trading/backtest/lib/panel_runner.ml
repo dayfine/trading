@@ -187,7 +187,33 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   let final_close_prices () =
     _final_close_prices ~daily_panels ~symbols:input.all_symbols ~end_date
   in
-  (strategy, adapter, final_close_prices)
+  (strategy, adapter, final_close_prices, daily_panels)
+
+(* Bundle of recorder collectors threaded through one backtest. Extracted
+   so [run] stays under the 50-line linter cap. *)
+type _recorders = {
+  stop_log : Stop_log.t;
+  trade_audit : Trade_audit.t;
+  force_liquidation_log : Force_liquidation_log.t;
+  stale_hold_log : Trading_simulation.Stale_hold.Log.t;
+  audit_recorder : Weinstein_strategy.Audit_recorder.t;
+}
+
+let _create_recorders () : _recorders =
+  let stop_log = Stop_log.create () in
+  let trade_audit = Trade_audit.create () in
+  let force_liquidation_log = Force_liquidation_log.create () in
+  let stale_hold_log = Trading_simulation.Stale_hold.Log.create () in
+  let audit_recorder =
+    Trade_audit_recorder.of_collector ~trade_audit ~force_liquidation_log
+  in
+  {
+    stop_log;
+    trade_audit;
+    force_liquidation_log;
+    stale_hold_log;
+    audit_recorder;
+  }
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
@@ -198,25 +224,19 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     (Date.to_string warmup_start)
     (Date.to_string end_date) warmup_days
     (Strategy_choice.name strategy_choice);
-  let stop_log = Stop_log.create () in
-  let trade_audit = Trade_audit.create () in
-  let force_liquidation_log = Force_liquidation_log.create () in
-  let stale_hold_log = Trading_simulation.Stale_hold.Log.create () in
-  let audit_recorder =
-    Trade_audit_recorder.of_collector ~trade_audit ~force_liquidation_log
-  in
+  let r = _create_recorders () in
   let n_all_symbols = List.length input.all_symbols in
   let snapshot_dir, manifest =
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
   in
-  let strategy, market_data_adapter, final_close_prices_thunk =
+  let strategy, market_data_adapter, final_close_prices_thunk, daily_panels =
     _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~warmup_start
-      ~end_date ~audit_recorder
+      ~end_date ~audit_recorder:r.audit_recorder
   in
   let sim =
-    _make_simulator input ~stop_log ~stale_hold_log ~start_date ~end_date
-      ~warmup_days ~initial_cash ~commission ?slippage_bps ~strategy
-      ~market_data_adapter ()
+    _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
+      ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps
+      ~strategy ~market_data_adapter ()
   in
   let progress_acc =
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
@@ -224,13 +244,16 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   let sim_result =
     Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
         Panel_step_loop.run_simulator_with_gc_trace ?gc_trace ?progress_acc
-          ~stop_log sim)
+          ~stop_log:r.stop_log sim)
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
+  (* Drop the Daily_panels LRU cache before returning. See
+     dev/notes/bayesian-int-rounding-bug-2026-05-19.md §"Third failure". *)
+  Daily_panels.close daily_panels;
   ( sim_result,
-    stop_log,
-    trade_audit,
-    force_liquidation_log,
-    stale_hold_log,
+    r.stop_log,
+    r.trade_audit,
+    r.force_liquidation_log,
+    r.stale_hold_log,
     final_close_prices )
