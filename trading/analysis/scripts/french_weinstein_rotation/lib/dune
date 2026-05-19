@@ -1,0 +1,5 @@
+(library
+ (name french_weinstein_rotation_lib)
+ (libraries core core_unix)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

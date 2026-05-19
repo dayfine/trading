@@ -1,0 +1,5 @@
+(executable
+ (name french_weinstein_rotation)
+ (libraries core core_unix.command_unix french_weinstein_rotation_lib)
+ (preprocess
+  (pps ppx_jane)))
