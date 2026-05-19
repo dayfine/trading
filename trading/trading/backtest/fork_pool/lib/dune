@@ -1,0 +1,3 @@
+(library
+ (name fork_pool)
+ (libraries core core_unix core_unix.signal_unix))
