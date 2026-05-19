@@ -33,6 +33,7 @@
  (libraries
   core
   core_unix
+  fork_pool
   tuner
   backtest
   scenario_lib

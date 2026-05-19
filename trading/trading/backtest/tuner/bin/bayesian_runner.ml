@@ -20,6 +20,7 @@
     {v
       bayesian_runner.exe --spec <spec.sexp> --out-dir <dir>
                           [--fixtures-root <path>]
+                          [--parallel N]    (default 1, max 16)
                           [--walk-forward-spec <spec.sexp>
                            --baseline-aggregate <aggregate.sexp>]
     v}
@@ -45,7 +46,14 @@
     spec's [holdout_folds] for OOS validation. The Bayesian spec's own
     [scenarios] list is ignored in walk-forward mode (the production fixture
     leaves it empty); the binary synthesises a single "walk-forward" scenario
-    label for the [bo_log.csv] writer's per-row column. *)
+    label for the [bo_log.csv] writer's per-row column.
+
+    [--parallel N] (default [1], max [Fork_pool.max_parallel] = 16) controls
+    fan-out of the (variant, fold) grid inside each BO iteration. The BO loop
+    itself remains serial (each iteration's score informs the next acquisition);
+    only the walk-forward CV grid parallelises. With 5 folds × 2 variants = 10
+    cells per iteration, [--parallel 4] processes them in 3 batches of 4 + 1
+    batch of 2. Plan #1197 §7 PR-3. *)
 
 open Core
 module Scenario = Scenario_lib.Scenario
@@ -61,7 +69,31 @@ module Oos_validator = Tuner_bin.Bayesian_runner_oos_validator
 let _usage_msg =
   "Usage: bayesian_runner.exe --spec <spec.sexp> --out-dir <dir>\n\
   \  [--fixtures-root <path>]\n\
+  \  [--parallel N]    (default 1, max 16)\n\
   \  [--walk-forward-spec <spec.sexp> --baseline-aggregate <aggregate.sexp>]"
+
+(** Default [--parallel] value. [1] preserves the pre-#1197 sequential path
+    bit-exactly (no fork, no marshal). *)
+let _default_parallel = 1
+
+(** Parse and validate the [--parallel N] flag at CLI time. Out-of-range values
+    would otherwise surface from inside [Fork_pool.run_parallel] as an
+    [Invalid_argument] after the spec has loaded — failing fast at parse time
+    gives the operator a clearer error. *)
+let _parse_parallel raw =
+  let n =
+    try Int.of_string raw
+    with _ ->
+      eprintf "Error: --parallel expects an integer, got %S\n%s\n" raw
+        _usage_msg;
+      Stdlib.exit 1
+  in
+  if n < 1 || n > Fork_pool.max_parallel then begin
+    eprintf "Error: --parallel must be in [1, %d], got %d\n%s\n"
+      Fork_pool.max_parallel n _usage_msg;
+    Stdlib.exit 1
+  end;
+  n
 
 (** Label assigned to the best cell when it is re-executed end-to-end for OOS
     validation. Distinct from the [bo-iter-N] labels the evaluator's iteration
@@ -79,10 +111,11 @@ type cli_args = {
   fixtures_root : string option;
   walk_forward_spec_path : string option;
   baseline_aggregate_path : string option;
+  parallel : int;
 }
 
 let _parse_args argv =
-  let rec loop spec out fixtures wf_spec baseline = function
+  let rec loop spec out fixtures wf_spec baseline parallel = function
     | [] -> (
         match (spec, out) with
         | Some s, Some o ->
@@ -92,19 +125,23 @@ let _parse_args argv =
               fixtures_root = fixtures;
               walk_forward_spec_path = wf_spec;
               baseline_aggregate_path = baseline;
+              parallel = Option.value parallel ~default:_default_parallel;
             }
         | _ ->
             eprintf "%s\n" _usage_msg;
             Stdlib.exit 1)
-    | "--spec" :: p :: rest -> loop (Some p) out fixtures wf_spec baseline rest
+    | "--spec" :: p :: rest ->
+        loop (Some p) out fixtures wf_spec baseline parallel rest
     | "--out-dir" :: p :: rest ->
-        loop spec (Some p) fixtures wf_spec baseline rest
+        loop spec (Some p) fixtures wf_spec baseline parallel rest
     | "--fixtures-root" :: p :: rest ->
-        loop spec out (Some p) wf_spec baseline rest
+        loop spec out (Some p) wf_spec baseline parallel rest
     | "--walk-forward-spec" :: p :: rest ->
-        loop spec out fixtures (Some p) baseline rest
+        loop spec out fixtures (Some p) baseline parallel rest
     | "--baseline-aggregate" :: p :: rest ->
-        loop spec out fixtures wf_spec (Some p) rest
+        loop spec out fixtures wf_spec (Some p) parallel rest
+    | "--parallel" :: n :: rest ->
+        loop spec out fixtures wf_spec baseline (Some (_parse_parallel n)) rest
     | "--help" :: _ | "-h" :: _ ->
         printf "%s\n" _usage_msg;
         Stdlib.exit 0
@@ -112,7 +149,7 @@ let _parse_args argv =
         eprintf "Error: unknown argument %S\n%s\n" unknown _usage_msg;
         Stdlib.exit 1
   in
-  loop None None None None None argv
+  loop None None None None None None argv
 
 (* -------------- legacy per-scenario mode -------------- *)
 
@@ -168,10 +205,12 @@ let _wf_spec_with_placeholder_scenario (s : Spec.t) : Spec.t =
 
 (** Re-execute the walk-forward sweep for the BO's best cell. Returns the
     fold_actuals list (per-fold, per-variant rows) that
-    {!Oos_validator.validate} partitions into in-sample vs OOS slices. *)
+    {!Oos_validator.validate} partitions into in-sample vs OOS slices. The
+    [parallel] degree is threaded through so the OOS re-run fans out the same
+    way the BO loop's per-iteration sweeps did. *)
 let _execute_best_cell_walk_forward ~(best_params : (string * float) list)
     ~(walk_forward_spec : Wf_spec.t) ~(base : Scenario.t)
-    ~(fixtures_root : string) : Wf_report.fold_actual list =
+    ~(fixtures_root : string) ~(parallel : int) : Wf_report.fold_actual list =
   let candidate =
     {
       Walk_forward.Walk_forward_runner.label = _walk_forward_candidate_label;
@@ -189,11 +228,13 @@ let _execute_best_cell_walk_forward ~(best_params : (string * float) list)
     }
   in
   eprintf
-    "[bayesian_runner] re-running walk-forward on best cell for OOS validation\n\
-     %!";
+    "[bayesian_runner] re-running walk-forward on best cell for OOS validation \
+     (parallel=%d)\n\
+     %!"
+    parallel;
   let result =
     Wf_executor.execute_spec ~base ~spec:two_variant_spec ~fixtures_root
-      ~progress:Wf_executor.noop_progress ()
+      ~progress:Wf_executor.noop_progress ~parallel ()
   in
   result.fold_actuals
 
@@ -219,13 +260,15 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
   let holdout_folds = Option.value spec.holdout_folds ~default:[] in
   eprintf
     "[bayesian_runner] mode=walk-forward; total_budget=%d; initial_random=%d; \
-     bounds=%d; holdout_folds=%d\n\
+     bounds=%d; holdout_folds=%d; parallel=%d\n\
      %!"
     spec.total_budget spec.initial_random (List.length spec.bounds)
-    (List.length holdout_folds);
+    (List.length holdout_folds)
+    args.parallel;
   let evaluator : Runner.evaluator =
-    Evaluator.build_walk_forward ~executor:Evaluator.default_executor ~base
-      ~walk_forward_spec ~baseline_aggregate ~fixtures_root ()
+    Evaluator.build_walk_forward
+      ~executor:(Evaluator.make_executor ~parallel:args.parallel ())
+      ~base ~walk_forward_spec ~baseline_aggregate ~fixtures_root ()
   in
   let runner_spec = _wf_spec_with_placeholder_scenario spec in
   let result =
@@ -239,7 +282,7 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
      per-fold results, emit oos_report.md. *)
   let fold_actuals =
     _execute_best_cell_walk_forward ~best_params:result.best_params
-      ~walk_forward_spec ~base ~fixtures_root
+      ~walk_forward_spec ~base ~fixtures_root ~parallel:args.parallel
   in
   let oos_result =
     Oos_validator.validate ~candidate_label:_walk_forward_candidate_label
