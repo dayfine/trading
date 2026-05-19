@@ -25,8 +25,17 @@ let _test_days (period : Scenario.period) =
 
 (** Run a single scenario via {!Backtest.Runner.run_backtest} and project its
     summary metrics into a {!Report.fold_actual}. The [fold_name] and
-    [variant_label] fields are filled by the caller — {!_evaluate_one_pair}. *)
-let _run_one ~fixtures_root (s : Scenario.t) : Report.fold_actual =
+    [variant_label] fields are filled by the caller — {!_evaluate_one_pair}.
+
+    Split out of {!_run_one} so [result] is unreachable as soon as this function
+    returns — that lets the post-call [Gc.compact] in {!_run_one} reclaim the
+    ~90 MB of transient Daily_panels-cached data the backtest allocates. The
+    [\@inline never] annotation prevents the compiler from inlining the body
+    back into {!_run_one}, which would keep [result] live as a stack root across
+    the [Gc.compact] call. See
+    [dev/notes/bayesian-int-rounding-bug-2026-05-19.md]. *)
+let[@inline never] _extract_fold ~fixtures_root (s : Scenario.t) :
+    Report.fold_actual =
   let resolved = Filename.concat fixtures_root s.universe_path in
   let sector_map_override =
     Universe_file.to_sector_map_override (Universe_file.load resolved)
@@ -46,7 +55,7 @@ let _run_one ~fixtures_root (s : Scenario.t) : Report.fold_actual =
   let test_days = _test_days s.period in
   let open Trading_simulation_types.Metric_types in
   {
-    fold_name = "";
+    Report.fold_name = "";
     variant_label = "";
     total_return_pct = total_return;
     sharpe_ratio = get SharpeRatio;
@@ -54,6 +63,22 @@ let _run_one ~fixtures_root (s : Scenario.t) : Report.fold_actual =
     calmar_ratio = get CalmarRatio;
     cagr_pct = WFR.cagr_pct ~test_days ~total_return_pct:total_return;
   }
+
+let _run_one ~fixtures_root (s : Scenario.t) : Report.fold_actual =
+  let fold = _extract_fold ~fixtures_root s in
+  (* Partial bandaid for cumulative-state OOM (2026-05-19): each
+     [Backtest.Runner.run_backtest] call leaks ~90 MB to the OCaml major
+     heap. Forcing [Gc.compact] here reduces that to ~25 MB/backtest by
+     reclaiming the transient ~65 MB that's actually unreachable. The
+     remaining 25 MB is a genuine reference leak (not collectible by GC)
+     whose root cause is unidentified — see
+     dev/notes/bayesian-int-rounding-bug-2026-05-19.md §"Root cause
+     identified 2026-05-19 PM". The complete fix is fork-per-fold (plan
+     PR #1197); with that landed, even at parallel=1 each backtest runs
+     in a child whose exit reclaims the leak, so this [Gc.compact] can
+     be removed. *)
+  Stdlib.Gc.compact ();
+  fold
 
 let _evaluate_one_pair ~fixtures_root ~base ~(fold : WS.fold)
     ~(variant : WFR.variant) ~(progress : progress_callback) =
