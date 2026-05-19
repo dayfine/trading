@@ -4,8 +4,16 @@
   test_fold_gate
   test_walk_forward_runner
   test_walk_forward_report
+  test_walk_forward_executor_parallel
   test_spec)
- (libraries ounit2 core matchers backtest scenario_lib walk_forward)
+ (libraries
+  ounit2
+  core
+  matchers
+  backtest
+  fork_pool
+  scenario_lib
+  walk_forward)
  (preprocess
   (pps ppx_sexp_conv))
  (deps
