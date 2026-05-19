@@ -1,0 +1,5 @@
+(executable
+ (name shiller_weinstein_decades)
+ (libraries core core_unix.command_unix shiller)
+ (preprocess
+  (pps ppx_jane)))
