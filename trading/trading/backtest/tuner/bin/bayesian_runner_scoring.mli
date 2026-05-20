@@ -23,11 +23,44 @@
         v}
         See {!_score_sharpe_with_hinge}.
      }
-     {- [Composite _] / [Calmar] / [TotalReturn] / [Concavity_coef] — return
-        [Status.Unimplemented]. PR-2 of the wire-spec plan implements the
-        Composite-relative and single-metric-relative branches. PR-1 (this
-        change) ships the signature plumbing only; the BO sweep should set
-        [objective = Sharpe] until PR-2 lands.
+     {- [Composite weights] — composite-relative-to-baseline (plan §1 Q2 (iii)):
+        {v
+          score(cell) = Σᵢ wᵢ · (cand_metricᵢ - base_metricᵢ)
+                      - lambda_gate * gate_penalty(cell)
+        v}
+        The identity case (candidate == baseline) yields a composite-delta of
+        [0.0]; improvement yields a positive score; worse candidate yields
+        negative. The "higher is better" BO contract is preserved.
+
+        Weighted metrics are looked up against the candidate's and baseline's
+        {!Walk_forward.Walk_forward_types.variant_stability} record via
+        {!_metric_mean_from_stability}. Only the five metrics carried by the
+        walk-forward aggregate are mapped — [TotalReturnPct], [SharpeRatio],
+        [MaxDrawdown], [CalmarRatio], [CAGR]. Any other metric_type in [weights]
+        (notably [CVaR95]) is silently dropped — plan §1 Q1 v1 behaviour; the
+        production sweep [Composite] formula is the 3-term
+        [(SharpeRatio 0.40)(CalmarRatio 0.30)(MaxDrawdown -0.10)] (CVaR95
+        deferred to a walk-forward follow-up).
+
+        See {!_score_composite_relative}.
+     }
+     {- [Calmar] / [TotalReturn] / [Concavity_coef] — single-metric-relative
+        (plan §1 Q5):
+        {v
+          score(cell) = (cand_metric - base_metric)
+                      - lambda_dd  * max(0, cand_maxdd - base_maxdd)
+                      - lambda_gate * gate_penalty(cell)
+        v}
+        The MaxDD hinge is retained for the single-metric branches because
+        (unlike Composite) the objective does not itself include a MaxDD
+        penalty, so an unhinged single-metric scorer would lose risk discipline.
+
+        Note: [Concavity_coef] is not carried in [variant_stability]; both
+        candidate and baseline metric values are [0.0] under this branch, so the
+        score reduces to [-(lambda_dd*hinge + lambda_gate*gate_penalty)]. Until
+        a follow-up threads concavity into the walk-forward aggregate the
+        Concavity_coef objective effectively scores by risk-discipline alone —
+        documented behaviour, not a bug. See {!_score_single_metric_relative}.
      }
     }
 
@@ -104,6 +137,44 @@ val _score_sharpe_with_hinge :
       score = -loss
     v} *)
 
+val _score_composite_relative :
+  candidate_stab:Walk_forward.Walk_forward_types.variant_stability ->
+  baseline_stab:Walk_forward.Walk_forward_types.variant_stability ->
+  weights:(Trading_simulation_types.Metric_types.metric_type * float) list ->
+  gate_penalty:float ->
+  float
+(** Composite-relative-to-baseline scoring helper. Exposed for test
+    introspection.
+
+    {v
+      score = Σᵢ wᵢ · (cand_metricᵢ - base_metricᵢ)
+            - _lambda_gate * gate_penalty
+    v}
+
+    Metric types not carried in
+    {!Walk_forward.Walk_forward_types.variant_stability} (anything other than
+    [TotalReturnPct], [SharpeRatio], [MaxDrawdown], [CalmarRatio], [CAGR]) are
+    silently dropped. Plan §1 Q1 v1 behaviour. *)
+
+val _score_single_metric_relative :
+  objective:Tuner.Grid_search.objective ->
+  candidate_stab:Walk_forward.Walk_forward_types.variant_stability ->
+  baseline_stab:Walk_forward.Walk_forward_types.variant_stability ->
+  gate_penalty:float ->
+  float
+(** Single-metric-relative scoring helper for [Calmar] / [TotalReturn] /
+    [Concavity_coef]. Exposed for test introspection.
+
+    {v
+      score = (cand_metric - base_metric)
+            - _lambda_dd  * max(0, cand_maxdd - base_maxdd)
+            - _lambda_gate * gate_penalty
+    v}
+
+    The caller is responsible for not routing [Sharpe] or [Composite _] through
+    this helper — the implementation defensively returns [0.0] for the
+    metric_value of those objectives so the formula remains total. *)
+
 val score_cell :
   parameters:(string * float) list ->
   candidate_label:string ->
@@ -125,10 +196,10 @@ val score_cell :
     [objective] selects the scoring branch (see top-of-module docstring):
 
     - [Sharpe] (default for existing sweeps) — preserves the legacy
-      Sharpe-with-MaxDD-hinge formula. All existing tests + production sweeps
-      continue to use this path.
-    - [Composite _] / [Calmar] / [TotalReturn] / [Concavity_coef] — return
-      [Status.Unimplemented] until PR-2 implements them.
+      Sharpe-with-MaxDD-hinge formula.
+    - [Composite _] — composite-relative-to-baseline (Σ wᵢ·Δmetricᵢ - gate).
+    - [Calmar] / [TotalReturn] / [Concavity_coef] — single-metric-relative
+      ((cand - base) - hinge - gate).
 
     [candidate_aggregate] and [baseline_aggregate] are produced by
     {!Walk_forward.Walk_forward_report.compute}. The candidate aggregate is the
@@ -146,8 +217,6 @@ val score_cell :
       [baseline_aggregate.stability].
     - [Status.Invalid_argument] when [candidate_aggregate.fold_count = 0] — a
       zero-fold aggregate cannot yield a meaningful mean Sharpe.
-    - [Status.Unimplemented] when [objective] is anything other than [Sharpe]
-      (lifted in PR-2 of the wire-spec plan).
 
     Determinism: same inputs → byte-identical [float] output (modulo IEEE-754
     quirks; no floating-point reduction order dependencies because the
