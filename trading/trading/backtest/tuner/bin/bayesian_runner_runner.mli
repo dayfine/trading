@@ -67,4 +67,30 @@ val run_and_write :
       [(stop_reason early_stopped (iter <N>))] when early-stop fired.
 
     Creates [out_dir] via [mkdir -p] if it does not exist. Returns the {!result}
-    record so callers can log [best_score] without re-reading the artefacts. *)
+    record so callers can log [best_score] without re-reading the artefacts.
+
+    {b Checkpoint / resume.} After every successful evaluation, the runner
+    atomically writes [<out_dir>/bo_checkpoint.sexp] holding the spec + every
+    observation so far. On a subsequent call against the same [out_dir]:
+
+    - If [bo_checkpoint.sexp] is absent, the run starts fresh as above.
+    - If present, the runner reconstructs the BO state by replaying every saved
+      observation (advancing the RNG identically to the original run via
+      discarded [suggest_next] calls), then continues the loop from the next
+      iteration. The replayed [suggest_next] must reproduce each saved parameter
+      set within [1e-12]; mismatch raises [Failure] (silent non-determinism
+      becomes a hard failure rather than a corrupted resume).
+    - If the loaded checkpoint's [schema_version] is not the current version
+      (1), or if the embedded spec differs from the supplied [spec] in any field
+      other than [total_budget], raises [Failure]. (The [total_budget] field is
+      excluded from the equality check so a partial run can be resumed under a
+      larger budget; the bounds, seed, scenarios, objective, and acquisition
+      must stay constant.) To start over, delete [bo_checkpoint.sexp].
+    - When the checkpoint already contains [spec.total_budget] iterations, the
+      loop runs zero further evaluator calls and just re-emits the final
+      artefacts.
+
+    [bo_log.csv], [best.sexp], and [convergence.md] are whole-file rewrites on
+    every call — they are derived from [bo_checkpoint.sexp] + the completed
+    in-memory state. The checkpoint file is the resume source of truth; the
+    other three files are final artefacts. *)
