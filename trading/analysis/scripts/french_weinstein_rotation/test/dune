@@ -1,0 +1,6 @@
+(tests
+ (names test_french_weinstein_rotation)
+ (libraries french_weinstein_rotation_lib core ounit2 matchers)
+ (deps
+  (file
+   ../../../data/sources/kenneth_french/fixture/french-49ind-2026-05-20.csv.gz)))
