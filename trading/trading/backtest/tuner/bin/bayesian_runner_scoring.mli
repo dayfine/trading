@@ -9,15 +9,27 @@
     module never touches the filesystem, never spawns a subprocess, never reads
     a config.
 
-    Scoring formula (plan [dev/plans/bayesian-multi-param-scaling-2026-05-16.md]
-    §3.1):
+    Scoring formula — per-objective dispatch (plan
+    [dev/plans/wire-spec-objective-into-score-cell-2026-05-18.md] §1 Q5):
 
-    {v
-      loss(cell)  = -mean_sharpe(cell)
-                  + lambda_dd  * max(0, mean_maxdd(cell) - baseline_maxdd)
-                  + lambda_gate * gate_penalty(cell)
-      score(cell) = -loss(cell)
-    v}
+    {ul
+     {- [Sharpe] (default) — preserves the legacy formula byte-for-byte (plan
+        [dev/plans/bayesian-multi-param-scaling-2026-05-16.md] §3.1):
+        {v
+          loss(cell)  = -mean_sharpe(cell)
+                      + lambda_dd  * max(0, mean_maxdd(cell) - baseline_maxdd)
+                      + lambda_gate * gate_penalty(cell)
+          score(cell) = -loss(cell)
+        v}
+        See {!_score_sharpe_with_hinge}.
+     }
+     {- [Composite _] / [Calmar] / [TotalReturn] / [Concavity_coef] — return
+        [Status.Unimplemented]. PR-2 of the wire-spec plan implements the
+        Composite-relative and single-metric-relative branches. PR-1 (this
+        change) ships the signature plumbing only; the BO sweep should set
+        [objective = Sharpe] until PR-2 lands.
+     }
+    }
 
     where:
 
@@ -74,15 +86,34 @@ val _degenerate_fold_floor_return_pct : float
     callers in PR-C can wire per-fold exclusion when the walk-forward harness
     surfaces per-fold returns to the scorer. *)
 
+val _score_sharpe_with_hinge :
+  candidate_stab:Walk_forward.Walk_forward_types.variant_stability ->
+  baseline_stab:Walk_forward.Walk_forward_types.variant_stability ->
+  gate_penalty:float ->
+  float
+(** Pure Sharpe-with-MaxDD-hinge formula. Exposed so tests can introspect the
+    branch directly (mirrors the existing [_lambda_dd] / [_gate_penalty_value]
+    exposure). The top-level [score_cell] routes [objective = Sharpe] through
+    this helper.
+
+    {v
+      loss  = -candidate_stab.sharpe_ratio.mean
+            + _lambda_dd  * max(0, candidate_stab.max_drawdown_pct.mean
+                                   - baseline_stab.max_drawdown_pct.mean)
+            + _lambda_gate * gate_penalty
+      score = -loss
+    v} *)
+
 val score_cell :
   parameters:(string * float) list ->
   candidate_label:string ->
   baseline_label:string ->
   candidate_aggregate:Walk_forward.Walk_forward_types.aggregate ->
   baseline_aggregate:Walk_forward.Walk_forward_types.aggregate ->
+  objective:Tuner.Grid_search.objective ->
   float Status.status_or
 (** [score_cell ~parameters ~candidate_label ~baseline_label
-     ~candidate_aggregate ~baseline_aggregate] returns the BO score
+     ~candidate_aggregate ~baseline_aggregate ~objective] returns the BO score
     (higher-is-better) for the candidate cell.
 
     [parameters] is accepted for logging-shape symmetry with the existing
@@ -90,6 +121,14 @@ val score_cell :
     directly (it depends only on the walk-forward outcomes). It is required so
     callers cannot accidentally pass a "blank" assignment when the BO loop
     expects per-iteration cells.
+
+    [objective] selects the scoring branch (see top-of-module docstring):
+
+    - [Sharpe] (default for existing sweeps) — preserves the legacy
+      Sharpe-with-MaxDD-hinge formula. All existing tests + production sweeps
+      continue to use this path.
+    - [Composite _] / [Calmar] / [TotalReturn] / [Concavity_coef] — return
+      [Status.Unimplemented] until PR-2 implements them.
 
     [candidate_aggregate] and [baseline_aggregate] are produced by
     {!Walk_forward.Walk_forward_report.compute}. The candidate aggregate is the
@@ -107,6 +146,8 @@ val score_cell :
       [baseline_aggregate.stability].
     - [Status.Invalid_argument] when [candidate_aggregate.fold_count = 0] — a
       zero-fold aggregate cannot yield a meaningful mean Sharpe.
+    - [Status.Unimplemented] when [objective] is anything other than [Sharpe]
+      (lifted in PR-2 of the wire-spec plan).
 
     Determinism: same inputs → byte-identical [float] output (modulo IEEE-754
     quirks; no floating-point reduction order dependencies because the

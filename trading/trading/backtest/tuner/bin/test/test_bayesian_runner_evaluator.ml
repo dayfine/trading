@@ -193,7 +193,8 @@ let test_score_matches_scoring_module _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let score, _metric_sets =
     evaluator ~parameters:[ ("initial_stop_buffer", 1.10) ]
@@ -240,7 +241,8 @@ let test_candidate_label_increments_per_call _ =
     Evaluator.build_walk_forward ~executor:exec ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let score_0, _ = evaluator ~parameters:[ ("x", 0.0) ] in
   let score_1, _ = evaluator ~parameters:[ ("x", 1.0) ] in
@@ -269,7 +271,8 @@ let test_two_variant_spec_carries_baseline_and_candidate _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let parameters = [ ("initial_stop_buffer", 1.20) ] in
   let _score, _metric_sets = evaluator ~parameters in
@@ -326,7 +329,8 @@ let test_executor_invoked_once_per_call _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let _score, _ = evaluator ~parameters:[ ("x", 0.0) ] in
   assert_that !calls (size_is 1)
@@ -351,7 +355,8 @@ let test_metric_set_list_is_single_element _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let _score, metric_sets = evaluator ~parameters:[ ("x", 0.0) ] in
   assert_that metric_sets (size_is 1)
@@ -378,7 +383,8 @@ let test_metric_set_contents_match_candidate_stability _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let _score, metric_sets = evaluator ~parameters:[ ("x", 0.0) ] in
   let metric_set = List.hd_exn metric_sets in
@@ -413,7 +419,8 @@ let test_scorer_error_propagates_as_failure _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let raised =
     try
@@ -446,7 +453,8 @@ let test_gate_fail_penalty_applied _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let score, _ = evaluator ~parameters:[ ("x", 0.0) ] in
   (* Expected: 0.9 - 10.0 = -9.1 *)
@@ -472,7 +480,8 @@ let test_fixtures_root_threaded_to_executor _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:"/custom/path" ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:"/custom/path" ()
   in
   let _ = evaluator ~parameters:[ ("x", 0.0) ] in
   assert_that !calls
@@ -503,7 +512,7 @@ let test_two_variant_spec_preserves_gate _ =
   let evaluator =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:template_spec ~baseline_aggregate:baseline_agg
-      ~fixtures_root:_fixtures_root ()
+      ~objective:Tuner.Grid_search.Sharpe ~fixtures_root:_fixtures_root ()
   in
   let _ = evaluator ~parameters:[ ("x", 0.0) ] in
   assert_that !calls
@@ -549,7 +558,8 @@ let test_baseline_label_passed_through_spec _ =
   let evaluator =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:(_make_walk_forward_spec ~baseline_label:"my-baseline")
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let _ = evaluator ~parameters:[ ("x", 0.0) ] in
   assert_that !calls
@@ -582,7 +592,8 @@ let test_parameters_thread_into_candidate_overrides _ =
     Evaluator.build_walk_forward ~executor ~base:(_make_base_scenario ())
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let parameters =
     [
@@ -628,7 +639,8 @@ let test_base_scenario_threaded_to_executor _ =
     Evaluator.build_walk_forward ~executor ~base
       ~walk_forward_spec:
         (_make_walk_forward_spec ~baseline_label:_baseline_label)
-      ~baseline_aggregate:baseline_agg ~fixtures_root:_fixtures_root ()
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Sharpe
+      ~fixtures_root:_fixtures_root ()
   in
   let _ = evaluator ~parameters:[ ("x", 0.0) ] in
   assert_that !calls

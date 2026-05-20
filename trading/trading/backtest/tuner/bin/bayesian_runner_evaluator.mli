@@ -92,11 +92,22 @@ val build_walk_forward :
   base:Scenario_lib.Scenario.t ->
   walk_forward_spec:Walk_forward.Spec.t ->
   baseline_aggregate:Walk_forward.Walk_forward_types.aggregate ->
+  objective:Tuner.Grid_search.objective ->
   fixtures_root:string ->
   unit ->
   t
 (** [build_walk_forward ~executor ~base ~walk_forward_spec ~baseline_aggregate
-     ~fixtures_root ()] returns a per-iteration walk-forward evaluator.
+     ~objective ~fixtures_root ()] returns a per-iteration walk-forward
+    evaluator.
+
+    [objective] is the spec-level scoring objective (per
+    {!Tuner_bin.Bayesian_runner_spec.t.objective} →
+    {!Tuner_bin.Bayesian_runner_spec.to_grid_objective}). It is captured at
+    build time (not per-iter) and threaded into
+    {!Tuner_bin.Bayesian_runner_scoring.score_cell}. PR-1 of the wire-spec plan:
+    only [Sharpe] is implemented; passing any other objective causes
+    [score_cell] to return [Status.Unimplemented], which the evaluator's
+    [_score_or_fail] surfaces as [Failure].
 
     Each [~parameters] call:
 
