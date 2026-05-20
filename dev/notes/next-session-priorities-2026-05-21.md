@@ -1,132 +1,135 @@
-# Next-session priorities (post 2026-05-20)
+# Next-session priorities (for 2026-05-21)
 
-Written end of session 2026-05-20 before user went off. Substantive work
-shipped in this session:
+Written end of session 2026-05-20.
 
-- **Bayesian leak hunt + fix** (PRs #1199, #1200, #1201, #1202, #1203,
-  #1197 merged): Random.State.make_self_init DLS-key leak in
-  price_path.ml identified; bandaid in place; Fork_pool library +
-  wire-in + `--parallel N` CLI shipped. Production sweeps now run
-  forked-per-fold (no parent-heap accumulation) at parallel=4.
-- **V1 Bayesian production sweep** running in background at parallel=4
-  (4-knob spec_prod.sexp, budget=60, init_random=10, seed=2026). Should
-  complete within ~1-2 hr of session-end (was at 87.7% / 3264/3720
-  backtests at handover).
-- **M1 cross-cycle Weinstein validation** (#1207 merged): Shiller
-  monthly fixture pinned + decade-by-decade reduction + β + Stage 1-4
-  classifier + ASCII charts + MA-window sweep. **Major finding**:
-  framework at MA=10 months beats B&H on every dimension over 155y
-  (CAGR +1.59pp, Sharpe ~2×, MaxDD -34% vs -85%, 10.3× more wealth).
-  Original 30-month MA was 4× too slow.
-- **Plans #1206** (hold-period deep-dive + cross-cycle Weinstein
-  validation roadmap) merged.
+## Substantive work shipped today (2026-05-20)
 
-## P0 — Process the v1 sweep result
+### M1 + M2 cross-cycle Weinstein validation
 
-The sweep may have finished by next session start. To check:
+- **PR #1207** (M1 Shiller): Monthly Weinstein on Shiller 1871-2025.
+  Headline (MA=10 months): framework beats B&H on every dimension over
+  155y. Sharpe ~2× B&H, MaxDD -34% vs -85%, 10.3× more wealth.
+- **PR #1209** (data): Kenneth French 49-Industry daily fixture
+  (1926-2026, 26,212 days × 49 industries).
+- **PR #1211** (M2 strategy): Daily-bar Weinstein 49-industry rotation.
+  100y headline: Sharpe **0.81**, CAGR **13.55%**, MaxDD **-64%**, β
+  **0.708**. 1970s **0.99 Sharpe vs B&H 0.48** (crushes stagflation).
+- **PR #1212** (M1 follow-up): MA-window unit-tag fix
+  (`Days | Weeks | Months` variant); default `Weeks 30` matches book.
+- **PR #1213** (M2 writeup): Decision-tree resolution — M3 **DEFERRED**
+  per plan's own gating logic (M3 only load-bearing if rotation
+  collapses; rotation does NOT collapse in any tested regime).
+
+### Bayesian sweep infrastructure (#1196)
+
+- **PR #1196** (plan, merged): Wire `Spec.objective` into walk-forward
+  scorer (3-PR plan).
+- **PR #1214** (PR-1 of #1196): Signature plumbing complete. Sharpe
+  path byte-identical. Non-Sharpe objectives → `Status.Unimplemented`
+  stub.
+- **PR-2 of #1196 (TODO)**: ~300 LOC. Implement Composite + Calmar
+  + TotalReturn + Concavity_coef scoring branches with 8 new tests.
+  Load-bearing if V2 sweep also rejects.
+
+### V2 Bayesian sweep (LAUNCHED — in-flight)
+
+- Started ~09:30 PT 2026-05-20. PID 90733 in `trading-1-dev`,
+  parallel=4. ETA ~20:50 PT (9pm) today.
+- Spec: `spec_prod_v2.sexp` (widened bounds on 3 of 4 knobs that
+  clustered at lower bound in v1).
+- Walk-forward: `walk_forward_v2_baseline.sexp` (cell-E single
+  variant; BO injects candidates per iteration).
+- Baseline aggregate reused from `v1-winner-fullrun/aggregate.sexp`
+  (cell-E rows pre-existing).
+- Output target: `output-v2-parallel4/`.
+- Log: `dev/logs/bayesian-prod-v2-parallel4.log`.
+
+## P0 — Process V2 sweep result
+
+Same recipe as v1. To check:
 
 ```sh
 docker exec trading-1-dev pgrep -f bayesian_runner.exe
 # Empty → sweep done. Output files at:
-ls /workspaces/trading-1/dev/experiments/bayesian-production-sweep-2026-05-18/output-v1-parallel4/
+ls /workspaces/trading-1/dev/experiments/bayesian-production-sweep-2026-05-18/output-v2-parallel4/
 # Expect: best.sexp, bo_log.csv, convergence.md, oos_report.md
 ```
 
 ### If sweep done
 
-1. Read `oos_report.md` — the Oos_validator already computes a verdict
-   (`promotable` / `reject_*`) using the holdout folds 27-30. Bayesian
-   runner has this baked in.
-2. Read `best.sexp` for the winner's 4 knob values.
-3. Read `bo_log.csv` to see convergence trajectory (60 rows, columns
-   include `iter`, the 4 params, scenario, all metrics, and
-   `objective_Sharpe`).
-4. Apply plan §6 promote-gate (5 axes) — note `oos_report.md` covers
-   only the OOS axis; the other 4 (median composite, worst fold,
-   MaxDD vs baseline, n_trades vs baseline) need manual check from
-   the BO log + best-cell aggregate.
-5. Write `dev/notes/bayesian-prod-v1-result-2026-05-XX.md` with
-   findings + decision.
+1. Read `oos_report.md` — built-in OOS verdict on holdout folds 27-30.
+2. Read `best.sexp` for the 4 knob values.
+3. Apply plan §6 promote-gate (5 axes): median composite ≥ baseline+0.05,
+   no fold worse by >0.10, OOS Sharpe ≥0.50 every fold, MaxDD ≤baseline+5pp,
+   n_trades within 2×. Note: only OOS axis is auto-computed.
+4. Write `dev/notes/bayesian-prod-v2-result-2026-05-21.md`.
 
-### If verdict is PROMOTABLE
+### If V2 PROMOTABLE
 
-Follow `dev/plans/private-tuned-configs-repo-2026-05-18.md`:
+Follow `dev/plans/private-tuned-configs-repo-2026-05-18.md` — commit
+to `dayfine/trading-configs-private`, open tracking issue here.
 
-- Create `dayfine/trading-configs-private` repo (if not already created).
-- Commit the best.sexp as `configs/2026-05-XX-bayesian-prod-v1/config.sexp`.
-- Open a tracking issue in this repo (NOT a PR — configs live in the
-  private repo, not main).
+### If V2 REJECT
 
-### If verdict is REJECT
+P0 becomes: implement PR-2 of #1196 (Composite scorer). Then re-run
+sweep as V3 against the multi-objective scorer. This is the "v2 also
+needs multi-objective scoring" branch of the original sweep plan.
 
-Write `dev/notes/bayesian-prod-v1-result-2026-05-XX.md` with:
+## P1 — PR-2 of #1196 (Composite scorer)
 
-- Which axis failed + per-fold breakdown.
-- Hypothesis for v2 (likely either widen knob bounds OR add a knob).
-- Whether plan #1196 (composite scorer) becomes load-bearing.
+Already-designed implementation work. Plan lives in main:
+`dev/plans/wire-spec-objective-into-score-cell-2026-05-18.md`.
 
-## P1 — Hold-period deep-dive probes (dev/plans/hold-period-deep-dive-2026-05-19.md)
+- ~300 LOC.
+- Adds Composite-relative + single-metric-relative scoring.
+- 8 new tests.
+- Reference doc PR-1 (merged in #1214) as the plumbing prerequisite.
 
-5 probes (P1-P5 in that plan) sequenced cheapest-first. P1 + P3 already
-ran inline this session — findings:
+Run regardless of V2 outcome — if V2 promotes, PR-2 is still useful
+for future tuning iterations. If V2 rejects, PR-2 unblocks V3.
 
-- 66% of cell-E 15y trades exit on `stop_loss` with P50=10d.
-- Those stop_loss trades are NET-NEGATIVE: mean −0.90% pnl, 23.9% win
-  rate. ~37% drag on laggard_rotation's edge (+5.54% mean, 61.7% wr).
-- 54.7% of stop_loss exits trigger within 10 days of entry (whipsaw).
+## P2 — Hold-period deep-dive remaining probes
 
-Implications already in the plan:
+Per `dev/plans/hold-period-deep-dive-2026-05-19.md`:
 
-- v2 sweep should widen stop-knob bounds (`initial_stop_buffer` up to
-  1.20, `installed_stop_min_pct` up to 0.20).
-- Add a 5-10 day post-entry settling window as a tunable knob.
-- These can be tested via P2 ablation sweep (~6 hr at parallel=4 with
-  the now-shipped Fork_pool).
+- **P4** (per-stage hold dispersion): needs entry-stage data joined to
+  hold-period distribution. Probably 1 day of data prep + analysis.
+- **P5** (composite scoring): blocked on PR-2 of #1196.
 
-## P2 — M2 French 49-industry rotation
+## P3 — Defer/Park
 
-Per `dev/plans/cross-cycle-weinstein-validation-2026-05-19.md` §M2.
-~1k LOC, 2 weeks. Tests whether the cross-sectional ranking value-add
-(the 0.20 Sharpe gap between M1's MA=10 reduction at 0.75 and cell-E's
-production 0.94) holds across 100y of French portfolios.
-
-NOT urgent if v1 sweep promotes — the cell-E production strategy is
-already calibrated correctly.
-
-## Drafts still open (P3)
-
-- **#1196** (Composite scorer plan, draft) — not blocking v1 sweep
-  promotion. Implement only if v2 needs multi-objective Bayesian
-  scoring (e.g., to penalise short median-hold).
-
-## Background processes to verify
-
-If next session is started while sweep still running:
-
-- The bayesian_runner.exe process should still be alive in
-  `trading-1-dev` container.
-- The /tmp cleanup sidecar should still be alive
-  (`docker exec trading-1-dev pgrep -af "find /tmp"` — should match).
-- If either died, check the log tail for crash:
-  `tail -50 /workspaces/trading-1/dev/logs/bayesian-prod-v1-parallel4.log`.
+- **M3 per-stock synthesis**: DEFERRED per M2 decision-tree (see
+  `dev/notes/cross-cycle-validation-m2-result-2026-05-20.md`). Revisit
+  only if V2 + composite scorer both fail to find a Pareto improvement.
+- **Plan #1196 PR-3** (~50 LOC doc): drop CVaR from production-sweep
+  doc + reword "median" → "mean". Low-priority cleanup; ship after
+  PR-2 lands.
 
 ## Branch state (end of 2026-05-20)
 
-- `main`: at PR #1207 (Shiller M1) merged.
-- Only `feat/wire-spec-objective-score-cell-plan` (#1196 draft) remains
-  open. All other PRs merged or branches deleted.
-- Working copy: clean (the v1 sweep output files in
-  `dev/experiments/bayesian-production-sweep-2026-05-18/` are
-  uncommitted but expected).
+- `main`: at PR #1196 (plan) + #1214 (plumbing) merged.
+- No feature branches open. No drafts.
+- Working copy: clean.
+
+## Background processes to verify at session start
+
+```sh
+# V2 sweep alive?
+docker exec trading-1-dev pgrep -f bayesian_runner.exe
+# Cleanup sidecar?
+docker exec trading-1-dev pgrep -af "find /tmp"
+# Log tail
+tail -50 /workspaces/trading-1/dev/logs/bayesian-prod-v2-parallel4.log
+```
 
 ## Files of interest
 
-- `dev/notes/bayesian-int-rounding-bug-2026-05-19.md` — full leak hunt
-  writeup, including root cause + mitigation matrix.
-- `dev/notes/bayesian-leak-rootcause-memprof-2026-05-19.md` — memprof
-  attribution of the DLS-key leak.
-- `dev/plans/hold-period-deep-dive-2026-05-19.md` — 5-probe sequence.
-- `dev/plans/cross-cycle-weinstein-validation-2026-05-19.md` — 4
-  milestones (M1 done, M2-M4 sequenced).
-- `dev/plans/parallelise-walk-forward-executor-2026-05-18.md` — the
-  fork-pool plan that landed.
+- `dev/notes/cross-cycle-validation-m2-result-2026-05-20.md` — M2
+  decision-tree resolution.
+- `dev/notes/bayesian-prod-v1-result-2026-05-20.md` — v1 REJECT verdict.
+- `dev/plans/wire-spec-objective-into-score-cell-2026-05-18.md` — PR-2
+  design.
+- `dev/plans/cross-cycle-weinstein-validation-2026-05-19.md` — full
+  4-milestone plan, M3+M4 parked.
+- `trading/trading/backtest/tuner/bin/bayesian_runner_scoring.{ml,mli}` —
+  PR-1 plumbing target for PR-2 implementation.
