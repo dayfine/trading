@@ -49,8 +49,8 @@ let _stats ?(stdev = Float.nan) ?(min = Float.nan) ?(max = Float.nan) ~mean () :
   { mean; stdev; min; max }
 
 let _stability_record ~label ~sharpe_mean ~maxdd_mean ?(calmar_mean = 0.0)
-    ?(total_return_mean = 0.0) ?(cagr_mean = Float.nan) () :
-    Wf_types.variant_stability =
+    ?(total_return_mean = 0.0) ?(cagr_mean = Float.nan)
+    ?(avg_holding_days_mean = Float.nan) () : Wf_types.variant_stability =
   {
     variant_label = label;
     total_return_pct = _stats ~mean:total_return_mean ();
@@ -58,6 +58,7 @@ let _stability_record ~label ~sharpe_mean ~maxdd_mean ?(calmar_mean = 0.0)
     max_drawdown_pct = _stats ~mean:maxdd_mean ();
     calmar_ratio = _stats ~mean:calmar_mean ();
     cagr_pct = _stats ~mean:cagr_mean ();
+    avg_holding_days = _stats ~mean:avg_holding_days_mean ();
   }
 
 let _pass_verdict ?(wins = 3) ?(n = 3) () : FG.verdict = Pass { wins; n }

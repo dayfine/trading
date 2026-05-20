@@ -67,7 +67,12 @@ let _score_sharpe_with_hinge ~(candidate_stab : Wf.variant_stability)
     objective) to the matching [per_metric_stats.mean] in a [variant_stability].
     Returns [None] for metric_types not carried by the walk-forward aggregate
     (e.g. [CVaR95], [TotalPnl], [WinRate], ...) — those weights are silently
-    dropped per plan §1 Q1 (v1 design). *)
+    dropped per plan §1 Q1 (v1 design).
+
+    [AvgHoldingDays] was added 2026-05-20 (P5 infra of
+    [dev/plans/hold-period-deep-dive-2026-05-19.md]) so the Composite scorer can
+    encode a hold-cadence reward term as [(AvgHoldingDays 0.10)] — positive
+    weight rewards candidates whose mean hold exceeds the baseline. *)
 let _metric_mean_from_stability
     (mt : Trading_simulation_types.Metric_types.metric_type)
     (stab : Wf.variant_stability) : float option =
@@ -77,6 +82,7 @@ let _metric_mean_from_stability
   | MaxDrawdown -> Some stab.max_drawdown_pct.mean
   | CalmarRatio -> Some stab.calmar_ratio.mean
   | CAGR -> Some stab.cagr_pct.mean
+  | AvgHoldingDays -> Some stab.avg_holding_days.mean
   | _ -> None
 
 let _score_composite_relative ~(candidate_stab : Wf.variant_stability)

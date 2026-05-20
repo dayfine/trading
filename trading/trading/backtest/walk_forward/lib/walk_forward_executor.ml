@@ -64,6 +64,7 @@ let[@inline never] _extract_fold ~fixtures_root (s : Scenario.t) :
     max_drawdown_pct = get MaxDrawdown;
     calmar_ratio = get CalmarRatio;
     cagr_pct = WFR.cagr_pct ~test_days ~total_return_pct:total_return;
+    avg_holding_days = get AvgHoldingDays;
   }
 
 let _run_one ~fixtures_root (s : Scenario.t) : Report.fold_actual =

@@ -31,7 +31,12 @@
     - Composite negative-weight penalises higher metric.
     - Composite drops unmapped metric (CVaR95) silently → v1 behaviour.
     - Composite gate Pass vs Fail score diff = -10.0.
-    - Calmar / TotalReturn objectives: (Δmetric - hinge - gate). *)
+    - Calmar / TotalReturn objectives: (Δmetric - hinge - gate).
+
+    Composite AvgHoldingDays infra (P5 of hold-period-deep-dive-2026-05-19):
+
+    - Composite ((AvgHoldingDays 0.10)) → 0.10·(cand_hold - base_hold).
+    - Composite P5 4-term formula → exact computed score (regression). *)
 
 open OUnit2
 open Core
@@ -59,13 +64,15 @@ let _stability_record ~label ~sharpe_mean ~maxdd_mean : Wf.variant_stability =
     max_drawdown_pct = _stats ~mean:maxdd_mean ();
     calmar_ratio = _stats ~mean:0.0 ();
     cagr_pct = _stats ~mean:Float.nan ();
+    avg_holding_days = _stats ~mean:Float.nan ();
   }
 
 (** Fuller builder that lets composite + single-metric-relative tests pin the
-    Calmar / TotalReturn / CAGR columns. [_stability_record] above is kept
-    intact so the existing 16 Sharpe-path tests remain byte-identical. *)
-let _stability_full ~label ~sharpe_mean ~maxdd_mean ~calmar_mean
-    ~total_return_mean : Wf.variant_stability =
+    Calmar / TotalReturn / CAGR / AvgHoldingDays columns. [_stability_record]
+    above is kept intact so the existing 16 Sharpe-path tests remain
+    byte-identical. *)
+let _stability_full ?(avg_holding_days_mean = Float.nan) ~label ~sharpe_mean
+    ~maxdd_mean ~calmar_mean ~total_return_mean () : Wf.variant_stability =
   {
     variant_label = label;
     total_return_pct = _stats ~mean:total_return_mean ();
@@ -73,24 +80,32 @@ let _stability_full ~label ~sharpe_mean ~maxdd_mean ~calmar_mean
     max_drawdown_pct = _stats ~mean:maxdd_mean ();
     calmar_ratio = _stats ~mean:calmar_mean ();
     cagr_pct = _stats ~mean:Float.nan ();
+    avg_holding_days = _stats ~mean:avg_holding_days_mean ();
   }
 
 (** Build a synthetic aggregate with full-column variants (Sharpe, MaxDD,
-    Calmar, TotalReturn). Used by the Composite + single-metric-relative suite
-    below. *)
-let _make_aggregate_full ~baseline_label ~candidate_label ~baseline_sharpe
-    ~baseline_maxdd ~baseline_calmar ~baseline_return ~candidate_sharpe
-    ~candidate_maxdd ~candidate_calmar ~candidate_return ~candidate_verdict
-    ?(fold_count = 3) () : Wf.aggregate =
+    Calmar, TotalReturn, optional AvgHoldingDays). Used by the Composite +
+    single-metric-relative suite below.
+
+    [?baseline_avg_hold] / [?candidate_avg_hold] default to [Float.nan] so
+    existing tests (which don't touch the AvgHoldingDays column) are
+    byte-identical through this builder. *)
+let _make_aggregate_full ?(baseline_avg_hold = Float.nan)
+    ?(candidate_avg_hold = Float.nan) ~baseline_label ~candidate_label
+    ~baseline_sharpe ~baseline_maxdd ~baseline_calmar ~baseline_return
+    ~candidate_sharpe ~candidate_maxdd ~candidate_calmar ~candidate_return
+    ~candidate_verdict ?(fold_count = 3) () : Wf.aggregate =
   let baseline_stab =
-    _stability_full ~label:baseline_label ~sharpe_mean:baseline_sharpe
+    _stability_full ~avg_holding_days_mean:baseline_avg_hold
+      ~label:baseline_label ~sharpe_mean:baseline_sharpe
       ~maxdd_mean:baseline_maxdd ~calmar_mean:baseline_calmar
-      ~total_return_mean:baseline_return
+      ~total_return_mean:baseline_return ()
   in
   let candidate_stab =
-    _stability_full ~label:candidate_label ~sharpe_mean:candidate_sharpe
+    _stability_full ~avg_holding_days_mean:candidate_avg_hold
+      ~label:candidate_label ~sharpe_mean:candidate_sharpe
       ~maxdd_mean:candidate_maxdd ~calmar_mean:candidate_calmar
-      ~total_return_mean:candidate_return
+      ~total_return_mean:candidate_return ()
   in
   {
     fold_count;
@@ -787,6 +802,77 @@ let test_total_return_objective_relative _ =
   in
   assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 0.0))
 
+(* ---------- 23. Composite with AvgHoldingDays weight (P5) ---------- *)
+
+(** P5 infra: encoding the hold-cadence reward as [(AvgHoldingDays w)] in a
+    Composite. With baseline avg_hold = 12.0 days (current cell-E P50 ≈ 12d),
+    candidate avg_hold = 30.0 days (Weinstein- target), w = 0.10, and a one-term
+    Composite weight on AvgHoldingDays: score = 0.10 · (30.0 - 12.0) - 0 (Pass)
+    = 1.8. *)
+let test_composite_avg_holding_days_weight _ =
+  let agg =
+    _make_aggregate_full ~baseline_avg_hold:12.0 ~candidate_avg_hold:30.0
+      ~baseline_label:_baseline_label ~candidate_label:_candidate_label
+      ~baseline_sharpe:0.5 ~baseline_maxdd:15.0 ~baseline_calmar:0.8
+      ~baseline_return:10.0 ~candidate_sharpe:0.5 ~candidate_maxdd:15.0
+      ~candidate_calmar:0.8 ~candidate_return:10.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let composite : Tuner.Grid_search.objective =
+    Composite [ (Trading_simulation_types.Metric_types.AvgHoldingDays, 0.10) ]
+  in
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:agg
+      ~baseline_aggregate:agg ~objective:composite
+  in
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 1.8))
+
+(* ---------- 24. Composite P5 production formula (4-term) ---------- *)
+
+(** P5 infra: end-to-end exact computation against the shipped P5 weights
+    [((SharpeRatio 0.50)(CalmarRatio 0.30)(MaxDrawdown -0.10) (AvgHoldingDays
+     0.10))]:
+    - ΔSharpe = 1.2 - 0.6 = 0.6 → +0.50 · 0.6 = +0.30
+    - ΔCalmar = 1.0 - 0.5 = 0.5 → +0.30 · 0.5 = +0.15
+    - ΔMaxDD = 18.0 - 12.0 = 6.0 → -0.10 · 6.0 = -0.60
+    - ΔAvgHoldingDays = 25.0 - 12.0 = 13.0 → +0.10 · 13.0 = +1.30
+    - sum = 0.30 + 0.15 - 0.60 + 1.30 = 1.15
+    - gate penalty (Pass) = 0
+    - score = 1.15 *)
+let test_composite_p5_production_formula _ =
+  let candidate_agg =
+    _make_aggregate_full ~baseline_avg_hold:12.0 ~candidate_avg_hold:25.0
+      ~baseline_label:_baseline_label ~candidate_label:_candidate_label
+      ~baseline_sharpe:0.6 ~baseline_maxdd:12.0 ~baseline_calmar:0.5
+      ~baseline_return:0.0 ~candidate_sharpe:1.2 ~candidate_maxdd:18.0
+      ~candidate_calmar:1.0 ~candidate_return:0.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let baseline_agg =
+    _make_aggregate_full ~baseline_avg_hold:12.0 ~candidate_avg_hold:12.0
+      ~baseline_label:_baseline_label ~candidate_label:_baseline_label
+      ~baseline_sharpe:0.6 ~baseline_maxdd:12.0 ~baseline_calmar:0.5
+      ~baseline_return:0.0 ~candidate_sharpe:0.6 ~candidate_maxdd:12.0
+      ~candidate_calmar:0.5 ~candidate_return:0.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let composite : Tuner.Grid_search.objective =
+    Composite
+      [
+        (Trading_simulation_types.Metric_types.SharpeRatio, 0.50);
+        (Trading_simulation_types.Metric_types.CalmarRatio, 0.30);
+        (Trading_simulation_types.Metric_types.MaxDrawdown, -0.10);
+        (Trading_simulation_types.Metric_types.AvgHoldingDays, 0.10);
+      ]
+  in
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:candidate_agg
+      ~baseline_aggregate:baseline_agg ~objective:composite
+  in
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 1.15))
+
 (* ---------- 16. Sharpe-branch helper is byte-identical to score_cell ---------- *)
 
 (** Pins the contract that [score_cell ~objective:Sharpe] dispatches through
@@ -887,6 +973,10 @@ let suite =
          >:: test_calmar_objective_relative;
          "TotalReturn objective: (Δreturn - hinge - gate)"
          >:: test_total_return_objective_relative;
+         "Composite (AvgHoldingDays w): score = w · (cand_hold - base_hold)"
+         >:: test_composite_avg_holding_days_weight;
+         "Composite P5 production formula (4-term incl. AvgHoldingDays)"
+         >:: test_composite_p5_production_formula;
        ]
 
 let () = run_test_tt_main suite

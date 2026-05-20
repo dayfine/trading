@@ -34,13 +34,20 @@
 
         Weighted metrics are looked up against the candidate's and baseline's
         {!Walk_forward.Walk_forward_types.variant_stability} record via
-        {!_metric_mean_from_stability}. Only the five metrics carried by the
+        {!_metric_mean_from_stability}. The six metrics carried by the
         walk-forward aggregate are mapped — [TotalReturnPct], [SharpeRatio],
-        [MaxDrawdown], [CalmarRatio], [CAGR]. Any other metric_type in [weights]
-        (notably [CVaR95]) is silently dropped — plan §1 Q1 v1 behaviour; the
-        production sweep [Composite] formula is the 3-term
-        [(SharpeRatio 0.40)(CalmarRatio 0.30)(MaxDrawdown -0.10)] (CVaR95
+        [MaxDrawdown], [CalmarRatio], [CAGR], [AvgHoldingDays]. Any other
+        metric_type in [weights] (notably [CVaR95]) is silently dropped — plan
+        §1 Q1 v1 behaviour; the production sweep [Composite] formula is the
+        3-term [(SharpeRatio 0.40)(CalmarRatio 0.30)(MaxDrawdown -0.10)] (CVaR95
         deferred to a walk-forward follow-up).
+
+        [AvgHoldingDays] was added 2026-05-20 (P5 infra of
+        [dev/plans/hold-period-deep-dive-2026-05-19.md]) so the Composite scorer
+        can carry a hold-cadence reward term, e.g.
+        [(SharpeRatio 0.50)(CalmarRatio 0.30)(MaxDrawdown -0.10) (AvgHoldingDays
+         0.10)] — positive weight rewards candidates whose mean hold exceeds the
+        baseline by N days, linearly.
 
         See {!_score_composite_relative}.
      }

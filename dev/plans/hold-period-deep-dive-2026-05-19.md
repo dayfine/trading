@@ -140,7 +140,8 @@ holding period of the trades the screener mis-classified.
 ### P5: composite objective sweep with cadence term (depends on PR #1196)
 
 Plan #1196 (`wire spec.objective into score_cell`) lets us define a
-multi-term objective. Add a soft penalty for `median_hold < 30 days`:
+multi-term objective. Original spec — add a soft penalty for
+`median_hold < 30 days`:
 
 ```
 score = 0.50 × Sharpe
@@ -148,6 +149,75 @@ score = 0.50 × Sharpe
       - 0.10 × MaxDD
       - 0.10 × max(0, 30 − median_hold) / 30
 ```
+
+#### P5-infra: design choice (2026-05-20)
+
+The Composite scorer (#1216) already has the shape
+`score = Σᵢ wᵢ · (cand_metricᵢ - base_metricᵢ) - lambda_gate · gate_penalty`.
+Two ways to encode the cadence term:
+
+- **Design A** (original): asymmetric soft penalty
+  `-0.10 · max(0, 30 - median_hold) / 30`. Only penalises short holds;
+  longer-than-30d holds incur zero contribution. Requires custom term
+  logic outside the Σwᵢ·Δ framework.
+- **Design B** (shipped): symmetric linear reward
+  `+0.10 · (cand_avg_hold - base_avg_hold)`. Encoded as
+  `(AvgHoldingDays 0.10)` in the Composite weights list. Longer hold →
+  higher score; shorter hold → lower score, both linear in days.
+
+**Decision: ship Design B.** Rationale:
+- Fits the existing Composite framework byte-for-byte; no new term
+  primitive required.
+- The cadence signal we care about is "did the winner's stops shift to
+  favour longer holds vs cell-E?". A linear delta surfaces that signal
+  just as well as the asymmetric hinge.
+- `AvgHoldingDays` (mean) is good enough; `MedianHoldDays` is not yet a
+  `metric_type` variant. If avg-hold is gamed by tail trades, swap
+  later.
+- Design A can be retro-added later as a `Composite_hinge` extension
+  if Design B's symmetric reward turns out to reward unrealistically
+  long holds. Cheaper to ship B, observe, escalate than to spec A's
+  custom-term machinery now.
+
+#### P5 production formula (B)
+
+```
+score = 0.50 · ΔSharpe
+      + 0.30 · ΔCalmar
+      − 0.10 · ΔMaxDD
+      + 0.10 · ΔAvgHoldingDays
+      − 1.0 · gate_penalty
+```
+
+Encoded as:
+
+```sexp
+(Composite
+  ((SharpeRatio 0.50)
+   (CalmarRatio 0.30)
+   (MaxDrawdown -0.10)
+   (AvgHoldingDays 0.10)))
+```
+
+#### P5-infra deliverables (2026-05-20, PR feat/composite-scorer-hold-cadence)
+
+1. `Walk_forward_types.fold_actual.avg_holding_days : float` and
+   `Walk_forward_types.variant_stability.avg_holding_days : per_metric_stats`
+   added with `[@sexp.default Float.nan]` so existing baseline
+   `aggregate.sexp` files (v1 sweep) continue to deserialise.
+2. `Walk_forward_executor._extract_fold` populates avg_holding_days
+   from `summary.metrics AvgHoldingDays`.
+3. `Walk_forward_report._stability_for_variant` computes the
+   per-metric-stats cross-fold rollup.
+4. `Bayesian_runner_scoring._metric_mean_from_stability` extended:
+   `AvgHoldingDays -> Some stab.avg_holding_days.mean`.
+5. 2 new tests in `test_bayesian_runner_scoring.ml`:
+   - Composite with `AvgHoldingDays` weight produces the expected
+     `Σwᵢ·Δ` score.
+   - The metric_mean lookup returns the avg-hold mean for the
+     AvgHoldingDays variant.
+
+#### P5-sweep follow-up (not in this PR)
 
 Re-run v2 sweep with this objective. If the cadence term moves the
 winner's stop knobs upward by >2σ, it's confirmation the fast-churn is

@@ -17,6 +17,7 @@ let _fa_cagr ~fold ~variant ~ret ~sharpe ~maxdd ~calmar ~cagr :
     max_drawdown_pct = maxdd;
     calmar_ratio = calmar;
     cagr_pct = cagr;
+    avg_holding_days = Float.nan;
   }
 
 let _fa ~fold ~variant ~ret ~sharpe ~maxdd ~calmar : Report.fold_actual =
