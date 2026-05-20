@@ -115,6 +115,7 @@ let _stub_runner (s : Scenario.t) : Report.fold_actual =
     max_drawdown_pct = (f /. 10.0) +. 1.0;
     calmar_ratio = (f /. 50.0) +. 0.1;
     cagr_pct = (f /. 2.0) +. 0.5;
+    avg_holding_days = (f /. 5.0) +. 7.0;
   }
 
 (* ---- §B Determinism: parallel=1 ≡ parallel=4 ---------------------- *)

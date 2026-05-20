@@ -105,6 +105,7 @@ let _stability_to_metric_set ~(label : string) (agg : Wf_types.aggregate) :
           (Metric_types.CalmarRatio, stab.calmar_ratio.mean);
           (Metric_types.TotalReturnPct, stab.total_return_pct.mean);
           (Metric_types.CAGR, stab.cagr_pct.mean);
+          (Metric_types.AvgHoldingDays, stab.avg_holding_days.mean);
         ]
       in
       List.fold pairs ~init:empty ~f:(fun acc (k, v) ->
