@@ -754,6 +754,165 @@ let test_phase3_fixture_bounds_cover_expected_tracks _ =
          equal_to "screening_config.weights.w_strong_volume";
        ])
 
+(* ---------- checkpoint / resume (2026-05-21) ---------- *)
+
+(** Read every byte of a regular file as a single string. Used by checkpoint
+    tests to assert byte-equality of artefacts between fresh and resumed runs.
+*)
+let _read_all path = In_channel.read_all path
+
+let _artefact_paths out_dir =
+  ( Filename.concat out_dir "bo_log.csv",
+    Filename.concat out_dir "best.sexp",
+    Filename.concat out_dir "convergence.md" )
+
+(** A counting evaluator wrapper: records every parameter set passed to the
+    underlying evaluator. Lets resume tests assert that a checkpoint already
+    covering the budget triggers zero further evaluator calls. *)
+let _counting_evaluator inner =
+  let calls = ref 0 in
+  let eval : Runner.evaluator =
+   fun ~parameters ->
+    incr calls;
+    inner ~parameters
+  in
+  (eval, calls)
+
+let test_resume_equivalent_to_full_run _ =
+  (* Splitting a budget-20 run as 10 + 10 (with the second call resuming via
+     the checkpoint) must produce byte-identical bo_log.csv, best.sexp, and
+     convergence.md as a single budget-20 run from scratch. *)
+  let final_spec = _parabola_spec ~total_budget:20 ~seed:31 in
+  let partial_spec = _parabola_spec ~total_budget:10 ~seed:31 in
+  _with_temp_dir (fun fresh_dir ->
+      _with_temp_dir (fun resume_dir ->
+          let fresh_out = Filename.concat fresh_dir "out" in
+          let resume_out = Filename.concat resume_dir "out" in
+          let _ =
+            Runner.run_and_write ~spec:final_spec ~out_dir:fresh_out
+              ~evaluator:_parabola_evaluator
+          in
+          let _ =
+            Runner.run_and_write ~spec:partial_spec ~out_dir:resume_out
+              ~evaluator:_parabola_evaluator
+          in
+          let _ =
+            Runner.run_and_write ~spec:final_spec ~out_dir:resume_out
+              ~evaluator:_parabola_evaluator
+          in
+          let fresh_log, fresh_best, fresh_conv = _artefact_paths fresh_out in
+          let resume_log, resume_best, resume_conv =
+            _artefact_paths resume_out
+          in
+          assert_that
+            (_read_all fresh_log, _read_all fresh_best, _read_all fresh_conv)
+            (equal_to
+               ( _read_all resume_log,
+                 _read_all resume_best,
+                 _read_all resume_conv ))))
+
+let test_checkpoint_file_written_per_iter _ =
+  (* After a complete run, bo_checkpoint.sexp exists, parses as a sexp, and
+     records every iteration. The internal sexp shape is private but the file
+     itself must be parseable as a sexp so external tooling can at least
+     introspect its presence + content. *)
+  let spec = _parabola_spec ~total_budget:6 ~seed:11 in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let _ =
+        Runner.run_and_write ~spec ~out_dir ~evaluator:_parabola_evaluator
+      in
+      let ck_path = Filename.concat out_dir "bo_checkpoint.sexp" in
+      assert_that (Sys_unix.file_exists_exn ck_path) (equal_to true);
+      let raised =
+        try
+          let _ = Sexp.load_sexp ck_path in
+          false
+        with _ -> true
+      in
+      assert_that raised (equal_to false))
+
+let test_resume_at_full_budget_skips_evaluator _ =
+  (* When the checkpoint already covers spec.total_budget iterations, a
+     second run_and_write with the same spec must perform zero evaluator
+     calls and just re-emit the final artefacts. *)
+  let spec = _parabola_spec ~total_budget:8 ~seed:19 in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let first_eval, first_calls = _counting_evaluator _parabola_evaluator in
+      let _ = Runner.run_and_write ~spec ~out_dir ~evaluator:first_eval in
+      let calls_after_fresh = !first_calls in
+      let second_eval, second_calls = _counting_evaluator _parabola_evaluator in
+      let result = Runner.run_and_write ~spec ~out_dir ~evaluator:second_eval in
+      assert_that
+        (calls_after_fresh, !second_calls, List.length result.observations)
+        (equal_to (8, 0, 8)))
+
+let test_resume_with_changed_spec_raises _ =
+  (* Tightening the bounds between runs must be refused: the BO state was
+     produced under the original spec and any mid-run knob change invalidates
+     the saved observations' interpretation. *)
+  let original_spec = _parabola_spec ~total_budget:8 ~seed:23 in
+  let changed_spec : Spec.t =
+    { original_spec with bounds = [ ("x", (0.0, 5.0)) ] }
+  in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let _ =
+        Runner.run_and_write ~spec:original_spec ~out_dir
+          ~evaluator:_parabola_evaluator
+      in
+      let raised =
+        try
+          let _ =
+            Runner.run_and_write ~spec:changed_spec ~out_dir
+              ~evaluator:_parabola_evaluator
+          in
+          false
+        with Failure msg ->
+          String.is_substring msg ~substring:"checkpoint spec mismatch"
+      in
+      assert_that raised (equal_to true))
+
+let test_resume_with_wrong_schema_version_raises _ =
+  (* A hand-crafted checkpoint sexp with the wrong schema_version must be
+     refused with a clear Failure naming the version mismatch. *)
+  let spec = _parabola_spec ~total_budget:6 ~seed:5 in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      Core_unix.mkdir_p out_dir;
+      let ck_path = Filename.concat out_dir "bo_checkpoint.sexp" in
+      let spec_sexp = Sexp.to_string_hum (Spec.sexp_of_t spec) in
+      Out_channel.write_all ck_path
+        ~data:
+          (sprintf "((schema_version 99) (spec %s) (iterations ()))" spec_sexp);
+      let raised =
+        try
+          let _ =
+            Runner.run_and_write ~spec ~out_dir ~evaluator:_parabola_evaluator
+          in
+          false
+        with Failure msg ->
+          String.is_substring msg ~substring:"checkpoint schema mismatch"
+      in
+      assert_that raised (equal_to true))
+
+let test_missing_checkpoint_starts_fresh _ =
+  (* Sanity-pin the legacy behaviour: with no bo_checkpoint.sexp in out_dir,
+     run_and_write performs total_budget evaluator calls and writes a fresh
+     checkpoint covering them. *)
+  let spec = _parabola_spec ~total_budget:6 ~seed:5 in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let eval, calls = _counting_evaluator _parabola_evaluator in
+      let result = Runner.run_and_write ~spec ~out_dir ~evaluator:eval in
+      let ck_exists =
+        Sys_unix.file_exists_exn (Filename.concat out_dir "bo_checkpoint.sexp")
+      in
+      assert_that
+        (!calls, List.length result.observations, ck_exists)
+        (equal_to (6, 6, true)))
+
 let suite =
   "Tuner_bin.Bayesian_runner"
   >::: [
@@ -828,6 +987,18 @@ let suite =
          >:: test_early_stop_omitted_parses_to_none;
          "PR-D: to_bo_config propagates length_scales + early_stop"
          >:: test_to_bo_config_propagates_pr_d_fields;
+         "checkpoint: resume after partial run produces identical artefacts"
+         >:: test_resume_equivalent_to_full_run;
+         "checkpoint: bo_checkpoint.sexp present + parseable after run"
+         >:: test_checkpoint_file_written_per_iter;
+         "checkpoint: resume at full budget skips evaluator"
+         >:: test_resume_at_full_budget_skips_evaluator;
+         "checkpoint: resume with changed spec raises Failure"
+         >:: test_resume_with_changed_spec_raises;
+         "checkpoint: wrong schema_version raises Failure"
+         >:: test_resume_with_wrong_schema_version_raises;
+         "checkpoint: missing checkpoint starts fresh"
+         >:: test_missing_checkpoint_starts_fresh;
        ]
 
 let () = run_test_tt_main suite

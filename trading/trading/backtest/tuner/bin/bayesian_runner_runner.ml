@@ -18,12 +18,105 @@ type result = {
 type evaluator =
   parameters:(string * float) list -> float * Metric_types.metric_set list
 
+(** {1 Checkpoint state}
+
+    [bo_checkpoint.sexp] is written atomically under [out_dir] after every
+    [observe] call. On a subsequent [run_and_write] against the same [out_dir],
+    the file is loaded and the BO state is reconstructed by replaying the saved
+    observations through {!Tuner.Bayesian_opt.observe} — advancing the RNG
+    identically to the original run via discarded
+    {!Tuner.Bayesian_opt.suggest_next} calls.
+
+    The on-disk shape is private to this module; consumers should treat
+    [bo_checkpoint.sexp] as an opaque resume token. *)
+
+type _saved_iteration = {
+  parameters : (string * float) list;
+  metric : float;
+  per_scenario_metrics : Metric_types.metric_set list;
+}
+[@@deriving sexp]
+
+type _checkpoint = {
+  schema_version : int;
+  spec : Bayesian_runner_spec.t;
+  iterations : _saved_iteration list;
+}
+[@@deriving sexp]
+
+let _checkpoint_schema_version = 1
+let _checkpoint_filename = "bo_checkpoint.sexp"
+
+(** RNG-mismatch tolerance: replayed {!_suggest} must reproduce each saved
+    parameter to within this many ULP. Pinned tight (1e-12) so any
+    non-determinism — lib upgrade, threading, NaN handling — fails loud. *)
+let _replay_epsilon = 1e-12
+
+let _checkpoint_path out_dir = Filename.concat out_dir _checkpoint_filename
+
+let _save_checkpoint ~out_dir ~checkpoint =
+  let path = _checkpoint_path out_dir in
+  let tmp = path ^ ".tmp" in
+  Out_channel.with_file tmp ~f:(fun oc ->
+      Out_channel.output_string oc
+        (Sexp.to_string_hum (sexp_of__checkpoint checkpoint));
+      Out_channel.output_string oc "\n");
+  Sys_unix.rename tmp path
+
+let _load_checkpoint_if_exists out_dir =
+  let path = _checkpoint_path out_dir in
+  if Sys_unix.file_exists_exn path then
+    Some (_checkpoint_of_sexp (Sexp.load_sexp path))
+  else None
+
+(** Project a spec into the form compared for resume-equality. Excludes
+    [total_budget] so a partial run can be resumed under a larger (or smaller)
+    budget — the search surface, RNG, scenarios, and objective are what must
+    stay constant; the budget only governs when the loop stops. *)
+let _spec_for_resume_check (spec : Bayesian_runner_spec.t) =
+  { spec with total_budget = 0 }
+
+let _validate_checkpoint ~ck ~spec =
+  if ck.schema_version <> _checkpoint_schema_version then
+    failwithf "checkpoint schema mismatch — found version %d, expected %d"
+      ck.schema_version _checkpoint_schema_version ();
+  let expected = Bayesian_runner_spec.sexp_of_t (_spec_for_resume_check spec) in
+  let found = Bayesian_runner_spec.sexp_of_t (_spec_for_resume_check ck.spec) in
+  if not (Sexp.equal expected found) then
+    failwith
+      "checkpoint spec mismatch — delete bo_checkpoint.sexp to start over"
+
 (** {1 BO loop} *)
 
 let _suggest spec bo =
   match spec.Bayesian_runner_spec.n_acquisition_candidates with
   | None -> BO.suggest_next bo
   | Some n -> BO.suggest_next_with_candidates bo ~n_candidates:n
+
+let _params_match a b =
+  match List.zip a b with
+  | Unequal_lengths -> false
+  | Ok pairs ->
+      List.for_all pairs ~f:(fun ((ka, va), (kb, vb)) ->
+          String.equal ka kb && Float.(abs (va -. vb) <= _replay_epsilon))
+
+let _verify_replay ~iter ~replayed ~saved =
+  if not (_params_match replayed saved) then
+    failwithf "resume RNG mismatch at iter %d" iter ()
+
+(** Re-create the BO state by replaying each saved observation through
+    {!BO.observe} after discarding a {!_suggest} call (which advances the RNG
+    identically to the original run). The replayed [_suggest] must reproduce the
+    saved [parameters] within {!_replay_epsilon}; mismatch aborts with [Failure]
+    so silent non-determinism surfaces as a hard failure rather than a corrupted
+    resume. *)
+let _replay_to_state spec iterations =
+  let config = Bayesian_runner_spec.to_bo_config spec in
+  let initial = BO.create config in
+  List.foldi iterations ~init:initial ~f:(fun i bo it ->
+      let replayed = _suggest spec bo in
+      _verify_replay ~iter:i ~replayed ~saved:it.parameters;
+      BO.observe bo { parameters = it.parameters; metric = it.metric })
 
 let _running_best_so_far rev_obs =
   let observations = List.rev rev_obs in
@@ -35,16 +128,19 @@ let _running_best_so_far rev_obs =
   in
   List.rev rev_running
 
-(** Run the BO ask/tell loop, accumulating
-    [(observation, per-scenario metric sets)] in evaluation order. Honours the
-    optional [early_stop_config] on the BO config: if set, after each iteration
-    computes the running-best curve and checks the early-stop predicate before
-    issuing the next [suggest_next]. *)
-let _run_loop spec ~evaluator =
+(** Run the BO ask/tell loop from an arbitrary starting BO state, accumulating
+    [(observation, per-scenario metric sets)] in evaluation order. Calls
+    [on_observation] after every successful [observe] so the caller can persist
+    a checkpoint to disk before the next iteration begins. Honours the optional
+    [early_stop_config] on the BO config. *)
+let _run_loop spec ~evaluator ~initial_bo ~prior_obs ~prior_metric_sets
+    ~iter_offset ~on_observation =
   let config = Bayesian_runner_spec.to_bo_config spec in
-  let initial = BO.create config in
   let early_stop_cfg = config.early_stop_config in
   let initial_random = config.initial_random in
+  let iters_left = spec.total_budget - iter_offset in
+  let prior_rev_obs = List.rev prior_obs in
+  let prior_rev_metrics = List.rev prior_metric_sets in
   let rec loop bo iter_idx iters_left rev_obs rev_metrics =
     if iters_left <= 0 then
       (bo, List.rev rev_obs, List.rev rev_metrics, Budget_exhausted)
@@ -62,10 +158,11 @@ let _run_loop spec ~evaluator =
           let metric, per_scenario = evaluator ~parameters in
           let obs = { BO.parameters; metric } in
           let bo = BO.observe bo obs in
+          on_observation ~obs ~per_scenario;
           loop bo (iter_idx + 1) (iters_left - 1) (obs :: rev_obs)
             (per_scenario :: rev_metrics)
   in
-  loop initial 0 spec.total_budget [] []
+  loop initial_bo iter_offset iters_left prior_rev_obs prior_rev_metrics
 
 (** {1 Output writers} *)
 
@@ -178,11 +275,71 @@ let _result_of bo observations per_iteration_metrics stop_reason =
         stop_reason;
       }
 
+(** Resume-or-fresh: if a valid checkpoint exists under [out_dir], reconstruct
+    BO state from it; otherwise start from a fresh [BO.create]. Returns
+    [(initial_bo, prior_obs, prior_metric_sets, iter_offset)]. *)
+let _load_or_init spec ~out_dir =
+  match _load_checkpoint_if_exists out_dir with
+  | None ->
+      let bo = BO.create (Bayesian_runner_spec.to_bo_config spec) in
+      (bo, [], [], 0)
+  | Some ck ->
+      _validate_checkpoint ~ck ~spec;
+      let bo = _replay_to_state spec ck.iterations in
+      let prior_obs =
+        List.map ck.iterations ~f:(fun it ->
+            { BO.parameters = it.parameters; metric = it.metric })
+      in
+      let prior_metrics =
+        List.map ck.iterations ~f:(fun it -> it.per_scenario_metrics)
+      in
+      (bo, prior_obs, prior_metrics, List.length ck.iterations)
+
+(** Build the streaming on-observation callback. Each call appends the new
+    iteration to [iterations_ref] (kept in reverse for O(1) prepend) and
+    persists the full checkpoint atomically. *)
+let _make_checkpoint_writer ~out_dir ~spec ~iterations_ref =
+ fun ~(obs : BO.observation) ~per_scenario ->
+  let saved =
+    {
+      parameters = obs.parameters;
+      metric = obs.metric;
+      per_scenario_metrics = per_scenario;
+    }
+  in
+  iterations_ref := saved :: !iterations_ref;
+  let checkpoint =
+    {
+      schema_version = _checkpoint_schema_version;
+      spec;
+      iterations = List.rev !iterations_ref;
+    }
+  in
+  _save_checkpoint ~out_dir ~checkpoint
+
+let _initial_iterations_rev ~prior_obs ~prior_metric_sets =
+  List.rev
+    (List.map2_exn prior_obs prior_metric_sets
+       ~f:(fun (obs : BO.observation) per_scenario_metrics ->
+         {
+           parameters = obs.parameters;
+           metric = obs.metric;
+           per_scenario_metrics;
+         }))
+
 let run_and_write ~(spec : Bayesian_runner_spec.t) ~out_dir ~evaluator =
   Core_unix.mkdir_p out_dir;
   let objective = Bayesian_runner_spec.to_grid_objective spec.objective in
+  let initial_bo, prior_obs, prior_metric_sets, iter_offset =
+    _load_or_init spec ~out_dir
+  in
+  let iterations_ref =
+    ref (_initial_iterations_rev ~prior_obs ~prior_metric_sets)
+  in
+  let on_observation = _make_checkpoint_writer ~out_dir ~spec ~iterations_ref in
   let bo, observations, per_iteration_metrics, stop_reason =
-    _run_loop spec ~evaluator
+    _run_loop spec ~evaluator ~initial_bo ~prior_obs ~prior_metric_sets
+      ~iter_offset ~on_observation
   in
   let result = _result_of bo observations per_iteration_metrics stop_reason in
   let log_path = Filename.concat out_dir "bo_log.csv" in
