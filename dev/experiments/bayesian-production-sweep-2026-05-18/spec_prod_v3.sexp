@@ -17,8 +17,12 @@
 ;; - Tighten `initial_stop_buffer` upper bound from 1.10 → 1.05: V2
 ;;   winner 1.072 caused fold-017 MaxDD regression. Tighter ceiling
 ;;   keeps stops disciplined.
-;; - Keep `max_position_pct_long` and `installed_stop_min_pct` bounds
-;;   unchanged from V2 — V2 winners on these axes were near-baseline.
+;; - Tighten `max_position_pct_long` from V2's (0.02 0.20) to (0.04 0.15):
+;;   V2 winners on this axis clustered near 0.07-0.10; rule out the
+;;   too-small / too-large tails that adds noise without payoff.
+;; - Tighten `installed_stop_min_pct` from V2's (0.04 0.15) to (0.06 0.13):
+;;   V2 best-cell at 0.114 (upper-mid); the wider V2 range admitted
+;;   degenerate stops <0.06 that fired too often to be useful.
 ;; - Same seed (2026) for cross-version comparability.
 ;; - Same budget=60 / initial_random=10 / holdout 27-30.
 ;;
