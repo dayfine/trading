@@ -6,7 +6,9 @@
     walk-forward run, no backtest invocation. This keeps the test suite fast and
     the failure surface localised to the scoring formula itself.
 
-    Coverage map (plan §7 PR-A):
+    Coverage map (plan §7 PR-A + wire-spec PR-2):
+
+    Sharpe branch (PR-A):
 
     - Identity case: candidate == baseline → score = +mean_sharpe(baseline).
     - MaxDD hinge zero: candidate MaxDD ≤ baseline → no penalty.
@@ -19,7 +21,17 @@
       greater than baseline self-score.
     - Edge cases: zero-fold aggregate, exactly-at-baseline-MaxDD, exact
       gate-Pass at zero penalty, baseline label missing from baseline aggregate,
-      candidate MaxDD < baseline (negative hinge clipped). *)
+      candidate MaxDD < baseline (negative hinge clipped).
+
+    Composite + single-metric branches (wire-spec PR-2):
+
+    - Composite identity (cand == base) → score = 0.0.
+    - Composite ((SharpeRatio 1.0)) → 1.0·(cand_sharpe - base_sharpe).
+    - Composite 3-term production weights → exact computed score.
+    - Composite negative-weight penalises higher metric.
+    - Composite drops unmapped metric (CVaR95) silently → v1 behaviour.
+    - Composite gate Pass vs Fail score diff = -10.0.
+    - Calmar / TotalReturn objectives: (Δmetric - hinge - gate). *)
 
 open OUnit2
 open Core
@@ -47,6 +59,46 @@ let _stability_record ~label ~sharpe_mean ~maxdd_mean : Wf.variant_stability =
     max_drawdown_pct = _stats ~mean:maxdd_mean ();
     calmar_ratio = _stats ~mean:0.0 ();
     cagr_pct = _stats ~mean:Float.nan ();
+  }
+
+(** Fuller builder that lets composite + single-metric-relative tests pin the
+    Calmar / TotalReturn / CAGR columns. [_stability_record] above is kept
+    intact so the existing 16 Sharpe-path tests remain byte-identical. *)
+let _stability_full ~label ~sharpe_mean ~maxdd_mean ~calmar_mean
+    ~total_return_mean : Wf.variant_stability =
+  {
+    variant_label = label;
+    total_return_pct = _stats ~mean:total_return_mean ();
+    sharpe_ratio = _stats ~mean:sharpe_mean ();
+    max_drawdown_pct = _stats ~mean:maxdd_mean ();
+    calmar_ratio = _stats ~mean:calmar_mean ();
+    cagr_pct = _stats ~mean:Float.nan ();
+  }
+
+(** Build a synthetic aggregate with full-column variants (Sharpe, MaxDD,
+    Calmar, TotalReturn). Used by the Composite + single-metric-relative suite
+    below. *)
+let _make_aggregate_full ~baseline_label ~candidate_label ~baseline_sharpe
+    ~baseline_maxdd ~baseline_calmar ~baseline_return ~candidate_sharpe
+    ~candidate_maxdd ~candidate_calmar ~candidate_return ~candidate_verdict
+    ?(fold_count = 3) () : Wf.aggregate =
+  let baseline_stab =
+    _stability_full ~label:baseline_label ~sharpe_mean:baseline_sharpe
+      ~maxdd_mean:baseline_maxdd ~calmar_mean:baseline_calmar
+      ~total_return_mean:baseline_return
+  in
+  let candidate_stab =
+    _stability_full ~label:candidate_label ~sharpe_mean:candidate_sharpe
+      ~maxdd_mean:candidate_maxdd ~calmar_mean:candidate_calmar
+      ~total_return_mean:candidate_return
+  in
+  {
+    fold_count;
+    baseline_label;
+    metric_label = "sharpe_ratio";
+    stability = [ baseline_stab; candidate_stab ];
+    sensitivity = [];
+    verdicts = [ (candidate_label, candidate_verdict) ];
   }
 
 (** Build a synthetic aggregate with two variants and the requested verdict on
@@ -457,36 +509,283 @@ let test_parameters_do_not_affect_score _ =
   | Ok a, Ok b -> assert_that a (float_equal ~epsilon:_epsilon b)
   | _ -> assert_failure "expected both score_cell calls to succeed"
 
-(* ---------- 15. Non-Sharpe objectives return Status.Unimplemented ---------- *)
+(* ---------- 15. Composite-identity case ---------- *)
 
-(** PR-1 of the wire-spec plan ships the Sharpe-default branch only; passing any
-    other [objective] yields [Status.Unimplemented]. PR-2 will replace these
-    stubs with the Composite-relative + single-metric-relative formulas and
-    remove this assertion. *)
-let test_non_sharpe_objective_returns_unimplemented _ =
+(** Candidate == baseline under [Composite [...]] yields composite-delta of
+    [0.0]; with Pass verdict the gate penalty is [0.0], so score = 0.0. Pins the
+    relative-to-baseline contract from plan §1 Q2 (iii). *)
+let test_composite_identity_returns_zero _ =
   let agg =
-    _make_aggregate ~baseline_label:_baseline_label
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:1.2
+      ~baseline_maxdd:12.0 ~baseline_calmar:1.8 ~baseline_return:25.0
+      ~candidate_sharpe:1.2 ~candidate_maxdd:12.0 ~candidate_calmar:1.8
+      ~candidate_return:25.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let composite : Tuner.Grid_search.objective =
+    Composite
+      [
+        (Trading_simulation_types.Metric_types.SharpeRatio, 0.40);
+        (Trading_simulation_types.Metric_types.CalmarRatio, 0.30);
+        (Trading_simulation_types.Metric_types.MaxDrawdown, -0.10);
+      ]
+  in
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:agg
+      ~baseline_aggregate:agg ~objective:composite
+  in
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 0.0))
+
+(* ---------- 16. Composite single-weight reduces to a Sharpe delta ---------- *)
+
+(** [Composite ((SharpeRatio 1.0))] reduces to
+    [1.0 * (cand_sharpe - base_sharpe)] with no MaxDD penalty (the Composite
+    branch omits the explicit hinge — risk discipline is encoded via the
+    negative MaxDD weight in the Composite itself, not via an extra hinge). *)
+let test_composite_sharpe_only_weight _ =
+  let candidate_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
       ~candidate_label:_candidate_label ~baseline_sharpe:0.5
-      ~baseline_maxdd:15.0 ~candidate_sharpe:0.9 ~candidate_maxdd:15.0
+      ~baseline_maxdd:15.0 ~baseline_calmar:0.8 ~baseline_return:10.0
+      ~candidate_sharpe:1.2 ~candidate_maxdd:20.0 ~candidate_calmar:0.6
+      ~candidate_return:18.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let baseline_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_baseline_label ~baseline_sharpe:0.5 ~baseline_maxdd:15.0
+      ~baseline_calmar:0.8 ~baseline_return:10.0 ~candidate_sharpe:0.5
+      ~candidate_maxdd:15.0 ~candidate_calmar:0.8 ~candidate_return:10.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let composite : Tuner.Grid_search.objective =
+    Composite [ (Trading_simulation_types.Metric_types.SharpeRatio, 1.0) ]
+  in
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:candidate_agg
+      ~baseline_aggregate:baseline_agg ~objective:composite
+  in
+  (* score = 1.0 * (1.2 - 0.5) - 0 (Pass) = 0.7 *)
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 0.7))
+
+(* ---------- 17. Composite 3-term production formula ---------- *)
+
+(** Exact computation against the v1 production weights
+    [((SharpeRatio 0.40)(CalmarRatio 0.30)(MaxDrawdown -0.10))]:
+    - candidate_sharpe = 1.2, baseline_sharpe = 0.6 → ΔSharpe = 0.6
+    - candidate_calmar = 1.0, baseline_calmar = 0.5 → ΔCalmar = 0.5
+    - candidate_maxdd = 18.0, baseline_maxdd = 12.0 → ΔMaxDD = 6.0 score =
+      0.40·0.6 + 0.30·0.5 + (-0.10)·6.0 - 0 = 0.24 + 0.15 - 0.60 = -0.21 *)
+let test_composite_three_term_production_formula _ =
+  let candidate_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.6
+      ~baseline_maxdd:12.0 ~baseline_calmar:0.5 ~baseline_return:0.0
+      ~candidate_sharpe:1.2 ~candidate_maxdd:18.0 ~candidate_calmar:1.0
+      ~candidate_return:0.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let baseline_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_baseline_label ~baseline_sharpe:0.6 ~baseline_maxdd:12.0
+      ~baseline_calmar:0.5 ~baseline_return:0.0 ~candidate_sharpe:0.6
+      ~candidate_maxdd:12.0 ~candidate_calmar:0.5 ~candidate_return:0.0
       ~candidate_verdict:(_pass_verdict ()) ()
   in
   let composite : Tuner.Grid_search.objective =
     Composite
       [
-        (Trading_simulation_types.Metric_types.SharpeRatio, 0.5);
-        (Trading_simulation_types.Metric_types.MaxDrawdown, -0.1);
+        (Trading_simulation_types.Metric_types.SharpeRatio, 0.40);
+        (Trading_simulation_types.Metric_types.CalmarRatio, 0.30);
+        (Trading_simulation_types.Metric_types.MaxDrawdown, -0.10);
       ]
   in
-  let other_objectives : Tuner.Grid_search.objective list =
-    [ composite; Calmar; TotalReturn; Concavity_coef ]
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:candidate_agg
+      ~baseline_aggregate:baseline_agg ~objective:composite
   in
-  List.iter other_objectives ~f:(fun obj ->
-      let result =
-        Scoring.score_cell ~parameters:_no_params
-          ~candidate_label:_candidate_label ~baseline_label:_baseline_label
-          ~candidate_aggregate:agg ~baseline_aggregate:agg ~objective:obj
-      in
-      assert_that result (is_error_with Status.Unimplemented))
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon (-0.21)))
+
+(* ---------- 18. Composite: negative MaxDD weight penalises higher MaxDD ---------- *)
+
+(** Sanity-check the negative-weight contract: when only MaxDrawdown carries a
+    negative weight, a HIGHER candidate MaxDD must produce a LOWER score than a
+    lower candidate MaxDD (with all else equal). *)
+let test_composite_negative_weight_penalises_metric _ =
+  let high_maxdd_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:10.0 ~baseline_calmar:0.5 ~baseline_return:0.0
+      ~candidate_sharpe:0.5 ~candidate_maxdd:20.0 ~candidate_calmar:0.5
+      ~candidate_return:0.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let low_maxdd_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:10.0 ~baseline_calmar:0.5 ~baseline_return:0.0
+      ~candidate_sharpe:0.5 ~candidate_maxdd:5.0 ~candidate_calmar:0.5
+      ~candidate_return:0.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let composite : Tuner.Grid_search.objective =
+    Composite [ (Trading_simulation_types.Metric_types.MaxDrawdown, -0.10) ]
+  in
+  let high_result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:high_maxdd_agg
+      ~baseline_aggregate:high_maxdd_agg ~objective:composite
+  in
+  let low_result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:low_maxdd_agg
+      ~baseline_aggregate:low_maxdd_agg ~objective:composite
+  in
+  match (high_result, low_result) with
+  | Ok h, Ok l -> assert_that l (gt (module Float_ord) h)
+  | _ ->
+      assert_failure
+        "expected both score_cell calls to succeed for negative-weight \
+         comparison"
+
+(* ---------- 19. Composite drops unmapped metrics silently ---------- *)
+
+(** [CVaR95] is not carried in [variant_stability]; under the v1 design it is
+    silently dropped from the weighted sum. With weights
+    [((CVaR95 -0.20)(SharpeRatio 1.0))], the score reduces to
+    [1.0 * (cand_sharpe - base_sharpe)] — identical to the
+    [test_composite_sharpe_only_weight] expected value. Documents the v1
+    behaviour. *)
+let test_composite_missing_metric_dropped_silently _ =
+  let candidate_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~baseline_calmar:0.5 ~baseline_return:0.0
+      ~candidate_sharpe:1.2 ~candidate_maxdd:15.0 ~candidate_calmar:0.5
+      ~candidate_return:0.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let baseline_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_baseline_label ~baseline_sharpe:0.5 ~baseline_maxdd:15.0
+      ~baseline_calmar:0.5 ~baseline_return:0.0 ~candidate_sharpe:0.5
+      ~candidate_maxdd:15.0 ~candidate_calmar:0.5 ~candidate_return:0.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let composite_with_cvar : Tuner.Grid_search.objective =
+    Composite
+      [
+        (Trading_simulation_types.Metric_types.CVaR95, -0.20);
+        (Trading_simulation_types.Metric_types.SharpeRatio, 1.0);
+      ]
+  in
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:candidate_agg
+      ~baseline_aggregate:baseline_agg ~objective:composite_with_cvar
+  in
+  (* CVaR95 dropped; SharpeRatio kept; score = 1.0 * (1.2 - 0.5) = 0.7 *)
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 0.7))
+
+(* ---------- 20. Composite + gate Pass vs Fail score diff ---------- *)
+
+(** Composite scoring under Pass vs Fail with same metrics differs by exactly
+    -lambda_gate * gate_penalty_value = -10.0 (analogous to the existing Sharpe
+    gate test). *)
+let test_composite_gate_fail_score_diff _ =
+  let composite : Tuner.Grid_search.objective =
+    Composite
+      [
+        (Trading_simulation_types.Metric_types.SharpeRatio, 0.40);
+        (Trading_simulation_types.Metric_types.CalmarRatio, 0.30);
+        (Trading_simulation_types.Metric_types.MaxDrawdown, -0.10);
+      ]
+  in
+  let pass_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~baseline_calmar:0.5 ~baseline_return:0.0
+      ~candidate_sharpe:0.9 ~candidate_maxdd:15.0 ~candidate_calmar:0.7
+      ~candidate_return:0.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let fail_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~baseline_calmar:0.5 ~baseline_return:0.0
+      ~candidate_sharpe:0.9 ~candidate_maxdd:15.0 ~candidate_calmar:0.7
+      ~candidate_return:0.0 ~candidate_verdict:(_fail_verdict ()) ()
+  in
+  let pass_result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:pass_agg
+      ~baseline_aggregate:pass_agg ~objective:composite
+  in
+  let fail_result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:fail_agg
+      ~baseline_aggregate:pass_agg ~objective:composite
+  in
+  match (pass_result, fail_result) with
+  | Ok p, Ok f -> assert_that (p -. f) (float_equal ~epsilon:_epsilon 10.0)
+  | _ ->
+      assert_failure
+        "expected both score_cell calls to succeed for composite pass/fail \
+         comparison"
+
+(* ---------- 21. Calmar objective: single-metric-relative formula ---------- *)
+
+(** [Calmar] objective scores as
+    [(cand_calmar - base_calmar) - lambda_dd * max(0, cand_maxdd - base_maxdd) -
+     lambda_gate * gate_penalty]. With candidate_calmar=1.4,
+    baseline_calmar=0.8, candidate_maxdd=20.0, baseline_maxdd=15.0, Pass: score
+    = 0.6 - 0.10*5.0 - 0 = 0.1. *)
+let test_calmar_objective_relative _ =
+  let candidate_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~baseline_calmar:0.8 ~baseline_return:0.0
+      ~candidate_sharpe:0.5 ~candidate_maxdd:20.0 ~candidate_calmar:1.4
+      ~candidate_return:0.0 ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let baseline_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_baseline_label ~baseline_sharpe:0.5 ~baseline_maxdd:15.0
+      ~baseline_calmar:0.8 ~baseline_return:0.0 ~candidate_sharpe:0.5
+      ~candidate_maxdd:15.0 ~candidate_calmar:0.8 ~candidate_return:0.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:candidate_agg
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.Calmar
+  in
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 0.1))
+
+(* ---------- 22. TotalReturn objective: single-metric-relative formula ---------- *)
+
+(** [TotalReturn] objective scores as
+    [(cand_return - base_return) - hinge - gate]. candidate_return=30.0,
+    baseline_return=20.0 (Δ=10.0), candidate_maxdd=15.0, baseline_maxdd=15.0
+    (hinge=0), Fail: score = 10.0 - 0 - 1.0*10.0 = 0.0. *)
+let test_total_return_objective_relative _ =
+  let candidate_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~baseline_calmar:0.0 ~baseline_return:20.0
+      ~candidate_sharpe:0.5 ~candidate_maxdd:15.0 ~candidate_calmar:0.0
+      ~candidate_return:30.0 ~candidate_verdict:(_fail_verdict ()) ()
+  in
+  let baseline_agg =
+    _make_aggregate_full ~baseline_label:_baseline_label
+      ~candidate_label:_baseline_label ~baseline_sharpe:0.5 ~baseline_maxdd:15.0
+      ~baseline_calmar:0.0 ~baseline_return:20.0 ~candidate_sharpe:0.5
+      ~candidate_maxdd:15.0 ~candidate_calmar:0.0 ~candidate_return:20.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let result =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:candidate_agg
+      ~baseline_aggregate:baseline_agg ~objective:Tuner.Grid_search.TotalReturn
+  in
+  assert_that result (is_ok_and_holds (float_equal ~epsilon:_epsilon 0.0))
 
 (* ---------- 16. Sharpe-branch helper is byte-identical to score_cell ---------- *)
 
@@ -568,12 +867,26 @@ let suite =
          >:: test_both_maxdd_and_gate_penalties_combine;
          "parameters argument does not affect score"
          >:: test_parameters_do_not_affect_score;
-         "non-Sharpe objectives → Status.Unimplemented (PR-1)"
-         >:: test_non_sharpe_objective_returns_unimplemented;
          "Sharpe branch == _score_sharpe_with_hinge helper"
          >:: test_sharpe_branch_equals_helper;
          "hyperparameter constants pinned"
          >:: test_hyperparameter_constants_pinned;
+         "Composite: identity (cand == base) → score = 0.0"
+         >:: test_composite_identity_returns_zero;
+         "Composite ((SharpeRatio 1.0)) → cand_sharpe - base_sharpe"
+         >:: test_composite_sharpe_only_weight;
+         "Composite 3-term production weights → exact computed score"
+         >:: test_composite_three_term_production_formula;
+         "Composite negative weight penalises higher metric"
+         >:: test_composite_negative_weight_penalises_metric;
+         "Composite drops unmapped metric (CVaR95) silently"
+         >:: test_composite_missing_metric_dropped_silently;
+         "Composite gate Pass vs Fail → score diff = -10.0"
+         >:: test_composite_gate_fail_score_diff;
+         "Calmar objective: (Δcalmar - hinge - gate)"
+         >:: test_calmar_objective_relative;
+         "TotalReturn objective: (Δreturn - hinge - gate)"
+         >:: test_total_return_objective_relative;
        ]
 
 let () = run_test_tt_main suite
