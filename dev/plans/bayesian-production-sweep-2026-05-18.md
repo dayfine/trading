@@ -151,7 +151,6 @@ would track than a single-year composition snapshot.
 (Composite
   ((SharpeRatio 0.40)
    (CalmarRatio 0.30)
-   (CVaR95 -0.20)        ; negative = penalise tail loss
    (MaxDrawdown -0.10))) ; negative = penalise DD
 ```
 
@@ -161,10 +160,14 @@ test fixture).
 
 Rationale: pure Sharpe over-weights small high-frequency wins. Pure
 Calmar over-rewards low-DD curve-fits. The composite weights Sharpe
-40% (consistency), Calmar 30% (risk-adjusted return), with explicit
-penalties for tail risk (-20% on CVaR-95) and headline DD (-10%).
-Tuning on this proxy gives a config that's robust to known failure
-modes from #1180/#1191.
+40% (consistency), Calmar 30% (risk-adjusted return), with an
+explicit penalty for headline DD (-10%). Tuning on this proxy gives
+a config that's robust to known failure modes from #1180/#1191.
+
+**Note (per #1196 Q1)**: CVaR95 was originally part of the composite
+(-20% weight) but is not currently carried in `variant_stability`.
+Dropped for v1 Composite; restore once a follow-up adds CVaR to the
+walk-forward aggregate.
 
 **Secondary metrics to log** (not scored but inspected post-hoc):
 TotalReturnPct, NumTrades, WinRate, SortinoRatioAnnualized,
@@ -204,7 +207,7 @@ a config that wins on composite but trips ANY single floor is
 rejected. This is intentional: the composite can mask single-fold
 catastrophes by averaging; the floors enforce per-fold sanity.
 
-- **Median-fold composite score ≥ baseline Cell-E + 0.05** (5% relative improvement) — composite-axis gate
+- **Mean-fold composite score ≥ baseline Cell-E + 0.05** (5% relative improvement) — composite-axis gate (per #1196 Q4, v1 uses mean; median is a follow-up)
 - **No fold loses to Cell-E by more than -0.10 composite** (no single-fold catastrophe) — composite-axis floor
 - **OOS Sharpe ≥ 0.50** on every fold (strategy still risk-adjusted-positive everywhere) — orthogonal hard floor
 - **MaxDD ≤ baseline Cell-E + 5pp** on every fold (no risk-budget blowout) — orthogonal hard floor
@@ -223,8 +226,8 @@ overnight-winner config 0.14/0.70/h1/h2):
 
 | Metric           | Cell-E (15y baseline) |
 |------------------|-----------------------|
-| Composite (4-term) | TBD — must measure as the v1 baseline before sweep |
-| Median-fold composite | TBD                  |
+| Composite (3-term) | TBD — must measure as the v1 baseline before sweep |
+| Mean-fold composite | TBD                  |
 | Sharpe (overall) | ~0.78                  |
 | MaxDD (overall)  | ~18.4%                 |
 
@@ -237,8 +240,8 @@ numbers by running the 5-fold split on Cell-E config first.
 
 0. **Establish Cell-E baseline numbers** (§6 reference table). Run
    Cell-E config through the 5-fold split; compute composite per
-   fold + median; record per-fold Sharpe/MaxDD/N_trades. These are
-   the values §6's promote-gate compares against.
+   fold + mean (per #1196 Q4); record per-fold Sharpe/MaxDD/N_trades.
+   These are the values §6's promote-gate compares against.
 1. Author `bayesian_runner.exe` spec sexp at
    `dev/experiments/bayesian-production-sweep-2026-05-18/spec.sexp`
    per the parameters in §2 + objective in §4 + budget in §5. Use
@@ -271,7 +274,7 @@ to a long-running cron OR run in a tmux session for the operator.
 ### Phase C — OOS validation + promote decision (~1 hr)
 
 1. Read `best.sexp` from Phase B output.
-2. Apply the 5 gates from §6 to the median-fold metrics.
+2. Apply the 5 gates from §6 to the mean-fold metrics (per #1196 Q4).
 3. If all clear: create private repo per the private-tuned-configs
    plan §4 (`dayfine/trading-configs-private` if not extant) and
    commit the winner as `configs/2026-05-XX-bayesian-prod-v1/config.sexp`.
@@ -310,7 +313,7 @@ to a long-running cron OR run in a tmux session for the operator.
 - **Strategy-mode tuning** (short-side on/off, continuation on/off) —
   defer until composite-sizing optimum is found.
 - **Walk-forward fold count** — fixed at 5; expanding-window
-  alternative is a follow-up if the median-fold result is unstable.
+  alternative is a follow-up if the mean-fold result is unstable.
 - **ML training** (M7.1) — separate track; not a Bayesian sweep
   target.
 
