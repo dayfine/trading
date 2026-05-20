@@ -1,0 +1,5 @@
+(executable
+ (name hold_period_per_stage_analysis)
+ (libraries core core_unix.command_unix)
+ (preprocess
+  (pps ppx_jane)))
