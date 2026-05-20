@@ -2,8 +2,11 @@
     series.
 
     Strategy:
-    - Compute a 30-month moving average over [sp_price] (a coarse proxy for the
-      canonical 30-week MA on weekly bars).
+    - Compute Stan Weinstein's canonical 30-week moving average over [sp_price].
+      The underlying data is monthly, so the default [ma_window = Weeks 30] is
+      converted internally to ~7 monthly bars (see {!_ma_window_to_months}).
+      Operators override the window length via [-ma-window] (supports day / week
+      / month units; see {!_parse_ma_window_arg}).
     - Long the index when current price > MA AND MA is rising (price[t] > ma[t]
       AND ma[t] > ma[t-1]). Cash otherwise. No shorts in this reduction.
     - Returns are computed on a monthly basis. The strategy participates in
@@ -14,13 +17,16 @@
 
     Output: a decade-by-decade table (1870s through 2020s) with CAGR, Sharpe,
     MaxDD for both the strategy and a buy-and-hold benchmark, plus headline
-    155-year totals.
+    155-year totals, β diagnostic, Stage 1-4 classification breakdown, and
+    optional per-decade ASCII charts.
 
     Limitations (per dev/plans/cross-cycle-weinstein-validation-2026-05-19.md):
     - Index-level only. No cross-sectional ranking, no sector rotation.
     - Monthly granularity. Can't measure intra-month stop performance.
-    - 30-month MA is a coarse proxy for 30-week. This is fine for the "does the
-      framework profit at all in 1929 / 1973 / 2000?" question. *)
+    - The MA window is rounded to whole months at the data boundary, so
+      [Weeks 30] → 7 month-bars, [Days 150] → 5 month-bars, etc. Fine for the
+      "does the framework profit at all in 1929 / 1973 / 2000?" question; if you
+      need finer resolution use weekly-bar data downstream. *)
 
 open Core
 module Client = Shiller.Shiller_client
@@ -59,10 +65,62 @@ let _parse_derived_csv body : Client.series =
   in
   { Client.observations }
 
-(** Default MA window in months. The canonical Weinstein "30-week" applied to
-    monthly data is ~7 months; the original M1 PR used 30 months, which we have
-    since shown lags ~4× too slow. Operators override via [-ma-window]. *)
-let _default_ma_window_months = 30
+(** Unit-tagged MA window length. The binary's underlying data is monthly, so
+    any length expressed in days or weeks is rounded to the nearest whole month
+    at the boundary between user input and the sliding-window convolution. The
+    three variants exist to keep the unit explicit at every call site — the
+    original M1 PR conflated [Months 30] with [Weeks 30] and silently lagged
+    re-entries by 6-12 months after every crash. See [_ma_window_to_months] for
+    the conversion factors. *)
+type ma_window = Days of int | Weeks of int | Months of int
+
+let _days_per_month = 30
+let _weeks_per_month = 4.333
+
+(** Convert a unit-tagged [ma_window] to the integer number of monthly bars
+    consumed by [_moving_average]. Floors to 1 so the convolution always has a
+    non-empty window. *)
+let _ma_window_to_months = function
+  | Days n -> Int.max 1 ((n + (_days_per_month / 2)) / _days_per_month)
+  | Weeks n ->
+      Int.max 1
+        (Float.to_int
+           (Float.round_nearest (Float.of_int n /. _weeks_per_month)))
+  | Months n -> Int.max 1 n
+
+(** Stan Weinstein's canonical 30-week MA, expressed in monthly bars (≈ 7).
+    Operators override via [-ma-window]. *)
+let _default_ma_window = Weeks 30
+
+(** Parse the CLI [-ma-window] argument. Accepts:
+    - [N] (bare integer) → [Months N] (backward-compat with the original CLI)
+    - [Nd] / [Nday] / [Ndays] → [Days N]
+    - [Nw] / [Nwk] / [Nweek] / [Nweeks] → [Weeks N]
+    - [Nm] / [Nmo] / [Nmonth] / [Nmonths] → [Months N] Trailing whitespace
+      tolerated; case-insensitive on the unit suffix. *)
+let _parse_ma_window_arg s =
+  let s = String.strip s |> String.lowercase in
+  let parse_num n_str =
+    try Int.of_string n_str
+    with _ ->
+      failwithf "shiller_weinstein_decades: not an integer: %S" n_str ()
+  in
+  let suffix_match unit_chars =
+    List.find_map unit_chars ~f:(fun unit_str ->
+        if String.is_suffix s ~suffix:unit_str then
+          let n = String.length s - String.length unit_str in
+          Some (parse_num (String.sub s ~pos:0 ~len:n))
+        else None)
+  in
+  match suffix_match [ "days"; "day"; "d" ] with
+  | Some n -> Days n
+  | None -> (
+      match suffix_match [ "weeks"; "week"; "wk"; "w" ] with
+      | Some n -> Weeks n
+      | None -> (
+          match suffix_match [ "months"; "month"; "mo"; "m" ] with
+          | Some n -> Months n
+          | None -> Months (parse_num s)))
 
 (** Risk-free rate proxy for Sharpe. We use a constant 0 for the cross-decade
     comparison; using the contemporaneous long-rate would bias toward
@@ -483,7 +541,13 @@ let _maybe_chart_decades ~chart_decades ~prices ~ma ~stages ~obs =
             ~to_idx:t ~title:(sprintf "%ds chart" dec)
       | _ -> ())
 
+let _format_ma_window = function
+  | Days n -> sprintf "%dd" n
+  | Weeks n -> sprintf "%dw" n
+  | Months n -> sprintf "%dmo" n
+
 let _run ~csv_path ~chart_decades ~ma_window =
+  let ma_window_months = _ma_window_to_months ma_window in
   let series = _load_series ~csv_path in
   let obs = Array.of_list series.observations in
   let prices = Array.map obs ~f:(fun o -> o.Client.sp_price) in
@@ -491,8 +555,10 @@ let _run ~csv_path ~chart_decades ~ma_window =
     Array.map obs ~f:(fun o -> o.Client.period) |> fun arr ->
     Array.sub arr ~pos:1 ~len:(Array.length arr - 1)
   in
-  printf "MA window: %d months\n" ma_window;
-  let ma = _moving_average prices ~window:ma_window in
+  printf "MA window: %s (= %d monthly bars)\n"
+    (_format_ma_window ma_window)
+    ma_window_months;
+  let ma = _moving_average prices ~window:ma_window_months in
   let bh_rs = _monthly_returns prices in
   let strat_rs = _strategy_returns ~prices ~ma in
   let strategy_signal =
@@ -537,12 +603,13 @@ let command =
          (optional_with_default "" string)
          ~doc:
            "CSV comma-separated decade starts to chart, e.g. '1920,1970,2000'"
-     and ma_window =
+     and ma_window_str =
        flag "-ma-window"
-         (optional_with_default _default_ma_window_months int)
+         (optional_with_default "30w" string)
          ~doc:
-           "INT moving-average window in months (default 30 = ~7y; try 7 for \
-            Weinstein-canonical 30-week cadence)"
+           "STR moving-average window, unit-tagged. Accepts '30w' (weeks, \
+            default, ≈ Stan's canonical 30wk), '7m'/'7mo' (months), '150d' \
+            (days), or a bare integer (= months for backward compat)."
      in
      fun () ->
        let chart_decades =
@@ -553,6 +620,7 @@ let command =
            |> List.filter ~f:(fun s -> not (String.is_empty s))
            |> List.map ~f:Int.of_string
        in
+       let ma_window = _parse_ma_window_arg ma_window_str in
        _run ~csv_path ~chart_decades ~ma_window)
 
 let () = Command_unix.run command
