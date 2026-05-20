@@ -258,17 +258,19 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
   let base = Scenario.load base_scenario_path in
   let baseline_aggregate = _load_aggregate baseline_aggregate_path in
   let holdout_folds = Option.value spec.holdout_folds ~default:[] in
+  let objective = Spec.to_grid_objective spec.objective in
+  let obj_label = Tuner.Grid_search.objective_label objective in
   eprintf
     "[bayesian_runner] mode=walk-forward; total_budget=%d; initial_random=%d; \
-     bounds=%d; holdout_folds=%d; parallel=%d\n\
+     bounds=%d; holdout_folds=%d; parallel=%d; objective=%s\n\
      %!"
     spec.total_budget spec.initial_random (List.length spec.bounds)
     (List.length holdout_folds)
-    args.parallel;
+    args.parallel obj_label;
   let evaluator : Runner.evaluator =
     Evaluator.build_walk_forward
       ~executor:(Evaluator.make_executor ~parallel:args.parallel ())
-      ~base ~walk_forward_spec ~baseline_aggregate ~fixtures_root ()
+      ~base ~walk_forward_spec ~baseline_aggregate ~objective ~fixtures_root ()
   in
   let runner_spec = _wf_spec_with_placeholder_scenario spec in
   let result =

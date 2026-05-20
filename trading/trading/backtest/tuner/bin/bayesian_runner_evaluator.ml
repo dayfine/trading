@@ -111,10 +111,10 @@ let _stability_to_metric_set ~(label : string) (agg : Wf_types.aggregate) :
           Map.set acc ~key:k ~data:v)
 
 let _score_or_fail ~candidate_label ~baseline_label ~candidate_aggregate
-    ~baseline_aggregate ~parameters : float =
+    ~baseline_aggregate ~objective ~parameters : float =
   let result =
     Bayesian_runner_scoring.score_cell ~parameters ~candidate_label
-      ~baseline_label ~candidate_aggregate ~baseline_aggregate
+      ~baseline_label ~candidate_aggregate ~baseline_aggregate ~objective
   in
   match result with
   | Ok score -> score
@@ -125,8 +125,8 @@ let _score_or_fail ~candidate_label ~baseline_label ~candidate_aggregate
 
 let build_walk_forward ~(executor : executor) ~(base : Scenario.t)
     ~(walk_forward_spec : Walk_forward.Spec.t)
-    ~(baseline_aggregate : Wf_types.aggregate) ~(fixtures_root : string) () : t
-    =
+    ~(baseline_aggregate : Wf_types.aggregate) ~(objective : GS.objective)
+    ~(fixtures_root : string) () : t =
   let iter_counter = ref 0 in
   let baseline_label = walk_forward_spec.baseline_label in
   fun ~parameters ->
@@ -140,7 +140,8 @@ let build_walk_forward ~(executor : executor) ~(base : Scenario.t)
     let result = executor ~base ~spec ~fixtures_root in
     let score =
       _score_or_fail ~candidate_label ~baseline_label
-        ~candidate_aggregate:result.aggregate ~baseline_aggregate ~parameters
+        ~candidate_aggregate:result.aggregate ~baseline_aggregate ~objective
+        ~parameters
     in
     let metric_set =
       _stability_to_metric_set ~label:candidate_label result.aggregate
