@@ -297,9 +297,13 @@ If P0 reads cleanly, this can run in parallel with V7 completion + P1 dev.
 - Synthetic data (M7.2) until cross-scenario validation in (P1) reveals whether we even need it.
 - M6.6 live cycle until V3 winner (or better) is promotable AND has shipped cross-scenario validation.
 
-## 10. Open questions for human review
+## 10. Decisions (resolved 2026-05-22)
 
-- §2.5 (a) vs (b): is cross-scenario validation a promote-gate (lazy, simpler) or a BO training input (eager, more powerful)? Recommendation here was (a) first, (b) deferred.
-- §2.6: how much investment is reasonable to fix optimal_strategy quality? Could be 2h or 2 weeks.
-- §6 M6.6 timing: is now the right moment to spin up the live-cycle track, given V3 winner is promotable under Option E gate?
-- §9: explicit deferral list — are we missing anything that's actually load-bearing?
+These were §10 open questions; resolved with the maintainer in the
+same session this doc was filed. Pinned here so the plan is
+self-contained going forward.
+
+- **§2.5 (a) vs (b):** Adopt **(a) promote-gate first** (~3-4h dev + 4-6h backtest panel). Defer (b) BO-training-input but scope it in parallel as a separate track — (b) is ~10-15h dev + 4-5× longer sweep wall (~50h vs 11h at parallel=4). If (a) catches V3 regressing on broad universe / French / Shiller, (b) is justified; if (a) shows V3 generalizes cleanly, (b) is premature optimization.
+- **§2.6 optimal-strategy quality budget:** ≤2 days. If quality isn't restored within that budget, park optimal-strategy as deferred and proceed without optimal-efficiency normalization (use raw `candidate_return / cell_e_return` as the proxy).
+- **§6 M6.6 timing:** start scoping M6.6 NOW. Prereqs are (1) parameter pin (handled by promote_config.sh once V3 winner or successor lands), (2) code version pin (handled by promote_config.sh provenance.md SHA — already shipped in #1234), (3) `live` DATA_SOURCE — does NOT exist yet; M6.6 scope = build this. Cross-scenario validation gate (P1 here) is a coupled requirement before any winner reaches the M6.6 live cycle.
+- **§9 deferral list:** Looks good. No missing items flagged.
