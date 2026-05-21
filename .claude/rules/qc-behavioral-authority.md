@@ -115,6 +115,19 @@ note: "Pure infra / harness / refactor PR; domain checklist not applicable."
 qc-structural's A1 row will not be flagged for such PRs because there is
 no domain logic to leak into core modules.
 
+## Operational requirements for QC agents in this repo
+
+Same invariants as qc-structural — see
+`.claude/rules/qc-structural-authority.md` §"Operational requirements
+for QC agents in this repo":
+
+1. Dispatch with **`isolation: "worktree"`**. qc-behavioral may run
+   `jj edit` on the PR branch to inspect; without isolation the parent
+   workspace's shared `.jj/repo/` is mutated.
+2. Run every `dune build` / `dune runtest` via `docker exec trading-1-dev`.
+   Native invocations produce ENVFAIL on the ocamlformat / opam skew
+   between host and container.
+
 ## What the generic agent doesn't know about
 
 - The five Weinstein authority docs above.

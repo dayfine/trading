@@ -33,6 +33,39 @@ After completing the generic checklist (H1–H3, P1–P5), append these rows:
 | A3 | No unnecessary modifications to existing (non-feature) modules | PASS/FAIL/NA | Look for cross-feature drift using `$PR_FILES` from Step 3 (file list per `gh pr view <N> --json files`), NOT from a git-log ancestry walk. This is where PR #687's false-positive originated: the agent walked git ancestry and saw 128 unrelated files; `gh pr view 687 --json files` showed 6. |
 ```
 
+## Operational requirements for QC agents in this repo
+
+QC agents dispatched on this repo MUST be invoked with both of:
+
+1. **`isolation: "worktree"`** — qc-structural and qc-behavioral aren't
+   read-only. They run `jj edit <branch>` to check out the PR. Without
+   isolation, those edits mutate the parent workspace's shared `.jj/repo/`
+   and snapshot unrelated files into surprise commits. Observed
+   2026-05-14: two non-isolated QC agents rebased the parent `@` onto
+   `experiments/continuation-tuning` and reverted `dev/status/screener.md`
+   to pre-fix content on disk. Same rule as `feat-*` per
+   `.claude/rules/worktree-isolation.md`.
+
+2. **Run `dune` inside docker** — the dispatch prompt must explicitly
+   instruct the agent to run every `dune build` / `dune build @fmt` /
+   `dune runtest` via:
+
+   ```bash
+   docker exec trading-1-dev bash -c \
+     'cd /workspaces/trading-1/trading && eval $(opam env) && dune build'
+   ```
+
+   Running natively against the host's opam state produces ENVFAIL
+   reports (ocamlformat 0.27.0 vs 0.29.0 skew, missing `core` / `owl`
+   libraries) that aren't about the PR. The container is named
+   `trading-1-dev`; dune root is `/workspaces/trading-1/trading`.
+   Observed 2026-05-14 PR #1090: qc-structural reported ENVFAIL despite
+   the PR being clean and its CI green.
+
+If a QC review comes back ENVFAIL or with bookmark conflicts after the
+agent ran, suspect one of these was skipped — re-dispatch with the
+correct invariants rather than treating the verdict as authoritative.
+
 ## Project-specific reusable references
 
 When filling notes:
