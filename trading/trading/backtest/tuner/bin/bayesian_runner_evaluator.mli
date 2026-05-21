@@ -88,6 +88,7 @@ val default_executor : executor
     bind it directly. *)
 
 val build_walk_forward :
+  ?gate_penalty_value:float ->
   executor:executor ->
   base:Scenario_lib.Scenario.t ->
   walk_forward_spec:Walk_forward.Spec.t ->
@@ -108,6 +109,11 @@ val build_walk_forward :
     only [Sharpe] is implemented; passing any other objective causes
     [score_cell] to return [Status.Unimplemented], which the evaluator's
     [_score_or_fail] surfaces as [Failure].
+
+    [?gate_penalty_value] (default [10.0]) overrides the
+    {!Tuner_bin.Bayesian_runner_scoring._gate_penalty_value} default. V3+ sweeps
+    pass a softer value (e.g. [2.0]) to keep the M-of-N gate informative as a
+    tiebreaker without overwhelming the composite-metric signal.
 
     Each [~parameters] call:
 

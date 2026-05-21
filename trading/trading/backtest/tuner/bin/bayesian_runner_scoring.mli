@@ -182,6 +182,24 @@ val _score_single_metric_relative :
     this helper — the implementation defensively returns [0.0] for the
     metric_value of those objectives so the formula remains total. *)
 
+val score_cell_with_penalty :
+  gate_penalty_value:float ->
+  parameters:(string * float) list ->
+  candidate_label:string ->
+  baseline_label:string ->
+  candidate_aggregate:Walk_forward.Walk_forward_types.aggregate ->
+  baseline_aggregate:Walk_forward.Walk_forward_types.aggregate ->
+  objective:Tuner.Grid_search.objective ->
+  float Status.status_or
+(** Like {!score_cell} but takes the gate-fail penalty magnitude as an explicit
+    argument instead of using the hardcoded {!_gate_penalty_value}. Used by V3+
+    sweeps to soften the gate from the legacy [10.0] (which dominated metric
+    signal of magnitude ~0.1–0.5) to something like [2.0] — the V2 production
+    sweep's flat-search-surface failure was diagnosed to this exact ratio (see
+    `dev/notes/bayesian-prod-v2-result-2026-05-21.md`).
+
+    All other arguments behave identically to {!score_cell}. *)
+
 val score_cell :
   parameters:(string * float) list ->
   candidate_label:string ->

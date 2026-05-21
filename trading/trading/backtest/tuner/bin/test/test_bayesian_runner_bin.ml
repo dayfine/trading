@@ -173,6 +173,7 @@ let test_to_bo_config_propagates_fields _ =
       sentinel_bounds = None;
       length_scales = None;
       early_stop = None;
+      gate_penalty_value = None;
     }
   in
   let config = Spec.to_bo_config spec in
@@ -209,6 +210,7 @@ let _parabola_spec ~total_budget ~seed : Spec.t =
     sentinel_bounds = None;
     length_scales = None;
     early_stop = None;
+    gate_penalty_value = None;
   }
 
 let test_run_and_write_emits_three_artefacts _ =
@@ -278,6 +280,7 @@ let _flat_spec_with_early_stop ~window ~epsilon : Spec.t =
     sentinel_bounds = None;
     length_scales = None;
     early_stop = Some (window, epsilon);
+    gate_penalty_value = None;
   }
 
 let test_early_stop_fires_on_flat_objective _ =
@@ -460,6 +463,7 @@ let _spec_record_with_holdout holdout : Spec.t =
     sentinel_bounds = None;
     length_scales = None;
     early_stop = None;
+    gate_penalty_value = None;
   }
 
 let test_holdout_folds_round_trip_none _ =
@@ -649,6 +653,7 @@ let test_to_bo_config_propagates_pr_d_fields _ =
       sentinel_bounds = None;
       length_scales = Some [ 0.3; 0.4 ];
       early_stop = Some (15, 0.025);
+      gate_penalty_value = None;
     }
   in
   let config = Spec.to_bo_config spec in

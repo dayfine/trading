@@ -267,8 +267,9 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
     spec.total_budget spec.initial_random (List.length spec.bounds)
     (List.length holdout_folds)
     args.parallel obj_label;
+  let gate_penalty_value = Option.value spec.gate_penalty_value ~default:10.0 in
   let evaluator : Runner.evaluator =
-    Evaluator.build_walk_forward
+    Evaluator.build_walk_forward ~gate_penalty_value
       ~executor:(Evaluator.make_executor ~parallel:args.parallel ())
       ~base ~walk_forward_spec ~baseline_aggregate ~objective ~fixtures_root ()
   in

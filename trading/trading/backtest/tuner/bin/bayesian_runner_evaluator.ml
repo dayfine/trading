@@ -111,11 +111,12 @@ let _stability_to_metric_set ~(label : string) (agg : Wf_types.aggregate) :
       List.fold pairs ~init:empty ~f:(fun acc (k, v) ->
           Map.set acc ~key:k ~data:v)
 
-let _score_or_fail ~candidate_label ~baseline_label ~candidate_aggregate
-    ~baseline_aggregate ~objective ~parameters : float =
+let _score_or_fail ~gate_penalty_value ~candidate_label ~baseline_label
+    ~candidate_aggregate ~baseline_aggregate ~objective ~parameters : float =
   let result =
-    Bayesian_runner_scoring.score_cell ~parameters ~candidate_label
-      ~baseline_label ~candidate_aggregate ~baseline_aggregate ~objective
+    Bayesian_runner_scoring.score_cell_with_penalty ~gate_penalty_value
+      ~parameters ~candidate_label ~baseline_label ~candidate_aggregate
+      ~baseline_aggregate ~objective
   in
   match result with
   | Ok score -> score
@@ -124,8 +125,8 @@ let _score_or_fail ~candidate_label ~baseline_label ~candidate_aggregate
         "Bayesian_runner_evaluator: score_cell failed for candidate %S: %s"
         candidate_label (Status.show err) ()
 
-let build_walk_forward ~(executor : executor) ~(base : Scenario.t)
-    ~(walk_forward_spec : Walk_forward.Spec.t)
+let build_walk_forward ?(gate_penalty_value = 10.0) ~(executor : executor)
+    ~(base : Scenario.t) ~(walk_forward_spec : Walk_forward.Spec.t)
     ~(baseline_aggregate : Wf_types.aggregate) ~(objective : GS.objective)
     ~(fixtures_root : string) () : t =
   let iter_counter = ref 0 in
@@ -140,7 +141,7 @@ let build_walk_forward ~(executor : executor) ~(base : Scenario.t)
     in
     let result = executor ~base ~spec ~fixtures_root in
     let score =
-      _score_or_fail ~candidate_label ~baseline_label
+      _score_or_fail ~gate_penalty_value ~candidate_label ~baseline_label
         ~candidate_aggregate:result.aggregate ~baseline_aggregate ~objective
         ~parameters
     in

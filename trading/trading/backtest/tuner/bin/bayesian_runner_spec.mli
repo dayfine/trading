@@ -138,6 +138,22 @@ type t = {
           [None] (or omitted), the loop runs to [total_budget] without early
           termination. Sexp form: [(early_stop (20 0.02))] for
           [Some (20, 0.02)]; omit the tag for [None]. *)
+  gate_penalty_value : float option;
+      (** Soft-penalty magnitude applied when the walk-forward
+          [Fold_gate.verdict] is [Fail]. The scorer subtracts
+          [lambda_gate * gate_penalty_value] from the cell's metric (lambda_gate
+          is fixed at 1.0 in {!Tuner_bin.Bayesian_runner_scoring}). When [None]
+          (or omitted), the runner uses the historical default of [10.0] —
+          preserved for backward compatibility with V1/V2 spec sexp files.
+
+          {b Why this is tunable:} V1 + V2 sweeps both failed because every
+          random cell triggered the gate, so every iter's score was dominated by
+          the [-10.0] penalty. The composite metric signal (typical magnitude
+          0.1–0.5) was drowned out, leaving the GP no gradient to climb. V3+ can
+          override with a smaller value (e.g. [2.0]) to keep the gate
+          informative as a tiebreaker without overwhelming the composite. Sexp
+          form: [(gate_penalty_value 2.0)] for [Some 2.0]; omit the tag for
+          [None] (= legacy [10.0]). *)
 }
 [@@deriving sexp]
 (** A Bayesian-optimisation spec on disk. Example sexp:
