@@ -95,8 +95,8 @@ Open question: should we run multiple BO sweeps with different seeds + initial_r
 ## 4. Action items
 
 For V3 promotion:
-- [x] §1 codified: `promote_config.sh` will embed trading repo SHA + tuner spec + walk-forward spec + BO output path in provenance.md.
-- [x] §2 MVP: `promote_config.sh` will run 2 scenarios (sp500-2010-2026 + sp500-2019-2023) at promote time, record results + delta vs current-live config.
+- [x] §1 codified: `promote_config.sh` accepts (optionally) the tuner spec + walk-forward spec paths and embeds them along with the trading repo SHA + BO output path in provenance.md.
+- [ ] §2 MVP: `promote_config.sh` writes a TBD-placeholder validation table; the operator runs the 2 scenarios manually via `backtest_runner` and fills the table in by hand. Codifying the automated run is the followup (~50 LOC bash + backtest_runner invocation + sexp metric extraction).
 - [ ] §2 deferred: add French 49-industry + Shiller scenarios once their goldens stabilize.
 - [ ] §3 deferred: document in next sweep plan, not blocking V3.
 
