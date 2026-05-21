@@ -17,23 +17,26 @@
       ((generated_at YYYY-MM-DD)
        (source_endpoint "/api/exchange-symbol-list/US?delisted=1")
        (symbols (
-         ((code CODE) (name "...") (exchange EX) (asset_type AT))
+         ((code CODE) (exchange EX) (asset_type AT))
          ...
        )))
     v}
 
-    Output is ~3 MB (vs ~8 MB raw JSON). Downstream P2 work builds the
-    delisted-aware composition pool by joining this roster with a per-symbol
-    bar-availability check on each snapshot date. *)
+    Output is ~3 MB raw, ~1.4 MB after the [name] field was dropped
+    (2026-05-22). Downstream P2 work builds the delisted-aware composition pool
+    by joining this roster with a per-symbol bar-availability check on each
+    snapshot date. *)
 
 open Core
 open Async
 
 (** {1 On-disk sexp shape} *)
 
+(* [name] was dropped from the on-disk shape (2026-05-22): it was used only
+   for a cosmetic log line in fetch_delisted_bars.exe and roughly doubled the
+   sexp size. *)
 type entry = {
   code : string;
-  name : string;
   exchange : string;
   asset_type : Eodhd.Asset_type.t;
 }
@@ -47,12 +50,7 @@ type t = {
 [@@deriving sexp]
 
 let _of_metadata (m : Eodhd.Http_client.symbol_metadata) : entry =
-  {
-    code = m.code;
-    name = m.name;
-    exchange = m.exchange;
-    asset_type = m.asset_type;
-  }
+  { code = m.code; exchange = m.exchange; asset_type = m.asset_type }
 
 (** {1 Token loading} *)
 
