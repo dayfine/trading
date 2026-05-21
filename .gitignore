@@ -91,3 +91,10 @@ dev/data/
 # macOS metadata
 .DS_Store
 **/.DS_Store
+
+# Bayesian sweep output dirs — long-running (~12h) experiment outputs
+# that must survive jj working-copy operations (jj new / jj rebase
+# would otherwise wipe them when the working copy materializes to a
+# tree without them). Cf. memory: jj operations during sweeps.
+dev/experiments/bayesian-production-sweep-*/output-v*-parallel*/
+dev/experiments/bayesian-production-sweep-*/output-v*-smoke/
