@@ -43,8 +43,9 @@ let _compute_maxdd_hinge ~(candidate_maxdd : float) ~(baseline_maxdd : float) :
     float =
   Float.max 0.0 (candidate_maxdd -. baseline_maxdd)
 
-let _compute_gate_penalty (verdict : Walk_forward.Fold_gate.verdict) : float =
-  match verdict with Pass _ -> 0.0 | Fail _ -> _gate_penalty_value
+let _compute_gate_penalty ~(value : float)
+    (verdict : Walk_forward.Fold_gate.verdict) : float =
+  match verdict with Pass _ -> 0.0 | Fail _ -> value
 
 (* ---------- per-objective scoring branches ---------- *)
 
@@ -137,8 +138,9 @@ let _score_single_metric_relative ~(objective : Tuner.Grid_search.objective)
 
 (* ---------- top-level scorer ---------- *)
 
-let score_cell ~parameters:_ ~candidate_label ~baseline_label
-    ~(candidate_aggregate : Wf.aggregate) ~(baseline_aggregate : Wf.aggregate)
+let score_cell_with_penalty ~(gate_penalty_value : float) ~parameters:_
+    ~candidate_label ~baseline_label ~(candidate_aggregate : Wf.aggregate)
+    ~(baseline_aggregate : Wf.aggregate)
     ~(objective : Tuner.Grid_search.objective) : float Status.status_or =
   if candidate_aggregate.fold_count = 0 then
     Status.error_invalid_argument
@@ -155,7 +157,9 @@ let score_cell ~parameters:_ ~candidate_label ~baseline_label
     let%bind candidate_verdict =
       _lookup_verdict ~label:candidate_label candidate_aggregate
     in
-    let gate_penalty = _compute_gate_penalty candidate_verdict in
+    let gate_penalty =
+      _compute_gate_penalty ~value:gate_penalty_value candidate_verdict
+    in
     match objective with
     | Tuner.Grid_search.Sharpe ->
         Ok
@@ -168,3 +172,14 @@ let score_cell ~parameters:_ ~candidate_label ~baseline_label
         Ok
           (_score_single_metric_relative ~objective ~candidate_stab
              ~baseline_stab ~gate_penalty)
+
+(** Backward-compatible entry point: uses {!_gate_penalty_value} (10.0) as the
+    gate penalty magnitude. Preserved so existing callers + tests keep working;
+    V3+ sweeps that override the penalty call [score_cell_with_penalty] via
+    [Bayesian_runner_spec.t.gate_penalty_value]. *)
+let score_cell ~parameters ~candidate_label ~baseline_label
+    ~(candidate_aggregate : Wf.aggregate) ~(baseline_aggregate : Wf.aggregate)
+    ~(objective : Tuner.Grid_search.objective) : float Status.status_or =
+  score_cell_with_penalty ~gate_penalty_value:_gate_penalty_value ~parameters
+    ~candidate_label ~baseline_label ~candidate_aggregate ~baseline_aggregate
+    ~objective

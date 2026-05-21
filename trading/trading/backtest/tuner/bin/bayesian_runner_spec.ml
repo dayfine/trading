@@ -64,6 +64,7 @@ type t = {
   sentinel_bounds : (string * bound_spec) list option; [@sexp.option]
   length_scales : float list option; [@sexp.option]
   early_stop : (int * float) option; [@sexp.option]
+  gate_penalty_value : float option; [@sexp.option]
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]
 

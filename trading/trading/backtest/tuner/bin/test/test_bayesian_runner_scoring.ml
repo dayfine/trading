@@ -922,6 +922,72 @@ let test_hyperparameter_constants_pinned _ =
   assert_that Scoring._degenerate_fold_floor_return_pct
     (float_equal ~epsilon:_epsilon (-50.0))
 
+(** [score_cell_with_penalty] with [gate_penalty_value=2.0] produces a
+    pass-vs-fail score difference of exactly 2.0, not 10.0 (the legacy default).
+    Pins the soft-gate use case for V3+ sweeps where the legacy 10.0 dominates
+    the composite-metric signal. *)
+let test_score_cell_with_penalty_soft_gate _ =
+  let pass_agg =
+    _make_aggregate ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~candidate_sharpe:0.9 ~candidate_maxdd:15.0
+      ~candidate_verdict:(_pass_verdict ()) ()
+  in
+  let fail_agg =
+    _make_aggregate ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~candidate_sharpe:0.9 ~candidate_maxdd:15.0
+      ~candidate_verdict:(_fail_verdict ()) ()
+  in
+  let baseline_agg = pass_agg in
+  let pass_result =
+    Scoring.score_cell_with_penalty ~gate_penalty_value:2.0
+      ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:pass_agg
+      ~baseline_aggregate:baseline_agg ~objective:_sharpe
+  in
+  let fail_result =
+    Scoring.score_cell_with_penalty ~gate_penalty_value:2.0
+      ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:fail_agg
+      ~baseline_aggregate:baseline_agg ~objective:_sharpe
+  in
+  match (pass_result, fail_result) with
+  | Ok p, Ok f -> assert_that (p -. f) (float_equal ~epsilon:_epsilon 2.0)
+  | _ ->
+      assert_failure
+        "expected both score_cell_with_penalty calls to succeed for pass/fail \
+         comparison"
+
+(** [score_cell] (no penalty override) must produce the same score as
+    [score_cell_with_penalty ~gate_penalty_value:_gate_penalty_value]. Ensures
+    the wrapper preserves the legacy contract byte-for-byte. *)
+let test_score_cell_matches_with_penalty_at_default _ =
+  let fail_agg =
+    _make_aggregate ~baseline_label:_baseline_label
+      ~candidate_label:_candidate_label ~baseline_sharpe:0.5
+      ~baseline_maxdd:15.0 ~candidate_sharpe:0.9 ~candidate_maxdd:15.0
+      ~candidate_verdict:(_fail_verdict ()) ()
+  in
+  let baseline_agg = fail_agg in
+  let legacy =
+    Scoring.score_cell ~parameters:_no_params ~candidate_label:_candidate_label
+      ~baseline_label:_baseline_label ~candidate_aggregate:fail_agg
+      ~baseline_aggregate:baseline_agg ~objective:_sharpe
+  in
+  let explicit =
+    Scoring.score_cell_with_penalty
+      ~gate_penalty_value:Scoring._gate_penalty_value ~parameters:_no_params
+      ~candidate_label:_candidate_label ~baseline_label:_baseline_label
+      ~candidate_aggregate:fail_agg ~baseline_aggregate:baseline_agg
+      ~objective:_sharpe
+  in
+  match (legacy, explicit) with
+  | Ok l, Ok e -> assert_that l (float_equal ~epsilon:_epsilon e)
+  | _ ->
+      assert_failure
+        "expected both score_cell and score_cell_with_penalty to succeed"
+
 let suite =
   "Tuner_bin.Bayesian_runner_scoring"
   >::: [
@@ -957,6 +1023,10 @@ let suite =
          >:: test_sharpe_branch_equals_helper;
          "hyperparameter constants pinned"
          >:: test_hyperparameter_constants_pinned;
+         "score_cell_with_penalty: soft gate (2.0) → diff = 2.0"
+         >:: test_score_cell_with_penalty_soft_gate;
+         "score_cell_with_penalty at default == legacy score_cell"
+         >:: test_score_cell_matches_with_penalty_at_default;
          "Composite: identity (cand == base) → score = 0.0"
          >:: test_composite_identity_returns_zero;
          "Composite ((SharpeRatio 1.0)) → cand_sharpe - base_sharpe"
