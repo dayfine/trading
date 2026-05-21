@@ -1,16 +1,27 @@
-;; V3 smoke spec — total_budget=2 (vs V3's 60) for end-to-end
-;; verification before the full ~11-12h sweep. Identical to
-;; spec_prod_v3.sexp on every other field.
+;; V3 smoke spec — STANDALONE end-to-end verification of the V3
+;; search surface before the full ~11-12h sweep. Differs from
+;; spec_prod_v3.sexp on two fields:
+;;   - total_budget: 2 (vs 60)
+;;   - initial_random: 2 (vs 10)
+;; Bounds, objective, acquisition, seed, and holdout_folds are
+;; byte-identical to V3, so a 2-eval smoke confirms the BO walks the
+;; correct (bounds × objective) surface without committing to the
+;; full wall.
 ;;
-;; Smoke-then-resume workflow:
-;; 1. Run this spec → produces bo_checkpoint.sexp + first 2 evals
-;;    under output-v3-parallel4/.
-;; 2. Verify bo_log.csv has 2 rows + the params differ across rows
-;;    (no silent-no-op overlay per #1051 → #1061 hazard).
-;; 3. Run spec_prod_v3.sexp against the SAME out_dir — checkpoint's
-;;    spec-equality check excludes total_budget so the budget=60
-;;    spec resumes from the 2 smoke iters and runs 58 more. Net:
-;;    smoke evals become the first 2 evals of the production run.
+;; Smoke workflow (STANDALONE — do NOT chain into the V3 production run):
+;; 1. Run this spec against a FRESH out_dir, e.g.
+;;    `output-v3-smoke/`.
+;; 2. Verify bo_log.csv has 2 rows + the param values differ across
+;;    rows (no silent-no-op overlay per the #1051 → #1061 hazard).
+;; 3. Inspect best.sexp + convergence.md for shape correctness.
+;; 4. Discard the smoke out_dir. The production run uses
+;;    spec_prod_v3.sexp against a separate out_dir
+;;    (`output-v3-parallel4/`) — it cannot RESUME from the smoke
+;;    checkpoint because `initial_random` differs and the
+;;    runner's `_spec_for_resume_check` only excludes `total_budget`
+;;    (see `bayesian_runner_runner.ml`); resuming a smoke checkpoint
+;;    with the V3 spec would raise `Failure "checkpoint spec
+;;    mismatch"`.
 ((bounds
   (("portfolio_config.max_position_pct_long" (0.04 0.15))
    ("portfolio_config.max_long_exposure_pct" (0.45 0.85))
