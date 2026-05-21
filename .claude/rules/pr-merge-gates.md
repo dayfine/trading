@@ -18,6 +18,38 @@ A PR is mergeable only when **all three** are green:
    this file entirely" (pure infra / refactor / harness PRs that touch
    no domain logic — still requires the generic CP1–CP4 review).
 
+## Docs-only PRs — both QC gates skipped
+
+A PR is **docs-only** if its diff touches **only** files in:
+- `dev/notes/`
+- `dev/plans/`
+- `dev/reviews/`
+- `dev/status/`
+- `.md` files at repo root
+- `*.md` files anywhere (READMEs, in-tree docs)
+
+For docs-only PRs, **both qc-structural and qc-behavioral are
+skipped**. CI is still required (`build-and-test` linters may catch
+status-file-integrity, magic-numbers-in-docstrings, etc.) but the QC
+agents add no value over CI for pure prose changes — they were
+designed to pin code contracts and architecture, neither of which is
+in scope for a doc-only diff.
+
+**The two-gate (CI + skip-QC) workflow for docs-only:**
+1. `gh pr view <N> --json files --jq '.files[].path'` — verify every file matches the docs-only allowlist above.
+2. `gh pr checks <N>` — verify all checks `pass`.
+3. `gh pr merge <N> --squash --delete-branch`.
+
+**Mixed PRs** (any code file + any docs file) follow the full
+three-gate rule.
+
+**Carve-out rationale:** docs-only PRs (V3 result writeups, axis-3
+proposals, methodology plans, status-file refreshes, README updates)
+were burning ~30 min per PR on QC agents that consistently APPROVED
+with no findings. Per 2026-05-22 user feedback: "no QC for doc only
+PR." Keeps CI as the structural safety net (linter rules catch
+malformed sexp in fixtures, magic numbers in code examples, etc.).
+
 ## Why each gate matters
 
 - **CI catches what local + QC cannot.** Local `dune build && dune runtest`
