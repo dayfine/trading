@@ -1,9 +1,38 @@
 # Status: backtest-perf
 
-## Last updated: 2026-05-13
+## Last updated: 2026-05-22
 
 ## Status
 IN_PROGRESS
+
+### Recent activity (2026-05-14..22, since last refresh)
+
+- **#1151 — cost-model overlay scaffold** (MERGED 2026-05-17). 4-knob
+  `Backtest_cost_model.Cost_model` module (`per_trade_commission`,
+  `per_share_commission`, `bid_ask_spread_bps`,
+  `market_impact_bps_per_pct_adv`; `zero` / `retail_default` /
+  `institutional_default` presets; `validate` / `to_engine_costs` /
+  `apply_per_trade_commission` / `market_impact_bps` /
+  `apply_market_impact` API; ~85 LOC impl + ~130 LOC mli + ~290 LOC
+  test, 27 unit tests). **Not yet wired into simulator** — 4
+  deferred items tracked in `dev/status/cost-model.md`: (1)
+  `scenario.mli` plumbing; (2) `Simulator._apply_trades_best_effort`
+  hook; (3) ADV plumbing for market-impact; (4) Cell E re-pin under
+  cost overlay. See `dev/status/cost-model.md` for the wiring track.
+- **Fork-based job parallelism for walk-forward + Bayesian runners**
+  (#1199 / #1200 / #1202 / #1203, MERGED 2026-05-18..19). Motivated
+  by `base.Random` DLS leak (#1201) requiring a fresh process per
+  fold for reproducibility. Stack:
+  - **#1199** `Gc.compact` between folds + `_extract_fold` scoping
+    (in-process leak mitigation; partial fix prior to fork-pool).
+  - **#1200** `Fork_pool` library — `trading/trading/backtest/
+    fork_pool/` (~200 LOC + tests).
+  - **#1202** wire `Fork_pool` into `Walk_forward_executor`.
+  - **#1203** `--parallel N` CLI flag on `walk_forward_runner.exe` +
+    `bayesian_runner.exe`.
+- **#1197 — plan(walk-forward): parallelise executor — design**
+  (MERGED 2026-05-19). The implementation lives in the fork_pool
+  stack above; #1197 is the design-doc commit.
 
 **15y memory cliff RESOLVED 2026-05-08..10.** Three data-side fixes (#988
 Fix C stream `csv_snapshot_builder` per-symbol, #992 Fix A dedupe

@@ -1,39 +1,59 @@
 # Status: tuning
 
-## Last updated: 2026-05-16
+## Last updated: 2026-05-22
 
 ## Status
 IN_PROGRESS
 
-**2026-05-15 strategic pivot — track elevated to P0 alongside
-data-foundations.** Per `dev/notes/next-session-priorities-2026-05-15.md`,
-multi-parameter ML-discipline tuning over the full Cell E config
-surface (~15-25 parameters) on walk-forward CV is now the primary
-tuning vector. Two cross-window inversions in one week (PR #1086 M5.5
-axis-2 + PR #1095 continuation combined) confirmed that single-axis
-and small-grid sweeps under fixed windows are diagnostic-only at this
-point; further manual tuning is rejected.
+**2026-05-22 — Bayesian Phase 3 stack COMPLETE; V1→V7 production
+sweep stack run; methodology redesign IN REVIEW (PR #1237).** The full
+PR-A→PR-E sequence landed 2026-05-17 (#1126/#1132/#1136/#1143/#1145).
+Five production sweeps (V1 #1210 REJECT, V2 #1222 REJECT, V3 #1232
+promotable under one gate variant, V4/V5/V6/V7 byte-identical scores
+to V3) have run; the convergence finding is that **the 4-param Cell E
+surface has plateaued** and further single-objective Bayesian sweeps
+won't move metrics. PR #1237 explicitly defers all further 4-param
+tuning work until cross-scenario validation lands as the new promote
+gate (§9). Active surface is now: `promote_config.sh` (MERGED #1234)
++ cross-scenario validation panel (NOT YET DISPATCHED — proposed
+track spawn per track-pacer 2026-05-22 §P7 / §Recommendations §1).
 
-New Phase 2 work — **walk-forward CV harness scaled up**:
-- Extend `dev/experiments/cell-e-walk-forward-2026-05-08/` (8 half-period
-  folds) to ~30 rolling folds.
-- Output `walk_forward_report.md` surfacing per-fold metrics + cross-
-  fold stability + parameter sensitivity + explicit go/no-go gate
-  ("wins on ≥M of N folds with no fold worse than baseline by Δ").
-- This gate language is what M5.5 axis-2 and continuation-combined
-  would have failed.
+This week's stack (V3-V7 + methodology redesign, since 2026-05-17):
 
-New Phase 3 work — **multi-parameter Bayesian opt scaled up**:
-- Extend `bayesian_runner.exe` (PR #914) from current 4-D bounds to
-  the full Cell E config surface.
-- Scored on Phase 2 walk-forward CV with explicit MaxDD penalty.
-- Acceptance: converges to a cell beating Cell E on walk-forward
-  Sharpe by ≥0.05 with MaxDD no worse.
+- **#1192** plan — Bayesian Phase 3 production-sweep dispatch.
+- **#1196** plan — wire `spec.objective` into walk-forward `score_cell`
+  (PR-1→PR-3 sequence).
+- **#1210** V1 production sweep result — 5-axis promote-gate REJECT.
+- **#1214** thread `spec.objective` through `score_cell` (#1196 PR-1).
+- **#1216** implement Composite + single-metric-relative branches (PR-2).
+- **#1217** drop CVaR + median→mean in sweep plan (PR-3 doc).
+- **#1219** P4 per-stage hold-period decomposition (Probe P4 analysis).
+- **#1220** wire AvgHoldingDays into Composite scorer (P5 infra).
+- **#1222** V2 production sweep result — REJECT.
+- **#1223** next-session priorities post-V2 (2026-05-21 PM).
+- **#1224** `bo_checkpoint.sexp` for resume after crash (lost ~5h on
+  2026-05-20 power-loss restart per `memory/project_bayesian_sweep_checkpoint_needed.md`).
+- **#1225** V3 + V3-cadence Bayesian sweep specs (post-V2 REJECT).
+- **#1226** V3 smoke spec + QC review writeups.
+- **#1229** soft gate penalty via `spec.gate_penalty_value` + V4 spec.
+- **#1232** V3 production result + axis-3 gate-fitness proposal.
+- **#1234** `promote_config.sh` + tuning methodology design doc.
+- **#1235** drop cosmetic `[name]` field from sexp output (-4.8 MB).
+- **#1231** V5 spec — OPEN (wider bounds + soft gate).
+- **#1236** V5 partial + V6 sweep specs — OPEN (gate-too-strict
+  hypothesis).
+- **#1237** tuning methodology redesign 2026-05-22 — OPEN (explicit
+  deferral of further 4-param sweeps; proposes cross-scenario
+  validation as new promote gate).
 
-Phase 2 is independent of `data-foundations` Phase 1 (can run on
-existing 510-sym 2010-2026 universe) and should land in parallel.
-Phase 3 benefits from Phase 1 broader universe but is not strictly
-blocked on it.
+**Strategic pivot 2026-05-15 retained context.** Per
+`dev/notes/next-session-priorities-2026-05-15.md`, multi-parameter
+ML-discipline tuning over walk-forward CV with explicit MaxDD penalty
+was the P0 vector. That work shipped: walk-forward harness
+(`walk-forward-cv` track MERGED 2026-05-16) + Bayesian Phase 3 stack
+(this track MERGED 2026-05-17). The V1→V7 sweep stack ran on the
+resulting harness; the diminishing-returns finding now drives the
+cross-scenario-validation pivot per #1237.
 
 Owner: feat-backtest.
 
@@ -88,65 +108,90 @@ Features: from M5.2e per-trade context (Stage one-hot, MA slope, vol ratio, RS, 
 Per `.claude/rules/no-python.md`. OCaml-native or FFI to C libs only.
 
 ## In Progress
-- **Bayesian Phase 3 PR-A** (scoring function, PR #1126, branch `feat/bayesian-phase3-pr-a`) — structural_qc: APPROVED; behavioral_qc: APPROVED (2026-05-16, quality 5). CP1–CP4 all PASS; domain rows NA (pure tuner-side scoring policy). See `dev/reviews/tuning.md` §"Behavioral Checklist — Bayesian Phase 3 PR-A".
-- T-A lib + CLI, T-B lib + CLI, and `min_score_override` / `max_score_override` knobs all MERGED. First 81-cell flagship sweep run published (PR #1051) but invalidated by key-path bug (PR #1061). Next queued: 81-cell rerun with corrected `w_positive_rs/w_strong_volume/w_stage2_breakout/w_sector_strong` field paths + sweep-path validation linter to prevent silent-no-op repeats.
+
+- **V5/V6 sweep specs + methodology redesign — IN REVIEW.** Three open
+  PRs gate the next dispatch:
+  - **#1231** V5 spec (wider bounds + soft gate).
+  - **#1236** V5 partial result + V6 sweep specs (wider-bounds
+    hypothesis rejected; gate-too-strict variant in flight).
+  - **#1237** tuning methodology redesign 2026-05-22 — proposes
+    cross-scenario validation as new promote gate; explicitly defers
+    all further 4-param Bayesian sweeps until that lands (§9).
+- **Cross-scenario validation panel — NOT YET DISPATCHED.** PR #1237
+  §2.5 + §3 row A + §5 P1 + §8 frame it as the load-bearing
+  methodology gap. `promote_config.sh` infra landed via #1234; the
+  `validation.sexp` aggregate writer + REFERENCE scenario panel
+  (sp500-2010-2026, sp500-2019-2023, broad-2019, French 49-industry
+  1926-2026, Shiller 1871-2025) is unshipped. Track-pacer 2026-05-22
+  §Recommendations §1: spawn `cross-scenario-validation` row OR fold
+  as multi-PR block under this track.
+- **Optimal-strategy quality refresh** — gates the §2.6 Composite
+  `efficiency = candidate_sharpe / optimal_sharpe` term per #1237.
+  Concern from #856 diagnostic note (2026-05-06); track-pacer
+  2026-05-22 §P7 KEEP_AS_INFO.
 
 ### Bayesian Phase 3 — multi-parameter scaling (5-PR stack, plan PR #1124 MERGED)
 
 Plan authority: `dev/plans/bayesian-multi-param-scaling-2026-05-16.md`.
-Plan splits into 5 stacked PRs (~200-400 LOC each):
+**Stack COMPLETE 2026-05-17** — all 5 PRs MERGED:
 
 - **PR-A: scoring function + walk-forward aggregate consumer** —
-  IN REVIEW (branch `feat/bayesian-phase3-pr-a`). Adds
-  `Tuner_bin.Bayesian_runner_scoring` (pure scorer over a
-  `Walk_forward_types.aggregate` + Cell E baseline aggregate) with
-  loss = `-mean_sharpe + lambda_dd*max(0, maxdd_excess) + lambda_gate*gate_penalty`;
-  hyperparameters as named constants (`_lambda_dd=0.10`,
-  `_gate_penalty_value=10.0`, `_lambda_gate=1.0`,
-  `_degenerate_fold_floor_return_pct=-50.0`). Returns
-  `float Status.status_or` so missing-variant lookups surface as
-  structured errors. 15 unit tests cover identity case, MaxDD hinge
-  zero/linear, gate Pass/Fail diff = -10.0 exactly, synthetic Fail ≡
-  regular Fail, lookup errors (3 paths), zero-fold guard, boundary
-  cases, parameters-not-affecting-score contract, and constant
-  pinning. No wiring into the BO evaluator/runner yet — that's PR-C.
-- **PR-B: knob inventory + parameter space encoding** — MERGED PR #1132 (2026-05-16).
-- **PR-C: walk-forward in-process integration** — IN REVIEW PR #1136
-  (branch `feat/bayesian-phase3-prc`). Hoists per-fold execution out
-  of `bin/walk_forward_runner.ml` into a shared
-  `Walk_forward.Walk_forward_executor.execute_spec` library entry
-  point (returns `{ fold_actuals; aggregate }`). Adds
+  MERGED PR #1126 (2026-05-16). `Tuner_bin.Bayesian_runner_scoring`
+  pure scorer over a `Walk_forward_types.aggregate` + Cell E baseline
+  with loss = `-mean_sharpe + lambda_dd*max(0, maxdd_excess) +
+  lambda_gate*gate_penalty`; hyperparameters as named constants;
+  15 unit tests.
+- **PR-B: knob inventory + parameter space encoding** — MERGED PR
+  #1132 (2026-05-16).
+- **PR-C: walk-forward in-process integration** — MERGED PR #1136
+  (2026-05-17). Hoists per-fold execution out of
+  `bin/walk_forward_runner.ml` into shared
+  `Walk_forward.Walk_forward_executor.execute_spec`. Adds
   `Bayesian_runner_evaluator.build_walk_forward` alongside the legacy
-  `build`: per BO iteration, builds a two-variant walk-forward spec
-  `[ baseline; bo-iter-N (cell-to-overrides) ]`, calls an injectable
-  executor (`default_executor` = real executor; tests pass a stub),
-  scores the resulting aggregate via PR-A's
-  `Bayesian_runner_scoring.score_cell`, propagates `Status.Error` as
-  `Failure`. Projects candidate stability stats into a single
-  `Metric_types.metric_set` for `bo_log.csv`. Binary's three output
-  files (`fold_actuals.sexp`, `walk_forward_report.md`,
-  `aggregate.sexp`) are byte-identical to the prior implementation.
-  Legacy `build` kept until PR-E flips the binary. 14 new unit tests
-  pin: score matches `Scoring.score_cell` output on stub aggregate;
-  candidate label increments per call (closure counter); two-variant
-  spec carries `[baseline; bo-iter-N]` in order; executor invoked
-  exactly once per call; metric_set list is single-element with
-  Sharpe/MaxDD/Calmar/TotalReturn/CAGR populated; scorer
-  `Status.Error` → `Failure`; gate `Fail` penalty applied
-  (Sharpe – 10.0 verified); `fixtures_root`, `base`, gate,
-  baseline_label, parameters threaded correctly; `default_executor`
-  is exposed in the mli. Verify: `dev/lib/run-in-env.sh dune runtest
-  trading/backtest/tuner/ trading/backtest/walk_forward/ --force`.
-- **PR-D: int/Option encoding + GP length-scale tuning + early-stop** — pending.
-- **PR-E: end-to-end runner + OOS holdout validator** — pending.
+  `build`; per BO iteration scores via PR-A's `score_cell`.
+- **PR-D: int/Option encoding + GP length-scale tuning + early-stop**
+  — MERGED PR #1143 (2026-05-17).
+- **PR-E: end-to-end runner + OOS holdout validator** — MERGED PR
+  #1145 (2026-05-17).
 
-Operational follow-ups (unblock when capacity allows):
+### V1→V7 production sweep stack (2026-05-19..22)
 
-- **81-cell flagship rerun with corrected field paths** — sweep
-  `screening.weights.{w_positive_rs, w_strong_volume, w_stage2_breakout, w_sector_strong}`
-  paired with `min_score_override` / `max_score_override` tightening.
-- **Sweep-path validation linter** in `runner.ml:_merge_records` —
-  fail on unrecognized keys to prevent silent-no-op overlays.
+Plan / next-session pointers:
+`dev/notes/next-session-priorities-2026-05-21.md`,
+`dev/notes/next-session-priorities-2026-05-21-pm.md`,
+`dev/plans/tuning-methodology-redesign-2026-05-22.md` (PR #1237).
+
+- **V1** (#1210 result, 2026-05-19) — 5-axis promote-gate REJECT.
+- **V2** (#1222 result, 2026-05-20) — REJECT. Lost ~5h to power-loss
+  restart on 2026-05-20; checkpointing landed via #1224 to prevent
+  recurrence.
+- **V3** (#1232 result, 2026-05-21) — promotable under one gate
+  variant; axis-3 gate-fitness proposal for human review.
+- **V4** (spec #1229 soft gate penalty) — byte-identical score to V3.
+- **V5** (spec #1231 OPEN; partial #1236) — wider-bounds hypothesis
+  rejected; gate-too-strict variant under V6 in flight.
+- **V6** (specs #1236 OPEN) — gate-too-strict hypothesis under test.
+- **V7** — byte-identical score to V3 per #1237 §1.
+
+**Diminishing-returns verdict (per #1237 §1 + track-pacer 2026-05-22 §P6):**
+the 4-param Cell E surface has plateaued; further sweeps on this
+surface will not produce new alpha. PR #1237 §9 explicitly defers
+further 4-param work until cross-scenario validation lands. Composite
+scorer shipped (#1216), soft-gate shipped (#1229), checkpointing
+shipped (#1224), promote-gate scaffolding shipped (#1234) — the
+methodology evolution was productive; the parameter-discovery was
+not.
+
+### Operational follow-ups
+
+- **Sweep-overlay path validator** — MERGED #1069 (2026-05-13); closes
+  the silent-no-op hazard from PR #1051 → #1061.
+- **81-cell flagship rerun with corrected field paths** — SUPERSEDED
+  by walk-forward CV + Bayesian Phase 3 stack. The corrected
+  scoring_weights field paths (`w_positive_rs/w_strong_volume/
+  w_stage2_breakout/w_sector_strong`) per #1068 `.mli` clarifications
+  are now BO knobs in PR-B's parameter encoding (#1132); no further
+  manual grid sweep needed.
 
 ## Completed
 
@@ -165,15 +210,32 @@ Operational follow-ups (unblock when capacity allows):
 
 1. ~~Wire CLI binary at `trading/trading/backtest/tuner/bin/grid_search.ml`~~ — done (#893).
 2. ~~Wire CLI binary at `trading/trading/backtest/tuner/bin/bayesian_runner.ml`~~ — done (#914).
-3. ~~Run 81-cell flagship sweep~~ — first run published #1051; invalidated by PR #1061 (key-path bug in overlays).
-4. **Bayesian Phase 3 PR-A** (scoring + aggregate consumer) — IN REVIEW
-   (`feat/bayesian-phase3-pr-a`). 15 unit tests passing. PR-B (knob
-   inventory) is the next deliverable in the 5-PR stack.
-5. **Rerun the 81-cell flagship sweep with corrected field paths** — sweep `screening.weights.{w_positive_rs, w_strong_volume, w_stage2_breakout, w_sector_strong}` (the real `Screener.scoring_weights` field names; see PR #1068 `.mli` clarifications). Pair with `min_score_override` / `max_score_override` tightening to surface a cell-discriminating signal.
-6. **Sweep-path validation linter** in `runner.ml:_merge_records` — fail on unrecognized keys to prevent silent-no-op overlays (closes the hazard surfaced by PR #1051 → #1061).
-7. After corrected grid sweep results land, validate T-B converges to the same (or better) cell within ~30 evals using the same param surface — the convergence acceptance criterion in `m5-experiments-roadmap-2026-05-02.md` §M5.5 T-B.
-8. T-C only after `data-foundations` Norgate ingest (need long enough train/test split).
-9. Hyperparameter learning for T-B (Type-II MLE on length scales) — defer until 4-dim / 6-dim sweeps show that fixed length scales miss the optimum.
+3. ~~Run 81-cell flagship sweep~~ — SUPERSEDED. Replaced by walk-forward
+   CV + Bayesian Phase 3 (#1126→#1145) + V1→V7 production sweep stack.
+4. ~~Bayesian Phase 3 PR-A→PR-E stack~~ — **DONE** 2026-05-17
+   (#1126/#1132/#1136/#1143/#1145).
+5. ~~Sweep-path validation linter~~ — DONE via #1069 (2026-05-13).
+6. **Decide on cross-scenario validation as a track** (NEW, top of
+   queue per track-pacer 2026-05-22 §Recommendations §1). Either spawn
+   `dev/status/cross-scenario-validation.md` per
+   `dev/plans/tuning-methodology-redesign-2026-05-22.md` §3 row A, or
+   formally add the work as a multi-PR block under this track. PR
+   #1237 explicitly defers further 4-param tuning work until this
+   lands (§9).
+7. **Resolve open V5/V6 PRs** (#1231, #1236, #1237). #1237 is the
+   load-bearing decision — its acceptance gates whether V5/V6 sweep
+   work continues or stops outright.
+8. **Optimal-strategy quality refresh** — gates the §2.6 Composite
+   efficiency term per #1237. Concern surfaced 2026-05-06 (#856
+   diagnostic) but never addressed. Low-cost (~2-3h); prerequisite
+   for the next sweep dimension if BO continues to be used.
+9. T-C (supervised ML) — RETIRED per `dev/status/_index.md` 2026-05-16
+   reconcile (Norgate vendor pivot). If revisited, reroute through
+   the EODHD + IWV + fja05680 data stack.
+10. Hyperparameter learning for the GP (Type-II MLE on length scales)
+    — partially landed via PR-D #1143; defer further refinement until
+    cross-scenario validation establishes whether 4-param surface
+    discrimination matters at all.
 
 ## Out of scope
 

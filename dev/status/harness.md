@@ -1,6 +1,52 @@
 # Status: harness
 
-## Last updated: 2026-05-08
+## Last updated: 2026-05-22
+
+## Recent activity (2026-05-09..22, since last refresh)
+
+### CI hardening (PRs #1117, #1121, #1130, #1131, #1138)
+
+- **#1117 — `no_python_check.sh` race-proof prune** (MERGED 2026-05-16):
+  guards against dune sandbox cleanup racing the no-Python linter walk
+  (closes intermittent CI red triggered by sandbox dir disappearing
+  mid-`find`).
+- **#1121 — remove cache restore-keys** (MERGED 2026-05-16): GHA cache
+  partial-key hits were resurrecting stale binaries that built on a
+  prior libc. Explicit-key only.
+- **#1130 — rebuild image with `-march=x86-64-v2` + CPU-flag smoke
+  test** (MERGED 2026-05-16): baseline CPU level bump for #1129
+  dependency floor; smoke test added in the devcontainer build
+  pipeline.
+- **#1131 — browser headers + 503/429 retry-with-backoff for IWV
+  fetcher** (MERGED 2026-05-16): partial unblock attempt for the IWV
+  scrape (`data-foundations` Phase 1.4); Akamai still ultimately
+  blocks both local + GHA-runner egress (see `data-foundations.md`
+  for the open vendor decision).
+- **#1138 — `iwv-scrape-once` workflow_dispatch** (MERGED 2026-05-17):
+  GHA workflow for IP-independent IWV retries; Akamai blocks the GHA
+  egress path too, but the workflow lets ops-data run from a different
+  runner pool on demand.
+
+### CSV-storage / CSV-manifest test guards (PRs #1153, #1158)
+
+- **#1153 — `is_directory` guard on `_reconcile_log_for` readdir**
+  (MERGED 2026-05-17): closes a CSV-manifest test race that surfaced
+  on #1148/#1150 (Phase 2 + Phase 3 manifest stack) when test temp_dir
+  cleanup raced the reconcile-log inspection.
+- **#1158 — `is_directory` guard on `test_reconcile_log_path_layout`
+  readdir** (MERGED 2026-05-17): same hazard, second test site.
+
+### Weekly deep health scan + rules promotion (PRs #1198, #1227)
+
+- **#1198 — weekly deep health scan 2026-05-18** (MERGED 2026-05-18):
+  ops/health-deep PR per the existing GHA Monday-cron workflow.
+- **#1227 — promote session-tested QC + merge + rampup norms from
+  memory to repo** (MERGED 2026-05-21): institutional-knowledge-capture
+  PR. New repo-level rules under `.claude/rules/` (referenced by
+  qc-structural-authority.md, qc-behavioral-authority.md):
+  pr-merge-gates, session-rampup, code-health-discipline. Lifts norms
+  previously held only in `~/.claude/memory/` so they apply in every
+  harness session, not only when memory pre-loaded.
 
 ## sweep-honor-locks (2026-05-08 incident)
 - **Incident (2026-05-08):** Operator ran `--force --stale-hours 0` while two cleanup agents were mid-flight. The script removed their worktrees, killing both agents' work in progress. Root cause: script used `git worktree remove --force` (overrides lock) and `rm -rf` fallback unconditionally; did not read lock state from `git worktree list --porcelain`.

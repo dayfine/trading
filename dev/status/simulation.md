@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-05-06
+## Last updated: 2026-05-22
 
 ## Status
 IN_PROGRESS
@@ -8,13 +8,40 @@ IN_PROGRESS
 Split-day broker-model redesign + regression follow-ups fully wrapped
 (PRs #658 / #662 / #664 / #667 broker-model; #678 strategy-side-position-map
 fix; #680 stop-state rescaling; #682 short-side flag for sp500 mitigation;
-all merged 2026-04-28..29). Slice 1+3 verdicts remain APPROVED. Track
-stays IN_PROGRESS for the M5 walk-forward + tuner catch-all items and the
-local sp500-2019-2023 baseline rerun (deferred — needs full 491-symbol
-universe data not present in GHA).
+all merged 2026-04-28..29). Slice 1+3 verdicts remain APPROVED. M5
+walk-forward harness COMPLETE 2026-05-16 (#1100/#1111/#1116, see
+`walk-forward-cv` track); Bayesian Phase 3 tuner stack consumed it via
+#1126/#1132/#1136/#1143/#1145 (see `tuning` track). Track stays
+IN_PROGRESS for residual simulator follow-ups landed 2026-05-16..18
+(margin Phase 2 wiring, NAV silent-fallback removal, rejected-fill
+retry plumbing — listed below).
 
 P0 CI RED (`split_day_stop_exit:1:post_split_exit_no_orphan_equity`, $400 drift)
 was resolved by PR #752 (2026-05-02); CI green on `main` since.
+
+### Recent simulator fix-forward (2026-05-16..18)
+
+- **#1119 — margin Phase 2 simulator wiring** (MERGED 2026-05-16):
+  daily borrow-fee accrual + maintenance force-cover on short positions;
+  ties the `short-side-strategy` track's Reg-T Phase 1 collateral (#1113/#1115)
+  into the per-step simulator loop. Default-off via `margin_config.enabled = false`
+  preserves all goldens. See `dev/status/short-side-strategy.md` for the bear-window
+  validation follow-on (ops-data dispatchable).
+- **#1123 — silent cash-fallback NAV removal** (MERGED 2026-05-16):
+  `_resolve_price` no longer substitutes `current_cash` when forward-fill
+  fails; instead surfaces `last_known_mark` + fail-loud `Status.Error`.
+  Closes the equity-curve corruption mode tracked in
+  `dev/notes/cell-e-15y-engineering-blocker-2026-05-09.md`. Builds on
+  prior #1019 / #1063 fixes; supersedes the workaround documented in
+  `memory/project_simulator_nav_fallback_bug.md`.
+- **#1128 — `portfolio_valuation.compute` nesting linter fix-forward**
+  (MERGED 2026-05-16): cosmetic refactor following the #1123 extraction;
+  no behavioral change.
+- **#1177 — surface rejected fills via CancelEntry (P0a-residual)**
+  (MERGED 2026-05-18): residual fix-forward from the BAH gap-buffer
+  work; rejected fills now flow back to strategies via `CancelEntry`
+  so they can retry. Closes the silent-drop hazard that surfaced after
+  #1123 landed.
 
 ## QC
 overall_qc: APPROVED (Slice 1 + Slice 3)
@@ -125,7 +152,14 @@ favour of a discrete event on the position ledger. Four PRs landed:
   Split-day broker model: regression" + §"2026-04-29 — Split-day OHLC:
   broker model".
 
-- M5 (walk-forward backtest, parameter tuner) is next.
+- **M5 walk-forward + parameter tuner — DONE via cross-tracks.** The
+  M5 surface has shipped under sibling tracks: walk-forward CV harness
+  via #1100/#1111/#1116 (`walk-forward-cv` track, MERGED 2026-05-16),
+  Bayesian Phase 3 tuner stack via #1126/#1132/#1136/#1143/#1145
+  (`tuning` track, MERGED 2026-05-17). Subsequent V1→V3 production
+  sweeps + V3-V7 methodology stack landed under `tuning`; see
+  `dev/status/tuning.md` for the current surface (`promote_config.sh`
+  + cross-scenario validation per PR #1237).
 
 ## Blocking Refactors
 - None
@@ -185,6 +219,12 @@ favour of a discrete event on the position ledger. Four PRs landed:
 ### Future slices
 
 - Position-level assertions: verify AAPL open position, PnL direction
-- Walk-forward backtest (M5): parameter tuner with validation period
+- ~~Walk-forward backtest (M5): parameter tuner with validation period~~
+  — **DONE** via `walk-forward-cv` track (#1100/#1111/#1116, MERGED
+  2026-05-16) + `tuning` track Bayesian Phase 3 (#1126/#1132/#1136/#1143/#1145,
+  MERGED 2026-05-17). Cross-scenario validation as the next promote-gate
+  surface owned by `tuning` per PR #1237.
 - Performance gate test (T2-B)
+- Local sp500-2019-2023 baseline rerun — still deferred (needs full
+  491-symbol universe data not present in GHA)
 
