@@ -190,6 +190,44 @@ implement iteratively step by step:
 - A sub-unit is done when it builds, has tests, and tests pass
 - Plan the full sequence upfront, but execute one step at a time
 
+### Status-file refreshes must verify claims against current main
+
+When refreshing a `dev/status/<track>.md` file, do not assume the
+existing prose is accurate. Status files routinely lag main by days
+or weeks — claims like "**M5.2a-d still PLANNED**" or "**blocked on
+M5.1**" can be wrong even when the file's "Last updated" date is
+recent.
+
+For each substantive claim in the file you're editing, verify before
+keeping or modifying it:
+
+1. **PR-number claims** (e.g. "M5.2a still PLANNED"): check whether
+   the work has shipped. `gh api "repos/dayfine/trading/pulls?state=closed&per_page=20" --jq '.[] | "\(.number) \(.title)"'`
+   for a recent window, or `ls trading/trading/<expected-path>/` to
+   check whether the named module exists on main.
+2. **Blocker claims** (e.g. "blocked on M5.1 split_day_stop_exit
+   fix"): check current CI status on main and recent PR history for
+   fix-commits — `git log --oneline | grep -E '<keyword>' | head`.
+3. **Status keyword** (`PLANNED` / `IN_PROGRESS` / `MERGED` /
+   `READY_FOR_REVIEW`): if the content body suggests work has shipped
+   (specific PR numbers, "merged" wording), the keyword should reflect
+   that.
+4. **"Next Steps" lists**: the first-position "Next Step" is the most
+   stale-prone. If it says "fix bug X" but bug X was fixed weeks ago,
+   the whole list needs reconciliation.
+
+**Pre-flight check before dispatching `feat-*` agents:** for any
+track listed in your dispatch reasoning, briefly verify the named
+module / file / PR doesn't already exist on main. ~30 seconds, saves
+a wrong dispatch.
+
+**Symptom of stale claims you've propagated:** an agent dispatch
+acting on the refreshed status file fails fast because the work was
+already shipped. If that happens, file a docs-reconcile PR immediately
+and update the status doc. Observed 2026-05-04: PR #832 carried
+forward "M5.2a-d still PLANNED" while M5.2a-d had already shipped via
+#756/#768/#774/#780, requiring docs-reconcile PR #836 to recover.
+
 ### Debugging Tips
 
 - For compilation errors with published packages, inspect opam/build to check
