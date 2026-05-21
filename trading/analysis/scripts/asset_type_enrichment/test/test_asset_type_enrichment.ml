@@ -198,21 +198,18 @@ let _legacy_sexp_string =
   (((symbol AAPL) (asset_type (Listed "Common Stock"))
     (name "Apple Inc (legacy)") (exchange NASDAQ)))))|}
 
+let _expected_legacy_entry =
+  _make_entry ~symbol:"AAPL" ~asset_type:(Listed Eodhd.Asset_type.Common_stock)
+    ~exchange:"NASDAQ"
+
+let _load_legacy_sexp () =
+  _with_temp_path ~name:"legacy_symbol_types.sexp" ~f:(fun path ->
+      Out_channel.write_all (Fpath.to_string path) ~data:_legacy_sexp_string;
+      load ~path)
+
 let test_legacy_sexp_with_name_field_still_loads _ =
-  let assertion =
-    _with_temp_path ~name:"legacy_symbol_types.sexp" ~f:(fun path ->
-        Out_channel.write_all (Fpath.to_string path) ~data:_legacy_sexp_string;
-        load ~path)
-  in
-  assert_that assertion
-    (is_ok_and_holds
-       (_symbols_match
-          [
-            equal_to
-              (_make_entry ~symbol:"AAPL"
-                 ~asset_type:(Listed Eodhd.Asset_type.Common_stock)
-                 ~exchange:"NASDAQ");
-          ]))
+  assert_that (_load_legacy_sexp ())
+    (is_ok_and_holds (_symbols_match [ equal_to _expected_legacy_entry ]))
 
 (* ---- Per-type counts ----
 

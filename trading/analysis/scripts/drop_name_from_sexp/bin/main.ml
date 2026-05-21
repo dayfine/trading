@@ -34,10 +34,10 @@ let _is_name_pair = function Sexp.List [ Atom "name"; _ ] -> true | _ -> false
 let rec _drop_name sexp =
   match sexp with
   | Sexp.Atom _ -> sexp
-  | Sexp.List children ->
-      Sexp.List
-        (List.filter_map children ~f:(fun child ->
-             if _is_name_pair child then None else Some (_drop_name child)))
+  | Sexp.List children -> Sexp.List (List.filter_map children ~f:_keep_child)
+
+and _keep_child child =
+  if _is_name_pair child then None else Some (_drop_name child)
 
 let _run ~input_path ~output_path =
   let original = Sexp.load_sexp input_path in
