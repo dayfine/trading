@@ -42,9 +42,11 @@ open Async
 
 (** {1 Delisted roster sexp shape — must match the P1 binary's output.} *)
 
+(* [name] was dropped from the on-disk shape (2026-05-22) — it was only used
+   for a cosmetic log line below. Must stay in sync with the [entry] shape in
+   fetch_delisted_symbols/bin/main.ml. *)
 type roster_entry = {
   code : string;
-  name : string;
   exchange : string;
   asset_type : Eodhd.Asset_type.t;
 }
@@ -114,8 +116,7 @@ let _step_one ~token ~data_dir_path ~total ~sleep_ms ~counters idx
     counters.skipped <- counters.skipped + 1;
     return ())
   else (
-    printf "[%d/%d] FETCH %s (%s, %s)\n%!" (idx + 1) total entry.code
-      entry.exchange entry.name;
+    printf "[%d/%d] FETCH %s (%s)\n%!" (idx + 1) total entry.code entry.exchange;
     let%bind result =
       Fetch_symbols_lib.fetch_one ~token ~data_dir:data_dir_path entry.code
     in

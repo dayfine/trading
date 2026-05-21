@@ -31,16 +31,16 @@ type enriched_asset_type =
 type entry = {
   symbol : string;
   asset_type : enriched_asset_type;
-  name : string;
-      (** Human-readable issuer name from EODHD. Empty string when
-          [asset_type = Not_in_eodhd_listing] or when EODHD returned a
-          null/empty value. *)
   exchange : string;
       (** Listing exchange from EODHD. Empty string when
           [asset_type = Not_in_eodhd_listing]. *)
 }
 [@@deriving show, eq]
-(** One enriched entry per inventory symbol. *)
+(** One enriched entry per inventory symbol.
+
+    Note: The human-readable issuer [name] field was dropped (2026-05-22) to
+    shrink the on-disk sexp by ~50%. No reader consulted it for logic — it was
+    only emitted in a cosmetic log line by [fetch_delisted_bars.exe]. *)
 
 type t = {
   generated_at : Date.t;

@@ -18,11 +18,11 @@ let _make_metadata ~code ~name ~exchange ~asset_type :
     Eodhd.Http_client.symbol_metadata =
   { code; name; exchange; asset_type }
 
-let _make_entry ~symbol ~asset_type ~name ~exchange : entry =
-  { symbol; asset_type; name; exchange }
+let _make_entry ~symbol ~asset_type ~exchange : entry =
+  { symbol; asset_type; exchange }
 
 let _absent_entry symbol =
-  _make_entry ~symbol ~asset_type:Not_in_eodhd_listing ~name:"" ~exchange:""
+  _make_entry ~symbol ~asset_type:Not_in_eodhd_listing ~exchange:""
 
 (* Three example EODHD listings — one Common_stock, one Mutual_fund, one ETF.
    The fourth inventory symbol below ("UNKNOWN") is intentionally absent. *)
@@ -97,11 +97,11 @@ let test_join_preserves_inventory_order _ =
 
 let _expected_aapl =
   _make_entry ~symbol:"AAPL" ~asset_type:(Listed Eodhd.Asset_type.Common_stock)
-    ~name:"Apple Inc" ~exchange:"NASDAQ"
+    ~exchange:"NASDAQ"
 
 let _expected_spy =
   _make_entry ~symbol:"SPY" ~asset_type:(Listed Eodhd.Asset_type.ETF)
-    ~name:"SPDR S&P 500" ~exchange:"NYSE ARCA"
+    ~exchange:"NYSE ARCA"
 
 let test_join_marks_absent_symbols_as_not_in_listing _ =
   let result =
@@ -149,7 +149,7 @@ let _aapl_second =
 
 let _expected_aapl_first =
   _make_entry ~symbol:"AAPL" ~asset_type:(Listed Eodhd.Asset_type.Common_stock)
-    ~name:"Apple Inc (FIRST)" ~exchange:"NASDAQ"
+    ~exchange:"NASDAQ"
 
 let test_join_first_occurrence_wins_on_duplicate _ =
   let result =
@@ -181,6 +181,38 @@ let test_round_trip_save_load _ =
         | Ok () -> load ~path)
   in
   assert_that assertion (is_ok_and_holds (equal_to original))
+
+(* ---- Backward-compat: legacy sexp with [name] field still loads ----
+
+   The on-disk shape lost [name] in 2026-05-22. To keep operator workflows
+   safe — a stale local copy of [symbol_types.sexp] must still be readable
+   by the new code — the parser tolerates an extra [name] pair by ignoring
+   it. Pin that contract so a future tightening of [_find_field] (e.g.
+   switching to a strict whitelist) is caught here, not on a stranger's
+   workstation a month later. *)
+
+let _legacy_sexp_string =
+  {|((generated_at 2026-05-17)
+ (source_endpoints ((/api/exchange-symbol-list/US 2026-05-17)))
+ (symbols
+  (((symbol AAPL) (asset_type (Listed "Common Stock"))
+    (name "Apple Inc (legacy)") (exchange NASDAQ)))))|}
+
+let test_legacy_sexp_with_name_field_still_loads _ =
+  let assertion =
+    _with_temp_path ~name:"legacy_symbol_types.sexp" ~f:(fun path ->
+        Out_channel.write_all (Fpath.to_string path) ~data:_legacy_sexp_string;
+        load ~path)
+  in
+  assert_that assertion
+    (is_ok_and_holds
+       (_symbols_match
+          [
+            equal_to
+              (_make_entry ~symbol:"AAPL"
+                 ~asset_type:(Listed Eodhd.Asset_type.Common_stock)
+                 ~exchange:"NASDAQ");
+          ]))
 
 (* ---- Per-type counts ----
 
@@ -360,6 +392,8 @@ let suite =
          "join_first_occurrence_wins_on_duplicate"
          >:: test_join_first_occurrence_wins_on_duplicate;
          "round_trip_save_load" >:: test_round_trip_save_load;
+         "legacy_sexp_with_name_field_still_loads"
+         >:: test_legacy_sexp_with_name_field_still_loads;
          "per_type_counts_sorted_by_count_desc"
          >:: test_per_type_counts_sorted_by_count_desc;
          "filter_drops_non_equity_like" >:: test_filter_drops_non_equity_like;

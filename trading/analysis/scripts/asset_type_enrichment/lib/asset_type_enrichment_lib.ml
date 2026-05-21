@@ -8,7 +8,6 @@ type enriched_asset_type = Listed of Eodhd.Asset_type.t | Not_in_eodhd_listing
 type entry = {
   symbol : string;
   asset_type : enriched_asset_type;
-  name : string;
   exchange : string;
 }
 [@@deriving show, eq]
@@ -57,12 +56,11 @@ let enriched_asset_type_of_sexp = function
 
 (* ---- Sexp encoding for [entry] and [t] ---- *)
 
-let sexp_of_entry { symbol; asset_type; name; exchange } =
+let sexp_of_entry { symbol; asset_type; exchange } =
   Sexp.List
     [
       List [ Atom "symbol"; Atom symbol ];
       List [ Atom "asset_type"; sexp_of_enriched_asset_type asset_type ];
-      List [ Atom "name"; Atom name ];
       List [ Atom "exchange"; Atom exchange ];
     ]
 
@@ -85,13 +83,15 @@ let _entry_field_pairs = function
 
 let entry_of_sexp sexp =
   let open Result.Let_syntax in
+  (* [name] was dropped from the on-disk shape (2026-05-22). Extra fields are
+     tolerated by [_find_field]'s key-lookup so older sexp files with a [name]
+     pair still load — the pair is simply ignored. *)
   let parse_fields fields =
     let%bind symbol = _find_field fields "symbol" >>= _atom_of in
     let%bind asset_type_sexp = _find_field fields "asset_type" in
     let asset_type = enriched_asset_type_of_sexp asset_type_sexp in
-    let%bind name = _find_field fields "name" >>= _atom_of in
     let%bind exchange = _find_field fields "exchange" >>= _atom_of in
-    Ok { symbol; asset_type; name; exchange }
+    Ok { symbol; asset_type; exchange }
   in
   let result =
     match sexp with
@@ -201,11 +201,9 @@ let _entry_of_inventory_symbol lookup symbol =
       {
         symbol;
         asset_type = Listed m.Eodhd.Http_client.asset_type;
-        name = m.name;
         exchange = m.exchange;
       }
-  | None ->
-      { symbol; asset_type = Not_in_eodhd_listing; name = ""; exchange = "" }
+  | None -> { symbol; asset_type = Not_in_eodhd_listing; exchange = "" }
 
 let join ~inventory_symbols ~eodhd_listings ~generated_at ~source_endpoints =
   let lookup = _build_lookup eodhd_listings in

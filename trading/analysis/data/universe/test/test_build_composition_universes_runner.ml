@@ -60,8 +60,7 @@ let _common_stock = "(Listed \"Common Stock\")"
 let _symbol_types_sexp_of entries =
   let body_lines =
     List.map entries ~f:(fun (sym, asset_type_sexp) ->
-        Printf.sprintf
-          "    ((symbol %s) (asset_type %s) (name \"\") (exchange \"\"))" sym
+        Printf.sprintf "    ((symbol %s) (asset_type %s) (exchange \"\"))" sym
           asset_type_sexp)
   in
   "((generated_at 2020-05-30)\n (source_endpoints ())\n (symbols (\n"
