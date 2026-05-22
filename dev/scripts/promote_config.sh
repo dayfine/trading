@@ -18,25 +18,56 @@
 #   1. Validates inputs (label format, file existence, parameters repo clone).
 #   2. Creates configs/<label>/ in the trading-parameters repo with:
 #      - config.sexp        (copied from <config_sexp>)
+#      - validation.sexp    (cross-scenario validation results, see below)
 #      - provenance.md      (auto-generated with commit SHA + scenario metrics)
 #      - bo_output/         (symlink or copy of BO output dir, if provided)
-#   3. Updates live/current.sexp symlink to point at the new config.
-#   4. Regenerates _metadata/catalog.sexp from configs/*/provenance.md.
-#   5. Commits in the trading-parameters repo with format:
-#      `promote: <label> — Sharpe X.XX (n=N folds), trading@<sha>`
+#   3. Runs cross-scenario validation (P1 of tuning-methodology-redesign-2026-05-22):
+#      - Applies the candidate config's overrides on top of each reference
+#        scenario's cell-E baseline and runs the resulting scratch scenario via
+#        scenario_runner.exe.
+#      - Reads actual.sexp metrics from each run.
+#      - Compares Sharpe to the cell-E baseline; refuses promotion if any
+#        scenario regresses by more than PROMOTE_SHARPE_REGRESSION_THRESHOLD
+#        (default 0.10 absolute Sharpe units).
+#      - Writes structured per-scenario metrics + cell-E reference + delta
+#        into configs/<label>/validation.sexp.
+#   4. Updates live/current.sexp symlink to point at the new config.
+#   5. Regenerates _metadata/catalog.sexp from configs/*/provenance.md.
+#   6. Commits in the trading-parameters repo with format:
+#      `promote: <label> — trading@<sha>`
 #
 # Environment:
-#   TRADING_PARAMS_DIR  Path to the trading-parameters clone.
-#                       Default: ~/Projects/trading-parameters
+#   TRADING_PARAMS_DIR
+#       Path to the trading-parameters clone.
+#       Default: ~/Projects/trading-parameters
+#
+#   PROMOTE_SHARPE_REGRESSION_THRESHOLD
+#       Maximum allowed Sharpe regression vs cell-E baseline on any scenario,
+#       in absolute Sharpe units. Default 0.10 (i.e. a candidate may not score
+#       0.10 lower Sharpe than cell-E on any panel scenario).
+#
+#   PROMOTE_SKIP_VALIDATION
+#       If set to "1", skip cross-scenario validation entirely. Useful for
+#       smoke-testing the promote machinery in environments that lack the
+#       per-symbol bars corpus (e.g. GHA). Validation.sexp records the skip.
+#
+#   PROMOTE_VALIDATION_PARALLEL
+#       Number of scenarios to run in parallel. Default 2 (the panel size).
 #
 # Exits non-zero on:
 #   - missing required argument
 #   - label already exists in configs/
 #   - source config.sexp not found
 #   - trading-parameters repo not a git checkout
+#   - cross-scenario validation gate failure (refuses promotion; cleans up
+#     target_dir; does NOT touch live/current.sexp or commit)
 #   - any sub-command failure (set -euo pipefail)
 
 set -euo pipefail
+
+# Source extract_metrics helpers used by the cross-scenario validation step.
+# shellcheck disable=SC1091
+. "$(dirname "$0")/lib/extract_metrics.sh"
 
 # ---------------------------------------------------------------------------
 # Args + validation
@@ -132,6 +163,208 @@ if [ -n "$bo_output_dir" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Cross-scenario validation (P1 of tuning-methodology-redesign-2026-05-22)
+# ---------------------------------------------------------------------------
+#
+# Per scenario in the reference panel, compose a scratch scenario sexp that
+# merges the candidate's overrides onto the base scenario's cell-E overrides,
+# run it via scenario_runner.exe, and read actual.sexp to extract metrics.
+# Then compute deltas vs the hardcoded cell-E baseline and apply the
+# regression gate.
+#
+# Cell-E baseline reference values (hardcoded; provenance documented below).
+# These are the canonical cell-E (max_position_pct_long=0.14, exposure=0.70,
+# min_cash=0.30, stage3 h=1, laggard h=2) full-window results on each panel
+# scenario, as measured at the time the scenario was last re-pinned:
+#
+# Source: scenario sexp file headers, both checked-in at HEAD:
+#   - trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp
+#     §"Measured 2026-05-13 (full Cell E, 16.3y window, post-#1052..#1054)"
+#   - trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp
+#     §"Measured 2026-05-12 (Cell E, post-#1052 force-liq fix + #1053 schema)"
+
+PROMOTE_SHARPE_REGRESSION_THRESHOLD="${PROMOTE_SHARPE_REGRESSION_THRESHOLD:-0.10}"
+PROMOTE_SKIP_VALIDATION="${PROMOTE_SKIP_VALIDATION:-0}"
+PROMOTE_VALIDATION_PARALLEL="${PROMOTE_VALIDATION_PARALLEL:-2}"
+
+# Panel: (scenario_name | base_scenario_sexp_path | cell_e_sharpe | cell_e_return | cell_e_max_dd)
+# When the panel grows (P7 broad-universe / French-49 / Shiller), append rows
+# here. Each row is a single space-separated record.
+read -r -d '' PROMOTE_VALIDATION_PANEL << 'EOF' || true
+sp500-2010-2026 trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp 0.78 341.69 18.36
+sp500-2019-2023 trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp 0.56 50.66 21.56
+EOF
+
+validation_sexp="$target_dir/validation.sexp"
+validation_dir="$(mktemp -d -t promote-validation-XXXXXX)"
+trap 'rm -rf "$validation_dir"' EXIT
+
+# Build validation.sexp incrementally as scenarios complete; the final form
+# is assembled at the end so promotion can fail mid-flight without leaving a
+# partial validation.sexp staged.
+declare -a validation_rows
+declare -a gate_failures
+
+if [ "$PROMOTE_SKIP_VALIDATION" = "1" ]; then
+  echo "=== Cross-scenario validation SKIPPED (PROMOTE_SKIP_VALIDATION=1) ==="
+  validation_rows+=("((status skipped) (reason \"PROMOTE_SKIP_VALIDATION=1 at promote time\"))")
+else
+  echo "=== Cross-scenario validation ==="
+  echo "Sharpe regression threshold: $PROMOTE_SHARPE_REGRESSION_THRESHOLD (absolute units)"
+  echo "Parallel: $PROMOTE_VALIDATION_PARALLEL"
+
+  scratch_scenarios_dir="$validation_dir/scenarios"
+  mkdir -p "$scratch_scenarios_dir"
+
+  # Compose scratch scenarios for every panel row.
+  while IFS=' ' read -r scenario_name base_path _ _ _; do
+    [ -z "$scenario_name" ] && continue
+    full_base_path="$trading_repo_root/$base_path"
+    if [ ! -f "$full_base_path" ]; then
+      echo "Error: panel scenario base file not found: $full_base_path" >&2
+      rm -rf "$target_dir"
+      exit 1
+    fi
+    scratch_path="$scratch_scenarios_dir/scratch-$scenario_name.sexp"
+    if ! compose_scratch_scenario \
+        "$full_base_path" "$config_sexp" \
+        "scratch-$scenario_name" "$scratch_path"; then
+      echo "Error: failed to compose scratch scenario for $scenario_name" >&2
+      rm -rf "$target_dir"
+      exit 1
+    fi
+    echo "Composed scratch scenario: $scratch_path"
+  done <<< "$PROMOTE_VALIDATION_PANEL"
+
+  # Build scenario_runner.exe (idempotent if already built).
+  echo "Building scenario_runner.exe..."
+  ( cd "$trading_repo_root/trading" && dune build trading/backtest/scenarios/scenario_runner.exe ) \
+    >/dev/null 2>&1 || {
+      echo "Error: dune build scenario_runner.exe failed" >&2
+      rm -rf "$target_dir"
+      exit 1
+    }
+  scenario_runner_exe="$trading_repo_root/trading/_build/default/trading/backtest/scenarios/scenario_runner.exe"
+
+  if [ ! -x "$scenario_runner_exe" ]; then
+    echo "Error: scenario_runner.exe missing post-build: $scenario_runner_exe" >&2
+    rm -rf "$target_dir"
+    exit 1
+  fi
+
+  # Run all scratch scenarios. We tolerate non-zero exit from scenario_runner
+  # because its PASS/FAIL gate compares against pinned cell-E ranges that the
+  # candidate may legitimately exceed (in either direction). The validation
+  # gate below reads actual.sexp directly.
+  runner_log="$validation_dir/runner.log"
+  # Capture the pre-run state of dev/backtest/scenarios-* so we can identify
+  # the runner's new output dir even when other backtests created dirs before.
+  pre_run_marker="$validation_dir/pre_run_marker"
+  touch "$pre_run_marker"
+  echo "Running scratch scenarios (this may take 15-60 min per scenario)..."
+  set +e
+  "$scenario_runner_exe" \
+    --dir "$scratch_scenarios_dir" \
+    --fixtures-root "$trading_repo_root/trading/test_data/backtest_scenarios" \
+    --parallel "$PROMOTE_VALIDATION_PARALLEL" \
+    --no-emit-all-eligible \
+    > "$runner_log" 2>&1
+  runner_exit=$?
+  set -e
+  echo "scenario_runner exited $runner_exit (non-zero is allowed; gate reads actual.sexp directly)"
+
+  # Locate the scenario_runner output root. The runner makes a fresh
+  # dev/backtest/scenarios-<timestamp>/ dir per invocation; pick the newest
+  # one created after our pre-run marker.
+  runner_output_root=$(find "$trading_repo_root/dev/backtest" \
+    -maxdepth 1 -mindepth 1 -type d -name 'scenarios-*' \
+    -newer "$pre_run_marker" 2>/dev/null \
+    | head -1)
+  if [ -z "$runner_output_root" ] || [ ! -d "$runner_output_root" ]; then
+    echo "Error: cannot find scenario_runner output root under dev/backtest/ (no scenarios-* dir newer than $pre_run_marker)" >&2
+    tail -20 "$runner_log" >&2
+    rm -rf "$target_dir"
+    exit 1
+  fi
+  echo "scenario_runner output root: $runner_output_root"
+
+  # Extract metrics + apply gate per scenario.
+  while IFS=' ' read -r scenario_name base_path cell_e_sharpe cell_e_return cell_e_max_dd; do
+    [ -z "$scenario_name" ] && continue
+    actual_sexp="$runner_output_root/scratch-$scenario_name/actual.sexp"
+    if [ ! -f "$actual_sexp" ]; then
+      echo "Error: actual.sexp missing for $scenario_name: $actual_sexp" >&2
+      tail -20 "$runner_log" >&2
+      rm -rf "$target_dir"
+      exit 1
+    fi
+
+    actual_sharpe=$(extract_metric "$actual_sexp" sharpe_ratio)
+    actual_return=$(extract_metric "$actual_sexp" total_return_pct)
+    actual_max_dd=$(extract_metric "$actual_sexp" max_drawdown_pct)
+    actual_trades=$(extract_metric "$actual_sexp" total_trades)
+    actual_win_rate=$(extract_metric "$actual_sexp" win_rate)
+
+    if [ -z "$actual_sharpe" ]; then
+      echo "Error: failed to extract sharpe_ratio from $actual_sexp" >&2
+      cat "$actual_sexp" >&2
+      rm -rf "$target_dir"
+      exit 1
+    fi
+
+    sharpe_delta=$(signed_delta "$actual_sharpe" "$cell_e_sharpe")
+    return_delta=$(signed_delta "$actual_return" "$cell_e_return")
+    max_dd_delta=$(signed_delta "$actual_max_dd" "$cell_e_max_dd")
+
+    # Gate: candidate must not regress Sharpe by more than the threshold.
+    verdict="pass"
+    if regresses_by_more_than \
+        "$actual_sharpe" "$cell_e_sharpe" \
+        "$PROMOTE_SHARPE_REGRESSION_THRESHOLD"; then
+      verdict="fail"
+      gate_failures+=("$scenario_name: sharpe $actual_sharpe vs cell-E $cell_e_sharpe (delta $sharpe_delta) regresses > $PROMOTE_SHARPE_REGRESSION_THRESHOLD")
+    fi
+
+    echo "  $scenario_name: sharpe=$actual_sharpe (cell-E $cell_e_sharpe, delta $sharpe_delta) return=$actual_return%% (cell-E $cell_e_return%%, delta $return_delta) verdict=$verdict"
+
+    validation_rows+=("((scenario $scenario_name)
+   (verdict $verdict)
+   (cell_e_baseline ((sharpe $cell_e_sharpe) (total_return_pct $cell_e_return) (max_drawdown_pct $cell_e_max_dd)))
+   (candidate ((sharpe $actual_sharpe) (total_return_pct $actual_return) (max_drawdown_pct $actual_max_dd) (total_trades $actual_trades) (win_rate $actual_win_rate)))
+   (delta ((sharpe $sharpe_delta) (total_return_pct $return_delta) (max_drawdown_pct $max_dd_delta))))")
+  done <<< "$PROMOTE_VALIDATION_PANEL"
+fi
+
+# Write validation.sexp.
+{
+  echo ";; Cross-scenario validation results for $label"
+  echo ";; Generated by promote_config.sh on $promotion_date"
+  echo ";; Sharpe regression threshold: $PROMOTE_SHARPE_REGRESSION_THRESHOLD"
+  echo "((label $label)"
+  echo " (promotion_date \"$promotion_date\")"
+  echo " (trading_sha $trading_short_sha)"
+  echo " (sharpe_regression_threshold $PROMOTE_SHARPE_REGRESSION_THRESHOLD)"
+  echo " (results ("
+  for row in "${validation_rows[@]}"; do
+    echo "  $row"
+  done
+  echo " )))"
+} > "$validation_sexp"
+
+# Apply the gate. On failure: clean up target_dir, refuse promotion.
+if [ "${#gate_failures[@]}" -gt 0 ]; then
+  echo ""
+  echo "=== Cross-scenario validation FAILED ==="
+  for f in "${gate_failures[@]}"; do
+    echo "  - $f"
+  done
+  echo ""
+  echo "Promotion refused. Cleaning up $target_dir."
+  rm -rf "$target_dir"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
 # Write provenance.md
 # ---------------------------------------------------------------------------
 
@@ -149,14 +382,14 @@ cat > "$target_dir/provenance.md" << EOF
 
 ## Cross-scenario validation
 
-| Scenario | Cell-E baseline | $label | Delta | Verdict |
-|---|---:|---:|---:|---|
-| sp500-2010-2026 (16y, 510 sym) | TBD | TBD | TBD | TBD |
-| sp500-2019-2023 (5y, 500 sym) | TBD | TBD | TBD | TBD |
+Sharpe regression threshold: \`$PROMOTE_SHARPE_REGRESSION_THRESHOLD\` absolute units.
+See \`validation.sexp\` for full structured results.
 
-(Populate this table by running the scenarios via \`backtest_runner\` with
-the config and comparing to baseline. Manual for now; the \`run_validation\`
-function below is the proposed automation.)
+$(if [ "$PROMOTE_SKIP_VALIDATION" = "1" ]; then
+    echo "**SKIPPED** — PROMOTE_SKIP_VALIDATION=1 at promote time. validation.sexp records the skip; this config has not been verified against the panel."
+  else
+    echo "All panel scenarios passed the Sharpe regression gate."
+  fi)
 
 ## How to use
 
