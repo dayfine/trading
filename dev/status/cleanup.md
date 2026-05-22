@@ -1,6 +1,6 @@
 # Status: cleanup
 
-## Last updated: 2026-05-08
+## Last updated: 2026-05-22
 
 ## Status
 IN_PROGRESS
@@ -15,13 +15,13 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 
 ## Backlog
 
-- [~] nesting: garch.ml + snapshot_writer.ml + split_detector.ml — 3 remaining violations (avg/max/else); cleanup/nesting-final-tail (source: dispatch 2026-05-08)
+- [x] nesting: garch.ml + snapshot_writer.ml + split_detector.ml — verified clean 2026-05-22; nesting_linter no longer flags any of these files (likely subsumed by PR #977 / #978 which extracted helpers for the same files)
 - [x] nesting: pipeline.ml+daily_panels.ml+optimal_strategy_runner_helpers.ml+optimal_portfolio_filler.ml — extracted _build_rows, update_bench, _insert_rows, _neutral_ctx, _compare_by_r_multiple, _compare_by_score; all 5 dispatch violations cleared (branch cleanup/nesting-pipeline-batch-2, 2026-05-08)
 - [x] nesting: 8 final violations — garch.ml, snapshot_writer.ml, split_detector.ml, split_event.ml, runner.ml, reconciler_writer.ml — extracted _run_garch_loop, _version_mismatch_error, _mkdir_error, _snap_if_split, _replace_if_symbol, _pos_symbol, _held_symbols_of_last_step, _write_split_row, _position_symbol; all 8 cleared. PR #978 (2026-05-08)
-- [~] nesting: trading/trading/weinstein/snapshot/lib/pick_diff.ml + trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_manifest.ml — extract private helpers to reduce avg/max nesting (source: dispatch 2026-05-08)
+- [x] nesting: trading/trading/weinstein/snapshot/lib/pick_diff.ml + trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_manifest.ml — verified clean 2026-05-22; nesting_linter no longer flags either file
 - [x] nesting: analysis/data/synthetic/garch.ml + regime_hmm.ml + data/types/split_detector.ml + wiki_sp500/changes_parser.ml + stock_analysis.ml — extracted _validate_sample_inputs, _garch_step, _sample_step, _classify_ratio, _date_of_groups, _split_factor_of_bar; all 5 violations cleared. PR #977 (2026-05-08)
-- [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
-- [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
+- [x] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — verified clean 2026-05-22; nesting_linter no longer flags this file (file avg below 2.5)
+- [x] fn_length: trading/trading/simulation/lib/simulator.ml — verified clean 2026-05-22; fn_length_linter says "no functions exceed 50 lines" (step fn was extracted in subsequent simulator-fix PRs)
 
 - [x] nesting: trading/trading/backtest/optimal/lib/optimal_strategy_report_sections.ml — extracted _cmp_actual_by_date, _actual_date_break, _label_actual_group, _cmp_optimal_by_date, _optimal_date_break, _label_optimal_group, _ratio_narrative; all 3 violations cleared (branch cleanup/nesting-report-sections, 2026-05-08)
 - [x] nesting: trading/trading/backtest/optimal/lib/outcome_scorer.ml — extracted _step_stage3, _make_initial_state, _resolve_exit; both violations cleared. PR #950 (2026-05-08)
@@ -29,8 +29,8 @@ Cleanup track has no public interface — it absorbs small mechanical fix-ups su
 - [x] fn_length: trading/trading/backtest/optimal/lib/optimal_strategy_runner.ml — extracted 7 helpers (calendar, analysis, sector, forward, scan) to Optimal_strategy_runner_helpers; 413→282 LOC (branch cleanup/optimal-runner-split-2, 2026-05-08)
 - [x] nesting: trading/trading/data_panel/snapshot/lib/snapshot_format.ml — extracted _check_all_hashes_equal, _build_manifest, _flush_to_channel, _try_write_file, _check_payload_length, _check_payload_md5, _check_row_count, _check_schema_hash; all violations cleared (branch cleanup/nesting-snapshot-format, 2026-05-08)
 - [x] nesting: analysis/data/synthetic/garch.ml + regime_hmm.ml + data/types/split_detector.ml + wiki_sp500/changes_parser.ml + stock_analysis.ml — extracted _validate_sample_inputs, _garch_step, _sample_step, _classify_ratio, _date_of_groups, _split_factor_of_bar; all 5 violations cleared. PR #977 (2026-05-08)
-- [~] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — file avg 2.63 (limit 2.5); deep record literals in all list (source: dispatch 2026-05-07)
-- [~] fn_length: trading/trading/simulation/lib/simulator.ml — step fn 63 lines (limit 50); extract helpers (source: dispatch 2026-05-08)
+- [x] nesting: trading/analysis/data/sources/wiki_sp500/lib/ticker_aliases.ml — verified clean 2026-05-22; nesting_linter no longer flags this file (file avg below 2.5)
+- [x] fn_length: trading/trading/simulation/lib/simulator.ml — verified clean 2026-05-22; fn_length_linter says "no functions exceed 50 lines" (step fn was extracted in subsequent simulator-fix PRs)
 - [x] nesting: trading/trading/simulation/lib/{antifragility,return_basics,distributional}_computer.ml — extracted _add_ols_pair, _zero_sums, _add_sq_dev, _add_moments, _bucket_loop helpers; all 5 dispatch violations cleared. PR #967 (2026-05-08)
 - [x] magic_numbers: trading/trading/backtest/optimal/lib/optimal_strategy_report_sections.ml — extracted _strong_outperform_threshold=3.0 and _moderate_outperform_threshold=1.5; linter clean (branch cleanup/optimal-report-sections-magic, 2026-05-08)
 - [x] nesting: trading/analysis/scripts/build_snapshots/build_snapshots.ml — extracted 5 helpers (_entry_is_current, _write_and_checksum, _file_metadata, _build_or_log, _load_benchmark_bars, _make_progress, _last_symbol, _fold_symbol); all 78 fns pass nesting linter (branch cleanup/nesting-build-snapshots-2, 2026-05-08)
