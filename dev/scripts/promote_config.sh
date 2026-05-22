@@ -46,6 +46,18 @@
 #       in absolute Sharpe units. Default 0.10 (i.e. a candidate may not score
 #       0.10 lower Sharpe than cell-E on any panel scenario).
 #
+#   PROMOTE_MAXDD_INCREASE_THRESHOLD
+#       Maximum allowed MaxDD increase vs cell-E baseline on any scenario, in
+#       absolute percentage points. Default 5.0 (i.e. a candidate whose MaxDD
+#       exceeds cell-E by more than 5pp on any panel scenario is refused).
+#       Per Option E (dev/plans/bayesian-production-sweep-2026-05-18.md §6).
+#
+#   PROMOTE_TRADES_RATIO_MAX
+#       Maximum allowed ratio between candidate and baseline total_trades on
+#       any scenario (in either direction). Default 2.0 (i.e. a candidate that
+#       trades more than 2x or less than 0.5x of cell-E is refused).
+#       Catches strategies that trade radically differently from baseline.
+#
 #   PROMOTE_SKIP_VALIDATION
 #       If set to "1", skip cross-scenario validation entirely. Useful for
 #       smoke-testing the promote machinery in environments that lack the
@@ -184,15 +196,18 @@ fi
 #     §"Measured 2026-05-12 (Cell E, post-#1052 force-liq fix + #1053 schema)"
 
 PROMOTE_SHARPE_REGRESSION_THRESHOLD="${PROMOTE_SHARPE_REGRESSION_THRESHOLD:-0.10}"
+PROMOTE_MAXDD_INCREASE_THRESHOLD="${PROMOTE_MAXDD_INCREASE_THRESHOLD:-5.0}"
+PROMOTE_TRADES_RATIO_MAX="${PROMOTE_TRADES_RATIO_MAX:-2.0}"
 PROMOTE_SKIP_VALIDATION="${PROMOTE_SKIP_VALIDATION:-0}"
 PROMOTE_VALIDATION_PARALLEL="${PROMOTE_VALIDATION_PARALLEL:-2}"
 
-# Panel: (scenario_name | base_scenario_sexp_path | cell_e_sharpe | cell_e_return | cell_e_max_dd)
+# Panel: (scenario_name | base_scenario_sexp_path | cell_e_sharpe | cell_e_return | cell_e_max_dd | cell_e_trades)
 # When the panel grows (P7 broad-universe / French-49 / Shiller), append rows
-# here. Each row is a single space-separated record.
+# here. Each row is a single space-separated record. cell_e_trades pinned from
+# the scenario sexp headers; re-pin whenever the scenario is re-measured.
 read -r -d '' PROMOTE_VALIDATION_PANEL << 'EOF' || true
-sp500-2010-2026 trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp 0.78 341.69 18.36
-sp500-2019-2023 trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp 0.56 50.66 21.56
+sp500-2010-2026 trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp 0.78 341.69 18.36 806
+sp500-2019-2023 trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp 0.56 50.66 21.56 264
 EOF
 
 validation_sexp="$target_dir/validation.sexp"
@@ -221,7 +236,7 @@ else
   mkdir -p "$scratch_scenarios_dir"
 
   # Compose scratch scenarios for every panel row.
-  while IFS=' ' read -r scenario_name base_path _ _ _; do
+  while IFS=' ' read -r scenario_name base_path _ _ _ _; do
     [ -z "$scenario_name" ] && continue
     full_base_path="$trading_repo_root/$base_path"
     if [ ! -f "$full_base_path" ]; then
@@ -305,7 +320,7 @@ else
   echo "scenario_runner output root: $runner_output_root"
 
   # Extract metrics + apply gate per scenario.
-  while IFS=' ' read -r scenario_name base_path cell_e_sharpe cell_e_return cell_e_max_dd; do
+  while IFS=' ' read -r scenario_name base_path cell_e_sharpe cell_e_return cell_e_max_dd cell_e_trades; do
     [ -z "$scenario_name" ] && continue
     actual_sexp="$runner_output_root/scratch-$scenario_name/actual.sexp"
     if [ ! -f "$actual_sexp" ]; then
@@ -331,8 +346,12 @@ else
     sharpe_delta=$(signed_delta "$actual_sharpe" "$cell_e_sharpe")
     return_delta=$(signed_delta "$actual_return" "$cell_e_return")
     max_dd_delta=$(signed_delta "$actual_max_dd" "$cell_e_max_dd")
+    trades_delta=$(signed_delta "$actual_trades" "$cell_e_trades")
 
-    # Gate: candidate must not regress Sharpe by more than the threshold.
+    # Gates (Option E, per dev/plans/bayesian-production-sweep-2026-05-18.md §6):
+    #  - Sharpe regression ≤ threshold (higher-is-better)
+    #  - MaxDD increase ≤ threshold (lower-is-better; swap regresses_by_more_than args)
+    #  - total_trades within ratio (catches strategies that trade radically differently)
     verdict="pass"
     if regresses_by_more_than \
         "$actual_sharpe" "$cell_e_sharpe" \
@@ -340,14 +359,26 @@ else
       verdict="fail"
       gate_failures+=("$scenario_name: sharpe $actual_sharpe vs cell-E $cell_e_sharpe (delta $sharpe_delta) regresses > $PROMOTE_SHARPE_REGRESSION_THRESHOLD")
     fi
+    if regresses_by_more_than \
+        "$cell_e_max_dd" "$actual_max_dd" \
+        "$PROMOTE_MAXDD_INCREASE_THRESHOLD"; then
+      verdict="fail"
+      gate_failures+=("$scenario_name: max_drawdown_pct $actual_max_dd vs cell-E $cell_e_max_dd (delta $max_dd_delta) increases > $PROMOTE_MAXDD_INCREASE_THRESHOLD pp")
+    fi
+    if trades_out_of_ratio \
+        "$actual_trades" "$cell_e_trades" \
+        "$PROMOTE_TRADES_RATIO_MAX"; then
+      verdict="fail"
+      gate_failures+=("$scenario_name: total_trades $actual_trades vs cell-E $cell_e_trades (delta $trades_delta) outside ratio ${PROMOTE_TRADES_RATIO_MAX}x")
+    fi
 
-    echo "  $scenario_name: sharpe=$actual_sharpe (cell-E $cell_e_sharpe, delta $sharpe_delta) return=$actual_return%% (cell-E $cell_e_return%%, delta $return_delta) verdict=$verdict"
+    echo "  $scenario_name: sharpe=$actual_sharpe (cell-E $cell_e_sharpe, delta $sharpe_delta) max_dd=$actual_max_dd (cell-E $cell_e_max_dd, delta $max_dd_delta) trades=$actual_trades (cell-E $cell_e_trades, delta $trades_delta) verdict=$verdict"
 
     validation_rows+=("((scenario $scenario_name)
    (verdict $verdict)
-   (cell_e_baseline ((sharpe $cell_e_sharpe) (total_return_pct $cell_e_return) (max_drawdown_pct $cell_e_max_dd)))
+   (cell_e_baseline ((sharpe $cell_e_sharpe) (total_return_pct $cell_e_return) (max_drawdown_pct $cell_e_max_dd) (total_trades $cell_e_trades)))
    (candidate ((sharpe $actual_sharpe) (total_return_pct $actual_return) (max_drawdown_pct $actual_max_dd) (total_trades $actual_trades) (win_rate $actual_win_rate)))
-   (delta ((sharpe $sharpe_delta) (total_return_pct $return_delta) (max_drawdown_pct $max_dd_delta))))")
+   (delta ((sharpe $sharpe_delta) (total_return_pct $return_delta) (max_drawdown_pct $max_dd_delta) (total_trades $trades_delta))))")
   done <<< "$PROMOTE_VALIDATION_PANEL"
 fi
 
@@ -355,11 +386,15 @@ fi
 {
   echo ";; Cross-scenario validation results for $label"
   echo ";; Generated by promote_config.sh on $promotion_date"
-  echo ";; Sharpe regression threshold: $PROMOTE_SHARPE_REGRESSION_THRESHOLD"
+  echo ";; Gates: Sharpe regression ≤ $PROMOTE_SHARPE_REGRESSION_THRESHOLD,"
+  echo ";;        MaxDD increase ≤ ${PROMOTE_MAXDD_INCREASE_THRESHOLD}pp,"
+  echo ";;        total_trades within ${PROMOTE_TRADES_RATIO_MAX}x"
   echo "((label $label)"
   echo " (promotion_date \"$promotion_date\")"
   echo " (trading_sha $trading_short_sha)"
   echo " (sharpe_regression_threshold $PROMOTE_SHARPE_REGRESSION_THRESHOLD)"
+  echo " (maxdd_increase_threshold_pp $PROMOTE_MAXDD_INCREASE_THRESHOLD)"
+  echo " (trades_ratio_max $PROMOTE_TRADES_RATIO_MAX)"
   echo " (results ("
   for row in "${validation_rows[@]}"; do
     echo "  $row"
@@ -398,13 +433,17 @@ cat > "$target_dir/provenance.md" << EOF
 
 ## Cross-scenario validation
 
-Sharpe regression threshold: \`$PROMOTE_SHARPE_REGRESSION_THRESHOLD\` absolute units.
+Gates applied:
+- Sharpe regression ≤ \`$PROMOTE_SHARPE_REGRESSION_THRESHOLD\` absolute units
+- MaxDD increase ≤ \`${PROMOTE_MAXDD_INCREASE_THRESHOLD}\` percentage points
+- total_trades within \`${PROMOTE_TRADES_RATIO_MAX}x\` of baseline (either direction)
+
 See \`validation.sexp\` for full structured results.
 
 $(if [ "$PROMOTE_SKIP_VALIDATION" = "1" ]; then
     echo "**SKIPPED** — PROMOTE_SKIP_VALIDATION=1 at promote time. validation.sexp records the skip; this config has not been verified against the panel."
   else
-    echo "All panel scenarios passed the Sharpe regression gate."
+    echo "All panel scenarios passed every gate (Sharpe + MaxDD + trades-ratio)."
   fi)
 
 ## How to use

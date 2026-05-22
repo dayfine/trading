@@ -346,6 +346,18 @@
  (action
   (run sh %{dep:no_python_check.sh})))
 
+; promote_config.sh gate-helper smoke test: pins the runtime semantics of
+; regresses_by_more_than (Sharpe + MaxDD), trades_out_of_ratio, and
+; extract_metric. Reads dev/scripts/lib/extract_metrics.sh via repo_root().
+; No dune dep on dev/scripts/* (outside workspace); cache invalidates when
+; the test script itself changes.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (run sh %{dep:extract_metrics_gate_smoke.sh})))
+
 ; Sweep stale worktrees smoke test: verifies (1) --stale-hours 0 is rejected,
 ; (2) locked worktrees appear as "skip" in dry-run mode, (3) --stale-hours 0
 ; combined with --include-active is also rejected. Uses a tmp git repo so it
