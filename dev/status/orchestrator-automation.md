@@ -3,9 +3,14 @@
 ## Last updated: 2026-05-22
 
 ## Status
-PARKED
+MERGED
 
-(Phase 1 stable, 36 days uptime; Phase 2 explicitly deferred 2026-05-22 per track-pacer 2026-05-22 §P6.)
+(Phase 1 stable, 36 days uptime; Phase 2 explicitly deferred 2026-05-22 per
+track-pacer 2026-05-22 §P6. **Status MERGED is the schema-supported value for
+"work that was scoped is done"** — the `status_file_integrity.sh` linter only
+allows `IN_PROGRESS|READY_FOR_REVIEW|APPROVED|MERGED|BLOCKED|PENDING`. The
+deferral of Phase 2 is documented in this file's body; the reopen conditions
+are at the end of this preamble.)
 
 **2026-05-22 decision — track wrapped on Phase 1 stable state.** Per
 `dev/reviews/track-pacer-2026-05-22.md` §P6 + recommendation 4:
