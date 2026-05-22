@@ -96,7 +96,7 @@ Open question: should we run multiple BO sweeps with different seeds + initial_r
 
 For V3 promotion:
 - [x] §1 codified: `promote_config.sh` accepts (optionally) the tuner spec + walk-forward spec paths and embeds them along with the trading repo SHA + BO output path in provenance.md.
-- [ ] §2 MVP: `promote_config.sh` writes a TBD-placeholder validation table; the operator runs the 2 scenarios manually via `backtest_runner` and fills the table in by hand. Codifying the automated run is the followup (~50 LOC bash + backtest_runner invocation + sexp metric extraction).
+- [x] §2 MVP: `promote_config.sh` now runs the 2 reference scenarios automatically via `scenario_runner.exe` and writes structured `validation.sexp` with per-scenario metrics + cell-E baseline + delta + verdict. A regression gate (`PROMOTE_SHARPE_REGRESSION_THRESHOLD`, default 0.10) refuses promotion + cleans up `target_dir` when any panel scenario regresses Sharpe by more than the threshold. Implementation: `dev/scripts/promote_config.sh` + helpers in `dev/scripts/lib/extract_metrics.sh`. See also `dev/plans/tuning-methodology-redesign-2026-05-22.md` §5 P1 (where this MVP scope was re-confirmed).
 - [ ] §2 deferred: add French 49-industry + Shiller scenarios once their goldens stabilize.
 - [ ] §3 deferred: document in next sweep plan, not blocking V3.
 
