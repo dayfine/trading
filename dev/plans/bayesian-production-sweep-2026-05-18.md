@@ -209,7 +209,7 @@ catastrophes by averaging; the floors enforce per-fold sanity.
 
 - **Mean-fold composite score ≥ baseline Cell-E + 0.05** (5% relative improvement) — composite-axis gate (per #1196 Q4, v1 uses mean; median is a follow-up)
 - **No fold loses to Cell-E by more than -0.10 composite** (no single-fold catastrophe) — composite-axis floor
-- **OOS Sharpe ≥ 0.50** on every fold (strategy still risk-adjusted-positive everywhere) — orthogonal hard floor
+- **OOS Sharpe ≥ baseline Cell-E Sharpe − 0.10** on every fold (per-fold relative floor — Option E, adopted from `dev/notes/axis-3-gate-fitness-2026-05-21.md` §Recommendation). Replaces the original v1 axis-3 "OOS Sharpe ≥ 0.50 every fold," which (per #1232 + #1237 §10) was unfit: it held candidates to a higher bar than the canonical baseline meets on structurally-bad folds (e.g. fold-29 cell-E Sharpe = −1.14), and locked out productive sweeps.
 - **MaxDD ≤ baseline Cell-E + 5pp** on every fold (no risk-budget blowout) — orthogonal hard floor
 - **N_trades within 2x of baseline** (consistency with mechanic-invariant claim) — orthogonal hard floor
 
