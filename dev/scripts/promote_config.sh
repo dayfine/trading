@@ -236,11 +236,15 @@ else
     echo "Composed scratch scenario: $scratch_path"
   done <<< "$PROMOTE_VALIDATION_PANEL"
 
-  # Build scenario_runner.exe (idempotent if already built).
-  echo "Building scenario_runner.exe..."
-  ( cd "$trading_repo_root/trading" && dune build trading/backtest/scenarios/scenario_runner.exe ) \
+  # Build scenario_runner.exe via docker (idempotent if already built).
+  # This repo's OCaml toolchain lives in the trading-1-dev container; the
+  # host opam switch is intentionally minimal and missing libraries like
+  # core_unix.
+  echo "Building scenario_runner.exe (inside docker)..."
+  docker exec "${PROMOTE_DOCKER_CONTAINER:-trading-1-dev}" bash -c \
+    'cd /workspaces/trading-1/trading && eval $(opam env) && dune build trading/backtest/scenarios/scenario_runner.exe' \
     >/dev/null 2>&1 || {
-      echo "Error: dune build scenario_runner.exe failed" >&2
+      echo "Error: dune build scenario_runner.exe failed inside docker" >&2
       rm -rf "$target_dir"
       exit 1
     }
@@ -252,22 +256,30 @@ else
     exit 1
   fi
 
-  # Run all scratch scenarios. We tolerate non-zero exit from scenario_runner
-  # because its PASS/FAIL gate compares against pinned cell-E ranges that the
-  # candidate may legitimately exceed (in either direction). The validation
-  # gate below reads actual.sexp directly.
+  # Run all scratch scenarios via docker (same toolchain as the build). We
+  # tolerate non-zero exit because the runner's PASS/FAIL gate compares
+  # against pinned cell-E ranges that the candidate may legitimately exceed
+  # (in either direction). The validation gate below reads actual.sexp
+  # directly.
   runner_log="$validation_dir/runner.log"
   # Capture the pre-run state of dev/backtest/scenarios-* so we can identify
   # the runner's new output dir even when other backtests created dirs before.
   pre_run_marker="$validation_dir/pre_run_marker"
   touch "$pre_run_marker"
   echo "Running scratch scenarios (this may take 15-60 min per scenario)..."
+  # Translate host paths to docker-visible paths (the bind-mount maps
+  # /Users/difan/Projects/trading-1 → /workspaces/trading-1).
+  docker_repo_root="/workspaces/trading-1"
+  docker_scratch_dir="${scratch_scenarios_dir/$trading_repo_root/$docker_repo_root}"
+  docker_runner_exe="${scenario_runner_exe/$trading_repo_root/$docker_repo_root}"
   set +e
-  "$scenario_runner_exe" \
-    --dir "$scratch_scenarios_dir" \
-    --fixtures-root "$trading_repo_root/trading/test_data/backtest_scenarios" \
-    --parallel "$PROMOTE_VALIDATION_PARALLEL" \
-    --no-emit-all-eligible \
+  docker exec "${PROMOTE_DOCKER_CONTAINER:-trading-1-dev}" bash -c "
+    cd $docker_repo_root/trading && eval \$(opam env) &&
+    $docker_runner_exe \\
+      --dir $docker_scratch_dir \\
+      --fixtures-root $docker_repo_root/trading/test_data/backtest_scenarios \\
+      --parallel $PROMOTE_VALIDATION_PARALLEL \\
+      --no-emit-all-eligible" \
     > "$runner_log" 2>&1
   runner_exit=$?
   set -e
