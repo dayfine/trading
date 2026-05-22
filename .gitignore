@@ -84,6 +84,11 @@ dev/perf/
 # Was getting wiped mid-run by jj auto-snapshot before this entry landed.
 dev/data/
 
+# Promote-config validation scratch dirs (composed scratch scenarios for
+# the cross-scenario gate). Live under dev/_tmp/ so docker (scenario_runner)
+# can see them via the bind-mount; cleaned up by promote_config.sh on exit.
+dev/_tmp/
+
 # jj conflict materialization directories (never commit these)
 .jjconflict-base-*/
 .jjconflict-side-*/

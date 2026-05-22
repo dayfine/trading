@@ -196,7 +196,11 @@ sp500-2019-2023 trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-20
 EOF
 
 validation_sexp="$target_dir/validation.sexp"
-validation_dir="$(mktemp -d -t promote-validation-XXXXXX)"
+# Place validation_dir under the repo bind-mount so docker (running
+# scenario_runner.exe) can see the composed scratch scenarios. Host TMPDIR
+# (/var/folders/... on macOS) is NOT bind-mounted into trading-1-dev.
+mkdir -p "$trading_repo_root/dev/_tmp"
+validation_dir="$(mktemp -d "$trading_repo_root/dev/_tmp/promote-validation-XXXXXX")"
 trap 'rm -rf "$validation_dir"' EXIT
 
 # Build validation.sexp incrementally as scenarios complete; the final form
