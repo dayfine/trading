@@ -1,11 +1,38 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-05-04
+## Last updated: 2026-05-22
 
 ## Status
-IN_PROGRESS
+PARKED
 
-(Phase 1 stable, ~18 days uptime; Phase 2 deferred, no active dispatch.)
+(Phase 1 stable, 36 days uptime; Phase 2 explicitly deferred 2026-05-22 per track-pacer 2026-05-22 §P6.)
+
+**2026-05-22 decision — track wrapped on Phase 1 stable state.** Per
+`dev/reviews/track-pacer-2026-05-22.md` §P6 + recommendation 4:
+"orchestrator-automation — 5+ daily-summary PRs and nothing else since
+2026-05-04. Same situation as flagged in 2026-05-17 pacer; no movement
+on Phase 2 in 5 days... either dispatch Phase 2 experiments or wrap
+track MERGED on Phase 1 stable state. Carrying as IN_PROGRESS without
+dispatch for 18+ days is the same problem we flag for stale Next Steps."
+
+Phase 2 (background execution: scraper concurrency, golden re-runs in
+parallel, cross-feature QC parallelism, stacked dispatch) optimises the
+GHA orchestrator that runs **2x/day on a reduced cron** (per
+`memory/project_orchestrator_off.md`). The marginal productivity win is
+small relative to current strategic priorities per
+`dev/notes/next-session-priorities-2026-05-22.md`:
+
+- P0 — V3 promotion E2E + cross-scenario validation gate
+- P2 — M6.6 live cycle scoping (`live` DATA_SOURCE + cron + alert dispatch)
+- P3 — 11-knob multi-param BO sweep
+- P4 — Component-decomposition objective
+
+Phase 2 research below is preserved as the implementation record.
+**Reopen this track if/when** (a) the 2x/day cadence becomes a bottleneck
+(needs more sweeps/scrapes than the current orchestrator capacity), or
+(b) a specific Phase 2 win becomes higher-leverage than the current
+P0-P5 stack (e.g. M6.6 cron integration could subsume the scraper-
+dispatch win).
 
 Phase 1 (scheduled daily orchestrator on GHA) has been producing daily
 summary PRs since 2026-04-16. See `.github/workflows/orchestrator.yml`
