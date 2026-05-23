@@ -67,6 +67,22 @@ val margin_call_transitions :
     be located for the flagged symbol (e.g. the short is already mid-exit on
     this tick). *)
 
+val dedup_strategy_exits_for_margin :
+  strategy_transitions:Position.transition list ->
+  margin_trans:Position.transition list ->
+  Position.transition list
+(** Drop any [TriggerExit] in [strategy_transitions] whose [position_id] matches
+    a transition in [margin_trans]. Resolves the same-tick same-position
+    collision described in issue #1266: the [Position.t] state machine accepts
+    [Holding _ -> TriggerExit] only once per position, so a strategy-side
+    stop-loss exit and a margin-call exit targeting the same short on the same
+    bar would otherwise crash the second application. Margin wins by priority —
+    it carries forensic detail ([entry_avg_cost], [current_price]) the
+    strategy's exit doesn't.
+
+    Only [TriggerExit] kinds are filtered. Other strategy transitions on the
+    same position-id (e.g. [UpdateRiskParams]) pass through unchanged. *)
+
 val tick :
   margin_config:Margin_config.t ->
   portfolio:Portfolio.t ->
@@ -77,4 +93,9 @@ val tick :
   Portfolio.t * Position.transition list
 (** One simulator-tick worth of margin mechanics: accrue daily borrow fee, then
     append any maintenance-margin-breach exits to [strategy_transitions]. No-op
-    when [margin_config.enabled = false] (preserves baselines bit-equal). *)
+    when [margin_config.enabled = false] (preserves baselines bit-equal).
+
+    Resolves same-tick same-position [TriggerExit] collisions between the
+    strategy and margin sources via {!dedup_strategy_exits_for_margin}: margin
+    transitions win, strategy exits for the same position-id are dropped. See
+    issue #1266 for the dotcom-2000-2002 crash this prevents. *)
