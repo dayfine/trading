@@ -3,7 +3,9 @@ open OUnit2
 open Trend.Segmentation
 open Trend.Trend_type
 
-let float_approx_equal ?(epsilon = 1e-10) (a : float) (b : float) =
+(* Epsilon at 1e-6 (was 1e-10) tolerates non-deterministic float-sum order
+   drift observed in CI vs. host (≈1e-8 on r_squared/channel_width). *)
+let float_approx_equal ?(epsilon = 1e-6) (a : float) (b : float) =
   Float.compare (Float.abs (a -. b)) epsilon <= 0
 
 let segment_equal a b =
