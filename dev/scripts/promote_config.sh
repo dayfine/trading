@@ -145,16 +145,22 @@ trading_repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 trading_sha="$(cd "$trading_repo_root" && git rev-parse HEAD)"
 trading_short_sha="$(cd "$trading_repo_root" && git rev-parse --short HEAD)"
 
-# If the trading repo working copy has uncommitted changes to TRACKED files,
-# refuse. The captured SHA must exist in the local clone for consumers to
-# reproduce. We use `git diff` (worktree vs HEAD, tracked-only) rather than
-# `git diff-index` (index vs HEAD) because the latter treats intent-to-add
-# markers — left behind by jj-colocated workflows on untracked files — as
-# uncommitted changes, even though they're not modifications to tracked
-# content. Untracked + intent-to-add files are not load-bearing for SHA
-# reproducibility; only modifications to tracked files are.
-if ! (cd "$trading_repo_root" && git diff --quiet HEAD --); then
-  echo "Error: trading repo working copy has uncommitted changes to tracked files" >&2
+# If the trading repo working copy has MODIFICATIONS to tracked files, refuse.
+# The captured SHA must exist in the local clone for consumers to reproduce.
+#
+# We use `--diff-filter=M` to filter to Modifications only (excluding Added /
+# Deleted / Renamed) — both `git diff` and `git diff-index` treat intent-to-add
+# markers (set by jj-colocated workflows on untracked files when git status is
+# invoked) as Added entries, even though those files aren't modifications of
+# tracked content. The `M`-only filter excludes intent-to-add (which shows up
+# as `A`) but still catches real worktree-vs-HEAD modifications of tracked
+# files — which is what actually affects SHA reproducibility.
+#
+# (PR #1257 first attempted `git diff` vs `git diff-index` — qc-behavioral
+# correctly noted the two are equivalent for intent-to-add markers in modern
+# git. This second iteration uses the diff-filter approach instead.)
+if ! (cd "$trading_repo_root" && git diff --diff-filter=M --quiet HEAD --); then
+  echo "Error: trading repo working copy has uncommitted modifications to tracked files" >&2
   echo "Hint: commit + push your changes, or use git stash, before promoting" >&2
   exit 1
 fi
