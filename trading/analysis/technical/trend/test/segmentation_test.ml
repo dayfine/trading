@@ -3,9 +3,12 @@ open OUnit2
 open Trend.Segmentation
 open Trend.Trend_type
 
-(* Epsilon at 1e-6 (was 1e-10) tolerates non-deterministic float-sum order
-   drift observed in CI vs. host (≈1e-8 on r_squared/channel_width). *)
-let float_approx_equal ?(epsilon = 1e-6) (a : float) (b : float) =
+(* Epsilon at 1e-10: the regression accumulator was rewritten in pure OCaml
+   (closed-form least squares with fixed-order Array.fold_left sums) for
+   #1269, eliminating the Owl/LAPACK float32 non-determinism. Results are
+   now bit-identical across runs / cores; tight epsilon catches real
+   numeric regressions. *)
+let float_approx_equal ?(epsilon = 1e-10) (a : float) (b : float) =
   Float.compare (Float.abs (a -. b)) epsilon <= 0
 
 let segment_equal a b =
@@ -190,37 +193,37 @@ let test_complex_segmentation _ =
         start_idx = 0;
         end_idx = 4;
         trend = Increasing;
-        r_squared = 0.990269418573;
-        channel_width = 0.098742295943;
-        slope = 0.629999923706;
-        intercept = 9.95999984741;
+        r_squared = 0.990269461078;
+        channel_width = 0.0987420882907;
+        slope = 0.63;
+        intercept = 9.96;
       };
       {
         start_idx = 5;
         end_idx = 19;
         trend = Decreasing;
-        r_squared = 0.910274046695;
-        channel_width = 0.467855281206;
-        slope = -0.333214259148;
-        intercept = 13.6991664807;
+        r_squared = 0.910274044226;
+        channel_width = 0.467855325333;
+        slope = -0.333214285714;
+        intercept = 13.6991666667;
       };
       {
         start_idx = 20;
         end_idx = 24;
         trend = Increasing;
-        r_squared = 0.0169173031313;
-        channel_width = 0.361593649799;
-        slope = 0.0300001144409;
-        intercept = 9.30000038147;
+        r_squared = 0.0169172932331;
+        channel_width = 0.361593694635;
+        slope = 0.03;
+        intercept = 9.3;
       };
       {
         start_idx = 25;
         end_idx = 35;
         trend = Increasing;
-        r_squared = 0.978035397787;
-        channel_width = 0.482568843996;
-        slope = 0.970908945257;
-        intercept = 8.67272827842;
+        r_squared = 0.978035395802;
+        channel_width = 0.482568883448;
+        slope = 0.970909090909;
+        intercept = 8.67272727273;
       };
     ]
   in

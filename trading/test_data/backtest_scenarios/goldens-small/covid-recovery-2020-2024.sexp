@@ -46,6 +46,16 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Cost-model overlay (PR #1260 wiring). See bull-crash-2015-2020.sexp for
+ ;; the full rationale. [retail_default] with per_trade=0 is byte-equal to
+ ;; [None] under current wiring (only [apply_per_trade_commission] is hooked);
+ ;; spread / per_share will activate once [Cost_model.to_engine_costs] is
+ ;; wired into [Panel_runner] — Open work item in `dev/status/cost-model.md`.
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
  (expected
   ((total_return_pct   ((min  68.0)        (max  93.0)))
    (total_trades       ((min 238)          (max 322)))

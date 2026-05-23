@@ -63,19 +63,43 @@ YES
   preserves baseline, custom per_trade=$1.50 subtracts exact
   delta). No goldens needed re-pinning since every existing
   scenario file has `cost_model = None`.
+- [x] **Apply `cost_model = Some retail_default` to canonical
+  Weinstein-strategy goldens** (PR pending, 2026-05-23 —
+  feat/cost-model-overlay-repin). Declarative overlay added to 7
+  goldens: `goldens-small/{bull-crash-2015-2020, six-year-2018-2023,
+  covid-recovery-2020-2024}`, `goldens-sp500/{sp500-2019-2023,
+  sp500-2019-2023-long-only}`,
+  `goldens-sp500-historical/{sp500-2010-2026, sp500-2010-2026-longshort}`.
+  BAH-benchmark scenarios excluded (passive references, not
+  Weinstein comparators). Byte-equal to prior baseline because
+  `retail_default.per_trade_commission = 0.0` and only that knob is
+  currently wired — pinned metric ranges preserved. The remaining
+  three knobs (per_share, spread_bps, market_impact) become material
+  once `to_engine_costs` is wired into `Panel_runner` (next Open
+  item). Pinning the overlay declaratively now means that wiring PR
+  doesn't have to touch every golden again. See
+  `dev/notes/cost-model-overlay-repin-2026-05-23.md` for rationale,
+  scope, and estimated drift under full wiring (≈10 bps per
+  round-trip ≈ ~1% absolute return-drag on Cell E's 341.69%
+  baseline — comfortably inside the ±15% range tolerances). Verify:
+  `dune runtest trading/backtest/scenarios` (scenario goldens
+  parse + pass).
 
 ## Open work
 
+- [ ] **Wire `Cost_model.to_engine_costs` through `Panel_runner.run`**
+  so `bid_ask_spread_bps` + `per_share_commission` actually take
+  effect when `cost_model` is set. Single-file change (~30 LOC) in
+  `panel_runner.ml`: when `cost_model = Some cm`, derive
+  `(commission, slippage_bps)` from `to_engine_costs cm`, falling
+  back to the runner default for `None`. After this lands, re-run
+  the small goldens to confirm pinned ranges still gate; if any
+  break, re-pin from the new run. Cell E expected to drift ≈1%
+  return — well inside the current ±15% tolerance.
 - [ ] **Wire market-impact into the engine** — requires ADV
   plumbing. ADV needs to be loaded alongside bars; not yet in the
   simulation data layer. Defer until empirical evidence shows
   impact dominates over spread for realistic order sizes.
-- [ ] **Re-pin Cell E baseline with retail/institutional cost
-  overlay** — once items 1+2 above land, run Cell E (15y SP500)
-  with `cost_model = Some retail_default` and `Some
-  institutional_default` to quantify the cost attrition curve
-  beyond bid-ask-spread. The `slippage_bps` knob (PR #920) already
-  approximates the spread component.
 
 ## Follow-up experiments
 

@@ -48,6 +48,22 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Cost-model overlay (PR #1260 wiring). [retail_default] declares the
+ ;; expected cost regime: flat-fee retail broker (per_trade=$0, per_share=$0,
+ ;; bid_ask=5 bps, no market impact). With the current wiring (only
+ ;; [apply_per_trade_commission] hooked into the simulator),
+ ;; [per_trade_commission=0.0] means this overlay is byte-equal to
+ ;; [cost_model = None]; the pinned ranges below are unchanged. The
+ ;; [bid_ask_spread_bps=5.0] and [per_share_commission] knobs will become
+ ;; material once [Cost_model.to_engine_costs] is wired into [Panel_runner]
+ ;; — Open work item in `dev/status/cost-model.md`. Pinning the overlay
+ ;; declaratively now means future wiring lands without touching every
+ ;; golden again.
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
  (expected
   ((total_return_pct   ((min  94.0)        (max 127.0)))
    (total_trades       ((min 240)          (max 325)))
