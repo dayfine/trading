@@ -77,6 +77,24 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Cost-model overlay (PR #1260 wiring). [retail_default] declares the
+ ;; expected cost regime: flat-fee retail broker (per_trade=$0, per_share=$0,
+ ;; bid_ask=5 bps, no market impact). With the current wiring (only
+ ;; [apply_per_trade_commission] hooked into the simulator), this is
+ ;; byte-equal to [cost_model = None] — the 341.69% / 0.78 Sharpe baseline
+ ;; below is preserved. The [bid_ask_spread_bps=5.0] and
+ ;; [per_share_commission] knobs activate once [Cost_model.to_engine_costs]
+ ;; is wired into [Panel_runner] (Open work item in
+ ;; `dev/status/cost-model.md`). Estimated drift under full wiring: ~10 bps
+ ;; round-trip × 806 trades ≈ ~0.5-1% return-drag/year — meaningful on 15y
+ ;; but absorbed by the current ±15% tolerance. Pinning the overlay
+ ;; declaratively now means the next wiring PR doesn't have to touch every
+ ;; golden.
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
  ;; Re-pinned 2026-05-13 post NAV stale-price fix (#1063). Long-only
  ;; force_liq events on this 16y run: 0 (vs spurious events pre-fix).
  ;; The Portfolio_view avg-cost fallback removes the phantom NAV
