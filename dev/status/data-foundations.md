@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-17
+## Last updated: 2026-05-23
 
 ## Status
 READY_FOR_REVIEW
@@ -43,6 +43,19 @@ READY_FOR_REVIEW
   evening per the Option B pivot above.
 
 ## Notes
+
+**2026-05-23 full-pool 2019 baseline landed.** Cell-E on the full
+3000-symbol `top-3000-2019.sexp` composition pool for 2019-2023
+measured +32.37% / Sharpe 0.37 / MaxDD 32.48% / 278 trades. Compared
+to the cap-weighted 500-name slice (+78.34% on top-500-2019.sexp),
+the full-pool result decomposes the +65 pp top-500-vs-random-sample
+gap into ~30% "size-weighted universe is richer" and ~70% true
+selection-bias premium. Supersedes the n=5 random-sample reference
+in `dev/notes/random-universe-sweep-2026-05-18.md` as the correct
+null for the cap-weighted-slice survivor-bias question. Scenario at
+`trading/test_data/backtest_scenarios/goldens-custom-universe-scenarios/weinstein-2019-full-pool.sexp`
+(tagged `;; perf-tier: research`, NOT a CI regression cell); full
+writeup at `dev/notes/full-2019-pool-baseline-2026-05-23.md`.
 
 **2026-05-16 vendor-landscape pointers added.** Beyond the Phase 1.4 IWV
 work (point-in-time Russell membership), see
