@@ -20,6 +20,7 @@ let build_fold_scenario ~(base : Scenario.t) ~(fold : Window_spec.fold)
     config_overrides = base.config_overrides @ variant.overrides;
     strategy = base.strategy;
     slippage_bps = base.slippage_bps;
+    cost_model = None;
     expected = base.expected;
   }
 

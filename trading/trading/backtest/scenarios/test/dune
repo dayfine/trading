@@ -23,6 +23,7 @@
   scenario_lib
   matchers
   backtest
+  backtest_cost_model
   weinstein.data_source
   trading.simulation
   universe

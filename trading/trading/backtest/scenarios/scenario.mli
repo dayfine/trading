@@ -99,6 +99,19 @@ type t = {
           non-negative int for cost-overlay runs (e.g. M5.6 slippage sweep,
           2026-05-14). The runner applies buy fills at [price * (1 + bps/10000)]
           and sell fills at [price / (1 + bps/10000)] symmetrically. *)
+  cost_model : Backtest_cost_model.Cost_model.t option; [@sexp.option]
+      (** Declarative cost-model overlay threaded into
+          {!Backtest.Runner.run_backtest}'s [?cost_model] argument. [None]
+          preserves the zero-cost baseline byte-for-byte — every existing
+          scenario file omits the field and is unaffected. When [Some cm] is
+          set, the runner applies [Cost_model.apply_per_trade_commission cm] to
+          every fill, bumping each [trade.commission] by
+          [cm.per_trade_commission] before the portfolio accounts for it.
+          Composes with [slippage_bps] above (engine-level bid-ask slippage
+          stays orthogonal until ADV is plumbed and [cm.bid_ask_spread_bps] can
+          replace it). The per-share-commission and market-impact knobs in [cm]
+          are not yet wired into the simulator — items 3 and 4 of the four-item
+          plan tracked in [dev/status/cost-model.md]. *)
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]

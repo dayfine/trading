@@ -151,6 +151,7 @@ val run_backtest :
   ?bar_data_source:Bar_data_source.t ->
   ?progress_emitter:Backtest_progress.emitter ->
   ?slippage_bps:int ->
+  ?cost_model:Backtest_cost_model.Cost_model.t ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -233,4 +234,15 @@ val run_backtest :
     cadence. Resumability is intentionally NOT in this PR — the checkpoint is
     read-only progress information; restartability of the simulator state is a
     follow-up (deferred per the data-pipeline-automation plan, §"Open question
-    4"). *)
+    4").
+
+    [cost_model], when passed, threads a {!Backtest_cost_model.Cost_model.t}
+    overlay through the simulator. The runner builds a per-trade post-fill
+    adjustment from {!Backtest_cost_model.Cost_model.apply_per_trade_commission}
+    and threads it through {!Panel_runner.run} into
+    {!Trading_simulation.Simulator.create_deps}. [None] (the default) preserves
+    the zero-cost baseline byte-for-byte — every existing scenario file omits
+    the field and is unaffected. Item 2 of the four-item cost-model wiring plan
+    tracked in [dev/status/cost-model.md]; the per-share-commission,
+    bid-ask-spread and market-impact components are not yet routed through the
+    runner. *)

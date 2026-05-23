@@ -69,6 +69,7 @@ let _make_base () : Scenario.t =
     config_overrides = [];
     strategy = Backtest.Strategy_choice.default;
     slippage_bps = None;
+    cost_model = None;
     expected;
   }
 

@@ -16,6 +16,7 @@
   trading.simulation.data
   trading.simulation.types
   trading.strategy
+  backtest_cost_model
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime
   weinstein_trading.strategy

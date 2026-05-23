@@ -62,6 +62,7 @@ type t = {
   strategy : Backtest.Strategy_choice.t;
       [@sexp.default Backtest.Strategy_choice.default]
   slippage_bps : int option; [@sexp.option]
+  cost_model : Backtest_cost_model.Cost_model.t option; [@sexp.option]
   expected : expected;
 }
 [@@deriving sexp] [@@sexp.allow_extra_fields]

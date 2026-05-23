@@ -42,6 +42,15 @@ type dependencies = {
       (** Phase-2 margin-accounting parameters (issue #859). When
           [enabled = false] (the default), every margin code path is a no-op and
           existing baselines are bit-equal. *)
+  on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
+      (** Optional post-fill per-trade adjustment, applied inside the
+          simulator's accept-trades path before the portfolio accounts for each
+          trade. [None] (the default) preserves byte-equal baselines.
+
+          Strategy-agnostic, cost-model-agnostic hook so the simulator does not
+          depend on the higher-layer [Backtest_cost_model.Cost_model]. Callers
+          in the backtest layer construct the hook from
+          [Cost_model.apply_per_trade_commission] and thread it through. *)
 }
 
 val create_deps :
@@ -56,6 +65,7 @@ val create_deps :
   ?stale_hold_log:Stale_hold.Log.t ->
   ?slippage_bps:int ->
   ?margin_config:Trading_portfolio.Margin_config.t ->
+  ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
@@ -89,7 +99,14 @@ val create_deps :
       Phase-2 margin-accounting parameters (issue #859). Default
       {!Trading_portfolio.Margin_config.default_config} — disabled, so the
       simulator's per-step margin code paths are no-ops and existing baselines
-      are bit-equal. *)
+      are bit-equal.
+    @param on_trade_fill
+      Optional per-trade adjustment applied to every accepted fill before the
+      portfolio accounts for it. Default [None] — preserves byte-equal
+      baselines. Used by the backtest layer to wire the
+      {!Backtest_cost_model.Cost_model} per-trade flat commission into the
+      simulator without giving [trading.simulation] a layering dependency on the
+      higher-layer cost-model module. *)
 
 (** {1 Creation} *)
 
