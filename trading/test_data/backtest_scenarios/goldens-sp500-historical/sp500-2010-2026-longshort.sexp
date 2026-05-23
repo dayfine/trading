@@ -68,6 +68,18 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Cost-model overlay (PR #1260 wiring). See sp500-2010-2026.sexp for the
+ ;; full rationale. [retail_default] with per_trade=0 is byte-equal to
+ ;; [None] under current wiring (only [apply_per_trade_commission] is
+ ;; hooked); spread / per_share activate once [Cost_model.to_engine_costs]
+ ;; is wired into [Panel_runner] — Open work item in
+ ;; `dev/status/cost-model.md`. Long-short scenarios will absorb more
+ ;; spread drag than long-only since shorts cycle faster on stops.
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
  ;; Re-pinned 2026-05-13 post NAV stale-price fix (#1063). Long-short
  ;; force_liq events on this 16y run: 1 (vs 300+ death-loop signature
  ;; pre-fix, per dev/notes/longshort-portfolio-floor-death-loop). The
