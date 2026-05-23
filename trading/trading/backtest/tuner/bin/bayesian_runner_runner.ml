@@ -212,8 +212,8 @@ let _write_bo_log ~output_path ~spec ~objective ~observations
               in
               Out_channel.output_string oc (_csv_line row))))
 
-let _write_best_sexp ~output_path ~best_params =
-  let sexps = GS.cell_to_overrides best_params in
+let _write_best_sexp ?(int_keys = []) ~output_path ~best_params () =
+  let sexps = GS.cell_to_overrides ~int_keys best_params in
   let combined = Sexp.List sexps in
   Out_channel.with_file output_path ~f:(fun oc ->
       Out_channel.output_string oc (Sexp.to_string_hum combined);
@@ -347,7 +347,8 @@ let run_and_write ~(spec : Bayesian_runner_spec.t) ~out_dir ~evaluator =
   let conv_path = Filename.concat out_dir "convergence.md" in
   _write_bo_log ~output_path:log_path ~spec ~objective ~observations
     ~per_iteration_metrics;
-  _write_best_sexp ~output_path:best_path ~best_params:result.best_params;
+  _write_best_sexp ~int_keys:spec.int_keys ~output_path:best_path
+    ~best_params:result.best_params ();
   _write_convergence_md ~output_path:conv_path ~objective ~observations
     ~stop_reason;
   result

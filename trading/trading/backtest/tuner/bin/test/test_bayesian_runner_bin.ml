@@ -136,6 +136,62 @@ let test_load_malformed_raises _ =
       in
       assert_that raised (equal_to true))
 
+(* ---------- int_keys: per-binding (int) marker + round-trip ---------- *)
+
+(* Per `dev/notes/bayesian-11knob-int-knob-crash-2026-05-22.md`: BO samples
+   int-typed knobs at continuous floats (e.g. 3.8004) which crash
+   `int_of_sexp` downstream. The spec's `(int)` marker flags those knobs so
+   the BO runner threads them through `Grid_search.cell_to_overrides`'s
+   `?int_keys` parameter for rounding. *)
+
+let _int_marker_spec_text =
+  String.concat
+    [
+      "((bounds";
+      "  ((screening.weights.rs (0.1 0.5))";
+      "   (stage3_force_exit_config.hysteresis_weeks (1.0 8.0) (int))";
+      "   (screening.weights.w_positive_rs (5.0 40.0) (int))))";
+      " (acquisition Expected_improvement)";
+      " (initial_random 5)";
+      " (total_budget 30)";
+      " (seed (17))";
+      " (n_acquisition_candidates ())";
+      " (objective Sharpe)";
+      " (scenarios (\"path/to/bull.sexp\")))";
+    ]
+    ~sep:"\n"
+
+let test_load_int_marker_per_binding _ =
+  _with_temp_dir (fun dir ->
+      let path = _write_spec_file dir _int_marker_spec_text in
+      let spec = Spec.load path in
+      assert_that spec
+        (all_of
+           [
+             field
+               (fun s -> s.Spec.bounds)
+               (elements_are
+                  [
+                    equal_to ("screening.weights.rs", (0.1, 0.5));
+                    equal_to
+                      ("stage3_force_exit_config.hysteresis_weeks", (1.0, 8.0));
+                    equal_to ("screening.weights.w_positive_rs", (5.0, 40.0));
+                  ]);
+             field
+               (fun s -> s.Spec.int_keys)
+               (elements_are
+                  [
+                    equal_to "stage3_force_exit_config.hysteresis_weeks";
+                    equal_to "screening.weights.w_positive_rs";
+                  ]);
+           ]))
+
+let test_load_no_int_marker_defaults_to_empty_int_keys _ =
+  _with_temp_dir (fun dir ->
+      let path = _write_spec_file dir _spec_text in
+      let spec = Spec.load path in
+      assert_that spec.int_keys (equal_to []))
+
 (* ---------- to_grid_objective + to_acquisition coverage ---------- *)
 
 let test_to_grid_objective_simple_variants _ =
@@ -174,6 +230,7 @@ let test_to_bo_config_propagates_fields _ =
       length_scales = None;
       early_stop = None;
       gate_penalty_value = None;
+      int_keys = [];
     }
   in
   let config = Spec.to_bo_config spec in
@@ -211,6 +268,7 @@ let _parabola_spec ~total_budget ~seed : Spec.t =
     length_scales = None;
     early_stop = None;
     gate_penalty_value = None;
+    int_keys = [];
   }
 
 let test_run_and_write_emits_three_artefacts _ =
@@ -281,6 +339,7 @@ let _flat_spec_with_early_stop ~window ~epsilon : Spec.t =
     length_scales = None;
     early_stop = Some (window, epsilon);
     gate_penalty_value = None;
+    int_keys = [];
   }
 
 let test_early_stop_fires_on_flat_objective _ =
@@ -464,6 +523,7 @@ let _spec_record_with_holdout holdout : Spec.t =
     length_scales = None;
     early_stop = None;
     gate_penalty_value = None;
+    int_keys = [];
   }
 
 let test_holdout_folds_round_trip_none _ =
@@ -654,6 +714,7 @@ let test_to_bo_config_propagates_pr_d_fields _ =
       length_scales = Some [ 0.3; 0.4 ];
       early_stop = Some (15, 0.025);
       gate_penalty_value = None;
+      int_keys = [];
     }
   in
   let config = Spec.to_bo_config spec in
@@ -824,9 +885,10 @@ let test_checkpoint_file_written_per_iter _ =
   let spec = _parabola_spec ~total_budget:6 ~seed:11 in
   _with_temp_dir (fun dir ->
       let out_dir = Filename.concat dir "out" in
-      let _ =
+      let first_result =
         Runner.run_and_write ~spec ~out_dir ~evaluator:_parabola_evaluator
       in
+      assert_that (List.length first_result.observations) (equal_to 6);
       let ck_path = Filename.concat out_dir "bo_checkpoint.sexp" in
       assert_that (Sys_unix.file_exists_exn ck_path) (equal_to true);
       let raised =
@@ -845,7 +907,10 @@ let test_resume_at_full_budget_skips_evaluator _ =
   _with_temp_dir (fun dir ->
       let out_dir = Filename.concat dir "out" in
       let first_eval, first_calls = _counting_evaluator _parabola_evaluator in
-      let _ = Runner.run_and_write ~spec ~out_dir ~evaluator:first_eval in
+      let first_result =
+        Runner.run_and_write ~spec ~out_dir ~evaluator:first_eval
+      in
+      assert_that (List.length first_result.observations) (equal_to 8);
       let calls_after_fresh = !first_calls in
       let second_eval, second_calls = _counting_evaluator _parabola_evaluator in
       let result = Runner.run_and_write ~spec ~out_dir ~evaluator:second_eval in
@@ -926,6 +991,10 @@ let suite =
          >:: test_load_ucb_acquisition_and_composite_objective_parses;
          "Spec.load: malformed file raises Failure"
          >:: test_load_malformed_raises;
+         "Spec.load: (int) marker per binding -> int_keys populated"
+         >:: test_load_int_marker_per_binding;
+         "Spec.load: no (int) markers -> int_keys = []"
+         >:: test_load_no_int_marker_defaults_to_empty_int_keys;
          "Spec.to_grid_objective: simple variants round-trip"
          >:: test_to_grid_objective_simple_variants;
          "Spec.to_acquisition: round-trips" >:: test_to_acquisition_round_trips;

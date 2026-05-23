@@ -89,6 +89,7 @@ val default_executor : executor
 
 val build_walk_forward :
   ?gate_penalty_value:float ->
+  ?int_keys:string list ->
   executor:executor ->
   base:Scenario_lib.Scenario.t ->
   walk_forward_spec:Walk_forward.Spec.t ->

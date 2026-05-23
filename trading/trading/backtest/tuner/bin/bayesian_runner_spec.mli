@@ -73,7 +73,13 @@ type t = {
   bounds : (string * (float * float)) list;
       (** Per-parameter bounds [(key, (min, max))]. Sexp:
           [((bounds (("key.path1" (0.0 1.0)) ("key.path2" (-1.0 2.0)))) ...)].
-      *)
+
+          Each binding optionally carries an [(int)] marker as a third element —
+          [("key" (lo hi) (int))] — which flags the knob as integer-typed. The
+          marker is stripped at parse time and the key is recorded in
+          {!int_keys}; the field type stays [(string * (float * float)) list] so
+          existing consumers (BO [create_config], CSV header writer) are
+          unchanged. *)
   acquisition : acquisition_spec;
       (** Acquisition function selector. Default in {!Tuner.Bayesian_opt} is
           [Expected_improvement] but the spec carries it explicitly so runs are
@@ -154,13 +160,36 @@ type t = {
           informative as a tiebreaker without overwhelming the composite. Sexp
           form: [(gate_penalty_value 2.0)] for [Some 2.0]; omit the tag for
           [None] (= legacy [10.0]). *)
+  int_keys : string list;
+      (** Names of {!bounds} keys whose downstream config field is integer-typed
+          (e.g. [stage3_force_exit_config.hysteresis_weeks],
+          [screening_config.weights.w_positive_rs]). Threaded into
+          {!Tuner.Grid_search.cell_to_overrides} so BO-sampled floats are
+          rounded to the nearest integer before being emitted as override atoms
+          — without this, [int_of_sexp] downstream throws on continuous floats
+          like [3.8004…] (see
+          [dev/notes/bayesian-11knob-int-knob-crash-2026-05-22.md] for the
+          observed crash).
+
+          Two on-disk encodings, both round-trip:
+          - {b Per-binding sugar (preferred):} write
+            [("knob.path" (lo hi) (int))] inside the [bounds] list. The marker
+            is stripped at parse time and the key is recorded here.
+          - {b Explicit field:} [(int_keys ("k1" "k2"))] at the top level. Used
+            internally when {!sexp_of_t} round-trips a spec that originated as a
+            value rather than a parse.
+
+          When both forms appear, keys from both are merged (explicit first,
+          per-binding markers appended). Empty list (default) is omitted from
+          the emitted sexp. *)
 }
 [@@deriving sexp]
 (** A Bayesian-optimisation spec on disk. Example sexp:
     {[
     (bounds
        (("screening.weights.rs" (0.1 0.5))
-          ("screening.weights.volume" (0.1 0.5))))
+          ("screening.weights.volume" (0.1 0.5))
+          ("screening.weights.w_positive_rs" (5.0 40.0) int)))
       (acquisition Expected_improvement)
       (initial_random 5) (total_budget 30) (seed 17)
       (n_acquisition_candidates ())
@@ -171,6 +200,14 @@ type t = {
     The [holdout_folds] tag is optional ([\@sexp.option]): omit it entirely for
     [None]; write [(holdout_folds (k1 ... kn))] for [Some [k1; ...; kn]]; write
     [(holdout_folds ())] for [Some []]. *)
+
+(** The auto-derived [sexp_of_t] / [t_of_sexp] are shadowed in the [.ml]:
+    parsing accepts the per-binding sugar [(key (lo hi) (int))] in the [bounds]
+    list and the explicit top-level [(int_keys ...)] field (both populate
+    {!t.int_keys}); emission rewrites each binding whose key is in {!t.int_keys}
+    as [(key (lo hi) (int))] and drops the now-redundant top-level
+    [(int_keys ...)] field. Round-trip [t_of_sexp ∘ sexp_of_t = id] holds for
+    any [t] — checkpoint validation in the BO runner depends on this. *)
 
 val load : string -> t
 (** Load and parse a spec sexp file. Raises [Failure] on malformed input. *)
