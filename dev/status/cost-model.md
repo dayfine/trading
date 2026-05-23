@@ -1,12 +1,20 @@
 # Status: cost-model
 
-## Last updated: 2026-05-23
+## Last updated: 2026-05-23 (run-2 reconcile — full wiring landed)
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-Canonical scenario-facing cost-overlay configuration module. Listed
-as the next-after-M5.5 priority in
+End-to-end cost-overlay wiring landed 2026-05-23: #1260 (scenario
+field + simulator `on_trade_fill` hook) → #1273 (`retail_default`
+golden annotations on 7 Weinstein scenarios) → #1276
+(`to_engine_costs` Panel_runner wiring; `engine_costs_with_overlay`
+helper exposed for tests) → #1277 (walk-forward `cost_model`
+inheritance fix-forward for the `walk_forward_runner.ml:23` follow-up
+surfaced on #1260). Item 3 (ADV plumbing for `apply_market_impact`)
+DEFERRED by design — wait for empirical evidence impact ≫ spread
+before adding the ADV data-layer plumbing. Canonical scenario-facing
+cost-overlay configuration module per
 `memory/project_m5-5-tuning-exhausted.md`.
 
 ## Interface stable
