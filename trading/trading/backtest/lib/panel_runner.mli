@@ -51,6 +51,7 @@ val run :
   ?bar_data_source:Bar_data_source.t ->
   ?progress_emitter:Backtest_progress.emitter ->
   ?slippage_bps:int ->
+  ?cost_model:Backtest_cost_model.Cost_model.t ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
@@ -118,4 +119,14 @@ val run :
     the only difference is whether the snapshot directory was materialised
     in-process or supplied externally. See
     `dev/notes/path-dependent-regression-848-investigation-2026-05-05.md` for
-    the path-dependence surface this rewiring closes. *)
+    the path-dependence surface this rewiring closes.
+
+    [cost_model], when passed, threads a {!Backtest_cost_model.Cost_model.t}
+    overlay through the simulator. The runner builds an [on_trade_fill] hook
+    from {!Cost_model.apply_per_trade_commission} and passes it to
+    {!Trading_simulation.Simulator.create_deps}, which applies the adjustment to
+    every accepted fill before the portfolio accounts for it. [None] (the
+    default) preserves the zero-cost baseline byte-for-byte. Item 2 of the
+    four-item cost-model wiring plan in [dev/status/cost-model.md]; the
+    per-share-commission, bid-ask-spread and market-impact components of
+    [cost_model] are not yet routed through the runner. *)

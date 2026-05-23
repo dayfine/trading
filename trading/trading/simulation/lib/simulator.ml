@@ -42,22 +42,16 @@ type dependencies = {
           as [None] on every step (default; preserves prior behaviour). *)
   stale_hold_policy : Stale_hold.config;
   stale_hold_log : Stale_hold.Log.t;
-  margin_config : Trading_portfolio.Margin_config.t;
-      (** Phase 2 margin-accounting parameters (issue #859). Default
-          {!Trading_portfolio.Margin_config.default_config} — i.e. disabled, so
-          every Phase-1 / Phase-2 surface is a bit-equal no-op and existing
-          long-only goldens stay pinned. When [margin_config.enabled = true] the
-          simulator accrues a daily short borrow fee against [current_cash] and
-          emits margin-call [TriggerExit] transitions on shorts whose
-          maintenance equity ratio has fallen below [maintenance_margin_pct]
-          (see {!Margin_runner}). *)
+  margin_config : Trading_portfolio.Margin_config.t;  (** See .mli. *)
+  on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(metric_suite = { computers = []; derived = [] }) ?benchmark_symbol
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
     ?stale_hold_log ?(slippage_bps = 0)
-    ?(margin_config = Trading_portfolio.Margin_config.default_config) () =
+    ?(margin_config = Trading_portfolio.Margin_config.default_config)
+    ?on_trade_fill () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -81,6 +75,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     stale_hold_policy;
     stale_hold_log;
     margin_config;
+    on_trade_fill;
   }
 
 (** {1 Simulator State} *)
@@ -360,10 +355,12 @@ let _try_apply_trade portfolio trade =
   | Ok p -> (p, `Accepted trade)
   | Error _ -> (portfolio, `Rejected trade)
 
-let _apply_trades_best_effort portfolio trades =
+let _apply_trades_best_effort ?on_trade_fill portfolio trades =
+  let hook = Option.value on_trade_fill ~default:Fn.id in
   let portfolio, accepted_rev, rejected_rev =
     List.fold trades ~init:(portfolio, [], [])
       ~f:(fun (portfolio, accepted, rejected) trade ->
+        let trade = hook trade in
         let portfolio, outcome = _try_apply_trade portfolio trade in
         match outcome with
         | `Accepted t -> (portfolio, t :: accepted, rejected)
@@ -424,7 +421,8 @@ let _process_fills_and_cancels t ~portfolio ~positions =
   in
   let all_trades = _extract_trades execution_reports in
   let portfolio, trades, rejected_trades =
-    _apply_trades_best_effort portfolio all_trades
+    _apply_trades_best_effort ?on_trade_fill:t.deps.on_trade_fill portfolio
+      all_trades
   in
   let%bind positions =
     _update_positions_from_trades ~date:t.current_date ~positions ~trades

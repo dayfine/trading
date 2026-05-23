@@ -248,6 +248,92 @@ let test_loader_strategy_extra_field_tolerated _ =
   in
   assert_that s.universe_path (equal_to Scenario.default_universe_path)
 
+(* Pre-existing scenario sexps that don't pin [cost_model] continue to parse
+   with [None] (skip-the-overlay semantic — runs on the byte-equal zero-cost
+   baseline path). Item 1 of the four-item cost-model wiring plan tracked in
+   [dev/status/cost-model.md]. *)
+let test_cost_model_field_absent _ =
+  let s =
+    Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
+  in
+  assert_that s.cost_model is_none
+
+let _make_sexp_with_cost_model ~cost_model_sexp =
+  sprintf
+    {|
+  ((name "test-scenario")
+   (description "Unit-test fixture")
+   (period ((start_date 2023-01-02) (end_date 2023-12-31)))
+   (config_overrides ())
+   (cost_model %s)
+   (expected
+    (%s)))
+  |}
+    cost_model_sexp _base_expected_fields
+
+(* A scenario that pins [cost_model] parses the record correctly. The runner
+   threads it through to {!Backtest_cost_model.Cost_model.apply_per_trade_commission}
+   inside the simulator's accept-trades path. *)
+let test_cost_model_field_present _ =
+  let cm_sexp =
+    {|((per_trade_commission 1.0)
+       (per_share_commission 0.005)
+       (bid_ask_spread_bps 5.0)
+       (market_impact_bps_per_pct_adv 0.0))|}
+  in
+  let s =
+    Scenario.t_of_sexp
+      (Sexp.of_string (_make_sexp_with_cost_model ~cost_model_sexp:cm_sexp))
+  in
+  assert_that s.cost_model
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Backtest_cost_model.Cost_model.t) ->
+                c.per_trade_commission)
+              (float_equal 1.0);
+            field
+              (fun (c : Backtest_cost_model.Cost_model.t) ->
+                c.per_share_commission)
+              (float_equal 0.005);
+            field
+              (fun (c : Backtest_cost_model.Cost_model.t) ->
+                c.bid_ask_spread_bps)
+              (float_equal 5.0);
+            field
+              (fun (c : Backtest_cost_model.Cost_model.t) ->
+                c.market_impact_bps_per_pct_adv)
+              (float_equal 0.0);
+          ]))
+
+(* The [cost_model] field round-trips through sexp_of_t / t_of_sexp. *)
+let test_cost_model_roundtrip _ =
+  let cm_sexp =
+    {|((per_trade_commission 0.50)
+       (per_share_commission 0.0)
+       (bid_ask_spread_bps 2.0)
+       (market_impact_bps_per_pct_adv 1.0))|}
+  in
+  let original =
+    Scenario.t_of_sexp
+      (Sexp.of_string (_make_sexp_with_cost_model ~cost_model_sexp:cm_sexp))
+  in
+  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
+  assert_that roundtripped.cost_model
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Backtest_cost_model.Cost_model.t) ->
+                c.per_trade_commission)
+              (float_equal 0.50);
+            field
+              (fun (c : Backtest_cost_model.Cost_model.t) ->
+                c.market_impact_bps_per_pct_adv)
+              (float_equal 1.0);
+          ]))
+
 let suite =
   "Scenario"
   >::: [
@@ -268,6 +354,9 @@ let suite =
          "universe_path sexp round-trips" >:: test_universe_path_roundtrip;
          "extra loader_strategy field is tolerated (post-3.4 backward compat)"
          >:: test_loader_strategy_extra_field_tolerated;
+         "cost_model absent => None" >:: test_cost_model_field_absent;
+         "cost_model present => Some record" >:: test_cost_model_field_present;
+         "cost_model sexp round-trips" >:: test_cost_model_roundtrip;
          "all scenario files parse" >:: test_all_scenario_files_parse;
        ]
 

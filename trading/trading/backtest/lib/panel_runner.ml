@@ -5,6 +5,7 @@ open Trading_simulation
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Cost_model = Backtest_cost_model.Cost_model
 
 type input = {
   data_dir_fpath : Fpath.t;
@@ -51,8 +52,8 @@ let _build_market_data_adapter ~daily_panels =
   Bar_data_source.build_adapter_from_panels daily_panels
 
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
-    ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps ~strategy
-    ~market_data_adapter () =
+    ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps
+    ?on_trade_fill ~strategy ~market_data_adapter () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
   let sim_deps =
@@ -60,7 +61,7 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~data_dir:input.data_dir_fpath ~strategy ~commission
       ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
       ~market_data_adapter ~stale_hold_log ?slippage_bps
-      ~margin_config:input.config.margin_config ()
+      ~margin_config:input.config.margin_config ?on_trade_fill ()
   in
   let sim_config =
     Simulator.
@@ -215,9 +216,15 @@ let _create_recorders () : _recorders =
     audit_recorder;
   }
 
+(* Build the simulator's per-trade post-fill adjustment from the optional
+   [cost_model]. [None] returns [None] — the simulator stays on its
+   byte-equal default path. *)
+let _on_trade_fill_of_cost_model cost_model =
+  Option.map cost_model ~f:Cost_model.apply_per_trade_commission
+
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
-    ?bar_data_source ?progress_emitter ?slippage_bps () =
+    ?bar_data_source ?progress_emitter ?slippage_bps ?cost_model () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   eprintf
     "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
@@ -233,10 +240,11 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~warmup_start
       ~end_date ~audit_recorder:r.audit_recorder
   in
+  let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
   let sim =
     _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
       ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps
-      ~strategy ~market_data_adapter ()
+      ?on_trade_fill ~strategy ~market_data_adapter ()
   in
   let progress_acc =
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date

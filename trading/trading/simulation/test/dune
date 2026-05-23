@@ -30,6 +30,24 @@
   simulation_test_helpers))
 
 (test
+ (name test_simulator_cost_model)
+ (modules test_simulator_cost_model)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.orders
+  trading.strategy
+  backtest_cost_model
+  types
+  matchers
+  simulation_test_helpers))
+
+(test
  (name test_time_series)
  (modules test_time_series)
  (libraries ounit2 core trading.simulation.data types matchers))

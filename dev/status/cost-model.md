@@ -1,6 +1,6 @@
 # Status: cost-model
 
-## Last updated: 2026-05-17
+## Last updated: 2026-05-23
 
 ## Status
 READY_FOR_REVIEW
@@ -36,28 +36,46 @@ YES
 
 ## Completed
 
-- [x] **Cost-model module** (PR pending, 2026-05-17). Module +
+- [x] **Cost-model module** (PR #1151, 2026-05-17). Module +
   test (27 cases, all green). ~85 LOC impl, ~130 LOC mli, ~290 LOC
   test. Wired into nothing — standalone, callers can opt in. Verify:
   `dune runtest trading/backtest/cost_model` (27/27 pass).
+- [x] **Wire `cost_model` sexp field into `scenario.mli`** (PR
+  pending, 2026-05-23 — feat/cost-model-wiring-phase1). Added
+  `cost_model : Cost_model.t option` with `[@sexp.option]` so every
+  existing scenario file omits the field and continues to parse
+  with `None`. Threaded through `scenario_runner` →
+  `Runner.run_backtest` → `Panel_runner.run`. Verify: `dune runtest
+  trading/backtest/scenarios/test/test_scenario` (15/15 pass
+  including 3 new cost_model round-trip cases).
+- [x] **Wire `apply_per_trade_commission` into the simulator's
+  post-fill hook** (PR pending, 2026-05-23 — same PR). Added
+  strategy-agnostic `?on_trade_fill : (trade -> trade)` optional
+  dep on `Simulator.create_deps` (default `None` → byte-equal
+  baseline). `Panel_runner.run` constructs the hook from
+  `Cost_model.apply_per_trade_commission` when `?cost_model` is
+  supplied. Architectural note: simulator does NOT depend on
+  `Backtest_cost_model` (avoids inverting the layering — backtest
+  already depends on simulation); the cost-model module lives one
+  layer up and the hook surface keeps simulator generic. Verify:
+  `dune runtest trading/simulation/test/test_simulator_cost_model`
+  (3/3 pass — None preserves baseline, retail_default per_trade=0
+  preserves baseline, custom per_trade=$1.50 subtracts exact
+  delta). No goldens needed re-pinning since every existing
+  scenario file has `cost_model = None`.
 
 ## Open work
 
-- [ ] **Wire `cost_model` sexp field into `scenario.mli`** — add
-  `cost_model : Cost_model.t option` so scenarios can declare costs
-  declaratively. Lifts the existing `slippage_bps : int option`
-  into the broader config. Defer until at least one scenario needs
-  per-trade or impact, since `slippage_bps` already covers the
-  bid-ask-spread case.
-- [ ] **Wire `apply_per_trade_commission` into the simulator's
-  post-fill hook** — currently a standalone helper. Likely the
-  cleanest place is `Simulator._apply_trades_best_effort` (map
-  trades through the adjustment before applying to portfolio).
-  Trade-off: when this lands, every scenario re-pin is needed.
 - [ ] **Wire market-impact into the engine** — requires ADV
   plumbing. ADV needs to be loaded alongside bars; not yet in the
   simulation data layer. Defer until empirical evidence shows
   impact dominates over spread for realistic order sizes.
+- [ ] **Re-pin Cell E baseline with retail/institutional cost
+  overlay** — once items 1+2 above land, run Cell E (15y SP500)
+  with `cost_model = Some retail_default` and `Some
+  institutional_default` to quantify the cost attrition curve
+  beyond bid-ask-spread. The `slippage_bps` knob (PR #920) already
+  approximates the spread component.
 
 ## Follow-up experiments
 

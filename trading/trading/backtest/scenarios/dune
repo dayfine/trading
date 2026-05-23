@@ -7,7 +7,14 @@
   fixtures_root
   smoke_catalog
   scenario_progress)
- (libraries core fpath weinstein.data_source backtest universe status)
+ (libraries
+  core
+  fpath
+  weinstein.data_source
+  backtest
+  backtest_cost_model
+  universe
+  status)
  (preprocess
   (pps ppx_sexp_conv)))
 

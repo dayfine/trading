@@ -38,6 +38,7 @@ let _make_base ?(name = "base-test") ?(description = "base-desc")
     config_overrides;
     strategy;
     slippage_bps;
+    cost_model = None;
     expected;
   }
 
