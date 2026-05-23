@@ -145,11 +145,16 @@ trading_repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 trading_sha="$(cd "$trading_repo_root" && git rev-parse HEAD)"
 trading_short_sha="$(cd "$trading_repo_root" && git rev-parse --short HEAD)"
 
-# If the trading repo working copy has uncommitted changes, refuse.
-# Verifies tracked-tree cleanness (not unpushed commits or untracked files);
-# the captured SHA must exist in the local clone for consumers to reproduce.
-if ! (cd "$trading_repo_root" && git diff-index --quiet HEAD --); then
-  echo "Error: trading repo working copy has uncommitted changes" >&2
+# If the trading repo working copy has uncommitted changes to TRACKED files,
+# refuse. The captured SHA must exist in the local clone for consumers to
+# reproduce. We use `git diff` (worktree vs HEAD, tracked-only) rather than
+# `git diff-index` (index vs HEAD) because the latter treats intent-to-add
+# markers — left behind by jj-colocated workflows on untracked files — as
+# uncommitted changes, even though they're not modifications to tracked
+# content. Untracked + intent-to-add files are not load-bearing for SHA
+# reproducibility; only modifications to tracked files are.
+if ! (cd "$trading_repo_root" && git diff --quiet HEAD --); then
+  echo "Error: trading repo working copy has uncommitted changes to tracked files" >&2
   echo "Hint: commit + push your changes, or use git stash, before promoting" >&2
   exit 1
 fi
