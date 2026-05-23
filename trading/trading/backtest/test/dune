@@ -20,6 +20,7 @@
   test_fuzz_distribution
   test_gc_trace
   test_panel_runner_gc_trace
+  test_panel_runner_cost_model
   test_backtest_progress
   test_release_perf_report
   test_determinism
@@ -47,6 +48,7 @@
   trading.data_panel.snapshot
   trading.engine
   trading.portfolio
+  backtest_cost_model
   trading.simulation
   trading.simulation.data
   trading.simulation.types

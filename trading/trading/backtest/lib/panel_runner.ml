@@ -222,6 +222,28 @@ let _create_recorders () : _recorders =
 let _on_trade_fill_of_cost_model cost_model =
   Option.map cost_model ~f:Cost_model.apply_per_trade_commission
 
+(* Resolve the effective [(commission, slippage_bps)] pair the simulator
+   receives.
+
+   When [cost_model = Some cm], the overlay takes precedence: the engine's
+   per-share commission + integer slippage_bps are derived from
+   {!Cost_model.to_engine_costs}, fully replacing the runner's default
+   commission and the caller's [?slippage_bps]. This is the explicit
+   scenario-facing surface — scenarios that declare a [cost_model] expect
+   their declared cost regime to be exactly what the engine bills.
+
+   When [cost_model = None], the function returns the runner-side defaults
+   unchanged: the [~default_commission] passed by the runner constants
+   table and the caller's [?default_slippage_bps] (typically [None] →
+   engine's own slippage default). Byte-equal to pre-#1260 baselines. *)
+let engine_costs_with_overlay ~default_commission ?default_slippage_bps
+    ?cost_model () =
+  match cost_model with
+  | None -> (default_commission, default_slippage_bps)
+  | Some cm ->
+      let commission, slip_bps = Cost_model.to_engine_costs cm in
+      (commission, Some slip_bps)
+
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?progress_emitter ?slippage_bps ?cost_model () =
@@ -241,9 +263,14 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
       ~end_date ~audit_recorder:r.audit_recorder
   in
   let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
+  let effective_commission, effective_slippage_bps =
+    engine_costs_with_overlay ~default_commission:commission
+      ?default_slippage_bps:slippage_bps ?cost_model ()
+  in
   let sim =
     _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
-      ~start_date ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps
+      ~start_date ~end_date ~warmup_days ~initial_cash
+      ~commission:effective_commission ?slippage_bps:effective_slippage_bps
       ?on_trade_fill ~strategy ~market_data_adapter ()
   in
   let progress_acc =
