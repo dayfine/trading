@@ -66,11 +66,36 @@ let margin_call_transitions ~margin_config ~portfolio ~positions ~prices ~date =
         List.filter_map flagged
           ~f:(_transition_for_flagged_symbol ~date ~price_map ~positions)
 
+(* Same-tick same-position [TriggerExit] collision is impossible to apply: the
+   [Position.t] state machine accepts [Holding _ -> TriggerExit] only once
+   per position, and the second transition fails with "Invalid transition
+   Position.TriggerExit". When the strategy's stop-loss runner and the
+   margin runner both fire on the same bar (a sharp adverse move can trip
+   both at once), we keep the {b margin} transition and drop the strategy
+   one — margin wins by priority per issue #1266 because its [exit_reason]
+   carries forensic detail (entry_avg_cost + current_price) the strategy's
+   stop exit doesn't. Other strategy transitions on the same position
+   (e.g. [UpdateRiskParams]) are not [TriggerExit] kinds and pass through. *)
+let dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans =
+  let margin_exit_ids =
+    List.map margin_trans ~f:(fun (t : Position.transition) -> t.position_id)
+    |> Set.of_list (module String)
+  in
+  if Set.is_empty margin_exit_ids then strategy_transitions
+  else
+    List.filter strategy_transitions ~f:(fun (t : Position.transition) ->
+        match t.kind with
+        | Position.TriggerExit _ -> not (Set.mem margin_exit_ids t.position_id)
+        | _ -> true)
+
 let tick ~margin_config ~portfolio ~positions ~today_bars ~date
     ~strategy_transitions =
   let prices = mark_prices today_bars in
   let portfolio = accrue_borrow_fee ~margin_config ~portfolio ~prices in
   let margin_trans =
     margin_call_transitions ~margin_config ~portfolio ~positions ~prices ~date
+  in
+  let strategy_transitions =
+    dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans
   in
   (portfolio, strategy_transitions @ margin_trans)

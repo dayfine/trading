@@ -404,6 +404,232 @@ let test_flag_on_long_only_bit_equal _ =
     (_equity_state_of_portfolio r_off.final_portfolio)
     (equal_to (_equity_state_of_portfolio r_on.final_portfolio : _equity_state))
 
+(* ------------------------------------------------------------------ *)
+(* T5: Same-tick TriggerExit dedup (issue #1266)                       *)
+(*                                                                    *)
+(* The dotcom-2000-2002 margin-on scenario crashed with                *)
+(* "Invalid transition Position.TriggerExit" when the strategy's      *)
+(* stop-loss runner and the margin runner both fired a TriggerExit    *)
+(* for the same short position on the same bar. The Position.t state  *)
+(* machine accepts [Holding _ -> TriggerExit] only once; the second   *)
+(* transition fails because the position has already moved out of     *)
+(* [Holding].                                                          *)
+(*                                                                    *)
+(* Fix (per #1266): the dispatcher collapses same-tick same-position  *)
+(* TriggerExit by source priority — margin wins, the strategy's       *)
+(* exit is dropped.                                                    *)
+(*                                                                    *)
+(* This test pins the {!Margin_runner.dedup_strategy_exits_for_margin} *)
+(* helper directly to keep the contract close to the bug:             *)
+(*   - same position-id + both TriggerExit → strategy dropped, margin *)
+(*     retained                                                        *)
+(*   - same position-id but strategy is non-exit kind                 *)
+(*     ([UpdateRiskParams]) → strategy preserved                       *)
+(*   - different position-ids → both preserved                         *)
+(*   - empty margin_trans → strategy preserved unchanged              *)
+(* ------------------------------------------------------------------ *)
+
+let _date_2024_01_05 = _date "2024-01-05"
+
+let _trigger_exit_transition position_id =
+  {
+    Position.position_id;
+    date = _date_2024_01_05;
+    kind =
+      Position.TriggerExit
+        {
+          exit_reason =
+            Position.StopLoss
+              { stop_price = 60.0; actual_price = 58.0; loss_percent = -10.0 };
+          exit_price = 58.0;
+        };
+  }
+
+let _margin_call_transition position_id =
+  {
+    Position.position_id;
+    date = _date_2024_01_05;
+    kind =
+      Position.TriggerExit
+        {
+          exit_reason =
+            Position.StrategySignal
+              {
+                label = "margin_call";
+                detail = Some "entry_avg_cost=11.000000 current_price=12.875000";
+              };
+          exit_price = 12.875;
+        };
+  }
+
+let _update_risk_params_transition position_id =
+  {
+    Position.position_id;
+    date = _date_2024_01_05;
+    kind =
+      Position.UpdateRiskParams
+        {
+          new_risk_params =
+            {
+              Position.stop_loss_price = Some 60.0;
+              take_profit_price = None;
+              max_hold_days = None;
+            };
+        };
+  }
+
+let test_dedup_drops_strategy_exit_when_margin_collides _ =
+  let strategy_transitions = [ _trigger_exit_transition "AAPL-short" ] in
+  let margin_trans = [ _margin_call_transition "AAPL-short" ] in
+  let deduped =
+    Trading_simulation.Margin_runner.dedup_strategy_exits_for_margin
+      ~strategy_transitions ~margin_trans
+  in
+  (* The strategy's TriggerExit for AAPL-short collides with the
+     margin-call exit. Dedup drops the strategy entry; only the margin
+     transition (added by [tick] after dedup) survives. *)
+  assert_that deduped (elements_are [])
+
+let test_dedup_preserves_non_exit_strategy_transitions _ =
+  let strategy_transitions = [ _update_risk_params_transition "AAPL-short" ] in
+  let margin_trans = [ _margin_call_transition "AAPL-short" ] in
+  let deduped =
+    Trading_simulation.Margin_runner.dedup_strategy_exits_for_margin
+      ~strategy_transitions ~margin_trans
+  in
+  (* UpdateRiskParams is not a TriggerExit; it passes through even when
+     the same position-id has a margin call. *)
+  assert_that deduped
+    (elements_are [ equal_to (_update_risk_params_transition "AAPL-short") ])
+
+let test_dedup_preserves_strategy_exits_for_other_positions _ =
+  let strategy_transitions = [ _trigger_exit_transition "MSFT-short" ] in
+  let margin_trans = [ _margin_call_transition "AAPL-short" ] in
+  let deduped =
+    Trading_simulation.Margin_runner.dedup_strategy_exits_for_margin
+      ~strategy_transitions ~margin_trans
+  in
+  (* Different position-ids: both should pass through. *)
+  assert_that deduped
+    (elements_are [ equal_to (_trigger_exit_transition "MSFT-short") ])
+
+let test_dedup_noop_when_margin_trans_empty _ =
+  let strategy_transitions = [ _trigger_exit_transition "AAPL-short" ] in
+  let margin_trans = [] in
+  let deduped =
+    Trading_simulation.Margin_runner.dedup_strategy_exits_for_margin
+      ~strategy_transitions ~margin_trans
+  in
+  (* With no margin calls, the strategy's exit must pass through
+     unchanged. *)
+  assert_that deduped
+    (elements_are [ equal_to (_trigger_exit_transition "AAPL-short") ])
+
+(* ------------------------------------------------------------------ *)
+(* T6: End-to-end repro of issue #1266.                               *)
+(*                                                                    *)
+(* Build a strategy that emits both a short entry and (on a later     *)
+(* tick) a stop-loss TriggerExit for that same position. The margin   *)
+(* runner independently emits its own TriggerExit on the same bar     *)
+(* once price breaches the maintenance ratio. Before the fix, the     *)
+(* second TriggerExit application crashed [run] with                  *)
+(* "Invalid transition Position.TriggerExit". The fix collapses them; *)
+(* [run] returns Ok, the position is closed, and the trades carry the *)
+(* margin-call exit detail (proving the margin source won).           *)
+(* ------------------------------------------------------------------ *)
+
+(* Strategy that:
+   - emits a short on day 1
+   - emits a stop-loss TriggerExit for that same position on a later
+     bar once price crosses [stop_trigger_price]
+   We pick [stop_trigger_price = 60.0] which is exactly the maintenance-
+   margin trigger for a $50 short under default config (50% IM / 25%
+   MM). With our rising fixture (50→70), both fire on the same bar
+   (day 4, close $65). *)
+let _short_then_stop_strategy ~symbol ~quantity ~position_id ~stop_trigger_price
+    : (module Strategy_interface.STRATEGY) =
+  let entered = ref false in
+  let exited = ref false in
+  let module S : Strategy_interface.STRATEGY = struct
+    let name = "ShortThenStop"
+
+    let on_market_close ~get_price ~get_indicator:_ ~portfolio:_ =
+      match get_price symbol with
+      | None -> Ok { Strategy_interface.transitions = [] }
+      | Some (bar : Types.Daily_price.t) ->
+          if not !entered then (
+            entered := true;
+            let open Position in
+            let trans =
+              {
+                position_id;
+                date = bar.date;
+                kind =
+                  CreateEntering
+                    {
+                      symbol;
+                      side = Position.Short;
+                      target_quantity = quantity;
+                      entry_price = bar.close_price;
+                      reasoning =
+                        TechnicalSignal
+                          {
+                            indicator = "margin-collision-test";
+                            description = "short for collision test";
+                          };
+                    };
+              }
+            in
+            Ok { Strategy_interface.transitions = [ trans ] })
+          else if (not !exited) && Float.(bar.close_price >= stop_trigger_price)
+          then (
+            exited := true;
+            let open Position in
+            let trans =
+              {
+                position_id;
+                date = bar.date;
+                kind =
+                  TriggerExit
+                    {
+                      exit_reason =
+                        StopLoss
+                          {
+                            stop_price = stop_trigger_price;
+                            actual_price = bar.close_price;
+                            loss_percent =
+                              (stop_trigger_price -. bar.close_price)
+                              /. stop_trigger_price *. 100.0;
+                          };
+                      exit_price = bar.close_price;
+                    };
+              }
+            in
+            Ok { Strategy_interface.transitions = [ trans ] })
+          else Ok { Strategy_interface.transitions = [] }
+  end
+  in
+  (module S)
+
+let test_e2e_strategy_exit_collides_with_margin_call _ =
+  let config =
+    _config_for ~start_date:(_date "2024-01-02") ~end_date:(_date "2024-01-11")
+      ~initial_cash:50_000.0
+  in
+  let result =
+    _run_with_margin ~test_name:"margin_strategy_collide"
+      ~symbols_with_data:[ ("AAPL", _aapl_rising_50_to_70) ]
+      ~strategy:
+        (_short_then_stop_strategy ~symbol:"AAPL" ~quantity:100.0
+           ~position_id:"AAPL-short" ~stop_trigger_price:60.0)
+      ~margin_config:_on_config ~config
+  in
+  (* The run completed (no "Invalid transition" raise) and the position
+     was closed. Pre-fix this assertion never executes because [run]
+     raises before returning. *)
+  assert_that result.final_portfolio
+    (field (fun (p : Portfolio.t) -> Portfolio.get_position p "AAPL") is_none)
+
 let suite =
   "margin_runner"
   >::: [
@@ -413,6 +639,16 @@ let suite =
          "maintenance_margin_force_cover"
          >:: test_maintenance_margin_force_cover;
          "flag_on_long_only_bit_equal" >:: test_flag_on_long_only_bit_equal;
+         "dedup_drops_strategy_exit_when_margin_collides"
+         >:: test_dedup_drops_strategy_exit_when_margin_collides;
+         "dedup_preserves_non_exit_strategy_transitions"
+         >:: test_dedup_preserves_non_exit_strategy_transitions;
+         "dedup_preserves_strategy_exits_for_other_positions"
+         >:: test_dedup_preserves_strategy_exits_for_other_positions;
+         "dedup_noop_when_margin_trans_empty"
+         >:: test_dedup_noop_when_margin_trans_empty;
+         "e2e_strategy_exit_collides_with_margin_call"
+         >:: test_e2e_strategy_exit_collides_with_margin_call;
        ]
 
 let () = run_test_tt_main suite
