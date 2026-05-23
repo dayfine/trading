@@ -12,8 +12,8 @@ let _date y m d = Date.create_exn ~y ~m:(Month.of_int_exn m) ~d
 
 let _make_base ?(name = "base-test") ?(description = "base-desc")
     ?(universe_path = "universes/parity-7sym.sexp") ?(config_overrides = [])
-    ?(slippage_bps = None) ?(strategy = Backtest.Strategy_choice.default) () :
-    Scenario.t =
+    ?(slippage_bps = None) ?(cost_model = None)
+    ?(strategy = Backtest.Strategy_choice.default) () : Scenario.t =
   let expected : Scenario.expected =
     {
       total_return_pct = { min_f = -100.0; max_f = 500.0 };
@@ -38,7 +38,7 @@ let _make_base ?(name = "base-test") ?(description = "base-desc")
     config_overrides;
     strategy;
     slippage_bps;
-    cost_model = None;
+    cost_model;
     expected;
   }
 
@@ -112,6 +112,24 @@ let test_slippage_bps_preserved _ =
   let variant : WFR.variant = { label = "v"; overrides = [] } in
   let s = WFR.build_fold_scenario ~base ~fold ~variant in
   assert_that s.slippage_bps (is_some_and (equal_to 5))
+
+let test_cost_model_preserved _ =
+  let base =
+    _make_base ~cost_model:(Some Backtest_cost_model.Cost_model.retail_default)
+      ()
+  in
+  let fold = _make_fold () in
+  let variant : WFR.variant = { label = "v"; overrides = [] } in
+  let s = WFR.build_fold_scenario ~base ~fold ~variant in
+  assert_that s.cost_model
+    (is_some_and (equal_to Backtest_cost_model.Cost_model.retail_default))
+
+let test_cost_model_none_preserved _ =
+  let base = _make_base ~cost_model:None () in
+  let fold = _make_fold () in
+  let variant : WFR.variant = { label = "v"; overrides = [] } in
+  let s = WFR.build_fold_scenario ~base ~fold ~variant in
+  assert_that s.cost_model is_none
 
 let test_description_marks_fold_and_variant _ =
   let base = _make_base ~description:"orig desc" () in
@@ -236,6 +254,8 @@ let suite =
          "universe + strategy preserved"
          >:: test_universe_and_strategy_preserved;
          "slippage_bps preserved" >:: test_slippage_bps_preserved;
+         "cost_model preserved (Some)" >:: test_cost_model_preserved;
+         "cost_model preserved (None)" >:: test_cost_model_none_preserved;
          "description marks fold + variant"
          >:: test_description_marks_fold_and_variant;
          "build_all cross product order" >:: test_build_all_cross_product;
