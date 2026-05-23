@@ -11,6 +11,7 @@
   core
   matchers
   backtest
+  backtest_cost_model
   fork_pool
   scenario_lib
   walk_forward)

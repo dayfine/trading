@@ -42,6 +42,10 @@ val build_fold_scenario :
       {!Backtest.Runner.run_backtest}).
     - [strategy] preserved.
     - [slippage_bps] preserved.
+    - [cost_model] preserved — the per-fold scenarios inherit the base
+      scenario's cost-model overlay, so a walk-forward sweep on a
+      `retail_default`-annotated base scenario produces folds that exercise the
+      same cost surface.
     - [expected] preserved — note this means range checks may fail per-fold; the
       walk-forward report's comparison is across variants, not against pinned
       ranges. *)
