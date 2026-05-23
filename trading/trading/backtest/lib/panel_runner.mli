@@ -122,11 +122,34 @@ val run :
     the path-dependence surface this rewiring closes.
 
     [cost_model], when passed, threads a {!Backtest_cost_model.Cost_model.t}
-    overlay through the simulator. The runner builds an [on_trade_fill] hook
-    from {!Cost_model.apply_per_trade_commission} and passes it to
-    {!Trading_simulation.Simulator.create_deps}, which applies the adjustment to
-    every accepted fill before the portfolio accounts for it. [None] (the
-    default) preserves the zero-cost baseline byte-for-byte. Item 2 of the
-    four-item cost-model wiring plan in [dev/status/cost-model.md]; the
-    per-share-commission, bid-ask-spread and market-impact components of
-    [cost_model] are not yet routed through the runner. *)
+    overlay through the simulator on two surfaces:
+
+    - {!Cost_model.apply_per_trade_commission} becomes the simulator's
+      [on_trade_fill] hook (item 2 of the cost-model wiring plan in
+      [dev/status/cost-model.md]).
+    - {!Cost_model.to_engine_costs} derives the engine's per-share commission
+      and integer slippage_bps, fully replacing both the runner's default
+      commission (typically [{ per_share = 0.01; minimum = 1.0 }]) and the
+      caller's [?slippage_bps]. This makes [bid_ask_spread_bps] and
+      [per_share_commission] material at every fill. See
+      {!engine_costs_with_overlay} for the pure helper that performs the
+      resolution (exposed for tests).
+
+    [None] (the default) preserves the byte-equal baseline: the runner's default
+    commission and the caller's [?slippage_bps] flow through unchanged, and no
+    [on_trade_fill] is set. The market-impact component of [cost_model] is not
+    yet routed through the runner — it requires ADV plumbing that lives on the
+    simulation data layer. *)
+
+val engine_costs_with_overlay :
+  default_commission:Trading_engine.Types.commission_config ->
+  ?default_slippage_bps:int ->
+  ?cost_model:Backtest_cost_model.Cost_model.t ->
+  unit ->
+  Trading_engine.Types.commission_config * int option
+(** Pure helper that mirrors the overlay rule applied inside {!run}: when
+    [cost_model = Some cm], the returned [(commission, slippage_bps)] pair is
+    derived from {!Cost_model.to_engine_costs} (fully replacing the runner
+    defaults); when [cost_model = None], the runner defaults flow through
+    unchanged. Exposed so tests can pin the resolution without spinning up a
+    full simulator. *)

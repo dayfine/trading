@@ -87,19 +87,35 @@ YES
 
 ## Open work
 
-- [ ] **Wire `Cost_model.to_engine_costs` through `Panel_runner.run`**
-  so `bid_ask_spread_bps` + `per_share_commission` actually take
-  effect when `cost_model` is set. Single-file change (~30 LOC) in
-  `panel_runner.ml`: when `cost_model = Some cm`, derive
-  `(commission, slippage_bps)` from `to_engine_costs cm`, falling
-  back to the runner default for `None`. After this lands, re-run
-  the small goldens to confirm pinned ranges still gate; if any
-  break, re-pin from the new run. Cell E expected to drift ≈1%
-  return — well inside the current ±15% tolerance.
 - [ ] **Wire market-impact into the engine** — requires ADV
   plumbing. ADV needs to be loaded alongside bars; not yet in the
   simulation data layer. Defer until empirical evidence shows
   impact dominates over spread for realistic order sizes.
+
+## Completed (continued)
+
+- [x] **Wire `Cost_model.to_engine_costs` through `Panel_runner.run`**
+  (PR pending, 2026-05-23 — feat/cost-model-to-engine-wiring). Added
+  pure helper `Panel_runner.engine_costs_with_overlay` (exposed in
+  the .mli for tests): when `cost_model = Some cm`, derives
+  `(commission, slippage_bps)` from `Cost_model.to_engine_costs cm`
+  and fully replaces both the runner default commission
+  (`{ per_share = 0.01; minimum = 1.0 }`) and the caller's
+  `?slippage_bps`; when `cost_model = None`, the runner defaults
+  flow through unchanged (byte-equal baseline). Wired into the
+  `_make_simulator` call site in `Panel_runner.run`. Two new test
+  cases pin the resolution
+  (`trading/backtest/test/test_panel_runner_cost_model.ml`):
+  `cost_model=None preserves runner defaults` and `cost_model=Some
+  retail_default overrides commission + slippage`. Goldens not
+  re-pinned in this PR — the 7 cost_model-annotated scenarios
+  exercise the full path under nightly perf-tier; Cell E expected
+  to drift ≈1% return inside the existing ±15% tolerance per
+  `dev/notes/cost-model-overlay-repin-2026-05-23.md` (spread drag
+  partially offset by per-share commission dropping $0.01 → $0.00).
+  Verify: `dune runtest trading/backtest/test/test_panel_runner_cost_model.exe`
+  (2/2 pass); `dune runtest trading/backtest/cost_model` (27/27
+  pass); full `dune runtest` green.
 
 ## Follow-up experiments
 
