@@ -20,8 +20,8 @@ let _sector_map_of_scenario ~fixtures_root (s : scenario) =
   let resolved = Filename.concat fixtures_root s.universe_path in
   Universe_file.to_sector_map_override (Universe_file.load resolved)
 
-let _run_one ~fixtures_root (s : scenario) parameters =
-  let cell_overrides = GS.cell_to_overrides parameters in
+let _run_one ~fixtures_root ?(int_keys = []) (s : scenario) parameters =
+  let cell_overrides = GS.cell_to_overrides ~int_keys parameters in
   let merged_overrides = s.config_overrides @ cell_overrides in
   let sector_map_override = _sector_map_of_scenario ~fixtures_root s in
   let result =
@@ -74,12 +74,16 @@ let _candidate_label_for_iter (iter : int) : string = sprintf "bo-iter-%d" iter
 
 let _build_two_variant_spec ~(baseline_label : string)
     ~(candidate_label : string) ~(parameters : (string * float) list)
-    ~(template : Walk_forward.Spec.t) : Walk_forward.Spec.t =
+    ?(int_keys = []) ~(template : Walk_forward.Spec.t) () : Walk_forward.Spec.t
+    =
   let baseline : Wf_runner.variant =
     { label = baseline_label; overrides = [] }
   in
   let candidate : Wf_runner.variant =
-    { label = candidate_label; overrides = GS.cell_to_overrides parameters }
+    {
+      label = candidate_label;
+      overrides = GS.cell_to_overrides ~int_keys parameters;
+    }
   in
   { template with variants = [ baseline; candidate ] }
 
@@ -125,8 +129,9 @@ let _score_or_fail ~gate_penalty_value ~candidate_label ~baseline_label
         "Bayesian_runner_evaluator: score_cell failed for candidate %S: %s"
         candidate_label (Status.show err) ()
 
-let build_walk_forward ?(gate_penalty_value = 10.0) ~(executor : executor)
-    ~(base : Scenario.t) ~(walk_forward_spec : Walk_forward.Spec.t)
+let build_walk_forward ?(gate_penalty_value = 10.0) ?(int_keys = [])
+    ~(executor : executor) ~(base : Scenario.t)
+    ~(walk_forward_spec : Walk_forward.Spec.t)
     ~(baseline_aggregate : Wf_types.aggregate) ~(objective : GS.objective)
     ~(fixtures_root : string) () : t =
   let iter_counter = ref 0 in
@@ -137,7 +142,7 @@ let build_walk_forward ?(gate_penalty_value = 10.0) ~(executor : executor)
     let candidate_label = _candidate_label_for_iter n in
     let spec =
       _build_two_variant_spec ~baseline_label ~candidate_label ~parameters
-        ~template:walk_forward_spec
+        ~int_keys ~template:walk_forward_spec ()
     in
     let result = executor ~base ~spec ~fixtures_root in
     let score =

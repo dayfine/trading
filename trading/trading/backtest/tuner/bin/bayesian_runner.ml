@@ -181,7 +181,9 @@ let _run_legacy_mode ~(args : cli_args) ~(spec : Spec.t) =
   eprintf "[bayesian_runner] best_score=%.6f best_params=%s\n%!"
     result.best_score
     (Sexp.to_string
-       (Sexp.List (Tuner.Grid_search.cell_to_overrides result.best_params)));
+       (Sexp.List
+          (Tuner.Grid_search.cell_to_overrides ~int_keys:spec.int_keys
+             result.best_params)));
   eprintf "[bayesian_runner] outputs written under %s\n%!" args.out_dir
 
 (* -------------- walk-forward mode (PR-E) -------------- *)
@@ -208,13 +210,14 @@ let _wf_spec_with_placeholder_scenario (s : Spec.t) : Spec.t =
     {!Oos_validator.validate} partitions into in-sample vs OOS slices. The
     [parallel] degree is threaded through so the OOS re-run fans out the same
     way the BO loop's per-iteration sweeps did. *)
-let _execute_best_cell_walk_forward ~(best_params : (string * float) list)
-    ~(walk_forward_spec : Wf_spec.t) ~(base : Scenario.t)
-    ~(fixtures_root : string) ~(parallel : int) : Wf_report.fold_actual list =
+let _execute_best_cell_walk_forward ?(int_keys = [])
+    ~(best_params : (string * float) list) ~(walk_forward_spec : Wf_spec.t)
+    ~(base : Scenario.t) ~(fixtures_root : string) ~(parallel : int) () :
+    Wf_report.fold_actual list =
   let candidate =
     {
       Walk_forward.Walk_forward_runner.label = _walk_forward_candidate_label;
-      overrides = Tuner.Grid_search.cell_to_overrides best_params;
+      overrides = Tuner.Grid_search.cell_to_overrides ~int_keys best_params;
     }
   in
   let two_variant_spec : Wf_spec.t =
@@ -269,7 +272,7 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
     args.parallel obj_label;
   let gate_penalty_value = Option.value spec.gate_penalty_value ~default:10.0 in
   let evaluator : Runner.evaluator =
-    Evaluator.build_walk_forward ~gate_penalty_value
+    Evaluator.build_walk_forward ~gate_penalty_value ~int_keys:spec.int_keys
       ~executor:(Evaluator.make_executor ~parallel:args.parallel ())
       ~base ~walk_forward_spec ~baseline_aggregate ~objective ~fixtures_root ()
   in
@@ -280,12 +283,15 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
   eprintf "[bayesian_runner] best_score=%.6f best_params=%s\n%!"
     result.best_score
     (Sexp.to_string
-       (Sexp.List (Tuner.Grid_search.cell_to_overrides result.best_params)));
+       (Sexp.List
+          (Tuner.Grid_search.cell_to_overrides ~int_keys:spec.int_keys
+             result.best_params)));
   (* OOS validation: re-run walk-forward on the best cell, partition the
      per-fold results, emit oos_report.md. *)
   let fold_actuals =
-    _execute_best_cell_walk_forward ~best_params:result.best_params
-      ~walk_forward_spec ~base ~fixtures_root ~parallel:args.parallel
+    _execute_best_cell_walk_forward ~int_keys:spec.int_keys
+      ~best_params:result.best_params ~walk_forward_spec ~base ~fixtures_root
+      ~parallel:args.parallel ()
   in
   let oos_result =
     Oos_validator.validate ~candidate_label:_walk_forward_candidate_label
