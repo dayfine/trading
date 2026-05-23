@@ -1,6 +1,6 @@
 # Status: cost-model
 
-## Last updated: 2026-05-23 (run-2 reconcile — full wiring landed)
+## Last updated: 2026-05-23
 
 ## Status
 MERGED
