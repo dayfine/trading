@@ -184,19 +184,21 @@ type t = {
           the emitted sexp. *)
 }
 [@@deriving sexp]
-(** A Bayesian-optimisation spec on disk. Example sexp:
-    {[
+(** A Bayesian-optimisation spec on disk. Example sexp (verbatim — the [(int)]
+    marker on the third binding must be parenthesised; the bare atom [int] is
+    rejected by {!t_of_sexp}'s pre-processor — see {!int_keys}):
+    {v
     (bounds
        (("screening.weights.rs" (0.1 0.5))
           ("screening.weights.volume" (0.1 0.5))
-          ("screening.weights.w_positive_rs" (5.0 40.0) int)))
+          ("screening.weights.w_positive_rs" (5.0 40.0) (int))))
       (acquisition Expected_improvement)
       (initial_random 5) (total_budget 30) (seed 17)
       (n_acquisition_candidates ())
       (objective Sharpe)
       (scenarios "trading/test_data/backtest_scenarios/smoke/bull-2019.sexp")
       (holdout_folds (27 28 29 30))
-    ]}
+    v}
     The [holdout_folds] tag is optional ([\@sexp.option]): omit it entirely for
     [None]; write [(holdout_folds (k1 ... kn))] for [Some [k1; ...; kn]]; write
     [(holdout_folds ())] for [Some []]. *)

@@ -192,6 +192,139 @@ let test_load_no_int_marker_defaults_to_empty_int_keys _ =
       let spec = Spec.load path in
       assert_that spec.int_keys (equal_to []))
 
+(** Build a [Spec.t] record carrying the given [int_keys]. Used by the
+    round-trip + merge-semantics tests below. *)
+let _spec_record_with_int_keys int_keys : Spec.t =
+  {
+    bounds =
+      [
+        ("screening.weights.rs", (0.1, 0.5));
+        ("stage3_force_exit_config.hysteresis_weeks", (1.0, 8.0));
+        ("screening.weights.w_positive_rs", (5.0, 40.0));
+      ];
+    acquisition = Spec.Expected_improvement;
+    initial_random = 5;
+    total_budget = 30;
+    seed = Some 17;
+    n_acquisition_candidates = None;
+    objective = Spec.Sharpe;
+    scenarios = [ "path/to/bull.sexp" ];
+    holdout_folds = None;
+    sentinel_bounds = None;
+    length_scales = None;
+    early_stop = None;
+    gate_penalty_value = None;
+    int_keys;
+  }
+
+let test_int_keys_round_trip_non_empty _ =
+  (* Round-trip [t -> sexp -> t] preserves a non-empty [int_keys]. The .mli
+     pins [t_of_sexp ∘ sexp_of_t = id] for any [t] — checkpoint validation
+     in the BO runner depends on this. The emitter writes per-binding
+     [(int)] markers and drops the top-level [(int_keys ...)] field; the
+     parser re-extracts them into [t.int_keys]. *)
+  let original =
+    _spec_record_with_int_keys
+      [
+        "stage3_force_exit_config.hysteresis_weeks";
+        "screening.weights.w_positive_rs";
+      ]
+  in
+  let round_tripped = Spec.t_of_sexp (Spec.sexp_of_t original) in
+  assert_that round_tripped.int_keys
+    (elements_are
+       [
+         equal_to "stage3_force_exit_config.hysteresis_weeks";
+         equal_to "screening.weights.w_positive_rs";
+       ])
+
+let _int_marker_with_explicit_field_spec_text =
+  (* Carries BOTH a top-level [(int_keys ...)] field AND per-binding [(int)]
+     markers. Pins the merge semantics documented at
+     bayesian_runner_spec.mli §int_keys and implemented in
+     [_preprocess_spec_sexp] (explicit-first, then per-binding markers). *)
+  String.concat
+    [
+      "((bounds";
+      "  ((screening.weights.rs (0.1 0.5))";
+      "   (stage3_force_exit_config.hysteresis_weeks (1.0 8.0) (int))";
+      "   (screening.weights.w_positive_rs (5.0 40.0) (int))))";
+      " (acquisition Expected_improvement)";
+      " (initial_random 5)";
+      " (total_budget 30)";
+      " (seed (17))";
+      " (n_acquisition_candidates ())";
+      " (objective Sharpe)";
+      " (scenarios (\"path/to/bull.sexp\"))";
+      " (int_keys (laggard_rotation_config.hysteresis_weeks)))";
+    ]
+    ~sep:"\n"
+
+let test_load_explicit_int_keys_field_merges_with_per_binding_markers _ =
+  (* Per .mli: "explicit-first, per-binding markers appended". The merged
+     order is the explicit field's contents followed by the per-binding
+     marker keys in their bounds-list order. *)
+  _with_temp_dir (fun dir ->
+      let path =
+        _write_spec_file dir _int_marker_with_explicit_field_spec_text
+      in
+      let spec = Spec.load path in
+      assert_that spec.int_keys
+        (elements_are
+           [
+             equal_to "laggard_rotation_config.hysteresis_weeks";
+             equal_to "stage3_force_exit_config.hysteresis_weeks";
+             equal_to "screening.weights.w_positive_rs";
+           ]))
+
+(** Build a spec sexp whose third [bounds] entry's trailing marker is
+    [marker_text]. Used to pin that malformed markers (e.g. [(int extra)],
+    [(int_alias)], bare atom [int]) are not silently treated as int-flags — they
+    fall through [_is_int_marker]'s exact match and cause [Spec.load] to raise
+    [Failure]. *)
+let _malformed_marker_spec_text ~marker_text =
+  String.concat
+    [
+      "((bounds";
+      "  ((screening.weights.rs (0.1 0.5))";
+      "   (screening.weights.w_positive_rs (5.0 40.0) " ^ marker_text ^ ")))";
+      " (acquisition Expected_improvement)";
+      " (initial_random 5)";
+      " (total_budget 30)";
+      " (seed (17))";
+      " (n_acquisition_candidates ())";
+      " (objective Sharpe)";
+      " (scenarios (\"path/to/bull.sexp\")))";
+    ]
+    ~sep:"\n"
+
+let _spec_load_raises_failure dir marker_text =
+  let path = _write_spec_file dir (_malformed_marker_spec_text ~marker_text) in
+  try
+    let _ = Spec.load path in
+    false
+  with Failure msg -> String.is_substring msg ~substring:"failed to parse"
+
+let test_load_malformed_int_marker_with_extra_atom_raises _ =
+  (* [(int extra)] is a two-atom list — [_is_int_marker] requires exactly
+     one atom, so the marker is not stripped. The 3-element binding then
+     fails the derived (string * (float * float)) parser. *)
+  _with_temp_dir (fun dir ->
+      assert_that (_spec_load_raises_failure dir "(int extra)") (equal_to true))
+
+let test_load_int_alias_marker_raises _ =
+  (* [(int_alias)] is rejected because [_is_int_marker] checks
+     [String.equal a "int"] exactly — typos do not silently parse. *)
+  _with_temp_dir (fun dir ->
+      assert_that (_spec_load_raises_failure dir "(int_alias)") (equal_to true))
+
+let test_load_bare_int_atom_marker_raises _ =
+  (* Bare atom [int] (not wrapped in parens) is a [Sexp.Atom], not a
+     [Sexp.List] — fails [_is_int_marker]'s outer [List ...] pattern.
+     Pins that the docstring example MUST use parenthesised [(int)]. *)
+  _with_temp_dir (fun dir ->
+      assert_that (_spec_load_raises_failure dir "int") (equal_to true))
+
 (* ---------- to_grid_objective + to_acquisition coverage ---------- *)
 
 let test_to_grid_objective_simple_variants _ =
@@ -995,6 +1128,16 @@ let suite =
          >:: test_load_int_marker_per_binding;
          "Spec.load: no (int) markers -> int_keys = []"
          >:: test_load_no_int_marker_defaults_to_empty_int_keys;
+         "Spec round-trip: non-empty int_keys preserved"
+         >:: test_int_keys_round_trip_non_empty;
+         "Spec.load: explicit (int_keys ...) merges with per-binding markers"
+         >:: test_load_explicit_int_keys_field_merges_with_per_binding_markers;
+         "Spec.load: malformed (int extra) marker -> Failure"
+         >:: test_load_malformed_int_marker_with_extra_atom_raises;
+         "Spec.load: (int_alias) marker -> Failure"
+         >:: test_load_int_alias_marker_raises;
+         "Spec.load: bare int atom marker -> Failure"
+         >:: test_load_bare_int_atom_marker_raises;
          "Spec.to_grid_objective: simple variants round-trip"
          >:: test_to_grid_objective_simple_variants;
          "Spec.to_acquisition: round-trips" >:: test_to_acquisition_round_trips;
