@@ -1,6 +1,6 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-05-16
+## Last updated: 2026-05-23
 
 ## Status
 IN_PROGRESS
@@ -16,14 +16,35 @@ force-cover) merged as #1119. Both phases gate behind
 `Margin_config.enabled = false` so prior MERGED baselines stay bit-equal
 until a scenario opts in.
 
-**Next short-side step: Margin Phase 3 — Stage A bear-window
-validation.** Plan: `dev/plans/short-side-margin-2026-05-13.md` §Stage A.
-Gated on an `ops-data` session: run shorts on 3 bear windows
-(2000-2002, 2008-2009, 2020-Q1 + 2022) with `margin_config.enabled =
-true` and compare bottom-line metrics (total return, MaxDD, force-cover
-count, accrued borrow fee) against the flag-off baseline. Hypothesis:
-realistic margin makes shorts strictly negative-EV at the current
-Stage-4 entry edge. Phase 4-5 (long-short combined) gated on Phase 3.
+**Phase 3 (Stage A bear-window validation) executed 2026-05-23.** Sweep
+ran 4 bear windows × 2 configs (margin off / on): 2000-2002 dot-com +
+2008 GFC (broad-1000-30y) + 2020-Q1 COVID + 2022 modern bear
+(sp500-2010-01-01). Results, scenarios, and recommendation:
+`dev/notes/margin-phase3-bear-windows-2026-05-23.md`. Scenarios:
+`dev/experiments/margin-phase3-bear-windows-2026-05-23/`. Headline
+verdicts:
+
+1. **Effect of flipping the margin flag on existing metrics is
+   negligible** in the three clean windows (Sharpe / MaxDD / return
+   deltas in the 4th decimal place; zero margin_call exits fired).
+2. **GFC is the one bear-window where short-side has positive edge**:
+   Sharpe 1.08, Calmar 1.43, 50% short win rate (vs 19% in dot-com).
+   The other bears are flat-to-losing. Plan §2.2 acceptance gate
+   FAILS at "Sharpe > 0 in ≥ 2 of 3 windows" (only GFC qualifies).
+3. **Phase 2 has a real transition bug** — `margin_call`
+   `TriggerExit` is rejected when the strategy's stop-loss runner
+   already queued a `TriggerExit` for the same position on the same
+   tick. Surfaced reproducibly in dot-com 2000-2002 within ~30 sec of
+   simulator start. Fix sketch: dedup margin-call candidates against
+   pending strategy transitions in `Margin_runner.tick`.
+4. **Recommendation**: keep `margin_config.enabled = false` default
+   for now; file Phase-2 fix issue; gate Phase 5 (long-short re-pin)
+   on the fix.
+
+**Next short-side step: fix the Phase 2 margin_call transition bug**
+(diagnosed in report Finding A), then re-run this sweep to populate
+the dot-com margin-on cell. Phase 4-5 (long-short combined re-pin)
+remains gated on the fix.
 
 **Earlier MERGED note retained below.**
 
