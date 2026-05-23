@@ -103,3 +103,4 @@ dev/_tmp/
 # tree without them). Cf. memory: jj operations during sweeps.
 dev/experiments/bayesian-production-sweep-*/output-v*-parallel*/
 dev/experiments/bayesian-production-sweep-*/output-v*-smoke/
+dev/experiments/bayesian-production-sweep-*/output-11knob*-parallel*/
