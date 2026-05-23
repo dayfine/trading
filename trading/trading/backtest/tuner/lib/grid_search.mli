@@ -107,11 +107,28 @@ val cells_of_spec : param_spec -> cell list
     [[[]]] — the single empty cell, representing "no overrides". An empty
     [values] list for any spec entry yields the empty cell list. *)
 
-val cell_to_overrides : cell -> Sexp.t list
+val cell_to_overrides : ?int_keys:string list -> cell -> Sexp.t list
 (** Convert a cell to the list of partial-config sexps consumed by
     [Backtest.Runner.run_backtest]'s [overrides] argument. Each [(key, value)]
     becomes one sexp via {!Backtest.Config_override.parse_to_sexp}; a malformed
-    [key_path] raises [Failure]. *)
+    [key_path] raises [Failure].
+
+    [int_keys] names cell keys whose downstream config field is integer-typed.
+    For each binding [(k, v)] where [k] is in [int_keys], the value is rounded
+    to the nearest integer ([Float.round_nearest]) and emitted as a bare integer
+    atom (e.g. [4], not [4.0] or [3.8004…]).
+
+    {b Why this matters:} the grid sampler enumerates [param_values] (floats),
+    so integer-valued floats like [40.0] format as [40.] and parse back as
+    [Some 40] for [int option] fields. Bayesian optimisation, however, samples
+    continuous floats from the bounded box — a sample of [3.8004…] for an
+    int-typed knob like [screening_config.weights.w_positive_rs] reaches the
+    config's [int_of_sexp] deserializer and crashes. The [int_keys] list opts
+    each int-typed knob into the rounding path so the emitted atom is always a
+    valid integer literal.
+
+    Default [int_keys = []] preserves the existing behavior. Unmarked keys
+    continue to round-trip their raw [%.17g] form. *)
 
 (** {1 Evaluation} *)
 
@@ -207,12 +224,16 @@ val write_csv : output_path:string -> objective:objective -> result -> unit
     {!Backtest.Comparison.metric_label}, then [objective_<label>]. Rows ordered
     by enumeration. *)
 
-val write_best_sexp : output_path:string -> result -> unit
+val write_best_sexp :
+  ?int_keys:string list -> output_path:string -> result -> unit
 (** Write [result.best_cell] as a list of partial-config sexps (one per param)
     to [output_path]. The output file shape is
     [((<key1> <value1>) (<key2> <value2>) ...)] where each entry is the
     {!Backtest.Config_override.parse_to_sexp} of the cell's binding — the same
-    shape consumed by [Backtest.Runner.run_backtest]'s [overrides]. *)
+    shape consumed by [Backtest.Runner.run_backtest]'s [overrides].
+
+    [int_keys] is threaded through to {!cell_to_overrides} so int-typed knobs
+    are emitted as integer atoms (see {!cell_to_overrides} for rationale). *)
 
 val write_sensitivity_md :
   output_path:string -> objective:objective -> sensitivity_row list -> unit
