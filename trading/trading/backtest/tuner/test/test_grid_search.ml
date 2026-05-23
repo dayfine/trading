@@ -105,6 +105,87 @@ let test_cell_to_overrides_nested _ =
              (equal_to true));
        ])
 
+(* ---------- int_keys rounding (issue #1249: 11-knob BO crash) ---------- *)
+
+(** Render the override sexps as a flat string for substring assertions. *)
+let _overrides_string sexps = Sexp.to_string (Sexp.List sexps)
+
+(** Substring predicates over [string]. Wrapped in [field] so the outer
+    [assert_that] checks a single derived value — keeps the test conformant with
+    the one-assert-per-value rule (.claude/rules/test-patterns.md). *)
+let _contains substring =
+  field (fun s -> String.is_substring s ~substring) (equal_to true)
+
+let _excludes substring =
+  field (fun s -> String.is_substring s ~substring) (equal_to false)
+
+(** Reproduces the crash documented in
+    [dev/notes/bayesian-11knob-int-knob-crash-2026-05-22.md]: a BO sampler
+    handed [3.8004…] to an int-typed knob, and [int_of_sexp] threw. With
+    [int_keys] set, the binding is rounded to the nearest integer and emitted as
+    a bare integer atom — safe for [int_of_sexp] downstream. *)
+let test_cell_to_overrides_int_keys_rounds_to_nearest _ =
+  let cell =
+    [ ("stage3_force_exit_config.hysteresis_weeks", 3.8004091733819) ]
+  in
+  let sexps =
+    GS.cell_to_overrides
+      ~int_keys:[ "stage3_force_exit_config.hysteresis_weeks" ]
+      cell
+  in
+  assert_that (_overrides_string sexps)
+    (all_of [ _contains "hysteresis_weeks 4"; _excludes "3.8" ])
+
+(** Rounding uses [Float.round_nearest] semantics — verified at the boundary
+    case [4.6 → 5] so the rounding rule is pinned (not "always truncate"). *)
+let test_cell_to_overrides_int_keys_rounds_above_half _ =
+  let cell = [ ("k", 4.6) ] in
+  let sexps = GS.cell_to_overrides ~int_keys:[ "k" ] cell in
+  assert_that (_overrides_string sexps) (_contains "k 5")
+
+(** Regression guard: the int marker is per-key, not global. A float-typed knob
+    in the same call must still round-trip its full precision. *)
+let test_cell_to_overrides_float_key_unchanged_when_int_keys_present _ =
+  let cell =
+    [
+      ("stage3_force_exit_config.hysteresis_weeks", 3.8);
+      ("initial_stop_buffer", 1.0541234567);
+    ]
+  in
+  let sexps =
+    GS.cell_to_overrides
+      ~int_keys:[ "stage3_force_exit_config.hysteresis_weeks" ]
+      cell
+  in
+  assert_that (_overrides_string sexps)
+    (all_of
+       [
+         _contains "hysteresis_weeks 4";
+         _contains "1.0541234567";
+         _excludes "hysteresis_weeks 3.8";
+       ])
+
+(** When [int_keys] is omitted (default), behavior is identical to the legacy
+    [%.17g] form. Pins backward compatibility — existing callers that don't pass
+    [int_keys] keep the pre-fix behavior.
+
+    Uses [3.5] (exactly representable in binary) so the [%.17g] form is the bare
+    ["3.5"] — avoids float-printing quirks like [3.8 → "3.7999…"]. *)
+let test_cell_to_overrides_default_int_keys_preserves_float_form _ =
+  let cell = [ ("k", 3.5) ] in
+  let sexps_default = GS.cell_to_overrides cell in
+  let sexps_empty = GS.cell_to_overrides ~int_keys:[] cell in
+  assert_that
+    (_overrides_string sexps_default)
+    (all_of
+       [
+         equal_to (_overrides_string sexps_empty);
+         (* The value must still contain the fractional digit (not rounded). *)
+         _contains "3.5";
+         (* And must NOT have been rounded to "4". *)
+         _excludes "k 4";
+       ])
+
 (* ---------- Objectives ---------- *)
 
 let test_objective_label _ =
@@ -373,6 +454,14 @@ let suite =
          "cell_to_overrides: top-level field"
          >:: test_cell_to_overrides_top_level;
          "cell_to_overrides: nested field" >:: test_cell_to_overrides_nested;
+         "cell_to_overrides: int_keys rounds 3.8004… to integer atom 4"
+         >:: test_cell_to_overrides_int_keys_rounds_to_nearest;
+         "cell_to_overrides: int_keys rounds 4.6 to 5 (nearest-int semantics)"
+         >:: test_cell_to_overrides_int_keys_rounds_above_half;
+         "cell_to_overrides: float key keeps precision when int_keys is set"
+         >:: test_cell_to_overrides_float_key_unchanged_when_int_keys_present;
+         "cell_to_overrides: default int_keys preserves legacy float form"
+         >:: test_cell_to_overrides_default_int_keys_preserves_float_form;
          "objective_label" >:: test_objective_label;
          "objective_metric_type" >:: test_objective_metric_type_simple;
          "evaluate_objective: simple metric lookup"

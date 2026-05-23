@@ -58,15 +58,30 @@ let cells_of_spec spec =
   if List.exists spec ~f:(fun (_, vs) -> List.is_empty vs) then []
   else _cartesian spec
 
-let _binding_to_sexp (key, value) =
-  let key_eq_value = sprintf "%s=%.17g" key value in
+(** Format a binding's value as either an integer or a float literal. Int keys
+    round the BO-sampled float to the nearest integer and emit a bare integer
+    atom (e.g. ["4"], not ["4.0"]); float keys emit the raw [%.17g] form. The
+    integer-atom branch matters for Option/int sexp deserializers downstream:
+    [int_of_sexp (Atom "3.8…")] throws, but [int_of_sexp (Atom "4")] succeeds.
+*)
+let _format_binding_value ~is_int value =
+  if is_int then sprintf "%d" (Float.to_int (Float.round_nearest value))
+  else sprintf "%.17g" value
+
+let _binding_to_sexp ~int_keys (key, value) =
+  let is_int = Set.mem int_keys key in
+  let key_eq_value =
+    sprintf "%s=%s" key (_format_binding_value ~is_int value)
+  in
   match Backtest.Config_override.parse_to_sexp key_eq_value with
   | Ok sexp -> sexp
   | Error err ->
       failwithf "cell_to_overrides: failed to parse %s: %s" key_eq_value
         (Status.show err) ()
 
-let cell_to_overrides cell = List.map cell ~f:_binding_to_sexp
+let cell_to_overrides ?(int_keys = []) cell =
+  let int_keys_set = Set.of_list (module String) int_keys in
+  List.map cell ~f:(_binding_to_sexp ~int_keys:int_keys_set)
 
 (** {1 Evaluation} *)
 
@@ -227,8 +242,8 @@ let _write_csv_to ~objective result oc =
 let write_csv ~output_path ~objective result =
   Out_channel.with_file output_path ~f:(_write_csv_to ~objective result)
 
-let write_best_sexp ~output_path result =
-  let sexps = cell_to_overrides result.best_cell in
+let write_best_sexp ?(int_keys = []) ~output_path result =
+  let sexps = cell_to_overrides ~int_keys result.best_cell in
   let combined = Sexp.List sexps in
   Out_channel.with_file output_path ~f:(fun oc ->
       Out_channel.output_string oc (Sexp.to_string_hum combined);
