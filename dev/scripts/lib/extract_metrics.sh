@@ -58,11 +58,23 @@ abs_delta() {
 # Returns 0 (true) iff <actual> regresses from <baseline> by more than
 # <threshold> in the strict direction: (baseline - actual) > threshold.
 # Sharpe / return are "higher is better" → caller passes them directly.
-# For "lower is better" metrics (max_dd), caller should invert.
+# For "lower is better" metrics (max_dd), caller should invert the args:
+# `regresses_by_more_than <baseline> <actual> <threshold>` returns 0 iff
+# (actual - baseline) > threshold.
 regresses_by_more_than() {
   local actual="$1" baseline="$2" threshold="$3"
   awk -v a="$actual" -v b="$baseline" -v t="$threshold" \
     'BEGIN { exit !((b - a) > t) }'
+}
+
+# Returns 0 (true) iff <actual> is outside [<baseline>/<ratio>, <baseline>*<ratio>].
+# Used for the N_trades gate: a candidate that trades 5x more or 5x less than
+# baseline is treated as a different strategy, even if Sharpe survives.
+# Ratio must be > 1.0; ratio=2.0 means "within 2x in either direction".
+trades_out_of_ratio() {
+  local actual="$1" baseline="$2" ratio="$3"
+  awk -v a="$actual" -v b="$baseline" -v r="$ratio" \
+    'BEGIN { exit !(a > b * r || a * r < b) }'
 }
 
 # Pretty-print a signed delta with explicit sign for the validation table.
