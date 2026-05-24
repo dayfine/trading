@@ -1175,18 +1175,11 @@ let test_out_dir_check_override_set_to_zero_does_not_allow _ =
 let test_out_dir_check_error_message_names_override _ =
   (* Operators reading the error in CI logs need to see the override name
      so they can decide whether to set it (rather than guess). *)
-  match
-    Out_dir_check.validate ~out_dir:"dev/experiments/grid-screening"
-      ~env_lookup:_no_env ()
-  with
-  | Ok () -> assert_failure "expected Error"
-  | Error status ->
-      let msg = Status.show status in
-      assert_bool
-        ("expected error message to mention \
-          BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT, got: " ^ msg)
-        (String.is_substring msg
-           ~substring:"BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT")
+  assert_that
+    (Out_dir_check.validate ~out_dir:"dev/experiments/grid-screening"
+       ~env_lookup:_no_env ())
+    (is_error_with Status.Invalid_argument
+       ~msg:"BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT")
 
 let suite =
   "Tuner_bin.Bayesian_runner"
