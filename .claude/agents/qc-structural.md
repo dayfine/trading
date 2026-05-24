@@ -49,25 +49,35 @@ You check: build health, format compliance, code patterns, architecture constrai
 
 ## Process
 
-### Step 1: Checkout the feature branch (read-only)
+### Step 1: Checkout the feature branch (read-only, plain git worktree)
+
+**Use plain `git worktree`, NOT `jj edit` / `jj new feat/...@origin`.** Plain git worktrees are filesystem-only — they don't touch the parent workspace's shared `.jj/repo/` op-heads or default WorkspaceName, so concurrent QC agents cannot race the parent's `@` or revert each other's working files. The prior `jj edit` pattern caused two documented contamination incidents (`memory/feedback_qc_agents_need_worktree_isolation.md`, `memory/project_jj_worktree_root_cause.md`).
 
 ```bash
-jj git init --colocate 2>/dev/null || true
-jj git fetch
-jj new feat/<feature-name>@origin   # read-only — do NOT write files here
+PR_BRANCH="feat/<feature-name>"
+WT="/tmp/qc-pr-${PR_NUMBER:-no-pr}-$$"
+
+git fetch origin "${PR_BRANCH}"
+FEAT_SHA="$(git rev-parse "origin/${PR_BRANCH}")"
+git worktree add --detach "${WT}" "${FEAT_SHA}"
+cd "${WT}"
+# ... run build/diff/read steps relative to ${WT} ...
+# When done:
+cd /
+git worktree remove --force "${WT}"
 ```
 
-After fetching, check staleness — how many commits is `main@origin` ahead of this branch's
-merge base? Run:
+`git worktree add --detach` is the load-bearing form: detaching from any named ref means no orchestrator-visible branch state changes, even if the agent forgets to clean up.
+
+After fetching, check staleness — how many commits is `main` ahead of this branch's merge base?
 
 ```bash
-# Count commits on main not reachable from the feature branch
-jj log --revset "main@origin ~ ancestors(feat/<feature-name>@origin)" --no-graph -T "commit_id\n" | wc -l
+# Count commits on origin/main not reachable from the feature branch
+git fetch origin main
+git rev-list --count "${FEAT_SHA}..origin/main"
 ```
 
-If this count is > 10, add a **FLAG** note to the checklist: "Branch is N commits behind
-main@origin — consider rebasing before merge." This is a FLAG, not a FAIL: it does not
-block APPROVED, but the orchestrator escalation policy should note it.
+If this count is > 10, add a **FLAG** note to the checklist: "Branch is N commits behind `main` — consider rebasing before merge." This is a FLAG, not a FAIL: it does not block APPROVED, but the orchestrator escalation policy should note it.
 
 ### Step 2: Hard deterministic gates
 
@@ -89,7 +99,7 @@ When multiple agents work concurrently, ancestry diffs can include commits from 
 
 ```
 WARNING: Do NOT derive the file list from `git log` walks, `jj log`-based ancestry,
-or `jj diff --from main@origin`. Concurrent feature development on adjacent branches
+or `git log` ancestry. Concurrent feature development on adjacent branches
 will pollute that view with unrelated commits. The PR scope is what
 `gh pr view <N> --json files` returns, period.
 ```
@@ -107,27 +117,27 @@ git diff origin/main...origin/<branch> --stat
 git diff origin/main...origin/<branch>
 ```
 
-Local jj mode:
+Local mode (plain git inside the worktree set up in Step 1):
 ```bash
 # Enumerate files in this PR — canonical scope
 PR_FILES=$(gh pr view "$PR_NUMBER" --json files --jq '.files[].path')
 echo "$PR_FILES"
 
 # Read the diff for content inspection
-jj diff --from main@origin --to feat/<feature-name>@origin --stat
-jj diff --from main@origin --to feat/<feature-name>@origin
+git diff "origin/main...origin/<branch>" --stat
+git diff "origin/main...origin/<branch>"
 ```
 
 **If `$PR_NUMBER` is not known** (e.g., branch not yet submitted):
 ```bash
-# Fall back to jj/git diff for content, but add a checklist note:
-# "PR_NUMBER unavailable — file list derived from jj diff; verify matches PR
+# Fall back to git diff for content, but add a checklist note:
+# "PR_NUMBER unavailable — file list derived from git diff; verify matches PR
 #  once submitted via: gh pr view <N> --json files --jq '.files[].path'"
-jj diff --from main@origin --to feat/<feature-name>@origin --stat
-jj diff --from main@origin --to feat/<feature-name>@origin
+git diff "origin/main...origin/<branch>" --stat
+git diff "origin/main...origin/<branch>"
 ```
 
-Use `$PR_FILES` as the file list for all downstream checklist items (P6, A1, A2, A3). When `$PR_FILES` differs from what `jj diff --stat` shows, trust `$PR_FILES` — the discrepancy means ancestry contamination is present.
+Use `$PR_FILES` as the file list for all downstream checklist items (P6, A1, A2, A3). When `$PR_FILES` differs from what `git diff --stat` shows, trust `$PR_FILES` — the discrepancy means ancestry contamination is present.
 
 ### Step 4: Fill in the structural checklist
 
@@ -138,7 +148,7 @@ Work through each item below. Use Grep and Glob to verify claims — do not gues
 After filling the checklist, capture the tip commit SHA of the feature branch:
 
 ```bash
-REVIEWED_SHA=$(jj log -r 'feat/<feature-name>@origin' -T 'commit_id' --no-graph)
+REVIEWED_SHA="${FEAT_SHA}"  # already resolved via `git rev-parse origin/<branch>` in Step 1
 ```
 
 Write this as the **first line** of `dev/reviews/<feature>.md` before the checklist:
@@ -237,14 +247,15 @@ Reviewed SHA: <sha captured in Step 5>
 
 Then append the structural checklist below it.
 
+Write the file using the Edit/Write tool, with the review path resolved against the PARENT workspace's repo root (NOT the per-agent git worktree at `${WT}`, which the orchestrator does not see):
+
 ```bash
-jj new main@origin
-jj describe -m "QC structural review: <feature-name>"
+REVIEW_FILE="${GITHUB_WORKSPACE:-${PARENT_REPO_ROOT:-$(pwd)}}/dev/reviews/<feature>.md"
 ```
 
-Write the file using the Edit/Write tool.
+Here `${PARENT_REPO_ROOT}` is the orchestrator's working tree (typically the dispatch prompt's cwd before this agent ran). On GHA, `${GITHUB_WORKSPACE}` carries the same value.
 
-**IMPORTANT: Do NOT push your changes to origin.** The review file is written in-place in your worktree for the lead-orchestrator to read directly. Pushing creates orphan `dev/reviews/*` branches on origin that accumulate as clutter. Write the file and return — the orchestrator reads your output text and the file you wrote.
+**IMPORTANT: Do NOT push your changes to origin.** The review file is written in-place in the parent worktree for the lead-orchestrator to read directly. Pushing creates orphan `dev/reviews/*` branches on origin that accumulate as clutter. Write the file and return — the orchestrator reads your output text and the file you wrote.
 
 ### Update status
 
