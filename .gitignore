@@ -104,3 +104,9 @@ dev/_tmp/
 dev/experiments/bayesian-production-sweep-*/output-v*-parallel*/
 dev/experiments/bayesian-production-sweep-*/output-v*-smoke/
 dev/experiments/bayesian-production-sweep-*/output-11knob*-parallel*/
+
+# Host bind-mount target for /tmp/sweeps inside the dev container —
+# routes long-running sweep output to host disk so it doesn't grow
+# Docker.raw. Created by .devcontainer/setup.sh's do_start. See
+# dev/plans/safe-sweep-infrastructure-2026-05-24.md.
+.sweep-output/
