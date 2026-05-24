@@ -144,6 +144,22 @@ kb_to_gb() {
 }
 
 # ---------------------------------------------------------------------------
+# Cross-VM kill helper. Routes `kill -SIG <pid>` through `docker exec
+# <container> kill -SIG <pid>` when --container is set, otherwise calls
+# KILL_BIN directly. Required on macOS Docker Desktop where the container
+# runs in a Linux VM and its PID namespace is NOT visible from the host —
+# direct `kill -0 <container-pid>` always fails there.
+# ---------------------------------------------------------------------------
+_kill() {
+  local signal="$1" pid="$2"
+  if [[ -n "${CONTAINER:-}" ]]; then
+    "${DOCKER_BIN}" exec "${CONTAINER}" kill "${signal}" "${pid}" 2>/dev/null
+  else
+    "${KILL_BIN}" "${signal}" "${pid}" 2>/dev/null
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Threshold evaluator — returns 0 if all clear, 1 if a KILL threshold tripped.
 # Always emits warnings; only ever emits one KILL line per invocation.
 # ---------------------------------------------------------------------------
@@ -190,7 +206,7 @@ while true; do
   iteration=$(( iteration + 1 ))
 
   # Check sweep PID liveness first. `kill -0` returns 0 if PID exists.
-  if ! "${KILL_BIN}" -0 "${SWEEP_PID}" 2>/dev/null; then
+  if ! _kill -0 "${SWEEP_PID}"; then
     log "sweep pid=${SWEEP_PID} exited — watcher done"
     exit 0
   fi
@@ -199,7 +215,7 @@ while true; do
 
   if (( should_kill == 1 )); then
     log "ABORT: ${kill_reason} — SIGTERM-ing pid=${SWEEP_PID} so BO can write a final checkpoint"
-    "${KILL_BIN}" -TERM "${SWEEP_PID}" 2>/dev/null || true
+    _kill -TERM "${SWEEP_PID}" || true
     exit 2
   fi
 

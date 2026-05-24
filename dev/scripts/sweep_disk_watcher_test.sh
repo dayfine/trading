@@ -52,17 +52,33 @@ EOF
 echo "${raw_kb}	\$2"
 EOF
 
+  # docker mock: handles `exec <container> du -sk /tmp` AND `exec <container> kill -SIG <pid>`.
+  # The watcher routes kill through `docker exec` whenever --container is set
+  # (needed on macOS Docker where the container's PID namespace is not visible
+  # from the host). The mock records TERMs into kill_calls + reads pid_alive
+  # to answer liveness probes.
   cat > "${dir}/docker" <<EOF
 #!/bin/sh
 case "\$1 \$3" in
   "exec du")
     echo "${tmp_kb}	/tmp"
     ;;
+  "exec kill")
+    # \$2 is the container name, \$3 is "kill", \$4 is the signal, \$5 is the PID.
+    case "\$4" in
+      -0)
+        [ "${pid_alive}" = "1" ] && exit 0 || exit 1
+        ;;
+      -TERM)
+        echo "TERM sent to pid=\$5" >> "${dir}/kill_calls"
+        exit 0
+        ;;
+    esac
+    ;;
 esac
 EOF
 
-  # kill mock: -0 = liveness probe (returns based on pid_alive)
-  #            -TERM = record to a marker file
+  # kill mock: --container-less fallback path (KILL_BIN); same semantics.
   cat > "${dir}/kill" <<EOF
 #!/bin/sh
 case "\$1" in

@@ -321,3 +321,24 @@ if [[ -n "${PID}" ]]; then
 fi
 log "monitor:    ${DOCKER_BIN} exec ${CONTAINER} pgrep -af 'bayesian_runner\\.exe.*${SWEEP_NAME}'"
 log "tail log:   ${DOCKER_BIN} exec ${CONTAINER} tail -f ${LOG_FILE}"
+
+# ---------------------------------------------------------------------------
+# Spawn the disk watcher (PR-C, #1296) in the background ON THE HOST.
+# Conditional: only if the script is present (older checkouts won't have it).
+#
+# The watcher polls host-only probes (df / Docker.raw) that aren't visible
+# inside the container, so it must run host-side. The watcher's --container
+# flag forwards kill -0/-TERM through `docker exec` so it can address the
+# container-internal sweep PID even on macOS Docker (where the host kernel
+# does NOT share a PID namespace with the container).
+# ---------------------------------------------------------------------------
+WATCHER="${SCRIPT_DIR}/sweep_disk_watcher.sh"
+if [[ -x "${WATCHER}" && -n "${PID}" ]]; then
+  nohup "${WATCHER}" \
+    --sweep-pid "${PID}" \
+    --sweep-name "${SWEEP_NAME}" \
+    --container "${CONTAINER}" \
+    >/dev/null 2>&1 &
+  WATCHER_PID=$!
+  log "spawned disk watcher pid=${WATCHER_PID} (log .sweep-output/${SWEEP_NAME}.watcher.log)"
+fi
