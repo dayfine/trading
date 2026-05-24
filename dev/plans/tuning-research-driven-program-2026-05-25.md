@@ -1,5 +1,13 @@
 # Tuning research-driven program (2026-05-25)
 
+> **SUPERSEDED by `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`.**
+> v2 absorbs 5 design refinements from the post-publication review
+> conversation (cost-model preference, 1998-2026 promoted to primary
+> via delisted-aware top-3000, Cell E baseline dropped for that
+> experiment, fold-COUNT fidelity instead of fold-length, true PIT as
+> Phase 2 stretch) and adds explicit milestones + task lists.
+> This v1 is retained for the reasoning path.
+
 Concrete plan for the next-session tuning work, derived from the
 2026-05-25 frontier-research triage at
 `/tmp/tuning-frontier-research-2026-05-25.md` (cited papers below).
