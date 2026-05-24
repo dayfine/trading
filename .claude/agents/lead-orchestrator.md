@@ -1289,18 +1289,42 @@ agent didn't open as draft), the mutation is a no-op and returns
 was not run). Runs for both APPROVED and NEEDS_REWORK outcomes.
 
 Call `trading/devtools/checks/record_qc_audit.sh` to extract verdicts and
-quality score from `dev/reviews/<feature>.md` and write the structured audit
-record to `dev/audit/YYYY-MM-DD-<feature>.json`:
+quality score. The script accepts two sources and prefers the PR review
+comments path (PR-D'a, #1299) when `--pr-number N` is supplied; otherwise
+it falls back to reading `dev/reviews/<feature>.md`:
 
 ```bash
 DATE="$(date +%Y-%m-%d)"
 FEATURE="<feature>"
 BRANCH="feat/<feature>"   # or harness/<name> for harness work
+PR_NUMBER="<N>"           # from `gh pr view --head $BRANCH --json number` if not already in hand
 
+# Preferred — reads verdicts from `gh pr view <N> --json reviews`:
+bash trading/devtools/checks/record_qc_audit.sh \
+  "$FEATURE" "$BRANCH" "$DATE" --pr-number "$PR_NUMBER"
+
+# Legacy fallback — when no PR exists yet (review file is the sole audit trail):
 bash trading/devtools/checks/record_qc_audit.sh "$FEATURE" "$BRANCH" "$DATE"
 ```
 
-The script extracts from `dev/reviews/<feature>.md`:
+The script writes the structured audit record to
+`dev/audit/YYYY-MM-DD-<feature>.json`. In `--pr-number` mode it extracts:
+
+- **Structural verdict** from the latest PR review whose body contains
+  `## Structural QC` (or `## Structural Checklist`). State `APPROVED` →
+  `APPROVED`; `CHANGES_REQUESTED` → `NEEDS_REWORK`; `COMMENTED`/`DISMISSED`
+  falls back to the `## Verdict` block in the body (self-approval-blocked
+  QC agents post `--comment` reviews with the verdict in the body).
+- **Behavioral verdict** — same logic against `## Behavioral QC` (or
+  `## Behavioral Checklist` / `## Contract Pinning Checklist`).
+- **Quality score** from the last `## Quality Score` / `### Quality Score`
+  block in any review body.
+
+If the PR has no matching reviews, the script falls back to the file path
+below — same behavior as the legacy invocation. The transitional dual-source
+contract is documented in PR-D'a (#1299).
+
+In file mode the script extracts from `dev/reviews/<feature>.md`:
 - **Structural verdict**: `structural_qc: APPROVED|NEEDS_REWORK` field, or the
   first `## Verdict` block (bare or `**bold**` format); defaults to SKIPPED.
 - **Behavioral verdict**: `behavioral_qc: APPROVED|NEEDS_REWORK` field, or the
