@@ -58,39 +58,89 @@ This invalidates parts of the v6-verdict framing:
 **Why first:** cheapest of the three, unblocks both other items by giving
 the optimizer a navigable surface. ~50 LOC change.
 
-**Change:**
+**The change requires both a functional-form decision AND a calibration
+step. Don't ship without doing both.**
 
-```ocaml
-(* In bayesian_runner_scoring.ml. Current: hardcoded 10.0 on Fail. *)
-let _compute_gate_penalty ~value (verdict : Walk_forward.Fold_gate.verdict) =
-  match verdict with
-  | Pass _ -> 0.0
-  | Fail { actual_m; required_m; worst_delta_actual; worst_delta_threshold; _ }
-    ->
-      (* Continuous in the gap: penalty grows linearly as candidate fails harder. *)
-      let m_gap = Float.of_int (required_m - actual_m) in     (* ≥1 since Fail *)
-      let delta_gap =
-        Float.max 0.0 (worst_delta_actual -. worst_delta_threshold)
-      in
-      (* Tune the coefficients so a "barely failing" candidate gets ~1-2 penalty,
-         not 10. A genuinely abysmal one still gets ~10. *)
-      0.3 *. m_gap +. 5.0 *. delta_gap
-```
+### Functional form (pick one — these are NOT pre-decided)
 
-Exact coefficients TBD by calibration on the v4/v6 data we have on disk
-(`.sweep-output/11knob-v6-random/bo_checkpoint.sexp`). Goal: candidates
-that fail by 1-2 folds get penalty ~0.3-0.6; candidates that fail
-catastrophically still hit the original 10-equivalent magnitude.
+Three candidates, ordered by my preference:
+
+1. **Cumulative per-fold Sharpe shortfall** (dimensionally natural, no
+   coefficients to pick):
+
+   ```ocaml
+   (* For each fold the candidate lost, sum the Sharpe deficit. *)
+   penalty = Σ_{f : fold} max 0.0 (baseline_sharpe_f -. candidate_sharpe_f)
+   ```
+
+   Pros: no arbitrary constants; the penalty IS the cumulative shortfall in
+   the metric units the gate already cares about. Auto-scales: barely
+   failing → small penalty; catastrophically failing → large penalty.
+
+   Cons: requires per-fold data passed through to the scoring function.
+   Need to verify `Walk_forward.Fold_gate.verdict` carries enough info.
+
+2. **Two-term linear** (mixes count + worst-fold):
+
+   ```ocaml
+   penalty = w_m *. m_gap +. w_d *. delta_gap
+   ```
+
+   Requires picking `w_m` and `w_d`. **These are calibration-only constants;
+   do NOT pick from gut feel.** Calibration procedure below.
+
+3. **Smooth (sigmoid) around the gate boundary**:
+
+   ```ocaml
+   penalty = 10.0 *. sigmoid (alpha *. (required_m -. actual_m))
+   ```
+
+   Pros: smoothly differentiable; pass/fail boundary is a slope rather
+   than a cliff. Cons: same calibration problem, plus one more
+   constant (alpha) to pick.
+
+**Recommendation:** form (1). No coefficient tuning required; the formula
+is the dimensionally-natural thing.
+
+### Calibration (mandatory regardless of form)
+
+Inputs already on disk:
+- v4 BO checkpoint: `/tmp/sweeps/11knob-v4/bo_checkpoint.sexp` (34 evaluations)
+- v6 random checkpoint: `.sweep-output/11knob-v6-random/bo_checkpoint.sexp` (29 evaluations)
+
+Total 63 evaluations with full per-fold metrics. For each, extract:
+- m_gap (folds short of gate)
+- delta_gap (worst-fold Sharpe excess below threshold)
+- per-fold Sharpe shortfall sum (for form 1)
+- old binary -10 penalty
+- composite_delta (the un-penalized weighted-blend metric)
+
+Then:
+1. Re-score all 63 with the new penalty function.
+2. Plot / tabulate the new score distribution. **Pass criterion: visible
+   structure (spread > 5× the old 0.81 = 4+ score units).**
+3. Verify ordering: candidates that v4 BO acquisition iterated toward
+   should now score better than v4's random-sample misses (because BO
+   was approaching the gate boundary).
+4. Verify the relative ordering of the v4 BO best (-9.6516) vs random
+   best is preserved (or both improve roughly equally).
+
+If form 1 produces a flat surface → the per-fold-Sharpe signal IS noise
+and even continuous-penalty doesn't help. That's itself a meaningful
+finding (the noise-dominates-knobs hypothesis from the v6 verdict).
+
+If form 1 produces visible structure → ship it. The optimizer now has
+gradient toward Pass.
 
 **Test plan:**
 
 - Unit test: gate-verdict fixtures with various `actual_m` / `required_m` /
-  `worst_delta_actual` combos; assert continuous penalty mapping.
+  per-fold Sharpe arrays; assert continuous penalty mapping.
 - Re-score the existing v4/v6 BO checkpoints with the new penalty (pure
-  function of stored data, no re-run needed). Verify the surface now has
-  visible structure rather than a flat -10 plateau.
+  function of stored data, no re-run needed). Surface should have
+  spread > 5× the old 0.81 between best + worst.
 
-**Effort:** ~50 LOC impl + ~80 LOC tests. 1 small PR.
+**Effort:** ~50 LOC impl + ~80 LOC tests + ~30 LOC re-score script. 1 small PR.
 
 ### P0b — Cell-E-never-saw out-of-sample experiment
 
