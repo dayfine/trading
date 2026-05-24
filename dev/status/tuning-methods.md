@@ -9,7 +9,16 @@ Methodology comparison track: random / TPE / Hyperband / CMA-ES /
 learned-surrogate vs the existing GP-EI Bayesian Optimization. Opened
 2026-05-24 after the 11-knob BO sweep plateau verdict.
 
-Plan: `dev/plans/tuning-methods-track-2026-05-24.md`.
+**Update 2026-05-24 PM:** Step 0 (random-search baseline) COMPLETE at
+iter 29 / 60 (terminated early; verdict locked). Result: random
+matches BO at -9.6516. Surface is the bind, not the surrogate. **Steps
+1-3 (TPE / Hyperband / CMA-ES) DEMOTED** — no longer P0 since
+surrogate-change can't help a flat surface. Track posture: open but
+not priority. Reopen if component-decomposition objective surfaces a
+component where surrogate-change becomes relevant.
+
+Plan: `dev/plans/tuning-methods-track-2026-05-24.md`. Verdict doc:
+`dev/notes/v6-random-baseline-verdict-2026-05-24.md`.
 
 ## Interface stable
 
@@ -23,14 +32,19 @@ feat-backtest
 
 ## Open work
 
-- [ ] **Step 0 — random-search baseline at budget=60.** Spec already
-  exists at `dev/experiments/bayesian-production-sweep-2026-05-18/spec_prod_11knob_random_v1.sexp`.
-  ~0 LOC change; ~12h sweep wall. Blocked on safe-sweep infrastructure
-  (`dev/plans/safe-sweep-infrastructure-2026-05-24.md`).
-- [ ] **Step 1 — TPE port.** ~200 LOC + tests.
+- [x] **Step 0 — random-search baseline at budget=60.** DONE 2026-05-24
+  (v6 sweep terminated early at iter 29; verdict matches v4 BO at
+  -9.6516). See `dev/notes/v6-random-baseline-verdict-2026-05-24.md`.
+- [ ] **Step 1 — TPE port.** ~200 LOC + tests. **DEMOTED** — surface is
+  the bind, not the surrogate; TPE unlikely to help.
 - [ ] **Step 2 — Hyperband / Successive Halving.** ~150 LOC + tests.
-- [ ] **Step 3 — CMA-ES** (deferred until step 2 verdict).
-- [ ] **Step 4 — learned-surrogate (stretch).**
+  **DEMOTED** — same reasoning.
+- [ ] **Step 3 — CMA-ES** (deferred until step 2 verdict). **DEMOTED**.
+- [ ] **Step 4 — learned-surrogate (stretch).** **DEMOTED**.
+
+All non-step-0 work demoted by the v6 verdict. Reopen contingent on
+the component-decomposition objective surfacing a knob-axis where
+a different surrogate could resolve signal that GP-EI missed.
 
 ## Blocked on
 
