@@ -1,0 +1,8 @@
+; M4 T4.3 — BAH baseline aggregator CLI for the 1998-2026 walk-forward fixture.
+; See lib/bah_baseline_aggregator_lib.mli for the math + variant-label contract,
+; and bah_baseline_aggregator.ml's header for invocation.
+
+(executable
+ (name bah_baseline_aggregator)
+ (modules bah_baseline_aggregator)
+ (libraries bah_baseline_aggregator_lib core csv fpath status walk_forward))
