@@ -95,6 +95,16 @@ do_start() {
         do_build
     fi
 
+    # Bind-mount target for long-running sweep output (BO checkpoints,
+    # per-fold panel-snapshot CSV churn). Routes /tmp/sweeps inside the
+    # container to a host path so multi-hour sweeps don't grow the
+    # Docker.raw VM image to the point of host-disk exhaustion (see
+    # dev/plans/safe-sweep-infrastructure-2026-05-24.md and
+    # memory/feedback_worktree_disk_kills_docker.md for the failure
+    # mode this prevents).
+    local SWEEP_OUTPUT_DIR="$PROJECT_ROOT/.sweep-output"
+    mkdir -p "$SWEEP_OUTPUT_DIR"
+
     if container_exists; then
         log_info "Starting existing container '$CONTAINER_NAME'..."
         docker start "$CONTAINER_NAME"
@@ -103,6 +113,7 @@ do_start() {
         docker run -d \
             --name "$CONTAINER_NAME" \
             -v "$PROJECT_ROOT:$WORKDIR" \
+            -v "$SWEEP_OUTPUT_DIR:/tmp/sweeps" \
             -w "$WORKDIR/trading" \
             "$IMAGE_NAME" \
             tail -f /dev/null
