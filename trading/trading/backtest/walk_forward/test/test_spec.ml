@@ -1,11 +1,14 @@
 (** Unit tests for {!Walk_forward.Spec}.
 
-    These exercise the two checked-in fixture spec sexps under
+    These exercise the three checked-in fixture spec sexps under
     [trading/test_data/walk_forward/]:
     - [cell_e_8fold_2026_05_08.sexp] — the 2026-05-08 hand-curated 8-fold
       experiment encoded as a [Window_spec.Explicit].
-    - [cell_e_30fold_2026_05_16.sexp] — the production 30-fold rolling window
-      over the 2010-2026 sp500 historical scenario.
+    - [cell_e_30fold_2026_05_16.sexp] — the 30-fold rolling window over the
+      2010-2026 sp500 historical scenario.
+    - [cell_e_full_history_28fold_2026_05_25.sexp] — the M4 (T4.1) 28-fold
+      annual non-overlapping window over the 1998-2026 top-3000 universe.
+      Single-variant (cell-E only), non-firing gate placeholder.
 
     The tests verify only that {!Spec.load} parses the fixture and that
     [Window_spec.generate] returns the right number of folds — no backtest is
@@ -126,6 +129,70 @@ let test_30fold_generate_yields_close_to_30_folds _ =
   assert_that (List.length folds)
     (is_between (module Int_ord) ~low:_min_acceptable ~high:_max_acceptable)
 
+(* ---------- 28-fold Full-history fixture (M4 T4.1) ---------- *)
+
+let _full_history_fixture = "cell_e_full_history_28fold_2026_05_25.sexp"
+
+let test_28fold_spec_parses _ =
+  let spec = Spec.load (_fixture_path _full_history_fixture) in
+  assert_that spec
+    (all_of
+       [
+         field
+           (fun (s : Spec.t) -> s.base_scenario)
+           (equal_to "goldens-sp500-historical/sp500-1998-2026.sexp");
+         field (fun (s : Spec.t) -> s.baseline_label) (equal_to "cell-E");
+         field (fun (s : Spec.t) -> List.length s.variants) (equal_to 1);
+       ])
+
+let test_28fold_window_spec_spans_1998_to_2026 _ =
+  let spec = Spec.load (_fixture_path _full_history_fixture) in
+  assert_that spec.window_spec
+    (matching ~msg:"Expected Window_spec.Rolling variant"
+       (function WS.Rolling r -> Some r | _ -> None)
+       (all_of
+          [
+            field
+              (fun (r : WS.rolling_spec) -> r.start_date)
+              (equal_to (Date.of_string "1998-01-01"));
+            field
+              (fun (r : WS.rolling_spec) -> r.end_date)
+              (equal_to (Date.of_string "2026-04-30"));
+            field (fun (r : WS.rolling_spec) -> r.train_days) (equal_to 0);
+            field (fun (r : WS.rolling_spec) -> r.test_days) (equal_to 365);
+            field (fun (r : WS.rolling_spec) -> r.step_days) (equal_to 365);
+          ]))
+
+(** T4.1 acceptance: target 28 folds (28 calendar years × 1 fold/year); allow ±1
+    for leap-year drift across the 28-year span. *)
+let test_28fold_generate_yields_close_to_28_folds _ =
+  let spec = Spec.load (_fixture_path _full_history_fixture) in
+  let folds = WS.generate spec.window_spec in
+  let _min_acceptable = 27 in
+  let _max_acceptable = 29 in
+  assert_that (List.length folds)
+    (is_between (module Int_ord) ~low:_min_acceptable ~high:_max_acceptable)
+
+let test_28fold_variants_is_cellE_only _ =
+  let spec = Spec.load (_fixture_path _full_history_fixture) in
+  let labels =
+    List.map spec.variants
+      ~f:(fun (v : Walk_forward.Walk_forward_runner.variant) -> v.label)
+  in
+  assert_that labels (elements_are [ equal_to "cell-E" ])
+
+let test_28fold_gate_is_non_firing _ =
+  let spec = Spec.load (_fixture_path _full_history_fixture) in
+  assert_that spec.gate
+    (all_of
+       [
+         field
+           (fun (g : Walk_forward.Fold_gate.t) -> g.metric)
+           (equal_to Walk_forward.Fold_gate.Sharpe);
+         field (fun (g : Walk_forward.Fold_gate.t) -> g.m) (equal_to 0);
+         field (fun (g : Walk_forward.Fold_gate.t) -> g.n) (equal_to 28);
+       ])
+
 let suite =
   "Walk_forward_spec"
   >::: [
@@ -139,6 +206,15 @@ let suite =
          "30-fold window_spec is Rolling" >:: test_30fold_window_spec_is_rolling;
          "30-fold generate yields close to 30 folds"
          >:: test_30fold_generate_yields_close_to_30_folds;
+         "28-fold (full-history) spec parses" >:: test_28fold_spec_parses;
+         "28-fold window_spec spans 1998-01-01..2026-04-30"
+         >:: test_28fold_window_spec_spans_1998_to_2026;
+         "28-fold generate yields ~28 folds"
+         >:: test_28fold_generate_yields_close_to_28_folds;
+         "28-fold variants is cell-E only"
+         >:: test_28fold_variants_is_cellE_only;
+         "28-fold gate is non-firing placeholder"
+         >:: test_28fold_gate_is_non_firing;
        ]
 
 let () = run_test_tt_main suite
