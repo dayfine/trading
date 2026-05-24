@@ -234,3 +234,19 @@ forward "M5.2a-d still PLANNED" while M5.2a-d had already shipped via
   exported symbols
 - Use WebSearch to identify similar issues and solutions
 - Check dune-package files for actual module structure when modules seem missing
+
+## Agent skills
+
+Project-wide config consumed by the global Matt-Pocock engineering skills (`to-issues`, `triage`, `to-prd`, `qa`, `improve-codebase-architecture`, `diagnose`, `tdd`). Located under `.claude/skills/` per Claude Code's skills convention.
+
+### Issue tracker
+
+GitHub Issues on `dayfine/trading` via the `gh` CLI. See `.claude/skills/issue-tracker.md`.
+
+### Triage labels
+
+Canonical defaults — each role's label string matches its name (`needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`). See `.claude/skills/triage-labels.md`.
+
+### Domain docs
+
+Single-context. The load-bearing authority is `docs/design/weinstein-book-reference.md`; the design-doc family in `docs/design/` plays the role of `CONTEXT.md` until that file is introduced. See `.claude/skills/domain.md`.
