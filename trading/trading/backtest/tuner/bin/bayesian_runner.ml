@@ -65,6 +65,7 @@ module Wf_spec = Walk_forward.Spec
 module Wf_executor = Walk_forward.Walk_forward_executor
 module Wf_report = Walk_forward.Walk_forward_report
 module Oos_validator = Tuner_bin.Bayesian_runner_oos_validator
+module Out_dir_check = Tuner_bin.Bayesian_runner_out_dir_check
 
 let _usage_msg =
   "Usage: bayesian_runner.exe --spec <spec.sexp> --out-dir <dir>\n\
@@ -304,6 +305,8 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
 let _main () =
   let argv = Sys.get_argv () |> Array.to_list |> List.tl_exn in
   let args = _parse_args argv in
+  (* Belt-and-suspenders even if launch_sweep.sh was bypassed. *)
+  Out_dir_check.validate_or_exit ~out_dir:args.out_dir;
   let spec = Spec.load args.spec_path in
   match (args.walk_forward_spec_path, args.baseline_aggregate_path) with
   | None, None -> _run_legacy_mode ~args ~spec
