@@ -3,7 +3,7 @@
 ## Last updated: 2026-05-24
 
 ## Status
-PLANNED
+PENDING
 
 Methodology comparison track: random / TPE / Hyperband / CMA-ES /
 learned-surrogate vs the existing GP-EI Bayesian Optimization. Opened
