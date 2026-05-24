@@ -1,0 +1,5 @@
+(library
+ (name bah_baseline_aggregator_lib)
+ (libraries core types walk_forward)
+ (preprocess
+  (pps ppx_sexp_conv)))

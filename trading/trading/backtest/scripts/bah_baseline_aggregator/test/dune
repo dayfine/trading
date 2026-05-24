@@ -1,0 +1,9 @@
+(test
+ (name test_bah_baseline_aggregator)
+ (libraries
+  bah_baseline_aggregator_lib
+  core
+  matchers
+  ounit2
+  types
+  walk_forward))
