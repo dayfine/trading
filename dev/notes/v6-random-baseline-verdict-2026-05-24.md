@@ -1,5 +1,13 @@
 # v6 random-search baseline — verdict: random matches BO; surface is the bind (2026-05-24)
 
+> **REVISED 2026-05-24 PM** by `dev/notes/next-session-priorities-2026-05-25.md`.
+> The headline "surface is the bind" is precise only AROUND CELL E on the
+> SAME 2010-2026 SP500 data Cell E was iteratively tuned for. The
+> follow-up doc lays out two un-tested confounders (binary fold-gate
+> penalty + meta-overfit-to-Cell-E) and three concrete P0 follow-ups.
+> Read that doc for the current state; the rest of this verdict is the
+> raw data + the framing at the moment it was written.
+
 Step 0 of the tuning-methods track (`dev/plans/tuning-methods-track-2026-05-24.md`).
 Settles the question raised by the 11-knob plateau verdict
 (`dev/notes/11knob-plateau-verdict-2026-05-24.md`): **does the BO surrogate (GP + Expected Improvement) add value over uniform random sampling at this budget on this surface?**
