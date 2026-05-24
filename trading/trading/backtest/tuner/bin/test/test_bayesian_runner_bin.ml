@@ -23,6 +23,7 @@ open Matchers
 module Spec = Tuner_bin.Bayesian_runner_spec
 module Runner = Tuner_bin.Bayesian_runner_runner
 module Evaluator = Tuner_bin.Bayesian_runner_evaluator
+module Out_dir_check = Tuner_bin.Bayesian_runner_out_dir_check
 module GS = Tuner.Grid_search
 module Metric_types = Trading_simulation_types.Metric_types
 
@@ -1116,6 +1117,77 @@ let test_missing_checkpoint_starts_fresh _ =
         (!calls, List.length result.observations, ck_exists)
         (equal_to (6, 6, true)))
 
+(* ---------- Out_dir_check: --out-dir prefix guard ---------- *)
+
+let _no_env (_ : string) : string option = None
+
+let _override_env name =
+  if String.equal name "BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT" then Some "1"
+  else None
+
+let _override_set_to_zero name =
+  if String.equal name "BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT" then Some "0"
+  else None
+
+let test_out_dir_check_accepts_tmp_sweeps_path _ =
+  assert_that
+    (Out_dir_check.validate ~out_dir:"/tmp/sweeps/test-foo" ~env_lookup:_no_env
+       ())
+    is_ok
+
+let test_out_dir_check_rejects_repo_path _ =
+  assert_that
+    (Out_dir_check.validate ~out_dir:"dev/experiments/grid-screening"
+       ~env_lookup:_no_env ())
+    is_error
+
+let test_out_dir_check_rejects_other_tmp_paths _ =
+  (* /tmp/foo (without the /sweeps/ segment) must still fail; the prefix is
+     strict and intentionally excludes /tmp/scratch, /tmp/x, etc. *)
+  assert_that
+    (Out_dir_check.validate ~out_dir:"/tmp/foo/bar" ~env_lookup:_no_env ())
+    is_error
+
+let test_out_dir_check_rejects_tmp_sweeps_without_trailing_slash _ =
+  (* "/tmp/sweeps" (no trailing slash) is a literal path, not a parent —
+     and an output written there clobbers a sibling-style file. Strict
+     prefix match (with the trailing slash) forces a subdirectory. *)
+  assert_that
+    (Out_dir_check.validate ~out_dir:"/tmp/sweeps" ~env_lookup:_no_env ())
+    is_error
+
+let test_out_dir_check_override_one_allows_bad_path _ =
+  assert_that
+    (Out_dir_check.validate ~out_dir:"dev/experiments/grid-screening"
+       ~env_lookup:_override_env ())
+    is_ok
+
+let test_out_dir_check_override_set_to_zero_does_not_allow _ =
+  (* Only "1" enables the override; "0" or any other value is treated as
+     "not overridden". Prevents an accidental
+     BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT=0 from silently disabling the
+     check (which would be the worst possible failure mode). *)
+  assert_that
+    (Out_dir_check.validate ~out_dir:"dev/experiments/grid-screening"
+       ~env_lookup:_override_set_to_zero ())
+    is_error
+
+let test_out_dir_check_error_message_names_override _ =
+  (* Operators reading the error in CI logs need to see the override name
+     so they can decide whether to set it (rather than guess). *)
+  match
+    Out_dir_check.validate ~out_dir:"dev/experiments/grid-screening"
+      ~env_lookup:_no_env ()
+  with
+  | Ok () -> assert_failure "expected Error"
+  | Error status ->
+      let msg = Status.show status in
+      assert_bool
+        ("expected error message to mention \
+          BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT, got: " ^ msg)
+        (String.is_substring msg
+           ~substring:"BAYESIAN_RUNNER_ALLOW_NON_SWEEP_OUTPUT")
+
 let suite =
   "Tuner_bin.Bayesian_runner"
   >::: [
@@ -1216,6 +1288,20 @@ let suite =
          >:: test_resume_with_wrong_schema_version_raises;
          "checkpoint: missing checkpoint starts fresh"
          >:: test_missing_checkpoint_starts_fresh;
+         "Out_dir_check accepts /tmp/sweeps/<name>"
+         >:: test_out_dir_check_accepts_tmp_sweeps_path;
+         "Out_dir_check rejects repo-relative path"
+         >:: test_out_dir_check_rejects_repo_path;
+         "Out_dir_check rejects other /tmp paths"
+         >:: test_out_dir_check_rejects_other_tmp_paths;
+         "Out_dir_check rejects /tmp/sweeps (no trailing slash)"
+         >:: test_out_dir_check_rejects_tmp_sweeps_without_trailing_slash;
+         "Out_dir_check override=1 allows bad path"
+         >:: test_out_dir_check_override_one_allows_bad_path;
+         "Out_dir_check override=0 does not disable check"
+         >:: test_out_dir_check_override_set_to_zero_does_not_allow;
+         "Out_dir_check error message names override env var"
+         >:: test_out_dir_check_error_message_names_override;
        ]
 
 let () = run_test_tt_main suite
