@@ -204,6 +204,98 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 5 — PR-mode: COMMENTED state → body ## Verdict parsed (CP2 fix).
+# Self-approval-blocked QC agents post `--comment` reviews; the verdict
+# lives in the body's ## Verdict block, not in the state field.
+# ---------------------------------------------------------------------------
+FEATURE5="pr-mode-commented-body-parse"
+S5_DIR="${TMP_REPO}/s5"
+mkdir -p "${S5_DIR}"
+cat > "${S5_DIR}/reviews.jsonl" <<'EOF'
+STATE:COMMENTED
+Reviewed SHA: jkl012
+
+## Structural QC — pr-mode-commented-body-parse
+
+## Verdict
+APPROVED
+ENDBODY
+STATE:COMMENTED
+Reviewed SHA: jkl012
+
+## Behavioral QC — pr-mode-commented-body-parse
+
+## Quality Score
+3 — acceptable
+
+## Verdict
+NEEDS_REWORK
+ENDBODY
+EOF
+make_gh_mock "${S5_DIR}" "${S5_DIR}/reviews.jsonl"
+
+out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S5_DIR}/gh" \
+        bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE5}" "feat/dummy" "2026-05-25" --pr-number 1236 2>&1) && rc=0 || rc=$?
+JSON5="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE5}.json"
+if (( rc == 0 )) && [[ -f "${JSON5}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON5}" \
+   && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON5}" \
+   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON5}" \
+   && grep -q '"quality_score": *3' "${JSON5}"; then
+  pass "scenario 5 — pr-mode COMMENTED state → body ## Verdict parsed (CP2 fix)"
+else
+  fail "scenario 5 — expected COMMENTED body-parse APPROVED+NEEDS_REWORK+3; got rc=${rc}, output:"
+  echo "${out}" | sed 's/^/      /'
+  [[ -f "${JSON5}" ]] && echo "      json: $(cat "${JSON5}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 6 — --pr-number set BUT PR has no reviews → falls back to file mode
+# (CP1 dual-source fallback test).
+# ---------------------------------------------------------------------------
+FEATURE6="pr-mode-empty-falls-back-to-file"
+S6_DIR="${TMP_REPO}/s6"
+mkdir -p "${S6_DIR}"
+# Mock gh returns nothing for the --jq query (no reviews to extract).
+cat > "${S6_DIR}/gh" <<'EOF'
+#!/bin/sh
+# Empty reviews list — the --jq filter returns nothing.
+case "$1 $2" in
+  "pr view") :;;
+esac
+EOF
+chmod +x "${S6_DIR}/gh"
+
+# Companion file-mode review file — fallback should land on this.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE6}.md" <<'EOF'
+Reviewed SHA: mno345
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — exemplary
+EOF
+
+out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S6_DIR}/gh" \
+        bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE6}" "feat/dummy" "2026-05-25" --pr-number 1237 2>&1) && rc=0 || rc=$?
+JSON6="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE6}.json"
+if (( rc == 0 )) && [[ -f "${JSON6}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON6}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON6}" \
+   && grep -q '"overall_qc": *"APPROVED"' "${JSON6}" \
+   && grep -q '"quality_score": *5' "${JSON6}"; then
+  pass "scenario 6 — pr-mode empty reviews → file-mode fallback (CP1 fix)"
+else
+  fail "scenario 6 — expected file-fallback APPROVED+APPROVED+5; got rc=${rc}, output:"
+  echo "${out}" | sed 's/^/      /'
+  [[ -f "${JSON6}" ]] && echo "      json: $(cat "${JSON6}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

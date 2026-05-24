@@ -129,55 +129,19 @@ fi
 # fully cut over to PR-comment-only review delivery, BOTH the file and
 # the PR-comment may be present. PR mode wins when both exist.
 
-_pr_to_verdict_state() {
-  # $1 = GitHub review state (APPROVED|CHANGES_REQUESTED|COMMENTED|DISMISSED)
+# _resolve_verdict — combine GitHub review state + body-parsed ## Verdict.
+#   $1 = state (APPROVED|CHANGES_REQUESTED|COMMENTED|DISMISSED|""),
+#   $2 = body verdict (APPROVED|NEEDS_REWORK|"")
+# Echoes APPROVED|NEEDS_REWORK|"". State wins when it's a verdict
+# state; falls back to body verdict for COMMENTED/DISMISSED (which is
+# what self-approval-blocked QC agents produce — they post `--comment`
+# with the verdict in the body's ## Verdict block).
+_resolve_verdict() {
   case "$1" in
-    APPROVED) echo "APPROVED";;
-    CHANGES_REQUESTED) echo "NEEDS_REWORK";;
-    *) echo "";;  # COMMENTED / DISMISSED → caller must body-parse
+    APPROVED) echo "APPROVED" ;;
+    CHANGES_REQUESTED) echo "NEEDS_REWORK" ;;
+    *) [ -n "$2" ] && echo "$2" || echo "" ;;
   esac
-}
-
-_extract_pr_verdict() {
-  # $1 = pr_reviews_json (output of `gh pr view --json reviews`)
-  # $2 = section header to match ("Structural QC" | "Behavioral QC")
-  # Echoes APPROVED|NEEDS_REWORK|SKIPPED.
-  echo "$1" | awk -v section="$2" '
-    BEGIN { RS=""; FS="\n" }
-    # GitHub returns reviews oldest-first; the last one matching the section is the freshest.
-    {
-      n = split($0, lines, "\n")
-      for (i = 1; i <= n; i++) {
-        if (lines[i] ~ ("## " section)) {
-          # Track latest state seen for this section
-          for (j = i; j >= 1 && j > i-20; j--) {
-            if (lines[j] ~ /\"state\":/) {
-              sub(/.*\"state\":[[:space:]]*\"/, "", lines[j])
-              sub(/\".*/, "", lines[j])
-              last_state = lines[j]
-              break
-            }
-          }
-          for (k = i; k < n && k < i+200; k++) {
-            if (lines[k] ~ /^## Verdict/) {
-              for (m = k+1; m < n && m < k+10; m++) {
-                gsub(/^\*\*|\*\*$/, "", lines[m])
-                if (lines[m] ~ /^APPROVED|^NEEDS_REWORK/) {
-                  last_body_verdict = lines[m]; break
-                }
-              }
-              break
-            }
-          }
-        }
-      }
-    }
-    END {
-      if (last_state == "APPROVED") print "APPROVED"
-      else if (last_state == "CHANGES_REQUESTED") print "NEEDS_REWORK"
-      else if (last_body_verdict != "") print last_body_verdict
-      else print ""
-    }'
 }
 
 PR_REVIEWS_JSON=""
@@ -187,30 +151,60 @@ OVERALL=""
 QUALITY_SCORE=""
 
 if [ -n "$PR_NUMBER" ]; then
-  PR_REVIEWS_JSON="$("$GH_BIN" pr view "$PR_NUMBER" --json reviews 2>/dev/null || true)"
-  if [ -n "$PR_REVIEWS_JSON" ]; then
-    # Newline-separated review bodies, in submitted order.
-    BODIES="$(echo "$PR_REVIEWS_JSON" \
-      | "$GH_BIN" pr view "$PR_NUMBER" --json reviews --jq '.reviews[] | "STATE:\(.state)\n\(.body)\nENDBODY"' 2>/dev/null || true)"
-    # Walk bodies; latest with each header wins.
-    STRUCTURAL_STATE=""
-    BEHAVIORAL_STATE=""
-    while IFS= read -r line; do
-      if [ "${line#STATE:}" != "$line" ]; then
-        CUR_STATE="${line#STATE:}"
-        continue
-      fi
-      if echo "$line" | grep -qE '^## (Structural QC|Structural Checklist)'; then
-        STRUCTURAL_STATE="$CUR_STATE"
-      fi
-      if echo "$line" | grep -qE '^## (Behavioral QC|Behavioral Checklist|Contract Pinning Checklist)'; then
-        BEHAVIORAL_STATE="$CUR_STATE"
-      fi
-    done <<EOF
-$BODIES
-EOF
-    STRUCTURAL="$(_pr_to_verdict_state "$STRUCTURAL_STATE")"
-    BEHAVIORAL="$(_pr_to_verdict_state "$BEHAVIORAL_STATE")"
+  # One gh call: render reviews into a STATE/body/ENDBODY frame, one per review.
+  BODIES="$("$GH_BIN" pr view "$PR_NUMBER" --json reviews \
+    --jq '.reviews[] | "STATE:\(.state)\n\(.body)\nENDBODY"' 2>/dev/null || true)"
+
+  if [ -n "$BODIES" ]; then
+    # Single-pass awk extracts per-section (state, body_verdict) tuples.
+    # Latest match per section wins (GitHub returns reviews oldest-first).
+    # Output format: "<struct_state>|<struct_body>|<behav_state>|<behav_body>"
+    PARSED="$(echo "$BODIES" | awk '
+      BEGIN {
+        struct_state=""; struct_body=""; behav_state=""; behav_body=""
+        cur_state=""; cur_section=""; in_verdict=0
+      }
+      /^STATE:/ {
+        cur_state = $0
+        sub(/^STATE:/, "", cur_state)
+        cur_section = ""
+        in_verdict = 0
+        next
+      }
+      /^## (Structural QC|Structural Checklist)/ { cur_section = "structural"; in_verdict = 0; next }
+      /^## (Behavioral QC|Behavioral Checklist|Contract Pinning Checklist)/ { cur_section = "behavioral"; in_verdict = 0; next }
+      /^## Verdict/ { in_verdict = 1; next }
+      in_verdict && /^[[:space:]]*$/ { next }
+      in_verdict {
+        line = $0
+        gsub(/^\*\*|\*\*$/, "", line)
+        if (line ~ /^APPROVED/) {
+          if (cur_section == "structural") { struct_state = cur_state; struct_body = "APPROVED" }
+          else if (cur_section == "behavioral") { behav_state = cur_state; behav_body = "APPROVED" }
+        } else if (line ~ /^NEEDS_REWORK/) {
+          if (cur_section == "structural") { struct_state = cur_state; struct_body = "NEEDS_REWORK" }
+          else if (cur_section == "behavioral") { behav_state = cur_state; behav_body = "NEEDS_REWORK" }
+        }
+        in_verdict = 0
+      }
+      /^ENDBODY/ {
+        # State-only signal when no ## Verdict block was present for this section.
+        if (cur_section == "structural" && struct_body == "") struct_state = cur_state
+        if (cur_section == "behavioral" && behav_body == "") behav_state = cur_state
+        cur_section = ""; cur_state = ""
+      }
+      END { print struct_state "|" struct_body "|" behav_state "|" behav_body }')"
+
+    STRUCTURAL_STATE="${PARSED%%|*}"
+    REST="${PARSED#*|}"
+    STRUCTURAL_BODY="${REST%%|*}"
+    REST="${REST#*|}"
+    BEHAVIORAL_STATE="${REST%%|*}"
+    BEHAVIORAL_BODY="${REST#*|}"
+
+    STRUCTURAL="$(_resolve_verdict "$STRUCTURAL_STATE" "$STRUCTURAL_BODY")"
+    BEHAVIORAL="$(_resolve_verdict "$BEHAVIORAL_STATE" "$BEHAVIORAL_BODY")"
+
     # Quality score from PR bodies (last "## Quality Score" wins).
     QUALITY_SCORE="$(echo "$BODIES" | awk '
       /^## Quality Score|^### Quality Score/ { in_qs=1; next }
