@@ -195,9 +195,41 @@ APPROVED | NEEDS_REWORK
 
 ---
 
-## Writing the review file
+## Writing the review
 
-Write `dev/reviews/<feature>.md` from a clean branch based on `main@origin` — never from the feature branch. The first line of the file must be the `Reviewed SHA:` line captured in Step 5:
+The review is delivered in **two places**:
+
+1. **GitHub PR review comment** (preferred medium — reviewers see the verdict directly on the PR).
+2. **`dev/reviews/<feature>.md` file** (transitional — the lead-orchestrator's Step 1.5 idempotency check still reads it; once the orchestrator migrates to reading PR review comments, the file write will drop).
+
+### Step 1 — post the GitHub PR review comment
+
+If `$PR_NUMBER` is known, post the verdict + summary as a PR review. The verdict uses GitHub's native `--approve` / `--request-changes` semantics so the merge-gate signals are first-class:
+
+```bash
+case "$VERDICT" in
+  APPROVED)     REVIEW_FLAG="--approve" ;;
+  NEEDS_REWORK) REVIEW_FLAG="--request-changes" ;;
+  *)            REVIEW_FLAG="--comment" ;;
+esac
+
+gh pr review "$PR_NUMBER" $REVIEW_FLAG --body "$(cat <<'EOF'
+Reviewed SHA: <sha captured in Step 5>
+
+## Structural QC — <feature-name>
+
+<condensed checklist + any NEEDS_REWORK items, same content as the file below>
+EOF
+)"
+```
+
+The first body line MUST be `Reviewed SHA: <sha>` so a future orchestrator can find this review via `gh pr view <N> --json reviews --jq '.reviews[].body'` and treat the SHA as the idempotency sentinel.
+
+If `$PR_NUMBER` is absent (branch not yet submitted), skip the PR-comment step and add a one-line note to the checklist: "PR_NUMBER unavailable — review file is the sole audit trail until PR is opened."
+
+### Step 2 — write `dev/reviews/<feature>.md` (transitional back-compat)
+
+Write `dev/reviews/<feature>.md` from a clean branch based on `main@origin` — never from the feature branch. The first line must be the `Reviewed SHA:` line captured in Step 5:
 
 ```
 Reviewed SHA: <sha captured in Step 5>

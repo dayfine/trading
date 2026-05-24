@@ -180,7 +180,39 @@ APPROVED | NEEDS_REWORK
 
 ---
 
-## Writing the review file
+## Writing the review
+
+The review is delivered in **two places**:
+
+1. **GitHub PR review comment** (preferred medium — reviewers see the verdict directly on the PR).
+2. **`dev/reviews/<feature>.md` file** (transitional — appended below qc-structural's content; the lead-orchestrator's Step 1.5 idempotency check still reads it).
+
+### Step 1 — post the GitHub PR review comment
+
+If `$PR_NUMBER` is known, post the behavioral verdict + checklist as a PR review. Use GitHub's native verdict flag so the merge-gate signal is first-class:
+
+```bash
+case "$VERDICT" in
+  APPROVED)     REVIEW_FLAG="--approve" ;;
+  NEEDS_REWORK) REVIEW_FLAG="--request-changes" ;;
+  *)            REVIEW_FLAG="--comment" ;;
+esac
+
+gh pr review "$PR_NUMBER" $REVIEW_FLAG --body "$(cat <<'EOF'
+Reviewed SHA: <sha from dev/reviews/<feature>.md first line>
+
+## Behavioral QC — <feature-name>
+
+<filled Contract Pinning Checklist + Behavioral Checklist + Quality Score + Verdict, same content as the file append below>
+EOF
+)"
+```
+
+The first body line MUST be `Reviewed SHA: <sha>` (matching qc-structural's pin from the same review pass) so a future orchestrator can locate this review via `gh pr view <N> --json reviews --jq '.reviews[].body'` and treat the SHA as the idempotency sentinel.
+
+If `$PR_NUMBER` is absent, skip the PR-comment step and add a one-line note to the checklist: "PR_NUMBER unavailable — review file is the sole audit trail until PR is opened."
+
+### Step 2 — append to `dev/reviews/<feature>.md` (transitional back-compat)
 
 Append your behavioral checklist to the existing `dev/reviews/<feature>.md` written by qc-structural. The file already begins with a `Reviewed SHA:` line written by qc-structural — do not overwrite it or move it. Append only below the existing structural checklist content.
 
