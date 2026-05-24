@@ -1,5 +1,14 @@
 # Next-session priorities (2026-05-25)
 
+> **SUPERSEDED in part 2026-05-25 PM by
+> `dev/plans/tuning-research-driven-program-2026-05-25.md`.** A
+> literature triage of frontier BBO methods (Hvarfner ICML 2024,
+> Schneider/Bischl AutoML 2025, Daulton qNEHVI, López de Prado DSR)
+> arrived at a tighter program that subsumes the P0a/b/c items below.
+> The plan doc has the new 3-PR program + a comprehensive
+> option-comparison table. This doc is retained for history of the
+> reasoning path.
+
 Supersedes `dev/notes/next-session-priorities-2026-05-23.md` and revises
 parts of `dev/notes/v6-random-baseline-verdict-2026-05-24.md` based on
 two user critiques after the v6 verdict landed.
