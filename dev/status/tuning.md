@@ -1,6 +1,6 @@
 # Status: tuning
 
-## Last updated: 2026-05-22
+## Last updated: 2026-05-25
 
 ## Status
 IN_PROGRESS
@@ -194,6 +194,8 @@ not.
   manual grid sweep needed.
 
 ## Completed
+
+- [x] **M1 T1.1 — `Window_spec.Tiered` variant** (branch `feat/walk-forward-window-spec-tiered`; pure data-shape PR per `dev/plans/tuning-research-driven-program-v2-2026-05-25.md` Milestone M1). Adds a third constructor to `Walk_forward.Window_spec.t` alongside the existing `Rolling`/`Explicit`: `Tiered of tiered_spec`, where `tiered_spec` carries a shared `start_date`/`end_date`/`train_days` plus an ordered `tiers : tier list` (cheap → expensive). Each `tier` names a `fold_count` + `horizon_days` for one fidelity stage. `generate` returns the concatenation of per-tier folds (global `index`, within-tier zero-padded name `<tier-name>-NNN`); each tier independently tiles its folds non-overlappingly from `start_date + train_days` with `step_days = horizon_days`. Overflow (`fold_count * horizon_days + train_days > end_date - start_date + 1`) raises `Failure` rather than silently truncating. Sexp parser extended to recognise the `Tiered`-tagged variant alongside `Rolling`/`Explicit`; legacy flat-record shape still parses as `Rolling`. 13 new tests in `test_window_spec.ml` covering parse, multi-tier concat with global indices, within-tier name padding, per-tier anchoring, train-then-test back-to-back, `train_days = 0` no-train-period case, overflow/empty-tiers/dup-name/zero-fold_count/zero-horizon_days/negative-train_days failure paths, and sexp round-trip. Existing 17 Rolling/Explicit tests pass unchanged (regression). T1.1 is a data-shape-only PR — no runner integration, no CLI flag, no promotion strategy (those are T1.2/T1.3). Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/walk_forward/test/ --force'` (30/30 pass).
 
 - [x] **PR #1047 — `grid_search.exe --parallel N` (cell-level parallelism)** (MERGED 2026-05-12). Reduces wall-time for large grids by running N cells concurrently. Used for the 81-cell flagship sweep.
 
