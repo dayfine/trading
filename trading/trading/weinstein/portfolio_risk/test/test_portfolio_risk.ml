@@ -178,6 +178,55 @@ let test_position_size_big_winner _ =
     (match_sizing ~shares:(equal_to 300) ~position_value:__ ~position_pct:__
        ~risk_amount:__)
 
+(* NaN/inf guards — v7 sweep 2026-05-25 crashed in fold 22 from this path.
+   Bare [Float.( <= ) x 0.0] returns false for NaN; values slipped through
+   and crashed at [Int.of_float NaN]. Each test below would have crashed
+   pre-fix; the guard makes them return zero shares instead. *)
+let test_position_size_nan_entry_price _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:100000.0
+      ~side:`Long ~entry_price:Float.nan ~stop_price:45.0 ()
+  in
+  assert_that result
+    (match_sizing ~shares:(equal_to 0) ~position_value:(float_equal 0.0)
+       ~position_pct:(float_equal 0.0) ~risk_amount:(float_equal 0.0))
+
+let test_position_size_nan_stop_price _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:100000.0
+      ~side:`Long ~entry_price:50.0 ~stop_price:Float.nan ()
+  in
+  assert_that result
+    (match_sizing ~shares:(equal_to 0) ~position_value:(float_equal 0.0)
+       ~position_pct:(float_equal 0.0) ~risk_amount:(float_equal 0.0))
+
+let test_position_size_nan_portfolio_value _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:Float.nan
+      ~side:`Long ~entry_price:50.0 ~stop_price:45.0 ()
+  in
+  assert_that result
+    (match_sizing ~shares:(equal_to 0) ~position_value:(float_equal 0.0)
+       ~position_pct:(float_equal 0.0) ~risk_amount:(float_equal 0.0))
+
+let test_position_size_inf_portfolio_value _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:Float.infinity
+      ~side:`Long ~entry_price:50.0 ~stop_price:45.0 ()
+  in
+  assert_that result
+    (match_sizing ~shares:(equal_to 0) ~position_value:(float_equal 0.0)
+       ~position_pct:(float_equal 0.0) ~risk_amount:(float_equal 0.0))
+
+let test_position_size_inf_entry_price _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:100000.0
+      ~side:`Long ~entry_price:Float.infinity ~stop_price:45.0 ()
+  in
+  assert_that result
+    (match_sizing ~shares:(equal_to 0) ~position_value:(float_equal 0.0)
+       ~position_pct:(float_equal 0.0) ~risk_amount:(float_equal 0.0))
+
 (* G7 regression — short with very tight stop must not size to >100% of
    portfolio. Pre-G7: risk-budget formula alone produces 12,191 shares for a
    $1M portfolio at risk_pct=0.01 with 0.82 risk_per_share → $1.238M position
@@ -586,6 +635,13 @@ let suite =
          "position_size_rounds_down" >:: test_position_size_rounds_down;
          "position_size_invalid_stop" >:: test_position_size_invalid_stop;
          "position_size_big_winner" >:: test_position_size_big_winner;
+         "position_size_nan_entry_price" >:: test_position_size_nan_entry_price;
+         "position_size_nan_stop_price" >:: test_position_size_nan_stop_price;
+         "position_size_nan_portfolio_value"
+         >:: test_position_size_nan_portfolio_value;
+         "position_size_inf_portfolio_value"
+         >:: test_position_size_inf_portfolio_value;
+         "position_size_inf_entry_price" >:: test_position_size_inf_entry_price;
          "position_size_short_capped_by_max_short_exposure"
          >:: test_position_size_short_capped_by_max_short_exposure;
          "position_size_long_capped_by_max_long_exposure"
