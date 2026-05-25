@@ -8,6 +8,7 @@
   bayesian_runner_evaluator
   bayesian_runner_runner
   bayesian_runner_scoring
+  bayesian_runner_successive_halving
   bayesian_runner_oos_validator
   bayesian_runner_out_dir_check)
  (libraries
