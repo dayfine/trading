@@ -27,8 +27,10 @@
 #     - CLAUDE_CODE_OAUTH_TOKEN   (claude-code-action auth)
 #     - GITHUB_TOKEN              (auto-provided by GHA; used for ghcr login)
 #
-#   cron_slots:              "17 7 * * *"   (00:17 PT)
-#                            "17 12 * * *"  (05:17 PT)
+#   cron_slots:              "17 7 * * *"   (00:17 PT / 07:17 UTC)
+#                            "17 13 * * *"  (06:17 PT / 13:17 UTC)
+#                            "17 19 * * *"  (12:17 PT / 19:17 UTC)
+#                            "17 1 * * *"   (18:17 PT / 01:17 UTC)
 #                            (UTC times — GitHub cron is UTC-only, no DST)
 #
 #   branch_patterns:         feat/, harness/, cleanup/, data/, fix/, ops/
@@ -73,18 +75,19 @@
 name: Daily orchestrator
 
 on:
-  # Two overnight runs (12 AM / 5 AM Pacific) so routine agent work
-  # progresses while the human is asleep. Daytime slots dropped because
-  # substantive work happens in dedicated local sessions (memory:
-  # `project_orchestrator_off.md` 2026-04-25 cost decision; revisited
-  # 2026-04-26 — keep nightly cadence only). Minute `:17` avoids
-  # top-of-hour GHA scheduler load (scheduled jobs at :00 – :05 get
-  # delayed or silently dropped). GitHub cron is UTC-only, no DST
-  # awareness — these are set for UTC-7 (PDT); during PST months they
-  # drift back 1 hour.
+  # Four daily runs spaced 6h apart so routine agent work progresses
+  # through the day and overnight. Expanded from 2x to 4x on 2026-05-26
+  # to allow the orchestrator to pick up new tasks (e.g. v7 sweep speedup
+  # wins from `dev/status/sweep-perf.md`) more promptly between local
+  # sessions. Minute `:17` avoids top-of-hour GHA scheduler load
+  # (scheduled jobs at :00 – :05 get delayed or silently dropped).
+  # GitHub cron is UTC-only, no DST awareness — PT comments are
+  # informational (UTC-7 PDT; shift +1h during PST months).
   schedule:
-    - cron: "17 7 * * *"    # 00:17 PT
-    - cron: "17 12 * * *"   # 05:17 PT
+    - cron: "17 7 * * *"    # 00:17 PT / 07:17 UTC
+    - cron: "17 13 * * *"   # 06:17 PT / 13:17 UTC
+    - cron: "17 19 * * *"   # 12:17 PT / 19:17 UTC
+    - cron: "17 1 * * *"    # 18:17 PT / 01:17 UTC
   workflow_dispatch:
 
 # Queue, do not cancel, if a previous run is still executing when the
