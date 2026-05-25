@@ -1,11 +1,13 @@
 # Status: screener
 
-## Last updated: 2026-05-14
+## Last updated: 2026-05-25
 
 ## Status
-IN_PROGRESS
+MERGED
 
-Cascade post-stop-out cooldown gate landed via PR #718 (merged 2026-04-30 evening). 2026-05-14: `feat/screener-pi-filter` (PR #1089, MERGED) adds an opt-in point-in-time universe-membership gate (`Screener.screen_with_cooldown ?membership_at`) plus strategy-side wiring (`enable_pi_filter` config flag → `Bar_reader.daily_bars_for` → `Daily_price.active_through`). Default-off preserves all baselines. 2026-05-14: `feat/snapshot-active-through-propagation` closes the snapshot-pipeline propagation gap — `Snapshot_manifest.file_metadata` carries per-symbol `active_through`, surfaced via `Daily_panels.active_through_for` and `Snapshot_callbacks.active_through_for`, stamped onto every reconstituted `Daily_price.t`. With this PR the PI filter is behaviourally active on the in-memory + snapshot path (verified by `test_pi_filter_wiring`); production-data backtests still see `active_through = None` everywhere because the source CSVs / Wiki universe builder do not populate the field — that is the next slice. See `dev/notes/historical-universe-status-2026-05-13.md`.
+**2026-05-25**: `fix(screener): NaN/inf guards in resistance/support/volume` (PR #1309) MERGED at `bee5e663c`. Defensive guards in `resistance.ml` (`_bucket_idx`), `support.ml` (`_bucket_idx_below`), and `volume.ml` (`_result_of_volumes`) are now pinned with three regression tests addressing the prior CP4 finding (band_size=0.0 → +inf offsets short-circuited; Float.nan event volume → None). Re-QC verdict on tip `774edc7f4`: structural APPROVED + behavioral APPROVED quality_score 4 (see `dev/reviews/screener-nan-inf-guards.md`); CI green (build-and-test + perf-tier1-smoke + golden-runs-custom-universe). Auto-merged via Step 6.5 after one branch-update cycle (got behind when #1313 merged ahead).
+
+**Prior**: Cascade post-stop-out cooldown gate landed via PR #718 (merged 2026-04-30 evening). 2026-05-14: `feat/screener-pi-filter` (PR #1089, MERGED) adds an opt-in point-in-time universe-membership gate (`Screener.screen_with_cooldown ?membership_at`) plus strategy-side wiring (`enable_pi_filter` config flag → `Bar_reader.daily_bars_for` → `Daily_price.active_through`). Default-off preserves all baselines. 2026-05-14: `feat/snapshot-active-through-propagation` closes the snapshot-pipeline propagation gap — `Snapshot_manifest.file_metadata` carries per-symbol `active_through`, surfaced via `Daily_panels.active_through_for` and `Snapshot_callbacks.active_through_for`, stamped onto every reconstituted `Daily_price.t`. With this PR the PI filter is behaviourally active on the in-memory + snapshot path (verified by `test_pi_filter_wiring`); production-data backtests still see `active_through = None` everywhere because the source CSVs / Wiki universe builder do not populate the field — that is the next slice. See `dev/notes/historical-universe-status-2026-05-13.md`.
 
 ## QC Review
 APPROVED — See dev/reviews/screener.md (2026-03-30). All prior blockers resolved.
