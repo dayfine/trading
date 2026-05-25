@@ -62,16 +62,40 @@ module Spec = Tuner_bin.Bayesian_runner_spec
 module Evaluator = Tuner_bin.Bayesian_runner_evaluator
 module Runner = Tuner_bin.Bayesian_runner_runner
 module Wf_spec = Walk_forward.Spec
+module Wf_window = Walk_forward.Window_spec
 module Wf_executor = Walk_forward.Walk_forward_executor
 module Wf_report = Walk_forward.Walk_forward_report
 module Oos_validator = Tuner_bin.Bayesian_runner_oos_validator
 module Out_dir_check = Tuner_bin.Bayesian_runner_out_dir_check
+module Successive_halving = Tuner_bin.Bayesian_runner_successive_halving
 
 let _usage_msg =
   "Usage: bayesian_runner.exe --spec <spec.sexp> --out-dir <dir>\n\
   \  [--fixtures-root <path>]\n\
   \  [--parallel N]    (default 1, max 16)\n\
-  \  [--walk-forward-spec <spec.sexp> --baseline-aggregate <aggregate.sexp>]"
+  \  [--walk-forward-spec <spec.sexp> --baseline-aggregate <aggregate.sexp>]\n\
+  \  [--fidelity-strategy single|successive_halving]   (default single; \
+   successive_halving requires a Tiered walk-forward window_spec)"
+
+(** Selector for {!Tuner_bin.Bayesian_runner_successive_halving} mode. [Single]
+    preserves the legacy single-tier behaviour bit-for-bit; [Successive_halving]
+    enables M1 T1.2's multi-fidelity promotion loop. Plan:
+    [dev/plans/tuning-research-driven-program-v2-2026-05-25.md]. *)
+type fidelity_strategy = Single | Successive_halving
+
+let _default_fidelity_strategy = Single
+
+let _parse_fidelity_strategy raw =
+  match String.lowercase raw with
+  | "single" -> Single
+  | "successive_halving" -> Successive_halving
+  | other ->
+      eprintf
+        "Error: --fidelity-strategy expects 'single' or 'successive_halving', \
+         got %S\n\
+         %s\n"
+        other _usage_msg;
+      Stdlib.exit 1
 
 (** Default [--parallel] value. [1] preserves the pre-#1197 sequential path
     bit-exactly (no fork, no marshal). *)
@@ -113,10 +137,11 @@ type cli_args = {
   walk_forward_spec_path : string option;
   baseline_aggregate_path : string option;
   parallel : int;
+  fidelity_strategy : fidelity_strategy;
 }
 
 let _parse_args argv =
-  let rec loop spec out fixtures wf_spec baseline parallel = function
+  let rec loop spec out fixtures wf_spec baseline parallel fidelity = function
     | [] -> (
         match (spec, out) with
         | Some s, Some o ->
@@ -127,22 +152,30 @@ let _parse_args argv =
               walk_forward_spec_path = wf_spec;
               baseline_aggregate_path = baseline;
               parallel = Option.value parallel ~default:_default_parallel;
+              fidelity_strategy =
+                Option.value fidelity ~default:_default_fidelity_strategy;
             }
         | _ ->
             eprintf "%s\n" _usage_msg;
             Stdlib.exit 1)
     | "--spec" :: p :: rest ->
-        loop (Some p) out fixtures wf_spec baseline parallel rest
+        loop (Some p) out fixtures wf_spec baseline parallel fidelity rest
     | "--out-dir" :: p :: rest ->
-        loop spec (Some p) fixtures wf_spec baseline parallel rest
+        loop spec (Some p) fixtures wf_spec baseline parallel fidelity rest
     | "--fixtures-root" :: p :: rest ->
-        loop spec out (Some p) wf_spec baseline parallel rest
+        loop spec out (Some p) wf_spec baseline parallel fidelity rest
     | "--walk-forward-spec" :: p :: rest ->
-        loop spec out fixtures (Some p) baseline parallel rest
+        loop spec out fixtures (Some p) baseline parallel fidelity rest
     | "--baseline-aggregate" :: p :: rest ->
-        loop spec out fixtures wf_spec (Some p) parallel rest
+        loop spec out fixtures wf_spec (Some p) parallel fidelity rest
     | "--parallel" :: n :: rest ->
-        loop spec out fixtures wf_spec baseline (Some (_parse_parallel n)) rest
+        loop spec out fixtures wf_spec baseline
+          (Some (_parse_parallel n))
+          fidelity rest
+    | "--fidelity-strategy" :: raw :: rest ->
+        loop spec out fixtures wf_spec baseline parallel
+          (Some (_parse_fidelity_strategy raw))
+          rest
     | "--help" :: _ | "-h" :: _ ->
         printf "%s\n" _usage_msg;
         Stdlib.exit 0
@@ -150,7 +183,7 @@ let _parse_args argv =
         eprintf "Error: unknown argument %S\n%s\n" unknown _usage_msg;
         Stdlib.exit 1
   in
-  loop None None None None None None argv
+  loop None None None None None None None argv
 
 (* -------------- legacy per-scenario mode -------------- *)
 
@@ -302,18 +335,90 @@ let _run_walk_forward_mode ~(args : cli_args) ~(spec : Spec.t)
     ~baseline_label:walk_forward_spec.baseline_label;
   eprintf "[bayesian_runner] outputs written under %s\n%!" args.out_dir
 
+(* -------------- successive-halving mode (M1 T1.2) -------------- *)
+
+(** Extract a [tiered_spec] from a walk-forward [Wf_spec.t] or fail fast.
+    Successive halving requires a [Tiered] window_spec — using a [Rolling] /
+    [Explicit] spec is a clear operator mistake (the SH loop has no meaning
+    without per-tier fold-counts). *)
+let _require_tiered (wf : Wf_spec.t) : Wf_window.tiered_spec =
+  match wf.window_spec with
+  | Tiered ts -> ts
+  | Rolling _ | Explicit _ ->
+      eprintf
+        "Error: --fidelity-strategy successive_halving requires a Tiered \
+         window_spec in the walk-forward spec (Rolling/Explicit are not \
+         supported by the SH pipeline).\n\
+         %s\n"
+        _usage_msg;
+      Stdlib.exit 1
+
+let _run_successive_halving_mode ~(args : cli_args) ~(spec : Spec.t)
+    ~(walk_forward_spec_path : string) ~(baseline_aggregate_path : string) =
+  let fixtures_root =
+    Fixtures_root.resolve ?fixtures_root:args.fixtures_root ()
+  in
+  let walk_forward_spec = Wf_spec.load walk_forward_spec_path in
+  let tiered = _require_tiered walk_forward_spec in
+  let base_scenario_path =
+    Filename.concat fixtures_root walk_forward_spec.base_scenario
+  in
+  let base = Scenario.load base_scenario_path in
+  let baseline_aggregate = _load_aggregate baseline_aggregate_path in
+  let objective = Spec.to_grid_objective spec.objective in
+  let obj_label = Tuner.Grid_search.objective_label objective in
+  eprintf
+    "[bayesian_runner] mode=successive_halving; total_budget=%d; \
+     initial_random=%d; bounds=%d; tiers=%d; parallel=%d; objective=%s\n\
+     %!"
+    spec.total_budget spec.initial_random (List.length spec.bounds)
+    (List.length tiered.tiers) args.parallel obj_label;
+  let gate_penalty_value = Option.value spec.gate_penalty_value ~default:10.0 in
+  let executor = Evaluator.make_executor ~parallel:args.parallel () in
+  let build_evaluator ~(walk_forward_spec : Wf_spec.t) =
+    Evaluator.build_walk_forward ~gate_penalty_value ~int_keys:spec.int_keys
+      ~executor ~base ~walk_forward_spec ~baseline_aggregate ~objective
+      ~fixtures_root ()
+  in
+  let result =
+    Successive_halving.run ~spec ~tiered
+      ~walk_forward_spec_template:walk_forward_spec ~build_evaluator
+      ~out_dir:args.out_dir ()
+  in
+  eprintf "[bayesian_runner] best_score=%.6f best_params=%s\n%!"
+    result.best_score
+    (Sexp.to_string
+       (Sexp.List
+          (Tuner.Grid_search.cell_to_overrides ~int_keys:spec.int_keys
+             result.best_params)));
+  eprintf "[bayesian_runner] outputs written under %s\n%!" args.out_dir
+
 let _main () =
   let argv = Sys.get_argv () |> Array.to_list |> List.tl_exn in
   let args = _parse_args argv in
   (* Belt-and-suspenders even if launch_sweep.sh was bypassed. *)
   Out_dir_check.validate_or_exit ~out_dir:args.out_dir;
   let spec = Spec.load args.spec_path in
-  match (args.walk_forward_spec_path, args.baseline_aggregate_path) with
-  | None, None -> _run_legacy_mode ~args ~spec
-  | Some wf_path, Some baseline_path ->
+  match
+    ( args.fidelity_strategy,
+      args.walk_forward_spec_path,
+      args.baseline_aggregate_path )
+  with
+  | Single, None, None -> _run_legacy_mode ~args ~spec
+  | Single, Some wf_path, Some baseline_path ->
       _run_walk_forward_mode ~args ~spec ~walk_forward_spec_path:wf_path
         ~baseline_aggregate_path:baseline_path
-  | _ ->
+  | Successive_halving, Some wf_path, Some baseline_path ->
+      _run_successive_halving_mode ~args ~spec ~walk_forward_spec_path:wf_path
+        ~baseline_aggregate_path:baseline_path
+  | Successive_halving, _, _ ->
+      eprintf
+        "Error: --fidelity-strategy successive_halving requires both \
+         --walk-forward-spec and --baseline-aggregate\n\
+         %s\n"
+        _usage_msg;
+      Stdlib.exit 1
+  | Single, _, _ ->
       eprintf
         "Error: --walk-forward-spec and --baseline-aggregate must be supplied \
          together\n\
