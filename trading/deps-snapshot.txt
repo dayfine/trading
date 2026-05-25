@@ -44,9 +44,9 @@ csv                         2.4
 ctypes                      0.24.0
 ctypes-foreign              0.24.0
 domain-name                 0.5.0
-dune                        3.23.0
-dune-build-info             3.23.0
-dune-configurator           3.23.0
+dune                        3.23.1
+dune-build-info             3.23.1
+dune-configurator           3.23.1
 either                      1.0.0
 expect_test_helpers_core    v0.17.0
 fieldslib                   v0.17.0
@@ -56,7 +56,7 @@ fpath                       0.7.3
 gel                         v0.17.0
 http                        6.2.1
 int_repr                    v0.17.0
-integers                    0.7.0
+integers                    0.8.0
 ipaddr                      5.6.2
 ipaddr-sexp                 5.6.2
 jane-street-headers         v0.17.0
