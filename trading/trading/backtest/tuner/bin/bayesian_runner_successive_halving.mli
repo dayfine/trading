@@ -29,13 +29,27 @@
     Output layout under [out_dir]:
 
     {v
-      bo_log_<tier-0-name>.csv     ← cheap stage, full BO loop
-      convergence_<tier-0-name>.md
-      bo_checkpoint.sexp           ← cheap-stage checkpoint (resume source)
-      promotion_<tier-N-name>.csv  ← per-tier survivor scores (N >= 1)
-      best.sexp                    ← final winner across all tiers
-      successive_halving_summary.md ← per-stage survivor counts + best score
-    v} *)
+      <cheap-tier-name>/bo_log.csv         ← cheap stage, full BO loop
+      <cheap-tier-name>/convergence.md
+      <cheap-tier-name>/bo_checkpoint.sexp ← cheap-stage checkpoint (resume source)
+      <cheap-tier-name>/best.sexp          ← cheap-stage argmax (Runner-emitted)
+      promotion_<tier-name>.csv            ← per-tier survivor scores (one per tier, top-level)
+      best.sexp                            ← final winner across all tiers (top-level)
+      successive_halving_summary.md        ← per-stage survivor counts + best score
+    v}
+
+    The cheap-stage artefacts live in a per-tier subdirectory (named for the
+    cheap tier's [name]) because they are written by
+    {!Bayesian_runner_runner.run_and_write}, which always emits its [bo_log.csv]
+    / [convergence.md] / [bo_checkpoint.sexp] / [best.sexp] quartet into the
+    [out_dir] it is given. The orchestrator hands it
+    [<out_dir>/<cheap-tier-name>/] to keep cheap-stage files isolated from the
+    top-level SH outputs and from any future per-tier artefacts.
+
+    Cross-tier files ([promotion_<tier>.csv], [best.sexp],
+    [successive_halving_summary.md]) live at the top level of [out_dir] —
+    they're synthesised by the orchestrator across all tiers, not by any one
+    tier's BO loop. *)
 
 type per_tier_result = {
   tier_name : string;
@@ -129,19 +143,26 @@ val run :
     Cheap stage: builds a per-tier walk-forward spec via
     {!build_walk_forward_spec_for_tier}, constructs the evaluator with
     [build_evaluator], and runs the standard BO ask/tell loop via
-    {!Bayesian_runner_runner.run_and_write} (writes its own checkpoint +
-    per-stage [bo_log_<tier>.csv] / [convergence_<tier>.md]).
+    {!Bayesian_runner_runner.run_and_write}, which is handed
+    [<out_dir>/<cheap-tier-name>/] so its standard quartet ([bo_log.csv] /
+    [convergence.md] / [bo_checkpoint.sexp] / [best.sexp]) lands inside that
+    subdirectory.
 
     Higher stages: for each tier after the first, the prior stage's top-K
     candidates (per [promotion_fractions]) are re-evaluated on this tier's
     walk-forward spec. Re-evaluation is sequential — one evaluator call per
     survivor. The new scores produce a fresh ranking for the next promotion.
 
-    Final outputs in [out_dir]:
+    Final outputs at the top level of [out_dir]:
 
-    - [best.sexp] — the winner's parameter overrides
+    - [promotion_<tier-name>.csv] — one file per tier (cheap + each higher
+      tier), holding that tier's candidates sorted descending by score
+    - [best.sexp] — the winner's parameter overrides (last tier's argmax)
     - [successive_halving_summary.md] — per-stage table of (tier, survivors,
       best_score)
+
+    Cheap-stage Runner-emitted files live in the per-tier subdirectory
+    [<out_dir>/<cheap-tier-name>/] — see the module-level Output Layout block.
 
     Raises [Failure] when [tiered.tiers = []] (caller's responsibility to reject
     empty tier lists; this is a defensive check), and propagates any [Failure]

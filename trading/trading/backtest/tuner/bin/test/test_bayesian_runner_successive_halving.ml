@@ -415,6 +415,33 @@ let test_run_writes_per_tier_promotion_csvs _ =
           Sys_unix.file_exists_exn expensive_csv )
         (equal_to (true, true, true)))
 
+let test_run_writes_cheap_stage_files_in_per_tier_subdir _ =
+  (* The cheap-stage BO loop runs via Runner.run_and_write, which emits its
+     standard quartet (bo_log.csv / convergence.md / bo_checkpoint.sexp /
+     best.sexp) into the out_dir it is handed. The SH orchestrator hands it
+     <out_dir>/<cheap-tier-name>/ so those files live in a per-tier
+     subdirectory — pinned here so the .mli's documented layout cannot
+     silently drift away from the implementation. *)
+  let spec = _make_sh_spec ~total_budget:8 ~seed:3 in
+  let calls_per_tier = Hashtbl.create (module String) in
+  let build_evaluator = _make_stub_evaluator_builder ~calls_per_tier in
+  _with_temp_dir (fun dir ->
+      let out_dir = Filename.concat dir "out" in
+      let _result =
+        SH.run ~spec ~tiered:(_make_three_tier_spec ())
+          ~walk_forward_spec_template:(_make_three_tier_template ())
+          ~build_evaluator ~out_dir ()
+      in
+      let cheap_dir = Filename.concat out_dir "cheap" in
+      let cheap_bo_log = Filename.concat cheap_dir "bo_log.csv" in
+      let cheap_convergence = Filename.concat cheap_dir "convergence.md" in
+      let cheap_checkpoint = Filename.concat cheap_dir "bo_checkpoint.sexp" in
+      assert_that
+        ( Sys_unix.file_exists_exn cheap_bo_log,
+          Sys_unix.file_exists_exn cheap_convergence,
+          Sys_unix.file_exists_exn cheap_checkpoint )
+        (equal_to (true, true, true)))
+
 let test_run_best_is_from_last_tier_scores _ =
   (* The per_tier candidates are sorted descending; the final winner must
      equal per_tier's last tier's head. *)
@@ -521,6 +548,8 @@ let suite =
          >:: test_run_writes_summary_and_best_files;
          "run: writes per-tier promotion csvs"
          >:: test_run_writes_per_tier_promotion_csvs;
+         "run: writes cheap-stage files in <cheap-tier-name>/ subdirectory"
+         >:: test_run_writes_cheap_stage_files_in_per_tier_subdir;
          "run: best_params is the last tier's top survivor"
          >:: test_run_best_is_from_last_tier_scores;
          "run: empty tiers list raises Failure" >:: test_run_empty_tiers_raises;
