@@ -102,7 +102,12 @@ permissions:
 jobs:
   orchestrator:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    # Bumped 180 → 360 to cover full PR lifecycle within one run:
+    # feat-agent (~30-60m) + qc-structural (~10m) + qc-behavioral (~5m)
+    # + rework feat-agent (~30m) + re-QC pair (~15m) + CI wait (~15m)
+    # + merge (~1m) ≈ 105-135m per PR; worst case with rework_cap=2 is ~3-4h.
+    # Source: feat/orchestrator/one-shot-per-pr (Step 6.5 addition).
+    timeout-minutes: 360
     container:
       image: ghcr.io/${{ github.repository_owner }}/trading-devcontainer:latest
       credentials:
