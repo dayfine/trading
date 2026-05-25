@@ -108,7 +108,7 @@ Each feature follows this explicit sequence of deterministic nodes (D) and agent
  → [D] rework decision (Step 5a) ───── NEEDS_REWORK + cap not hit ──┘
  │                             └────── APPROVED or cap hit ────────→
  → [D] gate suite: arch layer test + golden scenarios (M4+) + perf gate (M5+)
- → [D] merge decision: auto-merge if all pass, or HOLD + escalate
+ → [D] Step 6.5 merge gate: verify CI green, then auto-merge; HOLD + escalate on any failure
 ```
 
 **Dev → review loop is intra-run.** A NEEDS_REWORK verdict from either QC stage re-dispatches the feat-agent in the same run with a `## Rework mode` prompt (Step 4) — up to an iteration cap (default 2 per track per run). Past the cap, the PR stays draft and the track escalates for the next run. The loop exists because qc-behavioral's check surface is growing: waiting a full scheduler interval per mechanical finding would starve throughput. See Step 5a for the decision logic and budget guard.
@@ -725,7 +725,7 @@ Current tracks (as of status files at read time — re-read every run):
 | harness | harness-maintainer | none between tracks |
 | orchestrator-automation | harness-adjacent | human-only (secrets, GitHub App) |
 
-Skip a track if its status file shows MERGED with no Blocking Refactors or Follow-up items, or APPROVED (awaiting human merge decision).
+Skip a track if its status file shows MERGED with no Blocking Refactors or Follow-up items, or APPROVED (Step 6.5 will handle merge once CI is confirmed green).
 
 ---
 
@@ -1374,13 +1374,15 @@ it does not block the QC pipeline.
 
 **Why this exists.** Without this step, a NEEDS_REWORK verdict waits until the next scheduled orchestrator run before the feat-agent sees it, even when the finding is mechanical (missing `.mli` doc, magic number, test gap). As qc-behavioral's check surface grows, inter-run-only rework starves throughput: a single magic-number finding would cost a full scheduler interval. Intra-run rework closes the loop.
 
+**Branch author is irrelevant.** Rework applies to ALL open orchestrator-track PRs with a NEEDS_REWORK verdict, irrespective of whether the branch was originally authored by the orchestrator, a feat-agent, or the human maintainer (`dayfine`). The test is: does this branch have an open PR on a tracked feature? If yes, and QC returns NEEDS_REWORK, dispatch a rework feat-agent. The rework commit lands on top of the existing PR commits (2-commit stack per CLAUDE.md §"Review feedback workflow").
+
 ### Decision logic (per track)
 
 Maintain an in-memory counter `rework_count[<track>]` for the current run (starts at 0 on first QC of the track this run). After the QC pipeline completes for a track:
 
 ```
 IF overall_qc == APPROVED:
-  → proceed to Stage 3 (draft flip) + gate suite + merge decision
+  → proceed to Stage 3 (draft flip) + Stage 4 (audit) + Step 6.5 (merge gate)
   → rework_count[<track>] plays no further role
 
 ELIF overall_qc == NEEDS_REWORK:
@@ -1449,12 +1451,12 @@ Stage 1 (structural) → Stage 2 (behavioral, conditional) → Combined result
                               /         \
                        APPROVED        NEEDS_REWORK
                           │              /       \
-                     gate suite     cap/budget   under cap
-                     + merge           │            │
-                     decision     escalate     re-dispatch feat-agent
-                                  (PR stays    (Step 4 Rework Mode)
-                                    draft)           │
-                                                     └──→ back to Stage 1
+                    Step 6.5        cap/budget   under cap
+                    merge gate          │            │
+                    (auto-merge     escalate     re-dispatch feat-agent
+                     or escalate)   (PR stays    (Step 4 Rework Mode)
+                                     draft)           │
+                                                      └──→ back to Stage 1
 ```
 
 - Stage 3 (draft→ready flip) already guards on `overall_qc: APPROVED` (existing behavior) — it is a no-op on NEEDS_REWORK and does not need to move.
@@ -1504,6 +1506,123 @@ For each row in `dev/status/_index.md`:
 If an IN_PROGRESS track has no Owner or no Next task, surface it in the
 daily summary's §Escalations as "unassigned work." Silent drift is the
 failure mode this step exists to prevent.
+
+---
+
+## Step 6.5: Merge gate (auto-merge on full-green)
+
+**When to run:** for every track where Step 5a exited with `overall_qc: APPROVED` this run. This is a deterministic step — no subagent spawn. Read `auto_merge_enabled` from `dev/config/merge-policy.json` (default `true` if absent; set `false` to revert to human-merge-only mode).
+
+**The three-gate contract** (from `.claude/rules/pr-merge-gates.md`):
+
+1. CI — `build-and-test` + `perf-tier1-smoke` COMPLETED SUCCESS on the PR's tip SHA.
+2. qc-structural — APPROVED verdict at the current tip SHA.
+3. qc-behavioral — APPROVED verdict at the current tip SHA.
+
+All three must be green before merge. Re-verify CI immediately before merge — never trust a stale "CI was green" read from earlier in the run.
+
+**Per-PR procedure:**
+
+```bash
+REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
+PR_NUMBER="<N>"   # from Step 5's Stage 1/2 output
+
+# 1. Get the PR's tip SHA, then verify all required CI checks are COMPLETED SUCCESS.
+#    Poll up to 15 minutes (90 × 10s).
+TIP_SHA="$(curl -sSL \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}/commits" \
+  | python3 -c 'import json,sys; commits=json.load(sys.stdin); print(commits[-1]["sha"] if commits else "")')"
+
+FAILING="not_ready"
+for _ in $(seq 1 90); do
+  FAILING="$(curl -sSL \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${REPO}/commits/${TIP_SHA}/check-runs" \
+    | python3 -c '
+import json,sys
+runs = json.load(sys.stdin).get("check_runs", [])
+required = {"build-and-test", "perf-tier1-smoke"}
+failing = [r["name"] for r in runs
+           if r["name"] in required
+           and not (r["status"] == "completed" and r["conclusion"] == "success")]
+print(",".join(failing) if failing else "")
+' 2>/dev/null || echo "api_error")"
+  [ -z "$FAILING" ] && break
+  echo "Waiting for CI (not yet green: ${FAILING})..."
+  sleep 10
+done
+
+if [ -n "$FAILING" ]; then
+  echo "MERGE_SKIP: PR #${PR_NUMBER} — CI checks not green: ${FAILING}"
+  # → surface as escalation (see below); do NOT merge
+else
+  # 2. If branch is stale (behind main), update it first.
+  # mergeable_state REST field: "clean", "behind", "blocked", "dirty", "unknown".
+  MERGE_STATE="$(curl -sSL \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("mergeable_state","unknown"))')"
+
+  if [ "$MERGE_STATE" = "behind" ]; then
+    curl -sSL -X PUT \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}/update-branch" \
+      -d '{}' > /dev/null
+    echo "Branch update triggered for PR #${PR_NUMBER}; re-polling CI..."
+    # Re-poll CI for up to 15 minutes after the update
+    for _ in $(seq 1 90); do
+      sleep 10
+      NEW_MSTATE="$(curl -sSL \
+        -H "Authorization: Bearer ${GH_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("mergeable_state","unknown"))')"
+      [ "$NEW_MSTATE" = "clean" ] && break
+    done
+    MERGE_STATE="$NEW_MSTATE"
+  fi
+
+  if [ "$MERGE_STATE" != "clean" ]; then
+    echo "MERGE_SKIP: PR #${PR_NUMBER} — mergeable_state=${MERGE_STATE} (not clean after update)"
+    # → surface as escalation
+  else
+    # 3. Merge.
+    MERGE_RESPONSE="$(curl -sSL -X PUT \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      -d '{"merge_method":"squash"}' \
+      "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}/merge")"
+    MERGED="$(printf '%s' "$MERGE_RESPONSE" | jq -r '.merged // false | tostring' 2>/dev/null || echo false)"
+    if [ "$MERGED" = "true" ]; then
+      echo "Auto-merged PR #${PR_NUMBER} (all 3 gates green)."
+    else
+      echo "MERGE_FAILED: PR #${PR_NUMBER} response: ${MERGE_RESPONSE}"
+      # → surface as escalation
+    fi
+  fi
+fi
+```
+
+**On failure, surface in `## Escalations`:**
+
+```
+[merge-fail] <track>: PR #<N> — <reason>. Gates: CI=<pass/fail>, structural=APPROVED, behavioral=APPROVED. Action: human merge required (or re-dispatch next run if CI is transient).
+```
+
+**On success, record in `## Dispatched this run`:**
+
+```
+| <track> | auto-merge | merged | PR #<N> auto-merged (all 3 gates green) |
+```
+
+**Scope limit per run.** A single orchestrator run processes ≤2 rework cycles per track plus one final merge. If the QC pipeline exhausted the `rework_cap` without reaching APPROVED, skip Step 6.5 for that track — it goes to escalation instead. The next orchestrator run picks up from the current PR state (still open, last verdict carried in `dev/reviews/<track>.md`).
+
+**`auto_merge_enabled: false` kill switch.** If `dev/config/merge-policy.json` has `"auto_merge_enabled": false`, skip this step entirely for all tracks. Surface in `## Integration Queue` as "QC APPROVED — auto-merge disabled; human merge required" (previous behavior). This lets the human revert to the old workflow without a code change.
 
 ---
 
@@ -1625,13 +1744,14 @@ Run ID: <YYYY-MM-DD-run-N, e.g. 2026-04-16-run-1>
 ## Pending work
 
 Parseable state table — one row per tracked non-MERGED track. "State" must be one of:
-`dispatched`, `skipped (in-flight)`, `skipped (no-change)`, `awaiting-merge`, `blocked`.
+`dispatched`, `skipped (in-flight)`, `skipped (no-change)`, `awaiting-merge`, `auto-merged`, `blocked`.
 
 | Track | State | Branch | PR | Next step |
 |-------|-------|--------|----|-----------|
 | <track> | dispatched | feat/<track> | #<N> | <one-liner> |
 | <track> | skipped (in-flight) | feat/<track> | #<N> | open PR in flight — no new commits |
-| <track> | awaiting-merge | feat/<track> | #<N> | QC APPROVED — awaiting human merge |
+| <track> | awaiting-merge | feat/<track> | #<N> | QC APPROVED — auto-merge failed or disabled; human merge required |
+| <track> | auto-merged | feat/<track> | #<N> | auto-merged (all 3 gates green) — Step 6.5 |
 | <track> | blocked | — | — | <blocker description> |
 
 ## Dispatched this run
@@ -1716,7 +1836,7 @@ in merge-policy.json with rough token estimates. Tag it "estimated" not "measure
 - <track>: <list items verbatim, or "none">
 
 ## Integration Queue
-(Features with overall_qc APPROVED — ready to merge to main pending your decision)
+(Features with overall_qc APPROVED this run — Step 6.5 attempted auto-merge. List tracks that APPROVED but Step 6.5 was skipped or failed — those need human merge. Omit tracks that were successfully auto-merged.)
 - ...
 
 ## Current Milestone Target
