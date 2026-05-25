@@ -236,6 +236,21 @@ let test_parity_chart_window_filtering _ =
   in
   assert_parity ~config:small_cfg ~bars ~breakout_price:50.0 ()
 
+(* NaN/inf guard regression — see _bucket_idx guard. With
+   congestion_band_pct = 0.0, band_size becomes 0.0 and the
+   (mid - breakout_price) / band_size division yields inf/-inf, which
+   pre-guard would crash at Int.of_float. Post-guard: bucket index is
+   Int.min_value, filtered out by the bkt >= 0 check; zone list ends up
+   empty so quality = Clean (no virgin pass either, since bars are above
+   breakout). *)
+let test_zero_band_size_no_crash _ =
+  let zero_band_cfg = { cfg with congestion_band_pct = 0.0 } in
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
+  let result =
+    analyze ~config:zero_band_cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
+  in
+  assert_that result.zones_above (size_is 0)
+
 let suite =
   "resistance_tests"
   >::: [
@@ -256,6 +271,7 @@ let suite =
          "test_parity_moderate_resistance" >:: test_parity_moderate_resistance;
          "test_parity_chart_window_filtering"
          >:: test_parity_chart_window_filtering;
+         "test_zero_band_size_no_crash" >:: test_zero_band_size_no_crash;
        ]
 
 let () = run_test_tt_main suite
