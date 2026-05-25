@@ -191,6 +191,24 @@ let test_parity_event_at_max_index _ =
   in
   assert_parity ~bars ~event_idx:5 ()
 
+(* NaN guard regression — see _result_of_volumes Float.is_finite guard. A
+   NaN event volume from a bad CSV bar pre-guard would propagate through
+   division to NaN ratio + crash at Int.of_float on the result's
+   event_volume field. Post-guard: return None and the screener treats
+   the bar as having no volume signal. *)
+let test_nan_event_volume_returns_none _ =
+  let prior_callback ~week_offset =
+    if week_offset = 0 then Some Float.nan
+    else if week_offset >= 1 && week_offset <= 4 then Some 1000.0
+    else None
+  in
+  let callbacks = { get_volume = prior_callback } in
+  let result =
+    analyze_breakout_with_callbacks ~config:default_config ~callbacks
+      ~event_offset:0
+  in
+  assert_that result is_none
+
 let suite =
   "volume_tests"
   >::: [
@@ -215,6 +233,8 @@ let suite =
          "test_parity_weak_breakout" >:: test_parity_weak_breakout;
          "test_parity_insufficient_history" >:: test_parity_insufficient_history;
          "test_parity_event_at_max_index" >:: test_parity_event_at_max_index;
+         "test_nan_event_volume_returns_none"
+         >:: test_nan_event_volume_returns_none;
        ]
 
 let () = run_test_tt_main suite

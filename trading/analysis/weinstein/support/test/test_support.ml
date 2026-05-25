@@ -126,6 +126,19 @@ let test_analyze_matches_callback _ =
   assert_that bar_list_result.quality
     (equal_to (callback_result.quality : overhead_quality))
 
+(* NaN/inf guard regression — see _bucket_idx_below guard. With
+   congestion_band_pct = 0.0, band_size becomes 0.0 and the
+   (breakdown - mid) / band_size division yields inf, which pre-guard
+   would crash at Int.of_float. Post-guard: bucket index is Int.min_value,
+   filtered by bkt >= 0; the chart-density walk classifies as Clean. *)
+let test_zero_band_size_no_crash _ =
+  let zero_band_cfg = { cfg with congestion_band_pct = 0.0 } in
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:42.0 ~high:48.0 45.0) in
+  let result =
+    analyze ~config:zero_band_cfg ~bars ~breakdown_price:50.0 ~as_of_date:as_of
+  in
+  assert_that result.quality (equal_to Clean)
+
 let () =
   run_test_tt_main
     ("support_tests"
@@ -140,4 +153,5 @@ let () =
            "pure: same inputs" >:: test_pure_same_inputs;
            "analyze matches analyze_with_callbacks"
            >:: test_analyze_matches_callback;
+           "zero band_size → no crash" >:: test_zero_band_size_no_crash;
          ])
