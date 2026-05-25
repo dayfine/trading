@@ -214,54 +214,59 @@ let _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price =
     let dollar_cap = Float.min exposure_cap position_cap in
     Int.of_float (Float.round_down (dollar_cap /. entry_price))
 
+(* Caller [compute_position_size] has already screened [portfolio_value],
+   [entry_price], [stop_price] for NaN/inf. This helper handles the
+   directional + zero-risk-per-share guards and the actual sizing math.
+   Extracted so [compute_position_size] stays one if-level deep — the
+   finite-input check would otherwise push nesting past the linter cap. *)
+let _compute_position_size_finite ~config ~portfolio_value ~side ~entry_price
+    ~stop_price ~big_winner =
+  let stop_on_correct_side =
+    match side with
+    | `Long -> Float.( < ) stop_price entry_price
+    | `Short -> Float.( > ) stop_price entry_price
+  in
+  let risk_per_share = Float.abs (entry_price -. stop_price) in
+  if (not stop_on_correct_side) || Float.( <= ) risk_per_share 0.0 then
+    _zero_sizing
+  else
+    let base_risk_pct = config.risk_per_trade_pct in
+    let effective_risk_pct =
+      if big_winner then base_risk_pct *. config.big_winner_multiplier
+      else base_risk_pct
+    in
+    let dollar_risk = portfolio_value *. effective_risk_pct in
+    let risk_based_shares =
+      Int.of_float (Float.round_down (dollar_risk /. risk_per_share))
+    in
+    let exposure_capped_shares =
+      _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price
+    in
+    let shares = Int.min risk_based_shares exposure_capped_shares in
+    let position_value = Float.of_int shares *. entry_price in
+    let position_pct =
+      if Float.( <= ) portfolio_value 0.0 then 0.0
+      else position_value /. portfolio_value
+    in
+    let risk_amount = Float.of_int shares *. risk_per_share in
+    { shares; position_value; position_pct; risk_amount }
+
 let compute_position_size ~config ~portfolio_value ~side ~entry_price
     ~stop_price ?(big_winner = false) () =
   (* Defense against NaN/inf inputs — see [_is_finite_positive] above. A NaN
      [portfolio_value] (e.g. mark-to-market summed an inf bar from bad CSV) or
      NaN [entry_price]/[stop_price] would slip past the directional and <= 0
-     guards below and crash at [Int.of_float]. Returning zero shares makes the
-     strategy skip the candidate silently — the audit recorder upstream emits
-     a [Sized_zero] outcome trace. *)
+     guards in [_compute_position_size_finite] and crash at [Int.of_float].
+     Returning zero shares makes the strategy skip the candidate silently —
+     the audit recorder upstream emits a [Sized_zero] outcome trace. *)
   if
     (not (Float.is_finite portfolio_value))
     || (not (Float.is_finite entry_price))
     || not (Float.is_finite stop_price)
   then _zero_sizing
   else
-    (* Risk-per-share is the absolute distance between entry and stop. The
-     direction is determined by [side]: for [Long] the stop must be below
-     entry; for [Short] the stop must be above entry. If the stop is on the
-     wrong side or equal to entry, [|entry - stop| = 0] (or the stop fails
-     the directional check) and we return 0 shares. *)
-    let stop_on_correct_side =
-      match side with
-      | `Long -> Float.( < ) stop_price entry_price
-      | `Short -> Float.( > ) stop_price entry_price
-    in
-    let risk_per_share = Float.abs (entry_price -. stop_price) in
-    if (not stop_on_correct_side) || Float.( <= ) risk_per_share 0.0 then
-      _zero_sizing
-    else
-      let base_risk_pct = config.risk_per_trade_pct in
-      let effective_risk_pct =
-        if big_winner then base_risk_pct *. config.big_winner_multiplier
-        else base_risk_pct
-      in
-      let dollar_risk = portfolio_value *. effective_risk_pct in
-      let risk_based_shares =
-        Int.of_float (Float.round_down (dollar_risk /. risk_per_share))
-      in
-      let exposure_capped_shares =
-        _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price
-      in
-      let shares = Int.min risk_based_shares exposure_capped_shares in
-      let position_value = Float.of_int shares *. entry_price in
-      let position_pct =
-        if Float.( <= ) portfolio_value 0.0 then 0.0
-        else position_value /. portfolio_value
-      in
-      let risk_amount = Float.of_int shares *. risk_per_share in
-      { shares; position_value; position_pct; risk_amount }
+    _compute_position_size_finite ~config ~portfolio_value ~side ~entry_price
+      ~stop_price ~big_winner
 
 (* ---- Limit checks ---- *)
 
