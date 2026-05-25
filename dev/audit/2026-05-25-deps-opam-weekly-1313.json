@@ -1,12 +1,12 @@
 {
   "date": "2026-05-25",
-  "feature": "screener-nan-inf-guards",
-  "branch": "feat/screener/nan-inf-guards",
+  "feature": "deps-opam-weekly-1313",
+  "branch": "deps/opam-weekly",
   "structural_qc": "APPROVED",
   "behavioral_qc": "APPROVED",
   "overall_qc": "APPROVED",
   "harness_gap": "",
-  "quality_score": 4,
+  "quality_score": 5,
   "findings_count": {
     "PASS": 0,
     "FAIL": 0,

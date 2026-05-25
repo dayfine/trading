@@ -1,4 +1,4 @@
-Reviewed SHA: f831b4ea202190f873c1b57f60ab0c409e56550b
+Reviewed SHA: 774edc7f4d5cf5903cffbd77b86f322b0f3e6d71
 
 ## Structural Checklist
 
@@ -86,3 +86,106 @@ NEEDS_REWORK
 ### Notes for reworker
 - The structural verdict (APPROVED) and the underlying fix (correct sentinel choice, correct guard placement, mirror of merged #1307 pattern) are sound; this rework is narrowly about pinning the new behaviour, not about changing it.
 - After adding the three tests, no further structural QC pass is required — the diff will only add lines under `test/` directories.
+
+---
+
+# Structural QC — Re-QC after rework (2026-05-25)
+Reviewer: qc-structural
+PR: #1309
+Rework Commit: 774edc7f4d5cf5903cffbd77b86f322b0f3e6d71
+
+## Rework Changes
+
+Maintainer addressed the behavioral CP4 finding by adding three regression tests:
+- `test_resistance.ml`: `test_zero_band_size_no_crash` — exercises `congestion_band_pct = 0.0` → `band_size = 0.0` → `inf/−inf` offset → guard returns `Int.min_value` → zones_above empty.
+- `test_support.ml`: `test_zero_band_size_no_crash` — mirrors resistance case with breakdown_price, asserts Clean classification.
+- `test_volume.ml`: `test_nan_event_volume_returns_none` — callback returns `Float.nan` for event_volume, asserts `analyze_breakout_with_callbacks` returns `None`.
+
+## Structural Checklist (Re-QC)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | |
+| H2 | dune build | PASS | |
+| H3 | dune runtest | PASS | All tests pass, including linters (fn_length, magic_numbers, nesting, etc.) |
+| P1 | Functions ≤ 50 lines | PASS | fn_length_linter passed as part of H3; test functions are ~5 lines each |
+| P2 | No magic numbers | PASS | linter_magic_numbers passed as part of H3 |
+| P3 | All configurable thresholds/periods/weights in config record | PASS | Test-specific values (0.0, 50.0, 1000.0, Float.nan) are test constants, not config parameters |
+| P4 | Public-symbol export hygiene | PASS | mli_coverage linter passed as part of H3 |
+| P5 | Internal helpers prefixed per convention | PASS | No new helpers added; tests use existing module public APIs |
+| P6 | Tests conform to `.claude/rules/test-patterns.md` | PASS | All three new tests use single `assert_that` per value (size_is 0, equal_to Clean, is_none); proper Matchers library composition; no forbidden patterns |
+| A1 | Core module modifications | PASS | No core modules modified; changes confined to test files under `analysis/weinstein/` |
+| A2 | No new `analysis/→trading/trading/` imports | PASS | Only test files modified; no dune files touched |
+| A3 | No unnecessary modifications to existing modules | PASS | PR scope is exactly 3 test files per `gh pr view 1309 --json files` |
+
+## Verdict
+
+APPROVED
+
+## Summary
+
+The rework commit addresses the behavioral CP4 finding by pinning the new NaN/inf guard behaviour with three minimal regression tests. Each test exercises the guarded-against scenario (band_size=0→inf bucket index, NaN event_volume) and verifies the guard's sentinel value is handled correctly downstream (bucket filtered, None returned). All gates pass cleanly. Test-pattern compliance verified — no deviations from one-`assert_that`-per-value or Matchers library conventions.
+
+The rework successfully fulfills the CP4 requirement: "Each guard called out explicitly in code docstrings has a test that exercises the guarded-against scenario."
+
+---
+
+# Behavioral QC — Re-QC after rework (2026-05-25)
+Reviewer: qc-behavioral
+PR: #1309
+Rework Commit: 774edc7f4d5cf5903cffbd77b86f322b0f3e6d71
+Iteration: 1 of 2
+
+## Rework Verification
+
+Structural re-QC APPROVED `774edc7f4` on 2026-05-25 (see preceding section). This re-QC behavioral pass verifies the three new regression tests genuinely pin the three docstring guard claims that triggered the prior CP4 FAIL.
+
+**Guard ↔ test mapping (verified at SHA 774edc7f4):**
+
+1. **resistance.ml lines 97–102** (`_bucket_idx` guard, returns `Int.min_value` on non-finite offset) → `test_resistance.ml` line 246 `test_zero_band_size_no_crash`:
+   - Sets `congestion_band_pct = 0.0` → `band_size = 50.0 * 0.0 = 0.0`
+   - Bars: `low=52.0, high=58.0, mid=55.0`; breakout_price=50.0 → offset = `5.0 / 0.0 = +inf`
+   - Without the guard `Int.of_float +inf` raises (pre-fix v7 fold-22 crash); with guard, returns `Int.min_value` and the `bkt >= 0` filter at line 145 drops it.
+   - Assertion `assert_that result.zones_above (size_is 0)` is the post-guard observable signature.
+
+2. **support.ml lines 32–35** (`_bucket_idx_below` guard, mirrors resistance) → `test_support.ml` line 134 `test_zero_band_size_no_crash`:
+   - Same pattern: `congestion_band_pct = 0.0`, `bars: low=42.0, high=48.0, mid=45.0`; breakdown_price=50.0 → offset = `5.0 / 0.0 = +inf`
+   - With guard, `Int.min_value` filtered by `bkt >= 0` at line 55; bucket table stays empty; `_classify_chart_density` returns `Clean`.
+   - Assertion `assert_that result.quality (equal_to Clean)` is the post-guard observable signature.
+
+3. **volume.ml lines 95–99** (`_result_of_volumes` short-circuit for non-finite `event_volume_f`) → `test_volume.ml` line 199 `test_nan_event_volume_returns_none`:
+   - Callback returns `Some Float.nan` for `week_offset=0` (event bar) and `Some 1000.0` for offsets 1..4 (priors)
+   - `event_volume_f = nan` → `not (Float.is_finite event_volume_f)` is `true` → returns `None`
+   - Without guard, `Int.of_float nan` would raise at line 109 (`event_volume` field construction).
+   - Assertion `assert_that result is_none` is the post-guard observable signature.
+
+**Build/test verification:** `dune build` clean; `dune runtest analysis/weinstein/{resistance,support,volume}` passes 15 / 9 / 18 tests respectively (one new test per module beyond the prior counts of 14 / 8 / 17).
+
+## Contract Pinning Checklist (Re-QC)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new .mli docstrings has an identified test that pins it | NA | No `.mli` files added or modified in this rework; rework adds tests only. |
+| CP2 | Each claim in PR body "Test plan"/"Test coverage" sections has a corresponding test in the committed test file | NA | PR body's "Test plan" still lists only (a) `dune build` (verified by structural H2) and (b) the v7 sweep manual ops action. No specific unit-test names are advertised in the PR body. The three new tests exceed (not contradict) the PR body's stated coverage. |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size_is | NA | No pass-through / identity tests in this PR. The resistance test's `size_is 0` assertion is a guard-emptiness check (correct post-guard output is no zones), not a pass-through identity. |
+| CP4 | Each guard called out explicitly in code docstrings has a test that exercises the guarded-against scenario | PASS | Three docstring guard claims, three regression tests: (resistance `_bucket_idx` line 97–102 → `test_zero_band_size_no_crash` line 246); (support `_bucket_idx_below` line 32–35 → `test_zero_band_size_no_crash` line 134); (volume `_result_of_volumes` line 95–99 → `test_nan_event_volume_returns_none` line 199). Each test exercises the guarded-against scenario (`band_size = 0.0` producing inf offset; `Float.nan` event volume) and asserts the post-guard observable (empty zones / Clean quality / `None`). The original CP4 FAIL is resolved. |
+
+## Behavioral Checklist (Re-QC)
+
+Pure defensive infra fix; no Weinstein domain rule changed. All Weinstein-specific rows (A1, S*/L*/C*/T*) are NA per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely".
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1 | Core module modification is strategy-agnostic | NA | qc-structural re-QC did not flag A1; no core module touched. |
+| S1–S6 | Stage definitions / buy criteria | NA | Pure defensive-guard fix; domain checklist not applicable. |
+| L1–L4 | Stop-loss rules | NA | Pure defensive-guard fix; domain checklist not applicable. |
+| C1–C3 | Screener cascade / macro / sector rules | NA | Pure defensive-guard fix; domain checklist not applicable. The guards live inside `_bucket_idx` / `_bucket_idx_below` / `_result_of_volumes` — pure helper functions whose contracts for finite inputs are unchanged. |
+| T1–T4 | Test coverage of domain outcomes | NA | Pure defensive-guard fix; domain checklist not applicable. Guard-pinning coverage is now captured by CP4 above. |
+
+## Quality Score
+
+4 — Rework cleanly addresses the CP4 finding with three minimal, deterministic regression tests (~5 lines each) that pin exactly the docstring claims that were unpinned in run-1. Each test exercises the precise guarded-against scenario, asserts a single post-guard observable, and uses the Matchers library idioms (`size_is`, `equal_to`, `is_none`) without nesting. Below 5 only because the test file already had similar adjacent patterns the new tests could have re-used a tiny helper for; this is a style nit, not a behavioral issue.
+
+## Verdict
+
+APPROVED
