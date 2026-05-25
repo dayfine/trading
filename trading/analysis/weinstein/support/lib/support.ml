@@ -29,7 +29,10 @@ let _bucket_idx_below ~breakdown_price ~band_size ~high ~low =
   let mid = (high +. low) /. 2.0 in
   (* (breakdown - mid) is positive when the bar is below breakdown. *)
   let offset = (breakdown_price -. mid) /. band_size in
-  Int.of_float (Float.round_down offset)
+  (* Guard against NaN/inf from band_size=0 or NaN price inputs — see
+     [Resistance._bucket_idx]. Mirror that path's defensive fallback. *)
+  if Float.is_finite offset then Int.of_float (Float.round_down offset)
+  else Int.min_value
 
 (* Try to read (high, low) at [bar_offset]. Both must be defined; any
    missing field skips the offset (treated as "no bar"). *)

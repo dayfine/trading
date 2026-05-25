@@ -92,7 +92,11 @@ let _result_of_volumes ~config ~event_volume_f ~prior_vols : result option =
     List.fold prior_vols ~init:0.0 ~f:( +. )
     /. Float.of_int (List.length prior_vols)
   in
-  if Float.(avg_vol = 0.0) then None
+  if
+    Float.(avg_vol = 0.0)
+    || (not (Float.is_finite avg_vol))
+    || not (Float.is_finite event_volume_f)
+  then None
   else
     let ratio = event_volume_f /. avg_vol in
     let confirmation =

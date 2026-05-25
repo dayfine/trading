@@ -94,7 +94,12 @@ let _age_years date as_of_date : float =
 let _bucket_idx ~breakout_price ~band_size ~high ~low =
   let mid = (high +. low) /. 2.0 in
   let offset = Float.((mid - breakout_price) /. band_size) in
-  Int.of_float (Float.round_down offset)
+  (* Guard against NaN/inf from band_size=0 or NaN price inputs. Any non-finite
+     offset would crash at [Int.of_float]. Returning Int.min_value here yields
+     a deeply-negative bucket index that the callers' positive-bucket filter
+     drops naturally (v7 sweep 2026-05-25 fold-22 crash). *)
+  if Float.is_finite offset then Int.of_float (Float.round_down offset)
+  else Int.min_value
 
 type _bucket_agg = { count : int; most_recent : Date.t }
 (** Aggregate state per bucket while walking offsets: count of bars in the
