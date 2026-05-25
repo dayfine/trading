@@ -172,6 +172,17 @@ let snapshot_of_portfolio ~portfolio ~prices ?(sectors = []) () =
 
 (* ---- Position sizing ---- *)
 
+(* Reject NaN, infinity, and non-positive values in one check. IEEE-754
+   comparisons against NaN always return false, so bare [Float.( <= ) x 0.0]
+   guards let NaN propagate through division and crash at [Int.of_float NaN].
+   The v7 production sweep (2026-05-25) crashed in fold 22 (2020-12-26 →
+   2021-12-25) from this path when a NaN sizing input slipped past the bare
+   <= 0 guards in [_max_shares_by_caps] and [compute_position_size]. *)
+let _is_finite_positive x = Float.is_finite x && Float.( > ) x 0.0
+
+let _zero_sizing =
+  { shares = 0; position_value = 0.0; position_pct = 0.0; risk_amount = 0.0 }
+
 (* G7 fix: cap shares so that position_value never exceeds the side's
    max-exposure budget. Without this, a tight stop (small risk_per_share)
    relative to dollar_risk produces an unbounded share count, allowing single
@@ -181,60 +192,76 @@ let snapshot_of_portfolio ~portfolio ~prices ?(sectors = []) () =
    config.max_position_pct]. Per-position concentration sat well above the
    side-exposure cap; the [min()] of both caps tightens this. *)
 let _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price =
-  let exposure_pct, position_pct =
-    match side with
-    | `Long -> (config.max_long_exposure_pct, config.max_position_pct_long)
-    | `Short -> (config.max_short_exposure_pct, config.max_position_pct_short)
-  in
-  (* Clamp both caps to non-negative. With shorts, [portfolio_value] can go
-     negative when short notional exceeds cash + longs; without the clamp,
-     [position_cap] becomes negative and the share-count rounds to a negative
-     integer, silently corrupting downstream metrics + Sexp serialization
-     (sp500-2019-2023 with-shorts crashed silently post-#744 from this path).
-     A negative cap means the strategy has no room to add positions — return
-     zero shares instead of a negative count. *)
-  let exposure_cap = Float.max 0.0 (portfolio_value *. exposure_pct) in
-  let position_cap = Float.max 0.0 (portfolio_value *. position_pct) in
-  let dollar_cap = Float.min exposure_cap position_cap in
-  if Float.( <= ) entry_price 0.0 then Int.max_value
-  else Int.of_float (Float.round_down (dollar_cap /. entry_price))
+  if
+    (not (Float.is_finite portfolio_value))
+    || not (_is_finite_positive entry_price)
+  then Int.max_value
+  else
+    let exposure_pct, position_pct =
+      match side with
+      | `Long -> (config.max_long_exposure_pct, config.max_position_pct_long)
+      | `Short -> (config.max_short_exposure_pct, config.max_position_pct_short)
+    in
+    (* Clamp both caps to non-negative. With shorts, [portfolio_value] can go
+       negative when short notional exceeds cash + longs; without the clamp,
+       [position_cap] becomes negative and the share-count rounds to a negative
+       integer, silently corrupting downstream metrics + Sexp serialization
+       (sp500-2019-2023 with-shorts crashed silently post-#744 from this path).
+       A negative cap means the strategy has no room to add positions — return
+       zero shares instead of a negative count. *)
+    let exposure_cap = Float.max 0.0 (portfolio_value *. exposure_pct) in
+    let position_cap = Float.max 0.0 (portfolio_value *. position_pct) in
+    let dollar_cap = Float.min exposure_cap position_cap in
+    Int.of_float (Float.round_down (dollar_cap /. entry_price))
 
 let compute_position_size ~config ~portfolio_value ~side ~entry_price
     ~stop_price ?(big_winner = false) () =
-  (* Risk-per-share is the absolute distance between entry and stop. The
+  (* Defense against NaN/inf inputs — see [_is_finite_positive] above. A NaN
+     [portfolio_value] (e.g. mark-to-market summed an inf bar from bad CSV) or
+     NaN [entry_price]/[stop_price] would slip past the directional and <= 0
+     guards below and crash at [Int.of_float]. Returning zero shares makes the
+     strategy skip the candidate silently — the audit recorder upstream emits
+     a [Sized_zero] outcome trace. *)
+  if
+    (not (Float.is_finite portfolio_value))
+    || (not (Float.is_finite entry_price))
+    || not (Float.is_finite stop_price)
+  then _zero_sizing
+  else
+    (* Risk-per-share is the absolute distance between entry and stop. The
      direction is determined by [side]: for [Long] the stop must be below
      entry; for [Short] the stop must be above entry. If the stop is on the
      wrong side or equal to entry, [|entry - stop| = 0] (or the stop fails
      the directional check) and we return 0 shares. *)
-  let stop_on_correct_side =
-    match side with
-    | `Long -> Float.( < ) stop_price entry_price
-    | `Short -> Float.( > ) stop_price entry_price
-  in
-  let risk_per_share = Float.abs (entry_price -. stop_price) in
-  if (not stop_on_correct_side) || Float.( <= ) risk_per_share 0.0 then
-    { shares = 0; position_value = 0.0; position_pct = 0.0; risk_amount = 0.0 }
-  else
-    let base_risk_pct = config.risk_per_trade_pct in
-    let effective_risk_pct =
-      if big_winner then base_risk_pct *. config.big_winner_multiplier
-      else base_risk_pct
+    let stop_on_correct_side =
+      match side with
+      | `Long -> Float.( < ) stop_price entry_price
+      | `Short -> Float.( > ) stop_price entry_price
     in
-    let dollar_risk = portfolio_value *. effective_risk_pct in
-    let risk_based_shares =
-      Int.of_float (Float.round_down (dollar_risk /. risk_per_share))
-    in
-    let exposure_capped_shares =
-      _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price
-    in
-    let shares = Int.min risk_based_shares exposure_capped_shares in
-    let position_value = Float.of_int shares *. entry_price in
-    let position_pct =
-      if Float.( <= ) portfolio_value 0.0 then 0.0
-      else position_value /. portfolio_value
-    in
-    let risk_amount = Float.of_int shares *. risk_per_share in
-    { shares; position_value; position_pct; risk_amount }
+    let risk_per_share = Float.abs (entry_price -. stop_price) in
+    if (not stop_on_correct_side) || Float.( <= ) risk_per_share 0.0 then
+      _zero_sizing
+    else
+      let base_risk_pct = config.risk_per_trade_pct in
+      let effective_risk_pct =
+        if big_winner then base_risk_pct *. config.big_winner_multiplier
+        else base_risk_pct
+      in
+      let dollar_risk = portfolio_value *. effective_risk_pct in
+      let risk_based_shares =
+        Int.of_float (Float.round_down (dollar_risk /. risk_per_share))
+      in
+      let exposure_capped_shares =
+        _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price
+      in
+      let shares = Int.min risk_based_shares exposure_capped_shares in
+      let position_value = Float.of_int shares *. entry_price in
+      let position_pct =
+        if Float.( <= ) portfolio_value 0.0 then 0.0
+        else position_value /. portfolio_value
+      in
+      let risk_amount = Float.of_int shares *. risk_per_share in
+      { shares; position_value; position_pct; risk_amount }
 
 (* ---- Limit checks ---- *)
 
