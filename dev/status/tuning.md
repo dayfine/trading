@@ -182,6 +182,35 @@ shipped (#1224), promote-gate scaffolding shipped (#1234) — the
 methodology evolution was productive; the parameter-discovery was
 not.
 
+### Research-driven program v2 (plan PR #1291, 2026-05-25)
+
+Plan authority: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`.
+Supersedes V1–V7 4-param tuning agenda after the v6 random-baseline
+verdict (random matches BO ⇒ surface is the bind, not the optimiser).
+
+**Milestone M1 — multi-fidelity tuning infrastructure:**
+
+- [ ] **T1.1 — Walk-forward fixture: heterogeneous-tier spec.** New
+  `Window_spec.Tiered` variant. ~80 LOC + tests.
+- [ ] **T1.2 — Runner mode: fidelity-aware promotion.**
+  `bayesian_runner.exe --fidelity-strategy successive_halving`.
+  Cheap → Medium → Expensive promotion. ~150 LOC.
+- [x] **T1.3 — Scoring: paired Δ-vs-Cell-E.**
+  `Bayesian_runner_scoring.paired_delta` — pure-math primitive that
+  consumes per-fold actuals from candidate + Cell-E aggregates,
+  matches by `fold_name`, returns mean/stdev/n of per-fold Δ. Cancels
+  the common-mode per-fold variance that flattened the v3–v6 score
+  surface (~0.81 spread across 60+ candidates).
+  Surface: `trading/trading/backtest/tuner/bin/bayesian_runner_scoring.{ml,mli}`
+  — adds `type paired_delta_stats` + `val paired_delta`. 5 unit tests
+  pin identity / constant-delta / partial-overlap / disjoint-raises /
+  metric-discriminator-dispatch. ~140 LOC lib + ~217 LOC tests. T1.5
+  is the immediate consumer (re-score v4+v6 on-disk checkpoints).
+  Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/tuner/bin/test/'`
+  (33/33 pass).
+- [ ] **T1.4 — Calibration: proxy-fidelity correlation.** ~30 LOC.
+- [ ] **T1.5 — Re-score v4/v6 checkpoints** with paired-Δ. ~30 LOC.
+
 ### Operational follow-ups
 
 - **Sweep-overlay path validator** — MERGED #1069 (2026-05-13); closes
