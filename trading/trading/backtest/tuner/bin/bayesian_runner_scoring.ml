@@ -136,6 +136,77 @@ let _score_single_metric_relative ~(objective : Tuner.Grid_search.objective)
   let maxdd_hinge = _compute_maxdd_hinge ~candidate_maxdd ~baseline_maxdd in
   metric_delta -. (_lambda_dd *. maxdd_hinge) -. (_lambda_gate *. gate_penalty)
 
+(* ---------- paired-Δ scoring (T1.3) ---------- *)
+
+type paired_delta_stats = {
+  mean_delta : float;
+  stdev_delta : float;
+  n_matched : int;
+}
+[@@deriving show, eq]
+
+(** Pluck the per-fold metric value from a [fold_actual] record according to the
+    [metric] discriminator. Kept local to the paired-Δ section so the
+    Sharpe-default branch above is unaffected. *)
+let _fold_metric_value (m : [ `Sharpe | `Total_return_pct | `Calmar | `CAGR ])
+    (f : Wf.fold_actual) : float =
+  match m with
+  | `Sharpe -> f.sharpe_ratio
+  | `Total_return_pct -> f.total_return_pct
+  | `Calmar -> f.calmar_ratio
+  | `CAGR -> f.cagr_pct
+
+(** Sample stdev over [xs] (1/(n-1) denominator). Returns [0.0] for [n <= 1] so
+    callers don't have to special-case the single-fold path; the BO scorer only
+    consumes [mean_delta] today, [stdev_delta] is diagnostic. *)
+let _sample_stdev (xs : float list) : float =
+  let n = List.length xs in
+  if n <= 1 then 0.0
+  else
+    let mean = List.fold xs ~init:0.0 ~f:( +. ) /. Float.of_int n in
+    let sse =
+      List.fold xs ~init:0.0 ~f:(fun acc x ->
+          let d = x -. mean in
+          acc +. (d *. d))
+    in
+    Float.sqrt (sse /. Float.of_int (n - 1))
+
+let paired_delta ~(candidate_actuals : Wf.fold_actual list)
+    ~(baseline_actuals : Wf.fold_actual list)
+    ~(metric : [ `Sharpe | `Total_return_pct | `Calmar | `CAGR ]) :
+    paired_delta_stats =
+  let baseline_by_name =
+    List.map baseline_actuals ~f:(fun b -> (b.fold_name, b))
+    |> Map.of_alist_reduce (module String) ~f:(fun a _ -> a)
+  in
+  let deltas =
+    List.filter_map candidate_actuals ~f:(fun cand ->
+        match Map.find baseline_by_name cand.fold_name with
+        | None -> None
+        | Some base ->
+            Some
+              (_fold_metric_value metric cand -. _fold_metric_value metric base))
+  in
+  let n_matched = List.length deltas in
+  if n_matched = 0 then
+    failwith
+      (Printf.sprintf
+         "Bayesian_runner_scoring.paired_delta: no fold names matched between \
+          candidate (%d folds: [%s]) and baseline (%d folds: [%s]) — callsite \
+          bug, runs likely on different walk-forward specs"
+         (List.length candidate_actuals)
+         (String.concat ~sep:"; "
+            (List.map candidate_actuals ~f:(fun f -> f.fold_name)))
+         (List.length baseline_actuals)
+         (String.concat ~sep:"; "
+            (List.map baseline_actuals ~f:(fun f -> f.fold_name))))
+  else
+    let mean_delta =
+      List.fold deltas ~init:0.0 ~f:( +. ) /. Float.of_int n_matched
+    in
+    let stdev_delta = _sample_stdev deltas in
+    { mean_delta; stdev_delta; n_matched }
+
 (* ---------- top-level scorer ---------- *)
 
 let score_cell_with_penalty ~(gate_penalty_value : float) ~parameters:_

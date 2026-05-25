@@ -200,6 +200,72 @@ val score_cell_with_penalty :
 
     All other arguments behave identically to {!score_cell}. *)
 
+(** {1 Paired-Δ scoring (plan T1.3)}
+
+    The legacy scorers above consume the {b aggregate} (cross-fold means /
+    stdevs). v3–v6 production sweeps measured a flat ~0.81-spread score surface
+    across 60+ candidates; the diagnosed cause is that per-fold absolute-Sharpe
+    variance dominates knob-to-knob signal — every fold's market regime
+    contributes the same noise to candidate and Cell-E aggregates, but the noise
+    survives the [mean(absolute_sharpe)] reduction.
+
+    The {!paired_delta} primitive cancels that common-mode noise. For each fold
+    present in BOTH the candidate's and Cell-E's per-fold actuals, compute
+    [Δ_i = candidate.metric_i - baseline.metric_i], then aggregate [mean(Δ_i)] /
+    [stdev(Δ_i)]. The same year's regime affects both legs equally, so the
+    year-over-year market-condition noise drops out of the score; the residual
+    signal is the per-knob effect.
+
+    See `dev/plans/tuning-research-driven-program-v2-2026-05-25.md` §M1 T1.3.
+
+    Scope of this PR: pure-math primitive + unit tests. Wiring into the BO
+    runner is T1.2 / T1.5; this module does not call [paired_delta] from
+    [score_cell] / [score_cell_with_penalty] today. *)
+
+type paired_delta_stats = {
+  mean_delta : float;
+      (** Mean of (candidate - baseline) per matched fold. The BO scorer
+          consumes this single float as the higher-is-better objective. *)
+  stdev_delta : float;
+      (** Sample stdev of those Δ values. [0.0] when [n_matched <= 1]
+          (single-fold case has no stdev defined). Reported for sweep
+          diagnostics — the noise-reduction claim is verified by comparing this
+          against the corresponding mean-of-absolutes stdev. *)
+  n_matched : int;
+      (** Number of folds present in BOTH inputs (matched by [fold_name]).
+          Always [>= 1] in a successful return — the function raises if no fold
+          names match. *)
+}
+[@@deriving show, eq]
+
+val paired_delta :
+  candidate_actuals:Walk_forward.Walk_forward_types.fold_actual list ->
+  baseline_actuals:Walk_forward.Walk_forward_types.fold_actual list ->
+  metric:[ `Sharpe | `Total_return_pct | `Calmar | `CAGR ] ->
+  paired_delta_stats
+(** [paired_delta ~candidate_actuals ~baseline_actuals ~metric] computes per
+    fold [Δ_i = candidate.metric_i - baseline.metric_i] for every fold whose
+    [fold_name] appears in BOTH input lists, then returns the aggregate
+    {!paired_delta_stats}.
+
+    {b Matching is by [fold_name], not positional.} The baseline aggregate
+    typically carries the full superset of folds; a candidate run may carry a
+    subset (e.g. when promoted from cheap → expensive in T1.2's
+    successive-halving). Positional matching would silently mis-pair — explicit
+    name-keyed lookup catches that class of bug at the formula boundary.
+
+    [metric] selects which per-fold field of
+    {!Walk_forward.Walk_forward_types.fold_actual} is differenced. [`Sharpe] is
+    the default for the T1 BO surface; the other variants exist so T1.5's
+    re-scoring of on-disk checkpoints can pivot the metric without changing call
+    sites.
+
+    @raise Failure
+      when no [fold_name] appears in both inputs. A disjoint pair is a callsite
+      bug (the candidate and baseline were not run on the same walk-forward
+      spec) — failing loudly is safer than silently returning [n_matched = 0] /
+      [NaN]. *)
+
 val score_cell :
   parameters:(string * float) list ->
   candidate_label:string ->

@@ -152,6 +152,28 @@ let _baseline_label = "cell-E"
 let _no_params : (string * float) list = []
 let _epsilon = 1e-9
 
+(** Assert that [f ()] raises a [Failure] whose message contains [substring].
+    OUnit's [assert_raises] needs the exact exception payload, but
+    [paired_delta] embeds dynamic context (fold counts, label dumps) in its
+    Failure message — substring-match is the right contract. *)
+let assert_raises_failure_containing (substring : string) (f : unit -> unit) :
+    unit =
+  match
+    try
+      f ();
+      None
+    with
+    | Failure msg -> Some msg
+    | _ as e -> assert_failure ("expected Failure, got: " ^ Exn.to_string e)
+  with
+  | None -> assert_failure "expected Failure, but f returned normally"
+  | Some msg ->
+      if String.is_substring msg ~substring then ()
+      else
+        assert_failure
+          (Printf.sprintf "expected Failure with substring %S, got: %S"
+             substring msg)
+
 (* ---------- 1. Identity case ---------- *)
 
 (** When candidate aggregate == baseline aggregate (same variant labels, same
@@ -988,6 +1010,190 @@ let test_score_cell_matches_with_penalty_at_default _ =
       assert_failure
         "expected both score_cell and score_cell_with_penalty to succeed"
 
+(* ---------- Paired-Δ scoring (T1.3) ----------
+
+   The paired-Δ primitive consumes per-fold actuals (not the cross-fold
+   aggregate). Tests construct synthetic [Wf.fold_actual] lists directly —
+   no walk-forward run, no aggregate. See plan
+   [dev/plans/tuning-research-driven-program-v2-2026-05-25.md] §M1 T1.3. *)
+
+(** Construct a synthetic [fold_actual]. Defaults are NaN for fields not pinned
+    by the test (so accidental reads on the wrong metric branch fail loudly
+    rather than silently substituting [0.0]). *)
+let _fold_actual ?(variant_label = _candidate_label)
+    ?(total_return_pct = Float.nan) ?(sharpe_ratio = Float.nan)
+    ?(max_drawdown_pct = Float.nan) ?(calmar_ratio = Float.nan)
+    ?(cagr_pct = Float.nan) ?(avg_holding_days = Float.nan) ~fold_name () :
+    Wf.fold_actual =
+  {
+    fold_name;
+    variant_label;
+    total_return_pct;
+    sharpe_ratio;
+    max_drawdown_pct;
+    calmar_ratio;
+    cagr_pct;
+    avg_holding_days;
+  }
+
+(** When candidate == baseline, every Δ_i is 0.0 → mean = 0, stdev = 0,
+    n_matched = fold_count. Pins the identity case from plan §M1 T1.3. *)
+let test_paired_delta_identical_inputs _ =
+  let actuals =
+    [
+      _fold_actual ~fold_name:"f0" ~sharpe_ratio:0.7 ();
+      _fold_actual ~fold_name:"f1" ~sharpe_ratio:1.2 ();
+      _fold_actual ~fold_name:"f2" ~sharpe_ratio:(-0.3) ();
+    ]
+  in
+  let result =
+    Scoring.paired_delta ~candidate_actuals:actuals ~baseline_actuals:actuals
+      ~metric:`Sharpe
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun s -> s.Scoring.mean_delta)
+           (float_equal ~epsilon:_epsilon 0.0);
+         field
+           (fun s -> s.Scoring.stdev_delta)
+           (float_equal ~epsilon:_epsilon 0.0);
+         field (fun s -> s.Scoring.n_matched) (equal_to 3);
+       ])
+
+(** Constant outperformance: candidate Sharpe = baseline + 0.5 on every fold →
+    mean_delta = 0.5 exactly, stdev_delta = 0, n_matched = fold_count. This is
+    the per-knob signal the BO loop will see; the test confirms it survives the
+    matched aggregation. *)
+let test_paired_delta_constant_outperformance _ =
+  let baseline =
+    [
+      _fold_actual ~fold_name:"f0" ~sharpe_ratio:0.7 ();
+      _fold_actual ~fold_name:"f1" ~sharpe_ratio:1.2 ();
+      _fold_actual ~fold_name:"f2" ~sharpe_ratio:(-0.3) ();
+    ]
+  in
+  let candidate =
+    [
+      _fold_actual ~fold_name:"f0" ~sharpe_ratio:1.2 ();
+      _fold_actual ~fold_name:"f1" ~sharpe_ratio:1.7 ();
+      _fold_actual ~fold_name:"f2" ~sharpe_ratio:0.2 ();
+    ]
+  in
+  let result =
+    Scoring.paired_delta ~candidate_actuals:candidate ~baseline_actuals:baseline
+      ~metric:`Sharpe
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun s -> s.Scoring.mean_delta)
+           (float_equal ~epsilon:_epsilon 0.5);
+         field
+           (fun s -> s.Scoring.stdev_delta)
+           (float_equal ~epsilon:_epsilon 0.0);
+         field (fun s -> s.Scoring.n_matched) (equal_to 3);
+       ])
+
+(** Partial overlap: candidate has [f0; f1; f2], baseline has [f0; f2; f3].
+    Matched set = [f0; f2] → n_matched = 2; mean is over f0 + f2 only (f1
+    dropped because no baseline pair, f3 dropped because no candidate pair).
+    Pins matching-by-fold_name and the explicit drop semantics for
+    unmatched-on-either-side folds. *)
+let test_paired_delta_partial_match _ =
+  let baseline =
+    [
+      _fold_actual ~fold_name:"f0" ~sharpe_ratio:0.5 ();
+      _fold_actual ~fold_name:"f2" ~sharpe_ratio:1.0 ();
+      _fold_actual ~fold_name:"f3" ~sharpe_ratio:99.0 () (* dropped *);
+    ]
+  in
+  let candidate =
+    [
+      _fold_actual ~fold_name:"f0" ~sharpe_ratio:0.8 () (* Δ = +0.3 *);
+      _fold_actual ~fold_name:"f1" ~sharpe_ratio:88.0 () (* dropped *);
+      _fold_actual ~fold_name:"f2" ~sharpe_ratio:1.5 () (* Δ = +0.5 *);
+    ]
+  in
+  let result =
+    Scoring.paired_delta ~candidate_actuals:candidate ~baseline_actuals:baseline
+      ~metric:`Sharpe
+  in
+  (* mean over [0.3; 0.5] = 0.4; stdev = sqrt(((0.3-0.4)^2 + (0.5-0.4)^2) / 1)
+     = sqrt(0.02) ≈ 0.141421356 *)
+  assert_that result
+    (all_of
+       [
+         field
+           (fun s -> s.Scoring.mean_delta)
+           (float_equal ~epsilon:_epsilon 0.4);
+         field
+           (fun s -> s.Scoring.stdev_delta)
+           (float_equal ~epsilon:_epsilon (Float.sqrt 0.02));
+         field (fun s -> s.Scoring.n_matched) (equal_to 2);
+       ])
+
+(** Disjoint fold names → [Failure] raised. The function refuses to return
+    [n_matched = 0] / [NaN] because a disjoint pair is a callsite bug (runs on
+    different walk-forward specs); failing loudly surfaces it immediately rather
+    than letting a meaningless score reach the BO loop. *)
+let test_paired_delta_no_match_raises _ =
+  let baseline =
+    [
+      _fold_actual ~fold_name:"a0" ~sharpe_ratio:0.5 ();
+      _fold_actual ~fold_name:"a1" ~sharpe_ratio:1.0 ();
+    ]
+  in
+  let candidate =
+    [
+      _fold_actual ~fold_name:"b0" ~sharpe_ratio:0.8 ();
+      _fold_actual ~fold_name:"b1" ~sharpe_ratio:1.5 ();
+    ]
+  in
+  let f () =
+    let _ =
+      Scoring.paired_delta ~candidate_actuals:candidate
+        ~baseline_actuals:baseline ~metric:`Sharpe
+    in
+    ()
+  in
+  assert_raises_failure_containing
+    "Bayesian_runner_scoring.paired_delta: no fold names matched" f
+
+(** Discriminator dispatch: pin one alternate metric (`Total_return_pct`) to
+    confirm the per-fold field selection is correct. The Sharpe-only tests above
+    could pass even if the implementation always read [sharpe_ratio] — this test
+    catches that bug. *)
+let test_paired_delta_total_return_metric _ =
+  let baseline =
+    [
+      _fold_actual ~fold_name:"f0" ~sharpe_ratio:0.5 ~total_return_pct:10.0 ();
+      _fold_actual ~fold_name:"f1" ~sharpe_ratio:1.0 ~total_return_pct:20.0 ();
+    ]
+  in
+  let candidate =
+    [
+      _fold_actual ~fold_name:"f0" ~sharpe_ratio:99.0 ~total_return_pct:15.0 ();
+      _fold_actual ~fold_name:"f1" ~sharpe_ratio:99.0 ~total_return_pct:30.0 ();
+    ]
+  in
+  let result =
+    Scoring.paired_delta ~candidate_actuals:candidate ~baseline_actuals:baseline
+      ~metric:`Total_return_pct
+  in
+  (* Δ_total_return = [5.0; 10.0]; mean = 7.5; the bogus sharpe_ratio = 99.0
+     on candidates would corrupt this score if the dispatch were wrong. *)
+  assert_that result
+    (all_of
+       [
+         field
+           (fun s -> s.Scoring.mean_delta)
+           (float_equal ~epsilon:_epsilon 7.5);
+         field (fun s -> s.Scoring.n_matched) (equal_to 2);
+       ])
+
 let suite =
   "Tuner_bin.Bayesian_runner_scoring"
   >::: [
@@ -1047,6 +1253,17 @@ let suite =
          >:: test_composite_avg_holding_days_weight;
          "Composite P5 production formula (4-term incl. AvgHoldingDays)"
          >:: test_composite_p5_production_formula;
+         (* Paired-Δ (T1.3) *)
+         "paired_delta: identical inputs → mean=0, stdev=0, n=fold_count"
+         >:: test_paired_delta_identical_inputs;
+         "paired_delta: constant outperformance → mean=Δ, stdev=0"
+         >:: test_paired_delta_constant_outperformance;
+         "paired_delta: partial fold-name overlap → n_matched=intersection"
+         >:: test_paired_delta_partial_match;
+         "paired_delta: disjoint fold names → Failure raised"
+         >:: test_paired_delta_no_match_raises;
+         "paired_delta: metric=Total_return_pct discriminator dispatches"
+         >:: test_paired_delta_total_return_metric;
        ]
 
 let () = run_test_tt_main suite
