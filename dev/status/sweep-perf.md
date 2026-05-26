@@ -1,6 +1,6 @@
 # Status: sweep-perf
 
-## Last updated: 2026-05-26
+## Last updated: 2026-05-26 (post Win #2 + Win #4 merge; only Win #3 remaining)
 
 ## Status
 IN_PROGRESS
@@ -38,26 +38,31 @@ flambda OFF.
   `harness-maintainer`. Note: requires devcontainer image rebuild + push to
   ghcr.io after merge.
 
-- [~] **Win #4: Per-fold universe pruning via `Daily_price.active_through`** —
+- [x] **Win #4: Per-fold universe pruning via `Daily_price.active_through`** —
   filter `all_symbols` in `simulator.ml:_get_today_bars` and `config.universe`
   in `weinstein_strategy_screening.ml:_classify_all` to symbols with
   `active_through >= fold_start_date`. ~80-130 LOC + tests. Expected speedup:
-  1.10-1.25× on early folds. Owner: orchestrator-eligible. Spec:
-  `dev/plans/v7-sweep-speedup-2026-05-26.md` §Win #4. Dispatch as
-  `feat-backtest`. Not survivor bias — filters uninvestable symbols, not
-  future-delisted ones. **PR #1318 open** (branch
-  `feat/sweep-perf-active-through-prune`); surface + tests landed,
-  production wiring (`panel_runner` / `scenario_runner` opt-in) is the
-  follow-up.
+  1.10-1.25× on early folds. **MERGED as PR #1318** at `ebe4a01d` (2026-05-26
+  orchestrator run; all 3 gates green: CI + qc-structural APPROVED q=5 +
+  qc-behavioral APPROVED q=5). Surface + tests landed (5 new tests covering
+  pure-helper pruning, point-in-time vs survivor-bias framing, and integration
+  through `Weinstein_strategy_screening`); production wiring
+  (`panel_runner` / `scenario_runner` opt-in to pass `?active_through_for`)
+  is the follow-up.
 
 ## Completed
 
+- **Win #4** (PR #1318, `feat/sweep-perf-active-through-prune`): per-fold
+  universe pruning via `Daily_price.active_through`. Adds optional
+  `?active_through_for` (simulator) and `?fold_start_date` (Weinstein_strategy)
+  parameters; defaults preserve bit-equal baselines. 10 files touched,
+  +495 / -137 (incl. 5 new tests). MERGED at `ebe4a01d` (2026-05-26).
 - **Win #2** (PR #1317, `harness/sweep-parallel-6`): raised `PARALLEL` default
   from 4 to 6 in `dev/scripts/launch_sweep.sh` (1 line); added `--memory 12g`
   to the `docker run` incantation in `.devcontainer/setup.sh` (1 line). Total:
   3 files touched, 4 insertions, 3 deletions. Verify:
   `grep 'PARALLEL="6"' dev/scripts/launch_sweep.sh` and
-  `grep 'memory.*12' .devcontainer/setup.sh`.
+  `grep 'memory.*12' .devcontainer/setup.sh`. MERGED at `2c5e5716` (2026-05-26).
 
 ## Ownership
 
