@@ -1,6 +1,6 @@
 # Status: tuning
 
-## Last updated: 2026-05-25
+## Last updated: 2026-05-26
 
 ## Status
 IN_PROGRESS
@@ -55,7 +55,7 @@ was the P0 vector. That work shipped: walk-forward harness
 resulting harness; the diminishing-returns finding now drives the
 cross-scenario-validation pivot per #1237.
 
-Owner: feat-backtest.
+Owner: feat-backtest. T1.4 and T1.5 are orchestrator-dispatchable (see M1 task list below).
 
 **Prior status preamble retained below.**
 
@@ -208,8 +208,26 @@ verdict (random matches BO ⇒ surface is the bind, not the optimiser).
   is the immediate consumer (re-score v4+v6 on-disk checkpoints).
   Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/tuner/bin/test/'`
   (33/33 pass).
-- [ ] **T1.4 — Calibration: proxy-fidelity correlation.** ~30 LOC.
-- [ ] **T1.5 — Re-score v4/v6 checkpoints** with paired-Δ. ~30 LOC.
+- [ ] **T1.4 — Calibration: proxy-fidelity correlation.** Owner:
+  feat-backtest. ~30 LOC OCaml exe computing Spearman ρ between Cell E
+  on the 6-fold cheap proxy vs the 26-fold expensive walk-forward set;
+  acceptance ρ ≥ 0.7. Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`
+  §M1 T1.4. Branch: `feat/tuning/m1-t1-4-proxy-calibration`.
+- [ ] **T1.5 — Re-score v4/v6 checkpoints with paired-Δ.** Owner:
+  feat-backtest. ~30 LOC OCaml exe reading existing `bo_checkpoint.sexp`
+  files and applying `Bayesian_runner_scoring.paired_delta` (merged
+  #1308) to produce a re-score report; verifies spread > 5× the old
+  0.81 flat surface. Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`
+  §M1 T1.5. Branch: `feat/tuning/m1-t1-5-rescore-checkpoints`.
+  **Data note:** v4/v6 checkpoints live at
+  `/Users/difan/Projects/trading-1/.sweep-output/<sweep-name>/bo_checkpoint.sexp`
+  on the local machine only — not accessible in the GHA runtime. The
+  dispatched agent must either (a) skip the live re-score and instead
+  generate synthetic `bo_checkpoint.sexp` fixtures of the correct shape
+  to validate the `paired_delta` plumbing end-to-end, then document the
+  production run as a local-only step, OR (b) if run locally, point
+  `--checkpoint` at the real paths above and emit a verdict doc to
+  `dev/notes/t1-5-rescore-verdict-<date>.md`.
 
 ### Operational follow-ups
 
