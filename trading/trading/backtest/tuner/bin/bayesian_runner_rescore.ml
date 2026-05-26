@@ -11,10 +11,7 @@ type candidate = {
 }
 [@@deriving sexp]
 
-type bo_rescore_input = {
-  schema_version : int;
-  candidates : candidate list;
-}
+type bo_rescore_input = { schema_version : int; candidates : candidate list }
 [@@deriving sexp]
 
 let current_schema_version = 1
@@ -149,11 +146,11 @@ let report_to_markdown (report : report)
   Buffer.add_string buf
     (sprintf "max(mean \xCE\x94) - min(mean \xCE\x94) = %.6f\n" report.spread);
   Buffer.add_string buf
-    (sprintf "Historical flat-surface spread: %.2f (v3\xE2\x80\x93v6 \
-              absolute-Sharpe scoring).\n"
+    (sprintf
+       "Historical flat-surface spread: %.2f (v3\xE2\x80\x93v6 absolute-Sharpe \
+        scoring).\n"
        historical_flat_surface);
   Buffer.add_string buf
-    (sprintf
-       "Acceptance gate: spread > %.6f (= %g \xC3\x97 %.2f by default).\n"
+    (sprintf "Acceptance gate: spread > %.6f (= %g \xC3\x97 %.2f by default).\n"
        report.min_spread flat_surface_multiplier historical_flat_surface);
   Buffer.contents buf
