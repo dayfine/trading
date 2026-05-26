@@ -112,6 +112,7 @@ do_start() {
         log_info "Creating and starting container '$CONTAINER_NAME'..."
         docker run -d \
             --name "$CONTAINER_NAME" \
+            --memory 12g \
             -v "$PROJECT_ROOT:$WORKDIR" \
             -v "$SWEEP_OUTPUT_DIR:/tmp/sweeps" \
             -w "$WORKDIR/trading" \
