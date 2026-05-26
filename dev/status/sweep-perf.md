@@ -30,13 +30,17 @@ flambda OFF.
   orchestrator-eligible. Spec: `dev/plans/v7-sweep-speedup-2026-05-26.md`
   §Win #2. Dispatch as `harness-maintainer`.
 
-- [~] **Win #3: Enable Flambda + `-O3` compiler flags** — switch devcontainer
-  to `ocaml 5.3.0+flambda`; add `(env (release (ocamlopt_flags (:standard -O3))))` to
-  `trading/dune-workspace`. Config-only (~10 LOC in `.devcontainer/` + `dune-workspace`).
-  Expected speedup: 1.10-1.20×. Owner: orchestrator-eligible. Spec:
-  `dev/plans/v7-sweep-speedup-2026-05-26.md` §Win #3. Dispatch as
-  `harness-maintainer`. Note: requires devcontainer image rebuild + push to
-  ghcr.io after merge. **IN FLIGHT**: PR #1323 (`harness/sweep-perf-flambda-o3`).
+- [x] **Win #3: Enable Flambda + `-O3` compiler flags** — switch devcontainer
+  to `ocaml 5.3.0+flambda` (via `opam switch create` inside Dockerfile — the
+  upstream `ubuntu-22.04-ocaml-5.3-flambda` tag does not exist on Docker Hub);
+  add `(env (release (ocamlopt_flags (:standard -O3))))` to
+  `trading/dune-workspace`. Config-only (~10 LOC in `.devcontainer/` +
+  `dune-workspace`). Expected speedup: 1.10-1.20×. **MERGED as PR #1323** at
+  `c53bfa7d` (2026-05-26 run-2; all 3 gates green: CI + qc-structural APPROVED +
+  qc-behavioral APPROVED q=5). **Manual follow-up required (maintainer):**
+  rebuild `ghcr.io/dayfine/trading-devcontainer:latest` and push so the
+  flambda compiler actually fires in CI — until then `-O3` is silently no-op
+  per the deferred acceptance criterion documented in the PR body.
 
 - [x] **Win #4: Per-fold universe pruning via `Daily_price.active_through`** —
   filter `all_symbols` in `simulator.ml:_get_today_bars` and `config.universe`
@@ -51,6 +55,26 @@ flambda OFF.
   is the follow-up.
 
 ## Completed
+
+- **Win #3** (PR #1323, `harness/sweep-perf-flambda-o3`): Flambda + `-O3` in
+  release profile. Adds `RUN opam switch create 5.3.0+flambda` +
+  `ENV OPAMSWITCH=5.3.0+flambda` to `.devcontainer/Dockerfile` (+11), and
+  `(env (release (ocamlopt_flags (:standard -O3))))` to `trading/dune-workspace`
+  (+4). 3 files / +19 / -4. MERGED at `c53bfa7d` (2026-05-26 run-2). Note:
+  `ocamlopt_flags` (not `flags`) is correct — `ocamlc` rejects `-O3`. Manual
+  follow-up: rebuild + push `ghcr.io/dayfine/trading-devcontainer:latest`.
+- **Win #3 follow-up fix** (PR #1324, `fix/dockerfile-flambda-switch-syntax`):
+  corrects the opam switch invocation that #1323 introduced. The original
+  `--packages=ocaml-variants.5.3.0+flambda` references a non-existent package
+  for the 5.3 series (only `5.3.0+options` and `5.3.0+BER` are published in
+  opam-repository for that line; flambda layers via the standalone
+  `ocaml-option-flambda` package). Fixed form:
+  `--packages=ocaml-variants.5.3.0+options,ocaml-option-flambda`. Caught
+  post-merge via the `Build CI image` workflow failure on `c53bfa7d`
+  (Build CI image is NOT a required check, so #1323 merged green; but the
+  manual ghcr.io rebuild path would have failed until #1324 landed). 1 file /
+  +1 / -1. MERGED at `a3dcca7c` (2026-05-26 run-2; all 3 gates green:
+  CI + qc-structural APPROVED + qc-behavioral APPROVED q=4).
 
 - **Win #4** (PR #1318, `feat/sweep-perf-active-through-prune`): per-fold
   universe pruning via `Daily_price.active_through`. Adds optional
