@@ -45,8 +45,10 @@ flambda OFF.
   1.10-1.25× on early folds. Owner: orchestrator-eligible. Spec:
   `dev/plans/v7-sweep-speedup-2026-05-26.md` §Win #4. Dispatch as
   `feat-backtest`. Not survivor bias — filters uninvestable symbols, not
-  future-delisted ones. **In progress** on branch
-  `feat/sweep-perf-active-through-prune`.
+  future-delisted ones. **PR #1318 open** (branch
+  `feat/sweep-perf-active-through-prune`); surface + tests landed,
+  production wiring (`panel_runner` / `scenario_runner` opt-in) is the
+  follow-up.
 
 ## Completed
 
