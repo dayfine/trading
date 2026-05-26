@@ -42,3 +42,8 @@
   scenario_lib
   tuner_bin
   walk_forward))
+
+(executable
+ (name rescore_checkpoints)
+ (modules rescore_checkpoints)
+ (libraries core tuner_bin))
