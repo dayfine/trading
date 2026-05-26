@@ -252,11 +252,44 @@ let _full_analysis_of_survivor ~stock_analysis_config ~bar_reader ~index_view
   Stock_analysis.analyze_with_callbacks ~config:stock_analysis_config ~ticker
     ~callbacks ~prior_stage ~as_of_date
 
+(** Win #4: drop symbols from [universe] whose [active_through_for] returns
+    [Some d] with [Core.Date.(d < fold_start_date)]. [None] symbols (no
+    delisting marker — still trading or unknown) pass through unchanged.
+
+    Point-in-time framing: this is NOT survivor bias. We filter on the FOLD
+    start date, a date in the past relative to the present — symbols delisted
+    later during the fold are kept and participate normally; only symbols
+    already uninvestable AT THE TIME of the fold's start are dropped. Filtering
+    on the current date would be survivor bias; that cut is NOT performed here.
+    See Win #4 of [dev/plans/v7-sweep-speedup-2026-05-26.md].
+
+    Public for testability — tests pin the predicate independent of the
+    surrounding [_classify_all] / [screen_universe] wiring. *)
+let prune_universe_by_active_through ~universe ~active_through_for
+    ~fold_start_date =
+  List.filter universe ~f:(fun symbol ->
+      match active_through_for symbol with
+      | None -> true
+      | Some d -> Core.Date.( <= ) fold_start_date d)
+
 (** Phase 1: classify every ticker in [config.universe] via the cheap stage-only
     pass. Returns the full classification result — non-survivors retained so the
-    caller can update [prior_stages] in one pass after screening. *)
-let _classify_all ~config ~bar_reader ~prior_stages ~current_date =
-  List.filter_map config.universe
+    caller can update [prior_stages] in one pass after screening.
+
+    Win #4: when [?active_through_for] and [?fold_start_date] are both supplied,
+    [config.universe] is pre-pruned via {!_prune_universe_by_active_through}
+    before the Phase-1 loop runs. Default (both unset) preserves baselines — the
+    full [config.universe] is classified. *)
+let _classify_all ?active_through_for ?fold_start_date ~config ~bar_reader
+    ~prior_stages ~current_date () =
+  let universe =
+    match (active_through_for, fold_start_date) with
+    | Some f, Some d ->
+        prune_universe_by_active_through ~universe:config.universe
+          ~active_through_for:f ~fold_start_date:d
+    | _ -> config.universe
+  in
+  List.filter_map universe
     ~f:
       (_classify_stage_for_screening ~config ~bar_reader ~prior_stages
          ~current_date)
@@ -270,13 +303,18 @@ let _commit_prior_stages ~prior_stages classified =
       Hashtbl.set prior_stages ~key:ticker ~data:stage_result.Stage.stage)
 
 (** Public for testability. See {!Weinstein_strategy.survivors_for_screening} in
-    the .mli for the full contract. *)
-let survivors_for_screening ?sector_map ~config ~bar_reader ~prior_stages
-    ~current_date () :
+    the .mli for the full contract.
+
+    Win #4: [?active_through_for] and [?fold_start_date] are forwarded to
+    {!_classify_all} for universe pre-pruning. Default (both unset) preserves
+    baselines. *)
+let survivors_for_screening ?active_through_for ?fold_start_date ?sector_map
+    ~config ~bar_reader ~prior_stages ~current_date () :
     (string * Snapshot_runtime.Snapshot_bar_views.weekly_view * Stage.result)
     list =
   let classified =
-    _classify_all ~config ~bar_reader ~prior_stages ~current_date
+    _classify_all ?active_through_for ?fold_start_date ~config ~bar_reader
+      ~prior_stages ~current_date ()
   in
   let final_survivors =
     classified
@@ -309,13 +347,20 @@ let _sector_lookup_of ~sector_map symbol =
 (** Screen the universe via the lazy cascade (Phase 1 stage filter → PR-B sector
     pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
-    right shape per regime. *)
-let screen_universe ?membership_at ~config ~index_view
-    ~(macro_result : Macro.result) ~sector_map ~stop_states ~last_stop_out_dates
-    ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
-    ~current_date ~audit_recorder () =
+    right shape per regime.
+
+    Win #4: when [?active_through_for] and [?fold_start_date] are both supplied,
+    [config.universe] is pre-pruned (point-in-time, not survivor bias) before
+    Phase 1 runs. Symbols whose [active_through < fold_start_date] are dropped
+    from the per-Friday classification loop, eliminating the Phase-1 cost on
+    symbols that cannot contribute to the fold. *)
+let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
+    ~index_view ~(macro_result : Macro.result) ~sector_map ~stop_states
+    ~last_stop_out_dates ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader
+    ~prior_stages ~current_date ~audit_recorder () =
   let classified =
-    _classify_all ~config ~bar_reader ~prior_stages ~current_date
+    _classify_all ?active_through_for ?fold_start_date ~config ~bar_reader
+      ~prior_stages ~current_date ()
   in
   let stock_analysis_config = _stock_analysis_config_for ~config in
   (* Bind Phase-2 closure outside the pipeline (depth-5 ceiling). *)

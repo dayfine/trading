@@ -38,14 +38,17 @@ flambda OFF.
   `harness-maintainer`. Note: requires devcontainer image rebuild + push to
   ghcr.io after merge.
 
-- [ ] **Win #4: Per-fold universe pruning via `Daily_price.active_through`** —
+- [~] **Win #4: Per-fold universe pruning via `Daily_price.active_through`** —
   filter `all_symbols` in `simulator.ml:_get_today_bars` and `config.universe`
   in `weinstein_strategy_screening.ml:_classify_all` to symbols with
   `active_through >= fold_start_date`. ~80-130 LOC + tests. Expected speedup:
   1.10-1.25× on early folds. Owner: orchestrator-eligible. Spec:
   `dev/plans/v7-sweep-speedup-2026-05-26.md` §Win #4. Dispatch as
   `feat-backtest`. Not survivor bias — filters uninvestable symbols, not
-  future-delisted ones.
+  future-delisted ones. **PR #1318 open** (branch
+  `feat/sweep-perf-active-through-prune`); surface + tests landed,
+  production wiring (`panel_runner` / `scenario_runner` opt-in) is the
+  follow-up.
 
 ## Completed
 

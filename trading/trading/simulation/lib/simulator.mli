@@ -51,6 +51,24 @@ type dependencies = {
           depend on the higher-layer [Backtest_cost_model.Cost_model]. Callers
           in the backtest layer construct the hook from
           [Cost_model.apply_per_trade_commission] and thread it through. *)
+  active_through_for : (string -> Core.Date.t option) option;
+      (** Optional per-symbol [active_through] lookup. When [Some f], the
+          simulator prunes [symbols] once at {!create} time: any symbol [s] with
+          [f s = Some d] and [Core.Date.(d < config.start_date)] is dropped from
+          the per-step bar-fetch loop ({!_get_today_bars}). [config.start_date]
+          is the simulator's first day (== fold start date including warmup); a
+          symbol whose last active day is strictly before this start cannot
+          contribute any usable bar to the run.
+
+          Domain framing: this is NOT survivor bias. Filtering on
+          [active_through < fold_start_date] removes symbols that were genuinely
+          uninvestable AT THE TIME of the fold's start (already delisted before
+          the simulator began). Filtering on the present ("active_today") WOULD
+          be survivor bias — that cut is wrong and is not performed here.
+
+          Default [None] preserves bit-equal baselines: no pruning, every symbol
+          participates in every step's bar-fetch loop. Authority:
+          [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
 }
 
 val create_deps :
@@ -66,6 +84,7 @@ val create_deps :
   ?slippage_bps:int ->
   ?margin_config:Trading_portfolio.Margin_config.t ->
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
+  ?active_through_for:(string -> Core.Date.t option) ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
@@ -106,7 +125,28 @@ val create_deps :
       baselines. Used by the backtest layer to wire the
       {!Backtest_cost_model.Cost_model} per-trade flat commission into the
       simulator without giving [trading.simulation] a layering dependency on the
-      higher-layer cost-model module. *)
+      higher-layer cost-model module.
+    @param active_through_for
+      Optional per-symbol [active_through] lookup driving universe pruning at
+      {!create} time. Default [None] preserves baselines — no pruning. See the
+      field doc on {!dependencies.active_through_for} for the domain rationale
+      (point-in-time pruning, NOT survivor bias). *)
+
+val prune_symbols_by_active_through :
+  symbols:string list ->
+  active_through_for:(string -> Core.Date.t option) ->
+  fold_start_date:Core.Date.t ->
+  string list
+(** Win #4 pure helper: drop symbols from [symbols] whose [active_through_for]
+    returns [Some d] with [Core.Date.(d < fold_start_date)]. [None] symbols (no
+    delisting marker — still trading or unknown) pass through unchanged.
+
+    Point-in-time framing: filters on the fold's START date (a date in the past
+    relative to the present), so symbols delisted later during the fold are
+    KEPT. This is NOT survivor bias — filtering on the current date would be,
+    but that cut is not performed here. Invoked from {!create} when
+    [dependencies.active_through_for] is [Some _]; tests pin the predicate
+    directly. Authority: [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
 
 (** {1 Creation} *)
 
