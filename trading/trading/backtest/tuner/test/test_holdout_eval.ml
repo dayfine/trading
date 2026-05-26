@@ -135,6 +135,30 @@ let test_pair_fold_actuals_raises_on_missing_candidate _ =
       (String.is_substring msg ~substring:"no rows for candidate")
       (equal_to true)
 
+let test_pair_fold_actuals_raises_on_missing_baseline _ =
+  (* Mirror of [test_pair_fold_actuals_raises_on_missing_candidate]: pin the
+     third raise condition listed in the .mli (baseline label has zero rows
+     in [fold_actuals]). *)
+  let fixture =
+    [
+      _fold_actual ~fold_name:"fold-024" ~variant_label:"bo-iter-best"
+        ~sharpe_ratio:0.70 ~max_drawdown_pct:17.0 ();
+    ]
+  in
+  let f () =
+    ignore
+      (Holdout.pair_fold_actuals ~candidate_label:"bo-iter-best"
+         ~baseline_label:"cell-E" ~fold_actuals:fixture
+        : Holdout.per_fold_row list)
+  in
+  try
+    f ();
+    assert_failure "expected Failure for missing baseline label"
+  with Failure msg ->
+    assert_that
+      (String.is_substring msg ~substring:"no rows for baseline")
+      (equal_to true)
+
 let test_pair_fold_actuals_raises_on_disjoint_fold_names _ =
   let fixture =
     [
@@ -308,6 +332,8 @@ let suite =
          >:: test_pair_fold_actuals_computes_deltas;
          "pair_fold_actuals raises on missing candidate label"
          >:: test_pair_fold_actuals_raises_on_missing_candidate;
+         "pair_fold_actuals raises on missing baseline label"
+         >:: test_pair_fold_actuals_raises_on_missing_baseline;
          "pair_fold_actuals raises on disjoint fold names"
          >:: test_pair_fold_actuals_raises_on_disjoint_fold_names;
          "build_report verdict Robust on strong candidate"

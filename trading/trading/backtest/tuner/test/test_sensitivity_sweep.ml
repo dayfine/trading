@@ -139,6 +139,56 @@ let test_generate_replaces_only_the_target_knob _ =
          pair (equal_to "c") (float_equal 0.3);
        ])
 
+let test_generate_zero_knob_is_no_op _ =
+  (* Pin the .mli claim: zero-valued knob (best_value = 0.0) → every
+     perturbation yields perturbed_value = 0.0 because 0.0 * (1 + pct) = 0.0
+     for every pct, and 0.0 is within bounds (0.0, 1.0) so clipped = false. *)
+  let perts =
+    Sweep.generate_perturbations
+      ~best_params:[ ("a", 0.0) ]
+      ~bounds:[ ("a", (0.0, 1.0)) ]
+  in
+  assert_that perts
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (p : Sweep.perturbation) -> p.knob) (equal_to "a");
+             field (fun (p : Sweep.perturbation) -> p.pct) (float_equal (-0.10));
+             field
+               (fun (p : Sweep.perturbation) -> p.perturbed_value)
+               (float_equal 0.0);
+             field (fun (p : Sweep.perturbation) -> p.clipped) (equal_to false);
+           ];
+         all_of
+           [
+             field (fun (p : Sweep.perturbation) -> p.knob) (equal_to "a");
+             field (fun (p : Sweep.perturbation) -> p.pct) (float_equal (-0.05));
+             field
+               (fun (p : Sweep.perturbation) -> p.perturbed_value)
+               (float_equal 0.0);
+             field (fun (p : Sweep.perturbation) -> p.clipped) (equal_to false);
+           ];
+         all_of
+           [
+             field (fun (p : Sweep.perturbation) -> p.knob) (equal_to "a");
+             field (fun (p : Sweep.perturbation) -> p.pct) (float_equal 0.05);
+             field
+               (fun (p : Sweep.perturbation) -> p.perturbed_value)
+               (float_equal 0.0);
+             field (fun (p : Sweep.perturbation) -> p.clipped) (equal_to false);
+           ];
+         all_of
+           [
+             field (fun (p : Sweep.perturbation) -> p.knob) (equal_to "a");
+             field (fun (p : Sweep.perturbation) -> p.pct) (float_equal 0.10);
+             field
+               (fun (p : Sweep.perturbation) -> p.perturbed_value)
+               (float_equal 0.0);
+             field (fun (p : Sweep.perturbation) -> p.clipped) (equal_to false);
+           ];
+       ])
+
 let test_generate_drops_knob_missing_from_bounds _ =
   let perts =
     Sweep.generate_perturbations
@@ -356,6 +406,8 @@ let suite =
          >:: test_generate_clipping_to_lower_bound;
          "generate: only the target knob's value changes"
          >:: test_generate_replaces_only_the_target_knob;
+         "generate: zero-valued knob produces no-op perturbations"
+         >:: test_generate_zero_knob_is_no_op;
          "generate: knobs missing from bounds are dropped"
          >:: test_generate_drops_knob_missing_from_bounds;
          "threshold = half of improvement"
