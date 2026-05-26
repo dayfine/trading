@@ -1,6 +1,6 @@
 # Status: sweep-perf
 
-## Last updated: 2026-05-26 (post Win #2 + Win #4 merge; only Win #3 remaining)
+## Last updated: 2026-05-26
 
 ## Status
 IN_PROGRESS
