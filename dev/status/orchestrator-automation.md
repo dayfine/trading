@@ -1,16 +1,13 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-05-22
+## Last updated: 2026-05-26
 
 ## Status
-MERGED
+IN_PROGRESS
 
 (Phase 1 stable, 36 days uptime; Phase 2 explicitly deferred 2026-05-22 per
-track-pacer 2026-05-22 §P6. **Status MERGED is the schema-supported value for
-"work that was scoped is done"** — the `status_file_integrity.sh` linter only
-allows `IN_PROGRESS|READY_FOR_REVIEW|APPROVED|MERGED|BLOCKED|PENDING`. The
-deferral of Phase 2 is documented in this file's body; the reopen conditions
-are at the end of this preamble.)
+track-pacer 2026-05-22 §P6. Reopened 2026-05-26 for PR-D'c: drop `dev/reviews/`
+file writes from QC agents — new `[ ]` item added below.)
 
 **2026-05-22 decision — track wrapped on Phase 1 stable state.** Per
 `dev/reviews/track-pacer-2026-05-22.md` §P6 + recommendation 4:
@@ -449,6 +446,28 @@ convention above is the cheap mitigation.
   orchestrator does in GHA — #371's `show_full_output: true` is the
   enabler).
 - One successful daily-summary PR round-trip first.
+
+## Open work
+
+### PR-D'c — Drop `dev/reviews/*.md` file writes from QC agents
+
+- [ ] **PR-D'c — Remove dual-write of QC verdicts to `dev/reviews/` files.**
+  Owner: harness-maintainer. ~50 LOC across 4 agent/rules files. After
+  PR-D'b landed (`record_qc_audit --pr-number` + orchestrator reads PR
+  review comments directly), the QC agents' habit of writing the verdict
+  to `dev/reviews/<feature>.md` AND posting via `gh pr review` is
+  redundant. The PR review comment is the load-bearing artefact; the
+  file write creates noise (every QC run touches `dev/reviews/`, which
+  then needs cleanup) and the dual-write surface has caused at least one
+  inconsistency (review file says X, PR comment says Y). Scope: edit
+  `.claude/agents/qc-structural.md` + `.claude/agents/qc-behavioral.md`
+  to remove the "write to `dev/reviews/<feature>.md`" instruction and
+  keep the "post via `gh pr review --comment`" path as the single source
+  of truth. Update `.claude/rules/qc-structural-authority.md` +
+  `.claude/rules/qc-behavioral-authority.md` references accordingly.
+  Branch: `harness/drop-review-file-writes`. Verify: grep the four files
+  for `dev/reviews/` write instructions — none should remain; PR-comment
+  path must still be present.
 
 ## Completed work
 
