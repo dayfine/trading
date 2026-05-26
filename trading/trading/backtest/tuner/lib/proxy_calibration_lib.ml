@@ -45,24 +45,34 @@ let _mean (xs : float array) : float =
   let n = Array.length xs in
   if n = 0 then 0.0 else Array.fold xs ~init:0.0 ~f:( +. ) /. Float.of_int n
 
+(* Accumulate the three Pearson sums (cross + each squared) in one pass. *)
+let _pearson_sums (xs : float array) (ys : float array) ~(mx : float)
+    ~(my : float) : float * float * float =
+  let n = Array.length xs in
+  let num = ref 0.0 in
+  let sxx = ref 0.0 in
+  let syy = ref 0.0 in
+  for i = 0 to n - 1 do
+    let dx = xs.(i) -. mx in
+    let dy = ys.(i) -. my in
+    num := !num +. (dx *. dy);
+    sxx := !sxx +. (dx *. dx);
+    syy := !syy +. (dy *. dy)
+  done;
+  (!num, !sxx, !syy)
+
+let _pearson_from_sums ~num ~sxx ~syy : float =
+  let denom = Float.sqrt (sxx *. syy) in
+  if Float.( <= ) denom 0.0 then 0.0 else num /. denom
+
 let _pearson (xs : float array) (ys : float array) : float =
   let n = Array.length xs in
   if n <= 1 then 0.0
   else
     let mx = _mean xs in
     let my = _mean ys in
-    let num = ref 0.0 in
-    let sxx = ref 0.0 in
-    let syy = ref 0.0 in
-    for i = 0 to n - 1 do
-      let dx = xs.(i) -. mx in
-      let dy = ys.(i) -. my in
-      num := !num +. (dx *. dy);
-      sxx := !sxx +. (dx *. dx);
-      syy := !syy +. (dy *. dy)
-    done;
-    let denom = Float.sqrt (!sxx *. !syy) in
-    if Float.( <= ) denom 0.0 then 0.0 else !num /. denom
+    let num, sxx, syy = _pearson_sums xs ys ~mx ~my in
+    _pearson_from_sums ~num ~sxx ~syy
 
 let spearman_rho (xs : float array) (ys : float array) : float =
   let nx = Array.length xs in
@@ -98,6 +108,27 @@ let _filter_variant ?variant_label (actuals : Wf.fold_actual list) :
   | Some label ->
       List.filter actuals ~f:(fun fa -> String.equal fa.variant_label label)
 
+let _make_fold_name_table (actuals : Wf.fold_actual list) :
+    (string, Wf.fold_actual) Hashtbl.t =
+  let table = String.Table.create () in
+  List.iter actuals ~f:(fun fa -> Hashtbl.set table ~key:fa.fold_name ~data:fa);
+  table
+
+let _try_make_pair
+    ~(metric :
+       [ `Sharpe | `Total_return_pct | `Calmar | `CAGR | `Max_drawdown_pct ])
+    ~(exp_table : (string, Wf.fold_actual) Hashtbl.t)
+    (cheap_fa : Wf.fold_actual) : fold_pair option =
+  match Hashtbl.find exp_table cheap_fa.fold_name with
+  | None -> None
+  | Some exp_fa ->
+      Some
+        {
+          fold_name = cheap_fa.fold_name;
+          cheap = _metric_of cheap_fa metric;
+          expensive = _metric_of exp_fa metric;
+        }
+
 let matched_pairs ?variant_label ~(cheap_actuals : Wf.fold_actual list)
     ~(expensive_actuals : Wf.fold_actual list)
     ~(metric :
@@ -105,19 +136,8 @@ let matched_pairs ?variant_label ~(cheap_actuals : Wf.fold_actual list)
     : fold_pair list =
   let cheap_actuals = _filter_variant ?variant_label cheap_actuals in
   let expensive_actuals = _filter_variant ?variant_label expensive_actuals in
-  let exp_table = String.Table.create () in
-  List.iter expensive_actuals ~f:(fun fa ->
-      Hashtbl.set exp_table ~key:fa.fold_name ~data:fa);
-  List.filter_map cheap_actuals ~f:(fun cheap_fa ->
-      match Hashtbl.find exp_table cheap_fa.fold_name with
-      | None -> None
-      | Some exp_fa ->
-          Some
-            {
-              fold_name = cheap_fa.fold_name;
-              cheap = _metric_of cheap_fa metric;
-              expensive = _metric_of exp_fa metric;
-            })
+  let exp_table = _make_fold_name_table expensive_actuals in
+  List.filter_map cheap_actuals ~f:(_try_make_pair ~metric ~exp_table)
 
 (* -------------------------- verdict ---------------------------------- *)
 
