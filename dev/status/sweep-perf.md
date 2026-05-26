@@ -36,7 +36,7 @@ flambda OFF.
   Expected speedup: 1.10-1.20×. Owner: orchestrator-eligible. Spec:
   `dev/plans/v7-sweep-speedup-2026-05-26.md` §Win #3. Dispatch as
   `harness-maintainer`. Note: requires devcontainer image rebuild + push to
-  ghcr.io after merge. **IN FLIGHT**: PR #TBD (`harness/sweep-perf-flambda-o3`).
+  ghcr.io after merge. **IN FLIGHT**: PR #1323 (`harness/sweep-perf-flambda-o3`).
 
 - [x] **Win #4: Per-fold universe pruning via `Daily_price.active_through`** —
   filter `all_symbols` in `simulator.ml:_get_today_bars` and `config.universe`
