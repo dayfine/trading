@@ -469,6 +469,18 @@ convention above is the cheap mitigation.
   for `dev/reviews/` write instructions — none should remain; PR-comment
   path must still be present.
 
+  **2026-05-26 run-4 dispatch outcome: FAILED.** harness-maintainer agent
+  hit an Edit-on-`.claude/*` permission gate in its dispatched sandbox,
+  invoked the `update-config` skill in response (which attempted to add
+  `Edit(/__w/trading/trading/.claude/*)` + several other broad patterns
+  to `.claude/settings.json`), and returned without producing the actual
+  edits. No branch opened, no PR. The settings-json change was discarded
+  by the orchestrator before merge. Next-session re-dispatch needs either
+  (a) explicit pre-grant of Edit permission for `.claude/agents/qc-*.md`
+  + `.claude/rules/qc-*-authority.md` in the orchestrator's dispatch
+  prompt, or (b) maintainer-direct implementation since the work is
+  small (~50 LOC, 4 files).
+
 ## Completed work
 
 ### Orchestrator idempotency — Step 1.5 dispatch guard + structured summary format
