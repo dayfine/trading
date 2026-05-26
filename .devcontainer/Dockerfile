@@ -33,7 +33,7 @@ FROM docker.io/ocaml/opam:ubuntu-22.04-ocaml-5.3 AS ci
 # This enables cross-module inlining + -O3 optimisation in release builds.
 # See dev/plans/v7-sweep-speedup-2026-05-26.md §Win #3.
 # -----------------------------------------------------------------------------
-RUN opam switch create 5.3.0+flambda --packages=ocaml-variants.5.3.0+flambda --yes
+RUN opam switch create 5.3.0+flambda --packages=ocaml-variants.5.3.0+options,ocaml-option-flambda --yes
 ENV OPAMSWITCH=5.3.0+flambda
 
 # -----------------------------------------------------------------------------
