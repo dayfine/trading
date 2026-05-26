@@ -6,7 +6,8 @@
   test_bayesian_runner_scoring
   test_bayesian_runner_evaluator
   test_bayesian_runner_oos_validator
-  test_bayesian_runner_successive_halving)
+  test_bayesian_runner_successive_halving
+  test_proxy_calibration_runner)
  (libraries
   ounit2
   core

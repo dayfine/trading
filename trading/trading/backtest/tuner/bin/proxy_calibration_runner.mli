@@ -1,4 +1,6 @@
-(** CLI entry point for the M1 T1.4 proxy-fidelity calibration step.
+(** Logic for the M1 T1.4 proxy-fidelity calibration CLI, factored out of the
+    thin executable {!Proxy_calibration} so the pure helpers (arg parsing, sexp
+    loading, markdown rendering) can be unit-tested.
 
     Reads two on-disk [fold_actuals.sexp] files (cheap-proxy and expensive
     walk-forward runs of Cell E), joins by [fold_name], computes the Spearman
@@ -13,16 +15,16 @@
     `dev/notes/t1-4-calibration-procedure-<date>.md` for the operator's
     incantation.
 
-    Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`
-    §M1 T1.4. *)
+    Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md` §M1 T1.4.
+*)
 
-type metric_arg = Sharpe | TotalReturn | Calmar | CAGR | MaxDrawdown
-[@@deriving show, eq]
 (** CLI-visible metric selector. The CamelCased constructors are matched
     case-insensitively against the [--metric] argument. *)
+type metric_arg = Sharpe | TotalReturn | Calmar | CAGR | MaxDrawdown
+[@@deriving show, eq]
 
 val metric_arg_of_string : string -> metric_arg
-(** Parse a CLI [--metric] argument. Accepts the four token aliases (case
+(** Parse a CLI [--metric] argument. Accepts the five token aliases (case
     insensitive): [sharpe], [totalreturn] / [total_return] / [total-return],
     [calmar], [cagr], [maxdrawdown] / [max_drawdown] / [max-drawdown].
 
@@ -34,6 +36,15 @@ val metric_arg_to_lib :
 (** Adapter: maps {!metric_arg} to the polymorphic-variant input shape that
     {!Tuner.Proxy_calibration_lib.matched_pairs} expects. *)
 
+val metric_label : metric_arg -> string
+(** Map a [metric_arg] to its {!Walk_forward.Walk_forward_types.fold_actual}
+    field name. Used in markdown rendering for traceability. *)
+
+val default_variant_label : string
+(** [default_variant_label = "cell-E"]. Per plan §M1 T1.4, the calibration is
+    always run on Cell E's per-fold actuals; the default keeps the CLI ergonomic
+    while still surfacing the variant in error messages. *)
+
 type cli_args = {
   cheap_path : string;
       (** Path to the cheap-proxy [fold_actuals.sexp] (e.g. the 6-fold run). *)
@@ -43,8 +54,11 @@ type cli_args = {
   threshold : float;
       (** Acceptance threshold for ρ. Default
           {!Tuner.Proxy_calibration_lib.acceptance_threshold} (= 0.7). *)
+  variant_label : string;
+      (** Variant the fold_actuals files are filtered to before joining. Default
+          {!default_variant_label}. *)
   out_path : string option;
-      (** Optional markdown report path; [None] = print to stdout. *)
+      (** Optional markdown report path; [None] = stdout. *)
 }
 [@@deriving show, eq]
 
@@ -55,25 +69,29 @@ val parse_args : string list -> cli_args
     - [--cheap <path>] (required)
     - [--expensive <path>] (required)
     - [--metric sharpe|totalreturn|calmar|cagr|maxdrawdown] (default [sharpe])
-    - [--threshold <float>] (default {!Tuner.Proxy_calibration_lib.acceptance_threshold})
-    - [--out <path>] (optional)
+    - [--threshold <float>] (default
+      {!Tuner.Proxy_calibration_lib.acceptance_threshold})
+    - [--variant <label>] (default {!default_variant_label})
+    - [--out <path>] (optional; absent ⇒ stdout)
 
-    @raise Failure on missing required flags, unknown flags, or malformed
-      values. *)
+    @raise Failure
+      on missing required flags, unknown flags, or malformed values. *)
 
 val load_fold_actuals :
   string -> Walk_forward.Walk_forward_types.fold_actual list
 (** Load a [fold_actuals.sexp] file produced by {!Walk_forward_runner}. The
     on-disk shape is a [Sexp.List] of [fold_actual_of_sexp]-shaped records.
 
-    @raise Failure with a contextualised message when the file is missing or
-      the sexp doesn't parse. *)
+    @raise Failure
+      with a contextualised message when the file is missing or the sexp doesn't
+      parse. *)
 
 val render_markdown :
   cheap_path:string ->
   expensive_path:string ->
   metric:metric_arg ->
   threshold:float ->
+  variant_label:string ->
   pairs:Tuner.Proxy_calibration_lib.fold_pair list ->
   rho:float ->
   verdict:Tuner.Proxy_calibration_lib.verdict ->
@@ -81,6 +99,25 @@ val render_markdown :
 (** Render the calibration result as a self-contained markdown report.
     Deterministic — same inputs produce byte-identical output. *)
 
+type run_result = {
+  pairs : Tuner.Proxy_calibration_lib.fold_pair list;
+  rho : float;
+  verdict : Tuner.Proxy_calibration_lib.verdict;
+  report : string;
+}
+(** Structured result returned by {!run_calibration}. The [report] field is the
+    fully-rendered markdown the caller may write to disk or stdout. *)
+
+val run_calibration : cli_args -> run_result
+(** Pure orchestration: load the two fold_actuals files, project the chosen
+    metric, compute ρ + verdict, and render the markdown report. Performs
+    filesystem reads (load) but no writes.
+
+    @raise Failure
+      when matched-fold count is [< 2] (correlation with a single point is
+      ill-defined). *)
+
 val main : unit -> unit
-(** Standard executable entry point. Exits with status [0] on PASS and [1] on
-    FAIL so CI gates can branch on the verdict. *)
+(** Standard executable entry point. Parses argv, runs {!run_calibration},
+    writes the rendered report (to [--out] or stdout), and exits with status [0]
+    on PASS or [1] on FAIL so CI gates can branch on the verdict. *)

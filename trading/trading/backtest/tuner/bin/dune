@@ -11,7 +11,8 @@
   bayesian_runner_scoring
   bayesian_runner_successive_halving
   bayesian_runner_oos_validator
-  bayesian_runner_out_dir_check)
+  bayesian_runner_out_dir_check
+  proxy_calibration_runner)
  (libraries
   core
   core_unix
@@ -47,3 +48,8 @@
  (name rescore_checkpoints)
  (modules rescore_checkpoints)
  (libraries core tuner_bin))
+
+(executable
+ (name proxy_calibration)
+ (modules proxy_calibration)
+ (libraries tuner_bin))
