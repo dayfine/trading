@@ -213,21 +213,47 @@ verdict (random matches BO ⇒ surface is the bind, not the optimiser).
   on the 6-fold cheap proxy vs the 26-fold expensive walk-forward set;
   acceptance ρ ≥ 0.7. Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`
   §M1 T1.4. Branch: `feat/tuning/m1-t1-4-proxy-calibration`.
-- [ ] **T1.5 — Re-score v4/v6 checkpoints with paired-Δ.** Owner:
-  feat-backtest. ~30 LOC OCaml exe reading existing `bo_checkpoint.sexp`
-  files and applying `Bayesian_runner_scoring.paired_delta` (merged
-  #1308) to produce a re-score report; verifies spread > 5× the old
-  0.81 flat surface. Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`
-  §M1 T1.5. Branch: `feat/tuning/m1-t1-5-rescore-checkpoints`.
-  **Data note:** v4/v6 checkpoints live at
-  `/Users/difan/Projects/trading-1/.sweep-output/<sweep-name>/bo_checkpoint.sexp`
-  on the local machine only — not accessible in the GHA runtime. The
-  dispatched agent must either (a) skip the live re-score and instead
-  generate synthetic `bo_checkpoint.sexp` fixtures of the correct shape
-  to validate the `paired_delta` plumbing end-to-end, then document the
-  production run as a local-only step, OR (b) if run locally, point
-  `--checkpoint` at the real paths above and emit a verdict doc to
-  `dev/notes/t1-5-rescore-verdict-<date>.md`.
+- [~] **T1.5 — Re-score v4/v6 checkpoints with paired-Δ.** Owner:
+  feat-backtest. PR OPEN on branch `feat/tuning/m1-t1-5-rescore-checkpoints`.
+  Surface (per option (a) in the original dispatch — synthetic fixtures
+  only, production data is local-only):
+  - **Lib** `Tuner_bin.Bayesian_runner_rescore` (.ml 156 LOC / .mli 175 LOC)
+    — pure helpers consuming a new `bo_rescore_input.sexp` shape (a
+    per-iteration enriched companion to `bo_checkpoint.sexp` that carries
+    per-fold `fold_actual` lists alongside the BO parameters) + a Cell-E
+    `fold_actuals.sexp`. Calls `Bayesian_runner_scoring.paired_delta`
+    (#1308) per candidate, computes `spread = max(mean Δ) - min(mean Δ)`
+    across candidates, returns a `report` record with `PASS | FAIL`
+    verdict against the configurable acceptance gate
+    (default `4.05 = 5 × 0.81`, three named constants
+    `historical_flat_surface` / `flat_surface_multiplier` /
+    `default_min_spread`).
+  - **CLI** `rescore_checkpoints.exe` (`trading/backtest/tuner/bin/rescore_checkpoints.ml`,
+    ~120 LOC) — five flags: `--input` / `--baseline` / `--metric`
+    (Sharpe | TotalReturn | Calmar | CAGR, default Sharpe) /
+    `--min-spread` / `--out`. Emits a markdown report to stdout or the
+    `--out` path.
+  - **Tests** `test_bayesian_runner_rescore.ml` (17 cases, ~500 LOC) —
+    spread_of basic / empty / singleton; default-min-spread constants
+    pinned; rescore_candidate identity / constant-offset / partial-overlap
+    / disjoint-raises / Total_return_pct metric dispatch;
+    build_report 3-candidate Pass (spread 5.0) / below-threshold Fail
+    (spread 0.5) / strict-greater-boundary Fail (spread == threshold) /
+    empty-input Fail; markdown PASS/FAIL anchors;
+    sexp round-trip via public loaders; schema_version mismatch rejected.
+  - **Procedure doc** `dev/notes/t1-5-rescore-procedure-2026-05-26.md`
+    — what the exe does, the local-only incantation pointing at
+    `/Users/difan/Projects/trading-1/.sweep-output/v4-9knob/` and
+    `.sweep-output/v6-11knob/`, plus the gap (production
+    `bo_checkpoint.sexp` does NOT carry per-fold actuals — an upstream
+    adapter is required to produce the enriched `bo_rescore_input.sexp`;
+    documented as a follow-up).
+  - **Verdict doc location** `dev/notes/t1-5-rescore-verdict-<date>.md`
+    (only written when the local operator runs the exe against real
+    v4/v6 data).
+  Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/tuner/bin/test/ --force'`
+  (167 + 17 new = 184 tests pass).
+  Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md` §M1 T1.5.
 
 ### Operational follow-ups
 
