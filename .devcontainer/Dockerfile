@@ -26,6 +26,17 @@
 FROM docker.io/ocaml/opam:ubuntu-22.04-ocaml-5.3 AS ci
 
 # -----------------------------------------------------------------------------
+# Flambda switch — ubuntu-22.04-ocaml-5.3-flambda does not exist on Docker Hub
+# (only the base ubuntu-22.04-ocaml-5.3 tag is available). Instead, create the
+# 5.3.0+flambda variant via opam so all subsequent RUN layers use it.
+# OPAMSWITCH is set as an ENV variable so it persists across Docker RUN layers.
+# This enables cross-module inlining + -O3 optimisation in release builds.
+# See dev/plans/v7-sweep-speedup-2026-05-26.md §Win #3.
+# -----------------------------------------------------------------------------
+RUN opam switch create 5.3.0+flambda --packages=ocaml-variants.5.3.0+options,ocaml-option-flambda --yes
+ENV OPAMSWITCH=5.3.0+flambda
+
+# -----------------------------------------------------------------------------
 # System Dependencies
 # -----------------------------------------------------------------------------
 # Each dependency is annotated with which OCaml package requires it.
