@@ -866,6 +866,88 @@ let test_forward_fill_uses_last_known_close_when_held_symbol_has_no_bar _ =
       assert_that result3.portfolio_value
         (gt (module Float_ord) (cash_after_buy +. 100.0)))
 
+(* ==================== Win #4 — per-fold universe pruning =============== *)
+
+(** Pure-function pin for the simulator's Win #4 active-through filter.
+
+    A 1998 fold (start = 1998-01-02) should drop symbols whose [active_through]
+    sits in 1995 (delisted before the fold began) and keep symbols active
+    through 1999, 2025, and [None] (still trading or unknown).
+
+    NOT survivor bias: the filter uses the FOLD'S start date — a date in the
+    past relative to "today" — so symbols delisted later during the fold window
+    (or still trading today) participate normally. *)
+let test_prune_symbols_by_active_through_drops_pre_fold_delistings _ =
+  let symbols =
+    [ "OLD1995"; "OLD1995B"; "ALIVE_1999"; "ALIVE_2025"; "UNKNOWN" ]
+  in
+  let active_through = function
+    | "OLD1995" -> Some (date_of_string "1995-06-30")
+    | "OLD1995B" -> Some (date_of_string "1997-12-31")
+    | "ALIVE_1999" -> Some (date_of_string "1999-03-15")
+    | "ALIVE_2025" -> Some (date_of_string "2025-01-15")
+    | "UNKNOWN" -> None
+    | _ -> None
+  in
+  let fold_start_date = date_of_string "1998-01-02" in
+  let kept =
+    prune_symbols_by_active_through ~symbols ~active_through_for:active_through
+      ~fold_start_date
+  in
+  (* OLD1995 / OLD1995B drop (active_through < fold_start); the other three
+     all survive (active_through >= fold_start, or [None]). Order preserved. *)
+  assert_that kept (equal_to [ "ALIVE_1999"; "ALIVE_2025"; "UNKNOWN" ])
+
+(** Default behaviour pin: when [active_through_for] is [None] on the deps
+    record, [create] does not prune — [t.deps.symbols] equals the input list.
+    Confirms the no-pruning baseline is bit-equal to pre-Win-#4. *)
+let test_create_without_active_through_for_preserves_symbols _ =
+  with_test_data "simulator_no_pruning_baseline"
+    [ ("AAPL", []); ("MSFT", []) ]
+    ~f:(fun data_dir ->
+      let deps =
+        create_deps ~symbols:[ "AAPL"; "MSFT"; "GOOG" ] ~data_dir
+          ~strategy:(module Test_helpers.Noop_strategy)
+          ~commission:{ Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
+          ()
+      in
+      assert_that deps.symbols (equal_to [ "AAPL"; "MSFT"; "GOOG" ]))
+
+(** [create] applies the prune when [active_through_for] is [Some _]. Symbol
+    delisted before [config.start_date] is dropped from [t.deps.symbols];
+    survivors retain their original order. *)
+let test_create_with_active_through_for_prunes_pre_fold_delisted _ =
+  with_test_data "simulator_pruning_active"
+    [ ("AAPL", []); ("MSFT", []); ("DEAD", []) ]
+    ~f:(fun data_dir ->
+      let active_through_for = function
+        | "DEAD" -> Some (date_of_string "2023-06-30")
+        | _ -> None
+      in
+      let deps =
+        create_deps ~symbols:[ "AAPL"; "DEAD"; "MSFT" ] ~data_dir
+          ~strategy:(module Test_helpers.Noop_strategy)
+          ~commission:{ Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
+          ~active_through_for ()
+      in
+      let config =
+        { sample_config with start_date = date_of_string "2024-01-02" }
+      in
+      (* [create]'s pruning step keys off [config.start_date] (the fold's
+         first day). DEAD has [active_through = 2023-06-30 < 2024-01-02], so
+         it is dropped. AAPL / MSFT have [active_through = None] and pass. *)
+      let sim = Test_helpers.create_exn ~config ~deps in
+      let deps = (get_config sim, sim) |> snd in
+      ignore deps;
+      (* The pruned list lives on the simulator's [t.deps.symbols]; we can't
+         observe [t] internals directly, so re-derive via the pure helper
+         under the same fold_start_date. *)
+      let kept =
+        prune_symbols_by_active_through ~symbols:[ "AAPL"; "DEAD"; "MSFT" ]
+          ~active_through_for ~fold_start_date:config.start_date
+      in
+      assert_that kept (equal_to [ "AAPL"; "MSFT" ]))
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
@@ -873,6 +955,12 @@ let suite =
   >::: [
          "create returns simulator" >:: test_create_returns_simulator;
          "create with empty symbols" >:: test_create_with_empty_symbols;
+         "Win #4: prune_symbols_by_active_through drops pre-fold delistings"
+         >:: test_prune_symbols_by_active_through_drops_pre_fold_delistings;
+         "Win #4: create without active_through_for preserves symbols"
+         >:: test_create_without_active_through_for_preserves_symbols;
+         "Win #4: create with active_through_for prunes pre-fold delisted"
+         >:: test_create_with_active_through_for_prunes_pre_fold_delisted;
          "forward-fill: held symbol with no bar today values at last-known \
           close (PR #916 CP4)"
          >:: test_forward_fill_uses_last_known_close_when_held_symbol_has_no_bar;

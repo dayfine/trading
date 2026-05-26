@@ -361,7 +361,24 @@ val held_symbols : Trading_strategy.Portfolio_view.t -> string list
     natural query on strategy state and the behaviour (exclude [Closed]) is
     worth pinning by direct unit test. *)
 
+val prune_universe_by_active_through :
+  universe:string list ->
+  active_through_for:(string -> Date.t option) ->
+  fold_start_date:Date.t ->
+  string list
+(** Win #4 pure helper: drop symbols from [universe] whose [active_through_for]
+    returns [Some d] with [Core.Date.(d < fold_start_date)]. [None] symbols (no
+    delisting marker — still trading or unknown) pass through unchanged.
+
+    Point-in-time framing: filters on the fold's START date (a date in the past
+    relative to the present), so symbols delisted later during the fold are
+    KEPT. This is NOT survivor bias — filtering on the current date would be,
+    but that cut is not performed here. Authority:
+    [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
+
 val survivors_for_screening :
+  ?active_through_for:(string -> Date.t option) ->
+  ?fold_start_date:Date.t ->
   ?sector_map:(string, Screener.sector_context) Core.Hashtbl.t ->
   config:config ->
   bar_reader:Bar_reader.t ->
@@ -395,7 +412,21 @@ val survivors_for_screening :
     symbols (PR-B) without instrumenting the screener loop. The filter
     predicates are intentionally narrow (stage-only and sector-only); the
     screener's full eligibility rules (volume / RS / prior_stage / quality)
-    still run inside Phase 2's [Stock_analysis] for the surviving symbols. *)
+    still run inside Phase 2's [Stock_analysis] for the surviving symbols.
+
+    @param active_through_for
+      Win #4: optional per-symbol [active_through] lookup. When both this and
+      [?fold_start_date] are [Some _], [config.universe] is pre-pruned before
+      Phase 1: symbols whose [active_through_for s = Some d] with
+      [Date.(d < fold_start_date)] are dropped. Symbols with
+      [active_through_for s = None] (no delisting marker — still trading or
+      unknown) pass through. Default [None] preserves baselines (no
+      pre-pruning). Point-in-time, NOT survivor bias: the filter uses the fold's
+      start date, a past date relative to the present, so symbols delisted later
+      during the fold are kept and participate normally.
+    @param fold_start_date
+      Win #4: companion to [?active_through_for]. The fold's first day. When
+      omitted, no pre-pruning happens (matches default behaviour). *)
 
 val entries_from_candidates :
   ?sector_lookup:(string -> string option) ->
@@ -460,6 +491,7 @@ val make :
   ?ticker_sectors:(string, string) Hashtbl.t ->
   ?bar_reader:Bar_reader.t ->
   ?audit_recorder:Audit_recorder.t ->
+  ?fold_start_date:Date.t ->
   config ->
   (module Trading_strategy.Strategy_interface.STRATEGY)
 (** Create a Weinstein strategy module with fresh internal state.
@@ -497,7 +529,15 @@ val make :
       ({!Audit_recorder.entry_event} / [exit_event]). When omitted defaults to
       {!Audit_recorder.noop} — no observation is emitted and the strategy runs
       unchanged. Backtest callers wire a recorder backed by a
-      [Backtest.Trade_audit.t] collector. *)
+      [Backtest.Trade_audit.t] collector.
+    @param fold_start_date
+      Win #4: the fold's first day. When [Some d] together with [bar_reader]
+      exposing a snapshot-backed [active_through_for], the screener pre-prunes
+      [config.universe] before Phase 1 (stage classification), dropping symbols
+      whose last active day is strictly before [d]. Default [None] preserves
+      baselines — no pre-pruning. Point-in-time, NOT survivor bias: see
+      {!survivors_for_screening}'s [?active_through_for] / [?fold_start_date]
+      doc and the Win #4 spec in [dev/plans/v7-sweep-speedup-2026-05-26.md]. *)
 
 (** {1 Internal — testing only}
 
@@ -508,6 +548,7 @@ val make :
     review item B1). Not for production use. *)
 module Internal_for_test : sig
   val on_market_close :
+    fold_start_date:Date.t option ->
     config:config ->
     ad_bars:Macro.ad_bar list ->
     stop_states:Weinstein_stops.stop_state String.Map.t ref ->
@@ -530,7 +571,13 @@ module Internal_for_test : sig
       explicitly. Mutates [stop_states] / [last_stop_out_dates] / [prior_macro]
       / [prior_macro_result] / [peak_tracker] / [prior_stages] /
       [sector_prior_stages] / [stage3_streaks] / [laggard_streaks] in place,
-      mirroring the closure semantics in {!make}. *)
+      mirroring the closure semantics in {!make}.
+
+      [~fold_start_date] is a required parameter here (not optional) — pass
+      [None] to preserve baselines; pass [Some d] to enable Win #4 universe
+      pre-pruning at the per-Friday screener. The [make] entry point hides this
+      behind [?fold_start_date] (default [None]); the internal hook surfaces it
+      explicitly so tests pin the semantics directly. *)
 
   val record_force_exit :
     last_stop_out_dates:Date.t Hashtbl.M(String).t ->

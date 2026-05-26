@@ -1088,6 +1088,104 @@ let test_survivors_for_screening_pr_b_counter _ =
     (equal_to [ "FALL_WEAK"; "RISE_STRONG_A"; "RISE_STRONG_B" ])
 
 (* ------------------------------------------------------------------ *)
+(* Win #4: per-fold universe pruning via [active_through]               *)
+(* ------------------------------------------------------------------ *)
+
+(** Pure-function pin for the Win #4 screener-side pre-prune. A 1998 fold drops
+    symbols whose [active_through] is in 1995 (delisted before fold start) and
+    keeps symbols active through 1999, 2025, or [None].
+
+    NOT survivor bias: the filter uses the FOLD'S start date — a date in the
+    past relative to "today" — so symbols delisted later during the fold window
+    participate normally. Filtering on the current date would be survivor bias;
+    that cut is not performed. *)
+let test_prune_universe_by_active_through_drops_pre_fold_delistings _ =
+  let universe = [ "OLD1995"; "ALIVE_1999"; "ALIVE_2025"; "UNKNOWN" ] in
+  let active_through_for = function
+    | "OLD1995" -> Some (Date.of_string "1995-06-30")
+    | "ALIVE_1999" -> Some (Date.of_string "1999-03-15")
+    | "ALIVE_2025" -> Some (Date.of_string "2025-01-15")
+    | "UNKNOWN" -> None
+    | _ -> None
+  in
+  let fold_start_date = Date.of_string "1998-01-02" in
+  let kept =
+    prune_universe_by_active_through ~universe ~active_through_for
+      ~fold_start_date
+  in
+  assert_that kept (equal_to [ "ALIVE_1999"; "ALIVE_2025"; "UNKNOWN" ])
+
+(** Integration pin: [survivors_for_screening] with [?active_through_for] +
+    [?fold_start_date] drops the pre-fold-delisted symbol BEFORE Phase 1 stage
+    classification, so the survivor list shrinks compared to the default
+    (no-pruning) call. This is the load-bearing assertion for the plan's "fewer
+    symbols processed in Phase 1" acceptance criterion. *)
+let test_survivors_for_screening_drops_pre_fold_delisted _ =
+  (* Build a 3-symbol universe with two Stage2-classifying series + one that
+     starts trending but whose last bar is stamped with an active_through in
+     the deep past. The bar_reader's snapshot manifest picks up the stamp
+     and exposes it via [snapshot_callbacks.active_through_for]. *)
+  let start_friday = Date.of_string "2024-01-05" in
+  let rising_a = _trending_series ~start_friday ~start_price:50.0 ~step:0.8 in
+  let rising_b = _trending_series ~start_friday ~start_price:60.0 ~step:1.0 in
+  (* DEAD_PRE_FOLD: same series shape, but the LAST bar is stamped with
+     active_through = 1995. The of_in_memory_bars constructor copies the
+     last bar's [active_through] into the directory manifest. *)
+  let dead_pre_fold =
+    let bars = _trending_series ~start_friday ~start_price:70.0 ~step:0.7 in
+    match List.rev bars with
+    | [] -> []
+    | last :: rest ->
+        let stamped =
+          {
+            last with
+            Types.Daily_price.active_through =
+              Some (Date.of_string "1995-12-31");
+          }
+        in
+        List.rev (stamped :: rest)
+  in
+  let symbols_with_bars =
+    [
+      ("RISE_A", rising_a);
+      ("RISE_B", rising_b);
+      ("DEAD_PRE_FOLD", dead_pre_fold);
+    ]
+  in
+  let bar_reader = Bar_reader.of_in_memory_bars symbols_with_bars in
+  let cfg =
+    default_config
+      ~universe:[ "RISE_A"; "RISE_B"; "DEAD_PRE_FOLD" ]
+      ~index_symbol:"GSPCX"
+  in
+  let active_through_for symbol =
+    let cb = Bar_reader.snapshot_callbacks bar_reader in
+    cb.Snapshot_runtime.Snapshot_callbacks.active_through_for ~symbol
+  in
+  let last_date = _last_date_of_symbols symbols_with_bars in
+  (* Baseline pass: no Win #4 args → all three classify. *)
+  let baseline =
+    let prior_stages = Hashtbl.create (module String) in
+    survivors_for_screening ~config:cfg ~bar_reader ~prior_stages
+      ~current_date:last_date ()
+    |> List.length
+  in
+  (* Win #4 pass: fold_start = 1998-01-02 → DEAD_PRE_FOLD drops. *)
+  let pruned_survivors =
+    let prior_stages = Hashtbl.create (module String) in
+    survivors_for_screening ~active_through_for
+      ~fold_start_date:(Date.of_string "1998-01-02")
+      ~config:cfg ~bar_reader ~prior_stages ~current_date:last_date ()
+  in
+  let pruned_tickers =
+    List.map pruned_survivors ~f:(fun (ticker, _, _) -> ticker)
+    |> List.sort ~compare:String.compare
+  in
+  assert_that
+    (baseline, List.length pruned_survivors, pruned_tickers)
+    (equal_to ((3, 2, [ "RISE_A"; "RISE_B" ]) : int * int * string list))
+
+(* ------------------------------------------------------------------ *)
 (* record_force_exit — feeds stage3 / laggard exits into the existing  *)
 (* screener cooldown gate (issue #889 §F1).                            *)
 (* ------------------------------------------------------------------ *)
@@ -1256,4 +1354,8 @@ let () =
            >:: test_survivors_for_screening_sector_filter_unknown_ticker_passes;
            "PR-B counter test: (loaded, stage_pass, sector_pass) narrows"
            >:: test_survivors_for_screening_pr_b_counter;
+           "Win #4: prune_universe_by_active_through drops pre-fold delistings"
+           >:: test_prune_universe_by_active_through_drops_pre_fold_delistings;
+           "Win #4: survivors_for_screening drops pre-fold delisted symbol"
+           >:: test_survivors_for_screening_drops_pre_fold_delisted;
          ])

@@ -11,13 +11,8 @@ let _compute_metrics ~computers ~config ~steps =
       Trading_simulation_types.Metric_types.merge acc
         (computer.run ~config ~steps))
 
-(** Internal: compute derived metrics from base metrics.
-
-    Derived computers are folded in list order — each sees the accumulated
-    metrics from prior computers. This means callers must list them in
-    dependency order. Currently sufficient (only CalmarRatio depends on CAGR +
-    MaxDrawdown). If multi-layer dependencies arise, replace with topological
-    sort over the [depends_on] declarations. *)
+(** Internal: compute derived metrics. Folded in list order — callers must
+    pre-sort by dependency. *)
 let _compute_derived ~derived_computers ~config ~base_metrics =
   List.fold derived_computers ~init:base_metrics
     ~f:(fun acc (dc : derived_metric_computer) ->
@@ -34,16 +29,12 @@ type dependencies = {
   order_manager : Trading_orders.Manager.order_manager;
   market_data_adapter : Trading_simulation_data.Market_data_adapter.t;
   metric_suite : metric_suite;
-  benchmark_symbol : string option;
-      (** Optional symbol whose adjusted-close % change provides the per-step
-          benchmark return populated on [step_result.benchmark_return]. The
-          benchmark does not need to be in [symbols] — bars are fetched
-          independently via [market_data_adapter]. When [None] the field is left
-          as [None] on every step (default; preserves prior behaviour). *)
+  benchmark_symbol : string option;  (** See .mli. *)
   stale_hold_policy : Stale_hold.config;
   stale_hold_log : Stale_hold.Log.t;
   margin_config : Trading_portfolio.Margin_config.t;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
+  active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -51,7 +42,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
     ?stale_hold_log ?(slippage_bps = 0)
     ?(margin_config = Trading_portfolio.Margin_config.default_config)
-    ?on_trade_fill () =
+    ?on_trade_fill ?active_through_for () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -76,7 +67,18 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     stale_hold_log;
     margin_config;
     on_trade_fill;
+    active_through_for;
   }
+
+(* See .mli. Win #4 point-in-time pruning. *)
+let prune_symbols_by_active_through ~symbols ~active_through_for
+    ~fold_start_date =
+  let keep s =
+    match active_through_for s with
+    | None -> true
+    | Some d -> Core.Date.( <= ) fold_start_date d
+  in
+  List.filter symbols ~f:keep
 
 (** {1 Simulator State} *)
 
@@ -90,44 +92,54 @@ and t = {
   positions : Trading_strategy.Position.t String.Map.t;
   step_history : step_result list;  (** Accumulated steps in reverse order *)
   last_known_prices : float String.Table.t;
-      (** Per-symbol last-resolved close price. Populated whenever
-          [_prices_for_held_positions] resolves a price for a held symbol
-          (today's bar OR adapter forward-fill). Consulted as the third fallback
-          if both today's bar and [get_previous_bar] fail — covers held symbols
-          whose bar dataset has gaps the adapter cannot reach (M&A delisting +
-          dataset edge, survivor-bias purges). Reference-shared across all
-          per-step copies of [t]. *)
+      (** Per-symbol last-resolved close, used as the third fallback for
+          [_resolve_price]. Reference-shared across per-step copies of [t]. *)
   valuation_failure_count : int ref;
-      (** Counter incremented each time [_resolve_price] fell through to the
-          avg-cost last-resort (the cache was also empty for a held symbol).
-          Should remain [0] in healthy runs; printed at end of [run]. *)
+      (** Counter for fallback-to-avg-cost valuations; [0] in healthy runs. *)
 }
 
 (** {1 Creation} *)
 
+(* Win #4: prune the per-step bar-fetch universe once, up front. [None]
+   active_through_for preserves baselines. *)
+let _maybe_prune_deps ~fold_start_date deps =
+  match deps.active_through_for with
+  | None -> deps
+  | Some f ->
+      let symbols =
+        prune_symbols_by_active_through ~symbols:deps.symbols
+          ~active_through_for:f ~fold_start_date
+      in
+      { deps with symbols }
+
+let _build_initial_state ~config ~deps =
+  let deps = _maybe_prune_deps ~fold_start_date:config.start_date deps in
+  let portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
+  in
+  {
+    config;
+    deps;
+    current_date = config.start_date;
+    portfolio;
+    positions = String.Map.empty;
+    step_history = [];
+    last_known_prices = String.Table.create ();
+    valuation_failure_count = ref 0;
+  }
+
+let _date_range_error_of ~config =
+  let msg =
+    Printf.sprintf "end_date (%s) must be after start_date (%s)"
+      (Date.to_string config.end_date)
+      (Date.to_string config.start_date)
+  in
+  Status.invalid_argument_error msg
+
 let create ~config ~deps =
   if Date.(config.end_date <= config.start_date) then
-    let msg =
-      Printf.sprintf "end_date (%s) must be after start_date (%s)"
-        (Date.to_string config.end_date)
-        (Date.to_string config.start_date)
-    in
-    Error (Status.invalid_argument_error msg)
-  else
-    let portfolio =
-      Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
-    in
-    Ok
-      {
-        config;
-        deps;
-        current_date = config.start_date;
-        portfolio;
-        positions = String.Map.empty;
-        step_history = [];
-        last_known_prices = String.Table.create ();
-        valuation_failure_count = ref 0;
-      }
+    Error (_date_range_error_of ~config)
+  else Ok (_build_initial_state ~config ~deps)
 
 (** {1 Running} *)
 
@@ -148,12 +160,8 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
     close_price = daily_price.close_price;
   }
 
-(** Per-step benchmark return for the configured benchmark symbol, if any. We
-    use [adjusted_close] (split- and dividend-adjusted) to keep returns
-    comparable across the simulation window; this matches the convention used by
-    [Antifragility_computer]'s synthetic tests, which feed in raw percent
-    returns. Returns [None] when no benchmark is configured, or when either
-    today's bar or the prior trading day's bar is missing for the benchmark. *)
+(** Per-step benchmark return for the configured benchmark symbol, computed from
+    [adjusted_close]. [None] when no benchmark or either bar is missing. *)
 let _compute_benchmark_return t : float option =
   let%bind.Option symbol = t.deps.benchmark_symbol in
   let adapter = t.deps.market_data_adapter in
@@ -271,18 +279,9 @@ let _find_fill_target acc symbol =
   | Some _ as r -> r
   | None -> try_find _is_exiting_state false
 
-(* Either install [data] in [acc] or remove [key] when [data] is in the
-   [Closed] terminal state. Hot-path callers ([_update_positions_from_trades],
-   [_apply_trigger_exit]) used to retain Closed positions in the simulator's
-   positions Map indefinitely; over a 15y run the Map grew to thousands of
-   entries and every per-trade / per-Friday walk
-   ([_find_position_by_symbol_state], [held_symbols],
-   [_initial_short_notional]) paid an O(closed + active) cost plus an
-   allocation from [Map.to_alist] / [Map.data]. Closed positions are
-   strategy-invisible (held_symbols already filters them) and contribute 0 to
-   valuation, so dropping them is observable-invariant; audit trails live in
-   [Trade_audit] / [Stop_log] / [final_portfolio.positions], which are fed
-   from independent sources. *)
+(* Install [data] in [acc] or remove [key] when Closed. Closed positions are
+   strategy-invisible and contribute 0 to valuation; audit trails live in
+   [Trade_audit] / [Stop_log] / [final_portfolio.positions]. *)
 let _set_or_drop_if_closed acc ~key ~data =
   if Trading_strategy.Position.is_closed data then Map.remove acc key
   else Map.set acc ~key ~data
@@ -319,13 +318,8 @@ let _apply_transitions ~positions ~transitions =
       | CancelEntry _ -> Cancel_handler.apply_to_positions acc trans
       | _ -> Ok acc)
 
-(** Build run_result from accumulated state.
-
-    [final_portfolio] is the simulator's last full
-    {!Trading_portfolio.Portfolio.t}; it is exposed on the result so reconciler
-    writers (which need lots / avg-cost / per-symbol position details) read it
-    directly rather than reconstructing from the skinny per-step
-    [Portfolio_summary] retained on [steps]. *)
+(** Build run_result from accumulated state. [final_portfolio] is the full
+    {!Trading_portfolio.Portfolio.t} so reconciler writers read it directly. *)
 let _build_run_result t =
   let steps = List.rev t.step_history in
   let base_metrics =

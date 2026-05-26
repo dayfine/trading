@@ -100,7 +100,7 @@ let _get_price_of_state state ~current_date symbol =
   | bars -> List.last bars
 
 let _drive_tick state ~config ~current_date ~portfolio =
-  Internal_for_test.on_market_close ~config ~ad_bars:[]
+  Internal_for_test.on_market_close ~fold_start_date:None ~config ~ad_bars:[]
     ~stop_states:state.stop_states
     ~last_stop_out_dates:state.last_stop_out_dates
     ~prior_macro:state.prior_macro ~prior_macro_result:state.prior_macro_result

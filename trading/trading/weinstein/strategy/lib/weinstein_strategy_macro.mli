@@ -21,6 +21,7 @@ val run_macro_only :
     universe screen is gated off. *)
 
 val run_screen_after_macro :
+  fold_start_date:Date.t option ->
   config:Weinstein_strategy_config.config ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
   last_stop_out_dates:Date.t Hashtbl.M(String).t ->
@@ -38,9 +39,19 @@ val run_screen_after_macro :
 (** Run the Friday universe screener given an already-computed [macro_result].
     Builds the sector map, delegates to
     {!Weinstein_strategy_screening.screen_universe}, and returns entry
-    transitions. *)
+    transitions.
+
+    [~fold_start_date] is required (pass [None] to preserve baselines; pass
+    [Some d] to enable Win #4 universe pre-pruning at the per-Friday screener).
+    Internal helper: optional plumbing is hidden behind
+    {!Weinstein_strategy.make}'s [?fold_start_date] (default [None]). When
+    [Some d], the screener pre-prunes [config.universe] before Phase 1 stage
+    classification, dropping symbols whose [active_through < d] via the
+    snapshot-backed [Bar_reader] callbacks. Point-in-time, NOT survivor bias.
+    See [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
 
 val entry_transitions_if_active :
+  fold_start_date:Date.t option ->
   halted:bool ->
   is_screening_day:bool ->
   macro_result_opt:Macro.result option ->
@@ -60,7 +71,10 @@ val entry_transitions_if_active :
 (** Run the universe screen only when [halted = false],
     [is_screening_day = true], and [macro_result_opt = Some _]. Returns [[]]
     when any guard is false. Keeps [_on_market_close] at a shallow nesting
-    level. *)
+    level.
+
+    [~fold_start_date] is forwarded to {!run_screen_after_macro}. See its doc.
+*)
 
 module Internal_for_test : sig
   val pi_membership_at : bar_reader:Bar_reader.t -> string -> Date.t -> bool
