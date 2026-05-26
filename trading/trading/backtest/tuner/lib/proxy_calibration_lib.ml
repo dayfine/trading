@@ -43,8 +43,7 @@ let _ranks (xs : float array) : float array =
 
 let _mean (xs : float array) : float =
   let n = Array.length xs in
-  if n = 0 then 0.0
-  else Array.fold xs ~init:0.0 ~f:( +. ) /. Float.of_int n
+  if n = 0 then 0.0 else Array.fold xs ~init:0.0 ~f:( +. ) /. Float.of_int n
 
 let _pearson (xs : float array) (ys : float array) : float =
   let n = Array.length xs in
@@ -79,19 +78,12 @@ let spearman_rho (xs : float array) (ys : float array) : float =
 
 (* -------------------------- fold-actual joining ---------------------- *)
 
-type fold_pair = {
-  fold_name : string;
-  cheap : float;
-  expensive : float;
-}
+type fold_pair = { fold_name : string; cheap : float; expensive : float }
 
 let _metric_of (fa : Wf.fold_actual)
     (metric :
-      [ `Sharpe
-      | `Total_return_pct
-      | `Calmar
-      | `CAGR
-      | `Max_drawdown_pct ]) : float =
+      [ `Sharpe | `Total_return_pct | `Calmar | `CAGR | `Max_drawdown_pct ]) :
+    float =
   match metric with
   | `Sharpe -> fa.sharpe_ratio
   | `Total_return_pct -> fa.total_return_pct
@@ -99,14 +91,20 @@ let _metric_of (fa : Wf.fold_actual)
   | `CAGR -> fa.cagr_pct
   | `Max_drawdown_pct -> fa.max_drawdown_pct
 
-let matched_pairs ~(cheap_actuals : Wf.fold_actual list)
+let _filter_variant ?variant_label (actuals : Wf.fold_actual list) :
+    Wf.fold_actual list =
+  match variant_label with
+  | None -> actuals
+  | Some label ->
+      List.filter actuals ~f:(fun fa -> String.equal fa.variant_label label)
+
+let matched_pairs ?variant_label ~(cheap_actuals : Wf.fold_actual list)
     ~(expensive_actuals : Wf.fold_actual list)
     ~(metric :
-       [ `Sharpe
-       | `Total_return_pct
-       | `Calmar
-       | `CAGR
-       | `Max_drawdown_pct ]) : fold_pair list =
+       [ `Sharpe | `Total_return_pct | `Calmar | `CAGR | `Max_drawdown_pct ]) ()
+    : fold_pair list =
+  let cheap_actuals = _filter_variant ?variant_label cheap_actuals in
+  let expensive_actuals = _filter_variant ?variant_label expensive_actuals in
   let exp_table = String.Table.create () in
   List.iter expensive_actuals ~f:(fun fa ->
       Hashtbl.set exp_table ~key:fa.fold_name ~data:fa);
