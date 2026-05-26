@@ -628,7 +628,19 @@ When done:
 1. Update dev/notes/data-gaps.md to reflect what was resolved or what still blocks
 2. Run build_inventory.exe if any data was fetched
 3. Open the PR via `jst submit` for any branch you pushed
-4. Return: what changed, what still blocks, any errors, and the PR URL
+4. If $GITHUB_RUN_ID is set, append the GHA footer to the PR body immediately
+   after `jst submit` succeeds:
+     if [ -n "${GITHUB_RUN_ID:-}" ]; then
+       PR_NUM=$(GH_TOKEN=$GH_TOKEN gh pr view <branch> --json number -q '.number' 2>/dev/null || true)
+       if [ -n "$PR_NUM" ]; then
+         FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
+         EXISTING_BODY=$(GH_TOKEN=$GH_TOKEN gh pr view "$PR_NUM" --json body -q '.body' 2>/dev/null || true)
+         GH_TOKEN=$GH_TOKEN gh pr edit "$PR_NUM" --body "${EXISTING_BODY}
+
+${FOOTER}" 2>/dev/null || true
+       fi
+     fi
+5. Return: what changed, what still blocks, any errors, and the PR URL
 ```
 
 ops-data runs **before** feature agents — resolved data gaps may unblock
@@ -987,6 +999,19 @@ COMMIT DISCIPLINE — this is critical for reviewability AND for surviving rate-
     If jst is not available, use the URL printed by `jj git push`:
       remote: Create a pull request for '<branch>' on GitHub by visiting:
       remote:      https://github.com/dayfine/trading/pull/new/<branch>
+    **GHA footer (when $GITHUB_RUN_ID is set):** after `jst submit` succeeds,
+    append the orchestrator-origin footer to the PR body so it is scannable
+    from the PR list:
+      if [ -n "${GITHUB_RUN_ID:-}" ]; then
+        PR_NUM=$(GH_TOKEN=$GH_TOKEN gh pr view feat/<feature> --json number -q '.number' 2>/dev/null || true)
+        if [ -n "$PR_NUM" ]; then
+          FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
+          EXISTING_BODY=$(GH_TOKEN=$GH_TOKEN gh pr view "$PR_NUM" --json body -q '.body' 2>/dev/null || true)
+          GH_TOKEN=$GH_TOKEN gh pr edit "$PR_NUM" --body "${EXISTING_BODY}
+
+${FOOTER}" 2>/dev/null || true
+        fi
+      fi
   - At session end, mark the PR ready for review:
       GH_TOKEN=$GH_TOKEN jst submit feat/<feature>
     jst is on PATH in the orchestrator runtime (trading-devcontainer image
@@ -1147,7 +1172,20 @@ PR_COUNT=$(curl -sSL \
   -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/${REPO}/pulls?head=${OWNER}:<branch>&state=open" \
   | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
-[ "$PR_COUNT" -eq 0 ] && GH_TOKEN=$GH_TOKEN jst submit <branch>
+if [ "$PR_COUNT" -eq 0 ]; then
+  GH_TOKEN=$GH_TOKEN jst submit <branch>
+  # Append GHA footer to the newly-created PR body.
+  if [ -n "${GITHUB_RUN_ID:-}" ]; then
+    PR_NUM=$(GH_TOKEN=$GH_TOKEN gh pr view <branch> --json number -q '.number' 2>/dev/null || true)
+    if [ -n "$PR_NUM" ]; then
+      FOOTER="🤖 Dispatched by GHA orchestrator run [${GITHUB_RUN_ID}](https://github.com/dayfine/trading/actions/runs/${GITHUB_RUN_ID})"
+      EXISTING_BODY=$(GH_TOKEN=$GH_TOKEN gh pr view "$PR_NUM" --json body -q '.body' 2>/dev/null || true)
+      GH_TOKEN=$GH_TOKEN gh pr edit "$PR_NUM" --body "${EXISTING_BODY}
+
+${FOOTER}" 2>/dev/null || true
+    fi
+  fi
+fi
 ```
 
 If jst still fails, surface the branch + jst error in the daily summary
