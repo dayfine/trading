@@ -1,5 +1,11 @@
 (tests
- (names test_grid_search test_bayesian_opt test_proxy_calibration_lib)
+ (names
+  test_grid_search
+  test_bayesian_opt
+  test_proxy_calibration_lib
+  test_bo_checkpoint_reader
+  test_holdout_eval
+  test_sensitivity_sweep)
  (libraries
   ounit2
   core
@@ -7,6 +13,7 @@
   status
   matchers
   tuner
+  tuner_bin
   walk_forward
   trading.simulation.types)
  (preprocess

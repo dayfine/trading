@@ -12,6 +12,9 @@
   bayesian_runner_successive_halving
   bayesian_runner_oos_validator
   bayesian_runner_out_dir_check
+  bo_checkpoint_reader
+  holdout_eval
+  sensitivity_sweep
   proxy_calibration_runner)
  (libraries
   core
@@ -53,3 +56,28 @@
  (name proxy_calibration)
  (modules proxy_calibration)
  (libraries tuner_bin))
+
+(executable
+ (name holdout_eval_main)
+ (modules holdout_eval_main)
+ (libraries
+  core
+  core_unix
+  fork_pool
+  scenario_lib
+  tuner
+  tuner_bin
+  walk_forward))
+
+(executable
+ (name sensitivity_sweep_main)
+ (modules sensitivity_sweep_main)
+ (libraries
+  core
+  core_unix
+  fork_pool
+  status
+  scenario_lib
+  tuner
+  tuner_bin
+  walk_forward))
