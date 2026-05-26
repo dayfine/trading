@@ -49,7 +49,7 @@ flambda OFF.
 
 ## Completed
 
-- **Win #2** (PR #TBD, `harness/sweep-parallel-6`): raised `PARALLEL` default
+- **Win #2** (PR #1317, `harness/sweep-parallel-6`): raised `PARALLEL` default
   from 4 to 6 in `dev/scripts/launch_sweep.sh` (1 line); added `--memory 12g`
   to the `docker run` incantation in `.devcontainer/setup.sh` (1 line). Total:
   3 files touched, 4 insertions, 3 deletions. Verify:
