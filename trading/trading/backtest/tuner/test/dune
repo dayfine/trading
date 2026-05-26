@@ -1,5 +1,5 @@
 (tests
- (names test_grid_search test_bayesian_opt)
+ (names test_grid_search test_bayesian_opt test_proxy_calibration_lib)
  (libraries
   ounit2
   core
@@ -7,6 +7,7 @@
   status
   matchers
   tuner
+  walk_forward
   trading.simulation.types)
  (preprocess
-  (pps ppx_sexp_conv)))
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
