@@ -208,13 +208,51 @@ verdict (random matches BO ⇒ surface is the bind, not the optimiser).
   is the immediate consumer (re-score v4+v6 on-disk checkpoints).
   Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/tuner/bin/test/'`
   (33/33 pass).
-- [ ] **T1.4 — Calibration: proxy-fidelity correlation.** Owner:
+- [~] **T1.4 — Calibration: proxy-fidelity correlation.** Owner:
   feat-backtest. ~30 LOC OCaml exe computing Spearman ρ between Cell E
   on the 6-fold cheap proxy vs the 26-fold expensive walk-forward set;
   acceptance ρ ≥ 0.7. Spec: `dev/plans/tuning-research-driven-program-v2-2026-05-25.md`
   §M1 T1.4. Branch: `feat/tuning/m1-t1-4-proxy-calibration`.
+
+  **Status 2026-05-26:** OCaml implementation + tests landed (PR
+  pending). New surface:
+  - `Tuner.Proxy_calibration_lib`
+    (`trading/trading/backtest/tuner/lib/proxy_calibration_lib.{ml,mli}`)
+    — pure-function Spearman ρ with mid-rank tie handling +
+    matched_pairs fold join with optional variant_label filter +
+    Pass/Fail classifier. 18 unit tests (identical/reverse/known/ties/
+    length-mismatch/empty/single/zero-variance for spearman_rho, plus
+    subset/disjoint/metric-dispatch/variant-filter for matched_pairs +
+    end-to-end PASS/FAIL + classify boundary/below/NaN).
+  - `Tuner_bin.Proxy_calibration_runner`
+    (`trading/trading/backtest/tuner/bin/proxy_calibration_runner.{ml,mli}`)
+    — CLI arg parser + fold_actuals.sexp loader + markdown renderer +
+    end-to-end orchestrator. 14 unit tests (metric parsing recognised/
+    unknown, arg-parsing required-only/all-flags/missing/unknown,
+    sexp load round-trip/missing, markdown render PASS/FAIL, end-to-end
+    PASS/FAIL/multi-variant-filtered/disjoint-raises).
+  - Thin executable `trading/trading/backtest/tuner/bin/proxy_calibration.exe`
+    — wraps `Proxy_calibration_runner.main`. Exits 0 on PASS, 1 on FAIL
+    so a CI gate can branch on the verdict.
+  - Design note in `dev/notes/t1-4-calibration-procedure-2026-05-26.md`
+    documents the local-only production-run incantation (cheap +
+    expensive `fold_actuals.sexp` paths under
+    `/Users/difan/Projects/trading-1/.sweep-output/`) and where the
+    verdict file lands. Reads `fold_actuals.sexp`, NOT `aggregate.sexp`
+    (the aggregate carries only cross-fold means; Spearman requires
+    per-fold samples).
+
+  **Remaining work (local-only):** run Cell E through the 6-fold cheap
+  walk-forward spec and the 26-fold expensive walk-forward spec on the
+  maintainer's machine, then point
+  `proxy_calibration.exe --cheap ... --expensive ...` at the two
+  `fold_actuals.sexp` outputs to produce the calibration verdict.
+  Write the verdict to `dev/notes/t1-4-calibration-verdict-<date>.md`
+  and flip this row to `[x]`.
+
+  Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune runtest trading/backtest/tuner/ --force'` (215+18+14 new pass).
 - [~] **T1.5 — Re-score v4/v6 checkpoints with paired-Δ.** Owner:
-  feat-backtest. PR OPEN on branch `feat/tuning/m1-t1-5-rescore-checkpoints`.
+  feat-backtest. MERGED #1328 on branch `feat/tuning/m1-t1-5-rescore-checkpoints`.
   Surface (per option (a) in the original dispatch — synthetic fixtures
   only, production data is local-only):
   - **Lib** `Tuner_bin.Bayesian_runner_rescore` (.ml 156 LOC / .mli 175 LOC)
