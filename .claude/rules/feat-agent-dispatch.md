@@ -22,8 +22,8 @@ reality.
 <paste `dune runtest <target-test-dir>` output, OR "All passing" if clean>
 
 ### Last QC review findings
-<paste the relevant section of `dev/reviews/<feature>.md` if one exists,
- OR "No prior review" if first dispatch on this track>
+<paste relevant sections from `gh pr view <N> --json reviews --jq '.reviews[].body'`
+ if a prior QC review exists, OR "No prior review" if first dispatch on this track>
 
 ### Open follow-up items
 <paste the `## Follow-ups` section from `dev/status/<track>.md` if any,
@@ -83,9 +83,9 @@ Same cap applies here:
   needs human intent / scope renegotiation, not more agent cycles.
 
 In the rework brief itself, paste:
-- The full `dev/reviews/<feature>.md` contents (both structural and behavioral).
+- The full QC review comment bodies from `gh pr view <N> --json reviews --jq '.reviews[].body'` (both structural and behavioral).
 - The iteration number ("rework iteration 1 of 2") so the agent knows headroom.
-- An explicit instruction: "Address every checked-fail item in the review file. Do not introduce new scope. Commit with `fix(review): address QC rework iteration <N>`."
+- An explicit instruction: "Address every checked-fail item in the review comments. Do not introduce new scope. Commit with `fix(review): address QC rework iteration <N>`."
 
 The point of the cap is the third-iteration STOP. Without it, the
 loop drifts on stubborn findings.

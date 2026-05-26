@@ -6,7 +6,7 @@ harness: project
 # qc-structural authority — Weinstein Trading System
 
 This file is the **project-specific augmentation** of the generic qc-structural
-agent. The agent's protocol (run order, FAIL/PASS rules, write `dev/reviews/<feature>.md`,
+agent. The agent's protocol (run order, FAIL/PASS rules, PR review comment delivery,
 harness_gap classification, etc.) is in `.claude/agents/qc-structural.md` and is
 reusable across projects. The rows below are specific to *this* repo's
 architecture and conventions.

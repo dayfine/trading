@@ -31,14 +31,6 @@ git worktree remove --force "${WT}"
 
 `git worktree add --detach` is the load-bearing form: detaching from any named ref means no orchestrator-visible branch state changes, even if the agent forgets to clean up. On GHA the same pattern works (replace `/tmp/qc-pr-...` with a path under `${GITHUB_WORKSPACE}/../qc-...` if needed for the shared runner filesystem).
 
-Write (append to) `dev/reviews/<feature>.md` against the **parent workspace's** repo root (NOT `${WT}`, which the orchestrator does not see):
-
-```bash
-REVIEW_FILE="${GITHUB_WORKSPACE:-${PARENT_REPO_ROOT:-$(pwd)}}/dev/reviews/<feature>.md"
-```
-
-Here `${PARENT_REPO_ROOT}` is the orchestrator's working tree (typically the dispatch prompt's cwd before this agent ran into the worktree). On GHA, `${GITHUB_WORKSPACE}` carries the same value. Do NOT commit or push. The orchestrator reads the file directly from the parent's filesystem after the subagent returns.
-
 ## Allowed tools
 
 Read, Glob, Grep (no Write, no Edit, no Bash — review only).
@@ -72,9 +64,14 @@ Read the relevant design doc for this feature before reviewing any code. Do not 
 
 ### Step 2: Read the diff
 
-Use the structural QC agent's checklist (already in `dev/reviews/<feature>.md`) for the file list. Read the implementation files and their test files directly via the Read tool.
+Use the file list from `gh pr view $PR_NUMBER --json files --jq '.files[].path'` and read
+the implementation files and their test files directly via the Read tool. Read the
+structural QC review from `gh pr view $PR_NUMBER --json reviews` if you need the structural
+checklist for context.
 
-Note: `dev/reviews/<feature>.md` starts with a `Reviewed SHA:` line pinned by qc-structural. This is an idempotency sentinel used by the orchestrator — do not remove or modify it.
+The structural QC PR review comment begins with `Reviewed SHA: <sha>` — that is the
+idempotency sentinel used by the orchestrator. Include the same SHA in your behavioral
+review comment body.
 
 ### Step 3: Fill in the checklists
 
@@ -182,14 +179,13 @@ APPROVED | NEEDS_REWORK
 
 ## Writing the review
 
-The review is delivered in **two places**:
+The review is delivered via **GitHub PR review comment** — the single source of truth.
+The verdict is visible directly on the PR and queryable via `gh pr view <N> --json reviews`.
 
-1. **GitHub PR review comment** (preferred medium — reviewers see the verdict directly on the PR).
-2. **`dev/reviews/<feature>.md` file** (transitional — appended below qc-structural's content; the lead-orchestrator's Step 1.5 idempotency check still reads it).
+### Post the GitHub PR review comment
 
-### Step 1 — post the GitHub PR review comment
-
-If `$PR_NUMBER` is known, post the behavioral verdict + checklist as a PR review. Use GitHub's native verdict flag so the merge-gate signal is first-class:
+Post the behavioral verdict + checklist as a PR review. Use GitHub's native verdict flag
+so the merge-gate signal is first-class:
 
 ```bash
 case "$VERDICT" in
@@ -199,51 +195,27 @@ case "$VERDICT" in
 esac
 
 gh pr review "$PR_NUMBER" $REVIEW_FLAG --body "$(cat <<'EOF'
-Reviewed SHA: <sha from dev/reviews/<feature>.md first line>
+Reviewed SHA: <sha — same as qc-structural's pin for this review pass>
 
 ## Behavioral QC — <feature-name>
 
-<filled Contract Pinning Checklist + Behavioral Checklist + Quality Score + Verdict, same content as the file append below>
+<filled Contract Pinning Checklist + Behavioral Checklist + Quality Score + Verdict>
 EOF
 )"
 ```
 
-The first body line MUST be `Reviewed SHA: <sha>` (matching qc-structural's pin from the same review pass) so a future orchestrator can locate this review via `gh pr view <N> --json reviews --jq '.reviews[].body'` and treat the SHA as the idempotency sentinel.
+The first body line MUST be `Reviewed SHA: <sha>` (matching qc-structural's pin from the
+same review pass) so the orchestrator can locate this review via
+`gh pr view <N> --json reviews --jq '.reviews[].body'` and treat the SHA as the
+idempotency sentinel.
 
-If `$PR_NUMBER` is absent, skip the PR-comment step and add a one-line note to the checklist: "PR_NUMBER unavailable — review file is the sole audit trail until PR is opened."
-
-### Step 2 — append to `dev/reviews/<feature>.md` (transitional back-compat)
-
-Append your behavioral checklist to the existing `dev/reviews/<feature>.md` written by qc-structural. The file already begins with a `Reviewed SHA:` line written by qc-structural — do not overwrite it or move it. Append only below the existing structural checklist content.
-
-**IMPORTANT: Do NOT push your changes to origin.** The review file is written in-place in your worktree for the lead-orchestrator to read directly. Pushing creates orphan `dev/reviews/*` branches on origin that accumulate as clutter. Write the file and return — the orchestrator reads your output text and the file you wrote.
-
-Write the review file using the Edit/Write tool (do not run jj or git push):
-
-```markdown
----
-
-# Behavioral QC — <feature-name>
-Date: YYYY-MM-DD
-Reviewer: qc-behavioral
-
-## Contract Pinning Checklist
-... (filled CP1–CP4 checklist) ...
-
-## Behavioral Checklist
-... (filled A1/S*/L*/C*/T* checklist) ...
-
-## Quality Score
-<1–5> — <rationale>
-
-## Verdict
-APPROVED | NEEDS_REWORK
-```
+If `$PR_NUMBER` is absent (branch not yet submitted), skip the PR-comment step and note it
+in your return value: "PR_NUMBER unavailable — verdict in return text only until PR is opened."
 
 ### Update status
 
 - **APPROVED**: Update `dev/status/<feature>.md` — add `behavioral_qc: APPROVED` and the date. If both structural and behavioral are APPROVED, set overall status to APPROVED.
-- **NEEDS_REWORK**: Add `behavioral_qc: NEEDS_REWORK` and a note pointing to the review file.
+- **NEEDS_REWORK**: Add `behavioral_qc: NEEDS_REWORK` and a brief note.
 
 ### Return value
 
