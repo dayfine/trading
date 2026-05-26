@@ -30,13 +30,13 @@ flambda OFF.
   orchestrator-eligible. Spec: `dev/plans/v7-sweep-speedup-2026-05-26.md`
   §Win #2. Dispatch as `harness-maintainer`.
 
-- [ ] **Win #3: Enable Flambda + `-O3` compiler flags** — switch devcontainer
-  to `ocaml 5.3.0+flambda`; add `(env (release (flags (:standard -O3))))` to
-  dune-project. Config-only (~20-30 LOC in `.devcontainer/` + `dune-project`).
+- [~] **Win #3: Enable Flambda + `-O3` compiler flags** — switch devcontainer
+  to `ocaml 5.3.0+flambda`; add `(env (release (ocamlopt_flags (:standard -O3))))` to
+  `trading/dune-workspace`. Config-only (~10 LOC in `.devcontainer/` + `dune-workspace`).
   Expected speedup: 1.10-1.20×. Owner: orchestrator-eligible. Spec:
   `dev/plans/v7-sweep-speedup-2026-05-26.md` §Win #3. Dispatch as
   `harness-maintainer`. Note: requires devcontainer image rebuild + push to
-  ghcr.io after merge.
+  ghcr.io after merge. **IN FLIGHT**: PR #TBD (`harness/sweep-perf-flambda-o3`).
 
 - [x] **Win #4: Per-fold universe pruning via `Daily_price.active_through`** —
   filter `all_symbols` in `simulator.ml:_get_today_bars` and `config.universe`
