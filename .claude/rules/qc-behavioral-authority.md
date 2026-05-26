@@ -7,7 +7,7 @@ harness: project
 
 This file is the **project-specific augmentation** of the generic qc-behavioral
 agent. The agent's protocol (Contract Pinning Checklist CP1–CP4, quality
-score format, write `dev/reviews/<feature>.md`, harness_gap classification)
+score format, PR review comment delivery, harness_gap classification)
 lives in `.claude/agents/qc-behavioral.md` and is reusable across projects.
 The rows + authority list below are specific to *this* repo's domain.
 

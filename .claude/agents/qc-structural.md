@@ -27,14 +27,6 @@ git checkout main
 
 `git checkout --detach <sha>` does not move any named ref, so the orchestrator's working tree is unchanged when the subagent exits. Never run `git checkout <branch>` (without `--detach`) — that moves `HEAD` to the branch, mutating the shared working tree for all subsequent orchestrator steps.
 
-Write `dev/reviews/<feature>.md` to an absolute path derived from `${GITHUB_WORKSPACE}`:
-
-```bash
-REVIEW_FILE="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}/dev/reviews/<feature>.md"
-```
-
-Using `${GITHUB_WORKSPACE}` ensures the file lands in the orchestrator's working tree regardless of which SHA the agent currently has detached. Do NOT commit or push. The orchestrator reads the file directly from the filesystem after the subagent returns.
-
 Otherwise (local runs), use **jj** with a per-session workspace. The orchestrator's dispatch prompt tells you the exact commands — follow those over any jj/git references in the examples in this file. See `.claude/agents/lead-orchestrator.md` §"Step 4: Spawn feature agents" for the authoritative dispatch shape.
 
 ## Allowed tools
@@ -151,14 +143,14 @@ After filling the checklist, capture the tip commit SHA of the feature branch:
 REVIEWED_SHA="${FEAT_SHA}"  # already resolved via `git rev-parse origin/<branch>` in Step 1
 ```
 
-Write this as the **first line** of `dev/reviews/<feature>.md` before the checklist:
+Include `Reviewed SHA: <sha>` as the **first line** of your PR review comment body:
 
 ```
 Reviewed SHA: <sha>
 ```
 
-This line is the idempotency sentinel. The lead-orchestrator reads it in Step 1.5 to
-compare against the current tip SHA and skip re-QC when the branch hasn't advanced.
+This line is the idempotency sentinel. The lead-orchestrator reads it from the PR review
+comments (via `gh pr view <N> --json reviews`) to skip re-QC when the branch hasn't advanced.
 Do not omit it even on NEEDS_REWORK — the orchestrator needs it regardless of verdict.
 
 ---
@@ -207,14 +199,13 @@ APPROVED | NEEDS_REWORK
 
 ## Writing the review
 
-The review is delivered in **two places**:
+The review is delivered via **GitHub PR review comment** — the single source of truth.
+The verdict is visible directly on the PR and queryable via `gh pr view <N> --json reviews`.
 
-1. **GitHub PR review comment** (preferred medium — reviewers see the verdict directly on the PR).
-2. **`dev/reviews/<feature>.md` file** (transitional — the lead-orchestrator's Step 1.5 idempotency check still reads it; once the orchestrator migrates to reading PR review comments, the file write will drop).
+### Post the GitHub PR review comment
 
-### Step 1 — post the GitHub PR review comment
-
-If `$PR_NUMBER` is known, post the verdict + summary as a PR review. The verdict uses GitHub's native `--approve` / `--request-changes` semantics so the merge-gate signals are first-class:
+Post the verdict + checklist as a PR review. The verdict uses GitHub's native
+`--approve` / `--request-changes` semantics so the merge-gate signals are first-class:
 
 ```bash
 case "$VERDICT" in
@@ -228,39 +219,22 @@ Reviewed SHA: <sha captured in Step 5>
 
 ## Structural QC — <feature-name>
 
-<condensed checklist + any NEEDS_REWORK items, same content as the file below>
+<filled structural checklist + any NEEDS_REWORK items>
 EOF
 )"
 ```
 
-The first body line MUST be `Reviewed SHA: <sha>` so a future orchestrator can find this review via `gh pr view <N> --json reviews --jq '.reviews[].body'` and treat the SHA as the idempotency sentinel.
+The first body line MUST be `Reviewed SHA: <sha>` so the orchestrator can find this review
+via `gh pr view <N> --json reviews --jq '.reviews[].body'` and treat the SHA as the
+idempotency sentinel.
 
-If `$PR_NUMBER` is absent (branch not yet submitted), skip the PR-comment step and add a one-line note to the checklist: "PR_NUMBER unavailable — review file is the sole audit trail until PR is opened."
-
-### Step 2 — write `dev/reviews/<feature>.md` (transitional back-compat)
-
-Write `dev/reviews/<feature>.md` from a clean branch based on `main@origin` — never from the feature branch. The first line must be the `Reviewed SHA:` line captured in Step 5:
-
-```
-Reviewed SHA: <sha captured in Step 5>
-```
-
-Then append the structural checklist below it.
-
-Write the file using the Edit/Write tool, with the review path resolved against the PARENT workspace's repo root (NOT the per-agent git worktree at `${WT}`, which the orchestrator does not see):
-
-```bash
-REVIEW_FILE="${GITHUB_WORKSPACE:-${PARENT_REPO_ROOT:-$(pwd)}}/dev/reviews/<feature>.md"
-```
-
-Here `${PARENT_REPO_ROOT}` is the orchestrator's working tree (typically the dispatch prompt's cwd before this agent ran). On GHA, `${GITHUB_WORKSPACE}` carries the same value.
-
-**IMPORTANT: Do NOT push your changes to origin.** The review file is written in-place in the parent worktree for the lead-orchestrator to read directly. Pushing creates orphan `dev/reviews/*` branches on origin that accumulate as clutter. Write the file and return — the orchestrator reads your output text and the file you wrote.
+If `$PR_NUMBER` is absent (branch not yet submitted), skip the PR-comment step and note it
+in your return value: "PR_NUMBER unavailable — verdict in return text only until PR is opened."
 
 ### Update status
 
 - **APPROVED**: Update `dev/status/<feature>.md` — add `structural_qc: APPROVED` and the date.
-- **NEEDS_REWORK**: Add `structural_qc: NEEDS_REWORK` and a note: "See dev/reviews/<feature>.md. Behavioral QC blocked until structural passes."
+- **NEEDS_REWORK**: Add `structural_qc: NEEDS_REWORK` and a note: "Behavioral QC blocked until structural passes."
 
 ### Return value
 

@@ -10,13 +10,13 @@ A PR is mergeable only when **all three** are green:
 1. **GitHub CI** — `build-and-test` + `perf-tier1-smoke` (and any other
    required PR workflows). Status must be `COMPLETED SUCCESS`, never
    `IN_PROGRESS` or `PENDING`.
-2. **qc-structural** — APPROVED verdict at the current PR tip, recorded
-   in `dev/reviews/<feature>.md`.
-3. **qc-behavioral** — APPROVED verdict at the current PR tip, recorded
-   in `dev/reviews/<feature>-behavioral.md`. NA only for the cases
-   listed in `.claude/rules/qc-behavioral-authority.md` §"When to skip
-   this file entirely" (pure infra / refactor / harness PRs that touch
-   no domain logic — still requires the generic CP1–CP4 review).
+2. **qc-structural** — APPROVED verdict at the current PR tip, posted as a
+   GitHub PR review comment (query: `gh pr view <N> --json reviews`).
+3. **qc-behavioral** — APPROVED verdict at the current PR tip, posted as a
+   GitHub PR review comment. NA only for the cases listed in
+   `.claude/rules/qc-behavioral-authority.md` §"When to skip this file
+   entirely" (pure infra / refactor / harness PRs that touch no domain
+   logic — still requires the generic CP1–CP4 review).
 
 ## Docs-only PRs — both QC gates skipped
 
