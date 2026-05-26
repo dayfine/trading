@@ -23,7 +23,7 @@ flambda OFF.
 
 ## Open work — v7 sweep speedup (2026-05-26)
 
-- [ ] **Win #2: `--parallel 6` + container RAM 7→12 GB** — raise
+- [x] **Win #2: `--parallel 6` + container RAM 7→12 GB** — raise
   `launch_sweep.sh` default parallel from 4 to 6; raise devcontainer memory
   cap to 12 GB. Config-only (~20 LOC in `dev/scripts/launch_sweep.sh` +
   `.devcontainer/`). Expected speedup: 1.3-1.4×. Owner:
@@ -52,7 +52,12 @@ flambda OFF.
 
 ## Completed
 
-(none yet — track opened 2026-05-26)
+- **Win #2** (PR #1317, `harness/sweep-parallel-6`): raised `PARALLEL` default
+  from 4 to 6 in `dev/scripts/launch_sweep.sh` (1 line); added `--memory 12g`
+  to the `docker run` incantation in `.devcontainer/setup.sh` (1 line). Total:
+  3 files touched, 4 insertions, 3 deletions. Verify:
+  `grep 'PARALLEL="6"' dev/scripts/launch_sweep.sh` and
+  `grep 'memory.*12' .devcontainer/setup.sh`.
 
 ## Ownership
 

@@ -16,7 +16,7 @@
 #                   --spec <runner-spec.sexp> \
 #                   --walk-forward-spec <wf-spec.sexp> \
 #                   --baseline-aggregate <agg.sexp> \
-#                   [--parallel N]         (default 4)
+#                   [--parallel N]         (default 6)
 #                   [--container NAME]     (default trading-1-dev)
 #                   [--dry-run]
 #
@@ -61,7 +61,7 @@ SWEEP_NAME=""
 SPEC=""
 WF_SPEC=""
 BASELINE_AGG=""
-PARALLEL="4"
+PARALLEL="6"
 CONTAINER="trading-1-dev"
 DRY_RUN=0
 
