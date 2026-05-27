@@ -293,6 +293,74 @@ jobs:
           echo "out_file=${OUT_FILE}" >> "$GITHUB_OUTPUT"
         id: capture-cost
 
+      - name: Locate daily summary + detect no-op
+        id: publish-summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATE="$(date +%F)"
+          # lead-orchestrator now owns committing/pushing the daily summary
+          # branch and opening its PR (it runs with BOT_GITHUB_TOKEN via the
+          # claude-code-action and has jj + curl available inside the
+          # devcontainer). This step locates the summary file on disk so
+          # downstream steps can read it (escalations gate) and detects
+          # whether the run was a no-op (Step 0.5 saturated-queue fast-exit
+          # path emits `**Mode:** NO-OP` and does NOT push a PR — we surface
+          # via $GITHUB_STEP_SUMMARY instead).
+          #
+          # Prior versions of this step also did `git switch -c ops/daily-*`
+          # + git push + PR create, which collided with the agent's own
+          # push once the agent gained that capability. See run
+          # 24526632726 for the post-mortem.
+          #
+          # Pick the newest per-run summary for today: either the plain
+          # dev/daily/${DATE}.md or a dev/daily/${DATE}-runN.md. We
+          # deliberately exclude dev/daily/${DATE}-summary.md (the
+          # consolidated multi-run rollup the orchestrator also writes),
+          # because it concatenates Escalations sections from prior runs.
+          # Matching it here would re-surface already-resolved `[critical]`
+          # bullets from earlier runs on the same day and fail the gate on
+          # a clean run. See run 24745079773 (2026-04-21) for the
+          # post-mortem: run-4's own summary was clean, but the `ls -t`
+          # glob picked up the consolidated summary (written 8s later),
+          # which still carried `[critical]` bullets from runs 1/2/3.
+          SUMMARY="$(ls -t dev/daily/${DATE}.md dev/daily/${DATE}-run*.md 2>/dev/null | head -n 1 || true)"
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | grep -v -- '-summary\.md$' | head -n 1 || true)"
+          fi
+          if [ -z "$SUMMARY" ] || [ ! -f "$SUMMARY" ]; then
+            echo "::error::No daily summary file found under dev/daily/."
+            exit 1
+          fi
+          echo "Using daily summary: $SUMMARY"
+          echo "summary_path=$SUMMARY" >> "$GITHUB_OUTPUT"
+
+          # No-op detection. The summary's `**Mode:** NO-OP` line is the
+          # canonical signal. When detected, emit the step summary and let
+          # the bundle-budget step skip (gated on this output below).
+          if grep -qE '^\*\*Mode:\*\* NO-OP' "$SUMMARY"; then
+            NOOP=true
+            echo "Detected no-op run from $SUMMARY"
+            {
+              echo "## No-op run"
+              echo ""
+              echo "Saturated-queue fast-exit fired — orchestrator dispatched no work this run."
+              echo ""
+              echo "No \`ops/daily-*\` PR was created. Summary file (runner-local, not pushed): \`$SUMMARY\`"
+              echo ""
+              echo "<details><summary>Full summary</summary>"
+              echo ""
+              echo '```markdown'
+              cat "$SUMMARY"
+              echo '```'
+              echo ""
+              echo "</details>"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            NOOP=false
+          fi
+          echo "noop=$NOOP" >> "$GITHUB_OUTPUT"
+
       - name: Bundle budget into daily summary and auto-merge
         # The cost-capture step writes dev/budget/<date>-<run_id>.json.
         # This step adds it onto the ops/daily-* branch the lead-orchestrator
@@ -310,7 +378,14 @@ jobs:
         # and annotates ::warning:: so the human is aware a separate merge is
         # needed. It does NOT open a PR for the fallback branch — the annotation
         # is the signal; human merges directly.
-        if: always() && steps.capture-cost.outputs.out_file != ''
+        # Gated on noop != 'true' so saturated-queue fast-exit runs skip
+        # PR bundling + auto-merge entirely (the no-op summary is surfaced
+        # via $GITHUB_STEP_SUMMARY in the publish-summary step above).
+        # Note: if publish-summary did not run (e.g. orchestrator failed
+        # before writing a summary), `steps.publish-summary.outputs.noop`
+        # evaluates to '' which != 'true' — so the bundle-budget fallback
+        # path (ops/budget-* branch) still fires on orchestrator failure.
+        if: always() && steps.capture-cost.outputs.out_file != '' && steps.publish-summary.outputs.noop != 'true'
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
           OUT_FILE: ${{ steps.capture-cost.outputs.out_file }}
@@ -457,45 +532,6 @@ jobs:
             echo "::warning::Auto-merge failed for PR #${DAILY_PR_NUMBER}. Response: ${MERGE_RESPONSE}"
             echo "Human merge required for the daily summary PR. Budget JSON is already on the branch."
           fi
-
-      - name: Locate daily summary (for escalations check)
-        id: publish-summary
-        shell: bash
-        run: |
-          set -euo pipefail
-          DATE="$(date +%F)"
-          # lead-orchestrator now owns committing/pushing the daily summary
-          # branch and opening its PR (it runs with BOT_GITHUB_TOKEN via the
-          # claude-code-action and has jj + curl available inside the
-          # devcontainer). This step only locates the summary file on disk
-          # so the next step can scan it for escalations.
-          #
-          # Prior versions of this step also did `git switch -c ops/daily-*`
-          # + git push + PR create, which collided with the agent's own
-          # push once the agent gained that capability. See run
-          # 24526632726 for the post-mortem.
-          #
-          # Pick the newest per-run summary for today: either the plain
-          # dev/daily/${DATE}.md or a dev/daily/${DATE}-runN.md. We
-          # deliberately exclude dev/daily/${DATE}-summary.md (the
-          # consolidated multi-run rollup the orchestrator also writes),
-          # because it concatenates Escalations sections from prior runs.
-          # Matching it here would re-surface already-resolved `[critical]`
-          # bullets from earlier runs on the same day and fail the gate on
-          # a clean run. See run 24745079773 (2026-04-21) for the
-          # post-mortem: run-4's own summary was clean, but the `ls -t`
-          # glob picked up the consolidated summary (written 8s later),
-          # which still carried `[critical]` bullets from runs 1/2/3.
-          SUMMARY="$(ls -t dev/daily/${DATE}.md dev/daily/${DATE}-run*.md 2>/dev/null | head -n 1 || true)"
-          if [ -z "$SUMMARY" ]; then
-            SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | grep -v -- '-summary\.md$' | head -n 1 || true)"
-          fi
-          if [ -z "$SUMMARY" ] || [ ! -f "$SUMMARY" ]; then
-            echo "::error::No daily summary file found under dev/daily/."
-            exit 1
-          fi
-          echo "Using daily summary: $SUMMARY"
-          echo "summary_path=$SUMMARY" >> "$GITHUB_OUTPUT"
 
       - name: Fail on escalations
         env:

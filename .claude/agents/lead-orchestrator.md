@@ -510,9 +510,21 @@ Budget utilization: negligible
 - [run N] <FILENAME>
 ```
 
-Then proceed directly to Step 8 (push the daily summary PR). Skip Steps 2–7 entirely.
+**Skip Steps 2–8 entirely** — including Step 8's branch push and PR creation.
+The GHA workflow detects no-op runs by grepping for the `**Mode:** NO-OP` line
+in the summary file and surfaces the run via `$GITHUB_STEP_SUMMARY` (visible on
+the run page) instead of opening a PR. This eliminates the daily-summary PR
+noise on runs that did no work.
 
-**Important:** the no-op summary still acts as the idempotency sentinel for the next run's "previous timestamp" lookup. The next run reads this file's timestamp as `PREV_ISO` for Condition 2 and Condition 4. Do not skip writing it.
+**Important:** the no-op summary file is still written to the runner's local
+filesystem so the workflow can read it for the step-summary emission and the
+escalations gate. It is **not** pushed to a branch or to main.
+
+**Idempotency note:** because the no-op summary does not land on main, the
+next run's `PREV_ISO` lookup (Step 1b / Conditions 2 & 4) falls back to the
+most recent **merged** summary (the prior non-no-op run). The window for
+Condition 2/4 gets slightly wider, which is conservative — it makes the next
+run *less* likely to fast-exit, never more likely to falsely fast-exit.
 
 ---
 
