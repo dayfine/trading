@@ -89,3 +89,29 @@ v8 round-3 redesign is running in parallel (`docs/v8-round3-redesign`). Its desi
 Sequencing: complete the 1a/1b/2a/2b matrix first, then re-evaluate v8 launch in light of the alpha-layer findings.
 
 **Update 2026-05-28 post-diagnostics:** all 4 cells LOSE to BAH-SPY by similar magnitude. **v8 launch should be paused** until the strategy-mechanic redesign question (per `memory/feedback_strategy_mechanic_changes_too_explorative.md`) is addressed. Tuning over the same broken mechanic will not produce alpha.
+
+## Follow-up: mechanism ablation (2026-05-29)
+
+After all 4 cells lost to BAH-SPY, dispatched a 9-variant mechanism ablation
+to isolate WHICH strategy mechanic is the alpha-killer. Result: full report
+in `dev/notes/mechanism-ablation-2026-05-29.md`.
+
+**Headline:** `laggard_rotation` is the alpha-killer on both SPY-only and
+sector-ETF surfaces.
+
+| Single-knob ablation | 1b SPY-only Δreturn | 2b sector-ETF Δreturn |
+|---|---:|---:|
+| Disable `enable_laggard_rotation` | +0.22% → **+9.54%** (+9.3pp) | +7.43% → **+49.45%** (+42.0pp) |
+| Disable `enable_stage3_force_exit` | +0.22% → +0.22% (inert) | (not run, expected small) |
+| Widen stops to 30% | +0.22% → +0.30% (+0.08pp) | +7.43% → +5.35% (-2.1pp) |
+| Maximally permissive (no laggard + no stage3 + wide stops) | +0.22% → +6.46% (4 trades, 1 still open) | +7.43% → +27.22% (worse than no-laggard alone) |
+
+**Verdict:** disabling laggard_rotation alone produces a ~6.7x return
+improvement on the sector-ETF surface (Sharpe 0.15 → 0.43). Wide stops add
+noise; Stage3 is inert on a single-asset universe. Even the maximally
+permissive variant still loses to BAH-SPY by ~98%, so the Stage-2 admission
+criterion is the residual bind — but laggard_rotation is the dominant
+single bind.
+
+**Recommended action:** flip `enable_laggard_rotation = false` as the
+Cell-E default, then re-evaluate the v8 BO surface.

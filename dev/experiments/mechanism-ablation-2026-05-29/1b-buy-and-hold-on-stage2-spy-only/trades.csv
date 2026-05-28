@@ -1,0 +1,5 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry
+SPY,LONG,2000-08-19,2000-10-07,49,150.38,143.88,222,-1443.00,-4.32,,141.69,stop_loss,Stage2,1.5516,0.3306,gap_down,49,50
+SPY,LONG,2002-03-23,2002-04-12,20,115.50,111.02,289,-1294.72,-3.88,,111.37,stop_loss,Stage2,1.6746,0.3934,gap_down,20,65
+SPY,LONG,2006-09-09,2008-01-23,501,130.08,127.09,255,-762.45,-2.30,,128.83,stop_loss,Stage2,1.6360,0.3167,gap_down,501,50
+SPY,LONG,2014-11-08,2015-08-25,290,203.17,195.43,163,-1261.62,-3.81,,196.87,stop_loss,Stage2,1.9349,0.2974,gap_down,290,50
