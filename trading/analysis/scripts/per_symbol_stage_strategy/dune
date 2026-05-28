@@ -1,0 +1,5 @@
+(executable
+ (name per_symbol_stage_strategy)
+ (libraries core core_unix.command_unix fpath per_symbol_stage_strategy_lib)
+ (preprocess
+  (pps ppx_jane)))
