@@ -80,6 +80,34 @@ val generate_perturbations :
     [clipped = false] (no bound violation). The CLI surfaces a warning in the
     report for such zero knobs so the operator knows the rows are no-ops. *)
 
+(** {1 Spec construction} *)
+
+val build_spec_with_baseline :
+  candidate_label:string ->
+  candidate_overrides:Core.Sexp.t list ->
+  template:Walk_forward.Spec.t ->
+  Walk_forward.Spec.t
+(** [build_spec_with_baseline ~candidate_label ~candidate_overrides ~template]
+    returns a copy of [template] whose [variants] list is exactly
+    [[ baseline; candidate ]] where:
+
+    - [baseline] uses [template.baseline_label] with empty overrides — the
+      unperturbed reference cell;
+    - [candidate] uses the supplied [candidate_label] and [candidate_overrides].
+
+    The baseline variant is mandatory because
+    {!Walk_forward.Walk_forward_executor.execute_spec} eventually calls
+    {!Walk_forward.Walk_forward_report.compute}, which raises [Failure] when
+    [spec.baseline_label] is not present in the per-fold actuals. Building each
+    perturbation's spec with only the candidate variant — as the v7 sensitivity
+    sweep did initially — crashes mid-sweep with that exception (observed
+    2026-05-28 against the 11-knob v7 checkpoint).
+
+    Re-running the baseline alongside each perturbation is the cost; the
+    alternative (scoring perturbations against a precomputed baseline aggregate
+    without re-running) would require restructuring the executor's
+    aggregate-building contract. *)
+
 (** {1 Scoring} *)
 
 type scored_row = {

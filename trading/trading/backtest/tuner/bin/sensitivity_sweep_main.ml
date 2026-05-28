@@ -31,7 +31,6 @@ module Scoring = Tuner_bin.Bayesian_runner_scoring
 module Wf_spec = Walk_forward.Spec
 module Wf_executor = Walk_forward.Walk_forward_executor
 module Wf_report = Walk_forward.Walk_forward_report
-module Wf_runner = Walk_forward.Walk_forward_runner
 module Wf_types = Walk_forward.Walk_forward_types
 module GS = Tuner.Grid_search
 
@@ -121,17 +120,12 @@ let _load_aggregate path =
     failwithf "sensitivity_sweep: failed to load aggregate %s: %s" path
       (Exn.to_string exn) ()
 
-(** Build a single-variant walk-forward spec for a particular candidate. The
-    baseline-label is preserved verbatim so the gate / aggregate keys line up
-    with the supplied baseline_aggregate. *)
-let _build_one_variant_spec ~(label : string) ~(overrides : Sexp.t list)
-    ~(template : Wf_spec.t) : Wf_spec.t =
-  let variant : Wf_runner.variant = { label; overrides } in
-  { template with variants = [ variant ] }
-
 let _run_one ~base ~template ~fixtures_root ~parallel ~label ~overrides :
     Wf_types.aggregate =
-  let spec = _build_one_variant_spec ~label ~overrides ~template in
+  let spec =
+    Sweep.build_spec_with_baseline ~candidate_label:label
+      ~candidate_overrides:overrides ~template
+  in
   let result =
     Wf_executor.execute_spec ~base ~spec ~fixtures_root
       ~progress:Wf_executor.noop_progress ~parallel ()
