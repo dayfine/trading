@@ -1,0 +1,11 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry
+SPY,LONG,2000-08-19,2000-09-16,28,150.38,148.19,3018,-6601.88,-1.45,,,stop_loss,Stage2,1.5516,0.0649,intraday,28,50
+SPY,LONG,2002-03-23,2002-04-12,20,115.50,111.02,851,-3812.48,-3.88,,,laggard_rotation,Stage2,1.6746,0.2213,gap_down,20,65
+SPY,LONG,2006-09-09,2006-10-07,28,130.08,134.95,3406,16587.22,3.74,,111.37,stop_loss,Stage2,1.6360,0.0456,non_stop_exit,,50
+SPY,LONG,2007-10-27,2007-11-03,7,153.06,151.53,3148,-4816.44,-1.00,,,laggard_rotation,Stage2,1.6540,0.0377,gap_down,7,50
+SPY,LONG,2014-11-08,2014-12-16,38,203.17,198.58,2242,-10290.78,-2.26,,,stop_loss,Stage2,1.9349,0.0183,intraday,38,50
+SPY,LONG,2015-02-14,2015-02-28,14,209.07,211.26,2270,4971.30,1.05,,,stop_loss,Stage2,2.3723,0.0402,non_stop_exit,,60
+SPY,LONG,2016-11-26,2016-12-24,28,221.10,225.43,2161,9357.13,1.96,,,laggard_rotation,Stage2,1.7379,0.0172,non_stop_exit,,50
+SPY,LONG,2019-09-14,2019-09-25,11,301.78,295.96,1604,-9335.28,-1.93,,,laggard_rotation,Stage2,2.1869,0.0258,intraday,11,70
+SPY,LONG,2023-01-28,2023-02-11,14,403.66,405.86,216,475.20,0.55,,,stop_loss,Stage2,1.5552,0.2252,non_stop_exit,,50
+SPY,LONG,2023-04-15,2023-07-01,77,412.81,441.44,211,6040.93,6.94,,,laggard_rotation,Stage2,1.7369,0.1920,non_stop_exit,,60

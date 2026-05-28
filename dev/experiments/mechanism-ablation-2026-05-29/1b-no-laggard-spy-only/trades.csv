@@ -1,0 +1,11 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry
+SPY,LONG,2000-08-19,2000-09-16,28,150.38,148.19,3018,-6601.88,-1.45,,,stop_loss,Stage2,1.5516,0.0649,intraday,28,50
+SPY,LONG,2002-03-23,2002-04-12,20,115.50,111.02,851,-3812.48,-3.88,,395.75,stage3_force_exit,Stage2,1.6746,0.2213,gap_down,20,65
+SPY,LONG,2006-09-09,2007-08-11,336,130.08,144.39,3406,48739.86,11.00,,111.37,stop_loss,Stage2,1.6360,0.0456,non_stop_exit,,50
+SPY,LONG,2007-10-27,2007-11-03,7,153.06,151.53,3249,-4970.97,-1.00,,128.83,stage3_force_exit,Stage2,1.6540,0.0377,gap_down,7,50
+SPY,LONG,2014-11-08,2014-12-16,38,203.17,198.58,2313,-10616.67,-2.26,,,stop_loss,Stage2,1.9349,0.0183,intraday,38,50
+SPY,LONG,2015-02-14,2015-03-11,25,209.07,205.29,2343,-8856.54,-1.81,,,stop_loss,Stage2,2.3723,0.0402,intraday,25,60
+SPY,LONG,2016-11-26,2018-04-07,497,221.10,263.42,2199,93061.68,19.14,,,stop_loss,Stage2,1.7379,0.0172,non_stop_exit,,50
+SPY,LONG,2019-09-14,2019-09-25,11,301.78,295.96,1766,-10278.12,-1.93,,251.66,stage3_force_exit,Stage2,2.1869,0.0258,intraday,11,70
+SPY,LONG,2023-01-28,2023-03-11,42,403.66,390.99,238,-3015.46,-3.14,,,stop_loss,Stage2,1.5552,0.2252,non_stop_exit,,50
+SPY,LONG,2023-04-15,2023-10-07,175,412.81,421.97,232,2125.12,2.22,,,stage3_force_exit,Stage2,1.7369,0.1920,non_stop_exit,,60
