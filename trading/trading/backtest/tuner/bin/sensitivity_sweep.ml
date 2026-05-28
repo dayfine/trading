@@ -1,4 +1,6 @@
 open Core
+module Wf_spec = Walk_forward.Spec
+module Wf_runner = Walk_forward.Walk_forward_runner
 
 let perturbation_pcts = [ -0.10; -0.05; 0.05; 0.10 ]
 
@@ -76,6 +78,17 @@ let generate_perturbations ~best_params ~bounds =
       | Some bounds_for_knob ->
           _perturbations_for_knob ~knob ~best_value ~bounds_for_knob
             ~best_params)
+
+(* ---------- spec construction ---------- *)
+
+let build_spec_with_baseline ~candidate_label ~candidate_overrides ~template =
+  let baseline : Wf_runner.variant =
+    { label = template.Wf_spec.baseline_label; overrides = [] }
+  in
+  let candidate : Wf_runner.variant =
+    { label = candidate_label; overrides = candidate_overrides }
+  in
+  { template with variants = [ baseline; candidate ] }
 
 (* ---------- row assembly ---------- *)
 

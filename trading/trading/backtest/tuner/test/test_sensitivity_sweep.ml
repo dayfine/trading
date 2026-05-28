@@ -7,6 +7,12 @@ open OUnit2
 open Core
 open Matchers
 module Sweep = Tuner_bin.Sensitivity_sweep
+module Wf_spec = Walk_forward.Spec
+module Wf_runner = Walk_forward.Walk_forward_runner
+module Wf_window = Walk_forward.Window_spec
+module Wf_executor = Walk_forward.Walk_forward_executor
+module Wf_types = Walk_forward.Walk_forward_types
+module Scenario = Scenario_lib.Scenario
 
 (* ---------- perturbation_pcts ---------- *)
 
@@ -389,6 +395,194 @@ let test_render_report_no_sensitive_says_robust _ =
        ~substring:"No perturbations crossed the sensitivity threshold")
     (equal_to true)
 
+(* ---------- build_spec_with_baseline ---------- *)
+
+let _date y m d = Date.create_exn ~y ~m:(Month.of_int_exn m) ~d
+
+let _make_template ~baseline_label : Wf_spec.t =
+  let folds : Wf_window.explicit_fold list =
+    [
+      {
+        name = "fold-001";
+        train_period = None;
+        test_period =
+          { start_date = _date 2020 1 1; end_date = _date 2020 1 31 };
+      };
+      {
+        name = "fold-002";
+        train_period = None;
+        test_period =
+          { start_date = _date 2020 2 1; end_date = _date 2020 2 28 };
+      };
+    ]
+  in
+  {
+    base_scenario = "stub-base";
+    window_spec = Wf_window.Explicit folds;
+    (* Template carries only an arbitrary placeholder variant — the bug we're
+       pinning is that [build_spec_with_baseline] must NOT preserve the
+       template's variants verbatim; it must REPLACE them with [baseline;
+       candidate]. A template-carried "should-not-survive" entry makes that
+       check rigorous. *)
+    variants = [ { label = "should-not-survive"; overrides = [] } ];
+    baseline_label;
+    gate = { metric = Sharpe; m = 1; n = 2; worst_delta = 1.0 };
+  }
+
+let test_build_spec_replaces_variants_with_baseline_and_candidate _ =
+  let template = _make_template ~baseline_label:"cell-E" in
+  let spec =
+    Sweep.build_spec_with_baseline
+      ~candidate_label:"sensitivity-knob-001-pct-+5" ~candidate_overrides:[]
+      ~template
+  in
+  assert_that spec.variants
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (v : Wf_runner.variant) -> v.label) (equal_to "cell-E");
+             field
+               (fun (v : Wf_runner.variant) -> v.overrides)
+               (equal_to ([] : Sexp.t list));
+           ];
+         all_of
+           [
+             field
+               (fun (v : Wf_runner.variant) -> v.label)
+               (equal_to "sensitivity-knob-001-pct-+5");
+             field
+               (fun (v : Wf_runner.variant) -> v.overrides)
+               (equal_to ([] : Sexp.t list));
+           ];
+       ])
+
+let test_build_spec_passes_through_candidate_overrides _ =
+  let template = _make_template ~baseline_label:"cell-E" in
+  let knob_override = Sexp.of_string "(knob_a 0.55)" in
+  let spec =
+    Sweep.build_spec_with_baseline ~candidate_label:"cand"
+      ~candidate_overrides:[ knob_override ] ~template
+  in
+  match spec.variants with
+  | [ baseline; candidate ] ->
+      assert_that baseline.overrides (equal_to ([] : Sexp.t list));
+      assert_that candidate.overrides (elements_are [ equal_to knob_override ])
+  | _ -> assert_failure "expected exactly two variants"
+
+let test_build_spec_uses_template_baseline_label _ =
+  (* If the operator runs sensitivity sweep against a non-cell-E baseline (e.g.
+     a different research stratum), the spec must propagate that label rather
+     than hardcoding any particular value. *)
+  let template = _make_template ~baseline_label:"strat-2026-05-stratum-3" in
+  let spec =
+    Sweep.build_spec_with_baseline ~candidate_label:"cand"
+      ~candidate_overrides:[] ~template
+  in
+  match spec.variants with
+  | baseline :: _ ->
+      assert_that baseline.label (equal_to "strat-2026-05-stratum-3")
+  | [] -> assert_failure "expected non-empty variants"
+
+(* ---------- end-to-end executor regression: cell-E label must be present ----- *)
+
+(** Deterministic stub runner — returns a fold_actual whose Sharpe is hashed
+    from the scenario name so a label-mix-up would surface as a value mismatch,
+    not a silent identical reading. Mirrors the shape
+    [test_walk_forward_executor_parallel.ml] uses. *)
+let _stub_runner (s : Scenario.t) : Wf_types.fold_actual =
+  let h = String.hash s.name in
+  let f = Float.of_int (h mod 1000) in
+  {
+    fold_name = "";
+    variant_label = "";
+    total_return_pct = f;
+    sharpe_ratio = f /. 100.0;
+    max_drawdown_pct = (f /. 10.0) +. 1.0;
+    calmar_ratio = (f /. 50.0) +. 0.1;
+    cagr_pct = (f /. 2.0) +. 0.5;
+    avg_holding_days = (f /. 5.0) +. 7.0;
+  }
+
+let _stub_base () : Scenario.t =
+  let expected : Scenario.expected =
+    {
+      total_return_pct = { min_f = -100.0; max_f = 500.0 };
+      total_trades = { min_f = 0.0; max_f = 1000.0 };
+      win_rate = { min_f = 0.0; max_f = 100.0 };
+      sharpe_ratio = { min_f = -2.0; max_f = 3.0 };
+      max_drawdown_pct = { min_f = 0.0; max_f = 90.0 };
+      avg_holding_days = { min_f = 0.0; max_f = 500.0 };
+      open_positions_value = None;
+      unrealized_pnl = None;
+      sortino_ratio_annualized = None;
+      calmar_ratio = None;
+      ulcer_index = None;
+      wall_seconds = None;
+    }
+  in
+  {
+    name = "stub-base";
+    description = "stub base for sensitivity-sweep regression test";
+    period = { start_date = _date 2020 1 1; end_date = _date 2020 1 31 };
+    universe_path = "universes/parity-7sym.sexp";
+    config_overrides = [];
+    strategy = Backtest.Strategy_choice.default;
+    slippage_bps = None;
+    cost_model = None;
+    expected;
+  }
+
+let test_executor_with_built_spec_does_not_raise_on_baseline_label _ =
+  (* Regression for the 2026-05-28 crash: sensitivity_sweep_main built
+     single-variant specs containing only the candidate, so
+     [Walk_forward_report.compute] raised:
+
+       baseline_label "cell-E" not present in fold_actuals
+       (labels: bo-iter-best)
+
+     The fix is for [build_spec_with_baseline] to include the baseline
+     variant. This test invokes [execute_spec] (via the stub runner so no
+     real backtest runs) against a spec built by the helper and asserts:
+
+     1. No exception is raised.
+     2. The returned aggregate carries [baseline_label = "cell-E"] (matches
+        what was requested via the template).
+     3. The fold_actuals carry both the baseline and candidate labels —
+        pre-fix this would have been candidate-only. *)
+  let template = _make_template ~baseline_label:"cell-E" in
+  let spec =
+    Sweep.build_spec_with_baseline ~candidate_label:"bo-iter-best"
+      ~candidate_overrides:[] ~template
+  in
+  let base = _stub_base () in
+  let result =
+    Wf_executor.execute_spec ~base ~spec
+      ~fixtures_root:"/tmp/unused-by-stub-runner" ~run_one:_stub_runner ()
+  in
+  assert_that result.aggregate.baseline_label (equal_to "cell-E");
+  let labels_in_actuals =
+    List.map result.fold_actuals ~f:(fun fa -> fa.variant_label)
+    |> List.dedup_and_sort ~compare:String.compare
+  in
+  assert_that labels_in_actuals
+    (elements_are [ equal_to "bo-iter-best"; equal_to "cell-E" ])
+
+let test_executor_produces_one_fold_per_variant_pair _ =
+  (* Two folds × two variants = four fold_actual rows. Pins that the helper
+     does not silently introduce extra (or zero) variants. *)
+  let template = _make_template ~baseline_label:"cell-E" in
+  let spec =
+    Sweep.build_spec_with_baseline ~candidate_label:"bo-iter-best"
+      ~candidate_overrides:[] ~template
+  in
+  let base = _stub_base () in
+  let result =
+    Wf_executor.execute_spec ~base ~spec
+      ~fixtures_root:"/tmp/unused-by-stub-runner" ~run_one:_stub_runner ()
+  in
+  assert_that result.fold_actuals (size_is 4)
+
 let suite =
   "Tuner_bin.Sensitivity_sweep"
   >::: [
@@ -426,6 +620,18 @@ let suite =
          >:: test_render_report_lists_each_sensitive_knob_uniquely;
          "render_report no-sensitive path says 'robust'"
          >:: test_render_report_no_sensitive_says_robust;
+         "build_spec_with_baseline replaces template variants with baseline + \
+          candidate"
+         >:: test_build_spec_replaces_variants_with_baseline_and_candidate;
+         "build_spec_with_baseline passes through candidate overrides"
+         >:: test_build_spec_passes_through_candidate_overrides;
+         "build_spec_with_baseline uses template's baseline_label verbatim"
+         >:: test_build_spec_uses_template_baseline_label;
+         "executor on built spec does not raise on baseline_label lookup \
+          (regression for 2026-05-28 crash)"
+         >:: test_executor_with_built_spec_does_not_raise_on_baseline_label;
+         "executor on built spec produces one fold_actual per (variant, fold)"
+         >:: test_executor_produces_one_fold_per_variant_pair;
        ]
 
 let () = run_test_tt_main suite
