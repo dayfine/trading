@@ -3,9 +3,7 @@ open Core
 let periods_per_year = 52.0
 
 let _cagr_main ~returns ~n =
-  let cum =
-    Array.fold returns ~init:1.0 ~f:(fun acc r -> acc *. (1.0 +. r))
-  in
+  let cum = Array.fold returns ~init:1.0 ~f:(fun acc r -> acc *. (1.0 +. r)) in
   let years = Float.of_int n /. periods_per_year in
   if Float.(years <= 0.0) || Float.(cum <= 0.0) then 0.0
   else Float.((cum ** (1.0 / years)) - 1.0)
@@ -17,8 +15,7 @@ let cagr_from_returns ~returns =
 let _sharpe_main ~returns ~n =
   let mean = Array.fold returns ~init:0.0 ~f:( +. ) /. Float.of_int n in
   let var =
-    Array.fold returns ~init:0.0 ~f:(fun acc r ->
-        acc +. ((r -. mean) ** 2.0))
+    Array.fold returns ~init:0.0 ~f:(fun acc r -> acc +. ((r -. mean) ** 2.0))
     /. Float.of_int (n - 1)
   in
   if Float.(var <= 0.0) then 0.0

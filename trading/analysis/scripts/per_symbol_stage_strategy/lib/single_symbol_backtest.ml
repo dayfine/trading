@@ -93,48 +93,6 @@ let _process_one_week ~config ~variant ~bid_ask_bps ~state ~bars_so_far ~bar =
   _bump_time_counter ~state
 
 (* ------------------------------------------------------------------ *)
-(* Year-end equity samples                                             *)
-(* ------------------------------------------------------------------ *)
-
-(* For Section 4 of the report. Pick the LAST equity sample whose date is
-   on or before Dec 31 of each year present in the run window. *)
-let _year_end_equity ~dates ~equity : (int * float) list =
-  if Array.is_empty dates then []
-  else
-    let by_year = Int.Table.create () in
-    Array.iteri dates ~f:(fun i d ->
-        let y = Date.year d in
-        Hashtbl.set by_year ~key:y ~data:equity.(i));
-    Hashtbl.to_alist by_year
-    |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
-
-(* ------------------------------------------------------------------ *)
-(* BAH baseline                                                        *)
-(* ------------------------------------------------------------------ *)
-
-(* Buy-and-hold equity curve over the same weekly bars. The first bar's
-   close is the entry price; subsequent equity is shares * close.
-
-   No bid-ask cost on the BAH baseline — the comparison is "stage strategy
-   net of 0.5 bps round-trip costs" vs "passive hold gross". The latter is
-   how SPY BAH is commonly quoted, and the 0.5-bps difference is dwarfed by
-   the strategy's many trades. *)
-let _bah_metrics ~weekly_bars ~initial_cash =
-  match weekly_bars with
-  | [] | [ _ ] -> (0.0, 0.0)
-  | first :: _ ->
-      let entry_price = first.Daily_price.close_price in
-      let shares = initial_cash /. entry_price in
-      let equity =
-        List.map weekly_bars ~f:(fun b -> shares *. b.Daily_price.close_price)
-        |> Array.of_list
-      in
-      let returns = Equity_metrics.returns_from_equity ~equity in
-      let cagr = Equity_metrics.cagr_from_returns ~returns in
-      let dd = Equity_metrics.max_drawdown_from_equity ~equity in
-      (cagr, dd)
-
-(* ------------------------------------------------------------------ *)
 (* Simulation driver                                                   *)
 (* ------------------------------------------------------------------ *)
 
@@ -219,7 +177,11 @@ let _build_result ~symbol ~variant ~start_date ~end_date ~initial_cash
   let total_weeks = Array.length equity in
   let trades = List.rev state.trades_rev in
   let year_end_equity =
-    _year_end_equity ~dates:state.classification_dates ~equity
+    Baseline_and_samples.year_end_equity ~dates:state.classification_dates
+      ~equity
+  in
+  let bah_cagr, bah_max_dd =
+    Baseline_and_samples.bah_metrics ~weekly_bars ~initial_cash
   in
   {
     symbol;
@@ -232,8 +194,8 @@ let _build_result ~symbol ~variant ~start_date ~end_date ~initial_cash
     strategy_cagr = Equity_metrics.cagr_from_returns ~returns;
     strategy_sharpe = Equity_metrics.sharpe_from_returns ~returns;
     strategy_max_dd = Equity_metrics.max_drawdown_from_equity ~equity;
-    bah_cagr = fst (_bah_metrics ~weekly_bars ~initial_cash);
-    bah_max_dd = snd (_bah_metrics ~weekly_bars ~initial_cash);
+    bah_cagr;
+    bah_max_dd;
     num_long_entries = state.num_long_entries;
     num_short_entries = state.num_short_entries;
     pct_time_long = _pct_time ~weeks:state.weeks_long ~total:total_weeks;
@@ -256,8 +218,8 @@ let _load_bars ~data_dir ~symbol ~end_date =
    slope_lookback] weekly bars (otherwise the classifier has no signal). *)
 let _too_few_bars_error ~symbol ~n ~min_weeks =
   Status.invalid_argument_error
-    (sprintf "%s: only %d weekly bars, need >= %d for stage classifier" symbol
-       n min_weeks)
+    (sprintf "%s: only %d weekly bars, need >= %d for stage classifier" symbol n
+       min_weeks)
 
 let _validate_weekly_bars ~symbol ~config ~weekly_bars =
   let min_weeks =
@@ -304,7 +266,8 @@ let _run_with_bars ~config ~variant ~bid_ask_bps ~initial_cash ~start_date
 let run ~data_dir ~symbol ~start_date ~end_date ~initial_cash ~variant
     ?(bid_ask_bps = _default_bid_ask_bps) () =
   let config = Stage_lib.default_config in
-  Result.bind (_load_bars ~data_dir ~symbol ~end_date)
+  Result.bind
+    (_load_bars ~data_dir ~symbol ~end_date)
     ~f:
       (_run_with_bars ~config ~variant ~bid_ask_bps ~initial_cash ~start_date
          ~end_date ~symbol)
