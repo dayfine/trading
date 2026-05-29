@@ -33,6 +33,10 @@ type config = {
   stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
       (** Cascade re-admission cooldown (#718) for Stage-3 force-exited symbols.
           Default [0] = no extra cooldown. *)
+  stage3_exit_margin_pct : float; [@sexp.default 0.0]
+      (** Minimum margin (fraction) by which the current bar's close must sit
+          below the 30-week MA before the Stage-3 force-exit runner emits.
+          Default [0.0] preserves the prior detector behaviour. See [.mli]. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
       (** Laggard-rotation detector parameters (issue #887). *)
@@ -101,6 +105,7 @@ let default_config ~universe ~index_symbol =
     stage3_force_exit_config = Stage3_force_exit.default_config;
     enable_stage3_force_exit = false;
     stage3_reentry_cooldown_weeks = 0;
+    stage3_exit_margin_pct = 0.0;
     laggard_rotation_config = Laggard_rotation.default_config;
     enable_laggard_rotation = false;
     laggard_reentry_cooldown_weeks = 0;

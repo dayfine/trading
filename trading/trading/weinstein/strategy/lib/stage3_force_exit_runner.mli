@@ -28,6 +28,8 @@ open Trading_strategy
 
 val update :
   config:Stage3_force_exit.config ->
+  exit_margin_pct:float ->
+  prior_stage_ma_values:float Hashtbl.M(String).t option ->
   is_screening_day:bool ->
   positions:Position.t Map.M(String).t ->
   get_price:Strategy_interface.get_price_fn ->
@@ -53,6 +55,8 @@ val update :
       count. 3. On [Force_exit { weeks_in_stage3 }]:
     - Skips the position if its [position_id] is in [stop_exit_position_ids] —
       the stops runner already exited it this tick.
+    - Skips the position when the [exit_margin_pct] filter is not satisfied (see
+      below).
     - Otherwise emits a [TriggerExit] transition with
       [exit_reason = StrategySignal { label = "stage3_force_exit"; detail = Some
        "weeks_in_stage3=N" }] and [exit_price = bar.close_price] from
@@ -61,6 +65,29 @@ val update :
     - Short positions and non-Holding states are skipped without emitting, and
       their entry in [stage3_streaks] is left untouched. This keeps the streak
       counter accurate if the position later transitions back into Holding.
+
+    {2 Margin filter (price-below-MA gate)}
+
+    Layered on top of {!Stage3_force_exit.config.hysteresis_weeks}. When
+    [exit_margin_pct > 0.0] AND [prior_stage_ma_values] is [Some tbl] AND [tbl]
+    has an entry for the symbol, the runner additionally requires the current
+    bar's close price to sit at least [exit_margin_pct] (fractional) below the
+    30-week MA before emitting:
+
+    {v (ma_value -. bar.close_price) /. ma_value >= exit_margin_pct v}
+
+    When the margin is not met the runner returns no transition for that
+    position. The streak counter still advances (and resets on a non-Stage-3
+    read) — only the emission decision is gated.
+
+    Backward compatibility: when [exit_margin_pct = 0.0] the inequality is
+    satisfied by every close (closes above the MA produce a negative LHS, which
+    still satisfies [>= 0.0]). When [prior_stage_ma_values = None], or the
+    symbol is absent from the table, or the recorded MA value is non-positive
+    (warmup / corrupt data), the margin filter short-circuits to "satisfied" and
+    the runner falls back to pure hysteresis-only behaviour. All four
+    short-circuits preserve bit-equality with pre-fix runs (and with the
+    previous runner signature that lacked margin support entirely).
 
     {2 Mutates}
 

@@ -108,14 +108,14 @@ let _record_force_exit ~last_stop_out_dates ~positions ~current_date
     | _ -> ()
 
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
-    ~get_price ~last_stop_out_dates ~audit_recorder ~prior_macro_result
-    ~current_date =
+    ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
+    ~prior_macro_result ~current_date =
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
     ~as_of:current_date;
   let exit_transitions, adjust_transitions =
     Stops_runner.update
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ~stop_update_cadence:config.stop_update_cadence
+      ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
       ~stops_config:config.stops_config ~stage_config:config.stage_config
       ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
       ~bar_reader ~as_of:current_date ~prior_stages ()
@@ -149,8 +149,8 @@ let _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
 
 let _run_special_exits ~config ~positions ~last_stop_out_dates
     ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
-    ~prior_stages ~stage3_streaks ~laggard_streaks ~bar_reader ~index_view
-    ~exit_transitions ~current_date =
+    ~prior_stages ~prior_stage_ma_values ~stage3_streaks ~laggard_streaks
+    ~bar_reader ~index_view ~exit_transitions ~current_date =
   let raw_force_exit_ts =
     Force_liquidation_runner.update
       ~config:config.portfolio_config.force_liquidation ~positions ~get_price
@@ -166,6 +166,8 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
   let stage3_ts =
     if config.enable_stage3_force_exit then
       Stage3_force_exit_runner.update ~config:config.stage3_force_exit_config
+        ~exit_margin_pct:config.stage3_exit_margin_pct
+        ~prior_stage_ma_values:(Some prior_stage_ma_values)
         ~is_screening_day:is_friday ~positions ~get_price ~prior_stages
         ~stage3_streaks ~stop_exit_position_ids:stop_exited_ids ~current_date
     else []
@@ -251,14 +253,14 @@ let _assemble_output ~exit_transitions ~stage3_force_exit_transitions
 
 let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
     ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
-    ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-    ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
+    ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
+    ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
     ~(portfolio : Portfolio_view.t) ~current_date =
   let positions = portfolio.positions in
   let exit_transitions, adjust_transitions =
     _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
-      ~get_price ~last_stop_out_dates ~audit_recorder ~prior_macro_result
-      ~current_date
+      ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
+      ~prior_macro_result ~current_date
   in
   let index_view =
     Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary
@@ -271,8 +273,9 @@ let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
         stage3_exited_ids,
         laggard_exited_ids ) =
     _run_special_exits ~config ~positions ~last_stop_out_dates ~portfolio
-      ~get_price ~peak_tracker ~audit_recorder ~prior_stages ~stage3_streaks
-      ~laggard_streaks ~bar_reader ~index_view ~exit_transitions ~current_date
+      ~get_price ~peak_tracker ~audit_recorder ~prior_stages
+      ~prior_stage_ma_values ~stage3_streaks ~laggard_streaks ~bar_reader
+      ~index_view ~exit_transitions ~current_date
   in
   let entry_transitions =
     _run_macro_and_entries ~fold_start_date ~config ~ad_bars ~stop_states
@@ -286,18 +289,18 @@ let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
 
 let _on_market_close ~fold_start_date ~config ~ad_bars ~stop_states
     ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
-    ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-    ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
-    ~(portfolio : Portfolio_view.t) =
+    ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
+    ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
+    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   match get_price config.indices.primary with
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
       let current_date = primary_bar.Types.Daily_price.date in
       _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
-        ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-        ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~portfolio
-        ~current_date
+        ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
+        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
+        ~get_price ~portfolio ~current_date
 
 let _init_strategy_state ~initial_stop_states ~ad_bars =
   let stop_states = ref initial_stop_states in
@@ -308,6 +311,9 @@ let _init_strategy_state ~initial_stop_states ~ad_bars =
   let peak_tracker = Portfolio_risk.Force_liquidation.Peak_tracker.create () in
   let prior_macro_result : Macro.result option ref = ref None in
   let prior_stages = Hashtbl.create (module String) in
+  let prior_stage_ma_values : float Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
   let sector_prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
     Hashtbl.create (module String)
   in
@@ -324,6 +330,7 @@ let _init_strategy_state ~initial_stop_states ~ad_bars =
     peak_tracker,
     prior_macro_result,
     prior_stages,
+    prior_stage_ma_values,
     sector_prior_stages,
     stage3_streaks,
     laggard_streaks,
@@ -341,6 +348,7 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
         peak_tracker,
         prior_macro_result,
         prior_stages,
+        prior_stage_ma_values,
         sector_prior_stages,
         stage3_streaks,
         laggard_streaks,
@@ -353,8 +361,9 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     let on_market_close =
       _on_market_close ~fold_start_date ~config ~ad_bars:weekly_ad_bars
         ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
-        ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
-        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
+        ~peak_tracker ~bar_reader ~prior_stages ~prior_stage_ma_values
+        ~sector_prior_stages ~ticker_sectors ~stage3_streaks ~laggard_streaks
+        ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 

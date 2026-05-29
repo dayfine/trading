@@ -27,6 +27,7 @@ type stop_update_cadence = Daily | Weekly [@@deriving show, eq, sexp]
 val update :
   ?ma_cache:Weekly_ma_cache.t ->
   ?stop_update_cadence:stop_update_cadence ->
+  ?prior_stage_ma_values:float Hashtbl.M(String).t ->
   stops_config:Weinstein_stops.config ->
   stage_config:Stage.config ->
   lookback_bars:int ->
@@ -60,4 +61,12 @@ val update :
     see {!stop_update_cadence}. Under [Weekly], non-Friday [as_of] dates skip
     the state-machine update and only emit [TriggerExit] when the bar crosses
     the existing stop level. The default of [Daily] preserves bit-equality with
-    every existing caller and baseline. *)
+    every existing caller and baseline.
+
+    [prior_stage_ma_values] (optional) is mirrored alongside [prior_stages]:
+    when supplied, each position whose stage gets computed has its current
+    30-week MA value written into the table at key = symbol. The
+    {!Stage3_force_exit_runner} reads the same table to apply its
+    [stage3_exit_margin_pct] filter (price-below-MA margin gate). When omitted,
+    no MA values are recorded — the stage3 force-exit margin filter then
+    short-circuits as "margin met" and behaviour matches pre-fix runs. *)
