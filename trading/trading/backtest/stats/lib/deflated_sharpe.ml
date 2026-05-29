@@ -2,6 +2,11 @@ open Core
 
 let euler_mascheroni = 0.5772156649
 
+(* The PSR variance-adjustment term is ((kurtosis - 1) / 4) * SR^2 — the 4 is the
+   Bailey/Lopez de Prado denominator on the excess-kurtosis correction. Named to
+   keep it out of the bare-literal linter and document its origin. *)
+let psr_kurtosis_divisor = 4.0
+
 (* Population central moments of [xs]: mean and the k-th standardised moment.
    Divisor is [n] (population), matching the Bailey/Lopez de Prado convention
    for the skew/kurtosis adjustment terms. *)
@@ -29,7 +34,8 @@ let psr ~observed_sharpe ~benchmark_sharpe ~n_obs ~skewness ~kurtosis =
       (Printf.sprintf "Deflated_sharpe.psr: n_obs must be >= 2, got %d" n_obs);
   let sr = observed_sharpe in
   let variance_term =
-    1.0 -. (skewness *. sr) +. ((kurtosis -. 1.0) /. 4.0 *. sr *. sr)
+    1.0 -. (skewness *. sr)
+    +. ((kurtosis -. 1.0) /. psr_kurtosis_divisor *. sr *. sr)
   in
   if Float.(variance_term <= 0.0) then
     invalid_arg

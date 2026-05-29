@@ -38,24 +38,25 @@ let _check_unique_labels stabilities =
     invalid_arg
       "Variant_ranking.rank: duplicate variant label; labels must be unique"
 
+(* Labels of all variants that strictly dominate [s] (excluding [s] itself). *)
+let _dominators stabilities (s : T.variant_stability) =
+  List.filter_map stabilities ~f:(fun (other : T.variant_stability) ->
+      let is_self = String.equal other.variant_label s.variant_label in
+      if (not is_self) && dominates other s then Some other.variant_label
+      else None)
+
+let _rank_one stabilities (s : T.variant_stability) =
+  let dominated_by = _dominators stabilities s in
+  {
+    label = s.variant_label;
+    stability = s;
+    on_frontier = List.is_empty dominated_by;
+    dominated_by;
+  }
+
 let rank stabilities =
   _check_unique_labels stabilities;
-  let variants =
-    List.map stabilities ~f:(fun (s : T.variant_stability) ->
-        let dominated_by =
-          List.filter_map stabilities ~f:(fun (other : T.variant_stability) ->
-              let is_self = String.equal other.variant_label s.variant_label in
-              if (not is_self) && dominates other s then
-                Some other.variant_label
-              else None)
-        in
-        {
-          label = s.variant_label;
-          stability = s;
-          on_frontier = List.is_empty dominated_by;
-          dominated_by;
-        })
-  in
+  let variants = List.map stabilities ~f:(_rank_one stabilities) in
   let frontier =
     List.filter_map variants ~f:(fun v ->
         if v.on_frontier then Some v.label else None)

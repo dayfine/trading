@@ -102,9 +102,39 @@ let test_deflated_sharpe_rejects_zero_variance_folds _ =
         ~fold_returns:[ 2.0; 2.0; 2.0 ] ~n_trials:12
         ~sharpe_variance_across_trials:0.04)
 
+(* Robust raise-pinning for the float-message guards (the %.17g value makes an
+   exact-message assert_raises brittle). Pins the two documented degenerate
+   raises the PR body claims are covered: psr's non-positive variance term and
+   expected_max_sharpe's negative variance. *)
+let _raises_invalid_arg f =
+  try
+    ignore (f ());
+    false
+  with Invalid_argument _ -> true
+
+(* skewness*sr drives the variance term 1 - skew*sr + ((kurt-1)/4)*sr^2 negative:
+   sr=2, skew=1, kurt=1 -> 1 - 2 + 0 = -1 <= 0 -> raise. *)
+let test_psr_rejects_non_positive_variance_term _ =
+  assert_that
+    (_raises_invalid_arg (fun () ->
+         Deflated_sharpe.psr ~observed_sharpe:2.0 ~benchmark_sharpe:0.0
+           ~n_obs:24 ~skewness:1.0 ~kurtosis:1.0))
+    (equal_to true)
+
+let test_expected_max_sharpe_rejects_negative_variance _ =
+  assert_that
+    (_raises_invalid_arg (fun () ->
+         Deflated_sharpe.expected_max_sharpe ~n_trials:12
+           ~sharpe_variance:(-0.04)))
+    (equal_to true)
+
 let suite =
   "deflated_sharpe"
   >::: [
+         "psr_rejects_non_positive_variance_term"
+         >:: test_psr_rejects_non_positive_variance_term;
+         "expected_max_sharpe_rejects_negative_variance"
+         >:: test_expected_max_sharpe_rejects_negative_variance;
          "skewness_kurtosis_symmetric" >:: test_skewness_kurtosis_symmetric;
          "skewness_kurtosis_skewed" >:: test_skewness_kurtosis_skewed;
          "moments_reject_short" >:: test_moments_reject_short;
