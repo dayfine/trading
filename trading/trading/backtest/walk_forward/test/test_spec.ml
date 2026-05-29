@@ -207,7 +207,7 @@ let test_hysteresis_spec_parses _ =
            (equal_to "goldens-sp500-historical/sp500-2010-2026.sexp");
          field (fun (s : Spec.t) -> s.baseline_label) (equal_to "h1-m0");
          field (fun (s : Spec.t) -> List.length s.variants) (equal_to 2);
-         field (fun (s : Spec.t) -> s.gate.n) (equal_to 30);
+         field (fun (s : Spec.t) -> s.gate.n) (equal_to 31);
        ])
 
 let test_hysteresis_variants_are_h1m0_and_h2m02 _ =
@@ -217,6 +217,15 @@ let test_hysteresis_variants_are_h1m0_and_h2m02 _ =
       ~f:(fun (v : Walk_forward.Walk_forward_runner.variant) -> v.label)
   in
   assert_that labels (elements_are [ equal_to "h1-m0"; equal_to "h2-m02" ])
+
+(** Pins the gate-count contract: the Rolling geometry yields exactly 31 OOS
+    folds and [gate.n] must equal that count, otherwise [Fold_gate.evaluate]'s
+    fold-count guard makes the runner SKIP the verdict (observed on the
+    2026-05-29 run, which authored n=30 against 31 generated folds). *)
+let test_hysteresis_gate_n_matches_generated_fold_count _ =
+  let spec = Spec.load (_fixture_path _hysteresis_fixture) in
+  let generated = List.length (WS.generate spec.window_spec) in
+  assert_that generated (all_of [ equal_to 31; equal_to spec.gate.n ])
 
 let suite =
   "Walk_forward_spec"
@@ -243,6 +252,8 @@ let suite =
          "hysteresis 30-fold spec parses" >:: test_hysteresis_spec_parses;
          "hysteresis 30-fold variants are h1-m0 and h2-m02"
          >:: test_hysteresis_variants_are_h1m0_and_h2m02;
+         "hysteresis gate.n matches generated fold count (31)"
+         >:: test_hysteresis_gate_n_matches_generated_fold_count;
        ]
 
 let () = run_test_tt_main suite
