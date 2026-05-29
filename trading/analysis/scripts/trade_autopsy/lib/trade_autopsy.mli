@@ -30,34 +30,17 @@ module Walk_step = Per_symbol_stage_strategy_lib.Walk_step
     serializers. *)
 type trade_side = Long_side | Short_side [@@deriving show, eq, sexp]
 
-(** Exit-reason classification for a closed trade.
-
-    Derived from the position of the trade in the strategy's trade list and the
-    strategy's mechanic. For the per-symbol stage strategy:
-    - All long trades are entered on Stage1→Stage2 and exited on Stage2→Stage3,
-      except for the FINAL bar's open position which is force-closed by
-      {!Walk_step.force_close_at_end}.
-    - All short trades are entered on Stage3→Stage4 and exited on Stage4→Stage1,
-      with the same end-of-window force-close rule for the tail. *)
-type exit_reason =
+(** Exit-reason classification for a closed trade. Re-exported from
+    {!Exit_reason.t} so consumers can pattern-match using
+    [Trade_autopsy.<Variant>] without depending directly on the [Exit_reason]
+    module. See {!Exit_reason.t} for per-variant documentation. *)
+type exit_reason = Exit_reason.t =
   | Stage3_exit
-      (** Long-only exit on Stage 2→3 transition. Default for non-tail long
-          trades. *)
   | Stage1_cover_short
-      (** Long-short: cover triggered by Stage 4→1 transition. Default for
-          non-tail short trades. *)
-  | End_of_period  (** Final-bar force-close (tail trade). *)
+  | End_of_period
   | Stop_out
-      (** Stop-loss triggered. NEVER produced under the per-symbol stage
-          strategy; reserved for future strategies. *)
   | Stage4_decline
-      (** Price entered Stage 4 directly from Stage 2 (skipping Stage 3). NEVER
-          produced under the per-symbol stage strategy (Stage1→2→3 is the
-          canonical mapping); reserved. *)
   | Laggard_rotation
-      (** Cross-sectional rotation expelled the position. Strictly zero for
-          per-symbol diagnostic — included for completeness so a single autopsy
-          schema covers rotation-aware strategies too. *)
 [@@deriving show, eq, sexp]
 
 type failure_modes = {

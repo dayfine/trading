@@ -5,6 +5,16 @@
 ## Status
 READY_FOR_REVIEW
 
+## Interface stable
+NO
+
+`Trade_autopsy_lib.Trade_autopsy.{classify_trades, summarize,
+breakdown_for_symbol}` are the public surface, but threshold defaults and
+per-mode flag semantics are likely to evolve as the diagnostic informs
+strategy fixes. Sexp output schema may also extend (new fields, new modes).
+Treat as v0 until at least one downstream consumer (e.g. PR-A Stage-3
+hysteresis sweep) lands.
+
 ## What it is
 
 `analysis/scripts/trade_autopsy/` — a diagnostic OCaml tool that consumes
@@ -32,10 +42,26 @@ brief (`dev/notes/next-session-priorities-2026-05-29.md` §P3).
 
 ## Files
 
-- `trading/analysis/scripts/trade_autopsy/lib/trade_autopsy_config.{ml,mli}`
-- `trading/analysis/scripts/trade_autopsy/lib/missed_gain.{ml,mli}`
-- `trading/analysis/scripts/trade_autopsy/lib/trade_autopsy.{ml,mli}`
-- `trading/analysis/scripts/trade_autopsy/lib/test/test_trade_autopsy.ml`
+Library (`trading/analysis/scripts/trade_autopsy/lib/`):
+- `trade_autopsy_config.{ml,mli}` — threshold record + defaults.
+- `missed_gain.{ml,mli}` — bar lookup + cyclical-low helpers.
+- `exit_reason.{ml,mli}` — `Exit_reason.t` + `derive` (rework-1 split).
+- `classifiers.{ml,mli}` — the four per-mode classifiers + missed-gain
+  computation helpers (rework-1 split).
+- `trade_autopsy.{ml,mli}` — public types (`trade_autopsy`,
+  `mode_summary`, `per_symbol_breakdown`) and orchestration
+  (`classify_trades`, `summarize`, `breakdown_for_symbol`).
+
+Tests (`trading/analysis/scripts/trade_autopsy/lib/test/`, split per
+failure-mode category in rework-1):
+- `test_helpers.{ml,mli}` — shared synthetic-bar / trade builders.
+- `test_missed_gain.ml` — `Missed_gain` unit tests.
+- `test_exit_reason.ml` — exit-reason derivation tests.
+- `test_failure_modes.ml` — Stage3 / late re-entry / late Stage-2 /
+  stop-out whipsaw classifiers.
+- `test_aggregation.ml` — `summarize` + `breakdown_for_symbol` numerics.
+
+Runner + report:
 - `trading/analysis/scripts/trade_autopsy/bin/autopsy_runner.ml`
 - `dev/notes/trade-autopsy-2026-05-29.md` — diagnostic report on the
   197-trade canonical panel.

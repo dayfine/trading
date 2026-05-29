@@ -202,30 +202,29 @@ let _render_report ~start_date ~end_date ~runs ~aggregate_summary =
 (* Sexp output                                                         *)
 (* ------------------------------------------------------------------ *)
 
-let _structured_output ~runs ~aggregate_summary =
-  let per_symbol =
-    List.map runs ~f:(fun r ->
-        ( r.symbol,
-          r.breakdown,
-          List.map r.autopsies ~f:(fun a -> Autopsy.sexp_of_trade_autopsy a)
-          |> Sexp.List ))
-  in
-  let per_symbol_sexp =
-    List.map per_symbol ~f:(fun (sym, brk, autopsies_sexp) ->
-        Sexp.List
-          [
-            Sexp.Atom sym;
-            Autopsy.sexp_of_per_symbol_breakdown brk;
-            autopsies_sexp;
-          ])
-  in
+let _autopsies_sexp_of_run r =
+  Sexp.List (List.map r.autopsies ~f:Autopsy.sexp_of_trade_autopsy)
+
+let _run_sexp r =
   Sexp.List
     [
-      Sexp.List
-        [
-          Sexp.Atom "aggregate_summary";
-          Sexp.List (List.map aggregate_summary ~f:Autopsy.sexp_of_mode_summary);
-        ];
+      Sexp.Atom r.symbol;
+      Autopsy.sexp_of_per_symbol_breakdown r.breakdown;
+      _autopsies_sexp_of_run r;
+    ]
+
+let _aggregate_sexp aggregate_summary =
+  Sexp.List
+    [
+      Sexp.Atom "aggregate_summary";
+      Sexp.List (List.map aggregate_summary ~f:Autopsy.sexp_of_mode_summary);
+    ]
+
+let _structured_output ~runs ~aggregate_summary =
+  let per_symbol_sexp = List.map runs ~f:_run_sexp in
+  Sexp.List
+    [
+      _aggregate_sexp aggregate_summary;
       Sexp.List [ Sexp.Atom "per_symbol"; Sexp.List per_symbol_sexp ];
     ]
 
@@ -237,31 +236,40 @@ let _write_sexp ~out_path sexp =
 (* CLI                                                                 *)
 (* ------------------------------------------------------------------ *)
 
+(* Try to run a single symbol; print the error (if any) and turn it into an
+   Option so [List.filter_map] can drop failed symbols. *)
+let _try_run_symbol ~data_dir_fp ~start_date ~end_date ~config sym =
+  match
+    _run_one_symbol ~data_dir:data_dir_fp ~start_date ~end_date ~config sym
+  with
+  | Ok r -> Some r
+  | Error e ->
+      eprintf "skipping %s: %s\n%!" sym (Status.show e);
+      None
+
+let _maybe_write_sexp ~out_sexp ~runs ~aggregate_summary =
+  match out_sexp with
+  | None -> ()
+  | Some path ->
+      _write_sexp ~out_path:path (_structured_output ~runs ~aggregate_summary)
+
+let _emit_report ~start_date ~end_date ~runs ~aggregate_summary ~out_sexp =
+  _maybe_write_sexp ~out_sexp ~runs ~aggregate_summary;
+  print_endline (_render_report ~start_date ~end_date ~runs ~aggregate_summary)
+
 let _execute ~data_dir ~start_date ~end_date ~symbols ~out_sexp =
   let config = Config.default in
   let data_dir_fp = Fpath.v data_dir in
   let runs =
-    List.filter_map symbols ~f:(fun sym ->
-        match
-          _run_one_symbol ~data_dir:data_dir_fp ~start_date ~end_date ~config
-            sym
-        with
-        | Ok r -> Some r
-        | Error e ->
-            eprintf "skipping %s: %s\n%!" sym (Status.show e);
-            None)
+    List.filter_map symbols
+      ~f:(_try_run_symbol ~data_dir_fp ~start_date ~end_date ~config)
   in
   if List.is_empty runs then
     failwith "No symbols completed — nothing to report."
   else
     let all_autopsies = List.concat_map runs ~f:(fun r -> r.autopsies) in
     let aggregate_summary = Autopsy.summarize all_autopsies in
-    (match out_sexp with
-    | None -> ()
-    | Some path ->
-        _write_sexp ~out_path:path (_structured_output ~runs ~aggregate_summary));
-    print_endline
-      (_render_report ~start_date ~end_date ~runs ~aggregate_summary)
+    _emit_report ~start_date ~end_date ~runs ~aggregate_summary ~out_sexp
 
 let _cmd =
   Command.basic
