@@ -34,12 +34,24 @@ Update `promote_config.sh` to gate on Calmar Δ ≥ +0.5 (or Sortino, depending 
 
 Per the synthesis doc: "The reframed win condition: beat BAH SPY on Calmar ≥ 1.5× with CAGR within -2pp."
 
-## P3 — investigate `stage3_force_exit` false-positives
+## P3 — systematic gain-capture autopsy
 
-The per-symbol agent's interpretation: ~half of Stage 3 exits resolve back to Stage 2 (continuation), not Stage 4 (decline). If true, fixing these false-positives could give 1-3pp CAGR back without breaking the risk profile. Needs:
-- Per-symbol time-series of stage transitions (1998-2025)
-- Count: of N Stage 3 exits, M resolved back to Stage 2 within K weeks
-- Patch the classifier (or screener cascade) to require N-week confirmation before declaring Stage 3
+The diagnostic verdict says Weinstein is great at avoiding losses, weak at capturing gains. Before fixing, decompose WHICH gain-capture failure mode is biggest. Four candidates ranked by likely impact:
+
+| # | Failure mode | Why suspected | Already ruled out? |
+|---|---|---|---|
+| 1 | **Premature exit (Stage 3 false-positives)** | Per-symbol agent: "many Stage 3 periods resolve back to Stage 2" | NO |
+| 2 | **Late re-entry** | After stop-out / Stage 3 exit, re-entry requires fresh Stage 1→2 cycle (~30w wait); price often runs hard during the wait (2009-Q2, 2020-Q2) | NO |
+| 3 | **Late Stage 2 admission** | 30-week MA needs 30 weeks to compute; bear-bottom recoveries (Mar 2009, Mar 2020) signal Stage 2 months late, missing the V-recovery | NO |
+| 4 | **Stop-out whipsaws during Stage 2** | Wide stops alone barely helped in ablation (+0.08pp SPY, -2.1pp sectors) — likely NOT a primary contributor | YES (eliminated) |
+
+**Approach: build a trade-autopsy tool** on top of the per-symbol stage strategy module that just landed (#1353):
+- For each of the 197 trades over 12 symbols × 27y, classify the exit reason
+- Quantify "missed gain" = (BAH price at re-entry) − (exit price), in % of position
+- Aggregate by failure mode → empirical breakdown of where each $ of the -2.31pp avg CAGR loss comes from
+- Whichever mode is biggest = next surgical fix
+
+Scope estimate: 1 day to build autopsy tool, 1 day to interpret + write up findings, 1 day to ship the targeted fix on the dominant mode. Total ~3 days to convert "stage analysis underperforms by 2.31pp" into "fixed mechanism X recovers Y pp."
 
 ## P4 — try cross-sectional rotation (NEW STRATEGY MODULE)
 
@@ -68,10 +80,9 @@ This is the only path to potentially exceed BAH on absolute return — and it st
 - Diagnostics: #1340 (sensitivity-sweep fix) #1345 (1a sectors) #1347 (1a SPY-only) #1350 (1b/2b fullsize) #1352 (mechanism ablation)
 - Ops: #1336 (orchestrator skip-PR-on-noop)
 
-**Open PRs (auto-merge monitor running, CI pending):**
-- #1351 — `docs/layered-synthesis-2026-05-29` synthesis (docs-only, will auto-merge)
-- #1352 — `experiment/mechanism-ablation` (docs+sexp, will auto-merge on CI green)
-- #1353 — `experiment/per-symbol-stage-strategy-clean` (HAS OCaml code, may need QC dispatch — flag for human decision)
+**ALL PRs merged. No open work in flight.**
+
+Final-session additions to main: #1351 (synthesis + this priorities doc) + #1353 (per-symbol stage strategy) + #1355 (mechanism ablation). #1348/#1352/#1354 closed as duplicates after add/add conflicts during concurrent-agent work.
 
 **No active agents.** Two diagnostic agents completed (ablation, per-symbol). All others completed or stopped.
 
