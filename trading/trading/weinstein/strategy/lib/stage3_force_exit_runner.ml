@@ -43,6 +43,17 @@ let _find_force_exit ~config ~stage3_streaks ~prior_stages symbol =
       | Stage3_force_exit.Force_exit { weeks_in_stage3 } -> Some weeks_in_stage3
       )
 
+(** Look up the 30-week MA value for [symbol] if it exists and is usable.
+    Returns [None] when the margin filter is disabled at the data layer — no
+    [prior_stage_ma_values] table supplied, no entry for [symbol], or recorded
+    MA value is non-positive (warmup / corrupt data). The caller treats [None]
+    as "skip the margin gate" (backward-compatible with pre-margin behaviour).
+*)
+let _lookup_valid_ma ~prior_stage_ma_values ~symbol =
+  let%bind.Option tbl = prior_stage_ma_values in
+  let%bind.Option ma_value = Hashtbl.find tbl symbol in
+  Option.some_if Float.(ma_value > 0.0) ma_value
+
 (** Check the price-below-MA margin gate. Returns [true] when the close sits far
     enough below the 30-week MA to satisfy [exit_margin_pct], OR when the margin
     filter is disabled (no MA value available, no threshold supplied).
@@ -52,22 +63,29 @@ let _find_force_exit ~config ~stage3_streaks ~prior_stages symbol =
       [>= 0.0] inequality; runner emits exactly as it did pre-fix.
     - [prior_stage_ma_values] omitted or symbol absent — no MA available, so the
       runner cannot evaluate the margin and falls back to hysteresis-only.
+    - Recorded MA value is non-positive (warmup / corrupt data) — same.
 
     The classifier-side warmup case (weekly bars < ma_period) is handled by
     {!Stops_runner._compute_ma_and_stage}: during warmup the runner uses a
     side-defaulted stage that is not [Stage3], so the detector never reaches the
     margin check on a warmup bar in the first place. *)
 let _margin_ok ~prior_stage_ma_values ~exit_margin_pct ~bar ~symbol =
-  match prior_stage_ma_values with
+  match _lookup_valid_ma ~prior_stage_ma_values ~symbol with
   | None -> true
-  | Some tbl -> (
-      match Hashtbl.find tbl symbol with
-      | None -> true
-      | Some ma_value ->
-          if Float.(ma_value <= 0.0) then true
-          else
-            let close = bar.Types.Daily_price.close_price in
-            Float.((ma_value -. close) /. ma_value >= exit_margin_pct))
+  | Some ma_value ->
+      let close = bar.Types.Daily_price.close_price in
+      Float.((ma_value -. close) /. ma_value >= exit_margin_pct)
+
+(** Apply the margin gate to a single bar and emit the exit transition when the
+    gate is satisfied. Returns [None] when the close-vs-MA margin filter blocks
+    the emission for this bar. *)
+let _emit_for_bar ~prior_stage_ma_values ~exit_margin_pct ~bar ~pos
+    ~current_date ~weeks_in_stage3 =
+  if
+    _margin_ok ~prior_stage_ma_values ~exit_margin_pct ~bar
+      ~symbol:pos.Position.symbol
+  then Some (_make_exit_transition ~pos ~current_date ~bar ~weeks_in_stage3)
+  else None
 
 (** Emit a [TriggerExit] for [pos] if it is not already being exited by the
     stops runner this tick, [get_price] has a bar for the symbol, AND the
@@ -78,12 +96,8 @@ let _emit_if_eligible ~prior_stage_ma_values ~exit_margin_pct
   if Set.mem stop_exit_position_ids pos.Position.id then None
   else
     Option.bind (get_price pos.symbol) ~f:(fun bar ->
-        if
-          _margin_ok ~prior_stage_ma_values ~exit_margin_pct ~bar
-            ~symbol:pos.symbol
-        then
-          Some (_make_exit_transition ~pos ~current_date ~bar ~weeks_in_stage3)
-        else None)
+        _emit_for_bar ~prior_stage_ma_values ~exit_margin_pct ~bar ~pos
+          ~current_date ~weeks_in_stage3)
 
 (** Emit a force-exit for a [Holding] long position when the detector fires.
     Checks stage via [_find_force_exit] then eligibility; returns [None] when
