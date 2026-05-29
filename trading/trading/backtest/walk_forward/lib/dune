@@ -1,5 +1,11 @@
 (library
  (name walk_forward)
- (libraries core fork_pool scenario_lib backtest trading.simulation.types)
+ (libraries
+  core
+  fork_pool
+  scenario_lib
+  backtest
+  weinstein_trading.strategy
+  trading.simulation.types)
  (preprocess
   (pps ppx_sexp_conv)))
