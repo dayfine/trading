@@ -302,6 +302,30 @@ let test_axes_bad_key_raises_on_load _ =
   in
   assert_that raised (equal_to true)
 
+(* A label collision must fail at load (Spec.load's [_check_unique_labels]
+   fail-loud contract, qc-behavioral CP1/CP4). Here an explicit variant labeled
+   "base" collides with the auto-injected baseline cell (label = baseline_label
+   "base"). *)
+let _colliding_label_spec =
+  {|
+((base_scenario "stub.sexp")
+ (window_spec (Explicit (((name f0) (train_period ()) (test_period ((start_date 2020-01-01) (end_date 2020-12-31)))))))
+ (variants (((label "base") (overrides ()))))
+ (baseline_label "base")
+ (gate ((metric Sharpe) (m 1) (n 1) (worst_delta 1.0)))
+ (axes ((axes (((flag enable_laggard_rotation) (values (true false))))) (expansion Cartesian))))
+|}
+
+let test_axes_label_collision_raises_on_load _ =
+  let path = _write_temp_spec _colliding_label_spec in
+  let raised =
+    try
+      ignore (Spec.load path);
+      false
+    with Failure _ -> true
+  in
+  assert_that raised (equal_to true)
+
 (* Backward-compat: an axes-absent spec resolves to its hand-written variants
    verbatim (no baseline injected, no reordering). *)
 let test_no_axes_is_backward_compatible _ =
@@ -341,6 +365,8 @@ let suite =
          "explicit variants + axes concatenate"
          >:: test_explicit_plus_axes_concatenates;
          "axes bad key raises on load" >:: test_axes_bad_key_raises_on_load;
+         "axes label collision raises on load"
+         >:: test_axes_label_collision_raises_on_load;
          "no-axes spec is backward-compatible"
          >:: test_no_axes_is_backward_compatible;
        ]

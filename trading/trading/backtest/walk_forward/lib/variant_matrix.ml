@@ -4,15 +4,18 @@ type axis =
   | Key of { path : string list; values : Sexp.t list }
   | Flag of { name : string; values : Sexp.t list }
 
+(* Parse one record entry [(field args...)] into a [field, args] pair. *)
+let _parse_field (entry : Sexp.t) : string * Sexp.t list =
+  match entry with
+  | Sexp.List (Sexp.Atom k :: rest) -> (k, rest)
+  | other ->
+      failwithf "Variant_matrix.axis_of_sexp: bad field %s"
+        (Sexp.to_string other) ()
+
 (* Parse a record-shaped axis sexp into a [field -> args] assoc. *)
 let _axis_fields (sexp : Sexp.t) : (string * Sexp.t list) list =
   match sexp with
-  | Sexp.List entries ->
-      List.map entries ~f:(function
-        | Sexp.List (Sexp.Atom k :: rest) -> (k, rest)
-        | other ->
-            failwithf "Variant_matrix.axis_of_sexp: bad field %s"
-              (Sexp.to_string other) ())
+  | Sexp.List entries -> List.map entries ~f:_parse_field
   | other ->
       failwithf "Variant_matrix.axis_of_sexp: expected record, saw %s"
         (Sexp.to_string other) ()

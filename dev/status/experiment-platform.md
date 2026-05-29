@@ -26,7 +26,11 @@ Sequencing (per plan §Sequencing):
 - Skill — Experimentation gap-closing skill (Gap F).
 
 ## Interface stable
-PARTIAL
+NO
+
+The PR-1 `Walk_forward.Variant_matrix` surface below is the stable part;
+the program-level interface (ledger schema, ranking output) is still
+forming across PR-2/PR-3, so the track is NO until those land.
 
 `Walk_forward.Variant_matrix` surface (PR-1):
 - `type axis = Key of { path; values } | Flag of { name; values }`
