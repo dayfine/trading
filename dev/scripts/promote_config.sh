@@ -26,9 +26,9 @@
 #        scenario's cell-E baseline and runs the resulting scratch scenario via
 #        scenario_runner.exe.
 #      - Reads actual.sexp metrics from each run.
-#      - Compares Sharpe to the cell-E baseline; refuses promotion if any
-#        scenario regresses by more than PROMOTE_SHARPE_REGRESSION_THRESHOLD
-#        (default 0.10 absolute Sharpe units).
+#      - Applies the primary risk-adjusted gates (Calmar and Sortino) against
+#        the cell-E baseline, plus a CAGR-floor sanity check, plus a Sharpe
+#        guardrail and a MaxDD guardrail (see "Gating philosophy" below).
 #      - Writes structured per-scenario metrics + cell-E reference + delta
 #        into configs/<label>/validation.sexp.
 #   4. Updates live/current.sexp symlink to point at the new config.
@@ -36,20 +36,55 @@
 #   6. Commits in the trading-parameters repo with format:
 #      `promote: <label> — trading@<sha>`
 #
+# Gating philosophy (2026-05-29 reframe):
+#
+#   Per `dev/notes/layered-decomposition-synthesis-2026-05-29.md` § 4.6 +
+#   § 6, the Weinstein strategy is a defensive-tilt mechanism that delivers
+#   risk-adjusted alpha (Calmar 6/12 wins, MaxDD reduced 12/12 vs BAH on the
+#   12-symbol per-symbol panel) but loses absolute CAGR on most symbols
+#   (3/12 wins, avg -2.31pp). The original Sharpe-Δ regression gate (defined
+#   2026-05-22 against an absolute-CAGR target) was the wrong yardstick.
+#
+#   The reframed gate uses Calmar and Sortino as **primary** risk-adjusted
+#   criteria, with a CAGR floor as a sanity check (don't promote configs
+#   that throw away absolute return). Sharpe + MaxDD remain as **secondary
+#   guardrails**, looser than before, on the principle that a config which
+#   improves Calmar and Sortino without tanking Sharpe or MaxDD is what
+#   we're looking for.
+#
 # Environment:
 #   TRADING_PARAMS_DIR
 #       Path to the trading-parameters clone.
 #       Default: ~/Projects/trading-parameters
 #
-#   PROMOTE_SHARPE_REGRESSION_THRESHOLD
-#       Maximum allowed Sharpe regression vs cell-E baseline on any scenario,
-#       in absolute Sharpe units. Default 0.10 (i.e. a candidate may not score
-#       0.10 lower Sharpe than cell-E on any panel scenario).
+#   PROMOTE_CALMAR_DELTA_MIN  (PRIMARY, higher-is-better)
+#       Minimum allowed signed Calmar delta vs cell-E baseline. The gate
+#       trips iff (candidate_calmar - cell_e_calmar) < value.
+#       Default: -0.05 (i.e. a candidate may regress by at most 0.05 Calmar
+#       units on any panel scenario). Set to a positive value (e.g. +0.05)
+#       to require Calmar improvement.
 #
-#   PROMOTE_MAXDD_INCREASE_THRESHOLD
+#   PROMOTE_SORTINO_DELTA_MIN  (PRIMARY, higher-is-better)
+#       Minimum allowed signed Sortino delta vs cell-E baseline. Same
+#       convention as PROMOTE_CALMAR_DELTA_MIN. Default: -0.05.
+#
+#   PROMOTE_CAGR_REGRESSION_MAX_PP  (sanity floor, lower-is-better deltas)
+#       Maximum allowed regression of `total_return_pct` vs cell-E baseline,
+#       in absolute percentage points. The gate trips iff
+#       (cell_e_return - candidate_return) > value. Default: 2.0.
+#       NOTE: this uses `total_return_pct` (window cumulative return) as a
+#       CAGR proxy because that field is what actual.sexp emits today; for
+#       a 5y window the proxy is roughly 5×CAGR-pp, for 16y roughly 16×.
+#       Tune the env var accordingly when the panel grows.
+#
+#   PROMOTE_SHARPE_REGRESSION_THRESHOLD  (secondary guardrail, higher-is-better)
+#       Maximum allowed Sharpe regression vs cell-E baseline on any scenario,
+#       in absolute Sharpe units. Default 0.10 (was the prior primary gate;
+#       retained as a guardrail under the Calmar/Sortino reframe).
+#
+#   PROMOTE_MAXDD_INCREASE_THRESHOLD  (secondary guardrail, lower-is-better)
 #       Maximum allowed MaxDD increase vs cell-E baseline on any scenario, in
-#       absolute percentage points. Default 5.0 (i.e. a candidate whose MaxDD
-#       exceeds cell-E by more than 5pp on any panel scenario is refused).
+#       absolute percentage points. Default 5.0 (unchanged from prior).
 #       Per Option E (dev/plans/bayesian-production-sweep-2026-05-18.md §6).
 #
 #   PROMOTE_TRADES_RATIO_MAX
@@ -206,19 +241,31 @@ fi
 #   - trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp
 #     §"Measured 2026-05-12 (Cell E, post-#1052 force-liq fix + #1053 schema)"
 
+PROMOTE_CALMAR_DELTA_MIN="${PROMOTE_CALMAR_DELTA_MIN:--0.05}"
+PROMOTE_SORTINO_DELTA_MIN="${PROMOTE_SORTINO_DELTA_MIN:--0.05}"
+PROMOTE_CAGR_REGRESSION_MAX_PP="${PROMOTE_CAGR_REGRESSION_MAX_PP:-2.0}"
 PROMOTE_SHARPE_REGRESSION_THRESHOLD="${PROMOTE_SHARPE_REGRESSION_THRESHOLD:-0.10}"
 PROMOTE_MAXDD_INCREASE_THRESHOLD="${PROMOTE_MAXDD_INCREASE_THRESHOLD:-5.0}"
 PROMOTE_TRADES_RATIO_MAX="${PROMOTE_TRADES_RATIO_MAX:-2.0}"
 PROMOTE_SKIP_VALIDATION="${PROMOTE_SKIP_VALIDATION:-0}"
 PROMOTE_VALIDATION_PARALLEL="${PROMOTE_VALIDATION_PARALLEL:-2}"
 
-# Panel: (scenario_name | base_scenario_sexp_path | cell_e_sharpe | cell_e_return | cell_e_max_dd | cell_e_trades)
+# Panel row format (8 space-separated columns):
+#   scenario_name
+#   base_scenario_sexp_path
+#   cell_e_sharpe       (secondary guardrail baseline)
+#   cell_e_return       (CAGR-proxy floor baseline, total_return_pct)
+#   cell_e_max_dd       (secondary guardrail baseline)
+#   cell_e_trades       (trades-ratio baseline)
+#   cell_e_calmar       (PRIMARY gate baseline)
+#   cell_e_sortino      (PRIMARY gate baseline)
+#
 # When the panel grows (P7 broad-universe / French-49 / Shiller), append rows
-# here. Each row is a single space-separated record. cell_e_trades pinned from
-# the scenario sexp headers; re-pin whenever the scenario is re-measured.
+# here. cell-E values are pinned from the "Measured" headers in each scenario
+# sexp file; re-pin whenever the scenario is re-measured.
 read -r -d '' PROMOTE_VALIDATION_PANEL << 'EOF' || true
-sp500-2010-2026 trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp 0.78 341.69 18.36 806
-sp500-2019-2023 trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp 0.56 50.66 21.56 264
+sp500-2010-2026 trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp 0.78 341.69 18.36 806 0.52 1.25
+sp500-2019-2023 trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp 0.56 50.66 21.56 264 0.40 0.75
 EOF
 
 validation_sexp="$target_dir/validation.sexp"
@@ -240,14 +287,21 @@ if [ "$PROMOTE_SKIP_VALIDATION" = "1" ]; then
   validation_rows+=("((status skipped) (reason \"PROMOTE_SKIP_VALIDATION=1 at promote time\"))")
 else
   echo "=== Cross-scenario validation ==="
-  echo "Sharpe regression threshold: $PROMOTE_SHARPE_REGRESSION_THRESHOLD (absolute units)"
+  echo "Primary gates:"
+  echo "  Calmar  delta min:        $PROMOTE_CALMAR_DELTA_MIN (signed; +N requires improvement, -N tolerates regression)"
+  echo "  Sortino delta min:        $PROMOTE_SORTINO_DELTA_MIN (signed)"
+  echo "  CAGR-proxy regression max: ${PROMOTE_CAGR_REGRESSION_MAX_PP}pp (total_return_pct drop)"
+  echo "Secondary guardrails:"
+  echo "  Sharpe regression max:    $PROMOTE_SHARPE_REGRESSION_THRESHOLD (absolute units)"
+  echo "  MaxDD increase max:       ${PROMOTE_MAXDD_INCREASE_THRESHOLD}pp"
+  echo "  Trades ratio max:         ${PROMOTE_TRADES_RATIO_MAX}x"
   echo "Parallel: $PROMOTE_VALIDATION_PARALLEL"
 
   scratch_scenarios_dir="$validation_dir/scenarios"
   mkdir -p "$scratch_scenarios_dir"
 
   # Compose scratch scenarios for every panel row.
-  while IFS=' ' read -r scenario_name base_path _ _ _ _; do
+  while IFS=' ' read -r scenario_name base_path _ _ _ _ _ _; do
     [ -z "$scenario_name" ] && continue
     full_base_path="$trading_repo_root/$base_path"
     if [ ! -f "$full_base_path" ]; then
@@ -330,8 +384,15 @@ else
   fi
   echo "scenario_runner output root: $runner_output_root"
 
+  # The Calmar/Sortino gates are expressed as "min allowed signed delta"
+  # (so users can set positive values to require improvement). The underlying
+  # `regresses_by_more_than` helper takes a positive regression-tolerance, so
+  # we negate the env vars at the gate call site.
+  calmar_regression_tolerance=$(awk -v v="$PROMOTE_CALMAR_DELTA_MIN" 'BEGIN { printf "%g", -v }')
+  sortino_regression_tolerance=$(awk -v v="$PROMOTE_SORTINO_DELTA_MIN" 'BEGIN { printf "%g", -v }')
+
   # Extract metrics + apply gate per scenario.
-  while IFS=' ' read -r scenario_name base_path cell_e_sharpe cell_e_return cell_e_max_dd cell_e_trades; do
+  while IFS=' ' read -r scenario_name base_path cell_e_sharpe cell_e_return cell_e_max_dd cell_e_trades cell_e_calmar cell_e_sortino; do
     [ -z "$scenario_name" ] && continue
     actual_sexp="$runner_output_root/scratch-$scenario_name/actual.sexp"
     if [ ! -f "$actual_sexp" ]; then
@@ -346,9 +407,17 @@ else
     actual_max_dd=$(extract_metric "$actual_sexp" max_drawdown_pct)
     actual_trades=$(extract_metric "$actual_sexp" total_trades)
     actual_win_rate=$(extract_metric "$actual_sexp" win_rate)
+    actual_calmar=$(extract_metric "$actual_sexp" calmar_ratio)
+    actual_sortino=$(extract_metric "$actual_sexp" sortino_ratio_annualized)
 
     if [ -z "$actual_sharpe" ]; then
       echo "Error: failed to extract sharpe_ratio from $actual_sexp" >&2
+      cat "$actual_sexp" >&2
+      rm -rf "$target_dir"
+      exit 1
+    fi
+    if [ -z "$actual_calmar" ] || [ -z "$actual_sortino" ]; then
+      echo "Error: failed to extract calmar_ratio/sortino_ratio_annualized from $actual_sexp" >&2
       cat "$actual_sexp" >&2
       rm -rf "$target_dir"
       exit 1
@@ -358,23 +427,42 @@ else
     return_delta=$(signed_delta "$actual_return" "$cell_e_return")
     max_dd_delta=$(signed_delta "$actual_max_dd" "$cell_e_max_dd")
     trades_delta=$(signed_delta "$actual_trades" "$cell_e_trades")
+    calmar_delta=$(signed_delta "$actual_calmar" "$cell_e_calmar")
+    sortino_delta=$(signed_delta "$actual_sortino" "$cell_e_sortino")
 
-    # Gates (Option E, per dev/plans/bayesian-production-sweep-2026-05-18.md §6):
-    #  - Sharpe regression ≤ threshold (higher-is-better)
-    #  - MaxDD increase ≤ threshold (lower-is-better; swap regresses_by_more_than args)
-    #  - total_trades within ratio (catches strategies that trade radically differently)
+    # Gates — primary (Calmar/Sortino/CAGR floor) + secondary guardrails
+    # (Sharpe/MaxDD/trades-ratio). See the "Gating philosophy" block in this
+    # file's header docstring for rationale.
     verdict="pass"
+    if regresses_by_more_than \
+        "$actual_calmar" "$cell_e_calmar" \
+        "$calmar_regression_tolerance"; then
+      verdict="fail"
+      gate_failures+=("$scenario_name: calmar_ratio $actual_calmar vs cell-E $cell_e_calmar (delta $calmar_delta) below min $PROMOTE_CALMAR_DELTA_MIN")
+    fi
+    if regresses_by_more_than \
+        "$actual_sortino" "$cell_e_sortino" \
+        "$sortino_regression_tolerance"; then
+      verdict="fail"
+      gate_failures+=("$scenario_name: sortino_ratio_annualized $actual_sortino vs cell-E $cell_e_sortino (delta $sortino_delta) below min $PROMOTE_SORTINO_DELTA_MIN")
+    fi
+    if regresses_by_more_than \
+        "$actual_return" "$cell_e_return" \
+        "$PROMOTE_CAGR_REGRESSION_MAX_PP"; then
+      verdict="fail"
+      gate_failures+=("$scenario_name: total_return_pct $actual_return vs cell-E $cell_e_return (delta $return_delta) regresses > ${PROMOTE_CAGR_REGRESSION_MAX_PP}pp (CAGR-proxy floor)")
+    fi
     if regresses_by_more_than \
         "$actual_sharpe" "$cell_e_sharpe" \
         "$PROMOTE_SHARPE_REGRESSION_THRESHOLD"; then
       verdict="fail"
-      gate_failures+=("$scenario_name: sharpe $actual_sharpe vs cell-E $cell_e_sharpe (delta $sharpe_delta) regresses > $PROMOTE_SHARPE_REGRESSION_THRESHOLD")
+      gate_failures+=("$scenario_name: sharpe $actual_sharpe vs cell-E $cell_e_sharpe (delta $sharpe_delta) regresses > $PROMOTE_SHARPE_REGRESSION_THRESHOLD (secondary guardrail)")
     fi
     if regresses_by_more_than \
         "$cell_e_max_dd" "$actual_max_dd" \
         "$PROMOTE_MAXDD_INCREASE_THRESHOLD"; then
       verdict="fail"
-      gate_failures+=("$scenario_name: max_drawdown_pct $actual_max_dd vs cell-E $cell_e_max_dd (delta $max_dd_delta) increases > $PROMOTE_MAXDD_INCREASE_THRESHOLD pp")
+      gate_failures+=("$scenario_name: max_drawdown_pct $actual_max_dd vs cell-E $cell_e_max_dd (delta $max_dd_delta) increases > ${PROMOTE_MAXDD_INCREASE_THRESHOLD}pp (secondary guardrail)")
     fi
     if trades_out_of_ratio \
         "$actual_trades" "$cell_e_trades" \
@@ -383,13 +471,13 @@ else
       gate_failures+=("$scenario_name: total_trades $actual_trades vs cell-E $cell_e_trades (delta $trades_delta) outside ratio ${PROMOTE_TRADES_RATIO_MAX}x")
     fi
 
-    echo "  $scenario_name: sharpe=$actual_sharpe (cell-E $cell_e_sharpe, delta $sharpe_delta) max_dd=$actual_max_dd (cell-E $cell_e_max_dd, delta $max_dd_delta) trades=$actual_trades (cell-E $cell_e_trades, delta $trades_delta) verdict=$verdict"
+    echo "  $scenario_name: calmar=$actual_calmar (cell-E $cell_e_calmar, delta $calmar_delta) sortino=$actual_sortino (cell-E $cell_e_sortino, delta $sortino_delta) return=$actual_return (cell-E $cell_e_return, delta $return_delta) sharpe=$actual_sharpe (cell-E $cell_e_sharpe, delta $sharpe_delta) max_dd=$actual_max_dd (cell-E $cell_e_max_dd, delta $max_dd_delta) trades=$actual_trades (cell-E $cell_e_trades, delta $trades_delta) verdict=$verdict"
 
     validation_rows+=("((scenario $scenario_name)
    (verdict $verdict)
-   (cell_e_baseline ((sharpe $cell_e_sharpe) (total_return_pct $cell_e_return) (max_drawdown_pct $cell_e_max_dd) (total_trades $cell_e_trades)))
-   (candidate ((sharpe $actual_sharpe) (total_return_pct $actual_return) (max_drawdown_pct $actual_max_dd) (total_trades $actual_trades) (win_rate $actual_win_rate)))
-   (delta ((sharpe $sharpe_delta) (total_return_pct $return_delta) (max_drawdown_pct $max_dd_delta) (total_trades $trades_delta))))")
+   (cell_e_baseline ((sharpe $cell_e_sharpe) (total_return_pct $cell_e_return) (max_drawdown_pct $cell_e_max_dd) (total_trades $cell_e_trades) (calmar_ratio $cell_e_calmar) (sortino_ratio_annualized $cell_e_sortino)))
+   (candidate ((sharpe $actual_sharpe) (total_return_pct $actual_return) (max_drawdown_pct $actual_max_dd) (total_trades $actual_trades) (win_rate $actual_win_rate) (calmar_ratio $actual_calmar) (sortino_ratio_annualized $actual_sortino)))
+   (delta ((sharpe $sharpe_delta) (total_return_pct $return_delta) (max_drawdown_pct $max_dd_delta) (total_trades $trades_delta) (calmar_ratio $calmar_delta) (sortino_ratio_annualized $sortino_delta))))")
   done <<< "$PROMOTE_VALIDATION_PANEL"
 fi
 
@@ -397,12 +485,19 @@ fi
 {
   echo ";; Cross-scenario validation results for $label"
   echo ";; Generated by promote_config.sh on $promotion_date"
-  echo ";; Gates: Sharpe regression ≤ $PROMOTE_SHARPE_REGRESSION_THRESHOLD,"
-  echo ";;        MaxDD increase ≤ ${PROMOTE_MAXDD_INCREASE_THRESHOLD}pp,"
-  echo ";;        total_trades within ${PROMOTE_TRADES_RATIO_MAX}x"
+  echo ";; Primary gates: Calmar delta ≥ $PROMOTE_CALMAR_DELTA_MIN,"
+  echo ";;                Sortino delta ≥ $PROMOTE_SORTINO_DELTA_MIN,"
+  echo ";;                total_return_pct regression ≤ ${PROMOTE_CAGR_REGRESSION_MAX_PP}pp (CAGR-proxy floor)"
+  echo ";; Secondary guardrails:"
+  echo ";;                Sharpe regression ≤ $PROMOTE_SHARPE_REGRESSION_THRESHOLD,"
+  echo ";;                MaxDD increase ≤ ${PROMOTE_MAXDD_INCREASE_THRESHOLD}pp,"
+  echo ";;                total_trades within ${PROMOTE_TRADES_RATIO_MAX}x"
   echo "((label $label)"
   echo " (promotion_date \"$promotion_date\")"
   echo " (trading_sha $trading_short_sha)"
+  echo " (calmar_delta_min $PROMOTE_CALMAR_DELTA_MIN)"
+  echo " (sortino_delta_min $PROMOTE_SORTINO_DELTA_MIN)"
+  echo " (cagr_regression_max_pp $PROMOTE_CAGR_REGRESSION_MAX_PP)"
   echo " (sharpe_regression_threshold $PROMOTE_SHARPE_REGRESSION_THRESHOLD)"
   echo " (maxdd_increase_threshold_pp $PROMOTE_MAXDD_INCREASE_THRESHOLD)"
   echo " (trades_ratio_max $PROMOTE_TRADES_RATIO_MAX)"
@@ -444,7 +539,12 @@ cat > "$target_dir/provenance.md" << EOF
 
 ## Cross-scenario validation
 
-Gates applied:
+Primary gates (Calmar/Sortino reframe, 2026-05-29):
+- Calmar delta ≥ \`$PROMOTE_CALMAR_DELTA_MIN\` (signed; negative = tolerated regression)
+- Sortino delta ≥ \`$PROMOTE_SORTINO_DELTA_MIN\` (signed)
+- total_return_pct regression ≤ \`${PROMOTE_CAGR_REGRESSION_MAX_PP}\` pp (CAGR-proxy floor)
+
+Secondary guardrails:
 - Sharpe regression ≤ \`$PROMOTE_SHARPE_REGRESSION_THRESHOLD\` absolute units
 - MaxDD increase ≤ \`${PROMOTE_MAXDD_INCREASE_THRESHOLD}\` percentage points
 - total_trades within \`${PROMOTE_TRADES_RATIO_MAX}x\` of baseline (either direction)
@@ -454,7 +554,7 @@ See \`validation.sexp\` for full structured results.
 $(if [ "$PROMOTE_SKIP_VALIDATION" = "1" ]; then
     echo "**SKIPPED** — PROMOTE_SKIP_VALIDATION=1 at promote time. validation.sexp records the skip; this config has not been verified against the panel."
   else
-    echo "All panel scenarios passed every gate (Sharpe + MaxDD + trades-ratio)."
+    echo "All panel scenarios passed every gate (primary + guardrails)."
   fi)
 
 ## How to use
