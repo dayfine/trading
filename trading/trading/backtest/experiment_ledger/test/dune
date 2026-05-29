@@ -1,0 +1,5 @@
+(tests
+ (names test_experiment_ledger)
+ (libraries ounit2 core core_unix.filename_unix matchers experiment_ledger)
+ (preprocess
+  (pps ppx_sexp_conv)))

@@ -1,6 +1,6 @@
 # Status: experiment-platform
 
-## Last updated: 2026-05-29
+## Last updated: 2026-05-30
 
 ## Status
 IN_PROGRESS
@@ -66,22 +66,45 @@ Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && 
 ### Gap B — Loud override validation
 - [x] Already shipped (#1069) and reused at expansion time by PR-1.
 
+### Gap D — Experiment ledger (PR-2)
+- [x] **`Experiment_ledger`** — append-only per-experiment sexp +
+  machine-readable index, with effective-config-hash dedup. New pure lib
+  at `trading/trading/backtest/experiment_ledger/lib/experiment_ledger.{ml,mli}`
+  (sibling to `walk_forward`; deps `core` / `backtest` /
+  `weinstein_trading.strategy`). Types: `verdict` (`Accept`/`Reject`/
+  `Inconclusive`), `fold_aggregate` (optional per variant), `variant_record`,
+  `entry`, `index_row`. Functions: `config_hash` (the dedup key —
+  applies overrides onto the canonical default config via
+  `Overlay_validator.apply_overrides`, `sexp_of`s the effective config,
+  `Sexp.to_string_mach` + MD5; so two logically-equal override blobs hash
+  identically), `save_entry` (append-only, raises on overwrite),
+  `load_entry`, `load_index`, `build_index`, `save_index`, `lookup`.
+- [x] **Retroactive seed** under `dev/experiments/_ledger/`: full
+  machine-aggregate entry for the stage3-hysteresis WF-CV rejection
+  (`2026-05-29-stage3-hysteresis-wf-cv.sexp`, h1-m0 vs h2-m02, Reject);
+  minimal seeds for continuation-combined-axis, M5.5 single-lever, and
+  laggard-disable retraction. `index.sexp` regenerated from the entries.
+  Verified hashes: empty-override = `236ef895…`, h2-m02 = `9dfc464e…`,
+  continuation = `82ecc7b9…`.
+
+Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune exec trading/backtest/experiment_ledger/test/test_experiment_ledger.exe'`
+(9/9 tests: round-trip, config-hash equal/differ/stable, append-only raise,
+build_index, lookup hit/miss, load_index round-trip).
+
 ## Next Steps
 
-1. **PR-2 — Experiment ledger** (`dev/experiments/_ledger/`): append-only
-   per-experiment sexp + machine-readable index, config-hash dedup,
-   retroactive seed with known rejections (hysteresis ×2, continuation
-   combined-axis, M5.5 4-axis, laggard-disable).
-2. **PR-3 — Matrix ranking + Deflated Sharpe**: cross-variant best-of-N
+1. **PR-3 — Matrix ranking + Deflated Sharpe**: cross-variant best-of-N
    correction on top of `Fold_gate`; Pareto rank over (Sharpe, MaxDD,
    Calmar). Shares the DSR module with the BO program.
-3. **Skill (Gap F)** — once PR-1+PR-2 give it tools.
-4. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
+2. **Skill (Gap F)** — now unblocked (PR-1 + PR-2 give it the matrix
+   generator and the ledger lookup); build after PR-3.
+3. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
    a surface: hysteresis_weeks grid × exit_margin grid × relevant
    `enable_*` flags through WF-CV, ranked with DSR.
 
-## Out of scope (PR-1)
+## Out of scope (PR-2)
 
-- Ledger (PR-2), DSR ranking (PR-3), the skill (Gap F).
+- DSR ranking (PR-3), the skill (Gap F).
 - Any change to the WF runner / gate / report (reused unchanged).
+- Ledger-consuming dedup wiring into the WF runner / skill (PR-3 + skill).
 - Promotion automation (stays manual, ledger-backed).
