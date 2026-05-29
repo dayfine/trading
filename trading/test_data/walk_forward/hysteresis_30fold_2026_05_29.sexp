@@ -16,8 +16,11 @@
 ;; Variant  = "h2-m02" (the autopsy candidate that lost on the 15y panel).
 ;;
 ;; Gate: variant "h2-m02" must beat baseline "h1-m0" on Sharpe in
-;; ≥ 17 of 30 folds (>50%, simple majority), with no fold worse than
-;; baseline by more than 0.20 Sharpe. Calibrated to be FAILABLE on the
+;; ≥ 16 of 31 folds (>50%, simple majority), with no fold worse than
+;; baseline by more than 0.20 Sharpe. The Rolling geometry below yields
+;; 31 OOS folds (fold-000..fold-030) over 2010-2026 — n is set to 31 to
+;; match the generated count so the gate evaluates rather than SKIPs on a
+;; fold-count guard mismatch. Calibrated to be FAILABLE on the
 ;; same kind of disagreement that killed the 15y panel (the 15y panel
 ;; was 1 window worse by 0.16 Sharpe — would have been within tolerance,
 ;; but the failure-mode this spec catches is fold-distribution skew,
@@ -55,4 +58,4 @@
      (((stage3_force_exit_config ((hysteresis_weeks 2))))
       ((stage3_exit_margin_pct 0.02)))))))
  (baseline_label "h1-m0")
- (gate ((metric Sharpe) (m 17) (n 30) (worst_delta 0.20))))
+ (gate ((metric Sharpe) (m 16) (n 31) (worst_delta 0.20))))
