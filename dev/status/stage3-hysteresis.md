@@ -3,18 +3,27 @@
 ## Last updated: 2026-05-29
 
 ## Status
-READY_FOR_REVIEW
+MERGED
+
+PR-A MERGED (#1362, code knob plumbing). PR-B REJECTED on data (panel
+re-pin retracted; see retraction note). Track delivers no further code
+under this status file — any future revisit (walk-forward-grounded)
+will open under a new track.
 
 ## Interface stable
-NO
+YES
 
 `Stage3_force_exit_runner.update` gained two new arguments
 (`exit_margin_pct`, `prior_stage_ma_values`) and the strategy config
 gained `stage3_exit_margin_pct`. The detector core in
 `analysis/weinstein/stage3_force_exit/` is UNCHANGED — the margin
 filter sits at the runner layer (where price + MA are accessible).
-Public surface treated as v0 until at least one downstream sweep
-exercises both panel scenarios with the new defaults.
+Knob defaults preserve panel behavior (`hysteresis_weeks=2` on
+detector config; panel scenarios still pin explicit override
+`hysteresis_weeks=1`. Margin default `0.0` skips the filter). PR-B
+(panel re-pin to `hysteresis_weeks=2 + margin=0.02`) was REJECTED
+on 2026-05-29 PM after the 15y panel materially regressed (see
+follow-up retraction note).
 
 ## What it is
 
@@ -62,30 +71,31 @@ Tests (`trading/trading/weinstein/strategy/test/`):
 - `test_force_liquidation_strategy.ml` — `_strategy_state` record
   + `_fresh_state` updated with `prior_stage_ma_values` field.
 
-Panel scenarios NOT re-pinned in this PR — split out to PR-B
-(follow-up):
-- `trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp`
-- `trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp`
+Panel scenarios remain UNCHANGED — PR-B was REJECTED on 2026-05-29 PM
+after the planned re-pin (`hysteresis_weeks=2 + stage3_exit_margin_pct=0.02`)
+materially regressed the 15y panel despite winning on the 5y panel:
 
-Both still pin at `((hysteresis_weeks 1))` + default
-`((stage3_exit_margin_pct 0.0))` (preserved) — backward-compat is
-maintained, no panel pin drift, CI stays green on the merge of this
-PR. The actual flip to `hysteresis_weeks 2` + `stage3_exit_margin_pct
-0.02` requires:
+| Metric | 5y delta | 15y delta |
+|---|---|---|
+| total_return_pct | +4.33pp (improved) | -113.68pp (regressed) |
+| sharpe_ratio | +0.05 (improved) | -0.16 (regressed) |
+| max_drawdown_pct | -3.52pp (improved) | +4.47pp (regressed) |
+| calmar_ratio | +0.11 (improved) | -0.19 (regressed) |
+| sortino_ratio | +0.09 (improved) | -0.30 (regressed) |
+| ulcer_index | -1.80 (improved) | +1.61 (regressed) |
 
-1. Run scenario_runner on both panels (~25 min each wall).
-2. Read each `actual.sexp`; update Measured header + expected ranges
-   (±15% tolerances around new measurements).
-3. Update `dev/scripts/promote_config.sh` PANEL row constants
-   (8-column format from #1359).
+5y vs 15y disagreement is the textbook single-window overfit pattern
+this project has explicitly committed to reject (precedent:
+`memory/project_continuation_combined_rejected.md`). Full data + lesson
+in `dev/notes/stage3-hysteresis-panel-rejected-2026-05-29.md`.
 
-This is left to follow-up PR-B per the brief's "2 PRs if scenario
-re-pins want to be separate" allowance. Justification: the panel
-re-runs are wall-time-bound (~50 min combined) and require active
-sanity-checking against `feedback_strategy_mechanic_changes_too_explorative.md`
-(if numbers degrade on the 5y panel, retract). Keeping the code-only
-PR mergeable independently lets PR-B test (and potentially retract)
-the parameter choices in isolation.
+Panel scenarios stay at:
+- `trading/test_data/backtest_scenarios/goldens-sp500-historical/sp500-2010-2026.sexp` (`((hysteresis_weeks 1))`, default margin=0.0)
+- `trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023.sexp` (same)
+
+PR-A's code change (#1362) remains MERGED — knob defaults preserve panel
+behavior, no harm done. The knob is available for future use; the panel
+re-pin specifically was the wrong application.
 
 ## Architecture notes
 
@@ -104,12 +114,11 @@ the parameter choices in isolation.
 
 ## QC
 
-NOT YET REVIEWED. Awaiting:
-- `qc-structural` (A1 will FLAG — touches `weinstein_strategy_config`
-  + `weinstein_strategy.ml` + `stops_runner.ml` — Weinstein-specific
-  strategy-level config additions are expected for this track).
-- `qc-behavioral` (S* / L* / C* / T* domain rows apply; S3 / S5 / S6
-  / L1-L4 / T1-T4 most relevant).
+PR-A (#1362, code knob plumbing) — REVIEWED + MERGED.
+
+PR-B (panel re-pin) was REJECTED before opening. The retraction note
+`dev/notes/stage3-hysteresis-panel-rejected-2026-05-29.md` is the
+only PR-B-tier artifact landing.
 
 ## Verify
 
@@ -140,18 +149,28 @@ docker exec trading-1-dev bash -c \
      --no-emit-all-eligible'
 ```
 
-## Follow-ups (out of scope for this PR)
+## Follow-ups
 
-1. **Re-run trade-autopsy with the hysteresis fix in place** — pin
-   the autopsy framework as a fix-finder vs labelling exercise.
-   Expected: `late_reentry` total drops 40-70%; `stage3_false_positive`
-   drops dramatically; `late_stage2_admission` unchanged.
-2. **Sweep `(hysteresis_weeks, exit_margin_pct)` jointly** for the
-   CAGR-vs-Sharpe optimum on both 5y and 15y panels.
-3. **Late_stage2_admission fix** — autopsy's #3 failure mode
-   (+505% / 100 trades). Different mechanic; defer until P0+P1
-   confirm the autopsy → fix loop is working.
+1. **DO NOT re-attempt the panel re-pin with alternative `(h, margin)`
+   cells** without first adding walk-forward cross-window validation.
+   Per `dev/notes/stage3-hysteresis-panel-rejected-2026-05-29.md`, the
+   single-window-overfit pattern is the reason; iterating in knob
+   space without walk-forward is the explorative approach the project
+   has committed to avoid.
+2. **Walk-forward CV infrastructure** is the right unblock surface.
+   Per `memory/project_strategic_pivot_broader_first.md` (2026-05-15
+   pivot) — broader-universe + walk-forward CV + ML-discipline tuning
+   is P0; this retraction reinforces the pivot's framing.
+3. **Symmetric autopsy classifier** — extend `analysis/scripts/trade_autopsy/`
+   to also measure missed-drawdown-avoidance on the late-exit side,
+   not only missed-recovery on the early-exit side. The asymmetric
+   signal is part of why the autopsy's 5y projection missed the 15y
+   sign-flip.
 4. **`stage3_force_exit_config` field embedding** — eventually move
    `exit_margin_pct` into the analysis-side `Stage3_force_exit.config`
    record once the analysis vs trading layer split is reconsidered.
-   Out of scope here per the dispatch scope guard rail.
+   Lower priority now that PR-B is rejected — the knob is dormant
+   until a walk-forward-grounded re-attempt is feasible.
+5. **Late_stage2_admission fix (autopsy mode 3)** — same caution as
+   stage3 hysteresis. Do not project per-symbol missed gain to
+   portfolio outcomes without walk-forward validation.
