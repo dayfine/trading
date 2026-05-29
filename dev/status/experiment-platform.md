@@ -47,6 +47,20 @@ present it prepends the auto-baseline cell then appends the expanded
 matrix (explicit `variants`, if any, kept first). De-dups by label.
 Axes-absent specs parse 100% backward-compatibly.
 
+`Backtest_stats` + `Walk_forward.Variant_ranking` surface (PR-3):
+- `Backtest_stats.Normal_dist` — `cdf` / `inv_cdf` (Gaussian CDF and
+  quantile via `Owl.Maths.erf` / `erfinv`).
+- `Backtest_stats.Deflated_sharpe` — `psr` (Probabilistic Sharpe),
+  `expected_max_sharpe` (best-of-N benchmark SR*), `deflated_sharpe`
+  (PSR at that benchmark), plus `skewness` / `kurtosis` population
+  moment helpers. Pure; shared with the BO tuner (new `backtest_stats`
+  lib, deps `core` / `owl` only — no heavy `backtest` coupling).
+- `Walk_forward.Variant_ranking` — `dominates` (Pareto over Sharpe up /
+  Calmar up / MaxDD% down), `rank` (frontier + `dominated_by` per
+  variant over `Walk_forward_types.variant_stability`), `render`
+  (deterministic markdown frontier + per-variant table with a Deflated
+  Sharpe column passed in by the caller).
+
 ## Work
 
 ### Gap A — Variant-matrix generator (PR-1)
@@ -91,20 +105,47 @@ Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && 
 (9/9 tests: round-trip, config-hash equal/differ/stable, append-only raise,
 build_index, lookup hit/miss, load_index round-trip).
 
+### Gap C — Matrix-aware ranking + Deflated Sharpe (PR-3)
+- [x] **`Backtest_stats.Deflated_sharpe`** + **`Backtest_stats.Normal_dist`**
+  — pure Bailey & López de Prado closed form. New `backtest_stats` lib at
+  `trading/trading/backtest/stats/lib/{deflated_sharpe,normal_dist}.{ml,mli}`
+  (deps `core` / `owl` only, so both this matrix path and the BO tuner can
+  reuse it without pulling the heavy `backtest` lib). No prior DSR existed
+  in-repo (grep clean); `Normal_dist` wraps `Owl.Maths.erf` / `erfinv` for
+  Φ / Φ⁻¹. Pinned reference values: PSR(SR̂=0.5, T=24, normal, SR*=0)=
+  0.9881134547; PSR(…SR*=0.3)=0.8170846532; PSR(SR̂=0.8, T=36, γ3=−0.5,
+  γ4=4, SR*=0.2)=0.9951851034; expected_max_sharpe(N=12, var=0.04)=
+  0.3329622776; end-to-end DSR(obs=0.5, folds=[1..5], N=12, var=0.04)=
+  0.6281656469. Φ(1.96)≈0.975, Φ⁻¹(0.975)≈1.96. Degenerate guards
+  (n_obs<2, n_trials<2, zero variance) raise `Invalid_argument` and are
+  pinned.
+- [x] **`Walk_forward.Variant_ranking`** — Pareto dominance over (Sharpe ↑,
+  Calmar ↑, MaxDD% ↓) reusing the emitted
+  `Walk_forward_types.variant_stability`. `rank` returns per-variant
+  `{ label; stability; on_frontier; dominated_by }` + the frontier set;
+  `render` is a deterministic markdown frontier + per-variant table with a
+  Deflated-Sharpe column (DSR passed in by the caller, so the ranking lib
+  stays decoupled from `backtest_stats`). At
+  `trading/trading/backtest/walk_forward/lib/variant_ranking.{ml,mli}`.
+
+Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune exec trading/backtest/stats/test/test_normal_dist.exe && dune exec trading/backtest/stats/test/test_deflated_sharpe.exe && dune exec trading/backtest/walk_forward/test/test_variant_ranking.exe'`
+(normal_dist 5/5; deflated_sharpe 12/12; variant_ranking 6/6).
+
 ## Next Steps
 
-1. **PR-3 — Matrix ranking + Deflated Sharpe**: cross-variant best-of-N
-   correction on top of `Fold_gate`; Pareto rank over (Sharpe, MaxDD,
-   Calmar). Shares the DSR module with the BO program.
-2. **Skill (Gap F)** — now unblocked (PR-1 + PR-2 give it the matrix
-   generator and the ledger lookup); build after PR-3.
-3. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
+1. **Skill (Gap F)** — now unblocked (PR-1 + PR-2 + PR-3 give it the
+   matrix generator, the ledger lookup, and the DSR ranking); build next.
+2. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
    a surface: hysteresis_weeks grid × exit_margin grid × relevant
    `enable_*` flags through WF-CV, ranked with DSR.
+3. **Wire DSR into the BO tuner** — the `backtest_stats` lib is shared;
+   the BO program can adopt `Deflated_sharpe` for its own best-of-N
+   correction (deferred to that program).
 
-## Out of scope (PR-2)
+## Out of scope (PR-3)
 
-- DSR ranking (PR-3), the skill (Gap F).
+- The skill (Gap F).
+- Wiring `Variant_ranking` / `Deflated_sharpe` into the WF runner or the
+  BO tuner (this PR ships the pure libs + tests only).
 - Any change to the WF runner / gate / report (reused unchanged).
-- Ledger-consuming dedup wiring into the WF runner / skill (PR-3 + skill).
 - Promotion automation (stays manual, ledger-backed).
