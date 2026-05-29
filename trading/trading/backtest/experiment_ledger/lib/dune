@@ -1,0 +1,5 @@
+(library
+ (name experiment_ledger)
+ (libraries core core_unix.sys_unix backtest weinstein_trading.strategy)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.eq)))
