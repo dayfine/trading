@@ -1,0 +1,9 @@
+(tests
+ (names test_trade_autopsy)
+ (libraries
+  trade_autopsy_lib
+  per_symbol_stage_strategy_lib
+  types
+  core
+  ounit2
+  matchers))
