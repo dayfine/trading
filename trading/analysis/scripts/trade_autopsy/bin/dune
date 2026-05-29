@@ -1,0 +1,13 @@
+(executable
+ (name autopsy_runner)
+ (libraries
+  core
+  core_unix.command_unix
+  fpath
+  types
+  csv
+  indicators.time_period
+  per_symbol_stage_strategy_lib
+  trade_autopsy_lib)
+ (preprocess
+  (pps ppx_jane)))

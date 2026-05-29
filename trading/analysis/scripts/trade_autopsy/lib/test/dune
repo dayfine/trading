@@ -1,0 +1,25 @@
+(library
+ (name trade_autopsy_test_helpers)
+ (modules test_helpers)
+ (wrapped false)
+ (libraries core per_symbol_stage_strategy_lib types))
+
+(tests
+ (names
+  test_missed_gain
+  test_exit_reason
+  test_failure_modes
+  test_aggregation)
+ (modules
+  test_missed_gain
+  test_exit_reason
+  test_failure_modes
+  test_aggregation)
+ (libraries
+  trade_autopsy_lib
+  trade_autopsy_test_helpers
+  per_symbol_stage_strategy_lib
+  types
+  core
+  ounit2
+  matchers))
