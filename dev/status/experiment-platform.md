@@ -129,16 +129,26 @@ build_index, lookup hit/miss, load_index round-trip).
   `trading/trading/backtest/walk_forward/lib/variant_ranking.{ml,mli}`.
 
 Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build && dune exec trading/backtest/stats/test/test_normal_dist.exe && dune exec trading/backtest/stats/test/test_deflated_sharpe.exe && dune exec trading/backtest/walk_forward/test/test_variant_ranking.exe'`
-(normal_dist 5/5; deflated_sharpe 12/12; variant_ranking 6/6).
+(normal_dist 5/5; deflated_sharpe 14/14; variant_ranking 6/6).
+
+### Gap F — Gap-closing experimentation skill
+- [x] **`.claude/skills/experiment-gap-closing/SKILL.md`** — invocable skill
+  encoding the full loop: name the gap → hypothesis→axes (prefer existing
+  flags; new mechanism behind a default-off flag first) → check the ledger
+  (skip rejected config-hashes) → generate the matrix (`Variant_matrix`) →
+  run WF-CV (`sweep-hygiene`) → rank (`Variant_ranking` Pareto +
+  `Deflated_sharpe` best-of-N deflation) → verdict + `Experiment_ledger`
+  append → promote winner (`promote_config.sh`) → memory. Bakes in the two
+  hard lessons (autopsy = labeller-not-recommender; test a surface, not a
+  point) and the continuous-vs-discrete reframe.
 
 ## Next Steps
 
-1. **Skill (Gap F)** — now unblocked (PR-1 + PR-2 + PR-3 give it the
-   matrix generator, the ledger lookup, and the DSR ranking); build next.
-2. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
+1. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
    a surface: hysteresis_weeks grid × exit_margin grid × relevant
-   `enable_*` flags through WF-CV, ranked with DSR.
-3. **Wire DSR into the BO tuner** — the `backtest_stats` lib is shared;
+   `enable_*` flags through WF-CV, ranked with DSR. This is the canonical
+   end-to-end exercise of the whole platform.
+2. **Wire DSR into the BO tuner** — the `backtest_stats` lib is shared;
    the BO program can adopt `Deflated_sharpe` for its own best-of-N
    correction (deferred to that program).
 
