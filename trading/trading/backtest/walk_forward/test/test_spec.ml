@@ -227,6 +227,112 @@ let test_hysteresis_gate_n_matches_generated_fold_count _ =
   let generated = List.length (WS.generate spec.window_spec) in
   assert_that generated (all_of [ equal_to 31; equal_to spec.gate.n ])
 
+(* ---------- axes -> variants expansion on load (plan Gap A) ---------- *)
+
+(* Write [contents] to a fresh temp file and return its path. The spec [load]
+   path only reads the file, so a throwaway temp file is the simplest fixture. *)
+let _write_temp_spec contents =
+  let path = Stdlib.Filename.temp_file "wf_spec_axes" ".sexp" in
+  Out_channel.write_all path ~data:contents;
+  path
+
+let _variant_labels (spec : Spec.t) =
+  List.map spec.variants
+    ~f:(fun (v : Walk_forward.Walk_forward_runner.variant) -> v.label)
+
+(* axes-only: resolved variants = auto-baseline first, then the 2-cell matrix. *)
+let _axes_only_spec =
+  {|
+((base_scenario "stub.sexp")
+ (window_spec (Explicit (((name f0) (train_period ()) (test_period ((start_date 2020-01-01) (end_date 2020-12-31)))))))
+ (baseline_label "base")
+ (gate ((metric Sharpe) (m 1) (n 1) (worst_delta 1.0)))
+ (axes ((axes (((key (stage3_exit_margin_pct)) (values (0.0 0.02))))) (expansion Cartesian))))
+|}
+
+let test_axes_only_expands_with_baseline _ =
+  let spec = Spec.load (_write_temp_spec _axes_only_spec) in
+  assert_that (_variant_labels spec)
+    (elements_are
+       [
+         equal_to "base";
+         equal_to "stage3_exit_margin_pct=0.0";
+         equal_to "stage3_exit_margin_pct=0.02";
+       ])
+
+(* explicit variants + axes: explicit first, then baseline, then matrix. *)
+let _explicit_plus_axes_spec =
+  {|
+((base_scenario "stub.sexp")
+ (window_spec (Explicit (((name f0) (train_period ()) (test_period ((start_date 2020-01-01) (end_date 2020-12-31)))))))
+ (variants (((label "hand") (overrides ()))))
+ (baseline_label "base")
+ (gate ((metric Sharpe) (m 1) (n 1) (worst_delta 1.0)))
+ (axes ((axes (((flag enable_laggard_rotation) (values (true false))))) (expansion Cartesian))))
+|}
+
+let test_explicit_plus_axes_concatenates _ =
+  let spec = Spec.load (_write_temp_spec _explicit_plus_axes_spec) in
+  assert_that (_variant_labels spec)
+    (elements_are
+       [
+         equal_to "hand";
+         equal_to "base";
+         equal_to "enable_laggard_rotation=true";
+         equal_to "enable_laggard_rotation=false";
+       ])
+
+(* A typo'd axis key must fail at load (expansion-time validation, Gap B). *)
+let _bad_axis_spec =
+  {|
+((base_scenario "stub.sexp")
+ (window_spec (Explicit (((name f0) (train_period ()) (test_period ((start_date 2020-01-01) (end_date 2020-12-31)))))))
+ (baseline_label "base")
+ (gate ((metric Sharpe) (m 1) (n 1) (worst_delta 1.0)))
+ (axes ((axes (((key (not_a_real_config_key)) (values (1))))) (expansion Cartesian))))
+|}
+
+let test_axes_bad_key_raises_on_load _ =
+  let path = _write_temp_spec _bad_axis_spec in
+  let raised =
+    try
+      ignore (Spec.load path);
+      false
+    with Failure _ -> true
+  in
+  assert_that raised (equal_to true)
+
+(* A label collision must fail at load (Spec.load's [_check_unique_labels]
+   fail-loud contract, qc-behavioral CP1/CP4). Here an explicit variant labeled
+   "base" collides with the auto-injected baseline cell (label = baseline_label
+   "base"). *)
+let _colliding_label_spec =
+  {|
+((base_scenario "stub.sexp")
+ (window_spec (Explicit (((name f0) (train_period ()) (test_period ((start_date 2020-01-01) (end_date 2020-12-31)))))))
+ (variants (((label "base") (overrides ()))))
+ (baseline_label "base")
+ (gate ((metric Sharpe) (m 1) (n 1) (worst_delta 1.0)))
+ (axes ((axes (((flag enable_laggard_rotation) (values (true false))))) (expansion Cartesian))))
+|}
+
+let test_axes_label_collision_raises_on_load _ =
+  let path = _write_temp_spec _colliding_label_spec in
+  let raised =
+    try
+      ignore (Spec.load path);
+      false
+    with Failure _ -> true
+  in
+  assert_that raised (equal_to true)
+
+(* Backward-compat: an axes-absent spec resolves to its hand-written variants
+   verbatim (no baseline injected, no reordering). *)
+let test_no_axes_is_backward_compatible _ =
+  let spec = Spec.load (_fixture_path "cell_e_8fold_2026_05_08.sexp") in
+  assert_that (_variant_labels spec)
+    (elements_are [ equal_to "cell-A"; equal_to "cell-E" ])
+
 let suite =
   "Walk_forward_spec"
   >::: [
@@ -254,6 +360,15 @@ let suite =
          >:: test_hysteresis_variants_are_h1m0_and_h2m02;
          "hysteresis gate.n matches generated fold count (31)"
          >:: test_hysteresis_gate_n_matches_generated_fold_count;
+         "axes-only expands with auto-baseline"
+         >:: test_axes_only_expands_with_baseline;
+         "explicit variants + axes concatenate"
+         >:: test_explicit_plus_axes_concatenates;
+         "axes bad key raises on load" >:: test_axes_bad_key_raises_on_load;
+         "axes label collision raises on load"
+         >:: test_axes_label_collision_raises_on_load;
+         "no-axes spec is backward-compatible"
+         >:: test_no_axes_is_backward_compatible;
        ]
 
 let () = run_test_tt_main suite
