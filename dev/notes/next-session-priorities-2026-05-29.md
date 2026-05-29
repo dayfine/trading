@@ -4,13 +4,16 @@
 
 ## TL;DR
 
-**v7 BO is dead. v8 BO design is dead. The Weinstein strategy as currently implemented is a DEFENSIVE risk-management tool, not an alpha-generation tool.** Reframe to risk-adjusted (Calmar/Sortino) success metrics, then ship one concrete fix and one experiment.
+**v7 BO is dead. v8 BO design is dead. The Weinstein strategy as currently implemented is a DEFENSIVE risk-management tool, not an alpha-generation tool.** Reframe to risk-adjusted (Calmar/Sortino) success metrics, ship the metric-gate change (P2), and run the trade-autopsy decomposition (P3) before any further mechanism change.
+
+**P1 update 2026-05-29 PM:** the proposed laggard-disable Cell-E refresh was RETRACTED after re-test — ablation finding doesn't generalize from 12-symbol to 500-symbol universes. See `p1-laggard-disable-retracted-2026-05-29.md`.
 
 ## Read first
 
 - `dev/notes/layered-decomposition-synthesis-2026-05-29.md` — full 27y component-isolation analysis with verdict + concrete next-step list
 - `dev/notes/per-symbol-stage-strategy-2026-05-29.md` (PR #1353) — 12-symbol diagnostic: stage analysis is drawdown-protection, NOT alpha source on absolute return
-- `dev/notes/mechanism-ablation-2026-05-29.md` (#1352 merged) — `laggard_rotation` is the dominant alpha-killer
+- `dev/notes/mechanism-ablation-2026-05-29.md` (#1352 merged) — `laggard_rotation` is the alpha-killer **on narrow universes** (narrowed claim post-P1 retest)
+- `dev/notes/p1-laggard-disable-retracted-2026-05-29.md` (this session) — universe-dependence finding
 
 ## P0 — confirm direction with user
 
@@ -23,14 +26,21 @@ Get user agreement OR pushback. If they want to pursue absolute-CAGR alpha anywa
 - (b) Pivot to broader-universe per `project_strategic_pivot_broader_first.md`
 - (c) Pivot off Weinstein entirely
 
-## P1 — one config change + one ablation re-test
+## P1 — RETRACTED (laggard disable hurts on full-universe panel)
 
-1. **Disable `laggard_rotation`** as new Cell-E default (PR-sized: config edit + tests).
-2. **Re-run promote_config.sh** with that change against the 2-scenario panel (sp500-2010-2026 + sp500-2019-2023). Expectation: passes the gate (laggard was the alpha-killer that was making v7 fail). If it doesn't, the gate itself needs reframing per P2.
+**Original P1:** disable `enable_laggard_rotation` as new Cell-E default.
 
-## P2 — adopt Calmar/Sortino as primary metric
+**Outcome:** rejected after 2026-05-29 panel re-test. See `dev/notes/p1-laggard-disable-retracted-2026-05-29.md`.
 
-Update `promote_config.sh` to gate on Calmar Δ ≥ +0.5 (or Sortino, depending on which is more stable across the 2-scenario panel) rather than Sharpe Δ ≥ -0.10. Add CAGR Δ ≥ -2.0pp as a sanity floor (don't promote configs that throw away half the upside).
+Both panel scenarios regressed: 5y panel lost on every risk-adjusted metric (Sharpe −0.08, Calmar −0.11, MaxDD +3.4pp); 15y panel had marginal Calmar gain (+0.04) but Sharpe / Sortino / return all degraded (−0.04 / −0.11 / −45pp). The ablation finding (#1352) was real for narrow universes (12 symbols) but does not generalize to the production 500-symbol panel where rotation has many uncorrelated candidates to cycle into.
+
+**Narrower form survives:** for per-symbol or sector-ETF diagnostic experiments, keep `enable_laggard_rotation = false`. NOT a global default change.
+
+## P2 — adopt Calmar/Sortino as primary metric (STILL VALID)
+
+Independent of P1's retraction. Update `promote_config.sh` to gate on Calmar Δ ≥ +0.5 (or Sortino — pick whichever is more stable across the 2-scenario panel) rather than Sharpe Δ ≥ -0.10. Add CAGR Δ ≥ -2.0pp as a sanity floor (don't promote configs that throw away half the upside).
+
+Updated motivation post-P1 retraction: the per-symbol § 4.6 finding stands — stage analysis delivers risk-adjusted alpha (Calmar 6/12 wins) but loses absolute CAGR on most symbols. The gate should reward risk-adjusted gains rather than Sharpe-only. P2 proceeds against existing Cell-E baseline (laggard ON). The 15y panel actual.sexp now has Calmar 0.52 + Sortino 1.25 — directly usable for the new PANEL pin.
 
 Per the synthesis doc: "The reframed win condition: beat BAH SPY on Calmar ≥ 1.5× with CAGR within -2pp."
 
