@@ -65,6 +65,7 @@ type _strategy_state = {
   prior_macro_result : Macro.result option ref;
   peak_tracker : FL.Peak_tracker.t;
   prior_stages : stage Hashtbl.M(String).t;
+  prior_stage_ma_values : float Hashtbl.M(String).t;
   sector_prior_stages : stage Hashtbl.M(String).t;
   ticker_sectors : (string, string) Hashtbl.t;
   stage3_streaks : int Hashtbl.M(String).t;
@@ -83,6 +84,7 @@ let _fresh_state ~bar_reader =
     prior_macro_result = ref None;
     peak_tracker = FL.Peak_tracker.create ();
     prior_stages = Hashtbl.create (module String);
+    prior_stage_ma_values = Hashtbl.create (module String);
     sector_prior_stages = Hashtbl.create (module String);
     ticker_sectors = Hashtbl.create (module String);
     stage3_streaks = Hashtbl.create (module String);
@@ -106,6 +108,7 @@ let _drive_tick state ~config ~current_date ~portfolio =
     ~prior_macro:state.prior_macro ~prior_macro_result:state.prior_macro_result
     ~peak_tracker:state.peak_tracker ~bar_reader:state.bar_reader
     ~prior_stages:state.prior_stages
+    ~prior_stage_ma_values:state.prior_stage_ma_values
     ~sector_prior_stages:state.sector_prior_stages
     ~ticker_sectors:state.ticker_sectors ~stage3_streaks:state.stage3_streaks
     ~laggard_streaks:state.laggard_streaks ~audit_recorder:Audit_recorder.noop

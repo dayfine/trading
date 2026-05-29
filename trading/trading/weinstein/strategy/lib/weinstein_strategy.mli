@@ -249,6 +249,18 @@ type config = {
           records Stage-3 force-exit events into [last_stop_out_dates] when this
           knob is [> 0], so the existing cascade gate applies regardless of
           which exit path fired. *)
+  stage3_exit_margin_pct : float; [@sexp.default 0.0]
+      (** Minimum margin (fraction) by which the current bar's close must sit
+          below the 30-week MA before {!Stage3_force_exit_runner.update} emits a
+          force-exit transition. Layered on top of
+          {!Stage3_force_exit.config.hysteresis_weeks}: both conditions must be
+          satisfied for an exit to fire.
+
+          Default [0.0] preserves prior behaviour. Recommended panel values per
+          [dev/notes/next-session-priorities-2026-05-29-PM.md] §P0:
+          [stage3_exit_margin_pct] in [0.02..0.05] paired with
+          [stage3_force_exit_config.hysteresis_weeks >= 2]. See
+          {!Weinstein_strategy_config} for full semantics. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
       (** Laggard-rotation detector parameters (issue #887). Default
@@ -558,6 +570,7 @@ module Internal_for_test : sig
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
     bar_reader:Bar_reader.t ->
     prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
+    prior_stage_ma_values:float Hashtbl.M(String).t ->
     sector_prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
     ticker_sectors:(string, string) Hashtbl.t ->
     stage3_streaks:int Hashtbl.M(String).t ->
@@ -570,8 +583,8 @@ module Internal_for_test : sig
   (** Drives [_on_market_close] with all closure-scoped state passed in
       explicitly. Mutates [stop_states] / [last_stop_out_dates] / [prior_macro]
       / [prior_macro_result] / [peak_tracker] / [prior_stages] /
-      [sector_prior_stages] / [stage3_streaks] / [laggard_streaks] in place,
-      mirroring the closure semantics in {!make}.
+      [prior_stage_ma_values] / [sector_prior_stages] / [stage3_streaks] /
+      [laggard_streaks] in place, mirroring the closure semantics in {!make}.
 
       [~fold_start_date] is a required parameter here (not optional) — pass
       [None] to preserve baselines; pass [Some d] to enable Win #4 universe

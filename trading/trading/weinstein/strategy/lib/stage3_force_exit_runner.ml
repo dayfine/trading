@@ -43,52 +43,92 @@ let _find_force_exit ~config ~stage3_streaks ~prior_stages symbol =
       | Stage3_force_exit.Force_exit { weeks_in_stage3 } -> Some weeks_in_stage3
       )
 
+(** Check the price-below-MA margin gate. Returns [true] when the close sits far
+    enough below the 30-week MA to satisfy [exit_margin_pct], OR when the margin
+    filter is disabled (no MA value available, no threshold supplied).
+
+    Disabling cases — all backward-compatible:
+    - [exit_margin_pct = 0.0] — any close (incl. above the MA) satisfies the
+      [>= 0.0] inequality; runner emits exactly as it did pre-fix.
+    - [prior_stage_ma_values] omitted or symbol absent — no MA available, so the
+      runner cannot evaluate the margin and falls back to hysteresis-only.
+
+    The classifier-side warmup case (weekly bars < ma_period) is handled by
+    {!Stops_runner._compute_ma_and_stage}: during warmup the runner uses a
+    side-defaulted stage that is not [Stage3], so the detector never reaches the
+    margin check on a warmup bar in the first place. *)
+let _margin_ok ~prior_stage_ma_values ~exit_margin_pct ~bar ~symbol =
+  match prior_stage_ma_values with
+  | None -> true
+  | Some tbl -> (
+      match Hashtbl.find tbl symbol with
+      | None -> true
+      | Some ma_value ->
+          if Float.(ma_value <= 0.0) then true
+          else
+            let close = bar.Types.Daily_price.close_price in
+            Float.((ma_value -. close) /. ma_value >= exit_margin_pct))
+
 (** Emit a [TriggerExit] for [pos] if it is not already being exited by the
-    stops runner this tick and [get_price] has a bar for the symbol. Returns
-    [None] when either guard fires. *)
-let _emit_if_eligible ~stop_exit_position_ids ~get_price ~pos ~current_date
-    ~weeks_in_stage3 =
+    stops runner this tick, [get_price] has a bar for the symbol, AND the
+    price-below-MA margin gate is satisfied. Returns [None] when any guard
+    fires. *)
+let _emit_if_eligible ~prior_stage_ma_values ~exit_margin_pct
+    ~stop_exit_position_ids ~get_price ~pos ~current_date ~weeks_in_stage3 =
   if Set.mem stop_exit_position_ids pos.Position.id then None
   else
-    Option.map (get_price pos.symbol) ~f:(fun bar ->
-        _make_exit_transition ~pos ~current_date ~bar ~weeks_in_stage3)
+    Option.bind (get_price pos.symbol) ~f:(fun bar ->
+        if
+          _margin_ok ~prior_stage_ma_values ~exit_margin_pct ~bar
+            ~symbol:pos.symbol
+        then
+          Some (_make_exit_transition ~pos ~current_date ~bar ~weeks_in_stage3)
+        else None)
 
 (** Emit a force-exit for a [Holding] long position when the detector fires.
     Checks stage via [_find_force_exit] then eligibility; returns [None] when
     either guard is absent. *)
-let _force_exit_for_holding ~config ~stage3_streaks ~prior_stages
-    ~stop_exit_position_ids ~get_price ~current_date (pos : Position.t) =
+let _force_exit_for_holding ~prior_stage_ma_values ~exit_margin_pct ~config
+    ~stage3_streaks ~prior_stages ~stop_exit_position_ids ~get_price
+    ~current_date (pos : Position.t) =
   match _find_force_exit ~config ~stage3_streaks ~prior_stages pos.symbol with
   | None -> None
   | Some weeks_in_stage3 ->
-      _emit_if_eligible ~stop_exit_position_ids ~get_price ~pos ~current_date
-        ~weeks_in_stage3
+      _emit_if_eligible ~prior_stage_ma_values ~exit_margin_pct
+        ~stop_exit_position_ids ~get_price ~pos ~current_date ~weeks_in_stage3
 
 (** Process one position. Returns [Some transition] when the detector fires AND
-    the position is not already exiting via a stop hit this tick. The detector's
-    streak counter is always mutated (in [stage3_streaks]) — even on a skipped
-    emit — so the count remains accurate against the underlying stage stream. *)
-let _process_position ~config ~stage3_streaks ~prior_stages
-    ~stop_exit_position_ids ~get_price ~current_date (pos : Position.t) =
+    the position is not already exiting via a stop hit this tick AND the
+    price-below-MA margin gate is satisfied. The detector's streak counter is
+    always mutated (in [stage3_streaks]) — even on a skipped emit — so the count
+    remains accurate against the underlying stage stream. *)
+let _process_position ~prior_stage_ma_values ~exit_margin_pct ~config
+    ~stage3_streaks ~prior_stages ~stop_exit_position_ids ~get_price
+    ~current_date (pos : Position.t) =
   match (pos.side, Position.get_state pos) with
   | Trading_base.Types.Long, Position.Holding _ ->
-      _force_exit_for_holding ~config ~stage3_streaks ~prior_stages
-        ~stop_exit_position_ids ~get_price ~current_date pos
+      _force_exit_for_holding ~prior_stage_ma_values ~exit_margin_pct ~config
+        ~stage3_streaks ~prior_stages ~stop_exit_position_ids ~get_price
+        ~current_date pos
   | _ -> None
 
-let _fold_position ~config ~stage3_streaks ~prior_stages ~stop_exit_position_ids
-    ~get_price ~current_date acc pos =
+let _fold_position ~prior_stage_ma_values ~exit_margin_pct ~config
+    ~stage3_streaks ~prior_stages ~stop_exit_position_ids ~get_price
+    ~current_date acc pos =
   match
-    _process_position ~config ~stage3_streaks ~prior_stages
-      ~stop_exit_position_ids ~get_price ~current_date pos
+    _process_position ~prior_stage_ma_values ~exit_margin_pct ~config
+      ~stage3_streaks ~prior_stages ~stop_exit_position_ids ~get_price
+      ~current_date pos
   with
   | Some t -> t :: acc
   | None -> acc
 
-let update ~config ~is_screening_day ~positions ~get_price ~prior_stages
-    ~stage3_streaks ~stop_exit_position_ids ~current_date =
+let update ~config ~exit_margin_pct ~prior_stage_ma_values ~is_screening_day
+    ~positions ~get_price ~prior_stages ~stage3_streaks ~stop_exit_position_ids
+    ~current_date =
   if not is_screening_day then []
   else
     Map.fold positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
-        _fold_position ~config ~stage3_streaks ~prior_stages
-          ~stop_exit_position_ids ~get_price ~current_date acc pos)
+        _fold_position ~prior_stage_ma_values ~exit_margin_pct ~config
+          ~stage3_streaks ~prior_stages ~stop_exit_position_ids ~get_price
+          ~current_date acc pos)

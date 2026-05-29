@@ -30,6 +30,32 @@ type config = {
       [@sexp.default Stage3_force_exit.default_config]
   enable_stage3_force_exit : bool; [@sexp.default false]
   stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
+  stage3_exit_margin_pct : float; [@sexp.default 0.0]
+      (** Minimum margin (fraction) by which the current bar's close must sit
+          below the 30-week MA before {!Stage3_force_exit_runner.update} emits a
+          force-exit transition. Layered on top of
+          {!Stage3_force_exit.config.hysteresis_weeks} (the consecutive-Stage-3
+          count): both must be satisfied for an exit to fire.
+
+          Concretely the runner suppresses the exit when
+          [(ma_value -. close_price) /. ma_value < stage3_exit_margin_pct], i.e.
+          the close is not far enough below the MA. Negative values (close above
+          MA) are likewise suppressed when the threshold is positive. The
+          hysteresis streak counter is unaffected — the detector still observes
+          the Stage 3 read and advances its consecutive count; only the emission
+          decision is gated by margin.
+
+          Default [0.0] preserves prior behaviour: any close (above or below the
+          MA) satisfies the inequality, so the runner emits whenever
+          {!Stage3_force_exit.observe_position} returns [Force_exit].
+
+          Recommended panel values per
+          [dev/notes/next-session-priorities-2026-05-29-PM.md] §P0:
+          [stage3_exit_margin_pct] in [0.02..0.05] paired with
+          [stage3_force_exit_config.hysteresis_weeks >= 2]. The two knobs
+          together filter the false Stage 2 -> 3 transitions identified by the
+          trade-autopsy tool (PR #1360) as the dominant capital-recycling
+          failure mode. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
   enable_laggard_rotation : bool; [@sexp.default false]
