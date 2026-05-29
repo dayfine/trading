@@ -6,7 +6,8 @@
   test_walk_forward_report
   test_walk_forward_executor_parallel
   test_spec
-  test_variant_matrix)
+  test_variant_matrix
+  test_variant_ranking)
  (libraries
   ounit2
   core
