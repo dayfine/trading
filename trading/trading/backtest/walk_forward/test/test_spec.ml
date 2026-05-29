@@ -193,6 +193,31 @@ let test_28fold_gate_is_non_firing _ =
          field (fun (g : Walk_forward.Fold_gate.t) -> g.n) (equal_to 28);
        ])
 
+(* ---------- Hysteresis 30-fold fixture (stage3 revisit, 2026-05-29) ---------- *)
+
+let _hysteresis_fixture = "hysteresis_30fold_2026_05_29.sexp"
+
+let test_hysteresis_spec_parses _ =
+  let spec = Spec.load (_fixture_path _hysteresis_fixture) in
+  assert_that spec
+    (all_of
+       [
+         field
+           (fun (s : Spec.t) -> s.base_scenario)
+           (equal_to "goldens-sp500-historical/sp500-2010-2026.sexp");
+         field (fun (s : Spec.t) -> s.baseline_label) (equal_to "h1-m0");
+         field (fun (s : Spec.t) -> List.length s.variants) (equal_to 2);
+         field (fun (s : Spec.t) -> s.gate.n) (equal_to 30);
+       ])
+
+let test_hysteresis_variants_are_h1m0_and_h2m02 _ =
+  let spec = Spec.load (_fixture_path _hysteresis_fixture) in
+  let labels =
+    List.map spec.variants
+      ~f:(fun (v : Walk_forward.Walk_forward_runner.variant) -> v.label)
+  in
+  assert_that labels (elements_are [ equal_to "h1-m0"; equal_to "h2-m02" ])
+
 let suite =
   "Walk_forward_spec"
   >::: [
@@ -215,6 +240,9 @@ let suite =
          >:: test_28fold_variants_is_cellE_only;
          "28-fold gate is non-firing placeholder"
          >:: test_28fold_gate_is_non_firing;
+         "hysteresis 30-fold spec parses" >:: test_hysteresis_spec_parses;
+         "hysteresis 30-fold variants are h1-m0 and h2-m02"
+         >:: test_hysteresis_variants_are_h1m0_and_h2m02;
        ]
 
 let () = run_test_tt_main suite
