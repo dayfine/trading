@@ -10,3 +10,10 @@
   walk_forward)
  (preprocess
   (pps ppx_sexp_conv)))
+
+(executable
+ (name rank_variants)
+ (modules rank_variants)
+ (libraries core backtest_stats walk_forward)
+ (preprocess
+  (pps ppx_sexp_conv)))
