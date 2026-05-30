@@ -161,19 +161,45 @@ Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && 
   off bear bottoms (Mar 2009 / Mar 2020). Verify: `dune runtest
   analysis/weinstein/stage/` → 33 tests OK.
 
+## Platform usage log
+
+- **2026-05-30 — exit-timing surface (#1375): REJECT.** First real use;
+  whole exit-timing knob surface rejected on the fold distribution
+  (`dev/experiments/_ledger/2026-05-30-exit-timing-surface.sexp`).
+- **2026-05-30 — early-admission surface: INCONCLUSIVE.** First
+  entry-timing mechanism (PR #1378), swept
+  `stage_config.early_admission_ma_period ∈ {5,7,10,13}` vs `None`
+  baseline over the nominal 31-fold 2010-2026 geometry. The within-run
+  signal was strongly positive (all cells beat baseline on Sharpe; best
+  cell ma=10 Sharpe 0.414 vs 0.251, DSR 0.9987), **but the run is
+  compromised by a data-coverage defect** and cannot be promoted. See
+  `dev/notes/early-admission-surface-2026-05-30.md` +
+  `dev/experiments/_ledger/2026-05-30-early-admission-surface.sexp`.
+
+> **⚠ Infrastructure defect surfaced (affects ALL `sp500-2010-2026`
+> experiments).** The index golden `GSPC.INDX` covers only 2017-01-03→
+> 2026-04-09 and NYSE A/D breadth only 2017-2020. With no index data
+> before 2017 the Weinstein macro gate blocks all buys in 2010-2016, so
+> every walk-forward run on this scenario produces ~13 zero-trade folds
+> and effectively tests **2017-2026, not 2010-2026** — including the
+> exit-timing (#1375) and hysteresis (#1366) verdicts. **Fix before the
+> next surface sweep:** extend the index + breadth goldens back to ~2009
+> (ops-data EODHD fetch), then re-run.
+
 ## Next Steps
 
-1. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
-   a surface: hysteresis_weeks grid × exit_margin grid × relevant
-   `enable_*` flags through WF-CV, ranked with DSR. This is the canonical
-   end-to-end exercise of the whole platform.
-   - **Now also available as an axis:** the early-admission flag (PR #1378)
-     — sweep the `int option` sexp shape `(early_admission_ma_period (13))`
-     vs the `None` baseline through WF-CV to decide whether it earns
-     promotion for the `late_stage2_admission` gap.
+1. **Repair the index/breadth golden coverage** (P0 for any further
+   surface sweep on `sp500-2010-2026`) — extend `GSPC.INDX` + NYSE A/D
+   breadth back to ~2009 so the macro gate runs across the full window.
+   Then re-run the early-admission surface on the true distribution to
+   settle its INCONCLUSIVE verdict (the 2017-2026 signal is promising).
 2. **Wire DSR into the BO tuner** — the `backtest_stats` lib is shared;
    the BO program can adopt `Deflated_sharpe` for its own best-of-N
    correction (deferred to that program).
+3. **(nice-to-have) Commit a `rank-variants` CLI** — `Variant_ranking` /
+   `Deflated_sharpe` have no in-repo driver; the verdict above used an
+   ad-hoc one. A committed CLI over `aggregate.sexp`+`fold_actuals.sexp`
+   would make every future verdict reproducible.
 
 ## Out of scope (PR-3)
 
