@@ -33,7 +33,8 @@ let _is_rising ~threshold ~current ~back : bool =
 (** Fast MA rising from [back] to [current] AND price [close] above it — the
     early-admission condition once all three reads are present. *)
 let _admit ~slope_threshold ~current ~back ~close : bool =
-  _is_rising ~threshold:slope_threshold ~current ~back && Float.(close > current)
+  let fast_rising = _is_rising ~threshold:slope_threshold ~current ~back in
+  fast_rising && Float.(close > current)
 
 let compute ~get_close ~early_admission_ma_period ~slope_threshold
     ~slope_lookback : bool =
