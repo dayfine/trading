@@ -23,6 +23,7 @@ type config = {
   confirm_weeks : int;
   late_stage2_decel : float;
   stage_method : stage_method;
+  early_admission_ma_period : int option; [@sexp.default None]
 }
 [@@deriving sexp]
 
@@ -35,6 +36,7 @@ let default_config =
     confirm_weeks = 6;
     late_stage2_decel = 0.5;
     stage_method = MaSlope;
+    early_admission_ma_period = None;
   }
 
 (* ------------------------------------------------------------------ *)
@@ -377,10 +379,13 @@ let _stage1_default_result : result =
     [classify_with_callbacks] so the latter stays a flat sequence of
     let-bindings. *)
 let _build_result ~current_ma ~ma_dir ~ma_slope_pct ~prior_stage ~above_ma_count
-    ~below_ma_count ~is_late ~confirm_weeks : result =
-  let new_stage =
+    ~below_ma_count ~is_late ~early_admit ~confirm_weeks : result =
+  let standard_stage =
     _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
       ~is_late ~confirm_weeks
+  in
+  let new_stage =
+    Early_admission.apply ~early_admit ~prior_stage ~standard_stage
   in
   let transition = _detect_transition ~prior_stage ~new_stage in
   {
@@ -413,8 +418,14 @@ let _classify_signals ~config ~get_ma ~get_close ~prior_stage ~current_ma :
     _is_late_stage2_callback ~get_ma ~decel_threshold:config.late_stage2_decel
       ~slope_lookback:config.slope_lookback
   in
+  let early_admit =
+    Early_admission.compute ~get_close
+      ~early_admission_ma_period:config.early_admission_ma_period
+      ~slope_threshold:config.slope_threshold
+      ~slope_lookback:config.slope_lookback
+  in
   _build_result ~current_ma ~ma_dir ~ma_slope_pct ~prior_stage ~above_ma_count
-    ~below_ma_count ~is_late ~confirm_weeks:config.confirm_weeks
+    ~below_ma_count ~is_late ~early_admit ~confirm_weeks:config.confirm_weeks
 
 let classify_with_callbacks ~config ~get_ma ~get_close ~prior_stage : result =
   match get_ma ~week_offset:0 with

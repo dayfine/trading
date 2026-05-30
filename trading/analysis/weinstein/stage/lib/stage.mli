@@ -49,6 +49,28 @@ type config = {
       (** Method for determining MA direction. Default: [MaSlope] (current
           behavior). [Segmentation] enables the feature-flagged piecewise linear
           regression path (see {!stage_method}). *)
+  early_admission_ma_period : int option; [@sexp.default None]
+      (** Default-off dual-MA early Stage-2 admission flag (gap-closing
+          experiment for the [late_stage2_admission] failure mode: the slow
+          30-week MA admits Stage 2 months late off bear bottoms, e.g. Mar 2009
+          / Mar 2020).
+
+          [None] (default): no behavioural change — [classify] is bit-identical
+          to the pre-flag classifier on every input.
+
+          [Some fast_p]: a fast confirmation SMA of the most recent [fast_p]
+          closes (read self-contained from [get_close], no new panel callback)
+          can {b promote} a would-be [Stage1] to [Stage2] or
+          {b prevent a demotion} of a prior [Stage2] — but only while the fast
+          MA is both rising (per [slope_threshold] / [slope_lookback]) and below
+          the current close. It never blocks a slow-MA [Stage2] and never forces
+          an exit; when the fast MA rolls over, classification hands back to the
+          standard slow-MA result (no lock-in).
+
+          Wired as a config field so it routes through [Overlay_validator] and
+          is expressible as a [Variant_matrix] axis. Not wired into any default
+          config; awaits a surface-sweep ACCEPT per the experiment-flag
+          discipline. *)
 }
 [@@deriving sexp]
 (** Configuration for stage classification. All thresholds are configurable to

@@ -142,12 +142,35 @@ Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && 
   hard lessons (autopsy = labeller-not-recommender; test a surface, not a
   point) and the continuous-vs-discrete reframe.
 
+### Gap-closing experiments — landed mechanisms (default-off, awaiting sweep)
+
+- [x] **`late_stage2_admission` Step 1 — dual-MA early Stage-2 admission**
+  (PR #1378, branch `feat/weinstein/early-admission`). Adds default-off
+  `Stage.config.early_admission_ma_period : int option` (`[@sexp.default
+  None]`). When `None` the classifier is bit-identical to today (all 26
+  pre-existing stage golden tests stay green); when `Some fast_p` a fast
+  confirmation SMA of the most recent `fast_p` closes (read self-contained
+  from `get_close`) can promote a would-be Stage1 to Stage2 or prevent a
+  demotion of a prior Stage2 while the fast MA is rising and price is above
+  it — never blocks a slow-MA Stage2, never forces an exit, hands back on
+  rollover. Mechanism extracted into a sibling `Early_admission` module
+  (`compute` + `apply`) to keep `stage.ml` under the file-length limit.
+  Flag-discipline R1/R2 satisfied; **R3 pending** — not wired into any
+  default config, awaits a surface-sweep ACCEPT in the ledger. Targets the
+  autopsy failure mode where the slow 30-week MA admits Stage 2 months late
+  off bear bottoms (Mar 2009 / Mar 2020). Verify: `dune runtest
+  analysis/weinstein/stage/` → 33 tests OK.
+
 ## Next Steps
 
 1. **First real use** — re-attack the autopsy missed-gain (modes 1+2) as
    a surface: hysteresis_weeks grid × exit_margin grid × relevant
    `enable_*` flags through WF-CV, ranked with DSR. This is the canonical
    end-to-end exercise of the whole platform.
+   - **Now also available as an axis:** the early-admission flag (PR #1378)
+     — sweep the `int option` sexp shape `(early_admission_ma_period (13))`
+     vs the `None` baseline through WF-CV to decide whether it earns
+     promotion for the `late_stage2_admission` gap.
 2. **Wire DSR into the BO tuner** — the `backtest_stats` lib is shared;
    the BO program can adopt `Deflated_sharpe` for its own best-of-N
    correction (deferred to that program).

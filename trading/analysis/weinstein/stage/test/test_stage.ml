@@ -512,6 +512,166 @@ let test_segmentation_single_ma_point_falls_back_to_flat _ =
          field (fun r -> r.ma_value) (float_equal 100.0);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Dual-MA early Stage-2 admission (default-off flag)                  *)
+(*                                                                      *)
+(* These tests drive [classify_with_callbacks] directly so the slow MA *)
+(* ([get_ma]) and the close series ([get_close], which the fast MA is  *)
+(* derived from) can be controlled independently. The contract is the  *)
+(* CONTRAST between [early_admission_ma_period = None] and [Some 13] on *)
+(* the SAME callbacks — so each test asserts both configs.             *)
+(* ------------------------------------------------------------------ *)
+
+let cfg_early = { default_config with early_admission_ma_period = Some 13 }
+
+(** Slow-MA callback over a value array (oldest at index 0, newest at the end).
+    Independent from {!make_get_close_arr} so a flat slow MA can coexist with a
+    rising close series. *)
+let make_get_ma_arr (values : float array) ~week_offset =
+  let n = Array.length values in
+  let idx = n - 1 - week_offset in
+  if idx < 0 || idx >= n then None else Some values.(idx)
+
+(** Close callback over a value array (oldest at index 0, newest at the end). *)
+let make_get_close_arr (closes : float array) ~week_offset =
+  let n = Array.length closes in
+  let idx = n - 1 - week_offset in
+  if idx < 0 || idx >= n then None else Some closes.(idx)
+
+(** A flat slow-MA series (40 weeks at 100.0): standard classification reads it
+    as [Flat], so a prior [Stage1] stays [Stage1] and a prior [Stage2] would be
+    demoted toward [Stage3]. *)
+let flat_slow_ma = Array.create ~len:40 100.0
+
+(** A declining slow-MA series (ramps 130 → 100 over 40 weeks): reads as
+    [Declining]. The slow MA still has not turned up — the bear-bottom shape the
+    early-admission flag is meant to catch. *)
+let declining_slow_ma =
+  Array.init 40 ~f:(fun i -> 130.0 -. (Float.of_int i *. (30.0 /. 39.0)))
+
+(** A rising close series (ramps 80 → 130 over 40 weeks). The 13-week fast SMA
+    is rising and the current close sits above it — [early_admit] fires. *)
+let rising_closes =
+  Array.init 40 ~f:(fun i -> 80.0 +. (Float.of_int i *. (50.0 /. 39.0)))
+
+(** Early admission fires: with the slow MA flat (standard → [Stage1]) but the
+    fast MA rising and price above it, [Some 13] promotes to a fresh [Stage2]
+    while [None] stays [Stage1]. The contrast IS the contract. *)
+let test_early_admission_promotes_stage1_to_stage2 _ =
+  let get_ma = make_get_ma_arr flat_slow_ma in
+  let get_close = make_get_close_arr rising_closes in
+  let prior = Some (Stage1 { weeks_in_base = 4 }) in
+  let off =
+    classify_with_callbacks ~config:default_config ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  let on =
+    classify_with_callbacks ~config:cfg_early ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  assert_that (off.stage, on.stage)
+    (all_of
+       [
+         field fst is_stage1;
+         field snd
+           (equal_to (Stage2 { weeks_advancing = 0; late = false } : stage));
+       ])
+
+(** Hold on the fast MA: a prior [Stage2] that the slow MA (flat → [Stage3])
+    would demote is held advancing while the fast MA is still rising+above.
+    [None] demotes to [Stage3]; [Some 13] keeps [Stage2] with an incremented
+    [weeks_advancing] and the prior [late] flag preserved. *)
+let test_early_admission_holds_prior_stage2 _ =
+  let get_ma = make_get_ma_arr flat_slow_ma in
+  let get_close = make_get_close_arr rising_closes in
+  let prior = Some (Stage2 { weeks_advancing = 7; late = true }) in
+  let off =
+    classify_with_callbacks ~config:default_config ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  let on =
+    classify_with_callbacks ~config:cfg_early ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  assert_that (off.stage, on.stage)
+    (all_of
+       [
+         field fst is_stage3;
+         field snd
+           (equal_to (Stage2 { weeks_advancing = 8; late = true } : stage));
+       ])
+
+(** Rollover hands back: when the fast MA rolls over (current close below the
+    fast SMA), [early_admit] is [false] and the [Some 13] result is identical to
+    the [None] (standard slow-MA) result — no lock-in. We use a declining close
+    series so the fast SMA is falling and price is below it. *)
+let test_early_admission_rollover_hands_back _ =
+  let falling_closes =
+    Array.init 40 ~f:(fun i -> 130.0 -. (Float.of_int i *. (50.0 /. 39.0)))
+  in
+  let get_ma = make_get_ma_arr declining_slow_ma in
+  let get_close = make_get_close_arr falling_closes in
+  let prior = Some (Stage2 { weeks_advancing = 7; late = false }) in
+  let off =
+    classify_with_callbacks ~config:default_config ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  let on =
+    classify_with_callbacks ~config:cfg_early ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  assert_that on.stage (equal_to (off.stage : stage))
+
+(** Slow-MA Stage 2 unaffected: when the slow MA itself is rising and price is
+    above it (a genuine slow-MA [Stage2]), the flag changes nothing — [Some 13]
+    yields the same [Stage2] as [None]. Early admission only ever promotes /
+    holds; it never alters an existing slow-MA [Stage2]. *)
+let test_early_admission_slow_ma_stage2_unaffected _ =
+  let get_ma = make_get_ma_arr rising_closes in
+  let get_close = make_get_close_arr rising_closes in
+  let prior = Some (Stage2 { weeks_advancing = 5; late = false }) in
+  let off =
+    classify_with_callbacks ~config:default_config ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  let on =
+    classify_with_callbacks ~config:cfg_early ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  assert_that (off.stage, on.stage)
+    (all_of [ field fst is_stage2; field snd (equal_to (off.stage : stage)) ])
+
+(** Default config leaves the flag off. *)
+let test_default_config_early_admission_none _ =
+  assert_that default_config.early_admission_ma_period is_none
+
+(* ------------------------------------------------------------------ *)
+(* Sexp round-trip: defaulted field tolerates omission                 *)
+(* ------------------------------------------------------------------ *)
+
+(** A serialized [config] sexp that omits [early_admission_ma_period] (every
+    pre-flag golden / spec) parses with the field defaulting to [None]. *)
+let test_config_sexp_omitted_field_defaults_none _ =
+  let sexp =
+    Sexp.of_string
+      "((ma_period 30) (ma_type Wma) (slope_threshold 0.005) (slope_lookback \
+       4) (confirm_weeks 6) (late_stage2_decel 0.5) (stage_method MaSlope))"
+  in
+  let cfg = config_of_sexp sexp in
+  assert_that cfg.early_admission_ma_period is_none
+
+(** A serialized [config] sexp that includes [(early_admission_ma_period (13))]
+    parses to [Some 13]. *)
+let test_config_sexp_present_field_parses _ =
+  let sexp =
+    Sexp.of_string
+      "((ma_period 30) (ma_type Wma) (slope_threshold 0.005) (slope_lookback \
+       4) (confirm_weeks 6) (late_stage2_decel 0.5) (stage_method MaSlope) \
+       (early_admission_ma_period (13)))"
+  in
+  let cfg = config_of_sexp sexp in
+  assert_that cfg.early_admission_ma_period (is_some_and (equal_to 13))
+
 let suite =
   "stage_tests"
   >::: [
@@ -552,6 +712,20 @@ let suite =
          >:: test_segmentation_history_truncation_no_bias;
          "test_segmentation_single_ma_point_falls_back_to_flat"
          >:: test_segmentation_single_ma_point_falls_back_to_flat;
+         "test_early_admission_promotes_stage1_to_stage2"
+         >:: test_early_admission_promotes_stage1_to_stage2;
+         "test_early_admission_holds_prior_stage2"
+         >:: test_early_admission_holds_prior_stage2;
+         "test_early_admission_rollover_hands_back"
+         >:: test_early_admission_rollover_hands_back;
+         "test_early_admission_slow_ma_stage2_unaffected"
+         >:: test_early_admission_slow_ma_stage2_unaffected;
+         "test_default_config_early_admission_none"
+         >:: test_default_config_early_admission_none;
+         "test_config_sexp_omitted_field_defaults_none"
+         >:: test_config_sexp_omitted_field_defaults_none;
+         "test_config_sexp_present_field_parses"
+         >:: test_config_sexp_present_field_parses;
        ]
 
 let () = run_test_tt_main suite
