@@ -1,6 +1,6 @@
 # Status: experiment-platform
 
-## Last updated: 2026-05-30 (rank_variants CLI landed)
+## Last updated: 2026-05-30
 
 ## Status
 IN_PROGRESS
