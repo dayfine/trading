@@ -14,13 +14,12 @@
     aggregate) as the observed Sharpe, the variant's per-fold [total_return_pct]
     series (from fold_actuals) as the fold returns, and the across-variant
     Sharpe-mean variance as the best-of-N selection-bias correction. Variants
-    with fewer than two non-NaN fold returns or zero return-variance are
-    skipped (no DSR column for that row); the rendering treats missing labels
-    as "n/a" per {!Walk_forward.Variant_ranking.render}.
+    with fewer than two non-NaN fold returns or zero return-variance are skipped
+    (no DSR column for that row); the rendering treats missing labels as "n/a"
+    per {!Walk_forward.Variant_ranking.render}.
 
-    Gap C of [dev/plans/experiment-platform-2026-05-29.md]: every future
-    verdict ranks via the same committed pipeline rather than an ad-hoc exe.
-*)
+    Gap C of [dev/plans/experiment-platform-2026-05-29.md]: every future verdict
+    ranks via the same committed pipeline rather than an ad-hoc exe. *)
 
 open Core
 module T = Walk_forward.Walk_forward_types
@@ -39,9 +38,8 @@ type cli_args = {
 let _default_baseline_label = "baseline"
 
 let _usage_msg =
-  "Usage: rank_variants.exe --aggregate <aggregate.sexp> \
-   [--fold-actuals <fold_actuals.sexp>] [--baseline-label <label>] \
-   [--output <path>]"
+  "Usage: rank_variants.exe --aggregate <aggregate.sexp> [--fold-actuals \
+   <fold_actuals.sexp>] [--baseline-label <label>] [--output <path>]"
 
 let _parse_args argv =
   let rec loop agg folds baseline out = function
@@ -85,7 +83,8 @@ let _load_sexp ~label ~path ~of_sexp =
       eprintf "Error: cannot read %s %S: %s\n" label path msg;
       Stdlib.exit 1
   | Sexp.Of_sexp_error (exn, _) ->
-      eprintf "Error: failed to parse %s %S: %s\n" label path (Exn.to_string exn);
+      eprintf "Error: failed to parse %s %S: %s\n" label path
+        (Exn.to_string exn);
       Stdlib.exit 1
   | exn ->
       eprintf "Error: failed to load %s %S: %s\n" label path (Exn.to_string exn);
@@ -95,8 +94,8 @@ let _load_aggregate path =
   _load_sexp ~label:"aggregate" ~path ~of_sexp:T.aggregate_of_sexp
 
 let _load_fold_actuals path =
-  _load_sexp ~label:"fold-actuals" ~path
-    ~of_sexp:(fun sexp -> [%of_sexp: T.fold_actual list] sexp)
+  _load_sexp ~label:"fold-actuals" ~path ~of_sexp:(fun sexp ->
+      [%of_sexp: T.fold_actual list] sexp)
 
 (* -------------- DSR computation -------------- *)
 
@@ -150,8 +149,7 @@ let _compute_dsr_one ~variant_label ~observed_sharpe ~fold_actuals ~n_trials
           ~sharpe_variance_across_trials
       in
       Computed dsr
-    with Invalid_argument msg ->
-      Skipped (sprintf "%s: %s" variant_label msg)
+    with Invalid_argument msg -> Skipped (sprintf "%s: %s" variant_label msg)
 
 (** Walk the aggregate's [stability] list, computing DSR for each variant and
     collecting both the assoc list passed to the renderer and a list of skip
@@ -162,7 +160,11 @@ let _build_dsr_table (aggregate : T.aggregate) fold_actuals =
   if n_trials < _min_fold_count then
     (* expected_max_sharpe needs n >= 2; if we have one variant, DSR is
        undefined for the whole table. *)
-    ([], [ sprintf "n_trials = %d; need at least %d for DSR" n_trials _min_fold_count ])
+    ( [],
+      [
+        sprintf "n_trials = %d; need at least %d for DSR" n_trials
+          _min_fold_count;
+      ] )
   else
     let sharpe_means =
       List.map stability ~f:(fun s -> s.sharpe_ratio.mean)

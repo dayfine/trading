@@ -7,7 +7,8 @@
   test_walk_forward_executor_parallel
   test_spec
   test_variant_matrix
-  test_variant_ranking)
+  test_variant_ranking
+  test_rank_variants)
  (libraries
   ounit2
   core
@@ -20,4 +21,5 @@
  (preprocess
   (pps ppx_sexp_conv))
  (deps
-  (glob_files_rec %{workspace_root}/test_data/walk_forward/*.sexp)))
+  (glob_files_rec %{workspace_root}/test_data/walk_forward/*.sexp)
+  (file ../bin/rank_variants.exe)))
