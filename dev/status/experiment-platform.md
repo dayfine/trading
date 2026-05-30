@@ -1,6 +1,6 @@
 # Status: experiment-platform
 
-## Last updated: 2026-05-30
+## Last updated: 2026-05-30 (rank_variants CLI landed)
 
 ## Status
 IN_PROGRESS
@@ -196,10 +196,16 @@ Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && 
 2. **Wire DSR into the BO tuner** — the `backtest_stats` lib is shared;
    the BO program can adopt `Deflated_sharpe` for its own best-of-N
    correction (deferred to that program).
-3. **(nice-to-have) Commit a `rank-variants` CLI** — `Variant_ranking` /
-   `Deflated_sharpe` have no in-repo driver; the verdict above used an
-   ad-hoc one. A committed CLI over `aggregate.sexp`+`fold_actuals.sexp`
-   would make every future verdict reproducible.
+3. [x] **Commit a `rank-variants` CLI** — landed via
+   `trading/trading/backtest/walk_forward/bin/rank_variants.{ml}` (+
+   `test/test_rank_variants.ml`). Pure consumer of `aggregate.sexp`
+   (+ optional `fold_actuals.sexp` for DSR), computes per-variant
+   Deflated Sharpe via `Backtest_stats.Deflated_sharpe`, renders via
+   `Walk_forward.Variant_ranking.{rank,render}`. Replaces the ad-hoc
+   throwaway exe used in #1375 / #1379 verdicts; future rankings are
+   reproducible. Verify:
+   `dune exec trading/backtest/walk_forward/bin/rank_variants.exe -- --aggregate <path> [--fold-actuals <path>] [--baseline-label <label>] [--output <path>]`
+   and `dune runtest trading/backtest/walk_forward/test/` (5/5 new tests).
 
 ## Out of scope (PR-3)
 
