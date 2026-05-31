@@ -62,13 +62,11 @@ closed** (do not revive the promotion).
 
 ---
 
-## P0 · Make deep-history reproducible — ~1h
-- **Commit a `dev/scripts/build_deep_universe.sh`** that rebuilds the 2000-2026
-  data end-to-end (`build_universe -as-of` snapshot → fetch via the
-  `fetch-historical-data` skill's curl loop → extend GSPC to 1999). Makes the
-  deep capability a one-command rebuild. (Bars stay uncommitted; the 2000
-  snapshot is already committed.) The 27y deep run is now the *default* final
-  cell for any future mechanism's promotion grid.
+## P0 · Make deep-history reproducible — DONE (2026-05-31, PR #1388)
+- `dev/scripts/build_deep_universe.sh` shipped — one-command rebuild of the
+  2000-2026 data (probe → snapshot symbols → parallel EODHD fetch → extend GSPC
+  to 1999 → validate). Probe + 3-symbol run validated on host. The 27y deep run
+  is now the *default* final cell for any future mechanism's promotion grid.
 
 ## P1 · (was the ma=13 promotion) — CANCELLED
 The deep test killed it. Next entry-timing candidates from the original gap
@@ -77,15 +75,23 @@ open — but **the deep finding warns that any "early admission" variant likely
 fails the full cycle**; weight that before investing. If pursued, run the deep
 cell early.
 
-## P2 · Re-validate prior verdicts on repaired data — ~1.5h
-- Re-run exit-timing (#1375) + hysteresis (#1366) surfaces on the GSPC-repaired
-  (ideally deep) golden — their REJECTs were measured on the truncated 2017-2026
-  window. Confirm they still hold; strip the asterisk from those ledger entries.
+## P2 · Re-validate prior verdicts on repaired data — DONE (2026-05-31)
+- Re-ran the exit-timing 9-cell surface (#1375) on the GSPC-repaired golden
+  (the hysteresis #1366 `h2-m02` point is a cell of that surface, so one run
+  covered both). All 31 folds now trade (early folds 2010-2016 were zero before);
+  baseline Sharpe 0.540→0.6225 on the full window. **Both REJECTs hold and
+  strengthen** — every behaviour-changing cell is dominated by baseline.
+  Ledger `2026-05-31-exit-timing-hysteresis-revalidated.sexp`; writeup
+  `dev/notes/exit-timing-hysteresis-revalidated-2026-05-31.md`. Asterisk removed.
 
-## P3 · Deep-history infrastructure — ~1h
-- Build the other point-in-time snapshots (2005/2010/2015/2020); check whether the
-  `build_universe --change-log` dynamic-membership path can drive a *properly
-  rebalanced* point-in-time backtest (vs today's pinned-2000-cohort).
+## P3 · Deep-history infrastructure — PARTIAL (2026-05-31)
+- DONE (PR #1390): point-in-time snapshots 2005/2015/2020 generated + committed
+  (joining 2000 + 2010) — the 5-point regime-battery seed set.
+- STILL OPEN: check whether the `build_universe -change-log` dynamic-membership
+  path can drive a *properly rebalanced* point-in-time backtest (vs today's
+  pinned-cohort). Build deep bars for the new snapshots via
+  `build_deep_universe.sh --snapshot <path>` when a multi-regime battery run is
+  needed (see `dev/plans/population-search-2026-05-31.md`).
 
 ## Backlog (deferred)
 Cross-sectional rotation (`french_weinstein_rotation`), Russell-3000 broader
