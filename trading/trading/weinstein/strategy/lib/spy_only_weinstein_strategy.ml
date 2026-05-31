@@ -120,61 +120,6 @@ let _is_entry_signal (result : Stage.result) : bool =
   | Weinstein_types.Stage4 _ ->
       false
 
-let _entry_reasoning : Position.entry_reasoning =
-  TechnicalSignal
-    {
-      indicator = "Stage";
-      description = "SPY-only Weinstein: Stage 2 entry on rising 30-week MA";
-    }
-
-let _build_entry_transition ~(symbol : string) ~(bar : Types.Daily_price.t)
-    ~(target_quantity : float) : Position.transition =
-  {
-    Position.position_id = _position_id_of_symbol symbol;
-    date = bar.date;
-    kind =
-      CreateEntering
-        {
-          symbol;
-          side = Long;
-          target_quantity;
-          entry_price = bar.close_price;
-          reasoning = _entry_reasoning;
-        };
-  }
-
-let _build_exit_transition ~(pos : Position.t) ~(bar : Types.Daily_price.t)
-    ~(label : string) : Position.transition =
-  {
-    Position.position_id = pos.id;
-    date = bar.date;
-    kind =
-      TriggerExit
-        {
-          exit_reason = StrategySignal { label; detail = Some "side=long" };
-          exit_price = bar.close_price;
-        };
-  }
-
-let _build_stop_exit_transition ~(pos : Position.t) ~(bar : Types.Daily_price.t)
-    ~(stop_level : float) : Position.transition =
-  {
-    Position.position_id = pos.id;
-    date = bar.date;
-    kind =
-      TriggerExit
-        {
-          exit_reason =
-            StopLoss
-              {
-                stop_price = stop_level;
-                actual_price = bar.close_price;
-                loss_percent = 0.0;
-              };
-          exit_price = bar.close_price;
-        };
-  }
-
 (* Seed the initial trailing stop from a support-floor lookup on entry, falling
    back to the fixed buffer when no qualifying correction is found. Reads the
    accumulated daily bars for the symbol so the floor reflects real structure.
@@ -199,7 +144,7 @@ let _step_stop ~config ~(stage_result : Stage.result option)
   if Weinstein_stops.check_stop_hit ~state ~side:Long ~bar then
     ( state,
       Some
-        (_build_stop_exit_transition ~pos ~bar
+        (Spy_only_transitions.build_stop_exit ~pos ~bar
            ~stop_level:(Weinstein_stops.get_stop_level state)) )
   else if not (_is_weekly_close ~date:bar.date) then (state, None)
   else
@@ -214,7 +159,7 @@ let _step_stop ~config ~(stage_result : Stage.result option)
         let exit_tr =
           match event with
           | Weinstein_stops.Stop_hit { stop_level; _ } ->
-              Some (_build_stop_exit_transition ~pos ~bar ~stop_level)
+              Some (Spy_only_transitions.build_stop_exit ~pos ~bar ~stop_level)
           | Weinstein_stops.Stop_raised _ | Weinstein_stops.Entered_tightening _
           | Weinstein_stops.No_change ->
               None
@@ -254,7 +199,7 @@ let _on_holding ~config ~bar_reader ~stop_state ~prior_stage ~(pos : Position.t)
       match (is_friday, stage_result) with
       | true, Some r when _is_exit_signal r ->
           stop_state := None;
-          [ _build_exit_transition ~pos ~bar ~label:"stage4_exit" ]
+          [ Spy_only_transitions.build_exit ~pos ~bar ~label:"stage4_exit" ]
       | _ -> [])
 
 (* Flat branch: only act on a weekly close. Classify, and enter when the stage
@@ -273,8 +218,9 @@ let _on_flat ~config ~bar_reader ~prior_stage ~(cash : float)
         | None -> []
         | Some target_quantity ->
             [
-              _build_entry_transition ~symbol:config.symbol ~bar
-                ~target_quantity;
+              Spy_only_transitions.build_entry
+                ~position_id:(_position_id_of_symbol config.symbol)
+                ~symbol:config.symbol ~bar ~target_quantity;
             ])
     | _ -> []
 

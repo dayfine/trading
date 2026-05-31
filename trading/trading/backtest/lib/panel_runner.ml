@@ -31,6 +31,8 @@ let _snapshot_cache_mb = 1024
     [audit_recorder] are intentionally dropped on the BAH branch: BAH reads
     prices via [get_price] (the simulator's per-tick callback, wired through the
     snapshot-backed [Market_data_adapter]) and emits no audit events. *)
+module Spy_only = Weinstein_strategy.Spy_only_weinstein_strategy
+
 let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
     =
   match (strategy_choice : Strategy_choice.t) with
@@ -41,13 +43,8 @@ let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
   | Spy_only_weinstein { symbol } ->
-      let config =
-        {
-          Weinstein_strategy.Spy_only_weinstein_strategy.default_config with
-          symbol;
-        }
-      in
-      Weinstein_strategy.Spy_only_weinstein_strategy.make ~config ~bar_reader ()
+      let config = { Spy_only.default_config with symbol } in
+      Spy_only.make ~config ~bar_reader ()
 
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader.
