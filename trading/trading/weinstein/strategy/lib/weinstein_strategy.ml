@@ -5,6 +5,7 @@
 open Core
 open Trading_strategy
 module Bar_reader = Bar_reader
+module Spy_only_weinstein_strategy = Spy_only_weinstein_strategy
 module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
 module Force_liquidation_runner = Force_liquidation_runner

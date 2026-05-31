@@ -22,6 +22,7 @@ let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 let _warmup_days_for : Strategy_choice.t -> int = function
   | Weinstein -> 210
   | Bah_benchmark _ -> 0
+  | Spy_only_weinstein _ -> 210
 
 (* Public types *)
 

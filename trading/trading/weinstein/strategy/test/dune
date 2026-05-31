@@ -11,6 +11,7 @@
   test_panel_callbacks
   test_pi_filter_wiring
   test_short_side_bear_window
+  test_spy_only_weinstein_strategy
   test_stage3_force_exit_runner
   test_laggard_rotation_runner
   test_stops_runner
