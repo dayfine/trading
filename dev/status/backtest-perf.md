@@ -658,6 +658,20 @@ mechanics + release-gate procedure.
    (portfolio briefly $25K during AAPL/Tesla split window) — flagged
    for trade-audit follow-up.
 
+## Follow-up
+
+- **Panel_runner per-fold tmp-dir leak fix (#1393)** — landed via
+  `feat/panel-runner-tmp-cleanup`. `Csv_snapshot_builder` now registers
+  every `/tmp/panel_runner_csv_snapshot_*` dir in a process-wide
+  cleanup ledger; `Stdlib.at_exit` removes any dir still in the ledger
+  on exit, and SIGTERM/SIGINT/SIGHUP handlers re-raise as
+  `exit 130` so the at_exit chain fires on graceful kill. Adds
+  `cleanup`, `register_for_cleanup`, `registered_dirs`,
+  `startup_orphan_sweep` to the .mli. Closes the 1895-dir / 53 GB
+  orphan accumulation observed 2026-05-31. SIGKILL remains uncoverable
+  by design; `startup_orphan_sweep` is the belt-and-suspenders
+  mitigation for that residual.
+
 ## Ownership
 
 `feat-backtest` agent (sibling of backtest-infra and backtest-scale).

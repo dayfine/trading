@@ -25,7 +25,8 @@
   test_release_perf_report
   test_determinism
   test_bah_runner_e2e
-  test_macro_trend_writer)
+  test_macro_trend_writer
+  test_csv_snapshot_builder_cleanup)
  (libraries
   ounit2
   core
@@ -61,3 +62,12 @@
   matchers)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))
+
+; Subject binary for test_csv_snapshot_builder_cleanup's subprocess tests.
+; Allocates a /tmp/panel_runner_csv_snapshot_* dir, registers it for
+; cleanup, then exits abnormally per argv ("raise" or "sigterm"). Lives in
+; the same _build/test dir as the test exe so the test can locate it.
+
+(executable
+ (name csv_snapshot_builder_cleanup_subject)
+ (libraries backtest))
