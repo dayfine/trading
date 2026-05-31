@@ -1,5 +1,9 @@
 # Next-session priorities — 2026-05-31 (8h plan + resume state)
 
+**SUPERSEDED by `next-session-priorities-2026-06-01.md`** — P0/P2 shipped, P1
+cancelled, P3 partial; this doc is now the 2026-05-31 session record. Read the
+2026-06-01 doc for the forward plan.
+
 **Supersedes:** `next-session-priorities-2026-05-30-PM2.md`.
 
 ## ⚠ RESUME STATE (read first — there is in-flight work on disk)
@@ -83,6 +87,11 @@ cell early.
   strengthen** — every behaviour-changing cell is dominated by baseline.
   Ledger `2026-05-31-exit-timing-hysteresis-revalidated.sexp`; writeup
   `dev/notes/exit-timing-hysteresis-revalidated-2026-05-31.md`. Asterisk removed.
+  **Plus a deep 2000-2026 confirmation** (dot-com + GFC, 51 folds) — baseline is
+  the ONLY frontier cell and the knobs drag *harder* in bear regimes (h2/h3 lose
+  ~2.3% Sharpe vs ~0.3% on the bull window). Ledger
+  `2026-05-31-exit-timing-deep-2000-2026.sexp`. The rejection is now genuinely
+  multi-regime — first exercise of `build_deep_universe.sh` data end-to-end.
 
 ## P3 · Deep-history infrastructure — PARTIAL (2026-05-31)
 - DONE (PR #1390): point-in-time snapshots 2005/2015/2020 generated + committed
