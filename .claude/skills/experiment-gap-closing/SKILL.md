@@ -92,11 +92,19 @@ aggregates to a new `dev/experiments/_ledger/<date>-<slug>.sexp` via
 `dev/notes/`. A REJECT is a real result — it stops the next session from
 re-testing the same dead end.
 
-### 7. If a winner survives — promote
-Only an ACCEPT that survives DSR + holds on the Pareto frontier goes to
-`dev/scripts/promote_config.sh` → the private tuned-configs repo
-(`dev/plans/private-tuned-configs-repo-2026-05-18.md`). Promotion stays a
-manual, ledger-backed decision; nothing auto-promotes.
+### 7. If a winner survives — confirm across the grid, THEN promote
+An ACCEPT from one surface is **necessary but not sufficient** to flip a
+default. The single-window DSR winner is frequently overfit to that window —
+the 2026-05-30 early-admission ma=10 won 15y at DSR 1.0 but did **not**
+generalise to an independent 2019-2023 window. Before any promotion, run the
+**confirmation grid** in `.claude/rules/promotion-confirmation.md`: re-run the
+candidate surface across ≥3 independent (period × universe) contexts and promote
+only a value that is robust **across the grid**, not the single-window winner.
+If no value is robust, keep the mechanism's ACCEPT but leave the default off.
+
+Only a grid-robust value goes to `dev/scripts/promote_config.sh` → the private
+tuned-configs repo (`dev/plans/private-tuned-configs-repo-2026-05-18.md`).
+Promotion stays a manual, ledger-backed decision; nothing auto-promotes.
 
 ### 8. Memory
 Write the durable finding to `memory/` (project type), link
