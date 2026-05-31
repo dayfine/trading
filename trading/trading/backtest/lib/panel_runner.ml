@@ -21,6 +21,7 @@ type input = {
    oversized symbol stays resident even when its bytes exceed the cap. *)
 let _snapshot_cache_mb = 1024
 
+module Spy_only = Weinstein_strategy.Spy_only_weinstein_strategy
 (** Construct the strategy module the simulator will run.
 
     The Weinstein branch threads the runner's deps-loaded inputs (AD bars,
@@ -31,7 +32,6 @@ let _snapshot_cache_mb = 1024
     [audit_recorder] are intentionally dropped on the BAH branch: BAH reads
     prices via [get_price] (the simulator's per-tick callback, wired through the
     snapshot-backed [Market_data_adapter]) and emits no audit events. *)
-module Spy_only = Weinstein_strategy.Spy_only_weinstein_strategy
 
 let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
     =
