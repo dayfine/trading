@@ -39,6 +39,10 @@ module Ad_bars = Ad_bars
 module Bar_reader = Bar_reader
 (** Panel-backed bar source. See {!Bar_reader}. *)
 
+module Spy_only_weinstein_strategy = Spy_only_weinstein_strategy
+(** Single-instrument long/flat Weinstein stage-timing reference strategy. See
+    {!Spy_only_weinstein_strategy}. *)
+
 module Stops_runner = Stops_runner
 (** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
 *)

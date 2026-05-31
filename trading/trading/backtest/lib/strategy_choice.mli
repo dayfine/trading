@@ -30,6 +30,15 @@ type t =
           The configurable [symbol] must be present in the scenario's universe
           so the snapshot builder loads its CSV; see [universes/spy-only.sexp]
           for the canonical fixture. *)
+  | Spy_only_weinstein of { symbol : string }
+      (** Single-instrument Weinstein stage-timing reference strategy on
+          [symbol] (default [SPY]). Constructs
+          {!Weinstein_strategy.Spy_only_weinstein_strategy.make} with the
+          runner's [bar_reader] (it reads the symbol's own weekly + daily bars
+          for stage classification and the trailing-stop support floor). Like
+          {!Bah_benchmark}, the runner's universe / sector-map / AD-bars
+          machinery is loaded but unused; [symbol] must be present in the
+          scenario's universe. Long/flat only — no shorting. *)
 [@@deriving sexp, eq, show]
 
 val default : t
