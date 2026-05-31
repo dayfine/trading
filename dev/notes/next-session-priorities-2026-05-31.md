@@ -1,5 +1,9 @@
 # Next-session priorities — 2026-05-31 (8h plan + resume state)
 
+**SUPERSEDED by `next-session-priorities-2026-06-01.md`** — P0/P2 shipped, P1
+cancelled, P3 partial; this doc is now the 2026-05-31 session record. Read the
+2026-06-01 doc for the forward plan.
+
 **Supersedes:** `next-session-priorities-2026-05-30-PM2.md`.
 
 ## ⚠ RESUME STATE (read first — there is in-flight work on disk)
