@@ -30,7 +30,10 @@ type t =
           The configurable [symbol] must be present in the scenario's universe
           so the snapshot builder loads its CSV; see [universes/spy-only.sexp]
           for the canonical fixture. *)
-  | Spy_only_weinstein of { symbol : string }
+  | Spy_only_weinstein of {
+      symbol : string;
+      ma_period_weeks : int; [@sexp.default 30]
+    }
       (** Single-instrument Weinstein stage-timing reference strategy on
           [symbol] (default [SPY]). Constructs
           {!Weinstein_strategy.Spy_only_weinstein_strategy.make} with the
@@ -38,7 +41,17 @@ type t =
           for stage classification and the trailing-stop support floor). Like
           {!Bah_benchmark}, the runner's universe / sector-map / AD-bars
           machinery is loaded but unused; [symbol] must be present in the
-          scenario's universe. Long/flat only — no shorting. *)
+          scenario's universe. Long/flat only — no shorting.
+
+          [ma_period_weeks] is the {b only} tunable dial (per
+          [.claude/rules/weinstein-faithful-core.md] — the MA period is the
+          documented investor/trader dial). It sets the stage-classifier moving
+          average period in weeks. [30] (the [@sexp.default]) is Weinstein's
+          investor preset, so every pre-existing scenario that omits the field
+          deserialises bit-identically to it; [10] is the faster trader preset.
+          The strategy spine (Stage-2-only entry, Stage 3/4 exit, stop below
+          base) is untouched by this dial — only the MA window, and the
+          proportional weekly-bar lookback derived from it, change. *)
 [@@deriving sexp, eq, show]
 
 val default : t

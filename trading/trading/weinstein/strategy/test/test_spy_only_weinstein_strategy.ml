@@ -265,6 +265,44 @@ let test_stage1_friday_no_entry_when_flat _ =
   in
   assert_that result is_no_transitions
 
+(* A long, steep decline into a trough at week [_rally_trough], then a SHORT
+   sharp recent rally over the final weeks. The fast 10-week MA sits inside the
+   rally — rising, price above it for the full confirm window → Stage 2. The slow
+   30-week MA is still dominated by the long decline — declining, price not yet
+   above it for enough of the confirm window → Stage 3, no Stage-2 entry. Same
+   tape, opposite entry decision; the only difference between the two runs is
+   [ma_period_weeks]. (Verified empirically against [Stage.classify].) *)
+let _rally_trough = 51
+
+let decline_then_rally i =
+  if i <= _rally_trough then 130.0 -. (Float.of_int i *. 2.0)
+  else
+    130.0
+    -. (Float.of_int _rally_trough *. 2.0)
+    +. (Float.of_int (i - _rally_trough) *. 3.0)
+
+let test_trader_preset_enters_where_investor_waits _ =
+  (* On the same decline-then-rally tape, the 10-week (trader) preset enters on
+     the Friday while the 30-week (investor) preset does not — the only
+     difference between the two runs is [ma_period_weeks]. *)
+  let bars = weekly_closes ~last_friday ~n:n_weeks ~close:decline_then_rally in
+  let today = List.last_exn bars in
+  let bar_reader = bar_reader_of bars in
+  let run_with ~ma_period_weeks =
+    let config = Spy.config_with ~ma_period_weeks () in
+    run_once
+      (Spy.make ~config ~bar_reader ())
+      ~today_bar:today
+      ~portfolio:(make_portfolio ~cash:100_000.0 ())
+  in
+  assert_that
+    (run_with ~ma_period_weeks:10, run_with ~ma_period_weeks:30)
+    (all_of
+       [
+         field (fun (trader, _) -> trader) is_long_entry;
+         field (fun (_, investor) -> investor) is_no_transitions;
+       ])
+
 let suite =
   "spy_only_weinstein_strategy"
   >::: [
@@ -278,6 +316,8 @@ let suite =
          "stop hit exits when holding" >:: test_stop_hit_exits_when_holding;
          "flat tape Friday does not enter"
          >:: test_stage1_friday_no_entry_when_flat;
+         "trader preset enters where investor waits"
+         >:: test_trader_preset_enters_where_investor_waits;
        ]
 
 let () = run_test_tt_main suite
