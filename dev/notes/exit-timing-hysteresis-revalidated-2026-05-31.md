@@ -71,11 +71,37 @@ index updated. This **removes the GSPC-floor asterisk** from:
 Both prior verdicts stand: the only thing the truncation changed was the
 *magnitude* of the penalty, never its sign.
 
-## Caveat (the same one, smaller)
+## Deep 2000-2026 confirmation — the rejection is multi-regime
 
-This window is still 2010-2026 — one macro era (post-GFC bull + COVID dip).
-Per `.claude/rules/promotion-confirmation.md` the load-bearing test would be the
-deep 2000-2026 cell. But these are REJECTs being *confirmed*, not a promotion:
-a mechanism that loses on the easy bull window is not going to be rescued by
-adding the dot-com bust + GFC, where stage3 false-exit costs are larger. The
-deep cell would only deepen the rejection.
+The 2010-2026 window above is one macro era (post-GFC bull + COVID dip). To meet
+the `.claude/rules/promotion-confirmation.md` macro-regime standard, the same
+9-cell surface was re-run on the **full 2000-2026 cycle** (dot-com bust + GFC,
+point-in-time-2000 universe incl. delistings, 51 folds — early folds 2000-2002
+traded, avg_holding_days 32.5/43.9/17.8). Ledger
+`2026-05-31-exit-timing-deep-2000-2026.sexp`.
+
+| Variant | Sharpe | Calmar | MaxDD % | Frontier |
+|---|--:|--:|--:|:--:|
+| **baseline** (= h1·m=0.0) | **0.6806** | **2.038** | **11.14** | **yes (only)** |
+| h1 · m=0.02 | 0.6798 | 2.037 | 11.15 | no |
+| h1 · m=0.05 | 0.6723 | 2.032 | 11.15 | no |
+| h2 · m=0.0/0.02/0.05 | 0.6662 | 2.019 | 11.15 | no |
+| h3 · m=0.0/0.02/0.05 | 0.6649 | 2.015 | 11.16 | no |
+
+Baseline is the **only** frontier cell, and the drag is **larger** than on the
+bull window: h2/h3 lose ~2.3% of Sharpe (0.6806→0.665) where 2010-2026 lost only
+~0.3%; the result is monotone — more hysteresis and more margin both hurt more.
+This is the mechanism working as expected: stage3 false-exit costs are largest in
+bear regimes (2000-02, 2008), so deferring the exit (hysteresis) or widening the
+margin hurts most exactly when the slow 30-week MA is most protective. The logical
+prediction below held empirically — **the deep cell deepened the rejection.**
+
+(Baseline Sharpe 0.6806 reconciles with the early-admission deep baseline 0.68063
+— same deep dataset, same baseline config, an independent cross-check.)
+
+## Caveat — now closed
+
+A mechanism that loses on the easy bull window was never going to be rescued by
+adding the dot-com bust + GFC; the deep run confirms it directly. Both REJECTs
+(exit-timing #1375, hysteresis #1366) now stand on a genuinely multi-regime
+basis.
