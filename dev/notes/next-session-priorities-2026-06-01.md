@@ -44,6 +44,54 @@ Confirm the fork with the user before dispatching. The default lean (mine): **A*
 — it's the apparatus that makes B and C *trustworthy*, and it's infra not
 strategy-exploration, so it's the safest high-value work to do unsupervised.
 
+## P0 · SPY single-instrument reference strategy (user-requested 2026-05-31)
+
+Build a **new, separate** Weinstein strategy that trades **only SPY** (single
+instrument) on 30-week-MA stage timing — long when SPY is in Stage 2 (above a
+rising 30-week MA), flat/short in Stage 4 — reusing what we have. It is a
+**testbed + reference**, NOT a production strategy and NOT a change to the main
+strategy's defaults. It cuts both ways:
+
+- **Direction-finder for the main strategy.** SPY is the cleanest possible
+  signal: no cross-sectional selection, no position sizing, no sector
+  concentration, no macro-gate confound (SPY *is* the market). A mechanism that
+  helps here is a strong candidate to port to the main multi-symbol strategy; one
+  that doesn't help even on the clean signal almost certainly won't survive the
+  noisier 500-symbol setting. It is the cheapest way to triage the autopsy's gap
+  modes — and a direct test of whether this session's three rejections
+  (early-admission, exit-timing, hysteresis) are *universe-specific* (they were
+  all measured on the 500-symbol SP500) or *mechanism-dead* (fail on SPY too).
+- **Realistic bound on the autopsy.** The trade-autopsy's missed-gain figures
+  (e.g. late_reentry + stage3_false_positive ~+2734% over 27y×12sym) are
+  **perfect-hindsight per-trade upper bounds**. A *tradeable* SPY stage strategy
+  gives a **realizable** number — how much of that claimed headroom a disciplined
+  rule actually captures — which bounds how much of the autopsy is real vs.
+  hindsight artifact. The autopsy is a labeller (`project_stage3_hysteresis_*`);
+  this puts a floor and a ceiling around its claims.
+
+**Reuse (the "try to reuse what we have" ask):** the existing `STRATEGY` module
+type + `on_market_close`; the stage classifier + 30-week MA; the Weinstein
+trailing-stop machinery; the simulator; the **BAH-SPY benchmark** (already exists,
+PR #882) as the bar to beat. A 1-symbol universe. **Strip** the screener cascade /
+ranking / sizing / macro gate — for a single instrument they're degenerate; the
+strategy is pure stage-timing on SPY's own series. Needs **SPY bars** (the ETF,
+`SPY.US`, tradeable since 1993 — fetch via `build_deep_universe.sh` / the
+`fetch-historical-data` skill; we have GSPC.INDX deep to 1999 for cross-check but
+SPY is the tradeable instrument).
+
+**The test.** vs BAH-SPY on the deep window (incl. dot-com + GFC): Weinstein's
+whole claim is that Stage-4 exits dodge the big drawdowns, so stage-timed SPY
+should win on **risk-adjusted** terms (Sharpe/Calmar) even if it trails on raw
+return in a bull run. Then **tweak toward the autopsy headroom** — apply the same
+gap-mode mechanisms (earlier re-entry, stage3 hysteresis/exit-margin, early
+Stage-2 admission) as axes on SPY and see which, if any, recover gain on the clean
+signal. Record in the ledger like any surface; the deep cell is mandatory.
+
+**Caveat.** SPY-only is a *market-timing* strategy, a different beast from the
+stock-picking main strategy — it informs direction and bounds the autopsy; it is
+not itself the product. Lands as a new strategy module behind its own scenario;
+touches no existing default (per `experiment-flag-discipline`).
+
 ## P1 · Population-search apparatus — the buildable, low-risk path toward (A)
 
 Each step is independently valuable even if the full multi-arm engine is never
