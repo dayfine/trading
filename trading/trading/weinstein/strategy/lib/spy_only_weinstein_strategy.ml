@@ -133,6 +133,31 @@ let _seed_stop ~config ~bar_reader ~(entry_price : float) ~(as_of : Date.t) :
     ~side:Long ~entry_price ~bars ~as_of
     ~fallback_buffer:config.fallback_stop_buffer
 
+(* Map a stop state-machine event to an optional exit transition: only a
+   [Stop_hit] produces one. Kept separate so [_advance_stop] stays shallow. *)
+let _exit_of_stop_event ~(pos : Position.t) ~(bar : Types.Daily_price.t)
+    ~(event : Weinstein_stops.stop_event) : Position.transition option =
+  match event with
+  | Weinstein_stops.Stop_hit { stop_level; _ } ->
+      Some (Spy_only_transitions.build_stop_exit ~pos ~bar ~stop_level)
+  | Weinstein_stops.Stop_raised _ | Weinstein_stops.Entered_tightening _
+  | Weinstein_stops.No_change ->
+      None
+
+(* Weekly-close advance: run the stop state machine one tick against the stage
+   read [r] and report the (new state, optional exit). Only called on a Friday
+   with a live stage result. *)
+let _advance_stop ~config ~(r : Stage.result)
+    ~(state : Weinstein_stops.stop_state) ~(pos : Position.t)
+    ~(bar : Types.Daily_price.t) :
+    Weinstein_stops.stop_state * Position.transition option =
+  let new_state, event =
+    Weinstein_stops.update ~config:config.stops_config ~side:Long ~state
+      ~current_bar:bar ~ma_value:r.ma_value ~ma_direction:r.ma_direction
+      ~stage:r.stage
+  in
+  (new_state, _exit_of_stop_event ~pos ~bar ~event)
+
 (* Advance the trailing stop one tick on a held position and decide whether it
    triggers an exit. On a weekly close the state machine advances (raises /
    tightens); mid-week only the trigger check runs. Returns the (possibly
@@ -142,29 +167,13 @@ let _step_stop ~config ~(stage_result : Stage.result option)
     ~(bar : Types.Daily_price.t) :
     Weinstein_stops.stop_state * Position.transition option =
   if Weinstein_stops.check_stop_hit ~state ~side:Long ~bar then
-    ( state,
-      Some
-        (Spy_only_transitions.build_stop_exit ~pos ~bar
-           ~stop_level:(Weinstein_stops.get_stop_level state)) )
+    let stop_level = Weinstein_stops.get_stop_level state in
+    (state, Some (Spy_only_transitions.build_stop_exit ~pos ~bar ~stop_level))
   else if not (_is_weekly_close ~date:bar.date) then (state, None)
   else
     match stage_result with
     | None -> (state, None)
-    | Some r ->
-        let new_state, event =
-          Weinstein_stops.update ~config:config.stops_config ~side:Long ~state
-            ~current_bar:bar ~ma_value:r.ma_value ~ma_direction:r.ma_direction
-            ~stage:r.stage
-        in
-        let exit_tr =
-          match event with
-          | Weinstein_stops.Stop_hit { stop_level; _ } ->
-              Some (Spy_only_transitions.build_stop_exit ~pos ~bar ~stop_level)
-          | Weinstein_stops.Stop_raised _ | Weinstein_stops.Entered_tightening _
-          | Weinstein_stops.No_change ->
-              None
-        in
-        (new_state, exit_tr)
+    | Some r -> _advance_stop ~config ~r ~state ~pos ~bar
 
 (* Holding branch: run the stop, and on a weekly close also test the
    stage-based exit signal. The stop takes precedence — if it fires we exit on
@@ -202,6 +211,20 @@ let _on_holding ~config ~bar_reader ~stop_state ~prior_stage ~(pos : Position.t)
           [ Spy_only_transitions.build_exit ~pos ~bar ~label:"stage4_exit" ]
       | _ -> [])
 
+(* Build the (at most one) entry transition for [bar] when the all-cash sizing
+   affords a whole share; otherwise no transition. Kept separate so [_on_flat]
+   stays shallow. *)
+let _entry_transitions ~config ~(cash : float) ~(bar : Types.Daily_price.t) :
+    Position.transition list =
+  match _shares_from_cash ~cash ~close_price:bar.close_price with
+  | None -> []
+  | Some target_quantity ->
+      let position_id = _position_id_of_symbol config.symbol in
+      [
+        Spy_only_transitions.build_entry ~position_id ~symbol:config.symbol ~bar
+          ~target_quantity;
+      ]
+
 (* Flat branch: only act on a weekly close. Classify, and enter when the stage
    signal fires. The stop is seeded later, on the first Holding tick. *)
 let _on_flat ~config ~bar_reader ~prior_stage ~(cash : float)
@@ -213,35 +236,31 @@ let _on_flat ~config ~bar_reader ~prior_stage ~(cash : float)
     in
     Option.iter stage_result ~f:(fun r -> prior_stage := Some r.stage);
     match stage_result with
-    | Some r when _is_entry_signal r -> (
-        match _shares_from_cash ~cash ~close_price:bar.close_price with
-        | None -> []
-        | Some target_quantity ->
-            [
-              Spy_only_transitions.build_entry
-                ~position_id:(_position_id_of_symbol config.symbol)
-                ~symbol:config.symbol ~bar ~target_quantity;
-            ])
+    | Some r when _is_entry_signal r -> _entry_transitions ~config ~cash ~bar
     | _ -> []
+
+(* Dispatch one bar to the holding or flat branch based on the live position.
+   A still-[Entering] position (awaiting fill) yields no transitions. Kept
+   separate so [_on_market_close] stays shallow. *)
+let _transitions_for_bar ~config ~bar_reader ~stop_state ~prior_stage
+    ~(portfolio : Portfolio_view.t) ~(bar : Types.Daily_price.t) :
+    Position.transition list =
+  match _live_position ~symbol:config.symbol ~positions:portfolio.positions with
+  | Some pos when Option.is_some (_holding_quantity pos) ->
+      _on_holding ~config ~bar_reader ~stop_state ~prior_stage ~pos ~bar
+  | Some _ -> []
+  | None ->
+      stop_state := None;
+      _on_flat ~config ~bar_reader ~prior_stage ~cash:portfolio.cash ~bar
 
 let _on_market_close config ~bar_reader ~stop_state ~prior_stage ~get_price
     ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
   let transitions =
     match get_price config.symbol with
     | None -> []
-    | Some bar -> (
-        match
-          _live_position ~symbol:config.symbol ~positions:portfolio.positions
-        with
-        | Some pos when Option.is_some (_holding_quantity pos) ->
-            _on_holding ~config ~bar_reader ~stop_state ~prior_stage ~pos ~bar
-        | Some _ ->
-            (* Position exists but is still Entering (awaiting fill) — nothing to
-               do until it reaches Holding. *)
-            []
-        | None ->
-            stop_state := None;
-            _on_flat ~config ~bar_reader ~prior_stage ~cash:portfolio.cash ~bar)
+    | Some bar ->
+        _transitions_for_bar ~config ~bar_reader ~stop_state ~prior_stage
+          ~portfolio ~bar
   in
   Result.return { Strategy_interface.transitions }
 
