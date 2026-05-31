@@ -92,6 +92,41 @@ stock-picking main strategy — it informs direction and bounds the autopsy; it 
 not itself the product. Lands as a new strategy module behind its own scenario;
 touches no existing default (per `experiment-flag-discipline`).
 
+### Build plan (scoped 2026-05-31 — Explore reuse map)
+
+**Reuse as-is:** `Strategy_interface.STRATEGY` (symbol-agnostic `on_market_close`,
+`trading/trading/strategy/lib/strategy_interface.mli`), `Stage.classify` (pure,
+`analysis/weinstein/stage/lib/stage.mli`), `Macro.analyze`, `Weinstein_stops`,
+`Bar_reader`, and the **already-wired `Bah_benchmark` strategy +
+`universes/spy-only.sexp`** as the benchmark/universe.
+
+**New (the clean path — do NOT try to run the main strategy on a 1-symbol
+universe; its screener/ranking/sizing are too entangled):**
+- `trading/trading/weinstein/strategy/lib/spy_only_weinstein_strategy.{mli,ml}`
+  (~250-350 lines). Friday: `Stage.classify` SPY → Stage2 buy `floor(cash/close)`,
+  Stage3→4 sell-all; daily: `Weinstein_stops` trailing. Reuses macro gate
+  optionally (degenerate for SPY — make it a no-op/flag).
+- `trading/test_data/backtest_scenarios/spy-only-stage2.sexp` scenario.
+- Wire `Spy_only_weinstein` into `Strategy_choice.{mli,ml}` + `Panel_runner`
+  `_build_strategy` (mirror the `Bah_benchmark` arm).
+
+**Data:** SPY bars present **2009-2026** (`test_data/S/Y/SPY/`) — enough for a
+first cut. **Deep 1998/2000-2026 SPY needs a fetch** (the autopsy ran SPY
+1998-2025, so it's available via the `fetch-historical-data` skill) — follow-on,
+required before the deep-cell test.
+
+**Sequence:** (1) module + scenario + tests, first result vs **BAH-SPY** on
+2009-2026 — does stage-timing win risk-adjusted (Sharpe/Calmar)? (2) fetch deep
+SPY, re-test on 2000-2026. (3) add the autopsy gap modes as axes (stage3
+hysteresis/exit-margin, early-admission, re-entry) — the same knobs rejected on
+500-symbol — and see which recover gain on the clean SPY signal. Ledger each;
+deep cell mandatory.
+
+**Autopsy headroom (the bound):** late_reentry +1557% / stage3_false_positive
++1176% / late_stage2_admission +505% (`dev/notes/trade-autopsy-2026-05-29.md`,
+SPY + 11 SPDR ETFs 1998-2025). These are perfect-hindsight upper bounds; the SPY
+strategy's realized capture is the floor that bounds them.
+
 ## P1 · Population-search apparatus — the buildable, low-risk path toward (A)
 
 Each step is independently valuable even if the full multi-arm engine is never
