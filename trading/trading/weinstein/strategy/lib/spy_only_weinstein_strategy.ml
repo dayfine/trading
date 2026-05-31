@@ -23,10 +23,29 @@ let default_config =
     fallback_stop_buffer = default_fallback_stop_buffer;
   }
 
-(* Number of weekly bars fed to [Stage.classify]. The 30-week MA plus slope
-   lookback need a comfortable margin; 60 weeks (~14 months) is enough to warm
-   up the MA and still bound the read. *)
-let _stage_weeks = 60
+let config_with ?(symbol = default_symbol) ~ma_period_weeks () =
+  {
+    default_config with
+    symbol;
+    stage_config =
+      { default_config.stage_config with ma_period = ma_period_weeks };
+  }
+
+(* Number of weekly bars fed to [Stage.classify]. The MA plus its slope lookback
+   need a comfortable margin, so we read [ma_period] weeks for the MA itself
+   plus an equal margin for the slope/prior-stage context — i.e. twice the MA
+   period — floored at [_min_stage_weeks] so a very short trader MA still warms
+   up. At the 30-week investor default this is 60 weeks (~14 months), matching
+   the prior fixed read. *)
+let _min_stage_weeks = 12
+
+(* Window = ma_period weeks for the MA plus an equal margin for the slope
+   lookback, i.e. 2x the MA period. *)
+let _stage_weeks_ma_multiplier = 2
+
+let _stage_weeks_of (config : config) : int =
+  Int.max _min_stage_weeks
+    (_stage_weeks_ma_multiplier * config.stage_config.ma_period)
 
 (* Overnight gap buffer for all-cash sizing, identical in spirit to
    [Bah_benchmark_strategy._entry_gap_buffer_pct]: size against
@@ -86,8 +105,8 @@ let _holding_entry (pos : Position.t) : (float * Date.t) option =
 let _classify_stage ~config ~bar_reader ~prior_stage ~(as_of : Date.t) :
     Stage.result option =
   let bars =
-    Bar_reader.weekly_bars_for bar_reader ~symbol:config.symbol ~n:_stage_weeks
-      ~as_of
+    Bar_reader.weekly_bars_for bar_reader ~symbol:config.symbol
+      ~n:(_stage_weeks_of config) ~as_of
   in
   match bars with
   | [] -> None
