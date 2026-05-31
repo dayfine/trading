@@ -32,6 +32,16 @@ spanning two axes:
 - **Period diversity** — the full-history long window **plus ≥1 disjoint
   sub-window** in a different regime (e.g. an early 2011-2016 window vs a recent
   2019-2023 window). Overlapping windows are NOT independent.
+  - **⚠ MACRO-regime diversity, not just calendar diversity (2026-05-31 lesson).**
+    Disjoint sub-windows *within one macro era* are not enough. The
+    early-admission grid had FOUR independent post-2009 cells all agreeing
+    (ma=13 robust, DSR 1.0) — and a 27y cell adding the **dot-com bust + GFC**
+    flat-out reversed it (baseline dominated every variant). **Whenever the data
+    permits, one grid cell MUST span a genuinely different macro regime —
+    ideally a deep window covering 2000-02 + 2008.** Build the deep data via the
+    `fetch-historical-data` skill + `dev/scripts/build_deep_universe.sh` if it
+    isn't already present. A grid that never sees a bear-dominated regime can
+    only certify a bull-regime artifact.
 - **Universe diversity** — the canonical universe **plus ≥1 different universe**
   (different breadth or a different point-in-time snapshot, e.g. SP500-510 vs
   top-3000). A different snapshot of the same index counts; a survivor-biased
