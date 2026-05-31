@@ -49,32 +49,33 @@ verdicts/ledger/notes are merged (#1383/#1384/#1385).
 - Memory: `project_early_admission_mechanism`, `project_promotion_confirmation_grid`,
   `project_gspc_index_golden_2017_floor`.
 
-## Early-admission status going into next session
+## Early-admission status — RESOLVED: do NOT promote (deep test failed)
 
-5-context grid (15y/5y/early SP500 + top-3000 broad + **27y deep, pending**):
-**ma=13** beats baseline in every regime tested so far (frictionless + 5bps),
-turnover-neutral. ma=10 overfit. The 27y deep grid (dot-com + GFC) is the last
-input before the promotion decision.
+The 27y deep grid (2000-2026, dot-com + GFC, point-in-time-2000 universe incl.
+delistings) **REVERSED the recommendation**: baseline DOMINATES every
+early-admission variant and is the only Pareto-frontier cell; ma=13's per-fold
+win-rate collapses to 26/51 (~coin flip). The mechanism's post-2009 edge was a
+bull-regime artifact. **Verdict: Reject for promotion; mechanism stays
+default-off.** Ledger `2026-05-31-early-admission-deep-27y.sexp`; writeup
+`dev/notes/early-admission-deep-2026-05-31.md`. **The early-admission thread is
+closed** (do not revive the promotion).
 
 ---
 
-## P0 · Close the deep verdict + make deep-history reproducible — ~1.5h
-1. Harvest the 27y grid (command above) → the 5th grid context. Update the
-   grid; finalize the ma=13 verdict incl. dot-com + GFC.
-2. Append the deep result to the ledger (`early-admission-deep-27y` entry) +
-   write `dev/notes/early-admission-deep-2026-05-31.md`.
-3. **Commit a `dev/scripts/build_deep_universe.sh`** that rebuilds the 2000-2026
-   data end-to-end (build_universe snapshot → fetch via the skill's curl loop →
-   extend GSPC). Makes the deep capability a one-command rebuild. (Bars stay
-   uncommitted.)
+## P0 · Make deep-history reproducible — ~1h
+- **Commit a `dev/scripts/build_deep_universe.sh`** that rebuilds the 2000-2026
+  data end-to-end (`build_universe -as-of` snapshot → fetch via the
+  `fetch-historical-data` skill's curl loop → extend GSPC to 1999). Makes the
+  deep capability a one-command rebuild. (Bars stay uncommitted; the 2000
+  snapshot is already committed.) The 27y deep run is now the *default* final
+  cell for any future mechanism's promotion grid.
 
-## P1 · ma=13 promotion — ~3-4h — GATED on (deep grid confirms) AND (human go-ahead)
-- If ma=13 holds through dot-com + GFC and the flip is approved:
-  flip `Stage.default_config.early_admission_ma_period` `None → Some 13` (cite the
-  ledger ACCEPT), **re-baseline every affected golden** (5y/15y/custom-universe —
-  run each, reset expected ranges), full 3-gate QC + merge.
-- Else: record the deep finding, keep default-off, collapse P1 → bump P2/P3.
-- **The live-default flip is outward-facing — do NOT execute without the user's nod.**
+## P1 · (was the ma=13 promotion) — CANCELLED
+The deep test killed it. Next entry-timing candidates from the original gap
+(volatility-adjusted MA period; volume/breadth trend-establishment) are still
+open — but **the deep finding warns that any "early admission" variant likely
+fails the full cycle**; weight that before investing. If pursued, run the deep
+cell early.
 
 ## P2 · Re-validate prior verdicts on repaired data — ~1.5h
 - Re-run exit-timing (#1375) + hysteresis (#1366) surfaces on the GSPC-repaired
