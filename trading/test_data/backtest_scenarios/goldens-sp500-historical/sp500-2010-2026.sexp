@@ -104,15 +104,21 @@
  ;; few units lower as fewer false-exit cycles trigger. Wall on local
  ;; parallel-3 in trading-1-dev: 1218.7s; pin sized to absorb GHA/local
  ;; variance.
+ ;; Re-baselined 2026-05-30 on the GSPC-repaired index golden (issue #1380):
+ ;; the index now covers 2009-2026 so the macro gate trades the FULL window.
+ ;; The prior ranges reflected the truncated 2017-2026 behaviour (index golden
+ ;; only went back to 2017). Repaired full-run actuals: return 311.9%, 837
+ ;; trades, win 36.9%, sharpe 0.70, maxDD 26.2%, hold 42.4d, sortino 1.06,
+ ;; calmar 0.35, ulcer 8.78, wall 728s. Bands ~+/-12% for run nondeterminism.
  (expected
-  ((total_return_pct   ((min 290.0)         (max 393.0)))
-   (total_trades       ((min 640)           (max  800)))
-   (win_rate           ((min  33.2)         (max  44.9)))
-   (sharpe_ratio       ((min   0.66)        (max   0.90)))
-   (max_drawdown_pct   ((min  15.6)         (max  21.2)))
-   (avg_holding_days   ((min  37.9)         (max  51.3)))
-   (open_positions_value ((min 3400000.0)   (max 4400000.0)))
-   (sortino_ratio_annualized ((min  1.06)   (max   1.43)))
-   (calmar_ratio       ((min   0.44)        (max   0.59)))
-   (ulcer_index        ((min   6.35)        (max   8.60)))
+  ((total_return_pct   ((min 270.0)         (max 355.0)))
+   (total_trades       ((min 780)           (max  900)))
+   (win_rate           ((min  32.0)         (max  42.0)))
+   (sharpe_ratio       ((min   0.60)        (max   0.82)))
+   (max_drawdown_pct   ((min  21.5)         (max  30.5)))
+   (avg_holding_days   ((min  36.0)         (max  49.0)))
+   (open_positions_value ((min 3100000.0)   (max 4100000.0)))
+   (sortino_ratio_annualized ((min  0.90)   (max   1.27)))
+   (calmar_ratio       ((min   0.29)        (max   0.42)))
+   (ulcer_index        ((min   7.60)        (max  10.00)))
    (wall_seconds       ((min 600.0)         (max 2400.0))))))
