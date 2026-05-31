@@ -42,8 +42,8 @@ let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
         input.config
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
-  | Spy_only_weinstein { symbol } ->
-      let config = { Spy_only.default_config with symbol } in
+  | Spy_only_weinstein { symbol; ma_period_weeks } ->
+      let config = Spy_only.config_with ~symbol ~ma_period_weeks () in
       Spy_only.make ~config ~bar_reader ()
 
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's

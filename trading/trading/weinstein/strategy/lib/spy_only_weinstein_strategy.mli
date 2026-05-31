@@ -78,6 +78,18 @@ val default_config : config
 (** [default_config] uses {!default_symbol}, {!Stage.default_config},
     {!Weinstein_stops.default_config}, and {!default_fallback_stop_buffer}. *)
 
+val config_with : ?symbol:string -> ma_period_weeks:int -> unit -> config
+(** [config_with ?symbol ~ma_period_weeks ()] is {!default_config} with the
+    stage-classifier moving-average period overridden to [ma_period_weeks] weeks
+    (and optionally a different [symbol]).
+
+    The MA period is the single Weinstein-faithful dial that distinguishes the
+    investor preset ([30] weeks — Weinstein's default for position trading) from
+    the trader preset ([10] weeks — his faster cadence). Only
+    [stage_config.ma_period] changes; the stops config and fallback buffer are
+    untouched. The weekly-bar lookback the strategy reads scales with this
+    period so a shorter MA does not over-read history. *)
+
 val make :
   ?config:config ->
   bar_reader:Bar_reader.t ->
