@@ -1,5 +1,10 @@
 # Next-session priorities — 2026-06-01
 
+**SUPERSEDED by `next-session-priorities-2026-06-02.md`** — the P0 SPY reference
+strategy + trader/investor presets shipped (#1397/#1401); the mode comparison is
+done (trader rejected, selection ≫ timing). Read the 2026-06-02 doc for the
+forward plan (lead = the Cell E 2020-2026 stall).
+
 **Supersedes:** `next-session-priorities-2026-05-31.md` (its P0/P2 shipped; P1
 cancelled; P3 partial — see below). Read that doc for the full 2026-05-31
 session record; this one is the forward plan.
