@@ -45,6 +45,7 @@ type config = {
   max_buy_candidates : int;
   max_short_candidates : int;
   cascade_post_stop_cooldown_weeks : int; [@sexp.default 0]
+  neutral_blocks_longs : bool; [@sexp.default false]
 }
 [@@deriving sexp]
 
@@ -60,6 +61,7 @@ let default_config =
     max_buy_candidates = 20;
     max_short_candidates = 10;
     cascade_post_stop_cooldown_weeks = 0;
+    neutral_blocks_longs = false;
   }
 
 type scored_candidate = {
@@ -334,18 +336,30 @@ let _count_short_phases ~weights ~thresholds ~min_grade ~min_score_override
 let _filter_and_cap ~candidate_fn ~max_n candidates =
   List.filter_map candidates ~f:candidate_fn |> _top_n max_n
 
+(** Whether the macro tape admits new long entries.
+
+    [neutral_blocks_longs] defaults to [false] = the historical gate (longs
+    admitted under both [Bullish] and [Neutral]; blocked only under [Bearish]).
+    When [true], [Neutral] also blocks longs — only [Bullish] admits. This
+    tightens Weinstein's unconditional macro gate so a non-confirmed ([Neutral])
+    tape no longer admits buys. The short-side gate is unaffected. *)
+let _longs_admitted_by_macro ~neutral_blocks_longs macro_trend =
+  match macro_trend with
+  | Bearish -> false
+  | Neutral -> not neutral_blocks_longs
+  | Bullish -> true
+
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~max_buy_candidates
-    ~candidates ~macro_trend : scored_candidate list =
-  match macro_trend with
-  | Bearish -> []
-  | Bullish | Neutral ->
-      let candidate_fn =
-        _long_candidate ~weights ~thresholds ~params ~min_grade
-          ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-      in
-      _filter_and_cap ~candidate_fn ~max_n:max_buy_candidates candidates
+    ~neutral_blocks_longs ~candidates ~macro_trend : scored_candidate list =
+  if not (_longs_admitted_by_macro ~neutral_blocks_longs macro_trend) then []
+  else
+    let candidate_fn =
+      _long_candidate ~weights ~thresholds ~params ~min_grade
+        ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+    in
+    _filter_and_cap ~candidate_fn ~max_n:max_buy_candidates candidates
 
 (** Filter, score, grade, sort, and cap short candidates. *)
 let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
@@ -443,11 +457,12 @@ let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
     max_buy_candidates;
     max_short_candidates;
     cascade_post_stop_cooldown_weeks = _;
+    neutral_blocks_longs;
   } =
     config
   in
   let buys_active =
-    match macro_trend with Bullish | Neutral -> true | Bearish -> false
+    _longs_admitted_by_macro ~neutral_blocks_longs macro_trend
   in
   let total_stocks = List.length stocks in
   let candidates =
@@ -458,7 +473,7 @@ let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
     _evaluate_longs ~weights ~thresholds:grade_thresholds
       ~params:candidate_params ~min_grade ~min_score_override
       ~max_score_override ~volume_ratio_exclude_range ~max_buy_candidates
-      ~candidates ~macro_trend
+      ~neutral_blocks_longs ~candidates ~macro_trend
   in
   let short_candidates =
     _evaluate_shorts ~weights ~thresholds:grade_thresholds

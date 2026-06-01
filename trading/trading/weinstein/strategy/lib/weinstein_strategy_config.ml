@@ -80,6 +80,11 @@ type config = {
       [@sexp.default Trading_portfolio.Margin_config.default_config]
       (** Phase-2 margin-accounting parameters (issue #859,
           [dev/plans/short-side-margin-2026-05-13.md] §2). See [.mli]. *)
+  neutral_blocks_longs : bool; [@sexp.default false]
+      (** When [true], a macro-[Neutral] tape blocks new long entries (only
+          [Bullish] admits longs); default [false] preserves the historical gate
+          where both [Bullish] and [Neutral] admit longs. Threaded into
+          [screening_config.neutral_blocks_longs] at screen time. See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -113,6 +118,7 @@ let default_config ~universe ~index_symbol =
     continuation_config = Continuation.default_config;
     enable_pi_filter = false;
     margin_config = Trading_portfolio.Margin_config.default_config;
+    neutral_blocks_longs = false;
   }
 
 let name = "Weinstein"

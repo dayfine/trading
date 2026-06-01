@@ -48,6 +48,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     max_buy_candidates = Int.max_value;
     max_short_candidates = Int.max_value;
     cascade_post_stop_cooldown_weeks = 0;
+    neutral_blocks_longs = false;
   }
 
 (** Whether [trend] would have admitted longs at the macro gate. *)

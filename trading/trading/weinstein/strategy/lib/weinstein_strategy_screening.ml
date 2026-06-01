@@ -373,8 +373,17 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
     |> List.map ~f:analyze
   in
   _commit_prior_stages ~prior_stages classified;
+  (* Thread the top-level [neutral_blocks_longs] entry-gate flag into the
+     screener config so it is expressible as a [Weinstein_strategy.config] flag
+     axis. Default [false] leaves the screener config untouched bit-equally. *)
+  let screening_config =
+    {
+      config.screening_config with
+      Screener.neutral_blocks_longs = config.neutral_blocks_longs;
+    }
+  in
   let screen_result =
-    Screener.screen_with_cooldown ?membership_at ~config:config.screening_config
+    Screener.screen_with_cooldown ?membership_at ~config:screening_config
       ~macro_trend:macro_result.trend ~sector_map ~stocks
       ~held_tickers:(held_symbols portfolio) ~as_of:current_date
       ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)

@@ -87,6 +87,29 @@ type config = {
           borrow fee + maintenance-margin force-cover). Default
           {!Trading_portfolio.Margin_config.default_config} (disabled) preserves
           bit-equality with prior baselines. See [.ml] for full semantics. *)
+  neutral_blocks_longs : bool; [@sexp.default false]
+      (** Entry-gate axis (default-off): when [true], a macro-[Neutral] tape
+          blocks new long entries exactly as a [Bearish] tape does — only a
+          [Bullish] tape admits longs. Default [false] preserves the historical
+          macro gate bit-equally (longs admitted under both [Bullish] and
+          [Neutral], blocked only under [Bearish]).
+
+          This *tightens* Weinstein's unconditional macro gate
+          (weinstein-book-reference.md §Macro Analysis: do not buy in a
+          non-confirmed tape) — it is a faithful dial, not a spine change: the
+          Stage-2-only / breakout+volume entry criteria, the stops, and the
+          short-side gate are all unaffected. The short-side gate ([Bullish]
+          blocks; [Bearish]/[Neutral] admit) is independent of this flag.
+
+          Wired by threading into [screening_config.neutral_blocks_longs] at
+          screen time, so the flag is a single-component [Variant_matrix] flag
+          axis ([((flag neutral_blocks_longs) (values (true false)))]).
+
+          Motivation: lever #2 of the Cell E 2020-2026 stall diagnosis — in 2022
+          the macro gate was [Bearish] ~51% of the year but longs still entered
+          through the [Neutral]/[Bullish] bear-rally blips, contributing to the
+          false-breakout stop-out churn. Default-off until an experiment-ledger
+          ACCEPT (per [.claude/rules/experiment-flag-discipline.md]). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

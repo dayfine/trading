@@ -36,6 +36,15 @@ let _laggard_axis =
       values = Sexp.[ Atom "true"; Atom "false" ];
     }
 
+(* [neutral_blocks_longs] is a top-level bool flag on [Weinstein_strategy.config]
+   — proves the entry-gate axis resolves through [Overlay_validator]. *)
+let _neutral_blocks_longs_axis =
+  VM.Flag
+    {
+      name = "neutral_blocks_longs";
+      values = Sexp.[ Atom "true"; Atom "false" ];
+    }
+
 (* Catch a [Failure] from [thunk]; returns [true] iff one was raised. *)
 let _raises_failure thunk =
   try
@@ -111,6 +120,27 @@ let test_single_component_override_shape _ =
            (fun (v : WFR.variant) -> v.overrides)
            (elements_are
               [ equal_to (Sexp.of_string "((stage3_exit_margin_pct 0.02))") ]);
+       ])
+
+(* Proves R2 (experiment-flag-discipline): the [neutral_blocks_longs] entry-gate
+   flag is a real top-level [Weinstein_strategy.config] field, so the flag axis
+   expands and passes [Overlay_validator] validation, yielding the expected
+   single-component override sexps. *)
+let test_neutral_blocks_longs_flag_axis_expands _ =
+  let t =
+    { VM.axes = [ _neutral_blocks_longs_axis ]; expansion = VM.Cartesian }
+  in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [ equal_to (Sexp.of_string "((neutral_blocks_longs true))") ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [ equal_to (Sexp.of_string "((neutral_blocks_longs false))") ]);
        ])
 
 (* ---------- Sampled determinism + fallback ---------- *)
@@ -189,6 +219,8 @@ let suite =
          >:: test_known_matrix_labels_and_overrides;
          "single-component path override shape"
          >:: test_single_component_override_shape;
+         "neutral_blocks_longs flag axis expands + validates"
+         >:: test_neutral_blocks_longs_flag_axis_expands;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"

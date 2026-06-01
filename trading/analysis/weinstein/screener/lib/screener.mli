@@ -159,6 +159,23 @@ type config = {
           in response to the same-week re-fire pattern documented in
           dev/notes/sp500-trade-quality-findings-2026-04-30.md §"Cascade
           re-firing within days of stop-out". *)
+  neutral_blocks_longs : bool; [@sexp.default false]
+      (** When [true], a macro-[Neutral] tape blocks new long candidates exactly
+          as a [Bearish] tape does — only [Bullish] admits longs. Default
+          [false] preserves the historical gate bit-equally: longs are admitted
+          under both [Bullish] and [Neutral], blocked only under [Bearish].
+
+          This is a *tightening* of Weinstein's unconditional macro gate
+          (weinstein-book-reference.md §Macro Analysis: "don't buy in a
+          non-confirmed tape"): it removes the bear-rally [Neutral] blips that
+          admit longs during a predominantly-bearish year. The short-side gate
+          ([Bullish] blocks; [Bearish]/[Neutral] admit) is unaffected by this
+          flag.
+
+          Default-off entry-gate axis (lever #2 of the Cell E 2020-2026 stall
+          diagnosis). Mirrored from the top-level
+          [Weinstein_strategy.config.neutral_blocks_longs] field so the flag is
+          a [Variant_matrix] axis. *)
 }
 [@@deriving sexp]
 (** Main screener configuration. *)
