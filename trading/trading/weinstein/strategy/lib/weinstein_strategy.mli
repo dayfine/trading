@@ -43,6 +43,11 @@ module Spy_only_weinstein_strategy = Spy_only_weinstein_strategy
 (** Single-instrument long/flat Weinstein stage-timing reference strategy. See
     {!Spy_only_weinstein_strategy}. *)
 
+module Sector_rotation_weinstein_strategy = Sector_rotation_weinstein_strategy
+(** Multi-symbol long/flat Weinstein stage-timing reference strategy that holds
+    the top-[k] strongest Stage-2 sector ETFs by RS vs SPY. See
+    {!Sector_rotation_weinstein_strategy}. *)
+
 module Stops_runner = Stops_runner
 (** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
 *)

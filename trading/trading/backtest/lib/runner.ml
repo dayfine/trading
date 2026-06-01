@@ -23,6 +23,11 @@ let _warmup_days_for : Strategy_choice.t -> int = function
   | Weinstein -> 210
   | Bah_benchmark _ -> 0
   | Spy_only_weinstein _ -> 210
+  (* The RS analyzer needs [rs_ma_period] (52wk default) aligned weekly bars to
+     compute a ranking score, so the sector-rotation strategy warms up against
+     the larger of its 30-week stage MA and the 52-week RS window — ~52 weeks =
+     ~364 days. *)
+  | Sector_rotation_weinstein _ -> 364
 
 (* Public types *)
 
