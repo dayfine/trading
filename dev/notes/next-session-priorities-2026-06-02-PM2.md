@@ -47,11 +47,38 @@ Each rung adds exactly one knob so we can attribute effect to layer. Matrix:
 
 | universe | long / flat | long-short |
 |---|---|---|
-| **SPY** (1 instr, no selection) | ✅ DD-insurance floor (18.8% MaxDD) | ⚠️ **provisional** — appears to raise DD (32.6%), #1415 |
-| **Sectors** (few clean instr) | **← P0 NEXT** (K=1 → K=3-4 concentrated) | later |
-| **Broad** (many noisy) | ✅ asymmetry restored 3.4× (this session) | ⚠️ exists, appears to fail DD (squeeze) |
+| **SPY** (1 instr, no selection) | ✅ DD-insurance floor (18.8% MaxDD, robust bull+deep) | ⚠️ **provisional** — appears to raise DD (32.6%), #1415 |
+| **Sectors** (few clean instr) | ✅ **DONE — k=3 beats BAH, but DD 28-32% > SPY floor** (see below) | later |
+| **Broad** (many noisy) | ✅ asymmetry restored 3.4× (but liquidity-flattered) | ⚠️ exists, appears to fail DD (squeeze) |
 
-### P0 · Sector-rotation long/flat (data ready, build it)
+### P0 · Sector-rotation long/flat — ✅ DONE (#1419), full analysis: `sector-rotation-k-ladder-2026-06-02.md`
+Built `Sector_rotation_weinstein` (top-K Stage-2 sectors by RS vs SPY, per-symbol stops,
+macro gate stripped to isolate selection). Ran the K-ladder on **bull (2009-2025) AND
+deep (2000-2025, incl. dot-com + GFC)** — regime-robust attribution:
+- **Drawdown defense ⟸ index stage-timing (SPY-only), NOT selection.** SPY-only MaxDD
+  **18.8% in BOTH windows** (dodged dot-com + GFC; BAH ate 55%). Still the best single
+  strategy by the locked objective. Selection *worsens* DD (sectors more volatile than
+  the smoothed index): k=3 DD 28% (bull) / 32% (deep).
+- **Sector k=3 = strong bankable RETURN engine** — dominates BAH on every risk metric in
+  both regimes (deep: Calmar 0.23>0.11, MaxDD 32<55, Sharpe 0.56>0.40, ret 528>370),
+  regime-stable **1.5× win/loss-size asymmetry**, ZERO penny-stock risk (clean ETFs,
+  unlike the liquidity-flattered top-3000). But NOT a DD improvement over SPY-only.
+- **K=3 is the sweet spot** (Calmar ordering k=3>k=4>k=1 in both windows). **K=1 sector
+  rotation is DEAD** (deep: ~0% ret, 53.8% DD, negative 0.96× asymmetry — churns, shredded
+  in bears). Do not revive K=1.
+- **Conclusion:** SPY-only (DD floor) and sector-k3 (return engine) are **complementary
+  layers, not competitors.**
+
+#### → NEXT P0: re-add the macro gate as the DD layer on sector-k3
+The gate was stripped to isolate selection; the data says it's the missing piece.
+**Block sector entries / force flat when SPY itself is Stage-4.** Hypothesis: a
+SPY-Stage-gated sector-k3 cuts the 32% deep DD toward the 18.8% SPY floor while keeping
+most of the selection return. One knob (macro gate on/off) on the already-built
+sector-k3, same bull+deep grid; config dial default-off per `experiment-flag-discipline.md`,
+promote only on grid-robust ACCEPT (`promotion-confirmation.md`). Orthogonal cheap test:
+a **SPY-core + sector-satellite barbell** (50/50) combining floor + engine mechanically.
+
+### (superseded) original P0 brief · Sector-rotation long/flat (data ready, build it)
 - Universe: the 11 SPDR sector ETFs (`spdr-sectors-11.sexp`); deep bars fetched this
   session (originals 1998-12 → 2026; XLRE '15, XLC '18) — **but see "Data state": the
   fetch may have been wiped; re-verify / re-fetch (2 min).**
