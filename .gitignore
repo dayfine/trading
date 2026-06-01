@@ -51,7 +51,28 @@ dev/backtest/**/steps.csv
 
 # Scenario runner output dirs are timestamped per-run artefacts
 # (trades.csv, trade_audit.sexp, summary.sexp, etc.); regenerable and large.
+# NOTE: the runner's _repo_root resolves to the dune root (.../trading) when
+# invoked in-container, so outputs land under BOTH paths depending on cwd —
+# ignore both. (The trading/-prefixed path was previously un-ignored, which let
+# a concurrent jj-writing agent wipe an in-flight run's output dir mid-write and
+# crash the backtest — see memory/feedback_no_parent_backtest_during_jj_agent.)
 dev/backtest/scenarios-*/
+trading/dev/backtest/scenarios-*/
+# Ad-hoc diagnostic scenario scratch dirs (scenario sexps are reproducible from
+# the diagnosis docs; their run outputs are large + regenerable).
+dev/backtest/*-diag/
+dev/backtest/*-gate/
+dev/backtest/broad-lever1/
+trading/dev/backtest/
+
+# Fetched experiment bars: the canonical store tracks only committed golden
+# symbols; broad/sector/experiment fetches (e.g. top-3000, SPDR sectors) are
+# ephemeral local inputs (the ops-data agent writes them untracked, 100s of MB).
+# Ignoring NEW data files protects them from jj tree-op wipes AND keeps the repo
+# lean. Already-tracked golden bars are UNAFFECTED (gitignore is consulted only
+# for untracked files). To commit a new golden's bars deliberately: `git add -f`.
+trading/test_data/**/data.csv
+trading/test_data/**/data.metadata.sexp
 
 .claude/worktrees/
 
