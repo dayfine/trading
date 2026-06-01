@@ -1,4 +1,4 @@
-# Next-session priorities — 2026-06-03
+# Next-session priorities — 2026-06-02-PM
 
 **Supersedes:** `next-session-priorities-2026-06-02.md`. Its P0 (diagnose the Cell E
 2020-2026 stall) is **done** and the finding reshapes the roadmap; its P1 (trader-dials
