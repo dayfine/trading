@@ -9,12 +9,14 @@ open Trading_strategy
 val build_entry :
   position_id:string ->
   symbol:string ->
+  side:Position.position_side ->
   bar:Types.Daily_price.t ->
   target_quantity:float ->
   Position.transition
-(** Stage-2 entry: a [CreateEntering] long transition for [symbol] at
-    [bar.close_price], tagged with the SPY-only Weinstein entry reasoning.
-    [position_id] is the strategy's deterministic id for the symbol. *)
+(** Stage-driven entry: a [CreateEntering] transition for [symbol] on [side] at
+    [bar.close_price], tagged with the SPY-only Weinstein entry reasoning
+    ([Long] = Stage-2 advance, [Short] = Stage-4 decline). [position_id] is the
+    strategy's deterministic id for the symbol. *)
 
 val build_exit :
   pos:Position.t ->
@@ -22,7 +24,9 @@ val build_exit :
   label:string ->
   Position.transition
 (** Stage-based exit: a [TriggerExit] with a [StrategySignal] reason carrying
-    [label] (e.g. ["stage4_exit"]), exiting [pos] at [bar.close_price]. *)
+    [label] (e.g. ["stage4_exit"] for a long, ["stage4_cover"] for a short) and
+    a ["side=long"]/["side=short"] detail tag drawn from [pos.side], exiting
+    [pos] at [bar.close_price]. *)
 
 val build_stop_exit :
   pos:Position.t ->
