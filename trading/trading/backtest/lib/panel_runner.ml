@@ -22,6 +22,8 @@ type input = {
 let _snapshot_cache_mb = 1024
 
 module Spy_only = Weinstein_strategy.Spy_only_weinstein_strategy
+module Sector_rotation = Weinstein_strategy.Sector_rotation_weinstein_strategy
+
 (** Construct the strategy module the simulator will run.
 
     The Weinstein branch threads the runner's deps-loaded inputs (AD bars,
@@ -46,6 +48,9 @@ let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
         Spy_only.config_with ~symbol ~enable_stage4_short ~ma_period_weeks ()
       in
       Spy_only.make ~config ~bar_reader ()
+  | Sector_rotation_weinstein { k; ma_period_weeks } ->
+      let config = Sector_rotation.config_with ~k ~ma_period_weeks () in
+      Sector_rotation.make ~config ~bar_reader ()
 
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader.

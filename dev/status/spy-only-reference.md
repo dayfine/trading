@@ -43,6 +43,24 @@ return.
   per `.claude/rules/experiment-flag-discipline.md` R1. Expressible as
   a scenario via `(enable_stage4_short true)`; scenario
   `spy-longshort.sexp`.
+- **Sector-rotation long/flat reference** (PR
+  `feat/sector-rotation-strategy` — THIS PR). The multi-symbol
+  generalization of the SPY-only testbed: instead of one fixed symbol,
+  each Friday it classifies the 11 SPDR sector ETFs on their own weekly
+  bars, keeps the Stage-2 names, ranks them by RS vs SPY, and holds the
+  top-K. Held names that leave the top-K set or roll into Stage 3/4
+  exit to flat; a per-symbol `Weinstein_stops` trailing stop is checked
+  daily. K=1 cash sizing degenerates to all-cash (matches SPY-only);
+  K>1 equal-weights cash across the open entry slots. Long/flat only —
+  no shorting, no macro gate, no portfolio-risk sizing; isolates the
+  SELECTION layer (which Stage-2 names to hold) per the lever-#1
+  (breadth) finding. Faithful: Stage-2-only entry, Stage 3/4 exit, stop
+  below base, RS for selection (spine items 2/4/5/7). Reuses
+  `Spy_only_transitions` / `Spy_only_signals` (symbol-generic).
+  Constructed via `Strategy_choice.Sector_rotation_weinstein { k;
+  ma_period_weeks }`; scenarios `sector-rotation-k{1,3,4}.sexp` over the
+  new `spdr-sectors-11-plus-spy` universe. Backtest comparison vs
+  spy-investor + Cell E is the NEXT step (not in this PR).
 
 ## Stage-4 short-leg result (report only — NOT promoted)
 
@@ -81,11 +99,24 @@ clean signal. No promotion; testbed-only per R3.
 2. The long/flat investor 30wk remains the reference floor; selection
    (Cell E multi-symbol) ≫ timing for total return — see
    `dev/notes/spy-mode-comparison-2026-06-01.md`.
+3. **Run the sector-rotation scenarios** (`sector-rotation-k{1,3,4}.sexp`,
+   2009-2025) and compare K-sweep Return / Sharpe / Calmar / MaxDD vs
+   spy-investor (single-symbol) and Cell E (full screener). This is the
+   direct test of whether RS-ranked sector rotation captures the
+   breadth/selection lever in a faithful, minimal form. Then add a deep
+   (1995-2025) companion run for macro-regime robustness.
 
 ## References
 
 - `trading/trading/weinstein/strategy/lib/spy_only_weinstein_strategy.mli`
   — `config` + `enable_stage4_short` short mechanics.
+- `trading/trading/weinstein/strategy/lib/sector_rotation_weinstein_strategy.mli`
+  — multi-symbol `config` (`symbols` / `benchmark_symbol` / `k` /
+  `rs_config`), cadence, and sizing; `sector_rotation_signals.mli` is the
+  pure RS-ranking helper.
+- `trading/test_data/backtest_scenarios/sector-rotation-k{1,3,4}.sexp`
+  + `universes/spdr-sectors-11-plus-spy.sexp` — the K-sweep scenarios
+  (research tier, wide bands; direction-finders, not pinned goldens).
 - `trading/trading/weinstein/stops/lib/weinstein_stops.mli` — `~side:Short`
   stop (above entry, ratchets down; `check_stop_hit` on `high ≥ stop`).
 - `trading/test_data/backtest_scenarios/spy-longshort.sexp` — short-on
