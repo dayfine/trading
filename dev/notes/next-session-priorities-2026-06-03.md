@@ -70,10 +70,12 @@ Weinstein-faithful (tighten the macro/breadth gate; spine intact). Candidates:
   blips. ✅ **SHIPPED 2026-06-02 as the default-off axis `neutral_blocks_longs` (#1410).**
   The screener long-gate (`Bearish -> [] | Bullish | Neutral -> admit`) now optionally
   blocks Neutral too when the flag is on. Bit-identical default-off; `Variant_matrix`-
-  expressible. **Next: TEST it** — run `((flag neutral_blocks_longs) (values (true false)))`
-  through the gap-closing gauntlet on the regime battery (incl. a sustained-trend cell —
-  it must not strangle 2020-COVID-V / 2010-2019). It is built but UNvalidated; do not
-  promote without a ledger ACCEPT.
+  expressible. **DIRECTIONALLY TESTED 2026-06-02 (#1412): FRAGILE — do NOT promote.**
+  Single-backtest sign flips by universe vintage (fresh sp500-2020 HELPS: PF 0.96→1.12,
+  MaxDD 32→25%; but sp500-2010 full-run 2020-segment HURTS: PF 0.88→0.74). Stays
+  default-off. Only escalate to the full WF-CV + grid (multi-universe) if a cleaner
+  motivating signal appears — the directional contradiction says it likely won't survive.
+  (`dev/notes/neutral-blocks-longs-directional-2026-06-02.md`.)
 - **Breadth gate** — A/D or %-above-30wk-MA threshold (2023 was 88% index-"Bullish" yet
   25% win — the index gate is blind to narrow breadth; the run already loads "AD breadth
   bars", under-weighted today). Not yet built.
