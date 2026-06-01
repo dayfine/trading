@@ -1,0 +1,12 @@
+(tests
+ (names test_ledger_entry_builder)
+ (libraries
+  ounit2
+  core
+  core_unix.filename_unix
+  matchers
+  experiment_ledger
+  walk_forward
+  ledger_entry_builder)
+ (preprocess
+  (pps ppx_sexp_conv)))
