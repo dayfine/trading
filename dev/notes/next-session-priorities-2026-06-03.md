@@ -8,11 +8,14 @@ package) is **demoted to dead** by that finding; its P2.1 (population-aware DSR)
 ## State of the world (2026-06-02 EOD)
 
 Main green. The 06-02 session delivered the **Cell E stall diagnosis** (the 06-02 P0
-lead) plus two PRs:
+lead) plus **four merged PRs**:
 
-- **#1408** (docs) — `dev/notes/cell-e-2020-2026-stall-diagnosis-2026-06-02.md`.
+- **#1408** (docs) — `dev/notes/cell-e-2020-2026-stall-diagnosis-2026-06-02.md` + this doc.
 - **#1407** (code) — `rank_variants --lifetime-trials` (population-aware Deflated
   Sharpe; bit-identical when omitted). P2.1 of the population-search apparatus.
+- **#1409** (code) — durable `write_ledger_entry` CLI + `ledger_entry_builder`. P2.2.
+- **#1410** (code) — `neutral_blocks_longs` default-off entry-gate axis (lever #2,
+  built — see P1; UNvalidated, needs the gap-closing test before any promotion).
 
 ### The diagnosis (the load-bearing learning — read it)
 
@@ -63,16 +66,22 @@ The ONLY mechanism class that escapes the stops-vs-winners tension, because it g
 *entry count* not the stop: fewer entries in low-trend-quality / narrow-breadth tape →
 fewer −2.52% deep losers, while the stop on surviving winners is untouched.
 Weinstein-faithful (tighten the macro/breadth gate; spine intact). Candidates:
+- **Macro-Neutral as no-buy** — 2022's bleed entered through Neutral/Bullish bear-rally
+  blips. ✅ **SHIPPED 2026-06-02 as the default-off axis `neutral_blocks_longs` (#1410).**
+  The screener long-gate (`Bearish -> [] | Bullish | Neutral -> admit`) now optionally
+  blocks Neutral too when the flag is on. Bit-identical default-off; `Variant_matrix`-
+  expressible. **Next: TEST it** — run `((flag neutral_blocks_longs) (values (true false)))`
+  through the gap-closing gauntlet on the regime battery (incl. a sustained-trend cell —
+  it must not strangle 2020-COVID-V / 2010-2019). It is built but UNvalidated; do not
+  promote without a ledger ACCEPT.
 - **Breadth gate** — A/D or %-above-30wk-MA threshold (2023 was 88% index-"Bullish" yet
   25% win — the index gate is blind to narrow breadth; the run already loads "AD breadth
-  bars", under-weighted today).
-- **Macro-Neutral as no-buy** — 2022's bleed entered through Neutral/Bullish bear-rally
-  blips.
+  bars", under-weighted today). Not yet built.
 - **Trend-quality regime filter** — rolling measure (recent realized winner-hold, or %
   of universe in sustained Stage 2) that throttles new deployment when trends aren't
-  extending.
+  extending. Not yet built.
 
-Build with full `experiment-gap-closing` discipline: default-off axis
+Build remaining candidates with full `experiment-gap-closing` discipline: default-off axis
 (`experiment-flag-discipline`), deep cell + confirmation grid (`promotion-confirmation`).
 **Mandatory regime cell: a sustained-trend window (2010-2019 or deep pre-2009)** — a
 throttle tuned to dodge 2021-2025 chop must NOT strangle the 2010-2019 / 2020-COVID-V
@@ -82,11 +91,16 @@ restore the edge *without* a throttle that risks the good regimes.
 
 ## P2 · Population-search apparatus — continue (infra, safe autonomous)
 
-P2.1 (population-aware DSR) shipped (#1407). Remaining, per
-`dev/plans/population-search-2026-05-31.md` + `experiment-platform-2026-05-29.md`:
-- **Durable ledger-write CLI** — the ledger write was done by throwaway exes rebuilt 4×.
+P2.1 (population-aware DSR) shipped (#1407). P2.2 (durable ledger-write CLI) shipped
+(#1409 — `write_ledger_entry.exe` + `ledger_entry_builder`; ledger writes no longer
+hand-authored). Remaining, per `dev/plans/population-search-2026-05-31.md` +
+`experiment-platform-2026-05-29.md`:
 - **Multi-regime battery as a fixed artifact** — the (universe × period) cells with ≥1
-  deep; the fitness function the apparatus optimizes against.
+  deep; the fitness function the apparatus optimizes against. The Cell E diagnosis pins
+  which cells matter: a sustained-trend cell (2010-2019), a chop cell (2020-2026), and a
+  deep cell (2000-2026) — mechanisms behave oppositely across them (that opposition is
+  what killed the 3 prior knobs). This is the natural next P2 step + it's the fitness
+  function the `neutral_blocks_longs` test (P1) needs.
 - **Versioned goal + ledger-rescore tool.**
 
 ## Demoted / dead
