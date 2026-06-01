@@ -21,37 +21,6 @@ type input = {
    oversized symbol stays resident even when its bytes exceed the cap. *)
 let _snapshot_cache_mb = 1024
 
-module Spy_only = Weinstein_strategy.Spy_only_weinstein_strategy
-module Sector_rotation = Weinstein_strategy.Sector_rotation_weinstein_strategy
-
-(** Construct the strategy module the simulator will run.
-
-    The Weinstein branch threads the runner's deps-loaded inputs (AD bars,
-    sector map, config) through {!Weinstein_strategy.make}. The [Bah_benchmark]
-    branch ignores all of that machinery — BAH is a single-symbol passive
-    strategy that needs only its own [config.symbol]. The [bar_reader] /
-    [audit_recorder] are dropped on the BAH branch: BAH reads prices via
-    [get_price] (the snapshot-backed [Market_data_adapter]) and emits no audit
-    events. *)
-
-let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
-    =
-  match (strategy_choice : Strategy_choice.t) with
-  | Weinstein ->
-      Weinstein_strategy.make ~ad_bars:input.ad_bars
-        ~ticker_sectors:input.ticker_sectors ~bar_reader ~audit_recorder
-        input.config
-  | Bah_benchmark { symbol } ->
-      Trading_strategy.Bah_benchmark_strategy.make { symbol }
-  | Spy_only_weinstein { symbol; ma_period_weeks; enable_stage4_short } ->
-      let config =
-        Spy_only.config_with ~symbol ~enable_stage4_short ~ma_period_weeks ()
-      in
-      Spy_only.make ~config ~bar_reader ()
-  | Sector_rotation_weinstein { k; ma_period_weeks } ->
-      let config = Sector_rotation.config_with ~k ~ma_period_weeks () in
-      Sector_rotation.make ~config ~bar_reader ()
-
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader.
 
@@ -193,7 +162,9 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader = _build_snapshot_bar_reader ~daily_panels ~calendar in
   let strategy =
-    _build_strategy input ~strategy_choice ~bar_reader ~audit_recorder
+    Panel_strategy_builder.build ~ad_bars:input.ad_bars
+      ~ticker_sectors:input.ticker_sectors ~config:input.config ~strategy_choice
+      ~bar_reader ~audit_recorder
   in
   let adapter = _build_market_data_adapter ~daily_panels in
   let final_close_prices () =
