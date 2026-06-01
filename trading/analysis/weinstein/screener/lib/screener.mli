@@ -18,6 +18,12 @@ include module type of Screener_scoring
     [Screener.scoring_weights], etc. without importing the sub-module directly.
 *)
 
+include module type of Screener_admission
+(** Per-candidate admission predicates, cascade-phase counters, and the
+    {!Screener_admission.volume_ratio_band} type — re-exported from
+    {!Screener_admission} so callers continue to reference them as
+    [Screener.volume_ratio_band], [Screener.passes_score_floor], etc. *)
+
 type candidate_params = {
   entry_buffer_pct : float;
       (** Fraction above breakout price for the suggested entry. Default: 0.005.
@@ -65,13 +71,6 @@ type candidate_params = {
 
 val default_candidate_params : candidate_params
 (** [default_candidate_params] provides the reference parameters. *)
-
-type volume_ratio_band = { low : float; high : float } [@@deriving sexp]
-(** Half-open volume-ratio exclusion band used by
-    {!config.volume_ratio_exclude_range}. The named-field record (rather than a
-    plain [float * float] tuple) keeps the on-disk sexp shape outside the
-    runner's deep-merge "looks like a record" heuristic, so a partial-config
-    overlay that sets just this field deep-merges correctly. *)
 
 type config = {
   weights : scoring_weights;
