@@ -9,14 +9,23 @@
       ([fold_actuals.sexp] from the runner). Optional; required for DSR.
     - [--baseline-label <label>] — header annotation; defaults to "baseline".
     - [--output <path>] — write markdown there; default stdout.
+    - [--lifetime-trials <N>] — best-of-N trial budget for the DSR
+      selection-bias correction (positive int). Defaults to the number of
+      variants in this surface; supply a larger value when the search spans
+      multiple surfaces / rounds so DSR corrects against the whole
+      population-search lifetime, not a single matrix. Must be at least the
+      surface's variant count (a smaller lifetime budget than this surface is a
+      user error and fails fast). Omitting it reproduces the single-surface
+      behaviour exactly (bit-identical).
 
     DSR is per-variant: feeds the variant's [sharpe_ratio.mean] (from the
     aggregate) as the observed Sharpe, the variant's per-fold [total_return_pct]
     series (from fold_actuals) as the fold returns, and the across-variant
-    Sharpe-mean variance as the best-of-N selection-bias correction. Variants
-    with fewer than two non-NaN fold returns or zero return-variance are skipped
-    (no DSR column for that row); the rendering treats missing labels as "n/a"
-    per {!Walk_forward.Variant_ranking.render}.
+    Sharpe-mean variance as the best-of-N selection-bias correction. The
+    best-of-N trial count is [--lifetime-trials] when given, else the surface's
+    variant count. Variants with fewer than two non-NaN fold returns or zero
+    return-variance are skipped (no DSR column for that row); the rendering
+    treats missing labels as "n/a" per {!Walk_forward.Variant_ranking.render}.
 
     Gap C of [dev/plans/experiment-platform-2026-05-29.md]: every future verdict
     ranks via the same committed pipeline rather than an ad-hoc exe. *)
@@ -33,16 +42,28 @@ type cli_args = {
   fold_actuals_path : string option;
   baseline_label : string;
   output_path : string option;
+  lifetime_trials : int option;
 }
 
 let _default_baseline_label = "baseline"
 
 let _usage_msg =
   "Usage: rank_variants.exe --aggregate <aggregate.sexp> [--fold-actuals \
-   <fold_actuals.sexp>] [--baseline-label <label>] [--output <path>]"
+   <fold_actuals.sexp>] [--baseline-label <label>] [--output <path>] \
+   [--lifetime-trials <N>]"
+
+(** Parse a [--lifetime-trials] argument: a positive integer, else exit 1. *)
+let _parse_lifetime_trials raw =
+  match Int.of_string_opt raw with
+  | Some n when n > 0 -> n
+  | _ ->
+      eprintf
+        "Error: --lifetime-trials must be a positive integer, got %S\n%s\n" raw
+        _usage_msg;
+      Stdlib.exit 1
 
 let _parse_args argv =
-  let rec loop agg folds baseline out = function
+  let rec loop agg folds baseline out lifetime = function
     | [] -> (
         match agg with
         | Some a ->
@@ -52,14 +73,20 @@ let _parse_args argv =
               baseline_label =
                 Option.value baseline ~default:_default_baseline_label;
               output_path = out;
+              lifetime_trials = lifetime;
             }
         | None ->
             eprintf "Error: --aggregate is required\n%s\n" _usage_msg;
             Stdlib.exit 1)
-    | "--aggregate" :: p :: rest -> loop (Some p) folds baseline out rest
-    | "--fold-actuals" :: p :: rest -> loop agg (Some p) baseline out rest
-    | "--baseline-label" :: l :: rest -> loop agg folds (Some l) out rest
-    | "--output" :: p :: rest -> loop agg folds baseline (Some p) rest
+    | "--aggregate" :: p :: rest ->
+        loop (Some p) folds baseline out lifetime rest
+    | "--fold-actuals" :: p :: rest ->
+        loop agg (Some p) baseline out lifetime rest
+    | "--baseline-label" :: l :: rest ->
+        loop agg folds (Some l) out lifetime rest
+    | "--output" :: p :: rest -> loop agg folds baseline (Some p) lifetime rest
+    | "--lifetime-trials" :: n :: rest ->
+        loop agg folds baseline out (Some (_parse_lifetime_trials n)) rest
     | ("--help" | "-h") :: _ ->
         printf "%s\n" _usage_msg;
         Stdlib.exit 0
@@ -67,7 +94,7 @@ let _parse_args argv =
         eprintf "Error: unknown argument %S\n%s\n" unknown _usage_msg;
         Stdlib.exit 1
   in
-  loop None None None None argv
+  loop None None None None None argv
 
 (* -------------- input loading -------------- *)
 
@@ -151,18 +178,36 @@ let _compute_dsr_one ~variant_label ~observed_sharpe ~fold_actuals ~n_trials
       Computed dsr
     with Invalid_argument msg -> Skipped (sprintf "%s: %s" variant_label msg)
 
+(** Resolve the best-of-N trial count from the surface size and an optional
+    [lifetime_trials] override. Defaults to [surface_n] (reproducing the
+    single-surface behaviour). A lifetime budget smaller than this surface is a
+    user error — fail fast rather than silently clamping. *)
+let _resolve_n_trials ~surface_n ~lifetime_trials =
+  match lifetime_trials with
+  | None -> surface_n
+  | Some lt when lt >= surface_n -> lt
+  | Some lt ->
+      eprintf
+        "Error: --lifetime-trials (%d) is smaller than this surface's variant \
+         count (%d); the lifetime trial budget cannot be smaller than the \
+         surface it ranks\n"
+        lt surface_n;
+      Stdlib.exit 1
+
 (** Walk the aggregate's [stability] list, computing DSR for each variant and
     collecting both the assoc list passed to the renderer and a list of skip
-    reasons surfaced on stderr. *)
-let _build_dsr_table (aggregate : T.aggregate) fold_actuals =
+    reasons surfaced on stderr. [lifetime_trials], when given, overrides the
+    best-of-N trial count (defaults to the surface's variant count). *)
+let _build_dsr_table (aggregate : T.aggregate) fold_actuals ~lifetime_trials =
   let stability = aggregate.stability in
-  let n_trials = List.length stability in
-  if n_trials < _min_fold_count then
+  let surface_n = List.length stability in
+  let n_trials = _resolve_n_trials ~surface_n ~lifetime_trials in
+  if surface_n < _min_fold_count then
     (* expected_max_sharpe needs n >= 2; if we have one variant, DSR is
        undefined for the whole table. *)
     ( [],
       [
-        sprintf "n_trials = %d; need at least %d for DSR" n_trials
+        sprintf "surface has %d variant(s); need at least %d for DSR" surface_n
           _min_fold_count;
       ] )
   else
@@ -177,7 +222,7 @@ let _build_dsr_table (aggregate : T.aggregate) fold_actuals =
           sprintf
             "Sharpe variance across %d variants is zero; DSR undefined for \
              every variant"
-            n_trials;
+            surface_n;
         ] )
     else
       let dsrs, skips =
@@ -216,6 +261,7 @@ let _main () =
     | Some path ->
         let fold_actuals = _load_fold_actuals path in
         _build_dsr_table aggregate fold_actuals
+          ~lifetime_trials:args.lifetime_trials
   in
   List.iter skips ~f:(fun msg ->
       eprintf "[rank_variants] skipped DSR — %s\n" msg);

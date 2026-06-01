@@ -85,6 +85,57 @@ let _invoke ~dir args =
   let stderr = In_channel.read_all stderr_path in
   { exit_code; stdout; stderr }
 
+(* Extract the Deflated-Sharpe cell for [label] from rendered markdown. The
+   per-variant row is "| label | sharpe | calmar | maxdd | frontier | dsr |";
+   the DSR is the last pipe-delimited field. Returns [None] when the row is
+   absent or its DSR cell is "n/a". *)
+let _extract_dsr ~label stdout =
+  let row_marker = sprintf "| %s |" label in
+  List.find_map (String.split_lines stdout) ~f:(fun line ->
+      if String.is_prefix line ~prefix:row_marker then
+        match
+          String.split line ~on:'|' |> List.map ~f:String.strip
+          |> List.filter ~f:(fun s -> not (String.is_empty s))
+          |> List.last
+        with
+        | Some cell -> Float.of_string_opt cell
+        | None -> None
+      else None)
+
+(* The three-variant aggregate + fold_actuals fixture used by the
+   lifetime-trials tests: identical to the end-to-end fixture above. Returns the
+   aggregate-sexp and fold-actuals-sexp paths in [dir]. *)
+let _write_three_variant_fixture ~dir =
+  let stability =
+    [
+      _make_stability ~label:"A" ~sharpe:1.0 ~calmar:0.8 ~max_dd:20.0;
+      _make_stability ~label:"B" ~sharpe:0.9 ~calmar:0.9 ~max_dd:25.0;
+      _make_stability ~label:"C" ~sharpe:0.5 ~calmar:0.4 ~max_dd:30.0;
+    ]
+  in
+  let agg_path =
+    _write_sexp ~dir ~name:"aggregate.sexp"
+      (T.sexp_of_aggregate (_make_aggregate ~stability))
+  in
+  let folds =
+    [
+      _make_fold_actual ~fold_name:"f0" ~variant_label:"A" ~total_return:10.0;
+      _make_fold_actual ~fold_name:"f1" ~variant_label:"A" ~total_return:5.0;
+      _make_fold_actual ~fold_name:"f2" ~variant_label:"A" ~total_return:15.0;
+      _make_fold_actual ~fold_name:"f0" ~variant_label:"B" ~total_return:8.0;
+      _make_fold_actual ~fold_name:"f1" ~variant_label:"B" ~total_return:3.0;
+      _make_fold_actual ~fold_name:"f2" ~variant_label:"B" ~total_return:12.0;
+      _make_fold_actual ~fold_name:"f0" ~variant_label:"C" ~total_return:(-2.0);
+      _make_fold_actual ~fold_name:"f1" ~variant_label:"C" ~total_return:(-5.0);
+      _make_fold_actual ~fold_name:"f2" ~variant_label:"C" ~total_return:1.0;
+    ]
+  in
+  let folds_path =
+    _write_sexp ~dir ~name:"fold_actuals.sexp"
+      ([%sexp_of: T.fold_actual list] folds)
+  in
+  (agg_path, folds_path)
+
 (* -------------- tests -------------- *)
 
 (* 1. End-to-end on a 3-variant aggregate + matching fold_actuals. Output
@@ -267,6 +318,71 @@ let test_pareto_single_dominator _ =
   in
   assert_that frontier_section (not_ (contains_substring "- loser"))
 
+(* 6. Backward-compat: passing --lifetime-trials equal to the surface variant
+   count reproduces the default (no-flag) DSR output byte-for-byte. *)
+let test_lifetime_trials_equals_surface_is_identical _ =
+  let dir = _make_tmpdir () in
+  let agg_path, folds_path = _write_three_variant_fixture ~dir in
+  let base_args = [ "--aggregate"; agg_path; "--fold-actuals"; folds_path ] in
+  let default_res = _invoke ~dir base_args in
+  let equal_res = _invoke ~dir (base_args @ [ "--lifetime-trials"; "3" ]) in
+  assert_that default_res.exit_code (equal_to 0);
+  assert_that equal_res.stdout (equal_to default_res.stdout)
+
+(* 7. Monotonicity: a --lifetime-trials value strictly larger than the surface
+   variant count yields a strictly lower DSR for every variant (more trials →
+   higher SR_star benchmark → more conservative DSR). *)
+let test_lifetime_trials_lowers_every_dsr _ =
+  let dir = _make_tmpdir () in
+  let agg_path, folds_path = _write_three_variant_fixture ~dir in
+  let base_args = [ "--aggregate"; agg_path; "--fold-actuals"; folds_path ] in
+  let default_res = _invoke ~dir base_args in
+  let big_res = _invoke ~dir (base_args @ [ "--lifetime-trials"; "50" ]) in
+  assert_that default_res.exit_code (equal_to 0);
+  assert_that big_res.exit_code (equal_to 0);
+  let dsr_of res label =
+    match _extract_dsr ~label res.stdout with
+    | Some d -> d
+    | None -> assert_failure (sprintf "no DSR for variant %s" label)
+  in
+  (* One assert per variant: the inflated-trial DSR is strictly below the
+     surface-N DSR for that variant. *)
+  assert_that (dsr_of big_res "A")
+    (lt (module Float_ord) (dsr_of default_res "A"));
+  assert_that (dsr_of big_res "B")
+    (lt (module Float_ord) (dsr_of default_res "B"));
+  assert_that (dsr_of big_res "C")
+    (lt (module Float_ord) (dsr_of default_res "C"))
+
+(* 8. Guard: --lifetime-trials below the surface variant count is a user error;
+   the binary exits non-zero and explains on stderr. *)
+let test_lifetime_trials_below_surface_errors _ =
+  let dir = _make_tmpdir () in
+  let agg_path, folds_path = _write_three_variant_fixture ~dir in
+  let res =
+    _invoke ~dir
+      [
+        "--aggregate";
+        agg_path;
+        "--fold-actuals";
+        folds_path;
+        "--lifetime-trials";
+        "2";
+      ]
+  in
+  assert_that res.exit_code (gt (module Int_ord) 0);
+  assert_that res.stderr (contains_substring "smaller than this surface")
+
+(* 9. Guard: a non-positive --lifetime-trials value is rejected at parse time. *)
+let test_lifetime_trials_non_positive_errors _ =
+  let dir = _make_tmpdir () in
+  let agg_path, _ = _write_three_variant_fixture ~dir in
+  let res =
+    _invoke ~dir [ "--aggregate"; agg_path; "--lifetime-trials"; "0" ]
+  in
+  assert_that res.exit_code (gt (module Int_ord) 0);
+  assert_that res.stderr (contains_substring "must be a positive integer")
+
 (* -------------- suite -------------- *)
 
 let suite =
@@ -278,6 +394,14 @@ let suite =
          >:: test_skip_variant_with_too_few_folds;
          "missing_aggregate" >:: test_missing_aggregate;
          "pareto_single_dominator" >:: test_pareto_single_dominator;
+         "lifetime_trials_equals_surface_is_identical"
+         >:: test_lifetime_trials_equals_surface_is_identical;
+         "lifetime_trials_lowers_every_dsr"
+         >:: test_lifetime_trials_lowers_every_dsr;
+         "lifetime_trials_below_surface_errors"
+         >:: test_lifetime_trials_below_surface_errors;
+         "lifetime_trials_non_positive_errors"
+         >:: test_lifetime_trials_non_positive_errors;
        ]
 
 let () = run_test_tt_main suite
