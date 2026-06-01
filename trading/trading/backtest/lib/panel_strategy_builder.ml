@@ -17,6 +17,8 @@ let build ~ad_bars ~ticker_sectors ~config ~strategy_choice ~bar_reader
         Spy_only.config_with ~symbol ~enable_stage4_short ~ma_period_weeks ()
       in
       Spy_only.make ~config ~bar_reader ()
-  | Sector_rotation_weinstein { k; ma_period_weeks } ->
-      let config = Sector_rotation.config_with ~k ~ma_period_weeks () in
+  | Sector_rotation_weinstein { k; ma_period_weeks; enable_macro_gate } ->
+      let config =
+        Sector_rotation.config_with ~k ~ma_period_weeks ~enable_macro_gate ()
+      in
       Sector_rotation.make ~config ~bar_reader ()

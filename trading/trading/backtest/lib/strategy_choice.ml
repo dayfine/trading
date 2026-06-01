@@ -16,6 +16,11 @@ let default_spy_enable_stage4_short = false
 let default_sector_rotation_k = 1
 let default_sector_rotation_ma_period_weeks = 30
 
+(* Macro gate off by default: a scenario that omits [enable_macro_gate] gets the
+   ungated selection-only sector strategy, bit-identical to the pre-gate
+   behaviour. *)
+let default_sector_rotation_enable_macro_gate = false
+
 type t =
   | Weinstein
   | Bah_benchmark of { symbol : string }
@@ -28,6 +33,8 @@ type t =
       k : int; [@sexp.default default_sector_rotation_k]
       ma_period_weeks : int;
           [@sexp.default default_sector_rotation_ma_period_weeks]
+      enable_macro_gate : bool;
+          [@sexp.default default_sector_rotation_enable_macro_gate]
     }
 [@@deriving sexp, eq, show]
 
@@ -39,5 +46,6 @@ let name = function
   | Spy_only_weinstein { symbol; ma_period_weeks; enable_stage4_short } ->
       sprintf "Spy_only_weinstein(%s,ma=%dwk%s)" symbol ma_period_weeks
         (if enable_stage4_short then ",short" else "")
-  | Sector_rotation_weinstein { k; ma_period_weeks } ->
-      sprintf "Sector_rotation_weinstein(k=%d,ma=%dwk)" k ma_period_weeks
+  | Sector_rotation_weinstein { k; ma_period_weeks; enable_macro_gate } ->
+      sprintf "Sector_rotation_weinstein(k=%d,ma=%dwk%s)" k ma_period_weeks
+        (if enable_macro_gate then ",macrogate" else "")

@@ -148,6 +148,16 @@ let config_k ~k ~symbols =
   Sector.config_with ~k ~ma_period_weeks:30 ~symbols ~benchmark_symbol:benchmark
     ()
 
+(* Same as [config_k] but with the broad-tape macro gate turned on. *)
+let config_gate ~k ~symbols =
+  Sector.config_with ~k ~ma_period_weeks:30 ~symbols ~benchmark_symbol:benchmark
+    ~enable_macro_gate:true ()
+
+(* A benchmark (SPY) in Stage 4 — a steadily falling tape — used to fire the
+   macro gate. Distinct from [spy_bars] (rising = Stage 2). *)
+let spy_stage4_bars =
+  weekly_closes ~last_friday ~n:n_weeks ~close:(falling ~peak:140.0)
+
 (* ---------------------------------------------------------------- *)
 (* Tests.                                                            *)
 (* ---------------------------------------------------------------- *)
@@ -411,6 +421,100 @@ let test_mid_week_no_rotation _ =
     (is_ok_and_holds
        (field (fun (o : Strategy_interface.output) -> o.transitions) is_empty))
 
+let test_macro_gate_blocks_entry _ =
+  (* Gate ON and SPY itself in Stage 4: a Stage-2 sector (XLK, high RS vs the
+     falling benchmark) that would normally be entered is blocked — the macro
+     gate forces the target set empty. *)
+  let xlk = stage2_bars ~slope:2.0 in
+  let bar_reader =
+    bar_reader_of [ (benchmark, spy_stage4_bars); ("XLK", xlk) ]
+  in
+  let strat =
+    Sector.make ~config:(config_gate ~k:1 ~symbols:[ "XLK" ]) ~bar_reader ()
+  in
+  let result =
+    run_once strat
+      ~today_bars:[ ("XLK", friday_bar xlk) ]
+      ~portfolio:(make_portfolio ~cash:100_000.0 ())
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field (fun (o : Strategy_interface.output) -> o.transitions) is_empty))
+
+let test_macro_gate_force_exits_holding _ =
+  (* Gate ON and SPY in Stage 4: a held Stage-2 sector (XLK) that would normally
+     stay (it is the top-1 target) is force-flat via the rotation-out path
+     because the gate empties the target. Entry anchored at today's close so the
+     trailing stop does not fire — isolating the macro force-exit. No entry. *)
+  let xlk = stage2_bars ~slope:2.0 in
+  let today = friday_bar xlk in
+  let pos =
+    make_holding ~symbol:"XLK" ~entry_price:today.close_price
+      ~entry_date:today.date ~quantity:100.0 ()
+  in
+  let bar_reader =
+    bar_reader_of [ (benchmark, spy_stage4_bars); ("XLK", xlk) ]
+  in
+  let strat =
+    Sector.make ~config:(config_gate ~k:1 ~symbols:[ "XLK" ]) ~bar_reader ()
+  in
+  let result =
+    run_once strat
+      ~today_bars:[ ("XLK", today) ]
+      ~portfolio:(make_portfolio ~cash:0.0 ~positions:[ pos ] ())
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (o : Strategy_interface.output) -> o.transitions)
+          (elements_are
+             [
+               field
+                 (fun (t : Position.transition) -> (t.position_id, t.kind))
+                 (matching
+                    ~msg:"Expected macro force-flat (rotation_out) on XLK"
+                    (function
+                      | id, Position.TriggerExit e -> (
+                          match e.exit_reason with
+                          | Position.StrategySignal s -> Some (id, s.label)
+                          | _ -> None)
+                      | _ -> None)
+                    (equal_to ("XLK-sector-rotation-weinstein", "rotation_out")));
+             ])))
+
+let test_macro_gate_off_ignores_benchmark_stage _ =
+  (* Gate OFF (default) with SPY in Stage 4: the benchmark's stage is irrelevant,
+     so the Stage-2 XLK is entered exactly as it would be under a rising
+     benchmark — proving the gate is a true no-op when off. *)
+  let xlk = stage2_bars ~slope:2.0 in
+  let bar_reader =
+    bar_reader_of [ (benchmark, spy_stage4_bars); ("XLK", xlk) ]
+  in
+  let strat =
+    Sector.make ~config:(config_k ~k:1 ~symbols:[ "XLK" ]) ~bar_reader ()
+  in
+  let result =
+    run_once strat
+      ~today_bars:[ ("XLK", friday_bar xlk) ]
+      ~portfolio:(make_portfolio ~cash:100_000.0 ())
+  in
+  assert_that (entered_symbols result) (equal_to [ "XLK" ])
+
+let test_macro_gate_dormant_when_benchmark_not_stage4 _ =
+  (* Gate ON but SPY in Stage 2 (rising): the gate is dormant (it fires only on a
+     Stage-4 benchmark), so normal selection proceeds and XLK is entered. *)
+  let xlk = stage2_bars ~slope:2.0 in
+  let bar_reader = bar_reader_of [ (benchmark, spy_bars); ("XLK", xlk) ] in
+  let strat =
+    Sector.make ~config:(config_gate ~k:1 ~symbols:[ "XLK" ]) ~bar_reader ()
+  in
+  let result =
+    run_once strat
+      ~today_bars:[ ("XLK", friday_bar xlk) ]
+      ~portfolio:(make_portfolio ~cash:100_000.0 ())
+  in
+  assert_that (entered_symbols result) (equal_to [ "XLK" ])
+
 let suite =
   "sector_rotation_weinstein_strategy"
   >::: [
@@ -422,6 +526,13 @@ let suite =
          "stop hit exits holding" >:: test_stop_hit_exits_holding;
          "no Stage2 means no entry" >:: test_no_stage2_no_entry;
          "mid-week does not rotate" >:: test_mid_week_no_rotation;
+         "macro gate blocks entry" >:: test_macro_gate_blocks_entry;
+         "macro gate force-exits holding"
+         >:: test_macro_gate_force_exits_holding;
+         "macro gate off ignores benchmark stage"
+         >:: test_macro_gate_off_ignores_benchmark_stage;
+         "macro gate dormant when benchmark not Stage4"
+         >:: test_macro_gate_dormant_when_benchmark_not_stage4;
        ]
 
 let () = run_test_tt_main suite
