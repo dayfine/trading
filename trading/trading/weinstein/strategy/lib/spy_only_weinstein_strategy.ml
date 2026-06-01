@@ -9,11 +9,13 @@ type config = {
   stage_config : Stage.config;
   stops_config : Weinstein_stops.config;
   fallback_stop_buffer : float;
+  enable_stage4_short : bool;
 }
 
 let name = "SpyOnlyWeinstein"
 let default_symbol = "SPY"
 let default_fallback_stop_buffer = 0.92
+let default_enable_stage4_short = false
 
 let default_config =
   {
@@ -21,26 +23,25 @@ let default_config =
     stage_config = Stage.default_config;
     stops_config = Weinstein_stops.default_config;
     fallback_stop_buffer = default_fallback_stop_buffer;
+    enable_stage4_short = default_enable_stage4_short;
   }
 
-let config_with ?(symbol = default_symbol) ~ma_period_weeks () =
+let config_with ?(symbol = default_symbol)
+    ?(enable_stage4_short = default_enable_stage4_short) ~ma_period_weeks () =
   {
     default_config with
     symbol;
     stage_config =
       { default_config.stage_config with ma_period = ma_period_weeks };
+    enable_stage4_short;
   }
 
-(* Number of weekly bars fed to [Stage.classify]. The MA plus its slope lookback
-   need a comfortable margin, so we read [ma_period] weeks for the MA itself
-   plus an equal margin for the slope/prior-stage context — i.e. twice the MA
-   period — floored at [_min_stage_weeks] so a very short trader MA still warms
-   up. At the 30-week investor default this is 60 weeks (~14 months), matching
-   the prior fixed read. *)
+(* Number of weekly bars fed to [Stage.classify]: twice the MA period (the MA
+   plus an equal slope/prior-stage margin), floored at [_min_stage_weeks] so a
+   short trader MA still warms up. 60 weeks at the 30-week investor default. *)
 let _min_stage_weeks = 12
 
-(* Window = ma_period weeks for the MA plus an equal margin for the slope
-   lookback, i.e. 2x the MA period. *)
+(* MA weeks plus an equal slope-lookback margin, i.e. 2x the MA period. *)
 let _stage_weeks_ma_multiplier = 2
 
 let _stage_weeks_of (config : config) : int =
@@ -92,8 +93,7 @@ let _holding_quantity (pos : Position.t) : float option =
 
 (* The [(entry_price, entry_date)] of a [Holding] position — the anchor the
    initial stop's support floor is computed against (NOT today's close, which on
-   a crash bar would place the stop far below the trigger and silently disarm
-   it). Returns [None] for any non-[Holding] state. *)
+   a crash bar would disarm the stop). [None] for any non-[Holding] state. *)
 let _holding_entry (pos : Position.t) : (float * Date.t) option =
   match pos.state with
   | Position.Holding h -> Some (h.entry_price, h.entry_date)
@@ -115,42 +115,17 @@ let _classify_stage ~config ~bar_reader ~prior_stage ~(as_of : Date.t) :
         (Stage.classify ~config:config.stage_config ~bars
            ~prior_stage:!prior_stage)
 
-(* A Weinstein "exit to flat" signal: the symbol has rolled from a topping
-   Stage 3 into a declining Stage 4, or is already in Stage 4. Stage 1/2 and a
-   bare Stage 3 (still topping, not yet broken) do not exit. *)
-let _is_exit_signal (result : Stage.result) : bool =
-  match result.stage with
-  | Weinstein_types.Stage4 _ -> true
-  | Weinstein_types.Stage3 _ | Weinstein_types.Stage2 _
-  | Weinstein_types.Stage1 _ -> (
-      match result.transition with
-      | Some (Weinstein_types.Stage3 _, Weinstein_types.Stage4 _) -> true
-      | _ -> false)
-
-(* An entry signal: the symbol is in Stage 2 (advancing above a rising 30-week
-   MA). The classifier already encodes "above rising MA"; we additionally
-   require the MA itself to be rising so we never buy a flat-MA basing tape. *)
-let _is_entry_signal (result : Stage.result) : bool =
-  match result.stage with
-  | Weinstein_types.Stage2 _ ->
-      Weinstein_types.equal_ma_direction result.ma_direction
-        Weinstein_types.Rising
-  | Weinstein_types.Stage1 _ | Weinstein_types.Stage3 _
-  | Weinstein_types.Stage4 _ ->
-      false
-
 (* Seed the initial trailing stop from a support-floor lookup on entry, falling
-   back to the fixed buffer when no qualifying correction is found. Reads the
-   accumulated daily bars for the symbol so the floor reflects real structure.
-*)
-let _seed_stop ~config ~bar_reader ~(entry_price : float) ~(as_of : Date.t) :
-    Weinstein_stops.stop_state =
+   back to the fixed buffer when no qualifying correction is found. Long: stop
+   below the correction low; short: above the counter-rally high ([side] is
+   threaded into the stop module). *)
+let _seed_stop ~config ~bar_reader ~(side : Position.position_side)
+    ~(entry_price : float) ~(as_of : Date.t) : Weinstein_stops.stop_state =
   let bars =
     Bar_reader.daily_bars_for bar_reader ~symbol:config.symbol ~as_of
   in
   Weinstein_stops.compute_initial_stop_with_floor ~config:config.stops_config
-    ~side:Long ~entry_price ~bars ~as_of
-    ~fallback_buffer:config.fallback_stop_buffer
+    ~side ~entry_price ~bars ~as_of ~fallback_buffer:config.fallback_stop_buffer
 
 (* Map a stop state-machine event to an optional exit transition: only a
    [Stop_hit] produces one. Kept separate so [_advance_stop] stays shallow. *)
@@ -164,99 +139,128 @@ let _exit_of_stop_event ~(pos : Position.t) ~(bar : Types.Daily_price.t)
       None
 
 (* Weekly-close advance: run the stop state machine one tick against the stage
-   read [r] and report the (new state, optional exit). Only called on a Friday
-   with a live stage result. *)
-let _advance_stop ~config ~(r : Stage.result)
+   read [r] and report the (new state, optional exit). *)
+let _advance_stop ~config ~(side : Position.position_side) ~(r : Stage.result)
     ~(state : Weinstein_stops.stop_state) ~(pos : Position.t)
     ~(bar : Types.Daily_price.t) :
     Weinstein_stops.stop_state * Position.transition option =
   let new_state, event =
-    Weinstein_stops.update ~config:config.stops_config ~side:Long ~state
+    Weinstein_stops.update ~config:config.stops_config ~side ~state
       ~current_bar:bar ~ma_value:r.ma_value ~ma_direction:r.ma_direction
       ~stage:r.stage
   in
   (new_state, _exit_of_stop_event ~pos ~bar ~event)
 
 (* Advance the trailing stop one tick on a held position and decide whether it
-   triggers an exit. On a weekly close the state machine advances (raises /
-   tightens); mid-week only the trigger check runs. Returns the (possibly
-   updated) stop state and an optional exit transition. *)
-let _step_stop ~config ~(stage_result : Stage.result option)
-    ~(state : Weinstein_stops.stop_state) ~(pos : Position.t)
-    ~(bar : Types.Daily_price.t) :
+   triggers an exit. On a weekly close the state machine advances (for a short,
+   ratchets the stop down); mid-week only the trigger check runs. [side] is the
+   held position's side. *)
+let _step_stop ~config ~(side : Position.position_side)
+    ~(stage_result : Stage.result option) ~(state : Weinstein_stops.stop_state)
+    ~(pos : Position.t) ~(bar : Types.Daily_price.t) :
     Weinstein_stops.stop_state * Position.transition option =
-  if Weinstein_stops.check_stop_hit ~state ~side:Long ~bar then
+  if Weinstein_stops.check_stop_hit ~state ~side ~bar then
     let stop_level = Weinstein_stops.get_stop_level state in
     (state, Some (Spy_only_transitions.build_stop_exit ~pos ~bar ~stop_level))
   else if not (_is_weekly_close ~date:bar.date) then (state, None)
   else
     match stage_result with
     | None -> (state, None)
-    | Some r -> _advance_stop ~config ~r ~state ~pos ~bar
+    | Some r -> _advance_stop ~config ~side ~r ~state ~pos ~bar
+
+(* Seed the stop the first time we observe the position in Holding (the entry
+   tick created it in Entering; the fill lands the following tick). The seed
+   anchors on the position's recorded entry price/date — not today's bar — so
+   the support floor reflects the structure around entry. *)
+let _seed_or_keep_stop ~config ~bar_reader ~stop_state
+    ~(side : Position.position_side) ~(pos : Position.t)
+    ~(bar : Types.Daily_price.t) : Weinstein_stops.stop_state =
+  match !stop_state with
+  | Some s -> s
+  | None ->
+      let entry_price, entry_date =
+        Option.value (_holding_entry pos) ~default:(bar.close_price, bar.date)
+      in
+      _seed_stop ~config ~bar_reader ~side ~entry_price ~as_of:entry_date
+
+(* The stage-based exit when the stop did not fire: only on a weekly close, and
+   only when the held [side]'s stage read warrants it (long Stage-4 exit / short
+   Stage-4 cover). Clears [stop_state] on a fire so the next entry re-seeds. *)
+let _stage_exit_when_holding ~stop_state ~(side : Position.position_side)
+    ~(stage_result : Stage.result option) ~(pos : Position.t)
+    ~(bar : Types.Daily_price.t) : Position.transition list =
+  let label =
+    if _is_weekly_close ~date:bar.date then
+      Option.bind stage_result
+        ~f:(Spy_only_signals.stage_exit_label_for_side ~side)
+    else None
+  in
+  match label with
+  | None -> []
+  | Some label ->
+      stop_state := None;
+      [ Spy_only_transitions.build_exit ~pos ~bar ~label ]
 
 (* Holding branch: run the stop, and on a weekly close also test the
-   stage-based exit signal. The stop takes precedence — if it fires we exit on
-   it and ignore the (less urgent) stage exit. Mutates [stop_state] /
-   [prior_stage] for the next tick. *)
+   stage-based exit signal for the held [side]. The stop takes precedence — if
+   it fires we exit on it and ignore the (less urgent) stage exit. Mutates
+   [stop_state] / [prior_stage] for the next tick. *)
 let _on_holding ~config ~bar_reader ~stop_state ~prior_stage ~(pos : Position.t)
     ~(bar : Types.Daily_price.t) : Position.transition list =
-  let as_of = bar.date in
-  let stage_result = _classify_stage ~config ~bar_reader ~prior_stage ~as_of in
-  (* Seed the stop the first time we observe the position in Holding (the entry
-     tick created it in Entering; the fill lands the following tick). The seed
-     anchors on the position's recorded entry price/date — not today's bar — so
-     the support floor reflects the structure around entry. *)
+  let side = pos.side in
+  let stage_result =
+    _classify_stage ~config ~bar_reader ~prior_stage ~as_of:bar.date
+  in
   let state =
-    match !stop_state with
-    | Some s -> s
-    | None ->
-        let entry_price, entry_date =
-          Option.value (_holding_entry pos) ~default:(bar.close_price, as_of)
-        in
-        _seed_stop ~config ~bar_reader ~entry_price ~as_of:entry_date
+    _seed_or_keep_stop ~config ~bar_reader ~stop_state ~side ~pos ~bar
   in
   let new_state, stop_exit =
-    _step_stop ~config ~stage_result ~state ~pos ~bar
+    _step_stop ~config ~side ~stage_result ~state ~pos ~bar
   in
   stop_state := Some new_state;
   Option.iter stage_result ~f:(fun r -> prior_stage := Some r.stage);
   match stop_exit with
   | Some t -> [ t ]
-  | None -> (
-      let is_friday = _is_weekly_close ~date:bar.date in
-      match (is_friday, stage_result) with
-      | true, Some r when _is_exit_signal r ->
-          stop_state := None;
-          [ Spy_only_transitions.build_exit ~pos ~bar ~label:"stage4_exit" ]
-      | _ -> [])
+  | None -> _stage_exit_when_holding ~stop_state ~side ~stage_result ~pos ~bar
 
-(* Build the (at most one) entry transition for [bar] when the all-cash sizing
-   affords a whole share; otherwise no transition. Kept separate so [_on_flat]
-   stays shallow. *)
-let _entry_transitions ~config ~(cash : float) ~(bar : Types.Daily_price.t) :
-    Position.transition list =
+(* Build the (at most one) entry transition for [bar] on [side] when the
+   all-cash sizing affords a whole share; otherwise no transition. The short
+   side is sized identically to the long: [floor(cash / close)] notional. Kept
+   separate so [_on_flat] stays shallow. *)
+let _entry_transitions ~config ~(side : Position.position_side) ~(cash : float)
+    ~(bar : Types.Daily_price.t) : Position.transition list =
   match _shares_from_cash ~cash ~close_price:bar.close_price with
   | None -> []
   | Some target_quantity ->
       let position_id = _position_id_of_symbol config.symbol in
       [
-        Spy_only_transitions.build_entry ~position_id ~symbol:config.symbol ~bar
-          ~target_quantity;
+        Spy_only_transitions.build_entry ~position_id ~symbol:config.symbol
+          ~side ~bar ~target_quantity;
       ]
 
-(* Flat branch: only act on a weekly close. Classify, and enter when the stage
-   signal fires. The stop is seeded later, on the first Holding tick. *)
+(* Classify on this Friday, record [prior_stage], and resolve the flat-tape
+   entry side (long on Stage 2; short on Stage 4 when enabled), or [None]. *)
+let _flat_entry_side ~config ~bar_reader ~prior_stage
+    ~(bar : Types.Daily_price.t) : Position.position_side option =
+  let stage_result =
+    _classify_stage ~config ~bar_reader ~prior_stage ~as_of:bar.date
+  in
+  Option.iter stage_result ~f:(fun r -> prior_stage := Some r.stage);
+  Option.bind stage_result
+    ~f:
+      (Spy_only_signals.flat_entry_side
+         ~enable_stage4_short:config.enable_stage4_short)
+
+(* Flat branch: only act on a weekly close. Enter when the stage signal fires
+   (long on Stage 2; short on Stage 4 when enabled). The stop is seeded later,
+   on the first Holding tick. *)
 let _on_flat ~config ~bar_reader ~prior_stage ~(cash : float)
     ~(bar : Types.Daily_price.t) : Position.transition list =
   if not (_is_weekly_close ~date:bar.date) then []
   else
-    let stage_result =
-      _classify_stage ~config ~bar_reader ~prior_stage ~as_of:bar.date
-    in
-    Option.iter stage_result ~f:(fun r -> prior_stage := Some r.stage);
-    match stage_result with
-    | Some r when _is_entry_signal r -> _entry_transitions ~config ~cash ~bar
-    | _ -> []
+    match _flat_entry_side ~config ~bar_reader ~prior_stage ~bar with
+    | Some side -> _entry_transitions ~config ~side ~cash ~bar
+    | None -> []
 
 (* Dispatch one bar to the holding or flat branch based on the live position.
    A still-[Entering] position (awaiting fill) yields no transitions. Kept

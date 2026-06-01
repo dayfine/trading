@@ -53,9 +53,10 @@ let make_portfolio ~cash ?position () : Portfolio_view.t =
   in
   { cash; positions }
 
-(* Build a Holding SPY position at [entry_price] / [entry_date]. *)
-let make_holding ~entry_price ~entry_date ~quantity :
-    Trading_strategy.Position.t =
+(* Build a Holding SPY position at [entry_price] / [entry_date] on [side]
+   (default Long). *)
+let make_holding ?(side = Trading_strategy.Position.Long) ~entry_price
+    ~entry_date ~quantity () : Trading_strategy.Position.t =
   let pos_id = symbol ^ "-spy-only-weinstein" in
   let make_trans kind =
     { Trading_strategy.Position.position_id = pos_id; date = entry_date; kind }
@@ -71,7 +72,7 @@ let make_holding ~entry_price ~entry_date ~quantity :
        (CreateEntering
           {
             symbol;
-            side = Long;
+            side;
             target_quantity = quantity;
             entry_price;
             reasoning = ManualDecision { description = "test" };
@@ -122,6 +123,34 @@ let is_long_entry =
                  (equal_to
                     ((symbol, Trading_strategy.Position.Long)
                       : string * Trading_strategy.Position.position_side)));
+          ]))
+
+(* A matcher pinning a single CreateEntering(Short) transition for SPY with a
+   given [target_quantity] — projects [(symbol, side, target_quantity)] out of
+   the inlined record. *)
+let is_short_entry ~target_quantity =
+  is_ok_and_holds
+    (field
+       (fun (o : Strategy_interface.output) -> o.transitions)
+       (elements_are
+          [
+            field
+              (fun (t : Trading_strategy.Position.transition) -> t.kind)
+              (matching ~msg:"Expected CreateEntering Short"
+                 (function
+                   | Trading_strategy.Position.CreateEntering c ->
+                       Some (c.symbol, c.side, c.target_quantity)
+                   | _ -> None)
+                 (all_of
+                    [
+                      field (fun (s, _, _) -> s) (equal_to symbol);
+                      field
+                        (fun (_, side, _) -> side)
+                        (equal_to Trading_strategy.Position.Short);
+                      field
+                        (fun (_, _, qty) -> qty)
+                        (float_equal target_quantity);
+                    ]));
           ]))
 
 (* A matcher pinning a single TriggerExit transition whose exit_reason satisfies
@@ -207,7 +236,7 @@ let test_stage4_friday_exits_when_holding _ =
   let today = List.last_exn bars in
   let pos =
     make_holding ~entry_price:today.close_price ~entry_date:today.date
-      ~quantity:700.0
+      ~quantity:700.0 ()
   in
   let strat = Spy.make ~bar_reader:(bar_reader_of bars) () in
   let result =
@@ -237,7 +266,7 @@ let test_stop_hit_exits_when_holding _ =
   let pos =
     make_holding ~entry_price
       ~entry_date:(Date.of_string "2021-12-24")
-      ~quantity:700.0
+      ~quantity:700.0 ()
   in
   let strat = Spy.make ~bar_reader:(bar_reader_of bars) () in
   let result =
@@ -303,6 +332,109 @@ let test_trader_preset_enters_where_investor_waits _ =
          field (fun (_, investor) -> investor) is_no_transitions;
        ])
 
+(* ---------------------------------------------------------------- *)
+(* Stage-4 short leg (default-off testbed dial).                     *)
+(* ---------------------------------------------------------------- *)
+
+(* Expected whole-share notional for [cash] all-cash sizing at [close], mirroring
+   the strategy's [_shares_from_cash] (1% gap buffer, rounded down). *)
+let shares_at ~cash ~close = Float.round_down (cash /. (close *. 1.01))
+
+let short_falling_bars =
+  weekly_closes ~last_friday ~n:n_weeks ~close:(falling_closes ~peak:140.0)
+
+let test_stage4_flat_stays_flat_when_short_off _ =
+  (* Flag OFF (default): a flat portfolio on a Stage-4 Friday takes NO action —
+     long/flat stays flat, bit-identical to the pre-short-leg strategy. *)
+  let today = List.last_exn short_falling_bars in
+  let strat = Spy.make ~bar_reader:(bar_reader_of short_falling_bars) () in
+  let result =
+    run_once strat ~today_bar:today
+      ~portfolio:(make_portfolio ~cash:100_000.0 ())
+  in
+  assert_that result is_no_transitions
+
+let test_stage4_flat_goes_short_when_on _ =
+  (* Flag ON: the SAME Stage-4 Friday + flat portfolio now opens a SHORT, sized
+     by the same all-cash [floor(cash / (close * 1.01))] rule as the long. *)
+  let today = List.last_exn short_falling_bars in
+  let config =
+    Spy.config_with ~enable_stage4_short:true ~ma_period_weeks:30 ()
+  in
+  let strat =
+    Spy.make ~config ~bar_reader:(bar_reader_of short_falling_bars) ()
+  in
+  let result =
+    run_once strat ~today_bar:today
+      ~portfolio:(make_portfolio ~cash:100_000.0 ())
+  in
+  assert_that result
+    (is_short_entry
+       ~target_quantity:(shares_at ~cash:100_000.0 ~close:today.close_price))
+
+let test_short_stop_fires_when_holding _ =
+  (* Holding a SHORT; today's bar gaps the HIGH far above entry so the short
+     trailing stop (which sits above entry and ratchets down) triggers — a
+     StopLoss exit, independent of the day-of-week (trigger is continuous). *)
+  let entry_price = falling_closes ~peak:140.0 (n_weeks - 1) in
+  (* A violent up-day well above any plausible counter-rally-high floor. *)
+  let squeeze_bar =
+    make_bar "2021-12-30" ~close:(entry_price *. 2.0) ~low:entry_price
+      ~high:(entry_price *. 2.0) ()
+  in
+  let pos =
+    make_holding ~side:Trading_strategy.Position.Short ~entry_price
+      ~entry_date:(Date.of_string "2021-12-24")
+      ~quantity:1000.0 ()
+  in
+  let config =
+    Spy.config_with ~enable_stage4_short:true ~ma_period_weeks:30 ()
+  in
+  let strat =
+    Spy.make ~config ~bar_reader:(bar_reader_of short_falling_bars) ()
+  in
+  let result =
+    run_once strat ~today_bar:squeeze_bar
+      ~portfolio:(make_portfolio ~cash:0.0 ~position:pos ())
+  in
+  assert_that result
+    (is_exit
+       ~reason_ok:
+         (matching ~msg:"Expected StopLoss"
+            (function
+              | Trading_strategy.Position.StopLoss s -> Some s.actual_price
+              | _ -> None)
+            (float_equal (entry_price *. 2.0))))
+
+let test_short_covers_on_stage2_friday _ =
+  (* Holding a SHORT into a Stage-2 (rising-tape) Friday → cover via the stage
+     signal. The short is anchored at today's close/date so its seeded stop sits
+     just ABOVE today's counter-rally high (the short stop sits above entry),
+     and today's bar therefore does not breach it — isolating the stage-cover
+     path from the (higher-precedence) short-stop path. *)
+  let bars = weekly_closes ~last_friday ~n:n_weeks ~close:rising_closes in
+  let today = List.last_exn bars in
+  let pos =
+    make_holding ~side:Trading_strategy.Position.Short
+      ~entry_price:today.close_price ~entry_date:today.date ~quantity:300.0 ()
+  in
+  let config =
+    Spy.config_with ~enable_stage4_short:true ~ma_period_weeks:30 ()
+  in
+  let strat = Spy.make ~config ~bar_reader:(bar_reader_of bars) () in
+  let result =
+    run_once strat ~today_bar:today
+      ~portfolio:(make_portfolio ~cash:0.0 ~position:pos ())
+  in
+  assert_that result
+    (is_exit
+       ~reason_ok:
+         (matching ~msg:"Expected StrategySignal stage4_cover"
+            (function
+              | Trading_strategy.Position.StrategySignal s -> Some s.label
+              | _ -> None)
+            (equal_to "stage4_cover")))
+
 let suite =
   "spy_only_weinstein_strategy"
   >::: [
@@ -318,6 +450,12 @@ let suite =
          >:: test_stage1_friday_no_entry_when_flat;
          "trader preset enters where investor waits"
          >:: test_trader_preset_enters_where_investor_waits;
+         "Stage4 flat stays flat when short off"
+         >:: test_stage4_flat_stays_flat_when_short_off;
+         "Stage4 flat goes short when short on"
+         >:: test_stage4_flat_goes_short_when_on;
+         "short stop fires when holding" >:: test_short_stop_fires_when_holding;
+         "short covers on Stage2 Friday" >:: test_short_covers_on_stage2_friday;
        ]
 
 let () = run_test_tt_main suite

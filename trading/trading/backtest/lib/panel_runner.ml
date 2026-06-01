@@ -27,11 +27,10 @@ module Spy_only = Weinstein_strategy.Spy_only_weinstein_strategy
     The Weinstein branch threads the runner's deps-loaded inputs (AD bars,
     sector map, config) through {!Weinstein_strategy.make}. The [Bah_benchmark]
     branch ignores all of that machinery — BAH is a single-symbol passive
-    strategy that needs only its own [config.symbol] — and constructs
-    {!Trading_strategy.Bah_benchmark_strategy.make}. The [bar_reader] /
-    [audit_recorder] are intentionally dropped on the BAH branch: BAH reads
-    prices via [get_price] (the simulator's per-tick callback, wired through the
-    snapshot-backed [Market_data_adapter]) and emits no audit events. *)
+    strategy that needs only its own [config.symbol]. The [bar_reader] /
+    [audit_recorder] are dropped on the BAH branch: BAH reads prices via
+    [get_price] (the snapshot-backed [Market_data_adapter]) and emits no audit
+    events. *)
 
 let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
     =
@@ -42,8 +41,10 @@ let _build_strategy (input : input) ~strategy_choice ~bar_reader ~audit_recorder
         input.config
   | Bah_benchmark { symbol } ->
       Trading_strategy.Bah_benchmark_strategy.make { symbol }
-  | Spy_only_weinstein { symbol; ma_period_weeks } ->
-      let config = Spy_only.config_with ~symbol ~ma_period_weeks () in
+  | Spy_only_weinstein { symbol; ma_period_weeks; enable_stage4_short } ->
+      let config =
+        Spy_only.config_with ~symbol ~enable_stage4_short ~ma_period_weeks ()
+      in
       Spy_only.make ~config ~bar_reader ()
 
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's

@@ -33,6 +33,7 @@ type t =
   | Spy_only_weinstein of {
       symbol : string;
       ma_period_weeks : int; [@sexp.default 30]
+      enable_stage4_short : bool; [@sexp.default false]
     }
       (** Single-instrument Weinstein stage-timing reference strategy on
           [symbol] (default [SPY]). Constructs
@@ -41,9 +42,9 @@ type t =
           for stage classification and the trailing-stop support floor). Like
           {!Bah_benchmark}, the runner's universe / sector-map / AD-bars
           machinery is loaded but unused; [symbol] must be present in the
-          scenario's universe. Long/flat only — no shorting.
+          scenario's universe.
 
-          [ma_period_weeks] is the {b only} tunable dial (per
+          [ma_period_weeks] is the primary tunable dial (per
           [.claude/rules/weinstein-faithful-core.md] — the MA period is the
           documented investor/trader dial). It sets the stage-classifier moving
           average period in weeks. [30] (the [@sexp.default]) is Weinstein's
@@ -51,7 +52,17 @@ type t =
           deserialises bit-identically to it; [10] is the faster trader preset.
           The strategy spine (Stage-2-only entry, Stage 3/4 exit, stop below
           base) is untouched by this dial — only the MA window, and the
-          proportional weekly-bar lookback derived from it, change. *)
+          proportional weekly-bar lookback derived from it, change.
+
+          [enable_stage4_short] turns the Stage-4 short leg on ([false] default
+          = long/flat, bit-identical to the pre-short-leg strategy; every
+          pre-existing scenario that omits the field deserialises to it). When
+          [true] the strategy goes short in Stage 4 instead of sitting flat — a
+          faithful Weinstein adaptation (he shorts Stage-4 declines), gated as a
+          default-off testbed dial per
+          [.claude/rules/experiment-flag-discipline.md]. See
+          {!Weinstein_strategy.Spy_only_weinstein_strategy.config} for the short
+          mechanics. *)
 [@@deriving sexp, eq, show]
 
 val default : t

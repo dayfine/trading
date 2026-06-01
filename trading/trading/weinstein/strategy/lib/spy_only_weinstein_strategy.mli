@@ -61,7 +61,31 @@ type config = {
           support-floor lookup finds no qualifying correction. For a long the
           stop falls at [entry_price *. fallback_stop_buffer]; a value below 1.0
           (default {!default_fallback_stop_buffer}, [0.92] = an 8% stop)
-          therefore sits below entry. *)
+          therefore sits below entry. For a short the mirror is used — the stop
+          sits {e above} entry at [entry_price /. fallback_stop_buffer]. *)
+  enable_stage4_short : bool;
+      (** Stage-4 short leg. When [false] ({b the default}, bit-identical to the
+          original long/flat strategy) a Stage-4 read means "exit to flat" and
+          the strategy is never short. When [true] the strategy {b goes short}
+          in Stage 4 instead of sitting flat — a faithful Weinstein adaptation
+          (he shorts Stage-4 declines; book §Short-Selling Rules). It is a
+          {e testbed dial} only: default-off per
+          [.claude/rules/experiment-flag-discipline.md] R1, and not promoted to
+          the default config (R3) without a ledger ACCEPT.
+
+          Short mechanics (mirror of the long side):
+          - {b Entry.} On a weekly close, when flat and SPY's stage read is a
+            Stage-4 exit signal (Stage 4, or a Stage 3→4 roll-over), open a
+            short sized by the same all-cash [floor(cash / close)] rule as the
+            long entry.
+          - {b Stop.} {!Weinstein_stops} with [side = Short]: the initial stop
+            sits {e above} the Stage-4 rally high (a counter-rally-high support
+            floor, or the fallback buffer above entry) and ratchets {e down} as
+            price falls. Triggered intraday by [high ≥ stop_level].
+          - {b Exit.} The short is covered when SPY leaves Stage 4 — i.e. the
+            weekly stage read becomes Stage 1 (basing) or Stage 2 (advancing) —
+            or on a short-stop hit. (A flat Stage-2 read on the same Friday then
+            opens a fresh long via the normal entry path.) *)
 }
 
 val name : string
@@ -74,14 +98,26 @@ val default_fallback_stop_buffer : float
 (** [0.92] — an 8% loose initial stop, matching Weinstein's 8% correction rule
     (book §5.1) when no structural support floor is available. *)
 
+val default_enable_stage4_short : bool
+(** [false] — the Stage-4 short leg is off by default, keeping the strategy
+    long/flat and bit-identical to its pre-short-leg behaviour. *)
+
 val default_config : config
 (** [default_config] uses {!default_symbol}, {!Stage.default_config},
-    {!Weinstein_stops.default_config}, and {!default_fallback_stop_buffer}. *)
+    {!Weinstein_stops.default_config}, {!default_fallback_stop_buffer}, and
+    {!default_enable_stage4_short} ([false] — long/flat). *)
 
-val config_with : ?symbol:string -> ma_period_weeks:int -> unit -> config
-(** [config_with ?symbol ~ma_period_weeks ()] is {!default_config} with the
-    stage-classifier moving-average period overridden to [ma_period_weeks] weeks
-    (and optionally a different [symbol]).
+val config_with :
+  ?symbol:string ->
+  ?enable_stage4_short:bool ->
+  ma_period_weeks:int ->
+  unit ->
+  config
+(** [config_with ?symbol ?enable_stage4_short ~ma_period_weeks ()] is
+    {!default_config} with the stage-classifier moving-average period overridden
+    to [ma_period_weeks] weeks (and optionally a different [symbol] and the
+    Stage-4 short leg flipped on via [enable_stage4_short], default
+    {!default_enable_stage4_short} = [false]).
 
     The MA period is the single Weinstein-faithful dial that distinguishes the
     investor preset ([30] weeks — Weinstein's default for position trading) from
