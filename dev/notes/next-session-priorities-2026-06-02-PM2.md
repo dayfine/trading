@@ -1,6 +1,6 @@
-# Next-session priorities — 2026-06-04
+# Next-session priorities — 2026-06-02-PM2
 
-**Supersedes:** `next-session-priorities-2026-06-03.md`. The 06-02/06-03 work (Cell E
+**Supersedes:** `next-session-priorities-2026-06-02-PM.md` (formerly `-06-03`). The 06-02 / 06-02-PM work (Cell E
 stall diagnosis, population-search infra, `neutral_blocks_longs` axis) is done and
 **reframed by a bigger finding this session**: a broad universe restores the strategy's
 edge. This doc is the forward plan from that.
