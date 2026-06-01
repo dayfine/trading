@@ -341,6 +341,15 @@ type config = {
           {!Trading_portfolio.Margin_config.default_config} (disabled) preserves
           bit-equality with prior baselines. See [Weinstein_strategy_config] for
           full semantics. *)
+  neutral_blocks_longs : bool; [@sexp.default false]
+      (** Entry-gate axis (default-off): when [true], a macro-[Neutral] tape
+          blocks new long entries (only [Bullish] admits longs). Default [false]
+          preserves the historical macro gate where both [Bullish] and [Neutral]
+          admit longs. Tightens the macro gate only; the Stage-2-only entry,
+          stops, and short-side gate are unaffected. Threaded into
+          [screening_config.neutral_blocks_longs] at screen time so it is a
+          [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
+          semantics. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

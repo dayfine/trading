@@ -344,6 +344,25 @@ let _sector_lookup_of ~sector_map symbol =
   Hashtbl.find sector_map symbol
   |> Option.map ~f:(fun (ctx : Screener.sector_context) -> ctx.sector_name)
 
+(** Run the cascade screener over the Phase-2 [stocks], threading the top-level
+    [neutral_blocks_longs] entry-gate flag into the screener config so it is
+    expressible as a [Weinstein_strategy.config] flag axis. Default [false]
+    leaves the screener config untouched bit-equally. Factored out of
+    {!screen_universe} to keep that function under the 50-line linter cap. *)
+let _run_screener ?membership_at ~config ~macro_result ~sector_map ~stocks
+    ~portfolio ~last_stop_out_dates ~current_date () =
+  let screening_config =
+    {
+      config.screening_config with
+      Screener.neutral_blocks_longs = config.neutral_blocks_longs;
+    }
+  in
+  Screener.screen_with_cooldown ?membership_at ~config:screening_config
+    ~macro_trend:macro_result.Macro.trend ~sector_map ~stocks
+    ~held_tickers:(held_symbols portfolio) ~as_of:current_date
+    ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
+    ()
+
 (** Screen the universe via the lazy cascade (Phase 1 stage filter → PR-B sector
     pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
@@ -374,11 +393,8 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =
-    Screener.screen_with_cooldown ?membership_at ~config:config.screening_config
-      ~macro_trend:macro_result.trend ~sector_map ~stocks
-      ~held_tickers:(held_symbols portfolio) ~as_of:current_date
-      ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
-      ()
+    _run_screener ?membership_at ~config ~macro_result ~sector_map ~stocks
+      ~portfolio ~last_stop_out_dates ~current_date ()
   in
   let combined_candidates =
     if config.enable_short_side then

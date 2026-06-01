@@ -352,6 +352,91 @@ let test_ch11_no_shorts_under_bullish_macro_2022 _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* neutral_blocks_longs entry-gate axis (default-off)                   *)
+(* ------------------------------------------------------------------ *)
+
+let _config_neutral_blocks_longs blocks =
+  { Screener.default_config with Screener.neutral_blocks_longs = blocks }
+
+(** Default-off / bit-identical: passing [neutral_blocks_longs = false]
+    explicitly produces the exact same Neutral-macro buy list as
+    {!Screener.default_config} (where the field also defaults to [false]). Pins
+    against the canonical 2021-2023 four-name buy list, so a regression that
+    couples the flag-off path to a different gate is caught. *)
+let test_neutral_blocks_longs_off_is_identity _ =
+  let stocks =
+    _analyze_universe
+      ~start_date:(Date.of_string "2021-01-01")
+      ~end_date:(Date.of_string "2023-12-29")
+  in
+  let result =
+    Screener.screen
+      ~config:(_config_neutral_blocks_longs false)
+      ~macro_trend:Neutral ~sector_map:(_empty_sector_map ()) ~stocks
+      ~held_tickers:[]
+  in
+  assert_that result.Screener.buy_candidates
+    (elements_are _expected_2021_2023_buy_matchers)
+
+(** Flag on: a [Neutral] macro admits {b zero} long candidates — exactly as a
+    [Bearish] tape does — even though the same window admits four buys with the
+    flag off (pinned by {!test_neutral_blocks_longs_off_is_identity}). *)
+let test_neutral_blocks_longs_on_blocks_neutral_buys _ =
+  let stocks =
+    _analyze_universe
+      ~start_date:(Date.of_string "2021-01-01")
+      ~end_date:(Date.of_string "2023-12-29")
+  in
+  let result =
+    Screener.screen
+      ~config:(_config_neutral_blocks_longs true)
+      ~macro_trend:Neutral ~sector_map:(_empty_sector_map ()) ~stocks
+      ~held_tickers:[]
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (r : Screener.result) -> r.macro_trend) (equal_to Neutral);
+         field (fun (r : Screener.result) -> r.buy_candidates) is_empty;
+       ])
+
+(** Flag on: a [Bullish] macro still admits the full long list — the flag only
+    tightens the [Neutral] case, never the confirmed-bull case. *)
+let test_neutral_blocks_longs_on_bullish_unaffected _ =
+  let stocks =
+    _analyze_universe
+      ~start_date:(Date.of_string "2021-01-01")
+      ~end_date:(Date.of_string "2023-12-29")
+  in
+  let result =
+    Screener.screen
+      ~config:(_config_neutral_blocks_longs true)
+      ~macro_trend:Bullish ~sector_map:(_empty_sector_map ()) ~stocks
+      ~held_tickers:[]
+  in
+  assert_that result.Screener.buy_candidates
+    (elements_are _expected_2021_2023_buy_matchers)
+
+(** Short side is unaffected by the flag: under a [Neutral] macro the short
+    candidate list is identical whether [neutral_blocks_longs] is on or off.
+    Uses the 2018-2020 COVID-crash window where Stage-4 names produce shorts. *)
+let test_neutral_blocks_longs_short_side_unchanged _ =
+  let stocks =
+    _analyze_universe
+      ~start_date:(Date.of_string "2018-01-01")
+      ~end_date:(Date.of_string "2020-03-20")
+  in
+  let shorts_with blocks =
+    (Screener.screen
+       ~config:(_config_neutral_blocks_longs blocks)
+       ~macro_trend:Neutral ~sector_map:(_empty_sector_map ()) ~stocks
+       ~held_tickers:[])
+      .Screener.short_candidates
+    |> List.map ~f:(fun c -> c.Screener.ticker)
+  in
+  assert_that (shorts_with true) (equal_to (shorts_with false))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -371,4 +456,12 @@ let () =
            >:: test_ch11_spotcheck_2022_bear;
            "Ch.11 negative: bullish macro emits zero shorts (2022 window)"
            >:: test_ch11_no_shorts_under_bullish_macro_2022;
+           "neutral_blocks_longs off = identity (neutral buys preserved)"
+           >:: test_neutral_blocks_longs_off_is_identity;
+           "neutral_blocks_longs on blocks neutral buys"
+           >:: test_neutral_blocks_longs_on_blocks_neutral_buys;
+           "neutral_blocks_longs on leaves bullish buys unaffected"
+           >:: test_neutral_blocks_longs_on_bullish_unaffected;
+           "neutral_blocks_longs leaves short side unchanged"
+           >:: test_neutral_blocks_longs_short_side_unchanged;
          ])

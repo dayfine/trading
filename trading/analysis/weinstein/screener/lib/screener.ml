@@ -2,6 +2,7 @@
 open Core
 open Weinstein_types
 include Screener_scoring
+include Screener_admission
 
 type candidate_params = {
   entry_buffer_pct : float;
@@ -32,8 +33,6 @@ let default_candidate_params =
     installed_stop_min_pct = 0.0;
   }
 
-type volume_ratio_band = { low : float; high : float } [@@deriving sexp]
-
 type config = {
   weights : scoring_weights;
   grade_thresholds : grade_thresholds;
@@ -45,6 +44,7 @@ type config = {
   max_buy_candidates : int;
   max_short_candidates : int;
   cascade_post_stop_cooldown_weeks : int; [@sexp.default 0]
+  neutral_blocks_longs : bool; [@sexp.default false]
 }
 [@@deriving sexp]
 
@@ -60,6 +60,7 @@ let default_config =
     max_buy_candidates = 20;
     max_short_candidates = 10;
     cascade_post_stop_cooldown_weeks = 0;
+    neutral_blocks_longs = false;
   }
 
 type scored_candidate = {
@@ -143,43 +144,19 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     rationale = reasons;
   }
 
-(** Score gate: [true] iff [score] passes both the configured floor and the
-    optional ceiling. [min_score_override = Some n] makes the floor [score >= n]
-    and bypasses {!min_grade}; [None] (default) uses the grade-derived floor.
-    [max_score_override = Some m] adds a strict [score < m] ceiling.
-
-    Single source of truth so the score-and-build path and the
-    diagnostics-counting predicates can't drift. *)
-let _passes_score_floor ~thresholds ~min_grade ~min_score_override
-    ~max_score_override score =
-  (match min_score_override with
-    | Some n -> score >= n
-    | None -> compare_grade (grade_of_score ~thresholds score) min_grade <= 0)
-  && match max_score_override with Some m -> score < m | None -> true
-
 (** Score, grade, and build a candidate after passing preliminary gates. Returns
-    [None] if [score] does not pass {!_passes_score_floor}. *)
+    [None] if [score] does not pass {!Screener_admission.passes_score_floor}. *)
 let _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~is_short ~scorer ~sector a =
   let score, reasons = scorer ~weights ~sector a in
   if
     not
-      (_passes_score_floor ~thresholds ~min_grade ~min_score_override
+      (passes_score_floor ~thresholds ~min_grade ~min_score_override
          ~max_score_override score)
   then None
   else
     Some
       (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds ~is_short)
-
-(** Volume-band exclusion: rejects iff the candidate's volume_ratio is in the
-    half-open interval from [low] (inclusive) to [high] (exclusive). Candidates
-    without a [volume] result pass through. *)
-let _passes_volume_band ~excl (a : Stock_analysis.t) =
-  match (excl, a.volume) with
-  | None, _ | _, None -> true
-  | Some { low; high }, Some v ->
-      let r = v.Volume.volume_ratio in
-      not Float.(low <= r && r < high)
 
 (** Evaluate one (analysis, sector) pair as a long candidate. Returns [None] if
     excluded by the sector gate, breakout test, volume band, or score floor. *)
@@ -187,31 +164,19 @@ let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range (a, sector) =
   if equal_sector_rating sector.rating Weak then None
   else if not (Stock_analysis.is_breakout_candidate a) then None
-  else if not (_passes_volume_band ~excl:volume_ratio_exclude_range a) then None
+  else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then None
   else
     _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
       ~max_score_override ~is_short:false ~scorer:score_long ~sector a
 
-(** Hard gate per Weinstein Ch. 11: never short a stock with strong relative
-    strength, even if it breaks down. Rejects candidates whose RS trend is
-    positive ([Positive_rising], [Positive_flat], [Bullish_crossover]).
-    [Negative_improving] stays eligible — the stock is still rated negative
-    overall and the scorer reflects the weaker signal. Absent RS data is treated
-    as not-strong (doesn't block shorts). *)
-let _rs_blocks_short = function
-  | Some { Rs.trend = Positive_rising | Positive_flat | Bullish_crossover; _ }
-    ->
-      true
-  | _ -> false
-
 (** Evaluate one (analysis, sector) pair as a short candidate. Bearish/Neutral
-    only: score must pass {!_passes_score_floor}. *)
+    only: score must pass {!Screener_admission.passes_score_floor}. *)
 let _short_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range (a, sector) =
   if equal_sector_rating sector.rating Strong then None
   else if not (Stock_analysis.is_breakdown_candidate a) then None
-  else if _rs_blocks_short a.Stock_analysis.rs then None
-  else if not (_passes_volume_band ~excl:volume_ratio_exclude_range a) then None
+  else if rs_blocks_short a.Stock_analysis.rs then None
+  else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then None
   else
     _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
       ~max_score_override ~is_short:true ~scorer:score_short ~sector a
@@ -257,95 +222,35 @@ let _top_n n lst =
       if by_score <> 0 then by_score else String.compare a.ticker b.ticker)
   |> fun l -> List.sub l ~pos:0 ~len:(min n (List.length l))
 
-(** Long-side admission predicates: per-pair, returns one bool per phase that
-    actually got evaluated. Phases short-circuit (a [false] earlier means later
-    bools are [false]) so [(true, true, true)] means the pair passed all three
-    gates. *)
-let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range (a, sector) =
-  (* Volume-band exclusion is folded into breakout phase: keeps the
-     cascade-diagnostics record stable (no new counter) while gating downstream
-     counts. *)
-  let passes_breakout =
-    Stock_analysis.is_breakout_candidate a
-    && _passes_volume_band ~excl:volume_ratio_exclude_range a
-  in
-  let passes_sector =
-    passes_breakout && not (equal_sector_rating sector.rating Weak)
-  in
-  let passes_grade =
-    if not passes_sector then false
-    else
-      let score, _ = score_long ~weights ~sector a in
-      _passes_score_floor ~thresholds ~min_grade ~min_score_override
-        ~max_score_override score
-  in
-  (passes_breakout, passes_sector, passes_grade)
-
-(** Bump the counter by one when [b] is [true]. *)
-let _bump n b = if b then n + 1 else n
-
-(** Long-side phase counts for the cascade-diagnostics record. Folds the
-    per-pair predicate triple into running counts. *)
-let _count_long_phases ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~candidates =
-  List.fold candidates ~init:(0, 0, 0)
-    ~f:(fun (breakout, sector_ok, grade_ok) pair ->
-      let pb, ps, pg =
-        _long_admission ~weights ~thresholds ~min_grade ~min_score_override
-          ~max_score_override ~volume_ratio_exclude_range pair
-      in
-      (_bump breakout pb, _bump sector_ok ps, _bump grade_ok pg))
-
-(** Short-side admission predicates. Mirrors [_long_admission] with the RS hard
-    gate inserted between sector and grade — see [_short_candidate]. *)
-let _short_admission ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range (a, sector) =
-  let passes_breakdown =
-    Stock_analysis.is_breakdown_candidate a
-    && _passes_volume_band ~excl:volume_ratio_exclude_range a
-  in
-  let passes_sector =
-    passes_breakdown && not (equal_sector_rating sector.rating Strong)
-  in
-  let passes_rs = passes_sector && not (_rs_blocks_short a.Stock_analysis.rs) in
-  let passes_grade =
-    if not passes_rs then false
-    else
-      let score, _ = score_short ~weights ~sector a in
-      _passes_score_floor ~thresholds ~min_grade ~min_score_override
-        ~max_score_override score
-  in
-  (passes_breakdown, passes_sector, passes_rs, passes_grade)
-
-(** Short-side phase counts mirroring [_count_long_phases]. *)
-let _count_short_phases ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~candidates =
-  List.fold candidates ~init:(0, 0, 0, 0)
-    ~f:(fun (breakdown, sector_ok, rs_ok, grade_ok) pair ->
-      let pb, ps, pr, pg =
-        _short_admission ~weights ~thresholds ~min_grade ~min_score_override
-          ~max_score_override ~volume_ratio_exclude_range pair
-      in
-      (_bump breakdown pb, _bump sector_ok ps, _bump rs_ok pr, _bump grade_ok pg))
-
 (** Apply [candidate_fn] to each pair, drop [None]s, sort by score, and cap at
     [max_n]. Shared by the long and short evaluation paths. *)
 let _filter_and_cap ~candidate_fn ~max_n candidates =
   List.filter_map candidates ~f:candidate_fn |> _top_n max_n
 
+(** Whether the macro tape admits new long entries.
+
+    [neutral_blocks_longs] defaults to [false] = the historical gate (longs
+    admitted under both [Bullish] and [Neutral]; blocked only under [Bearish]).
+    When [true], [Neutral] also blocks longs — only [Bullish] admits. This
+    tightens Weinstein's unconditional macro gate so a non-confirmed ([Neutral])
+    tape no longer admits buys. The short-side gate is unaffected. *)
+let _longs_admitted_by_macro ~neutral_blocks_longs macro_trend =
+  match macro_trend with
+  | Bearish -> false
+  | Neutral -> not neutral_blocks_longs
+  | Bullish -> true
+
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~max_buy_candidates
-    ~candidates ~macro_trend : scored_candidate list =
-  match macro_trend with
-  | Bearish -> []
-  | Bullish | Neutral ->
-      let candidate_fn =
-        _long_candidate ~weights ~thresholds ~params ~min_grade
-          ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-      in
-      _filter_and_cap ~candidate_fn ~max_n:max_buy_candidates candidates
+    ~neutral_blocks_longs ~candidates ~macro_trend : scored_candidate list =
+  if not (_longs_admitted_by_macro ~neutral_blocks_longs macro_trend) then []
+  else
+    let candidate_fn =
+      _long_candidate ~weights ~thresholds ~params ~min_grade
+        ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+    in
+    _filter_and_cap ~candidate_fn ~max_n:max_buy_candidates candidates
 
 (** Filter, score, grade, sort, and cap short candidates. *)
 let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
@@ -391,12 +296,12 @@ let _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade
     ~total_stocks ~candidates_after_held ~macro_trend ~candidates
     ~buy_candidates ~short_candidates =
   let long_phases =
-    _count_long_phases ~weights ~thresholds:grade_thresholds ~min_grade
+    count_long_phases ~weights ~thresholds:grade_thresholds ~min_grade
       ~min_score_override ~max_score_override ~volume_ratio_exclude_range
       ~candidates
   in
   let short_phases =
-    _count_short_phases ~weights ~thresholds:grade_thresholds ~min_grade
+    count_short_phases ~weights ~thresholds:grade_thresholds ~min_grade
       ~min_score_override ~max_score_override ~volume_ratio_exclude_range
       ~candidates
   in
@@ -429,53 +334,58 @@ let _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member =
       else if not (is_member a.ticker) then None
       else Some (a, _resolve_sector ~sector_map a.ticker))
 
+(** Evaluate the long and short cascade paths for one screen call. Returns
+    [(buy_candidates, short_candidates)]; decoupled from [_screen] so the latter
+    stays within the 50-line linter cap. *)
+let _evaluate_candidates ~config ~candidates ~macro_trend =
+  let buy_candidates =
+    _evaluate_longs ~weights:config.weights ~thresholds:config.grade_thresholds
+      ~params:config.candidate_params ~min_grade:config.min_grade
+      ~min_score_override:config.min_score_override
+      ~max_score_override:config.max_score_override
+      ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
+      ~max_buy_candidates:config.max_buy_candidates
+      ~neutral_blocks_longs:config.neutral_blocks_longs ~candidates ~macro_trend
+  in
+  let short_candidates =
+    _evaluate_shorts ~weights:config.weights ~thresholds:config.grade_thresholds
+      ~params:config.candidate_params ~min_grade:config.min_grade
+      ~min_score_override:config.min_score_override
+      ~max_score_override:config.max_score_override
+      ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
+      ~max_short_candidates:config.max_short_candidates ~candidates ~macro_trend
+  in
+  (buy_candidates, short_candidates)
+
 let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
     ~is_member : result =
   let held_set = String.Set.of_list held_tickers in
-  let {
-    weights;
-    grade_thresholds;
-    candidate_params;
-    min_grade;
-    min_score_override;
-    max_score_override;
-    volume_ratio_exclude_range;
-    max_buy_candidates;
-    max_short_candidates;
-    cascade_post_stop_cooldown_weeks = _;
-  } =
-    config
-  in
   let buys_active =
-    match macro_trend with Bullish | Neutral -> true | Bearish -> false
+    _longs_admitted_by_macro ~neutral_blocks_longs:config.neutral_blocks_longs
+      macro_trend
   in
   let total_stocks = List.length stocks in
   let candidates =
     _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member
   in
   let candidates_after_held = List.length candidates in
-  let buy_candidates =
-    _evaluate_longs ~weights ~thresholds:grade_thresholds
-      ~params:candidate_params ~min_grade ~min_score_override
-      ~max_score_override ~volume_ratio_exclude_range ~max_buy_candidates
-      ~candidates ~macro_trend
-  in
-  let short_candidates =
-    _evaluate_shorts ~weights ~thresholds:grade_thresholds
-      ~params:candidate_params ~min_grade ~min_score_override
-      ~max_score_override ~volume_ratio_exclude_range ~max_short_candidates
-      ~candidates ~macro_trend
+  let buy_candidates, short_candidates =
+    _evaluate_candidates ~config ~candidates ~macro_trend
   in
   {
     buy_candidates;
     short_candidates;
     watchlist =
-      _build_watchlist ~weights ~thresholds:grade_thresholds ~candidates
-        ~buy_candidates ~buys_active;
+      _build_watchlist ~weights:config.weights
+        ~thresholds:config.grade_thresholds ~candidates ~buy_candidates
+        ~buys_active;
     macro_trend;
     cascade_diagnostics =
-      _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade
-        ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+      _diagnostics_for_screen ~weights:config.weights
+        ~grade_thresholds:config.grade_thresholds ~min_grade:config.min_grade
+        ~min_score_override:config.min_score_override
+        ~max_score_override:config.max_score_override
+        ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
         ~total_stocks ~candidates_after_held ~macro_trend ~candidates
         ~buy_candidates ~short_candidates;
   }

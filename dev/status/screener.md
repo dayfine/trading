@@ -1,9 +1,11 @@
 # Status: screener
 
-## Last updated: 2026-05-25
+## Last updated: 2026-06-01
 
 ## Status
 MERGED
+
+**2026-06-01**: `feat(weinstein): neutral_blocks_longs default-off entry-gate axis` (branch `feat/neutral-blocks-longs-axis`, OPEN) — lever #2 of the Cell E 2020-2026 stall diagnosis. Adds `Screener.config.neutral_blocks_longs : bool [@sexp.default false]` plus a mirrored top-level `Weinstein_strategy.config.neutral_blocks_longs` field threaded into `screening_config` at screen time. When `true`, a macro-`Neutral` tape blocks new long candidates exactly as `Bearish` does (only `Bullish` admits longs); default `false` preserves the historical gate bit-equally. The short-side gate is unaffected. A *tightening* of Weinstein's unconditional macro gate (a faithful dial, spine intact). Default-off axis per `.claude/rules/experiment-flag-discipline.md` — proven `Variant_matrix`-expressible (`(flag neutral_blocks_longs)`) by `test_variant_matrix.ml`. No default flipped; no golden config_overrides touched. Tests: bit-identical-when-off + flag-on-blocks-Neutral + Bullish-unaffected + short-side-unchanged in `test_screener_e2e.ml`.
 
 **2026-05-25**: `fix(screener): NaN/inf guards in resistance/support/volume` (PR #1309) MERGED at `bee5e663c`. Defensive guards in `resistance.ml` (`_bucket_idx`), `support.ml` (`_bucket_idx_below`), and `volume.ml` (`_result_of_volumes`) are now pinned with three regression tests addressing the prior CP4 finding (band_size=0.0 → +inf offsets short-circuited; Float.nan event volume → None). Re-QC verdict on tip `774edc7f4`: structural APPROVED + behavioral APPROVED quality_score 4 (see `dev/reviews/screener-nan-inf-guards.md`); CI green (build-and-test + perf-tier1-smoke + golden-runs-custom-universe). Auto-merged via Step 6.5 after one branch-update cycle (got behind when #1313 merged ahead).
 

@@ -18,6 +18,12 @@ include module type of Screener_scoring
     [Screener.scoring_weights], etc. without importing the sub-module directly.
 *)
 
+include module type of Screener_admission
+(** Per-candidate admission predicates, cascade-phase counters, and the
+    {!Screener_admission.volume_ratio_band} type — re-exported from
+    {!Screener_admission} so callers continue to reference them as
+    [Screener.volume_ratio_band], [Screener.passes_score_floor], etc. *)
+
 type candidate_params = {
   entry_buffer_pct : float;
       (** Fraction above breakout price for the suggested entry. Default: 0.005.
@@ -65,13 +71,6 @@ type candidate_params = {
 
 val default_candidate_params : candidate_params
 (** [default_candidate_params] provides the reference parameters. *)
-
-type volume_ratio_band = { low : float; high : float } [@@deriving sexp]
-(** Half-open volume-ratio exclusion band used by
-    {!config.volume_ratio_exclude_range}. The named-field record (rather than a
-    plain [float * float] tuple) keeps the on-disk sexp shape outside the
-    runner's deep-merge "looks like a record" heuristic, so a partial-config
-    overlay that sets just this field deep-merges correctly. *)
 
 type config = {
   weights : scoring_weights;
@@ -159,6 +158,23 @@ type config = {
           in response to the same-week re-fire pattern documented in
           dev/notes/sp500-trade-quality-findings-2026-04-30.md §"Cascade
           re-firing within days of stop-out". *)
+  neutral_blocks_longs : bool; [@sexp.default false]
+      (** When [true], a macro-[Neutral] tape blocks new long candidates exactly
+          as a [Bearish] tape does — only [Bullish] admits longs. Default
+          [false] preserves the historical gate bit-equally: longs are admitted
+          under both [Bullish] and [Neutral], blocked only under [Bearish].
+
+          This is a *tightening* of Weinstein's unconditional macro gate
+          (weinstein-book-reference.md §Macro Analysis: "don't buy in a
+          non-confirmed tape"): it removes the bear-rally [Neutral] blips that
+          admit longs during a predominantly-bearish year. The short-side gate
+          ([Bullish] blocks; [Bearish]/[Neutral] admit) is unaffected by this
+          flag.
+
+          Default-off entry-gate axis (lever #2 of the Cell E 2020-2026 stall
+          diagnosis). Mirrored from the top-level
+          [Weinstein_strategy.config.neutral_blocks_longs] field so the flag is
+          a [Variant_matrix] axis. *)
 }
 [@@deriving sexp]
 (** Main screener configuration. *)
