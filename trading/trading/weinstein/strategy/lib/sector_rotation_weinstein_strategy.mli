@@ -81,6 +81,20 @@ type config = {
           [entry_price *. fallback_stop_buffer] when the support-floor lookup
           finds no qualifying correction. Default
           {!default_fallback_stop_buffer} ([0.92] = an 8% stop). *)
+  enable_macro_gate : bool;
+      (** Broad-tape macro gate (Weinstein spine item 6). Default
+          {!default_enable_macro_gate} ([false] — the ungated testbed,
+          bit-identical to the pre-gate strategy). When [true], on each Friday
+          the {!benchmark_symbol} (e.g. SPY) is itself stage-classified, and if
+          it is in {b Stage 4} the gate fires: no new sector entries open and
+          every held sector is forced flat (mechanically, the Friday target set
+          is forced empty — this both suppresses entries and routes every
+          holding through the rotation-out exit in
+          {!Sector_rotation_transitions.holding_exits}). This is the faithful
+          "bearish tape blocks buys / get out" rule (weinstein-book-reference.md
+          §Macro Analysis) the bare testbed omits. A {e default-off dial} per
+          [.claude/rules/experiment-flag-discipline.md] R1/R2: a config field,
+          searchable as an axis, not wired on until a ledger ACCEPT (R3). *)
 }
 
 val name : string
@@ -100,22 +114,30 @@ val default_fallback_stop_buffer : float
 (** [0.92] — an 8% loose initial stop, matching Weinstein's 8% correction rule
     (book §5.1) when no structural support floor is available. *)
 
+val default_enable_macro_gate : bool
+(** [false] — the macro gate is off by default, keeping the strategy
+    bit-identical to the ungated selection-only testbed. *)
+
 val default_config : config
 (** [default_config] uses {!default_symbols}, {!default_benchmark_symbol},
     {!default_k}, {!Stage.default_config}, {!Weinstein_stops.default_config},
-    {!Rs.default_config}, and {!default_fallback_stop_buffer}. *)
+    {!Rs.default_config}, {!default_fallback_stop_buffer}, and
+    {!default_enable_macro_gate}. *)
 
 val config_with :
   ?symbols:string list ->
   ?benchmark_symbol:string ->
+  ?enable_macro_gate:bool ->
   k:int ->
   ma_period_weeks:int ->
   unit ->
   config
-(** [config_with ?symbols ?benchmark_symbol ~k ~ma_period_weeks ()] is
-    {!default_config} with [k] holdings and the stage-classifier moving-average
-    period overridden to [ma_period_weeks] weeks (and optionally a different
-    tradable [symbols] list / [benchmark_symbol]).
+(** [config_with ?symbols ?benchmark_symbol ?enable_macro_gate ~k
+     ~ma_period_weeks ()] is {!default_config} with [k] holdings and the
+    stage-classifier moving-average period overridden to [ma_period_weeks] weeks
+    (and optionally a different tradable [symbols] list / [benchmark_symbol],
+    and the macro gate flipped on via [enable_macro_gate], default
+    {!default_enable_macro_gate} = [false]).
 
     The MA period is the Weinstein-faithful dial distinguishing the investor
     preset ([30] weeks) from the trader preset ([10] weeks). Only

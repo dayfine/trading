@@ -12,6 +12,7 @@ type config = {
   stops_config : Weinstein_stops.config;
   rs_config : Rs.config;
   fallback_stop_buffer : float;
+  enable_macro_gate : bool;
 }
 
 let name = "SectorRotationWeinstein"
@@ -26,6 +27,7 @@ let default_symbols =
 let default_benchmark_symbol = "SPY"
 let default_k = 1
 let default_fallback_stop_buffer = 0.92
+let default_enable_macro_gate = false
 
 let default_config =
   {
@@ -36,10 +38,12 @@ let default_config =
     stops_config = Weinstein_stops.default_config;
     rs_config = Rs.default_config;
     fallback_stop_buffer = default_fallback_stop_buffer;
+    enable_macro_gate = default_enable_macro_gate;
   }
 
 let config_with ?(symbols = default_symbols)
-    ?(benchmark_symbol = default_benchmark_symbol) ~k ~ma_period_weeks () =
+    ?(benchmark_symbol = default_benchmark_symbol)
+    ?(enable_macro_gate = default_enable_macro_gate) ~k ~ma_period_weeks () =
   {
     default_config with
     symbols;
@@ -47,6 +51,7 @@ let config_with ?(symbols = default_symbols)
     k;
     stage_config =
       { default_config.stage_config with ma_period = ma_period_weeks };
+    enable_macro_gate;
   }
 
 (* Number of weekly bars fed to [Stage.classify] / [Rs.analyze]: twice the MA
@@ -135,13 +140,47 @@ let _target_set ~config ~bar_reader ~prior_stage ~(as_of : Date.t) :
   in
   Sector_rotation_signals.rank_top_k ~candidates ~k:config.k
 
-(* The target set for this tick: the top-[k] Stage-2 names on a weekly close
-   (which also refreshes [prior_stage] for all symbols), else empty (no rotation
-   decision mid-week). [as_of] anchors the weekly reads. *)
+let _is_stage4 (stage : Weinstein_types.stage) : bool =
+  match stage with Weinstein_types.Stage4 _ -> true | _ -> false
+
+(* The broad-tape macro gate (spine item 6). When [enable_macro_gate] is on and
+   the benchmark (e.g. SPY) is itself in Stage 4, new buys are blocked and held
+   sectors are forced flat. Returns [true] iff the gate fires. Classifies the
+   benchmark on its own weekly bars, threading [prior_stage] keyed by the
+   benchmark symbol for flat-MA continuity; a benchmark still in warmup (no
+   bars) never gates. Default-off, so the strategy is bit-identical to the
+   ungated testbed unless a scenario opts in. *)
+let _macro_blocks ~config ~bar_reader ~prior_stage ~(as_of : Date.t) : bool =
+  if not config.enable_macro_gate then false
+  else
+    let prior = Map.find !prior_stage config.benchmark_symbol in
+    match
+      _classify_stage ~config ~bar_reader ~prior ~symbol:config.benchmark_symbol
+        ~as_of
+    with
+    | None -> false
+    | Some r ->
+        prior_stage :=
+          Map.set !prior_stage ~key:config.benchmark_symbol ~data:r.stage;
+        _is_stage4 r.stage
+
+(* The Friday target: the top-[k] Stage-2 names by RS (computing it also
+   refreshes [prior_stage] for every tradable symbol), forced empty when the
+   macro gate fires. An empty target both blocks entries and, via the
+   rotation-out path in [Sector_rotation_transitions.holding_exits], force-flats
+   every held sector. *)
+let _weekly_target ~config ~bar_reader ~prior_stage ~(as_of : Date.t) :
+    String.Set.t =
+  let base = _target_set ~config ~bar_reader ~prior_stage ~as_of in
+  if _macro_blocks ~config ~bar_reader ~prior_stage ~as_of then String.Set.empty
+  else base
+
+(* The target set for this tick: the Friday target on a weekly close, else empty
+   (no rotation decision mid-week). [as_of] anchors the weekly reads. *)
 let _target_for_tick ~config ~bar_reader ~prior_stage ~(as_of : Date.t) :
     String.Set.t =
   if _is_weekly_close ~date:as_of then
-    _target_set ~config ~bar_reader ~prior_stage ~as_of
+    _weekly_target ~config ~bar_reader ~prior_stage ~as_of
   else String.Set.empty
 
 (* One tick's transitions, anchored at [date]: exit rotated-out / Stage-4 /

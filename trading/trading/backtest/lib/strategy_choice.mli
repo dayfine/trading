@@ -66,6 +66,7 @@ type t =
   | Sector_rotation_weinstein of {
       k : int; [@sexp.default 1]
       ma_period_weeks : int; [@sexp.default 30]
+      enable_macro_gate : bool; [@sexp.default false]
     }
       (** Sector-rotation Weinstein stage-timing reference strategy — the
           multi-symbol generalization of {!Spy_only_weinstein}. Constructs
@@ -75,19 +76,25 @@ type t =
           them by relative strength vs SPY, and holds the top [k]; held names
           that leave the top-[k] set or roll into Stage 3/4 exit to flat, and a
           per-symbol Weinstein trailing stop is checked daily. Long/flat only —
-          no shorting, no macro gate, no portfolio-risk sizing (cash is
-          equal-weighted across the entry slots filled each Friday). The default
-          tradable symbols are the 11 SPDR sector ETFs and the benchmark is SPY;
-          all must be present in the scenario's universe so the bar reader loads
-          their bars (SPY is the RS benchmark and is never traded). See
+          no shorting, no portfolio-risk sizing (cash is equal-weighted across
+          the entry slots filled each Friday). The default tradable symbols are
+          the 11 SPDR sector ETFs and the benchmark is SPY; all must be present
+          in the scenario's universe so the bar reader loads their bars (SPY is
+          the RS benchmark and is never traded). See
           {!Weinstein_strategy.Sector_rotation_weinstein_strategy.config}.
 
           [k] ([@sexp.default 1]) is the maximum number of concurrent holdings.
           [ma_period_weeks] ([@sexp.default 30], the investor preset) is the
           Weinstein-faithful MA dial (per
           [.claude/rules/weinstein-faithful-core.md]); [10] is the trader
-          preset. The strategy spine (Stage-2-only entry, Stage 3/4 exit, stop
-          below base, RS for selection) is untouched by both dials. *)
+          preset. [enable_macro_gate] ([@sexp.default false]) turns on the
+          broad-tape macro gate: when SPY itself is in Stage 4, new sector buys
+          are blocked and held sectors are forced flat (Weinstein spine item 6,
+          omitted from the bare testbed to isolate selection). Default-off keeps
+          every pre-existing sector scenario bit-identical; it is a searchable
+          dial per [.claude/rules/experiment-flag-discipline.md]. The strategy
+          spine (Stage-2-only entry, Stage 3/4 exit, stop below base, RS for
+          selection) is untouched by all dials. *)
 [@@deriving sexp, eq, show]
 
 val default : t
