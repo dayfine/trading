@@ -101,3 +101,19 @@ starts the session with new information.
 - Don't read every status file at session start — they're stale-prone
   (see `memory/feedback_status_refresh_must_verify.md`), and only the
   ones the priorities doc cites are load-bearing for this session.
+
+## Maintenance — refresh the committed memory snapshot
+
+The agent's durable project knowledge (`project`- / `reference`-typed
+memories) is exported into `dev/agent-memory/` as a versioned, shared
+snapshot; the canonical copy stays in the local `~/.claude` store. After
+a session that produced substantive new findings or retired stale ones,
+refresh + commit it:
+
+```bash
+sh dev/scripts/export-memory.sh   # rewrites dev/agent-memory/ + its index
+```
+
+It curates automatically (excludes `feedback`-typed process notes and
+dated `project_20YY-*` session logs); add superseded entries to the
+script's `STALE` list. Docs-only change → admin-merge.
