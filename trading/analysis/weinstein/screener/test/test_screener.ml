@@ -1243,9 +1243,107 @@ let test_pi_filter_composes_with_cooldown _ =
   in
   assert_that result.buy_candidates is_empty
 
+(* ------------------------------------------------------------------ *)
+(* min_price: liquidity floor                                          *)
+(* ------------------------------------------------------------------ *)
+
+let _tickers cs = List.map cs ~f:(fun (c : scored_candidate) -> c.ticker)
+
+(** A low-priced (~$2.70 breakout) Stage1→Stage2 breakout candidate. *)
+let _cheap_long ticker =
+  let bars = rising_bars_with_spike ~n:35 1.5 3.0 ~spike_idx:31 in
+  make_analysis ticker (Some (Stage1 { weeks_in_base = 10 })) bars
+
+(** A higher-priced (~$9.00 breakout) Stage1→Stage2 breakout candidate. *)
+let _rich_long ticker =
+  let bars = rising_bars_with_spike ~n:35 5.0 10.0 ~spike_idx:31 in
+  make_analysis ticker (Some (Stage1 { weeks_in_base = 10 })) bars
+
+(** A low-priced (~$3.34 breakdown) Stage3→Stage4 short candidate. *)
+let _cheap_short ticker =
+  let bars = declining_bars_with_spike ~n:60 6.0 3.0 ~spike_idx:55 in
+  make_analysis ticker (Some (Stage3 { weeks_topping = 8 })) bars
+
+(** No-op proof: [min_price = 0.0] (the default) admits a low-priced (~$2.70)
+    Stage-2 breakout exactly as today. *)
+let test_min_price_zero_admits_low_priced _ =
+  let result =
+    screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+      ~stocks:[ _cheap_long "CHEAP" ]
+      ~held_tickers:[]
+  in
+  assert_that
+    (_tickers result.buy_candidates)
+    (elements_are [ equal_to "CHEAP" ])
+
+(** Floor rejects: [min_price = 5.0] drops the ~$2.70 candidate but admits the
+    ~$9.00 one. *)
+let test_min_price_floor_rejects_below _ =
+  let floor_cfg = { cfg with min_price = 5.0 } in
+  let result =
+    screen ~config:floor_cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ())
+      ~stocks:[ _cheap_long "CHEAP"; _rich_long "RICH" ]
+      ~held_tickers:[]
+  in
+  assert_that
+    (_tickers result.buy_candidates)
+    (elements_are [ equal_to "RICH" ])
+
+(** Short side: the floor also gates short candidates — a ~$3.34 breakdown short
+    is rejected at [min_price = 5.0]. *)
+let test_min_price_floor_rejects_short _ =
+  let floor_cfg = { cfg with min_price = 5.0 } in
+  let sector_map =
+    sector_map_of [ ("SHT", make_sector ~rating:Weak "Energy") ]
+  in
+  let result =
+    screen ~config:floor_cfg ~macro_trend:Bearish ~sector_map
+      ~stocks:[ _cheap_short "SHT" ]
+      ~held_tickers:[]
+  in
+  assert_that result.short_candidates is_empty
+
+(** The same ~$3.34 breakdown short is admitted when the floor is disabled
+    ([min_price = 0.0]) — confirms the short-side gate is the floor, not an
+    unrelated rejection. *)
+let test_min_price_zero_admits_short _ =
+  let sector_map =
+    sector_map_of [ ("SHT", make_sector ~rating:Weak "Energy") ]
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map
+      ~stocks:[ _cheap_short "SHT" ]
+      ~held_tickers:[]
+  in
+  assert_that
+    (_tickers result.short_candidates)
+    (elements_are [ equal_to "SHT" ])
+
+(** Missing price under a positive floor is rejected — liquidity can't be
+    verified. *)
+let test_passes_price_floor_missing_price_rejected _ =
+  assert_that (passes_price_floor ~min_price:5.0 ~price:None) (equal_to false)
+
+(** Missing price with the floor disabled ([min_price = 0.0]) is admitted — the
+    no-op short-circuits before the price is examined. *)
+let test_passes_price_floor_missing_price_noop _ =
+  assert_that (passes_price_floor ~min_price:0.0 ~price:None) (equal_to true)
+
 let suite =
   "screener_tests"
   >::: [
+         "test_min_price_zero_admits_low_priced"
+         >:: test_min_price_zero_admits_low_priced;
+         "test_min_price_floor_rejects_below"
+         >:: test_min_price_floor_rejects_below;
+         "test_min_price_floor_rejects_short"
+         >:: test_min_price_floor_rejects_short;
+         "test_min_price_zero_admits_short" >:: test_min_price_zero_admits_short;
+         "test_passes_price_floor_missing_price_rejected"
+         >:: test_passes_price_floor_missing_price_rejected;
+         "test_passes_price_floor_missing_price_noop"
+         >:: test_passes_price_floor_missing_price_noop;
          "test_bearish_macro_no_buys" >:: test_bearish_macro_no_buys;
          "test_bullish_macro_no_shorts" >:: test_bullish_macro_no_shorts;
          "test_weak_sector_excluded_from_buys"

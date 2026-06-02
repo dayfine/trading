@@ -18,6 +18,15 @@ let passes_volume_band ~excl (a : Stock_analysis.t) =
       let r = v.Volume.volume_ratio in
       not Float.(low <= r && r < high)
 
+let passes_price_floor ~min_price ~price =
+  (* Liquidity floor: disabled when [min_price <= 0.0] (the default no-op).
+     Otherwise the candidate's setup price ([breakout_price] for longs,
+     [breakdown_price] for shorts) must be known and at/above the floor; an
+     unknown price ([None]) is REJECTED under a positive floor since liquidity
+     can't be verified. *)
+  if Float.(min_price <= 0.0) then true
+  else match price with Some p -> Float.(p >= min_price) | None -> false
+
 let rs_blocks_short = function
   | Some { Rs.trend = Positive_rising | Positive_flat | Bullish_crossover; _ }
     ->
@@ -25,12 +34,14 @@ let rs_blocks_short = function
   | _ -> false
 
 let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range (a, sector) =
-  (* Volume-band exclusion is folded into breakout phase: keeps the
-     cascade-diagnostics record stable (no new counter) while gating downstream
-     counts. *)
+    ~max_score_override ~volume_ratio_exclude_range ~min_price (a, sector) =
+  (* Volume-band exclusion and the min-price liquidity floor are folded into the
+     breakout phase: keeps the cascade-diagnostics record stable (no new
+     counter) while gating downstream counts. The long-side setup price is
+     [breakout_price]. *)
   let passes_breakout =
-    Stock_analysis.is_breakout_candidate a
+    passes_price_floor ~min_price ~price:a.Stock_analysis.breakout_price
+    && Stock_analysis.is_breakout_candidate a
     && passes_volume_band ~excl:volume_ratio_exclude_range a
   in
   let passes_sector =
@@ -48,19 +59,22 @@ let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
 let _bump n b = if b then n + 1 else n
 
 let count_long_phases ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~candidates =
+    ~max_score_override ~volume_ratio_exclude_range ~min_price ~candidates =
   List.fold candidates ~init:(0, 0, 0)
     ~f:(fun (breakout, sector_ok, grade_ok) pair ->
       let pb, ps, pg =
         _long_admission ~weights ~thresholds ~min_grade ~min_score_override
-          ~max_score_override ~volume_ratio_exclude_range pair
+          ~max_score_override ~volume_ratio_exclude_range ~min_price pair
       in
       (_bump breakout pb, _bump sector_ok ps, _bump grade_ok pg))
 
 let _short_admission ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range (a, sector) =
+    ~max_score_override ~volume_ratio_exclude_range ~min_price (a, sector) =
+  (* The short-side setup price is [breakdown_price]; the floor folds into the
+     breakdown phase, mirroring [_long_admission]. *)
   let passes_breakdown =
-    Stock_analysis.is_breakdown_candidate a
+    passes_price_floor ~min_price ~price:a.Stock_analysis.breakdown_price
+    && Stock_analysis.is_breakdown_candidate a
     && passes_volume_band ~excl:volume_ratio_exclude_range a
   in
   let passes_sector =
@@ -77,11 +91,11 @@ let _short_admission ~weights ~thresholds ~min_grade ~min_score_override
   (passes_breakdown, passes_sector, passes_rs, passes_grade)
 
 let count_short_phases ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~candidates =
+    ~max_score_override ~volume_ratio_exclude_range ~min_price ~candidates =
   List.fold candidates ~init:(0, 0, 0, 0)
     ~f:(fun (breakdown, sector_ok, rs_ok, grade_ok) pair ->
       let pb, ps, pr, pg =
         _short_admission ~weights ~thresholds ~min_grade ~min_score_override
-          ~max_score_override ~volume_ratio_exclude_range pair
+          ~max_score_override ~volume_ratio_exclude_range ~min_price pair
       in
       (_bump breakdown pb, _bump sector_ok ps, _bump rs_ok pr, _bump grade_ok pg))

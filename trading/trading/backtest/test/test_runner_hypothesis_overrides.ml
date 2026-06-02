@@ -271,6 +271,22 @@ let test_default_screening_volume_ratio_exclude_range_is_none _ =
   let cfg = _default_config () in
   assert_that cfg.screening_config.volume_ratio_exclude_range is_none
 
+(** Deep-merge path for [screening_config.min_price] — the liquidity floor. A
+    scenario's [config_overrides] can set it to 1.0 / 5.0 / 10.0 so
+    broad-universe backtests exclude penny / illiquid names. *)
+let test_override_screening_min_price _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string "((screening_config ((min_price 5.0))))")
+  in
+  assert_that merged.screening_config.min_price (float_equal 5.0)
+
+(** [0.0] (the default) is preserved when no override is applied. Pins the
+    bit-identical no-op contract documented in [Screener.config.min_price]. *)
+let test_default_screening_min_price_is_zero _ =
+  let cfg = _default_config () in
+  assert_that cfg.screening_config.min_price (float_equal 0.0)
+
 (** Fold-equivalent helper: applies a list of override sexps the same way
     [Backtest.Runner._apply_overrides] does — sequential deep-merge of each
     overlay into the running sexp, then a single [config_of_sexp] at the end.
@@ -462,6 +478,10 @@ let suite =
           through sexp" >:: test_override_screening_volume_ratio_exclude_range;
          "default: screening_config.volume_ratio_exclude_range = None"
          >:: test_default_screening_volume_ratio_exclude_range_is_none;
+         "override: screening_config.min_price round-trips through sexp"
+         >:: test_override_screening_min_price;
+         "default: screening_config.min_price = 0.0"
+         >:: test_default_screening_min_price_is_zero;
          "two overlays targeting same top-level field both apply"
          >:: test_two_overlays_same_top_level_field;
          "unknown top-level overlay key fails loudly (sweep-path linter)"
