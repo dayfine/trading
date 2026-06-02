@@ -81,11 +81,28 @@ buys + force flat. Ran on sector-k3, bull + deep:
   volatile. Promotion needs a different-universe grid cell (`promotion-confirmation.md`);
   testbed has no default to flip. Full result: `sector-rotation-k-ladder-2026-06-02.md`.
 
-#### → NEXT P0: SPY-core + sector-satellite barbell
-The gate caps the tail but can't reach the floor — the 18.8% floor comes from *being* the
-index, not timing it. Combine the layers mechanically: **50% SPY-only floor + 50% gate-ON
-sector-k3 engine**. SPY core supplies structural smoothness the gate can't synthesise;
-sector sleeve supplies breadth/return. Test as a two-strategy blend on the bull+deep grid.
+#### → barbell (SPY-core + sector-satellite) — ✅ TESTED + WEIGHT-SWEPT, CONFIRMED
+Continuously-rebalanced blend of SPY-only floor + gate-ON sector-k3 engine (post-hoc NAV
+blend, no module yet). Swept core weight 100%→0%. **The optimum is ~70/30 and it's the
+best risk-adjusted config found in the whole study:**
+- **Bull: 70/30 STRICTLY DOMINATES pure SPY-only** — Calmar **0.488>0.467**, MaxDD
+  **18.4%<18.8%**, return **336%>322%**. A diversification free-lunch (the sleeves' DDs are
+  low/neg-correlated → a 30% sector sleeve improves *every* metric).
+- **Deep: Calmar peaks at pure SPY (0.337); 70/30 matches it (0.334)** while adding **+54pp
+  return** (474% vs 420%) for +1.3pp DD. Past ~30% satellite trades Calmar for return.
+- Validates the layer story: DD-floor + return-engine **compose**. Full sweep table:
+  `sector-rotation-k-ladder-2026-06-02.md` §"Weight sweep".
+- Caveat: continuously-rebalanced daily = idealized upper bound (free-lunch shrinks with
+  rebalance friction). Re-confirm 70/30 at a realistic cadence + different-universe cell.
+
+#### → NEXT P0 (SUPERVISED build): two-sleeve meta-strategy module, target 70/30
+The blend is post-hoc. A live version needs a meta-strategy running both sub-strategies on
+split capital — the simulator runs ONE `STRATEGY` today, so it's design-heavy (left
+supervised). Recommended cheap path first: a **`Scenario`-level blend runner** that
+post-processes two scenario NAVs at a configurable weight (reproduces this result exactly),
+before a true shared-portfolio meta-strategy with periodic rebalancing. Target the **70/30**
+weight; re-confirm at monthly/quarterly cadence; add a different-universe cell for the
+macro-gate promotion grid. Spec in the k-ladder note §"NEXT (supervised build)".
 
 ### (superseded) original P0 brief · Sector-rotation long/flat (data ready, build it)
 - Universe: the 11 SPDR sector ETFs (`spdr-sectors-11.sexp`); deep bars fetched this
