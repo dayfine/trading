@@ -1,20 +1,17 @@
 # Agent memory — durable project knowledge
 
-Point-in-time export (2026-06-03) of the **project** and **reference** memories the
-Claude Code agent keeps for this repo: distilled, cross-linked conclusions and gotchas
-from the Weinstein trading-system work — a decision log / knowledge base.
+Versioned snapshot of the Claude Code agent's **project** and **reference**
+memories for this repo: distilled, cross-linked conclusions and gotchas from the
+Weinstein trading-system work. The canonical copy lives in the agent's local
+`~/.claude` store (loaded at session start); refresh this snapshot with
+`sh dev/scripts/export-memory.sh` + commit.
 
-**Canonical copy** lives in the agent's local store and is loaded at session start;
-this directory is a shared, versioned snapshot (not auto-synced). Agent-process /
-workflow memories (`type: feedback`, 44 files) are intentionally excluded — they are
-"how to work" notes, not project knowledge.
+Excluded: agent-process (`feedback`-typed) memories, dated session-log
+snapshots (`project_20YY-*`), and superseded entries (see the script's STALE
+list). Generated file — edit the source memories, not this directory.
 
 ## Index
 
-- [`project_2026-05-07_priorities.md`](./project_2026-05-07_priorities.md) — Capital-recycling thesis confirmed end-to-end — Cell E (Stage3 K=1 + Laggard h=2) hit Sharpe 0.94 on 16y SP500. Forward-looking priorities P1-P9 live in dev/notes/next-session-priorities-2026-05-07.md. P1 (equity_curve writer fix) blocks P2/P3.
-- [`project_2026-05-10_session.md`](./project_2026-05-10_session.md) — Today's session findings and PRs — simulator NAV fallback bug fix, Order_manager active-orders index, benchmark-relative metrics, state-pollution experiment in flight.
-- [`project_2026-05-13_session.md`](./project_2026-05-13_session.md) — 21 PRs merged in one session — NAV fix + universe foundation + tuning evidence + 2 negative results
-- [`project_2026-05-17-PM-session.md`](./project_2026-05-17-PM-session.md) — Q1 + Q2-A (pivoted) + Q2-B + cross-val all complete. BRK-B BAH + weekly-sweep tool. CSV-storage 4th-recurrence flake root-fixed. BAH-runner zero-trade bug surfaced.
 - [`project_bayesian_int_knob_crash.md`](./project_bayesian_int_knob_crash.md) — 11-knob BO sweep crashes int_of_sexp because cell_to_overrides emits raw %.17g floats for int-typed knobs. P3 BLOCKED until per-knob round added.
 - [`project_bayesian_sweep_checkpoint_needed.md`](./project_bayesian_sweep_checkpoint_needed.md) — V2 sweep lost ~5h of work to power-loss-induced restart (2026-05-20). User flagged checkpointing as a needed improvement for future frequent sweeps.
 - [`project_broad_universe_semantics.md`](./project_broad_universe_semantics.md) — Broad backtest universes (data/sectors.csv, ~10k symbols) should NOT pre-filter by bar coverage; the runner skips per-symbol when no bars exist.
@@ -40,7 +37,6 @@ workflow memories (`type: feedback`, 44 files) are intentionally excluded — th
 - [`project_sector_rotation_layer_attribution.md`](./project_sector_rotation_layer_attribution.md) — Sector-rotation K-ladder + macro-gate results — what each strategy layer buys, regime-robust across bull+deep
 - [`project_short_side_reprioritize.md`](./project_short_side_reprioritize.md) — Short-side-strategy track is MERGED so orchestrator treats it closed; reopen + dispatch its 3 follow-ups once the backtest-scale optimization work (3f-part2/3f-part3 and successors) finishes
 - [`project_simulator_nav_fallback_bug.md`](./project_simulator_nav_fallback_bug.md) — Original bug at simulator.ml:213-214 silently substituted current_cash on forward-fill failure. PR #1019 moved to portfolio_valuation.ml:85-87; PR #1123 (2026-05-15) replaced with fail-loud. Historical artifact only.
-- [`project_sp500_baseline_conflict.md`](./project_sp500_baseline_conflict.md) — Both sp500-2019-2023 (500-sym, post-#851 dedup) and sp500-2010-2026 (510-sym, with #855 position-sizing override) tight-pinned 2026-05-05 in their scenario sexps with ±10-25% tolerance bands.
 - [`project_split_day_ohlc_design.md`](./project_split_day_ohlc_design.md) — Broker-model plan landed as PR #656 on 2026-04-28; 4 phases ~650 LOC; #641 closed as superseded
 - [`project_spy_reference_strategy.md`](./project_spy_reference_strategy.md) — SPY-only Weinstein stage-timing strategy (PR #1397) — a new separate testbed module (long/flat, reuses Stage.classify + Weinstein_stops, strips screener/sizing/macro). Direction-finder for the main strategy + realizable bound on the autopsy.
 - [`project_stage_chart_visual_diagnostic.md`](./project_stage_chart_visual_diagnostic.md) — stage_chart tool renders a symbol's weekly close colored by programmatic Weinstein stage (owl-plplot PNG I can view) — visually validates the classifier; first finding = false Stage-3 while price still above MA → fix is price-action confirmation not weeks-hysteresis
