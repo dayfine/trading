@@ -104,21 +104,35 @@
  ;; few units lower as fewer false-exit cycles trigger. Wall on local
  ;; parallel-3 in trading-1-dev: 1218.7s; pin sized to absorb GHA/local
  ;; variance.
- ;; Re-baselined 2026-05-30 on the GSPC-repaired index golden (issue #1380):
- ;; the index now covers 2009-2026 so the macro gate trades the FULL window.
- ;; The prior ranges reflected the truncated 2017-2026 behaviour (index golden
- ;; only went back to 2017). Repaired full-run actuals: return 311.9%, 837
- ;; trades, win 36.9%, sharpe 0.70, maxDD 26.2%, hold 42.4d, sortino 1.06,
- ;; calmar 0.35, ulcer 8.78, wall 728s. Bands ~+/-12% for run nondeterminism.
+ ;; Re-pinned 2026-06-02 — GROUND-TRUTH re-measure. The 2026-05-30 "repaired"
+ ;; bands (return 311.9 / 837 trades / 26.2% DD / band 270-355) were STALE: that
+ ;; measurement was taken before the GSPC.INDX 2009-floor data (#1380/#1383)
+ ;; fully propagated to the run's index reader, so the macro gate was still
+ ;; effectively degenerate (no Stage-4 broad-tape block → more buys, higher
+ ;; return, higher DD). With the index golden genuinely covering 2009-2026, the
+ ;; macro gate is ACTIVE across the full window: it blocks new buys when SPY is
+ ;; in Stage 4, cutting weak-tape entries. Fewer trades, lower return, much lower
+ ;; drawdown — a coherent macro-gate-on profile.
+ ;;
+ ;; Two INDEPENDENT measurements agree: the 2026-06-02 priorities-doc figure
+ ;; (237%/17.5%/0.44) and this session's fresh scenario_runner re-run
+ ;; (dev/notes/barbell-on-stocks-2026-06-02.md). Measured actuals (full Cell E,
+ ;; sp500-2010-01-01 universe, 510 sym, 2010-01-01→2026-04-30):
+ ;;   return 237.60  trades 670  win 38.06  sharpe 0.65  maxDD 17.50
+ ;;   hold 48.07d  open_positions_value 3,090,872  sortino 1.02  calmar 0.44
+ ;;   ulcer 7.03  wall 1845s (--parallel 1, busy container).
+ ;; Bands ~+/-12% for run nondeterminism; wall band wide for host/parallelism
+ ;; variance. NOTE: this golden is perf-tier 3-historical (NOT in PR CI), so the
+ ;; stale pin never surfaced as a CI failure — local goldens drift silently.
  (expected
-  ((total_return_pct   ((min 270.0)         (max 355.0)))
-   (total_trades       ((min 780)           (max  900)))
-   (win_rate           ((min  32.0)         (max  42.0)))
-   (sharpe_ratio       ((min   0.60)        (max   0.82)))
-   (max_drawdown_pct   ((min  21.5)         (max  30.5)))
-   (avg_holding_days   ((min  36.0)         (max  49.0)))
-   (open_positions_value ((min 3100000.0)   (max 4100000.0)))
-   (sortino_ratio_annualized ((min  0.90)   (max   1.27)))
-   (calmar_ratio       ((min   0.29)        (max   0.42)))
-   (ulcer_index        ((min   7.60)        (max  10.00)))
-   (wall_seconds       ((min 600.0)         (max 2400.0))))))
+  ((total_return_pct   ((min 209.0)         (max 266.0)))
+   (total_trades       ((min 590)           (max  750)))
+   (win_rate           ((min  33.0)         (max  43.0)))
+   (sharpe_ratio       ((min   0.55)        (max   0.76)))
+   (max_drawdown_pct   ((min  14.5)         (max  21.0)))
+   (avg_holding_days   ((min  42.0)         (max  55.0)))
+   (open_positions_value ((min 2600000.0)   (max 3600000.0)))
+   (sortino_ratio_annualized ((min  0.88)   (max   1.18)))
+   (calmar_ratio       ((min   0.37)        (max   0.52)))
+   (ulcer_index        ((min   6.00)        (max   8.50)))
+   (wall_seconds       ((min 300.0)         (max 3600.0))))))
