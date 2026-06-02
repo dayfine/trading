@@ -12,6 +12,7 @@ list). Generated file — edit the source memories, not this directory.
 
 ## Index
 
+- [`project_barbell_on_stocks.md`](./project_barbell_on_stocks.md) — Barbell (SPY-timing floor + Cell-E stock-selection engine) NAV blend dominates both standalone legs on Calmar in BOTH regimes; 70/30 regime-robust. Resolves the 918%-vs-drawdown tension.
 - [`project_bayesian_int_knob_crash.md`](./project_bayesian_int_knob_crash.md) — 11-knob BO sweep crashes int_of_sexp because cell_to_overrides emits raw %.17g floats for int-typed knobs. P3 BLOCKED until per-knob round added.
 - [`project_bayesian_sweep_checkpoint_needed.md`](./project_bayesian_sweep_checkpoint_needed.md) — V2 sweep lost ~5h of work to power-loss-induced restart (2026-05-20). User flagged checkpointing as a needed improvement for future frequent sweeps.
 - [`project_broad_universe_semantics.md`](./project_broad_universe_semantics.md) — Broad backtest universes (data/sectors.csv, ~10k symbols) should NOT pre-filter by bar coverage; the runner skips per-symbol when no bars exist.
