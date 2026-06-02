@@ -142,10 +142,32 @@ series combined; `/tmp/blend.awk`, 50/50 daily-rebalanced).
 This validates the whole layer story: **DD floor (SPY core) + return engine (gate-ON
 sector-k3) compose into a strategy with the floor's risk profile and the engine's return.**
 
+### Weight sweep — the optimum is ~70/30, and it's an interior optimum
+Swept the core (SPY) weight from 100% to 0% (continuously-rebalanced):
+
+| core/sat | Bull Calmar | Bull MaxDD | Bull ret | Deep Calmar | Deep MaxDD | Deep ret |
+|---|--:|--:|--:|--:|--:|--:|
+| 100/0 (pure SPY) | 0.467 | 18.8% | 322% | **0.337** | 18.8% | 420% |
+| **70/30** | **0.488** | **18.4%** | 336% | 0.334 | 20.1% | 474% |
+| 60/40 | 0.472 | 19.1% | 339% | 0.323 | 21.1% | 489% |
+| 50/50 | 0.457 | 19.8% | 341% | 0.312 | 22.2% | 503% |
+| 0/100 (pure sector) | 0.385 | 23.4% | 339% | 0.253 | 28.6% | 551% |
+
+- **Bull: 70/30 is an interior optimum that STRICTLY DOMINATES pure SPY-only** — higher
+  Calmar (0.488 > 0.467), *lower* MaxDD (18.4% < 18.8%), *higher* return (336% > 322%). A
+  genuine diversification free-lunch: a 30% sector sleeve makes every metric better. This
+  is only possible because the two sleeves' drawdowns are low/negatively correlated.
+- **Deep: Calmar peaks at pure SPY (0.337); 70/30 matches it (0.334) while adding +54pp
+  return** (474% vs 420%) for only +1.3pp DD. Adding satellite past ~30% trades Calmar for
+  return monotonically.
+- **→ 70/30 SPY-core / sector-satellite is the robust pick:** a strict improvement over the
+  SPY-only champion in the bull regime, near-free added return in the deep regime. It is
+  the best risk-adjusted configuration found in this whole study.
+
 **Caveat:** continuously-rebalanced daily is an idealized upper bound (frictionless, no
-rebalance cost). A real module would rebalance monthly/quarterly and capture most—not
-all—of the benefit. The blend also assumes 50/50 fixed capital; a tuned weight (e.g.
-60/40 core/satellite) is an open knob.
+rebalance cost; the diversification free-lunch shrinks with rebalance friction/latency). A
+real module rebalances monthly/quarterly. The 70/30 optimum should be re-confirmed at a
+realistic cadence + with a different-universe cell before promotion.
 
 ### → NEXT (supervised build): two-sleeve meta-strategy module
 The blend is post-hoc; a live/backtestable version needs a **meta-strategy that runs both
