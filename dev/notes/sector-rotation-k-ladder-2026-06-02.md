@@ -79,22 +79,47 @@ trender; no single rotating sector is. Do not revive K=1 sector rotation.
 The two are **complementary layers, not competitors**: SPY-only = DD floor; sector
 k=3 = return/breadth. Neither dominates the other on all axes.
 
-## Next step — re-add the macro gate as the DD layer on top of selection
+## Macro-gate result (#1422) — TESTED, and it works in both regimes
 
-The macro gate was *deliberately stripped* to isolate selection. The data now says
-the gate is exactly the missing piece: sector k=3's only weakness vs SPY-only is the
-28-32% drawdown it eats in bears. The Weinstein-faithful fix is to **block new sector
-entries (and/or force flat) when SPY itself is Stage-4** — the macro gate this testbed
-omitted. Hypothesis: a SPY-Stage-gated sector-k3 cuts the 32% deep-window DD back
-toward the 18.8% SPY-only floor while keeping most of the selection return. That is
-the next rung — one knob (macro gate on/off) on the already-built sector-k3, run on
-the same bull+deep grid. (It is a config dial, default-off, per
-`experiment-flag-discipline.md`; promote only on a grid-robust ACCEPT per
-`promotion-confirmation.md`.)
+The macro gate (`enable_macro_gate`, default-off dial added in #1422) re-adds Weinstein
+spine item 6: on any Friday where **SPY itself is in Stage 4**, no new sector entries
+open and every held sector is force-flat. Ran it on sector-k3, both windows:
 
-A second, orthogonal idea: a **SPY-core + sector-satellite barbell** (e.g. 50% SPY-only
-floor + 50% sector-k3 engine) — combines the DD floor with the return engine
-mechanically rather than via the gate. Cheaper to reason about; worth a quick test.
+| sector-k3 | Return | Sharpe | MaxDD | Calmar | win/loss |
+|---|--:|--:|--:|--:|--:|
+| Bull gate-off | 440% | 0.74 | 28.3% | 0.36 | 1.53× |
+| **Bull gate-ON** | 367% | 0.72 | **23.4%** | **0.40** | 1.59× |
+| Deep gate-off | 528% | 0.56 | 32.3% | 0.23 | 1.55× |
+| **Deep gate-ON** | 548% | 0.61 | **28.6%** | **0.26** | 1.64× |
+
+- **Cuts MaxDD in both windows** (bull −4.9pp → 23.4%, deep −3.7pp → 28.6%) and **raises
+  Calmar in both** (0.36→0.40, 0.23→0.26). Per-trade asymmetry improves slightly too
+  (1.5→1.6×).
+- **Deep window: a strict Pareto win** — *more* return (548>528), *less* DD (28.6<32.3),
+  *higher* Sharpe (0.61>0.56). Bull: trades ~73pp return for the DD cut, net Calmar up.
+- **It improves BOTH windows consistently** — the signature of a real effect, unlike the
+  three rejected mechanisms (continuation / early-admission / hysteresis), each of which
+  won one window and lost another. This is a strong ACCEPT candidate.
+- **But it does NOT close the gap to the SPY floor (18.8%).** The gate narrows the excess
+  DD by ~⅓-½, not all of it: sectors stay more volatile than the index because the gate
+  only fires once SPY has *already* rolled to Stage 4 — sectors still draw down in the
+  lead-in lag and within Stage-2/3 chop the index smooths over. Selection-volatility is
+  intrinsic; the gate caps the tail, it doesn't erase the body.
+
+**Promotion status:** this is 2 windows on ONE universe — not yet the ≥3-context grid
+(`promotion-confirmation.md`) needed to flip a default. (The module is a testbed with no
+production default to flip, so nothing is gated on it shipping.) Recommendation: **keep
+the gate as a faithful dial and treat gate-ON as the preferred sector config** (Calmar
+0.40 bull / 0.26 deep, the best sector numbers found); add a different-universe grid cell
+before any cross-strategy promotion.
+
+## Next step — SPY-core + sector-satellite barbell
+The gate caps the tail but can't reach the 18.8% floor, because the floor comes from
+*being the index*, not from timing it. The remaining idea combines the two layers
+mechanically: a **SPY-core + sector-satellite barbell** (e.g. 50% SPY-only floor + 50%
+gate-ON sector-k3 engine). The SPY core supplies the structural 18.8%-DD smoothness the
+gate can't synthesise; the sector sleeve supplies the breadth/return. Cheap to test as a
+two-strategy blend on the same bull+deep grid.
 
 ## Repro
 Scenarios committed on main (#1419): `test_data/backtest_scenarios/sector-rotation-k{1,3,4}.sexp`
