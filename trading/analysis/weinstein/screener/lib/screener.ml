@@ -45,6 +45,7 @@ type config = {
   max_short_candidates : int;
   cascade_post_stop_cooldown_weeks : int; [@sexp.default 0]
   neutral_blocks_longs : bool; [@sexp.default false]
+  min_price : float; [@sexp.default 0.0]
 }
 [@@deriving sexp]
 
@@ -61,6 +62,7 @@ let default_config =
     max_short_candidates = 10;
     cascade_post_stop_cooldown_weeks = 0;
     neutral_blocks_longs = false;
+    min_price = 0.0;
   }
 
 type scored_candidate = {
@@ -159,10 +161,13 @@ let _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
       (_build_candidate ~params ~sector ~a ~score ~reasons ~thresholds ~is_short)
 
 (** Evaluate one (analysis, sector) pair as a long candidate. Returns [None] if
-    excluded by the sector gate, breakout test, volume band, or score floor. *)
+    excluded by the price floor, sector gate, breakout test, volume band, or
+    score floor. *)
 let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range (a, sector) =
-  if equal_sector_rating sector.rating Weak then None
+    ~max_score_override ~volume_ratio_exclude_range ~min_price (a, sector) =
+  if not (passes_price_floor ~min_price ~price:a.Stock_analysis.breakout_price)
+  then None
+  else if equal_sector_rating sector.rating Weak then None
   else if not (Stock_analysis.is_breakout_candidate a) then None
   else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then None
   else
@@ -172,8 +177,10 @@ let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
 (** Evaluate one (analysis, sector) pair as a short candidate. Bearish/Neutral
     only: score must pass {!Screener_admission.passes_score_floor}. *)
 let _short_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range (a, sector) =
-  if equal_sector_rating sector.rating Strong then None
+    ~max_score_override ~volume_ratio_exclude_range ~min_price (a, sector) =
+  if not (passes_price_floor ~min_price ~price:a.Stock_analysis.breakdown_price)
+  then None
+  else if equal_sector_rating sector.rating Strong then None
   else if not (Stock_analysis.is_breakdown_candidate a) then None
   else if rs_blocks_short a.Stock_analysis.rs then None
   else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then None
@@ -242,26 +249,29 @@ let _longs_admitted_by_macro ~neutral_blocks_longs macro_trend =
 
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~max_buy_candidates
-    ~neutral_blocks_longs ~candidates ~macro_trend : scored_candidate list =
+    ~max_score_override ~volume_ratio_exclude_range ~min_price
+    ~max_buy_candidates ~neutral_blocks_longs ~candidates ~macro_trend :
+    scored_candidate list =
   if not (_longs_admitted_by_macro ~neutral_blocks_longs macro_trend) then []
   else
     let candidate_fn =
       _long_candidate ~weights ~thresholds ~params ~min_grade
         ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+        ~min_price
     in
     _filter_and_cap ~candidate_fn ~max_n:max_buy_candidates candidates
 
 (** Filter, score, grade, sort, and cap short candidates. *)
 let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~max_short_candidates
-    ~candidates ~macro_trend : scored_candidate list =
+    ~max_score_override ~volume_ratio_exclude_range ~min_price
+    ~max_short_candidates ~candidates ~macro_trend : scored_candidate list =
   match macro_trend with
   | Bullish -> []
   | Bearish | Neutral ->
       let candidate_fn =
         _short_candidate ~weights ~thresholds ~params ~min_grade
           ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+          ~min_price
       in
       _filter_and_cap ~candidate_fn ~max_n:max_short_candidates candidates
 
@@ -293,17 +303,17 @@ let _resolve_sector ~sector_map ticker =
     [screen] so the latter stays within the 50-line linter cap. *)
 let _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade
     ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-    ~total_stocks ~candidates_after_held ~macro_trend ~candidates
+    ~min_price ~total_stocks ~candidates_after_held ~macro_trend ~candidates
     ~buy_candidates ~short_candidates =
   let long_phases =
     count_long_phases ~weights ~thresholds:grade_thresholds ~min_grade
       ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-      ~candidates
+      ~min_price ~candidates
   in
   let short_phases =
     count_short_phases ~weights ~thresholds:grade_thresholds ~min_grade
       ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-      ~candidates
+      ~min_price ~candidates
   in
   Screener_cascade_diagnostics.build ~total_stocks ~candidates_after_held
     ~macro_trend ~long_phases ~short_phases
@@ -344,7 +354,7 @@ let _evaluate_candidates ~config ~candidates ~macro_trend =
       ~min_score_override:config.min_score_override
       ~max_score_override:config.max_score_override
       ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
-      ~max_buy_candidates:config.max_buy_candidates
+      ~min_price:config.min_price ~max_buy_candidates:config.max_buy_candidates
       ~neutral_blocks_longs:config.neutral_blocks_longs ~candidates ~macro_trend
   in
   let short_candidates =
@@ -353,6 +363,7 @@ let _evaluate_candidates ~config ~candidates ~macro_trend =
       ~min_score_override:config.min_score_override
       ~max_score_override:config.max_score_override
       ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
+      ~min_price:config.min_price
       ~max_short_candidates:config.max_short_candidates ~candidates ~macro_trend
   in
   (buy_candidates, short_candidates)
@@ -386,8 +397,8 @@ let _screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~cooldown_set
         ~min_score_override:config.min_score_override
         ~max_score_override:config.max_score_override
         ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
-        ~total_stocks ~candidates_after_held ~macro_trend ~candidates
-        ~buy_candidates ~short_candidates;
+        ~min_price:config.min_price ~total_stocks ~candidates_after_held
+        ~macro_trend ~candidates ~buy_candidates ~short_candidates;
   }
 
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =

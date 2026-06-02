@@ -175,6 +175,25 @@ type config = {
           diagnosis). Mirrored from the top-level
           [Weinstein_strategy.config.neutral_blocks_longs] field so the flag is
           a [Variant_matrix] axis. *)
+  min_price : float; [@sexp.default 0.0]
+      (** Minimum candidate price to admit — a liquidity floor. [0.0] (default)
+          = no floor, bit-identical to pre-floor behaviour. A positive value
+          excludes candidates whose setup price ([breakout_price] for longs,
+          [breakdown_price] for shorts) is below it, or whose setup price is
+          unknown (liquidity can't be verified). Applies symmetrically to long
+          and short candidates.
+
+          Faithful screener filter: Weinstein trades liquid leaders, not penny /
+          thin names (weinstein-book-reference.md §4.2 Volume Confirmation —
+          "never trust a breakout that isn't accompanied by a significant
+          increase in volume"). The intent is to keep broad-universe backtests
+          honest by excluding un-fillable sub-$1 names; typical settings are 1.0
+          / 5.0 / 10.0.
+
+          Default-off liquidity dial reachable from the scenario/strategy
+          override path via [((screening_config ((min_price 5.0))))] — see
+          [Weinstein_strategy.config.screening_config]. Not wired into any
+          default config or the automated tuner sweep surface. *)
 }
 [@@deriving sexp]
 (** Main screener configuration. *)

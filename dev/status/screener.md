@@ -1,9 +1,11 @@
 # Status: screener
 
-## Last updated: 2026-06-01
+## Last updated: 2026-06-02
 
 ## Status
 MERGED
+
+**2026-06-02**: `feat(screener): min_price liquidity floor (default-off)` (branch `feat/screener-min-price`, PR #1428, OPEN) — adds `Screener.config.min_price : float [@sexp.default 0.0]`, a default-off liquidity floor that excludes penny / illiquid names from buy and short candidates (faithful screener filter; Weinstein trades liquid leaders — book §4.2). `0.0` = no floor, bit-identical to pre-floor behaviour; positive values (1/5/10) exclude candidates whose setup price (`breakout_price` longs / `breakdown_price` shorts) is below the floor or unknown. Gate helper `Screener_admission.passes_price_floor` (kept out of the already-large `screener.ml`); threaded through `_long_candidate`/`_short_candidate`/`_evaluate_*`/`screen`/`screen_with_cooldown` mirroring `min_score_override`, folds into the breakout/breakdown diagnostics phase. Reachable from the scenario/strategy override path via `((screening_config ((min_price 5.0))))` (two deep-merge tests in `test_runner_hypothesis_overrides.ml`). 6 new `test_screener.ml` cases (no-op / floor-rejects-below / short-side / missing-price). Note: brief assumed a `Stock_analysis.t.get_high` accessor that doesn't exist on main — gated on the `float option` setup price instead (matches the `None`-rejection semantics). **Follow-up:** wire `min_price` into the automated tuner sweep surface (`grid_search` / `bayesian_runner_spec`).
 
 **2026-06-01**: `feat(weinstein): neutral_blocks_longs default-off entry-gate axis` (branch `feat/neutral-blocks-longs-axis`, OPEN) — lever #2 of the Cell E 2020-2026 stall diagnosis. Adds `Screener.config.neutral_blocks_longs : bool [@sexp.default false]` plus a mirrored top-level `Weinstein_strategy.config.neutral_blocks_longs` field threaded into `screening_config` at screen time. When `true`, a macro-`Neutral` tape blocks new long candidates exactly as `Bearish` does (only `Bullish` admits longs); default `false` preserves the historical gate bit-equally. The short-side gate is unaffected. A *tightening* of Weinstein's unconditional macro gate (a faithful dial, spine intact). Default-off axis per `.claude/rules/experiment-flag-discipline.md` — proven `Variant_matrix`-expressible (`(flag neutral_blocks_longs)`) by `test_variant_matrix.ml`. No default flipped; no golden config_overrides touched. Tests: bit-identical-when-off + flag-on-blocks-Neutral + Bullish-unaffected + short-side-unchanged in `test_screener_e2e.ml`.
 

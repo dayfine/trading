@@ -36,6 +36,14 @@ val passes_volume_band :
     half-open interval from [low] (inclusive) to [high] (exclusive). Candidates
     without a [volume] result pass through. *)
 
+val passes_price_floor : min_price:float -> price:float option -> bool
+(** Liquidity floor (Weinstein trades liquid leaders — book §4.2 Volume
+    Confirmation). [true] iff the floor is disabled ([min_price <= 0.0], the
+    default no-op) or [price] is known and at/above [min_price]. A [None] price
+    is REJECTED under a positive floor (liquidity can't be verified) and
+    admitted when the floor is [0.0]. Callers pass the candidate's setup price —
+    [breakout_price] for longs, [breakdown_price] for shorts. *)
+
 val rs_blocks_short : Rs.result option -> bool
 (** Hard gate per Weinstein Ch. 11: never short a stock with strong relative
     strength, even if it breaks down. Returns [true] for candidates whose RS
@@ -50,11 +58,13 @@ val count_long_phases :
   min_score_override:int option ->
   max_score_override:int option ->
   volume_ratio_exclude_range:volume_ratio_band option ->
+  min_price:float ->
   candidates:(Stock_analysis.t * sector_context) list ->
   int * int * int
 (** Long-side cascade-phase counts [(breakout, sector, grade)] for the
     diagnostics record. Each phase short-circuits (a [false] earlier phase keeps
-    later phases [false]) so the triple is monotone non-increasing. *)
+    later phases [false]) so the triple is monotone non-increasing. The
+    [min_price] liquidity floor folds into the breakout phase. *)
 
 val count_short_phases :
   weights:scoring_weights ->
@@ -63,8 +73,9 @@ val count_short_phases :
   min_score_override:int option ->
   max_score_override:int option ->
   volume_ratio_exclude_range:volume_ratio_band option ->
+  min_price:float ->
   candidates:(Stock_analysis.t * sector_context) list ->
   int * int * int * int
 (** Short-side cascade-phase counts [(breakdown, sector, rs, grade)] mirroring
     {!count_long_phases}, with the RS hard gate inserted between sector and
-    grade. *)
+    grade. The [min_price] liquidity floor folds into the breakdown phase. *)
