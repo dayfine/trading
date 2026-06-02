@@ -113,13 +113,56 @@ the gate as a faithful dial and treat gate-ON as the preferred sector config** (
 0.40 bull / 0.26 deep, the best sector numbers found); add a different-universe grid cell
 before any cross-strategy promotion.
 
-## Next step — SPY-core + sector-satellite barbell
-The gate caps the tail but can't reach the 18.8% floor, because the floor comes from
-*being the index*, not from timing it. The remaining idea combines the two layers
-mechanically: a **SPY-core + sector-satellite barbell** (e.g. 50% SPY-only floor + 50%
-gate-ON sector-k3 engine). The SPY core supplies the structural 18.8%-DD smoothness the
-gate can't synthesise; the sector sleeve supplies the breadth/return. Cheap to test as a
-two-strategy blend on the same bull+deep grid.
+## SPY-core + sector-satellite barbell — TESTED (blend analysis), THESIS CONFIRMED
+The gate caps the tail but can't reach the 18.8% floor (the floor comes from *being* the
+index, not timing it). Tested the mechanical combination: a **50/50 continuously-
+rebalanced blend** of the SPY-only floor + the gate-ON sector-k3 engine, by blending their
+daily equity curves (no new module — the two sleeves were run separately and their NAV
+series combined; `/tmp/blend.awk`, 50/50 daily-rebalanced).
+
+| | Return | MaxDD | CAGR | Calmar | Sharpe |
+|---|--:|--:|--:|--:|--:|
+| **Bull** SPY-only | 322% | **18.8%** | 8.8% | 0.47 | |
+| Bull sector-k3 (gate-on) | 339% | 23.4% | 9.0% | 0.38 | |
+| **Bull BLEND 50/50** | **341%** | **19.8%** | 9.0% | **0.46** | 0.81 |
+| **Deep** SPY-only | 420% | **18.8%** | 6.3% | 0.34 | |
+| Deep sector-k3 (gate-on) | 551% | 28.6% | 7.2% | 0.25 | |
+| **Deep BLEND 50/50** | **503%** | **22.2%** | 6.9% | **0.31** | 0.67 |
+
+**The barbell is the best of both layers, regime-robustly:**
+- It keeps ~the sector engine's **return** (bull 341% ≥ *both* sleeves via the rebalancing
+  bonus of two low-correlation sleeves; deep 503%, capturing ~64% of the SPY→sector return
+  uplift) while pulling **MaxDD most of the way back to the floor** (bull 23.4→**19.8%**,
+  deep 28.6→**22.2%**).
+- **Blend Calmar ≈ the SPY-only champion in both windows** (bull 0.46 vs 0.47; deep 0.31
+  vs 0.34) **and beats sector-k3 in both** (0.38 / 0.25). The diversification works because
+  the SPY core is defensive precisely when the sector sleeve chops — they don't draw down
+  together.
+
+This validates the whole layer story: **DD floor (SPY core) + return engine (gate-ON
+sector-k3) compose into a strategy with the floor's risk profile and the engine's return.**
+
+**Caveat:** continuously-rebalanced daily is an idealized upper bound (frictionless, no
+rebalance cost). A real module would rebalance monthly/quarterly and capture most—not
+all—of the benefit. The blend also assumes 50/50 fixed capital; a tuned weight (e.g.
+60/40 core/satellite) is an open knob.
+
+### → NEXT (supervised build): two-sleeve meta-strategy module
+The blend is post-hoc; a live/backtestable version needs a **meta-strategy that runs both
+sub-strategies on split capital**. The simulator runs ONE `STRATEGY` today, so this is a
+design-heavy change — left for a supervised session. Build-ready spec:
+- New `Barbell_strategy` (or `Blended_strategy`) implementing `STRATEGY`, parameterised by
+  a list of `(weight, sub_strategy_choice)` and a rebalance cadence. It instantiates each
+  sub-strategy with its slice of capital, routes `on_market_close` to each over a
+  Portfolio_view *partition*, and merges their transitions. The hard part is capital
+  partitioning + rebalancing across sub-portfolios within the existing single-portfolio
+  simulator — decide whether to (a) run two simulators and blend NAV (cheap, matches this
+  analysis, no intra-sleeve rebalance) or (b) a true shared-portfolio meta-strategy (real
+  rebalancing, more faithful, more work). Recommend (a) first as a `Scenario`-level
+  "blend" runner that post-processes two scenario NAVs — it reproduces this result exactly
+  and is far cheaper than (b).
+- Then sweep the core/satellite weight (50/50, 60/40, 40/60) on the bull+deep grid, and add
+  a different-universe cell for the macro-gate promotion grid.
 
 ## Repro
 Scenarios committed on main (#1419): `test_data/backtest_scenarios/sector-rotation-k{1,3,4}.sexp`

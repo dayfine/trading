@@ -81,11 +81,25 @@ buys + force flat. Ran on sector-k3, bull + deep:
   volatile. Promotion needs a different-universe grid cell (`promotion-confirmation.md`);
   testbed has no default to flip. Full result: `sector-rotation-k-ladder-2026-06-02.md`.
 
-#### → NEXT P0: SPY-core + sector-satellite barbell
-The gate caps the tail but can't reach the floor — the 18.8% floor comes from *being* the
-index, not timing it. Combine the layers mechanically: **50% SPY-only floor + 50% gate-ON
-sector-k3 engine**. SPY core supplies structural smoothness the gate can't synthesise;
-sector sleeve supplies breadth/return. Test as a two-strategy blend on the bull+deep grid.
+#### → barbell (SPY-core + sector-satellite) — ✅ TESTED (blend analysis), CONFIRMED
+50/50 continuously-rebalanced blend of SPY-only floor + gate-ON sector-k3 engine
+(post-hoc NAV blend, no module yet). **Best of both layers, both regimes:**
+- Keeps ~sector return (bull 341% ≥ both sleeves; deep 503%) while pulling MaxDD back
+  toward the floor (bull 23.4→**19.8%**, deep 28.6→**22.2%**). **Blend Calmar ≈ the
+  SPY-only champion** (bull 0.46 vs 0.47; deep 0.31 vs 0.34) **and beats sector-k3 both**.
+  The SPY core is defensive exactly when sectors chop → they don't draw down together.
+- Validates the layer story: DD-floor + return-engine **compose**. Full result +
+  build-ready module spec: `sector-rotation-k-ladder-2026-06-02.md` §barbell.
+- Caveat: continuously-rebalanced daily = idealized upper bound; real module rebalances
+  monthly/quarterly. 50/50 weight is an open knob (sweep 60/40, 40/60).
+
+#### → NEXT P0 (SUPERVISED build): two-sleeve meta-strategy module
+The blend is post-hoc. A live version needs a meta-strategy running both sub-strategies on
+split capital — the simulator runs ONE `STRATEGY` today, so it's design-heavy (left
+supervised). Recommended cheap path: a **`Scenario`-level blend runner** that post-processes
+two scenario NAVs 50/50 (reproduces this result exactly), before a true shared-portfolio
+meta-strategy. Then sweep core/satellite weight + add a different-universe cell for the
+macro-gate promotion grid. Spec in the k-ladder note §"NEXT (supervised build)".
 
 ### (superseded) original P0 brief · Sector-rotation long/flat (data ready, build it)
 - Universe: the 11 SPDR sector ETFs (`spdr-sectors-11.sexp`); deep bars fetched this
