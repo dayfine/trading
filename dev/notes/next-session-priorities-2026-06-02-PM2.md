@@ -69,14 +69,23 @@ deep (2000-2025, incl. dot-com + GFC)** — regime-robust attribution:
 - **Conclusion:** SPY-only (DD floor) and sector-k3 (return engine) are **complementary
   layers, not competitors.**
 
-#### → NEXT P0: re-add the macro gate as the DD layer on sector-k3
-The gate was stripped to isolate selection; the data says it's the missing piece.
-**Block sector entries / force flat when SPY itself is Stage-4.** Hypothesis: a
-SPY-Stage-gated sector-k3 cuts the 32% deep DD toward the 18.8% SPY floor while keeping
-most of the selection return. One knob (macro gate on/off) on the already-built
-sector-k3, same bull+deep grid; config dial default-off per `experiment-flag-discipline.md`,
-promote only on grid-robust ACCEPT (`promotion-confirmation.md`). Orthogonal cheap test:
-a **SPY-core + sector-satellite barbell** (50/50) combining floor + engine mechanically.
+#### → macro gate (#1422) — ✅ DONE, WORKS in both regimes
+Added `enable_macro_gate` (default-off dial): when SPY itself is Stage 4, block sector
+buys + force flat. Ran on sector-k3, bull + deep:
+- **Cuts MaxDD both windows** (bull 28.3→**23.4%**, deep 32.3→**28.6%**), **raises Calmar
+  both** (0.36→**0.40**, 0.23→**0.26**). Deep is a **strict Pareto win** (more return,
+  less DD, higher Sharpe). Improves BOTH windows consistently — a real effect, unlike the
+  3 rejected single-window mechanisms. Gate-ON k3 = best sector config found.
+- **Does NOT reach the 18.8% SPY floor** — narrows excess DD ~⅓-½, not all: the gate
+  fires only after SPY *already* rolled to Stage 4; sectors stay intrinsically more
+  volatile. Promotion needs a different-universe grid cell (`promotion-confirmation.md`);
+  testbed has no default to flip. Full result: `sector-rotation-k-ladder-2026-06-02.md`.
+
+#### → NEXT P0: SPY-core + sector-satellite barbell
+The gate caps the tail but can't reach the floor — the 18.8% floor comes from *being* the
+index, not timing it. Combine the layers mechanically: **50% SPY-only floor + 50% gate-ON
+sector-k3 engine**. SPY core supplies structural smoothness the gate can't synthesise;
+sector sleeve supplies breadth/return. Test as a two-strategy blend on the bull+deep grid.
 
 ### (superseded) original P0 brief · Sector-rotation long/flat (data ready, build it)
 - Universe: the 11 SPDR sector ETFs (`spdr-sectors-11.sexp`); deep bars fetched this
