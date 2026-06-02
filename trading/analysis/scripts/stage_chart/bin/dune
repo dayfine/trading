@@ -1,0 +1,16 @@
+(executable
+ (name stage_chart)
+ (libraries
+  core
+  core_unix
+  types
+  csv
+  indicators.time_period
+  weinstein.stage
+  weinstein.types
+  status
+  fpath
+  owl
+  owl-plplot)
+ (preprocess
+  (pps ppx_jane)))
