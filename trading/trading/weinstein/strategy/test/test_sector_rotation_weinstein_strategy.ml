@@ -153,6 +153,20 @@ let config_gate ~k ~symbols =
   Sector.config_with ~k ~ma_period_weeks:30 ~symbols ~benchmark_symbol:benchmark
     ~enable_macro_gate:true ()
 
+(* Same as [config_k] but with a per-sector concentration cap and an explicit
+   symbol→sector lookup (mirrors the runner's [ticker_sectors] map). *)
+let config_cap ~k ~symbols ~sector_cap ~sector_of =
+  Sector.config_with ~k ~ma_period_weeks:30 ~symbols ~benchmark_symbol:benchmark
+    ~sector_cap ~sector_of ()
+
+(* A fixture symbol→GICS-sector lookup matching [trading/test_data/sectors.csv]:
+   AAPL + MSFT share Information Technology; JPM is Financials. Any other symbol
+   maps to [None] (its own singleton sector — never capped). *)
+let fixture_sector_of = function
+  | "AAPL" | "MSFT" -> Some "Information Technology"
+  | "JPM" -> Some "Financials"
+  | _ -> None
+
 (* A benchmark (SPY) in Stage 4 — a steadily falling tape — used to fire the
    macro gate. Distinct from [spy_bars] (rising = Stage 2). *)
 let spy_stage4_bars =
@@ -515,6 +529,72 @@ let test_macro_gate_dormant_when_benchmark_not_stage4 _ =
   in
   assert_that (entered_symbols result) (equal_to [ "XLK" ])
 
+let test_universe_override_screens_given_symbols _ =
+  (* The strategy screens only the symbols its config names. AAPL (Stage 2, high
+     RS) and JPM (Stage 4) are present in the bar reader, but the config lists
+     ONLY AAPL, so JPM is never screened/entered even though MSFT (a stronger
+     Stage-2 name) is also present in the reader. Only AAPL is entered — proving
+     the configured universe, not the bar reader's full key set, drives
+     selection. This mirrors what the panel builder does when
+     [use_scenario_universe = true]: it points the strategy at the scenario's
+     symbols. *)
+  let aapl = stage2_bars ~slope:2.0 in
+  let msft = stage2_bars ~slope:3.0 in
+  (* strictly stronger than AAPL *)
+  let jpm = stage4_bars in
+  let bar_reader =
+    bar_reader_of
+      [ (benchmark, spy_bars); ("AAPL", aapl); ("MSFT", msft); ("JPM", jpm) ]
+  in
+  let strat =
+    Sector.make ~config:(config_k ~k:2 ~symbols:[ "AAPL" ]) ~bar_reader ()
+  in
+  let result =
+    run_once strat
+      ~today_bars:
+        [
+          ("AAPL", friday_bar aapl);
+          ("MSFT", friday_bar msft);
+          ("JPM", friday_bar jpm);
+        ]
+      ~portfolio:(make_portfolio ~cash:100_000.0 ())
+  in
+  assert_that (entered_symbols result) (equal_to [ "AAPL" ])
+
+let test_sector_cap_one_per_sector _ =
+  (* Three Stage-2 candidates: AAPL + MSFT both Information Technology, JPM
+     Financials. MSFT has the highest RS, then AAPL, then JPM. At k=3 the
+     uncapped selection would hold all three. With [sector_cap = Some 1], only
+     one Information-Technology name (MSFT, the higher RS of the two) is admitted
+     and the second IT name (AAPL) is skipped in favour of JPM (a different
+     sector) — so the held set is {MSFT, JPM}. *)
+  let msft = stage2_bars ~slope:3.0 in
+  let aapl = stage2_bars ~slope:2.0 in
+  let jpm = stage2_bars ~slope:1.0 in
+  let symbols = [ "AAPL"; "MSFT"; "JPM" ] in
+  let bar_reader =
+    bar_reader_of
+      [ (benchmark, spy_bars); ("AAPL", aapl); ("MSFT", msft); ("JPM", jpm) ]
+  in
+  let strat =
+    Sector.make
+      ~config:
+        (config_cap ~k:3 ~symbols ~sector_cap:(Some 1)
+           ~sector_of:fixture_sector_of)
+      ~bar_reader ()
+  in
+  let result =
+    run_once strat
+      ~today_bars:
+        [
+          ("AAPL", friday_bar aapl);
+          ("MSFT", friday_bar msft);
+          ("JPM", friday_bar jpm);
+        ]
+      ~portfolio:(make_portfolio ~cash:150_000.0 ())
+  in
+  assert_that (entered_symbols result) (equal_to [ "JPM"; "MSFT" ])
+
 let suite =
   "sector_rotation_weinstein_strategy"
   >::: [
@@ -533,6 +613,10 @@ let suite =
          >:: test_macro_gate_off_ignores_benchmark_stage;
          "macro gate dormant when benchmark not Stage4"
          >:: test_macro_gate_dormant_when_benchmark_not_stage4;
+         "universe override screens only configured symbols"
+         >:: test_universe_override_screens_given_symbols;
+         "sector cap limits one holding per sector"
+         >:: test_sector_cap_one_per_sector;
        ]
 
 let () = run_test_tt_main suite
