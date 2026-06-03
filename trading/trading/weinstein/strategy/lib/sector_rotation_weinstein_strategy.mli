@@ -95,6 +95,29 @@ type config = {
           §Macro Analysis) the bare testbed omits. A {e default-off dial} per
           [.claude/rules/experiment-flag-discipline.md] R1/R2: a config field,
           searchable as an axis, not wired on until a ledger ACCEPT (R3). *)
+  sector_cap : int option;
+      (** Optional per-GICS-sector concentration cap on the weekly rotation.
+          Default {!default_sector_cap} ([None] — no cap, bit-identical to the
+          uncapped selection). When [Some n], at most [n] held symbols may share
+          a GICS sector: walking the RS-ranked Stage-2 candidates top-down, a
+          candidate is skipped once its sector already has [n] picks. Sectors
+          are resolved via {!sector_of}; a symbol with no sector mapping is
+          treated as its own singleton sector and is never capped away.
+
+          This is a {e diversification constraint only} on which of the
+          already-qualified, RS-ranked Stage-2 names get filled — the Weinstein
+          spine is untouched (Stage-2-only entry per spine item 2, Stage 3/4
+          exit per item 4, RS-for-selection ordering per item 7). See
+          [.claude/rules/weinstein-faithful-core.md]. A {e default-off dial} per
+          [.claude/rules/experiment-flag-discipline.md] R1/R2: a config field,
+          searchable as an axis, not wired on until a ledger ACCEPT (R3). *)
+  sector_of : string -> string option;
+      (** Symbol -> GICS-sector lookup used by {!sector_cap}. Default
+          {!default_sector_of} ([fun _ -> None] — every symbol its own singleton
+          sector, so the cap is a no-op even if set with no map wired). The
+          backtest builder supplies the runner's loaded sector map; tests pass a
+          small fixture lookup. Not part of the sexp / equality surface (it is a
+          function), so [config] derives no sexp. *)
 }
 
 val name : string
@@ -118,26 +141,39 @@ val default_enable_macro_gate : bool
 (** [false] — the macro gate is off by default, keeping the strategy
     bit-identical to the ungated selection-only testbed. *)
 
+val default_sector_cap : int option
+(** [None] — no per-sector concentration cap by default, keeping selection
+    bit-identical to the uncapped top-[k]. *)
+
+val default_sector_of : string -> string option
+(** [fun _ -> None] — no symbol→sector mapping by default, so every symbol is
+    its own singleton sector and {!default_sector_cap} stays a no-op. *)
+
 val default_config : config
 (** [default_config] uses {!default_symbols}, {!default_benchmark_symbol},
     {!default_k}, {!Stage.default_config}, {!Weinstein_stops.default_config},
-    {!Rs.default_config}, {!default_fallback_stop_buffer}, and
-    {!default_enable_macro_gate}. *)
+    {!Rs.default_config}, {!default_fallback_stop_buffer},
+    {!default_enable_macro_gate}, {!default_sector_cap}, and
+    {!default_sector_of}. *)
 
 val config_with :
   ?symbols:string list ->
   ?benchmark_symbol:string ->
   ?enable_macro_gate:bool ->
+  ?sector_cap:int option ->
+  ?sector_of:(string -> string option) ->
   k:int ->
   ma_period_weeks:int ->
   unit ->
   config
-(** [config_with ?symbols ?benchmark_symbol ?enable_macro_gate ~k
-     ~ma_period_weeks ()] is {!default_config} with [k] holdings and the
-    stage-classifier moving-average period overridden to [ma_period_weeks] weeks
-    (and optionally a different tradable [symbols] list / [benchmark_symbol],
-    and the macro gate flipped on via [enable_macro_gate], default
-    {!default_enable_macro_gate} = [false]).
+(** [config_with ?symbols ?benchmark_symbol ?enable_macro_gate ?sector_cap
+     ?sector_of ~k ~ma_period_weeks ()] is {!default_config} with [k] holdings
+    and the stage-classifier moving-average period overridden to
+    [ma_period_weeks] weeks (and optionally a different tradable [symbols] list
+    / [benchmark_symbol], the macro gate flipped on via [enable_macro_gate]
+    (default {!default_enable_macro_gate} = [false]), a per-sector [sector_cap]
+    (default {!default_sector_cap} = [None]) resolved through [sector_of]
+    (default {!default_sector_of})).
 
     The MA period is the Weinstein-faithful dial distinguishing the investor
     preset ([30] weeks) from the trader preset ([10] weeks). Only

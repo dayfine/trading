@@ -21,6 +21,15 @@ let default_sector_rotation_ma_period_weeks = 30
    behaviour. *)
 let default_sector_rotation_enable_macro_gate = false
 
+(* Scenario-universe opt-in off by default: a scenario that omits
+   [use_scenario_universe] keeps the hardcoded 11-SPDR tradable list,
+   bit-identical to the pre-opt-in behaviour. *)
+let default_sector_rotation_use_scenario_universe = false
+
+(* No per-sector cap by default: a scenario that omits [sector_cap] gets the
+   uncapped top-k selection, bit-identical to the pre-cap behaviour. *)
+let default_sector_rotation_sector_cap = None
+
 type t =
   | Weinstein
   | Bah_benchmark of { symbol : string }
@@ -35,10 +44,26 @@ type t =
           [@sexp.default default_sector_rotation_ma_period_weeks]
       enable_macro_gate : bool;
           [@sexp.default default_sector_rotation_enable_macro_gate]
+      use_scenario_universe : bool;
+          [@sexp.default default_sector_rotation_use_scenario_universe]
+      sector_cap : int option; [@sexp.default default_sector_rotation_sector_cap]
     }
 [@@deriving sexp, eq, show]
 
 let default = Weinstein
+
+(* Render the sector-rotation label. Extracted from [name]'s match arm so the
+   arm stays a flat call (the inline conditionals pushed [name] over the nesting
+   limit); the flat sequential lets here keep this helper well under it. *)
+let _sector_rotation_label ~k ~ma_period_weeks ~enable_macro_gate
+    ~use_scenario_universe ~sector_cap =
+  let macro = if enable_macro_gate then ",macrogate" else "" in
+  let scenuniv = if use_scenario_universe then ",scenuniv" else "" in
+  let cap =
+    match sector_cap with Some n -> sprintf ",cap=%d" n | None -> ""
+  in
+  sprintf "Sector_rotation_weinstein(k=%d,ma=%dwk%s%s%s)" k ma_period_weeks
+    macro scenuniv cap
 
 let name = function
   | Weinstein -> "Weinstein"
@@ -46,6 +71,13 @@ let name = function
   | Spy_only_weinstein { symbol; ma_period_weeks; enable_stage4_short } ->
       sprintf "Spy_only_weinstein(%s,ma=%dwk%s)" symbol ma_period_weeks
         (if enable_stage4_short then ",short" else "")
-  | Sector_rotation_weinstein { k; ma_period_weeks; enable_macro_gate } ->
-      sprintf "Sector_rotation_weinstein(k=%d,ma=%dwk%s)" k ma_period_weeks
-        (if enable_macro_gate then ",macrogate" else "")
+  | Sector_rotation_weinstein
+      {
+        k;
+        ma_period_weeks;
+        enable_macro_gate;
+        use_scenario_universe;
+        sector_cap;
+      } ->
+      _sector_rotation_label ~k ~ma_period_weeks ~enable_macro_gate
+        ~use_scenario_universe ~sector_cap

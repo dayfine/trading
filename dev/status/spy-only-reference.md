@@ -1,6 +1,6 @@
 # Status: spy-only-reference
 
-## Last updated: 2026-06-01
+## Last updated: 2026-06-03
 
 ## Status
 IN_PROGRESS
@@ -61,6 +61,32 @@ return.
   ma_period_weeks }`; scenarios `sector-rotation-k{1,3,4}.sexp` over the
   new `spdr-sectors-11-plus-spy` universe. Backtest comparison vs
   spy-investor + Cell E is the NEXT step (not in this PR).
+- **Scenario-universe opt-in + per-sector cap dials** (PR
+  `feat/sector-rotation-universe-cap` — THIS PR). Two default-off dials
+  on the sector-rotation carrier, landing bit-identical (every existing
+  golden unchanged):
+  - `use_scenario_universe : bool` (on the `Sector_rotation_weinstein`
+    scenario variant, default `false`). When `true`, the panel builder
+    points the strategy at the scenario's own universe — the keys of the
+    runner's loaded `ticker_sectors` (every symbol with a snapshot),
+    excluding the benchmark, sorted deterministically — instead of the
+    hardcoded 11 SPDR sectors. This lets the carrier run on an arbitrary
+    universe (e.g. a PIT S&P 500 snapshot) for the few-feature comparison
+    vs the Cell-E production engine.
+  - `sector_cap : int option` (default `None`) + `sector_of` lookup on
+    the strategy `config`; `sector_cap` also on the scenario variant. A
+    per-GICS-sector concentration cap on the weekly rotation:
+    `Sector_rotation_signals.rank_top_k_capped` admits an RS-ranked
+    Stage-2 candidate only while total picks `< k` AND its sector holds
+    `< n` picks; an unmapped symbol is its own singleton sector (never
+    capped). `None` delegates to `rank_top_k` (bit-identical). The panel
+    builder builds `sector_of` from `ticker_sectors`.
+  Both are searchable config fields per
+  `.claude/rules/experiment-flag-discipline.md` (R1/R2); not wired on
+  until a ledger ACCEPT (R3). Spine untouched (cap is a diversification
+  constraint on already-qualified, RS-ranked Stage-2 names) per
+  `.claude/rules/weinstein-faithful-core.md`. Unit tests only — no
+  backtest run in this PR.
 
 ## Stage-4 short-leg result (report only — NOT promoted)
 
@@ -105,6 +131,14 @@ clean signal. No promotion; testbed-only per R3.
    direct test of whether RS-ranked sector rotation captures the
    breadth/selection lever in a faithful, minimal form. Then add a deep
    (1995-2025) companion run for macro-regime robustness.
+4. **Few-feature carrier comparison on stocks** (now plumbed, dials
+   default-off; maintainer's local experiment). With
+   `use_scenario_universe true`, run the sector-rotation carrier on a
+   PIT S&P 500 snapshot universe and compare K-sweep + `sector_cap`
+   {None, Some 2, Some 3} vs the Cell-E production engine. Promote a
+   `sector_cap` value only on a ledger ACCEPT + confirmation grid per
+   `.claude/rules/promotion-confirmation.md`; both dials stay default-off
+   until then.
 
 ## References
 
