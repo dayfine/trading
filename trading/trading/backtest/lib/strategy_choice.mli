@@ -67,6 +67,8 @@ type t =
       k : int; [@sexp.default 1]
       ma_period_weeks : int; [@sexp.default 30]
       enable_macro_gate : bool; [@sexp.default false]
+      use_scenario_universe : bool; [@sexp.default false]
+      sector_cap : int option; [@sexp.default None]
     }
       (** Sector-rotation Weinstein stage-timing reference strategy — the
           multi-symbol generalization of {!Spy_only_weinstein}. Constructs
@@ -92,9 +94,32 @@ type t =
           are blocked and held sectors are forced flat (Weinstein spine item 6,
           omitted from the bare testbed to isolate selection). Default-off keeps
           every pre-existing sector scenario bit-identical; it is a searchable
-          dial per [.claude/rules/experiment-flag-discipline.md]. The strategy
-          spine (Stage-2-only entry, Stage 3/4 exit, stop below base, RS for
-          selection) is untouched by all dials. *)
+          dial per [.claude/rules/experiment-flag-discipline.md].
+
+          [use_scenario_universe] ([@sexp.default false]) selects the tradable
+          universe. When [false] (default) the strategy trades the hardcoded 11
+          SPDR sector ETFs (its [default_symbols]), so every pre-existing sector
+          scenario is bit-identical. When [true] the panel builder instead
+          points the strategy at the scenario's own universe (the keys of the
+          runner's loaded [ticker_sectors], i.e. every symbol with a snapshot),
+          excluding the benchmark symbol so the never-trade-the-benchmark
+          invariant holds. This lets the sector-rotation carrier run on an
+          arbitrary scenario universe (e.g. a PIT S&P 500 snapshot) rather than
+          only the SPDR sectors.
+
+          [sector_cap] ([@sexp.default None]) is an optional per-GICS-sector
+          concentration cap on the weekly rotation. When [Some n], at most [n]
+          held symbols may share a GICS sector among the RS-ranked Stage-2 picks
+          (the builder supplies the symbol→sector lookup from the runner's
+          [ticker_sectors]; an unmapped symbol is its own singleton sector,
+          never capped). [None] (default) = uncapped top-[k], bit-identical. A
+          diversification constraint only — the spine ordering is untouched; a
+          searchable default-off dial per
+          [.claude/rules/experiment-flag-discipline.md] and faithful per
+          [.claude/rules/weinstein-faithful-core.md].
+
+          The strategy spine (Stage-2-only entry, Stage 3/4 exit, stop below
+          base, RS for selection) is untouched by all dials. *)
 [@@deriving sexp, eq, show]
 
 val default : t

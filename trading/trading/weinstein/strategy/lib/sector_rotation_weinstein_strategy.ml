@@ -13,6 +13,8 @@ type config = {
   rs_config : Rs.config;
   fallback_stop_buffer : float;
   enable_macro_gate : bool;
+  sector_cap : int option;
+  sector_of : string -> string option;
 }
 
 let name = "SectorRotationWeinstein"
@@ -28,6 +30,8 @@ let default_benchmark_symbol = "SPY"
 let default_k = 1
 let default_fallback_stop_buffer = 0.92
 let default_enable_macro_gate = false
+let default_sector_cap = None
+let default_sector_of : string -> string option = fun _ -> None
 
 let default_config =
   {
@@ -39,11 +43,15 @@ let default_config =
     rs_config = Rs.default_config;
     fallback_stop_buffer = default_fallback_stop_buffer;
     enable_macro_gate = default_enable_macro_gate;
+    sector_cap = default_sector_cap;
+    sector_of = default_sector_of;
   }
 
 let config_with ?(symbols = default_symbols)
     ?(benchmark_symbol = default_benchmark_symbol)
-    ?(enable_macro_gate = default_enable_macro_gate) ~k ~ma_period_weeks () =
+    ?(enable_macro_gate = default_enable_macro_gate)
+    ?(sector_cap = default_sector_cap) ?(sector_of = default_sector_of) ~k
+    ~ma_period_weeks () =
   {
     default_config with
     symbols;
@@ -52,6 +60,8 @@ let config_with ?(symbols = default_symbols)
     stage_config =
       { default_config.stage_config with ma_period = ma_period_weeks };
     enable_macro_gate;
+    sector_cap;
+    sector_of;
   }
 
 (* Number of weekly bars fed to [Stage.classify] / [Rs.analyze]: twice the MA
@@ -138,7 +148,8 @@ let _target_set ~config ~bar_reader ~prior_stage ~(as_of : Date.t) :
     List.filter_map config.symbols ~f:(fun symbol ->
         _candidate_for ~config ~bar_reader ~prior_stage ~symbol ~as_of)
   in
-  Sector_rotation_signals.rank_top_k ~candidates ~k:config.k
+  Sector_rotation_signals.rank_top_k_capped ~candidates ~k:config.k
+    ~sector_cap:config.sector_cap ~sector_of:config.sector_of
 
 let _is_stage4 (stage : Weinstein_types.stage) : bool =
   match stage with Weinstein_types.Stage4 _ -> true | _ -> false
