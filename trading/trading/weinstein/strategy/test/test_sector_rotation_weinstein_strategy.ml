@@ -595,6 +595,41 @@ let test_sector_cap_one_per_sector _ =
   in
   assert_that (entered_symbols result) (equal_to [ "JPM"; "MSFT" ])
 
+let test_sector_cap_unmapped_survives _ =
+  (* Three Stage-2 candidates: AAPL + MSFT both Information Technology, UNK
+     unmapped ([fixture_sector_of] returns [None]). RS ranks MSFT > UNK > AAPL.
+     With [sector_cap = Some 1] at k=3, the single IT slot is filled by MSFT
+     (higher RS), so AAPL is dropped. UNK is keyed as its own singleton sector
+     ("symbol:UNK"), so the IT cap never applies to it and it survives — the held
+     set is {MSFT, UNK}. Guards the [_sector_key]/[_admit] None arm: a regression
+     bucketing all unmapped symbols under one shared key would drop UNK here. *)
+  let msft = stage2_bars ~slope:3.0 in
+  let unk = stage2_bars ~slope:2.0 in
+  let aapl = stage2_bars ~slope:1.0 in
+  let symbols = [ "AAPL"; "MSFT"; "UNK" ] in
+  let bar_reader =
+    bar_reader_of
+      [ (benchmark, spy_bars); ("AAPL", aapl); ("MSFT", msft); ("UNK", unk) ]
+  in
+  let strat =
+    Sector.make
+      ~config:
+        (config_cap ~k:3 ~symbols ~sector_cap:(Some 1)
+           ~sector_of:fixture_sector_of)
+      ~bar_reader ()
+  in
+  let result =
+    run_once strat
+      ~today_bars:
+        [
+          ("AAPL", friday_bar aapl);
+          ("MSFT", friday_bar msft);
+          ("UNK", friday_bar unk);
+        ]
+      ~portfolio:(make_portfolio ~cash:150_000.0 ())
+  in
+  assert_that (entered_symbols result) (equal_to [ "MSFT"; "UNK" ])
+
 let suite =
   "sector_rotation_weinstein_strategy"
   >::: [
@@ -617,6 +652,8 @@ let suite =
          >:: test_universe_override_screens_given_symbols;
          "sector cap limits one holding per sector"
          >:: test_sector_cap_one_per_sector;
+         "sector cap: unmapped symbol survives as its own singleton sector"
+         >:: test_sector_cap_unmapped_survives;
        ]
 
 let () = run_test_tt_main suite
