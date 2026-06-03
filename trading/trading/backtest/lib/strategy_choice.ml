@@ -52,6 +52,19 @@ type t =
 
 let default = Weinstein
 
+(* Render the sector-rotation label. Extracted from [name]'s match arm so the
+   arm stays a flat call (the inline conditionals pushed [name] over the nesting
+   limit); the flat sequential lets here keep this helper well under it. *)
+let _sector_rotation_label ~k ~ma_period_weeks ~enable_macro_gate
+    ~use_scenario_universe ~sector_cap =
+  let macro = if enable_macro_gate then ",macrogate" else "" in
+  let scenuniv = if use_scenario_universe then ",scenuniv" else "" in
+  let cap =
+    match sector_cap with Some n -> sprintf ",cap=%d" n | None -> ""
+  in
+  sprintf "Sector_rotation_weinstein(k=%d,ma=%dwk%s%s%s)" k ma_period_weeks
+    macro scenuniv cap
+
 let name = function
   | Weinstein -> "Weinstein"
   | Bah_benchmark { symbol } -> sprintf "Bah_benchmark(%s)" symbol
@@ -66,7 +79,5 @@ let name = function
         use_scenario_universe;
         sector_cap;
       } ->
-      sprintf "Sector_rotation_weinstein(k=%d,ma=%dwk%s%s%s)" k ma_period_weeks
-        (if enable_macro_gate then ",macrogate" else "")
-        (if use_scenario_universe then ",scenuniv" else "")
-        (match sector_cap with Some n -> sprintf ",cap=%d" n | None -> "")
+      _sector_rotation_label ~k ~ma_period_weeks ~enable_macro_gate
+        ~use_scenario_universe ~sector_cap
