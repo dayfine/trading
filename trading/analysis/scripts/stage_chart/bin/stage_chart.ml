@@ -19,6 +19,40 @@ let stage_index = function
   | Stage3 _ -> 3
   | Stage4 _ -> 4
 
+let stage_label = function
+  | Weinstein_types.Stage1 _ -> "Stage1"
+  | Stage2 _ -> "Stage2"
+  | Stage3 _ -> "Stage3"
+  | Stage4 _ -> "Stage4"
+
+(* (weeks-in-stage, late-flag) for the lifecycle CSV sidecar. [late] is only
+   meaningful for Stage2 (the MA-deceleration top-warning); false elsewhere. *)
+let stage_detail = function
+  | Weinstein_types.Stage1 { weeks_in_base } -> (weeks_in_base, false)
+  | Stage2 { weeks_advancing; late } -> (weeks_advancing, late)
+  | Stage3 { weeks_topping } -> (weeks_topping, false)
+  | Stage4 { weeks_declining } -> (weeks_declining, false)
+
+(* Write a per-week classification CSV alongside the PNG: lets the lifecycle
+   sub-signals (weeks-in-stage, the Stage2 [late] MA-deceleration flag) be
+   inspected, since the chart only colours the four discrete stages. *)
+let emit_csv ~out ~arr ~stages ~mas =
+  let path = out ^ ".csv" in
+  let oc = Out_channel.create path in
+  Out_channel.output_string oc "week,date,close,ma,stage,weeks_in_stage,late\n";
+  Array.iteri arr ~f:(fun i b ->
+      let stage = stages.(i) in
+      let label = Option.value_map stage ~default:"-" ~f:stage_label in
+      let weeks, late =
+        Option.value_map stage ~default:(0, false) ~f:stage_detail
+      in
+      Out_channel.output_string oc
+        (sprintf "%d,%s,%.2f,%.2f,%s,%d,%b\n" i
+           (Date.to_string b.Types.Daily_price.date)
+           b.Types.Daily_price.adjusted_close mas.(i) label weeks late));
+  Out_channel.close oc;
+  printf "wrote %s\n" path
+
 let load_weekly ~data_dir ~symbol ~end_date =
   let result =
     let open Result.Let_syntax in
@@ -87,6 +121,7 @@ let () =
   let arr = Array.of_list weekly in
   let n = Array.length arr in
   let stages, mas = classify_series arr in
+  emit_csv ~out ~arr ~stages ~mas;
   Core_unix.putenv ~key:"QT_QPA_PLATFORM" ~data:"offscreen";
   let h = Plot.create out in
   Plot.set_output h out;
