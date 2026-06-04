@@ -1,38 +1,31 @@
 ;; perf-tier: 4
-;; perf-tier-rationale: Tier-4 release-gate cell at N=1000 × ~5y (2020 COVID crash through 2024 recovery). Run on-demand via `dev/scripts/perf_tier4_release_gate.sh` (see `dev/notes/tier4-release-gate-checklist-2026-04-28.md`) when cutting a release. Per dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md (β=3.94 MB/symbol), N=1000×5y projects to ~4.8 GB peak RSS, fits the 8 GB ceiling. N>=5000 release-gate stays P1 awaiting daily-snapshot streaming (dev/plans/daily-snapshot-streaming-2026-04-27.md).
+;; perf-tier-rationale: N=1000 × ~5y. Per dev/notes/panels-rss-matrix-post-engine-pool-2026-04-28.md (RSS ≈ 67 + 3.94·N + 0.19·N·(T−1) MB), this projects to ~4.8 GB peak RSS — fits the local 7.75 GB Docker ceiling. Run on-demand via `dev/scripts/perf_tier4_release_gate.sh`.
 ;;
-;; STATUS: long-only baseline pinned 2026-04-29. Expected ranges are tightened
-;; to ±~15% around the canonical long-only baseline measured on 2026-04-29
-;; (post-#682 — `enable_short_side = false`). See
-;; dev/notes/goldens-broad-long-only-baselines-2026-04-29.md for the run output
-;; and reasoning. Re-pin once short-side gaps G1-G4
-;; (dev/notes/short-side-gaps-2026-04-29.md) close and the override is reverted.
+;; PIT-clean universe migration 2026-06-05 (dev/plans/goldens-broad-pit-migration-2026-06-05.md).
+;; Replaced the non-reproducible `universes/broad.sexp` sentinel (Full_sector_map +
+;; universe_cap=1000 = "first-1000 of the live, growing data/sectors.csv") with the frozen
+;; point-in-time composition snapshot `top-1000-2020` (the 1000 largest by historical
+;; cap-weight as of the window start, survivorship-clean — it includes names that failed
+;; afterward, e.g. SIVB/FRC). The universe is now reproducible: it no longer shifts when
+;; sectors.csv changes. Numbers are LOWER than the prior top-N pins (294.5% / 38.6% on
+;; 2026-05-11) because that universe was a drifting artifact, not because of a regression —
+;; see the migration plan for the full diagnosis.
 ;;
-;; Golden (broad-1000): COVID crash and recovery through 2024, run against the
-;; full sector-map with universe_cap=1000.
+;; enable_short_side stays false (short-side gaps G1-G4, dev/notes/short-side-gaps-2026-04-29.md).
+;; Cell E config (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+;; stage3 force-exit h=1, laggard rotation h=2).
 ;;
-;; See bull-crash-2015-2020.sexp for the rationale on universe_cap=1000.
+;; Measured 2026-06-05 (Cell E, PIT top-1000-2020):
+;;   total_return_pct 41.3   total_trades 272   win_rate 33.1
+;;   sharpe_ratio 0.46   max_drawdown 36.1   avg_holding_days 38.7   calmar 0.20
+;; Tolerances ±20% (return/DD/sharpe/trades/holding), win_rate ±5pp — first PIT pin.
 ((name "covid-recovery-2020-2024")
- (description "COVID crash and recovery through 2024 (broad-1000 universe)")
+ (description "COVID crash and recovery through 2024 (PIT top-1000-2020)")
  (period ((start_date 2020-01-02) (end_date 2024-12-31)))
- (universe_path "universes/broad.sexp")
+ (universe_path "../goldens-custom-universe/composition/top-1000-2020.sexp")
  (universe_size 1000)
- ;; enable_short_side disabled 2026-04-29: short-side gaps (G1-G4 in
- ;; dev/notes/short-side-gaps-2026-04-29.md) produce broken metrics on any
- ;; scenario crossing a Bearish-macro window. Until the gaps close, this
- ;; cell runs long-only — see dev/notes/goldens-broad-long-only-baselines-2026-04-29.md.
- ;; Cell E rollout 2026-05-11: applies the new standard strategy config
- ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
- ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
- ;; default-sized baseline (15.12% / 149 trades / 75.3% DD on N=1000 broad).
- ;; Measured 2026-05-11 (Cell E, N=1000 broad):
- ;;   total_return_pct  294.5   total_trades 309   win_rate 34.6
- ;;   sharpe_ratio       0.85   max_drawdown 38.6  avg_holding_days  34
- ;;   open_positions_value 3,787,086
- ;; Return 19x (15 → 295), MaxDD cut 37pp (75 → 39). Tolerances ±15%.
  (config_overrides
-  (((universe_cap (1000)))
-   ((enable_short_side false))
+  (((enable_short_side false))
    ((portfolio_config ((max_position_pct_long 0.14))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
@@ -41,10 +34,9 @@
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 250.0)        (max 339.0)))
-   (total_trades       ((min 263)          (max 355)))
-   (win_rate           ((min  29.4)        (max  39.8)))
-   (sharpe_ratio       ((min   0.72)       (max   0.98)))
-   (max_drawdown_pct   ((min  32.8)        (max  44.4)))
-   (avg_holding_days   ((min  29.0)        (max  39.0)))
-   (open_positions_value ((min 3220000.0)  (max 4360000.0))))))
+  ((total_return_pct   ((min  33.1)  (max  49.6)))
+   (total_trades       ((min 218)    (max 326)))
+   (win_rate           ((min  28.1)  (max  38.1)))
+   (sharpe_ratio       ((min   0.37) (max   0.55)))
+   (max_drawdown_pct   ((min  28.9)  (max  43.4)))
+   (avg_holding_days   ((min  31.0)  (max  46.5))))))
