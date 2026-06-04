@@ -110,6 +110,45 @@ type config = {
           through the [Neutral]/[Bullish] bear-rally blips, contributing to the
           false-breakout stop-out churn. Default-off until an experiment-ledger
           ACCEPT (per [.claude/rules/experiment-flag-discipline.md]). *)
+  enable_late_stage2_stop_tighten : bool; [@sexp.default false]
+      (** Held-position risk dial (default-off): when [true], the
+          {!Late_stage2_stop_runner} tightens the trailing stop of every held
+          long whose current stage is [Stage2 { late = true }] (MA-slope
+          deceleration — the earliest top-warning the classifier produces, today
+          discarded for held positions). Default [false] preserves all existing
+          baselines: the runner is never invoked, so behaviour is bit-identical
+          to today regardless of [late_stage2_stop_buffer_pct].
+
+          This is the {b exit-aggressiveness} dial (the trader preset — "get out
+          as the Stage-3 top starts forming"), a faithful adaptation of
+          [docs/design/weinstein-book-reference.md] §Stage 3 detail (Ch. 2):
+          "Traders: exit with profits. Investors: sell half, protect remaining
+          half with tight sell-stop below support." The strategy {b spine} is
+          untouched — stage classification, the Stage-2-only buy rule,
+          breakout+volume entry, the macro/sector gate, and relative strength
+          are all unaffected; only the trailing stop of an existing held
+          position moves, and it is only ever raised (never lowered).
+
+          Wired as a real config field, so the flag is a single-component
+          [Variant_matrix] flag axis
+          ([((flag enable_late_stage2_stop_tighten) (values (true false)))]).
+
+          Motivation + cross-regime lead-time evidence:
+          [dev/notes/stage-lifecycle-pivot-diagnosis-2026-06-03.md] (the [late]
+          flag fired weeks-to-months before 6 of 7 major tops, while the Stage-4
+          exit lagged each top by 5-29 weeks). Default-off until a
+          confirmation-grid ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
+  late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
+      (** Buffer (fraction) below the current close at which
+          {!Late_stage2_stop_runner.update} raises the trailing stop on a held
+          [Stage2 { late }] long: the tightened candidate is
+          [close *. (1.0 -. late_stage2_stop_buffer_pct)]. Only consulted when
+          [enable_late_stage2_stop_tighten = true]. Default [0.0] is the no-op
+          buffer (and, because the runner is gated entirely by the flag, the
+          disabled path is byte-identical to baseline regardless of this value).
+          See {!Late_stage2_stop_runner}. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

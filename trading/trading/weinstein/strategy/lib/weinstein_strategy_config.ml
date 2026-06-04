@@ -85,6 +85,10 @@ type config = {
           [Bullish] admits longs); default [false] preserves the historical gate
           where both [Bullish] and [Neutral] admit longs. Threaded into
           [screening_config.neutral_blocks_longs] at screen time. See [.mli]. *)
+  enable_late_stage2_stop_tighten : bool; [@sexp.default false]
+      (** Master switch for the late-Stage-2 stop-tighten runner; see [.mli]. *)
+  late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
+      (** Buffer below close where the runner raises the stop; see [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -119,6 +123,8 @@ let default_config ~universe ~index_symbol =
     enable_pi_filter = false;
     margin_config = Trading_portfolio.Margin_config.default_config;
     neutral_blocks_longs = false;
+    enable_late_stage2_stop_tighten = false;
+    late_stage2_stop_buffer_pct = 0.0;
   }
 
 let name = "Weinstein"

@@ -77,6 +77,14 @@ module Stage3_force_exit = Stage3_force_exit
     {!Weinstein_strategy.config} can reference {!Stage3_force_exit.config} and
     {!Stage3_force_exit.default_config} without a separate library import. *)
 
+module Late_stage2_stop_runner = Late_stage2_stop_runner
+(** Late-Stage-2 trailing-stop tightening runner (P1 stage-accuracy dial).
+    Invoked on Friday ticks when
+    [config.enable_late_stage2_stop_tighten = true]: raises the trailing stop of
+    every held [Stage2 { late = true }] long. Emits [UpdateRiskParams] adjust
+    transitions (never exits). Default-off preserves all baselines. See
+    {!Late_stage2_stop_runner}. *)
+
 module Laggard_rotation_runner = Laggard_rotation_runner
 (** Laggard-rotation runner — capital recycling on the long side (issue #887).
     Invoked AFTER {!Stops_runner.update}, {!Force_liquidation_runner.update} and
@@ -355,6 +363,21 @@ type config = {
           [screening_config.neutral_blocks_longs] at screen time so it is a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
           semantics. *)
+  enable_late_stage2_stop_tighten : bool; [@sexp.default false]
+      (** Held-position risk dial (default-off): when [true], the
+          {!Late_stage2_stop_runner} tightens the trailing stop of every held
+          long whose current stage is [Stage2 { late = true }] on Friday ticks.
+          Default [false] preserves all baselines (the runner is never invoked).
+          The {b spine} is untouched — only an existing held long's trailing
+          stop moves, and only ever upward. [Variant_matrix] flag axis. See
+          [Weinstein_strategy_config] / {!Late_stage2_stop_runner} for full
+          semantics. *)
+  late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
+      (** Buffer (fraction) below the current close at which the late-Stage-2
+          tighten runner raises the trailing stop; the candidate stop is
+          [close *. (1.0 -. late_stage2_stop_buffer_pct)]. Only consulted when
+          [enable_late_stage2_stop_tighten = true]; default [0.0] is the no-op
+          buffer. See [Weinstein_strategy_config]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
