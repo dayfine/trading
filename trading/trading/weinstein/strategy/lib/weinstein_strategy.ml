@@ -11,6 +11,7 @@ module Stops_runner = Stops_runner
 module Stops_split_runner = Stops_split_runner
 module Force_liquidation_runner = Force_liquidation_runner
 module Stage3_force_exit_runner = Stage3_force_exit_runner
+module Late_stage2_stop_runner = Late_stage2_stop_runner
 module Laggard_rotation_runner = Laggard_rotation_runner
 module Stage3_force_exit = Stage3_force_exit
 module Laggard_rotation = Laggard_rotation
@@ -196,6 +197,23 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
     stage3_exited_ids,
     laggard_exited_ids )
 
+(** Run the late-Stage-2 trailing-stop tightening dial (P1 stage-accuracy). On
+    Friday ticks, when [config.enable_late_stage2_stop_tighten = true], raise
+    the trailing stop of every held [Stage2 { late = true }] long. Returns
+    [UpdateRiskParams] adjust transitions (never exits). The flag default-off
+    short-circuits to [[]], so the disabled path is bit-identical to baseline.
+    See {!Late_stage2_stop_runner}. *)
+let _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
+    ~index_view ~current_date =
+  if not config.enable_late_stage2_stop_tighten then []
+  else
+    let is_friday =
+      Weinstein_strategy_screening.is_screening_day_view index_view
+    in
+    Late_stage2_stop_runner.update
+      ~buffer_pct:config.late_stage2_stop_buffer_pct ~is_screening_day:is_friday
+      ~positions ~get_price ~prior_stages ~current_date
+
 let _run_macro_and_entries ~fold_start_date ~config ~ad_bars ~stop_states
     ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
     ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price
@@ -279,6 +297,10 @@ let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
       ~prior_stage_ma_values ~stage3_streaks ~laggard_streaks ~bar_reader
       ~index_view ~exit_transitions ~current_date
   in
+  let late_tighten_transitions =
+    _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
+      ~index_view ~current_date
+  in
   let entry_transitions =
     _run_macro_and_entries ~fold_start_date ~config ~ad_bars ~stop_states
       ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
@@ -286,7 +308,8 @@ let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
       ~portfolio ~current_date ~index_view ~audit_recorder
   in
   _assemble_output ~exit_transitions ~stage3_force_exit_transitions
-    ~laggard_rotation_transitions ~force_exit_transitions ~adjust_transitions
+    ~laggard_rotation_transitions ~force_exit_transitions
+    ~adjust_transitions:(adjust_transitions @ late_tighten_transitions)
     ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
 
 let _on_market_close ~fold_start_date ~config ~ad_bars ~stop_states
