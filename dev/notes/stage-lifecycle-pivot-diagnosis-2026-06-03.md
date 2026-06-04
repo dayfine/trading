@@ -86,6 +86,43 @@ size to the Stage-4 roll. Test:
   killing the 918% / 237% return?).
 - Promote only through the confirmation grid (`.claude/rules/promotion-confirmation.md`).
 
+## Single-name battery (where the 37% DD actually originates)
+
+The SPY battery is index-level; the production engine's drawdown comes from
+single-name rollovers. Same `stage_chart` lead-time analysis on 5 iconic
+single-name tops:
+
+| name | price peak | Stage-4 exit lag | price already | `late` fired pre-peak |
+|---|---|---|---|---|
+| CSCO 2000 | 2000-03-24 | +26 wk | −24% | 23 wk early |
+| INTC 2000 | 2000-09-01 | +4 wk | **−43.8%** | 19 wk early |
+| GE 2016 | 2016-07-15 | +11 wk | −9.2% | 26 wk early |
+| NKE 2021 | 2021-11-05 | +11 wk | −19.3% | 7 wk early |
+| AIG 2007 | 2007-06-01 | +8 wk | −10% | 18 wk early |
+
+**Single-name evidence is stronger than the index:** `late` fired before the
+peak in **all 5** (vs the 2020 *index* blow-off where it reset), and persisted to
+within 1–2 weeks of the top (INTC last-late 2 wk pre-peak; NKE 1 wk). So on
+individual names the discarded `late` signal is a reliable, persistent early
+warning — fired 18–49 weeks before the Stage-4 exit signal in every case. The
+INTC chart is the archetype: parabolic blow-off stays solid green into the peak,
+first red (Stage 4) only after −44%.
+
+Combined verdict (7 episodes: SPY ×2 informative + 5 single names): **6 of 7 had
+`late` warn before the peak; the lone miss (2020 index) was a vertical blow-off
+that only a daily/volatility guard catches.** Strong support for a `late`-driven
+held-exposure dial, paired with the existing daily gap stop for fast crashes.
+
+## Side-finding — possible split artifacts in the trade log (separate issue)
+
+The production-deep run's worst-$ "losses" cluster suspiciously on split dates:
+NKE −39.6% on a 203-day hold **ending exactly at its 2007-04 2:1 split**; ISRG
+−59.7% (Oct-2021 3:1 split); DISCA −51.7% **in 6 days**; EL −52.8%. These look
+like split-adjustment artifacts in `trades.csv` pnl, not genuine rollover
+give-backs. Worth a dedicated check — it would also pollute the per-symbol
+autopsy harness the `late`-exposure dial is meant to be tested against. Not
+chased here; flagged for follow-up.
+
 ## Tooling note
 
 `stage_chart` now emits a per-week CSV sidecar (`<out>.png.csv`:
