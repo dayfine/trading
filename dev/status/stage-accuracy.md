@@ -1,6 +1,6 @@
 # Status: stage-accuracy
 
-## Last updated: 2026-06-03
+## Last updated: 2026-06-04
 
 ## Status
 IN_PROGRESS
@@ -43,7 +43,11 @@ down 5-44%).
 
 ## In Progress
 
-- PR open: `feat/late-stage2-stop-tighten`. Awaiting CI + QC + merge.
+- **MERGED via #1446 (2026-06-04, squash `919e10a8`)** — `feat/late-stage2-stop-tighten`.
+  QC structural APPROVED q=5 (review 4426367035) + behavioral APPROVED q=5
+  (review 4426387423); all 3 merge gates green; auto-merged (Step 6.5).
+  Audit `dev/audit/2026-06-04-late-stage2-stop-tighten.json`. The confirmation
+  grid (Next Step 1) is the maintainer's separate local backtest experiment.
 
 ## Next Steps
 
