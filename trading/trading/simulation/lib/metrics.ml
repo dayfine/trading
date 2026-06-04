@@ -71,12 +71,39 @@ let _compute_pnl ~entry_side ~entry_price ~exit_price ~quantity =
   in
   (dollars, percent)
 
-let _make_trade_metric symbol entry_date entry exit_date exit =
+(** Cumulative split factor for events straddling a single hold — the product of
+    [factor] over all splits with [entry_date < split_date <= exit_date].
+
+    [Split_event.factor] is [new_shares /. old_shares] (2:1 → [2.0], 3:1 →
+    [3.0], reverse 1:5 → [0.2]), matching [Split_handler]'s live-position
+    scaling. A split on the entry date itself is excluded (the entry fill
+    already prints on that day's post-split basis); a split on the exit date is
+    included (the exit fill is post-split, so the entry leg must be carried
+    forward through it). *)
+let _cumulative_split_factor ~entry_date ~exit_date
+    (splits : Trading_portfolio.Split_event.t list) =
+  List.fold splits ~init:1.0
+    ~f:(fun acc (s : Trading_portfolio.Split_event.t) ->
+      if Date.( < ) entry_date s.date && Date.( <= ) s.date exit_date then
+        acc *. s.factor
+      else acc)
+
+let _make_trade_metric symbol entry_date entry exit_date exit splits =
   let open Trading_base.Types in
   let days_held = Date.diff exit_date entry_date in
+  (* Restate the entry leg onto the exit's (post-split) basis so pnl is computed
+     across one consistent share/price space. Dividing the entry price by — and
+     multiplying the entry quantity by — the cumulative factor leaves the
+     position's dollar exposure unchanged while making it directly comparable to
+     the post-split exit fill. The recorded [entry_price]/[quantity] are the
+     adjusted (post-split) values, consistent with [exit_price]. With no
+     straddling split the factor is [1.0] and the record is unchanged. *)
+  let factor = _cumulative_split_factor ~entry_date ~exit_date splits in
+  let entry_price = entry.price /. factor in
+  let quantity = entry.quantity *. factor in
   let pnl_dollars, pnl_percent =
-    _compute_pnl ~entry_side:entry.side ~entry_price:entry.price
-      ~exit_price:exit.price ~quantity:entry.quantity
+    _compute_pnl ~entry_side:entry.side ~entry_price ~exit_price:exit.price
+      ~quantity
   in
   {
     symbol;
@@ -84,9 +111,9 @@ let _make_trade_metric symbol entry_date entry exit_date exit =
     entry_date;
     exit_date;
     days_held;
-    entry_price = entry.price;
+    entry_price;
     exit_price = exit.price;
-    quantity = entry.quantity;
+    quantity;
     pnl_dollars;
     pnl_percent;
   }
@@ -104,19 +131,35 @@ let _is_paired_round_trip entry exit =
 
 (** Pair entry trades with subsequent close trades to form round-trips for a
     single symbol. Handles both Buy→Sell (long) and Sell→Buy (short) — see
-    {!_is_paired_round_trip}. *)
+    {!_is_paired_round_trip}. [splits] is the symbol's split events; each
+    round-trip is corrected for any split straddling its hold via
+    {!_make_trade_metric}. *)
 let _pair_trades_for_symbol symbol
-    (trades : (Date.t * Trading_base.Types.trade) list) : trade_metrics list =
+    (trades : (Date.t * Trading_base.Types.trade) list)
+    (splits : Trading_portfolio.Split_event.t list) : trade_metrics list =
   let rec pair_trades trades_list metrics =
     match trades_list with
     | (entry_date, entry) :: (exit_date, exit) :: rest
       when _is_paired_round_trip entry exit ->
-        let m = _make_trade_metric symbol entry_date entry exit_date exit in
+        let m =
+          _make_trade_metric symbol entry_date entry exit_date exit splits
+        in
         pair_trades rest (m :: metrics)
     | _ :: rest -> pair_trades rest metrics
     | [] -> List.rev metrics
   in
   pair_trades trades []
+
+(** Group the [splits_applied] across all steps by symbol. Split events are
+    detected on the split day and carried on each [step_result], so the trade
+    metrics can adjust split-straddling holds without re-deriving factors. *)
+let _splits_by_symbol (steps : Simulator_types.step_result list) :
+    Trading_portfolio.Split_event.t list String.Map.t =
+  List.concat_map steps ~f:(fun step -> step.splits_applied)
+  |> List.fold
+       ~init:(Map.empty (module String))
+       ~f:(fun acc (s : Trading_portfolio.Split_event.t) ->
+         Map.add_multi acc ~key:s.symbol ~data:s)
 
 let extract_round_trips (steps : Simulator_types.step_result list) :
     trade_metrics list =
@@ -124,6 +167,7 @@ let extract_round_trips (steps : Simulator_types.step_result list) :
     List.concat_map steps ~f:(fun step ->
         List.map step.trades ~f:(fun trade -> (step.date, trade)))
   in
+  let splits_by_symbol = _splits_by_symbol steps in
   let by_symbol =
     List.fold all_trades
       ~init:(Map.empty (module String))
@@ -136,7 +180,10 @@ let extract_round_trips (steps : Simulator_types.step_result list) :
       let sorted =
         List.sort trades ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2)
       in
-      _pair_trades_for_symbol symbol sorted @ acc)
+      let splits =
+        Map.find splits_by_symbol symbol |> Option.value ~default:[]
+      in
+      _pair_trades_for_symbol symbol sorted splits @ acc)
 
 let compute_summary (trades : trade_metrics list) : summary_stats option =
   match trades with

@@ -21,15 +21,26 @@ type trade_metrics = {
   entry_date : Date.t;  (** Date of entry — the open leg *)
   exit_date : Date.t;  (** Date of exit — the close leg *)
   days_held : int;  (** Number of days position was held *)
-  entry_price : float;  (** Price at entry — i.e. the open-leg fill price *)
+  entry_price : float;
+      (** Price at entry, restated onto the exit leg's split basis. With no
+          split straddling the hold this is the raw open-leg fill price; when ≥1
+          split occurs between entry and exit it is the open-leg fill divided by
+          the cumulative split factor, so it is directly comparable to
+          [exit_price]. *)
   exit_price : float;  (** Price at exit — i.e. the close-leg fill price *)
-  quantity : float;  (** Number of shares traded *)
+  quantity : float;
+      (** Number of shares traded, restated onto the exit leg's split basis (the
+          open-leg quantity multiplied by the cumulative straddling-split
+          factor). Equals the raw open-leg quantity when no split straddles the
+          hold. *)
   pnl_dollars : float;
-      (** Profit/loss in dollars. Long: [(exit − entry) × qty]. Short:
-          [(entry − exit) × qty] (positive when cover price < entry). *)
+      (** Profit/loss in dollars, on the split-consistent basis. Long:
+          [(exit − entry) × qty]. Short: [(entry − exit) × qty] (positive when
+          cover price < entry). *)
   pnl_percent : float;
-      (** Profit/loss as percentage of entry price. Mirrored direction so a
-          positive reading always means profit, regardless of long or short. *)
+      (** Profit/loss as percentage of (split-adjusted) entry price. Mirrored
+          direction so a positive reading always means profit, regardless of
+          long or short. *)
 }
 [@@deriving show, eq]
 (** Metrics for a completed round-trip trade.
@@ -71,6 +82,18 @@ val extract_round_trips :
     next opposite-side trade for the same symbol. A trailing entry trade with no
     matching close (e.g., an open position at the end of the simulation window)
     is dropped.
+
+    {b Split adjustment.} Entry and exit fills can sit on different price bases
+    when a stock split occurs mid-hold — the exit fill is post-split while the
+    raw entry fill is pre-split. To keep per-trade P&L meaningful, each
+    round-trip's entry leg is restated onto the exit's (post-split) basis using
+    the [splits_applied] carried on each step: [entry_price] is divided by, and
+    [quantity] multiplied by, the product of all split factors with
+    [entry_date < split_date <= exit_date]. Dollar exposure is preserved, so a
+    split-straddling winner is no longer mis-booked as a ~−50% loss. Holds with
+    no straddling split are unaffected. This corrects only the trade-level
+    metrics; portfolio NAV is already split-adjusted upstream by
+    [Split_handler].
 
     @param steps List of step results from simulator run
     @return List of trade metrics for completed round-trips *)

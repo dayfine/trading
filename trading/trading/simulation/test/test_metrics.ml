@@ -113,18 +113,25 @@ let _make_trade ~id ~symbol ~side ~quantity ~price =
 
 (** Wrap a list of trades in a single [step_result] on [date]. The portfolio +
     portfolio_value fields are placeholders — [extract_round_trips] only
-    consumes [step.trades] and [step.date]. *)
-let _step_with_trades ~date ~trades =
+    consumes [step.trades], [step.date], and [step.splits_applied]. [splits]
+    defaults to [[]] so the pre-existing tests stay focused on the trade legs.
+*)
+let _step_with_trades ?(splits = []) ~date ~trades () =
   {
     date;
     portfolio = Trading_simulation_types.Portfolio_summary.empty;
     portfolio_value = 10000.0;
     trades;
     orders_submitted = [];
-    splits_applied = [];
+    splits_applied = splits;
     benchmark_return = None;
     had_market_bars = true;
   }
+
+(** Build a split event for [symbol] on [date] with [factor = new/old] ([2.0]
+    for 2:1, [3.0] for 3:1, [0.2] for a 1:5 reverse split). *)
+let _split ~symbol ~date ~factor =
+  { Trading_portfolio.Split_event.symbol; date; factor }
 
 (** Long round-trip: Buy@100 → Sell@110, quantity 10, profit $100. Pins the
     pre-existing contract — this test must keep passing after the short-side
@@ -138,8 +145,8 @@ let test_extract_round_trips_long_pair _ =
   in
   let steps =
     [
-      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ buy ];
-      _step_with_trades ~date:(date_of_string "2024-01-12") ~trades:[ sell ];
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ buy ] ();
+      _step_with_trades ~date:(date_of_string "2024-01-12") ~trades:[ sell ] ();
     ]
   in
   let trips = extract_round_trips steps in
@@ -177,8 +184,8 @@ let test_extract_round_trips_short_pair_profit _ =
   in
   let steps =
     [
-      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ];
-      _step_with_trades ~date:(date_of_string "2024-01-09") ~trades:[ buy ];
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ] ();
+      _step_with_trades ~date:(date_of_string "2024-01-09") ~trades:[ buy ] ();
     ]
   in
   let trips = extract_round_trips steps in
@@ -220,8 +227,8 @@ let test_extract_round_trips_short_pair_loss _ =
   in
   let steps =
     [
-      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ];
-      _step_with_trades ~date:(date_of_string "2024-01-09") ~trades:[ buy ];
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ] ();
+      _step_with_trades ~date:(date_of_string "2024-01-09") ~trades:[ buy ] ();
     ]
   in
   let trips = extract_round_trips steps in
@@ -263,10 +270,10 @@ let test_extract_round_trips_long_and_short_mixed _ =
     [
       _step_with_trades
         ~date:(date_of_string "2024-01-02")
-        ~trades:[ long_buy; short_sell ];
+        ~trades:[ long_buy; short_sell ] ();
       _step_with_trades
         ~date:(date_of_string "2024-01-12")
-        ~trades:[ long_sell; short_buy ];
+        ~trades:[ long_sell; short_buy ] ();
     ]
   in
   let trips = extract_round_trips steps in
@@ -308,10 +315,238 @@ let test_extract_round_trips_unclosed_short_dropped _ =
     _make_trade ~id:"s1" ~symbol:"BEAR" ~side:Sell ~quantity:10.0 ~price:100.0
   in
   let steps =
-    [ _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ] ]
+    [
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ sell ] ();
+    ]
   in
   let trips = extract_round_trips steps in
   assert_that trips (size_is 0)
+
+(* ==================== Split-straddling adjustment Tests ==================== *)
+
+(** NKE shape from [dev/notes/split-artifact-trade-record-2026-06-03.md]: a long
+    held across a 2:1 split. Entry 5988 at 88.54 (pre-split), exit at 53.45
+    (post-split), with a 2:1 split between the two fills. Restating the entry
+    leg onto the post-split basis gives 11976 at 44.27, so the real result is
+    [(53.45 - 44.27) / 44.27 ~ +20.7%] -- NOT the [-39.6%] the raw mismatched
+    bases produce. Pins the bug fix. *)
+let test_extract_round_trips_long_across_2_for_1_split _ =
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"NKE" ~side:Buy ~quantity:5988.0 ~price:88.54
+  in
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"NKE" ~side:Sell ~quantity:11976.0 ~price:53.45
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2006-09-30") ~trades:[ buy ] ();
+      _step_with_trades
+        ~date:(date_of_string "2007-04-03")
+        ~trades:[]
+        ~splits:
+          [
+            _split ~symbol:"NKE" ~date:(date_of_string "2007-04-03") ~factor:2.0;
+          ]
+        ();
+      _step_with_trades ~date:(date_of_string "2007-04-21") ~trades:[ sell ] ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.symbol) (equal_to "NKE");
+             (* entry restated onto post-split basis: 88.54 / 2 = 44.27 *)
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 44.27);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 53.45);
+             (* quantity restated: 5988 * 2 = 11976 *)
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 11976.0);
+             (* (53.45 − 44.27) / 44.27 * 100 ≈ +20.736% — positive, not −39.6% *)
+             field
+               (fun (t : trade_metrics) -> t.pnl_percent)
+               (float_equal ~epsilon:0.01 20.736);
+             (* dollar exposure preserved: (53.45 − 44.27) * 11976 = +109,939.68 *)
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal ~epsilon:0.01 109939.68);
+           ];
+       ])
+
+(** No-split control: a Buy→Sell hold with a split event present for a
+    {e different} symbol on a non-overlapping basis must leave the metric
+    untouched (factor [1.0]). Guards against the adjustment firing when it
+    should not. *)
+let test_extract_round_trips_no_split_unchanged _ =
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"AAPL" ~side:Buy ~quantity:100.0 ~price:100.0
+  in
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"AAPL" ~side:Sell ~quantity:100.0 ~price:120.0
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ buy ] ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-08")
+        ~trades:[]
+        ~splits:
+          [
+            _split ~symbol:"MSFT"
+              ~date:(date_of_string "2024-01-08")
+              ~factor:2.0;
+          ]
+        ();
+      _step_with_trades ~date:(date_of_string "2024-01-12") ~trades:[ sell ] ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 120.0);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 100.0);
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal 2000.0);
+             field (fun (t : trade_metrics) -> t.pnl_percent) (float_equal 20.0);
+           ];
+       ])
+
+(** ISRG shape: a long held across a 3:1 split. Entry 1553 at 823.38
+    (pre-split), exit at 332.03 (post-split). Restated entry: 4659 at 274.46, so
+    the real result is [(332.03 - 274.46) / 274.46 ~ +20.98%] -- NOT the
+    [-59.7%] the raw bases produce. Exercises a factor other than 2 to confirm
+    the adjustment is general. *)
+let test_extract_round_trips_long_across_3_for_1_split _ =
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"ISRG" ~side:Buy ~quantity:1553.0 ~price:823.38
+  in
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"ISRG" ~side:Sell ~quantity:4659.0
+      ~price:332.03
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2021-05-15") ~trades:[ buy ] ();
+      _step_with_trades
+        ~date:(date_of_string "2021-10-05")
+        ~trades:[]
+        ~splits:
+          [
+            _split ~symbol:"ISRG"
+              ~date:(date_of_string "2021-10-05")
+              ~factor:3.0;
+          ]
+        ();
+      _step_with_trades ~date:(date_of_string "2021-10-16") ~trades:[ sell ] ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.symbol) (equal_to "ISRG");
+             (* 823.38 / 3 = 274.46 *)
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 274.46);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 4659.0);
+             (* (332.03 − 274.46) / 274.46 * 100 ≈ +20.976% — positive *)
+             field
+               (fun (t : trade_metrics) -> t.pnl_percent)
+               (float_equal ~epsilon:0.01 20.976);
+           ];
+       ])
+
+(** Boundary: a split dated exactly on [exit_date] is INCLUDED by the half-open
+    window [entry_date < split_date <= exit_date], so the entry leg is restated.
+    The exit fill is already on the post-split basis, so the factor must apply
+    for entry/exit to share a basis. Pins the load-bearing endpoint of the
+    [_cumulative_split_factor] guard. *)
+let test_extract_round_trips_split_on_exit_date_included _ =
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"BND" ~side:Buy ~quantity:100.0 ~price:100.0
+  in
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"BND" ~side:Sell ~quantity:200.0 ~price:60.0
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2020-01-02") ~trades:[ buy ] ();
+      _step_with_trades
+        ~date:(date_of_string "2020-06-01")
+        ~trades:[ sell ]
+        ~splits:
+          [
+            _split ~symbol:"BND" ~date:(date_of_string "2020-06-01") ~factor:2.0;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             (* split on exit day applies: 100 / 2 = 50, qty 100 * 2 = 200 *)
+             field (fun (t : trade_metrics) -> t.entry_price) (float_equal 50.0);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 200.0);
+             (* (60 − 50) / 50 * 100 = +20% *)
+             field (fun (t : trade_metrics) -> t.pnl_percent) (float_equal 20.0);
+           ];
+       ])
+
+(** Boundary: a split dated exactly on [entry_date] is EXCLUDED by the half-open
+    window (the strict [entry_date <] lower bound), because the entry fill is
+    already on the post-split basis. The metric is left unadjusted. Pins the
+    lower endpoint of the [_cumulative_split_factor] guard. *)
+let test_extract_round_trips_split_on_entry_date_excluded _ =
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"BND" ~side:Buy ~quantity:100.0 ~price:100.0
+  in
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"BND" ~side:Sell ~quantity:100.0 ~price:110.0
+  in
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2020-01-02")
+        ~trades:[ buy ]
+        ~splits:
+          [
+            _split ~symbol:"BND" ~date:(date_of_string "2020-01-02") ~factor:2.0;
+          ]
+        ();
+      _step_with_trades ~date:(date_of_string "2020-06-01") ~trades:[ sell ] ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             (* split on entry day excluded: entry/qty untouched *)
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 100.0);
+             (* (110 − 100) / 100 * 100 = +10% *)
+             field (fun (t : trade_metrics) -> t.pnl_percent) (float_equal 10.0);
+           ];
+       ])
 
 (* ==================== Metric Computer Tests ==================== *)
 
@@ -1314,6 +1549,17 @@ let suite =
          >:: test_extract_round_trips_long_and_short_mixed;
          "extract_round_trips unclosed short dropped"
          >:: test_extract_round_trips_unclosed_short_dropped;
+         (* split-straddling adjustment tests *)
+         "extract_round_trips long across 2:1 split"
+         >:: test_extract_round_trips_long_across_2_for_1_split;
+         "extract_round_trips no split unchanged"
+         >:: test_extract_round_trips_no_split_unchanged;
+         "extract_round_trips long across 3:1 split"
+         >:: test_extract_round_trips_long_across_3_for_1_split;
+         "extract_round_trips split on exit date included"
+         >:: test_extract_round_trips_split_on_exit_date_included;
+         "extract_round_trips split on entry date excluded"
+         >:: test_extract_round_trips_split_on_entry_date_excluded;
          (* Sharpe ratio tests *)
          "sharpe ratio zero with no data"
          >:: test_sharpe_ratio_zero_with_no_data;
