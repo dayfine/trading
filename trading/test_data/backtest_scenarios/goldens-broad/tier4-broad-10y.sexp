@@ -34,8 +34,17 @@
 ((name "tier4-broad-10y")
  (description "Tier-4 release-gate SCALE — full broad universe × 10y (snapshot-mode only)")
  (period ((start_date 2014-01-02) (end_date 2023-12-29)))
- (universe_path "universes/broad.sexp")
- (universe_size 10472)
+ ;; PIT-clean universe migration 2026-06-06 (dev/plans/goldens-broad-pit-migration-2026-06-05.md):
+ ;; replaced the non-reproducible `universes/broad.sexp` sentinel (Full_sector_map →
+ ;; "whatever is in the live, growing data/sectors.csv", ~10,472 today) with the frozen
+ ;; point-in-time `top-3000-2014` composition snapshot (window start year) — the largest
+ ;; reproducible PIT universe available, survivorship-clean. The cell is now reproducible and
+ ;; no longer drifts when sectors.csv changes. top-3000 (3015 with index+ETFs) is a legitimate
+ ;; large-N SCALE target — see the 2026-06-06 N=3000 local snapshot proof (peak ~3 GB RSS,
+ ;; bounded; ~2.4 h for 5y so a 10y run is multi-hour). Ranges stay wide (SCAFFOLDING-ONLY /
+ ;; never pinned); a follow-up run pins them.
+ (universe_path "../goldens-custom-universe/composition/top-3000-2014.sexp")
+ (universe_size 3000)
  ;; enable_short_side disabled mirroring the N=1000 tier-4 cells
  ;; (dev/notes/short-side-gaps-2026-04-29.md G1-G4 unresolved). Revert when
  ;; short-side gaps close + the override is dropped from the long-only family.
