@@ -66,3 +66,24 @@ vertical crashes — consistent with the diagnosis. Still default-off; promotion
 needs the confirmation grid ([[project_promotion_confirmation_grid]]). Buf05≡buf08
 identical both windows → past a threshold the buffer doesn't differentiate; widen
 the axis (e.g. {0.08, 0.12, 0.16}) when running the grid.
+
+## Dial confirmation grid — REJECTED 2026-06-06
+
+The default-off late-Stage2 stop-tighten dial (#1446) went through its confirmation
+grid (deep PIT-2000 2000-2026 + bull PIT-2010 2010-2026, Cell E, buffer ∈ {0.03,0.05,0.08}).
+**Clean REJECT** (`dev/experiments/_ledger/2026-06-06-late-stage2-stop-tighten-grid.sexp`):
+- **MaxDD unchanged to the basis point** in both windows (37.32 deep / 17.50 bull) — the
+  dial does NOT cut drawdown, which was its entire purpose.
+- **Buffer-insensitive** (0.03/0.05/0.08 byte-identical) → no tunable surface.
+- **Bull = total no-op**; deep = +321pp return bump (918→1239%) from ~1 trade (DD-neutral,
+  Sharpe 0.70→0.76) = single-episode capital-recycling artifact, not robust.
+- **ROOT CAUSE (the real lesson):** the worst drawdowns are FAST crashes (2000-02/2008/2020)
+  that **reset `late` before the top**, so the dial never engages on the DD-defining episodes.
+  It only acts on slow-topping cases, which aren't the max-DD drivers. So wiring the discarded
+  `late` flag into held-exposure management does NOT recover drawdown — the premise that `late`
+  precedes the costly tops holds for SLOW tops but not the fast crashes that set MaxDD.
+
+Dial stays default-off / available as an axis; no further investment. The 2020-stall lever
+remains **breadth** ([[project_cell_e_2020_stall_regime]]), not late-Stage2 stop-tightening.
+A `late`-driven PARTIAL-TRIM variant (vs stop-tighten) could still differ, but the root-cause
+above (fast crashes reset `late`) suggests it would hit the same wall on DD.
