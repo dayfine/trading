@@ -13,6 +13,21 @@
     {!Snapshot_schema.Macro_composite} are populated. Without it those columns
     are NaN per {!Snapshot_pipeline.Pipeline.build_for_symbol}'s contract.
 
+    Optional [--start-date YYYY-MM-DD] / [--end-date YYYY-MM-DD]: window each
+    symbol's loaded bars to the inclusive [start, end] range {e before} building
+    (the benchmark bars get the same window so RS_line / Macro_composite stay
+    consistent). Omitting both is unchanged behaviour (full history). This makes
+    a snapshot-mode warehouse cache-friendly: a full-history warehouse forces
+    {!Daily_panels} to decode whole per-symbol files and blows the 1 GB LRU
+    cache → thrash → re-decode every symbol every cycle (~100x slower than CSV
+    mode). Windowing mirrors {!Csv_snapshot_builder}'s contract — see
+    {!Bar_window} for the rationale and the {b warmup caveat}: indicators are
+    computed only over the bars passed in, so the caller must set [--start-date]
+    to the backtest's {e warmup_start} (early enough to cover 50-day / 30-week
+    lookback), exactly as [Csv_snapshot_builder.build] is invoked with
+    [~warmup_start]. The durable fix is a Phase-F windowed/mmap decode in
+    {!Daily_panels}; this flag is the cheap interim mitigation.
+
     Checkpointing (added per dev/plans/data-pipeline-automation-2026-05-03.md):
 
     - Per-symbol atomic manifest update via
@@ -67,6 +82,22 @@ let _load_bars ~data_dir ~symbol =
         (Status.invalid_argument_error
            (Printf.sprintf "create %s: %s" symbol (Status.show err)))
   | Ok storage -> Csv.Csv_storage.get storage ()
+
+(* Window a symbol's loaded bars to the inclusive [start_date, end_date] range
+   before the snapshot pipeline sees them. Mirrors [Csv_snapshot_builder]'s
+   windowing so a snapshot-mode warehouse stays cache-friendly (see
+   {!Bar_window} for the perf rationale + warmup caveat). When both bounds are
+   [None] the bars pass through unchanged. *)
+let _window_bars ~start_date ~end_date bars =
+  Bar_window.filter ?start:start_date ?end_:end_date bars
+
+(* Load a symbol's bars and apply the date window. The window is also threaded
+   into the benchmark load (see [_load_benchmark_bars]) so RS_line /
+   Macro_composite are computed over the same range. *)
+let _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol =
+  match _load_bars ~data_dir ~symbol with
+  | Error _ as err -> err
+  | Ok bars -> Ok (_window_bars ~start_date ~end_date bars)
 
 let _file_path ~output_dir ~symbol =
   Filename.concat output_dir (symbol ^ ".snap")
@@ -152,9 +183,9 @@ let _build_or_log ~symbol ~bars ~schema ~benchmark_bars ~output_dir ~csv_mtime
 (** Load bars for [symbol] and build its snapshot entry. Returns [None] on load
     or build failure (logs the error). On success, optionally checkpoints the
     manifest entry if [checkpoint] is set. *)
-let _try_build_and_checkpoint ~data_dir ~schema ~benchmark_bars ~output_dir
-    ~manifest_path ~checkpoint ~csv_mtime symbol =
-  match _load_bars ~data_dir ~symbol with
+let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~schema
+    ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime symbol =
+  match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol with
   | Error err ->
       Printf.eprintf "skip %s: load: %s\n%!" symbol (Status.show err);
       None
@@ -162,8 +193,8 @@ let _try_build_and_checkpoint ~data_dir ~schema ~benchmark_bars ~output_dir
       _build_or_log ~symbol ~bars ~schema ~benchmark_bars ~output_dir ~csv_mtime
         ~manifest_path ~checkpoint
 
-let _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
-    ~manifest_path ~checkpoint symbol =
+let _process_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
+    ~output_dir ~existing ~manifest_path ~checkpoint symbol =
   match _csv_mtime ~data_dir ~symbol with
   | None ->
       Printf.eprintf "skip %s: no CSV\n%!" symbol;
@@ -172,8 +203,9 @@ let _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
       if _should_skip ~existing ~symbol ~csv_mtime ~schema then
         _maybe_reuse ~existing ~symbol
       else
-        _try_build_and_checkpoint ~data_dir ~schema ~benchmark_bars ~output_dir
-          ~manifest_path ~checkpoint ~csv_mtime symbol
+        _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~schema
+          ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime
+          symbol
 
 (* Universe-file reader. Accepts either the [Pinned] shape
    ([scenario_lib/universe_file]) or an [analysis/data/universe] composition
@@ -187,16 +219,17 @@ let _load_universe ~universe_path =
       Printf.eprintf "build_snapshots: %s\n%!" (Status.show err);
       exit 1
 
-let _load_benchmark_bars ~data_dir sym =
-  match _load_bars ~data_dir ~symbol:sym with
+let _load_benchmark_bars ~data_dir ~start_date ~end_date sym =
+  match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol:sym with
   | Ok bars -> Some bars
   | Error err ->
       Printf.eprintf "warning: benchmark %s load failed: %s\n%!" sym
         (Status.show err);
       None
 
-let _benchmark_bars_opt ~data_dir ~benchmark_symbol =
-  Option.bind benchmark_symbol ~f:(_load_benchmark_bars ~data_dir)
+let _benchmark_bars_opt ~data_dir ~start_date ~end_date ~benchmark_symbol =
+  Option.bind benchmark_symbol
+    ~f:(_load_benchmark_bars ~data_dir ~start_date ~end_date)
 
 let _verify_or_warn ~manifest_path =
   match Snapshot_verifier.verify_directory ~manifest_path with
@@ -263,11 +296,12 @@ let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
       Printf.eprintf "manifest write failed: %s\n%!" (Status.show err);
       exit 1
 
-let _fold_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
-    ~manifest_path ~progress_every ~symbols_total ~started_at i acc symbol =
+let _fold_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
+    ~output_dir ~existing ~manifest_path ~progress_every ~symbols_total
+    ~started_at i acc symbol =
   match
-    _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
-      ~manifest_path ~checkpoint:true symbol
+    _process_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
+      ~output_dir ~existing ~manifest_path ~checkpoint:true symbol
   with
   | None -> acc
   | Some entry ->
@@ -276,14 +310,16 @@ let _fold_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
         ~symbols_done ~last_completed:symbol ~started_at;
       acc @ [ entry ]
 
-let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~incremental
-    ~progress_every () =
+let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
+    ~end_date ~incremental ~progress_every () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
   let symbols = _load_universe ~universe_path in
   let symbols_total = List.length symbols in
   let data_dir = Fpath.v csv_data_dir in
-  let benchmark_bars = _benchmark_bars_opt ~data_dir ~benchmark_symbol in
+  let benchmark_bars =
+    _benchmark_bars_opt ~data_dir ~start_date ~end_date ~benchmark_symbol
+  in
   let existing = if incremental then _existing_manifest ~output_dir else None in
   let manifest_path = Filename.concat output_dir "manifest.sexp" in
   let started_at = Core_unix.time () in
@@ -291,8 +327,9 @@ let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~incremental
   let entries =
     List.foldi symbols ~init:[]
       ~f:
-        (_fold_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
-           ~manifest_path ~progress_every ~symbols_total ~started_at)
+        (_fold_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
+           ~output_dir ~existing ~manifest_path ~progress_every ~symbols_total
+           ~started_at)
   in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
   _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;
@@ -318,6 +355,21 @@ let command =
          ~doc:
            "SYM Optional benchmark ticker for RS_line / Macro_composite \
             (default: NaN columns)"
+     and start_date =
+       flag "start-date"
+         (optional (Command.Arg_type.create Date.of_string))
+         ~doc:
+           "YYYY-MM-DD Optional inclusive lower bound: drop each symbol's bars \
+            before this date before building (default: full history). Pass the \
+            backtest's WARMUP_START, not its start — indicators warm up over \
+            in-window bars only, so earlier dates carry NaN indicators (same \
+            contract as Csv_snapshot_builder's ~warmup_start)."
+     and end_date =
+       flag "end-date"
+         (optional (Command.Arg_type.create Date.of_string))
+         ~doc:
+           "YYYY-MM-DD Optional inclusive upper bound: drop each symbol's bars \
+            after this date before building (default: full history)."
      and incremental =
        flag "incremental" no_arg
          ~doc:
@@ -332,6 +384,6 @@ let command =
      in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
-         ~incremental ~progress_every ())
+         ~start_date ~end_date ~incremental ~progress_every ())
 
 let () = Command_unix.run command

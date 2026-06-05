@@ -1,5 +1,13 @@
-(test
- (name test_universe_loader)
- (libraries core ounit2 matchers status universe universe_loader)
+(tests
+ (names test_universe_loader test_bar_window)
+ (libraries
+  core
+  ounit2
+  matchers
+  status
+  types
+  universe
+  universe_loader
+  bar_window)
  (preprocess
   (pps ppx_jane)))
