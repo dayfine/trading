@@ -1,0 +1,5 @@
+(test
+ (name test_universe_loader)
+ (libraries core ounit2 matchers status universe universe_loader)
+ (preprocess
+  (pps ppx_jane)))
