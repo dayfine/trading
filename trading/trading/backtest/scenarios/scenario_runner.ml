@@ -3,12 +3,20 @@
 
     Usage: scenario_runner
     [--goldens-small | --goldens-broad | --goldens | --smoke | --dir <path>]
-    [--parallel N] [--fixtures-root <path>] [--progress-every N]
-    [--no-emit-all-eligible]
+    [--parallel N] [--fixtures-root <path>] [--snapshot-dir <path>]
+    [--progress-every N] [--no-emit-all-eligible]
 
     [--goldens-small] — small-universe goldens (~300 symbols; local-friendly).
     [--goldens-broad] — broad-universe goldens (full sector-map; nightly/GHA).
     [--goldens] — alias for [--goldens-small] for backwards compat.
+
+    [--snapshot-dir <path>] — run every cell in snapshot (streaming) mode,
+    reading OHLCV from the pre-built snapshot warehouse at [path] instead of
+    building per-symbol bars in-process from CSVs. The manifest at
+    [<path>/manifest.sexp] is read once at parse time and the resulting
+    [Bar_data_source.t] is reused for every cell. With no [--snapshot-dir], the
+    run stays bit-identical to CSV mode. The load-bearing use is large-N goldens
+    (e.g. N=3000) that OOM the dev container in CSV mode (~14 GB resident).
 
     [--fixtures-root <path>] — directory the scenario [universe_path] field is
     resolved against (defaults to [TRADING_DATA_DIR/backtest_scenarios]). The
@@ -46,6 +54,7 @@ module Scenario = Scenario_lib.Scenario
 module Universe_file = Scenario_lib.Universe_file
 module Fixtures_root = Scenario_lib.Fixtures_root
 module Scenario_progress = Scenario_lib.Scenario_progress
+module Bar_source_resolver = Scenario_lib.Bar_source_resolver
 
 (* Universe resolution *)
 
@@ -252,7 +261,7 @@ let _actual_path ~output_root (s : Scenario.t) =
 (* Run one scenario inside a child process *)
 
 let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
-    ~emit_all_eligible ~scenario_path (s : Scenario.t) =
+    ~emit_all_eligible ~bar_data_source ~scenario_path (s : Scenario.t) =
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
     (Date.to_string s.period.start_date)
     (Date.to_string s.period.end_date);
@@ -269,7 +278,7 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
       ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
-      ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ()
+      ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source ()
   in
   let wall_seconds =
     Time_ns.Span.to_sec (Time_ns.diff (Time_ns_unix.now ()) t_start)
@@ -309,12 +318,12 @@ let _write_crashed_actual ~output_root (s : Scenario.t) ~msg =
     (sexp_of_actual (_crashed_actual ~msg))
 
 let _fork_scenario ~output_root ~fixtures_root ~progress_every
-    ~emit_all_eligible ~scenario_path (s : Scenario.t) =
+    ~emit_all_eligible ~bar_data_source ~scenario_path (s : Scenario.t) =
   match Core_unix.fork () with
   | `In_the_child -> (
       try
         _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
-          ~emit_all_eligible ~scenario_path s;
+          ~emit_all_eligible ~bar_data_source ~scenario_path s;
         Stdlib.exit 0
       with e ->
         let msg = Exn.to_string e in
@@ -338,8 +347,8 @@ let _await_one running =
   match Core_unix.waitpid pid with Ok () -> Succeeded | Error _ -> Crashed
 
 let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
-    ~progress_every ~emit_all_eligible (scenarios : (string * Scenario.t) list)
-    =
+    ~progress_every ~emit_all_eligible ~bar_data_source
+    (scenarios : (string * Scenario.t) list) =
   let running = Queue.create () in
   let statuses = Hashtbl.create (module String) in
   let reap () =
@@ -352,7 +361,7 @@ let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
       if Queue.length running >= parallel then reap ();
       let pid =
         _fork_scenario ~output_root ~fixtures_root ~progress_every
-          ~emit_all_eligible ~scenario_path s
+          ~emit_all_eligible ~bar_data_source ~scenario_path s
       in
       Queue.enqueue running (s, pid));
   while not (Queue.is_empty running) do
@@ -398,6 +407,15 @@ type _cli_args = {
   dir : string;
   parallel : int;
   fixtures_root : string option;
+  snapshot_dir : string option;
+      (* When [Some dir], every cell reads OHLCV from the snapshot warehouse at
+         [dir] (streaming / snapshot mode) instead of building per-symbol bars
+         in-process from CSVs. Resolved once at parse time via
+         [Bar_source_resolver.resolve]; the resulting [Bar_data_source.t] is
+         reused for every cell in the [--dir] run. [None] (the default) keeps
+         the pre-existing CSV behaviour bit-identical. The load-bearing use is
+         large-N goldens (e.g. N=3000) that OOM the dev container in CSV mode
+         (~14 GB resident). *)
   progress_every : int;
       (* Friday-cycle cadence for [progress.sexp] emission, threaded into each
          scenario's [Backtest.Runner.run_backtest] call. Always populated:
@@ -420,7 +438,7 @@ let _usage () =
   eprintf
     "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
      --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>] \
-     [--progress-every N] [--no-emit-all-eligible]\n";
+     [--snapshot-dir <path>] [--progress-every N] [--no-emit-all-eligible]\n";
   Stdlib.exit 1
 
 let _parse_progress_every n_str =
@@ -430,65 +448,100 @@ let _parse_progress_every n_str =
       eprintf "--progress-every requires a positive integer argument\n";
       Stdlib.exit 1
 
+(* Mutable accumulator for the parse. Using a record (rather than threading 7
+   positionals through a recursive [loop]) keeps each flag case a one-line field
+   update and stays well under the function-length limit as flags grow. *)
+type _parse_acc = {
+  mutable dir : string option;
+  mutable parallel : int option;
+  mutable fixtures_root : string option;
+  mutable snapshot_dir : string option;
+  mutable progress_every : int option;
+  mutable emit_all_eligible : bool;
+}
+
+let _finalize_acc (acc : _parse_acc) : _cli_args =
+  {
+    dir = Option.value acc.dir ~default:(_goldens_small_dir ());
+    parallel = Option.value acc.parallel ~default:_default_parallel;
+    fixtures_root = acc.fixtures_root;
+    snapshot_dir = acc.snapshot_dir;
+    progress_every =
+      Option.value acc.progress_every
+        ~default:Scenario_progress.default_every_n_fridays;
+    emit_all_eligible = acc.emit_all_eligible;
+  }
+
 let _parse_flag args =
-  let rec loop args dir parallel fixtures_root progress_every emit_all_eligible
-      =
+  let acc =
+    {
+      dir = None;
+      parallel = None;
+      fixtures_root = None;
+      snapshot_dir = None;
+      progress_every = None;
+      emit_all_eligible = true;
+    }
+  in
+  let rec loop args =
     match args with
-    | [] ->
-        let dir = Option.value dir ~default:(_goldens_small_dir ()) in
-        {
-          dir;
-          parallel = Option.value parallel ~default:_default_parallel;
-          fixtures_root;
-          progress_every =
-            Option.value progress_every
-              ~default:Scenario_progress.default_every_n_fridays;
-          emit_all_eligible;
-        }
-    | "--goldens-small" :: rest ->
+    | [] -> _finalize_acc acc
+    | "--goldens-small" :: rest | "--goldens" :: rest ->
+        acc.dir <- Some (_goldens_small_dir ());
         loop rest
-          (Some (_goldens_small_dir ()))
-          parallel fixtures_root progress_every emit_all_eligible
     | "--goldens-broad" :: rest ->
+        acc.dir <- Some (_goldens_broad_dir ());
         loop rest
-          (Some (_goldens_broad_dir ()))
-          parallel fixtures_root progress_every emit_all_eligible
-    | "--goldens" :: rest ->
-        loop rest
-          (Some (_goldens_small_dir ()))
-          parallel fixtures_root progress_every emit_all_eligible
     | "--smoke" :: rest ->
+        acc.dir <- Some (_smoke_dir ());
         loop rest
-          (Some (_smoke_dir ()))
-          parallel fixtures_root progress_every emit_all_eligible
     | "--dir" :: path :: rest ->
-        loop rest (Some path) parallel fixtures_root progress_every
-          emit_all_eligible
+        acc.dir <- Some path;
+        loop rest
     | "--parallel" :: n :: rest ->
-        loop rest dir
-          (Some (Int.of_string n))
-          fixtures_root progress_every emit_all_eligible
+        acc.parallel <- Some (Int.of_string n);
+        loop rest
     | "--fixtures-root" :: path :: rest ->
-        loop rest dir parallel (Some path) progress_every emit_all_eligible
+        acc.fixtures_root <- Some path;
+        loop rest
+    | "--snapshot-dir" :: path :: rest ->
+        acc.snapshot_dir <- Some path;
+        loop rest
+    | [ "--snapshot-dir" ] ->
+        eprintf "--snapshot-dir requires a directory-path argument\n";
+        Stdlib.exit 1
     | "--progress-every" :: n :: rest ->
-        loop rest dir parallel fixtures_root
-          (Some (_parse_progress_every n))
-          emit_all_eligible
+        acc.progress_every <- Some (_parse_progress_every n);
+        loop rest
     | "--no-emit-all-eligible" :: rest ->
-        loop rest dir parallel fixtures_root progress_every false
+        acc.emit_all_eligible <- false;
+        loop rest
     | _ -> _usage ()
   in
-  loop args None None None None true
+  loop args
 
 let _parse_args () =
   let argv = Sys.get_argv () in
   _parse_flag (List.tl_exn (Array.to_list argv))
 
 let () =
-  let { dir; parallel; fixtures_root; progress_every; emit_all_eligible } =
+  let ({
+         dir;
+         parallel;
+         fixtures_root;
+         snapshot_dir;
+         progress_every;
+         emit_all_eligible;
+       }
+        : _cli_args) =
     _parse_args ()
   in
   let fixtures_root = Fixtures_root.resolve ?fixtures_root () in
+  (* Resolve the snapshot warehouse once at parse time; the same
+     [Bar_data_source.t] is reused for every cell in the run. [None] keeps the
+     pre-existing CSV behaviour bit-identical. Exits 1 on a missing/corrupt
+     manifest. *)
+  let bar_data_source = Bar_source_resolver.resolve snapshot_dir in
   let files = _list_scenario_files dir in
   if List.is_empty files then (
     eprintf "No .sexp scenario files found in %s\n" dir;
@@ -497,6 +550,10 @@ let () =
   eprintf "Loading %d scenarios from %s (parallel=%d)\n%!" (List.length files)
     dir parallel;
   eprintf "Fixtures root: %s\n%!" fixtures_root;
+  eprintf "Bar data source: %s\n%!"
+    (match snapshot_dir with
+    | Some d -> sprintf "snapshot mode (%s)" d
+    | None -> "CSV mode");
   eprintf "Progress emission: every %d Friday cycle(s) per scenario\n%!"
     progress_every;
   eprintf "All-eligible diagnostic: %s\n%!"
@@ -508,7 +565,7 @@ let () =
   eprintf "Output root: %s\n%!" output_root;
   let results =
     _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
-      ~progress_every ~emit_all_eligible scenarios_with_paths
+      ~progress_every ~emit_all_eligible ~bar_data_source scenarios_with_paths
   in
   _print_header ();
   let pass_flags = List.map results ~f:(_process_result ~output_root) in
