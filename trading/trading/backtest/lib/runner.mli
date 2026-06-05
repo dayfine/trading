@@ -4,6 +4,34 @@
 
 open Core
 
+val warmup_days_for : Strategy_choice.t -> int
+(** Number of calendar days the runner prepends before a scenario's [start_date]
+    when it runs [strategy] — i.e.
+    [warmup_start = start_date - warmup_days_for strategy]. The Weinstein /
+    SPY-only stage classifier needs ~30 weeks (210 days) of bar history;
+    sector-rotation needs ~52 weeks (364 days) for its RS window; the stateless
+    Buy-and-Hold benchmark needs none (0). Exposed (#882-dispatched) so
+    snapshot-warehouse tooling derives the same warmup window the runner uses,
+    rather than copying the magic numbers. *)
+
+val primary_index_symbol : string
+(** The primary index ([GSPC.INDX]) every run loads bars for and feeds into the
+    macro / relative-strength pipeline. Exposed so warehouse-building tooling
+    stages the same benchmark symbol the runner reads, instead of hardcoding it.
+*)
+
+val all_snapshot_symbols : universe:string list -> string list
+(** [all_snapshot_symbols ~universe] is the deduped, sorted union of every
+    symbol a default [Weinstein] run stages bars for over [universe]: the
+    universe itself, {!primary_index_symbol}, every SPDR sector ETF
+    ({!Weinstein_strategy.Macro_inputs.spdr_sector_etfs}), and every global
+    macro index ({!Weinstein_strategy.Macro_inputs.default_global_indices}).
+    Reuses the exact assembly the runner builds its internal [all_symbols] from
+    (with the hypothesis-testing skip toggles at their defaults), so a snapshot
+    warehouse built over this set carries every macro / RS column the runner
+    reads. Omitting these auxiliary symbols leaves those columns degenerate and
+    the strategy produces zero trades. *)
+
 type result = {
   summary : Summary.t;
   round_trips : Trading_simulation.Metrics.trade_metrics list;

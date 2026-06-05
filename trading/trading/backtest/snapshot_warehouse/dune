@@ -1,0 +1,22 @@
+(library
+ (name scenario_snapshot_plan)
+ (modules scenario_snapshot_plan)
+ (libraries core backtest scenario_lib)
+ (preprocess
+  (pps ppx_jane)))
+
+(executable
+ (name build_scenario_snapshots)
+ (modules build_scenario_snapshots)
+ (libraries
+  core
+  core_unix
+  core_unix.command_unix
+  fpath
+  status
+  backtest
+  scenario_lib
+  scripts.build_runner
+  scenario_snapshot_plan)
+ (preprocess
+  (pps ppx_jane)))
