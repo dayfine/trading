@@ -1,9 +1,34 @@
 # Status: backtest-perf
 
-## Last updated: 2026-05-22
+## Last updated: 2026-06-04
 
 ## Status
 IN_PROGRESS
+
+### Recent activity (2026-06-04)
+
+- **[x] `scenario_runner --snapshot-dir <path>`** (READY_FOR_REVIEW,
+  branch `feat/scenario-runner-snapshot-dir`). Exposes snapshot
+  (streaming) bar-reading at the `--dir` golden entry point so a
+  large-N golden cell (e.g. N=3000) reads OHLCV from a pre-built
+  snapshot warehouse instead of building the whole universe's bars
+  in-process from CSVs (~14 GB resident at N=3000). Mirrors
+  `backtest_runner.exe --snapshot-dir` exactly: the manifest at
+  `<dir>/manifest.sexp` is read once at parse time and the resulting
+  `Bar_data_source.Snapshot {…}` is reused for every cell; missing /
+  corrupt manifest exits 1. With no flag, behaviour is bit-identical
+  to today's CSV mode.
+  - Surface: new `Scenario_lib.Bar_source_resolver.resolve` (lib
+    module + `.mli`, mirrors `backtest_runner._resolve_bar_data_source`
+    so the manifest-read + error path is unit-testable);
+    `scenario_runner.ml` parses `--snapshot-dir`, resolves once, and
+    threads `?bar_data_source` into `Backtest.Runner.run_backtest`.
+  - Verify: `dune runtest trading/backtest/scenarios/test/` (new
+    `test_bar_source_resolver` — `resolve None -> None`;
+    `resolve (Some dir) -> Snapshot {…}` over a real written manifest).
+  - Unblocks running large-N goldens locally in snapshot mode at
+    bounded RSS — a prerequisite step toward the tier-4 release-gate
+    at N≥5000 (see § Blocked on).
 
 ### Recent activity (2026-05-14..22, since last refresh)
 

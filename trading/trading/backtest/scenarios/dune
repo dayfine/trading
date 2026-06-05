@@ -6,11 +6,13 @@
   universe_snapshot
   fixtures_root
   smoke_catalog
-  scenario_progress)
+  scenario_progress
+  bar_source_resolver)
  (libraries
   core
   fpath
   weinstein.data_source
+  weinstein.snapshot_pipeline
   backtest
   backtest_cost_model
   universe

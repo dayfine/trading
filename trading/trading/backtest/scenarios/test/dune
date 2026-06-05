@@ -6,7 +6,8 @@
   test_fixtures_root
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
-  test_scenario_progress)
+  test_scenario_progress
+  test_bar_source_resolver)
  (modules
   test_scenario
   test_universe_file
@@ -14,19 +15,24 @@
   test_fixtures_root
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
-  test_scenario_progress)
+  test_scenario_progress
+  test_bar_source_resolver)
  (libraries
   ounit2
   core
   core_unix
+  core_unix.filename_unix
   fpath
   scenario_lib
   matchers
   backtest
   backtest_cost_model
   weinstein.data_source
+  weinstein.snapshot_pipeline
+  trading.data_panel.snapshot
   trading.simulation
   universe
+  types
   status)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))
