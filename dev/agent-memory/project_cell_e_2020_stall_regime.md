@@ -82,3 +82,17 @@ LS drawdown/NAV calc is suspect** (short mark-to-market / margin / borrow / equi
 reconstruction when short — repo has NAV-bug history). Per user 2026-06-02: verify the
 LS DD calc with worked examples in a DEDICATED HUMAN SESSION before trusting the
 LS-raises-DD magnitude. Mechanism (shorts lose on fast-V) is real; magnitude is not.
+
+## Breadth lever — CLEAN top-1000 vs top-3000 confirmation (2026-06-06)
+
+Direct A/B, SAME window (covid 2020-01-02..2024-12-31), SAME Cell E config, only the PIT
+universe size differs:
+- **top-1000-2020** (N=1000): return 41.3% / Sharpe 0.46 / MaxDD 36.1% / Calmar 0.20 / win 33.1% (the migrated golden center).
+- **top-3000-2020** (N=3000): return **152.75%** / Sharpe **0.89** / MaxDD **25.53%** / Calmar **0.80** / win 34.6% / PF 1.76.
+
+Tripling breadth: return +3.7×, Sharpe ~2×, **MaxDD DOWN 36→25.5%**, **Calmar UP 4× (0.20→0.80)**,
+win-rate ~flat. Same signature as the earlier top-3000-vs-SP500-506 finding (win/loss ratio
+and PF rise, DD falls, hit-rate ~flat) — breadth gives more shots at the fat-tailed winners
+the strategy is built to ride, and diversifies the drawdown. **Breadth is THE lever**, now
+confirmed at the largest PIT scale on a clean same-window A/B. Run via the snapshot streaming
+loader (local, ~3 GB RSS) — see [[project-snapshot-streaming-status]] for the perf caveat.
