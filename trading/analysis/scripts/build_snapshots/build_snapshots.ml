@@ -175,25 +175,17 @@ let _process_symbol ~data_dir ~schema ~benchmark_bars ~output_dir ~existing
         _try_build_and_checkpoint ~data_dir ~schema ~benchmark_bars ~output_dir
           ~manifest_path ~checkpoint ~csv_mtime symbol
 
-(* Minimal universe-file reader — only the [Pinned] shape is supported in
-   Phase B, which is all this writer needs (Full_sector_map requires the
-   sectors.csv side channel that the runner threads in, irrelevant to the
-   snapshot writer). The sexp shape mirrors [scenario_lib/universe_file.mli]:
-   [(Pinned ((symbol AAPL) (sector "Information Technology")) ...)]. *)
-type _pinned_entry = { symbol : string; sector : string [@warning "-69"] }
-[@@deriving sexp]
-
-type _universe_kind = Pinned of _pinned_entry list | Full_sector_map
-[@@deriving sexp]
-
+(* Universe-file reader. Accepts either the [Pinned] shape
+   ([scenario_lib/universe_file]) or an [analysis/data/universe] composition
+   snapshot (the shape the goldens' universes use). See {!Universe_loader}.
+   Exits non-zero on an unsupported shape (Full_sector_map, all-synthetic, or a
+   malformed sexp) rather than building an empty warehouse silently. *)
 let _load_universe ~universe_path =
-  let sexp = Sexp.load_sexp universe_path in
-  match _universe_kind_of_sexp sexp with
-  | Pinned entries -> List.map entries ~f:(fun e -> e.symbol)
-  | Full_sector_map ->
-      failwith
-        "build_snapshots: Full_sector_map universes are not supported in Phase \
-         B; pass a Pinned universe sexp"
+  match Universe_loader.symbols_of_path ~path:universe_path with
+  | Ok symbols -> symbols
+  | Error err ->
+      Printf.eprintf "build_snapshots: %s\n%!" (Status.show err);
+      exit 1
 
 let _load_benchmark_bars ~data_dir sym =
   match _load_bars ~data_dir ~symbol:sym with
@@ -312,7 +304,9 @@ let command =
     ~summary:"Build per-symbol snapshot files for the daily-snapshot warehouse"
     (let%map_open.Command universe_path =
        flag "universe-path" (required string)
-         ~doc:"PATH Universe sexp (Pinned shape required in Phase B)"
+         ~doc:
+           "PATH Universe sexp (Pinned shape or analysis/data/universe \
+            composition snapshot)"
      and csv_data_dir =
        flag "csv-data-dir" (required string)
          ~doc:"PATH Directory containing per-symbol CSV history"

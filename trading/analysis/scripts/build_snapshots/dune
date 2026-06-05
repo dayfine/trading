@@ -1,5 +1,13 @@
+(library
+ (name universe_loader)
+ (modules universe_loader)
+ (libraries core status universe)
+ (preprocess
+  (pps ppx_jane)))
+
 (executable
  (name build_snapshots)
+ (modules build_snapshots)
  (libraries
   core
   core_unix
@@ -7,6 +15,7 @@
   core_unix.filename_unix
   status
   trading.data_panel.snapshot
+  universe_loader
   weinstein.snapshot_pipeline
   csv)
  (preprocess
