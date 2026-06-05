@@ -51,13 +51,24 @@ down 5-44%).
 
 ## Next Steps
 
-1. **Confirmation grid** (`.claude/rules/promotion-confirmation.md`):
-   evaluate the dial across ≥3 independent period × universe contexts
-   (incl. one deep pre-2009 macro-regime cell) before any promotion.
-   Sweep `late_stage2_stop_buffer_pct` on bull + deep backtests: does it
-   cut the 37% / 17.5% MaxDD without killing the 918% / 237% return?
-   Promote a grid-robust value only via the grid, never a single-window
-   winner. The dispatcher runs the grid separately.
+1. **Confirmation grid — DONE 2026-06-06: REJECTED.**
+   (`dev/experiments/_ledger/2026-06-06-late-stage2-stop-tighten-grid.sexp`.)
+   Swept `late_stage2_stop_buffer_pct ∈ {0.03,0.05,0.08}` × dial on/off on
+   the deep (PIT-2000 SP500, 2000-2026, dot-com+GFC) and bull (PIT-2010,
+   2010-2026) Cell E surfaces. The dial fires but is a clean REJECT:
+   - **MaxDD unchanged to the basis point in BOTH windows** (37.32 deep,
+     17.50 bull) — it does not cut drawdown, its entire design purpose.
+   - **Buffer-insensitive** (0.03/0.05/0.08 byte-identical) — no tunable surface.
+   - **Bull = complete no-op**; deep = a +321pp return bump (918→1239%) from
+     ~1 trade (DD-neutral, Sharpe 0.70→0.76) = a single-episode capital-
+     recycling artifact, not a robust improvement.
+   - **Root cause:** the worst drawdowns are fast crashes (2000-02/2008/2020)
+     that reset `late` before the top, so the dial never engages on the
+     DD-defining episodes — vindicates Next-Step-3 below.
+
+   Dial stays **default-off** + available as a `Variant_matrix` axis per
+   flag-discipline; earns no further investment. The 2020-stall lever
+   remains **breadth** (`project_cell_e_2020_stall_regime`), not this dial.
 2. **Partial-trim variant** (separate larger PR): on `late`, trim the
    position toward a configurable fraction instead of (or in addition to)
    tightening the stop. Needs Position-core partial-exit support — out of
