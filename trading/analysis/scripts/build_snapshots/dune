@@ -5,6 +5,13 @@
  (preprocess
   (pps ppx_jane)))
 
+(library
+ (name bar_window)
+ (modules bar_window)
+ (libraries core types)
+ (preprocess
+  (pps ppx_jane)))
+
 (executable
  (name build_snapshots)
  (modules build_snapshots)
@@ -15,6 +22,7 @@
   core_unix.filename_unix
   status
   trading.data_panel.snapshot
+  bar_window
   universe_loader
   weinstein.snapshot_pipeline
   csv)
