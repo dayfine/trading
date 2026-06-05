@@ -19,7 +19,7 @@ let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
     enter its single position at [warmup_start] instead of [start_date], which
     corrupts the day-1-entry semantics the BAH baseline is pinned against.
     Strategy-dispatched (#882) rather than a single constant. *)
-let _warmup_days_for : Strategy_choice.t -> int = function
+let warmup_days_for : Strategy_choice.t -> int = function
   | Weinstein -> 210
   | Bah_benchmark _ -> 0
   | Spy_only_weinstein _ -> 210
@@ -28,6 +28,10 @@ let _warmup_days_for : Strategy_choice.t -> int = function
      the larger of its 30-week stage MA and the 52-week RS window — ~52 weeks =
      ~364 days. *)
   | Sector_rotation_weinstein _ -> 364
+
+(* Backwards-compatible internal alias kept so the rest of this module reads as
+   before; [warmup_days_for] is the exported name (see [runner.mli]). *)
+let _warmup_days_for = warmup_days_for
 
 (* Public types *)
 
@@ -186,6 +190,20 @@ let _all_runner_symbols ~(config : Weinstein_strategy.config) ~universe =
   in
   (index_symbol :: universe) @ sector_etf_symbols @ global_index_symbols
   |> List.dedup_and_sort ~compare:String.compare
+
+(* The primary index symbol every run loads bars for and feeds the macro / RS
+   pipeline. Surfaced via [runner.mli] so warehouse-building tooling can stage
+   the same benchmark the runner reads, rather than hardcoding it. *)
+let primary_index_symbol = index_symbol
+
+(* All symbols a default [Weinstein] run would stage bars for over [universe]:
+   the (post-cap) universe, the primary index, and the full SPDR sector-ETF +
+   global-index macro set with the hypothesis-testing skip toggles at their
+   defaults (i.e. nothing skipped). Reuses the same [_runner_base_config] +
+   [_all_runner_symbols] the runner builds [_deps.all_symbols] from, so the two
+   agree by construction. See [runner.mli]. *)
+let all_snapshot_symbols ~universe =
+  _all_runner_symbols ~config:(_runner_base_config ~universe) ~universe
 
 let _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () =
   let data_dir_fpath = Data_path.default_data_dir () in

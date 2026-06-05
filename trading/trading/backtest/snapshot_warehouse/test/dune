@@ -1,0 +1,5 @@
+(test
+ (name test_scenario_snapshot_plan)
+ (libraries core ounit2 matchers scenario_lib scenario_snapshot_plan)
+ (preprocess
+  (pps ppx_jane)))

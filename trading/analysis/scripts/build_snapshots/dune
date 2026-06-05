@@ -7,8 +7,26 @@
 
 (library
  (name bar_window)
+ (public_name scripts.bar_window)
  (modules bar_window)
  (libraries core types)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
+ (name build_runner)
+ (public_name scripts.build_runner)
+ (modules build_runner)
+ (libraries
+  core
+  core_unix
+  status
+  types
+  fpath
+  trading.data_panel.snapshot
+  bar_window
+  weinstein.snapshot_pipeline
+  csv)
  (preprocess
   (pps ppx_jane)))
 
@@ -19,12 +37,8 @@
   core
   core_unix
   core_unix.command_unix
-  core_unix.filename_unix
   status
-  trading.data_panel.snapshot
-  bar_window
   universe_loader
-  weinstein.snapshot_pipeline
-  csv)
+  build_runner)
  (preprocess
   (pps ppx_jane)))
