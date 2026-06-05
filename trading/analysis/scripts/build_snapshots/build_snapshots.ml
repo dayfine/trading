@@ -58,51 +58,61 @@ let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
   Build_runner.build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol
     ~start_date ~end_date ~incremental ~progress_every ()
 
+(* Flag [~doc] strings are hoisted to top-level bindings so the [Command.basic]
+   flag block below stays flat (one line per flag) — the multi-line doc text is
+   the only deeply-indented content in this thin CLI shell, so lifting it keeps
+   the file's structural nesting low. The build contract lives in
+   {!Build_runner}. *)
+let doc_universe_path =
+  "PATH Universe sexp (Pinned shape or analysis/data/universe composition \
+   snapshot)"
+
+let doc_csv_data_dir = "PATH Directory containing per-symbol CSV history"
+
+let doc_output_dir =
+  "PATH Directory where snapshot files + manifest are written"
+
+let doc_benchmark_symbol =
+  "SYM Optional benchmark ticker for RS_line / Macro_composite (default: NaN \
+   columns)"
+
+let doc_start_date =
+  "YYYY-MM-DD Optional inclusive lower bound: drop each symbol's bars before \
+   this date before building (default: full history). Pass the backtest's \
+   WARMUP_START, not its start — indicators warm up over in-window bars only, \
+   so earlier dates carry NaN indicators (same contract as \
+   Csv_snapshot_builder's ~warmup_start)."
+
+let doc_end_date =
+  "YYYY-MM-DD Optional inclusive upper bound: drop each symbol's bars after \
+   this date before building (default: full history)."
+
+let doc_incremental =
+  "Skip symbols whose CSV mtime <= the existing manifest's csv_mtime"
+
+let doc_progress_every =
+  Printf.sprintf "N Emit progress.sexp every N symbols processed (default %d)"
+    Build_runner.default_progress_every
+
+let date_arg = Command.Param.optional (Command.Arg_type.create Date.of_string)
+
 let command =
   Command.basic
     ~summary:"Build per-symbol snapshot files for the daily-snapshot warehouse"
     (let%map_open.Command universe_path =
-       flag "universe-path" (required string)
-         ~doc:
-           "PATH Universe sexp (Pinned shape or analysis/data/universe \
-            composition snapshot)"
+       flag "universe-path" (required string) ~doc:doc_universe_path
      and csv_data_dir =
-       flag "csv-data-dir" (required string)
-         ~doc:"PATH Directory containing per-symbol CSV history"
-     and output_dir =
-       flag "output-dir" (required string)
-         ~doc:"PATH Directory where snapshot files + manifest are written"
+       flag "csv-data-dir" (required string) ~doc:doc_csv_data_dir
+     and output_dir = flag "output-dir" (required string) ~doc:doc_output_dir
      and benchmark_symbol =
-       flag "benchmark-symbol" (optional string)
-         ~doc:
-           "SYM Optional benchmark ticker for RS_line / Macro_composite \
-            (default: NaN columns)"
-     and start_date =
-       flag "start-date"
-         (optional (Command.Arg_type.create Date.of_string))
-         ~doc:
-           "YYYY-MM-DD Optional inclusive lower bound: drop each symbol's bars \
-            before this date before building (default: full history). Pass the \
-            backtest's WARMUP_START, not its start — indicators warm up over \
-            in-window bars only, so earlier dates carry NaN indicators (same \
-            contract as Csv_snapshot_builder's ~warmup_start)."
-     and end_date =
-       flag "end-date"
-         (optional (Command.Arg_type.create Date.of_string))
-         ~doc:
-           "YYYY-MM-DD Optional inclusive upper bound: drop each symbol's bars \
-            after this date before building (default: full history)."
-     and incremental =
-       flag "incremental" no_arg
-         ~doc:
-           "Skip symbols whose CSV mtime <= the existing manifest's csv_mtime"
+       flag "benchmark-symbol" (optional string) ~doc:doc_benchmark_symbol
+     and start_date = flag "start-date" date_arg ~doc:doc_start_date
+     and end_date = flag "end-date" date_arg ~doc:doc_end_date
+     and incremental = flag "incremental" no_arg ~doc:doc_incremental
      and progress_every =
        flag "progress-every"
          (optional_with_default Build_runner.default_progress_every int)
-         ~doc:
-           (Printf.sprintf
-              "N Emit progress.sexp every N symbols processed (default %d)"
-              Build_runner.default_progress_every)
+         ~doc:doc_progress_every
      in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
