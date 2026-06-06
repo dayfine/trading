@@ -149,6 +149,27 @@ type config = {
           buffer (and, because the runner is gated entirely by the flag, the
           disabled path is byte-identical to baseline regardless of this value).
           See {!Late_stage2_stop_runner}. *)
+  enable_macro_bearish_exposure_trim : bool; [@sexp.default false]
+      (** Master switch for the macro-bearish held-exposure trim runner
+          ({!Macro_bearish_trim_runner}, plan
+          [dev/plans/macro-bearish-exposure-trim-2026-06-06.md]). When [true]
+          and the macro tape is Bearish on a screening (Friday) day, held long
+          exposure is capped (see [macro_bearish_max_long_exposure_pct]) and the
+          excess is trimmed weakest-RS-first. Default [false] preserves all
+          existing baselines — the trim pass short-circuits to [[]] before any
+          work, so the disabled path is byte-identical to the pre-feature
+          strategy. Searchable as a [Variant_matrix] flag axis
+          ([((flag enable_macro_bearish_exposure_trim) (values (true false)))]).
+      *)
+  macro_bearish_max_long_exposure_pct : float; [@sexp.default 0.70]
+      (** Fraction of portfolio value at which total held long exposure is
+          capped when the macro-bearish trim fires; the excess is exited
+          weakest-RS-first. [0.0] = full flat (all cash in a bear tape); [1.0]
+          (or higher) = no-op. Only consulted when
+          [enable_macro_bearish_exposure_trim = true]. Default [0.70] mirrors
+          the normal long-exposure cap, so even with the flag flipped on the
+          value defaults to a no-op cap — only a tighter value changes
+          behaviour. See {!Macro_bearish_trim_runner}. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

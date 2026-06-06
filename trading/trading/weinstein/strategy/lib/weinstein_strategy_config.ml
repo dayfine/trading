@@ -1,5 +1,9 @@
 open Core
 
+(* No-op default for [macro_bearish_max_long_exposure_pct]: equals the normal
+   long-exposure cap, so the trim never bites until a spec sets a tighter value. *)
+let macro_bearish_no_op_cap = 0.70
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -89,6 +93,13 @@ type config = {
       (** Master switch for the late-Stage-2 stop-tighten runner; see [.mli]. *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
       (** Buffer below close where the runner raises the stop; see [.mli]. *)
+  enable_macro_bearish_exposure_trim : bool; [@sexp.default false]
+      (** Master switch for the macro-bearish held-exposure trim runner; default
+          [false] is a no-op (bit-identical to baseline). See [.mli]. *)
+  macro_bearish_max_long_exposure_pct : float;
+      [@sexp.default macro_bearish_no_op_cap]
+      (** Fraction of portfolio value the trim caps held long exposure at on a
+          Bearish tape; default [0.70] is a no-op cap. See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -125,6 +136,8 @@ let default_config ~universe ~index_symbol =
     neutral_blocks_longs = false;
     enable_late_stage2_stop_tighten = false;
     late_stage2_stop_buffer_pct = 0.0;
+    enable_macro_bearish_exposure_trim = false;
+    macro_bearish_max_long_exposure_pct = macro_bearish_no_op_cap;
   }
 
 let name = "Weinstein"

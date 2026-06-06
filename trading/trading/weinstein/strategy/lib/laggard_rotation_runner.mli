@@ -62,6 +62,15 @@
 open Core
 open Trading_strategy
 
+val window_return : n:int -> Types.Daily_price.t list -> float option
+(** [window_return ~n bars] = the simple return over the most recent rolling
+    window of [n] weekly bars: [close[last] / close[first] - 1.0], computed from
+    a chronological [bars] list with [List.length bars >= n + 1]. Returns [None]
+    when the list is shorter than [n + 1] bars or its oldest close is
+    non-positive (degenerate snapshot). Exposed so the macro-bearish trim's RS
+    ranking ({!Macro_bearish_trim_runner}) reuses the identical window-return
+    primitive, keeping the laggard and trim RS notions consistent. *)
+
 val update :
   config:Laggard_rotation.config ->
   benchmark_symbol:string ->

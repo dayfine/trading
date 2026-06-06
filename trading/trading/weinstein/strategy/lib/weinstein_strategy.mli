@@ -85,6 +85,15 @@ module Late_stage2_stop_runner = Late_stage2_stop_runner
     transitions (never exits). Default-off preserves all baselines. See
     {!Late_stage2_stop_runner}. *)
 
+module Macro_bearish_trim_runner = Macro_bearish_trim_runner
+(** Macro-bearish held-exposure trim runner (default-off). Invoked AFTER the
+    special-exit passes on Friday ticks when
+    [config.enable_macro_bearish_exposure_trim = true] AND the macro trend is
+    Bearish: caps held long exposure at
+    [config.macro_bearish_max_long_exposure_pct] of portfolio value, trimming
+    the excess weakest-RS-first. Default-off preserves all baselines. See
+    {!Macro_bearish_trim_runner}. *)
+
 module Laggard_rotation_runner = Laggard_rotation_runner
 (** Laggard-rotation runner — capital recycling on the long side (issue #887).
     Invoked AFTER {!Stops_runner.update}, {!Force_liquidation_runner.update} and
@@ -378,6 +387,24 @@ type config = {
           [close *. (1.0 -. late_stage2_stop_buffer_pct)]. Only consulted when
           [enable_late_stage2_stop_tighten = true]; default [0.0] is the no-op
           buffer. See [Weinstein_strategy_config]. *)
+  enable_macro_bearish_exposure_trim : bool; [@sexp.default false]
+      (** Held-exposure risk dial (default-off): when [true] and the macro tape
+          is Bearish on a Friday tick, the {!Macro_bearish_trim_runner} caps
+          total held long exposure (see [macro_bearish_max_long_exposure_pct])
+          and trims the excess weakest-RS-first. Default [false] preserves all
+          baselines (the runner is never invoked). The {b spine} is untouched —
+          this is the macro gate (spine item #6) extended from "block buys" to
+          "raise cash on a bear tape", a faithful exit-aggressiveness dial; it
+          never force-buys. [Variant_matrix] flag axis. See
+          [Weinstein_strategy_config] / {!Macro_bearish_trim_runner} for full
+          semantics. *)
+  macro_bearish_max_long_exposure_pct : float; [@sexp.default 0.70]
+      (** Fraction of portfolio value at which held long exposure is capped when
+          the macro-bearish trim fires. [0.0] = full flat; [1.0] (or higher) =
+          no-op. Only consulted when
+          [enable_macro_bearish_exposure_trim = true]; default [0.70] mirrors
+          the normal long-exposure cap (a no-op cap). See
+          [Weinstein_strategy_config]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
