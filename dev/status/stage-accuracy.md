@@ -1,6 +1,6 @@
 # Status: stage-accuracy
 
-## Last updated: 2026-06-04
+## Last updated: 2026-06-06
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,42 @@ trigger (Stage-4 flip) lagged every top by 5-29 weeks (price already
 down 5-44%).
 
 ## Completed
+
+- **Macro-bearish held-exposure trim** (default-off, 2026-06-06). New
+  module `Macro_bearish_trim_runner`
+  (`trading/trading/weinstein/strategy/lib/macro_bearish_trim_runner.{ml,mli}`):
+  on a screening (Friday) day, when the macro tape is confirmed `Bearish`,
+  caps total held long exposure at
+  `config.macro_bearish_max_long_exposure_pct` of portfolio value and
+  exits the excess **weakest-RS-first** (reusing the laggard RS window
+  return via the newly-exposed `Laggard_rotation_runner.window_return`).
+  `0.0` = full flat; `1.0` (or higher) = no-op. Shorts never trimmed;
+  never force-buys (re-entry naturally damped through the normal Stage-2
+  breakout+volume screen). Wired into `weinstein_strategy.ml`
+  `_process_market_day` as `_run_macro_bearish_trim`, after
+  `_run_special_exits`; the macro result is hoisted into a new `_run_macro`
+  helper (split out of `_run_macro_and_entries` → `_run_entries`) so the
+  trend is available to the trim pass without computing macro twice.
+  Respects the single-exit collision rule (skip-id union of stop /
+  Stage-3 / laggard / force-liq exits).
+  - Config fields (both default to baseline no-op):
+    `enable_macro_bearish_exposure_trim : bool [@sexp.default false]`,
+    `macro_bearish_max_long_exposure_pct : float [@sexp.default 0.70]`
+    (mirrors the normal long cap → no-op even when flag flipped on).
+  - Flag-discipline: default-off (R1, flag-off path bit-identical to
+    baseline), real config fields → `Variant_matrix` flag + key axes
+    (R2, pinned in `test_variant_matrix.ml`), NOT promoted (R3).
+  - Weinstein-faithful: extends the macro gate (spine item #6) from
+    "block buys" to "raise cash on a bear tape" — an exit-aggressiveness
+    dial, book §Macro Analysis / §Stage 4. Spine untouched.
+  - Tests: `test_macro_bearish_trim_runner.ml` (9 cases) — trim to cap,
+    full-flat, under-cap no-op, no-op cap (1.0), non-positive portfolio
+    value, shorts-not-trimmed, exit-reason label / never-force-buy,
+    unranked-position-excluded, skip-id single-exit collision.
+  - Plan: `dev/plans/macro-bearish-exposure-trim-2026-06-06.md`. Branch
+    `feat/macro-bearish-trim`. Supersedes the late-dial as the deep-window
+    DD lever (the late `late` flag resets on fast crashes; the macro gate
+    fires early + persists through 2000/2008).
 
 - **Late-Stage-2 trailing-stop tightening dial** (default-off). New
   module `Late_stage2_stop_runner`

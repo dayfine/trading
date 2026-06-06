@@ -18,6 +18,10 @@ let _window_return ~(n : int) (bars : Types.Daily_price.t list) : float option =
     _simple_return ~oldest:arr.(0).close_price
       ~latest:arr.(Array.length arr - 1).close_price
 
+(* Public alias so {!Macro_bearish_trim_runner}'s caller can compute the same
+   window return for its RS ranking, keeping the two RS notions consistent. *)
+let window_return = _window_return
+
 (** Build the [TriggerExit] transition for a laggard-rotation exit. Same fill
     convention as {!Stage3_force_exit_runner._make_exit_transition}: the exit
     fires at the close of the current bar (discretionary exit at the close).

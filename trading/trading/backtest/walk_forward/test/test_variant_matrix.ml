@@ -143,6 +143,63 @@ let test_neutral_blocks_longs_flag_axis_expands _ =
               [ equal_to (Sexp.of_string "((neutral_blocks_longs false))") ]);
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the macro-bearish held-exposure
+   trim mechanism: both [enable_macro_bearish_exposure_trim] (flag) and
+   [macro_bearish_max_long_exposure_pct] (float key) are real top-level
+   [Weinstein_strategy.config] fields, so the combined axis expands and passes
+   [Overlay_validator] validation. This is the "axis the day it lands" gate. *)
+let test_macro_bearish_trim_axes_expand _ =
+  let flag_axis =
+    VM.Flag
+      {
+        name = "enable_macro_bearish_exposure_trim";
+        values = Sexp.[ Atom "true"; Atom "false" ];
+      }
+  in
+  let cap_axis =
+    VM.Key
+      {
+        path = [ "macro_bearish_max_long_exposure_pct" ];
+        values = Sexp.[ Atom "0.0"; Atom "0.35" ];
+      }
+  in
+  let t = { VM.axes = [ flag_axis; cap_axis ]; expansion = VM.Cartesian } in
+  (* 2 flag values * 2 cap values = 4 cells; first axis varies slowest. *)
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (v : WFR.variant) -> v.label)
+               (equal_to
+                  "enable_macro_bearish_exposure_trim=true__macro_bearish_max_long_exposure_pct=0.0");
+             field
+               (fun (v : WFR.variant) -> v.overrides)
+               (elements_are
+                  [
+                    equal_to
+                      (Sexp.of_string
+                         "((enable_macro_bearish_exposure_trim true))");
+                    equal_to
+                      (Sexp.of_string
+                         "((macro_bearish_max_long_exposure_pct 0.0))");
+                  ]);
+           ];
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to
+              "enable_macro_bearish_exposure_trim=true__macro_bearish_max_long_exposure_pct=0.35");
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to
+              "enable_macro_bearish_exposure_trim=false__macro_bearish_max_long_exposure_pct=0.0");
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to
+              "enable_macro_bearish_exposure_trim=false__macro_bearish_max_long_exposure_pct=0.35");
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -221,6 +278,8 @@ let suite =
          >:: test_single_component_override_shape;
          "neutral_blocks_longs flag axis expands + validates"
          >:: test_neutral_blocks_longs_flag_axis_expands;
+         "macro-bearish trim flag + cap axes expand + validate"
+         >:: test_macro_bearish_trim_axes_expand;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"
