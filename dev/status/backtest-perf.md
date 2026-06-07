@@ -29,13 +29,38 @@ IN_PROGRESS
     default pipeline → no experiment-flag gate.
   - Verify: `dune runtest trading/backtest/rolling_start/` (27 tests:
     19 dispersion-stats + 8 types).
-  - **Follow-up (PR-2):** the `rolling_start_eval` exe that enumerates
-    start dates (quarterly cadence, `-start-stride-days` default 91),
-    runs `Backtest.Runner.run_backtest` per start (with `--snapshot-dir`
+  - **[x] Follow-up (PR-2) — `rolling_start_eval` exe** (READY_FOR_REVIEW,
+    branch `feat/rolling-start-eval`, PR #1476). Enumerates start dates
+    (quarterly cadence, `--start-stride-days` default 91), runs
+    `Backtest.Runner.run_backtest` per start (with `--snapshot-dir`
     threaded via `Scenario_lib.Bar_source_resolver.resolve`, reusing the
     `walk_forward_executor` per-fold run + metric-map extraction
-    pattern), collects per-start metrics, and emits the `report`. Split
-    out to keep this PR's pure-core diff small and reviewable.
+    pattern), collects per-start metrics, and emits the `report`.
+    - Surface: new `Rolling_start_runner` lib module at
+      `trading/trading/backtest/rolling_start/lib/rolling_start_runner.{ml,mli}`
+      (`enumerate_starts` — pure quarterly-cadence enumeration + clipping;
+      `per_start_of_summary` — pure projection of a `Backtest.Summary.t`
+      into a `per_start`, CAGR via `Walk_forward_runner.cagr_pct` +
+      `MaxUnderwaterVsInitialPct` + `MaxDrawdown`; `run` — the N-backtest
+      orchestration). Thin CLI wrapper at
+      `trading/trading/backtest/rolling_start/bin/rolling_start_eval.ml`
+      (`--scenario` / `--end-date` / `--start-stride-days` /
+      `--fixtures-root` / `--snapshot-dir` / `--out`).
+    - Additive / analysis-only: runs nothing in the default pipeline, no
+      strategy behaviour change → no experiment-flag gate.
+    - Tested (CI, no external data): `test_rolling_start_runner` — 7
+      tests pinning the start-date enumeration (quarterly cadence,
+      first/last clipping, empty cases, non-positive-stride rejection)
+      and the per-start metric extraction (CAGR + capital-relative DD +
+      peak-relative DD from a hand-built `Summary.t`, NaN surfacing).
+    - **Data-gated / uncovered**: a true multi-start end-to-end PIT run
+      (`run` driving real `Runner.run_backtest` calls) needs deep PIT
+      OHLCV / `EODHD_API_KEY`, unavailable in GHA; the CLI plumbing is
+      smoke-verified on `smoke/bull-2019h2.sexp` with `--end-date` equal
+      to the scenario start (empty enumeration → empty report, no
+      backtest).
+    - Verify: `dune runtest trading/backtest/rolling_start/` (34 tests:
+      19 dispersion-stats + 8 types + 7 runner).
 
 ### Recent activity (2026-06-04)
 
