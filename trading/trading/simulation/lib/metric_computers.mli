@@ -125,6 +125,19 @@ val stability_turnover_computer : unit -> Simulator.any_metric_computer
     [PositionTurnover], [PositionConcentrationHhi]. [TradeFrequencyAnnualized]
     ships as a {b derived} metric (see {!default_derived_computers}). *)
 
+(** {1 Capital-Relative Drawdown Computer} *)
+
+val capital_relative_drawdown_computer :
+  ?initial_cash:float -> unit -> Simulator.any_metric_computer
+(** Computer that emits [MaxUnderwaterVsInitialPct]: the worst shortfall of
+    portfolio value below the initial capital, as a percent of initial. Unlike
+    the peak-relative max drawdown, this is measured against the starting stake.
+
+    @param initial_cash
+      Baseline the NAV is compared against. Pass the simulator's configured
+      [initial_cash]; if absent or [<= 0.0] the metric reports 0.0. See
+      {!Capital_relative_drawdown_computer} for spec. *)
+
 (** {1 Default Computer Set} *)
 
 val default_computers :

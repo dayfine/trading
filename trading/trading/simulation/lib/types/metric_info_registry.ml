@@ -402,87 +402,30 @@ let get_metric_info = function
            number of trading days). Reported in percent·days.";
         unit = Ratio;
       }
-  | Skewness ->
+  | MaxUnderwaterVsInitialPct ->
       {
-        display_name = "Skewness";
+        display_name = "Max Underwater vs Initial";
         description =
-          "Third standardized moment of the per-step return distribution. \
-           Positive = heavier right tail (gains); negative = heavier left tail \
-           (losses).";
-        unit = Ratio;
-      }
-  | Kurtosis ->
-      {
-        display_name = "Kurtosis (Excess)";
-        description =
-          "Fourth standardized moment of the per-step return distribution \
-           minus 3. 0 = Gaussian; positive = fat-tailed; negative = \
-           thin-tailed.";
-        unit = Ratio;
-      }
-  | CVaR95 ->
-      {
-        display_name = "CVaR (95%)";
-        description =
-          "Conditional Value-at-Risk at 95% (Expected Shortfall): mean of the \
-           worst 5% of step returns.";
+          "Worst shortfall of portfolio value below the initial capital, as a \
+           percent of initial. Unlike Max Drawdown (peak-relative), measured \
+           against the starting stake — a strategy that 3×'d then fell 40% \
+           reads 0; one that dipped below its starting money reads positive.";
         unit = Percent;
       }
-  | CVaR99 ->
-      {
-        display_name = "CVaR (99%)";
-        description =
-          "Conditional Value-at-Risk at 99%: mean of the worst 1% of step \
-           returns.";
-        unit = Percent;
-      }
-  | TailRatio ->
-      {
-        display_name = "Tail Ratio";
-        description =
-          "mean(top 5% returns) / |mean(bottom 5% returns)|. > 1 means upside \
-           tail dominates downside tail.";
-        unit = Ratio;
-      }
-  | GainToPain ->
-      {
-        display_name = "Gain-to-Pain";
-        description =
-          "Sum of positive step returns divided by absolute sum of negative \
-           step returns. > 1 means cumulative gains exceed cumulative losses.";
-        unit = Ratio;
-      }
-  | ConcavityCoef ->
-      {
-        display_name = "Concavity Coefficient (γ)";
-        description =
-          "Antifragility coefficient from r_strat = α + β·r_bench + \
-           γ·r_bench². γ > 0 = convex/antifragile; γ < 0 = concave/fragile. \
-           Reported as 0 when no benchmark series is supplied.";
-        unit = Ratio;
-      }
-  | BucketAsymmetry ->
-      {
-        display_name = "Bucket Asymmetry";
-        description =
-          "(Q1 + Q5) / (Q2 + Q3 + Q4) of strategy step returns bucketed by \
-           benchmark quintile. > 1 means barbell (strategy concentrates \
-           returns in extremes). Reported as 0 when no benchmark series is \
-           supplied.";
-        unit = Ratio;
-      }
-  | ( BenchmarkAlphaPctAnnualized | BenchmarkBeta | TrackingErrorPctAnnualized
-    | InformationRatio | CorrelationToBenchmark | RollingSharpeStability
-    | TradeFrequencyAnnualized | PositionTurnover | PositionConcentrationHhi )
-    as t -> (
+  | ( Skewness | Kurtosis | CVaR95 | CVaR99 | TailRatio | GainToPain
+    | ConcavityCoef | BucketAsymmetry | BenchmarkAlphaPctAnnualized
+    | BenchmarkBeta | TrackingErrorPctAnnualized | InformationRatio
+    | CorrelationToBenchmark | RollingSharpeStability | TradeFrequencyAnnualized
+    | PositionTurnover | PositionConcentrationHhi ) as t ->
       let open Metric_info_registry_extras in
-      match info_for_benchmark_relative t with
-      | Some i -> i
-      | None ->
-          Option.value_exn
-            (info_for_stability_turnover t)
-            ~message:(sprintf "missing extras info for %s" (show_metric_type t))
-      )
+      Option.value_exn
+        (List.find_map
+           [
+             info_for_distribution_antifragility;
+             info_for_benchmark_relative;
+             info_for_stability_turnover;
+           ] ~f:(fun f -> f t))
+        ~message:(sprintf "missing extras info for %s" (show_metric_type t))
 
 let format_metric metric_type value =
   let info = get_metric_info metric_type in

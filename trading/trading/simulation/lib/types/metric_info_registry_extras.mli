@@ -14,3 +14,8 @@ val info_for_stability_turnover :
 (** Stability + turnover family: [RollingSharpeStability],
     [TradeFrequencyAnnualized], [PositionTurnover], [PositionConcentrationHhi].
 *)
+
+val info_for_distribution_antifragility :
+  Metric_types.metric_type -> Metric_info_types.metric_info option
+(** Distribution-shape + antifragility family: [Skewness], [Kurtosis], [CVaR95],
+    [CVaR99], [TailRatio], [GainToPain], [ConcavityCoef], [BucketAsymmetry]. *)

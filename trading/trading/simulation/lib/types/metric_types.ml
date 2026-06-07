@@ -78,6 +78,7 @@ module Metric_type = struct
       | TradeFrequencyAnnualized
       | PositionTurnover
       | PositionConcentrationHhi
+      | MaxUnderwaterVsInitialPct
     [@@deriving show, eq, compare, sexp]
   end
 
@@ -157,6 +158,7 @@ type metric_type = Metric_type.t =
   | TradeFrequencyAnnualized
   | PositionTurnover
   | PositionConcentrationHhi
+  | MaxUnderwaterVsInitialPct
 [@@deriving show, eq, compare, sexp]
 
 include (Metric_type : Comparator.S with type t := metric_type)

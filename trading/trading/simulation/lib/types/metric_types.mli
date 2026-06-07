@@ -254,6 +254,17 @@ module Metric_type : sig
             symbol-level diversity is the available proxy for the
             rotation-vs-concentration question. Reported as [0.0] when no Friday
             step has any open position. *)
+    (* ---- Capital-relative drawdown ---- *)
+    | MaxUnderwaterVsInitialPct
+        (** Worst shortfall of portfolio value below the {b initial} capital, as
+            a percent of initial:
+            [max over days of (initial - NAV) / initial × 100], clamped at 0
+            when NAV never dips below the initial stake. Unlike [MaxDrawdown]
+            (peak-relative), this is measured against the starting capital — a
+            strategy that 3×'d then fell 40% reads 0 here; one that dipped below
+            its starting money reads positive. Captures psychological depth in
+            capital terms. Reported as [0.0] when no initial cash is supplied
+            ([initial_cash] absent or ≤ 0). *)
   [@@deriving show, eq, compare, sexp]
 
   include Comparator.S with type t := t
@@ -332,6 +343,7 @@ type metric_type = Metric_type.t =
   | TradeFrequencyAnnualized
   | PositionTurnover
   | PositionConcentrationHhi
+  | MaxUnderwaterVsInitialPct
 [@@deriving show, eq, compare, sexp]
 
 (** {1 Metric Set} *)
