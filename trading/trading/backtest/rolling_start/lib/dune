@@ -1,5 +1,5 @@
 (library
  (name rolling_start)
- (libraries core)
+ (libraries core backtest scenario_lib walk_forward trading_simulation_types)
  (preprocess
   (pps ppx_compare ppx_sexp_conv)))

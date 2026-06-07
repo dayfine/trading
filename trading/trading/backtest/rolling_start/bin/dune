@@ -1,0 +1,6 @@
+(executable
+ (name rolling_start_eval)
+ (modules rolling_start_eval)
+ (libraries core rolling_start scenario_lib)
+ (preprocess
+  (pps ppx_sexp_conv)))
