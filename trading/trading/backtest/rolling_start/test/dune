@@ -1,0 +1,5 @@
+(tests
+ (names test_dispersion_stats test_rolling_start_types)
+ (libraries ounit2 core matchers rolling_start)
+ (preprocess
+  (pps ppx_compare ppx_sexp_conv)))
