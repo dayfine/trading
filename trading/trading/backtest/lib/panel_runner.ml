@@ -15,11 +15,40 @@ type input = {
   all_symbols : string list;
 }
 
-(* LRU cap for the snapshot cache. Sized so a tier-3 sp500 run at a long
-   horizon fits resident; tier-4 release gates plumb this through
-   [Runner.config] when they land. Memory budget is best-effort — a single
-   oversized symbol stays resident even when its bytes exceed the cap. *)
-let _snapshot_cache_mb = 1024
+(* Default LRU cap (MB) for the snapshot cache. 4096 MB holds the decoded
+   working set of an N~3000 PIT universe (~1.5 GB on disk) resident, avoiding
+   the thrash that left N=3000 snapshot runs non-terminating under the old
+   1 GB cap (see dev/notes/macro-bearish-trim-grid-2026-06-07.md §7). N=1000
+   (~544 MB) fit under the old cap; the bump is what unlocks N=3000 locally.
+
+   Overridable via the [SNAPSHOT_CACHE_MB] env var (an infra knob, not a
+   strategy parameter, so it is not threaded through
+   [Weinstein_strategy.config]; the env var is the least-plumbing surface).
+   Memory budget is best-effort — a single oversized symbol stays resident even
+   when its bytes exceed the cap. *)
+let _default_snapshot_cache_mb = 4096
+let _snapshot_cache_mb_env_var = "SNAPSHOT_CACHE_MB"
+
+(* Resolve the snapshot LRU cap from [SNAPSHOT_CACHE_MB], falling back to the
+   default on an absent / unparseable / non-positive value. Logs the resolved
+   value once to stderr. *)
+let _resolve_snapshot_cache_mb () =
+  let resolved =
+    match Sys.getenv _snapshot_cache_mb_env_var with
+    | None -> _default_snapshot_cache_mb
+    | Some raw -> (
+        match Int.of_string_opt (String.strip raw) with
+        | Some n when n > 0 -> n
+        | _ ->
+            eprintf
+              "Panel_runner: ignoring unparseable %s=%S; using default %d MB\n\
+               %!"
+              _snapshot_cache_mb_env_var raw _default_snapshot_cache_mb;
+            _default_snapshot_cache_mb)
+  in
+  eprintf "Panel_runner: snapshot cache cap = %d MB (env %s)\n%!" resolved
+    _snapshot_cache_mb_env_var;
+  resolved
 
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader.
@@ -152,7 +181,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   let daily_panels =
     match
       Daily_panels.create ~snapshot_dir ~manifest
-        ~max_cache_mb:_snapshot_cache_mb
+        ~max_cache_mb:(_resolve_snapshot_cache_mb ())
     with
     | Ok p -> p
     | Error err ->
@@ -265,6 +294,21 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
+  (* Snapshot-cache thrash diagnostic. [misses_per_symbol] ≈ 1 means the cache
+     held the working set; a value approaching the cycle count means the cache
+     thrashed (every cycle re-decoding an evicted symbol) — the signal that the
+     cap is too small for this universe. Emit before [close] drops the cache. *)
+  let cache_stats = Daily_panels.cache_stats daily_panels in
+  let misses_per_symbol =
+    if n_all_symbols = 0 then 0.0
+    else Float.of_int cache_stats.misses /. Float.of_int n_all_symbols
+  in
+  eprintf
+    "Panel_runner: snapshot cache hits=%d misses=%d evictions=%d n_symbols=%d \
+     misses_per_symbol=%.2f\n\
+     %!"
+    cache_stats.hits cache_stats.misses cache_stats.evictions n_all_symbols
+    misses_per_symbol;
   (* Drop the Daily_panels LRU cache before returning. See
      dev/notes/bayesian-int-rounding-bug-2026-05-19.md §"Third failure". *)
   Daily_panels.close daily_panels;

@@ -30,6 +30,9 @@ let _per_symbol_overhead_bytes = 128
    never revised. *)
 type cache_entry = { symbol : string; rows : Snapshot.t array; bytes : int }
 
+type stats = { hits : int; misses : int; evictions : int }
+[@@deriving sexp, equal]
+
 type t = {
   snapshot_dir : string;
   manifest : Snapshot_manifest.t;
@@ -40,6 +43,11 @@ type t = {
      tail = LRU. Eviction pops from tail. *)
   lru : cache_entry Doubly_linked.t;
   mutable bytes : int;
+  (* Cumulative cache-access counters since [create]. Surfaced via [cache_stats]
+     for thrash diagnosis; never reset, not even by [close]. *)
+  mutable hits : int;
+  mutable misses : int;
+  mutable evictions : int;
 }
 
 (* --- Path resolution -------------------------------------------------- *)
@@ -73,6 +81,7 @@ let _evict_one t =
       Doubly_linked.remove t.lru elt;
       Hashtbl.remove t.cache entry.symbol;
       t.bytes <- t.bytes - entry.bytes;
+      t.evictions <- t.evictions + 1;
       true
 
 (* Drop entries until the budget is restored. Always leaves at least one
@@ -119,6 +128,7 @@ let _insert_rows t ~symbol rows_list =
   _insert_into_cache t ~symbol ~rows
 
 let _load_and_insert t ~symbol =
+  t.misses <- t.misses + 1;
   match Snapshot_manifest.find t.manifest ~symbol with
   | None ->
       Status.error_not_found
@@ -128,6 +138,7 @@ let _load_and_insert t ~symbol =
 
 (* Cache hit: promote to MRU and return the resident entry. *)
 let _hit_path t (elt : cache_entry Doubly_linked.Elt.t) =
+  t.hits <- t.hits + 1;
   _promote_to_mru t elt;
   Ok (Doubly_linked.Elt.value elt)
 
@@ -148,6 +159,9 @@ let _empty_cache ~snapshot_dir ~manifest ~max_cache_bytes =
     cache = Hashtbl.create (module String);
     lru = Doubly_linked.create ();
     bytes = 0;
+    hits = 0;
+    misses = 0;
+    evictions = 0;
   }
 
 let create ~snapshot_dir ~manifest ~max_cache_mb =
@@ -204,6 +218,9 @@ let active_through_for t ~symbol =
     ~f:(fun (e : Snapshot_manifest.file_metadata) -> e.active_through)
 
 let cache_bytes t = t.bytes
+
+let cache_stats t =
+  { hits = t.hits; misses = t.misses; evictions = t.evictions }
 
 let close t =
   Doubly_linked.clear t.lru;

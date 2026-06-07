@@ -130,6 +130,26 @@ val cache_bytes : t -> int
 (** [cache_bytes t] returns the current sum of estimated bytes resident in the
     cache. Useful for tests that assert eviction kicked in. *)
 
+type stats = { hits : int; misses : int; evictions : int }
+[@@deriving sexp, equal]
+(** Cumulative cache-access counters observed since {!create}.
+
+    - [hits] — reads served from a resident (already-decoded) symbol entry.
+    - [misses] — reads that had to load + decode a symbol file from disk. Each
+      miss is one full sexp decode, the dominant per-read cost.
+    - [evictions] — LRU evictions that actually dropped a resident entry to
+      restore the byte budget.
+
+    The decisive thrash metric is [misses / n_symbols]: ≈1 means each symbol was
+    decoded roughly once (the cache held the working set), whereas a value
+    approaching the number of strategy cycles means the cache is thrashing —
+    every cycle re-decoding a symbol it just evicted. *)
+
+val cache_stats : t -> stats
+(** [cache_stats t] returns the cumulative {!stats} since {!create}. {!close}
+    does not reset the counters — they measure lifetime cache behaviour, so a
+    caller can read them after the run to diagnose cache thrash. *)
+
 val close : t -> unit
 (** [close t] drops every cached symbol. After {!close}, [t] is logically empty;
     subsequent {!read_today} / {!read_history} calls will reload from disk on
