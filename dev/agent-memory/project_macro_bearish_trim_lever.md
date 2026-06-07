@@ -1,6 +1,6 @@
 ---
 name: project_macro_bearish_trim_lever
-description: "The deep-window drawdown lever is bearish-macro-driven HELD-exposure reduction (not the rejected per-stock late-dial, not reaction speed). Macro gate fires early on slow tops but only blocks entries. Scoped experiment, default-off, awaits build+grid."
+description: "Macro-bearish held-exposure trim: BUILT (#1464, default-off) + gridded → REJECT for promotion. cap=0 (full-flat) trades a consistent avoided-loss benefit for a regime-dependent missed-V-recovery cost; net positive ONLY when no sharp V to miss. Not robust across breadth/horizon."
 metadata: 
   node_type: memory
   type: project
@@ -33,10 +33,31 @@ the per-stock `late` flag (reset by fast crashes). Cannot help 2020 — nothing 
 daily stop. Weinstein-faithful (book §Macro/§Stage4 "raise cash when the tape turns";
 spine item #6 extended from block-buys to raise-cash).
 
-**Status: SCOPED, not built.** Plan: `dev/plans/macro-bearish-exposure-trim-2026-06-06.md`
-(#1461). Default-off config (`enable_macro_bearish_exposure_trim` +
-`macro_bearish_max_long_exposure_pct`), model on `force_liquidation`, axis
-`{0.0,0.175,0.35,0.525}`, deep+bull confirmation grid. **Honest prediction: WILL move DD
-(unlike the late-dial which moved nothing), but at a return cost (whipsaw + missed rebound)
-— could still REJECT; the grid prices the DD-vs-return trade.** Build = strategy-core →
-TDD + 3-gate QC → dispatch feat-weinstein, then dispatcher runs the grid.
+**Status: BUILT (#1464, default-off) + GRIDDED → REJECT for promotion (2026-06-07).**
+Full writeup: `dev/notes/macro-bearish-trim-grid-2026-06-07.md`.
+
+**Results:**
+- SP500 grid: cap=0 looked like a deep Pareto win (918→1234%, DD 37→27%) — but this was
+  a no-V window + survivorship inflation (see below).
+- **Cap surface is jagged/non-robust** — force-liquidation RESONANCE at intermediate caps:
+  0.175 → **70 force-liqs / 64% DD** on BOTH windows (the trim holds just enough residual to
+  keep breaching the 60%-DD circuit breaker → liquidate → rebuild → breach). Only cap≈0
+  (clean full exit) is internally stable.
+- **top-1000 PIT (survivorship-correct): cap=0 NOT robust** — 15y huge win (29.6→730.9%),
+  20y return HALVED (228.7→111.2%). Three universes/windows gave three different answers.
+
+**Mechanism (trade-by-trade, definitive):** cap=0 = consistent **avoided-loss benefit**
+(cuts the bear-tape stop-loss cohort every window) MINUS a regime-dependent
+**missed-V-recovery cost**. Smoking gun (20y): cap=0 went to cash into 2008 correctly but
+sat flat through the Mar-2009 V (+37% baseline captured, cap=0 $1.07M→$1.08M) — re-entry is
+a fresh Stage-2 breakout, which structurally lags V-bottoms. Net = avoided-loss − missed-V;
+positive only when no sharp V exists to miss. Can't know that ex-ante → not a promotable
+global default. **Stays default-off as a Variant_matrix axis.**
+
+**Possible faithful refinement (future, not built):** faster re-admission after the macro
+gate flips Bullish (shorter cooldown / re-admit names still in Stage-2) to recover the
+missed V — keeps the Stage-2 spine. Speculative; would need its own experiment.
+
+See also: [[feedback_large_n_needs_snapshot_mode]] (the breadth runs),
+[[project_pit_survivorship_inflation]] (the bigger finding),
+[[project_evaluation_methodology_reframe]] (MaxDD misled the read).
