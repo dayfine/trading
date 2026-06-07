@@ -45,7 +45,7 @@ Before reading any file or writing any code, create an isolated jj workspace:
 
 ```bash
 AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
-AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+AGENT_WS=".claude/worktrees/jjws-${AGENT_ID}"
 jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
 cd "$AGENT_WS"
 # Verify: @ should be an empty commit on top of main@origin
@@ -181,7 +181,8 @@ status to READY_FOR_REVIEW.
 - [ ] **No Python** — confirmed via `find <touched paths> -name '*.py'` returning zero matches; `trading/devtools/checks/no_python_check.sh` (wired into `dune runtest`) catches this on CI
 - [ ] **Pinned data fixtures are committed** — any HTML / CSV / sexp the test depends on lives under `test/data/` and is referenced by relative path. Do not depend on network fetches in tests.
 - [ ] **Cached data is gitignored** — `dev/data/<vendor>/` (anything fetched at runtime) is in `.gitignore`; small samples for tests live under `test/data/` and are checked in.
-- [ ] `dune build && dune runtest` passes with zero warnings on a clean checkout of the branch
+- [ ] `dune build && dune runtest` passes with zero warnings on a clean checkout of the branch — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail not dune)
+- [ ] **Finish Protocol** followed (`.claude/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] `dune build @fmt` passes (formatter in check mode)
 - [ ] `dev/status/data-foundations.md` updated: tick off the item, add a Completed entry with what was built, where it lives, and how to verify
 - [ ] PR body is non-empty — after `jst submit`, write the PR description (what/why/test plan) via `gh pr edit <N> --body-file <path>`. `jst submit` does not populate the body.

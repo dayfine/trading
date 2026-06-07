@@ -18,7 +18,7 @@ Before reading any file or writing any code, create an isolated jj workspace:
 
 ```bash
 AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
-AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+AGENT_WS=".claude/worktrees/jjws-${AGENT_ID}"
 jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
 cd "$AGENT_WS"
 # Verify: @ should be an empty commit on top of main@origin
