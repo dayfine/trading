@@ -108,14 +108,27 @@ Standard boilerplate for every feat-* / harness-maintainer / ops-data agent:
 # Claude Code's isolation:"worktree" creates a git-worktree, NOT a jj-workspace.
 # Without this step, concurrent agents race the shared op_heads / default WorkspaceName.
 # See .claude/rules/worktree-isolation.md §"jj workspace isolation".
+#
+# CRITICAL: the workspace MUST live under the repo (.claude/worktrees/) so it is
+# visible inside the Docker container via the bind-mount. A /tmp path is
+# INVISIBLE to `docker exec trading-1-dev` — the agent would edit files jj+host
+# can see but dune (run in the container) cannot, silently building the parent
+# tree instead. This was the 2026-06-07 contamination root cause. See
+# memory/project_jj_workspace_docker_path.
 
 AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
-AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+AGENT_WS=".claude/worktrees/jjws-${AGENT_ID}"          # repo-local → container-visible
 jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
 cd "$AGENT_WS"
 
 # Verify isolation: the new workspace's @ should be off main@origin
 jj log -n 1 -r @
+
+# Run EVERY dune command against THIS workspace's trading dir (NOT the parent):
+#   docker exec trading-1-dev bash -c \
+#     'cd /workspaces/trading-1/'"$AGENT_WS"'/trading && eval $(opam env) && dune build'
+# If you cd the container to /workspaces/trading-1/trading you build the parent,
+# not your edits — that is the bug this whole section exists to prevent.
 ```
 
 **After work is complete, clean up:**
@@ -127,13 +140,44 @@ rm -rf "$AGENT_WS"
 ```
 
 **Notes:**
-- `$AGENT_WS` is under `/tmp/` — outside the repo — so it cannot contaminate
-  the parent worktree's git index.
+- `$AGENT_WS` is **repo-local** (`.claude/worktrees/jjws-…`) so it is bind-mounted
+  into the container; jj runs on the host, dune runs in the container, and both
+  see the same files. A `/tmp` path breaks this (host-only) — never use it.
 - The `-r main@origin` flag ensures the new `@` starts from main, not from
   whatever `@` the parent had at dispatch time.
 - This fix applies to local jj runs only. GHA runs use `$TRADING_IN_CONTAINER`
   mode (plain git, no jj) and are unaffected.
-- Reference: `memory/project_jj_worktree_root_cause.md` (root cause writeup).
+- Reference: `memory/project_jj_worktree_root_cause.md` +
+  `memory/project_jj_workspace_docker_path.md` (root cause writeups).
+
+## Finish Protocol (required — prevents lost-work / un-opened PRs)
+
+The 2026-06-07 session lost three feat-agent commits because agents (a)
+backgrounded the final `dune runtest` and ended the turn "standing by" before
+ever committing, and (b) relied on workspace isolation to protect *uncommitted*
+state. The work survived only because it could be recovered from disk by hand.
+
+Every jj-writing agent MUST finish with this exact sequence, **in the foreground,
+as its last actions, without ending the turn in between:**
+
+1. **Verify in the foreground.** Run `dune build @fmt && dune build && dune runtest`
+   and read the **exit code** (not a `grep FAIL:` — OUnit failures and some
+   linters don't print that literal; and `… | tail; echo $?` captures `tail`'s
+   exit, not dune's). Blocking ~10 min here is expected and correct. Do NOT
+   background it and wait for an event.
+2. **Commit → bookmark → push → open PR, atomically:**
+   `jj describe -m "…"` → `jj bookmark set feat/<name> -r @` →
+   `jj git push -b feat/<name>` → `gh pr create …`.
+3. **Verify the push landed:** `jj diff -r @ --stat` must list your files (a
+   commit that shows 0 files = the working copy never snapshotted into it — STOP
+   and fix) **and** `gh pr view <N> --json files` must show them.
+4. **On any push/PR failure:** retry once; if it still fails, report the
+   **bookmark name + commit id + "PR NOT opened"** explicitly so the dispatcher
+   can open it (the dispatcher's recovery path, `feat-agent-dispatch.md` §2).
+
+Never end a turn with an un-pushed commit. The PR being open on origin is the
+only durable proof of done — a green local build that was never pushed is lost
+work.
 
 ## Cleanup
 

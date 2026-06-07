@@ -44,7 +44,7 @@ Before reading any file or writing any code, create an isolated jj workspace:
 
 ```bash
 AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
-AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+AGENT_WS=".claude/worktrees/jjws-${AGENT_ID}"
 jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
 cd "$AGENT_WS"
 # Verify: @ should be an empty commit on top of main@origin
@@ -188,7 +188,8 @@ status to READY_FOR_REVIEW.
 - [ ] All configurable parameters routed through config record — no magic numbers
 - [ ] If experiment: scenario files parse via `Scenario.load` (run `dune build`)
 - [ ] If experiment: `dev/experiments/<name>/report.md` includes a comparative table + falsifiable conclusion
-- [ ] `dune build && dune runtest` passes with zero warnings
+- [ ] `dune build && dune runtest` passes with zero warnings — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail not dune)
+- [ ] **Finish Protocol** followed (`.claude/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] `dune build @fmt` passes (formatter in check mode; equivalent: `dune fmt` produces no diff)
 - [ ] The relevant status file (`backtest-infra.md` or `backtest-scale.md`) updated: tick off the item under the relevant subsection, add a Completed entry with what was built, where it lives, and how to verify
 - [ ] Trading-behaviour-impact items also link back to `## Potential experiments` if they originated there

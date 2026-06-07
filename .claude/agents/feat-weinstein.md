@@ -26,7 +26,7 @@ Before reading any file or writing any code, create an isolated jj workspace:
 
 ```bash
 AGENT_ID="${HOSTNAME}-$$-$(date +%s)"
-AGENT_WS="/tmp/agent-ws-${AGENT_ID}"
+AGENT_WS=".claude/worktrees/jjws-${AGENT_ID}"
 jj workspace add "$AGENT_WS" --name "$AGENT_ID" -r main@origin
 cd "$AGENT_WS"
 # Verify: @ should be an empty commit on top of main@origin
@@ -91,7 +91,8 @@ Do **not** modify the state machine itself (Initial → FirstCorrection → Trai
 - [ ] `Support_floor.find_recent_low` implemented + unit tests: peak + pullback identification, depth threshold, lookback truncation, no-pullback returns None, empty bars returns None
 - [ ] `Stops.compute_initial_stop` accepts the output; behaviour under `None` is identical to today's fixed-buffer code path
 - [ ] Smoke test: run `Weinstein_strategy` on cached 2018-2023 data and confirm at least one Stage-2 entry places its initial stop based on a support-floor value (not the fixed-buffer proxy)
-- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes
+- [ ] `dune build && dune runtest` passes, `dune build @fmt` passes — run in the **foreground**, check the **exit code** (not `grep FAIL:`; not `… | tail; echo $?` which captures tail)
+- [ ] **Finish Protocol** followed (`.claude/rules/worktree-isolation.md` §"Finish Protocol"): verify → `jj describe`→`bookmark set`→`git push`→`gh pr create` atomically as the last actions; `jj diff -r @ --stat` non-empty + `gh pr view <N> --json files` lists your files; on push/PR failure report bookmark+commit+"PR NOT opened". Never end a turn with an un-pushed commit.
 - [ ] PR diff respects `## PR sizing` rules from `feat-agent-template.md` (≤500 LOC, one new module per PR)
 - [ ] No changes to screener, portfolio_risk, order_gen, or trading_state
 
