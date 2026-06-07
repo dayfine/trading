@@ -19,9 +19,7 @@ let _inclusive_days ~start_date ~end_date = Date.diff end_date start_date + 1
 
 let per_start_of_summary ~start_date ~end_date (summary : Backtest.Summary.t) :
     Rolling_start_types.per_start =
-  let get k =
-    Map.find summary.metrics k |> Option.value ~default:Float.nan
-  in
+  let get k = Map.find summary.metrics k |> Option.value ~default:Float.nan in
   let total_return_pct =
     (summary.final_portfolio_value -. summary.initial_cash)
     /. summary.initial_cash *. 100.0
@@ -43,9 +41,9 @@ type config = {
   bar_data_source : Backtest.Bar_data_source.t option;
 }
 
-(** Resolve the scenario's [universe_path] (relative to [fixtures_root]) into the
-    optional sector-map override [Backtest.Runner] uses as its universe. Mirrors
-    [scenario_runner._sector_map_of_universe_file]. *)
+(** Resolve the scenario's [universe_path] (relative to [fixtures_root]) into
+    the optional sector-map override [Backtest.Runner] uses as its universe.
+    Mirrors [scenario_runner._sector_map_of_universe_file]. *)
 let _sector_map_override ~fixtures_root (scenario : Scenario.t) =
   let resolved = Filename.concat fixtures_root scenario.universe_path in
   Universe_file.to_sector_map_override (Universe_file.load resolved)

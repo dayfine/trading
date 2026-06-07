@@ -1,7 +1,7 @@
-(** Drive a rolling-start dispersion evaluation: enumerate start dates at a fixed
-    cadence, run one backtest per start to a common end date, project each run's
-    terminal metrics into a {!Rolling_start_types.per_start}, and assemble the
-    {!Rolling_start_types.report}.
+(** Drive a rolling-start dispersion evaluation: enumerate start dates at a
+    fixed cadence, run one backtest per start to a common end date, project each
+    run's terminal metrics into a {!Rolling_start_types.per_start}, and assemble
+    the {!Rolling_start_types.report}.
 
     Plan: [dev/plans/evaluation-objective-and-metrics-2026-06-07.md] §2 P1. This
     is PR-2 of the rolling-start work — the executable layer on top of the pure
@@ -17,9 +17,9 @@ val enumerate_starts :
   scenario_start:Date.t -> end_date:Date.t -> stride_days:int -> Date.t list
 (** [enumerate_starts ~scenario_start ~end_date ~stride_days] is the ascending
     list of clipped start dates to run a backtest from. Starting at
-    [scenario_start], it steps forward by [stride_days] calendar days
-    (default quarterly = 91) and emits every start strictly before [end_date],
-    so each enumerated start spans a non-empty window.
+    [scenario_start], it steps forward by [stride_days] calendar days (default
+    quarterly = 91) and emits every start strictly before [end_date], so each
+    enumerated start spans a non-empty window.
 
     - The first element is always [scenario_start] when
       [scenario_start < end_date].
@@ -36,8 +36,8 @@ val per_start_of_summary :
   Backtest.Summary.t ->
   Rolling_start_types.per_start
 (** [per_start_of_summary ~start_date ~end_date summary] projects one backtest's
-    {!Backtest.Summary.t} into a {!Rolling_start_types.per_start} tagged with the
-    [start_date] it ran from. Pure — depends only on the summary, so it is
+    {!Backtest.Summary.t} into a {!Rolling_start_types.per_start} tagged with
+    the [start_date] it ran from. Pure — depends only on the summary, so it is
     unit-tested by constructing a [Summary.t] directly without a backtest.
 
     - [cagr_pct] is the annualised total return over [start_date .. end_date],
@@ -59,14 +59,15 @@ type config = {
       (** The fixed end date every enumerated run terminates on. Overrides the
           scenario's own [period.end_date] so the sweep span is explicit. *)
   stride_days : int;
-      (** Calendar-day cadence between successive start dates (91 = quarterly). *)
+      (** Calendar-day cadence between successive start dates (91 = quarterly).
+      *)
   fixtures_root : string;
       (** Directory the scenario's [universe_path] is resolved against (mirrors
           [scenario_runner --fixtures-root]). *)
   bar_data_source : Backtest.Bar_data_source.t option;
       (** Optional snapshot bar source, resolved once from [--snapshot-dir] via
-          {!Scenario_lib.Bar_source_resolver.resolve} and reused for every start.
-          [None] keeps the pre-snapshot CSV behaviour. *)
+          {!Scenario_lib.Bar_source_resolver.resolve} and reused for every
+          start. [None] keeps the pre-snapshot CSV behaviour. *)
 }
 (** Everything {!run} needs to enumerate starts and run one backtest per start.
 *)

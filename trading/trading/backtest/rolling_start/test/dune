@@ -1,5 +1,8 @@
 (tests
- (names test_dispersion_stats test_rolling_start_types test_rolling_start_runner)
+ (names
+  test_dispersion_stats
+  test_rolling_start_types
+  test_rolling_start_runner)
  (libraries
   ounit2
   core

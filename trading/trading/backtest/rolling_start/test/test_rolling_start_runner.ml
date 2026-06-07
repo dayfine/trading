@@ -69,7 +69,8 @@ let test_enumerate_empty_when_start_after_end _ =
 
 (* A non-positive stride is rejected. *)
 let test_enumerate_rejects_nonpositive_stride _ =
-  assert_raises (Invalid_argument "enumerate_starts: stride_days must be positive, got 0")
+  assert_raises
+    (Invalid_argument "enumerate_starts: stride_days must be positive, got 0")
     (fun () ->
       Runner.enumerate_starts
         ~scenario_start:(date ~y:2011 ~m:Month.Jan ~d:1)
