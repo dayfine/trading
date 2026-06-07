@@ -5,6 +5,38 @@
 ## Status
 IN_PROGRESS
 
+### Recent activity (2026-06-07)
+
+- **[x] Rolling-start dispersion — pure stats core (PR-1 of 2)**
+  (branch `feat/rolling-start-dispersion`). P1 ("highest value") of
+  `dev/plans/evaluation-objective-and-metrics-2026-06-07.md` §2: judge a
+  strategy on the *distribution* of terminal outcomes across many
+  backtest start dates (to a fixed end), not one full-window number —
+  start-date robustness as the primary evaluation lens (plan §1.3).
+  - Surface: new `rolling_start` lib at
+    `trading/trading/backtest/rolling_start/lib/`:
+    - `Dispersion_stats` — pure `percentile` (NumPy linear / type-7),
+      `median`, `iqr`, and a `summarize` → `summary`
+      (median / p10 / IQR / min / max / n) over a `float list`. The
+      rock-solid numeric core; unit-tested against hand-computed values
+      with no backtest.
+    - `Rolling_start_types` — `per_start` row (start_date + CAGR +
+      `MaxUnderwaterVsInitialPct` capital-relative DD (#1471) +
+      peak-relative MaxDD), `report` (one `Dispersion_stats.summary` per
+      metric), `build`, and a `to_markdown` renderer mirroring the
+      `walk_forward_render` table style + a derived sexp.
+  - Additive / analysis-only: no strategy behaviour, runs nothing in the
+    default pipeline → no experiment-flag gate.
+  - Verify: `dune runtest trading/backtest/rolling_start/` (27 tests:
+    19 dispersion-stats + 8 types).
+  - **Follow-up (PR-2):** the `rolling_start_eval` exe that enumerates
+    start dates (quarterly cadence, `-start-stride-days` default 91),
+    runs `Backtest.Runner.run_backtest` per start (with `--snapshot-dir`
+    threaded via `Scenario_lib.Bar_source_resolver.resolve`, reusing the
+    `walk_forward_executor` per-fold run + metric-map extraction
+    pattern), collects per-start metrics, and emits the `report`. Split
+    out to keep this PR's pure-core diff small and reviewable.
+
 ### Recent activity (2026-06-04)
 
 - **[x] `scenario_runner --snapshot-dir <path>`** (READY_FOR_REVIEW,
