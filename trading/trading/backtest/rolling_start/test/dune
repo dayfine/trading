@@ -1,5 +1,11 @@
 (tests
- (names test_dispersion_stats test_rolling_start_types)
- (libraries ounit2 core matchers rolling_start)
+ (names test_dispersion_stats test_rolling_start_types test_rolling_start_runner)
+ (libraries
+  ounit2
+  core
+  matchers
+  rolling_start
+  backtest
+  trading_simulation_types)
  (preprocess
   (pps ppx_compare ppx_sexp_conv)))
