@@ -282,6 +282,58 @@ let test_round_trip_30d_10sym _ =
     (is_ok_and_holds
        (field (fun (r : Snapshot.t) -> r.values.(0)) (float_equal 105.0)))
 
+(* --- cache stats counters ------------------------------------------- *)
+
+(* A first read of a fresh symbol is a miss (one disk decode), no hit, no
+   eviction. *)
+let test_cache_stats_first_read_is_a_miss _ =
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _ =
+    match Daily_panels.read_today t ~symbol:"AAPL" ~date:_default_start with
+    | Ok r -> r
+    | Error err -> assert_failure ("read_today: " ^ Status.show err)
+  in
+  assert_that
+    (Daily_panels.cache_stats t)
+    (equal_to ({ hits = 0; misses = 1; evictions = 0 } : Daily_panels.stats))
+
+(* A second read of the same resident symbol is a hit; the miss count stays
+   at one. *)
+let test_cache_stats_second_read_is_a_hit _ =
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let read () =
+    match Daily_panels.read_today t ~symbol:"AAPL" ~date:_default_start with
+    | Ok _ -> ()
+    | Error err -> assert_failure ("read_today: " ^ Status.show err)
+  in
+  read ();
+  read ();
+  assert_that
+    (Daily_panels.cache_stats t)
+    (equal_to ({ hits = 1; misses = 1; evictions = 0 } : Daily_panels.stats))
+
+(* Under a tiny budget with several large symbols, loading them all forces at
+   least one eviction; each first-touch is a miss and none are hits. *)
+let test_cache_stats_counts_evictions_under_pressure _ =
+  let symbols = [ "A"; "B"; "C"; "D"; "E"; "F" ] in
+  let _dir, t = _setup ~symbols ~n_days:5000 ~max_cache_mb:1 in
+  List.iter symbols ~f:(fun symbol ->
+      match Daily_panels.read_today t ~symbol ~date:_default_start with
+      | Ok _ -> ()
+      | Error err -> assert_failure ("read_today: " ^ Status.show err));
+  assert_that
+    (Daily_panels.cache_stats t)
+    (all_of
+       [
+         field (fun (s : Daily_panels.stats) -> s.hits) (equal_to 0);
+         field
+           (fun (s : Daily_panels.stats) -> s.misses)
+           (equal_to (List.length symbols));
+         field
+           (fun (s : Daily_panels.stats) -> s.evictions)
+           (gt (module Int_ord) 0);
+       ])
+
 let suite =
   "Daily_panels tests"
   >::: [
@@ -305,6 +357,12 @@ let suite =
          "close then read reloads" >:: test_close_then_read_reloads;
          "schema mismatch fails loud" >:: test_schema_mismatch_fails_loud;
          "round trip 30d × 10 sym" >:: test_round_trip_30d_10sym;
+         "cache stats first read is a miss"
+         >:: test_cache_stats_first_read_is_a_miss;
+         "cache stats second read is a hit"
+         >:: test_cache_stats_second_read_is_a_hit;
+         "cache stats counts evictions under pressure"
+         >:: test_cache_stats_counts_evictions_under_pressure;
        ]
 
 let () = run_test_tt_main suite

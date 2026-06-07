@@ -15,12 +15,6 @@ type input = {
   all_symbols : string list;
 }
 
-(* LRU cap for the snapshot cache. Sized so a tier-3 sp500 run at a long
-   horizon fits resident; tier-4 release gates plumb this through
-   [Runner.config] when they land. Memory budget is best-effort — a single
-   oversized symbol stays resident even when its bytes exceed the cap. *)
-let _snapshot_cache_mb = 1024
-
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
    callback adapter, sharing the LRU cache with the strategy bar reader.
 
@@ -152,7 +146,7 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
   let daily_panels =
     match
       Daily_panels.create ~snapshot_dir ~manifest
-        ~max_cache_mb:_snapshot_cache_mb
+        ~max_cache_mb:(Snapshot_cache_config.resolve_cache_mb ())
     with
     | Ok p -> p
     | Error err ->
@@ -265,8 +259,9 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
-  (* Drop the Daily_panels LRU cache before returning. See
+  (* Emit the cache thrash diagnostic, then drop the LRU before returning. See
      dev/notes/bayesian-int-rounding-bug-2026-05-19.md §"Third failure". *)
+  Snapshot_cache_config.log_cache_stats ~daily_panels ~n_symbols:n_all_symbols;
   Daily_panels.close daily_panels;
   ( sim_result,
     r.stop_log,
