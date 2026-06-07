@@ -823,8 +823,9 @@ let test_default_computers _ =
      trade_aggregates (M5.2b), return_basics (M5.2b), omega_ratio (M5.2c),
      drawdown_analytics (M5.2c), distributional (M5.2d), antifragility
      (M5.2d), benchmark_relative (CAPM-style alpha/beta/IR), stability +
-     turnover (rolling-sharpe stability, position turnover, HHI). *)
-  assert_that computers (size_is 13)
+     turnover (rolling-sharpe stability, position turnover, HHI),
+     capital_relative_drawdown (MaxUnderwaterVsInitialPct). *)
+  assert_that computers (size_is 14)
 
 (* ==================== Factory Tests ==================== *)
 

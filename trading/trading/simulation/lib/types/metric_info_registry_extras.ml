@@ -60,3 +60,60 @@ let info_for_stability_turnover : metric_type -> metric_info option = function
             diversified."
            Ratio)
   | _ -> None
+
+let info_for_distribution_antifragility : metric_type -> metric_info option =
+  function
+  | Skewness ->
+      Some
+        (_info "Skewness"
+           "Third standardized moment of the per-step return distribution. \
+            Positive = heavier right tail (gains); negative = heavier left \
+            tail (losses)."
+           Ratio)
+  | Kurtosis ->
+      Some
+        (_info "Kurtosis (Excess)"
+           "Fourth standardized moment of the per-step return distribution \
+            minus 3. 0 = Gaussian; positive = fat-tailed; negative = \
+            thin-tailed."
+           Ratio)
+  | CVaR95 ->
+      Some
+        (_info "CVaR (95%)"
+           "Conditional Value-at-Risk at 95% (Expected Shortfall): mean of the \
+            worst 5% of step returns."
+           Percent)
+  | CVaR99 ->
+      Some
+        (_info "CVaR (99%)"
+           "Conditional Value-at-Risk at 99%: mean of the worst 1% of step \
+            returns."
+           Percent)
+  | TailRatio ->
+      Some
+        (_info "Tail Ratio"
+           "mean(top 5% returns) / |mean(bottom 5% returns)|. > 1 means upside \
+            tail dominates downside tail."
+           Ratio)
+  | GainToPain ->
+      Some
+        (_info "Gain-to-Pain"
+           "Sum of positive step returns divided by absolute sum of negative \
+            step returns. > 1 means cumulative gains exceed cumulative losses."
+           Ratio)
+  | ConcavityCoef ->
+      Some
+        (_info "Concavity Coefficient (γ)"
+           "Antifragility coefficient from r_strat = α + β·r_bench + \
+            γ·r_bench². γ > 0 = convex/antifragile; γ < 0 = concave/fragile. \
+            Reported as 0 when no benchmark series is supplied."
+           Ratio)
+  | BucketAsymmetry ->
+      Some
+        (_info "Bucket Asymmetry"
+           "(Q1 + Q5) / (Q2 + Q3 + Q4) of strategy step returns bucketed by \
+            benchmark quintile. > 1 means barbell (strategy concentrates \
+            returns in extremes). Reported as 0 when no benchmark series is \
+            supplied."
+           Ratio)
+  | _ -> None

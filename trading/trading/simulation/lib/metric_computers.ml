@@ -35,6 +35,9 @@ let antifragility_computer = Antifragility_computer.computer
 let benchmark_relative_computer = Benchmark_relative_computer.computer
 let stability_turnover_computer = Stability_turnover_computer.computer
 
+let capital_relative_drawdown_computer =
+  Capital_relative_drawdown_computer.computer
+
 (** {1 Derived Metric Computers} *)
 
 let calmar_ratio_derived : Simulator_types.derived_metric_computer =
@@ -109,6 +112,7 @@ let create_computer (metric_type : Metric_types.metric_type) :
   | TradeFrequencyAnnualized ->
       _derived_only_stub ~name:"trade_freq_annualized_stub"
         TradeFrequencyAnnualized
+  | MaxUnderwaterVsInitialPct -> capital_relative_drawdown_computer ()
 
 (** {1 Default Computer Set} *)
 
@@ -127,6 +131,7 @@ let default_computers ?(risk_free_rate = 0.0) ?(initial_cash = 0.0) () =
     antifragility_computer ();
     benchmark_relative_computer ();
     stability_turnover_computer ();
+    capital_relative_drawdown_computer ~initial_cash ();
   ]
 
 let default_derived_computers () =
