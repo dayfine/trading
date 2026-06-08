@@ -25,6 +25,18 @@ type input = {
 let _build_market_data_adapter ~daily_panels =
   Bar_data_source.build_adapter_from_panels daily_panels
 
+(* Stale-hold policy for the simulator, derived from the resolved strategy
+   config. The detector defaults ([enabled]/[stale_after_days]) are carried over
+   from [Stale_hold.default_config]; only [stale_exit_after_days] is threaded
+   from the strategy config. [None] (the default) keeps every existing backtest
+   byte-identical — the detector still records, but no force-exit fires. *)
+let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
+    =
+  {
+    Stale_hold.default_config with
+    stale_exit_after_days = config.stale_exit_after_days;
+  }
+
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
     ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps
     ?on_trade_fill ~strategy ~market_data_adapter () =
@@ -35,6 +47,7 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~data_dir:input.data_dir_fpath ~strategy ~commission
       ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
       ~market_data_adapter ~stale_hold_log ?slippage_bps
+      ~stale_hold_policy:(_stale_hold_policy input.config)
       ~margin_config:input.config.margin_config ?on_trade_fill ()
   in
   let sim_config =

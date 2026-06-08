@@ -198,12 +198,96 @@ let test_detect_disabled_returns_no_events _ =
   let adapter =
     _adapter_of_table ~table:[ ("ANDV", _date "2018-09-28", 153.46) ]
   in
-  let config = { Stale_hold.enabled = false; stale_after_days = 5 } in
+  let config =
+    {
+      Stale_hold.enabled = false;
+      stale_after_days = 5;
+      stale_exit_after_days = None;
+    }
+  in
   let events =
     Stale_hold.detect_stale ~adapter ~date:(_date "2018-10-05") ~portfolio
       ~today_bars:[] ~config
   in
   assert_that events (size_is 0)
+
+(* -------------------------------------------------------------------- *)
+(* Force-exit candidate selection                                        *)
+(* -------------------------------------------------------------------- *)
+
+let test_force_exit_disabled_by_default _ =
+  (* Default config has [stale_exit_after_days = None] — no candidates even
+     for a clearly-stale held position. Pins the default-off invariant. *)
+  let portfolio =
+    _portfolio_with_position ~symbol:"ANDV" ~quantity:100.0 ~entry_price:80.0
+      ~entry_date:(_date "2018-06-01")
+  in
+  let adapter =
+    _adapter_of_table ~table:[ ("ANDV", _date "2018-09-28", 153.46) ]
+  in
+  let candidates =
+    Stale_hold.force_exit_candidates ~adapter ~date:(_date "2018-10-05")
+      ~portfolio ~today_bars:[] ~config:Stale_hold.default_config
+  in
+  assert_that candidates (size_is 0)
+
+let test_force_exit_emits_long_candidate_at_last_close _ =
+  (* Symbol last had a bar 7 days ago — past the configured exit threshold of
+     5. One candidate: full (positive) quantity, last close, gap = 7. *)
+  let portfolio =
+    _portfolio_with_position ~symbol:"ANDV" ~quantity:100.0 ~entry_price:80.0
+      ~entry_date:(_date "2018-06-01")
+  in
+  let adapter =
+    _adapter_of_table ~table:[ ("ANDV", _date "2018-09-28", 153.46) ]
+  in
+  let config =
+    { Stale_hold.default_config with stale_exit_after_days = Some 5 }
+  in
+  let candidates =
+    Stale_hold.force_exit_candidates ~adapter ~date:(_date "2018-10-05")
+      ~portfolio ~today_bars:[] ~config
+  in
+  assert_that candidates
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (c : Stale_hold.force_exit) -> c.symbol)
+               (equal_to "ANDV");
+             field
+               (fun (c : Stale_hold.force_exit) -> c.signed_quantity)
+               (float_equal 100.0);
+             field
+               (fun (c : Stale_hold.force_exit) -> c.last_close)
+               (float_equal 153.46);
+             field
+               (fun (c : Stale_hold.force_exit) -> c.last_bar_date)
+               (equal_to (_date "2018-09-28"));
+             field
+               (fun (c : Stale_hold.force_exit) -> c.days_since_last_bar)
+               (equal_to 7);
+           ];
+       ])
+
+let test_force_exit_skips_recent_gap _ =
+  (* Last bar only 2 days ago — under the Some 5 threshold. No candidate. *)
+  let portfolio =
+    _portfolio_with_position ~symbol:"AAPL" ~quantity:10.0 ~entry_price:100.0
+      ~entry_date:(_date "2024-01-02")
+  in
+  let adapter =
+    _adapter_of_table ~table:[ ("AAPL", _date "2024-01-13", 105.0) ]
+  in
+  let config =
+    { Stale_hold.default_config with stale_exit_after_days = Some 5 }
+  in
+  let candidates =
+    Stale_hold.force_exit_candidates ~adapter ~date:(_date "2024-01-15")
+      ~portfolio ~today_bars:[] ~config
+  in
+  assert_that candidates (size_is 0)
 
 (* -------------------------------------------------------------------- *)
 (* Log + persistence                                                     *)
@@ -289,6 +373,12 @@ let suite =
          >:: test_detect_held_position_with_no_prior_bar_is_dropped;
          "detect: enabled=false suppresses all events"
          >:: test_detect_disabled_returns_no_events;
+         "force_exit: disabled by default (None)"
+         >:: test_force_exit_disabled_by_default;
+         "force_exit: emits long candidate at last close"
+         >:: test_force_exit_emits_long_candidate_at_last_close;
+         "force_exit: skips position with recent gap"
+         >:: test_force_exit_skips_recent_gap;
          "log: events returned in chronological order"
          >:: test_log_records_events_in_chronological_order;
          "log: distinct_symbols dedupes" >:: test_log_distinct_symbols_dedupes;

@@ -170,6 +170,16 @@ type config = {
           the normal long-exposure cap, so even with the flag flipped on the
           value defaults to a no-op cap — only a tighter value changes
           behaviour. See {!Macro_bearish_trim_runner}. *)
+  stale_exit_after_days : int option; [@sexp.default None]
+      (** When [Some n], a held position whose underlying symbol has stopped
+          emitting bars for [n] calendar days is force-sold at its last
+          available close as a realised trade (instead of being carried open at
+          a stale mark indefinitely and counted in terminal NAV — issue #1484).
+          The runner threads this into the simulator's
+          [Trading_simulation.Stale_hold.config.stale_exit_after_days]. Default
+          [None] keeps every existing backtest byte-identical (detector still
+          records stale holds; no force-exit). Searchable as a [Variant_matrix]
+          flag axis ([((flag stale_exit_after_days) (values (() (5))))]). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

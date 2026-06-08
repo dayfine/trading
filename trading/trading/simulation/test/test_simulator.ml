@@ -866,6 +866,155 @@ let test_forward_fill_uses_last_known_close_when_held_symbol_has_no_bar _ =
       assert_that result3.portfolio_value
         (gt (module Float_ord) (cash_after_buy +. 100.0)))
 
+(* ==================== Stale force-exit (#1484) ==================== *)
+
+(* Daily bars for a never-delisted symbol so [today_bars] stays non-empty
+   on the days AAPL has gone stale — the simulator force-exit (like the
+   detector) only runs on bar-bearing days. *)
+let keep_prices =
+  List.init 10 ~f:(fun i ->
+      let date = Date.add_days (date_of_string "2024-01-02") i in
+      make_daily_price ~date ~open_price:50.0 ~high:51.0 ~low:49.0 ~close:50.0
+        ~volume:500000)
+
+let stale_exit_deps data_dir ~stale_exit_after_days =
+  create_deps ~symbols:[ "AAPL"; "KEEP" ] ~data_dir
+    ~strategy:(module Noop_strategy)
+    ~commission:sample_config.commission
+    ~stale_hold_policy:
+      {
+        Trading_simulation.Stale_hold.enabled = true;
+        stale_after_days = 5;
+        stale_exit_after_days;
+      }
+    ()
+
+(* Submit a direct market buy for AAPL so the test pins the force-exit without
+   coupling to a strategy. The buy fills on day 1 at AAPL's open (150.0). *)
+let _submit_market_buy deps ~symbol ~quantity =
+  let order_params =
+    Trading_orders.Create_order.
+      {
+        symbol;
+        side = Trading_base.Types.Buy;
+        quantity;
+        order_type = Trading_base.Types.Market;
+        time_in_force = Trading_orders.Types.GTC;
+      }
+  in
+  let order =
+    match Trading_orders.Create_order.create_order order_params with
+    | Ok o -> o
+    | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+  in
+  Trading_orders.Manager.submit_orders deps.order_manager [ order ] |> ignore
+
+(* AAPL has bars Jan 2 + Jan 3 only; KEEP trades every day. A market buy fills
+   10 AAPL on day 1. With [stale_exit_after_days = Some n], the simulator must
+   force-sell the 10 AAPL shares at the Jan-3 close (157.0) on the first
+   bar-bearing day whose gap from Jan 3 reaches n, then stay flat. *)
+let _run_stale_exit ~name ~stale_exit_after_days ~f =
+  let prices_through_jan_3 = List.take sample_aapl_prices 2 in
+  with_test_data
+    ("simulator_stale_exit_" ^ name)
+    [ ("AAPL", prices_through_jan_3); ("KEEP", keep_prices) ]
+    ~f:(fun data_dir ->
+      let deps = stale_exit_deps data_dir ~stale_exit_after_days in
+      _submit_market_buy deps ~symbol:"AAPL" ~quantity:10.0;
+      let config =
+        { sample_config with end_date = date_of_string "2024-01-09" }
+      in
+      let sim = Test_helpers.create_exn ~config ~deps in
+      match run sim with
+      | Error err -> failwith ("Run failed: " ^ Status.show err)
+      | Ok result -> f result)
+
+let _aapl_trades result =
+  List.concat_map result.steps ~f:(fun step -> step.trades)
+  |> List.filter ~f:(fun (t : Trading_base.Types.trade) ->
+      String.equal t.symbol "AAPL")
+
+let test_stale_exit_disabled_keeps_position_open _ =
+  (* [stale_exit_after_days = None]: only the entry buy trades; AAPL stays
+     held at its last close (the pre-#1484 behaviour). *)
+  _run_stale_exit ~name:"disabled" ~stale_exit_after_days:None ~f:(fun result ->
+      let aapl_trades = _aapl_trades result in
+      assert_that aapl_trades
+        (elements_are
+           [
+             all_of
+               [
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.side)
+                   (equal_to (Trading_base.Types.Buy : Trading_base.Types.side));
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.quantity)
+                   (float_equal 10.0);
+               ];
+           ]);
+      assert_that
+        (Trading_portfolio.Calculations.position_quantity
+           (List.find_exn result.final_portfolio.positions ~f:(fun p ->
+                String.equal p.symbol "AAPL")))
+        (float_equal 10.0))
+
+let test_stale_exit_realizes_sell_at_last_close _ =
+  (* [stale_exit_after_days = Some 2]: AAPL is force-sold at the Jan-3 close
+     (157.0) once its gap reaches 2 days. Exactly one entry Buy + one
+     force-exit Sell; the position is flat at end of run. *)
+  _run_stale_exit ~name:"realizes" ~stale_exit_after_days:(Some 2)
+    ~f:(fun result ->
+      let aapl_trades = _aapl_trades result in
+      assert_that aapl_trades
+        (elements_are
+           [
+             all_of
+               [
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.side)
+                   (equal_to (Trading_base.Types.Buy : Trading_base.Types.side));
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.quantity)
+                   (float_equal 10.0);
+               ];
+             all_of
+               [
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.side)
+                   (equal_to
+                      (Trading_base.Types.Sell : Trading_base.Types.side));
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.quantity)
+                   (float_equal 10.0);
+                 field
+                   (fun (t : Trading_base.Types.trade) -> t.price)
+                   (float_equal 157.0);
+               ];
+           ]);
+      (* AAPL no longer held after the force-exit. *)
+      assert_that
+        (List.find result.final_portfolio.positions ~f:(fun p ->
+             String.equal p.symbol "AAPL"))
+        is_none)
+
+let test_stale_exit_frees_cash_with_realized_pnl _ =
+  (* The realized force-exit proceeds (10 * 157.0 = 1570, minus commission)
+     return to cash. Entry filled 10 AAPL at the Jan-2 open (150.0). Net AAPL
+     P&L = (157.0 - 150.0) * 10 = +70, less two commissions. The KEEP symbol
+     is never bought, so final cash isolates the AAPL round-trip. *)
+  _run_stale_exit ~name:"frees-cash" ~stale_exit_after_days:(Some 2)
+    ~f:(fun result ->
+      let entry_cost = 10.0 *. 150.0 in
+      let exit_proceeds = 10.0 *. 157.0 in
+      let entry_commission = Float.max (0.01 *. 10.0) 1.0 in
+      let exit_commission = Float.max (0.01 *. 10.0) 1.0 in
+      let expected_cash =
+        10000.0 -. entry_cost -. entry_commission +. exit_proceeds
+        -. exit_commission
+      in
+      assert_that result.final_portfolio.current_cash
+        (float_equal ~epsilon:1e-6 expected_cash))
+
 (* ==================== Win #4 — per-fold universe pruning =============== *)
 
 (** Pure-function pin for the simulator's Win #4 active-through filter.
@@ -964,6 +1113,12 @@ let suite =
          "forward-fill: held symbol with no bar today values at last-known \
           close (PR #916 CP4)"
          >:: test_forward_fill_uses_last_known_close_when_held_symbol_has_no_bar;
+         "stale-exit (#1484): None keeps position open"
+         >:: test_stale_exit_disabled_keeps_position_open;
+         "stale-exit (#1484): Some n realizes sell at last close"
+         >:: test_stale_exit_realizes_sell_at_last_close;
+         "stale-exit (#1484): frees cash with realized PnL"
+         >:: test_stale_exit_frees_cash_with_realized_pnl;
          "step executes market order" >:: test_step_executes_market_order;
          "limit order executes on later day"
          >:: test_limit_order_executes_on_later_day;

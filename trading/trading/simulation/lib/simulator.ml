@@ -362,9 +362,11 @@ let _apply_trades_best_effort ?on_trade_fill portfolio trades =
   in
   (portfolio, List.rev accepted_rev, List.rev rejected_rev)
 
-(** Apply split detection, update market state, and record stale-held positions.
-    Returns the post-split portfolio, positions, today's bars, and the split
-    events (needed for [step_result.splits_applied]). *)
+(** Apply split detection, update market state, record stale-held positions, and
+    (when configured, default-off) force-exit stale/delisted positions at their
+    last close. Returns the post-split / post-force-exit portfolio, positions,
+    today's bars, split events, and the realised force-exit trades (merged into
+    the step's [trades] by the caller; see {!Stale_exit_runner}). *)
 let _prepare_market_state t =
   let split_events =
     Split_handler.detect_for_held_positions ~adapter:t.deps.market_data_adapter
@@ -373,18 +375,19 @@ let _prepare_market_state t =
   let portfolio = Split_handler.apply_events t.portfolio split_events in
   let positions = Split_handler.apply_to_positions t.positions split_events in
   let today_bars = _get_today_bars t in
-  (* Record stale-held positions (symbols without bars for K+ days) into
-     the per-run log. Detector only — no force-close; see [Stale_hold].
-     Runs only on bar-bearing days so weekend/holiday gaps don't trigger
-     false-positives every Saturday. *)
   if not (List.is_empty today_bars) then
     List.iter
       (Stale_hold.detect_stale ~adapter:t.deps.market_data_adapter
          ~date:t.current_date ~portfolio ~today_bars
          ~config:t.deps.stale_hold_policy)
       ~f:(Stale_hold.Log.record t.deps.stale_hold_log);
+  let portfolio, positions, stale_exit_trades =
+    Stale_exit_runner.tick ~adapter:t.deps.market_data_adapter
+      ~config:t.deps.stale_hold_policy ~commission:t.config.commission
+      ~date:t.current_date ~today_bars ~portfolio ~positions
+  in
   Trading_engine.Engine.update_market t.deps.engine today_bars;
-  (portfolio, positions, today_bars, split_events)
+  (portfolio, positions, today_bars, split_events, stale_exit_trades)
 
 (** Build the per-step [step_result]. Projection to the skinny
     [Portfolio_summary] mirrors Fix B from
@@ -433,11 +436,14 @@ let _process_fills_and_cancels t ~portfolio ~positions =
 (** Process one day: execute pending orders, call strategy, generate new orders,
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
-let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
+let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
+    ~stale_exit_trades =
   let open Result.Let_syntax in
-  let%bind portfolio, positions, trades =
+  let%bind portfolio, positions, fill_trades =
     _process_fills_and_cancels t ~portfolio ~positions
   in
+  (* Surface the already-realised stale force-exits in this step's trades. *)
+  let trades = stale_exit_trades @ fill_trades in
   let%bind strategy_transitions =
     _call_strategy { t with portfolio; positions }
   in
@@ -474,10 +480,11 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events =
 let step t =
   if _is_complete t then Ok (Completed (_build_run_result t))
   else
-    let portfolio, positions, today_bars, split_events =
+    let portfolio, positions, today_bars, split_events, stale_exit_trades =
       _prepare_market_state t
     in
     _process_step_day t ~portfolio ~positions ~today_bars ~split_events
+      ~stale_exit_trades
 
 let get_config t = t.config
 
