@@ -16,8 +16,16 @@
     {v
       walk_forward_runner.exe --spec <spec.sexp> --out-dir <dir>
                               [--fixtures-root <path>]
-                              [--parallel N]    (default 1, max 16)
+                              [--parallel N]          (default 1, max 16)
+                              [--snapshot-dir <path>] (default: CSV bars)
     v}
+
+    [--snapshot-dir], when given, points every fold's backtest at a pre-built
+    snapshot warehouse (via {!Scenario_lib.Bar_source_resolver}) instead of the
+    default CSV bar store. This is what makes broad-universe (N >= 1000) WF-CV
+    tractable: CSV mode is superlinear and OOMs at N >= 1000, whereas snapshot
+    mode reads streamed bars at bounded RSS. With the flag omitted, behaviour is
+    byte-identical to the pre-snapshot CSV path.
 
     This binary is the integration seam for Phase 3: the Bayesian optimizer
     consumes the same harness with variant-overrides chosen by the BO loop
@@ -28,6 +36,7 @@
 open Core
 module Scenario = Scenario_lib.Scenario
 module Fixtures_root = Scenario_lib.Fixtures_root
+module Bar_source_resolver = Scenario_lib.Bar_source_resolver
 module WS = Walk_forward.Window_spec
 module Report = Walk_forward.Walk_forward_report
 module Spec = Walk_forward.Spec
@@ -44,11 +53,12 @@ type cli_args = {
   out_dir : string;
   fixtures_root : string option;
   parallel : int;
+  snapshot_dir : string option;
 }
 
 let _usage_msg =
   "Usage: walk_forward_runner.exe --spec <spec.sexp> --out-dir <dir> \
-   [--fixtures-root <path>] [--parallel N]"
+   [--fixtures-root <path>] [--parallel N] [--snapshot-dir <path>]"
 
 (** Parse and validate the [--parallel N] flag at CLI time. Out-of-range values
     would otherwise surface from inside [Fork_pool.run_parallel] as an
@@ -70,7 +80,7 @@ let _parse_parallel raw =
   n
 
 let _parse_args argv =
-  let rec loop spec out fixtures parallel = function
+  let rec loop spec out fixtures parallel snapshot = function
     | [] -> (
         match (spec, out) with
         | Some s, Some o ->
@@ -79,15 +89,20 @@ let _parse_args argv =
               out_dir = o;
               fixtures_root = fixtures;
               parallel = Option.value parallel ~default:_default_parallel;
+              snapshot_dir = snapshot;
             }
         | _ ->
             eprintf "%s\n" _usage_msg;
             Stdlib.exit 1)
-    | "--spec" :: p :: rest -> loop (Some p) out fixtures parallel rest
-    | "--out-dir" :: p :: rest -> loop spec (Some p) fixtures parallel rest
-    | "--fixtures-root" :: p :: rest -> loop spec out (Some p) parallel rest
+    | "--spec" :: p :: rest -> loop (Some p) out fixtures parallel snapshot rest
+    | "--out-dir" :: p :: rest ->
+        loop spec (Some p) fixtures parallel snapshot rest
+    | "--fixtures-root" :: p :: rest ->
+        loop spec out (Some p) parallel snapshot rest
     | "--parallel" :: n :: rest ->
-        loop spec out fixtures (Some (_parse_parallel n)) rest
+        loop spec out fixtures (Some (_parse_parallel n)) snapshot rest
+    | "--snapshot-dir" :: p :: rest ->
+        loop spec out fixtures parallel (Some p) rest
     | ("--help" | "-h") :: _ ->
         printf "%s\n" _usage_msg;
         Stdlib.exit 0
@@ -95,7 +110,7 @@ let _parse_args argv =
         eprintf "Error: unknown argument %S\n%s\n" unknown _usage_msg;
         Stdlib.exit 1
   in
-  loop None None None None argv
+  loop None None None None None argv
 
 (* -------------- output writers -------------- *)
 
@@ -140,16 +155,19 @@ let _main () =
     Fixtures_root.resolve ?fixtures_root:args.fixtures_root ()
   in
   let base = Scenario.load spec.base_scenario in
+  let bar_data_source = Bar_source_resolver.resolve args.snapshot_dir in
   eprintf
-    "[walk_forward] spec=%s base=%s baseline=%s variants=%d folds=%d parallel=%d\n\
+    "[walk_forward] spec=%s base=%s baseline=%s variants=%d folds=%d \
+     parallel=%d bars=%s\n\
      %!"
     args.spec_path spec.base_scenario spec.baseline_label
     (List.length spec.variants)
     (List.length (WS.generate spec.window_spec))
-    args.parallel;
+    args.parallel
+    (match args.snapshot_dir with Some d -> "snapshot:" ^ d | None -> "csv");
   let result =
     Executor.execute_spec ~base ~spec ~fixtures_root ~progress:_stderr_progress
-      ~parallel:args.parallel ()
+      ~parallel:args.parallel ?bar_data_source ()
   in
   _write_fold_actuals ~out_dir:args.out_dir result.fold_actuals;
   _write_report ~out_dir:args.out_dir ~spec result.fold_actuals;

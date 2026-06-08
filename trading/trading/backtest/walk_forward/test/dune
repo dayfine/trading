@@ -5,6 +5,7 @@
   test_walk_forward_runner
   test_walk_forward_report
   test_walk_forward_executor_parallel
+  test_walk_forward_snapshot_parity
   test_spec
   test_variant_matrix
   test_variant_ranking
@@ -12,12 +13,18 @@
  (libraries
   ounit2
   core
+  core_unix
+  core_unix.filename_unix
   matchers
   backtest
   backtest_cost_model
   fork_pool
   scenario_lib
-  walk_forward)
+  walk_forward
+  weinstein.snapshot_pipeline
+  trading.data_panel.snapshot
+  types
+  status)
  (preprocess
   (pps ppx_sexp_conv))
  (deps
