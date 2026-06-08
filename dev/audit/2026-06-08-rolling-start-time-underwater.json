@@ -1,0 +1,17 @@
+{
+  "date": "2026-06-08",
+  "feature": "rolling-start-time-underwater",
+  "branch": "feat/rolling-start-time-underwater",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "1 intra-run rework iteration (orchestrator-authored mechanical nesting-linter fix on time_underwater_pct + _variance; commit a4241829). qc-structural re-APPROVED q=5 at rework tip a4241829 (review 4446374862); qc-behavioral APPROVED q=5 at 34cd3d43 (review 4446350614) covers a4241829 (byte-identical .mli+tests, bit-identical behaviour). worst-vol-decile prototype deferred (regime-tag infra). harness_gap: nesting linter is a devtools/checks runtest target not run by targeted dir-scoped runtest — both QC and the orchestrator deterministic gate initially missed it; CI caught it."
+}
